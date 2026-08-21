@@ -1,9 +1,19 @@
-export const PROOF_SYSTEM_ID_GROTH16_BN254_V1 = 1;
 export const PROOF_ENCODING_ID_ABI_GROTH16_ABC = 1;
-export const DEFAULT_PROOF_SYSTEM_ID = PROOF_SYSTEM_ID_GROTH16_BN254_V1;
 export const DEFAULT_PROOF_ENCODING_ID = PROOF_ENCODING_ID_ABI_GROTH16_ABC;
 
+const UINT8_MAX = (1n << 8n) - 1n;
+const UINT32_MAX = (1n << 32n) - 1n;
 const UINT256_MAX = (1n << 256n) - 1n;
+
+function normalizeBoundedId(value, { label, maximum, allowZero = false }) {
+  const normalized = BigInt(value);
+  if (normalized < (allowZero ? 0n : 1n) || normalized > maximum) {
+    throw new Error(
+      `${label} must be ${allowZero ? "a" : "a nonzero"} integer no greater than ${maximum}`,
+    );
+  }
+  return Number(normalized);
+}
 
 function encodeUint256Word(value) {
   const normalized = BigInt(value);
@@ -22,8 +32,7 @@ function hasAtLeastTwoCoordinates(value) {
 }
 
 // Snarkjs emits BN254 G2 coordinates as [x0, x1] / [y0, y1], but Solidity
-// Groth16 verifier templates consume them swapped. a / c have no inner
-// ambiguity. This is the single implementation site for the swap.
+// Groth16 verifier templates consume them swapped. a / c have no inner ambiguity.
 export function normalizeGroth16Proof(proof) {
   if (
     !proof ||
@@ -56,7 +65,6 @@ export function encodeGroth16AbcProofData(abcProof) {
   ) {
     throw new Error("Groth16 proof must contain a/b/c components");
   }
-  // These fixed-size arrays are eight consecutive uint256 ABI words.
   const words = [
     abcProof.a[0],
     abcProof.a[1],
@@ -76,10 +84,19 @@ export function packGroth16ProofEnvelope(proof, opts = {}) {
   if (!hasSnarkjs && !hasAbc) {
     throw new Error("packGroth16ProofEnvelope: proof must contain pi_a/pi_b/pi_c or a/b/c");
   }
+  if (opts.circuitId === undefined || opts.circuitId === null) {
+    throw new Error("packGroth16ProofEnvelope: circuitId is required");
+  }
   const abcProof = hasSnarkjs ? normalizeGroth16Proof(proof) : proof;
   return {
-    proofSystemId: opts.proofSystemId ?? DEFAULT_PROOF_SYSTEM_ID,
-    proofEncodingId: opts.proofEncodingId ?? DEFAULT_PROOF_ENCODING_ID,
+    circuitId: normalizeBoundedId(opts.circuitId, {
+      label: "circuitId",
+      maximum: UINT32_MAX,
+    }),
+    proofEncodingId: normalizeBoundedId(opts.proofEncodingId ?? DEFAULT_PROOF_ENCODING_ID, {
+      label: "proofEncodingId",
+      maximum: UINT8_MAX,
+    }),
     proofData: encodeGroth16AbcProofData(abcProof),
   };
 }

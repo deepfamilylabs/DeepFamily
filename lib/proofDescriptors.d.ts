@@ -10,7 +10,7 @@ export type ProofDescriptor = ProofDefinition & {
   };
 };
 
-export const PERSON_COMMITMENT_PROOF_DESCRIPTOR: ProofDescriptor;
+export const PERSON_RELATION_PROOF_DESCRIPTOR: ProofDescriptor;
 export const DISCLOSURE_BINDING_PROOF_DESCRIPTOR: ProofDescriptor;
 export const PROOF_DESCRIPTORS: Readonly<Record<string, ProofDescriptor>>;
 export const PROOF_DESCRIPTORS_BY_PURPOSE: Readonly<Record<string, ProofDescriptor>>;

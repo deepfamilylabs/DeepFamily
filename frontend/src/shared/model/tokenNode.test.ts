@@ -13,7 +13,11 @@ describe("tokenNode", () => {
       versionIndex: 2,
       version: {
         fatherHash: "0xfather",
-        metadataCID: "cid",
+      },
+      metadata: {
+        pointer: "0x00000000000000000000000000000000000000aa",
+        payloadHash: "0xpayload",
+        payloadLength: 128,
       },
       core: {
         fullName: "Alice",

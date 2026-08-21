@@ -1,132 +1,71 @@
 /**
- * Test helpers for ZK flow using stub verifiers.
- * All tests use stub verifiers (always return true) to test contract logic
- * without requiring real ZK proof generation.
+ * Contract-test helpers for the v1 proof and encrypted-metadata ABI.
+ *
+ * These helpers intentionally use always-true verifier stubs. They exercise the
+ * contract's routing and business bindings without generating Groth16 proofs.
  */
-import { AbiCoder } from "ethers";
+import { AbiCoder, ethers as ethersLib } from "ethers";
 import { poseidon4 } from "poseidon-lite";
-import personCommitmentProof from "../../lib/personCommitmentProof.js";
-import disclosureBindingProof from "../../lib/disclosureBindingProof.js";
+import { buildDisclosureBindingInput } from "../../lib/disclosureBindingProof.js";
+import {
+  buildPersonRelationInput,
+  canonicalizeFullName,
+  computeAtomicSuiteCommitment,
+} from "../../lib/personCommitmentProof.js";
 
-const { buildPersonCommitmentInput } = personCommitmentProof;
-const { buildDisclosureBindingInput } = disclosureBindingProof;
+export const PROOF_PURPOSE_PERSON_RELATION = 0;
+export const PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
+export const STUB_CIRCUIT_ID = 0x7fff0001;
+export const STUB_PROOF_ENCODING_ID = 1;
 
-const PROOF_PURPOSE_PERSON_COMMITMENT = 0;
-const PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
-const STUB_PROOF_SYSTEM_ID = 1;
-const STUB_PROOF_ENCODING_ID = 1;
+// Transitional alias for tests that only use the ordinal, not the old ABI name.
+export const PROOF_PURPOSE_PERSON_COMMITMENT = PROOF_PURPOSE_PERSON_RELATION;
 
 const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const DOMAIN_NAME_SECRET = 1001n;
+const DOMAIN_IDENTITY = 1002n;
+const DOMAIN_DISCLOSURE = 1003n;
 
-function canonicalizeFullName(fullName) {
-  if (fullName === undefined || fullName === null) return "";
-  const value = String(fullName);
-  const normalized = typeof value.normalize === "function" ? value.normalize("NFKC") : value;
-  return normalized.replace(/\s+/gu, " ").trim();
+function resolveIdentitySuiteId(source = {}, fallback = 1) {
+  return BigInt(
+    source.selfSuiteId ??
+      source.identitySuiteId ??
+      // Retain the first legacy positional option as a convenience while tests
+      // migrate to the atomic identitySuiteId vocabulary.
+      source.schemaVersion ??
+      fallback,
+  );
 }
 
-export function computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId) {
-  return poseidon4([1000n, BigInt(schemaVersion), BigInt(cryptoSuiteVersion), BigInt(hashAlgoId)]);
+function defaultContentDigest(ethers, tag = "v1") {
+  return ethers.keccak256(ethers.toUtf8Bytes(`DeepFamily:test-version-content:${String(tag)}`));
+}
+
+function withContentDigest(ethers, opts = {}) {
+  if (opts.contentDigest !== undefined) {
+    return { contentDigest: opts.contentDigest };
+  }
+  if (opts.contentDigestLo !== undefined || opts.contentDigestHi !== undefined) {
+    if (opts.contentDigestLo === undefined || opts.contentDigestHi === undefined) {
+      throw new Error("contentDigestLo and contentDigestHi must be provided together");
+    }
+    return {
+      contentDigestLo: opts.contentDigestLo,
+      contentDigestHi: opts.contentDigestHi,
+    };
+  }
+  return { contentDigest: defaultContentDigest(ethers, opts.tag) };
+}
+
+export function computeSuiteCommitment(identitySuiteId = 1) {
+  return computeAtomicSuiteCommitment(BigInt(identitySuiteId));
 }
 
 export function computeNameField(ethers, fullName) {
   const canonicalFullName = canonicalizeFullName(fullName);
   const domainBytes = ethers.toUtf8Bytes("deepfamily:name-prehash:v2");
   const nameBytes = ethers.toUtf8Bytes(canonicalFullName);
-  const namePrehash = ethers.keccak256(ethers.concat([domainBytes, nameBytes]));
-  return BigInt(namePrehash) % SNARK_FIELD;
-}
-
-export function computeDisclosureBinding(
-  ethers,
-  fullName,
-  basicInfo,
-  schemaVersion,
-  cryptoSuiteVersion,
-  hashAlgoId,
-) {
-  const nameField = computeNameField(ethers, fullName);
-  const packedBirthGenderField = packBirthGenderField(basicInfo);
-  const suite = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
-  return poseidon4([1003n, nameField, packedBirthGenderField, suite]);
-}
-
-export function makeTestPerson(fullName, overrides = {}) {
-  return {
-    fullName,
-    derivedSecretField: 0n,
-    isBirthBC: false,
-    birthYear: 1999,
-    birthMonth: 0,
-    birthDay: 0,
-    gender: 1,
-    ...overrides,
-  };
-}
-
-export function computeProfileIdentityCommitment(ethers, person, opts = {}) {
-  const schemaVersion = opts.schemaVersion ?? person.schemaVersion ?? 1;
-  const cryptoSuiteVersion = opts.cryptoSuiteVersion ?? person.cryptoSuiteVersion ?? 1;
-  const hashAlgoId = opts.hashAlgoId ?? person.hashAlgoId ?? 1;
-  return computeIdentityCommitment(
-    ethers,
-    person.fullName,
-    person,
-    schemaVersion,
-    cryptoSuiteVersion,
-    hashAlgoId,
-    person.derivedSecretField ?? 0n,
-  );
-}
-
-export function buildPersonCommitmentCircuitInput(
-  person,
-  father,
-  mother,
-  submitterAddress,
-  opts = {},
-) {
-  return buildPersonCommitmentInput(person, father, mother, submitterAddress, opts);
-}
-
-export function computeNameSecretCommitment(
-  ethers,
-  fullName,
-  derivedSecretField,
-  schemaVersion,
-  cryptoSuiteVersion,
-  hashAlgoId,
-) {
-  const nameField = computeNameField(ethers, fullName);
-  const suite = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
-  return poseidon4([1001n, nameField, BigInt(derivedSecretField), suite]);
-}
-
-export function computeIdentityCommitment(
-  ethers,
-  fullName,
-  basicInfo,
-  schemaVersion,
-  cryptoSuiteVersion,
-  hashAlgoId,
-  derivedSecretField = 0n,
-) {
-  const packedBirthGenderField = packBirthGenderField(basicInfo);
-  const suite = computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
-  const nameSecretCommitment = computeNameSecretCommitment(
-    ethers,
-    fullName,
-    derivedSecretField,
-    schemaVersion,
-    cryptoSuiteVersion,
-    hashAlgoId,
-  );
-  return poseidon4([1002n, nameSecretCommitment, packedBirthGenderField, suite]);
-}
-
-export function computePersonHash(ethers, identityCommitment) {
-  const hex = ethers.zeroPadValue(ethers.toBeHex(identityCommitment), 32);
-  return ethers.keccak256(ethers.solidityPacked(["bytes32"], [hex]));
+  return BigInt(ethers.keccak256(ethers.concat([domainBytes, nameBytes]))) % SNARK_FIELD;
 }
 
 export function packBirthGenderField({
@@ -145,87 +84,232 @@ export function packBirthGenderField({
   );
 }
 
+export function computeNameSecretCommitment(
+  ethers,
+  fullName,
+  derivedSecretField,
+  identitySuiteId = 1,
+) {
+  return poseidon4([
+    DOMAIN_NAME_SECRET,
+    computeNameField(ethers, fullName),
+    BigInt(derivedSecretField),
+    computeSuiteCommitment(identitySuiteId),
+  ]);
+}
+
+export function computeIdentityCommitment(
+  ethers,
+  fullName,
+  basicInfo,
+  identitySuiteId = 1,
+  _legacyCryptoSuiteVersion,
+  _legacyHashAlgoId,
+  derivedSecretField = 0n,
+) {
+  const suiteCommitment = computeSuiteCommitment(identitySuiteId);
+  const nameSecretCommitment = computeNameSecretCommitment(
+    ethers,
+    fullName,
+    derivedSecretField,
+    identitySuiteId,
+  );
+  return poseidon4([
+    DOMAIN_IDENTITY,
+    nameSecretCommitment,
+    packBirthGenderField(basicInfo),
+    suiteCommitment,
+  ]);
+}
+
+export function computeDisclosureBinding(ethers, fullName, basicInfo, identitySuiteId = 1) {
+  return poseidon4([
+    DOMAIN_DISCLOSURE,
+    computeNameField(ethers, fullName),
+    packBirthGenderField(basicInfo),
+    computeSuiteCommitment(identitySuiteId),
+  ]);
+}
+
+export function makeTestPerson(fullName, overrides = {}) {
+  return {
+    fullName,
+    derivedSecretField: 0n,
+    isBirthBC: false,
+    birthYear: 1999,
+    birthMonth: 0,
+    birthDay: 0,
+    gender: 1,
+    ...overrides,
+  };
+}
+
+export function computeProfileIdentityCommitment(ethers, person, opts = {}) {
+  const identitySuiteId = resolveIdentitySuiteId(opts, resolveIdentitySuiteId(person));
+  return computeIdentityCommitment(
+    ethers,
+    person.fullName,
+    person,
+    identitySuiteId,
+    undefined,
+    undefined,
+    person.derivedSecretField ?? 0n,
+  );
+}
+
+export function computePersonHash(ethers, identityCommitment) {
+  return ethers.keccak256(ethers.zeroPadValue(ethers.toBeHex(identityCommitment), 32));
+}
+
+export function buildPersonCommitmentCircuitInput(
+  person,
+  father,
+  mother,
+  submitterAddress,
+  opts = {},
+) {
+  const ethers = opts.ethers ?? ethersLib;
+  const selfSuiteId = resolveIdentitySuiteId(opts, resolveIdentitySuiteId(person));
+  const fatherSuiteId = father
+    ? resolveIdentitySuiteId({ selfSuiteId: opts.fatherSuiteId }, resolveIdentitySuiteId(father))
+    : 0n;
+  const motherSuiteId = mother
+    ? resolveIdentitySuiteId({ selfSuiteId: opts.motherSuiteId }, resolveIdentitySuiteId(mother))
+    : 0n;
+
+  return buildPersonRelationInput(person, father, mother, submitterAddress, {
+    selfSuiteId,
+    fatherSuiteId,
+    motherSuiteId,
+    ...withContentDigest(ethers, opts),
+  });
+}
+
+export function makeMetadataEnvelope(ethers, identitySuiteId = 1, opts = {}) {
+  const suiteId = BigInt(identitySuiteId);
+  if (suiteId < 0n || suiteId > 0xffffffffn) {
+    throw new Error("identitySuiteId must fit uint32");
+  }
+
+  const bytes = new Uint8Array(opts.length ?? 20);
+  if (bytes.length < 20) throw new Error("test metadata envelope must be at least 20 bytes");
+  bytes.set([0x44, 0x46, 0x4d, 0x31, Number(opts.formatVersion ?? 1)], 0);
+  new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).setUint32(
+    16,
+    Number(suiteId),
+    false,
+  );
+
+  if (opts.tag !== undefined) {
+    const marker = ethers.getBytes(defaultContentDigest(ethers, opts.tag));
+    bytes.set(marker.slice(0, Math.min(11, bytes.length - 5)), 5);
+  }
+  return ethers.hexlify(bytes);
+}
+
 export async function setupStubVerifiers(ethers, deepFamily) {
-  const personStubFactory = await ethers.getContractFactory(
+  const relationRoute = await deepFamily.verifierRegistry(
+    PROOF_PURPOSE_PERSON_RELATION,
+    STUB_CIRCUIT_ID,
+  );
+  const disclosureRoute = await deepFamily.verifierRegistry(
+    PROOF_PURPOSE_DISCLOSURE_BINDING,
+    STUB_CIRCUIT_ID,
+  );
+  if (relationRoute !== ethers.ZeroAddress || disclosureRoute !== ethers.ZeroAddress) {
+    if (relationRoute === ethers.ZeroAddress || disclosureRoute === ethers.ZeroAddress) {
+      throw new Error("Stub verifier routes are only partially configured");
+    }
+    return {
+      adapter: await ethers.getContractAt("Groth16VerifierAdapter", relationRoute),
+      personVerifier: null,
+      disclosureVerifier: null,
+    };
+  }
+
+  const PersonVerifier = await ethers.getContractFactory(
     "contracts/test/StubPersonCommitmentVerifier.sol:StubPersonCommitmentVerifier",
   );
-  const personVerifier = await personStubFactory.deploy(true);
+  const personVerifier = await PersonVerifier.deploy(true);
   await personVerifier.waitForDeployment();
 
-  const nameStubFactory = await ethers.getContractFactory(
+  const DisclosureVerifier = await ethers.getContractFactory(
     "contracts/test/StubDisclosureBindingVerifier.sol:StubDisclosureBindingVerifier",
   );
-  const nameVerifier = await nameStubFactory.deploy(true);
-  await nameVerifier.waitForDeployment();
+  const disclosureVerifier = await DisclosureVerifier.deploy(true);
+  await disclosureVerifier.waitForDeployment();
 
-  const adapterFactory = await ethers.getContractFactory("Groth16VerifierAdapter");
-  const adapter = await adapterFactory.deploy(
+  const Adapter = await ethers.getContractFactory("Groth16VerifierAdapter");
+  const adapter = await Adapter.deploy(
     await personVerifier.getAddress(),
-    await nameVerifier.getAddress(),
+    await disclosureVerifier.getAddress(),
   );
   await adapter.waitForDeployment();
   const adapterAddress = await adapter.getAddress();
 
-  await deepFamily.setVerifier(
-    STUB_PROOF_SYSTEM_ID,
-    PROOF_PURPOSE_PERSON_COMMITMENT,
-    adapterAddress,
-  );
-  await deepFamily.setVerifier(
-    STUB_PROOF_SYSTEM_ID,
-    PROOF_PURPOSE_DISCLOSURE_BINDING,
-    adapterAddress,
-  );
+  await (
+    await deepFamily.setCircuitVerifier(
+      PROOF_PURPOSE_PERSON_RELATION,
+      STUB_CIRCUIT_ID,
+      adapterAddress,
+    )
+  ).wait();
+  await (
+    await deepFamily.setCircuitVerifier(
+      PROOF_PURPOSE_DISCLOSURE_BINDING,
+      STUB_CIRCUIT_ID,
+      adapterAddress,
+    )
+  ).wait();
 
-  return { personVerifier, nameVerifier, adapter };
+  return { personVerifier, disclosureVerifier, adapter };
 }
 
-export function makeStubProof() {
-  const proofData = AbiCoder.defaultAbiCoder().encode(
-    ["uint256[2]", "uint256[2][2]", "uint256[2]"],
-    [
-      [0, 0],
+export function makeStubProof(overrides = {}) {
+  const normalizedOverrides = typeof overrides === "number" ? { circuitId: overrides } : overrides;
+  return {
+    circuitId: STUB_CIRCUIT_ID,
+    proofEncodingId: STUB_PROOF_ENCODING_ID,
+    proofData: AbiCoder.defaultAbiCoder().encode(
+      ["uint256[2]", "uint256[2][2]", "uint256[2]"],
       [
         [0, 0],
+        [
+          [0, 0],
+          [0, 0],
+        ],
         [0, 0],
       ],
-      [0, 0],
-    ],
-  );
-  return {
-    proofSystemId: STUB_PROOF_SYSTEM_ID,
-    proofEncodingId: STUB_PROOF_ENCODING_ID,
-    proofData,
+    ),
+    ...normalizedOverrides,
   };
 }
 
 export function makeAddPersonPublicSignals(identityCommitment, submitterAddress, opts = {}) {
-  const {
-    fatherIdentityCommitment = 0n,
-    motherIdentityCommitment = 0n,
-    schemaVersion = 1,
-    cryptoSuiteVersion = 1,
-    hashAlgoId = 1,
-  } = opts;
+  const identitySuiteId = resolveIdentitySuiteId(opts);
+  const defaultVersionCommitment =
+    BigInt(
+      ethersLib.keccak256(
+        ethersLib.solidityPacked(
+          ["uint256", "string"],
+          [BigInt(identityCommitment), String(opts.tag ?? "v1")],
+        ),
+      ),
+    ) % SNARK_FIELD;
   return {
     identityCommitment: BigInt(identityCommitment),
-    fatherIdentityCommitment: BigInt(fatherIdentityCommitment),
-    motherIdentityCommitment: BigInt(motherIdentityCommitment),
-    submitter: BigInt(submitterAddress),
-    schemaVersion,
-    cryptoSuiteVersion,
-    hashAlgoId,
+    fatherIdentityCommitment: BigInt(opts.fatherIdentityCommitment ?? 0n),
+    motherIdentityCommitment: BigInt(opts.motherIdentityCommitment ?? 0n),
+    submitterAndSelfSuiteId:
+      opts.submitterAndSelfSuiteId ?? BigInt(submitterAddress) | (identitySuiteId << 160n),
+    versionCommitment: BigInt(opts.versionCommitment ?? defaultVersionCommitment),
   };
 }
 
 function resolveTestPerson(opts, prefix = "") {
   const key = prefix ? `${prefix}Person` : "person";
-  if (opts[key] !== undefined) {
-    return opts[key];
-  }
-  if (prefix) {
-    return null;
-  }
+  if (opts[key] !== undefined) return opts[key];
+  if (prefix) return null;
   return makeTestPerson(opts.fullName ?? "Test Person", {
     derivedSecretField: opts.derivedSecretField ?? 0n,
     isBirthBC: opts.isBirthBC ?? false,
@@ -233,90 +317,80 @@ function resolveTestPerson(opts, prefix = "") {
     birthMonth: opts.birthMonth ?? 0,
     birthDay: opts.birthDay ?? 0,
     gender: opts.gender ?? 1,
-    schemaVersion: opts.schemaVersion,
-    cryptoSuiteVersion: opts.cryptoSuiteVersion,
-    hashAlgoId: opts.hashAlgoId,
+    identitySuiteId: opts.identitySuiteId ?? opts.selfSuiteId ?? opts.schemaVersion,
   });
 }
 
-/**
- * Add a person using stub verifiers. Returns personHash.
- */
+/** Add one encrypted-metadata person version through the stub relation route. */
 export async function addPerson(ethers, deepFamily, signer, identityCommitment, opts = {}) {
-  const {
-    fatherIdentityCommitment = 0n,
-    motherIdentityCommitment = 0n,
-    fatherVersionIndex = 0,
-    motherVersionIndex = 0,
-    tag = "v1",
-    metadataCID = "ipfs://test",
-    schemaVersion = 1,
-    cryptoSuiteVersion = 1,
-    hashAlgoId = 1,
-  } = opts;
-
-  const signerAddr = await signer.getAddress();
+  const signerAddress = await signer.getAddress();
   const person = resolveTestPerson(opts);
   const fatherPerson = resolveTestPerson(opts, "father");
   const motherPerson = resolveTestPerson(opts, "mother");
-  const circuit = buildPersonCommitmentCircuitInput(
+  const identitySuiteId = resolveIdentitySuiteId(opts, resolveIdentitySuiteId(person));
+  const built = buildPersonCommitmentCircuitInput(
     person,
     fatherPerson,
     motherPerson,
-    signerAddr,
-    { schemaVersion, cryptoSuiteVersion, hashAlgoId },
+    signerAddress,
+    {
+      ...opts,
+      ethers,
+      selfSuiteId: identitySuiteId,
+      tag: opts.tag ?? "v1",
+    },
   );
-  const resolvedIdentityCommitment = circuit.person.identityCommitment;
-  const resolvedFatherIdentityCommitment = circuit.father?.identityCommitment ?? 0n;
-  const resolvedMotherIdentityCommitment = circuit.mother?.identityCommitment ?? 0n;
 
+  const resolvedIdentityCommitment = built.person.identityCommitment;
   if (
     identityCommitment !== undefined &&
     identityCommitment !== null &&
     BigInt(identityCommitment) !== resolvedIdentityCommitment
   ) {
     throw new Error(
-      "addPerson stub helper requires identityCommitment to match the person-commitment circuit input",
-    );
-  }
-  if (BigInt(fatherIdentityCommitment) !== resolvedFatherIdentityCommitment) {
-    throw new Error(
-      "addPerson stub helper requires fatherIdentityCommitment to match the person-commitment circuit input",
-    );
-  }
-  if (BigInt(motherIdentityCommitment) !== resolvedMotherIdentityCommitment) {
-    throw new Error(
-      "addPerson stub helper requires motherIdentityCommitment to match the person-commitment circuit input",
+      "addPerson stub helper requires identityCommitment to match the relation input",
     );
   }
 
-  const proof = makeStubProof();
-  const publicSignals = makeAddPersonPublicSignals(resolvedIdentityCommitment, signerAddr, {
-    fatherIdentityCommitment: resolvedFatherIdentityCommitment,
-    motherIdentityCommitment: resolvedMotherIdentityCommitment,
-    schemaVersion,
-    cryptoSuiteVersion,
-    hashAlgoId,
+  const derivedFatherCommitment = built.father?.identityCommitment ?? 0n;
+  const derivedMotherCommitment = built.mother?.identityCommitment ?? 0n;
+  const fatherIdentityCommitment = BigInt(opts.fatherIdentityCommitment ?? derivedFatherCommitment);
+  const motherIdentityCommitment = BigInt(opts.motherIdentityCommitment ?? derivedMotherCommitment);
+  if (fatherPerson && fatherIdentityCommitment !== derivedFatherCommitment) {
+    throw new Error("fatherIdentityCommitment does not match fatherPerson");
+  }
+  if (motherPerson && motherIdentityCommitment !== derivedMotherCommitment) {
+    throw new Error("motherIdentityCommitment does not match motherPerson");
+  }
+
+  const versionCommitment = BigInt(opts.versionCommitment ?? built.versionCommitment);
+  const publicSignals = makeAddPersonPublicSignals(resolvedIdentityCommitment, signerAddress, {
+    selfSuiteId: identitySuiteId,
+    fatherIdentityCommitment,
+    motherIdentityCommitment,
+    versionCommitment,
   });
+  const metadataEnvelope =
+    opts.metadataEnvelope ??
+    makeMetadataEnvelope(ethers, identitySuiteId, {
+      tag: opts.tag ?? "v1",
+      formatVersion: opts.formatVersion,
+    });
 
   const tx = await deepFamily
     .connect(signer)
     .addPersonVersion(
-      proof,
+      makeStubProof(opts.proofOverrides),
       publicSignals,
-      resolvedFatherIdentityCommitment === 0n ? 0 : fatherVersionIndex,
-      resolvedMotherIdentityCommitment === 0n ? 0 : motherVersionIndex,
-      tag,
-      metadataCID,
+      fatherIdentityCommitment === 0n ? 0 : (opts.fatherVersionIndex ?? 0),
+      motherIdentityCommitment === 0n ? 0 : (opts.motherVersionIndex ?? 0),
+      metadataEnvelope,
     );
   await tx.wait();
-
-  return circuit.person.personHash;
+  return built.person.personHash;
 }
 
-/**
- * Full mint flow using stub verifiers: add person -> endorse -> mint.
- */
+/** Full stubbed mint flow: add encrypted version, endorse, and mint. */
 export async function mintPerson(
   ethers,
   deepFamily,
@@ -326,76 +400,52 @@ export async function mintPerson(
   opts = {},
 ) {
   const canonicalFullName = canonicalizeFullName(fullName);
-  const schemaVersion = opts.schemaVersion ?? 1;
-  const cryptoSuiteVersion = opts.cryptoSuiteVersion ?? 1;
-  const hashAlgoId = opts.hashAlgoId ?? 1;
-  const basicInfo = {
+  const identitySuiteId = resolveIdentitySuiteId(opts);
+  const person = makeTestPerson(canonicalFullName, {
+    derivedSecretField: opts.derivedSecretField ?? 0n,
     isBirthBC: opts.isBirthBC ?? false,
     birthYear: opts.birthYear ?? 1999,
     birthMonth: opts.birthMonth ?? 0,
     birthDay: opts.birthDay ?? 0,
     gender: opts.gender ?? 1,
-  };
-  const signerAddr = await signer.getAddress();
-  const disclosureBindingBuilt = buildDisclosureBindingInput(
-    makeTestPerson(canonicalFullName, {
-      derivedSecretField: opts.derivedSecretField ?? 0n,
-      isBirthBC: basicInfo.isBirthBC,
-      birthYear: basicInfo.birthYear,
-      birthMonth: basicInfo.birthMonth,
-      birthDay: basicInfo.birthDay,
-      gender: basicInfo.gender,
-    }),
-    signerAddr,
-    {
-      schemaVersion,
-      cryptoSuiteVersion,
-      hashAlgoId,
-    },
-  );
-  const circuitInput = disclosureBindingBuilt.input;
-  const consistentIdentityCommitment = disclosureBindingBuilt.person.identityCommitment;
+    identitySuiteId,
+  });
+  const signerAddress = await signer.getAddress();
+  const disclosure = buildDisclosureBindingInput(person, signerAddress, {
+    selfSuiteId: identitySuiteId,
+  });
+  const resolvedIdentityCommitment = disclosure.person.identityCommitment;
   if (
     identityCommitment !== undefined &&
     identityCommitment !== null &&
-    BigInt(identityCommitment) !== consistentIdentityCommitment
+    BigInt(identityCommitment) !== resolvedIdentityCommitment
   ) {
     throw new Error(
-      "mintPerson stub helper requires identityCommitment to match the disclosure-binding circuit input",
+      "mintPerson stub helper requires identityCommitment to match the disclosure input",
     );
   }
-  const resolvedIdentityCommitment = consistentIdentityCommitment;
-  basicInfo.identityCommitment = ethers.zeroPadValue(
-    ethers.toBeHex(resolvedIdentityCommitment),
-    32,
-  );
 
   const personHash = await addPerson(ethers, deepFamily, signer, resolvedIdentityCommitment, {
     ...opts,
-    person: makeTestPerson(canonicalFullName, {
-      derivedSecretField: BigInt(circuitInput.derivedSecretField),
-      isBirthBC: basicInfo.isBirthBC,
-      birthYear: basicInfo.birthYear,
-      birthMonth: basicInfo.birthMonth,
-      birthDay: basicInfo.birthDay,
-      gender: basicInfo.gender,
-    }),
+    person,
+    selfSuiteId: identitySuiteId,
   });
+  await (await deepFamily.connect(signer).endorseVersion(personHash, 1)).wait();
 
-  await deepFamily.connect(signer).endorseVersion(personHash, 1);
-
-  const disclosureBindingValue = disclosureBindingBuilt.disclosureBinding;
-
-  const proof = makeStubProof();
-  const publicSignals = {
-    identityCommitment: consistentIdentityCommitment,
-    disclosureBinding: disclosureBindingValue,
-    minter: BigInt(circuitInput.minter),
-    schemaVersion: circuitInput.schemaVersion,
-    cryptoSuiteVersion: circuitInput.cryptoSuiteVersion,
-    hashAlgoId: circuitInput.hashAlgoId,
+  const basicInfo = {
+    identityCommitment: ethers.zeroPadValue(ethers.toBeHex(resolvedIdentityCommitment), 32),
+    isBirthBC: person.isBirthBC,
+    birthYear: person.birthYear,
+    birthMonth: person.birthMonth,
+    birthDay: person.birthDay,
+    gender: person.gender,
   };
-
+  const publicSignals = {
+    identityCommitment: resolvedIdentityCommitment,
+    disclosureBinding: disclosure.disclosureBinding,
+    minter: BigInt(signerAddress),
+    suiteCommitment: disclosure.suiteCommitment,
+  };
   const coreInfo = {
     basicInfo,
     supplementInfo: {
@@ -412,13 +462,19 @@ export async function mintPerson(
 
   const tx = await deepFamily
     .connect(signer)
-    .mintPersonVersionNFT(proof, publicSignals, 1, opts.tokenURI ?? "", coreInfo);
+    .mintPersonVersionNFT(
+      makeStubProof(opts.mintProofOverrides),
+      publicSignals,
+      1,
+      opts.tokenURI ?? "",
+      coreInfo,
+    );
   const receipt = await tx.wait();
 
   return {
     personHash,
     identityCommitment: resolvedIdentityCommitment,
-    circuitInput,
+    circuitInput: disclosure.input,
     coreInfo,
     publicSignals,
     receipt,

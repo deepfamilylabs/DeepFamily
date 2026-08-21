@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Globe,
-  Lock,
   ChevronRight,
   X,
   Layers,
@@ -13,7 +12,6 @@ import {
 import { useSidebar } from "../context";
 import { FamilyTreeConfigForm } from "../../domains/config";
 import { languages } from "../config/languages";
-import { useNavigate } from "react-router-dom";
 import Logo from "./Logo";
 
 export default function GlobalSidebar() {
@@ -21,7 +19,6 @@ export default function GlobalSidebar() {
   const { t, i18n } = useTranslation();
   const [isDark, setIsDark] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const navigate = useNavigate();
 
   // Theme Toggle Logic
   useEffect(() => {
@@ -104,12 +101,6 @@ export default function GlobalSidebar() {
         value: isDark,
       },
       {
-        id: "decryption",
-        icon: Lock,
-        label: t("decryptMetadata.title", "Decrypt Metadata"),
-        path: "/decrypt",
-      },
-      {
         id: "logo",
         icon: Image,
         label: t("logo.label", "Logo"),
@@ -124,13 +115,7 @@ export default function GlobalSidebar() {
       item.onClick();
       return;
     }
-    if (item.path) {
-      navigate(item.path);
-      closeMobileSidebar();
-      if (activeSection) toggleSection(activeSection);
-    } else {
-      toggleSection(item.id);
-    }
+    toggleSection(item.id);
   };
 
   // Calculate width based on state
@@ -288,7 +273,7 @@ export default function GlobalSidebar() {
                 )}
 
                 {/* Accordion Content */}
-                {(isMobileOpen || isExpanded) && !item.path && !item.isSwitch && (
+                {(isMobileOpen || isExpanded) && !item.isSwitch && (
                   <div
                     className={`
                           overflow-hidden transition-all duration-300 bg-slate-50/50 dark:bg-black/20

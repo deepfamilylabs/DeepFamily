@@ -53,6 +53,7 @@ import {
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
@@ -106,6 +107,7 @@ const CORE_DEPLOYMENT_FILES = [
   "DisclosureBindingVerifier.json",
   "Groth16VerifierAdapter.json",
   "DeepFamily.json",
+  "MetadataArchiveV1.json",
   "DeepFamilyReader.json",
 ];
 const RELEASE_ARTIFACT_NAMES = Object.freeze([
@@ -118,6 +120,7 @@ const RELEASE_ARTIFACT_NAMES = Object.freeze([
   "Groth16VerifierAdapter",
   "DeepFamily",
   "UUPSProxy",
+  "MetadataArchiveV1",
   "DeepFamilyReader",
 ]);
 
@@ -214,6 +217,7 @@ const buildFingerprint = ({
   releaseIntentsDigest,
   zkArtifactTrust,
   zkCeremonyVerification,
+  protocolManifestEvidence,
   testnetReleaseEvidence,
 }) => ({
   schemaVersion: MAINNET_STATE_SCHEMA_VERSION,
@@ -253,6 +257,12 @@ const buildFingerprint = ({
       ptauSha256: zkCeremonyVerification.ptau.sha256,
       ptauBlake2b512: zkCeremonyVerification.ptau.blake2b512,
     },
+  },
+  protocolReleaseManifest: {
+    path: protocolManifestEvidence.manifestPath,
+    sha256: protocolManifestEvidence.manifestSha256,
+    protocol: protocolManifestEvidence.manifest.protocol,
+    protocolGeneration: protocolManifestEvidence.manifest.protocolGeneration,
   },
   testnetReleaseEvidence: testnetReleaseEvidence.publicSummary,
   buildInfo: {
@@ -295,6 +305,8 @@ const buildFingerprint = ({
         token: plannedAddresses.token,
         initialOwner: config.expectedDeployer,
       },
+      metadataArchiveV1: [plannedAddresses.deepFamily],
+      deepFamilyMetadataArchive: plannedAddresses.metadataArchiveV1,
       deepFamilyReader: [plannedAddresses.deepFamily],
     },
   },
@@ -329,22 +341,23 @@ const buildFingerprint = ({
 });
 
 const derivePlannedAddresses = ({ ethers, deployer, startingNonce }) => {
-  const labels = [
-    "timelock",
-    "token",
-    "poseidonT5",
-    "adultAgeGate",
-    "personCommitmentVerifier",
-    "disclosureBindingVerifier",
-    "groth16VerifierAdapter",
-    "deepFamilyImplementation",
-    "deepFamily",
-    "deepFamilyReader",
-  ];
+  const deploymentOffsets = {
+    timelock: 0,
+    token: 1,
+    poseidonT5: 2,
+    adultAgeGate: 3,
+    personCommitmentVerifier: 4,
+    disclosureBindingVerifier: 5,
+    groth16VerifierAdapter: 6,
+    deepFamilyImplementation: 7,
+    deepFamily: 8,
+    metadataArchiveV1: 10,
+    deepFamilyReader: 12,
+  };
   return Object.fromEntries(
-    labels.map((label, index) => [
+    Object.entries(deploymentOffsets).map(([label, offset]) => [
       label,
-      ethers.getCreateAddress({ from: deployer, nonce: startingNonce + index }),
+      ethers.getCreateAddress({ from: deployer, nonce: startingNonce + offset }),
     ]),
   );
 };
@@ -524,6 +537,7 @@ const assertProtocolTerminalState = async ({
       },
     ],
     ["UUPSProxy", addresses.deepFamily, { needsLibraries: false }],
+    ["MetadataArchiveV1", addresses.metadataArchiveV1, { needsLibraries: false }],
     ["DeepFamilyReader", addresses.deepFamilyReader, { needsLibraries: false }],
   ];
   for (const [contractName, address, spec] of artifactChecks) {
@@ -537,13 +551,16 @@ const assertProtocolTerminalState = async ({
     });
   }
 
-  const { token, deepFamily, deepFamilyReader, groth16VerifierAdapter } = deployed;
+  const { token, deepFamily, metadataArchive, deepFamilyReader, groth16VerifierAdapter } = deployed;
   const [
     owner,
     tokenOwner,
     tokenMain,
     mainToken,
     readerMain,
+    configuredArchive,
+    archiveMain,
+    readerArchive,
     personRoute,
     disclosureRoute,
     personBackend,
@@ -558,7 +575,10 @@ const assertProtocolTerminalState = async ({
     token.deepFamilyContract(),
     deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
     deepFamilyReader.DEEP_FAMILY(),
-    deepFamily.verifierRegistry(1, 0),
+    deepFamily.metadataArchive(),
+    metadataArchive.DEEP_FAMILY(),
+    deepFamilyReader.METADATA_ARCHIVE(),
+    deepFamily.verifierRegistry(0, 1),
     deepFamily.verifierRegistry(1, 1),
     groth16VerifierAdapter.personVerifier(),
     groth16VerifierAdapter.disclosureBindingVerifier(),
@@ -573,6 +593,15 @@ const assertProtocolTerminalState = async ({
     [sameAddress(tokenMain, addresses.deepFamily), "Token is not bound to DeepFamily"],
     [sameAddress(mainToken, addresses.token), "DeepFamily is not bound to Token"],
     [sameAddress(readerMain, addresses.deepFamily), "Reader is not bound to DeepFamily"],
+    [
+      sameAddress(configuredArchive, addresses.metadataArchiveV1),
+      "DeepFamily is not bound to MetadataArchiveV1",
+    ],
+    [sameAddress(archiveMain, addresses.deepFamily), "Archive is not bound to DeepFamily"],
+    [
+      sameAddress(readerArchive, addresses.metadataArchiveV1),
+      "Reader is not bound to MetadataArchiveV1",
+    ],
     [sameAddress(personRoute, addresses.groth16VerifierAdapter), "person verifier route mismatch"],
     [
       sameAddress(disclosureRoute, addresses.groth16VerifierAdapter),
@@ -726,7 +755,7 @@ const revalidateCompletedRelease = async ({
     recordedLabels.some((label, index) => label !== expectedLabels[index]) ||
     expectedLabels.some((label) => checkpoint.transactions[label]?.status !== "finalized")
   ) {
-    throw new Error("Completed mainnet checkpoint does not contain exactly 14 finalized steps");
+    throw new Error("Completed mainnet checkpoint does not contain exactly 16 finalized steps");
   }
   const verifiedContracts = checkpoint.verification.contracts ?? [];
   if (
@@ -757,6 +786,10 @@ const revalidateCompletedRelease = async ({
   const deployed = {
     token: await ethers.getContractAt("DeepFamilyToken", addresses.token),
     deepFamily: await ethers.getContractAt("DeepFamily", addresses.deepFamily),
+    metadataArchive: await ethers.getContractAt(
+      "MetadataArchiveV1",
+      addresses.metadataArchiveV1,
+    ),
     deepFamilyReader: await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader),
     groth16VerifierAdapter: await ethers.getContractAt(
       "Groth16VerifierAdapter",
@@ -842,6 +875,10 @@ export const main = async (chainProfile) => {
     root: process.cwd(),
     requireProduction: true,
     requireBuiltR1cs: true,
+  });
+  const protocolManifestEvidence = inspectProtocolReleaseManifest({
+    root: process.cwd(),
+    requireProduction: true,
   });
 
   const [sourceState, releaseInputs, buildState, safeProfile, existingCheckpoint] =
@@ -935,6 +972,7 @@ export const main = async (chainProfile) => {
     releaseIntentsDigest,
     zkArtifactTrust,
     zkCeremonyVerification,
+    protocolManifestEvidence,
     testnetReleaseEvidence,
   });
   const planDigest = deriveMainnetPlanDigest(fingerprint);
@@ -1311,6 +1349,7 @@ export const main = async (chainProfile) => {
       groth16VerifierAdapter: await deployed.groth16VerifierAdapter.getAddress(),
       deepFamily: await deployed.deepFamily.getAddress(),
       deepFamilyImplementation: deployed.deepFamilyImplementationAddress,
+      metadataArchiveV1: await deployed.metadataArchive.getAddress(),
       deepFamilyReader: await deployed.deepFamilyReader.getAddress(),
     };
     for (const [label, plannedAddress] of Object.entries(plannedAddresses)) {
@@ -1363,6 +1402,12 @@ export const main = async (chainProfile) => {
         addresses.deepFamilyImplementation,
         proxyInitData,
       ]),
+      await verificationEntry(
+        hre.artifacts,
+        "MetadataArchiveV1",
+        addresses.metadataArchiveV1,
+        [addresses.deepFamily],
+      ),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
         addresses.deepFamily,
       ]),

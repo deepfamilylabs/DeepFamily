@@ -7,10 +7,12 @@ import MintNFTModal from "./MintNFTModal";
 
 const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
+const metadataEnvelope = `0x44464d3101${"00".repeat(11)}00000001`;
 
 const mocks = vi.hoisted(() => ({
   address: "0x00000000000000000000000000000000000000aa",
   getVersionDetails: vi.fn(),
+  getMetadataCode: vi.fn(),
   endorsedVersionIndex: vi.fn(),
   contract: {} as any,
   mintRunOrThrow: vi.fn(),
@@ -20,7 +22,8 @@ const mocks = vi.hoisted(() => ({
   onSuccess: vi.fn(),
   onGoEndorse: vi.fn(),
   zkWorkerCall: vi.fn(),
-  computeIdentityHashMaterial: vi.fn(),
+  cryptoWorkerCall: vi.fn(),
+  nodesData: {} as Record<string, any>,
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -42,6 +45,7 @@ vi.mock("../../wallet", () => ({
 vi.mock("../hooks/useContractClient", () => ({
   useContractClient: () => ({
     getVersionDetails: mocks.getVersionDetails,
+    getMetadataCode: mocks.getMetadataCode,
     contract: mocks.contract,
   }),
 }));
@@ -50,6 +54,7 @@ vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     markVersionMinted: mocks.markVersionMinted,
   }),
+  useTreeGraphData: () => ({ nodesData: mocks.nodesData }),
 }));
 
 vi.mock("./mint-nft/hooks/useMintNftFlow", () => ({
@@ -64,10 +69,14 @@ vi.mock("../../../shared/workers/zkWorkerClient", () => ({
   zkWorkerCall: (...args: any[]) => mocks.zkWorkerCall(...args),
 }));
 
+vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({
+  cryptoWorkerCall: (...args: any[]) => mocks.cryptoWorkerCall(...args),
+}));
+
 vi.mock("../../../shared/zk/zk", () => ({
   computeDisclosureBinding: () => 99n,
   formatGroth16ProofForContract: () => ({
-    proofSystemId: 1,
+    circuitId: 1,
     proofEncodingId: 1,
     proofData: "0x",
   }),
@@ -75,15 +84,6 @@ vi.mock("../../../shared/zk/zk", () => ({
 
 vi.mock("../../../shared/crypto/identityCommitment", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
-}));
-
-vi.mock("../../../shared/crypto/identityHash", () => ({
-  computeIdentityHashMaterial: (...args: any[]) => mocks.computeIdentityHashMaterial(...args),
-  normalizeIdentitySaltHex: (value: string) => value,
-}));
-
-vi.mock("../../../shared/crypto/passphraseStrength", () => ({
-  normalizePassphraseForHash: (value: string) => value.trim(),
 }));
 
 vi.mock("../../../shared/lib/errors", () => ({
@@ -155,6 +155,7 @@ describe("MintNFTModal", () => {
   beforeEach(() => {
     mocks.address = ownerAddress;
     mocks.getVersionDetails.mockReset();
+    mocks.getMetadataCode.mockReset();
     mocks.endorsedVersionIndex.mockReset();
     mocks.contract = {
       endorsedVersionIndex: mocks.endorsedVersionIndex,
@@ -166,7 +167,8 @@ describe("MintNFTModal", () => {
     mocks.onSuccess.mockReset();
     mocks.onGoEndorse.mockReset();
     mocks.zkWorkerCall.mockReset();
-    mocks.computeIdentityHashMaterial.mockReset();
+    mocks.cryptoWorkerCall.mockReset();
+    mocks.nodesData = {};
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
       cb(0);
@@ -190,13 +192,19 @@ describe("MintNFTModal", () => {
         fatherHash: `0x${"34".repeat(32)}`,
         motherHash: `0x${"56".repeat(32)}`,
       },
+      metadata: {
+        pointer: "0x0000000000000000000000000000000000000fed",
+        payloadHash: ethers.keccak256(metadataEnvelope),
+        payloadLength: ethers.getBytes(metadataEnvelope).length,
+      },
     });
+    mocks.getMetadataCode.mockResolvedValue(`0x00${metadataEnvelope.slice(2)}`);
     mocks.endorsedVersionIndex.mockResolvedValue(2);
     mocks.zkWorkerCall.mockImplementation((method: string) => {
       if (method === "generateDisclosureBindingProof") {
         return Promise.resolve({
           proof: { pi_a: [], pi_b: [], pi_c: [] },
-          publicSignals: ["1", "99", "2", "1", "1", "1"],
+          publicSignals: ["1", "99", "2", "3"],
         });
       }
       if (method === "verifyDisclosureBindingProof") {
@@ -204,14 +212,22 @@ describe("MintNFTModal", () => {
       }
       return Promise.reject(new Error(`unexpected zk method ${method}`));
     });
-    mocks.computeIdentityHashMaterial.mockResolvedValue({
-      canonicalFullName: "Ada Lovelace",
-      derivedSecretField: 1n,
-      identityCommitment: 1n,
+    mocks.cryptoWorkerCall.mockResolvedValue({
+      identitySuiteId: 1,
+      identity: {
+        fullName: "Ada Lovelace",
+        gender: 2,
+        birthYear: 1815,
+        birthMonth: 12,
+        birthDay: 10,
+        isBirthBC: false,
+      },
+      derivedSecretField: "1",
+      identityCommitment: "1",
       personHash,
-      nameField: 2n,
-      suiteCommitment: 3n,
-      packedBirthGenderField: 4n,
+      nameField: "2",
+      suiteCommitment: "3",
+      packedBirthGenderField: "4",
     });
   });
 
@@ -259,6 +275,7 @@ describe("MintNFTModal", () => {
       expect.objectContaining({
         personHash,
         versionIndex: 2,
+        selfSuiteId: 1,
         tokenURI: "ipfs://token",
         coreInfo: expect.objectContaining({
           supplementInfo: expect.objectContaining({
@@ -278,6 +295,52 @@ describe("MintNFTModal", () => {
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(77);
     expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
+  });
+
+  it("copies only a validated unlocked biography after an explicit public disclosure confirmation", async () => {
+    mocks.nodesData = {
+      [`${personHash}-v-2`]: {
+        id: `${personHash}-v-2`,
+        personHash,
+        versionIndex: 2,
+        metadataUnlockValidated: true,
+        biography: "Validated private biography",
+      },
+    };
+
+    renderMintModal();
+
+    const copyButton = await screen.findByRole("button", {
+      name: "Copy biography into public story",
+    });
+    expect((copyButton as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByLabelText(
+        "I understand this copies decrypted private biography text into a public, immutable NFT field.",
+      ),
+    );
+    expect((copyButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(copyButton);
+
+    const story = screen.getByPlaceholderText("Enter a brief life story summary...");
+    expect((story as HTMLTextAreaElement).value).toBe("Validated private biography");
+  });
+
+  it("never offers cached biography text without the validated unlock marker", async () => {
+    mocks.nodesData = {
+      [`${personHash}-v-2`]: {
+        id: `${personHash}-v-2`,
+        personHash,
+        versionIndex: 2,
+        biography: "Untrusted cached text",
+      },
+    };
+
+    renderMintModal();
+    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+
+    expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
   });
 
   it("shows a friendly error when the mint flow fails", async () => {

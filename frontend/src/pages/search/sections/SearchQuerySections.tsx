@@ -96,11 +96,6 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                         <div className="px-2.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 font-medium text-xs">
                           v{Number(version.versionIndex)}
                         </div>
-                        {version.tag && (
-                          <div className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700">
-                            {version.tag}
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 max-w-full flex-1 min-w-0">
                         <span className="whitespace-nowrap shrink-0">
@@ -126,20 +121,20 @@ export function VersionsQuerySection({ search }: { search: SearchPageController 
                     </div>
 
                     <div className="flex flex-col gap-1 text-sm pl-0 md:pl-0">
-                      {version.metadataCID && (
+                      {version.versionCommitment !== undefined && (
                         <div className="grid grid-cols-[80px_1fr] gap-2 items-center min-h-[28px]">
                           <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap shrink-0 text-right text-xs">
-                            {t("search.versionsQuery.metadataCID")}
+                            {t("search.versionsQuery.versionCommitment", "Commitment")}
                           </span>
                           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md min-w-0 w-fit max-w-full">
                             <span
                               className="font-mono text-xs text-gray-900 dark:text-gray-100 truncate min-w-0"
-                              title={version.metadataCID}
+                              title={String(version.versionCommitment)}
                             >
-                              {version.metadataCID}
+                              {String(version.versionCommitment)}
                             </span>
                             <CopyIconButton
-                              onClick={() => search.onCopy(version.metadataCID || "")}
+                              onClick={() => search.onCopy(String(version.versionCommitment))}
                               label={t("search.copy", "Copy") as string}
                               size="xs"
                             />

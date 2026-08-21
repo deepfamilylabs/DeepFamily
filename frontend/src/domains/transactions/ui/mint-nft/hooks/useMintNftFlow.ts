@@ -86,6 +86,7 @@ export function useMintNftFlow() {
           address,
           personHash: args.personHash,
           versionIndex: args.versionIndex,
+          selfSuiteId: args.selfSuiteId,
           proofEnvelope: args.proofEnvelope,
           publicSignals: args.publicSignals,
           tokenURI: args.tokenURI,

@@ -1,85 +1,221 @@
-import type { EncryptedMetadataPayloadV2 } from "../crypto/metadataCrypto";
-import type { IdentityHashInput } from "../crypto/identityHash";
 import type {
-  DerivedSecretBundle,
-  FileEncryptionKdfConfig,
-  IdentityKdfConfig,
-} from "../crypto/secretDerivation";
+  IdentityFields,
+  MetadataContextInput,
+  PersonVersionMetadataInput,
+} from "@deepfamily/protocol-core";
+import type { IdentityHashInput } from "../crypto/identityHash";
 import type { DerivedKey, KeyPurpose, KDFPreset } from "../crypto/secureKeyDerivation";
 
-type CryptoWorkerCallMap = {
+export interface IdentityMaterialV1Result {
+  identitySuiteId: number;
+  identity: {
+    fullName: string;
+    gender: number;
+    birthYear: number;
+    birthMonth: number;
+    birthDay: number;
+    isBirthBC: boolean;
+  };
+  derivedSecretField: string;
+  nameField: string;
+  packedBirthGenderField: string;
+  suiteCommitment: string;
+  nameSecretCommitment: string;
+  identityCommitment: string;
+  personHash: string;
+}
+
+export interface PreparedPersonVersionContentV1Result {
+  canonicalJsonLength: number;
+  contentDigestLo: string;
+  contentDigestHi: string;
+  versionCommitment: string;
+}
+
+export interface EncryptedPersonVersionEnvelopeV1Result {
+  envelopeHex: string;
+  payloadHash: string;
+  formatVersion: 1;
+  identitySuiteId: number;
+  envelopeLength: number;
+  canonicalJsonLength: number;
+  compressedPlaintextLength: number;
+}
+
+export interface ValidatedPersonVersionV1Result {
+  metadata: {
+    schema: "deepfamily/person-version@1.0";
+    person: {
+      fullName: string;
+      gender: number;
+      birthYear: number;
+      birthMonth: number;
+      birthDay: number;
+      isBirthBC: boolean;
+      personHash: string;
+    };
+    parents: {
+      father: null | {
+        fullName: string;
+        gender: number;
+        birthYear: number;
+        birthMonth: number;
+        birthDay: number;
+        isBirthBC: boolean;
+        personHash: string;
+        versionIndex: string;
+      };
+      mother: null | {
+        fullName: string;
+        gender: number;
+        birthYear: number;
+        birthMonth: number;
+        birthDay: number;
+        isBirthBC: boolean;
+        personHash: string;
+        versionIndex: string;
+      };
+    };
+    tag: string;
+    biography: string;
+  };
+  formatVersion: 1;
+  identitySuiteId: number;
+  payloadHash: string;
+  versionCommitment: string;
+  metadataUnlockValidated: true;
+  protocolGeneration: string;
+}
+
+export type CryptoWorkerCallMap = {
   computeIdentityHash: { params: { input: IdentityHashInput }; result: { identityHash: string } };
-  passwordFingerprint: { params: { password: string }; result: { passwordFingerprint: string } };
   deriveKey: {
     params: { input: IdentityHashInput; purpose?: KeyPurpose; preset?: KDFPreset };
     result: DerivedKey;
   };
-  deriveIdentitySecret: {
-    params: { passphrase: string; saltHex?: string; config?: IdentityKdfConfig };
-    result: DerivedSecretBundle;
-  };
-  encryptMetadataBundleV2: {
+  deriveIdentityMaterialV1: {
     params: {
-      plaintextJson: string;
-      password: string;
-      aad?: string;
-      schema?: string;
-      version?: string;
-      fileKdfConfig?: FileEncryptionKdfConfig;
+      identity: IdentityFields;
+      rawPassphrase: string;
+      identitySuiteId?: number | string | bigint;
     };
-    result: {
-      encryptedJson: string;
-      cid: string;
-      plainHash: string;
-      passwordFingerprint: string;
-      payload: EncryptedMetadataPayloadV2;
-    };
+    result: IdentityMaterialV1Result;
   };
-  decryptMetadataBundleV2: {
-    params: { payloadOrJson: string; password: string };
-    result: { plaintext: string; data: any; hash: string; payload: EncryptedMetadataPayloadV2 };
+  preparePersonVersionContentV1: {
+    params: {
+      metadata: PersonVersionMetadataInput;
+      derivedSecretField: number | string | bigint;
+    };
+    result: PreparedPersonVersionContentV1Result;
+  };
+  encryptPersonVersionEnvelopeV1: {
+    params: {
+      metadata: PersonVersionMetadataInput;
+      rawPassphrase: string;
+      identitySuiteId?: number | string | bigint;
+      context: MetadataContextInput;
+    };
+    result: EncryptedPersonVersionEnvelopeV1Result;
+  };
+  roundTripPersonVersionEnvelopeV1: {
+    params: {
+      envelopeHex: string;
+      rawPassphrase: string;
+      context: MetadataContextInput;
+      expectedMetadata: PersonVersionMetadataInput;
+      submitterAndSelfSuiteId?: number | string | bigint;
+      expectedSubmitter?: string;
+    };
+    result: ValidatedPersonVersionV1Result;
+  };
+  decryptPersonVersionEnvelopeV1: {
+    params: {
+      envelopeHex: string;
+      rawPassphrase: string;
+      context: MetadataContextInput;
+    };
+    result: ValidatedPersonVersionV1Result;
   };
 };
 
-type CryptoWorkerRequest = { id: number; method: keyof CryptoWorkerCallMap; params: any };
+type CryptoWorkerRequest = { id: number; method: keyof CryptoWorkerCallMap; params: unknown };
 type CryptoWorkerResponse =
-  | { id: number; ok: true; result: any }
-  | { id: number; ok: false; error: { message: string; name?: string } };
+  | { id: number; ok: true; result: unknown }
+  | { id: number; ok: false; error: { message: string; name?: string; code?: string } };
+
+interface PendingCryptoWorkerCall {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timeoutId?: ReturnType<typeof setTimeout>;
+}
+
+export class CryptoWorkerTerminatedError extends Error {
+  constructor(message = "Crypto worker terminated") {
+    super(message);
+    this.name = "CryptoWorkerTerminatedError";
+  }
+}
 
 let workerSingleton: Worker | null = null;
 let nextId = 1;
-const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+const pending = new Map<number, PendingCryptoWorkerCall>();
+
+const rejectPending = (error: Error): void => {
+  for (const [, entry] of pending) {
+    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+    entry.reject(error);
+  }
+  pending.clear();
+};
+
+export function terminateCryptoWorker(
+  reason: Error = new CryptoWorkerTerminatedError(),
+): void {
+  const worker = workerSingleton;
+  workerSingleton = null;
+  if (worker) worker.terminate();
+  rejectPending(reason);
+}
+
+export function terminateCryptoWorkerIfIdle(): boolean {
+  if (pending.size > 0) return false;
+  terminateCryptoWorker();
+  return true;
+}
 
 const ensureWorker = (): Worker => {
   if (typeof window === "undefined") {
     throw new Error("Crypto worker is not available (no window)");
   }
   if (workerSingleton) return workerSingleton;
-  workerSingleton = new Worker(new URL("../../workers/crypto.worker.ts", import.meta.url), {
+  const worker = new Worker(new URL("../../workers/crypto.worker.ts", import.meta.url), {
     type: "module",
   });
-  workerSingleton.addEventListener("message", (event: MessageEvent<CryptoWorkerResponse>) => {
-    const msg = event.data;
-    const entry = pending.get(msg.id);
+  workerSingleton = worker;
+  worker.addEventListener("message", (event: MessageEvent<CryptoWorkerResponse>) => {
+    const message = event.data;
+    const entry = pending.get(message.id);
     if (!entry) return;
-    pending.delete(msg.id);
-    if (msg.ok) entry.resolve(msg.result);
-    else
-      entry.reject(
-        Object.assign(new Error(msg.error?.message || "Crypto worker error"), {
-          name: msg.error?.name,
-        }),
-      );
+    pending.delete(message.id);
+    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+    if (message.ok) {
+      entry.resolve(message.result);
+      return;
+    }
+    const error = Object.assign(new Error(message.error?.message || "Crypto worker error"), {
+      name: message.error?.name,
+      code: message.error?.code,
+    });
+    entry.reject(error);
   });
-  workerSingleton.addEventListener("error", () => {
-    for (const [, entry] of pending) entry.reject(new Error("Crypto worker crashed"));
-    pending.clear();
-    workerSingleton = null;
+  worker.addEventListener("error", () => {
+    if (workerSingleton !== worker) return;
+    terminateCryptoWorker(new Error("Crypto worker crashed"));
   });
-  return workerSingleton;
+  return worker;
 };
 
-export async function cryptoWorkerCall<M extends keyof CryptoWorkerCallMap>(
+export function cryptoWorkerCall<M extends keyof CryptoWorkerCallMap>(
   method: M,
   params: CryptoWorkerCallMap[M]["params"],
   opts?: { timeoutMs?: number },
@@ -88,22 +224,25 @@ export async function cryptoWorkerCall<M extends keyof CryptoWorkerCallMap>(
   const id = nextId++;
   const timeoutMs = opts?.timeoutMs ?? 120_000;
 
-  const promise = new Promise<CryptoWorkerCallMap[M]["result"]>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    const req: CryptoWorkerRequest = { id, method, params };
-    worker.postMessage(req);
-  });
-
-  if (!timeoutMs) return promise;
-  return await Promise.race([
-    promise,
-    new Promise<CryptoWorkerCallMap[M]["result"]>((_, reject) => {
-      setTimeout(() => {
-        if (pending.has(id)) {
-          pending.delete(id);
-          reject(new Error(`Crypto worker timeout (${String(method)})`));
-        }
+  return new Promise<CryptoWorkerCallMap[M]["result"]>((resolve, reject) => {
+    const entry: PendingCryptoWorkerCall = {
+      resolve: (value) => resolve(value as CryptoWorkerCallMap[M]["result"]),
+      reject,
+    };
+    if (timeoutMs > 0) {
+      entry.timeoutId = setTimeout(() => {
+        if (!pending.has(id)) return;
+        terminateCryptoWorker(new Error(`Crypto worker timeout (${String(method)})`));
       }, timeoutMs);
-    }),
-  ]);
+    }
+    pending.set(id, entry);
+    try {
+      const request: CryptoWorkerRequest = { id, method, params };
+      worker.postMessage(request);
+    } catch (error) {
+      pending.delete(id);
+      if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 }

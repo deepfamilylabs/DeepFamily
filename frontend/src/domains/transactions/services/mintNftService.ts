@@ -1,14 +1,66 @@
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents } from "../api/txGateway";
+import {
+  computeSuiteCommitment,
+  readMetadataEnvelopeFromRef,
+  type BytesLike,
+} from "@deepfamily/protocol-core";
 
 export type MintDisclosurePublicSignals = {
   identityCommitment: bigint;
   disclosureBinding: bigint;
   minter: bigint;
-  schemaVersion: number;
-  cryptoSuiteVersion: number;
-  hashAlgoId: number;
+  suiteCommitment: bigint;
 };
+
+export type MintTargetEnvelopeHeader = {
+  formatVersion: number;
+  selfSuiteId: number;
+};
+
+export type MintVersionDetailsReader = (personHash: string, versionIndex: number) => Promise<any>;
+
+export type MintMetadataCodeReader = (pointer: string, blockTag: "latest") => Promise<BytesLike>;
+
+const readMetadataField = (metadata: any, name: string, tupleIndex: number): unknown =>
+  metadata?.[name] ?? metadata?.[tupleIndex];
+
+/**
+ * Resolves the suite from the target version's hash/length-authenticated data-contract envelope.
+ * Cached UI metadata is deliberately not accepted as the authority for proof routing.
+ */
+export async function readMintTargetEnvelopeHeader(input: {
+  personHash: string;
+  versionIndex: number;
+  getVersionDetails: MintVersionDetailsReader;
+  getCode: MintMetadataCodeReader;
+}): Promise<MintTargetEnvelopeHeader & { versionDetails: any }> {
+  const versionDetails = await input.getVersionDetails(input.personHash, input.versionIndex);
+  const metadata = versionDetails?.metadata ?? versionDetails?.[1];
+  if (!metadata) {
+    throw new Error("Target version does not contain a metadata reference");
+  }
+
+  const pointer = readMetadataField(metadata, "pointer", 0);
+  const payloadHash = readMetadataField(metadata, "payloadHash", 1);
+  const payloadLength = readMetadataField(metadata, "payloadLength", 2);
+  if (typeof pointer !== "string" || typeof payloadHash !== "string") {
+    throw new Error("Target version metadata reference is incomplete");
+  }
+
+  const verified = await readMetadataEnvelopeFromRef({
+    getCode: input.getCode,
+    pointer,
+    payloadHash,
+    payloadLength: payloadLength as bigint | number | string,
+  });
+
+  return {
+    formatVersion: verified.prefix.formatVersion,
+    selfSuiteId: verified.prefix.identitySuiteId,
+    versionDetails,
+  };
+}
 
 export type MintCoreInfo = {
   basicInfo: {
@@ -55,6 +107,7 @@ export type ExecuteMintFlowParams = {
   versionIndex: number;
   proofEnvelope: any;
   publicSignals: MintDisclosurePublicSignals;
+  selfSuiteId: number;
   tokenURI: string;
   coreInfo: MintCoreInfo;
   mintPersonVersionNFT: MintPersonVersionNFTFn;
@@ -81,11 +134,19 @@ export async function executeMintFlow({
   versionIndex,
   proofEnvelope,
   publicSignals,
+  selfSuiteId,
   tokenURI,
   coreInfo,
   mintPersonVersionNFT,
   getVersionDetails,
 }: ExecuteMintFlowParams): Promise<ExecuteMintFlowResult> {
+  if (!Number.isInteger(selfSuiteId) || selfSuiteId <= 0 || selfSuiteId > 0xffff_ffff) {
+    throw new Error("Target identity suite must be a nonzero uint32");
+  }
+  if (publicSignals.suiteCommitment !== computeSuiteCommitment(selfSuiteId)) {
+    throw new Error("Disclosure suite commitment does not match the target envelope header");
+  }
+
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
   if (Number(endorsedIdx) !== Number(versionIndex)) {
     return { requiresEndorsement: true };

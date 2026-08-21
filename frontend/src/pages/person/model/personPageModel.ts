@@ -240,7 +240,7 @@ export function buildNftCoreInfo(node: NodeData | null | undefined): StoryDetail
     deathDay: node.deathDay,
     deathPlace: node.deathPlace,
     isDeathBC: node.isDeathBC,
-    story: node.story || "",
+    story: node.nftPublicStory || "",
   };
 }
 

@@ -146,7 +146,7 @@ export function applyStoryDataToNode(
     ...nodesData,
     [nodeId]: {
       ...current,
-      story: hasCompleteStory ? storyData.fullStory : current.story,
+      nftPublicStory: hasCompleteStory ? storyData.fullStory : current.nftPublicStory,
       storyMetadata: storyData.metadata,
       storyChunks: storyData.chunks,
       storyFetchedAt: storyData.fetchedAt,

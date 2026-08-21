@@ -52,11 +52,19 @@ export function useContractClient() {
     };
   }, [readContract]);
 
+  const getMetadataCode = useMemo(() => {
+    if (!readonlyProvider) return null;
+    return async (pointer: string, blockTag: "latest") => {
+      return await readonlyProvider.getCode(pointer, blockTag);
+    };
+  }, [readonlyProvider]);
+
   return {
     contract,
     readContract,
     isContractReady,
     getVersionDetails,
     getNFTDetails,
+    getMetadataCode,
   };
 }

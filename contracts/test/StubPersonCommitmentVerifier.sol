@@ -12,7 +12,7 @@ contract StubPersonCommitmentVerifier {
     uint256[2] calldata,
     uint256[2][2] calldata,
     uint256[2] calldata,
-    uint256[7] calldata
+    uint256[5] calldata
   ) external view returns (bool) {
     return shouldVerify;
   }

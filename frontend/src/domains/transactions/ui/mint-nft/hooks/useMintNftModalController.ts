@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import type { IdentitySaltMode } from "../../../../../shared/crypto/identityHash";
+import { makeNodeId } from "../../../../../shared/model";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
-import { useTreeMutations } from "../../../../tree";
+import { useTreeGraphData, useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { createMintNFTSchema } from "../model/mintNftSchema";
@@ -49,8 +49,9 @@ export function useMintNftModalController({
 }: UseMintNftModalControllerArgs) {
   const { t } = useTranslation();
   const { address } = useWallet();
-  const { getVersionDetails, contract } = useContractClient();
+  const { getVersionDetails, getMetadataCode, contract } = useContractClient();
   const { markVersionMinted } = useTreeMutations();
+  const { nodesData } = useTreeGraphData();
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t]);
   const {
     status: mintNftStatus,
@@ -68,9 +69,6 @@ export function useMintNftModalController({
   const [consents, setConsents] = useState(defaultConsents);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [personInfo, setPersonInfo] = useState<MintPersonInfo | null>(null);
-  const [personHasPassphrase, setPersonHasPassphrase] = useState(false);
-  const [personIdentityMode, setPersonIdentityMode] = useState<IdentitySaltMode>("deterministic");
-  const [personRecoverySaltHex, setPersonRecoverySaltHex] = useState("");
   const [showEndorseConfirm, setShowEndorseConfirm] = useState(false);
   const [successResult, setSuccessResult] = useState<MintNFTSuccessResultView | null>(null);
   const [errorResult, setErrorResult] = useState<MintNFTErrorResultView | null>(null);
@@ -88,6 +86,21 @@ export function useMintNftModalController({
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
   const allConsentsChecked = consents.public && consents.age && consents.legal;
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
+  const validatedTargetBiography = useMemo(() => {
+    if (!hasValidTarget) return undefined;
+    const exact = nodesData[makeNodeId(targetPersonHash, targetVersionIndex)];
+    const node =
+      exact ??
+      Object.values(nodesData).find(
+        (candidate) =>
+          candidate.personHash.toLowerCase() === targetPersonHash.toLowerCase() &&
+          Number(candidate.versionIndex) === targetVersionIndex,
+      );
+    if (node?.metadataUnlockValidated !== true || typeof node.biography !== "string") {
+      return undefined;
+    }
+    return node.biography;
+  }, [hasValidTarget, nodesData, targetPersonHash, targetVersionIndex]);
 
   const isDesktop = useResponsiveModalMode();
   const { entered, requestClose: handleClose } = useTransactionModalFrameState({
@@ -102,6 +115,7 @@ export function useMintNftModalController({
     address,
     contract,
     getVersionDetails: getVersionDetails ?? undefined,
+    getMetadataCode: getMetadataCode ?? undefined,
     targetPersonHash,
     targetVersionIndex,
     hasValidTarget,
@@ -111,6 +125,8 @@ export function useMintNftModalController({
     isAlreadyMinted,
     isCheckingStatus,
     hasMissingParents,
+    selfSuiteId: targetSelfSuiteId,
+    envelopeHeaderError,
     reset: resetTargetStatus,
   } = targetStatus;
 
@@ -146,9 +162,6 @@ export function useMintNftModalController({
     setPersonHash("");
     setVersionIndex(1);
     setPersonInfo(null);
-    setPersonHasPassphrase(false);
-    setPersonIdentityMode("deterministic");
-    setPersonRecoverySaltHex("");
     setSuccessResult(null);
     setErrorResult(null);
     setConsents(defaultConsents());
@@ -167,9 +180,6 @@ export function useMintNftModalController({
       const nextIndex = initialVersionIndex || 1;
       setPersonHash(nextHash);
       setVersionIndex(nextIndex);
-      setPersonHasPassphrase(false);
-      setPersonIdentityMode("deterministic");
-      setPersonRecoverySaltHex("");
       setSuccessResult(null);
       setErrorResult(null);
       setConsentError(null);
@@ -241,11 +251,10 @@ export function useMintNftModalController({
     isEndorsed,
     isAlreadyMinted,
     personInfo,
-    personIdentityMode,
-    personRecoverySaltHex,
     personCalcRef,
     targetPersonHash,
     targetVersionIndex,
+    targetSelfSuiteId,
     didPatchCacheRef,
     generateDisclosureProof,
     resetDisclosureProof,
@@ -279,25 +288,23 @@ export function useMintNftModalController({
       isEndorsed,
       isAlreadyMinted,
       hasMissingParents,
+      targetSelfSuiteId,
+      envelopeHeaderError,
       onPersonHashChange: setPersonHash,
       onVersionIndexChange: setVersionIndex,
     },
     personProofSection: {
       personCalcRef,
       personInfo,
-      personHasPassphrase,
-      personIdentityMode,
-      personRecoverySaltHex,
+      targetSelfSuiteId,
       onPersonInfoChange: setPersonInfo,
-      onPersonHasPassphraseChange: setPersonHasPassphrase,
-      onPersonIdentityModeChange: setPersonIdentityMode,
-      onPersonRecoverySaltHexChange: setPersonRecoverySaltHex,
     },
     supplementForm: {
       register,
       errors,
       setValue,
       watch,
+      validatedBiography: validatedTargetBiography,
     },
     consentSection: {
       consents,
@@ -321,6 +328,7 @@ export function useMintNftModalController({
       hasPersonInfo,
       hasTargetInputs,
       hasValidTarget,
+      hasVerifiedTargetEnvelope: targetSelfSuiteId !== null,
       onClose: handleClose,
       onContinueMinting: handleContinueMinting,
       onShowEndorseConfirm: () => setShowEndorseConfirm(true),

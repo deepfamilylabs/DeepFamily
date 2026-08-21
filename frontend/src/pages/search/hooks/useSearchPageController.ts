@@ -10,10 +10,6 @@ import {
   type PersonHashCalculatorHandle,
 } from "../../../domains/person";
 import { useTreeGateway } from "../../../domains/tree";
-import {
-  generateRandomIdentitySaltHex,
-  type IdentitySaltMode,
-} from "../../../shared/crypto/identityHash";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { StoryChunk } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
@@ -242,8 +238,6 @@ export function useSearchPageController() {
   const [childrenQueried, setChildrenQueried] = useState<boolean>(false);
 
   const [openSections, setOpenSections] = useState(initialSearchOpenSections);
-  const [hashIdentityMode, setHashIdentityMode] = useState<IdentitySaltMode>("deterministic");
-  const [hashRecoverySaltHex, setHashRecoverySaltHex] = useState("");
   const [hashHasPassphrase, setHashHasPassphrase] = useState(false);
   const hashCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
@@ -306,22 +300,6 @@ export function useSearchPageController() {
   const onHashPublicFormChange = useCallback(() => {
     const nextHasPassphrase = hashCalcRef.current?.hasPassphrase() ?? false;
     setHashHasPassphrase(nextHasPassphrase);
-    if (!nextHasPassphrase) {
-      setHashIdentityMode("deterministic");
-    }
-  }, []);
-
-  const useDeterministicIdentityMode = useCallback(() => {
-    setHashIdentityMode("deterministic");
-  }, []);
-
-  const useRandomIdentityMode = useCallback(() => {
-    setHashIdentityMode("random");
-    setHashRecoverySaltHex((current) => current || generateRandomIdentitySaltHex());
-  }, []);
-
-  const regenerateRecoverySalt = useCallback(() => {
-    setHashRecoverySaltHex(generateRandomIdentitySaltHex());
   }, []);
 
   const onQueryEndorsementStats = useCallback(
@@ -734,14 +712,8 @@ export function useSearchPageController() {
     onCopy,
     hash: {
       hashCalcRef,
-      identityMode: hashIdentityMode,
-      recoverySaltHex: hashRecoverySaltHex,
-      setRecoverySaltHex: setHashRecoverySaltHex,
       hasPassphrase: hashHasPassphrase,
       onPublicFormChange: onHashPublicFormChange,
-      useDeterministicIdentityMode,
-      useRandomIdentityMode,
-      regenerateRecoverySalt,
     },
     chunkTypes: {
       getChunkTypeLabel,

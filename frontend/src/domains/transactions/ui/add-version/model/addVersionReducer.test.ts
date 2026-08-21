@@ -16,6 +16,7 @@ describe("addVersionReducer", () => {
       events: {
         PersonHashZKVerified: null,
         PersonVersionAdded: null,
+        MetadataStored: null,
         TokenRewardDistributed: null,
       },
     };

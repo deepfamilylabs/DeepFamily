@@ -58,7 +58,7 @@ async function collectMultiLanguageRootHashes(deepFamily) {
 
   for (const [lang, rootData] of Object.entries(roots)) {
     try {
-      const hash = computePersonHashFromBasicInfo(rootData);
+      const hash = await computePersonHashFromBasicInfo(rootData);
       console.log(`   [${lang.toUpperCase()}] Computing hash for ${rootData.fullName}: ${hash}`);
 
       const { exists, totalVersions } = await checkPersonExists({

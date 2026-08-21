@@ -29,7 +29,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(12);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(14);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -46,6 +46,9 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     expect(nonceAfterSecond).to.equal(nonceAfterFirst);
     expect(await second.token.getAddress()).to.equal(await first.token.getAddress());
     expect(await second.deepFamily.getAddress()).to.equal(await first.deepFamily.getAddress());
+    expect(await second.metadataArchive.getAddress()).to.equal(
+      await first.metadataArchive.getAddress(),
+    );
     expect(await second.deepFamilyReader.getAddress()).to.equal(
       await first.deepFamilyReader.getAddress(),
     );
@@ -88,6 +91,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       },
     });
     const Proxy = await ethers.getContractFactory("UUPSProxy", deployer);
+    const Archive = await ethers.getContractFactory("MetadataArchiveV1", deployer);
     const Reader = await ethers.getContractFactory("DeepFamilyReader", deployer);
     const initializeData = DeepFamily.interface.encodeFunctionData("initialize", [
       address("deepFamilyToken"),
@@ -109,22 +113,29 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         address("deepFamilyImplementation"),
         initializeData,
       ),
+      metadataArchiveV1: await Archive.getDeployTransaction(address("deepFamilyProxy")),
       deepFamilyReader: await Reader.getDeployTransaction(address("deepFamilyProxy")),
       tokenInitialize: {
         to: address("deepFamilyToken"),
         data: Token.interface.encodeFunctionData("initialize", [address("deepFamilyProxy")]),
       },
-      setPersonCommitmentVerifier: {
+      setMetadataArchive: {
         to: address("deepFamilyProxy"),
-        data: DeepFamily.interface.encodeFunctionData("setVerifier", [
-          1,
+        data: DeepFamily.interface.encodeFunctionData("setMetadataArchive", [
+          address("metadataArchiveV1"),
+        ]),
+      },
+      setPersonRelationVerifier: {
+        to: address("deepFamilyProxy"),
+        data: DeepFamily.interface.encodeFunctionData("setCircuitVerifier", [
           0,
+          1,
           address("groth16VerifierAdapter"),
         ]),
       },
       setDisclosureBindingVerifier: {
         to: address("deepFamilyProxy"),
-        data: DeepFamily.interface.encodeFunctionData("setVerifier", [
+        data: DeepFamily.interface.encodeFunctionData("setCircuitVerifier", [
           1,
           1,
           address("groth16VerifierAdapter"),

@@ -12,6 +12,8 @@ export interface MintTargetSectionProps {
   isEndorsed: boolean;
   isAlreadyMinted: boolean;
   hasMissingParents: MintMissingParents;
+  targetSelfSuiteId: number | null;
+  envelopeHeaderError: string | null;
   onPersonHashChange: (value: string) => void;
   onVersionIndexChange: (value: number) => void;
 }
@@ -26,6 +28,8 @@ export function MintTargetSection({
   isEndorsed,
   isAlreadyMinted,
   hasMissingParents,
+  targetSelfSuiteId,
+  envelopeHeaderError,
   onPersonHashChange,
   onVersionIndexChange,
 }: MintTargetSectionProps) {
@@ -95,6 +99,17 @@ export function MintTargetSection({
                 <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 {t("mintNFT.checkingStatus", "Checking status...")}
               </div>
+            ) : envelopeHeaderError ? (
+              <div
+                className="p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2"
+                role="alert"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {t(
+                  "mintNFT.targetEnvelopeHeaderInvalid",
+                  "The target metadata envelope header could not be verified. Minting is disabled.",
+                )}
+              </div>
             ) : (
               <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
                 <div
@@ -117,6 +132,11 @@ export function MintTargetSection({
                     ? t("mintNFT.alreadyMinted", "Already Minted")
                     : t("mintNFT.canMint", "Can Mint")}
                 </div>
+                {targetSelfSuiteId !== null && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    {t("mintNFT.identitySuite", "Identity suite")}: {targetSelfSuiteId}
+                  </div>
+                )}
               </div>
             )}
           </div>

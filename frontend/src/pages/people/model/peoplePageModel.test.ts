@@ -28,7 +28,6 @@ const baseFilters: PeopleFiltersState = {
   filterType: "all",
   sortOrder: "asc",
   selectedAddresses: [],
-  selectedTags: [],
 };
 
 describe("peoplePageModel", () => {
@@ -68,13 +67,13 @@ describe("peoplePageModel", () => {
     expect(resolveProjectedPerson("0xada", lookup)).toBeNull();
   });
 
-  it("filters by search text, address, and tag before applying sort order", () => {
+  it("filters by public search text and address before applying sort order", () => {
     const people = [
       makePerson({
         tokenId: "1",
         fullName: "Ada Lovelace",
         addedBy: "0xCreatorA",
-        tag: "math",
+        nftPublicStory: "Analytical engine mathematics",
         endorsementCount: 2,
       }),
       makePerson({
@@ -82,7 +81,7 @@ describe("peoplePageModel", () => {
         tokenId: "2",
         fullName: "Grace Hopper",
         addedBy: "0xCreatorB",
-        tag: "navy",
+        nftPublicStory: "Navy compiler pioneer",
         endorsementCount: 5,
       }),
       makePerson({
@@ -90,16 +89,15 @@ describe("peoplePageModel", () => {
         tokenId: "3",
         fullName: "Katherine Johnson",
         addedBy: "0xCreatorA",
-        tag: "math",
+        nftPublicStory: "Orbital calculation mathematics",
         endorsementCount: 9,
       }),
     ];
 
     const filtered = filterPeople(people, {
       ...baseFilters,
-      searchTerm: "a",
+      searchTerm: "math",
       selectedAddresses: ["creatora"],
-      selectedTags: ["math"],
       filterType: "by_endorsement",
       sortOrder: "desc",
     });

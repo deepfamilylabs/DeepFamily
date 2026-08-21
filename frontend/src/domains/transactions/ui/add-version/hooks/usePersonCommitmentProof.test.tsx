@@ -13,21 +13,19 @@ vi.mock("../../../../../shared/workers/zkWorkerClient", () => ({
 
 vi.mock("../../../../../shared/zk/zk", () => ({
   formatGroth16ProofForContract: () => ({
-    proofSystemId: 1,
+    circuitId: 1,
     proofEncodingId: 1,
     proofData: "0xproof",
   }),
 }));
 
 vi.mock("../../../../../shared/zk/publicSignalSpecs", () => ({
-  decodePersonCommitmentPublicSignals: () => ({
+  decodePersonRelationPublicSignals: () => ({
     identityCommitment: 1n,
     fatherIdentityCommitment: 0n,
     motherIdentityCommitment: 0n,
-    submitter: 2n,
-    schemaVersion: 1,
-    cryptoSuiteVersion: 1,
-    hashAlgoId: 1,
+    submitterAndSelfSuiteId: 2n,
+    versionCommitment: 3n,
   }),
 }));
 
@@ -37,13 +35,13 @@ describe("usePersonCommitmentProof", () => {
   beforeEach(() => {
     mocks.zkWorkerCall.mockReset();
     mocks.zkWorkerCall.mockImplementation((method: string) => {
-      if (method === "generatePersonCommitmentProof") {
+      if (method === "generatePersonRelationProof") {
         return Promise.resolve({
           proof: { pi_a: [], pi_b: [], pi_c: [] },
-          publicSignals: ["1", "0", "0", "2", "1", "1", "1"],
+          publicSignals: ["1", "0", "0", "2", "3"],
         });
       }
-      if (method === "verifyPersonCommitmentProof") {
+      if (method === "verifyPersonRelationProof") {
         return Promise.resolve({ ok: true });
       }
       return Promise.reject(new Error(`unexpected zk method ${method}`));
@@ -64,37 +62,43 @@ describe("usePersonCommitmentProof", () => {
           birthDay: 10,
           isBirthBC: false,
           gender: 2,
+          identitySuiteId: 1,
         },
         fatherData: null,
         motherData: null,
         submitterAddress: "0x00000000000000000000000000000000000000aa",
+        contentDigestLo: "4",
+        contentDigestHi: "5",
       });
     });
 
     expect(mocks.zkWorkerCall).toHaveBeenNthCalledWith(
       1,
-      "generatePersonCommitmentProof",
+      "generatePersonRelationProof",
       expect.objectContaining({
         submitterAddress: "0x00000000000000000000000000000000000000aa",
+        selfSuiteId: 1,
+        fatherSuiteId: 0,
+        motherSuiteId: 0,
+        contentDigestLo: "4",
+        contentDigestHi: "5",
       }),
       { timeoutMs: 240_000 },
     );
     expect(mocks.zkWorkerCall).toHaveBeenNthCalledWith(
       2,
-      "verifyPersonCommitmentProof",
+      "verifyPersonRelationProof",
       expect.any(Object),
       { timeoutMs: 120_000 },
     );
     expect(proofResult!).toEqual({
-      proof: { proofSystemId: 1, proofEncodingId: 1, proofData: "0xproof" },
+      proof: { circuitId: 1, proofEncodingId: 1, proofData: "0xproof" },
       publicSignals: {
         identityCommitment: 1n,
         fatherIdentityCommitment: 0n,
         motherIdentityCommitment: 0n,
-        submitter: 2n,
-        schemaVersion: 1,
-        cryptoSuiteVersion: 1,
-        hashAlgoId: 1,
+        submitterAndSelfSuiteId: 2n,
+        versionCommitment: 3n,
       },
     });
   });

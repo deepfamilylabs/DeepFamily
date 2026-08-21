@@ -254,7 +254,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidVersionIndex: "Version index is invalid.",
   InvalidFullName: "Full name does not meet format requirements.",
   InvalidTagLength: "Tag is too long.",
-  InvalidCIDLength: "Metadata CID is too long.",
+  InvalidCIDLength: "Attachment CID is too long.",
   InvalidBirthPlace: "Birth place is invalid.",
   InvalidDeathPlace: "Death place is invalid.",
   InvalidDeathMonth: "Death month is invalid.",

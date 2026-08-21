@@ -70,9 +70,11 @@ function PersonStoryCard({
 
   // Story preview
   const storyPreview = useMemo(() => {
-    if (!person.story) return "";
-    return person.story.length > 150 ? person.story.substring(0, 150) + "..." : person.story;
-  }, [person.story]);
+    if (!person.nftPublicStory) return "";
+    return person.nftPublicStory.length > 150
+      ? person.nftPublicStory.substring(0, 150) + "..."
+      : person.nftPublicStory;
+  }, [person.nftPublicStory]);
 
   const handleStoryBadgeClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {

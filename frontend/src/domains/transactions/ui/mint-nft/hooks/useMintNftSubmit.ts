@@ -1,5 +1,4 @@
 import { useCallback, type MutableRefObject } from "react";
-import type { IdentitySaltMode } from "../../../../../shared/crypto/identityHash";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import type {
@@ -20,8 +19,7 @@ type GenerateDisclosureProof = (args: {
   personInfo: MintPersonInfo;
   formData: MintNFTFormValues;
   targetPersonHash: string;
-  identityMode: IdentitySaltMode;
-  recoverySaltHex: string;
+  selfSuiteId: number;
   getPassphrase: () => string;
 }) => Promise<{
   computedPersonHash: string;
@@ -41,11 +39,10 @@ interface UseMintNftSubmitArgs {
   isEndorsed: boolean;
   isAlreadyMinted: boolean;
   personInfo: MintPersonInfo | null;
-  personIdentityMode: IdentitySaltMode;
-  personRecoverySaltHex: string;
   personCalcRef: MutableRefObject<PersonHashCalculatorHandle | null>;
   targetPersonHash: string;
   targetVersionIndex: number;
+  targetSelfSuiteId: number | null;
   didPatchCacheRef: MutableRefObject<boolean>;
   generateDisclosureProof: GenerateDisclosureProof;
   resetDisclosureProof: () => void;
@@ -74,11 +71,10 @@ export function useMintNftSubmit({
   isEndorsed,
   isAlreadyMinted,
   personInfo,
-  personIdentityMode,
-  personRecoverySaltHex,
   personCalcRef,
   targetPersonHash,
   targetVersionIndex,
+  targetSelfSuiteId,
   didPatchCacheRef,
   generateDisclosureProof,
   resetDisclosureProof,
@@ -130,6 +126,19 @@ export function useMintNftSubmit({
         return;
       }
 
+      if (hasValidTarget && targetSelfSuiteId === null) {
+        setErrorResult(
+          toMintNFTErrorResult(
+            "TARGET_ENVELOPE_HEADER_UNAVAILABLE",
+            t(
+              "mintNFT.targetEnvelopeHeaderRequired",
+              "The target metadata envelope header must be verified before minting",
+            ),
+          ),
+        );
+        return;
+      }
+
       if (hasValidTarget) {
         if (!isEndorsed) {
           setShowEndorseConfirm(true);
@@ -155,8 +164,7 @@ export function useMintNftSubmit({
           personInfo,
           formData: data,
           targetPersonHash,
-          identityMode: personIdentityMode,
-          recoverySaltHex: personRecoverySaltHex,
+          selfSuiteId: targetSelfSuiteId!,
           getPassphrase: () => personCalcRef.current?.getSecretInputs().passphrase || "",
         });
 
@@ -169,6 +177,7 @@ export function useMintNftSubmit({
         const mintResult = await runMintNftOrThrow({
           personHash: finalPersonHash,
           versionIndex: finalVersionIndex,
+          selfSuiteId: targetSelfSuiteId!,
           proofEnvelope: proof.proofEnvelope,
           publicSignals: proof.publicSignals,
           tokenURI: proof.tokenURI,
@@ -244,9 +253,7 @@ export function useMintNftSubmit({
       markVersionMinted,
       onSuccess,
       personCalcRef,
-      personIdentityMode,
       personInfo,
-      personRecoverySaltHex,
       resetDisclosureProof,
       runMintNftOrThrow,
       setConsentError,
@@ -255,6 +262,7 @@ export function useMintNftSubmit({
       setSuccessResult,
       t,
       targetPersonHash,
+      targetSelfSuiteId,
       targetVersionIndex,
     ],
   );

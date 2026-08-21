@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "deprecated-pre-v1",
+  "ceremonyId": "deepfamily-single-operator-20260804T103721Z",
+  "reason": "Fresh-v1 changes both circuit constraints and public-signal ABI; these Phase 2 keys and verifiers are incompatible.",
+  "archivedManifest": {
+    "path": "circuits/pre-v1/zk-artifacts-manifest.json",
+    "sha256": "06db52b09580242b9bcdd8e1f1b86f9137f697aeb3cf94fb6a19f086792a70ef"
+  },
+  "archivedTranscript": {
+    "path": "circuits/pre-v1/zk-ceremony-transcript.json",
+    "sha256": "a4877b58c98ce6cce22431c7fd12cc11f3b87dc3d984b59288cc8532536a0bdd"
+  },
+  "replacement": {
+    "status": "development-only",
+    "command": "npm run zk:dev:fresh-v1",
+    "productionCeremonyRequired": true
+  }
+}

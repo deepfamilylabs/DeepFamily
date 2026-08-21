@@ -1,25 +1,24 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import disclosureBindingProof from "../lib/disclosureBindingProof.js";
+import { buildDisclosureBindingInput } from "../lib/disclosureBindingProof.js";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import {
   addPerson,
   buildPersonCommitmentCircuitInput,
   computeProfileIdentityCommitment,
   makeAddPersonPublicSignals,
+  makeMetadataEnvelope,
   makeStubProof,
   makeTestPerson,
   setupStubVerifiers,
 } from "./helpers/testHelper.mjs";
 
-const { buildDisclosureBindingInput } = disclosureBindingProof;
-
 const PURPOSE_PERSON = 0;
 const PURPOSE_DISCLOSURE_BINDING = 1;
-const FALSE_PROOF_SYSTEM_ID = 900;
-const MISSING_PROOF_SYSTEM_ID = 901;
-const UPDATED_PROOF_SYSTEM_ID = 902;
+const FALSE_CIRCUIT_ID = 900;
+const MISSING_CIRCUIT_ID = 901;
+const UPDATED_CIRCUIT_ID = 902;
 
 async function deployStubAdapter({
   personShouldVerify = true,
@@ -82,11 +81,10 @@ async function buildAddPersonAttempt(signer, opts = {}) {
       ...makeStubProof(),
       ...opts.proofOverrides,
     },
-    publicSignals: makeAddPersonPublicSignals(
-      built.person.identityCommitment,
-      signerAddr,
-      opts.meta,
-    ),
+    publicSignals: makeAddPersonPublicSignals(built.person.identityCommitment, signerAddr, {
+      ...opts.meta,
+      versionCommitment: built.versionCommitment,
+    }),
   };
 }
 
@@ -115,9 +113,7 @@ async function buildMintAttempt(deepFamily, signer, opts = {}) {
       identityCommitment: built.person.identityCommitment,
       disclosureBinding: built.disclosureBinding,
       minter: BigInt(built.input.minter),
-      schemaVersion: built.input.schemaVersion,
-      cryptoSuiteVersion: built.input.cryptoSuiteVersion,
-      hashAlgoId: built.input.hashAlgoId,
+      suiteCommitment: built.suiteCommitment,
     },
     coreInfo: makeDisclosureCoreInfo(
       built.person.identityCommitment,
@@ -136,7 +132,7 @@ describe("Proof transport layer tests", function () {
       const proof = makeStubProof();
 
       await expect(
-        adapter.verifyProof(PURPOSE_PERSON, 255, proof.proofData, Array(7).fill(0)),
+        adapter.verifyProof(PURPOSE_PERSON, 255, proof.proofData, Array(5).fill(0)),
       ).to.be.revertedWithCustomError(adapter, "UnsupportedProofEncoding");
     });
 
@@ -144,7 +140,7 @@ describe("Proof transport layer tests", function () {
       const { adapter } = await deployStubAdapter();
 
       await expect(
-        adapter.verifyProof(PURPOSE_PERSON, 1, "0x1234", Array(7).fill(0)),
+        adapter.verifyProof(PURPOSE_PERSON, 1, "0x1234", Array(5).fill(0)),
       ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     });
 
@@ -153,7 +149,7 @@ describe("Proof transport layer tests", function () {
       const proof = makeStubProof();
 
       await expect(
-        adapter.verifyProof(PURPOSE_PERSON, 1, proof.proofData, Array(6).fill(0)),
+        adapter.verifyProof(PURPOSE_PERSON, 1, proof.proofData, Array(4).fill(0)),
       ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     });
 
@@ -162,7 +158,7 @@ describe("Proof transport layer tests", function () {
       const proof = makeStubProof();
 
       await expect(
-        adapter.verifyProof(PURPOSE_DISCLOSURE_BINDING, 1, proof.proofData, Array(7).fill(0)),
+        adapter.verifyProof(PURPOSE_DISCLOSURE_BINDING, 1, proof.proofData, Array(5).fill(0)),
       ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     });
   });
@@ -177,16 +173,18 @@ describe("Proof transport layer tests", function () {
       await expect(
         deepFamily
           .connect(nonOwner)
-          .setVerifier(UPDATED_PROOF_SYSTEM_ID, PURPOSE_PERSON, adapterAddress),
+          .setCircuitVerifier(PURPOSE_PERSON, UPDATED_CIRCUIT_ID, adapterAddress),
       )
         .to.be.revertedWithCustomError(deepFamily, "OwnableUnauthorizedAccount")
         .withArgs(await nonOwner.getAddress());
 
-      await expect(deepFamily.setVerifier(UPDATED_PROOF_SYSTEM_ID, PURPOSE_PERSON, adapterAddress))
-        .to.emit(deepFamily, "VerifierUpdated")
-        .withArgs(UPDATED_PROOF_SYSTEM_ID, PURPOSE_PERSON, adapterAddress);
+      await expect(
+        deepFamily.setCircuitVerifier(PURPOSE_PERSON, UPDATED_CIRCUIT_ID, adapterAddress),
+      )
+        .to.emit(deepFamily, "CircuitVerifierSet")
+        .withArgs(PURPOSE_PERSON, UPDATED_CIRCUIT_ID, adapterAddress);
 
-      expect(await deepFamily.verifierRegistry(UPDATED_PROOF_SYSTEM_ID, PURPOSE_PERSON)).to.equal(
+      expect(await deepFamily.verifierRegistry(PURPOSE_PERSON, UPDATED_CIRCUIT_ID)).to.equal(
         adapterAddress,
       );
     });
@@ -196,12 +194,12 @@ describe("Proof transport layer tests", function () {
       const [, eoa] = await hre.ethers.getSigners();
 
       await expect(
-        deepFamily.setVerifier(1, PURPOSE_PERSON, hre.ethers.ZeroAddress),
+        deepFamily.setCircuitVerifier(PURPOSE_PERSON, UPDATED_CIRCUIT_ID, hre.ethers.ZeroAddress),
       ).to.be.revertedWithCustomError(deepFamily, "InvalidVerifierAddress");
 
       const eoaAddress = await eoa.getAddress();
       await expect(
-        deepFamily.setVerifier(1, PURPOSE_PERSON, eoaAddress),
+        deepFamily.setCircuitVerifier(PURPOSE_PERSON, UPDATED_CIRCUIT_ID, eoaAddress),
       ).to.be.revertedWithCustomError(deepFamily, "InvalidVerifierAddress");
     });
 
@@ -209,7 +207,7 @@ describe("Proof transport layer tests", function () {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
       const [signer] = await hre.ethers.getSigners();
       const attempt = await buildAddPersonAttempt(signer, {
-        proofOverrides: { proofSystemId: MISSING_PROOF_SYSTEM_ID },
+        proofOverrides: { circuitId: MISSING_CIRCUIT_ID },
       });
 
       await expect(
@@ -220,8 +218,7 @@ describe("Proof transport layer tests", function () {
             attempt.publicSignals,
             0,
             0,
-            "missing-route",
-            "ipfs://missing-route",
+            makeMetadataEnvelope(hre.ethers, 1, { tag: "missing-route" }),
           ),
       ).to.be.revertedWithCustomError(deepFamily, "VerifierRouteNotSet");
     });
@@ -230,14 +227,14 @@ describe("Proof transport layer tests", function () {
       const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
       const [signer] = await hre.ethers.getSigners();
       const { adapter } = await deployStubAdapter({ personShouldVerify: false });
-      await deepFamily.setVerifier(
-        FALSE_PROOF_SYSTEM_ID,
+      await deepFamily.setCircuitVerifier(
         PURPOSE_PERSON,
+        FALSE_CIRCUIT_ID,
         await adapter.getAddress(),
       );
 
       const attempt = await buildAddPersonAttempt(signer, {
-        proofOverrides: { proofSystemId: FALSE_PROOF_SYSTEM_ID },
+        proofOverrides: { circuitId: FALSE_CIRCUIT_ID },
       });
 
       await expect(
@@ -248,8 +245,7 @@ describe("Proof transport layer tests", function () {
             attempt.publicSignals,
             0,
             0,
-            "invalid-proof",
-            "ipfs://invalid-proof",
+            makeMetadataEnvelope(hre.ethers, 1, { tag: "invalid-proof" }),
           ),
       ).to.be.revertedWithCustomError(deepFamily, "InvalidZKProof");
     });
@@ -260,7 +256,7 @@ describe("Proof transport layer tests", function () {
       await setupStubVerifiers(hre.ethers, deepFamily);
 
       const attempt = await buildMintAttempt(deepFamily, signer, {
-        proofOverrides: { proofSystemId: MISSING_PROOF_SYSTEM_ID },
+        proofOverrides: { circuitId: MISSING_CIRCUIT_ID },
       });
 
       await expect(
@@ -276,14 +272,14 @@ describe("Proof transport layer tests", function () {
       await setupStubVerifiers(hre.ethers, deepFamily);
 
       const { adapter } = await deployStubAdapter({ disclosureShouldVerify: false });
-      await deepFamily.setVerifier(
-        FALSE_PROOF_SYSTEM_ID,
+      await deepFamily.setCircuitVerifier(
         PURPOSE_DISCLOSURE_BINDING,
+        FALSE_CIRCUIT_ID,
         await adapter.getAddress(),
       );
 
       const attempt = await buildMintAttempt(deepFamily, signer, {
-        proofOverrides: { proofSystemId: FALSE_PROOF_SYSTEM_ID },
+        proofOverrides: { circuitId: FALSE_CIRCUIT_ID },
       });
 
       await expect(

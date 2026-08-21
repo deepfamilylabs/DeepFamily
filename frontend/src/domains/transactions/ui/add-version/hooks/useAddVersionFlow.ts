@@ -18,6 +18,10 @@ export function useAddVersionFlow() {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(addVersionReducer, initialAddVersionFlowState);
   const runIdRef = useRef(0);
+  const submittedTransactionRef = useRef<{
+    args: AddVersionFlowArgs;
+    transactionHash: string;
+  } | null>(null);
 
   const stepMessage = useMemo(() => {
     switch (state.step) {
@@ -32,6 +36,7 @@ export function useAddVersionFlow() {
 
   const reset = useCallback(() => {
     runIdRef.current += 1;
+    submittedTransactionRef.current = null;
     dispatch({ type: "reset" });
   }, []);
 
@@ -49,10 +54,25 @@ export function useAddVersionFlow() {
         const submitContract = createDeepFamilyContract(contractAddress, signer);
 
         let preflightContract = submitContract;
+        let receiptProvider = (signer as any).provider;
         if (rpcUrl) {
           const readonlyProvider = getReadonlyProvider(rpcUrl, chainId);
           preflightContract = createDeepFamilyContract(contractAddress, readonlyProvider);
+          receiptProvider = readonlyProvider;
         }
+
+        const priorSubmission = submittedTransactionRef.current;
+        if (priorSubmission && priorSubmission.args !== args) {
+          submittedTransactionRef.current = null;
+        }
+        const reconcileTransactionHash =
+          submittedTransactionRef.current?.args === args
+            ? submittedTransactionRef.current.transactionHash
+            : undefined;
+        const getTransactionReceipt =
+          typeof receiptProvider?.getTransactionReceipt === "function"
+            ? (txHash: string) => receiptProvider.getTransactionReceipt(txHash)
+            : undefined;
 
         const result = await executeAddVersionFlow({
           submitContract,
@@ -63,10 +83,12 @@ export function useAddVersionFlow() {
           publicSignals: args.publicSignals,
           fatherVersionIndex: args.fatherVersionIndex,
           motherVersionIndex: args.motherVersionIndex,
-          tag: args.tag,
-          metadataCID: args.metadataCID,
+          metadataEnvelope: args.metadataEnvelope,
           isDev: isDevMode(),
-          onTransactionSubmitted: () => {
+          reconcileTransactionHash,
+          getTransactionReceipt,
+          onTransactionSubmitted: (transactionHash) => {
+            submittedTransactionRef.current = { args, transactionHash };
             if (runIdRef.current === thisRunId) {
               dispatch({ type: "stage", step: "confirming" });
             }
@@ -78,8 +100,12 @@ export function useAddVersionFlow() {
         }
 
         dispatch({ type: "success", result });
+        submittedTransactionRef.current = null;
         return result;
       } catch (error) {
+        if ((error as any)?.transactionReconciliationFinal === true) {
+          submittedTransactionRef.current = null;
+        }
         if (runIdRef.current !== thisRunId) {
           throw error;
         }

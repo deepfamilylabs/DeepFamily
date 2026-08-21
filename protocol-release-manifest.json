@@ -1,0 +1,274 @@
+{
+  "schemaVersion": 1,
+  "protocol": "deepfamily/onchain-biography-unified-passphrase-v1",
+  "releaseStatus": "development",
+  "protocolGeneration": "df-onchain-biography-v1",
+  "envelope": {
+    "maximumBytes": 16384,
+    "payloadHash": "keccak256(envelope)",
+    "universalPrefix": {
+      "minimumBytes": 20,
+      "magic": "0x44464d31",
+      "formatVersion": {
+        "offset": 4,
+        "bytes": 1,
+        "nonZero": true
+      },
+      "selfIdentitySuiteId": {
+        "offset": 16,
+        "bytes": 4,
+        "encoding": "uint32-big-endian",
+        "nonZero": true
+      }
+    },
+    "dataContract": {
+      "runtimeEncoding": "0x00 || envelope",
+      "stopPrefix": "0x00",
+      "payloadStartsAtCodeOffset": 1,
+      "payloadLengthIncludesStop": false,
+      "payloadHashIncludesStop": false
+    }
+  },
+  "formats": {
+    "1": {
+      "name": "DFM1-format-1",
+      "status": "development",
+      "headerLength": 112,
+      "fixedEnvelopeOverhead": 128,
+      "maximumContentCiphertextBytes": 16256,
+      "selectors": {
+        "flags": 0,
+        "plaintextCodec": 1,
+        "compressionSuite": 1,
+        "cipherSuite": 1,
+        "kdfSuite": 1
+      },
+      "offsets": {
+        "flags": 5,
+        "plaintextCodec": 6,
+        "compressionSuite": 7,
+        "cipherSuite": 8,
+        "kdfSuite": 9,
+        "headerLength": 10,
+        "contentCiphertextLength": 12,
+        "identitySuiteId": 16,
+        "reserved": 20,
+        "fileSalt": 24,
+        "wrapIV": 40,
+        "contentIV": 52,
+        "wrappedDEK": 64,
+        "wrappedDEKTag": 96,
+        "contentCiphertext": 112
+      },
+      "lengths": {
+        "fileSalt": 16,
+        "wrapIV": 12,
+        "contentIV": 12,
+        "dek": 32,
+        "wrappedDEK": 32,
+        "gcmTag": 16
+      },
+      "plaintext": {
+        "schema": "deepfamily/person-version@1.0",
+        "maximumUtf8Bytes": 1048576,
+        "tagMaximumUtf8Bytes": 256,
+        "serialization": "df-canonical-json-v1",
+        "compression": {
+          "name": "gzip-v1",
+          "level": 6,
+          "mtime": 0,
+          "members": 1,
+          "allowTrailingData": false
+        }
+      },
+      "cipher": {
+        "name": "AES-256-GCM",
+        "keyBytes": 32,
+        "ivBytes": 12,
+        "tagBytes": 16
+      },
+      "aad": {
+        "contextDomain": {
+          "text": "DeepFamily:MetadataContext:v1",
+          "keccak256": "0xd855c7e2d5c09af20c9453bcc630044c23cac2f75592bb98aa7594840f3ce779"
+        },
+        "wrapDomain": {
+          "text": "DeepFamily:MetadataWrapAAD:v1",
+          "keccak256": "0xf77f0a01a36d0a758e0bdf9f2fe11d3823c4a7e096e62da5e508ec2328084c07"
+        },
+        "contentDomain": {
+          "text": "DeepFamily:MetadataContentAAD:v1",
+          "keccak256": "0x69e1eba7ef35740df1813aa87a977b14fada1a507b16620977e70fa83dcc4978"
+        },
+        "contextAbiWords": [
+          "bytes32 contextDomain",
+          "uint256 chainId",
+          "address deepFamilyProxy",
+          "bytes32 personHash",
+          "bytes32 fatherHash",
+          "uint256 fatherVersionIndex",
+          "bytes32 motherHash",
+          "uint256 motherVersionIndex",
+          "uint256 versionCommitment",
+          "uint32 identitySuiteId",
+          "uint8 formatVersion",
+          "uint8 plaintextCodec",
+          "uint8 compressionSuite",
+          "uint8 cipherSuite",
+          "uint8 kdfSuite"
+        ]
+      }
+    }
+  },
+  "identitySuites": {
+    "1": {
+      "status": "candidate-awaiting-device-benchmark",
+      "normalization": "NFKD",
+      "trim": false,
+      "unicodeVersion": "17.0",
+      "passwordDomain": "DeepFamily:IdentityKDF:v1",
+      "passwordDomainSeparatorHex": "00",
+      "salt": {
+        "bytes": 16,
+        "derivation": "first16(keccak256(solidityPacked(string,uint32,string,bytes32)))",
+        "domain": "deepfamily:identity-kdf-salt:v1"
+      },
+      "kdf": {
+        "algorithm": "Argon2id",
+        "version": 19,
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputBytes": 32
+      },
+      "fieldEncoding": "big-endian uint256 mod BN254 scalar field"
+    }
+  },
+  "fileKdfSuites": {
+    "1": {
+      "status": "candidate-awaiting-device-benchmark",
+      "normalization": "NFKD",
+      "trim": false,
+      "passwordDomain": "DeepFamily:FileKDF:v1",
+      "passwordDomainSeparatorHex": "00",
+      "saltBytes": 16,
+      "kdf": {
+        "algorithm": "Argon2id",
+        "version": 19,
+        "memoryKiB": 65536,
+        "iterations": 3,
+        "parallelism": 1,
+        "outputBytes": 32
+      }
+    }
+  },
+  "commitments": {
+    "poseidonArity": 4,
+    "domains": {
+      "suite": 1000,
+      "nameSecret": 1001,
+      "identity": 1002,
+      "disclosure": 1003,
+      "version": 1004
+    },
+    "contentDigest": "keccak256(canonicalJsonBytes)",
+    "contentDigestLimbs": "uint128-low, uint128-high",
+    "versionCommitment": "Poseidon4(1004,derivedSecretField,contentDigestLo,contentDigestHi)",
+    "versionHashDomain": {
+      "text": "DeepFamily:VersionHash:v1",
+      "keccak256": "0x9bf4224bff73f3d304ffbd739e694221255df4b3497fec14a7beabb471b34b2b"
+    }
+  },
+  "proofRoutes": [
+    {
+      "purpose": "PersonRelation",
+      "purposeOrdinal": 0,
+      "circuitId": 1,
+      "proofEncodingId": 1,
+      "publicSignals": [
+        { "name": "identityCommitment", "bits": 254 },
+        { "name": "fatherIdentityCommitment", "bits": 254 },
+        { "name": "motherIdentityCommitment", "bits": 254 },
+        { "name": "submitterAndSelfSuiteId", "bits": 192 },
+        { "name": "versionCommitment", "bits": 254 }
+      ],
+      "roleSuiteSemantics": "private uint32 self/father/mother; self nonzero and packed public; present parent nonzero; absent parent zero",
+      "artifacts": {
+        "status": "development-regeneration-required",
+        "sourceSha256": null,
+        "r1csSha256": null,
+        "wasmSha256": null,
+        "zkeySha256": null,
+        "verificationKeySha256": null,
+        "solidityVerifierSha256": null,
+        "adapterArtifactSha256": null,
+        "adapterRuntimeSha256": null
+      }
+    },
+    {
+      "purpose": "DisclosureBinding",
+      "purposeOrdinal": 1,
+      "circuitId": 1,
+      "proofEncodingId": 1,
+      "publicSignals": [
+        { "name": "identityCommitment", "bits": 254 },
+        { "name": "disclosureBinding", "bits": 254 },
+        { "name": "minter", "bits": 160 },
+        { "name": "suiteCommitment", "bits": 254 }
+      ],
+      "roleSuiteSemantics": "private nonzero uint32 selfIdentitySuiteId",
+      "artifacts": {
+        "status": "development-regeneration-required",
+        "sourceSha256": null,
+        "r1csSha256": null,
+        "wasmSha256": null,
+        "zkeySha256": null,
+        "verificationKeySha256": null,
+        "solidityVerifierSha256": null,
+        "adapterArtifactSha256": null,
+        "adapterRuntimeSha256": null
+      }
+    }
+  ],
+  "deployments": {
+    "status": "not-deployed",
+    "chainId": null,
+    "deepFamilyProxy": null,
+    "deepFamilyImplementation": null,
+    "metadataArchiveV1": {
+      "address": null,
+      "deepFamilyImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "deepFamilyReader": {
+      "address": null,
+      "deepFamilyImmutable": null,
+      "metadataArchiveImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    }
+  },
+  "goldenVectors": {
+    "status": "candidate-not-production-frozen",
+    "path": "protocol-vectors/onchain-biography-v1.json",
+    "sha256": "537afdf6135f526a44c02e7fc1538571de22e90d1cb362a8e2f697e364aa1d80"
+  },
+  "releaseEvidence": {
+    "kdfDeviceMatrix": {
+      "status": "missing",
+      "path": null,
+      "sha256": null
+    },
+    "kdfAttackerCostStudy": {
+      "status": "missing",
+      "path": null,
+      "sha256": null
+    },
+    "trustedSetup": {
+      "status": "fresh-v1-ceremony-required",
+      "manifestSha256": null,
+      "transcriptSha256": null
+    }
+  }
+}

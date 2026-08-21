@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import type React from "react";
-import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
+import {
+  deleteBlob,
+  isIndexedDBSupported,
+  readBlob,
+  writeBlob,
+} from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import {
   csKey,
@@ -16,6 +21,7 @@ import {
   applyNodeDetailNftDetails,
   applyNodeDetailVersionDetails,
   bumpNodeEndorsementCount,
+  clearAllMetadataUnlocks,
   makeNodeId,
   type NodeData,
   type NodeId,
@@ -132,6 +138,10 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.storageNS,
     options.useIndexedDbCache,
   ]);
+
+  const clearMetadataUnlockCache = useCallback(() => {
+    options.setNodesData((current) => clearAllMetadataUnlocks(current));
+  }, [options.setNodesData]);
 
   const invalidateTreeRootCache = useCallback(() => {
     options.setReachableNodeIds([]);
@@ -321,6 +331,55 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     [options.setNodesData, invalidateByTx],
   );
 
+  const cacheValidatedPersonVersion = useCallback(
+    (node: NodeData) => {
+      if (!node.metadataUnlockValidated || !node.metadataProtocolGeneration) {
+        throw new Error("Only fully validated metadata may enter the NodeData unlock cache");
+      }
+      const id = makeNodeId(node.personHash, Number(node.versionIndex));
+      options.setNodesData((current) =>
+        upsertNode(current, {
+          ...(current[id] ?? {}),
+          ...node,
+          id,
+          personHash: node.personHash,
+          versionIndex: Number(node.versionIndex),
+        }),
+      );
+    },
+    [options.setNodesData],
+  );
+
+  const persistValidatedPersonVersion = useCallback(
+    async (node: NodeData) => {
+      if (!node.metadataUnlockValidated || !node.metadataProtocolGeneration) {
+        throw new Error("Only fully validated metadata may enter the IndexedDB unlock cache");
+      }
+      if (!options.useIndexedDbCache || !isIndexedDBSupported()) return;
+
+      const id = makeNodeId(node.personHash, Number(node.versionIndex));
+      const storageKey = `${options.storageNS}::nodesData`;
+      const persisted =
+        (await readBlob<Record<string, NodeData>>(storageKey)) ?? {};
+      // Persist each successful unlock immediately. Merge both the durable and
+      // current in-memory snapshots so a per-item write never discards public
+      // tree data or a preceding successful item in the same serial batch.
+      await writeBlob(storageKey, {
+        ...persisted,
+        ...options.nodesDataRef.current,
+        [id]: {
+          ...(persisted[id] ?? {}),
+          ...(options.nodesDataRef.current[id] ?? {}),
+          ...node,
+          id,
+          personHash: node.personHash,
+          versionIndex: Number(node.versionIndex),
+        },
+      });
+    },
+    [options.nodesDataRef, options.storageNS, options.useIndexedDbCache],
+  );
+
   const mergeNodeDetail = useCallback(
     (
       selected: NodeKeyMinimal,
@@ -359,6 +418,9 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
 
   return {
     clearAllCaches,
+    clearMetadataUnlockCache,
+    cacheValidatedPersonVersion,
+    persistValidatedPersonVersion,
     invalidateTreeRootCache,
     invalidateByTx,
     bumpEndorsementCount,

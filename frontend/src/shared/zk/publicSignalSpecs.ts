@@ -1,6 +1,6 @@
 export {
-  PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
-  DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
   PUBLIC_SIGNAL_SPECS,
   PUBLIC_SIGNAL_SPECS_BY_PURPOSE,
   getPublicSignalSpec,
@@ -10,7 +10,7 @@ export {
 
 import {
   decodeDisclosureBindingPublicSignals as decodeDisclosureBindingPublicSignalsRaw,
-  decodePersonCommitmentPublicSignals as decodePersonCommitmentPublicSignalsRaw,
+  decodePersonRelationPublicSignals as decodePersonRelationPublicSignalsRaw,
 } from "@deepfamily/proof-core";
 
 export type {
@@ -19,43 +19,31 @@ export type {
   PublicSignalValue,
 } from "@deepfamily/proof-core";
 
-type PersonPublicSignalsStruct = {
+export type PersonRelationPublicSignalsStruct = {
   identityCommitment: bigint;
   fatherIdentityCommitment: bigint;
   motherIdentityCommitment: bigint;
-  submitter: bigint;
-  schemaVersion: number;
-  cryptoSuiteVersion: number;
-  hashAlgoId: number;
+  submitterAndSelfSuiteId: bigint;
+  versionCommitment: bigint;
 };
 
-type DisclosureBindingPublicSignalsStruct = {
+export type DisclosureBindingPublicSignalsStruct = {
   identityCommitment: bigint;
   disclosureBinding: bigint;
   minter: bigint;
-  schemaVersion: number;
-  cryptoSuiteVersion: number;
-  hashAlgoId: number;
+  suiteCommitment: bigint;
 };
 
-const VERSION_FIELD_TRANSFORMS = {
-  schemaVersion: (value: bigint) => Number(value),
-  cryptoSuiteVersion: (value: bigint) => Number(value),
-  hashAlgoId: (value: bigint) => Number(value),
-} as const;
-
-export function decodePersonCommitmentPublicSignals(
+export function decodePersonRelationPublicSignals(
   publicSignals: ReadonlyArray<string | number | bigint>,
-): PersonPublicSignalsStruct {
-  return decodePersonCommitmentPublicSignalsRaw(publicSignals, {
-    fieldTransforms: VERSION_FIELD_TRANSFORMS,
-  }) as PersonPublicSignalsStruct;
+): PersonRelationPublicSignalsStruct {
+  return decodePersonRelationPublicSignalsRaw(publicSignals) as PersonRelationPublicSignalsStruct;
 }
 
 export function decodeDisclosureBindingPublicSignals(
   publicSignals: ReadonlyArray<string | number | bigint>,
 ): DisclosureBindingPublicSignalsStruct {
-  return decodeDisclosureBindingPublicSignalsRaw(publicSignals, {
-    fieldTransforms: VERSION_FIELD_TRANSFORMS,
-  }) as DisclosureBindingPublicSignalsStruct;
+  return decodeDisclosureBindingPublicSignalsRaw(
+    publicSignals,
+  ) as DisclosureBindingPublicSignalsStruct;
 }

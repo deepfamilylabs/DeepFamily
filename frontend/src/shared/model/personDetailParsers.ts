@@ -8,14 +8,21 @@ export interface DetailQueryOptions {
 }
 
 export interface VersionStructFields {
+  personHash?: string;
+  versionIndex?: string;
   fatherHash?: string;
   motherHash?: string;
-  fatherVersionIndex?: number;
-  motherVersionIndex?: number;
+  fatherVersionIndex?: string;
+  motherVersionIndex?: string;
+  versionCommitment?: string;
   addedBy?: string;
   timestamp?: number;
-  tag?: string;
-  metadataCID?: string;
+}
+
+export interface MetadataRefFields {
+  pointer?: string;
+  payloadHash?: string;
+  payloadLength?: number;
 }
 
 export interface CoreInfoFields {
@@ -31,11 +38,12 @@ export interface CoreInfoFields {
   deathDay?: number;
   deathPlace?: string;
   isDeathBC?: boolean;
-  story?: string;
+  nftPublicStory?: string;
 }
 
 export interface ParsedVersionDetails {
   version: VersionStructFields;
+  metadata: MetadataRefFields;
   endorsementCount: number;
   tokenId: string;
 }
@@ -44,6 +52,7 @@ export interface ParsedNftDetails {
   personHash: string;
   versionIndex: number;
   version: VersionStructFields;
+  metadata: MetadataRefFields;
   core: CoreInfoFields;
   endorsementCount?: number;
   nftTokenURI?: string;
@@ -51,37 +60,62 @@ export interface ParsedNftDetails {
 
 export function parseVersionStruct(versionStruct: any): VersionStructFields {
   if (!versionStruct) return {};
+  const personHash = versionStruct.personHash || versionStruct[0];
+  const versionIndexRaw =
+    versionStruct.versionIndex !== undefined ? versionStruct.versionIndex : versionStruct[3];
   const fatherHash = versionStruct.fatherHash || versionStruct[1];
   const motherHash = versionStruct.motherHash || versionStruct[2];
   const fatherVersionIndex =
     versionStruct.fatherVersionIndex !== undefined
-      ? Number(versionStruct.fatherVersionIndex)
+      ? versionStruct.fatherVersionIndex.toString()
       : versionStruct[4] !== undefined
-        ? Number(versionStruct[4])
+        ? versionStruct[4].toString()
         : undefined;
   const motherVersionIndex =
     versionStruct.motherVersionIndex !== undefined
-      ? Number(versionStruct.motherVersionIndex)
+      ? versionStruct.motherVersionIndex.toString()
       : versionStruct[5] !== undefined
-        ? Number(versionStruct[5])
+        ? versionStruct[5].toString()
         : undefined;
-  const addedBy = versionStruct.addedBy || versionStruct[6];
+  const versionCommitmentRaw =
+    versionStruct.versionCommitment !== undefined
+      ? versionStruct.versionCommitment
+      : versionStruct[6];
+  const addedBy = versionStruct.addedBy || versionStruct[7];
   const timestampRaw =
-    versionStruct.timestamp !== undefined ? versionStruct.timestamp : versionStruct[7];
+    versionStruct.timestamp !== undefined ? versionStruct.timestamp : versionStruct[8];
   const timestamp =
     timestampRaw !== undefined && timestampRaw !== null ? Number(timestampRaw) : undefined;
-  const tag = versionStruct.tag || versionStruct[8];
-  const metadataCID = versionStruct.metadataCID || versionStruct[9];
   return {
+    personHash,
+    versionIndex:
+      versionIndexRaw !== undefined && versionIndexRaw !== null
+        ? versionIndexRaw.toString()
+        : undefined,
     fatherHash,
     motherHash,
     fatherVersionIndex,
     motherVersionIndex,
+    versionCommitment:
+      versionCommitmentRaw !== undefined && versionCommitmentRaw !== null
+        ? versionCommitmentRaw.toString()
+        : undefined,
     addedBy,
     timestamp,
-    tag,
-    metadataCID,
   };
+}
+
+export function parseMetadataRef(metadataRef: any): MetadataRefFields {
+  if (!metadataRef) return {};
+  const pointer = metadataRef.pointer || metadataRef[0];
+  const payloadHash = metadataRef.payloadHash || metadataRef[1];
+  const payloadLengthRaw =
+    metadataRef.payloadLength !== undefined ? metadataRef.payloadLength : metadataRef[2];
+  const payloadLength =
+    payloadLengthRaw !== undefined && payloadLengthRaw !== null
+      ? Number(payloadLengthRaw)
+      : undefined;
+  return { pointer, payloadHash, payloadLength };
 }
 
 export function parseCoreInfo(coreInfo: any): CoreInfoFields {
@@ -119,7 +153,7 @@ export function parseCoreInfo(coreInfo: any): CoreInfoFields {
     coreInfo?.supplementInfo?.isDeathBC !== undefined
       ? Boolean(coreInfo.supplementInfo.isDeathBC)
       : undefined;
-  const story = coreInfo?.supplementInfo?.story;
+  const nftPublicStory = coreInfo?.supplementInfo?.story;
   return {
     fullName,
     gender,
@@ -133,17 +167,19 @@ export function parseCoreInfo(coreInfo: any): CoreInfoFields {
     deathDay,
     deathPlace,
     isDeathBC,
-    story,
+    nftPublicStory,
   };
 }
 
 export function parseVersionDetailsResult(ret: any): ParsedVersionDetails {
   const versionStruct = ret?.[0];
-  const endorsementCount = Number(ret?.[1] ?? 0);
-  const tokenIdVal = ret?.[2];
+  const metadataRef = ret?.[1];
+  const endorsementCount = Number(ret?.[2] ?? 0);
+  const tokenIdVal = ret?.[3];
   const tokenId = tokenIdVal !== undefined && tokenIdVal !== null ? tokenIdVal.toString() : "0";
   return {
     version: parseVersionStruct(versionStruct),
+    metadata: parseMetadataRef(metadataRef),
     endorsementCount,
     tokenId,
   };
@@ -153,9 +189,10 @@ export function parseNftDetailsResult(ret: any): ParsedNftDetails {
   const personHash = ret?.[0];
   const versionIndex = Number(ret?.[1] ?? 0);
   const versionStruct = ret?.[2];
-  const coreInfo = ret?.[3];
-  const endorsementCountRaw = ret?.[4];
-  const nftTokenURI = ret?.[5];
+  const metadataRef = ret?.[3];
+  const coreInfo = ret?.[4];
+  const endorsementCountRaw = ret?.[5];
+  const nftTokenURI = ret?.[6];
   const endorsementCount =
     endorsementCountRaw !== undefined && endorsementCountRaw !== null
       ? Number(endorsementCountRaw)
@@ -164,6 +201,7 @@ export function parseNftDetailsResult(ret: any): ParsedNftDetails {
     personHash,
     versionIndex,
     version: parseVersionStruct(versionStruct),
+    metadata: parseMetadataRef(metadataRef),
     core: parseCoreInfo(coreInfo),
     endorsementCount,
     nftTokenURI,

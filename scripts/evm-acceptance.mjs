@@ -9,16 +9,16 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { Contract, id as solidityId, Interface, JsonRpcProvider, keccak256 } from "ethers";
+import { decryptPersonVersionRuntime } from "@deepfamily/protocol-core";
 
 import hre from "hardhat";
 
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-import personCommitmentProof from "../lib/personCommitmentProof.js";
-import disclosureBindingProof from "../lib/disclosureBindingProof.js";
+import seedHelpers from "../lib/seedHelpers.js";
 import { resolveArtifactFile } from "../lib/proofCommon.js";
 import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
-  PERSON_COMMITMENT_PROOF_DESCRIPTOR,
+  PERSON_RELATION_PROOF_DESCRIPTOR,
 } from "../lib/proofDescriptors.js";
 import {
   assertImplementationMatchesArtifact,
@@ -59,6 +59,7 @@ import { resolveProductionRpcUrl } from "./lib/hardhatConfig.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
@@ -67,8 +68,7 @@ import {
 } from "./lib/testnetReleaseEvidence.mjs";
 import { publishTestnetReleaseEvidence } from "./lib/releaseEvidencePublisher.mjs";
 
-const { generatePersonCommitmentProof } = personCommitmentProof;
-const { generateDisclosureBindingProof } = disclosureBindingProof;
+const { addPersonVersion, mintPersonVersionNFT } = seedHelpers;
 
 let CHAIN_PROFILE = ESPACE_CHAIN_PROFILE;
 let ACCEPTANCE_PROFILE = CHAIN_PROFILE.acceptance;
@@ -76,6 +76,11 @@ let EXPECTED_NETWORK = ACCEPTANCE_PROFILE.networkName;
 let EXPECTED_CHAIN_ID = ACCEPTANCE_PROFILE.chainId;
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const PROOF_TIMEOUT_MS = 5 * 60 * 1000;
+const PERSON_RELATION_PURPOSE = 0;
+const DISCLOSURE_BINDING_PURPOSE = 1;
+const RELEASE_PERSON_RELATION_CIRCUIT_ID = 1;
+const RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID = 1;
+const GOVERNED_PERSON_RELATION_CIRCUIT_ID = 2;
 const READY_GRACE_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 2_000;
 const ZERO_HASH = `0x${"0".repeat(64)}`;
@@ -318,10 +323,16 @@ const hashAcceptanceInputs = async (ethers) => {
     "hardhat",
     "lib",
     "packages",
+    "protocol-vectors",
     "scripts",
     "tasks",
   ];
-  const fileNames = ["hardhat.config.mjs", "package.json", "package-lock.json"];
+  const fileNames = [
+    "hardhat.config.mjs",
+    "package.json",
+    "package-lock.json",
+    "protocol-release-manifest.json",
+  ];
   const entries = [];
   const directories = {};
   const files = {};
@@ -863,6 +874,18 @@ export const main = async (chainProfile) => {
     requireProduction: config.acceptanceMode === "release-rehearsal",
     requireBuiltR1cs: true,
   });
+  const inspectedProtocolManifest = inspectProtocolReleaseManifest({
+    root: process.cwd(),
+    requireProduction: config.acceptanceMode === "release-rehearsal",
+  });
+  const protocolManifestEvidence = {
+    path: path.relative(process.cwd(), inspectedProtocolManifest.manifestPath),
+    sha256: inspectedProtocolManifest.manifestSha256,
+    protocol: inspectedProtocolManifest.manifest.protocol,
+    protocolGeneration: inspectedProtocolManifest.manifest.protocolGeneration,
+    releaseStatus: inspectedProtocolManifest.manifest.releaseStatus,
+    goldenVectorSha256: inspectedProtocolManifest.manifest.goldenVectors.sha256,
+  };
   const report = {
     schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
     mode: "acceptance",
@@ -888,6 +911,7 @@ export const main = async (chainProfile) => {
     buildState,
     zkArtifactTrust,
     zkCeremonyVerification,
+    protocolManifestEvidence,
     network: {
       name: connection.networkName,
       chainId: network.chainId,
@@ -1079,6 +1103,7 @@ export const main = async (chainProfile) => {
       artifactTrust: zkArtifactTrust,
       ceremonyVerification: zkCeremonyVerification,
     });
+    await addStep("protocol-release-manifest-preflight", protocolManifestEvidence);
 
     if (config.acceptanceMode === "release-rehearsal") {
       currentStep = "acceptance-mode-preflight";
@@ -1482,6 +1507,7 @@ export const main = async (chainProfile) => {
       nameDisclosureVerifier,
       groth16VerifierAdapter,
       deepFamily,
+      metadataArchive,
       deepFamilyReader,
       deepFamilyImplementationAddress,
       transactionReceipts,
@@ -1495,6 +1521,7 @@ export const main = async (chainProfile) => {
       groth16VerifierAdapter: await groth16VerifierAdapter.getAddress(),
       deepFamily: await deepFamily.getAddress(),
       deepFamilyImplementation: deepFamilyImplementationAddress,
+      metadataArchive: await metadataArchive.getAddress(),
       deepFamilyReader: await deepFamilyReader.getAddress(),
     };
     Object.assign(report.addresses, addresses);
@@ -1507,6 +1534,7 @@ export const main = async (chainProfile) => {
       DisclosureBindingVerifier: addresses.disclosureBindingVerifier,
       Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
       DeepFamily: addresses.deepFamily,
+      MetadataArchiveV1: addresses.metadataArchive,
       DeepFamilyReader: addresses.deepFamilyReader,
     };
     for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
@@ -1564,8 +1592,20 @@ export const main = async (chainProfile) => {
       "Reader to DeepFamily binding mismatch",
     );
     assertCondition(
-      (await deepFamily.verifierRegistry(1, 0)) === addresses.groth16VerifierAdapter &&
-        (await deepFamily.verifierRegistry(1, 1)) === addresses.groth16VerifierAdapter,
+      (await deepFamily.metadataArchive()) === addresses.metadataArchive &&
+        (await metadataArchive.DEEP_FAMILY()) === addresses.deepFamily &&
+        (await deepFamilyReader.METADATA_ARCHIVE()) === addresses.metadataArchive,
+      "Metadata Archive reverse binding mismatch",
+    );
+    assertCondition(
+      (await deepFamily.verifierRegistry(
+        PERSON_RELATION_PURPOSE,
+        RELEASE_PERSON_RELATION_CIRCUIT_ID,
+      )) === addresses.groth16VerifierAdapter &&
+        (await deepFamily.verifierRegistry(
+          DISCLOSURE_BINDING_PURPOSE,
+          RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
+        )) === addresses.groth16VerifierAdapter,
       "DeepFamily verifier route mismatch",
     );
     assertCondition(
@@ -1643,6 +1683,9 @@ export const main = async (chainProfile) => {
       await verificationEntry(hre.artifacts, "UUPSProxy", addresses.deepFamily, [
         addresses.deepFamilyImplementation,
         proxyInitData,
+      ]),
+      await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchive, [
+        addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
         addresses.deepFamily,
@@ -1738,7 +1781,11 @@ export const main = async (chainProfile) => {
         () =>
           deepFamily
             .connect(runDeployer)
-            .setVerifier.staticCall(1, 0, addresses.governedVerifierCandidate),
+            .setCircuitVerifier.staticCall(
+              PERSON_RELATION_PURPOSE,
+              GOVERNED_PERSON_RELATION_CIRCUIT_ID,
+              addresses.governedVerifierCandidate,
+            ),
         "Direct non-owner verifier update",
         {
           expectedErrorNames: ["OwnableUnauthorizedAccount"],
@@ -1810,16 +1857,16 @@ export const main = async (chainProfile) => {
       const verifierOperation = await scheduleOperation({
         label: "verifier-update",
         target: addresses.deepFamily,
-        data: deepFamily.interface.encodeFunctionData("setVerifier", [
-          1,
-          0,
+        data: deepFamily.interface.encodeFunctionData("setCircuitVerifier", [
+          PERSON_RELATION_PURPOSE,
+          GOVERNED_PERSON_RELATION_CIRCUIT_ID,
           addresses.governedVerifierCandidate,
         ]),
         salt: deriveGovernanceSalt(ethers, {
           targetAddress: addresses.deepFamily,
-          calldata: deepFamily.interface.encodeFunctionData("setVerifier", [
-            1,
-            0,
+          calldata: deepFamily.interface.encodeFunctionData("setCircuitVerifier", [
+            PERSON_RELATION_PURPOSE,
+            GOVERNED_PERSON_RELATION_CIRCUIT_ID,
             addresses.governedVerifierCandidate,
           ]),
         }),
@@ -1834,8 +1881,11 @@ export const main = async (chainProfile) => {
       );
       await executeOperation("verifier-update", verifierOperation, [ownerA, ownerB]);
       assertCondition(
-        (await deepFamily.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate,
-        "Governed person-commitment verifier route was not updated",
+        (await deepFamily.verifierRegistry(
+          PERSON_RELATION_PURPOSE,
+          GOVERNED_PERSON_RELATION_CIRCUIT_ID,
+        )) === addresses.governedVerifierCandidate,
+        "Governed person-relation verifier route was not appended",
       );
 
       const cancelledFee = newFee === 502n ? 503n : 502n;
@@ -1888,6 +1938,8 @@ export const main = async (chainProfile) => {
         verifierOperationId: verifierOperation.operationId,
         verifierBefore: addresses.groth16VerifierAdapter,
         verifierAfter: addresses.governedVerifierCandidate,
+        verifierPurpose: PERSON_RELATION_PURPOSE,
+        verifierCircuitId: GOVERNED_PERSON_RELATION_CIRCUIT_ID,
         directPrivilegedCallsRejected: true,
         cancelledOperationId: cancelOperation.operationId,
         earlyExecutionRejected: true,
@@ -1906,14 +1958,14 @@ export const main = async (chainProfile) => {
         },
       };
       activeProtocolFee = newFee;
-      activePersonVerifier = addresses.governedVerifierCandidate;
       await addStep("safe-timelock-schedule-wait-execute-cancel", report.governance);
     }
 
     currentStep = "real-zk-business";
+    const acceptancePassphrase = `DeepFamily acceptance ${CHAIN_PROFILE.id} ${config.runId}`;
     const person = {
       fullName: `DeepFamily ${CHAIN_PROFILE.displayName} E2E ${config.runId}`,
-      derivedSecretField: 0n,
+      passphrase: acceptancePassphrase,
       isBirthBC: false,
       birthYear: 1990,
       birthMonth: 1,
@@ -1923,7 +1975,7 @@ export const main = async (chainProfile) => {
     };
     const father = {
       fullName: `DeepFamily ${CHAIN_PROFILE.displayName} E2E Father ${config.runId}`,
-      derivedSecretField: 0n,
+      passphrase: acceptancePassphrase,
       isBirthBC: false,
       birthYear: 1960,
       birthMonth: 1,
@@ -1932,7 +1984,7 @@ export const main = async (chainProfile) => {
     };
     const mother = {
       fullName: `DeepFamily ${CHAIN_PROFILE.displayName} E2E Mother ${config.runId}`,
-      derivedSecretField: 0n,
+      passphrase: acceptancePassphrase,
       isBirthBC: false,
       birthYear: 1962,
       birthMonth: 1,
@@ -1940,44 +1992,81 @@ export const main = async (chainProfile) => {
       gender: 2,
     };
     const personProofArtifactPaths = resolveProofArtifacts(
-      PERSON_COMMITMENT_PROOF_DESCRIPTOR,
-      "Person commitment circuit",
+      PERSON_RELATION_PROOF_DESCRIPTOR,
+      "Person relation circuit",
     );
     const personProofArtifactsBefore = await hashProofArtifacts(ethers, personProofArtifactPaths);
-    const personProof = await withTimeout(
-      generatePersonCommitmentProof(person, father, mother, runDeployer.address, {
-        wasm: personProofArtifactPaths.wasm,
-        zkey: personProofArtifactPaths.zkey,
+    const rewardBalanceBefore = await token.balanceOf(runDeployer.address);
+    const addResult = await withTimeout(
+      addPersonVersion({
+        deepFamily,
+        signer: runDeployer,
+        personData: person,
+        fatherData: father,
+        motherData: mother,
+        fatherVersion: 0,
+        motherVersion: 0,
+        versionContent: {
+          tag: `${CHAIN_PROFILE.id}-e2e-v1`,
+          biography: `DeepFamily automated ${CHAIN_PROFILE.displayName} acceptance identity`,
+        },
+        proofArtifacts: personProofArtifactPaths,
       }),
       PROOF_TIMEOUT_MS,
-      "Person commitment proof generation",
+      "Person relation proof, DFM1 encryption, and submission",
     );
-    const personProofArtifacts = await hashProofArtifacts(ethers, personProof.artifacts);
+    const personProofArtifacts = await hashProofArtifacts(ethers, addResult.proofArtifacts);
     assertProofArtifactsUnchanged(
       personProofArtifactsBefore,
       personProofArtifacts,
-      "Person commitment proof artifact",
+      "Person relation proof artifact",
     );
     assertCondition(
-      personProof.father && personProof.mother,
+      addResult.metadata.parents.father && addResult.metadata.parents.mother,
       "Complete parent commitments missing",
     );
-    const rewardBalanceBefore = await token.balanceOf(runDeployer.address);
-    const addPersonTx = await deepFamily
-      .connect(runDeployer)
-      .addPersonVersion(
-        personProof.proofEnvelope,
-        personProof.publicSignalsStruct,
-        0,
-        0,
-        `${CHAIN_PROFILE.id}-e2e-v1`,
-        `ipfs://deepfamily-e2e/${config.runId}/person`,
-      );
-    await recordTx("zk-add-person", addPersonTx);
-    const personHash = personProof.person.personHash;
+    await recordTx("zk-add-person", addResult.tx);
+    const personHash = addResult.personHash;
     assertCondition(
       (await deepFamily.personVersionsCount(personHash)) === 1n,
       "Person version missing",
+    );
+    const versionDetails = await deepFamilyReader.getVersionDetails(personHash, 1);
+    const storedVersion = versionDetails.version ?? versionDetails[0];
+    const metadataRef = versionDetails.metadata ?? versionDetails[1];
+    assertCondition(
+      storedVersion.versionCommitment === addResult.versionCommitment,
+      "Reader versionCommitment does not match the submitted metadata",
+    );
+    assertCondition(
+      metadataRef.payloadHash.toLowerCase() === addResult.payloadHash.toLowerCase(),
+      "Reader MetadataRef payloadHash does not match the submitted envelope",
+    );
+    assertCondition(
+      Number(metadataRef.payloadLength) === addResult.metadataEnvelope.length,
+      "Reader MetadataRef payloadLength does not match the submitted envelope",
+    );
+    const metadataRuntimeCode = await provider.getCode(metadataRef.pointer);
+    const decodedMetadata = await decryptPersonVersionRuntime({
+      runtimeCode: metadataRuntimeCode,
+      payloadLength: metadataRef.payloadLength,
+      payloadHash: metadataRef.payloadHash,
+      rawPassphrase: acceptancePassphrase,
+      context: {
+        chainId: network.chainId,
+        deepFamilyProxy: addresses.deepFamily,
+        personHash,
+        fatherHash: addResult.metadata.parents.father.personHash,
+        fatherVersionIndex: addResult.metadata.parents.father.versionIndex,
+        motherHash: addResult.metadata.parents.mother.personHash,
+        motherVersionIndex: addResult.metadata.parents.mother.versionIndex,
+        versionCommitment: addResult.versionCommitment,
+      },
+    });
+    assertCondition(
+      decodedMetadata.metadata.tag === addResult.metadata.tag &&
+        decodedMetadata.metadata.biography === addResult.metadata.biography,
+      "Archive runtime did not decrypt to the submitted tag and biography",
     );
     const reward = await token.recentReward();
     const rewardBalanceAfter = await token.balanceOf(runDeployer.address);
@@ -2012,56 +2101,36 @@ export const main = async (chainProfile) => {
       ethers,
       disclosureProofArtifactPaths,
     );
-    const disclosureProof = await withTimeout(
-      generateDisclosureBindingProof(person, runDeployer.address, {
-        wasm: disclosureProofArtifactPaths.wasm,
-        zkey: disclosureProofArtifactPaths.zkey,
+    const mintResult = await withTimeout(
+      mintPersonVersionNFT({
+        deepFamily,
+        signer: runDeployer,
+        personHash,
+        versionIndex: 1,
+        tokenURI: `ipfs://deepfamily-e2e/${config.runId}/nft`,
+        basicInfo: person,
+        supplementInfo: {
+          fullName: person.fullName,
+          birthPlace: `${CHAIN_PROFILE.displayName} Testnet`,
+          isDeathBC: false,
+          deathYear: 0,
+          deathMonth: 0,
+          deathDay: 0,
+          deathPlace: "",
+          story: `DeepFamily automated ${CHAIN_PROFILE.displayName} acceptance identity`,
+        },
+        proofArtifacts: disclosureProofArtifactPaths,
       }),
       PROOF_TIMEOUT_MS,
-      "Disclosure binding proof generation",
+      "Disclosure binding proof and NFT submission",
     );
-    const disclosureProofArtifacts = await hashProofArtifacts(ethers, disclosureProof.artifacts);
+    const disclosureProofArtifacts = await hashProofArtifacts(ethers, mintResult.proofArtifacts);
     assertProofArtifactsUnchanged(
       disclosureProofArtifactsBefore,
       disclosureProofArtifacts,
       "Disclosure binding proof artifact",
     );
-    const identityCommitment = ethers.zeroPadValue(
-      ethers.toBeHex(personProof.person.identityCommitment),
-      32,
-    );
-    const coreInfo = {
-      basicInfo: {
-        identityCommitment,
-        isBirthBC: person.isBirthBC,
-        birthYear: person.birthYear,
-        birthMonth: person.birthMonth,
-        birthDay: person.birthDay,
-        gender: person.gender,
-      },
-      supplementInfo: {
-        fullName: disclosureProof.canonicalFullName,
-        birthPlace: `${CHAIN_PROFILE.displayName} Testnet`,
-        isDeathBC: false,
-        deathYear: 0,
-        deathMonth: 0,
-        deathDay: 0,
-        deathPlace: "",
-        story: `DeepFamily automated ${CHAIN_PROFILE.displayName} acceptance identity`,
-      },
-    };
-    await recordTx(
-      "zk-mint-person-nft",
-      await deepFamily
-        .connect(runDeployer)
-        .mintPersonVersionNFT(
-          disclosureProof.proofEnvelope,
-          disclosureProof.publicSignalsStruct,
-          1,
-          `ipfs://deepfamily-e2e/${config.runId}/nft`,
-          coreInfo,
-        ),
-    );
+    await recordTx("zk-mint-person-nft", mintResult.tx);
     const tokenId = await deepFamily.versionToTokenId(personHash, 1);
     assertCondition(tokenId > 0n, "NFT token ID was not assigned");
     assertCondition(
@@ -2120,7 +2189,10 @@ export const main = async (chainProfile) => {
       activePersonVerifier,
       activeProtocolFee,
       activeVerifierRouteUsedByRealProof:
-        (await deepFamily.verifierRegistry(1, 0)) === activePersonVerifier,
+        (await deepFamily.verifierRegistry(
+          PERSON_RELATION_PURPOSE,
+          RELEASE_PERSON_RELATION_CIRCUIT_ID,
+        )) === activePersonVerifier,
     };
     await addStep("real-zk-endorsement-nft-story", report.business);
 
@@ -2269,8 +2341,18 @@ export const main = async (chainProfile) => {
         "Upgrade changed Token wiring",
       );
       assertCondition(
-        (await deepFamilyV2.verifierRegistry(1, 0)) === addresses.governedVerifierCandidate &&
-          (await deepFamilyV2.verifierRegistry(1, 1)) === addresses.groth16VerifierAdapter,
+        (await deepFamilyV2.verifierRegistry(
+          PERSON_RELATION_PURPOSE,
+          RELEASE_PERSON_RELATION_CIRCUIT_ID,
+        )) === addresses.groth16VerifierAdapter &&
+          (await deepFamilyV2.verifierRegistry(
+            DISCLOSURE_BINDING_PURPOSE,
+            RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
+          )) === addresses.groth16VerifierAdapter &&
+          (await deepFamilyV2.verifierRegistry(
+            PERSON_RELATION_PURPOSE,
+            GOVERNED_PERSON_RELATION_CIRCUIT_ID,
+          )) === addresses.governedVerifierCandidate,
         "Upgrade changed verifier routes",
       );
       assertCondition(
@@ -3029,10 +3111,21 @@ export const main = async (chainProfile) => {
         () => implementationAddress(ethers, provider, addresses.deepFamily),
       );
       const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
-        deepFamilyV2.verifierRegistry(1, 0),
+        deepFamilyV2.verifierRegistry(PERSON_RELATION_PURPOSE, RELEASE_PERSON_RELATION_CIRCUIT_ID),
+      );
+      const terminalGovernedPersonVerifier = await terminalRead(
+        "terminal governed person verifier",
+        () =>
+          deepFamilyV2.verifierRegistry(
+            PERSON_RELATION_PURPOSE,
+            GOVERNED_PERSON_RELATION_CIRCUIT_ID,
+          ),
       );
       const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
-        deepFamilyV2.verifierRegistry(1, 1),
+        deepFamilyV2.verifierRegistry(
+          DISCLOSURE_BINDING_PURPOSE,
+          RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
+        ),
       );
       const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
         deepFamilyV2.protocolEndorsementFeeBps(),
@@ -3074,7 +3167,9 @@ export const main = async (chainProfile) => {
         "DeepFamily terminal implementation is not the verified V2 candidate",
       );
       assertCondition(
-        ethers.getAddress(terminalPersonVerifier) === addresses.governedVerifierCandidate &&
+        ethers.getAddress(terminalPersonVerifier) === addresses.groth16VerifierAdapter &&
+          ethers.getAddress(terminalGovernedPersonVerifier) ===
+            addresses.governedVerifierCandidate &&
           ethers.getAddress(terminalDisclosureVerifier) === addresses.groth16VerifierAdapter,
         "DeepFamily terminal verifier routes changed unexpectedly",
       );
@@ -3120,6 +3215,7 @@ export const main = async (chainProfile) => {
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
           personCommitmentVerifier: terminalPersonVerifier,
+          governedPersonRelationVerifier: terminalGovernedPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
           protocolEndorsementFeeBps: terminalProtocolFee,
         },
@@ -3154,10 +3250,13 @@ export const main = async (chainProfile) => {
         () => implementationAddress(ethers, provider, addresses.deepFamily),
       );
       const terminalPersonVerifier = await terminalRead("terminal person verifier", () =>
-        deepFamily.verifierRegistry(1, 0),
+        deepFamily.verifierRegistry(PERSON_RELATION_PURPOSE, RELEASE_PERSON_RELATION_CIRCUIT_ID),
       );
       const terminalDisclosureVerifier = await terminalRead("terminal disclosure verifier", () =>
-        deepFamily.verifierRegistry(1, 1),
+        deepFamily.verifierRegistry(
+          DISCLOSURE_BINDING_PURPOSE,
+          RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID,
+        ),
       );
       const terminalProtocolFee = await terminalRead("terminal protocol fee", () =>
         deepFamily.protocolEndorsementFeeBps(),
@@ -3383,7 +3482,8 @@ export const main = async (chainProfile) => {
         report.productionParity.productionTrustedSetupMatched === true &&
         report.productionParity.productionCeremonyVerified === true &&
         report.zkCeremonyVerification?.status === "passed" &&
-        report.zkArtifactTrust.productionReady === true,
+        report.zkArtifactTrust.productionReady === true &&
+        report.protocolManifestEvidence.releaseStatus === "production",
       onchainChecksPassed: report.onchain.status === "passed",
       terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
       deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { formatGroth16ProofForContract, type PersonData } from "../../../../../shared/zk/zk";
-import { decodePersonCommitmentPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
+import { decodePersonRelationPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
+import { PERSON_RELATION_PROOF_DESCRIPTOR } from "../../../../../shared/zk/proofDescriptors";
 import { zkWorkerCall } from "../../../../../shared/workers/zkWorkerClient";
 import type { AddVersionT } from "../model/addVersionTypes";
 
@@ -9,6 +10,8 @@ interface GeneratePersonCommitmentProofArgs {
   fatherData: PersonData | null;
   motherData: PersonData | null;
   submitterAddress: string;
+  contentDigestLo: string | bigint;
+  contentDigestHi: string | bigint;
 }
 
 export function usePersonCommitmentProof(t: AddVersionT) {
@@ -24,6 +27,8 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       fatherData,
       motherData,
       submitterAddress,
+      contentDigestLo,
+      contentDigestHi,
     }: GeneratePersonCommitmentProofArgs) => {
       setProofGenerationStep(
         t(
@@ -33,12 +38,17 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       );
 
       const { proof, publicSignals } = await zkWorkerCall(
-        "generatePersonCommitmentProof",
+        "generatePersonRelationProof",
         {
           person: personData,
           father: fatherData,
           mother: motherData,
           submitterAddress,
+          selfSuiteId: personData.identitySuiteId ?? 1,
+          fatherSuiteId: fatherData?.identitySuiteId ?? 0,
+          motherSuiteId: motherData?.identitySuiteId ?? 0,
+          contentDigestLo,
+          contentDigestHi,
         },
         { timeoutMs: 240_000 },
       );
@@ -46,7 +56,7 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       setProofGenerationStep(t("addVersion.verifyingProof", "Verifying proof..."));
 
       const { ok: isValid } = await zkWorkerCall(
-        "verifyPersonCommitmentProof",
+        "verifyPersonRelationProof",
         { proof, publicSignals },
         { timeoutMs: 120_000 },
       );
@@ -57,8 +67,11 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       }
 
       return {
-        proof: formatGroth16ProofForContract(proof),
-        publicSignals: decodePersonCommitmentPublicSignals(publicSignals),
+        proof: formatGroth16ProofForContract(proof, {
+          circuitId: PERSON_RELATION_PROOF_DESCRIPTOR.circuitId,
+          proofEncodingId: PERSON_RELATION_PROOF_DESCRIPTOR.proofEncodingId,
+        }),
+        publicSignals: decodePersonRelationPublicSignals(publicSignals),
       };
     },
     [t],

@@ -1,4 +1,4 @@
-import { Hash, Plus, Search, User, X } from "lucide-react";
+import { Plus, Search, User, X } from "lucide-react";
 import { Children, type KeyboardEventHandler, type ReactNode } from "react";
 import { PageContainer } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
@@ -63,7 +63,7 @@ export function PeopleFiltersPanel({
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               <TokenFilterInput
                 icon={<User className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />}
                 value={filters.addressInput}
@@ -77,30 +77,11 @@ export function PeopleFiltersPanel({
                   <FilterChip
                     key={address}
                     label={address}
-                    variant="address"
                     onRemove={() => filters.removeAddress(address)}
                   />
                 ))}
               </TokenFilterInput>
 
-              <TokenFilterInput
-                icon={<Hash className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-orange-500 transition-colors" />}
-                value={filters.tagInput}
-                onChange={filters.setTagInput}
-                onKeyDown={filters.handleTagKeyDown}
-                placeholder={t("people.filterByTag", "Add tag...")}
-                onAdd={filters.addTag}
-                addDisabled={!filters.tagInput.trim()}
-              >
-                {filters.selectedTags.map((tag) => (
-                  <FilterChip
-                    key={tag}
-                    label={tag}
-                    variant="tag"
-                    onRemove={() => filters.removeTag(tag)}
-                  />
-                ))}
-              </TokenFilterInput>
             </div>
           </div>
 
@@ -199,21 +180,14 @@ function TokenFilterInput({
 
 function FilterChip({
   label,
-  variant,
   onRemove,
 }: {
   label: string;
-  variant: "address" | "tag";
   onRemove: () => void;
 }) {
   const variantClass =
-    variant === "address"
-      ? "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-900/30"
-      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700";
-  const removeClass =
-    variant === "address"
-      ? "hover:bg-orange-200 dark:hover:bg-orange-800/40"
-      : "hover:bg-gray-200 dark:hover:bg-gray-700";
+    "bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-900/30";
+  const removeClass = "hover:bg-orange-200 dark:hover:bg-orange-800/40";
 
   return (
     <div

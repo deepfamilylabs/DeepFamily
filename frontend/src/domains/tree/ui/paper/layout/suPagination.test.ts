@@ -307,7 +307,8 @@ describe("buildSuPaperBook", () => {
         versionIndex: 1,
         fullName: "曹长文",
         gender: 1,
-        story,
+        metadataUnlockValidated: true,
+        biography: story,
       },
     };
     const generations = makeGenerations(wide.graph, nodesData);

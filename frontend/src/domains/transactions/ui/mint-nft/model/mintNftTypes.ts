@@ -44,6 +44,7 @@ export type MintMissingParents = {
 export interface MintNftFlowArgs {
   personHash: string;
   versionIndex: number;
+  selfSuiteId: number;
   proofEnvelope: any;
   publicSignals: MintDisclosurePublicSignals;
   tokenURI: string;

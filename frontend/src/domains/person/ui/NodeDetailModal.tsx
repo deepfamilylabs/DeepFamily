@@ -204,7 +204,6 @@ export default function NodeDetailModal({
             nodeData={nodeData}
             fallback={fallback}
             onCopy={onCopy}
-            onDecryptCid={(cid) => navigate(`/decrypt?cid=${encodeURIComponent(cid)}`)}
           />
           <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />
           <NodeDetailTrustedEndorsersSection

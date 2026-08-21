@@ -11,6 +11,7 @@ import { ensureProductionPtau } from "./lib/productionPtau.mjs";
 import { buildSnarkjsCommand } from "./lib/snarkjsToolchain.mjs";
 import {
   assertDevelopmentManifest,
+  initializeFreshV1DevelopmentManifest,
   updateDevelopmentManifest,
 } from "./update-zk-development-manifest.mjs";
 
@@ -93,6 +94,8 @@ export const runZkDevelopmentRefresh = async ({
   root = process.cwd(),
   output = console,
   manifestGuard = assertDevelopmentManifest,
+  freshV1 = false,
+  freshV1Initializer = initializeFreshV1DevelopmentManifest,
   ptauInstaller = ensureProductionPtau,
   commandRunner = runCommand,
   assetSynchronizer = syncZkAssets,
@@ -104,7 +107,11 @@ export const runZkDevelopmentRefresh = async ({
   const resolvedRoot = path.resolve(root);
 
   // This must remain the first operation: every later dependency can write files.
-  await manifestGuard({ root: resolvedRoot });
+  if (freshV1) {
+    await freshV1Initializer({ root: resolvedRoot });
+  } else {
+    await manifestGuard({ root: resolvedRoot });
+  }
 
   const ptau = await ptauInstaller({ root: resolvedRoot });
   output.log(`Pinned Powers of Tau ${ptau.status}: ${ptau.path} (SHA-256 ${ptau.sha256})`);
@@ -158,10 +165,10 @@ export const runZkDevelopmentRefresh = async ({
 };
 
 export const main = async (argv = process.argv.slice(2)) => {
-  if (argv.length !== 0) {
-    throw new Error("Usage: node scripts/zk-dev-refresh.mjs");
+  if (argv.length > 1 || (argv.length === 1 && argv[0] !== "--fresh-v1")) {
+    throw new Error("Usage: node scripts/zk-dev-refresh.mjs [--fresh-v1]");
   }
-  return runZkDevelopmentRefresh();
+  return runZkDevelopmentRefresh({ freshV1: argv[0] === "--fresh-v1" });
 };
 
 const isMain =

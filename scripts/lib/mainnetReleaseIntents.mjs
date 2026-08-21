@@ -1,7 +1,8 @@
 import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 
-const PROOF_SYSTEM_GROTH16_BN254_V1 = 1;
-const PROOF_PURPOSE_PERSON_COMMITMENT = 0;
+const PERSON_RELATION_CIRCUIT_ID = 1;
+const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
+const PROOF_PURPOSE_PERSON_RELATION = 0;
 const PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
 
 const requiredAddress = (ethers, name, value) => {
@@ -75,7 +76,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the exact fourteen-transaction EVM mainnet release intent without a signer or RPC.
+ * Rebuilds the exact sixteen-transaction EVM mainnet release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -109,6 +110,7 @@ export const buildMainnetReleaseIntents = async ({
     "Groth16VerifierAdapter",
     "DeepFamily",
     "UUPSProxy",
+    "MetadataArchiveV1",
     "DeepFamilyReader",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
@@ -126,7 +128,10 @@ export const buildMainnetReleaseIntents = async ({
     groth16VerifierAdapter: addressAt(6),
     deepFamilyImplementation: addressAt(7),
     deepFamilyProxy: addressAt(8),
-    deepFamilyReader: addressAt(9),
+    // nonce 9 is the tokenInitialize call.
+    metadataArchiveV1: addressAt(10),
+    // nonce 11 is the one-time setMetadataArchive call.
+    deepFamilyReader: addressAt(12),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -149,7 +154,7 @@ export const buildMainnetReleaseIntents = async ({
     normalizedDeployer,
   ]);
 
-  const deploymentSpecs = [
+  const initialDeploymentSpecs = [
     ["governanceTimelock", "GovernanceTimelock", [delay, normalizedMultisig]],
     ["deepFamilyToken", "DeepFamilyToken", []],
     ["poseidonT5", "PoseidonT5", []],
@@ -163,11 +168,10 @@ export const buildMainnetReleaseIntents = async ({
     ],
     ["deepFamilyImplementation", "DeepFamily", [], deepFamilyBytecode],
     ["deepFamilyProxy", "UUPSProxy", [addresses.deepFamilyImplementation, proxyInitializeData]],
-    ["deepFamilyReader", "DeepFamilyReader", [addresses.deepFamilyProxy]],
   ];
 
   const intents = [];
-  for (const [label, contractName, args, bytecode] of deploymentSpecs) {
+  const pushDeployment = async (label, contractName, args = [], bytecode) => {
     const nonce = nonceBase + intents.length;
     intents.push(
       normalizeIntent({
@@ -182,39 +186,8 @@ export const buildMainnetReleaseIntents = async ({
         data: await deployData(contractName, args, bytecode),
       }),
     );
-  }
-
-  const callSpecs = [
-    [
-      "tokenInitialize",
-      addresses.deepFamilyToken,
-      tokenInterface.encodeFunctionData("initialize", [addresses.deepFamilyProxy]),
-    ],
-    [
-      "setPersonCommitmentVerifier",
-      addresses.deepFamilyProxy,
-      deepFamilyInterface.encodeFunctionData("setVerifier", [
-        PROOF_SYSTEM_GROTH16_BN254_V1,
-        PROOF_PURPOSE_PERSON_COMMITMENT,
-        addresses.groth16VerifierAdapter,
-      ]),
-    ],
-    [
-      "setDisclosureBindingVerifier",
-      addresses.deepFamilyProxy,
-      deepFamilyInterface.encodeFunctionData("setVerifier", [
-        PROOF_SYSTEM_GROTH16_BN254_V1,
-        PROOF_PURPOSE_DISCLOSURE_BINDING,
-        addresses.groth16VerifierAdapter,
-      ]),
-    ],
-    [
-      "transferDeepFamilyOwnership",
-      addresses.deepFamilyProxy,
-      deepFamilyInterface.encodeFunctionData("transferOwnership", [addresses.governanceTimelock]),
-    ],
-  ];
-  for (const [label, to, data] of callSpecs) {
+  };
+  const pushCall = (label, to, data) => {
     const nonce = nonceBase + intents.length;
     intents.push(
       normalizeIntent({
@@ -229,7 +202,47 @@ export const buildMainnetReleaseIntents = async ({
         data,
       }),
     );
+  };
+
+  for (const [label, contractName, args, bytecode] of initialDeploymentSpecs) {
+    await pushDeployment(label, contractName, args, bytecode);
   }
+
+  pushCall(
+    "tokenInitialize",
+    addresses.deepFamilyToken,
+    tokenInterface.encodeFunctionData("initialize", [addresses.deepFamilyProxy]),
+  );
+  await pushDeployment("metadataArchiveV1", "MetadataArchiveV1", [addresses.deepFamilyProxy]);
+  pushCall(
+    "setMetadataArchive",
+    addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("setMetadataArchive", [addresses.metadataArchiveV1]),
+  );
+  await pushDeployment("deepFamilyReader", "DeepFamilyReader", [addresses.deepFamilyProxy]);
+  pushCall(
+    "setPersonRelationVerifier",
+    addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("setCircuitVerifier", [
+      PROOF_PURPOSE_PERSON_RELATION,
+      PERSON_RELATION_CIRCUIT_ID,
+      addresses.groth16VerifierAdapter,
+    ]),
+  );
+  pushCall(
+    "setDisclosureBindingVerifier",
+    addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("setCircuitVerifier", [
+      PROOF_PURPOSE_DISCLOSURE_BINDING,
+      DISCLOSURE_BINDING_CIRCUIT_ID,
+      addresses.groth16VerifierAdapter,
+    ]),
+  );
+  pushCall(
+    "transferDeepFamilyOwnership",
+    addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("transferOwnership", [addresses.governanceTimelock]),
+  );
 
   if (
     intents.length !== MAINNET_TRANSACTION_LABELS.length ||

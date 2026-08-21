@@ -11,7 +11,7 @@ import {
 } from "./nodeEnrichment";
 
 describe("nodeEnrichment patch builders", () => {
-  it("builds version-details patch with current tag fallback", () => {
+  it("builds version-details patch with encrypted metadata anchors", () => {
     const patch = buildVersionDetailsPatch({
       id: "0xabc-v-2",
       original: { h: "0xabc", v: 2 },
@@ -19,11 +19,16 @@ describe("nodeEnrichment patch builders", () => {
         version: {
           fatherHash: "0xfather",
           motherHash: "0xmother",
-          fatherVersionIndex: 1,
-          motherVersionIndex: 1,
+          fatherVersionIndex: "1",
+          motherVersionIndex: "1",
+          versionCommitment: "123",
           addedBy: "0xadder",
           timestamp: 123,
-          metadataCID: "cid",
+        },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000aa",
+          payloadHash: "0xpayload",
+          payloadLength: 128,
         },
         endorsementCount: 9,
         tokenId: "42",
@@ -37,10 +42,84 @@ describe("nodeEnrichment patch builders", () => {
       versionDetailsFetchedAt: 999,
     });
 
-    expect(patch.tag).toBe("existing");
+    expect(patch.metadataPayloadHash).toBe("0xpayload");
+    expect(patch.versionCommitment).toBe("123");
     expect(patch.endorsementCount).toBe(9);
     expect(patch.tokenId).toBe("42");
     expect(patch.versionDetailsFetchedAt).toBe(999);
+  });
+
+  it("removes every private decrypted field when authoritative anchors change", () => {
+    const patch = buildVersionDetailsPatch({
+      id: "0xabc-v-2",
+      original: { h: "0xabc", v: 2 },
+      parsed: {
+        version: {
+          versionCommitment: "new-commitment",
+          fatherHash: "0xfather",
+          motherHash: "0xmother",
+        },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000bb",
+          payloadHash: "0xnew-payload",
+          payloadLength: 256,
+        },
+        endorsementCount: 1,
+        tokenId: "0",
+      },
+      current: {
+        personHash: "0xabc",
+        versionIndex: 2,
+        id: "0xabc-v-2",
+        versionCommitment: "old-commitment",
+        metadataPointer: "0x00000000000000000000000000000000000000aa",
+        metadataPayloadHash: "0xold-payload",
+        metadataPayloadLength: 128,
+        metadataUnlockValidated: true,
+        metadataProtocolGeneration: "df-onchain-biography-v1",
+        metadataFormatVersion: 1,
+        identitySuiteId: 1,
+        tag: "private tag",
+        biography: "private biography",
+        fullName: "Private Name",
+        gender: 2,
+        birthYear: 1980,
+        birthMonth: 1,
+        birthDay: 2,
+        isBirthBC: false,
+        metadataPerson: {
+          fullName: "Private Name",
+          gender: 2,
+          birthYear: 1980,
+          birthMonth: 1,
+          birthDay: 2,
+          isBirthBC: false,
+          personHash: "0xabc",
+        },
+        metadataParents: { father: null, mother: null },
+        tokenId: "0",
+      },
+      versionDetailsFetchedAt: 1000,
+    });
+
+    expect(patch.metadataUnlockValidated).toBe(false);
+    for (const key of [
+      "tag",
+      "biography",
+      "metadataPerson",
+      "metadataParents",
+      "metadataProtocolGeneration",
+      "metadataFormatVersion",
+      "identitySuiteId",
+      "fullName",
+      "gender",
+      "birthYear",
+      "birthMonth",
+      "birthDay",
+      "isBirthBC",
+    ]) {
+      expect(patch).not.toHaveProperty(key);
+    }
   });
 
   it("builds nft patch preserving existing fields when nft details omit them", () => {
@@ -57,6 +136,7 @@ describe("nodeEnrichment patch builders", () => {
         personHash: "0xabc",
         versionIndex: 2,
         version: {},
+        metadata: {},
         core: { fullName: "Alice" },
         endorsementCount: 7,
         nftTokenURI: "ipfs://token",
@@ -71,7 +151,9 @@ describe("nodeEnrichment patch builders", () => {
     });
 
     expect(patch.fatherHash).toBe("0xfather");
-    expect(patch.tag).toBe("existing");
+    // NFT enrichment is a selective patch. Applying it must leave private,
+    // locally unlocked metadata untouched instead of copying a stale snapshot.
+    expect(patch).not.toHaveProperty("tag");
     expect(patch.fullName).toBe("Alice");
     expect(patch.tokenId).toBe("42");
   });
@@ -81,7 +163,8 @@ describe("nodeEnrichment fetchNodeEnrichmentBatch", () => {
   it("fetches version details, then nft details and story metadata when needed", async () => {
     const api = {
       getVersionDetails: vi.fn(async () => ({
-        version: { tag: "v2" },
+        version: { versionCommitment: "123" },
+        metadata: {},
         endorsementCount: 3,
         tokenId: "88",
       })),
@@ -89,6 +172,7 @@ describe("nodeEnrichment fetchNodeEnrichmentBatch", () => {
         personHash: "0xabc",
         versionIndex: 2,
         version: {},
+        metadata: {},
         core: { fullName: "Alice" },
         endorsementCount: 4,
         nftTokenURI: "ipfs://token",
@@ -247,6 +331,9 @@ describe("nodeEnrichment planning helpers", () => {
           personHash: "0xaaa",
           versionIndex: 1,
           id: "0xaaa-v-1",
+          tag: "private-local-tag",
+          biography: "private local biography",
+          metadataUnlockValidated: true,
           endorsementCount: 1,
           tokenId: "11",
           versionDetailsFetchedAt: Date.now(),
@@ -267,6 +354,9 @@ describe("nodeEnrichment planning helpers", () => {
           personHash: "0xaaa",
           versionIndex: 1,
           id: "0xaaa-v-1",
+          tag: "private-local-tag",
+          biography: "private local biography",
+          metadataUnlockValidated: true,
         },
       },
       {
@@ -292,6 +382,12 @@ describe("nodeEnrichment planning helpers", () => {
         patch: { fullName: "Alice" },
       },
     ]);
-    expect(withPatches["0xaaa-v-1"]).toMatchObject({ fullName: "Alice", id: "0xaaa-v-1" });
+    expect(withPatches["0xaaa-v-1"]).toMatchObject({
+      fullName: "Alice",
+      id: "0xaaa-v-1",
+      tag: "private-local-tag",
+      biography: "private local biography",
+      metadataUnlockValidated: true,
+    });
   });
 });

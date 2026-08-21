@@ -1,42 +1,51 @@
-export const PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC = Object.freeze({
-  name: "person-commitment-v2",
-  version: 2,
-  purpose: "PersonCommitment",
+export const PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC = Object.freeze({
+  name: "person-relation-v1",
+  version: 1,
+  purpose: "PersonRelation",
   fieldOrder: Object.freeze([
     "identityCommitment",
     "fatherIdentityCommitment",
     "motherIdentityCommitment",
-    "submitter",
-    "schemaVersion",
-    "cryptoSuiteVersion",
-    "hashAlgoId",
+    "submitterAndSelfSuiteId",
+    "versionCommitment",
   ]),
-  length: 7,
+  fieldBitWidths: Object.freeze({
+    identityCommitment: 254,
+    fatherIdentityCommitment: 254,
+    motherIdentityCommitment: 254,
+    submitterAndSelfSuiteId: 192,
+    versionCommitment: 254,
+  }),
+  length: 5,
 });
 
-export const DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC = Object.freeze({
-  name: "disclosure-binding-v2",
-  version: 2,
+export const DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC = Object.freeze({
+  name: "disclosure-binding-v1",
+  version: 1,
   purpose: "DisclosureBinding",
   fieldOrder: Object.freeze([
     "identityCommitment",
     "disclosureBinding",
     "minter",
-    "schemaVersion",
-    "cryptoSuiteVersion",
-    "hashAlgoId",
+    "suiteCommitment",
   ]),
-  length: 6,
+  fieldBitWidths: Object.freeze({
+    identityCommitment: 254,
+    disclosureBinding: 254,
+    minter: 160,
+    suiteCommitment: 254,
+  }),
+  length: 4,
 });
 
 export const PUBLIC_SIGNAL_SPECS = Object.freeze({
-  [PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.name]: PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
-  [DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.name]: DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  [PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.name]: PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
+  [DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.name]: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 export const PUBLIC_SIGNAL_SPECS_BY_PURPOSE = Object.freeze({
-  [PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC.purpose]: PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC,
-  [DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC.purpose]: DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC,
+  [PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.purpose]: PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
+  [DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.purpose]: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 function resolveSpecLabel(spec, label) {
@@ -86,15 +95,15 @@ export function getPublicSignalSpecByPurpose(purpose) {
   return spec;
 }
 
-export function decodePersonCommitmentPublicSignals(publicSignals, opts = {}) {
-  return decodePublicSignals(publicSignals, PERSON_COMMITMENT_V2_PUBLIC_SIGNAL_SPEC, {
-    label: "Person commitment",
+export function decodePersonRelationPublicSignals(publicSignals, opts = {}) {
+  return decodePublicSignals(publicSignals, PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC, {
+    label: "Person relation",
     ...opts,
   });
 }
 
 export function decodeDisclosureBindingPublicSignals(publicSignals, opts = {}) {
-  return decodePublicSignals(publicSignals, DISCLOSURE_BINDING_V2_PUBLIC_SIGNAL_SPEC, {
+  return decodePublicSignals(publicSignals, DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC, {
     label: "Disclosure binding",
     ...opts,
   });

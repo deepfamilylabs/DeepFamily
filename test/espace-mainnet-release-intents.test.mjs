@@ -29,6 +29,8 @@ const artifactPaths = {
     "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
   DeepFamily: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
   UUPSProxy: "artifacts/contracts/proxy/UUPSProxy.sol/UUPSProxy.json",
+  MetadataArchiveV1:
+    "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json",
   DeepFamilyReader: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
 };
 
@@ -52,17 +54,17 @@ const constructorData = (intent, artifact) =>
   `0x${intent.data.slice(String(artifact.bytecode).length)}`;
 
 describe("eSpace Mainnet release transaction intents", function () {
-  it("reconstructs the exact ten deployments and four calls in nonce order", async function () {
+  it("reconstructs the exact eleven deployments and five calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(14);
+    expect(intents).to.have.length(16);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
       expect(intent.chainId).to.equal("1030");
       expect(intent.value).to.equal("0");
       expect(intent.dataHash).to.equal(ethers.keccak256(intent.data));
-      if (index < 10) {
+      if (intent.kind === "deployment") {
         expect(intent.kind).to.equal("deployment");
         expect(intent.to).to.equal(null);
         expect(intent.predictedAddress).to.equal(
@@ -129,6 +131,8 @@ describe("eSpace Mainnet release transaction intents", function () {
 
     const readerArgs = decodeConstructor("deepFamilyReader", "DeepFamilyReader", ["address"]);
     expect(readerArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
+    const archiveArgs = decodeConstructor("metadataArchiveV1", "MetadataArchiveV1", ["address"]);
+    expect(archiveArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
 
     const tokenInitialize = tokenInterface.decodeFunctionData(
       "initialize",
@@ -137,14 +141,21 @@ describe("eSpace Mainnet release transaction intents", function () {
     expect(byLabel.tokenInitialize.to).to.equal(byLabel.deepFamilyToken.predictedAddress);
     expect(tokenInitialize[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
 
+    const setArchive = deepInterface.decodeFunctionData(
+      "setMetadataArchive",
+      byLabel.setMetadataArchive.data,
+    );
+    expect(byLabel.setMetadataArchive.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
+    expect(setArchive[0]).to.equal(byLabel.metadataArchiveV1.predictedAddress);
+
     for (const [label, purpose] of [
-      ["setPersonCommitmentVerifier", 0n],
+      ["setPersonRelationVerifier", 0n],
       ["setDisclosureBindingVerifier", 1n],
     ]) {
-      const args = deepInterface.decodeFunctionData("setVerifier", byLabel[label].data);
+      const args = deepInterface.decodeFunctionData("setCircuitVerifier", byLabel[label].data);
       expect(byLabel[label].to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
-      expect(args[0]).to.equal(1n);
-      expect(args[1]).to.equal(purpose);
+      expect(args[0]).to.equal(purpose);
+      expect(args[1]).to.equal(1n);
       expect(args[2]).to.equal(byLabel.groth16VerifierAdapter.predictedAddress);
     }
     const ownership = deepInterface.decodeFunctionData(

@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
+import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
@@ -44,7 +45,6 @@ contract DeepFamily is
   error InvalidMotherVersionIndex();
   error InvalidVersionIndex();
   error InvalidFullName();
-  error InvalidTagLength();
   error InvalidCIDLength();
   error InvalidBirthPlace();
   error InvalidDeathPlace();
@@ -57,18 +57,27 @@ contract DeepFamily is
   error InvalidTokenURI();
   error InvalidZKProof();
   error InvalidVerifierAddress();
+  error InvalidCircuitId();
+  error VerifierRouteAlreadySet();
   error VerifierRouteNotSet();
   error UnsupportedProofEncoding();
   error MalformedProofData();
 
   // Business logic errors
-  error DuplicateVersion();
+  error DuplicateVersionCommitment();
   error MustEndorseVersionFirst();
   error VersionAlreadyMinted();
   error BasicInfoMismatch();
   error CallerMismatch();
+  error CallerOrIdentitySuiteMismatch();
   error InvalidParentHash();
   error MustBeAdult();
+  error InvalidMetadataArchive();
+  error MetadataArchiveAlreadySet();
+  error MetadataArchiveNotSet();
+  error InvalidMetadataEnvelope();
+  error InvalidEnvelopePrefix();
+  error InvalidIdentitySuite();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -113,10 +122,9 @@ contract DeepFamily is
     uint256 versionIndex;
     uint256 fatherVersionIndex;
     uint256 motherVersionIndex;
+    uint256 versionCommitment;
     address addedBy;
     uint96 timestamp;
-    string tag;
-    string metadataCID;
   }
 
   struct PersonSupplementInfo {
@@ -136,12 +144,12 @@ contract DeepFamily is
   }
 
   enum ProofPurpose {
-    PersonCommitment,
+    PersonRelation,
     DisclosureBinding
   }
 
   struct ProofEnvelope {
-    uint16 proofSystemId;
+    uint32 circuitId;
     uint8 proofEncodingId;
     bytes proofData;
   }
@@ -150,19 +158,15 @@ contract DeepFamily is
     uint256 identityCommitment;
     uint256 fatherIdentityCommitment;
     uint256 motherIdentityCommitment;
-    uint256 submitter;
-    uint256 schemaVersion;
-    uint256 cryptoSuiteVersion;
-    uint256 hashAlgoId;
+    uint256 submitterAndSelfSuiteId;
+    uint256 versionCommitment;
   }
 
   struct DisclosureBindingPublicSignals {
     uint256 identityCommitment;
     uint256 disclosureBinding;
     uint256 minter;
-    uint256 schemaVersion;
-    uint256 cryptoSuiteVersion;
-    uint256 hashAlgoId;
+    uint256 suiteCommitment;
   }
 
   struct ChildRef {
@@ -225,14 +229,13 @@ contract DeepFamily is
   uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 2048;
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
-  uint256 private constant DOMAIN_SUITE = 1000;
-  uint256 private constant DOMAIN_NAME_SECRET = 1001;
-  uint256 private constant DOMAIN_IDENTITY = 1002;
   uint256 private constant DOMAIN_DISCLOSURE = 1003;
   string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
+  bytes32 internal constant VERSION_HASH_DOMAIN = keccak256("DeepFamily:VersionHash:v1");
 
   address public DEEP_FAMILY_TOKEN_CONTRACT;
-  mapping(uint16 => mapping(uint8 => address)) public verifierRegistry;
+  address public metadataArchive;
+  mapping(uint8 purpose => mapping(uint32 circuitId => address adapter)) public verifierRegistry;
   mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public trustedEndorserOf;
   mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
   mapping(bytes32 => mapping(uint256 => mapping(address => uint256))) private trustedEndorserIndex;
@@ -254,7 +257,7 @@ contract DeepFamily is
     uint256 fatherVersionIndex,
     bytes32 motherHash,
     uint256 motherVersionIndex,
-    string tag
+    uint256 versionCommitment
   );
 
   event PersonVersionEndorsed(
@@ -320,7 +323,12 @@ contract DeepFamily is
 
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
-  event VerifierUpdated(uint16 indexed proofSystemId, uint8 indexed purpose, address verifier);
+  event CircuitVerifierSet(
+    uint8 indexed purpose,
+    uint32 indexed circuitId,
+    address indexed adapter
+  );
+  event MetadataArchiveSet(address indexed archive);
 
   event TrustedEndorserAdded(
     bytes32 indexed personHash,
@@ -359,11 +367,9 @@ contract DeepFamily is
     return keccak256(abi.encodePacked(value));
   }
 
-  function _getVerifier(
-    uint16 proofSystemId,
-    ProofPurpose purpose
-  ) internal view returns (address) {
-    address verifier = verifierRegistry[proofSystemId][uint8(purpose)];
+  function _getVerifier(uint32 circuitId, ProofPurpose purpose) internal view returns (address) {
+    if (circuitId == 0) revert InvalidCircuitId();
+    address verifier = verifierRegistry[uint8(purpose)][circuitId];
     if (verifier == address(0)) revert VerifierRouteNotSet();
     return verifier;
   }
@@ -395,31 +401,16 @@ contract DeepFamily is
     return uint256(_computeNamePrehash(fullName)) % fieldModulus;
   }
 
-  function _computeSuiteCommitment(
-    uint256 schemaVersion,
-    uint256 cryptoSuiteVersion,
-    uint256 hashAlgoId
-  ) internal pure returns (uint256) {
-    uint256[4] memory inputs;
-    inputs[0] = DOMAIN_SUITE;
-    inputs[1] = schemaVersion;
-    inputs[2] = cryptoSuiteVersion;
-    inputs[3] = hashAlgoId;
-    return PoseidonT5.hash(inputs);
-  }
-
   function _computeDisclosureBinding(
     string memory fullName,
     PersonBasicInfo calldata basicInfo,
-    uint256 schemaVersion,
-    uint256 cryptoSuiteVersion,
-    uint256 hashAlgoId
+    uint256 suiteCommitment
   ) internal pure returns (bytes32) {
     uint256[4] memory inputs;
     inputs[0] = DOMAIN_DISCLOSURE;
     inputs[1] = _computeNameField(fullName);
     inputs[2] = _packBirthGenderField(basicInfo);
-    inputs[3] = _computeSuiteCommitment(schemaVersion, cryptoSuiteVersion, hashAlgoId);
+    inputs[3] = suiteCommitment;
 
     uint256 disclosurePoseidon = PoseidonT5.hash(inputs);
     return bytes32(disclosurePoseidon);
@@ -458,14 +449,12 @@ contract DeepFamily is
     ProofEnvelope calldata proof,
     DisclosureBindingPublicSignals calldata publicSignals
   ) internal view {
-    address adapter = _getVerifier(proof.proofSystemId, ProofPurpose.DisclosureBinding);
+    address adapter = _getVerifier(proof.circuitId, ProofPurpose.DisclosureBinding);
     uint256[] memory ps = new uint256[](ProofConstants.DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN);
     ps[0] = publicSignals.identityCommitment;
     ps[1] = publicSignals.disclosureBinding;
     ps[2] = publicSignals.minter;
-    ps[3] = publicSignals.schemaVersion;
-    ps[4] = publicSignals.cryptoSuiteVersion;
-    ps[5] = publicSignals.hashAlgoId;
+    ps[3] = publicSignals.suiteCommitment;
 
     if (
       !IProofVerifierAdapter(adapter).verifyProof(
@@ -496,9 +485,7 @@ contract DeepFamily is
     bytes32 computedDisclosureBinding = _computeDisclosureBinding(
       coreInfo.supplementInfo.fullName,
       coreInfo.basicInfo,
-      publicSignals.schemaVersion,
-      publicSignals.cryptoSuiteVersion,
-      publicSignals.hashAlgoId
+      publicSignals.suiteCommitment
     );
     if (bytes32(publicSignals.disclosureBinding) != computedDisclosureBinding) {
       revert BasicInfoMismatch();
@@ -541,9 +528,8 @@ contract DeepFamily is
    * @param initialOwner Initial owner of the proxy, expected to become timelock/multisig governance.
    */
   function initialize(address _deepFamilyTokenContract, address initialOwner) public initializer {
-    if (
-      _deepFamilyTokenContract == address(0) || _deepFamilyTokenContract.code.length == 0
-    ) revert TokenContractNotSet();
+    if (_deepFamilyTokenContract == address(0) || _deepFamilyTokenContract.code.length == 0)
+      revert TokenContractNotSet();
 
     __ERC721_init("DeepFamily", "Family");
     __ERC721Enumerable_init();
@@ -562,16 +548,42 @@ contract DeepFamily is
   // ========== Public Functions ==========
 
   /**
-   * @notice Register or update a proof verifier address for a given proof system and purpose.
+   * @notice Permanently register one verifier-adapter route.
+   * @dev Existing routes cannot be replaced or cleared.
    */
-  function setVerifier(
-    uint16 proofSystemId,
+  function setCircuitVerifier(
     ProofPurpose purpose,
-    address verifier
+    uint32 circuitId,
+    address adapter
   ) external onlyOwner {
-    if (verifier == address(0) || verifier.code.length == 0) revert InvalidVerifierAddress();
-    verifierRegistry[proofSystemId][uint8(purpose)] = verifier;
-    emit VerifierUpdated(proofSystemId, uint8(purpose), verifier);
+    if (circuitId == 0) revert InvalidCircuitId();
+    if (adapter == address(0) || adapter.code.length == 0) revert InvalidVerifierAddress();
+    if (verifierRegistry[uint8(purpose)][circuitId] != address(0)) {
+      revert VerifierRouteAlreadySet();
+    }
+    verifierRegistry[uint8(purpose)][circuitId] = adapter;
+    emit CircuitVerifierSet(uint8(purpose), circuitId, adapter);
+  }
+
+  /**
+   * @notice Permanently bind the one metadata archive used by this protocol deployment.
+   * @dev `onlyProxy` intentionally runs before `onlyOwner`, so direct implementation calls
+   *      fail on the proxy-context invariant regardless of implementation ownership state.
+   */
+  function setMetadataArchive(address archive) external onlyProxy onlyOwner {
+    if (metadataArchive != address(0)) revert MetadataArchiveAlreadySet();
+    if (archive == address(0) || archive.code.length == 0) revert InvalidMetadataArchive();
+
+    address boundDeepFamily;
+    try IMetadataArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
+      boundDeepFamily = bound;
+    } catch {
+      revert InvalidMetadataArchive();
+    }
+    if (boundDeepFamily != address(this)) revert InvalidMetadataArchive();
+
+    metadataArchive = archive;
+    emit MetadataArchiveSet(archive);
   }
 
   function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
@@ -632,14 +644,42 @@ contract DeepFamily is
     emit TrustedEndorserRemoved(personHash, versionIndex, account);
   }
 
+  function _validateMetadataEnvelope(
+    bytes calldata metadataEnvelope,
+    uint256 submitterAndSelfSuiteId
+  ) internal view {
+    if (metadataEnvelope.length < 0x14) revert InvalidMetadataEnvelope();
+
+    uint32 containerMagic;
+    uint8 formatVersion;
+    uint32 headerSelfSuiteId;
+    assembly ("memory-safe") {
+      let firstWord := calldataload(metadataEnvelope.offset)
+      containerMagic := shr(224, firstWord)
+      formatVersion := byte(4, firstWord)
+      headerSelfSuiteId := shr(224, calldataload(add(metadataEnvelope.offset, 0x10)))
+    }
+
+    if (containerMagic != 0x44464d31 || formatVersion == 0) {
+      revert InvalidEnvelopePrefix();
+    }
+    if (headerSelfSuiteId == 0) revert InvalidIdentitySuite();
+
+    uint256 expectedSubmitterAndSelfSuiteId = uint256(uint160(msg.sender)) |
+      (uint256(headerSelfSuiteId) << 160);
+    if (submitterAndSelfSuiteId != expectedSubmitterAndSelfSuiteId) {
+      revert CallerOrIdentitySuiteMismatch();
+    }
+  }
+
   function _addPersonInternal(
     bytes32 personHash,
     bytes32 fatherHash,
     bytes32 motherHash,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
-    string calldata metadataCID
+    uint256 versionCommitment,
+    bytes calldata metadataEnvelope
   ) internal {
     if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (fatherHash == personHash || motherHash == personHash) revert InvalidParentHash();
@@ -648,29 +688,37 @@ contract DeepFamily is
     if (motherHash == bytes32(0) && motherVersionIndex != 0) revert InvalidMotherVersionIndex();
     if (fatherVersionIndex > personVersions[fatherHash].length) revert InvalidFatherVersionIndex();
     if (motherVersionIndex > personVersions[motherHash].length) revert InvalidMotherVersionIndex();
-    if (bytes(tag).length > MAX_LONG_TEXT_LENGTH) revert InvalidTagLength();
-    if (bytes(metadataCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
     bytes32 versionHash = keccak256(
-      abi.encode(personHash, fatherHash, motherHash, fatherVersionIndex, motherVersionIndex, tag)
+      abi.encode(
+        VERSION_HASH_DOMAIN,
+        personHash,
+        fatherHash,
+        fatherVersionIndex,
+        motherHash,
+        motherVersionIndex,
+        versionCommitment
+      )
     );
-    if (versionExists[personHash][versionHash]) revert DuplicateVersion();
+    if (versionExists[personHash][versionHash]) revert DuplicateVersionCommitment();
     versionExists[personHash][versionHash] = true;
+
+    uint256 versionIndex = personVersions[personHash].length + 1;
     personVersions[personHash].push(
       PersonVersion({
         personHash: personHash,
         fatherHash: fatherHash,
         motherHash: motherHash,
-        versionIndex: 0,
+        versionIndex: versionIndex,
         fatherVersionIndex: fatherVersionIndex,
         motherVersionIndex: motherVersionIndex,
-        tag: tag,
-        metadataCID: metadataCID,
+        versionCommitment: versionCommitment,
         addedBy: msg.sender,
         timestamp: uint96(block.timestamp)
       })
     );
-    uint256 versionIndex = personVersions[personHash].length;
-    personVersions[personHash][versionIndex - 1].versionIndex = versionIndex;
+
+    IMetadataArchiveV1(metadataArchive).store(personHash, versionIndex, metadataEnvelope);
+
     _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {
       childrenOf[fatherHash][fatherVersionIndex].push(
@@ -694,14 +742,12 @@ contract DeepFamily is
       fatherVersionIndex,
       motherHash,
       motherVersionIndex,
-      tag
+      versionCommitment
     );
     // Reward the first complete-parent claim for a person. Parent versions may remain unspecified
     // (index 0) and the parent records do not need to exist on-chain yet.
     if (
-      !rewardClaimedByPerson[personHash] &&
-      fatherHash != bytes32(0) &&
-      motherHash != bytes32(0)
+      !rewardClaimedByPerson[personHash] && fatherHash != bytes32(0) && motherHash != bytes32(0)
     ) {
       rewardClaimedByPerson[personHash] = true;
       uint256 reward = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT).mint(msg.sender);
@@ -712,33 +758,31 @@ contract DeepFamily is
   }
 
   /**
-   * @notice Add a person via ZK proof of identity commitment.
+   * @notice Add a person version via a ZK relation proof and archive its encrypted envelope.
    * @dev Public signals order: identityCommitment, fatherIdentityCommitment,
-   *      motherIdentityCommitment, submitter, schemaVersion, cryptoSuiteVersion, hashAlgoId
+   *      motherIdentityCommitment, submitterAndSelfSuiteId, versionCommitment.
    */
   function addPersonVersion(
     ProofEnvelope calldata proof,
     PersonProofPublicSignals calldata publicSignals,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    string calldata tag,
-    string calldata metadataCID
+    bytes calldata metadataEnvelope
   ) external nonReentrant {
-    if (publicSignals.submitter != uint256(uint160(msg.sender))) revert CallerMismatch();
+    if (metadataArchive == address(0)) revert MetadataArchiveNotSet();
+    _validateMetadataEnvelope(metadataEnvelope, publicSignals.submitterAndSelfSuiteId);
 
-    address adapter = _getVerifier(proof.proofSystemId, ProofPurpose.PersonCommitment);
-    uint256[] memory ps = new uint256[](ProofConstants.PERSON_PUBLIC_SIGNALS_LEN);
+    address adapter = _getVerifier(proof.circuitId, ProofPurpose.PersonRelation);
+    uint256[] memory ps = new uint256[](ProofConstants.PERSON_RELATION_PUBLIC_SIGNALS_LEN);
     ps[0] = publicSignals.identityCommitment;
     ps[1] = publicSignals.fatherIdentityCommitment;
     ps[2] = publicSignals.motherIdentityCommitment;
-    ps[3] = publicSignals.submitter;
-    ps[4] = publicSignals.schemaVersion;
-    ps[5] = publicSignals.cryptoSuiteVersion;
-    ps[6] = publicSignals.hashAlgoId;
+    ps[3] = publicSignals.submitterAndSelfSuiteId;
+    ps[4] = publicSignals.versionCommitment;
 
     if (
       !IProofVerifierAdapter(adapter).verifyProof(
-        uint8(ProofPurpose.PersonCommitment),
+        uint8(ProofPurpose.PersonRelation),
         proof.proofEncodingId,
         proof.proofData,
         ps
@@ -771,8 +815,8 @@ contract DeepFamily is
       motherHash_,
       fatherVersionIndex,
       motherVersionIndex,
-      tag,
-      metadataCID
+      publicSignals.versionCommitment,
+      metadataEnvelope
     );
   }
 

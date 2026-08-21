@@ -9,7 +9,6 @@ import {
   Users,
 } from "lucide-react";
 import type { UseFormRegister } from "react-hook-form";
-import type { IdentitySaltMode } from "../../../../../shared/crypto/identityHash";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type {
   AddVersionFormInput,
@@ -18,7 +17,6 @@ import type {
   ParentStatus,
   PersonInfoPublic,
 } from "../model/addVersionTypes";
-import { IdentityRecoveryModePanel } from "./IdentityRecoveryModePanel";
 
 interface ParentIdentitySectionProps {
   t: AddVersionT;
@@ -27,15 +25,9 @@ interface ParentIdentitySectionProps {
   expanded: boolean;
   status: ParentStatus;
   calcRef: Ref<PersonHashCalculatorHandle>;
-  hasPassphrase: boolean;
-  identityMode: IdentitySaltMode;
-  recoverySaltHex: string;
   register: UseFormRegister<AddVersionFormInput>;
   onExpandedChange: (value: boolean) => void;
   onInfoChange: (value: PersonInfoPublic) => void;
-  onHasPassphraseChange: (value: boolean) => void;
-  onIdentityModeChange: (value: IdentitySaltMode) => void;
-  onRecoverySaltHexChange: (value: string) => void;
 }
 
 function StatusIndicator({ status }: { status: ParentStatus }) {
@@ -64,15 +56,9 @@ export function ParentIdentitySection({
   expanded,
   status,
   calcRef,
-  hasPassphrase,
-  identityMode,
-  recoverySaltHex,
   register,
   onExpandedChange,
   onInfoChange,
-  onHasPassphraseChange,
-  onIdentityModeChange,
-  onRecoverySaltHexChange,
 }: ParentIdentitySectionProps) {
   const isFather = kind === "father";
   const title = isFather
@@ -150,8 +136,7 @@ export function ParentIdentitySection({
             showTitle={false}
             collapsible={false}
             className="border-0 shadow-none bg-transparent"
-            identityMode={identityMode}
-            identitySaltHex={identityMode === "random" ? recoverySaltHex : undefined}
+            requirePassphraseConfirmation
             initialValues={{
               fullName: "",
               gender: isFather ? 1 : 2,
@@ -169,40 +154,8 @@ export function ParentIdentitySection({
                 birthDay: formData.birthDay,
                 isBirthBC: formData.isBirthBC,
               });
-              onHasPassphraseChange(formData.hasPassphrase);
-              if (!formData.hasPassphrase) {
-                onIdentityModeChange("deterministic");
-              }
             }}
           />
-
-          {hasPassphrase && (
-            <IdentityRecoveryModePanel
-              t={t}
-              compact
-              mode={identityMode}
-              recoverySaltHex={recoverySaltHex}
-              onModeChange={onIdentityModeChange}
-              onRecoverySaltHexChange={onRecoverySaltHexChange}
-              title={t("addVersion.parentIdentityMode", "Parent Identity Recovery Mode")}
-              hint={t(
-                "addVersion.parentIdentityModeHint",
-                "Use enhanced mode only when the parent identity was originally created with a saved recovery salt.",
-              )}
-              saltLabel={t("addVersion.parentRecoverySalt", "Parent Recovery Salt")}
-              saltPlaceholder={
-                isFather
-                  ? t(
-                      "addVersion.parentRecoverySaltPlaceholder",
-                      "Paste the father's saved recovery salt",
-                    )
-                  : t(
-                      "addVersion.parentRecoverySaltPlaceholderMother",
-                      "Paste the mother's saved recovery salt",
-                    )
-              }
-            />
-          )}
 
           <div className="w-full sm:w-auto">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

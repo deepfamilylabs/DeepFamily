@@ -113,6 +113,9 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
 
   const {
     clearAllCaches,
+    clearMetadataUnlockCache,
+    cacheValidatedPersonVersion,
+    persistValidatedPersonVersion,
     invalidateTreeRootCache,
     invalidateByTx,
     bumpEndorsementCount,
@@ -161,6 +164,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     invalidateTreeRootCache,
     errors,
     clearAllCaches,
+    clearMetadataUnlockCache,
   };
 
   const nodeAccessValue: TreeNodeAccessValue = {
@@ -172,6 +176,9 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
 
   const mutationsValue: TreeMutationsValue = {
     clearAllCaches,
+    clearMetadataUnlockCache,
+    cacheValidatedPersonVersion,
+    persistValidatedPersonVersion,
     bumpEndorsementCount,
     invalidateByTx,
     markVersionMinted,

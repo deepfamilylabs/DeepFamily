@@ -1,44 +1,24 @@
-// Helper script for isolated witness calculation
-const fs = require("fs");
-const path = require("path");
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as snarkjs from "snarkjs";
 
-async function calculateWitnessIsolated(inputData) {
-  try {
-    const wasm = fs.readFileSync(
-      path.join(__dirname, "../../zk-artifacts/circuits/person_commitment_js/person_commitment.wasm"),
-    );
-    const wc = require("../../zk-artifacts/circuits/person_commitment_js/witness_calculator.js");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-    const witnessCalculator = await wc(wasm);
-    const witness = await witnessCalculator.calculateWitness(inputData, 0);
-
-    const publicSignals = [];
-    for (let i = 1; i <= 7; i++) {
-      publicSignals.push(witness[i].toString());
-    }
-
-    // For direct function calls, return the result
-    if (require.main !== module) {
-      return { witness, publicSignals };
-    }
-
-    // For child process calls, output JSON to stdout
-    console.log(JSON.stringify({ success: true, publicSignals }));
-  } catch (error) {
-    // For direct function calls, throw the error
-    if (require.main !== module) {
-      throw error;
-    }
-
-    // For child process calls, output error JSON to stdout
-    console.log(JSON.stringify({ success: false, error: error.message }));
-  }
+export async function calculateCircuitProofIsolated(inputData, circuitName) {
+  const artifactDirectory = path.resolve(__dirname, "../../zk-artifacts/circuits");
+  const wasmPath = path.join(artifactDirectory, `${circuitName}_js/${circuitName}.wasm`);
+  const zkeyPath = path.join(artifactDirectory, `${circuitName}_final.zkey`);
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+    inputData,
+    wasmPath,
+    zkeyPath,
+    undefined,
+    undefined,
+    { singleThread: true },
+  );
+  return { proof, publicSignals: publicSignals.map(String) };
 }
 
-// If called directly (from child process)
-if (require.main === module) {
-  const inputData = JSON.parse(process.argv[2]);
-  calculateWitnessIsolated(inputData);
+export function calculateWitnessIsolated(inputData) {
+  return calculateCircuitProofIsolated(inputData, "person_commitment");
 }
-
-module.exports = { calculateWitnessIsolated };

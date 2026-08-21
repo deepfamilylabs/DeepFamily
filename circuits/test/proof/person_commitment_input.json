@@ -1,11 +1,12 @@
 {
   "nameField": "7173052488296810130072144012550757420157685903474029370848730126143330982683",
-  "derivedSecretField": "0",
+  "derivedSecretField": "11",
   "isBirthBC": 0,
   "birthYear": 1990,
   "birthMonth": 5,
   "birthDay": 15,
   "gender": 1,
+  "selfSuiteId": 2,
   "fatherNameField": "0",
   "fatherDerivedSecretField": "0",
   "fatherIsBirthBC": 0,
@@ -13,6 +14,7 @@
   "fatherBirthMonth": 0,
   "fatherBirthDay": 0,
   "fatherGender": 0,
+  "fatherSuiteId": 0,
   "motherNameField": "0",
   "motherDerivedSecretField": "0",
   "motherIsBirthBC": 0,
@@ -20,10 +22,10 @@
   "motherBirthMonth": 0,
   "motherBirthDay": 0,
   "motherGender": 0,
+  "motherSuiteId": 0,
   "hasFather": 0,
   "hasMother": 0,
   "submitter": "103929005307130220006098923584552504982110632080",
-  "schemaVersion": 1,
-  "cryptoSuiteVersion": 1,
-  "hashAlgoId": 1
+  "contentDigestLo": "1512366075204170947332355369683137040",
+  "contentDigestHi": "1339673755198158349044581307228491536"
 }

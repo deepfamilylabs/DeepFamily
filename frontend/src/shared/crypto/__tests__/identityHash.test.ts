@@ -1,117 +1,55 @@
 import { describe, expect, it } from "vitest";
 import {
   computeIdentityHashMaterial,
+  computeIdentitySaltHex,
   computePersonHash,
-  normalizeIdentitySaltHex,
 } from "../identityHash";
-import { computePersonHashFromData } from "../../zk/zk";
 
-describe("identityHash integration", () => {
-  it("computes the same personHash for raw and canonicalized names", async () => {
-    const rawInput = {
+const identity = {
+  fullName: "Alice Smith",
+  passphrase: "correct horse battery staple",
+  isBirthBC: false,
+  birthYear: 1990,
+  birthMonth: 5,
+  birthDay: 15,
+  gender: 1,
+};
+
+describe("fresh-v1 identityHash integration", () => {
+  it("canonicalizes names and derives a stable deterministic identity", async () => {
+    const raw = await computeIdentityHashMaterial({
+      ...identity,
       fullName: "  Alice\u3000Smith  ",
-      passphrase: "",
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
-    };
-
-    const canonicalInput = {
-      ...rawInput,
-      fullName: "Alice Smith",
-    };
-
-    expect(await computePersonHash(rawInput)).toBe(await computePersonHash(canonicalInput));
-  });
-
-  it("changes personHash when a non-empty passphrase is supplied", async () => {
-    const baseInput = {
-      fullName: "Alice Smith",
-      passphrase: "",
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
-    };
-
-    const withPassphrase = {
-      ...baseInput,
-      passphrase: "strong passphrase",
-    };
-
-    expect(await computePersonHash(baseInput)).not.toBe(await computePersonHash(withPassphrase));
-  });
-
-  it("canonicalizes inside computePersonHashFromData", () => {
-    const raw = computePersonHashFromData({
-      fullName: "  Alice\u3000Smith  ",
-      derivedSecretField: 0n,
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
     });
+    const canonical = await computeIdentityHashMaterial(identity);
 
-    const canonical = computePersonHashFromData({
-      fullName: "Alice Smith",
-      derivedSecretField: 0n,
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
-    });
-
-    expect(raw.identityCommitment).toBe(canonical.identityCommitment);
+    expect(raw.canonicalFullName).toBe("Alice Smith");
     expect(raw.personHash).toBe(canonical.personHash);
-    expect(raw.nameField).toBe(canonical.nameField);
+    expect(raw.identityCommitment).toBe(canonical.identityCommitment);
+    expect(raw.identitySuiteId).toBe(1);
   });
 
-  it("reuses the same random identity salt to reproduce the same personHash", async () => {
-    const baseInput = {
-      fullName: "Alice Smith",
-      passphrase: "strong passphrase",
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
-      identityMode: "random" as const,
-      identitySaltHex: normalizeIdentitySaltHex("00112233445566778899aabbccddeeff"),
-    };
+  it("runs the same Argon2id path for an empty passphrase", async () => {
+    const empty = await computeIdentityHashMaterial({ ...identity, passphrase: "" });
+    const protectedHash = await computePersonHash(identity);
 
-    const first = await computeIdentityHashMaterial(baseInput);
-    const second = await computeIdentityHashMaterial(baseInput);
-
-    expect(first.personHash).toBe(second.personHash);
-    expect(first.identitySaltHex).toBe(second.identitySaltHex);
+    expect(empty.derivedSecretField).not.toBe(0n);
+    expect(empty.personHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(empty.personHash).not.toBe(protectedHash);
   });
 
-  it("changes personHash when random identity salt changes", async () => {
-    const baseInput = {
-      fullName: "Alice Smith",
-      passphrase: "strong passphrase",
-      isBirthBC: false,
-      birthYear: 1990,
-      birthMonth: 5,
-      birthDay: 15,
-      gender: 1,
-      identityMode: "random" as const,
-    };
+  it("derives the salt only from canonical identity fields and suite 1", () => {
+    const rawSalt = computeIdentitySaltHex({ ...identity, fullName: "  Alice\u3000Smith  " });
+    const canonicalSalt = computeIdentitySaltHex(identity);
 
-    const first = await computeIdentityHashMaterial({
-      ...baseInput,
-      identitySaltHex: "00112233445566778899aabbccddeeff",
-    });
-    const second = await computeIdentityHashMaterial({
-      ...baseInput,
-      identitySaltHex: "ffeeddccbbaa99887766554433221100",
-    });
+    expect(rawSalt).toBe(canonicalSalt);
+    expect(rawSalt).toMatch(/^[0-9a-f]{32}$/);
+  });
 
-    expect(first.personHash).not.toBe(second.personHash);
+  it("fails closed for an unsupported identity suite", async () => {
+    await expect(computeIdentityHashMaterial({ ...identity, identitySuiteId: 999 })).rejects.toMatchObject({
+      code: "UNSUPPORTED_IDENTITY_SUITE",
+    });
+    await expect(computePersonHash({ ...identity, identitySuiteId: 999 })).resolves.toBe("");
   });
 });

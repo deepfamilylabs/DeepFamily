@@ -9,7 +9,7 @@ export function AddVersionIntroNotices({ t }: { t: AddVersionT }) {
         <p className="text-xs font-medium leading-relaxed opacity-90">
           {t(
             "mintNFT.legalTruthfulNotice",
-            "Submit only lawful, truthful information you are authorized to disclose publicly; do not include private data outside the intended public scope.",
+            "Submit only lawful, truthful information you are authorized to preserve. Encryption does not remove privacy, consent, or data-protection obligations.",
           )}
         </p>
       </div>

@@ -1,3 +1,4 @@
+import { useEffect, useId, useState } from "react";
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
 import { Lock } from "lucide-react";
 import { getFieldErrorA11y } from "../../../../../shared/ui";
@@ -10,6 +11,7 @@ export interface MintSupplementFormProps {
   errors: FieldErrors<MintNFTFormValues>;
   setValue: UseFormSetValue<MintNFTFormValues>;
   watch: UseFormWatch<MintNFTFormValues>;
+  validatedBiography?: string;
 }
 
 export function MintSupplementForm({
@@ -18,7 +20,10 @@ export function MintSupplementForm({
   errors,
   setValue,
   watch,
+  validatedBiography,
 }: MintSupplementFormProps) {
+  const [biographyCopyConfirmed, setBiographyCopyConfirmed] = useState(false);
+  const biographyCopyConfirmationId = useId();
   const isDeathBC = Boolean(watch("isDeathBC"));
   const currentYear = new Date().getFullYear();
   const storyErrorId = "mint-nft-story-error";
@@ -33,6 +38,12 @@ export function MintSupplementForm({
     errorId: tokenUriErrorId,
     describedByIds: [tokenUriHintId],
   });
+  const canOfferBiographyCopy =
+    typeof validatedBiography === "string" && validatedBiography.length > 0;
+
+  useEffect(() => {
+    setBiographyCopyConfirmed(false);
+  }, [validatedBiography]);
 
   return (
     <>
@@ -157,6 +168,48 @@ export function MintSupplementForm({
             <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
               {t("mintNFT.story", "Life Story Summary")}
             </label>
+            {canOfferBiographyCopy && (
+              <div className="mb-3 space-y-3 rounded-xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-900/10">
+                <p className="text-xs font-medium leading-relaxed text-red-800 dark:text-red-200">
+                  {t(
+                    "mintNFT.copyBiographyWarning",
+                    "An unlocked private biography is available for this exact version. Copying it into the NFT story makes that text permanently public on-chain.",
+                  )}
+                </p>
+                <label
+                  htmlFor={biographyCopyConfirmationId}
+                  className="flex cursor-pointer items-start gap-2 text-xs font-semibold text-red-900 dark:text-red-100"
+                >
+                  <input
+                    id={biographyCopyConfirmationId}
+                    type="checkbox"
+                    checked={biographyCopyConfirmed}
+                    onChange={(event) => setBiographyCopyConfirmed(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                  />
+                  <span>
+                    {t(
+                      "mintNFT.copyBiographyConfirm",
+                      "I understand this copies decrypted private biography text into a public, immutable NFT field.",
+                    )}
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  disabled={!biographyCopyConfirmed}
+                  onClick={() =>
+                    setValue("story", validatedBiography, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                      shouldValidate: true,
+                    })
+                  }
+                  className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {t("mintNFT.copyBiographyToStory", "Copy biography into public story")}
+                </button>
+              </div>
+            )}
             <textarea
               {...register("story")}
               rows={4}
@@ -184,7 +237,10 @@ export function MintSupplementForm({
             className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
             placeholder="https://... or ipfs://..."
           />
-          <p id={tokenUriHintId} className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+          <p
+            id={tokenUriHintId}
+            className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium"
+          >
             {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
           </p>
           {errors.tokenURI && (

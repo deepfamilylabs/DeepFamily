@@ -132,8 +132,10 @@ hre.run = async (taskName, args = {}) => {
         motherData,
         fatherVersion: Number(args.fatherversion ?? 0),
         motherVersion: Number(args.motherversion ?? 0),
-        tag: String(args.tag ?? ""),
-        ipfs: String(args.ipfs ?? ""),
+        versionContent: {
+          tag: String(args.tag ?? ""),
+          biography: String(args.biography ?? ""),
+        },
       });
     }
 

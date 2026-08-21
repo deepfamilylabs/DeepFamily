@@ -14,7 +14,6 @@ const PeoplePage = lazy(() => import("../pages/PeoplePage"));
 const StoryEditorPage = lazy(() => import("../pages/StoryEditorPage"));
 const ActionsPage = lazy(() => import("../pages/ActionsPage"));
 const KeyDerivationPage = lazy(() => import("../pages/KeyDerivationPage"));
-const DecryptMetadataPage = lazy(() => import("../pages/DecryptMetadataPage"));
 const GenealogyBookPage = lazy(() => import("../pages/GenealogyBookPage"));
 
 function PageFallback() {
@@ -47,8 +46,6 @@ function TitleUpdater() {
           return `${baseName} - ${t("navigation.actions", "Actions")}`;
         case "/keygen":
           return `${baseName} - Secure Key Derivation`;
-        case "/decrypt":
-          return `${baseName} - ${t("decryptMetadata.title", "Decrypt Metadata")}`;
         default:
           if (location.pathname.startsWith("/person/")) {
             return `${t("person.pageTitle", "Biography Wiki")}`;
@@ -81,7 +78,6 @@ export function AppRouter() {
               <Route path="people" element={<DomainErrorBoundary domain="people"><PeoplePage /></DomainErrorBoundary>} />
               <Route path="actions" element={<ActionsPage />} />
               <Route path="keygen" element={<KeyDerivationPage />} />
-              <Route path="decrypt" element={<DecryptMetadataPage />} />
               <Route path="person/:tokenId" element={<DomainErrorBoundary domain="person"><PersonPage /></DomainErrorBoundary>} />
               <Route path="editor/:tokenId" element={<DomainErrorBoundary domain="story"><StoryEditorPage /></DomainErrorBoundary>} />
             </Route>

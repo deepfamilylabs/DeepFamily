@@ -273,7 +273,8 @@ describe("PaperGenealogyView", () => {
           versionIndex: 1,
           tokenId: "1",
           fullName: "曹操",
-          story: "这是同步后的完整 story，纸本只读这个字段。",
+          metadataUnlockValidated: true,
+          biography: "这是解锁并验证后的版本传记，纸本只读这个字段。",
           storyMetadata: {
             totalChunks: 3,
             fullStoryHash: "",
@@ -316,7 +317,7 @@ describe("PaperGenealogyView", () => {
     });
 
     const record = getOuFullRecordText(generations[0].people[0]);
-    expect(record).toContain("附记这是同步后的完整 story，纸本只读这个字段。");
+    expect(record).toContain("附记这是解锁并验证后的版本传记，纸本只读这个字段。");
     expect(record).not.toContain("第一段。第二段。第三段。");
   });
 
@@ -753,7 +754,8 @@ describe("PaperGenealogyView", () => {
             personHash: child.personHash,
             versionIndex: 1,
             fullName: "曹启",
-            story: longStory,
+            metadataUnlockValidated: true,
+            biography: longStory,
           },
         }}
         hasRoot
@@ -914,7 +916,8 @@ describe("PaperGenealogyView", () => {
           id: child.id,
           personHash: child.personHash,
           versionIndex: 1,
-          story: longStory,
+          metadataUnlockValidated: true,
+          biography: longStory,
         },
       },
       t: zhTranslate,
@@ -956,7 +959,8 @@ describe("PaperGenealogyView", () => {
           deathDay: 1,
           birthPlace: "沛国谯县（今安徽亳州）",
           deathPlace: "楚国",
-          story,
+          metadataUnlockValidated: true,
+          biography: story,
         },
       },
       t: zhTranslate,
@@ -988,7 +992,8 @@ describe("PaperGenealogyView", () => {
             deathDay: 1,
             birthPlace: "沛国谯县（今安徽亳州）",
             deathPlace: "楚国",
-            story,
+            metadataUnlockValidated: true,
+            biography: story,
           },
         }}
         hasRoot
@@ -1018,7 +1023,8 @@ describe("PaperGenealogyView", () => {
           versionIndex: 1,
           tokenId: "2",
           fullName: "曹启",
-          story: longStory,
+          metadataUnlockValidated: true,
+          biography: longStory,
         },
       },
       t: zhTranslate,
@@ -1050,7 +1056,8 @@ describe("PaperGenealogyView", () => {
             versionIndex: 1,
             tokenId: "2",
             fullName: "曹启",
-            story: longStory,
+            metadataUnlockValidated: true,
+            biography: longStory,
           },
         }}
         hasRoot
@@ -1105,7 +1112,8 @@ describe("PaperGenealogyView", () => {
           versionIndex: 1,
           tokenId: "2",
           fullName: "曹数",
-          story: digitHeavyStory,
+          metadataUnlockValidated: true,
+          biography: digitHeavyStory,
         },
       },
       t: zhTranslate,
@@ -1164,7 +1172,8 @@ describe("PaperGenealogyView", () => {
           versionIndex: 1,
           tokenId: "2",
           fullName: "曹续",
-          story,
+          metadataUnlockValidated: true,
+          biography: story,
         },
       },
       t: zhTranslate,
@@ -1206,7 +1215,8 @@ describe("PaperGenealogyView", () => {
           versionIndex: 1,
           tokenId: "2",
           fullName: "曹植",
-          story: "才高辞丽文采风流宗族修谱传承有序".repeat(10),
+          metadataUnlockValidated: true,
+          biography: "才高辞丽文采风流宗族修谱传承有序".repeat(10),
         },
       },
       t: zhTranslate,
@@ -1255,7 +1265,8 @@ describe("PaperGenealogyView", () => {
           fullName: "曹植",
           birthYear: 192,
           deathYear: 232,
-          story:
+          metadataUnlockValidated: true,
+          biography:
             "曹植（192—232），字子建，曹操与卞氏之子、曹丕同母弟，建安文学代表作者。" +
             "早年以才学受曹操重视，储位之争后渐失信任，曹丕、曹叡两朝屡遭贬爵迁封。",
         },
@@ -1310,7 +1321,8 @@ describe("PaperGenealogyView", () => {
           deathDay: 1,
           birthPlace: "沛国谯县（今安徽亳州）",
           deathPlace: "洛阳",
-          story: "续排测试，确认左页会继续承接。",
+          metadataUnlockValidated: true,
+          biography: "续排测试，确认左页会继续承接。",
         },
       ]),
     );
@@ -1922,7 +1934,8 @@ describe("PaperGenealogyView", () => {
           personHash: child.personHash,
           versionIndex: 1,
           fullName: "曹启",
-          story: longStory,
+          metadataUnlockValidated: true,
+          biography: longStory,
         },
       },
       t: zhTranslate,
@@ -1960,7 +1973,8 @@ describe("PaperGenealogyView", () => {
             personHash: child.personHash,
             versionIndex: 1,
             fullName: "曹启",
-            story: longStory,
+            metadataUnlockValidated: true,
+            biography: longStory,
           },
         }}
         hasRoot

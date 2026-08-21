@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     chainId: 123,
     contractAddress: "0x0000000000000000000000000000000000000abc",
   },
-  readonlyProvider: { id: "readonly-provider" },
+  readonlyProvider: { id: "readonly-provider", getTransactionReceipt: vi.fn() },
   submitContract: { id: "submit-contract" },
   preflightContract: { id: "preflight-contract" },
   createDeepFamilyContract: vi.fn(),
@@ -50,20 +50,17 @@ vi.mock("../../../services/addVersionService", () => ({
 }));
 
 const flowArgs = {
-  proof: { pi_a: [], pi_b: [], pi_c: [], protocol: "groth16" } as any,
+  proof: { circuitId: 1, proofEncodingId: 1, proofData: "0x1234" } as any,
   publicSignals: {
     identityCommitment: 1n,
     fatherIdentityCommitment: 0n,
     motherIdentityCommitment: 0n,
-    submitter: 2n,
-    schemaVersion: 1,
-    cryptoSuiteVersion: 1,
-    hashAlgoId: 1,
+    submitterAndSelfSuiteId: 2n,
+    versionCommitment: 3n,
   },
   fatherVersionIndex: 0,
   motherVersionIndex: 0,
-  tag: "v1",
-  metadataCID: "ipfs://metadata",
+  metadataEnvelope: new Uint8Array([0x44, 0x46, 0x4d, 0x31]),
 };
 
 describe("useAddVersionFlow", () => {
@@ -78,6 +75,7 @@ describe("useAddVersionFlow", () => {
     mocks.createDeepFamilyContract.mockReset();
     mocks.getReadonlyProvider.mockReset();
     mocks.executeAddVersionFlow.mockReset();
+    mocks.readonlyProvider.getTransactionReceipt.mockReset();
     mocks.getReadonlyProvider.mockReturnValue(mocks.readonlyProvider);
     mocks.createDeepFamilyContract.mockImplementation((_address, runner) =>
       runner === mocks.wallet.signer ? mocks.submitContract : mocks.preflightContract,
@@ -94,6 +92,7 @@ describe("useAddVersionFlow", () => {
       events: {
         PersonHashZKVerified: null,
         PersonVersionAdded: null,
+        MetadataStored: null,
         TokenRewardDistributed: null,
       },
     };
@@ -127,8 +126,7 @@ describe("useAddVersionFlow", () => {
         publicSignals: flowArgs.publicSignals,
         fatherVersionIndex: 0,
         motherVersionIndex: 0,
-        tag: "v1",
-        metadataCID: "ipfs://metadata",
+        metadataEnvelope: flowArgs.metadataEnvelope,
         isDev: expect.any(Boolean),
         onTransactionSubmitted: expect.any(Function),
       }),
@@ -147,6 +145,7 @@ describe("useAddVersionFlow", () => {
       events: {
         PersonHashZKVerified: null,
         PersonVersionAdded: null,
+        MetadataStored: null,
         TokenRewardDistributed: null,
       },
     });
@@ -164,6 +163,52 @@ describe("useAddVersionFlow", () => {
         preflightContract: mocks.submitContract,
       }),
     );
+  });
+
+  it("reconciles the exact submitted hash on retry without rebuilding the frozen package", async () => {
+    const transactionHash = `0x${"aa".repeat(32)}`;
+    const receipt = { hash: transactionHash, status: 1, blockNumber: 10, logs: [] };
+    const serviceResult = {
+      hash: "0xperson",
+      index: 1,
+      rewardAmount: 0,
+      transactionHash,
+      blockNumber: 10,
+      events: {
+        PersonHashZKVerified: null,
+        PersonVersionAdded: null,
+        MetadataStored: null,
+        TokenRewardDistributed: null,
+      },
+    };
+    mocks.readonlyProvider.getTransactionReceipt.mockResolvedValue(receipt);
+    mocks.executeAddVersionFlow
+      .mockImplementationOnce(async (params) => {
+        params.onTransactionSubmitted?.(transactionHash);
+        throw new Error("RPC timeout while waiting for receipt");
+      })
+      .mockResolvedValueOnce(serviceResult);
+
+    const { result } = renderHook(() => useAddVersionFlow());
+
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toThrow("RPC timeout");
+    });
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).resolves.toBe(serviceResult);
+    });
+
+    expect(mocks.executeAddVersionFlow).toHaveBeenCalledTimes(2);
+    const first = mocks.executeAddVersionFlow.mock.calls[0][0];
+    const second = mocks.executeAddVersionFlow.mock.calls[1][0];
+    expect(first.reconcileTransactionHash).toBeUndefined();
+    expect(second.reconcileTransactionHash).toBe(transactionHash);
+    expect(second.proof).toBe(first.proof);
+    expect(second.publicSignals).toBe(first.publicSignals);
+    expect(second.metadataEnvelope).toBe(first.metadataEnvelope);
+    await expect(second.getTransactionReceipt(transactionHash)).resolves.toBe(receipt);
+    expect(mocks.readonlyProvider.getTransactionReceipt).toHaveBeenCalledWith(transactionHash);
+    expect(result.current.state).toEqual({ step: "success", result: serviceResult });
   });
 
   it("fails before contract creation when wallet or contract config is missing", async () => {

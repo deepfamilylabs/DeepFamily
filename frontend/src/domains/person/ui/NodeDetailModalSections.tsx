@@ -196,13 +196,11 @@ export function NodeDetailHashRows({
   nodeData,
   fallback,
   onCopy,
-  onDecryptCid,
 }: {
   t: NodeDetailT;
   nodeData?: NodeData | null;
   fallback: { hash: string; versionIndex?: number };
   onCopy: (text: string) => void;
-  onDecryptCid: (cid: string) => void;
 }) {
   const copyLabel = t("search.copy", "Copy");
 
@@ -289,36 +287,67 @@ export function NodeDetailHashRows({
         onCopy={onCopy}
       />
       <NodeDetailRow
-        label={t("familyTree.nodeDetail.tag")}
-        value={nodeData?.tag || "-"}
+        label={t("familyTree.nodeDetail.versionCommitment", "Version Commitment")}
+        value={<SmartHash text={nodeData?.versionCommitment} />}
+        copy={nodeData?.versionCommitment}
         color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
       <NodeDetailRow
-        label={t("familyTree.nodeDetail.cid")}
-        value={
-          <div className="flex items-center justify-between gap-3 w-full">
-            <span className="block break-all min-w-0">{nodeData?.metadataCID || "-"}</span>
-            {nodeData?.metadataCID && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDecryptCid(nodeData.metadataCID!);
-                }}
-                className="shrink-0 whitespace-nowrap px-4 py-1.5 text-xs font-semibold rounded-full bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 text-gray-500 hover:text-white dark:hover:text-white hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] transition-all duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
-              >
-                {t("familyTree.nodeDetail.decrypt", "Decrypt and View")}
-              </button>
-            )}
-          </div>
-        }
-        copy={nodeData?.metadataCID ? nodeData.metadataCID : undefined}
+        label={t("familyTree.nodeDetail.metadataPointer", "Metadata Pointer")}
+        value={<SmartAddress text={nodeData?.metadataPointer} />}
+        copy={nodeData?.metadataPointer}
         color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
+      <NodeDetailRow
+        label={t("familyTree.nodeDetail.metadataPayloadHash", "Metadata Payload Hash")}
+        value={<SmartHash text={nodeData?.metadataPayloadHash} />}
+        copy={nodeData?.metadataPayloadHash}
+        color="slate"
+        copyLabel={copyLabel}
+        onCopy={onCopy}
+      />
+      <NodeDetailRow
+        label={t("familyTree.nodeDetail.metadataPayloadLength", "Metadata Size")}
+        value={
+          Number.isInteger(nodeData?.metadataPayloadLength)
+            ? `${nodeData!.metadataPayloadLength} bytes`
+            : "-"
+        }
+        color="slate"
+        copyLabel={copyLabel}
+        onCopy={onCopy}
+      />
+      <NodeDetailRow
+        label={t("familyTree.nodeDetail.privateMetadata", "Private Version Metadata")}
+        value={
+          nodeData?.metadataUnlockValidated
+            ? t("familyTree.nodeDetail.unlockedOnDevice", "Unlocked on this device")
+            : t("familyTree.nodeDetail.locked", "Locked")
+        }
+        color={nodeData?.metadataUnlockValidated ? "emerald" : "slate"}
+        copyLabel={copyLabel}
+        onCopy={onCopy}
+      />
+      {nodeData?.metadataUnlockValidated ? (
+        <>
+          <NodeDetailRow
+            label={t("familyTree.nodeDetail.tag")}
+            value={nodeData.tag ?? ""}
+            copy={nodeData.tag || undefined}
+            color="slate"
+            copyLabel={copyLabel}
+            onCopy={onCopy}
+          />
+          <NodeDetailStorySection
+            label={t("familyTree.nodeDetail.versionBiography", "Encrypted Version Biography")}
+            story={nodeData.biography}
+          />
+        </>
+      ) : null}
     </>
   );
 }
@@ -485,14 +514,14 @@ export function NodeDetailTrustedEndorsersSection({
   );
 }
 
-function NodeDetailStorySection({ t, story }: { t: NodeDetailT; story?: string }) {
+function NodeDetailStorySection({ label, story }: { label: React.ReactNode; story?: string }) {
   if (!story?.trim()) return null;
 
   return (
     <div className="group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)] transition-all duration-300">
       <div className="min-w-0 flex-1">
         <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-          {t("familyTree.nodeDetail.story")}
+          {label}
         </div>
         <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap wrap-break-word max-h-[200px] overflow-y-auto font-medium">
           {story}
@@ -572,7 +601,10 @@ export function NodeDetailNftSection({
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
-      <NodeDetailStorySection t={t} story={nodeData?.story} />
+      <NodeDetailStorySection
+        label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Story")}
+        story={nodeData?.nftPublicStory}
+      />
       <NodeDetailRow
         label={t("person.owner", "Owner Address")}
         value={<SmartAddress text={owner} />}

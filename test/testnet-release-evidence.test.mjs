@@ -27,6 +27,10 @@ const REFUND_TRANSACTION_HASH = `0x${"9a".repeat(32)}`;
 const MIN_DELAY = 172800;
 const CHAIN_ID = 71;
 const DESTINATION_RELATIVE_PATH = "tmp/release-evidence/espace-release-rehearsal.json";
+const PROTOCOL = "deepfamily/onchain-biography-unified-passphrase-v1";
+const PROTOCOL_GENERATION = "df-onchain-biography-v1";
+const PROTOCOL_MANIFEST_SHA256 = "cd".repeat(32);
+const GOLDEN_VECTOR_SHA256 = "ef".repeat(32);
 const address = (suffix) => `0x${String(suffix).padStart(40, "0")}`;
 const GOVERNANCE_SAFE = address(1);
 const TIMELOCK = address(3);
@@ -62,6 +66,7 @@ const EXPECTED_INITIAL_RELEASE_STEPS = [
   "fund-isolated-run-deployer",
   "isolated-integrated-protocol-wiring",
   "production-build-manifest-preflight",
+  "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
@@ -101,6 +106,22 @@ const terminalTimelock = (timelockAddress, minDelay) => ({
   currentMultisig: GOVERNANCE_SAFE,
   minDelay: String(minDelay),
 });
+
+const protocolManifestInspector = ({ root, requireProduction }) => {
+  if (requireProduction !== true) {
+    throw new Error("test protocol manifest inspector requires production validation");
+  }
+  return {
+    manifestPath: path.join(root, "protocol-release-manifest.json"),
+    manifestSha256: PROTOCOL_MANIFEST_SHA256,
+    manifest: {
+      protocol: PROTOCOL,
+      protocolGeneration: PROTOCOL_GENERATION,
+      releaseStatus: "production",
+      goldenVectors: { sha256: GOLDEN_VECTOR_SHA256 },
+    },
+  };
+};
 
 const validReport = () => ({
   schemaVersion: 4,
@@ -180,6 +201,14 @@ const validReport = () => ({
   },
   isolatedDeploymentArtifacts: {
     productionWriterExercised: true,
+  },
+  protocolManifestEvidence: {
+    path: "protocol-release-manifest.json",
+    sha256: PROTOCOL_MANIFEST_SHA256,
+    protocol: PROTOCOL,
+    protocolGeneration: PROTOCOL_GENERATION,
+    releaseStatus: "production",
+    goldenVectorSha256: GOLDEN_VECTOR_SHA256,
   },
   zkArtifactTrust: {
     status: "passed",
@@ -301,6 +330,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       expectedTestnetNetworkName: "confluxTestnet",
       mainnetMinDelaySeconds: MIN_DELAY,
       currentCommit: COMMIT,
+      protocolManifestInspector,
       ...overrides,
     });
 
@@ -321,6 +351,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       mainnetMinDelaySeconds: MIN_DELAY,
       currentCommit: COMMIT,
       expectedAcceptanceInputDigest: INPUT_DIGEST,
+      protocolManifestInspector,
       ...overrides,
     });
 
@@ -389,6 +420,12 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       productionReady: true,
+    });
+    expect(result.publicSummary.protocolManifest).to.deep.equal({
+      sha256: PROTOCOL_MANIFEST_SHA256,
+      protocol: PROTOCOL,
+      protocolGeneration: PROTOCOL_GENERATION,
+      goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
     expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(1);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
@@ -526,6 +563,29 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       chainId: String(sepoliaChainId),
       confirmations: 2,
     });
+  });
+
+  it("binds the report to the currently inspected production protocol manifest", async function () {
+    const cases = [
+      ["path", "other-manifest.json", /protocolManifestEvidence\.path/iu],
+      ["sha256", "ab".repeat(32), /protocolManifestEvidence\.sha256/iu],
+      ["protocol", "deepfamily/other-protocol", /protocolManifestEvidence\.protocol/iu],
+      ["protocolGeneration", "other-generation", /protocolManifestEvidence\.protocolGeneration/iu],
+      ["releaseStatus", "candidate", /protocolManifestEvidence\.releaseStatus/iu],
+      ["goldenVectorSha256", "ab".repeat(32), /protocolManifestEvidence\.goldenVectorSha256/iu],
+    ];
+    for (const [field, value, pattern] of cases) {
+      const report = validReport();
+      report.protocolManifestEvidence[field] = value;
+      await writeReport(report);
+      await expectRejected(() => validate(), pattern);
+    }
+
+    await writeReport(validReport());
+    await expectRejected(
+      () => validate({ protocolManifestInspector: null }),
+      /protocolManifestInspector must be a function/iu,
+    );
   });
 
   it("requires an explicit regular JSON file and rejects symlinks", async function () {

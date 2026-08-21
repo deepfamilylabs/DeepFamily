@@ -12,7 +12,7 @@ import {
 } from "../tasks/zk-person-hash-check.mjs";
 import personCommitmentProof from "../lib/personCommitmentProof.js";
 
-const { buildPersonCommitmentInput } = personCommitmentProof;
+const { buildPersonRelationInput } = personCommitmentProof;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -27,12 +27,12 @@ describe("zk-person-hash-check helpers", function () {
         birthMonth: 5,
         birthDay: "15",
         gender: 1,
+        selfSuiteId: 2,
         hasFather: 0,
         hasMother: 0,
         submitter: "4660",
-        schemaVersion: 1,
-        cryptoSuiteVersion: "1",
-        hashAlgoId: 1,
+        contentDigestLo: 7,
+        contentDigestHi: 8,
       };
       const validated = validatePersonCommitmentInput(raw);
       expect(validated.nameField).to.equal(123n);
@@ -59,12 +59,12 @@ describe("zk-person-hash-check helpers", function () {
           birthMonth: 1,
           birthDay: 1,
           gender: 1,
+          selfSuiteId: 1,
           hasFather: 2,
           hasMother: 0,
           submitter: 1,
-          schemaVersion: 1,
-          cryptoSuiteVersion: 1,
-          hashAlgoId: 1,
+          contentDigestLo: 7,
+          contentDigestHi: 8,
         }),
       ).to.throw(/hasFather must be 0 or 1/);
     });
@@ -72,7 +72,7 @@ describe("zk-person-hash-check helpers", function () {
 
   describe("computeExpectedSignals", function () {
     it("matches the active person-commitment helper semantics", async function () {
-      const built = buildPersonCommitmentInput(
+      const built = buildPersonRelationInput(
         {
           fullName: "Child Example",
           derivedSecretField: 0n,
@@ -101,6 +101,13 @@ describe("zk-person-hash-check helpers", function () {
           gender: 2,
         },
         "0x1234567890123456789012345678901234567890",
+        {
+          selfSuiteId: 2,
+          fatherSuiteId: 1,
+          motherSuiteId: 1,
+          contentDigestLo: 7,
+          contentDigestHi: 8,
+        },
       );
 
       const expected = await computeExpectedSignals(validatePersonCommitmentInput(built.input));
@@ -108,10 +115,8 @@ describe("zk-person-hash-check helpers", function () {
         built.person.identityCommitment.toString(),
         built.father.identityCommitment.toString(),
         built.mother.identityCommitment.toString(),
-        built.submitter,
-        String(built.schemaVersion),
-        String(built.cryptoSuiteVersion),
-        String(built.hashAlgoId),
+        built.submitterAndSelfSuiteId.toString(),
+        built.versionCommitment.toString(),
       ]);
     });
   });

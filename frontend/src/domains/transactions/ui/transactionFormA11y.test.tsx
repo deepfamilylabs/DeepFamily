@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { createRef } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AddVersionConsentSection } from "./add-version/sections/AddVersionConsentSection";
@@ -60,6 +59,8 @@ describe("transaction form accessibility", () => {
         isEndorsed={false}
         isAlreadyMinted={false}
         hasMissingParents={{ father: false, mother: false }}
+        targetSelfSuiteId={null}
+        envelopeHeaderError={null}
         onPersonHashChange={vi.fn()}
         onVersionIndexChange={vi.fn()}
       />,
@@ -106,7 +107,7 @@ describe("transaction form accessibility", () => {
       <>
         <AddVersionConsentSection
           t={t as any}
-          consents={{ hash: false, age: false, legal: false }}
+          consents={{ hash: false, age: false, legal: false, passphrase: false }}
           consentError="Add version consent required"
           onToggleConsent={vi.fn()}
         />
@@ -127,39 +128,26 @@ describe("transaction form accessibility", () => {
     expect(alerts.every((alert) => alert.getAttribute("aria-live") === "assertive")).toBe(true);
   });
 
-  it("links add-version encryption errors to password fields", () => {
+  it("renders only private tag/biography fields, with no legacy metadata password or CID", () => {
     render(
       <MetadataEncryptionSection
         t={t as any}
         register={register}
         isSubmitting={false}
-        personHasPassphrase={false}
-        encryptionPasswordRef={createRef<HTMLInputElement>()}
-        confirmEncryptionPasswordRef={createRef<HTMLInputElement>()}
-        encryptionError="Passwords do not match"
-        usePersonPassphraseForEncryption
-        showEncryptionPassword={false}
-        showConfirmEncryptionPassword={false}
-        showManualEncryptionInputs
-        onUsePersonPassphraseForEncryptionChange={vi.fn()}
-        onEncryptionErrorClear={vi.fn()}
-        onToggleEncryptionPassword={vi.fn()}
-        onToggleConfirmEncryptionPassword={vi.fn()}
-        onDownloadMetadata={vi.fn()}
       />,
     );
 
-    const password = screen.getByPlaceholderText("Password (min 8 chars)");
-    const confirmPassword = screen.getByPlaceholderText("Confirm password");
-    const error = screen.getByText("Passwords do not match");
-
-    expect(error.getAttribute("role")).toBe("alert");
-    expect(error.getAttribute("aria-live")).toBe("assertive");
-    expect(password.getAttribute("aria-invalid")).toBe("true");
-    expect(password.getAttribute("aria-describedby")).toContain(error.id);
-    expect(confirmPassword.getAttribute("aria-invalid")).toBe("true");
-    expect(confirmPassword.getAttribute("aria-describedby")).toContain(error.id);
-    expect(screen.getByRole("button", { name: "Show encryption password" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Show confirm password" })).toBeTruthy();
+    expect(screen.getByPlaceholderText("Optional private revision label")).toBeTruthy();
+    expect(
+      screen.getByPlaceholderText(
+        "This immutable biography is encrypted on this device before it is stored on-chain.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Password (min 8 chars)")).toBeNull();
+    expect(screen.queryByPlaceholderText("Confirm password")).toBeNull();
+    expect(screen.queryByText("Metadata CID")).toBeNull();
+    expect(
+      screen.getByText(/No separate metadata password or CID is created/),
+    ).toBeTruthy();
   });
 });

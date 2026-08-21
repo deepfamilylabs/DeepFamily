@@ -1,7 +1,5 @@
 import type { TFunction } from "i18next";
 import type { FriendlyError } from "../../../../../shared/lib/errors";
-import type { MetadataRecoveryV2 } from "../../../../../shared/crypto/metadataCrypto";
-import type { IdentitySaltMode } from "../../../../../shared/crypto/identityHash";
 import type { PersonData, ProofEnvelope } from "../../../../../shared/zk/zk";
 import type {
   AddVersionPublicSignals,
@@ -16,21 +14,21 @@ export interface AddVersionFormInput {
   fatherVersionIndex: number | "";
   motherVersionIndex: number | "";
   tag: string;
-  metadataCID?: string;
+  biography: string;
 }
 
 export interface AddVersionFormData {
   fatherVersionIndex: number;
   motherVersionIndex: number;
   tag: string;
-  metadataCID?: string;
+  biography: string;
 }
 
 export interface EncryptedMetadataBundle {
-  json: string;
-  cid: string;
-  plainHash: string;
-  passwordFingerprint: string;
+  envelope: Uint8Array;
+  payloadHash: string;
+  envelopeLength: number;
+  versionCommitment: bigint;
 }
 
 export interface PersonInfoPublic {
@@ -45,26 +43,16 @@ export interface PersonInfoPublic {
 export interface IdentityMaterial {
   personData: PersonData;
   personHash: string;
-  identityMode: IdentitySaltMode;
-  identitySaltHex: string | null;
-  recovery: MetadataRecoveryV2["identityKdf"] | null;
-}
-
-export interface IdentityResolutionOptions {
-  identityMode?: IdentitySaltMode;
-  identitySaltHex?: string | null;
-}
-
-export interface IdentitySaltSelections {
-  personIdentitySaltHex: string | null;
-  fatherIdentitySaltHex: string | null;
-  motherIdentitySaltHex: string | null;
+  identitySuiteId: number;
+  identityCommitment: bigint;
+  derivedSecretField: bigint;
 }
 
 export interface AddVersionConsents {
   hash: boolean;
   age: boolean;
   legal: boolean;
+  passphrase: boolean;
 }
 
 export type ParentKind = "father" | "mother";
@@ -75,8 +63,7 @@ export interface AddVersionFlowArgs {
   publicSignals: AddVersionPublicSignals;
   fatherVersionIndex: number;
   motherVersionIndex: number;
-  tag: string;
-  metadataCID: string;
+  metadataEnvelope: Uint8Array;
 }
 
 export type AddVersionFlowStep = "idle" | "validating" | "confirming" | "success" | "error";

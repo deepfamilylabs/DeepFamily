@@ -58,11 +58,6 @@ vi.mock("../domains/tree", () => ({
   useTreeGateway: () => mocks.treeGateway,
 }));
 
-vi.mock("../shared/crypto/identityHash", () => ({
-  generateRandomIdentitySaltHex: () =>
-    "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-}));
-
 vi.mock("../domains/person", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../domains/person")>();
   return {
@@ -114,10 +109,9 @@ describe("SearchPage", () => {
         versions: [
           {
             versionIndex: 2,
-            tag: "verified",
             addedBy: "0x00000000000000000000000000000000000000aa",
             timestamp: 1710000000,
-            metadataCID: "cid://version-2",
+            versionCommitment: "0xcommitment-2",
             fatherHash: personHashB,
             fatherVersionIndex: 1,
             motherHash: personHashA,
@@ -132,10 +126,9 @@ describe("SearchPage", () => {
         versions: [
           {
             versionIndex: 3,
-            tag: "latest",
             addedBy: "0x00000000000000000000000000000000000000bb",
             timestamp: 1710000100,
-            metadataCID: "cid://version-3",
+            versionCommitment: "0xcommitment-3",
             fatherHash: personHashB,
             fatherVersionIndex: 1,
             motherHash: personHashA,
@@ -161,7 +154,7 @@ describe("SearchPage", () => {
       expect(mocks.treeGateway.listPersonVersionsPage).toHaveBeenCalledWith(personHashA, 0, 100),
     );
     expect(await screen.findByText("v2")).toBeTruthy();
-    expect(screen.getByText("cid://version-2")).toBeTruthy();
+    expect(screen.getByText("0xcommitment-2")).toBeTruthy();
     expect(screen.getByText("search.totalResults: 3")).toBeTruthy();
 
     const section = form!.parentElement;
@@ -176,7 +169,7 @@ describe("SearchPage", () => {
       ),
     );
     expect(await screen.findByText("v3")).toBeTruthy();
-    expect(screen.getByText("cid://version-3")).toBeTruthy();
+    expect(screen.getByText("0xcommitment-3")).toBeTruthy();
   });
 
   it("queries endorsement stats through personGateway and resets the section state", async () => {

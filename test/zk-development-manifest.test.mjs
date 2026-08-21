@@ -2,7 +2,15 @@ import { expect } from "chai";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { updateDevelopmentManifest } from "../scripts/update-zk-development-manifest.mjs";
+import {
+  FRESH_V1_DEVELOPMENT_WARNING,
+  PRE_V1_CEREMONY_ID,
+  PRE_V1_DEPRECATION_RECORD_PATH,
+  PRE_V1_MANIFEST_ARCHIVE_PATH,
+  PRE_V1_TRANSCRIPT_ARCHIVE_PATH,
+  initializeFreshV1DevelopmentManifest,
+  updateDevelopmentManifest,
+} from "../scripts/update-zk-development-manifest.mjs";
 import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
@@ -199,6 +207,60 @@ describe("development ZK manifest updater", function () {
     );
     expect(await fs.readFile(fixture.manifestPath, "utf8")).to.equal(original);
     expectRegularFileWithPosixMode(await fs.lstat(fixture.manifestPath), MANIFEST_MODE);
+  });
+
+  it("requires an explicit fresh-v1 transition and preserves the pre-v1 ceremony evidence", async function () {
+    const transcript = {
+      schemaVersion: 3,
+      ceremonyId: PRE_V1_CEREMONY_ID,
+      status: "archived-pre-v1-fixture",
+    };
+    const transcriptRaw = `${JSON.stringify(transcript, null, 2)}\n`;
+    await writeRelativeFile(fixture.root, ZK_CEREMONY_TRANSCRIPT_PATH, transcriptRaw);
+    fixture.manifest.trustedSetup = {
+      ...productionSetup(),
+      ceremonyId: PRE_V1_CEREMONY_ID,
+      transcript: {
+        path: ZK_CEREMONY_TRANSCRIPT_PATH,
+        sha256: sha256Text(transcriptRaw),
+      },
+    };
+    const productionManifestRaw = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
+    await fs.writeFile(fixture.manifestPath, productionManifestRaw);
+
+    const result = initializeFreshV1DevelopmentManifest({ root: fixture.root });
+    expect(result.status).to.equal("initialized-fresh-v1-development");
+    const transitioned = JSON.parse(await fs.readFile(fixture.manifestPath, "utf8"));
+    expect(transitioned.trustedSetup).to.deep.equal({
+      status: "development",
+      trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
+      warning: FRESH_V1_DEVELOPMENT_WARNING,
+      minimumContributors: 1,
+      contributorCount: 1,
+      beaconApplied: false,
+      transcriptSha256: null,
+    });
+    expect(
+      await fs.readFile(artifactPath(fixture.root, PRE_V1_MANIFEST_ARCHIVE_PATH), "utf8"),
+    ).to.equal(productionManifestRaw);
+    expect(
+      await fs.readFile(artifactPath(fixture.root, PRE_V1_TRANSCRIPT_ARCHIVE_PATH), "utf8"),
+    ).to.equal(transcriptRaw);
+    const record = JSON.parse(
+      await fs.readFile(artifactPath(fixture.root, PRE_V1_DEPRECATION_RECORD_PATH), "utf8"),
+    );
+    expect(record).to.deep.include({
+      status: "deprecated-pre-v1",
+      ceremonyId: PRE_V1_CEREMONY_ID,
+    });
+    expect(record.replacement).to.deep.equal({
+      status: "development-only",
+      command: "npm run zk:dev:fresh-v1",
+      productionCeremonyRequired: true,
+    });
+    expect(initializeFreshV1DevelopmentManifest({ root: fixture.root }).status).to.equal(
+      "already-development",
+    );
   });
 
   it("leaves the manifest unchanged when a required artifact is missing", async function () {

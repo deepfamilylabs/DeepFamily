@@ -20,7 +20,7 @@ export function AddVersionConsentSection({
       key: "hash",
       label: t(
         "addVersion.consentHash",
-        "I understand the plaintext stays off-chain, but its hash will be permanently public on-chain and cannot be removed.",
+        "I understand the encrypted envelope, its payload hash, and a keyed version commitment are permanently public on-chain and cannot be removed.",
       ),
     },
     {
@@ -32,6 +32,13 @@ export function AddVersionConsentSection({
       label: t(
         "addVersion.consentLegal",
         "I confirm the data is lawful, truthful, and authorized for disclosure; no extra private content is included.",
+      ),
+    },
+    {
+      key: "passphrase",
+      label: t(
+        "addVersion.consentPassphrase",
+        "I understand anyone can permanently attempt offline passphrase guesses. An empty passphrase makes the encrypted metadata effectively public, and AES cannot restore missing entropy.",
       ),
     },
   ] as const;

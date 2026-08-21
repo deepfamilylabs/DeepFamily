@@ -1,6 +1,5 @@
 import hre from "hardhat";
-import path from "node:path";
-import fs from "node:fs";
+import { ZeroHash } from "ethers";
 import seedHelpers from "../lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
@@ -30,18 +29,23 @@ async function checkPerson(deepFamily, reader, personData, versionIndex = 1) {
 
   // Get version details
   try {
-    const [versionDetails] = await reader.getVersionDetails(personHash, versionIndex);
+    const [versionDetails, metadataRef] = await reader.getVersionDetails(
+      personHash,
+      versionIndex,
+    );
     console.log(`\nVersion ${versionIndex} details:`);
-    console.log(`  Tag: ${versionDetails.tag}`);
-    console.log(`  IPFS CID: ${versionDetails.ipfsCID}`);
+    console.log(`  Version commitment: ${versionDetails.versionCommitment}`);
+    console.log(`  Metadata pointer: ${metadataRef.pointer}`);
+    console.log(`  Metadata payload hash: ${metadataRef.payloadHash}`);
+    console.log(`  Metadata payload length: ${metadataRef.payloadLength}`);
     console.log(`  Added at: ${new Date(Number(versionDetails.timestamp) * 1000).toISOString()}`);
     console.log(`  Added by: ${versionDetails.addedBy}`);
-    if (versionDetails.fatherHash !== ethers.ZeroHash) {
+    if (versionDetails.fatherHash !== ZeroHash) {
       console.log(
         `  Father hash: ${versionDetails.fatherHash} (v${versionDetails.fatherVersionIndex})`,
       );
     }
-    if (versionDetails.motherHash !== ethers.ZeroHash) {
+    if (versionDetails.motherHash !== ZeroHash) {
       console.log(
         `  Mother hash: ${versionDetails.motherHash} (v${versionDetails.motherVersionIndex})`,
       );
@@ -73,7 +77,7 @@ async function checkPerson(deepFamily, reader, personData, versionIndex = 1) {
 
   // Check NFT
   try {
-    const nftId = await deepFamily.personVersionNFT(personHash, versionIndex);
+    const nftId = await deepFamily.versionToTokenId(personHash, versionIndex);
     if (nftId && Number(nftId) !== 0) {
       console.log(`\nNFT minted`);
       console.log(`  TokenID: ${nftId.toString()}`);
@@ -221,7 +225,7 @@ async function main() {
     for (const item of summary) {
       if (item.exists) {
         try {
-          const nftId = await deepFamily.personVersionNFT(item.hash, 1);
+          const nftId = await deepFamily.versionToTokenId(item.hash, 1);
           const isMinted = nftId && Number(nftId) !== 0;
           const mintStatus = isMinted ? `Minted (TokenID: ${nftId.toString()})` : "Not minted";
           console.log(`[${item.lang}] ${item.name.padEnd(25)} ${mintStatus}`);
@@ -279,10 +283,15 @@ async function main() {
       console.log(`Person exists (total versions: ${existsResult.totalVersions})`);
       // Get detailed info (reuse logic above)
       try {
-        const [versionDetails] = await deepFamilyReader.getVersionDetails(customHash, version);
+        const [versionDetails, metadataRef] = await deepFamilyReader.getVersionDetails(
+          customHash,
+          version,
+        );
         console.log(`\nVersion ${version} details:`);
-        console.log(`  Tag: ${versionDetails.tag}`);
-        console.log(`  IPFS CID: ${versionDetails.ipfsCID}`);
+        console.log(`  Version commitment: ${versionDetails.versionCommitment}`);
+        console.log(`  Metadata pointer: ${metadataRef.pointer}`);
+        console.log(`  Metadata payload hash: ${metadataRef.payloadHash}`);
+        console.log(`  Metadata payload length: ${metadataRef.payloadLength}`);
         console.log(
           `  Added at: ${new Date(Number(versionDetails.timestamp) * 1000).toISOString()}`,
         );
