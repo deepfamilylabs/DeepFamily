@@ -255,7 +255,9 @@ describe("production ZK ceremony verifier", function () {
       ),
     ).to.equal(true);
     expect(snapshotSnarkjsCli).not.to.equal(resolveSnarkjsCliPath({ root }));
-    expect(snapshotSnarkjsCli.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli)).to.equal(true);
+    expect(
+      snapshotSnarkjsCli.endsWith(path.join(...ZK_TOOLCHAIN_PATHS.snarkjsCli.split("/"))),
+    ).to.equal(true);
     expect(calls[0].args.slice(1, 3)).to.deep.equal(["powersoftau", "verify"]);
     expect(path.basename(calls[0].args[3])).to.equal("phase1.ptau");
     for (const [index, circuitName] of Object.keys(ZK_RELEASE_ARTIFACTS).entries()) {

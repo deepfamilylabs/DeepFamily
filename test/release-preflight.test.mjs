@@ -218,6 +218,7 @@ const createProductionFixture = async () => {
 };
 
 const commandLabel = ({ executable, args }) => `${path.basename(executable)} ${args.join(" ")}`;
+const nativeToolchainPath = (portablePath) => path.join(...portablePath.split("/"));
 
 const metadataReaderFor = (fixture) => async (zkeyPath) =>
   fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")];
@@ -716,7 +717,7 @@ describe("production release preflight", function () {
       fake.calls.filter(
         ({ executable, args }) =>
           executable === process.execPath &&
-          args[0]?.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli) &&
+          args[0]?.endsWith(nativeToolchainPath(ZK_TOOLCHAIN_PATHS.snarkjsCli)) &&
           args[1] === "powersoftau" &&
           args[2] === "verify",
       ),
@@ -725,7 +726,7 @@ describe("production release preflight", function () {
       fake.calls.filter(
         ({ executable, args }) =>
           executable === process.execPath &&
-          args[0]?.endsWith(ZK_TOOLCHAIN_PATHS.snarkjsCli) &&
+          args[0]?.endsWith(nativeToolchainPath(ZK_TOOLCHAIN_PATHS.snarkjsCli)) &&
           args[1] === "zkey" &&
           args[2] === "verify",
       ),
