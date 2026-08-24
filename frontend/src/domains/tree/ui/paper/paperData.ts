@@ -198,9 +198,11 @@ function buildClassicalLines(params: {
   const origin = ui.birthPlace || nodeData?.birthPlace;
   const deathPlace = nodeData?.deathPlace;
   // The encrypted version biography and the NFT's public story are distinct.
-  // Paper genealogy consumes only a fully validated local biography.
+  // Private text requires a fully validated local unlock; the independently
+  // public NFT story is labelled separately and never substitutes for it.
   const metadataUnlocked = isMetadataUnlockUsable(nodeData);
-  const story = metadataUnlocked ? nodeData?.biography : undefined;
+  const versionBiography = metadataUnlocked ? nodeData?.biography : undefined;
+  const nftPublicStory = nodeData?.nftPublicStory;
   const tag = metadataUnlocked ? ui.tagText || nodeData?.tag : undefined;
 
   return compactUnique([
@@ -211,7 +213,12 @@ function buildClassicalLines(params: {
       ? `${tFallback(t, "genealogyBook.fields.deathPlace", "Death place")}: ${deathPlace}`
       : undefined,
     tag ? `${tFallback(t, "genealogyBook.fields.tag", "Tag")}: ${tag}` : undefined,
-    story ? `${tFallback(t, "genealogyBook.fields.notes", "Notes")}: ${story}` : undefined,
+    versionBiography
+      ? `${tFallback(t, "genealogyBook.fields.notes", "Notes")}: ${versionBiography}`
+      : undefined,
+    nftPublicStory
+      ? `${tFallback(t, "genealogyBook.fields.nftPublicStory", "Public NFT Story")}: ${nftPublicStory}`
+      : undefined,
   ]);
 }
 

@@ -56,7 +56,8 @@ Rules:
 - An uncertain RPC result may retain and resubmit the exact frozen proof/public-signals/envelope
   package. It must not rerun the KDF, prover, or encryption with already-cleared secrets.
 
-The identity and file KDF paths both normalize the raw passphrase with NFKD and do not trim it.
+The identity and file KDF paths both normalize the raw passphrase with the protocol's checked-in
+Unicode 17.0.0 NFKD implementation and do not trim it; browser/Node host ICU tables are not used.
 They prepend different nonempty domains before Argon2id, so even an empty raw passphrase executes
 the full KDF. Identity suite 1 derives a deterministic salt from the suite ID and canonical
 identity fields; format 1 uses a fresh random `fileSalt` for every envelope.

@@ -14,6 +14,7 @@ import {
   protocolManifestSha256,
   PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS,
   PROTOCOL_RELEASE_MANIFEST_PATH,
+  PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -56,6 +57,34 @@ const ADDRESSES = Object.freeze({
 const writeCanonicalJson = (filePath, value) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+};
+
+const createDevelopmentManifestFixture = () => {
+  const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), "deepfamily-manifest-"));
+  const manifest = structuredClone(inspectProtocolReleaseManifest({ root: ROOT }).manifest);
+  fs.mkdirSync(path.join(root, path.dirname(manifest.goldenVectors.path)), { recursive: true });
+  fs.copyFileSync(
+    path.join(ROOT, manifest.goldenVectors.path),
+    path.join(root, manifest.goldenVectors.path),
+  );
+  fs.mkdirSync(path.join(root, path.dirname(PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH)), {
+    recursive: true,
+  });
+  fs.copyFileSync(
+    path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
+    path.join(root, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
+  );
+  return {
+    root,
+    manifest,
+    inspect() {
+      writeCanonicalJson(path.join(root, PROTOCOL_RELEASE_MANIFEST_PATH), manifest);
+      return inspectProtocolReleaseManifest({ root });
+    },
+    cleanup() {
+      fs.rmSync(root, { recursive: true, force: true });
+    },
+  };
 };
 
 const createContractInterfaceArtifactFixture = () => {
@@ -298,6 +327,8 @@ const createProductionFixture = () => {
             version: "1.0.0",
             sourceRevision: "0123456789abcdef",
           },
+          independentFromProductImplementation: true,
+          optimizedForAttackerThroughput: true,
           hardware: {
             description: "reference hardware",
             processor: "reference processor",
@@ -356,6 +387,15 @@ const createProductionFixture = () => {
   const goldenVectorPath = path.join(temporaryRoot, manifest.goldenVectors.path);
   fs.mkdirSync(path.dirname(goldenVectorPath), { recursive: true });
   fs.copyFileSync(path.join(ROOT, manifest.goldenVectors.path), goldenVectorPath);
+  const unicodeNormalizationDataPath = path.join(
+    temporaryRoot,
+    PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
+  );
+  fs.mkdirSync(path.dirname(unicodeNormalizationDataPath), { recursive: true });
+  fs.copyFileSync(
+    path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
+    unicodeNormalizationDataPath,
+  );
   writeCanonicalJson(path.join(temporaryRoot, PROTOCOL_RELEASE_MANIFEST_PATH), manifest);
 
   const zkEvidence = {
@@ -541,7 +581,7 @@ describe("protocol release manifest", function () {
     assert.equal(evidence.manifest.proofRoutes[1].publicSignals.length, 4);
     assert.equal(
       evidence.manifest.goldenVectors.sha256,
-      "89b29f59e1ad209386505b0abc0410c539019bae6bf937866115b347458fd6dd",
+      "e654308e4bac1f1847f51ceaf6b79f8f28f5595c2df2c7968a9a7ad37294f68a",
     );
   });
 
@@ -552,15 +592,90 @@ describe("protocol release manifest", function () {
     );
   });
 
+  for (const [label, mutate, pattern] of [
+    [
+      "unknown manifest root field",
+      (manifest) => {
+        manifest.activeCircuitId = 1;
+      },
+      /manifest root must contain exactly/,
+    ],
+    [
+      "unknown proof route field",
+      (manifest) => {
+        manifest.proofRoutes[0].latest = true;
+      },
+      /PersonRelation route must contain exactly/,
+    ],
+    [
+      "unknown proof artifact field",
+      (manifest) => {
+        manifest.proofRoutes[0].artifacts.verifier = null;
+      },
+      /PersonRelation artifacts must contain exactly/,
+    ],
+    [
+      "unknown golden-vector field",
+      (manifest) => {
+        manifest.goldenVectors.generator = "unbound";
+      },
+      /golden vectors must contain exactly/,
+    ],
+    [
+      "unknown release-evidence field",
+      (manifest) => {
+        manifest.releaseEvidence.latest = null;
+      },
+      /release evidence must contain exactly/,
+    ],
+    [
+      "claimed hash on a pending ceremony",
+      (manifest) => {
+        manifest.releaseEvidence.trustedSetup.manifestSha256 = hash("0");
+      },
+      /pending trusted setup must not claim ceremony hashes/,
+    ],
+    [
+      "claimed address on a not-deployed release",
+      (manifest) => {
+        manifest.deployments.deepFamilyProxy = address(9);
+      },
+      /not-deployed state must not claim deployment evidence/,
+    ],
+  ]) {
+    it(`rejects ${label} in development inspection`, function () {
+      const fixture = createDevelopmentManifestFixture();
+      try {
+        mutate(fixture.manifest);
+        assert.throws(() => fixture.inspect(), pattern);
+      } finally {
+        fixture.cleanup();
+      }
+    });
+  }
+
+  it("binds both suite definitions to the exact checked-in Unicode normalization data", function () {
+    const fixture = createDevelopmentManifestFixture();
+    try {
+      fs.appendFileSync(
+        path.join(fixture.root, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
+        "// drift\n",
+      );
+      assert.throws(
+        () => fixture.inspect(),
+        /Unicode normalization data hash does not match the suite definitions/,
+      );
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   it("rejects a moved universal self-suite offset", function () {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-protocol-manifest-"));
     try {
       const manifest = structuredClone(inspectProtocolReleaseManifest({ root: ROOT }).manifest);
       manifest.envelope.universalPrefix.selfIdentitySuiteId.offset = 17;
-      fs.writeFileSync(
-        path.join(directory, PROTOCOL_RELEASE_MANIFEST_PATH),
-        `${JSON.stringify(manifest)}\n`,
-      );
+      writeCanonicalJson(path.join(directory, PROTOCOL_RELEASE_MANIFEST_PATH), manifest);
       assert.throws(
         () => inspectProtocolReleaseManifest({ root: directory }),
         /self identity suite offset must be 16/,
@@ -715,6 +830,20 @@ describe("production protocol release manifest evidence", function () {
         manifest.identitySuites["1"].normalization = "NFC";
       },
       /identity suite 1 definition does not match/,
+    ],
+    [
+      "identity Unicode normalization-data hash",
+      (manifest) => {
+        manifest.identitySuites["1"].normalizationDataSha256 = hash("0");
+      },
+      /identity suite 1 definition does not match/,
+    ],
+    [
+      "file Unicode normalization implementation",
+      (manifest) => {
+        manifest.fileKdfSuites["1"].normalizationImplementation = "host-icu";
+      },
+      /file KDF suite 1 definition does not match/,
     ],
     [
       "identity KDF parameter",
@@ -874,6 +1003,7 @@ describe("production protocol release manifest evidence", function () {
   for (const [label, relativePath] of [
     ["manifest", PROTOCOL_RELEASE_MANIFEST_PATH],
     ["golden vectors", "protocol-vectors/onchain-biography-v1.json"],
+    ["Unicode normalization data", PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH],
     ["device matrix", "release-evidence/kdf-device-matrix.json"],
     ["attacker study", "release-evidence/kdf-attacker-study.json"],
   ]) {
@@ -1056,6 +1186,20 @@ describe("production protocol release manifest evidence", function () {
       /tool\.sourceRevision is missing/,
     ],
     [
+      "attacker measurement using the product implementation",
+      (report) => {
+        report.profiles[0].implementations[0].independentFromProductImplementation = false;
+      },
+      /must use an implementation independent from the product KDF path/,
+    ],
+    [
+      "attacker measurement using an unoptimized implementation",
+      (report) => {
+        report.profiles[0].implementations[0].optimizedForAttackerThroughput = false;
+      },
+      /must use an implementation optimized for attacker throughput/,
+    ],
+    [
       "short attacker measurement",
       (report) => {
         report.profiles[0].implementations[0].measurement.durationSeconds = 59;
@@ -1183,7 +1327,7 @@ describe("production protocol release manifest evidence", function () {
     fixture.manifest.deployments.archiveRegistry = ADDRESSES.archive;
     fixture.writeManifest();
 
-    assert.throws(() => fixture.inspect(), /production deployment definition must contain exactly/);
+    assert.throws(() => fixture.inspect(), /deployment definition must contain exactly/);
   });
 
   it("does not accept a production label while format 1 remains mutable", function () {

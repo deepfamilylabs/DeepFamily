@@ -291,6 +291,10 @@
       "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
       "confirmPassphrasePlaceholder": "Repeat the identity passphrase (empty is allowed)",
       "deterministicIdentityNotice": "Identity suite 1 always derives its salt deterministically from the canonical identity fields. No recovery salt is stored or accepted.",
+      "passphraseRisk": {
+        "empty": "An empty identity passphrase has zero passphrase entropy. It is accepted without skipping the KDF, but irreversible actions require a separate high-risk confirmation.",
+        "unicodeWhitespace": "This identity passphrase contains only Unicode White_Space after NFKD normalization. It is not trimmed, but it is highly guessable; irreversible actions require a separate high-risk confirmation."
+      },
       "passphraseHelp": {
         "title": "Identity Passphrase Usage Guide",
         "buttonAriaLabel": "Identity passphrase help",
@@ -318,7 +322,7 @@
         "weak": "Tip: Use at least 15+ mixed characters or 20+ letters for better security"
       },
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
-      "passphraseCharCount": "Characters after trim: {{count}}",
+      "passphraseCharCount": "Characters after NFKD (not trimmed): {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
       "description": "Compute the identity hash locally. Nothing is uploaded.",
       "bcOptions": {
@@ -500,6 +504,7 @@
       "origin": "Origin",
       "deathPlace": "Death place",
       "notes": "Notes",
+      "nftPublicStory": "Public NFT Story",
       "endorsements": "Endorsements",
       "children": "Children",
       "descendants": "Children",
@@ -1026,6 +1031,9 @@
     "consentPublic": "I understand this mint makes the entered info permanently public on-chain and undeletable.",
     "consentAge": "I confirm the person is 18 years or older.",
     "consentLegal": "I confirm the data is lawful, truthful, and authorized for public disclosure without extra private content.",
+    "consentEmptyPassphrase": "I explicitly confirm this target uses an empty identity passphrase. Anyone who knows the identity fields can reproduce its identity witness, and this public mint is permanent.",
+    "consentWhitespacePassphrase": "I explicitly confirm this identity passphrase contains only Unicode White_Space after NFKD normalization. It is not trimmed, but it is highly guessable, and this public mint is permanent.",
+    "passphraseMismatch": "The identity passphrases do not match.",
     "consentMissing": "Please confirm all required checkboxes before minting.",
     "supplementalInfo": "Supplemental Information",
     "supplementalInfoImmutable": "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
@@ -1185,6 +1193,7 @@
       "title": "Secure Key Derivation",
       "description": "Derive secure EVM-compatible wallet private keys from personal information and a strong passphrase using a KDF.",
       "passphraseWarning": "Must use a strong passphrase with 15+ characters!",
+      "passphraseMismatch": "The identity passphrases do not match.",
       "fillInfoFirst": "Please fill in personal information first",
       "nameRequired": "Name cannot be empty",
       "success": "Private key derived successfully",
@@ -1216,7 +1225,8 @@
       "proceedAnyway": "Proceed Anyway",
       "improvePassphrase": "Improve Passphrase",
       "recommendations": {
-        "empty": "Empty passphrase: insufficient security. Strongly recommend a 15+ character strong passphrase",
+        "empty": "Empty passphrase: zero passphrase entropy. Anyone who knows the identity fields can reproduce this key derivation input; the KDF cannot restore missing entropy.",
+        "unicodeWhitespace": "This passphrase contains only Unicode White_Space after NFKD. It is not trimmed, but it is highly guessable and must be treated as a high-risk choice.",
         "weak": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
         "medium": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols",
         "strong": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",

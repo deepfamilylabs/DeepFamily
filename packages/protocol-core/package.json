@@ -15,7 +15,8 @@
   "types": "./index.d.ts",
   "files": [
     "*.js",
-    "*.d.ts"
+    "*.d.ts",
+    "UNICODE-LICENSE.txt"
   ],
   "scripts": {
     "test": "node --test test/*.test.js"

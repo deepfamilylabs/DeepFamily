@@ -68,6 +68,7 @@ const zhTranslate = (key: string, fallback?: string, options?: Record<string, un
     "genealogyBook.fields.origin": "籍贯",
     "genealogyBook.fields.deathPlace": "卒于",
     "genealogyBook.fields.notes": "附记",
+    "genealogyBook.fields.nftPublicStory": "NFT 公开传记",
     "genealogyBook.fields.children": "子女",
     "genealogyBook.fields.spouse": "配偶",
     "genealogyBook.fields.spouseWife": "配",
@@ -276,7 +277,7 @@ describe("PaperGenealogyView", () => {
     expect(childLane?.kind === "person" ? childLane.relationLabel : "unexpected").toBe("");
   });
 
-  it("uses node story directly in paper records", () => {
+  it("keeps validated version biography and NFT public story as labelled paper tracks", () => {
     const generations = buildPaperGenerations({
       graph: {
         nodes: [{ id: rootId, depth: 0, personHash: rootHash, versionIndex: 1 }],
@@ -292,6 +293,7 @@ describe("PaperGenealogyView", () => {
           fullName: "曹操",
           metadataUnlockValidated: true,
           biography: "这是解锁并验证后的版本传记，纸本只读这个字段。",
+          nftPublicStory: "这是独立公开的 NFT 传记。",
           storyMetadata: {
             totalChunks: 3,
             fullStoryHash: "",
@@ -335,7 +337,36 @@ describe("PaperGenealogyView", () => {
 
     const record = getOuFullRecordText(generations[0].people[0]);
     expect(record).toContain("附记这是解锁并验证后的版本传记，纸本只读这个字段。");
+    expect(record).toContain("NFT 公开传记: 这是独立公开的 NFT 传记。");
     expect(record).not.toContain("第一段。第二段。第三段。");
+  });
+
+  it("does not expose a locked biography or use it as an empty NFT-story fallback", () => {
+    const generations = buildPaperGenerationsBase({
+      graph: {
+        nodes: [{ id: rootId, depth: 0, personHash: rootHash, versionIndex: 1 }],
+        edges: [],
+        childrenByParent: {},
+      },
+      nodesData: {
+        [rootId]: {
+          id: rootId,
+          personHash: rootHash,
+          versionIndex: 1,
+          tokenId: "1",
+          fullName: "曹操",
+          metadataUnlockValidated: false,
+          biography: "不得显示的未验证私密传记",
+          nftPublicStory: "",
+        },
+      },
+      t: zhTranslate,
+    });
+
+    const record = getOuFullRecordText(generations[0].people[0]);
+    expect(record).not.toContain("不得显示的未验证私密传记");
+    expect(record).not.toContain("附记");
+    expect(record).not.toContain("NFT 公开传记");
   });
 
   it("projects shared paper relation labels ranked per gender within each parent", () => {

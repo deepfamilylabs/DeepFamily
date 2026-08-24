@@ -1,4 +1,4 @@
-import type { BigNumberish } from "@deepfamily/protocol-core";
+import { normalizePassphrase, type BigNumberish } from "@deepfamily/protocol-core";
 import type { NodeData } from "../model/graph";
 import { isMetadataUnlockUsable, rebaseValidatedMetadataUnlock } from "../model/metadataUnlock";
 import { CryptoWorkerTerminatedError, terminateCryptoWorker } from "../workers/cryptoWorkerClient";
@@ -71,7 +71,13 @@ const defaultUnlockNode: MetadataNodeUnlocker = (input) => unlockPersonVersionNo
 
 const redactSecret = (message: string, rawPassphrase: string): string => {
   let redacted = message;
-  const candidates = new Set([rawPassphrase, rawPassphrase.normalize("NFKD")]);
+  const candidates = new Set([rawPassphrase]);
+  try {
+    candidates.add(normalizePassphrase(rawPassphrase));
+  } catch {
+    // Raw input remains a redaction candidate when normalization rejects a
+    // malformed programmatic string.
+  }
   for (const candidate of candidates) {
     if (candidate.length > 0) redacted = redacted.split(candidate).join("[REDACTED]");
   }

@@ -733,8 +733,24 @@ export const validateKdfAttackerStudyV2Evidence = ({
       const implementationLabel = `${label}.implementations[${implementationIndex}]`;
       assertExactKeys(
         implementation,
-        ["tool", "hardware", "measurement", "assumptions", "memoryTimeTradeoff"],
+        [
+          "tool",
+          "independentFromProductImplementation",
+          "optimizedForAttackerThroughput",
+          "hardware",
+          "measurement",
+          "assumptions",
+          "memoryTimeTradeoff",
+        ],
         implementationLabel,
+      );
+      assert(
+        implementation.independentFromProductImplementation === true,
+        `${implementationLabel} must use an implementation independent from the product KDF path`,
+      );
+      assert(
+        implementation.optimizedForAttackerThroughput === true,
+        `${implementationLabel} must use an implementation optimized for attacker throughput`,
       );
       assertExactKeys(
         implementation.tool,

@@ -59,6 +59,20 @@ describe("fresh-v1 proof helpers", function () {
     expect(computeAtomicSuiteCommitment(2)).to.equal(a.suiteCommitment);
   });
 
+  it("uses the release-frozen Unicode White_Space set for proof names", function () {
+    const withBom = computePersonHashFromInput(
+      { ...child, fullName: "Alice\ufeffSmith" },
+      { selfSuiteId: 1 },
+    );
+    const withSpace = computePersonHashFromInput(
+      { ...child, fullName: "Alice Smith" },
+      { selfSuiteId: 1 },
+    );
+
+    expect(withBom.canonicalFullName).to.equal("Alice\ufeffSmith");
+    expect(withBom.personHash).not.to.equal(withSpace.personHash);
+  });
+
   it("builds mixed-suite relation input, packed signal, digest limbs, and version commitment", function () {
     const built = buildPersonRelationInput(child, father, mother, submitter, {
       selfSuiteId: 2,

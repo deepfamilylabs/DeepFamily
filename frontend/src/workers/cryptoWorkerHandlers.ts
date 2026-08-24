@@ -4,6 +4,7 @@ import {
   decryptPersonVersionEnvelope,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
+  normalizePassphrase,
   roundTripPersonVersionEnvelope,
   wipeBytes,
   wipePreparedPersonVersionContent,
@@ -34,7 +35,13 @@ export type CryptoWorkerResponse =
 
 const redactPassphrase = (message: string, rawPassphrase: unknown): string => {
   if (typeof rawPassphrase !== "string" || rawPassphrase.length === 0) return message;
-  const candidates = new Set([rawPassphrase, rawPassphrase.normalize("NFKD")]);
+  const candidates = new Set([rawPassphrase]);
+  try {
+    candidates.add(normalizePassphrase(rawPassphrase));
+  } catch {
+    // Keep the raw candidate even when protocol normalization rejects malformed
+    // input; serialization must never turn an error path into a secret leak.
+  }
   let redacted = message;
   for (const candidate of candidates) {
     if (candidate.length > 0) redacted = redacted.split(candidate).join("[REDACTED]");
@@ -57,6 +64,17 @@ export const serializeCryptoWorkerError = (
     }
   }
   return { message: redactPassphrase(String(error), rawPassphrase) };
+};
+
+const requestPassphrase = (params: unknown): unknown => {
+  if (!params || typeof params !== "object") return undefined;
+  const value = params as Record<string, unknown>;
+  if (typeof value.rawPassphrase === "string") return value.rawPassphrase;
+  if (value.input && typeof value.input === "object") {
+    const nested = value.input as Record<string, unknown>;
+    if (typeof nested.passphrase === "string") return nested.passphrase;
+  }
+  return undefined;
 };
 
 const serializeValidatedPersonVersion = (result: {
@@ -201,7 +219,7 @@ export async function handleCryptoWorkerRequest(
     post({
       id,
       ok: false,
-      error: serializeCryptoWorkerError(error, request.params?.rawPassphrase),
+      error: serializeCryptoWorkerError(error, requestPassphrase(request.params)),
     });
   } finally {
     // JavaScript strings cannot be zeroed. Bound the structured-clone lifetime

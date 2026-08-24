@@ -23,14 +23,19 @@ numeric ID may be used under different purposes because the full key is `(purpos
 
 ### Canonical identity
 
-Full names are canonicalized before identity derivation:
+Full names are canonicalized before identity derivation using the checked-in Unicode 17.0.0
+normalization tables, independent of the host browser or Node ICU version:
 
 - Unicode NFKC;
 - Unicode whitespace collapsed to one ASCII space;
 - leading and trailing whitespace removed;
 - the result must be nonempty and at most 256 UTF-8 bytes.
 
-Passphrases follow a different rule: NFKD, no trim. Empty is valid and still executes Argon2id.
+Passphrases follow a different rule: Unicode 17.0.0 NFKD, no trim. Empty is valid and still
+executes Argon2id. Both suite definitions bind the exact generated normalization-data SHA-256 in
+the protocol release manifest. `npm run protocol:unicode:check` downloads hash-pinned official UCD
+sources and runs the complete Unicode normalization conformance suite; it is an explicit
+reproducibility check rather than a network dependency of the ordinary offline test command.
 Identity suite 1 derives its 16-byte deterministic salt from the suite ID, canonical name, and
 packed birth/gender field. The file KDF uses the same user-entered passphrase with a different
 password-input domain and a random 16-byte `fileSalt`.

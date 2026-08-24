@@ -415,8 +415,10 @@ describe("DeepFamily encrypted metadata v1", function () {
       );
     });
 
-    it("keeps a maximum-size envelope below the configured block limit with 20% headroom", async () => {
+    it("keeps a maximum-size envelope below the eSpace single-tx limit with 20% headroom", async () => {
       const { deepFamily, archive, owner } = await deployCore();
+      // eSpace transaction pools cap one transaction at half of the 30M block gas limit.
+      const espaceSingleTransactionGasLimit = 15_000_000n;
       const signals = makePublicSignals(await owner.getAddress(), {
         versionCommitment: 16_384n,
       });
@@ -425,7 +427,8 @@ describe("DeepFamily encrypted metadata v1", function () {
       const estimate = await deepFamily.addPersonVersion.estimateGas(...args);
       const latestBlock = await hre.ethers.provider.getBlock("latest");
       expect(latestBlock).not.to.equal(null);
-      expect((estimate * 120n + 99n) / 100n).to.be.lessThan(latestBlock.gasLimit);
+      expect(latestBlock.gasLimit).to.be.at.least(espaceSingleTransactionGasLimit);
+      expect((estimate * 120n + 99n) / 100n).to.be.lessThan(espaceSingleTransactionGasLimit);
 
       const tx = await deepFamily.addPersonVersion(...args);
       const receipt = await tx.wait();

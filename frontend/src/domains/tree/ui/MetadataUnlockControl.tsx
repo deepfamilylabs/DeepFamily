@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KeyRound, LoaderCircle, LockKeyhole, Trash2, X } from "lucide-react";
-import { isUnicodeWhiteSpaceOnly, normalizePassphrase } from "@deepfamily/protocol-core";
+import {
+  classifyProtocolPassphraseRisk,
+  type ProtocolPassphraseRisk,
+} from "../../../shared/crypto/passphraseStrength";
 import { useConfig } from "../../config";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import {
@@ -13,7 +16,6 @@ import { useTreeGraphData, useTreeMutations } from "../context";
 import { buildTreeStorageNamespace } from "../context/treeStorageScope";
 
 type PreparationState = "idle" | "preparing" | "ready";
-type PassphraseRisk = "empty" | "whitespace" | "other";
 
 function hasArchiveAnchors(node: NodeData): boolean {
   return Boolean(
@@ -26,18 +28,6 @@ function hasArchiveAnchors(node: NodeData): boolean {
     Number.isSafeInteger(node.metadataPayloadLength) &&
     Number(node.metadataPayloadLength) > 0,
   );
-}
-
-function classifyPassphrase(raw: string): PassphraseRisk {
-  try {
-    const normalized = normalizePassphrase(raw);
-    if (normalized.length === 0) return "empty";
-    return isUnicodeWhiteSpaceOnly(normalized) ? "whitespace" : "other";
-  } catch {
-    // The production KDF path will report malformed Unicode precisely; an
-    // input event must never crash the surrounding React tree.
-    return "other";
-  }
 }
 
 export function MetadataUnlockControl() {
@@ -62,7 +52,7 @@ export function MetadataUnlockControl() {
   const [error, setError] = useState("");
   const [riskConfirmed, setRiskConfirmed] = useState(false);
   const [highRiskConfirmed, setHighRiskConfirmed] = useState(false);
-  const [passphraseRisk, setPassphraseRisk] = useState<PassphraseRisk>("empty");
+  const [passphraseRisk, setPassphraseRisk] = useState<ProtocolPassphraseRisk>("empty");
   const unlockScopeKey = useMemo(
     () => buildTreeStorageNamespace({ chainId, contractAddress }),
     [chainId, contractAddress],
@@ -189,13 +179,13 @@ export function MetadataUnlockControl() {
       throw new Error("Metadata unlock scope changed");
     };
     const rawPassphrase = passphraseRef.current?.value ?? "";
-    const currentRisk = classifyPassphrase(rawPassphrase);
+    const currentRisk = classifyProtocolPassphraseRisk(rawPassphrase);
     setPassphraseRisk(currentRisk);
     if (!riskConfirmed) {
       setError("Confirm the permanent offline-guessing risk before unlocking.");
       return;
     }
-    if (currentRisk !== "other" && !highRiskConfirmed) {
+    if (currentRisk !== "ordinary" && !highRiskConfirmed) {
       setError(
         currentRisk === "empty"
           ? "Explicitly confirm that an empty passphrase provides no secrecy."
@@ -314,7 +304,7 @@ export function MetadataUnlockControl() {
                     autoComplete="off"
                     disabled={running}
                     onChange={(event) => {
-                      setPassphraseRisk(classifyPassphrase(event.currentTarget.value));
+                      setPassphraseRisk(classifyProtocolPassphraseRisk(event.currentTarget.value));
                       setHighRiskConfirmed(false);
                     }}
                     className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
@@ -332,7 +322,7 @@ export function MetadataUnlockControl() {
                     passphrase guesses and that the unlocked plaintext is stored in IndexedDB.
                   </span>
                 </label>
-                {passphraseRisk !== "other" ? (
+                {passphraseRisk !== "ordinary" ? (
                   <label className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
                     <input
                       type="checkbox"

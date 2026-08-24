@@ -688,6 +688,10 @@ describe("production release preflight", function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
 
+    expect(
+      RELEASE_PREFLIGHT_COMMANDS.map(([executable, args]) => commandLabel({ executable, args })),
+    ).to.include("npm run protocol:unicode:check");
+
     const result = await runWithFixtureCompiler({
       root: fixture.root,
       platform: "linux",

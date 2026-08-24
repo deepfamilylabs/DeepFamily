@@ -29,10 +29,7 @@ async function checkPerson(deepFamily, reader, personData, versionIndex = 1) {
 
   // Get version details
   try {
-    const [versionDetails, metadataRef] = await reader.getVersionDetails(
-      personHash,
-      versionIndex,
-    );
+    const [versionDetails, metadataRef] = await reader.getVersionDetails(personHash, versionIndex);
     console.log(`\nVersion ${versionIndex} details:`);
     console.log(`  Version commitment: ${versionDetails.versionCommitment}`);
     console.log(`  Metadata pointer: ${metadataRef.pointer}`);
@@ -148,7 +145,6 @@ async function main() {
     if (personData.familyName) {
       console.log(`  Family: ${personData.familyName}`);
     }
-    console.log(`  Passphrase: "${personData.passphrase}"`);
     console.log(
       `  Birth: ${personData.birthYear}-${String(personData.birthMonth).padStart(2, "0")}-${String(personData.birthDay).padStart(2, "0")}`,
     );

@@ -14,11 +14,12 @@ import {
   utf8Bytes,
 } from "./bytes.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
+import { normalizeUnicodeNfkc } from "./unicode-normalization.js";
 
 // Unicode White_Space property, frozen by the v1 release manifest. The set is
 // unchanged in Unicode 17.0 and is written explicitly so host RegExp tables do
 // not silently redefine identity canonicalization.
-export const UNICODE_WHITE_SPACE_VERSION = "17.0";
+export const UNICODE_WHITE_SPACE_VERSION = "17.0.0";
 const UNICODE_WHITE_SPACE_RUN =
   /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu;
 const UNICODE_WHITE_SPACE_ONLY =
@@ -64,7 +65,7 @@ function assertExactKeys(value, expected, label) {
 export function canonicalizeFullName(value) {
   protocolAssert(typeof value === "string", "INVALID_FULL_NAME", "fullName must be a string");
   assertUnicodeScalarString(value, "fullName");
-  const normalized = value.normalize("NFKC");
+  const normalized = normalizeUnicodeNfkc(value, "fullName");
   const collapsed = normalized
     .replace(UNICODE_WHITE_SPACE_RUN, " ")
     .replace(LEADING_OR_TRAILING_ASCII_SPACE, "");

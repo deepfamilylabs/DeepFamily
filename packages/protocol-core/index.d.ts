@@ -216,7 +216,10 @@ export function writeUint16BE(bytes: Uint8Array, offset: number, value: BigNumbe
 export function writeUint32BE(bytes: Uint8Array, offset: number, value: BigNumberish): void;
 export function wipeBytes(value: unknown): void;
 
-export const UNICODE_WHITE_SPACE_VERSION: "17.0";
+export const UNICODE_WHITE_SPACE_VERSION: "17.0.0";
+export const UNICODE_NORMALIZATION_VERSION: "17.0.0";
+export function normalizeUnicodeNfkd(value: string, label?: string): string;
+export function normalizeUnicodeNfkc(value: string, label?: string): string;
 export function canonicalizeFullName(value: string): string;
 export function isUnicodeWhiteSpaceOnly(value: string): boolean;
 export function escapeCanonicalJsonString(value: string): string;

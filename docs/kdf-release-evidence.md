@@ -51,6 +51,8 @@ The attacker study binds the device matrix's selected candidate and separately c
 and file suites. Each implementation entry records:
 
 - tool name, exact version, and source revision;
+- explicit confirmation that the implementation is independent from the product KDF path and
+  optimized for attacker throughput;
 - hardware description, processor, installed memory, and accelerator;
 - measurement duration of at least 60 seconds, attempt count, optimization mode, measured
   throughput, memory per attempt, and the measured memory-time product;

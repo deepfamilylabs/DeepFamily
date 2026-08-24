@@ -17,6 +17,10 @@ describe("zk-generate-disclosure-binding-proof helpers", function () {
     it("canonicalizes whitespace variants", function () {
       expect(normalizeNameForHash("  Alice　Smith  ")).to.equal("Alice Smith");
     });
+
+    it("does not treat BOM as Unicode White_Space", function () {
+      expect(normalizeNameForHash("Alice\ufeffSmith")).to.equal("Alice\ufeffSmith");
+    });
   });
 
   describe("parseDisclosureBindingPersonArgs", function () {

@@ -15,7 +15,10 @@ import {
   estimateKDFDuration,
   type KDFPreset,
 } from "../../../shared/crypto/secureKeyDerivation";
-import { normalizeNameForHash } from "../../../shared/crypto/passphraseStrength";
+import {
+  classifyProtocolPassphraseRisk,
+  normalizeNameForHash,
+} from "../../../shared/crypto/passphraseStrength";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 import { sanitizeErrorForLogging } from "../../../shared/lib/errors";
 
@@ -65,6 +68,11 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       return;
     }
 
+    if (!personCalcRef.current?.passphrasesMatch()) {
+      toast.warning(t("keyDerivation.component.passphraseMismatch"));
+      return;
+    }
+
     setIsGenerating(true);
     setProgress(0);
     setProgressStage("");
@@ -109,38 +117,46 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       return;
     }
 
+    if (!personCalcRef.current?.passphrasesMatch()) {
+      toast.warning(t("keyDerivation.component.passphraseMismatch"));
+      return;
+    }
+
     // Check passphrase strength (without lifting passphrase into component state)
     const strength = validatePassphraseStrength(formData.passphrase || "");
-    if (strength && !strength.isStrong) {
+    const passphraseRisk = classifyProtocolPassphraseRisk(formData.passphrase || "");
+    if (passphraseRisk !== "ordinary" || (strength && !strength.isStrong)) {
       const rawBits = Math.round(strength.rawEntropy ?? 0);
       const adjustedBits = Math.round(strength.entropy ?? 0);
       const recommendation =
-        adjustedBits === 0
+        passphraseRisk === "empty"
           ? t("keyDerivation.component.recommendations.empty")
-          : strength.level === "weak"
-            ? t("keyDerivation.component.recommendations.weak", {
-                raw: rawBits,
-                adjusted: adjustedBits,
-              })
-            : strength.level === "medium"
-              ? t("keyDerivation.component.recommendations.medium", {
+          : passphraseRisk === "unicode-whitespace"
+            ? t("keyDerivation.component.recommendations.unicodeWhitespace")
+            : strength.level === "weak"
+              ? t("keyDerivation.component.recommendations.weak", {
                   raw: rawBits,
                   adjusted: adjustedBits,
                 })
-              : strength.level === "strong"
-                ? t("keyDerivation.component.recommendations.strong", {
+              : strength.level === "medium"
+                ? t("keyDerivation.component.recommendations.medium", {
                     raw: rawBits,
                     adjusted: adjustedBits,
                   })
-                : strength.level === "very-strong"
-                  ? t("keyDerivation.component.recommendations.veryStrong", {
+                : strength.level === "strong"
+                  ? t("keyDerivation.component.recommendations.strong", {
                       raw: rawBits,
                       adjusted: adjustedBits,
                     })
-                  : t("keyDerivation.component.recommendations.excellent", {
-                      raw: rawBits,
-                      adjusted: adjustedBits,
-                    });
+                  : strength.level === "very-strong"
+                    ? t("keyDerivation.component.recommendations.veryStrong", {
+                        raw: rawBits,
+                        adjusted: adjustedBits,
+                      })
+                    : t("keyDerivation.component.recommendations.excellent", {
+                        raw: rawBits,
+                        adjusted: adjustedBits,
+                      });
 
       setWeakPassphraseMessage(
         [
@@ -216,6 +232,7 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
       <PersonHashCalculator
         ref={personCalcRef}
         showTitle={false}
+        requirePassphraseConfirmation
         onPublicFormChange={setPublicFormData}
         className="border-0 shadow-none"
       />

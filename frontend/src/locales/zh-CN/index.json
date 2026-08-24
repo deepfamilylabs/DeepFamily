@@ -291,6 +291,10 @@
       "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 15+ 字符并混合不同符号",
       "confirmPassphrasePlaceholder": "再次输入身份口令（允许留空）",
       "deterministicIdentityNotice": "身份套件 1 始终从规范化身份字段确定性派生盐值，不保存也不接受恢复盐。",
+      "passphraseRisk": {
+        "empty": "空身份口令的口令熵为零。系统仍会完整执行 KDF，但在不可逆操作前必须另行完成高风险确认。",
+        "unicodeWhitespace": "此身份口令经 NFKD 规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中；在不可逆操作前必须另行完成高风险确认。"
+      },
       "passphraseHelp": {
         "title": "身份口令说明",
         "buttonAriaLabel": "身份口令帮助",
@@ -318,7 +322,7 @@
         "weak": "建议：至少使用 15+ 混合字符或 20+ 字母以获得更好的安全性"
       },
       "entropyDisplay": "真实熵值：{{raw}} bits · 评估强度评分：{{adjusted}}",
-      "passphraseCharCount": "去除首尾空格后字符数：{{count}}",
+      "passphraseCharCount": "NFKD 规范化后的字符数（不裁剪）：{{count}}",
       "nameInputPlaceholder": "例如：张三",
       "description": "说明：身份哈希仅在本地计算，不会上传任何数据。",
       "bcOptions": {
@@ -500,6 +504,7 @@
       "origin": "籍贯",
       "deathPlace": "卒于",
       "notes": "附记",
+      "nftPublicStory": "NFT 公开传记",
       "endorsements": "背书",
       "children": "子女",
       "descendants": "子嗣",
@@ -1026,6 +1031,9 @@
     "consentPublic": "我理解并同意：本次铸造将把填写的信息永久公开在区块链上，任何人可见且不可删除。",
     "consentAge": "我确认被铸造人物已年满 18 周岁。",
     "consentLegal": "我确认提交内容合法、真实且有权公开，不包含超出约定范围的个人隐私数据。",
+    "consentEmptyPassphrase": "我明确确认目标人物使用空身份口令。任何知道身份字段的人都能复现其 identity witness，且本次公开铸造永久不可撤回。",
+    "consentWhitespacePassphrase": "我明确确认此身份口令经 NFKD 规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中，且本次公开铸造永久不可撤回。",
+    "passphraseMismatch": "两次输入的身份口令不一致。",
     "consentMissing": "请勾选所有必选项后再铸造。",
     "supplementalInfo": "补充信息",
     "supplementalInfoImmutable": "补充信息将永久保存在区块链上，提交后无法修改，请审慎填写。",
@@ -1185,6 +1193,7 @@
       "title": "安全密钥派生",
       "description": "使用 KDF 算法从个人信息和强口令短语派生安全的 EVM 兼容钱包私钥。",
       "passphraseWarning": "推荐使用 15+ 字符的强口令短语！",
+      "passphraseMismatch": "两次输入的身份口令不一致。",
       "fillInfoFirst": "请先填写个人信息",
       "nameRequired": "姓名不能为空",
       "success": "私钥派生成功",
@@ -1216,7 +1225,8 @@
       "proceedAnyway": "仍然继续",
       "improvePassphrase": "改进口令短语",
       "recommendations": {
-        "empty": "空口令短语：安全性不足。强烈建议使用 15+ 字符的强口令短语",
+        "empty": "空口令的口令熵为零。任何知道身份字段的人都能复现此密钥派生输入，KDF 无法弥补缺失的熵。",
+        "unicodeWhitespace": "此口令经 NFKD 规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中，必须视为高风险选择。",
         "weak": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性不足。建议：15+ 混合字符或 20+ 纯字母",
         "medium": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号",
         "strong": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性良好",

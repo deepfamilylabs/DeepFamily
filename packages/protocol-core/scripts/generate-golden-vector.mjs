@@ -11,10 +11,12 @@ import {
   computeFormat1Aad,
   computePersonVersionContentCommitment,
   computeVersionHash,
+  deriveFileKekBytes,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
   packSubmitterAndSelfSuiteId,
   parseFormat1Envelope,
+  wipeBytes,
 } from "../index.js";
 import {
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
@@ -108,6 +110,13 @@ const encrypted = await encryptPersonVersionEnvelope({
   randomBytes: sequentialRandom(),
 });
 const parsed = parseFormat1Envelope(encrypted.envelope);
+const fileKek = await deriveFileKekBytes({
+  rawPassphrase,
+  fileSalt: parsed.fileSalt,
+  kdfSuite: 1,
+});
+const fileArgon2idOutputHex = bytesToHex(fileKek);
+wipeBytes(fileKek);
 
 const vector = {
   schemaVersion: 1,
@@ -176,6 +185,7 @@ const vector = {
       "sequential bytes 0x00.. in call order DEK(32), fileSalt(16), wrapIV(12), contentIV(12)",
     headerHex: bytesToHex(encrypted.envelope.slice(0, 112)),
     fileSaltHex: bytesToHex(parsed.fileSalt),
+    fileArgon2idOutputHex,
     wrapIVHex: bytesToHex(parsed.wrapIV),
     contentIVHex: bytesToHex(parsed.contentIV),
     wrappedDEKHex: bytesToHex(parsed.wrappedDEK),

@@ -5,16 +5,27 @@
  * Used by PersonHashCalculator and SecureKeyDerivation components.
  */
 
+import {
+  canonicalizeFullName,
+  isUnicodeWhiteSpaceOnly,
+  normalizePassphrase,
+} from "@deepfamily/protocol-core";
+
+export type ProtocolPassphraseRisk = "empty" | "unicode-whitespace" | "ordinary";
+
 /**
  * Normalize full name for identity flows.
- * Uses NFKC + Unicode whitespace folding + trim.
+ * Uses the release-frozen protocol NFKC + Unicode White_Space rules.
  * Returns an empty string when canonicalization yields an invalid empty name.
  */
 export const normalizeNameForHash = (value: string): string => {
-  if (!value) return "";
-  const normalized = typeof value.normalize === "function" ? value.normalize("NFKC") : value;
-  const collapsedWhitespace = normalized.replace(/\s+/gu, " ").trim();
-  return collapsedWhitespace;
+  try {
+    return canonicalizeFullName(value);
+  } catch {
+    // UI validation calls this during render and input events. The production
+    // identity derivation remains authoritative and rejects the same value.
+    return "";
+  }
 };
 
 /**
@@ -22,8 +33,31 @@ export const normalizeNameForHash = (value: string): string => {
  * Uses NFKD (BIP39-style); no trimming or other mutation
  */
 export const normalizePassphraseForHash = (value: string): string => {
-  if (!value) return "";
-  return typeof value.normalize === "function" ? value.normalize("NFKD") : value;
+  try {
+    return normalizePassphrase(value);
+  } catch {
+    // Keep strength meters and render-time validation total. The production
+    // identity/KDF worker rejects the same malformed input authoritatively.
+    return "";
+  }
+};
+
+/**
+ * Classify the exact v1 passphrase bytes for high-risk UX decisions.
+ *
+ * The protocol applies NFKD and deliberately does not trim. Keep UI event
+ * handling total for malformed programmatic input; the authoritative worker
+ * path still rejects invalid Unicode before doing proof or transaction work.
+ */
+export const classifyProtocolPassphraseRisk = (value: string): ProtocolPassphraseRisk => {
+  let normalized: string;
+  try {
+    normalized = normalizePassphrase(value);
+  } catch {
+    return "ordinary";
+  }
+  if (normalized.length === 0) return "empty";
+  return isUnicodeWhiteSpaceOnly(normalized) ? "unicode-whitespace" : "ordinary";
 };
 
 /**

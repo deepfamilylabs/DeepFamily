@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next";
 import type { FriendlyError } from "../../../../../shared/lib/errors";
+import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
 import type {
   ExecuteMintFlowResult,
   MintCoreInfo,
@@ -34,7 +35,10 @@ export interface MintConsents {
   public: boolean;
   age: boolean;
   legal: boolean;
+  passphraseRisk: boolean;
 }
+
+export type MintPassphraseRisk = ProtocolPassphraseRisk;
 
 export type MintMissingParents = {
   father: boolean;
