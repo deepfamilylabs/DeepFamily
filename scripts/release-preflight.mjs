@@ -167,7 +167,6 @@ export const runReleasePreflight = async ({
     if (localTarget.strategy === "pinned-source") {
       compilerStageRoot = await privateDirectoryFactory({
         prefix: "deepfamily-zk-preflight-compiler-",
-        platform,
       });
       localCompiler = await preparePrivateProductionCompiler({
         target: localTarget,

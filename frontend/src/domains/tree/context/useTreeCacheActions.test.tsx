@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
@@ -146,6 +147,124 @@ describe("useTreeCacheActions", () => {
     expect(
       harness.queryCache.get(trustedEndorsementVisibilityKey(personHash, 1, ["0xsource"]), 0),
     ).toBeUndefined();
+  });
+
+  it("clears the imperative node snapshot before a same-tick confirmed-version write", async () => {
+    const oldPersonHash = `0x${"ce".repeat(32)}`;
+    const oldId = makeNodeId(oldPersonHash, 1);
+    const oldNode: NodeData = {
+      id: oldId,
+      personHash: oldPersonHash,
+      versionIndex: 1,
+      versionCommitment: "111",
+      metadataPointer: `0x${"cf".repeat(20)}`,
+      metadataPayloadHash: `0x${"d0".repeat(32)}`,
+      metadataPayloadLength: 256,
+      metadataUnlockValidated: true,
+      metadataProtocolGeneration: "df-onchain-biography-v1",
+      metadataFormatVersion: 1,
+      identitySuiteId: 1,
+      metadataPerson: {
+        fullName: "Old private person",
+        gender: 2,
+        birthYear: 1980,
+        birthMonth: 1,
+        birthDay: 2,
+        isBirthBC: false,
+        personHash: oldPersonHash,
+      },
+      metadataParents: { father: null, mother: null },
+      tag: "old-private-tag",
+      biography: "old-private-biography",
+    };
+    const newPersonHash = `0x${"d1".repeat(32)}`;
+    const newId = makeNodeId(newPersonHash, 2);
+    const confirmed: NodeData = {
+      id: newId,
+      personHash: newPersonHash,
+      versionIndex: 2,
+      versionCommitment: "222",
+      metadataPointer: `0x${"d2".repeat(20)}`,
+      metadataPayloadHash: `0x${"d3".repeat(32)}`,
+      metadataPayloadLength: 512,
+      metadataUnlockValidated: true,
+      metadataProtocolGeneration: "df-onchain-biography-v1",
+      metadataFormatVersion: 1,
+      identitySuiteId: 1,
+      metadataPerson: {
+        fullName: "New confirmed person",
+        gender: 1,
+        birthYear: 1990,
+        birthMonth: 3,
+        birthDay: 4,
+        isBirthBC: false,
+        personHash: newPersonHash,
+      },
+      metadataParents: { father: null, mother: null },
+      tag: "new-confirmed-tag",
+      biography: "new-confirmed-biography",
+    };
+    const storageNS = "clear-all-same-tick";
+    persistenceMocks.blobs.set(`${storageNS}::nodesData`, { [oldId]: oldNode });
+
+    const hook = renderHook(() => {
+      const [nodesData, setNodesData] = useState<Record<string, NodeData>>({ [oldId]: oldNode });
+      const nodesDataRef = useRef(nodesData);
+      useEffect(() => {
+        nodesDataRef.current = nodesData;
+      }, [nodesData]);
+      const actions = useTreeCacheActions({
+        api: null,
+        contract: null,
+        contractAddress: null,
+        eventInterfaceRef: { current: null },
+        queryCacheRef: { current: new QueryCache() },
+        nodesDataRef,
+        edgesStrictRef: { current: {} },
+        reachableNodeIdsRef: { current: [] },
+        setNodesData,
+        setEdgesUnion: vi.fn(),
+        setEdgesStrict: vi.fn(),
+        setReachableNodeIds: vi.fn(),
+        setProgress: vi.fn(),
+        refresh: vi.fn(),
+        storageNS,
+        edgesUnionKey: `${storageNS}::edges.union.v1`,
+        edgesStrictKey: `${storageNS}::edges.strict.v1`,
+        useIndexedDbCache: true,
+        childrenPageLimit: 200,
+        totalVersionsTtlMs: 60_000,
+      });
+      return { actions, nodesData };
+    });
+
+    let persistence!: Promise<void>;
+    act(() => {
+      hook.result.current.actions.clearAllCaches();
+      const revision = hook.result.current.actions.captureMetadataCacheRevision();
+      persistence = hook.result.current.actions.cacheConfirmedPersonVersion(confirmed, revision);
+    });
+    await persistence;
+
+    expect(hook.result.current.nodesData).toMatchObject({
+      [newId]: {
+        personHash: newPersonHash,
+        tag: "new-confirmed-tag",
+        biography: "new-confirmed-biography",
+        metadataUnlockValidated: true,
+      },
+    });
+    expect(hook.result.current.nodesData).not.toHaveProperty(oldId);
+    const durable = persistenceMocks.blobs.get(`${storageNS}::nodesData`);
+    expect(durable).toMatchObject({
+      [newId]: {
+        personHash: newPersonHash,
+        tag: "new-confirmed-tag",
+        biography: "new-confirmed-biography",
+      },
+    });
+    expect(durable).not.toHaveProperty(oldId);
+    expect(JSON.stringify(durable)).not.toContain("old-private");
   });
 
   it("clears only decrypted metadata while preserving public version anchors", () => {

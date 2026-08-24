@@ -10,7 +10,8 @@ describe("Real disclosure binding proof", function () {
   this.timeout(90_000);
 
   it("mints through the generated disclosure verifier with uint8 gender packing", async () => {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+    const { deepFamily, groth16VerifierAdapter } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [signer] = await hre.ethers.getSigners();
     const signerAddress = await signer.getAddress();
     const person = {
@@ -43,6 +44,28 @@ describe("Real disclosure binding proof", function () {
     expect(disclosureProof.person.identityCommitment).to.equal(
       personProof.person.identityCommitment,
     );
+    expect(
+      await groth16VerifierAdapter.verifyProof(
+        1,
+        disclosureProof.proofEnvelope.proofEncodingId,
+        disclosureProof.proofEnvelope.proofData,
+        disclosureProof.publicSignals,
+      ),
+    ).to.equal(true);
+    const signalNames = ["identityCommitment", "disclosureBinding", "minter", "suiteCommitment"];
+    for (const [index, name] of signalNames.entries()) {
+      const tamperedSignals = [...disclosureProof.publicSignals];
+      tamperedSignals[index] = tamperedSignals[index] === 0n ? 1n : tamperedSignals[index] - 1n;
+      expect(
+        await groth16VerifierAdapter.verifyProof(
+          1,
+          disclosureProof.proofEnvelope.proofEncodingId,
+          disclosureProof.proofEnvelope.proofData,
+          tamperedSignals,
+        ),
+        `${name} must remain cryptographically bound to the same proof`,
+      ).to.equal(false);
+    }
 
     const coreInfo = {
       basicInfo: {

@@ -1,5 +1,6 @@
 export type BigNumberish = bigint | number | string;
 export type BytesLike = Uint8Array | ArrayBuffer | ArrayBufferView | string;
+/** Must return a fresh disposable buffer; encryption copies and immediately zeroes it. */
 export type RandomBytes = (length: number) => Uint8Array;
 
 export interface IdentityFields {

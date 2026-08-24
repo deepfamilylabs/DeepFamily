@@ -7,6 +7,7 @@ import {
   CIRCOM_OVERRIDE_ENV,
   buildCircomOverrideEnvironment,
   inspectCircomCompilerOverride,
+  isPathStrictlyInside,
   withoutCircomOverrideEnvironment,
 } from "../scripts/lib/circomCompilerOverride.mjs";
 import { CIRCOM_VERSION } from "../scripts/lib/circomToolchain.mjs";
@@ -132,6 +133,36 @@ describe("release Circom compiler override", function () {
 
     expect(() => inspect("x64", "win32-x64")).to.throw("does not match the native source target");
     expect(() => inspect("arm64", "win32-arm64")).to.throw("Unsupported Circom host win32/arm64");
+  });
+
+  it("compares Windows temporary paths case-insensitively across drive and UNC namespaces", function () {
+    expect(
+      isPathStrictlyInside({
+        parent: String.raw`C:\Users\Runner\AppData\Local\Temp`,
+        candidate: String.raw`\\?\C:\USERS\RUNNER\APPDATA\LOCAL\TEMP\private\circom`,
+        hostPlatform: "win32",
+      }),
+    ).to.equal(true);
+    expect(
+      isPathStrictlyInside({
+        parent: String.raw`\\server\share\Temp`,
+        candidate: String.raw`\\?\UNC\SERVER\SHARE\TEMP\private\circom`,
+        hostPlatform: "win32",
+      }),
+    ).to.equal(true);
+    for (const candidate of [
+      String.raw`C:\Users\Runner\AppData\Local\Temp`,
+      String.raw`C:\Users\Runner\AppData\Local\Temp-escape\circom`,
+      String.raw`D:\Users\Runner\AppData\Local\Temp\circom`,
+    ]) {
+      expect(
+        isPathStrictlyInside({
+          parent: String.raw`C:\Users\Runner\AppData\Local\Temp`,
+          candidate,
+          hostPlatform: "win32",
+        }),
+      ).to.equal(false);
+    }
   });
 
   it("rejects a symlink, an outside-temp path, and a wrong compiler version", async function () {

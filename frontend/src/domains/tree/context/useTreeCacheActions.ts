@@ -163,7 +163,13 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.setNodesData({});
     options.setEdgesUnion({});
     options.setEdgesStrict({});
+    // Query invalidation needs the old node snapshot to discover its detail keys.
+    // Once that scan is complete, clear the imperative ref before returning:
+    // React may not commit setNodesData({}) until a later render, and a confirmed
+    // version cached in the same tick must not spread that stale plaintext into
+    // its new durable snapshot.
     clearTreeQueryCaches(true);
+    options.nodesDataRef.current = {};
     options.setReachableNodeIds([]);
     options.setProgress(undefined);
     if (options.useIndexedDbCache && isIndexedDBSupported()) {
@@ -180,6 +186,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.setEdgesStrict,
     options.setEdgesUnion,
     options.setNodesData,
+    options.nodesDataRef,
     options.setProgress,
     options.setReachableNodeIds,
     nodesStorageKey,

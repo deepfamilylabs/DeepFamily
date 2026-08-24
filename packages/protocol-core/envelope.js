@@ -237,13 +237,19 @@ function secureRandomBytes(length) {
 }
 
 function takeRandomBytes(randomBytes, length, label) {
-  const output = copyBytes(randomBytes(length), label);
-  protocolAssert(
-    output.length === length,
-    "INVALID_RANDOM_SOURCE",
-    `${label} must be ${length} bytes`,
-  );
-  return output;
+  const source = asUint8Array(randomBytes(length), label);
+  try {
+    protocolAssert(
+      source.length === length,
+      "INVALID_RANDOM_SOURCE",
+      `${label} must be ${length} bytes`,
+    );
+    return new Uint8Array(source);
+  } finally {
+    // A random source must return a fresh disposable buffer. Clear that source
+    // buffer immediately; the owned return value is cleared by the encryptor.
+    wipeBytes(source);
+  }
 }
 
 async function aesGcmEncrypt(keyBytes, iv, additionalData, plaintext) {

@@ -57,6 +57,81 @@ describe("Person Version (add-person) Tests", function () {
     ).to.be.revertedWithCustomError(deepFamily, "DuplicateVersionCommitment");
   });
 
+  it("allows only one of two pending submissions for the same version commitment", async () => {
+    const { deepFamily, reader, signer } = await baseSetup();
+    const person = makeTestPerson("Concurrent Duplicate Subject");
+    const identityCommitment = commitmentOf(person);
+    const signerAddress = await signer.getAddress();
+    const publicSignals = makeAddPersonPublicSignals(identityCommitment, signerAddress, {
+      tag: "same-canonical-plaintext",
+    });
+    const personHash = computePersonHash(hre.ethers, identityCommitment);
+    const provider = hre.ethers.provider;
+    const pendingTransactions = [];
+    let minedPendingBlock = false;
+    let firstTransaction;
+    let secondTransaction;
+
+    await provider.send("evm_setAutomine", [false]);
+    try {
+      const firstNonce = await signer.getNonce("pending");
+      firstTransaction = await deepFamily
+        .connect(signer)
+        .addPersonVersion(
+          makeStubProof(),
+          publicSignals,
+          0,
+          0,
+          makeMetadataEnvelope(hre.ethers, 1, { tag: "randomized-envelope-a" }),
+          { nonce: firstNonce, gasLimit: 12_000_000 },
+        );
+      pendingTransactions.push(firstTransaction);
+      secondTransaction = await deepFamily
+        .connect(signer)
+        .addPersonVersion(
+          makeStubProof(),
+          publicSignals,
+          0,
+          0,
+          makeMetadataEnvelope(hre.ethers, 1, { tag: "randomized-envelope-b" }),
+          { nonce: firstNonce + 1, gasLimit: 12_000_000 },
+        );
+      pendingTransactions.push(secondTransaction);
+
+      expect(await provider.getTransactionReceipt(firstTransaction.hash)).to.equal(null);
+      expect(await provider.getTransactionReceipt(secondTransaction.hash)).to.equal(null);
+      await provider.send("evm_mine", []);
+      minedPendingBlock = true;
+    } finally {
+      try {
+        if (!minedPendingBlock) {
+          for (const transaction of pendingTransactions.reverse()) {
+            if ((await provider.getTransactionReceipt(transaction.hash)) === null) {
+              await hre.networkHelpers.dropTransaction(transaction.hash);
+            }
+          }
+        }
+      } finally {
+        await provider.send("evm_setAutomine", [true]);
+      }
+    }
+    expect(await provider.send("hardhat_getAutomine", [])).to.equal(true);
+
+    const firstReceipt = await firstTransaction.wait();
+    expect(firstReceipt.status).to.equal(1);
+
+    let revertedReceipt;
+    try {
+      await secondTransaction.wait();
+    } catch (error) {
+      revertedReceipt = error?.receipt;
+    }
+    expect(revertedReceipt?.status).to.equal(0);
+
+    const [, totalVersions] = await reader.listPersonVersions(personHash, 0, 0);
+    expect(totalVersions).to.equal(1n);
+  });
+
   it("adds person without parents (zero hash preserved)", async () => {
     const { deepFamily, reader, signer } = await baseSetup();
     const person = makeTestPerson("No Parent Subject");
@@ -373,6 +448,43 @@ describe("Person Version (add-person) Tests", function () {
           makeMetadataEnvelope(hre.ethers, 1, { tag: "invalid-parent" }),
         ),
     ).to.be.revertedWithCustomError(deepFamily, "InvalidParentHash");
+  });
+
+  it("rejects father and mother version indices beyond their corresponding histories", async () => {
+    const { deepFamily, signer } = await baseSetup();
+    const signerAddress = await signer.getAddress();
+
+    const fatherSignals = makeAddPersonPublicSignals(501n, signerAddress, {
+      fatherIdentityCommitment: 601n,
+      versionCommitment: 701n,
+    });
+    await expect(
+      deepFamily
+        .connect(signer)
+        .addPersonVersion(
+          makeStubProof(),
+          fatherSignals,
+          1,
+          0,
+          makeMetadataEnvelope(hre.ethers, 1, { tag: "father-index-out-of-range" }),
+        ),
+    ).to.be.revertedWithCustomError(deepFamily, "InvalidFatherVersionIndex");
+
+    const motherSignals = makeAddPersonPublicSignals(502n, signerAddress, {
+      motherIdentityCommitment: 602n,
+      versionCommitment: 702n,
+    });
+    await expect(
+      deepFamily
+        .connect(signer)
+        .addPersonVersion(
+          makeStubProof(),
+          motherSignals,
+          0,
+          1,
+          makeMetadataEnvelope(hre.ethers, 1, { tag: "mother-index-out-of-range" }),
+        ),
+    ).to.be.revertedWithCustomError(deepFamily, "InvalidMotherVersionIndex");
   });
 
   it("accepts a nonzero atomic identity suite id", async () => {

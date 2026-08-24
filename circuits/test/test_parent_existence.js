@@ -94,6 +94,7 @@ async function testParentExistence() {
   console.log("PASS: canonical null parents produce zero outputs without changing self/version");
 
   await expectRejected("hasFather is boolean", { ...baseInput, hasFather: 2 });
+  await expectRejected("hasMother is boolean", { ...baseInput, hasMother: 2 });
   await expectRejected("present father suite is nonzero", { ...baseInput, fatherSuiteId: 0 });
   await expectRejected("present mother suite is nonzero", { ...baseInput, motherSuiteId: 0 });
   await expectRejected("father suite is uint32", {

@@ -9,7 +9,8 @@ describe("Real person commitment proof", function () {
   this.timeout(120_000);
 
   it("accepts the maximum uint8 gender through the generated Solidity verifier", async () => {
-    const { deepFamily } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+    const { deepFamily, groth16VerifierAdapter } =
+      await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [signer] = await hre.ethers.getSigners();
     const signerAddress = await signer.getAddress();
     const person = {
@@ -24,6 +25,35 @@ describe("Real person commitment proof", function () {
     const generated = await generatePersonRelationProof(person, null, null, signerAddress, {
       contentDigest: hre.ethers.id("real-person-gender-255"),
     });
+
+    expect(
+      await groth16VerifierAdapter.verifyProof(
+        0,
+        generated.proofEnvelope.proofEncodingId,
+        generated.proofEnvelope.proofData,
+        generated.publicSignals,
+      ),
+    ).to.equal(true);
+    const signalNames = [
+      "identityCommitment",
+      "fatherIdentityCommitment",
+      "motherIdentityCommitment",
+      "submitterAndSelfSuiteId",
+      "versionCommitment",
+    ];
+    for (const [index, name] of signalNames.entries()) {
+      const tamperedSignals = [...generated.publicSignals];
+      tamperedSignals[index] = tamperedSignals[index] === 0n ? 1n : tamperedSignals[index] - 1n;
+      expect(
+        await groth16VerifierAdapter.verifyProof(
+          0,
+          generated.proofEnvelope.proofEncodingId,
+          generated.proofEnvelope.proofData,
+          tamperedSignals,
+        ),
+        `${name} must remain cryptographically bound to the same proof`,
+      ).to.equal(false);
+    }
 
     await expect(
       deepFamily

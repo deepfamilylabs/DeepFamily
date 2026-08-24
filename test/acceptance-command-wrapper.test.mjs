@@ -222,11 +222,18 @@ describe("acceptance command wrapper", function () {
     const buildLockPath = productionBuildLockPath(root);
     const calls = [];
     try {
+      const npmCli = path.join(root, "npm-cli.js");
+      await fs.writeFile(npmCli, "// trusted test npm CLI\n");
+      const environment = Object.fromEntries(
+        Object.entries(process.env).filter(([name]) => name.toLowerCase() !== "npm_execpath"),
+      );
       await runAcceptanceCommand({
         chainProfile,
         entryScript: "scripts/espace-acceptance.mjs",
         arguments_: [],
         environment: {
+          ...environment,
+          npm_execpath: npmCli,
           [acceptance.modeEnvironmentName]: "release-rehearsal",
         },
         root,

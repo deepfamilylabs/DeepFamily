@@ -51,6 +51,49 @@ function makePerson(overrides: Partial<NodeData> = {}): NodeData {
   };
 }
 
+function makeUnlockedMintedPerson(nftPublicStory: string): NodeData {
+  return makePerson({
+    tokenId: "7",
+    versionCommitment: "99",
+    metadataPointer: `0x${"34".repeat(20)}`,
+    metadataPayloadHash: `0x${"56".repeat(32)}`,
+    metadataPayloadLength: 256,
+    metadataUnlockValidated: true,
+    metadataProtocolGeneration: "df-onchain-biography-v1",
+    metadataFormatVersion: 1,
+    identitySuiteId: 1,
+    metadataPerson: {
+      fullName: "Private Ada",
+      gender: 2,
+      birthYear: 1815,
+      birthMonth: 12,
+      birthDay: 10,
+      isBirthBC: false,
+      personHash,
+    },
+    metadataParents: { father: null, mother: null },
+    tag: "private-v1",
+    biography: "Validated private version biography",
+    nftPublicStory,
+  });
+}
+
+function renderNodeDetail(nodeData: NodeData) {
+  return render(
+    <ToastProvider>
+      <MemoryRouter>
+        <NodeDetailModal
+          open
+          onClose={vi.fn()}
+          nodeData={nodeData}
+          fallback={{ hash: personHash, versionIndex: 1 }}
+          getOwnerOf={mocks.getOwnerOf}
+        />
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+}
+
 function NodeDetailHarness({ onClose }: { onClose: () => void }) {
   const [open, setOpen] = React.useState(true);
   const handleClose = () => {
@@ -160,6 +203,23 @@ describe("person detail modals a11y", () => {
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(personHash));
     expect(screen.getByRole("status").textContent).toContain("search.copied");
+  });
+
+  it("shows validated version biography and NFT public story as separate tracks", () => {
+    renderNodeDetail(makeUnlockedMintedPerson("Independent public NFT story"));
+
+    expect(screen.getByText("Encrypted Version Biography")).toBeTruthy();
+    expect(screen.getByText("Validated private version biography")).toBeTruthy();
+    expect(screen.getByText("Public NFT Story")).toBeTruthy();
+    expect(screen.getByText("Independent public NFT story")).toBeTruthy();
+  });
+
+  it("never falls back from an empty NFT public story to the private biography", () => {
+    renderNodeDetail(makeUnlockedMintedPerson(""));
+
+    expect(screen.getByText("Encrypted Version Biography")).toBeTruthy();
+    expect(screen.getAllByText("Validated private version biography")).toHaveLength(1);
+    expect(screen.queryByText("Public NFT Story")).toBeNull();
   });
 
   it("renders NFT information before recommended sources", async () => {
