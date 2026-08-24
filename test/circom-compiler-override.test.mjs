@@ -8,6 +8,7 @@ import {
   buildCircomOverrideEnvironment,
   inspectCircomCompilerOverride,
   isPathStrictlyInside,
+  isRealPathStrictlyInside,
   withoutCircomOverrideEnvironment,
 } from "../scripts/lib/circomCompilerOverride.mjs";
 import { CIRCOM_VERSION } from "../scripts/lib/circomToolchain.mjs";
@@ -165,13 +166,108 @@ describe("release Circom compiler override", function () {
     }
   });
 
+  it("canonicalizes Windows short-name aliases before applying host path semantics", function () {
+    const shortTemporaryDirectory = String.raw`C:\Users\RUNNER~1\AppData\Local\Temp`;
+    const compilerPath = String.raw`C:\Users\runneradmin\AppData\Local\Temp\private\circom`;
+    const canonicalPaths = new Map([
+      [shortTemporaryDirectory, String.raw`\\?\C:\Users\RunnerAdmin\AppData\Local\Temp`],
+      [compilerPath, String.raw`c:\USERS\RUNNERADMIN\APPDATA\LOCAL\TEMP\private\circom`],
+    ]);
+    const inspectedPaths = [];
+
+    expect(
+      isRealPathStrictlyInside({
+        parent: shortTemporaryDirectory,
+        candidate: compilerPath,
+        hostPlatform: "win32",
+        realpathSync: (value) => {
+          inspectedPaths.push(value);
+          return canonicalPaths.get(value);
+        },
+      }),
+    ).to.equal(true);
+    expect(inspectedPaths).to.deep.equal([shortTemporaryDirectory, compilerPath]);
+  });
+
+  it("proves Windows short-name containment by directory identity when spellings stay distinct", function () {
+    const shortTemporaryDirectory = String.raw`C:\Users\RUNNER~1\AppData\Local\Temp`;
+    const longTemporaryDirectory = String.raw`C:\Users\runneradmin\AppData\Local\Temp`;
+    const compilerPath = path.win32.join(longTemporaryDirectory, "private", "circom");
+    const inspectedDirectories = [];
+    const directoryState = (value) => ({
+      dev: 11n,
+      ino: value === shortTemporaryDirectory || value === longTemporaryDirectory ? 29n : 31n,
+      isDirectory: () => true,
+    });
+
+    expect(
+      isRealPathStrictlyInside({
+        parent: shortTemporaryDirectory,
+        candidate: compilerPath,
+        hostPlatform: "win32",
+        realpathSync: (value) => value,
+        statSync: (value, options) => {
+          expect(options).to.deep.equal({ bigint: true });
+          inspectedDirectories.push(value);
+          return directoryState(value);
+        },
+      }),
+    ).to.equal(true);
+    expect(inspectedDirectories).to.include(longTemporaryDirectory);
+
+    expect(
+      isRealPathStrictlyInside({
+        parent: shortTemporaryDirectory,
+        candidate: String.raw`D:\outside\circom`,
+        hostPlatform: "win32",
+        realpathSync: (value) => value,
+        statSync: (value) => directoryState(value),
+      }),
+    ).to.equal(false);
+    expect(
+      isRealPathStrictlyInside({
+        parent: shortTemporaryDirectory,
+        candidate: compilerPath,
+        hostPlatform: "win32",
+        realpathSync: (value) => value,
+        statSync: () => ({ dev: 11n, ino: 0n, isDirectory: () => true }),
+      }),
+    ).to.equal(false);
+  });
+
+  it("uses explicit POSIX semantics when path tests run on another host", function () {
+    expect(
+      isPathStrictlyInside({
+        parent: "/tmp/deepfamily",
+        candidate: "/tmp/deepfamily/private/circom",
+        hostPlatform: "linux",
+      }),
+    ).to.equal(true);
+    expect(
+      isPathStrictlyInside({
+        parent: "/tmp/deepfamily",
+        candidate: "/tmp/deepfamily-escape/circom",
+        hostPlatform: "linux",
+      }),
+    ).to.equal(false);
+  });
+
   it("rejects a symlink, an outside-temp path, and a wrong compiler version", async function () {
     const compilerPath = path.join(root, "circom");
     const symlinkPath = path.join(root, "circom-link");
+    const realDirectory = path.join(root, "real-compiler-directory");
+    const directorySymlink = path.join(root, "compiler-directory-link");
     const bytes = Buffer.from("fresh private compiler\n");
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     await fs.writeFile(compilerPath, bytes);
     await fs.symlink(compilerPath, symlinkPath);
+    await fs.mkdir(realDirectory);
+    await fs.writeFile(path.join(realDirectory, "circom"), bytes);
+    await fs.symlink(
+      realDirectory,
+      directorySymlink,
+      process.platform === "win32" ? "junction" : "dir",
+    );
     const environmentFor = (filePath, digest = sha256) =>
       buildCircomOverrideEnvironment({
         compiler: { path: filePath, target: "darwin-arm64", sha256: digest },
@@ -185,6 +281,9 @@ describe("release Circom compiler override", function () {
       });
 
     expect(() => inspect(environmentFor(symlinkPath))).to.throw(/non-symlink/u);
+    expect(() => inspect(environmentFor(path.join(directorySymlink, "circom")))).to.throw(
+      /non-symlink/u,
+    );
     const outsidePath = path.resolve("scripts/zk-build.mjs");
     const outsideSha256 = createHash("sha256")
       .update(await fs.readFile(outsidePath))
