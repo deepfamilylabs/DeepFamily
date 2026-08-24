@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { isMetadataUnlockUsable, makeNodeId } from "../../../../../shared/model";
+import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
@@ -36,7 +37,7 @@ function isBytes32(value: string | undefined | null) {
 }
 
 function defaultConsents(): MintConsents {
-  return { public: false, age: false, legal: false };
+  return { public: false, age: false, legal: false, passphraseRisk: false };
 }
 
 export function useMintNftModalController({
@@ -67,6 +68,7 @@ export function useMintNftModalController({
   const [personHash, setPersonHash] = useState("");
   const [versionIndex, setVersionIndex] = useState(1);
   const [consents, setConsents] = useState(defaultConsents);
+  const [passphraseRisk, setPassphraseRisk] = useState<ProtocolPassphraseRisk>("empty");
   const [consentError, setConsentError] = useState<string | null>(null);
   const [personInfo, setPersonInfo] = useState<MintPersonInfo | null>(null);
   const [showEndorseConfirm, setShowEndorseConfirm] = useState(false);
@@ -84,7 +86,11 @@ export function useMintNftModalController({
   );
   const hasTargetInputs = hasValidTarget;
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
-  const allConsentsChecked = consents.public && consents.age && consents.legal;
+  const allConsentsChecked =
+    consents.public &&
+    consents.age &&
+    consents.legal &&
+    (passphraseRisk === "ordinary" || consents.passphraseRisk);
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
   const validatedTargetBiography = useMemo(() => {
     if (!hasValidTarget) return undefined;
@@ -165,6 +171,7 @@ export function useMintNftModalController({
     setSuccessResult(null);
     setErrorResult(null);
     setConsents(defaultConsents());
+    setPassphraseRisk("empty");
     setConsentError(null);
     setShowEndorseConfirm(false);
     resetDisclosureProof();
@@ -212,6 +219,7 @@ export function useMintNftModalController({
     setSuccessResult(null);
     setErrorResult(null);
     setConsentError(null);
+    setConsents((current) => ({ ...current, passphraseRisk: false }));
     didPatchCacheRef.current = false;
     resetMintNftFlow();
   }, [isOpen, resetMintNftFlow, targetPersonHash, targetVersionIndex]);
@@ -220,14 +228,26 @@ export function useMintNftModalController({
     (key: keyof MintConsents) => {
       setConsents((current) => {
         const next = { ...current, [key]: !current[key] };
-        if (consentError && next.public && next.age && next.legal) {
+        if (
+          consentError &&
+          next.public &&
+          next.age &&
+          next.legal &&
+          (passphraseRisk === "ordinary" || next.passphraseRisk)
+        ) {
           setConsentError(null);
         }
         return next;
       });
     },
-    [consentError],
+    [consentError, passphraseRisk],
   );
+
+  const handlePassphraseChange = useCallback((risk: ProtocolPassphraseRisk) => {
+    setPassphraseRisk(risk);
+    setConsents((current) => ({ ...current, passphraseRisk: false }));
+    setConsentError(null);
+  }, []);
 
   const handleGoEndorse = useCallback(() => {
     if (!targetPersonHash || !isPersonHashFormatValid || !targetVersionIndex) {
@@ -246,6 +266,8 @@ export function useMintNftModalController({
     address,
     contract,
     allConsentsChecked,
+    renderedPassphraseRisk: passphraseRisk,
+    passphraseRiskConsentChecked: consents.passphraseRisk,
     hasTargetInputs,
     hasValidTarget,
     isEndorsed,
@@ -298,6 +320,7 @@ export function useMintNftModalController({
       personInfo,
       targetSelfSuiteId,
       onPersonInfoChange: setPersonInfo,
+      onPassphraseChange: handlePassphraseChange,
     },
     supplementForm: {
       register,
@@ -308,6 +331,7 @@ export function useMintNftModalController({
     },
     consentSection: {
       consents,
+      passphraseRisk,
       consentError,
       onToggleConsent: toggleConsent,
     },

@@ -1,4 +1,4 @@
-import { isUnicodeWhiteSpaceOnly, normalizePassphrase } from "@deepfamily/protocol-core";
+import { classifyProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
 import type {
   AddVersionConsents,
   AddVersionIdentityRole,
@@ -23,18 +23,7 @@ export function defaultAddVersionPassphraseRisks(): AddVersionPassphraseRisks {
 
 /** Classifies the exact protocol passphrase bytes: NFKD, with no trimming. */
 export function classifyAddVersionPassphrase(rawPassphrase: string): AddVersionPassphraseRisk {
-  let normalized: string;
-  try {
-    normalized = normalizePassphrase(rawPassphrase);
-  } catch {
-    // Browser text controls normally replace malformed scalar input, but a
-    // programmatic DOM mutation can still expose an isolated surrogate. Keep
-    // React event handling total; the protocol KDF remains authoritative and
-    // will reject the malformed value before any proof or transaction work.
-    return "ordinary";
-  }
-  if (normalized.length === 0) return "empty";
-  return isUnicodeWhiteSpaceOnly(normalized) ? "unicode-whitespace" : "ordinary";
+  return classifyProtocolPassphraseRisk(rawPassphrase);
 }
 
 export function passphraseRiskNeedsExplicitConsent(risk: AddVersionPassphraseRisk): boolean {

@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { asUint8Array, parseCanonicalPersonVersion } from "@deepfamily/protocol-core";
-import { describe, expect, it } from "vitest";
+import {
+  asUint8Array,
+  normalizePassphrase,
+  parseCanonicalPersonVersion,
+} from "@deepfamily/protocol-core";
+import { describe, expect, it, vi } from "vitest";
 import {
   cryptoWorkerHandlers,
   handleCryptoWorkerRequest,
@@ -227,5 +231,66 @@ describe("production crypto worker handlers", () => {
         rawPassphrase,
       ),
     ).toMatchObject({ message: "failed for [REDACTED]", code: "KDF_FAILED" });
+  });
+
+  it("redacts nested shared-identity passphrases from Worker errors", async () => {
+    const rawPassphrase = "nested-worker-passphrase-\u00e9-sentinel";
+    const deriveKey = vi.spyOn(cryptoWorkerHandlers, "deriveKey").mockRejectedValueOnce(
+      Object.assign(new Error(`derive failed for ${rawPassphrase.normalize("NFKD")}`), {
+        code: "KDF_FAILED",
+      }),
+    );
+    const request: CryptoWorkerRequest = {
+      id: 43,
+      method: "deriveKey",
+      params: {
+        input: { ...identity, passphrase: rawPassphrase },
+        purpose: "PRIVATE_KEY",
+        preset: "FAST",
+      },
+    };
+    const responses: CryptoWorkerResponse[] = [];
+
+    await handleCryptoWorkerRequest(request, (response) => responses.push(response));
+
+    expect(request.params).toBeUndefined();
+    expect(responses[0]).toMatchObject({
+      id: 43,
+      ok: false,
+      error: { message: "derive failed for [REDACTED]", code: "KDF_FAILED" },
+    });
+    expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
+    expect(JSON.stringify(responses)).not.toContain(rawPassphrase.normalize("NFKD"));
+    deriveKey.mockRestore();
+  });
+
+  it("redacts Unicode 17 protocol-normalized secrets even when host ICU differs", async () => {
+    const rawPassphrase = "\ua7f1-worker-secret";
+    const normalizedPassphrase = normalizePassphrase(rawPassphrase);
+    expect(normalizedPassphrase).toBe("S-worker-secret");
+    const deriveKey = vi
+      .spyOn(cryptoWorkerHandlers, "deriveKey")
+      .mockRejectedValueOnce(new Error(`derive failed for ${normalizedPassphrase}`));
+    const request: CryptoWorkerRequest = {
+      id: 44,
+      method: "deriveKey",
+      params: {
+        input: { ...identity, passphrase: rawPassphrase },
+        purpose: "PRIVATE_KEY",
+        preset: "FAST",
+      },
+    };
+    const responses: CryptoWorkerResponse[] = [];
+
+    await handleCryptoWorkerRequest(request, (response) => responses.push(response));
+
+    expect(responses[0]).toMatchObject({
+      id: 44,
+      ok: false,
+      error: { message: "derive failed for [REDACTED]" },
+    });
+    expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
+    expect(JSON.stringify(responses)).not.toContain(normalizedPassphrase);
+    deriveKey.mockRestore();
   });
 });

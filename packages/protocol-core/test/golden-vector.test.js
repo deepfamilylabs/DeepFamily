@@ -16,8 +16,10 @@ import {
   computeDisclosureBinding,
   computePersonVersionContentCommitment,
   computeVersionHash,
+  computeIdentityFromDerivedSecret,
   decryptPersonVersionEnvelope,
   decryptPersonVersionRuntime,
+  deriveFileKekBytes,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
   packSubmitterAndSelfSuiteId,
@@ -25,6 +27,7 @@ import {
   parseFormat1Envelope,
   roundTripPersonVersionEnvelope,
   serializeCanonicalPersonVersion,
+  wipeBytes,
 } from "../index.js";
 import {
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
@@ -106,6 +109,28 @@ test("empty passphrase golden vector runs full domain-separated identity Argon2i
   assert.equal(material.nameSecretCommitment.toString(), vector.identity.nameSecretCommitment);
   assert.equal(material.identityCommitment.toString(), vector.identity.identityCommitment);
   assert.equal(material.personHash, vector.identity.personHash);
+  assert.notEqual(
+    material.personHash,
+    computeIdentityFromDerivedSecret({
+      identity,
+      identitySuiteId: vector.identity.identitySuiteId,
+      derivedSecretField: 0n,
+    }).personHash,
+  );
+});
+
+test("empty passphrase golden vector runs full domain-separated file Argon2id", async () => {
+  const fileKek = await deriveFileKekBytes({
+    rawPassphrase: vector.identity.rawPassphrase,
+    fileSalt: vector.envelope.fileSaltHex,
+    kdfSuite: 1,
+  });
+  try {
+    assert.equal(bytesToHex(fileKek), vector.envelope.fileArgon2idOutputHex);
+    assert.notEqual(vector.envelope.fileArgon2idOutputHex, vector.identity.argon2idOutputHex);
+  } finally {
+    wipeBytes(fileKek);
+  }
 });
 
 test("golden canonical bytes, digest limbs, commitment, versionHash and 15-word AAD are exact", () => {

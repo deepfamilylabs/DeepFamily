@@ -236,8 +236,16 @@ async function verifyConfirmedVersion(input: {
   contractAddress: string;
   readerAddress: string;
   result: AddVersionResult;
+  expectedPersonHash: string;
+  expectedFatherHash: string;
+  expectedMotherHash: string;
+  expectedFatherVersionIndex: number;
+  expectedMotherVersionIndex: number;
+  expectedSubmitter: string;
   expectedVersionCommitment: bigint;
+  expectedMetadataPointer: string;
   expectedPayloadHash: string;
+  expectedPayloadLength: number;
 }) {
   const deepFamily = createDeepFamilyContract(input.contractAddress, input.runner);
   const reader = createDeepFamilyReaderContract(input.readerAddress, input.runner);
@@ -254,14 +262,40 @@ async function verifyConfirmedVersion(input: {
     throw new Error("Reader and DeepFamily metadata archive binding mismatch after confirmation");
   }
   const details = parseVersionDetailsResult(rawDetails);
-  if (details.version.versionCommitment !== input.expectedVersionCommitment.toString()) {
-    throw new Error("Confirmed versionCommitment does not match the prepared submission");
-  }
-  if (!sameHex(details.metadata.payloadHash, input.expectedPayloadHash)) {
-    throw new Error("Confirmed metadata payloadHash does not match the prepared envelope");
-  }
-  if (!details.metadata.pointer || !Number.isInteger(details.metadata.payloadLength)) {
-    throw new Error("Confirmed metadata reference is incomplete");
+  const version = details.version;
+  const metadata = details.metadata;
+  const sameUnsignedInteger = (
+    actual: string | number | undefined,
+    expected: string | number | bigint,
+  ): boolean => {
+    try {
+      return actual !== undefined && BigInt(actual) === BigInt(expected);
+    } catch {
+      return false;
+    }
+  };
+  const pointerIsValid =
+    typeof metadata.pointer === "string" &&
+    ethers.isAddress(metadata.pointer) &&
+    !sameHex(metadata.pointer, ethers.ZeroAddress);
+  const versionMatches =
+    sameHex(version.personHash, input.expectedPersonHash) &&
+    sameUnsignedInteger(version.versionIndex, input.result.index) &&
+    sameHex(version.fatherHash, input.expectedFatherHash) &&
+    sameHex(version.motherHash, input.expectedMotherHash) &&
+    sameUnsignedInteger(version.fatherVersionIndex, input.expectedFatherVersionIndex) &&
+    sameUnsignedInteger(version.motherVersionIndex, input.expectedMotherVersionIndex) &&
+    sameHex(version.addedBy, input.expectedSubmitter) &&
+    sameUnsignedInteger(version.versionCommitment, input.expectedVersionCommitment);
+  const metadataMatches =
+    pointerIsValid &&
+    sameHex(metadata.pointer, input.expectedMetadataPointer) &&
+    sameHex(metadata.payloadHash, input.expectedPayloadHash) &&
+    metadata.payloadLength === input.expectedPayloadLength;
+  if (!versionMatches || !metadataMatches) {
+    throw new Error(
+      "Confirmed Reader version or Archive reference does not match the prepared submission",
+    );
   }
   return details;
 }
@@ -403,13 +437,25 @@ export function useAddVersionSubmit({
           submission.confirmationRpcUrl,
           submission.scope.chainId,
         );
+        const metadataStored = result.events.MetadataStored;
+        if (!metadataStored) {
+          throw new Error("Confirmed transaction is missing the MetadataStored event");
+        }
         const confirmed = await verifyConfirmedVersion({
           runner: confirmationProvider,
           contractAddress: submission.scope.contractAddress,
           readerAddress: submission.scope.readerAddress,
           result,
+          expectedPersonHash: submission.personHash,
+          expectedFatherHash: submission.fatherHash,
+          expectedMotherHash: submission.motherHash,
+          expectedFatherVersionIndex: submission.args.fatherVersionIndex,
+          expectedMotherVersionIndex: submission.args.motherVersionIndex,
+          expectedSubmitter: submission.scope.submitterAddress,
           expectedVersionCommitment: submission.versionCommitment,
+          expectedMetadataPointer: metadataStored.pointer,
           expectedPayloadHash: submission.payloadHash,
+          expectedPayloadLength: submission.args.metadataEnvelope.length,
         });
         await assertCurrentScope();
         const anchors = {
@@ -420,19 +466,17 @@ export function useAddVersionSubmit({
           metadataPayloadHash: confirmed.metadata.payloadHash!,
           metadataPayloadLength: confirmed.metadata.payloadLength!,
         };
-        const versionEvent = result.events.PersonVersionAdded;
         const baseNode: NodeData = {
           id: makeNodeId(result.hash, result.index),
           ...anchors,
-          fatherHash: versionEvent?.fatherHash ?? submission.fatherHash,
-          motherHash: versionEvent?.motherHash ?? submission.motherHash,
-          fatherVersionIndex:
-            versionEvent?.fatherVersionIndex ?? submission.args.fatherVersionIndex,
-          motherVersionIndex:
-            versionEvent?.motherVersionIndex ?? submission.args.motherVersionIndex,
-          addedBy: versionEvent?.addedBy ?? submission.scope.submitterAddress,
-          timestamp: versionEvent?.timestamp,
-          tokenId: "0",
+          fatherHash: confirmed.version.fatherHash!,
+          motherHash: confirmed.version.motherHash!,
+          fatherVersionIndex: confirmed.version.fatherVersionIndex!,
+          motherVersionIndex: confirmed.version.motherVersionIndex!,
+          addedBy: confirmed.version.addedBy!,
+          timestamp: confirmed.version.timestamp,
+          endorsementCount: confirmed.endorsementCount,
+          tokenId: confirmed.tokenId,
         };
         const node = mergeValidatedMetadataUnlock(baseNode, anchors, {
           person: submission.validated.metadata.person,

@@ -1,10 +1,11 @@
 import { AlertTriangle, Shield } from "lucide-react";
 import { ConsentCheckbox } from "../../shared/ConsentCheckbox";
-import type { MintConsents, MintNFTT } from "../model/mintNftTypes";
+import type { MintConsents, MintNFTT, MintPassphraseRisk } from "../model/mintNftTypes";
 
 export interface MintConsentSectionProps {
   t: MintNFTT;
   consents: MintConsents;
+  passphraseRisk: MintPassphraseRisk;
   consentError: string | null;
   onToggleConsent: (key: keyof MintConsents) => void;
 }
@@ -12,10 +13,11 @@ export interface MintConsentSectionProps {
 export function MintConsentSection({
   t,
   consents,
+  passphraseRisk,
   consentError,
   onToggleConsent,
 }: MintConsentSectionProps) {
-  const items = [
+  const items: Array<{ key: keyof MintConsents; label: string }> = [
     {
       key: "public",
       label: t(
@@ -34,7 +36,25 @@ export function MintConsentSection({
         "I confirm the data is lawful, truthful, and authorized for public disclosure without extra private content.",
       ),
     },
-  ] as const;
+  ];
+
+  if (passphraseRisk === "empty") {
+    items.push({
+      key: "passphraseRisk",
+      label: t(
+        "mintNFT.consentEmptyPassphrase",
+        "I explicitly confirm this target uses an empty identity passphrase. Anyone who knows the identity fields can reproduce its identity witness, and this public mint is permanent.",
+      ),
+    });
+  } else if (passphraseRisk === "unicode-whitespace") {
+    items.push({
+      key: "passphraseRisk",
+      label: t(
+        "mintNFT.consentWhitespacePassphrase",
+        "I explicitly confirm this identity passphrase contains only Unicode White_Space after NFKD normalization. It is not trimmed, but it is highly guessable, and this public mint is permanent.",
+      ),
+    });
+  }
 
   return (
     <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm mt-8!">

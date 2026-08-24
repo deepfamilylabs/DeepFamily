@@ -125,7 +125,8 @@ describe("transaction form accessibility", () => {
         />
         <MintConsentSection
           t={t as any}
-          consents={{ public: false, age: false, legal: false }}
+          consents={{ public: false, age: false, legal: false, passphraseRisk: false }}
+          passphraseRisk="ordinary"
           consentError="Mint consent required"
           onToggleConsent={vi.fn()}
         />

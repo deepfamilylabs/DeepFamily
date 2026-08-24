@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   zkWorkerCall: vi.fn(),
   cryptoWorkerCall: vi.fn(),
   nodesData: {} as Record<string, any>,
+  personPassphrase: "",
+  passphrasesMatch: true,
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -99,7 +101,7 @@ vi.mock("../../../shared/lib/errors", () => ({
 vi.mock("../../person", () => ({
   PersonHashCalculator: forwardRef((props: any, ref) => {
     useImperativeHandle(ref, () => ({
-      getSecretInputs: () => ({ passphrase: "" }),
+      getSecretInputs: () => ({ passphrase: mocks.personPassphrase }),
       getPublicFormData: () => ({
         fullName: "Ada Lovelace",
         gender: 2,
@@ -108,7 +110,8 @@ vi.mock("../../person", () => ({
         birthDay: 10,
         isBirthBC: false,
       }),
-      hasPassphrase: () => false,
+      hasPassphrase: () => mocks.personPassphrase.length > 0,
+      passphrasesMatch: () => mocks.passphrasesMatch,
     }));
 
     useEffect(() => {
@@ -125,7 +128,25 @@ vi.mock("../../person", () => ({
       // mock injects it once to avoid parent state update loops.
     }, []);
 
-    return <div data-testid="person-hash-calculator" />;
+    return (
+      <div data-testid="person-hash-calculator">
+        <input
+          aria-label="mint identity passphrase test input"
+          onChange={(event) => {
+            mocks.personPassphrase = event.currentTarget.value;
+            const risk =
+              mocks.personPassphrase.length === 0
+                ? "empty"
+                : /^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/u.test(
+                      mocks.personPassphrase,
+                    )
+                  ? "unicode-whitespace"
+                  : "ordinary";
+            props.onPassphraseChange?.(risk);
+          }}
+        />
+      </div>
+    );
   }),
 }));
 
@@ -169,6 +190,8 @@ describe("MintNFTModal", () => {
     mocks.zkWorkerCall.mockReset();
     mocks.cryptoWorkerCall.mockReset();
     mocks.nodesData = {};
+    mocks.personPassphrase = "";
+    mocks.passphrasesMatch = true;
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
       cb(0);
@@ -295,6 +318,59 @@ describe("MintNFTModal", () => {
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(77);
     expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
+  });
+
+  it("requires and invalidates the Mint-specific Unicode whitespace confirmation", async () => {
+    renderMintModal();
+
+    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    const input = screen.getByLabelText("mint identity passphrase test input");
+    fireEvent.change(input, { target: { value: "\u0085\u3000" } });
+
+    const riskConsent = screen.getByRole("checkbox", {
+      name: /contains only Unicode White_Space after NFKD normalization/i,
+    });
+    expect(riskConsent).toBeTruthy();
+
+    await checkAllConsents();
+    expect((screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+
+    fireEvent.change(input, { target: { value: "\u00a0\u2028" } });
+
+    expect((screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: /contains only Unicode White_Space after NFKD normalization/i,
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+  });
+
+  it("rejects a stale risk consent snapshot before proof generation", async () => {
+    renderMintModal();
+
+    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await checkAllConsents();
+
+    // Model a programmatic mutation that bypasses the normal React change
+    // callback. The submit boundary must still compare the exact secret.
+    mocks.personPassphrase = "\u0085";
+    fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
+
+    expect(
+      await screen.findByText("Please confirm all required checkboxes before minting"),
+    ).toBeTruthy();
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalledWith(
+      "generateDisclosureBindingProof",
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
   });
 
   it("copies only a validated unlocked biography after an explicit public disclosure confirmation", async () => {

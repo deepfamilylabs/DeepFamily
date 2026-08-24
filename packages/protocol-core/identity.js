@@ -27,6 +27,7 @@ import {
 } from "./bytes.js";
 import { canonicalizeFullName } from "./canonical.js";
 import { ProtocolError, UnsupportedProtocolError, protocolAssert } from "./errors.js";
+import { normalizeUnicodeNfkd } from "./unicode-normalization.js";
 
 function assertSmallUnsigned(value, maximum, label) {
   return Number(bigintFrom(value, label, BigInt(maximum)));
@@ -97,7 +98,7 @@ export function normalizePassphrase(rawPassphrase) {
     "Passphrase must be a string",
   );
   assertUnicodeScalarString(rawPassphrase, "passphrase");
-  return rawPassphrase.normalize("NFKD");
+  return normalizeUnicodeNfkd(rawPassphrase, "passphrase");
 }
 
 export function buildDomainSeparatedPasswordBytes(domain, rawPassphrase) {

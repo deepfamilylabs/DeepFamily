@@ -568,6 +568,84 @@ describe("AddVersionModal", () => {
     expect(screen.queryByText(/legacy-public-tag/)).toBeNull();
   });
 
+  it("refuses to cache plaintext when the confirmed Reader ref differs from the frozen envelope", async () => {
+    mocks.addVersionRunOrThrow.mockResolvedValue(successfulFlowResult());
+    mocks.readerContract.getVersionDetails.mockResolvedValueOnce([
+      {
+        personHash,
+        fatherHash: `0x${"00".repeat(32)}`,
+        motherHash: `0x${"00".repeat(32)}`,
+        versionIndex: 3n,
+        fatherVersionIndex: 0n,
+        motherVersionIndex: 0n,
+        versionCommitment: 99n,
+        addedBy: submitter,
+        timestamp: 789n,
+      },
+      // The frozen package contains exactly 20 bytes. A Reader response for a
+      // different Archive ref must not produce an unlocked NodeData record.
+      { pointer, payloadHash, payloadLength: 19n },
+      0n,
+      0n,
+    ]);
+
+    renderAddVersionModal();
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
+    expect(mocks.readerContract.getVersionDetails).toHaveBeenCalledWith(personHash, 3);
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+    expect(JSON.stringify(mocks.cacheValidatedPersonVersion.mock.calls)).not.toContain(
+      "private biography",
+    );
+  });
+
+  it("refuses to cache plaintext when the Reader pointer differs from the receipt anchor", async () => {
+    mocks.addVersionRunOrThrow.mockResolvedValue(successfulFlowResult());
+    mocks.readerContract.getVersionDetails.mockResolvedValueOnce([
+      {
+        personHash,
+        fatherHash: `0x${"00".repeat(32)}`,
+        motherHash: `0x${"00".repeat(32)}`,
+        versionIndex: 3n,
+        fatherVersionIndex: 0n,
+        motherVersionIndex: 0n,
+        versionCommitment: 99n,
+        addedBy: submitter,
+        timestamp: 789n,
+      },
+      {
+        pointer: "0x0000000000000000000000000000000000000b11",
+        payloadHash,
+        payloadLength: 20n,
+      },
+      0n,
+      0n,
+    ]);
+
+    renderAddVersionModal();
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.invalidateByTx).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+
   it("reuses the exact verified submission package after an uncertain RPC send failure", async () => {
     const flowResult = successfulFlowResult();
     mocks.addVersionRunOrThrow

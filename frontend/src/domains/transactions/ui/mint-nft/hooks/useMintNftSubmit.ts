@@ -1,5 +1,9 @@
 import { useCallback, type MutableRefObject } from "react";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
+import {
+  classifyProtocolPassphraseRisk,
+  type ProtocolPassphraseRisk,
+} from "../../../../../shared/crypto/passphraseStrength";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import type {
   ExecuteMintFlowResult,
@@ -34,6 +38,8 @@ interface UseMintNftSubmitArgs {
   address?: string | null;
   contract?: any;
   allConsentsChecked: boolean;
+  renderedPassphraseRisk: ProtocolPassphraseRisk;
+  passphraseRiskConsentChecked: boolean;
   hasTargetInputs: boolean;
   hasValidTarget: boolean;
   isEndorsed: boolean;
@@ -66,6 +72,8 @@ export function useMintNftSubmit({
   address,
   contract,
   allConsentsChecked,
+  renderedPassphraseRisk,
+  passphraseRiskConsentChecked,
   hasTargetInputs,
   hasValidTarget,
   isEndorsed,
@@ -88,13 +96,31 @@ export function useMintNftSubmit({
 }: UseMintNftSubmitArgs) {
   return useCallback(
     async (data: MintNFTFormValues) => {
-      if (!allConsentsChecked) {
+      const calculator = personCalcRef.current;
+      const currentPassphraseRisk = classifyProtocolPassphraseRisk(
+        calculator?.getSecretInputs().passphrase ?? "",
+      );
+      if (
+        !allConsentsChecked ||
+        currentPassphraseRisk !== renderedPassphraseRisk ||
+        (currentPassphraseRisk !== "ordinary" && !passphraseRiskConsentChecked)
+      ) {
         setConsentError(
           t("mintNFT.consentMissing", "Please confirm all required checkboxes before minting"),
         );
         return;
       }
       setConsentError(null);
+
+      if (!calculator?.passphrasesMatch()) {
+        setErrorResult(
+          toMintNFTErrorResult(
+            "PASSPHRASE_MISMATCH",
+            t("mintNFT.passphraseMismatch", "The identity passphrases do not match"),
+          ),
+        );
+        return;
+      }
 
       if (!hasTargetInputs) {
         setErrorResult(
@@ -243,6 +269,8 @@ export function useMintNftSubmit({
     [
       address,
       allConsentsChecked,
+      renderedPassphraseRisk,
+      passphraseRiskConsentChecked,
       contract,
       didPatchCacheRef,
       generateDisclosureProof,

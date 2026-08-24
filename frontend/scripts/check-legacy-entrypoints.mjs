@@ -50,6 +50,25 @@ for (const path of removedFreshV1Artifacts) {
   }
 }
 
+const removedRepositoryArtifacts = [
+  // This executable demo derived an EVM private key with a legacy scrypt flow
+  // whose salt included a direct passphrase hash. It is incompatible with the
+  // deterministic Argon2id identity suite used by every fresh-v1 entrypoint.
+  "scripts/test-keygen-demo.mjs",
+];
+
+for (const path of removedRepositoryArtifacts) {
+  if (existsSync(join(repositoryRoot, path))) {
+    violations.push(`removed fresh-v1 legacy repository artifact was restored: ${path}`);
+  }
+}
+
+const checkRootPath = join(repositoryRoot, "scripts", "check-root.mjs");
+const checkRootSource = readFileSync(checkRootPath, "utf8");
+if (/console\.(?:log|info|warn|error)\([^\n]*passphrase/iu.test(checkRootSource)) {
+  violations.push("check-root must not print an identity passphrase");
+}
+
 const runtimeSourceFiles = listFiles(srcRoot).filter((file) => {
   const path = relative(srcRoot, file);
   return (
@@ -125,4 +144,4 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log("Legacy frontend entrypoints and pre-fresh-v1 identity APIs are absent.");
+console.log("Legacy frontend/repository entrypoints and pre-fresh-v1 identity APIs are absent.");

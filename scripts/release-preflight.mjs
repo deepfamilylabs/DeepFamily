@@ -36,6 +36,9 @@ import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
+  Object.freeze(["npm", ["run", "protocol:legacy:check"]]),
+  // Re-run the pinned Unicode 17 conformance suite before a production release.
+  Object.freeze(["npm", ["run", "protocol:unicode:check"]]),
   // Contracts must build before the frontend synchronizes ABI artifacts.
   Object.freeze(["npm", ["run", "contracts:check"]]),
   Object.freeze(["npm", ["run", "frontend:check"]]),

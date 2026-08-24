@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { normalizePassphrase } from "@deepfamily/protocol-core";
 import type { NodeData } from "../model/graph";
 import { MetadataUnlockCancelledError } from "./metadataArchiveService";
 import {
@@ -90,6 +91,29 @@ describe("MetadataUnlockCoordinator", () => {
     expect(JSON.stringify(report)).not.toContain(rawPassphrase);
     expect(report.persistenceFailures[0]).toMatchObject({ nodeId: "node-4" });
     expect(progress[progress.length - 1]?.status).toBe("completed");
+  });
+
+  it("redacts Unicode 17 protocol-normalized passphrases from failure reports", async () => {
+    const rawPassphrase = "\ua7f1-unlock-secret";
+    const normalizedPassphrase = normalizePassphrase(rawPassphrase);
+    expect(normalizedPassphrase).toBe("S-unlock-secret");
+    const coordinator = new MetadataUnlockCoordinator();
+
+    const report = await coordinator.run({
+      nodes: [node(1)],
+      chainId: 71,
+      deepFamilyProxy: `0x${"11".repeat(20)}`,
+      getCode: async () => "0x",
+      rawPassphrase,
+      unlockNode: async () => {
+        throw new Error(`wrong ${normalizedPassphrase}`);
+      },
+      cacheValidatedPersonVersion: vi.fn(),
+    });
+
+    expect(report.failures[0]?.message).toBe("wrong [REDACTED]");
+    expect(JSON.stringify(report)).not.toContain(rawPassphrase);
+    expect(JSON.stringify(report)).not.toContain(normalizedPassphrase);
   });
 
   it("cancels the current job and preserves successes already committed", async () => {

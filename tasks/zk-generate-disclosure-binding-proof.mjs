@@ -6,6 +6,7 @@ import { ArgumentType } from "hardhat/types/arguments";
 import disclosureBindingProof from "../lib/disclosureBindingProof.js";
 import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
+import { canonicalizeFullName } from "@deepfamily/protocol-core";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,10 +26,7 @@ export const DEFAULT_ZKEY_CANDIDATES = resolveDescriptorNodeArtifactCandidates(
 );
 
 export function normalizeNameForHash(value) {
-  if (value === undefined || value === null) return "";
-  const normalized =
-    typeof String(value).normalize === "function" ? String(value).normalize("NFKC") : String(value);
-  return normalized.replace(/\s+/gu, " ").trim();
+  return canonicalizeFullName(value);
 }
 
 export function parseDisclosureBindingPersonArgs(args) {
@@ -39,9 +37,7 @@ export function parseDisclosureBindingPersonArgs(args) {
   const gender = Number(args.gender ?? 0);
   const derivedSecretField = BigInt(args.derivedsecretfield ?? 0);
 
-  if (fullName.trim().length === 0) {
-    throw new Error("Full name must be a non-empty string");
-  }
+  canonicalizeFullName(fullName);
   if (!Number.isInteger(birthYear) || birthYear < 0 || birthYear > 65535) {
     throw new Error("birthYear must be an integer in [0, 65535]");
   }

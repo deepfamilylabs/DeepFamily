@@ -56,6 +56,8 @@ import {
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
 
 export const PROTOCOL_RELEASE_MANIFEST_PATH = "protocol-release-manifest.json";
+export const PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH =
+  "packages/protocol-core/unicode-normalization-data.js";
 export const PROTOCOL_DEPLOYMENT_EVIDENCE_SCHEMA_VERSION = 1;
 
 const PROTOCOL_IDENTIFIER = "deepfamily/onchain-biography-unified-passphrase-v1";
@@ -104,6 +106,18 @@ const SHA256_HEX = /^[0-9a-f]{64}$/;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
 const EVM_BYTECODE = /^0x(?:[0-9a-fA-F]{2})+$/;
+const PROOF_ARTIFACT_KEYS = Object.freeze([
+  "status",
+  "sourceSha256",
+  "r1csSha256",
+  "wasmSha256",
+  "zkeySha256",
+  "verificationKeySha256",
+  "solidityVerifierSha256",
+  "adapterArtifactSha256",
+  "adapterRuntimeSha256",
+]);
+const PROOF_ARTIFACT_HASH_KEYS = Object.freeze(PROOF_ARTIFACT_KEYS.slice(1));
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(`Protocol release manifest: ${message}`);
@@ -509,8 +523,10 @@ const validateFrozenV1Constants = ({
     identityDefinition,
     {
       normalization: "NFKD",
+      unicodeVersion: "17.0.0",
+      normalizationImplementation: "deepfamily-ucd-normalization-v1",
+      normalizationDataSha256: "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
       trim: false,
-      unicodeVersion: "17.0",
       passwordDomain: IDENTITY_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
       salt: {
@@ -530,6 +546,9 @@ const validateFrozenV1Constants = ({
     fileDefinition,
     {
       normalization: "NFKD",
+      unicodeVersion: "17.0.0",
+      normalizationImplementation: "deepfamily-ucd-normalization-v1",
+      normalizationDataSha256: "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
       trim: false,
       passwordDomain: FILE_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
@@ -1231,9 +1250,33 @@ export const inspectProtocolReleaseManifest = ({
   const bytes = fs.readFileSync(manifestPath);
   const manifest = JSON.parse(bytes.toString("utf8"));
 
+  assertExactKeys(
+    manifest,
+    [
+      "schemaVersion",
+      "protocol",
+      "releaseStatus",
+      "protocolGeneration",
+      "envelope",
+      "formats",
+      "identitySuites",
+      "fileKdfSuites",
+      "commitments",
+      "contractInterfaces",
+      "proofRoutes",
+      "deployments",
+      "goldenVectors",
+      "releaseEvidence",
+    ],
+    "manifest root",
+  );
   assert(manifest.schemaVersion === 1, "schemaVersion must be 1");
   assert(manifest.protocol === PROTOCOL_IDENTIFIER, "unexpected protocol identifier");
   assert(manifest.protocolGeneration === PROTOCOL_GENERATION, "unexpected protocol generation");
+  assert(
+    manifest.releaseStatus === "development" || manifest.releaseStatus === "production",
+    "releaseStatus is invalid",
+  );
   assert(manifest.envelope?.maximumBytes === 16_384, "envelope maximum must be 16,384");
   assert(manifest.envelope?.universalPrefix?.minimumBytes === 20, "prefix must be 20 bytes");
   assert(manifest.envelope?.universalPrefix?.magic === "0x44464d31", "magic must be DFM1");
@@ -1263,6 +1306,10 @@ export const inspectProtocolReleaseManifest = ({
   );
 
   const format1 = manifest.formats["1"];
+  assert(
+    format1?.status === "development" || format1?.status === "frozen",
+    "format 1 status is invalid",
+  );
   assert(format1?.headerLength === 112, "format 1 headerLength must be 112");
   assert(format1?.fixedEnvelopeOverhead === 128, "format 1 overhead must be 128");
   assert(format1?.maximumContentCiphertextBytes === 16_256, "format 1 payload limit changed");
@@ -1275,6 +1322,10 @@ export const inspectProtocolReleaseManifest = ({
     ["identity suite 1", identitySuite],
     ["file KDF suite 1", fileSuite],
   ]) {
+    assert(
+      suite?.status === "candidate-awaiting-device-benchmark" || suite?.status === "frozen",
+      `${label} status is invalid`,
+    );
     assert(suite?.kdf?.algorithm === "Argon2id", `${label} must use Argon2id`);
     assert(suite?.kdf?.version === 19, `${label} must use Argon2 version 0x13`);
     assert(suite?.kdf?.memoryKiB >= 65_536, `${label} is below the 64 MiB baseline`);
@@ -1290,6 +1341,35 @@ export const inspectProtocolReleaseManifest = ({
   assert(personRoute?.purposeOrdinal === 0, "PersonRelation purpose ordinal must be 0");
   assert(disclosureRoute?.purposeOrdinal === 1, "DisclosureBinding purpose ordinal must be 1");
   for (const route of [personRoute, disclosureRoute]) {
+    assertExactKeys(
+      route,
+      [
+        "purpose",
+        "purposeOrdinal",
+        "circuitId",
+        "proofEncodingId",
+        "publicSignals",
+        "roleSuiteSemantics",
+        "artifacts",
+      ],
+      `${route?.purpose ?? "proof"} route`,
+    );
+    assertExactKeys(route.artifacts, PROOF_ARTIFACT_KEYS, `${route.purpose} artifacts`);
+    assert(
+      route.artifacts.status === "development-regeneration-required" ||
+        route.artifacts.status === "production",
+      `${route.purpose} artifact status is invalid`,
+    );
+    if (route.artifacts.status === "development-regeneration-required") {
+      assert(
+        PROOF_ARTIFACT_HASH_KEYS.every((key) => route.artifacts[key] === null),
+        `${route.purpose} development artifacts must not claim production hashes`,
+      );
+    } else {
+      for (const key of PROOF_ARTIFACT_HASH_KEYS) {
+        assertSha256(route.artifacts[key], `${route.purpose}.${key}`);
+      }
+    }
     assert(Number.isInteger(route?.circuitId) && route.circuitId > 0, "circuitId must be nonzero");
     assert(route?.proofEncodingId === 1, `${route?.purpose} proofEncodingId must be 1`);
   }
@@ -1315,7 +1395,41 @@ export const inspectProtocolReleaseManifest = ({
     disclosureRoute,
   });
 
+  assert(
+    identitySuite.normalizationDataSha256 === fileSuite.normalizationDataSha256,
+    "identity and file suites must bind the same Unicode normalization data",
+  );
+  const unicodeNormalizationDataPath = path.join(
+    resolvedRoot,
+    PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
+  );
+  let unicodeNormalizationData;
+  try {
+    const state = fs.lstatSync(unicodeNormalizationDataPath);
+    assert(
+      state.isFile() &&
+        !state.isSymbolicLink() &&
+        fs.realpathSync(unicodeNormalizationDataPath) === unicodeNormalizationDataPath,
+      "Unicode normalization data must be a regular non-symlink file",
+    );
+    unicodeNormalizationData = fs.readFileSync(unicodeNormalizationDataPath);
+  } catch (error) {
+    if (String(error?.message ?? "").startsWith("Protocol release manifest:")) throw error;
+    throw new Error("Protocol release manifest: Unicode normalization data is unavailable", {
+      cause: error,
+    });
+  }
+  assert(
+    protocolManifestSha256(unicodeNormalizationData) === identitySuite.normalizationDataSha256,
+    "Unicode normalization data hash does not match the suite definitions",
+  );
+
   const goldenVectors = manifest.goldenVectors;
+  assertExactKeys(goldenVectors, ["status", "path", "sha256"], "golden vectors");
+  assert(
+    goldenVectors.status === "candidate-not-production-frozen" || goldenVectors.status === "frozen",
+    "golden vector status is invalid",
+  );
   assert(
     goldenVectors?.path === "protocol-vectors/onchain-biography-v1.json",
     "unexpected golden vector path",
@@ -1328,6 +1442,185 @@ export const inspectProtocolReleaseManifest = ({
     "golden vector file hash does not match the manifest",
   );
 
+  const releaseEvidence = manifest.releaseEvidence;
+  assertExactKeys(
+    releaseEvidence,
+    ["kdfDeviceMatrix", "kdfAttackerCostStudy", "trustedSetup"],
+    "release evidence",
+  );
+  const deviceMatrixBinding = releaseEvidence.kdfDeviceMatrix;
+  assertExactKeys(
+    deviceMatrixBinding,
+    [
+      "status",
+      "schemaVersion",
+      "evidenceType",
+      "selectedCandidateId",
+      "latencyBudgets",
+      "stressRequirements",
+      "path",
+      "sha256",
+    ],
+    "kdfDeviceMatrix binding",
+  );
+  assertExactKeys(
+    deviceMatrixBinding.latencyBudgets,
+    [
+      "identitySingleDerivationP95Milliseconds",
+      "fileSingleDerivationP95Milliseconds",
+      "completeAddVersionP95Milliseconds",
+      "serialUnlock",
+    ],
+    "kdfDeviceMatrix latency budgets",
+  );
+  assertExactKeys(
+    deviceMatrixBinding.latencyBudgets.serialUnlock,
+    ["versionCount", "p95Milliseconds"],
+    "kdfDeviceMatrix serial unlock budget",
+  );
+  assertExactKeys(
+    deviceMatrixBinding.stressRequirements,
+    ["minimumDurationSeconds", "minimumIterations"],
+    "kdfDeviceMatrix stress requirements",
+  );
+  assert(deviceMatrixBinding.schemaVersion === 2, "kdfDeviceMatrix schemaVersion must be 2");
+  assert(
+    deviceMatrixBinding.evidenceType === "deepfamily/kdf-device-matrix-v2",
+    "kdfDeviceMatrix evidenceType is invalid",
+  );
+  assert(
+    deviceMatrixBinding.status === "missing" || deviceMatrixBinding.status === "passed",
+    "kdfDeviceMatrix status is invalid",
+  );
+  assert(
+    deviceMatrixBinding.stressRequirements.minimumDurationSeconds >= 1_800,
+    "kdfDeviceMatrix minimum stress duration is below 30 minutes",
+  );
+  if (deviceMatrixBinding.status === "missing") {
+    assert(
+      deviceMatrixBinding.selectedCandidateId === null &&
+        deviceMatrixBinding.path === null &&
+        deviceMatrixBinding.sha256 === null,
+      "missing kdfDeviceMatrix must not claim selected or bound evidence",
+    );
+  } else {
+    assertNonemptyString(deviceMatrixBinding.selectedCandidateId, "selected KDF candidate ID");
+    assertSafeRelativePath(deviceMatrixBinding.path, "kdfDeviceMatrix evidence path", {
+      json: true,
+    });
+    assertSha256(deviceMatrixBinding.sha256, "kdfDeviceMatrix evidence hash");
+  }
+
+  const attackerStudyBinding = releaseEvidence.kdfAttackerCostStudy;
+  assertExactKeys(
+    attackerStudyBinding,
+    ["status", "schemaVersion", "evidenceType", "selectedCandidateId", "path", "sha256"],
+    "kdfAttackerCostStudy binding",
+  );
+  assert(attackerStudyBinding.schemaVersion === 2, "kdfAttackerCostStudy schemaVersion must be 2");
+  assert(
+    attackerStudyBinding.evidenceType === "deepfamily/kdf-attacker-cost-study-v2",
+    "kdfAttackerCostStudy evidenceType is invalid",
+  );
+  assert(
+    attackerStudyBinding.status === "missing" || attackerStudyBinding.status === "passed",
+    "kdfAttackerCostStudy status is invalid",
+  );
+  if (attackerStudyBinding.status === "missing") {
+    assert(
+      attackerStudyBinding.selectedCandidateId === null &&
+        attackerStudyBinding.path === null &&
+        attackerStudyBinding.sha256 === null,
+      "missing kdfAttackerCostStudy must not claim selected or bound evidence",
+    );
+  } else {
+    assertNonemptyString(attackerStudyBinding.selectedCandidateId, "attacker-study candidate ID");
+    assertSafeRelativePath(attackerStudyBinding.path, "kdfAttackerCostStudy evidence path", {
+      json: true,
+    });
+    assertSha256(attackerStudyBinding.sha256, "kdfAttackerCostStudy evidence hash");
+  }
+
+  const trustedSetupBinding = releaseEvidence.trustedSetup;
+  assertExactKeys(
+    trustedSetupBinding,
+    ["status", "manifestSha256", "transcriptSha256"],
+    "trusted setup binding",
+  );
+  assert(
+    trustedSetupBinding.status === "fresh-v1-ceremony-required" ||
+      trustedSetupBinding.status === "production",
+    "trusted setup status is invalid",
+  );
+  if (trustedSetupBinding.status === "fresh-v1-ceremony-required") {
+    assert(
+      trustedSetupBinding.manifestSha256 === null && trustedSetupBinding.transcriptSha256 === null,
+      "pending trusted setup must not claim ceremony hashes",
+    );
+  } else {
+    assertSha256(trustedSetupBinding.manifestSha256, "trusted setup manifest hash");
+    assertSha256(trustedSetupBinding.transcriptSha256, "trusted setup transcript hash");
+  }
+
+  const deployments = manifest.deployments;
+  assertExactKeys(
+    deployments,
+    [
+      "status",
+      "chainId",
+      "deepFamilyProxy",
+      "deepFamilyImplementation",
+      "groth16VerifierAdapter",
+      "metadataArchiveV1",
+      "deepFamilyReader",
+    ],
+    "deployment definition",
+  );
+  assertExactKeys(
+    deployments.groth16VerifierAdapter,
+    [
+      "address",
+      "personVerifierImmutable",
+      "disclosureBindingVerifierImmutable",
+      "artifactSha256",
+      "runtimeSha256",
+    ],
+    "Groth16VerifierAdapter deployment",
+  );
+  assertExactKeys(
+    deployments.metadataArchiveV1,
+    ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
+    "MetadataArchiveV1 deployment",
+  );
+  assertExactKeys(
+    deployments.deepFamilyReader,
+    [
+      "address",
+      "deepFamilyImmutable",
+      "metadataArchiveImmutable",
+      "artifactSha256",
+      "runtimeSha256",
+    ],
+    "DeepFamilyReader deployment",
+  );
+  assert(
+    deployments.status === "not-deployed" || deployments.status === "production",
+    "deployment status is invalid",
+  );
+  if (deployments.status === "not-deployed") {
+    assert(
+      [
+        deployments.chainId,
+        deployments.deepFamilyProxy,
+        deployments.deepFamilyImplementation,
+        ...Object.values(deployments.groth16VerifierAdapter),
+        ...Object.values(deployments.metadataArchiveV1),
+        ...Object.values(deployments.deepFamilyReader),
+      ].every((value) => value === null),
+      "not-deployed state must not claim deployment evidence",
+    );
+  }
+
   if (requireProduction) {
     assert(typeof zkArtifactInspector === "function", "zkArtifactInspector must be a function");
     assert(typeof trackedPathInspector === "function", "trackedPathInspector must be a function");
@@ -1339,16 +1632,17 @@ export const inspectProtocolReleaseManifest = ({
       typeof contractInterfaceInspector === "function",
       "contractInterfaceInspector must be a function",
     );
+    assert(manifest.releaseStatus === "production", "releaseStatus is not production");
     for (const [relativePath, label] of [
       [PROTOCOL_RELEASE_MANIFEST_PATH, "protocol release manifest"],
       [goldenVectors.path, "golden vector"],
+      [PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH, "Unicode normalization data"],
     ]) {
       assert(
         trackedPathInspector({ root: resolvedRoot, relativePath }) === true,
         `${label} must be a version-controlled repository file`,
       );
     }
-    assert(manifest.releaseStatus === "production", "releaseStatus is not production");
     assert(
       protocolImplementationStatus?.releaseStatus === "production" &&
         protocolImplementationStatus?.identitySuite1 === "frozen" &&

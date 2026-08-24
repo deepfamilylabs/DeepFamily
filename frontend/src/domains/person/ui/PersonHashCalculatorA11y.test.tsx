@@ -6,7 +6,15 @@ import { PersonHashCalculator } from "./PersonHashCalculator";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, fallback?: string) => fallback ?? key,
+    t: (key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
+      const template = typeof fallbackOrOptions === "string" ? fallbackOrOptions : key;
+      const values =
+        fallbackOrOptions && typeof fallbackOrOptions === "object" ? fallbackOrOptions : options;
+      if (key === "search.hashCalculator.passphraseCharCount") {
+        return `Characters after NFKD (not trimmed): ${String(values?.count ?? "")}`;
+      }
+      return template.replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(values?.[name] ?? ""));
+    },
     i18n: { language: "en" },
   }),
 }));
@@ -96,5 +104,25 @@ describe("PersonHashCalculator accessibility", () => {
 
     expect(screen.queryByRole("dialog", { name: "Passphrase Information" })).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(helpButton));
+  });
+
+  it("warns that protocol Unicode whitespace is not trimmed", () => {
+    render(
+      <ToastProvider>
+        <PersonHashCalculator showTitle={false} />
+      </ToastProvider>,
+    );
+
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+      ),
+      { target: { value: "\u0085\u3000" } },
+    );
+
+    expect(
+      screen.getByText(/contains only Unicode White_Space after NFKD normalization/i),
+    ).toBeTruthy();
+    expect(screen.getByText("Characters after NFKD (not trimmed): 2")).toBeTruthy();
   });
 });

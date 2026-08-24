@@ -124,8 +124,10 @@
     "1": {
       "status": "candidate-awaiting-device-benchmark",
       "normalization": "NFKD",
+      "unicodeVersion": "17.0.0",
+      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
+      "normalizationDataSha256": "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
       "trim": false,
-      "unicodeVersion": "17.0",
       "passwordDomain": "DeepFamily:IdentityKDF:v1",
       "passwordDomainSeparatorHex": "00",
       "salt": {
@@ -148,6 +150,9 @@
     "1": {
       "status": "candidate-awaiting-device-benchmark",
       "normalization": "NFKD",
+      "unicodeVersion": "17.0.0",
+      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
+      "normalizationDataSha256": "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
       "trim": false,
       "passwordDomain": "DeepFamily:FileKDF:v1",
       "passwordDomainSeparatorHex": "00",
@@ -482,7 +487,7 @@
   "goldenVectors": {
     "status": "candidate-not-production-frozen",
     "path": "protocol-vectors/onchain-biography-v1.json",
-    "sha256": "89b29f59e1ad209386505b0abc0410c539019bae6bf937866115b347458fd6dd"
+    "sha256": "e654308e4bac1f1847f51ceaf6b79f8f28f5595c2df2c7968a9a7ad37294f68a"
   },
   "releaseEvidence": {
     "kdfDeviceMatrix": {

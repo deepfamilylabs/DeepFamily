@@ -2,6 +2,7 @@ import type { Ref } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { MintNFTT, MintPersonInfo } from "../model/mintNftTypes";
+import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
 
 export interface MintPersonProofSectionProps {
   t: MintNFTT;
@@ -9,6 +10,7 @@ export interface MintPersonProofSectionProps {
   personInfo: MintPersonInfo | null;
   targetSelfSuiteId: number | null;
   onPersonInfoChange: (value: MintPersonInfo) => void;
+  onPassphraseChange: (risk: ProtocolPassphraseRisk) => void;
 }
 
 export function MintPersonProofSection({
@@ -17,6 +19,7 @@ export function MintPersonProofSection({
   personInfo,
   targetSelfSuiteId,
   onPersonInfoChange,
+  onPassphraseChange,
 }: MintPersonProofSectionProps) {
   return (
     <>
@@ -65,6 +68,8 @@ export function MintPersonProofSection({
           collapsible={false}
           className="bg-transparent border-0 shadow-none p-0!"
           identitySuiteId={targetSelfSuiteId ?? 1}
+          requirePassphraseConfirmation
+          onPassphraseChange={onPassphraseChange}
           initialValues={
             personInfo
               ? {
