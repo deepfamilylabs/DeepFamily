@@ -217,6 +217,7 @@ export function wipeBytes(value: unknown): void;
 
 export const UNICODE_WHITE_SPACE_VERSION: "17.0";
 export function canonicalizeFullName(value: string): string;
+export function isUnicodeWhiteSpaceOnly(value: string): boolean;
 export function escapeCanonicalJsonString(value: string): string;
 export function validateCanonicalPersonVersion(
   value: PersonVersionMetadataInput,
@@ -252,6 +253,11 @@ export function deriveFileKekBytes(input: {
 export function mapBytesToSnarkField(bytes: BytesLike): bigint;
 export function computeNameField(canonicalFullName: string): bigint;
 export function computeSuiteCommitment(identitySuiteId: BigNumberish): bigint;
+export function computeDisclosureBinding(input: {
+  nameField: BigNumberish;
+  packedBirthGenderField: BigNumberish;
+  suiteCommitment: BigNumberish;
+}): bigint;
 export function computeIdentityFromDerivedSecret(input: {
   identity: IdentityFields;
   identitySuiteId: BigNumberish;

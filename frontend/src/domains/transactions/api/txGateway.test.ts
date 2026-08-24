@@ -46,20 +46,17 @@ describe("txGateway parseReceiptEvents", () => {
     if (!endorseEvent) {
       throw new Error("PersonVersionEndorsed event ABI missing");
     }
-    const log = eventInterface.encodeEventLog(
-      endorseEvent,
-      [
-        "0x00000000000000000000000000000000000000000000000000000000000000aa",
-        "0x00000000000000000000000000000000000000bb",
-        2,
-        "0x00000000000000000000000000000000000000cc",
-        1n,
-        "0x00000000000000000000000000000000000000dd",
-        1n,
-        2n,
-        123n,
-      ],
-    );
+    const log = eventInterface.encodeEventLog(endorseEvent, [
+      "0x00000000000000000000000000000000000000000000000000000000000000aa",
+      "0x00000000000000000000000000000000000000bb",
+      2,
+      "0x00000000000000000000000000000000000000cc",
+      1n,
+      "0x00000000000000000000000000000000000000dd",
+      1n,
+      2n,
+      123n,
+    ]);
 
     const parsed = parseReceiptEvents(
       {

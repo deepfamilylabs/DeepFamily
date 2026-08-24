@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { makeNodeId } from "../../../../../shared/model";
+import { isMetadataUnlockUsable, makeNodeId } from "../../../../../shared/model";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
@@ -96,7 +96,7 @@ export function useMintNftModalController({
           candidate.personHash.toLowerCase() === targetPersonHash.toLowerCase() &&
           Number(candidate.versionIndex) === targetVersionIndex,
       );
-    if (node?.metadataUnlockValidated !== true || typeof node.biography !== "string") {
+    if (!isMetadataUnlockUsable(node)) {
       return undefined;
     }
     return node.biography;

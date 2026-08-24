@@ -139,15 +139,6 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
                   />
                 </>
               )}
-
-              {versionEvent.tag && (
-                <ResultDataRow
-                  label={t("addVersion.tag", "Tag")}
-                  value={`"${versionEvent.tag}"`}
-                  colorClass="green"
-                  isPlainText
-                />
-              )}
             </div>
           </details>
         )}

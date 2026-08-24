@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KeyRound, LoaderCircle, LockKeyhole, Trash2, X } from "lucide-react";
-import { normalizePassphrase } from "@deepfamily/protocol-core";
+import { isUnicodeWhiteSpaceOnly, normalizePassphrase } from "@deepfamily/protocol-core";
 import { useConfig } from "../../config";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import {
@@ -10,22 +10,21 @@ import {
 } from "../../../shared/metadata";
 import { isMetadataUnlockUsable, type NodeData } from "../../../shared/model";
 import { useTreeGraphData, useTreeMutations } from "../context";
+import { buildTreeStorageNamespace } from "../context/treeStorageScope";
 
 type PreparationState = "idle" | "preparing" | "ready";
 type PassphraseRisk = "empty" | "whitespace" | "other";
 
-const UNICODE_WHITESPACE_ONLY = /^\p{White_Space}+$/u;
-
 function hasArchiveAnchors(node: NodeData): boolean {
   return Boolean(
     node.personHash &&
-      Number.isSafeInteger(node.versionIndex) &&
-      node.versionIndex > 0 &&
-      node.versionCommitment &&
-      node.metadataPointer &&
-      node.metadataPayloadHash &&
-      Number.isSafeInteger(node.metadataPayloadLength) &&
-      Number(node.metadataPayloadLength) > 0,
+    Number.isSafeInteger(node.versionIndex) &&
+    node.versionIndex > 0 &&
+    node.versionCommitment &&
+    node.metadataPointer &&
+    node.metadataPayloadHash &&
+    Number.isSafeInteger(node.metadataPayloadLength) &&
+    Number(node.metadataPayloadLength) > 0,
   );
 }
 
@@ -33,7 +32,7 @@ function classifyPassphrase(raw: string): PassphraseRisk {
   try {
     const normalized = normalizePassphrase(raw);
     if (normalized.length === 0) return "empty";
-    return UNICODE_WHITESPACE_ONLY.test(normalized) ? "whitespace" : "other";
+    return isUnicodeWhiteSpaceOnly(normalized) ? "whitespace" : "other";
   } catch {
     // The production KDF path will report malformed Unicode precisely; an
     // input event must never crash the surrounding React tree.
@@ -47,9 +46,12 @@ export function MetadataUnlockControl() {
     cacheValidatedPersonVersion,
     persistValidatedPersonVersion,
     clearMetadataUnlockCache,
+    captureMetadataCacheRevision,
   } = useTreeMutations();
   const { rpcUrl, chainId, contractAddress } = useConfig();
   const coordinatorRef = useRef(new MetadataUnlockCoordinator());
+  const nodesDataRef = useRef(nodesData);
+  nodesDataRef.current = nodesData;
   const passphraseRef = useRef<HTMLInputElement>(null);
   const preflightGenerationRef = useRef(0);
   const [open, setOpen] = useState(false);
@@ -61,6 +63,15 @@ export function MetadataUnlockControl() {
   const [riskConfirmed, setRiskConfirmed] = useState(false);
   const [highRiskConfirmed, setHighRiskConfirmed] = useState(false);
   const [passphraseRisk, setPassphraseRisk] = useState<PassphraseRisk>("empty");
+  const unlockScopeKey = useMemo(
+    () => buildTreeStorageNamespace({ chainId, contractAddress }),
+    [chainId, contractAddress],
+  );
+  const currentScopeKeyRef = useRef(unlockScopeKey);
+  const previousScopeKeyRef = useRef(unlockScopeKey);
+  // Update during render, rather than waiting for an effect, so a Worker
+  // completion racing a network render cannot commit against the old scope.
+  currentScopeKeyRef.current = unlockScopeKey;
 
   const provider = useMemo(() => {
     if (!rpcUrl) return null;
@@ -83,15 +94,7 @@ export function MetadataUnlockControl() {
     [nodesData],
   );
 
-  useEffect(
-    () => () => {
-      preflightGenerationRef.current += 1;
-      coordinatorRef.current.cancel();
-    },
-    [],
-  );
-
-  const resetAttempt = () => {
+  const clearAttemptState = useCallback(() => {
     preflightGenerationRef.current += 1;
     coordinatorRef.current.cancel();
     if (passphraseRef.current) passphraseRef.current.value = "";
@@ -103,7 +106,26 @@ export function MetadataUnlockControl() {
     setRiskConfirmed(false);
     setHighRiskConfirmed(false);
     setPassphraseRisk("empty");
-  };
+  }, []);
+
+  useEffect(
+    () => () => {
+      preflightGenerationRef.current += 1;
+      coordinatorRef.current.cancel();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (previousScopeKeyRef.current === unlockScopeKey) return;
+    previousScopeKeyRef.current = unlockScopeKey;
+    // A chain/proxy change invalidates both public preflight bytes and every
+    // passphrase-derived result. cancel() aborts the batch and terminates an
+    // Argon2 Worker that is already executing.
+    clearAttemptState();
+  }, [clearAttemptState, unlockScopeKey]);
+
+  const resetAttempt = clearAttemptState;
 
   const close = () => {
     resetAttempt();
@@ -121,6 +143,9 @@ export function MetadataUnlockControl() {
     }
 
     const generation = ++preflightGenerationRef.current;
+    const runScopeKey = unlockScopeKey;
+    const isCurrent = () =>
+      generation === preflightGenerationRef.current && runScopeKey === currentScopeKeyRef.current;
     setPreparation("preparing");
     setError("");
     setPreparedNodes([]);
@@ -128,7 +153,7 @@ export function MetadataUnlockControl() {
     const supported: NodeData[] = [];
     let failed = 0;
     for (const node of candidates) {
-      if (generation !== preflightGenerationRef.current) return;
+      if (!isCurrent()) return;
       try {
         await readPersonVersionEnvelope({
           node,
@@ -136,12 +161,14 @@ export function MetadataUnlockControl() {
           deepFamilyProxy: contractAddress,
           getCode: (pointer, blockTag) => provider.getCode(pointer, blockTag),
         });
+        if (!isCurrent()) return;
         supported.push(node);
       } catch {
+        if (!isCurrent()) return;
         failed += 1;
       }
     }
-    if (generation !== preflightGenerationRef.current) return;
+    if (!isCurrent()) return;
     setPreparedNodes(supported);
     setPreflightFailures(failed);
     setPreparation("ready");
@@ -152,6 +179,15 @@ export function MetadataUnlockControl() {
 
   const unlock = async () => {
     if (!provider || !chainId || !contractAddress || preparedNodes.length === 0) return;
+    const runScopeKey = unlockScopeKey;
+    const assertCurrentScope = () => {
+      if (currentScopeKeyRef.current === runScopeKey) return;
+      // This also terminates an in-flight Worker. Throwing after abort makes
+      // the coordinator treat the stale completion as cancellation, not as a
+      // failed unlock that may continue with another node.
+      coordinatorRef.current.cancel();
+      throw new Error("Metadata unlock scope changed");
+    };
     const rawPassphrase = passphraseRef.current?.value ?? "";
     const currentRisk = classifyPassphrase(rawPassphrase);
     setPassphraseRisk(currentRisk);
@@ -169,15 +205,32 @@ export function MetadataUnlockControl() {
     }
 
     setError("");
+    // Bind every later Worker/cache completion to the clear fence that was
+    // current when this user-initiated batch began.
+    const cacheRevision = captureMetadataCacheRevision();
     const run = coordinatorRef.current.run({
       nodes: preparedNodes,
       chainId,
       deepFamilyProxy: contractAddress,
       getCode: (pointer, blockTag) => provider.getCode(pointer, blockTag),
       rawPassphrase,
-      cacheValidatedPersonVersion,
-      persistUnlocked: persistValidatedPersonVersion,
-      onProgress: setProgress,
+      getCurrentNode: (nodeId) => {
+        assertCurrentScope();
+        return nodesDataRef.current[nodeId];
+      },
+      cacheValidatedPersonVersion: (node) => {
+        assertCurrentScope();
+        cacheValidatedPersonVersion(node, cacheRevision);
+        assertCurrentScope();
+      },
+      persistUnlocked: async (node) => {
+        assertCurrentScope();
+        await persistValidatedPersonVersion(node, cacheRevision);
+        assertCurrentScope();
+      },
+      onProgress: (nextProgress) => {
+        if (currentScopeKeyRef.current === runScopeKey) setProgress(nextProgress);
+      },
     });
     // The coordinator owns the active batch's only in-memory string. Clear the
     // DOM before any later wallet or UI interaction.
@@ -185,10 +238,12 @@ export function MetadataUnlockControl() {
     setPassphraseRisk("empty");
     try {
       const report = await run;
+      if (currentScopeKeyRef.current !== runScopeKey) return;
       if (report.status === "completed" && report.failed > 0) {
         setError(`${report.failed} version(s) could not be unlocked with this passphrase.`);
       }
     } catch (cause) {
+      if (currentScopeKeyRef.current !== runScopeKey) return;
       setError(cause instanceof Error ? cause.message : "Metadata unlock failed");
     }
   };
@@ -320,7 +375,9 @@ export function MetadataUnlockControl() {
               </div>
             ) : null}
 
-            {error ? <p className="mt-3 text-xs text-rose-600 dark:text-rose-300">{error}</p> : null}
+            {error ? (
+              <p className="mt-3 text-xs text-rose-600 dark:text-rose-300">{error}</p>
+            ) : null}
 
             <button
               type="button"

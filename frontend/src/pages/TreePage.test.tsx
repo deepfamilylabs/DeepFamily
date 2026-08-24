@@ -94,6 +94,7 @@ vi.mock("../domains/tree", () => ({
     </div>
   ),
   TreeDebugPanel: () => <div data-testid="tree-debug-panel">debug</div>,
+  MetadataUnlockControl: () => <div data-testid="metadata-unlock-control">unlock</div>,
 }));
 
 vi.mock("../domains/person", () => ({

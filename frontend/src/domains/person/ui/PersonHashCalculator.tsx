@@ -28,11 +28,8 @@ import {
   normalizePassphraseForHash,
   getGraphemeLength as getGraphemeLengthUtil,
 } from "../../../shared/crypto/passphraseStrength";
-import {
-  computeIdentityHash,
-  computePersonHash,
-} from "../../../shared/crypto/identityHash";
-import { safeCanonicalizeFullName } from "../../../shared/crypto/identityCommitment";
+import { computeIdentityHash, computePersonHash } from "../../../shared/crypto/identityHash";
+import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 
 const MAX_FULL_NAME_BYTES = 256;
@@ -136,7 +133,7 @@ const ThemedSelect: React.FC<{
                     ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
                     : index === activeIndex
                       ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-50"
-                    : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
               >
                 {o.label}
@@ -159,7 +156,10 @@ const hashFormSchema = z.object({
     .string()
     .min(1)
     .refine((val) => safeCanonicalizeFullName(val).length > 0, "Name required")
-    .refine((val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES, "Name exceeds max bytes"),
+    .refine(
+      (val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES,
+      "Name exceeds max bytes",
+    ),
   isBirthBC: z.boolean(),
   birthYear: z
     .union([z.number().int().min(0).max(10000), z.literal("")])
@@ -201,6 +201,7 @@ export { computePersonHash, computeIdentityHash };
 interface PersonHashCalculatorProps {
   className?: string;
   onPublicFormChange?: (formData: PublicHashForm) => void;
+  onPassphraseChange?: () => void;
   showTitle?: boolean;
   collapsible?: boolean;
   isOpen?: boolean;
@@ -233,6 +234,7 @@ export const PersonHashCalculator = forwardRef<
     {
       className = "",
       onPublicFormChange,
+      onPassphraseChange,
       showTitle = true,
       collapsible = false,
       isOpen = true,
@@ -276,9 +278,12 @@ export const PersonHashCalculator = forwardRef<
               .refine((val) => safeCanonicalizeFullName(val).length > 0, {
                 message: t("search.validation.required"),
               })
-              .refine((val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES, {
-                message: t("search.validation.nameTooLong"),
-              }),
+              .refine(
+                (val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES,
+                {
+                  message: t("search.validation.nameTooLong"),
+                },
+              ),
             isBirthBC: z.boolean(),
             birthYear: z
               .union([
@@ -464,31 +469,34 @@ export const PersonHashCalculator = forwardRef<
       }
 
       let cancelled = false;
-      const timer = window.setTimeout(() => {
-        setIsComputingHash(true);
-        cryptoWorkerCall(
-          "computeIdentityHash",
-          {
-            input: { ...transformedData, identitySuiteId },
-          },
-          { timeoutMs: 180_000 },
-        )
-          .then(({ identityHash }) => {
-            if (!cancelled) {
-              setComputedHash(identityHash);
-            }
-          })
-          .catch(() => {
-            if (!cancelled) {
-              setComputedHash("");
-            }
-          })
-          .finally(() => {
-            if (!cancelled) {
-              setIsComputingHash(false);
-            }
-          });
-      }, hasPassphrase ? 250 : 0);
+      const timer = window.setTimeout(
+        () => {
+          setIsComputingHash(true);
+          cryptoWorkerCall(
+            "computeIdentityHash",
+            {
+              input: { ...transformedData, identitySuiteId },
+            },
+            { timeoutMs: 180_000 },
+          )
+            .then(({ identityHash }) => {
+              if (!cancelled) {
+                setComputedHash(identityHash);
+              }
+            })
+            .catch(() => {
+              if (!cancelled) {
+                setComputedHash("");
+              }
+            })
+            .finally(() => {
+              if (!cancelled) {
+                setIsComputingHash(false);
+              }
+            });
+        },
+        hasPassphrase ? 250 : 0,
+      );
 
       return () => {
         cancelled = true;
@@ -692,10 +700,7 @@ export const PersonHashCalculator = forwardRef<
 
                         <div className="text-gray-600 dark:text-gray-300">
                           <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.remember",
-                              "Please Remember",
-                            )}
+                            {t("search.hashCalculator.passphraseHelp.remember", "Please Remember")}
                           </div>
                           <div className="text-xs leading-relaxed">
                             {t(
@@ -740,7 +745,10 @@ export const PersonHashCalculator = forwardRef<
                 spellCheck={false}
                 lang={i18n.language}
                 ref={passphraseInputRef}
-                onChange={() => setPassphraseRevision((r) => r + 1)}
+                onChange={() => {
+                  setPassphraseRevision((r) => r + 1);
+                  onPassphraseChange?.();
+                }}
               />
               <button
                 type="button"

@@ -11,6 +11,31 @@ const node = (index: number): NodeData => ({
   id: `node-${index}`,
   personHash: `0x${index.toString(16).padStart(64, "0")}`,
   versionIndex: 1,
+  versionCommitment: String(index),
+  metadataPointer: `0x${index.toString(16).padStart(40, "0")}`,
+  metadataPayloadHash: `0x${index.toString(16).padStart(64, "0")}`,
+  metadataPayloadLength: 112 + index,
+});
+
+const validated = (current: NodeData): NodeData => ({
+  ...current,
+  fullName: `Person ${current.id}`,
+  tag: `tag-${current.id}`,
+  biography: `bio-${current.id}`,
+  metadataPerson: {
+    fullName: `Person ${current.id}`,
+    gender: 0,
+    birthYear: 0,
+    birthMonth: 0,
+    birthDay: 0,
+    isBirthBC: false,
+    personHash: current.personHash,
+  },
+  metadataParents: { father: null, mother: null },
+  metadataFormatVersion: 1,
+  identitySuiteId: 1,
+  metadataProtocolGeneration: "df-onchain-biography-v1",
+  metadataUnlockValidated: true,
 });
 
 describe("MetadataUnlockCoordinator", () => {
@@ -25,7 +50,7 @@ describe("MetadataUnlockCoordinator", () => {
       await Promise.resolve();
       inFlight -= 1;
       if (current.id === "node-3") throw new Error(`wrong ${rawPassphrase}`);
-      return { ...current, metadataUnlockValidated: true, biography: `bio-${current.id}` };
+      return validated(current);
     });
     const unlocked: string[] = [];
     const persisted: string[] = [];
@@ -75,7 +100,7 @@ describe("MetadataUnlockCoordinator", () => {
       markSecondStarted = resolve;
     });
     const unlockNode: MetadataNodeUnlocker = async ({ node: current, signal }) => {
-      if (current.id === first.id) return { ...current, metadataUnlockValidated: true };
+      if (current.id === first.id) return validated(current);
       markSecondStarted();
       return new Promise<NodeData>((_resolve, reject) => {
         signal?.addEventListener("abort", () => reject(new MetadataUnlockCancelledError()), {
@@ -115,5 +140,34 @@ describe("MetadataUnlockCoordinator", () => {
     expect(progress[progress.length - 1]?.status).toBe("cancelled");
     expect(coordinator.running).toBe(false);
     expect(coordinator.cancel()).toBe(false);
+  });
+
+  it("rejects plaintext when public anchors change while the Worker is unlocking", async () => {
+    const original = node(1);
+    const latest = {
+      ...original,
+      versionCommitment: "changed-while-unlocking",
+      metadataPayloadHash: `0x${"ff".repeat(32)}`,
+    };
+    const cacheValidatedPersonVersion = vi.fn();
+    const persistUnlocked = vi.fn();
+    const coordinator = new MetadataUnlockCoordinator();
+
+    const report = await coordinator.run({
+      nodes: [original],
+      chainId: 71,
+      deepFamilyProxy: `0x${"11".repeat(20)}`,
+      getCode: async () => "0x",
+      rawPassphrase: "race-test",
+      unlockNode: async ({ node: current }) => validated(current),
+      getCurrentNode: () => latest,
+      cacheValidatedPersonVersion,
+      persistUnlocked,
+    });
+
+    expect(report).toMatchObject({ status: "completed", succeeded: 0, failed: 1 });
+    expect(report.failures[0]?.message).toMatch(/public anchors/);
+    expect(cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(persistUnlocked).not.toHaveBeenCalled();
   });
 });

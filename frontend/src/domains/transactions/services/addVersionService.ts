@@ -8,7 +8,7 @@ import type { ProofEnvelope } from "../../../shared/zk/zk";
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import {
-  estimateGasWithFallback,
+  estimateGasWithFallbackDetails,
   parseReceiptEvents,
   waitForTransactionReceipt,
 } from "../api/txGateway";
@@ -59,6 +59,11 @@ export type AddVersionResult = {
   };
 };
 
+export type AddVersionTransactionPreview = {
+  envelopeBytes: number;
+  gasLimit: bigint;
+} & ({ estimatedGas: bigint; estimated: true } | { estimatedGas: null; estimated: false });
+
 export type ExecuteAddVersionFlowParams = {
   submitContract: any;
   preflightContract: any;
@@ -72,8 +77,11 @@ export type ExecuteAddVersionFlowParams = {
   fallbackGas?: bigint;
   isDev?: boolean;
   onTransactionSubmitted?: (txHash: string) => void;
+  expectedChainId?: number | bigint | null;
+  assertWalletScope?: () => Promise<void>;
   reconcileTransactionHash?: string | null;
   getTransactionReceipt?: (txHash: string) => Promise<any | null>;
+  confirmTransactionPreview?: (preview: AddVersionTransactionPreview) => boolean | Promise<boolean>;
 };
 
 const makeValidationError = (reason: string) => {
@@ -82,13 +90,11 @@ const makeValidationError = (reason: string) => {
   return error;
 };
 
-const makeReconciliationError = (
-  reason: string,
-  code: string,
-  terminal = false,
-): Error =>
-  Object.assign(new Error(reason), {
-    reason,
+const makeReconciliationError = (message: string, code: string, terminal = false): Error =>
+  Object.assign(new Error(message), {
+    reason: code,
+    humanMessage: message,
+    __dfDecodedReason: code,
     code,
     transactionReconciliationFinal: terminal,
   });
@@ -97,6 +103,100 @@ const sameHex = (left: unknown, right: unknown): boolean =>
   typeof left === "string" &&
   typeof right === "string" &&
   left.toLowerCase() === right.toLowerCase();
+
+function assertExactAddVersionReplacement(input: {
+  replacement: any;
+  expectedContractAddress?: string | null;
+  expectedSubmitter: string | null;
+  expectedChainId?: number | bigint | null;
+  expectedData: string;
+}): void {
+  const { replacement } = input;
+  const chainMatches =
+    input.expectedChainId === undefined ||
+    input.expectedChainId === null ||
+    (replacement?.chainId !== undefined &&
+      replacement?.chainId !== null &&
+      BigInt(replacement.chainId) === BigInt(input.expectedChainId));
+  const submitterMatches =
+    input.expectedSubmitter === null || sameHex(replacement?.from, input.expectedSubmitter);
+  const contractMatches =
+    Boolean(input.expectedContractAddress) &&
+    sameHex(replacement?.to, input.expectedContractAddress);
+  const dataMatches = sameHex(replacement?.data, input.expectedData);
+  const valueMatches =
+    replacement?.value === undefined ||
+    replacement?.value === null ||
+    BigInt(replacement.value) === 0n;
+
+  if (!chainMatches || !submitterMatches || !contractMatches || !dataMatches || !valueMatches) {
+    throw makeReconciliationError(
+      "The replacement transaction does not match the frozen Add Version package",
+      "TRANSACTION_REPLACEMENT_MISMATCH",
+      true,
+    );
+  }
+}
+
+async function waitForExactAddVersionTransaction(input: {
+  transaction: any;
+  expectedContractAddress?: string | null;
+  expectedSubmitter: string | null;
+  expectedChainId?: number | bigint | null;
+  expectedData: string;
+  onTransactionSubmitted?: (txHash: string) => void;
+}): Promise<{ transactionHash: string; receipt: any }> {
+  let transaction = input.transaction;
+
+  while (true) {
+    try {
+      const receipt = await waitForTransactionReceipt(transaction);
+      return { transactionHash: transaction.hash, receipt };
+    } catch (error: any) {
+      if (error?.code !== "TRANSACTION_REPLACED") throw error;
+      if (error?.cancelled === true) {
+        throw makeReconciliationError(
+          "The Add Version transaction was cancelled by a nonce replacement",
+          "TRANSACTION_REPLACED_CANCELLED",
+          true,
+        );
+      }
+
+      const replacement = error?.replacement;
+      if (!replacement?.hash) {
+        throw makeReconciliationError(
+          "The Add Version replacement transaction is missing",
+          "TRANSACTION_REPLACEMENT_MISMATCH",
+          true,
+        );
+      }
+      assertExactAddVersionReplacement({
+        replacement,
+        expectedContractAddress: input.expectedContractAddress,
+        expectedSubmitter: input.expectedSubmitter,
+        expectedChainId: input.expectedChainId,
+        expectedData: input.expectedData,
+      });
+      input.onTransactionSubmitted?.(replacement.hash);
+
+      if (error?.receipt) {
+        const receiptHash = error.receipt.hash ?? error.receipt.transactionHash;
+        if (
+          Number(error.receipt.status) !== 1 ||
+          (receiptHash && !sameHex(receiptHash, replacement.hash))
+        ) {
+          throw makeReconciliationError(
+            "The exact Add Version replacement transaction did not succeed",
+            "TRANSACTION_RECONCILIATION_MISMATCH",
+            true,
+          );
+        }
+        return { transactionHash: replacement.hash, receipt: error.receipt };
+      }
+      transaction = replacement;
+    }
+  }
+}
 
 const readTotalVersions = async (
   preflightContract: any,
@@ -265,8 +365,11 @@ export async function executeAddVersionFlow({
   fallbackGas = 6_500_000n,
   isDev = false,
   onTransactionSubmitted,
+  expectedChainId,
+  assertWalletScope,
   reconcileTransactionHash,
   getTransactionReceipt,
+  confirmTransactionPreview,
 }: ExecuteAddVersionFlowParams): Promise<AddVersionResult> {
   const addPersonArgs = [
     proof,
@@ -275,6 +378,10 @@ export async function executeAddVersionFlow({
     motherVersionIndex,
     metadataEnvelope,
   ] as const;
+  const expectedTransactionData = createDeepFamilyInterface().encodeFunctionData(
+    "addPersonVersion",
+    addPersonArgs,
+  );
 
   const expectedPersonHash = wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
   const expectedFatherHash =
@@ -285,9 +392,7 @@ export async function executeAddVersionFlow({
     publicSignals.motherIdentityCommitment === 0n
       ? ethers.ZeroHash
       : wrapIdentityCommitmentAsPersonHash(publicSignals.motherIdentityCommitment);
-  const packedSubmitter = unpackSubmitterAndSelfSuiteId(
-    publicSignals.submitterAndSelfSuiteId,
-  );
+  const packedSubmitter = unpackSubmitterAndSelfSuiteId(publicSignals.submitterAndSelfSuiteId);
   const expectedSubmitter = submitterAddress ? ethers.getAddress(submitterAddress) : null;
   const envelopePrefix = parseEnvelopeCommonPrefix(metadataEnvelope);
 
@@ -401,12 +506,15 @@ export async function executeAddVersionFlow({
         throw preflightError;
       }
       if (isDev) {
-        console.debug("[addVersionService] duplicate preflight failed; continuing with submit", preflightError);
+        console.debug(
+          "[addVersionService] duplicate preflight failed; continuing with submit",
+          preflightError,
+        );
       }
     }
   }
 
-  const gasLimit = await estimateGasWithFallback({
+  const gasDetails = await estimateGasWithFallbackDetails({
     contractMethod: submitContract.addPersonVersion,
     args: addPersonArgs,
     decodeContract: submitContract ?? preflightContract,
@@ -415,8 +523,66 @@ export async function executeAddVersionFlow({
     label: "addPersonVersion",
   });
 
-  const tx = await submitContract.addPersonVersion(...addPersonArgs, gasLimit ? { gasLimit } : {});
+  if (confirmTransactionPreview) {
+    const envelopeBytes = ethers.getBytes(metadataEnvelope).length;
+    const preview: AddVersionTransactionPreview = gasDetails.estimated
+      ? {
+          envelopeBytes,
+          estimatedGas: gasDetails.estimatedGas,
+          gasLimit: gasDetails.gasLimit,
+          estimated: true,
+        }
+      : {
+          envelopeBytes,
+          estimatedGas: null,
+          gasLimit: gasDetails.gasLimit,
+          estimated: false,
+        };
+    const approved = await confirmTransactionPreview(preview);
+    if (!approved) {
+      throw Object.assign(new Error("Add Version submission cancelled before wallet request"), {
+        reason: "Add Version submission cancelled before wallet request",
+        code: "ADD_VERSION_PREVIEW_REJECTED",
+      });
+    }
+  }
+
+  // This is intentionally the last awaited operation before requesting the
+  // wallet transaction. Injected-wallet network/account events can reach React
+  // after the provider itself has already switched scope.
+  await assertWalletScope?.();
+  const tx = await submitContract.addPersonVersion(
+    ...addPersonArgs,
+    gasDetails.gasLimit ? { gasLimit: gasDetails.gasLimit } : {},
+  );
   onTransactionSubmitted?.(tx.hash);
-  const receipt = await waitForTransactionReceipt(tx);
-  return parseAddVersionReceipt({ receipt, transactionHash: tx.hash, contractAddress });
+  if (
+    expectedChainId !== undefined &&
+    expectedChainId !== null &&
+    tx.chainId !== undefined &&
+    tx.chainId !== null &&
+    BigInt(tx.chainId) !== BigInt(expectedChainId)
+  ) {
+    throw Object.assign(
+      makeReconciliationError(
+        "The wallet submitted the Add Version transaction on a different chain",
+        "ADD_VERSION_SCOPE_CHANGED",
+        true,
+      ),
+      { transactionHash: tx.hash },
+    );
+  }
+  const finalTransaction = await waitForExactAddVersionTransaction({
+    transaction: tx,
+    expectedContractAddress: contractAddress,
+    expectedSubmitter,
+    expectedChainId,
+    expectedData: expectedTransactionData,
+    onTransactionSubmitted,
+  });
+  return parseAddVersionReceipt({
+    receipt: finalTransaction.receipt,
+    transactionHash: finalTransaction.transactionHash,
+    contractAddress,
+  });
 }

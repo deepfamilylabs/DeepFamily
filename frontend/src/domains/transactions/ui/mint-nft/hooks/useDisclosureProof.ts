@@ -10,7 +10,7 @@ import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../../../../../shared/zk/pr
 import { decodeDisclosureBindingPublicSignals } from "../../../../../shared/zk/publicSignalSpecs";
 import { cryptoWorkerCall } from "../../../../../shared/workers/cryptoWorkerClient";
 import { zkWorkerCall } from "../../../../../shared/workers/zkWorkerClient";
-import { safeCanonicalizeFullName } from "../../../../../shared/crypto/identityCommitment";
+import { safeCanonicalizeFullName } from "../../../../../shared/identity/fullName";
 import type { MintNFTFormValues, MintPersonInfo } from "../model/mintNftTypes";
 
 interface GenerateDisclosureProofArgs {

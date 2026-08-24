@@ -16,6 +16,9 @@ describe("eSpace Mainnet Safe command wiring", function () {
     expect(packageJson.scripts["espace:mainnet:release:plan"]).to.equal(
       "node scripts/espace-mainnet-release-command.mjs --plan",
     );
+    expect(packageJson.scripts["espace:mainnet:release:projection"]).to.equal(
+      "node scripts/protocol-deployment-projection.mjs --chain espace",
+    );
     expect(packageJson.scripts["espace:mainnet:release:execute"]).to.equal(
       "node scripts/espace-mainnet-release-command.mjs --execute",
     );

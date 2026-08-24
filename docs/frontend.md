@@ -32,7 +32,8 @@ frontend/src/
 │   ├── cache/         # Query cache + IndexedDB persistence
 │   ├── clients/       # Ethers provider/contract clients
 │   ├── config/        # Env-driven runtime config
-│   ├── crypto/        # Worker-safe identity and key-derivation adapters
+│   ├── crypto/        # Worker-safe fresh-v1 identity/hash and key-derivation adapters
+│   ├── identity/      # UI-safe adapters around protocol-core identity canonicalization
 │   ├── metadata/      # Archive preflight, DFM1 unlock, validation, and batch coordination
 │   ├── zk/            # Worker-safe ZK helpers (proof I/O, hashing)
 │   ├── ipfs/          # IPFS gateways + CID helpers
@@ -60,7 +61,7 @@ Use the directory tree for ownership boundaries, and these files as first-read e
   `frontend/src/workers/zk.worker.ts`, `frontend/src/shared/workers/`,
   `frontend/src/shared/metadata/metadataArchiveService.ts`,
   `frontend/src/shared/metadata/metadataUnlockCoordinator.ts`,
-  `frontend/src/shared/crypto/identityCommitment.ts`, and
+  `packages/protocol-core/identity.js`, `frontend/src/shared/crypto/identityHash.ts`, and
   `frontend/src/shared/zk/proofDescriptors.ts`
 - Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`
 
@@ -85,7 +86,8 @@ That package must remain browser- and Node-neutral: no filesystem access, `snark
 paths, or browser URLs. Node artifact candidates belong in `lib/proofDescriptors.js`; browser
 artifact URLs belong in `frontend/src/shared/zk/proofDescriptors.ts`.
 
-`frontend:legacy-entrypoints` enforces that retired entrypoints stay removed; re-run it after large refactors.
+`frontend:legacy-entrypoints` enforces that retired entrypoints and the pre-fresh-v1 random/recovery
+identity APIs stay removed; re-run it after large refactors.
 
 ### React page and transaction UI structure
 

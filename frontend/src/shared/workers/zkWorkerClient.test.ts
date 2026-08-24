@@ -12,7 +12,10 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
 
   readonly messages: any[] = [];
-  readonly terminate = vi.fn();
+  readonly deliveredMessages: any[] = [];
+  readonly terminate = vi.fn(() => {
+    this.deliveredMessages.length = 0;
+  });
   private listeners = new Map<string, Array<(event: any) => void>>();
 
   constructor(_url: URL, _options: WorkerOptions) {
@@ -26,6 +29,7 @@ class FakeWorker {
   }
 
   postMessage(message: any): void {
+    this.deliveredMessages.push(structuredClone(message));
     this.messages.push(message);
   }
 
@@ -47,13 +51,56 @@ describe("ZK worker lifecycle", () => {
   });
 
   it("only performs an idle cleanup when no proof call is pending and recreates after termination", async () => {
+    const witnessSentinel = 918273645546372819n;
+    const digestLoSentinel = "717273747576777879";
+    const digestHiSentinel = "818283848586878889";
     const firstCall = zkWorkerCall(
-      "verifyPersonRelationProof",
-      { proof: {} as any, publicSignals: ["1"] },
+      "generatePersonRelationProof",
+      {
+        person: {
+          fullName: "Worker Witness Sentinel",
+          gender: 1,
+          birthYear: 1980,
+          birthMonth: 2,
+          birthDay: 3,
+          isBirthBC: false,
+          derivedSecretField: witnessSentinel,
+          identitySuiteId: 1,
+        },
+        father: null,
+        mother: null,
+        submitterAddress: `0x${"11".repeat(20)}`,
+        selfSuiteId: 1,
+        fatherSuiteId: 0,
+        motherSuiteId: 0,
+        contentDigestLo: digestLoSentinel,
+        contentDigestHi: digestHiSentinel,
+      },
       { timeoutMs: 0 },
     );
     const firstWorker = FakeWorker.instances[0];
 
+    expect(firstWorker.messages[0]).toEqual({
+      id: expect.any(Number),
+      method: "generatePersonRelationProof",
+      params: undefined,
+    });
+    const bufferedMessages = JSON.stringify(firstWorker.messages);
+    expect(bufferedMessages).not.toContain(witnessSentinel.toString());
+    expect(bufferedMessages).not.toContain(digestLoSentinel);
+    expect(bufferedMessages).not.toContain(digestHiSentinel);
+    expect(firstWorker.deliveredMessages[0]).toMatchObject({
+      method: "generatePersonRelationProof",
+      params: {
+        person: { derivedSecretField: witnessSentinel },
+        contentDigestLo: digestLoSentinel,
+        contentDigestHi: digestHiSentinel,
+      },
+    });
+    expect(firstWorker.deliveredMessages[0].params).not.toHaveProperty("rawPassphrase");
+    expect(firstWorker.deliveredMessages[0].params).not.toHaveProperty("identitySalt");
+    expect(firstWorker.deliveredMessages[0].params).not.toHaveProperty("kek");
+    expect(firstWorker.deliveredMessages[0].params).not.toHaveProperty("dek");
     expect(terminateZkWorkerIfIdle()).toBe(false);
     expect(firstWorker.terminate).not.toHaveBeenCalled();
 
@@ -61,6 +108,7 @@ describe("ZK worker lifecycle", () => {
     terminateZkWorker(new ZkWorkerTerminatedError("clear witness memory"));
     await rejected;
     expect(firstWorker.terminate).toHaveBeenCalledOnce();
+    expect(firstWorker.deliveredMessages).toEqual([]);
 
     const secondCall = zkWorkerCall(
       "verifyPersonRelationProof",
@@ -74,6 +122,7 @@ describe("ZK worker lifecycle", () => {
     await expect(secondCall).resolves.toEqual({ ok: true });
     expect(terminateZkWorkerIfIdle()).toBe(true);
     expect(secondWorker.terminate).toHaveBeenCalledOnce();
+    expect(secondWorker.deliveredMessages).toEqual([]);
     expect(FakeWorker.instances).toHaveLength(2);
   });
 });

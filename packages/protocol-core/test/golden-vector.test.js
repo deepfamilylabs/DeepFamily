@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
@@ -12,6 +13,7 @@ import {
   buildIdentityPasswordBytes,
   bytesToHex,
   computeFormat1Aad,
+  computeDisclosureBinding,
   computePersonVersionContentCommitment,
   computeVersionHash,
   decryptPersonVersionEnvelope,
@@ -24,12 +26,19 @@ import {
   roundTripPersonVersionEnvelope,
   serializeCanonicalPersonVersion,
 } from "../index.js";
+import {
+  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
+} from "../../proof-core/index.js";
 
 const vectorPath = fileURLToPath(
   new URL("../../../protocol-vectors/onchain-biography-v1.json", import.meta.url),
 );
 const manifestPath = fileURLToPath(
   new URL("../../../protocol-release-manifest.json", import.meta.url),
+);
+const generatorPath = fileURLToPath(
+  new URL("../scripts/generate-golden-vector.mjs", import.meta.url),
 );
 const vector = JSON.parse(fs.readFileSync(vectorPath, "utf8"));
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -125,6 +134,58 @@ test("golden canonical bytes, digest limbs, commitment, versionHash and 15-word 
   assert.equal(aad.contextHash, vector.context.contextHash);
   assert.equal(bytesToHex(aad.wrapAAD), vector.context.wrapAADHex);
   assert.equal(bytesToHex(aad.contentAAD), vector.context.contentAADHex);
+});
+
+test("golden vector freezes every PersonRelation and DisclosureBinding public signal in order", () => {
+  const relation = vector.zkPublicSignals.personRelation;
+  const disclosure = vector.zkPublicSignals.disclosureBinding;
+  const relationManifest = manifest.proofRoutes.find((route) => route.purpose === "PersonRelation");
+  const disclosureManifest = manifest.proofRoutes.find(
+    (route) => route.purpose === "DisclosureBinding",
+  );
+
+  assert.equal(relation.purpose, PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.purpose);
+  assert.equal(relation.circuitId, 1);
+  assert.deepEqual(relation.publicSignalOrder, [
+    ...PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.fieldOrder,
+  ]);
+  assert.deepEqual(
+    relation.publicSignalOrder,
+    relationManifest.publicSignals.map(({ name }) => name),
+  );
+  assert.equal(relation.publicSignals.length, PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.length);
+  assert.equal(relation.publicSignals[0], vector.identity.identityCommitment);
+  assert.equal(relation.publicSignals[1], "0");
+  assert.equal(relation.publicSignals[2], "0");
+  assert.equal(relation.publicSignals[3], vector.context.submitterAndSelfSuiteId);
+  assert.equal(relation.publicSignals[4], vector.metadata.versionCommitment);
+
+  const expectedDisclosureBinding = computeDisclosureBinding({
+    nameField: vector.identity.nameField,
+    packedBirthGenderField: vector.identity.packedBirthGenderField,
+    suiteCommitment: vector.identity.suiteCommitment,
+  });
+  assert.equal(disclosure.purpose, DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.purpose);
+  assert.equal(disclosure.circuitId, 1);
+  assert.deepEqual(disclosure.publicSignalOrder, [
+    ...DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.fieldOrder,
+  ]);
+  assert.deepEqual(
+    disclosure.publicSignalOrder,
+    disclosureManifest.publicSignals.map(({ name }) => name),
+  );
+  assert.equal(disclosure.publicSignals.length, DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.length);
+  assert.equal(disclosure.publicSignals[0], vector.identity.identityCommitment);
+  assert.equal(disclosure.publicSignals[1], expectedDisclosureBinding.toString());
+  assert.equal(disclosure.publicSignals[2], BigInt(vector.context.submitter).toString());
+  assert.equal(disclosure.publicSignals[3], vector.identity.suiteCommitment);
+});
+
+test("golden vector generator reproduces the committed bytes and manifest hash", () => {
+  const output = execFileSync(process.execPath, [generatorPath, "--check"], {
+    encoding: "utf8",
+  });
+  assert.match(output, new RegExp(`sha256=${manifest.goldenVectors.sha256}\\n$`, "u"));
 });
 
 test("fixed randomness reproduces the byte-exact DFM1 envelope and production round-trip", async () => {

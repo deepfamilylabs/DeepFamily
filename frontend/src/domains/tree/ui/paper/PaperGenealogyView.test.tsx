@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import React from "react";
+import React, { type ComponentProps } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../shared/model";
-import { buildPaperGenerations, splitPaperRecordLines } from "./paperData";
-import { PaperGenealogyView } from "./PaperGenealogyView";
+import {
+  buildPaperGenerations as buildPaperGenerationsBase,
+  splitPaperRecordLines,
+} from "./paperData";
+import { PaperGenealogyView as PaperGenealogyViewBase } from "./PaperGenealogyView";
+import { withValidatedPaperMetadata } from "./paperTestMetadata";
 import { buildLineagePaperBook } from "./layout/lineagePagination";
 import {
   buildOuPaperBook,
@@ -99,6 +103,19 @@ const graph = {
     [rootId]: [childId],
   },
 };
+
+function buildPaperGenerations(input: Parameters<typeof buildPaperGenerationsBase>[0]) {
+  return buildPaperGenerationsBase({
+    ...input,
+    nodesData: withValidatedPaperMetadata(input.nodesData),
+  });
+}
+
+function PaperGenealogyView(props: ComponentProps<typeof PaperGenealogyViewBase>) {
+  return (
+    <PaperGenealogyViewBase {...props} nodesData={withValidatedPaperMetadata(props.nodesData)} />
+  );
+}
 
 const nodesData: Record<string, NodeData> = {
   [rootId]: {
@@ -658,7 +675,13 @@ describe("PaperGenealogyView", () => {
 
   it("omits the cover spread when coverEnabled is false or unset", () => {
     render(
-      <PaperGenealogyView style="modern" graph={graph} rootId={rootId} nodesData={nodesData} hasRoot />,
+      <PaperGenealogyView
+        style="modern"
+        graph={graph}
+        rootId={rootId}
+        nodesData={nodesData}
+        hasRoot
+      />,
     );
     expect(screen.queryByTestId("paper-cover-spread")).toBeNull();
     expect(screen.queryByTestId("paper-cover")).toBeNull();

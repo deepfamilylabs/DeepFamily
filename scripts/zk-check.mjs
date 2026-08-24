@@ -8,32 +8,53 @@ import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelect
 
 const PERSON_SUBMITTER = "0x1234567890123456789012345678901234567890";
 const CHECKS = Object.freeze({
-  person: Object.freeze({
-    task: path.join("tasks", "zk-person-hash-check.mjs"),
-    args: Object.freeze([
-      "--prove",
-      "--wasm",
-      "./frontend/public/zk/person_commitment.wasm",
-      "--zkey",
-      "./frontend/public/zk/person_commitment_final.zkey",
-      "--input",
-      "./circuits/test/proof/person_commitment_input.json",
-      "--submitter",
-      PERSON_SUBMITTER,
-    ]),
-  }),
-  disclosure: Object.freeze({
-    task: path.join("tasks", "zk-disclosure-binding-check.mjs"),
-    args: Object.freeze([
-      "--prove",
-      "--wasm",
-      "./frontend/public/zk/disclosure_binding.wasm",
-      "--zkey",
-      "./frontend/public/zk/disclosure_binding_final.zkey",
-      "--input",
-      "./circuits/test/proof/disclosure_binding_input.json",
-    ]),
-  }),
+  person: Object.freeze([
+    Object.freeze({
+      check: "proof",
+      task: path.join("tasks", "zk-person-hash-check.mjs"),
+      args: Object.freeze([
+        "--prove",
+        "--wasm",
+        "./frontend/public/zk/person_commitment.wasm",
+        "--zkey",
+        "./frontend/public/zk/person_commitment_final.zkey",
+        "--input",
+        "./circuits/test/proof/person_commitment_input.json",
+        "--submitter",
+        PERSON_SUBMITTER,
+      ]),
+    }),
+    Object.freeze({
+      check: "constraints",
+      task: path.join("circuits", "test", "test_circuit_constraints.js"),
+      args: Object.freeze(["--circuit", "person"]),
+    }),
+    Object.freeze({
+      check: "parents",
+      task: path.join("circuits", "test", "test_parent_existence.js"),
+      args: Object.freeze([]),
+    }),
+  ]),
+  disclosure: Object.freeze([
+    Object.freeze({
+      check: "proof",
+      task: path.join("tasks", "zk-disclosure-binding-check.mjs"),
+      args: Object.freeze([
+        "--prove",
+        "--wasm",
+        "./frontend/public/zk/disclosure_binding.wasm",
+        "--zkey",
+        "./frontend/public/zk/disclosure_binding_final.zkey",
+        "--input",
+        "./circuits/test/proof/disclosure_binding_input.json",
+      ]),
+    }),
+    Object.freeze({
+      check: "constraints",
+      task: path.join("circuits", "test", "test_circuit_constraints.js"),
+      args: Object.freeze(["--circuit", "disclosure"]),
+    }),
+  ]),
 });
 
 const defaultRunner = ({ executable, args, cwd }) =>
@@ -47,15 +68,17 @@ export const parseArguments = parseCircuitArguments;
 export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
   const resolvedRoot = path.resolve(root);
   return Object.freeze(
-    selectCircuitNames(circuit).map((name) => {
-      const check = CHECKS[name];
-      return Object.freeze({
-        circuit: name,
-        executable: process.execPath,
-        args: Object.freeze([path.join(resolvedRoot, check.task), ...check.args]),
-        cwd: resolvedRoot,
-      });
-    }),
+    selectCircuitNames(circuit).flatMap((name) =>
+      CHECKS[name].map((check) =>
+        Object.freeze({
+          circuit: name,
+          check: check.check,
+          executable: process.execPath,
+          args: Object.freeze([path.join(resolvedRoot, check.task), ...check.args]),
+          cwd: resolvedRoot,
+        }),
+      ),
+    ),
   );
 };
 
@@ -79,8 +102,9 @@ const printUsage = () => {
   console.log(`Usage:
   node scripts/zk-check.mjs [--circuit <all|person|disclosure>]
 
-Generates and independently verifies a real proof for the selected circuit using the
-repository's committed frontend ZK artifacts and proof input. The default is --circuit all.`);
+Generates and independently verifies real proofs plus range/parent constraint regressions for the
+selected circuit using the repository's committed frontend ZK artifacts. The default is
+--circuit all.`);
 };
 
 export const main = (argv = process.argv.slice(2)) => {

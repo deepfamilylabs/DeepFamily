@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-red?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Node](https://img.shields.io/badge/Node.js-22.10+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/Node.js-22.13+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 **A blockchain-based decentralized digital family tree protocol**
 _Leveraging zero-knowledge proofs and community governance for collaborative family history_
@@ -78,7 +78,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Prerequisites
 
-- **Node.js** >= 22.10.0
+- **Node.js** >= 22.13.0
 - **npm** or **yarn**
 - **Git**
 
@@ -250,7 +250,7 @@ eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default 
 pinned public power-13 pTau and records one local Phase 2 contributor under the explicit
 `single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
 a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
-A successful, self-validated rehearsal automatically publishes the exact schema-v4 evidence to the
+A successful, self-validated rehearsal automatically publishes the exact schema-v5 evidence to the
 Git-ignored, eSpace-specific path `tmp/release-evidence/espace-release-rehearsal.json`. Diagnostic,
 failed, and recovery runs never overwrite that file. The eSpace Mainnet release commands read it
 automatically and reject a missing file, an older release commit, or mismatched artifact digest,

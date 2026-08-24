@@ -12,9 +12,14 @@ import {
   ZK_TRUST_MODEL_MULTI_PARTY,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "./zkArtifactTrust.mjs";
-import { inspectProtocolReleaseManifest } from "./protocolReleaseManifest.mjs";
+import {
+  inspectProtocolDeploymentArtifacts,
+  inspectProtocolReleaseManifest,
+  protocolDeploymentEvidenceFromAcceptanceReport,
+  protocolDeploymentEvidenceSha256,
+} from "./protocolReleaseManifest.mjs";
 
-export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 4;
+export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 5;
 export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
 export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
   "allRecordedStepsPassed",
@@ -64,6 +69,7 @@ const REQUIRED_VERIFIED_CONTRACTS = Object.freeze([
   "initial-deployment:DisclosureBindingVerifier",
   "initial-deployment:GovernanceTimelock",
   "initial-deployment:Groth16VerifierAdapter",
+  "initial-deployment:MetadataArchiveV1",
   "initial-deployment:PersonCommitmentVerifier",
   "initial-deployment:PoseidonT5",
   "initial-deployment:UUPSProxy",
@@ -130,6 +136,13 @@ const requireExact = (actual, expected, label) => {
 const requireHash32 = (value, label) => {
   if (typeof value !== "string" || !HASH_32_PATTERN.test(value)) {
     throw new Error(`${label} must be a lowercase 32-byte 0x-prefixed hash`);
+  }
+  return value;
+};
+
+const requireSha256 = (value, label) => {
+  if (typeof value !== "string" || !SHA_256_PATTERN.test(value)) {
+    throw new Error(`${label} must be lowercase SHA-256 hex`);
   }
   return value;
 };
@@ -353,7 +366,7 @@ const requireAllReadinessGates = (value) => {
   const names = Object.keys(gates).sort();
   if (JSON.stringify(names) !== JSON.stringify(TESTNET_RELEASE_READINESS_GATES)) {
     throw new Error(
-      "releaseReadinessGates must contain exactly the schema v4 initial-release gate set: " +
+      "releaseReadinessGates must contain exactly the schema v5 initial-release gate set: " +
         TESTNET_RELEASE_READINESS_GATES.join(", "),
     );
   }
@@ -396,7 +409,7 @@ const requireVerificationEvidence = (report) => {
   requireExact(verification.status, "passed", "verification.status");
   if (Object.hasOwn(verification, "gateBeforeUpgradeSchedule")) {
     throw new Error(
-      "verification.gateBeforeUpgradeSchedule is forbidden in schema v4 initial-release evidence",
+      "verification.gateBeforeUpgradeSchedule is forbidden in schema v5 initial-release evidence",
     );
   }
   if (!Array.isArray(verification.contracts) || verification.contracts.length === 0) {
@@ -418,7 +431,7 @@ const requireVerificationEvidence = (report) => {
     JSON.stringify(sortedVerifiedContracts) !== JSON.stringify(REQUIRED_VERIFIED_CONTRACTS)
   ) {
     throw new Error(
-      "verification.contracts must contain exactly the schema v4 initial-release contract set",
+      "verification.contracts must contain exactly the schema v5 initial-release contract set",
     );
   }
   if (!Array.isArray(verification.phases) || verification.phases.length === 0) {
@@ -438,7 +451,7 @@ const requireVerificationEvidence = (report) => {
     JSON.stringify(sortedPhases) !== JSON.stringify(REQUIRED_VERIFICATION_PHASES)
   ) {
     throw new Error(
-      "verification.phases must contain exactly the schema v4 initial-release phase set",
+      "verification.phases must contain exactly the schema v5 initial-release phase set",
     );
   }
   return verification;
@@ -629,19 +642,30 @@ const requireTerminalTimelock = ({
   return timelock;
 };
 
-const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinDelay) => {
+const requireTerminalGovernanceEvidence = ({
+  report,
+  expectedChainId,
+  expectedMinDelay,
+  repositoryRoot,
+  protocolManifest,
+  protocolDeploymentArtifactInspector,
+}) => {
   const terminal = requireExactRecordKeys(
     report.terminalGovernanceState,
     "terminalGovernanceState",
     [
+      "archive",
       "deepFamily",
+      "deploymentEvidenceSha256",
       "observedAfterFinality",
       "observedAtBlock",
+      "proofRoutes",
       "reader",
       "safe",
       "status",
       "timelock",
       "token",
+      "verifierAdapter",
     ],
   );
   requireExact(terminal.status, "passed", "terminalGovernanceState.status");
@@ -692,6 +716,18 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     addresses.groth16VerifierAdapter,
     "addresses.groth16VerifierAdapter",
   );
+  const personVerifierAddress = requireAddress(
+    addresses.personCommitmentVerifier,
+    "addresses.personCommitmentVerifier",
+  );
+  const disclosureBindingVerifierAddress = requireAddress(
+    addresses.disclosureBindingVerifier,
+    "addresses.disclosureBindingVerifier",
+  );
+  const metadataArchiveAddress = requireAddress(
+    addresses.metadataArchive,
+    "addresses.metadataArchive",
+  );
   const deepFamily = requireExactRecordKeys(
     terminal.deepFamily,
     "terminalGovernanceState.deepFamily",
@@ -699,6 +735,7 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
       "address",
       "disclosureBindingVerifier",
       "implementation",
+      "metadataArchive",
       "owner",
       "personCommitmentVerifier",
       "protocolEndorsementFeeBps",
@@ -724,6 +761,11 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     deepFamily.disclosureBindingVerifier,
     verifierAdapterAddress,
     "terminalGovernanceState.deepFamily.disclosureBindingVerifier",
+  );
+  requireSameAddress(
+    deepFamily.metadataArchive,
+    metadataArchiveAddress,
+    "terminalGovernanceState.deepFamily.metadataArchive",
   );
   requireExact(
     requireSafeInteger(
@@ -754,10 +796,51 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     "terminalGovernanceState.token.deepFamilyTokenFromProtocol",
   );
 
+  const verifierAdapter = requireExactRecordKeys(
+    terminal.verifierAdapter,
+    "terminalGovernanceState.verifierAdapter",
+    ["address", "artifactSha256", "disclosureBindingVerifier", "personVerifier", "runtimeSha256"],
+  );
+  requireSameAddress(
+    verifierAdapter.address,
+    verifierAdapterAddress,
+    "terminalGovernanceState.verifierAdapter.address",
+  );
+  requireSameAddress(
+    verifierAdapter.personVerifier,
+    personVerifierAddress,
+    "terminalGovernanceState.verifierAdapter.personVerifier",
+  );
+  requireSameAddress(
+    verifierAdapter.disclosureBindingVerifier,
+    disclosureBindingVerifierAddress,
+    "terminalGovernanceState.verifierAdapter.disclosureBindingVerifier",
+  );
+
+  const archive = requireExactRecordKeys(terminal.archive, "terminalGovernanceState.archive", [
+    "address",
+    "artifactSha256",
+    "deepFamily",
+    "runtimeSha256",
+  ]);
+  requireSameAddress(
+    archive.address,
+    metadataArchiveAddress,
+    "terminalGovernanceState.archive.address",
+  );
+  requireSameAddress(
+    archive.deepFamily,
+    deepFamilyAddress,
+    "terminalGovernanceState.archive.deepFamily",
+  );
+
   const readerAddress = requireAddress(addresses.deepFamilyReader, "addresses.deepFamilyReader");
   const reader = requireExactRecordKeys(terminal.reader, "terminalGovernanceState.reader", [
     "address",
+    "artifactSha256",
     "deepFamily",
+    "metadataArchive",
+    "runtimeSha256",
   ]);
   requireSameAddress(reader.address, readerAddress, "terminalGovernanceState.reader.address");
   requireSameAddress(
@@ -765,7 +848,155 @@ const requireTerminalGovernanceEvidence = (report, expectedChainId, expectedMinD
     deepFamilyAddress,
     "terminalGovernanceState.reader.deepFamily",
   );
-  return { observedAtBlock, minDelay: expectedMinDelay };
+  requireSameAddress(
+    reader.metadataArchive,
+    metadataArchiveAddress,
+    "terminalGovernanceState.reader.metadataArchive",
+  );
+
+  if (!Array.isArray(terminal.proofRoutes)) {
+    throw new Error("terminalGovernanceState.proofRoutes must be an array");
+  }
+  const actualRoutes = terminal.proofRoutes
+    .map((route, index) => {
+      const item = requireExactRecordKeys(route, `terminalGovernanceState.proofRoutes[${index}]`, [
+        "circuitId",
+        "proofEncodingId",
+        "purpose",
+        "purposeOrdinal",
+      ]);
+      return {
+        purpose: requireNonemptyString(
+          item.purpose,
+          `terminalGovernanceState.proofRoutes[${index}].purpose`,
+          64,
+        ),
+        purposeOrdinal: requireSafeInteger(
+          item.purposeOrdinal,
+          `terminalGovernanceState.proofRoutes[${index}].purposeOrdinal`,
+          0,
+        ),
+        circuitId: requireSafeInteger(
+          item.circuitId,
+          `terminalGovernanceState.proofRoutes[${index}].circuitId`,
+          1,
+        ),
+        proofEncodingId: requireSafeInteger(
+          item.proofEncodingId,
+          `terminalGovernanceState.proofRoutes[${index}].proofEncodingId`,
+          1,
+        ),
+      };
+    })
+    .sort(
+      (left, right) =>
+        left.purposeOrdinal - right.purposeOrdinal || left.circuitId - right.circuitId,
+    );
+  const expectedRoutes = requireRecord(protocolManifest, "current protocol manifest").proofRoutes;
+  if (!Array.isArray(expectedRoutes)) {
+    throw new Error("current protocol manifest proofRoutes must be an array");
+  }
+  const normalizedExpectedRoutes = expectedRoutes
+    .map((route) => ({
+      purpose: route?.purpose,
+      purposeOrdinal: route?.purposeOrdinal,
+      circuitId: route?.circuitId,
+      proofEncodingId: route?.proofEncodingId,
+    }))
+    .sort(
+      (left, right) =>
+        left.purposeOrdinal - right.purposeOrdinal || left.circuitId - right.circuitId,
+    );
+  requireExact(
+    JSON.stringify(actualRoutes),
+    JSON.stringify(normalizedExpectedRoutes),
+    "terminalGovernanceState.proofRoutes",
+  );
+
+  if (typeof protocolDeploymentArtifactInspector !== "function") {
+    throw new Error("protocolDeploymentArtifactInspector must be a function");
+  }
+  const inspectedArtifacts = protocolDeploymentArtifactInspector({
+    root: repositoryRoot,
+    deployments: {
+      groth16VerifierAdapter: {
+        personVerifierImmutable: verifierAdapter.personVerifier,
+        disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
+      },
+      metadataArchiveV1: { deepFamilyImmutable: archive.deepFamily },
+      deepFamilyReader: {
+        deepFamilyImmutable: reader.deepFamily,
+        metadataArchiveImmutable: reader.metadataArchive,
+      },
+    },
+  });
+  const manifestDeployments = requireRecord(
+    protocolManifest.deployments,
+    "current protocol manifest deployments",
+  );
+  for (const [label, reported, inspected, manifestDeployment] of [
+    [
+      "Groth16VerifierAdapter",
+      verifierAdapter,
+      inspectedArtifacts?.groth16VerifierAdapter,
+      manifestDeployments.groth16VerifierAdapter,
+    ],
+    [
+      "MetadataArchiveV1",
+      archive,
+      inspectedArtifacts?.metadataArchiveV1,
+      manifestDeployments.metadataArchiveV1,
+    ],
+    [
+      "DeepFamilyReader",
+      reader,
+      inspectedArtifacts?.deepFamilyReader,
+      manifestDeployments.deepFamilyReader,
+    ],
+  ]) {
+    const reportedArtifactSha256 = requireSha256(
+      reported.artifactSha256,
+      `terminalGovernanceState ${label} artifactSha256`,
+    );
+    const reportedRuntimeSha256 = requireSha256(
+      reported.runtimeSha256,
+      `terminalGovernanceState ${label} runtimeSha256`,
+    );
+    requireExact(
+      reportedArtifactSha256,
+      requireSha256(inspected?.artifactSha256, `inspected ${label} artifactSha256`),
+      `terminalGovernanceState ${label} artifactSha256`,
+    );
+    requireExact(
+      reportedRuntimeSha256,
+      requireSha256(inspected?.runtimeSha256, `inspected ${label} runtimeSha256`),
+      `terminalGovernanceState ${label} runtimeSha256`,
+    );
+    requireExact(
+      reportedArtifactSha256,
+      requireSha256(
+        manifestDeployment?.artifactSha256,
+        `protocol manifest ${label} artifactSha256`,
+      ),
+      `terminalGovernanceState ${label} production artifactSha256`,
+    );
+  }
+
+  const projection = protocolDeploymentEvidenceFromAcceptanceReport(report);
+  const projectionSha256 = protocolDeploymentEvidenceSha256(projection);
+  requireExact(
+    requireSha256(
+      terminal.deploymentEvidenceSha256,
+      "terminalGovernanceState.deploymentEvidenceSha256",
+    ),
+    projectionSha256,
+    "terminalGovernanceState.deploymentEvidenceSha256",
+  );
+  return {
+    observedAtBlock,
+    minDelay: expectedMinDelay,
+    deploymentEvidenceSha256: projectionSha256,
+  };
 };
 
 const requireRefundEvidence = (report) => {
@@ -812,7 +1043,7 @@ const requireProductionParityEvidence = (report) => {
   }
   if (Object.hasOwn(productionParity, "sharedGovernanceOperationBuildersMatched")) {
     throw new Error(
-      "productionParity.sharedGovernanceOperationBuildersMatched is forbidden in schema v4 " +
+      "productionParity.sharedGovernanceOperationBuildersMatched is forbidden in schema v5 " +
         "initial-release evidence",
     );
   }
@@ -989,11 +1220,11 @@ const requireProtocolManifestEvidence = (report, repositoryRoot, protocolManifes
     current.manifest.goldenVectors.sha256,
     "protocolManifestEvidence.goldenVectorSha256",
   );
-  return evidence;
+  return { evidence, inspection: current };
 };
 
 /**
- * Loads one explicitly selected schema-v4 initial-mainnet-release rehearsal report and fails closed
+ * Loads one explicitly selected schema-v5 initial-mainnet-release rehearsal report and fails closed
  * unless it is valid evidence for the exact Git commit, testnet chain and production MIN_DELAY being
  * released. Governance lifecycle exercises are deliberately outside this evidence type.
  *
@@ -1012,6 +1243,7 @@ export const validateTestnetReleaseEvidence = async ({
   currentCommit,
   expectedAcceptanceInputDigest,
   protocolManifestInspector = inspectProtocolReleaseManifest,
+  protocolDeploymentArtifactInspector = inspectProtocolDeploymentArtifacts,
 } = {}) => {
   const expectedChainId = requireSafeInteger(expectedTestnetChainId, "expectedTestnetChainId", 1);
   const expectedMinDelay = requireSafeInteger(
@@ -1082,7 +1314,14 @@ export const validateTestnetReleaseEvidence = async ({
   const zkArtifactTrust = requireProductionZkEvidence(report);
   const verification = requireVerificationEvidence(report);
   const finality = requireFinalityEvidence(report);
-  const terminal = requireTerminalGovernanceEvidence(report, expectedChainId, expectedMinDelay);
+  const terminal = requireTerminalGovernanceEvidence({
+    report,
+    expectedChainId,
+    expectedMinDelay,
+    repositoryRoot,
+    protocolManifest: protocolManifest.inspection.manifest,
+    protocolDeploymentArtifactInspector,
+  });
   if (terminal.observedAtBlock < finality.finalizedBlockNumber) {
     throw new Error(
       "terminalGovernanceState.observedAtBlock must be at or after the finalized coverage block",
@@ -1112,7 +1351,7 @@ export const validateTestnetReleaseEvidence = async ({
   const expectedStepNames = [...TESTNET_RELEASE_REQUIRED_STEPS].sort();
   if (JSON.stringify(sortedStepNames) !== JSON.stringify(expectedStepNames)) {
     throw new Error(
-      "steps must contain exactly the schema v4 initial-release step set: " +
+      "steps must contain exactly the schema v5 initial-release step set: " +
         expectedStepNames.join(", "),
     );
   }
@@ -1162,10 +1401,10 @@ export const validateTestnetReleaseEvidence = async ({
       productionReady: zkArtifactTrust.productionReady,
     },
     protocolManifest: {
-      sha256: protocolManifest.sha256,
-      protocol: protocolManifest.protocol,
-      protocolGeneration: protocolManifest.protocolGeneration,
-      goldenVectorSha256: protocolManifest.goldenVectorSha256,
+      sha256: protocolManifest.evidence.sha256,
+      protocol: protocolManifest.evidence.protocol,
+      protocolGeneration: protocolManifest.evidence.protocolGeneration,
+      goldenVectorSha256: protocolManifest.evidence.goldenVectorSha256,
     },
     verification: {
       status: verification.status,
@@ -1181,6 +1420,7 @@ export const validateTestnetReleaseEvidence = async ({
     terminalGovernance: {
       status: "passed",
       observedAtBlock: terminal.observedAtBlock,
+      deploymentEvidenceSha256: terminal.deploymentEvidenceSha256,
     },
     refund: {
       status: refund.status,

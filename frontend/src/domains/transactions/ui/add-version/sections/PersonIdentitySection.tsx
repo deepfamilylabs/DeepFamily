@@ -9,6 +9,7 @@ export interface PersonIdentitySectionProps {
   personCalcRef: Ref<PersonHashCalculatorHandle>;
   initialPersonData?: Partial<PersonInfoPublic>;
   onPersonInfoChange: (value: PersonInfoPublic) => void;
+  onPassphraseChange: () => void;
 }
 
 export function PersonIdentitySection({
@@ -17,6 +18,7 @@ export function PersonIdentitySection({
   personCalcRef,
   initialPersonData,
   onPersonInfoChange,
+  onPassphraseChange,
 }: PersonIdentitySectionProps) {
   return (
     <div className="space-y-4">
@@ -41,6 +43,7 @@ export function PersonIdentitySection({
         collapsible={false}
         requirePassphraseConfirmation
         initialValues={initialPersonData}
+        onPassphraseChange={onPassphraseChange}
         onPublicFormChange={(formData) => {
           onPersonInfoChange({
             fullName: formData.fullName,

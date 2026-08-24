@@ -1,11 +1,11 @@
 import { concat, keccak256, solidityPacked, toBeHex, toUtf8Bytes, zeroPadValue } from "ethers";
 import { poseidon4 } from "poseidon-lite";
+import { canonicalizeFullName } from "@deepfamily/protocol-core";
 import {
   DEFAULT_PROOF_ENCODING_ID as CODEC_DEFAULT_PROOF_ENCODING_ID,
   packGroth16ProofEnvelope,
   type ProofEnvelope as CodecProofEnvelope,
 } from "@deepfamily/proof-core";
-import { canonicalizeFullName } from "../crypto/identityCommitment";
 
 export type Groth16Proof = {
   pi_a: [string | bigint, string | bigint, string | bigint];

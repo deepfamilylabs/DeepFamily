@@ -43,6 +43,42 @@
     "submitterAndSelfSuiteId": "1656368522308356640630842810411787422276723548706",
     "versionHash": "0x9c661d498c911a2270306d604399baa376b680bef857b514d0ec02d0a5684a76"
   },
+  "zkPublicSignals": {
+    "personRelation": {
+      "purpose": "PersonRelation",
+      "circuitId": 1,
+      "publicSignalOrder": [
+        "identityCommitment",
+        "fatherIdentityCommitment",
+        "motherIdentityCommitment",
+        "submitterAndSelfSuiteId",
+        "versionCommitment"
+      ],
+      "publicSignals": [
+        "13166249186222432455035688418808390715097088392450773922375059234903197015131",
+        "0",
+        "0",
+        "1656368522308356640630842810411787422276723548706",
+        "16578183192710462814388650839578223073020502192092924822206518273685241358552"
+      ]
+    },
+    "disclosureBinding": {
+      "purpose": "DisclosureBinding",
+      "circuitId": 1,
+      "publicSignalOrder": [
+        "identityCommitment",
+        "disclosureBinding",
+        "minter",
+        "suiteCommitment"
+      ],
+      "publicSignals": [
+        "13166249186222432455035688418808390715097088392450773922375059234903197015131",
+        "7832937926281167397924177897827378868079258619807623301616918502763111327022",
+        "194866884977453722427157977695504402620791005730",
+        "5105253872377533494962772008515703873846679337516418187471762237527368964566"
+      ]
+    }
+  },
   "envelope": {
     "randomSource": "sequential bytes 0x00.. in call order DEK(32), fileSalt(16), wrapIV(12), contentIV(12)",
     "headerHex": "0x44464d310100010101010070000001030000000100000000202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f4041424344454647358a3f3bb746d74b1923690688577d209056436e4aafc9bbfa1244b172f411364af7ea1b35a91178fd4af9ba6c54095a",

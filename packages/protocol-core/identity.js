@@ -3,6 +3,7 @@ import { getAddress, getBytes, keccak256, solidityPacked, toBeHex, zeroPadValue 
 import { poseidon4 } from "poseidon-lite";
 import {
   CANDIDATE_ARGON2ID_PROFILE,
+  DOMAIN_DISCLOSURE,
   DOMAIN_IDENTITY,
   DOMAIN_NAME_SECRET,
   DOMAIN_SUITE,
@@ -217,6 +218,21 @@ export function computeNameField(canonicalFullName) {
 export function computeSuiteCommitment(identitySuiteId) {
   const suite = assertIdentitySuiteSupported(identitySuiteId);
   return poseidon4([DOMAIN_SUITE, BigInt(suite), 0n, 0n]);
+}
+
+export function computeDisclosureBinding(input) {
+  const nameField = bigintFrom(input.nameField, "nameField", SNARK_SCALAR_FIELD - 1n);
+  const packedBirthGenderField = bigintFrom(
+    input.packedBirthGenderField,
+    "packedBirthGenderField",
+    SNARK_SCALAR_FIELD - 1n,
+  );
+  const suiteCommitment = bigintFrom(
+    input.suiteCommitment,
+    "suiteCommitment",
+    SNARK_SCALAR_FIELD - 1n,
+  );
+  return poseidon4([DOMAIN_DISCLOSURE, nameField, packedBirthGenderField, suiteCommitment]);
 }
 
 export function computeIdentityFromDerivedSecret(input) {

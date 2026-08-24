@@ -19,6 +19,7 @@ import {
   NodeData,
   StoryChunk,
   isMinted,
+  isMetadataUnlockUsable,
   formatUnixSeconds,
   shortAddress,
   formatHashMiddle,
@@ -107,13 +108,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function InfoCard({
-  borderClass,
-  children,
-}: {
-  borderClass: string;
-  children: React.ReactNode;
-}) {
+function InfoCard({ borderClass, children }: { borderClass: string; children: React.ReactNode }) {
   return (
     <div
       className={`group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] ${borderClass} transition-all duration-300`}
@@ -200,7 +195,9 @@ export function StoryIdentitySection({
   isDesktop: boolean;
   copyText: (text: string) => void;
 }) {
-  if (!person.personHash && !isMinted(person) && !person.tag && !person.nftTokenURI) return null;
+  const privateMetadataUnlocked = isMetadataUnlockUsable(person);
+  const visibleTag = privateMetadataUnlocked ? person.tag : undefined;
+  if (!person.personHash && !isMinted(person) && !visibleTag && !person.nftTokenURI) return null;
   const copyLabel = t("common.copy", "Copy");
 
   return (
@@ -246,16 +243,16 @@ export function StoryIdentitySection({
           </InfoCard>
         )}
 
-        {person.tag && (
+        {visibleTag && (
           <InfoCard borderClass="border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]">
             <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
               {t("storyChunksModal.tag", "Tag")}
             </div>
             <div className="flex items-center gap-3">
               <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
-                {person.tag}
+                {visibleTag}
               </div>
-              <CopyButton label={copyLabel} onClick={() => copyText(person.tag!)} />
+              <CopyButton label={copyLabel} onClick={() => copyText(visibleTag)} />
             </div>
           </InfoCard>
         )}
@@ -401,13 +398,7 @@ function StoryIntegritySection({
   );
 }
 
-export function StoryEmptyState({
-  t,
-  icon = "file",
-}: {
-  t: PersonStoryT;
-  icon?: "file" | "book";
-}) {
+export function StoryEmptyState({ t, icon = "file" }: { t: PersonStoryT; icon?: "file" | "book" }) {
   const Icon = icon === "book" ? Book : FileText;
   return (
     <div className="text-center py-16 bg-gray-50/50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">

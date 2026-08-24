@@ -33,7 +33,7 @@ export interface TreeStatusValue {
   invalidateTreeRootCache: () => void;
   errors: Array<unknown>;
   clearAllCaches: () => void;
-  clearMetadataUnlockCache: () => void;
+  clearMetadataUnlockCache: () => Promise<void>;
 }
 
 export interface TreeNodeAccessValue {
@@ -45,9 +45,11 @@ export interface TreeNodeAccessValue {
 
 export interface TreeMutationsValue {
   clearAllCaches: () => void;
-  clearMetadataUnlockCache: () => void;
-  cacheValidatedPersonVersion: (input: NodeData) => void;
-  persistValidatedPersonVersion: (input: NodeData) => Promise<void>;
+  clearMetadataUnlockCache: () => Promise<void>;
+  captureMetadataCacheRevision: () => number;
+  cacheValidatedPersonVersion: (input: NodeData, expectedRevision: number) => void;
+  cacheConfirmedPersonVersion: (input: NodeData, expectedRevision: number) => Promise<void>;
+  persistValidatedPersonVersion: (input: NodeData, expectedRevision: number) => Promise<void>;
   bumpEndorsementCount: (personHash: string, versionIndex: number, delta?: number) => void;
   invalidateByTx: (input?: TreeTxInvalidationInput | null) => void;
   markVersionMinted: (params: {

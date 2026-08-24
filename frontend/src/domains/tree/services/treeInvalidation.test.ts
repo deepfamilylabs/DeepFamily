@@ -85,7 +85,7 @@ describe("treeInvalidation parseTreeTxEvents", () => {
       3,
       "0x00000000000000000000000000000000000000000000000000000000000000cc",
       4,
-      "tag",
+      456n,
     ]);
 
     const out = parseTreeTxEvents(
@@ -176,14 +176,8 @@ describe("treeInvalidation buildTreeTxInvalidation", () => {
 
     expect(out.versionDetailKeys.sort()).toEqual(
       [
-        vdKey(
-          "0x00000000000000000000000000000000000000000000000000000000000000aa",
-          2,
-        ),
-        vdKey(
-          "0x00000000000000000000000000000000000000000000000000000000000000ff",
-          7,
-        ),
+        vdKey("0x00000000000000000000000000000000000000000000000000000000000000aa", 2),
+        vdKey("0x00000000000000000000000000000000000000000000000000000000000000ff", 7),
       ].sort(),
     );
     expect(out.nftKeys.sort()).toEqual([nftKey("88"), nftKey("99")].sort());

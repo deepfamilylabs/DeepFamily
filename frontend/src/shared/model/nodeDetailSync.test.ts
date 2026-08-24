@@ -71,9 +71,53 @@ describe("nodeDetailSync", () => {
       endorsementCount: 8,
       fatherHash: "0xfather",
       motherHash: "0xmother",
-      tag: "existing",
       versionDetailsFetchedAt: 999,
     });
+    expect(out["0xabc-v-2"]).not.toHaveProperty("tag");
+  });
+
+  it("removes unlocked plaintext from the final detail state when version anchors change", () => {
+    const id = "0xabc-v-2";
+    const out = applyNodeDetailVersionDetails({
+      nodesData: {
+        [id]: {
+          personHash: "0xabc",
+          versionIndex: 2,
+          id,
+          tokenId: "0",
+          versionCommitment: "old-commitment",
+          metadataPointer: "0x00000000000000000000000000000000000000aa",
+          metadataPayloadHash: "0xold-payload",
+          metadataPayloadLength: 128,
+          metadataUnlockValidated: true,
+          metadataProtocolGeneration: "df-onchain-biography-v1",
+          tag: "private tag",
+          biography: "private biography",
+          fullName: "Private name",
+        },
+      },
+      selected: { personHash: "0xabc", versionIndex: 2 },
+      parsed: {
+        version: { versionCommitment: "new-commitment" },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000bb",
+          payloadHash: "0xnew-payload",
+          payloadLength: 256,
+        },
+        endorsementCount: 1,
+        tokenId: "0",
+      },
+      fetchedAt: 1000,
+    });
+
+    expect(out[id]).toMatchObject({
+      metadataUnlockValidated: false,
+      versionCommitment: "new-commitment",
+      metadataPayloadHash: "0xnew-payload",
+    });
+    expect(out[id]).not.toHaveProperty("tag");
+    expect(out[id]).not.toHaveProperty("biography");
+    expect(out[id]).not.toHaveProperty("fullName");
   });
 
   it("applies nft and story details onto an existing node", () => {
@@ -158,6 +202,74 @@ describe("nodeDetailSync", () => {
     });
     expect(out["0xabc-v-2"]?.storyMetadata).toEqual(storyData.metadata);
     expect(out["0xabc-v-2"]?.storyChunks).toEqual(storyData.chunks);
+  });
+
+  it("drops decrypted metadata when NFT details carry different authoritative anchors", () => {
+    const id = "0xabc-v-2";
+    const out = applyNodeDetailNftDetails({
+      nodesData: {
+        [id]: {
+          personHash: "0xabc",
+          versionIndex: 2,
+          id,
+          tokenId: "42",
+          versionCommitment: "old-commitment",
+          metadataPointer: "0x00000000000000000000000000000000000000aa",
+          metadataPayloadHash: "0xold-payload",
+          metadataPayloadLength: 128,
+          metadataUnlockValidated: true,
+          metadataProtocolGeneration: "df-onchain-biography-v1",
+          metadataFormatVersion: 1,
+          identitySuiteId: 1,
+          fullName: "Old public name",
+          tag: "private tag",
+          biography: "private biography",
+          metadataPerson: {
+            fullName: "Old public name",
+            gender: 2,
+            birthYear: 1980,
+            birthMonth: 1,
+            birthDay: 2,
+            isBirthBC: false,
+            personHash: "0xabc",
+          },
+          metadataParents: { father: null, mother: null },
+        },
+      },
+      selected: { personHash: "0xabc", versionIndex: 2 },
+      tokenId: "42",
+      nftDetails: {
+        personHash: "0xabc",
+        versionIndex: 2,
+        version: { versionCommitment: "new-commitment" },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000bb",
+          payloadHash: "0xnew-payload",
+          payloadLength: 256,
+        },
+        core: { fullName: "New public name", gender: 1 },
+      },
+      storyData: null,
+    });
+
+    expect(out[id]).toMatchObject({
+      fullName: "New public name",
+      gender: 1,
+      versionCommitment: "new-commitment",
+      metadataPayloadHash: "0xnew-payload",
+      metadataUnlockValidated: false,
+    });
+    for (const key of [
+      "tag",
+      "biography",
+      "metadataPerson",
+      "metadataParents",
+      "metadataProtocolGeneration",
+      "metadataFormatVersion",
+      "identitySuiteId",
+    ]) {
+      expect(out[id]).not.toHaveProperty(key);
+    }
   });
 
   it("does not create a node when nft details arrive before version bootstrap", () => {

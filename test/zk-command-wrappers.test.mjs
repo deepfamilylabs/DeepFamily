@@ -216,11 +216,12 @@ describe("parameterized ZK command wrappers", function () {
   });
 
   describe("zk-check", function () {
-    it("builds the fixed proof-check commands in person/disclosure order", function () {
+    it("builds fixed proof and constraint commands in person/disclosure order", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot });
       expect(commands).to.deep.equal([
         {
           circuit: "person",
+          check: "proof",
           executable: process.execPath,
           args: [
             path.join(fixtureRoot, "tasks", "zk-person-hash-check.mjs"),
@@ -237,7 +238,26 @@ describe("parameterized ZK command wrappers", function () {
           cwd: fixtureRoot,
         },
         {
+          circuit: "person",
+          check: "constraints",
+          executable: process.execPath,
+          args: [
+            path.join(fixtureRoot, "circuits", "test", "test_circuit_constraints.js"),
+            "--circuit",
+            "person",
+          ],
+          cwd: fixtureRoot,
+        },
+        {
+          circuit: "person",
+          check: "parents",
+          executable: process.execPath,
+          args: [path.join(fixtureRoot, "circuits", "test", "test_parent_existence.js")],
+          cwd: fixtureRoot,
+        },
+        {
           circuit: "disclosure",
+          check: "proof",
           executable: process.execPath,
           args: [
             path.join(fixtureRoot, "tasks", "zk-disclosure-binding-check.mjs"),
@@ -251,6 +271,17 @@ describe("parameterized ZK command wrappers", function () {
           ],
           cwd: fixtureRoot,
         },
+        {
+          circuit: "disclosure",
+          check: "constraints",
+          executable: process.execPath,
+          args: [
+            path.join(fixtureRoot, "circuits", "test", "test_circuit_constraints.js"),
+            "--circuit",
+            "disclosure",
+          ],
+          cwd: fixtureRoot,
+        },
       ]);
     });
 
@@ -259,10 +290,13 @@ describe("parameterized ZK command wrappers", function () {
       const commands = runZkCheck({
         root: fixtureRoot,
         circuit: "disclosure",
-        runner: (command) => seen.push(command.circuit),
+        runner: (command) => seen.push(`${command.circuit}:${command.check}`),
       });
-      expect(commands.map(({ circuit }) => circuit)).to.deep.equal(["disclosure"]);
-      expect(seen).to.deep.equal(["disclosure"]);
+      expect(commands.map(({ circuit, check }) => `${circuit}:${check}`)).to.deep.equal([
+        "disclosure:proof",
+        "disclosure:constraints",
+      ]);
+      expect(seen).to.deep.equal(["disclosure:proof", "disclosure:constraints"]);
     });
 
     it("propagates a proof-check error and does not run the next circuit", function () {
@@ -272,12 +306,12 @@ describe("parameterized ZK command wrappers", function () {
         runZkCheck({
           root: fixtureRoot,
           runner: (command) => {
-            seen.push(command.circuit);
+            seen.push(`${command.circuit}:${command.check}`);
             throw failure;
           },
         }),
       ).to.throw(failure);
-      expect(seen).to.deep.equal(["person"]);
+      expect(seen).to.deep.equal(["person:proof"]);
     });
 
     it("rejects an invalid runner and programmatic circuit selection", function () {

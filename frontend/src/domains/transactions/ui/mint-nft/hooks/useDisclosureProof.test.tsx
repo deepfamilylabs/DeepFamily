@@ -43,7 +43,7 @@ vi.mock("../../../../../shared/zk/publicSignalSpecs", () => ({
   }),
 }));
 
-vi.mock("../../../../../shared/crypto/identityCommitment", () => ({
+vi.mock("../../../../../shared/identity/fullName", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 

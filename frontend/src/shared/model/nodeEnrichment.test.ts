@@ -50,6 +50,38 @@ describe("nodeEnrichment patch builders", () => {
   });
 
   it("removes every private decrypted field when authoritative anchors change", () => {
+    const current = {
+      personHash: "0xabc",
+      versionIndex: 2,
+      id: "0xabc-v-2",
+      versionCommitment: "old-commitment",
+      metadataPointer: "0x00000000000000000000000000000000000000aa",
+      metadataPayloadHash: "0xold-payload",
+      metadataPayloadLength: 128,
+      metadataUnlockValidated: true,
+      metadataProtocolGeneration: "df-onchain-biography-v1",
+      metadataFormatVersion: 1,
+      identitySuiteId: 1,
+      tag: "private tag",
+      biography: "private biography",
+      fullName: "Private Name",
+      gender: 2,
+      birthYear: 1980,
+      birthMonth: 1,
+      birthDay: 2,
+      isBirthBC: false,
+      metadataPerson: {
+        fullName: "Private Name",
+        gender: 2,
+        birthYear: 1980,
+        birthMonth: 1,
+        birthDay: 2,
+        isBirthBC: false,
+        personHash: "0xabc",
+      },
+      metadataParents: { father: null, mother: null },
+      tokenId: "0",
+    };
     const patch = buildVersionDetailsPatch({
       id: "0xabc-v-2",
       original: { h: "0xabc", v: 2 },
@@ -67,42 +99,23 @@ describe("nodeEnrichment patch builders", () => {
         endorsementCount: 1,
         tokenId: "0",
       },
-      current: {
-        personHash: "0xabc",
-        versionIndex: 2,
-        id: "0xabc-v-2",
-        versionCommitment: "old-commitment",
-        metadataPointer: "0x00000000000000000000000000000000000000aa",
-        metadataPayloadHash: "0xold-payload",
-        metadataPayloadLength: 128,
-        metadataUnlockValidated: true,
-        metadataProtocolGeneration: "df-onchain-biography-v1",
-        metadataFormatVersion: 1,
-        identitySuiteId: 1,
-        tag: "private tag",
-        biography: "private biography",
-        fullName: "Private Name",
-        gender: 2,
-        birthYear: 1980,
-        birthMonth: 1,
-        birthDay: 2,
-        isBirthBC: false,
-        metadataPerson: {
-          fullName: "Private Name",
-          gender: 2,
-          birthYear: 1980,
-          birthMonth: 1,
-          birthDay: 2,
-          isBirthBC: false,
-          personHash: "0xabc",
-        },
-        metadataParents: { father: null, mother: null },
-        tokenId: "0",
-      },
+      current,
       versionDetailsFetchedAt: 1000,
     });
 
     expect(patch.metadataUnlockValidated).toBe(false);
+    const persistedNode = structuredClone(
+      applyNodeEnrichmentPatches({ [current.id]: current }, [{ id: current.id, patch }])[
+        current.id
+      ],
+    );
+    expect(persistedNode).toMatchObject({
+      metadataUnlockValidated: false,
+      versionCommitment: "new-commitment",
+      metadataPointer: "0x00000000000000000000000000000000000000bb",
+      metadataPayloadHash: "0xnew-payload",
+      metadataPayloadLength: 256,
+    });
     for (const key of [
       "tag",
       "biography",
@@ -119,7 +132,96 @@ describe("nodeEnrichment patch builders", () => {
       "isBirthBC",
     ]) {
       expect(patch).not.toHaveProperty(key);
+      expect(persistedNode).not.toHaveProperty(key);
     }
+  });
+
+  it("physically removes stale plaintext even when the invalid marker was already false", () => {
+    const id = "0xabc-v-2";
+    const stale = {
+      personHash: "0xabc",
+      versionIndex: 2,
+      id,
+      tokenId: "0",
+      versionCommitment: "old-commitment",
+      metadataPointer: "0x00000000000000000000000000000000000000aa",
+      metadataPayloadHash: "0xold-payload",
+      metadataPayloadLength: 128,
+      metadataUnlockValidated: false,
+      metadataProtocolGeneration: "df-onchain-biography-v1",
+      metadataFormatVersion: 1,
+      identitySuiteId: 1,
+      metadataPerson: {
+        fullName: "Stale private name",
+        gender: 2,
+        birthYear: 1980,
+        birthMonth: 1,
+        birthDay: 2,
+        isBirthBC: false,
+        personHash: "0xabc",
+      },
+      metadataParents: { father: null, mother: null },
+      fullName: "Stale private name",
+      tag: "stale private tag",
+      biography: "stale private biography",
+    };
+
+    const patch = buildVersionDetailsPatch({
+      id,
+      original: { h: "0xabc", v: 2 },
+      current: stale,
+      parsed: {
+        version: { versionCommitment: "new-commitment" },
+        metadata: {
+          pointer: "0x00000000000000000000000000000000000000bb",
+          payloadHash: "0xnew-payload",
+          payloadLength: 256,
+        },
+        endorsementCount: 1,
+        tokenId: "0",
+      },
+      versionDetailsFetchedAt: 1000,
+    });
+    const patched = applyNodeEnrichmentPatches({ [id]: stale }, [{ id, patch }])[id];
+
+    expect(patched.metadataUnlockValidated).toBe(false);
+    expect(patched.versionCommitment).toBe("new-commitment");
+    expect(patched.metadataPayloadHash).toBe("0xnew-payload");
+    for (const key of [
+      "tag",
+      "biography",
+      "metadataPerson",
+      "metadataParents",
+      "metadataProtocolGeneration",
+      "metadataFormatVersion",
+      "identitySuiteId",
+      "fullName",
+    ]) {
+      expect(patched).not.toHaveProperty(key);
+    }
+  });
+
+  it("clears an unmarked unlock footprint when an authoritative anchor changes", () => {
+    const id = "0xabc-v-2";
+    const patched = applyNodeEnrichmentPatches(
+      {
+        [id]: {
+          personHash: "0xabc",
+          versionIndex: 2,
+          id,
+          tokenId: "0",
+          versionCommitment: "old-commitment",
+          tag: "orphaned private tag",
+          biography: "orphaned private biography",
+        },
+      },
+      [{ id, patch: { versionCommitment: "new-commitment" } }],
+    )[id];
+
+    expect(patched.versionCommitment).toBe("new-commitment");
+    expect(patched.metadataUnlockValidated).toBe(false);
+    expect(patched.tag).toBeUndefined();
+    expect(patched.biography).toBeUndefined();
   });
 
   it("builds nft patch preserving existing fields when nft details omit them", () => {

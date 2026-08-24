@@ -51,11 +51,7 @@ const installedPackageReader = ({ nodePath }) => {
 };
 
 const unreachableInspection = () => ({
-  reactVersion: "18.3.1",
-  reactDomVersion: "18.3.1",
-  viteBuild: true,
   cryptoImports: [],
-  routerRscReferences: [],
 });
 
 const evaluate = (report, options = {}) =>
@@ -72,13 +68,13 @@ const expectFailure = (operation, pattern) => {
 };
 
 describe("exact npm audit exception policy", function () {
-  it("accepts only the reviewed residual graph and reports both advisory sources", function () {
+  it("accepts only the reviewed residual graph and reports its advisory source", function () {
     const result = evaluate(reportFromPolicy());
 
     expect(result).to.deep.equal({
       clean: false,
-      vulnerabilityCount: 14,
-      advisorySources: [1112030, 1124282],
+      vulnerabilityCount: 12,
+      advisorySources: [1112030],
       reviewBy: "2026-11-04",
     });
   });
@@ -144,30 +140,6 @@ describe("exact npm audit exception policy", function () {
     );
   });
 
-  it("invalidates the React Router exception when the app can enter RSC mode", function () {
-    expectFailure(
-      () =>
-        evaluate(reportFromPolicy(), {
-          inspectReachability: () => ({
-            ...unreachableInspection(),
-            reactVersion: "19.2.7",
-            reactDomVersion: "19.2.7",
-          }),
-        }),
-      /requires matching React 18\/React DOM 18 and a Vite SPA build/u,
-    );
-    expectFailure(
-      () =>
-        evaluate(reportFromPolicy(), {
-          inspectReachability: () => ({
-            ...unreachableInspection(),
-            routerRscReferences: ["frontend/src/server.tsx: unstable_matchRSCServerRequest"],
-          }),
-        }),
-      /unreachable only without RSC references/u,
-    );
-  });
-
   it("runs the JSON audit gate and emits a concise reviewed-exception result", function () {
     const stdout = [];
     const result = runNpmAuditPolicy({
@@ -179,10 +151,10 @@ describe("exact npm audit exception policy", function () {
       inspectReachability: unreachableInspection,
     });
 
-    expect(result.vulnerabilityCount).to.equal(14);
+    expect(result.vulnerabilityCount).to.equal(12);
     expect(stdout).to.deep.equal([
-      "npm audit policy passed: 14 vulnerable package(s) are limited to 2 reviewed advisory " +
-        "exception(s); review by 2026-11-04.",
+      "npm audit policy passed: 12 vulnerable package(s) are limited to 1 reviewed advisory " +
+        "exception; review by 2026-11-04.",
     ]);
   });
 });

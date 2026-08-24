@@ -1,14 +1,12 @@
 // @vitest-environment jsdom
-import React from "react";
+import React, { type ComponentProps } from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../../shared/model";
-import { PaperGenealogyView } from "../PaperGenealogyView";
-import { buildPaperGenerations } from "../paperData";
-import {
-  getSuFullRecordText,
-  SU_BODY_LINE_HEIGHT,
-} from "../layout/suPagination";
+import { PaperGenealogyView as PaperGenealogyViewBase } from "../PaperGenealogyView";
+import { buildPaperGenerations as buildPaperGenerationsBase } from "../paperData";
+import { withValidatedPaperMetadata } from "../paperTestMetadata";
+import { getSuFullRecordText, SU_BODY_LINE_HEIGHT } from "../layout/suPagination";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -34,9 +32,24 @@ function makeHash(index: number) {
 }
 
 function makeFamily() {
-  const root = { id: makeNodeId(makeHash(1), 1), depth: 0, personHash: makeHash(1), versionIndex: 1 };
-  const son = { id: makeNodeId(makeHash(2), 1), depth: 1, personHash: makeHash(2), versionIndex: 1 };
-  const daughter = { id: makeNodeId(makeHash(3), 1), depth: 1, personHash: makeHash(3), versionIndex: 1 };
+  const root = {
+    id: makeNodeId(makeHash(1), 1),
+    depth: 0,
+    personHash: makeHash(1),
+    versionIndex: 1,
+  };
+  const son = {
+    id: makeNodeId(makeHash(2), 1),
+    depth: 1,
+    personHash: makeHash(2),
+    versionIndex: 1,
+  };
+  const daughter = {
+    id: makeNodeId(makeHash(3), 1),
+    depth: 1,
+    personHash: makeHash(3),
+    versionIndex: 1,
+  };
   return {
     root,
     son,
@@ -78,6 +91,19 @@ function makeWideFamily(childCount: number) {
       },
     },
   };
+}
+
+function PaperGenealogyView(props: ComponentProps<typeof PaperGenealogyViewBase>) {
+  return (
+    <PaperGenealogyViewBase {...props} nodesData={withValidatedPaperMetadata(props.nodesData)} />
+  );
+}
+
+function buildPaperGenerations(input: Parameters<typeof buildPaperGenerationsBase>[0]) {
+  return buildPaperGenerationsBase({
+    ...input,
+    nodesData: withValidatedPaperMetadata(input.nodesData),
+  });
 }
 
 describe("SuBookRenderer", () => {
@@ -160,9 +186,7 @@ describe("SuBookRenderer", () => {
       "vertical-rl",
     );
     expect(screen.queryByTestId(`paper-su-relation-${family.son.id}`)).toBeNull();
-    expect(screen.getByTestId(`paper-su-female-${family.daughter.id}`).textContent).toContain(
-      "女",
-    );
+    expect(screen.getByTestId(`paper-su-female-${family.daughter.id}`).textContent).toContain("女");
     expect(screen.queryByTestId(`paper-su-female-${family.son.id}`)).toBeNull();
     expect(screen.getAllByTestId(`paper-su-connector-${family.root.id}`).length).toBeGreaterThan(0);
     expect(screen.getByTestId(`paper-su-child-stem-${family.son.id}`)).toBeTruthy();

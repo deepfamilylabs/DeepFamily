@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
-import { useCallback, type MutableRefObject } from "react";
+import { useCallback, useRef, type MutableRefObject } from "react";
 import {
+  DFM1_MAX_ENVELOPE_BYTES,
   ZERO_BYTES32,
   computeVersionHash,
   type MetadataContextInput,
@@ -11,14 +12,17 @@ import {
   createDeepFamilyContract,
   createDeepFamilyReaderContract,
 } from "../../../../../shared/clients/contractFactory";
+import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import {
   cryptoWorkerCall,
   terminateCryptoWorkerIfIdle,
+  type EncryptedPersonVersionEnvelopeV1Result,
   type PreparedPersonVersionContentV1Result,
   type ValidatedPersonVersionV1Result,
 } from "../../../../../shared/workers/cryptoWorkerClient";
 import { terminateZkWorkerIfIdle } from "../../../../../shared/workers/zkWorkerClient";
 import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
+import type { ProofEnvelope } from "../../../../../shared/zk/zk";
 import {
   makeNodeId,
   mergeValidatedMetadataUnlock,
@@ -30,10 +34,18 @@ import {
   buildAddVersionSuccessResultView,
   toAddVersionErrorResult,
 } from "../model/addVersionResultView";
+import {
+  ADD_VERSION_SCOPE_CHANGED,
+  addVersionScopeChangedError,
+  assertAddVersionTransactionScope,
+  createAddVersionTransactionScope,
+  type AddVersionTransactionScope,
+} from "../model/addVersionTransactionScope";
 import type {
   AddVersionErrorResultView,
   AddVersionFormData,
   AddVersionFormInput,
+  AddVersionPublicSignals,
   AddVersionResult,
   AddVersionSuccessResultView,
   AddVersionT,
@@ -44,6 +56,7 @@ interface UseAddVersionSubmitArgs {
   t: AddVersionT;
   signer?: ethers.Signer | null;
   isContractReady: boolean;
+  rpcUrl: string;
   chainId: number;
   contractAddress: string;
   readerAddress: string;
@@ -67,11 +80,11 @@ interface UseAddVersionSubmitArgs {
     submitterAddress: string;
     contentDigestLo: string | bigint;
     contentDigestHi: string | bigint;
-  }) => Promise<{ proof: any; publicSignals: any }>;
+  }) => Promise<{ proof: ProofEnvelope; publicSignals: AddVersionPublicSignals }>;
   setProofGenerationStep: (value: string) => void;
   runAddVersionOrThrow: (args: {
-    proof: any;
-    publicSignals: any;
+    proof: ProofEnvelope;
+    publicSignals: AddVersionPublicSignals;
     fatherVersionIndex: number;
     motherVersionIndex: number;
     metadataEnvelope: Uint8Array;
@@ -90,9 +103,11 @@ interface UseAddVersionSubmitArgs {
 
 export interface RetryableAddVersionSubmission {
   draftKey: string;
+  scope: AddVersionTransactionScope;
+  confirmationRpcUrl: string;
   args: {
-    proof: any;
-    publicSignals: any;
+    proof: ProofEnvelope;
+    publicSignals: AddVersionPublicSignals;
     fatherVersionIndex: number;
     motherVersionIndex: number;
     metadataEnvelope: Uint8Array;
@@ -103,8 +118,68 @@ export interface RetryableAddVersionSubmission {
   personHash: string;
   fatherHash: string;
   motherHash: string;
-  submitterAddress: string;
   broadcastConfirmed: boolean;
+}
+
+function copyProofEnvelope(value: ProofEnvelope): ProofEnvelope {
+  return {
+    circuitId: value.circuitId,
+    proofEncodingId: value.proofEncodingId,
+    proofData: value.proofData,
+  };
+}
+
+function copyAddVersionPublicSignals(value: AddVersionPublicSignals): AddVersionPublicSignals {
+  return {
+    identityCommitment: value.identityCommitment,
+    fatherIdentityCommitment: value.fatherIdentityCommitment,
+    motherIdentityCommitment: value.motherIdentityCommitment,
+    submitterAndSelfSuiteId: value.submitterAndSelfSuiteId,
+    versionCommitment: value.versionCommitment,
+  };
+}
+
+function copyValidatedPersonVersion(
+  value: ValidatedPersonVersionV1Result,
+): ValidatedPersonVersionV1Result {
+  const copyPerson = (person: ValidatedPersonVersionV1Result["metadata"]["person"]) => ({
+    fullName: person.fullName,
+    gender: person.gender,
+    birthYear: person.birthYear,
+    birthMonth: person.birthMonth,
+    birthDay: person.birthDay,
+    isBirthBC: person.isBirthBC,
+    personHash: person.personHash,
+  });
+  const copyParent = (parent: ValidatedPersonVersionV1Result["metadata"]["parents"]["father"]) =>
+    parent === null
+      ? null
+      : {
+          ...copyPerson(parent),
+          versionIndex: parent.versionIndex,
+        };
+
+  // Treat Worker responses as an untrusted runtime boundary even though their
+  // TypeScript shape is narrow. Retain an explicit DTO so future diagnostic or
+  // crypto fields cannot silently join a retryable transaction package.
+  return {
+    metadata: {
+      schema: value.metadata.schema,
+      person: copyPerson(value.metadata.person),
+      parents: {
+        father: copyParent(value.metadata.parents.father),
+        mother: copyParent(value.metadata.parents.mother),
+      },
+      tag: value.metadata.tag,
+      biography: value.metadata.biography,
+    },
+    formatVersion: value.formatVersion,
+    identitySuiteId: value.identitySuiteId,
+    payloadHash: value.payloadHash,
+    versionCommitment: value.versionCommitment,
+    metadataUnlockValidated: true,
+    protocolGeneration: value.protocolGeneration,
+  };
 }
 
 function publicIdentitySnapshot(calc: PersonHashCalculatorHandle | null) {
@@ -130,6 +205,7 @@ function buildDraftKey(input: {
 
 function isDefinitelyNotRetryable(error: unknown): boolean {
   const value = error && typeof error === "object" ? (error as Record<string, any>) : {};
+  if (value.transactionReconciliationFinal === true) return true;
   const code = value.code ?? value.error?.code;
   const reason = String(value.reason ?? value.shortMessage ?? value.message ?? "");
   return (
@@ -137,6 +213,8 @@ function isDefinitelyNotRetryable(error: unknown): boolean {
     code === "ACTION_REJECTED" ||
     code === "INSUFFICIENT_FUNDS" ||
     code === "CALL_EXCEPTION" ||
+    code === ADD_VERSION_SCOPE_CHANGED ||
+    code === "ADD_VERSION_PREVIEW_REJECTED" ||
     code === "TRANSACTION_RECONCILIATION_MISMATCH" ||
     reason.includes("DuplicateVersionCommitment")
   );
@@ -154,22 +232,25 @@ function duplicateVersionError(): Error {
 }
 
 async function verifyConfirmedVersion(input: {
-  signer: ethers.Signer;
+  runner: ethers.ContractRunner;
   contractAddress: string;
   readerAddress: string;
   result: AddVersionResult;
   expectedVersionCommitment: bigint;
   expectedPayloadHash: string;
 }) {
-  const deepFamily = createDeepFamilyContract(input.contractAddress, input.signer);
-  const reader = createDeepFamilyReaderContract(input.readerAddress, input.signer);
+  const deepFamily = createDeepFamilyContract(input.contractAddress, input.runner);
+  const reader = createDeepFamilyReaderContract(input.readerAddress, input.runner);
   const [configuredArchive, readerDeepFamily, readerArchive, rawDetails] = await Promise.all([
     deepFamily.metadataArchive(),
     reader.DEEP_FAMILY(),
     reader.METADATA_ARCHIVE(),
     reader.getVersionDetails(input.result.hash, input.result.index),
   ]);
-  if (!sameHex(configuredArchive, readerArchive) || !sameHex(readerDeepFamily, input.contractAddress)) {
+  if (
+    !sameHex(configuredArchive, readerArchive) ||
+    !sameHex(readerDeepFamily, input.contractAddress)
+  ) {
     throw new Error("Reader and DeepFamily metadata archive binding mismatch after confirmation");
   }
   const details = parseVersionDetailsResult(rawDetails);
@@ -189,6 +270,7 @@ export function useAddVersionSubmit({
   t,
   signer,
   isContractReady,
+  rpcUrl,
   chainId,
   contractAddress,
   readerAddress,
@@ -212,6 +294,14 @@ export function useAddVersionSubmit({
   setIsSubmitting,
   submissionPackageRef,
 }: UseAddVersionSubmitArgs) {
+  const latestRuntimeScopeRef = useRef({
+    signer,
+    chainId,
+    contractAddress,
+    readerAddress,
+  });
+  latestRuntimeScopeRef.current = { signer, chainId, contractAddress, readerAddress };
+
   return useCallback(
     async (data: AddVersionFormInput) => {
       if (!allConsentsChecked) {
@@ -225,7 +315,14 @@ export function useAddVersionSubmit({
       }
       setConsentError(null);
 
-      if (!signer || !isContractReady || !contractAddress || !readerAddress || chainId <= 0) {
+      if (
+        !signer ||
+        !isContractReady ||
+        !rpcUrl ||
+        !contractAddress ||
+        !readerAddress ||
+        chainId <= 0
+      ) {
         setErrorResult(
           toAddVersionErrorResult(
             "WALLET_NOT_CONNECTED",
@@ -257,7 +354,10 @@ export function useAddVersionSubmit({
       setIsSubmitting(true);
       setProofGenerationStep(
         submissionPackageRef.current
-          ? t("addVersion.reusingSubmission", "Reusing the previously verified submission package...")
+          ? t(
+              "addVersion.reusingSubmission",
+              "Reusing the previously verified submission package...",
+            )
           : t("addVersion.preparingData", "Deriving identity material..."),
       );
 
@@ -266,12 +366,27 @@ export function useAddVersionSubmit({
       let fatherIdentity: IdentityMaterial | null = null;
       let motherIdentity: IdentityMaterial | null = null;
       let prepared: PreparedPersonVersionContentV1Result | null = null;
+      let encrypted: EncryptedPersonVersionEnvelopeV1Result | null = null;
+      let validatedWorkerResult: ValidatedPersonVersionV1Result | null = null;
       let cryptoWorkStarted = false;
       let zkWorkStarted = false;
       let cryptoWorkerReleased = false;
       let zkWorkerReleased = false;
 
       const submitPrepared = async (submission: RetryableAddVersionSubmission) => {
+        const assertCurrentScope = async () => {
+          const current = latestRuntimeScopeRef.current;
+          if (!current.signer) throw addVersionScopeChangedError();
+          await assertAddVersionTransactionScope({
+            expected: submission.scope,
+            chainId: current.chainId,
+            contractAddress: current.contractAddress,
+            readerAddress: current.readerAddress,
+            signer: current.signer,
+          });
+        };
+
+        await assertCurrentScope();
         setProofGenerationStep(
           t(
             "addVersion.submittingToBlockchain",
@@ -282,15 +397,21 @@ export function useAddVersionSubmit({
         // A receipt now proves this exact package is on-chain. Never retry it,
         // even if a subsequent Reader/cache check fails.
         submission.broadcastConfirmed = true;
+        await assertCurrentScope();
 
+        const confirmationProvider = getReadonlyProvider(
+          submission.confirmationRpcUrl,
+          submission.scope.chainId,
+        );
         const confirmed = await verifyConfirmedVersion({
-          signer,
-          contractAddress,
-          readerAddress,
+          runner: confirmationProvider,
+          contractAddress: submission.scope.contractAddress,
+          readerAddress: submission.scope.readerAddress,
           result,
           expectedVersionCommitment: submission.versionCommitment,
           expectedPayloadHash: submission.payloadHash,
         });
+        await assertCurrentScope();
         const anchors = {
           personHash: result.hash,
           versionIndex: result.index,
@@ -309,7 +430,7 @@ export function useAddVersionSubmit({
             versionEvent?.fatherVersionIndex ?? submission.args.fatherVersionIndex,
           motherVersionIndex:
             versionEvent?.motherVersionIndex ?? submission.args.motherVersionIndex,
-          addedBy: versionEvent?.addedBy ?? submission.submitterAddress,
+          addedBy: versionEvent?.addedBy ?? submission.scope.submitterAddress,
           timestamp: versionEvent?.timestamp,
           tokenId: "0",
         };
@@ -321,6 +442,7 @@ export function useAddVersionSubmit({
           formatVersion: submission.validated.formatVersion,
           identitySuiteId: submission.validated.identitySuiteId,
         });
+        await assertCurrentScope();
         cacheValidatedPersonVersion(node);
         submissionPackageRef.current = null;
 
@@ -351,6 +473,12 @@ export function useAddVersionSubmit({
         }
 
         const submitterAddress = await signer.getAddress();
+        const scope = createAddVersionTransactionScope({
+          chainId,
+          contractAddress,
+          readerAddress,
+          submitterAddress,
+        });
 
         // Application-level KDF concurrency is deliberately one: each awaited
         // identity job finishes before the next role is sent to the worker.
@@ -397,14 +525,14 @@ export function useAddVersionSubmit({
 
         // This public commitment preflight happens before compression, Groth16,
         // or file encryption so random re-encryption cannot waste proof work.
-        const deepFamily = createDeepFamilyContract(contractAddress, signer);
+        const deepFamily = createDeepFamilyContract(scope.contractAddress, signer);
         if (await deepFamily.versionExists(personIdentity.personHash, versionHash)) {
           throw duplicateVersionError();
         }
 
         const context: MetadataContextInput = {
-          chainId,
-          deepFamilyProxy: contractAddress,
+          chainId: scope.chainId,
+          deepFamilyProxy: scope.contractAddress,
           personHash: personIdentity.personHash,
           fatherHash,
           fatherVersionIndex: processedData.fatherVersionIndex,
@@ -413,21 +541,36 @@ export function useAddVersionSubmit({
           versionCommitment,
         };
 
+        const sizePreflight = await cryptoWorkerCall(
+          "preflightPersonVersionEnvelopeSizeV1",
+          { metadata },
+          { timeoutMs: 120_000 },
+        );
+        setProofGenerationStep(
+          t(
+            "addVersion.metadataSizeReady",
+            `Metadata fits in an exact ${sizePreflight.envelopeLength}-byte envelope.`,
+          ),
+        );
+
         zkWorkStarted = true;
         const { proof, publicSignals } = await generatePersonCommitmentProof({
           personData: personIdentity.personData,
           fatherData: fatherIdentity?.personData ?? null,
           motherData: motherIdentity?.personData ?? null,
-          submitterAddress,
+          submitterAddress: scope.submitterAddress,
           contentDigestLo: prepared.contentDigestLo,
           contentDigestHi: prepared.contentDigestHi,
-        });
+        }).then((generated) => ({
+          proof: copyProofEnvelope(generated.proof),
+          publicSignals: copyAddVersionPublicSignals(generated.publicSignals),
+        }));
         if (BigInt(publicSignals.versionCommitment) !== versionCommitment) {
           throw new Error("Relation proof versionCommitment does not match canonical metadata");
         }
 
         setProofGenerationStep(t("addVersion.encryptingMetadata", "Encrypting metadata..."));
-        const encrypted = await cryptoWorkerCall(
+        encrypted = await cryptoWorkerCall(
           "encryptPersonVersionEnvelopeV1",
           {
             metadata,
@@ -437,7 +580,17 @@ export function useAddVersionSubmit({
           },
           { timeoutMs: 240_000 },
         );
-        const validated = await cryptoWorkerCall(
+        const metadataEnvelope = ethers.getBytes(encrypted.envelopeHex);
+        if (
+          metadataEnvelope.length > DFM1_MAX_ENVELOPE_BYTES ||
+          metadataEnvelope.length !== encrypted.envelopeLength ||
+          encrypted.canonicalJsonLength !== sizePreflight.canonicalJsonLength ||
+          encrypted.envelopeLength !== sizePreflight.envelopeLength ||
+          encrypted.compressedPlaintextLength !== sizePreflight.compressedPlaintextLength
+        ) {
+          throw new Error("Encrypted envelope length differs from deterministic size preflight");
+        }
+        validatedWorkerResult = await cryptoWorkerCall(
           "roundTripPersonVersionEnvelopeV1",
           {
             envelopeHex: encrypted.envelopeHex,
@@ -445,36 +598,45 @@ export function useAddVersionSubmit({
             context,
             expectedMetadata: metadata,
             submitterAndSelfSuiteId: publicSignals.submitterAndSelfSuiteId.toString(),
-            expectedSubmitter: submitterAddress,
+            expectedSubmitter: scope.submitterAddress,
           },
           { timeoutMs: 300_000 },
         );
         if (
-          validated.versionCommitment !== versionCommitment.toString() ||
-          !sameHex(validated.payloadHash, encrypted.payloadHash)
+          validatedWorkerResult.versionCommitment !== versionCommitment.toString() ||
+          !sameHex(validatedWorkerResult.payloadHash, encrypted.payloadHash)
         ) {
           throw new Error("Local production decoder round-trip did not reproduce the submission");
         }
+        const validated = copyValidatedPersonVersion(validatedWorkerResult);
+        const payloadHash = encrypted.payloadHash;
+
+        // Neither result shape is allowed to flow into retry state wholesale.
+        // The retained package below uses only explicit ciphertext/public
+        // fields and the projected validated display DTO.
+        encrypted = null;
+        validatedWorkerResult = null;
 
         // Freeze the exact public transaction material before clearing secrets.
         // RPC timeout/re-sign/replacement retries reuse this same package and
         // therefore never rerun KDF, proving, compression, or encryption.
         const submission: RetryableAddVersionSubmission = {
           draftKey,
+          scope,
+          confirmationRpcUrl: rpcUrl,
           args: {
             proof,
             publicSignals,
             fatherVersionIndex: processedData.fatherVersionIndex,
             motherVersionIndex: processedData.motherVersionIndex,
-            metadataEnvelope: ethers.getBytes(encrypted.envelopeHex),
+            metadataEnvelope,
           },
           versionCommitment,
-          payloadHash: encrypted.payloadHash,
+          payloadHash,
           validated,
           personHash: personIdentity.personHash,
           fatherHash,
           motherHash,
-          submitterAddress,
           broadcastConfirmed: false,
         };
         submissionPackageRef.current = submission;
@@ -490,6 +652,8 @@ export function useAddVersionSubmit({
         fatherIdentity = null;
         motherIdentity = null;
         prepared = null;
+        encrypted = null;
+        validatedWorkerResult = null;
         cryptoWorkerReleased = terminateCryptoWorkerIfIdle();
         zkWorkerReleased = terminateZkWorkerIfIdle();
         await submitPrepared(submission);
@@ -497,6 +661,10 @@ export function useAddVersionSubmit({
         const retained = submissionPackageRef.current;
         if (retained?.broadcastConfirmed || isDefinitelyNotRetryable(error)) {
           submissionPackageRef.current = null;
+        }
+        if ((error as any)?.code === "ADD_VERSION_PREVIEW_REJECTED") {
+          setProofGenerationStep("");
+          return;
         }
         console.error("Add version failed:", sanitizeErrorForLogging(error));
         const friendly = getFriendlyError(error, t);
@@ -516,6 +684,8 @@ export function useAddVersionSubmit({
         fatherIdentity = null;
         motherIdentity = null;
         prepared = null;
+        encrypted = null;
+        validatedWorkerResult = null;
         if (cryptoWorkStarted && !cryptoWorkerReleased) terminateCryptoWorkerIfIdle();
         if (zkWorkStarted && !zkWorkerReleased) terminateZkWorkerIfIdle();
         setIsSubmitting(false);
@@ -535,6 +705,7 @@ export function useAddVersionSubmit({
       onSuccess,
       personCalcRef,
       readerAddress,
+      rpcUrl,
       resolveIdentityMaterial,
       runAddVersionOrThrow,
       setConsentError,

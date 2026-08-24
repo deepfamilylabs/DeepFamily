@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { makeNodeId, type NodeData } from "../../../../../shared/model";
-import { buildPaperGenerations, type PaperPerson, type TranslateFn } from "../paperData";
+import {
+  buildPaperGenerations as buildPaperGenerationsBase,
+  type PaperPerson,
+  type TranslateFn,
+} from "../paperData";
+import { withValidatedPaperMetadata } from "../paperTestMetadata";
 import {
   buildSuPaperBook,
   getSuFullRecordText,
@@ -17,9 +22,7 @@ import {
 import { measureRecordUnits } from "../paperText";
 
 const translate: TranslateFn = (key, fallback, options) =>
-  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
-    String(options?.[name] ?? ""),
-  );
+  (fallback || key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(options?.[name] ?? ""));
 
 function makeHash(index: number) {
   return `0x${index.toString(16).padStart(64, "0")}`;
@@ -48,9 +51,24 @@ function makeLinearGraph(length: number) {
 }
 
 function makeBranchGraph() {
-  const root = { id: makeNodeId(makeHash(101), 1), depth: 0, personHash: makeHash(101), versionIndex: 1 };
-  const first = { id: makeNodeId(makeHash(102), 1), depth: 1, personHash: makeHash(102), versionIndex: 1 };
-  const second = { id: makeNodeId(makeHash(103), 1), depth: 1, personHash: makeHash(103), versionIndex: 1 };
+  const root = {
+    id: makeNodeId(makeHash(101), 1),
+    depth: 0,
+    personHash: makeHash(101),
+    versionIndex: 1,
+  };
+  const first = {
+    id: makeNodeId(makeHash(102), 1),
+    depth: 1,
+    personHash: makeHash(102),
+    versionIndex: 1,
+  };
+  const second = {
+    id: makeNodeId(makeHash(103), 1),
+    depth: 1,
+    personHash: makeHash(103),
+    versionIndex: 1,
+  };
   const firstChildren = Array.from({ length: 2 }, (_value, index) => ({
     id: makeNodeId(makeHash(104 + index), 1),
     depth: 2,
@@ -89,7 +107,12 @@ function makeBranchGraph() {
 }
 
 function makeWideGraph(childCount: number) {
-  const root = { id: makeNodeId(makeHash(201), 1), depth: 0, personHash: makeHash(201), versionIndex: 1 };
+  const root = {
+    id: makeNodeId(makeHash(201), 1),
+    depth: 0,
+    personHash: makeHash(201),
+    versionIndex: 1,
+  };
   const children = Array.from({ length: childCount }, (_value, index) => ({
     id: makeNodeId(makeHash(202 + index), 1),
     depth: 1,
@@ -109,9 +132,24 @@ function makeWideGraph(childCount: number) {
 }
 
 function makeSecondGenerationOverflowGraph(childCount: number) {
-  const root = { id: makeNodeId(makeHash(301), 1), depth: 0, personHash: makeHash(301), versionIndex: 1 };
-  const elderSibling = { id: makeNodeId(makeHash(302), 1), depth: 1, personHash: makeHash(302), versionIndex: 1 };
-  const parent = { id: makeNodeId(makeHash(303), 1), depth: 1, personHash: makeHash(303), versionIndex: 1 };
+  const root = {
+    id: makeNodeId(makeHash(301), 1),
+    depth: 0,
+    personHash: makeHash(301),
+    versionIndex: 1,
+  };
+  const elderSibling = {
+    id: makeNodeId(makeHash(302), 1),
+    depth: 1,
+    personHash: makeHash(302),
+    versionIndex: 1,
+  };
+  const parent = {
+    id: makeNodeId(makeHash(303), 1),
+    depth: 1,
+    personHash: makeHash(303),
+    versionIndex: 1,
+  };
   const children = Array.from({ length: childCount }, (_value, index) => ({
     id: makeNodeId(makeHash(304 + index), 1),
     depth: 2,
@@ -143,13 +181,14 @@ function makeGenerations(
   graph: ReturnType<typeof makeLinearGraph>["graph"],
   nodesData: Record<string, NodeData> = {},
 ) {
-  return buildPaperGenerations({ graph, nodesData, t: translate });
+  return buildPaperGenerationsBase({
+    graph,
+    nodesData: withValidatedPaperMetadata(nodesData),
+    t: translate,
+  });
 }
 
-function getPrimaryEntry(
-  entries: SuPersonEntry[],
-  personId: string,
-): SuPersonEntry | undefined {
+function getPrimaryEntry(entries: SuPersonEntry[], personId: string): SuPersonEntry | undefined {
   return entries.find((entry) => entry.person.id === personId && !entry.continued);
 }
 
@@ -168,9 +207,7 @@ describe("buildSuPaperBook", () => {
     expect(book.charts[0].generationDepths).toEqual([0, 1, 2, 3, 4]);
     expect(book.charts[1].generationDepths).toEqual([4, 5, 6, 7, 8]);
     expect(book.charts[1].repeatedDepth).toBe(4);
-    expect(book.charts[1].spreads[0].rows[0].entries[0].person.id).toBe(
-      linear.graph.nodes[4].id,
-    );
+    expect(book.charts[1].spreads[0].rows[0].entries[0].person.id).toBe(linear.graph.nodes[4].id);
   });
 
   it("keeps each branch contiguous with the parent at the branch's right edge", () => {
@@ -238,9 +275,9 @@ describe("buildSuPaperBook", () => {
     expect(rightEntries).toHaveLength(7);
     expect(leftEntries).toHaveLength(7);
     expect(Math.min(...rightEntries.map((entry) => entry.x))).toBeCloseTo(0);
-    expect(
-      Math.max(...leftEntries.map((entry) => entry.x + entry.slotWidth)),
-    ).toBeCloseTo(metrics.leftBodyWidth - SU_LEFT_SPINE_CONTENT_GAP);
+    expect(Math.max(...leftEntries.map((entry) => entry.x + entry.slotWidth))).toBeCloseTo(
+      metrics.leftBodyWidth - SU_LEFT_SPINE_CONTENT_GAP,
+    );
   });
 
   it("keeps the first Su name lane reserved while a left-page record grows across slots", () => {
@@ -353,14 +390,10 @@ describe("buildSuPaperBook", () => {
 
     expect(connectors.some((connector) => connector.kind === "local")).toBe(true);
     expect(
-      connectors.some(
-        (connector) => connector.kind === "outgoing" && connector.side === "right",
-      ),
+      connectors.some((connector) => connector.kind === "outgoing" && connector.side === "right"),
     ).toBe(true);
     expect(
-      connectors.some(
-        (connector) => connector.kind === "incoming" && connector.side === "left",
-      ),
+      connectors.some((connector) => connector.kind === "incoming" && connector.side === "left"),
     ).toBe(true);
     expect(book.charts[0].spreads.length).toBeGreaterThan(1);
     const firstSpreadExitBridge = book.charts[0].spreads[0].connectors.find(
@@ -487,10 +520,7 @@ describe("buildSuPaperBook", () => {
       .flatMap((row) => row.entries)
       .find((entry) => entry.person.id === secondChild.id && !entry.continued);
 
-    expect(firstIncoming?.childIds).toEqual([
-      firstChildren[15].id,
-      firstChildren[16].id,
-    ]);
+    expect(firstIncoming?.childIds).toEqual([firstChildren[15].id, firstChildren[16].id]);
     expect(secondLocal?.childIds).toEqual([secondChild.id]);
     expect(firstIncoming?.horizontalY).toBe(secondLocal?.horizontalY);
     expect(firstIncoming?.horizontalStartX).toBeGreaterThan(secondChildEntry?.centerX || 0);
@@ -559,9 +589,7 @@ describe("buildSuPaperBook", () => {
 
     expect(continuationSpread).toBeDefined();
     expect(
-      continuationSpread?.rows[1].entries.some(
-        (entry) => entry.person.id === branch.parent.id,
-      ),
+      continuationSpread?.rows[1].entries.some((entry) => entry.person.id === branch.parent.id),
     ).toBe(false);
     expect(leftIncoming?.horizontalStartX).toBe(0);
     expect(leftIncoming?.horizontalEndX).toBe(metrics.leftBodyWidth);

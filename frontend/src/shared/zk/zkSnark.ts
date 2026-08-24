@@ -1,5 +1,6 @@
 // Fresh-v1 PersonRelation / DisclosureBinding proof generation and verification.
 
+import { canonicalizeFullName } from "@deepfamily/protocol-core";
 import type { Groth16Proof, PersonData } from "./zk";
 import type { ProofDescriptor } from "./proofDescriptors";
 import {
@@ -17,7 +18,6 @@ import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
   PERSON_RELATION_PROOF_DESCRIPTOR,
 } from "./proofDescriptors";
-import { canonicalizeFullName } from "../crypto/identityCommitment";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 

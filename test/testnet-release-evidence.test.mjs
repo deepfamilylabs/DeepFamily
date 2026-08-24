@@ -5,11 +5,16 @@ import { expect } from "chai";
 
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
+  TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
   TESTNET_RELEASE_READINESS_GATES,
   TESTNET_RELEASE_REQUIRED_STEPS,
   validateTestnetReleaseEvidence,
 } from "../scripts/lib/testnetReleaseEvidence.mjs";
 import { publishTestnetReleaseEvidence } from "../scripts/lib/releaseEvidencePublisher.mjs";
+import {
+  protocolDeploymentEvidenceFromAcceptanceReport,
+  protocolDeploymentEvidenceSha256,
+} from "../scripts/lib/protocolReleaseManifest.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
@@ -40,6 +45,15 @@ const TOKEN = address(7);
 const VERIFIER_ADAPTER = address(9);
 const READER = address(10);
 const SAFE_OWNERS = [address(11), address(12), address(13)];
+const PERSON_VERIFIER = address(14);
+const DISCLOSURE_BINDING_VERIFIER = address(15);
+const METADATA_ARCHIVE = address(16);
+const ADAPTER_ARTIFACT_SHA256 = "31".repeat(32);
+const ADAPTER_RUNTIME_SHA256 = "32".repeat(32);
+const ARCHIVE_ARTIFACT_SHA256 = "33".repeat(32);
+const ARCHIVE_RUNTIME_SHA256 = "34".repeat(32);
+const READER_ARTIFACT_SHA256 = "35".repeat(32);
+const READER_RUNTIME_SHA256 = "36".repeat(32);
 const COMPONENT_HASH = `0x${"ab".repeat(32)}`;
 const ROLE_HASH = `0x${"bc".repeat(32)}`;
 const ZERO_ADDRESS = `0x${"00".repeat(20)}`;
@@ -52,6 +66,7 @@ const VERIFIED_CONTRACTS = [
   ["initial-deployment", "PersonCommitmentVerifier"],
   ["initial-deployment", "DisclosureBindingVerifier"],
   ["initial-deployment", "Groth16VerifierAdapter"],
+  ["initial-deployment", "MetadataArchiveV1"],
   ["initial-deployment", "DeepFamily"],
   ["initial-deployment", "UUPSProxy"],
   ["initial-deployment", "DeepFamilyReader"],
@@ -119,12 +134,66 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
       protocolGeneration: PROTOCOL_GENERATION,
       releaseStatus: "production",
       goldenVectors: { sha256: GOLDEN_VECTOR_SHA256 },
+      proofRoutes: [
+        {
+          purpose: "PersonRelation",
+          purposeOrdinal: 0,
+          circuitId: 1,
+          proofEncodingId: 1,
+        },
+        {
+          purpose: "DisclosureBinding",
+          purposeOrdinal: 1,
+          circuitId: 1,
+          proofEncodingId: 1,
+        },
+      ],
+      deployments: {
+        groth16VerifierAdapter: { artifactSha256: ADAPTER_ARTIFACT_SHA256 },
+        metadataArchiveV1: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
+        deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
+      },
     },
   };
 };
 
-const validReport = () => ({
-  schemaVersion: 4,
+const protocolDeploymentArtifactInspector = ({ deployments }) => {
+  expect(deployments).to.deep.equal({
+    groth16VerifierAdapter: {
+      personVerifierImmutable: PERSON_VERIFIER,
+      disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
+    },
+    metadataArchiveV1: { deepFamilyImmutable: DEEP_FAMILY },
+    deepFamilyReader: {
+      deepFamilyImmutable: DEEP_FAMILY,
+      metadataArchiveImmutable: METADATA_ARCHIVE,
+    },
+  });
+  return {
+    groth16VerifierAdapter: {
+      artifactSha256: ADAPTER_ARTIFACT_SHA256,
+      runtimeSha256: ADAPTER_RUNTIME_SHA256,
+    },
+    metadataArchiveV1: {
+      artifactSha256: ARCHIVE_ARTIFACT_SHA256,
+      runtimeSha256: ARCHIVE_RUNTIME_SHA256,
+    },
+    deepFamilyReader: {
+      artifactSha256: READER_ARTIFACT_SHA256,
+      runtimeSha256: READER_RUNTIME_SHA256,
+    },
+  };
+};
+
+const bindDeploymentEvidence = (report) => {
+  report.terminalGovernanceState.deploymentEvidenceSha256 = protocolDeploymentEvidenceSha256(
+    protocolDeploymentEvidenceFromAcceptanceReport(report),
+  );
+  return report;
+};
+
+const validReportTemplate = () => ({
+  schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
   evidenceType: TESTNET_RELEASE_EVIDENCE_TYPE,
   governanceLifecycleIncluded: false,
   mode: "acceptance",
@@ -189,7 +258,10 @@ const validReport = () => ({
     deepFamily: DEEP_FAMILY,
     deepFamilyImplementation: DEEP_FAMILY_IMPLEMENTATION,
     token: TOKEN,
+    personCommitmentVerifier: PERSON_VERIFIER,
+    disclosureBindingVerifier: DISCLOSURE_BINDING_VERIFIER,
     groth16VerifierAdapter: VERIFIER_ADAPTER,
+    metadataArchive: METADATA_ARCHIVE,
     deepFamilyReader: READER,
   },
   timelockDeployment: { minDelaySeconds: MIN_DELAY },
@@ -280,6 +352,7 @@ const validReport = () => ({
       address: DEEP_FAMILY,
       owner: TIMELOCK,
       implementation: DEEP_FAMILY_IMPLEMENTATION,
+      metadataArchive: METADATA_ARCHIVE,
       personCommitmentVerifier: VERIFIER_ADAPTER,
       disclosureBindingVerifier: VERIFIER_ADAPTER,
       protocolEndorsementFeeBps: "500",
@@ -293,7 +366,38 @@ const validReport = () => ({
     reader: {
       address: READER,
       deepFamily: DEEP_FAMILY,
+      metadataArchive: METADATA_ARCHIVE,
+      artifactSha256: READER_ARTIFACT_SHA256,
+      runtimeSha256: READER_RUNTIME_SHA256,
     },
+    verifierAdapter: {
+      address: VERIFIER_ADAPTER,
+      personVerifier: PERSON_VERIFIER,
+      disclosureBindingVerifier: DISCLOSURE_BINDING_VERIFIER,
+      artifactSha256: ADAPTER_ARTIFACT_SHA256,
+      runtimeSha256: ADAPTER_RUNTIME_SHA256,
+    },
+    archive: {
+      address: METADATA_ARCHIVE,
+      deepFamily: DEEP_FAMILY,
+      artifactSha256: ARCHIVE_ARTIFACT_SHA256,
+      runtimeSha256: ARCHIVE_RUNTIME_SHA256,
+    },
+    proofRoutes: [
+      {
+        purpose: "PersonRelation",
+        purposeOrdinal: 0,
+        circuitId: 1,
+        proofEncodingId: 1,
+      },
+      {
+        purpose: "DisclosureBinding",
+        purposeOrdinal: 1,
+        circuitId: 1,
+        proofEncodingId: 1,
+      },
+    ],
+    deploymentEvidenceSha256: null,
   },
   budget: {
     refund: {
@@ -306,6 +410,8 @@ const validReport = () => ({
   steps: EXPECTED_INITIAL_RELEASE_STEPS.map((name) => ({ name, status: "passed" })),
 });
 
+const validReport = () => bindDeploymentEvidence(validReportTemplate());
+
 const expectRejected = async (operation, pattern) => {
   let error;
   try {
@@ -317,7 +423,7 @@ const expectRejected = async (operation, pattern) => {
   expect(error.message).to.match(pattern);
 };
 
-describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
+describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
   let repositoryRoot;
   let reportPath;
   let destinationPath;
@@ -331,6 +437,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       mainnetMinDelaySeconds: MIN_DELAY,
       currentCommit: COMMIT,
       protocolManifestInspector,
+      protocolDeploymentArtifactInspector,
       ...overrides,
     });
 
@@ -352,6 +459,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       currentCommit: COMMIT,
       expectedAcceptanceInputDigest: INPUT_DIGEST,
       protocolManifestInspector,
+      protocolDeploymentArtifactInspector,
       ...overrides,
     });
 
@@ -395,7 +503,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       sha256: result.reportSha256,
     });
     expect(result.publicSummary).to.deep.include({
-      schemaVersion: 4,
+      schemaVersion: 5,
       evidenceType: TESTNET_RELEASE_EVIDENCE_TYPE,
       governanceLifecycleIncluded: false,
       acceptanceMode: "release-rehearsal",
@@ -552,6 +660,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     report.network.name = "sepolia";
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
+    bindDeploymentEvidence(report);
     await writeReport(report);
 
     const result = await validate({
@@ -585,6 +694,10 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     await expectRejected(
       () => validate({ protocolManifestInspector: null }),
       /protocolManifestInspector must be a function/iu,
+    );
+    await expectRejected(
+      () => validate({ protocolDeploymentArtifactInspector: null }),
+      /protocolDeploymentArtifactInspector must be a function/iu,
     );
   });
 
@@ -653,7 +766,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
 
   it("strictly requires the release report identity and exact target chain", async function () {
     const mutations = [
-      ["schemaVersion", 3, /schemaVersion must be 4/iu],
+      ["schemaVersion", 4, /schemaVersion must be 5/iu],
       ["evidenceType", "governance-lifecycle", /evidenceType must be "initial-mainnet-release"/iu],
       ["governanceLifecycleIncluded", true, /governanceLifecycleIncluded must be false/iu],
       ["mode", "recovery", /mode must be "acceptance"/iu],
@@ -713,7 +826,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
             attempts: 1,
             status: "passed",
           }),
-        /exactly the schema v4 initial-release contract set/iu,
+        /exactly the schema v5 initial-release contract set/iu,
       ]),
       ...[
         "delayed-deep-treasury-transfer",
@@ -722,7 +835,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
         "storage-safe-timelocked-uups-upgrade",
       ].map((name) => [
         (report) => report.steps.push({ name, status: "passed" }),
-        /exactly the schema v4 initial-release step set/iu,
+        /exactly the schema v5 initial-release step set/iu,
       ]),
       ...[
         "fee-update-schedule",
@@ -809,7 +922,7 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     );
   });
 
-  it("requires the exact schema v4 readiness gate set and every gate to be true", async function () {
+  it("requires the exact schema v5 readiness gate set and every gate to be true", async function () {
     const failedGate = validReport();
     failedGate.releaseReadinessGates.refundCompleted = false;
     await writeReport(failedGate);
@@ -818,12 +931,12 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
     const missingGate = validReport();
     delete missingGate.releaseReadinessGates.cleanReleaseCommit;
     await writeReport(missingGate);
-    await expectRejected(() => validate(), /exactly the schema v4 initial-release gate set/iu);
+    await expectRejected(() => validate(), /exactly the schema v5 initial-release gate set/iu);
 
     const extraGate = validReport();
     extraGate.releaseReadinessGates.unrecognizedGate = true;
     await writeReport(extraGate);
-    await expectRejected(() => validate(), /exactly the schema v4 initial-release gate set/iu);
+    await expectRejected(() => validate(), /exactly the schema v5 initial-release gate set/iu);
   });
 
   it("requires production Trusted Setup evidence behind the production configuration gate", async function () {
@@ -1044,14 +1157,14 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => report.verification.contracts.pop(),
-        /exactly the schema v4 initial-release contract set/iu,
+        /exactly the schema v5 initial-release contract set/iu,
       ],
       [
         (report) =>
           (report.steps = report.steps.filter(
             (step) => step.name !== "terminal-governance-state-verified",
           )),
-        /exactly the schema v4 initial-release step set/iu,
+        /exactly the schema v5 initial-release step set/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.safe.threshold = 1),
@@ -1086,6 +1199,39 @@ describe("schema v4 initial-mainnet-release rehearsal evidence", function () {
       [
         (report) => (report.terminalGovernanceState.reader.deepFamily = address(999)),
         /terminalGovernanceState\.reader\.deepFamily/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.deepFamily.metadataArchive = address(999)),
+        /terminalGovernanceState\.deepFamily\.metadataArchive/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.verifierAdapter.personVerifier = address(999)),
+        /terminalGovernanceState\.verifierAdapter\.personVerifier/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.archive.deepFamily = address(999)),
+        /terminalGovernanceState\.archive\.deepFamily/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.reader.metadataArchive = address(999)),
+        /terminalGovernanceState\.reader\.metadataArchive/iu,
+      ],
+      [
+        (report) =>
+          (report.terminalGovernanceState.verifierAdapter.artifactSha256 = "91".repeat(32)),
+        /Groth16VerifierAdapter artifactSha256/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.archive.runtimeSha256 = "92".repeat(32)),
+        /MetadataArchiveV1 runtimeSha256/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.proofRoutes[0].proofEncodingId = 2),
+        /terminalGovernanceState\.proofRoutes/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.deploymentEvidenceSha256 = "93".repeat(32)),
+        /terminalGovernanceState\.deploymentEvidenceSha256/iu,
       ],
     ];
     for (const [mutate, pattern] of cases) {

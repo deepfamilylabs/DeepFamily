@@ -1,11 +1,6 @@
 import { useCallback } from "react";
 import type React from "react";
-import {
-  deleteBlob,
-  isIndexedDBSupported,
-  readBlob,
-  writeBlob,
-} from "../../../shared/cache/persistence";
+import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
 import {
   csKey,
@@ -22,7 +17,9 @@ import {
   applyNodeDetailVersionDetails,
   bumpNodeEndorsementCount,
   clearAllMetadataUnlocks,
+  isMetadataUnlockUsable,
   makeNodeId,
+  rebaseValidatedMetadataUnlock,
   type NodeData,
   type NodeId,
   type NodeKeyMinimal,
@@ -46,6 +43,15 @@ import {
   type TreeTxInvalidationInput,
 } from "../services/treeInvalidation";
 import { applyTotalVersionsToNodes } from "../selectors/treeTotals";
+import {
+  captureTreeNodesPersistenceRevision,
+  clearTreeMetadataUnlocks,
+  deleteTreeNodesSnapshot,
+  invalidateAllTreeNodesWrites,
+  invalidateTreeNodesPlaintextWrites,
+  isTreeNodesPersistenceRevisionCurrent,
+  updateTreeNodesSnapshot,
+} from "../services/treeNodesPersistence";
 import type { TreeProgress } from "./types";
 
 interface UseTreeCacheActionsOptions {
@@ -71,7 +77,46 @@ interface UseTreeCacheActionsOptions {
   totalVersionsTtlMs: number;
 }
 
+function projectConfirmedPersonVersion(node: NodeData): NodeData {
+  if (!isMetadataUnlockUsable(node)) {
+    throw new Error("Only fully validated metadata may enter the confirmed version cache");
+  }
+  const id = makeNodeId(node.personHash, Number(node.versionIndex));
+  const publicSnapshot: NodeData = {
+    id,
+    personHash: node.personHash,
+    versionIndex: Number(node.versionIndex),
+    versionCommitment: node.versionCommitment,
+    metadataPointer: node.metadataPointer,
+    metadataPayloadHash: node.metadataPayloadHash,
+    metadataPayloadLength: node.metadataPayloadLength,
+    ...(node.fatherHash !== undefined ? { fatherHash: node.fatherHash } : {}),
+    ...(node.motherHash !== undefined ? { motherHash: node.motherHash } : {}),
+    ...(node.fatherVersionIndex !== undefined
+      ? { fatherVersionIndex: node.fatherVersionIndex }
+      : {}),
+    ...(node.motherVersionIndex !== undefined
+      ? { motherVersionIndex: node.motherVersionIndex }
+      : {}),
+    ...(node.addedBy !== undefined ? { addedBy: node.addedBy } : {}),
+    ...(node.timestamp !== undefined ? { timestamp: node.timestamp } : {}),
+    ...(node.endorsementCount !== undefined ? { endorsementCount: node.endorsementCount } : {}),
+    ...(node.tokenId !== undefined ? { tokenId: node.tokenId } : {}),
+    ...(node.versionDetailsFetchedAt !== undefined
+      ? { versionDetailsFetchedAt: node.versionDetailsFetchedAt }
+      : {}),
+    ...(node.totalVersions !== undefined ? { totalVersions: node.totalVersions } : {}),
+  };
+  return rebaseValidatedMetadataUnlock(publicSnapshot, node);
+}
+
 export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
+  const nodesStorageKey = `${options.storageNS}::nodesData`;
+  const captureMetadataCacheRevision = useCallback(
+    () => captureTreeNodesPersistenceRevision(nodesStorageKey),
+    [nodesStorageKey],
+  );
+
   const clearTreeQueryCaches = useCallback(
     (includeNodeDetailKeys: boolean) => {
       options.queryCacheRef.current.clear("tv:");
@@ -122,9 +167,11 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.setReachableNodeIds([]);
     options.setProgress(undefined);
     if (options.useIndexedDbCache && isIndexedDBSupported()) {
-      deleteBlob(`${options.storageNS}::nodesData`).catch(() => {});
+      deleteTreeNodesSnapshot(nodesStorageKey).catch(() => {});
       deleteBlob(options.edgesUnionKey).catch(() => {});
       deleteBlob(options.edgesStrictKey).catch(() => {});
+    } else {
+      invalidateAllTreeNodesWrites(nodesStorageKey);
     }
   }, [
     clearTreeQueryCaches,
@@ -135,13 +182,26 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.setNodesData,
     options.setProgress,
     options.setReachableNodeIds,
-    options.storageNS,
+    nodesStorageKey,
     options.useIndexedDbCache,
   ]);
 
   const clearMetadataUnlockCache = useCallback(() => {
-    options.setNodesData((current) => clearAllMetadataUnlocks(current));
-  }, [options.setNodesData]);
+    const lockedSnapshot = clearAllMetadataUnlocks(options.nodesDataRef.current);
+    // Keep the imperative ref in lockstep immediately: callers may unmount or
+    // start another cache operation before React runs the normal ref effect.
+    options.nodesDataRef.current = lockedSnapshot;
+    options.setNodesData((current) => {
+      const lockedCurrent = clearAllMetadataUnlocks(current);
+      options.nodesDataRef.current = lockedCurrent;
+      return lockedCurrent;
+    });
+    if (!options.useIndexedDbCache || !isIndexedDBSupported()) {
+      invalidateTreeNodesPlaintextWrites(nodesStorageKey);
+      return Promise.resolve();
+    }
+    return clearTreeMetadataUnlocks(nodesStorageKey, lockedSnapshot);
+  }, [nodesStorageKey, options.nodesDataRef, options.setNodesData, options.useIndexedDbCache]);
 
   const invalidateTreeRootCache = useCallback(() => {
     options.setReachableNodeIds([]);
@@ -332,52 +392,100 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
   );
 
   const cacheValidatedPersonVersion = useCallback(
-    (node: NodeData) => {
-      if (!node.metadataUnlockValidated || !node.metadataProtocolGeneration) {
+    (node: NodeData, expectedRevision: number) => {
+      if (!isMetadataUnlockUsable(node)) {
         throw new Error("Only fully validated metadata may enter the NodeData unlock cache");
       }
       const id = makeNodeId(node.personHash, Number(node.versionIndex));
-      options.setNodesData((current) =>
-        upsertNode(current, {
-          ...(current[id] ?? {}),
-          ...node,
-          id,
-          personHash: node.personHash,
-          versionIndex: Number(node.versionIndex),
+      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) return;
+      const latest = options.nodesDataRef.current[id];
+      if (!latest) throw new Error("Cannot cache metadata for a node that is no longer loaded");
+      rebaseValidatedMetadataUnlock(latest, node);
+      options.setNodesData((current) => {
+        const currentNode = current[id];
+        if (!currentNode) return current;
+        try {
+          return upsertNode(current, rebaseValidatedMetadataUnlock(currentNode, node));
+        } catch {
+          return current;
+        }
+      });
+    },
+    [nodesStorageKey, options.nodesDataRef, options.setNodesData],
+  );
+
+  const cacheConfirmedPersonVersion = useCallback(
+    (node: NodeData, expectedRevision: number): Promise<void> => {
+      // This is the only missing-node path. Its caller must have already checked
+      // the post-confirmation Reader/Archive anchors; the explicit projection
+      // prevents Worker diagnostics or secret intermediates from being retained.
+      const committed = projectConfirmedPersonVersion(node);
+      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) {
+        return Promise.resolve();
+      }
+      const id = committed.id;
+      const nextNodes = upsertNode(options.nodesDataRef.current, committed);
+      options.nodesDataRef.current = nextNodes;
+      options.setNodesData((current) => {
+        const currentNode = current[id];
+        if (!currentNode) return upsertNode(current, committed);
+        return upsertNode(current, rebaseValidatedMetadataUnlock(currentNode, committed));
+      });
+
+      if (!options.useIndexedDbCache || !isIndexedDBSupported()) return Promise.resolve();
+      return updateTreeNodesSnapshot(
+        nodesStorageKey,
+        (persisted) => ({
+          ...persisted,
+          ...nextNodes,
+          [id]: {
+            ...(persisted[id] ?? {}),
+            ...committed,
+          },
         }),
+        expectedRevision,
       );
     },
-    [options.setNodesData],
+    [nodesStorageKey, options.nodesDataRef, options.setNodesData, options.useIndexedDbCache],
   );
 
   const persistValidatedPersonVersion = useCallback(
-    async (node: NodeData) => {
-      if (!node.metadataUnlockValidated || !node.metadataProtocolGeneration) {
+    async (node: NodeData, expectedRevision: number) => {
+      if (!isMetadataUnlockUsable(node)) {
         throw new Error("Only fully validated metadata may enter the IndexedDB unlock cache");
       }
+      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) return;
       if (!options.useIndexedDbCache || !isIndexedDBSupported()) return;
 
       const id = makeNodeId(node.personHash, Number(node.versionIndex));
-      const storageKey = `${options.storageNS}::nodesData`;
-      const persisted =
-        (await readBlob<Record<string, NodeData>>(storageKey)) ?? {};
+      if (!options.nodesDataRef.current[id]) {
+        throw new Error("Cannot persist metadata for a node that is no longer loaded");
+      }
       // Persist each successful unlock immediately. Merge both the durable and
       // current in-memory snapshots so a per-item write never discards public
       // tree data or a preceding successful item in the same serial batch.
-      await writeBlob(storageKey, {
-        ...persisted,
-        ...options.nodesDataRef.current,
-        [id]: {
-          ...(persisted[id] ?? {}),
-          ...(options.nodesDataRef.current[id] ?? {}),
-          ...node,
-          id,
-          personHash: node.personHash,
-          versionIndex: Number(node.versionIndex),
+      await updateTreeNodesSnapshot(
+        nodesStorageKey,
+        (persisted) => {
+          const currentNodes = options.nodesDataRef.current;
+          const latest = currentNodes[id];
+          if (!latest) {
+            throw new Error("Cannot persist metadata for a node that is no longer loaded");
+          }
+          const committed = rebaseValidatedMetadataUnlock(latest, node);
+          return {
+            ...persisted,
+            ...currentNodes,
+            [id]: {
+              ...(persisted[id] ?? {}),
+              ...committed,
+            },
+          };
         },
-      });
+        expectedRevision,
+      );
     },
-    [options.nodesDataRef, options.storageNS, options.useIndexedDbCache],
+    [nodesStorageKey, options.nodesDataRef, options.useIndexedDbCache],
   );
 
   const mergeNodeDetail = useCallback(
@@ -419,7 +527,9 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
   return {
     clearAllCaches,
     clearMetadataUnlockCache,
+    captureMetadataCacheRevision,
     cacheValidatedPersonVersion,
+    cacheConfirmedPersonVersion,
     persistValidatedPersonVersion,
     invalidateTreeRootCache,
     invalidateByTx,

@@ -12,7 +12,10 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
 
   readonly messages: any[] = [];
-  readonly terminate = vi.fn();
+  readonly deliveredMessages: any[] = [];
+  readonly terminate = vi.fn(() => {
+    this.deliveredMessages.length = 0;
+  });
   private listeners = new Map<string, Array<(event: any) => void>>();
 
   constructor(_url: URL, _options: WorkerOptions) {
@@ -26,6 +29,9 @@ class FakeWorker {
   }
 
   postMessage(message: any): void {
+    // Model the browser's synchronous structured clone separately from the
+    // caller-realm request object retained by instrumentation.
+    this.deliveredMessages.push(structuredClone(message));
     this.messages.push(message);
   }
 
@@ -47,11 +53,12 @@ describe("crypto worker lifecycle", () => {
   });
 
   it("termination rejects the active KDF request and the next call creates a new Worker", async () => {
+    const rawPassphraseSentinel = "secret-raw-passphrase-\u00e9-8a72";
     const firstCall = cryptoWorkerCall(
       "decryptPersonVersionEnvelopeV1",
       {
         envelopeHex: "0x00",
-        rawPassphrase: "worker-only-secret",
+        rawPassphrase: rawPassphraseSentinel,
         context: {
           chainId: 71,
           deepFamilyProxy: `0x${"11".repeat(20)}`,
@@ -68,11 +75,27 @@ describe("crypto worker lifecycle", () => {
     const firstWorker = FakeWorker.instances[0];
     const rejected = expect(firstCall).rejects.toBeInstanceOf(CryptoWorkerTerminatedError);
 
+    expect(firstWorker.messages[0]).toEqual({
+      id: expect.any(Number),
+      method: "decryptPersonVersionEnvelopeV1",
+      params: undefined,
+    });
+    expect(firstWorker.deliveredMessages[0]).toMatchObject({
+      method: "decryptPersonVersionEnvelopeV1",
+      params: { rawPassphrase: rawPassphraseSentinel, envelopeHex: "0x00" },
+    });
+    expect(Object.keys(firstWorker.deliveredMessages[0].params).sort()).toEqual([
+      "context",
+      "envelopeHex",
+      "rawPassphrase",
+    ]);
+    expect(JSON.stringify(firstWorker.messages)).not.toContain(rawPassphraseSentinel);
     expect(terminateCryptoWorkerIfIdle()).toBe(false);
     expect(firstWorker.terminate).not.toHaveBeenCalled();
     terminateCryptoWorker(new CryptoWorkerTerminatedError("cancelled"));
     await rejected;
     expect(firstWorker.terminate).toHaveBeenCalledOnce();
+    expect(firstWorker.deliveredMessages).toEqual([]);
 
     const secondCall = cryptoWorkerCall(
       "preparePersonVersionContentV1",
@@ -112,6 +135,7 @@ describe("crypto worker lifecycle", () => {
     await expect(secondCall).resolves.toMatchObject({ versionCommitment: "1" });
     expect(terminateCryptoWorkerIfIdle()).toBe(true);
     expect(secondWorker.terminate).toHaveBeenCalledOnce();
+    expect(secondWorker.deliveredMessages).toEqual([]);
     expect(FakeWorker.instances).toHaveLength(2);
     expect(secondWorker).not.toBe(firstWorker);
   });

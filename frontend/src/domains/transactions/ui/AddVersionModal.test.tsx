@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React, { forwardRef, useEffect, useImperativeHandle } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddVersionModal from "./AddVersionModal";
@@ -53,8 +53,10 @@ const mocks = vi.hoisted(() => ({
   },
   addVersionRunOrThrow: vi.fn(),
   addVersionReset: vi.fn(),
+  confirmTransactionPreview: null as null | ((preview: any) => Promise<boolean> | boolean),
   invalidateByTx: vi.fn(),
   cacheValidatedPersonVersion: vi.fn(),
+  captureMetadataCacheRevision: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   onClose: vi.fn(),
@@ -65,6 +67,7 @@ const mocks = vi.hoisted(() => ({
   terminateCryptoWorkerIfIdle: vi.fn(),
   terminateZkWorkerIfIdle: vi.fn(),
   clearSecretInputs: vi.fn(),
+  secretInputRead: vi.fn(),
   deepFamilyContract: {
     versionExists: vi.fn(),
     metadataArchive: vi.fn(),
@@ -92,6 +95,7 @@ vi.mock("../../wallet", () => ({
 
 vi.mock("../../config", () => ({
   useConfig: () => ({
+    rpcUrl: "http://127.0.0.1:8545",
     chainId: 71,
     contractAddress: "0x0000000000000000000000000000000000000abc",
     readerAddress: "0x0000000000000000000000000000000000000def",
@@ -120,15 +124,20 @@ vi.mock("../../tree", () => ({
   useTreeMutations: () => ({
     invalidateByTx: mocks.invalidateByTx,
     cacheValidatedPersonVersion: mocks.cacheValidatedPersonVersion,
+    cacheConfirmedPersonVersion: mocks.cacheValidatedPersonVersion,
+    captureMetadataCacheRevision: mocks.captureMetadataCacheRevision,
   }),
 }));
 
 vi.mock("./add-version/hooks/useAddVersionFlow", () => ({
-  useAddVersionFlow: () => ({
-    status: "idle",
-    reset: mocks.addVersionReset,
-    runOrThrow: mocks.addVersionRunOrThrow,
-  }),
+  useAddVersionFlow: (options?: any) => {
+    mocks.confirmTransactionPreview = options?.confirmTransactionPreview ?? null;
+    return {
+      status: "idle",
+      reset: mocks.addVersionReset,
+      runOrThrow: mocks.addVersionRunOrThrow,
+    };
+  },
 }));
 
 vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({
@@ -151,11 +160,10 @@ vi.mock("../../../shared/zk/zk", () => ({
 
 vi.mock("../../../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: (...args: any[]) => mocks.createDeepFamilyContract(...args),
-  createDeepFamilyReaderContract: (...args: any[]) =>
-    mocks.createDeepFamilyReaderContract(...args),
+  createDeepFamilyReaderContract: (...args: any[]) => mocks.createDeepFamilyReaderContract(...args),
 }));
 
-vi.mock("../../../shared/crypto/identityCommitment", () => ({
+vi.mock("../../../shared/identity/fullName", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 
@@ -172,6 +180,8 @@ vi.mock("../../../shared/lib/errors", () => ({
 vi.mock("../../person", () => ({
   PersonHashCalculator: forwardRef((props: any, ref) => {
     const isParent = props.initialValues?.fullName === "";
+    const role = !isParent ? "person" : props.initialValues?.gender === 1 ? "father" : "mother";
+    const secretRef = useRef("identity-passphrase");
     const publicFormData = isParent
       ? {
           fullName: "",
@@ -190,17 +200,35 @@ vi.mock("../../person", () => ({
           isBirthBC: false,
         };
     useImperativeHandle(ref, () => ({
-      getSecretInputs: () => ({ passphrase: "identity-passphrase" }),
+      getSecretInputs: () => {
+        mocks.secretInputRead(role);
+        return { passphrase: secretRef.current };
+      },
       getPublicFormData: () => publicFormData,
       passphrasesMatch: () => true,
-      clearSecretInputs: mocks.clearSecretInputs,
+      clearSecretInputs: () => {
+        secretRef.current = "";
+        mocks.clearSecretInputs(role);
+      },
     }));
 
     useEffect(() => {
       props.onPublicFormChange?.(publicFormData);
+      props.onPassphraseChange?.();
     }, []);
 
-    return <div data-testid="person-hash-calculator" />;
+    return (
+      <div data-testid="person-hash-calculator">
+        <input
+          aria-label={`${role} identity passphrase test input`}
+          defaultValue={secretRef.current}
+          onChange={(event) => {
+            secretRef.current = event.currentTarget.value;
+            props.onPassphraseChange?.();
+          }}
+        />
+      </div>
+    );
   }),
 }));
 
@@ -246,6 +274,7 @@ describe("AddVersionModal", () => {
     mocks.signer.getAddress.mockReset();
     mocks.addVersionRunOrThrow.mockReset();
     mocks.addVersionReset.mockReset();
+    mocks.confirmTransactionPreview = null;
     mocks.invalidateByTx.mockReset();
     mocks.toastSuccess.mockReset();
     mocks.toastError.mockReset();
@@ -259,7 +288,11 @@ describe("AddVersionModal", () => {
     mocks.terminateCryptoWorkerIfIdle.mockReturnValue(true);
     mocks.terminateZkWorkerIfIdle.mockReturnValue(true);
     mocks.clearSecretInputs.mockReset();
+    mocks.secretInputRead.mockReset();
     mocks.cacheValidatedPersonVersion.mockReset();
+    mocks.cacheValidatedPersonVersion.mockResolvedValue(undefined);
+    mocks.captureMetadataCacheRevision.mockReset();
+    mocks.captureMetadataCacheRevision.mockReturnValue(11);
     mocks.deepFamilyContract.versionExists.mockReset();
     mocks.deepFamilyContract.metadataArchive.mockReset();
     mocks.readerContract.DEEP_FAMILY.mockReset();
@@ -336,6 +369,13 @@ describe("AddVersionModal", () => {
           versionCommitment: "99",
         });
       }
+      if (method === "preflightPersonVersionEnvelopeSizeV1") {
+        return Promise.resolve({
+          canonicalJsonLength: 2,
+          compressedPlaintextLength: 1,
+          envelopeLength: 20,
+        });
+      }
       if (method === "encryptPersonVersionEnvelopeV1") {
         return Promise.resolve({
           envelopeHex,
@@ -378,13 +418,7 @@ describe("AddVersionModal", () => {
       if (method === "generatePersonRelationProof") {
         return Promise.resolve({
           proof: { pi_a: [], pi_b: [], pi_c: [] },
-          publicSignals: [
-            "11",
-            "0",
-            "0",
-            packedSubmitterAndSelfSuiteId.toString(),
-            "99",
-          ],
+          publicSignals: ["11", "0", "0", packedSubmitterAndSelfSuiteId.toString(), "99"],
         });
       }
       if (method === "verifyPersonRelationProof") {
@@ -399,15 +433,81 @@ describe("AddVersionModal", () => {
     vi.restoreAllMocks();
   });
 
-  it("submits through the add-version flow, invalidates tree state, and reports success", async () => {
+  it("invalidates self risk confirmations after every passphrase edit", async () => {
+    renderAddVersionModal();
+
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+    const submitButton = screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement;
+    expect(submitButton.disabled).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
+      target: { value: "" },
+    });
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(5));
+    expect(submitButton.disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /anyone can permanently attempt offline passphrase guesses/i,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /empty identity passphrase for this person/i,
+      }),
+    );
+    await waitFor(() => expect(submitButton.disabled).toBe(false));
+
+    fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
+      target: { value: "\u00a0\u2003" },
+    });
+    expect(
+      (
+        screen.getByRole("checkbox", {
+          name: /consists only of Unicode White_Space after NFKD normalization/i,
+        }) as HTMLInputElement
+      ).checked,
+    ).toBe(false);
+    expect(submitButton.disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /anyone can permanently attempt offline passphrase guesses/i,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /consists only of Unicode White_Space after NFKD normalization/i,
+      }),
+    );
+    await waitFor(() => expect(submitButton.disabled).toBe(false));
+
+    // A different passphrase in the same risk class must also invalidate the
+    // prior confirmation; classification equality is not consent equality.
+    fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
+      target: { value: "\t" },
+    });
+    expect(submitButton.disabled).toBe(true);
+  });
+
+  it("reports confirmed success even when local confirmed-node persistence fails", async () => {
     const flowResult = successfulFlowResult();
+    // A malformed/legacy provider result must never resurrect the removed
+    // public event tag in the success UI.
+    Object.assign(flowResult.events.PersonVersionAdded!, { tag: "legacy-public-tag" });
     mocks.addVersionRunOrThrow.mockResolvedValue(flowResult);
+    mocks.cacheValidatedPersonVersion.mockRejectedValueOnce(
+      new Error("IndexedDB confirmed-node write failed"),
+    );
 
     renderAddVersionModal();
 
     await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator").length).toBe(3));
     await fillRequiredFields();
-    expect((screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+    ).toBe(false);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
@@ -438,6 +538,7 @@ describe("AddVersionModal", () => {
         tag: "verified",
         biography: "private biography",
       }),
+      11,
     );
     expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(3);
     expect(mocks.terminateCryptoWorkerIfIdle).toHaveBeenCalledOnce();
@@ -451,9 +552,12 @@ describe("AddVersionModal", () => {
     expect(mocks.cryptoWorkerCall.mock.calls.map(([method]) => method)).toEqual([
       "deriveIdentityMaterialV1",
       "preparePersonVersionContentV1",
+      "preflightPersonVersionEnvelopeSizeV1",
       "encryptPersonVersionEnvelopeV1",
       "roundTripPersonVersionEnvelopeV1",
     ]);
+    expect(mocks.secretInputRead).not.toHaveBeenCalledWith("father");
+    expect(mocks.secretInputRead).not.toHaveBeenCalledWith("mother");
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Person version added successfully");
     expect(mocks.invalidateByTx).toHaveBeenCalledWith({
       events: { PersonVersionAdded: flowResult.events.PersonVersionAdded },
@@ -461,6 +565,7 @@ describe("AddVersionModal", () => {
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(flowResult);
     expect(await screen.findByText("Version Added Successfully")).toBeTruthy();
+    expect(screen.queryByText(/legacy-public-tag/)).toBeNull();
   });
 
   it("reuses the exact verified submission package after an uncertain RPC send failure", async () => {
@@ -483,10 +588,12 @@ describe("AddVersionModal", () => {
     const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
     const cryptoMethodsAfterFirstSend = mocks.cryptoWorkerCall.mock.calls.map(([method]) => method);
     const zkMethodsAfterFirstSend = mocks.zkWorkerCall.mock.calls.map(([method]) => method);
+    const secretReadsAfterFirstSend = mocks.secretInputRead.mock.calls.length;
 
     expect(cryptoMethodsAfterFirstSend).toEqual([
       "deriveIdentityMaterialV1",
       "preparePersonVersionContentV1",
+      "preflightPersonVersionEnvelopeSizeV1",
       "encryptPersonVersionEnvelopeV1",
       "roundTripPersonVersionEnvelopeV1",
     ]);
@@ -516,14 +623,64 @@ describe("AddVersionModal", () => {
     expect(mocks.cryptoWorkerCall.mock.calls.map(([method]) => method)).toEqual(
       cryptoMethodsAfterFirstSend,
     );
-    expect(mocks.zkWorkerCall.mock.calls.map(([method]) => method)).toEqual(zkMethodsAfterFirstSend);
-    expect(mocks.signer.getAddress).toHaveBeenCalledTimes(1);
+    expect(mocks.zkWorkerCall.mock.calls.map(([method]) => method)).toEqual(
+      zkMethodsAfterFirstSend,
+    );
+    expect(mocks.secretInputRead).toHaveBeenCalledTimes(secretReadsAfterFirstSend);
     expect(mocks.deepFamilyContract.versionExists).toHaveBeenCalledTimes(1);
     expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(3);
     expect(mocks.terminateCryptoWorkerIfIdle).toHaveBeenCalledTimes(1);
     expect(mocks.terminateZkWorkerIfIdle).toHaveBeenCalledTimes(1);
     expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledTimes(1);
     expect(mocks.onSuccess).toHaveBeenCalledWith(flowResult);
+  });
+
+  it("builds a new package when a passphrase is edited after an uncertain send failure", async () => {
+    const flowResult = successfulFlowResult();
+    mocks.addVersionRunOrThrow
+      .mockRejectedValueOnce(new Error("temporary RPC timeout after transaction send"))
+      .mockResolvedValueOnce(flowResult);
+
+    renderAddVersionModal();
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(1));
+    const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+
+    fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
+      target: { value: "replacement-passphrase" },
+    });
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: /anyone can permanently attempt offline passphrase guesses/i,
+      }),
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+
+    await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1));
+    const secondArgs = mocks.addVersionRunOrThrow.mock.calls[1][0];
+
+    expect(secondArgs).not.toBe(firstArgs);
+    expect(
+      mocks.cryptoWorkerCall.mock.calls.filter(([method]) => method === "deriveIdentityMaterialV1"),
+    ).toHaveLength(2);
+    expect(
+      mocks.cryptoWorkerCall.mock.calls.filter(
+        ([method]) => method === "encryptPersonVersionEnvelopeV1",
+      ),
+    ).toHaveLength(2);
+    expect(
+      mocks.zkWorkerCall.mock.calls.filter(([method]) => method === "generatePersonRelationProof"),
+    ).toHaveLength(2);
+    expect(mocks.deepFamilyContract.versionExists).toHaveBeenCalledTimes(2);
   });
 
   it("shows a friendly error when the add-version flow fails", async () => {
@@ -533,7 +690,9 @@ describe("AddVersionModal", () => {
 
     await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator").length).toBe(3));
     await fillRequiredFields();
-    expect((screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+    ).toBe(false);
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
@@ -549,6 +708,73 @@ describe("AddVersionModal", () => {
     expect(screen.getAllByText("add version reverted").length).toBeGreaterThan(0);
   });
 
+  it("stops before Groth16, encryption, or transaction submission when gzip cannot fit", async () => {
+    const defaultCryptoCall = mocks.cryptoWorkerCall.getMockImplementation();
+    mocks.cryptoWorkerCall.mockImplementation((method: string, ...args: any[]) => {
+      if (method === "preflightPersonVersionEnvelopeSizeV1") {
+        return Promise.reject(
+          Object.assign(
+            new Error("Compressed metadata cannot fit in the 16384-byte envelope limit"),
+            {
+              code: "ENVELOPE_TOO_LARGE",
+            },
+          ),
+        );
+      }
+      return defaultCryptoCall?.(method, ...args);
+    });
+
+    renderAddVersionModal();
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1));
+    expect(mocks.cryptoWorkerCall.mock.calls.map(([method]) => method)).toEqual([
+      "deriveIdentityMaterialV1",
+      "preparePersonVersionContentV1",
+      "preflightPersonVersionEnvelopeSizeV1",
+    ]);
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+    expect(mocks.addVersionRunOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("shows exact envelope bytes and RPC gas before allowing the wallet request", async () => {
+    const flowResult = successfulFlowResult();
+    mocks.addVersionRunOrThrow.mockImplementation(async () => {
+      const approved = await mocks.confirmTransactionPreview?.({
+        envelopeBytes: 20,
+        estimatedGas: 123_456n,
+        gasLimit: 148_147n,
+        estimated: true,
+      });
+      if (!approved) throw new Error("preview rejected");
+      return flowResult;
+    });
+
+    renderAddVersionModal();
+    await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
+    await fillRequiredFields();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
+    });
+
+    expect(await screen.findByText("Review before opening your wallet")).toBeTruthy();
+    expect(screen.getByText("20 / 16,384")).toBeTruthy();
+    expect(screen.getByText("123,456")).toBeTruthy();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Continue to Wallet" }));
+    });
+
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1));
+  });
+
   it("prevents native form submission when submitting add version", async () => {
     mocks.addVersionRunOrThrow.mockRejectedValue(new Error("add version reverted"));
 
@@ -556,7 +782,9 @@ describe("AddVersionModal", () => {
 
     await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator").length).toBe(3));
     await fillRequiredFields();
-    expect((screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement).disabled,
+    ).toBe(false);
 
     const form = document.getElementById("add-version-form");
     expect(form).toBeTruthy();

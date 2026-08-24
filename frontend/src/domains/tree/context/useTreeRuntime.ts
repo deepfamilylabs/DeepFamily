@@ -9,8 +9,8 @@ import {
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { createPersonReadGateway } from "../../../shared/clients/personReadGateway";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
-import { METADATA_CACHE_PROTOCOL_GENERATION } from "../../../shared/model/metadataUnlock";
 import { createTreeReadGateway } from "../api/treeReadGateway";
+import { buildTreeStorageNamespace } from "./treeStorageScope";
 
 export function useTreeRuntime() {
   const { rpcUrl, contractAddress, readerAddress, rootHash, rootVersionIndex, chainId } =
@@ -67,11 +67,10 @@ export function useTreeRuntime() {
     [contract],
   );
 
-  const storageNS = useMemo(() => {
-    const addr = contractAddress?.toLowerCase() || "no-contract";
-    const chain = chainId ? String(chainId) : "no-chain";
-    return `df.cache::${METADATA_CACHE_PROTOCOL_GENERATION}::${chain}::${addr}`;
-  }, [contractAddress, chainId]);
+  const storageNS = useMemo(
+    () => buildTreeStorageNamespace({ chainId, contractAddress }),
+    [contractAddress, chainId],
+  );
 
   const edgesUnionKey = useMemo(() => `${storageNS}::edges.union.v1`, [storageNS]);
   const edgesStrictKey = useMemo(() => `${storageNS}::edges.strict.v1`, [storageNS]);
