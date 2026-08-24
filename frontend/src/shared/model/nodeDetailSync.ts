@@ -5,7 +5,6 @@ import {
   buildNftDetailsPatch,
   buildVersionDetailsPatch,
 } from "./nodeEnrichment";
-import { applySingleNodePatch } from "./nodeState";
 import type { StoryDataResult } from "./storyData";
 
 export interface NodeKeyMinimal {
@@ -66,6 +65,7 @@ export function applyNodeDetailNftDetails(options: {
   const { nodesData, selected, tokenId, nftDetails, storyData } = options;
   const id = makeNodeId(selected.personHash, selected.versionIndex);
   const current = nodesData[id];
+  if (!current) return nodesData;
   const storyMetadata = storyData?.metadata ?? current?.storyMetadata ?? EMPTY_STORY_METADATA;
   const nftPatch = buildNftDetailsPatch({
     current: current ?? undefined,
@@ -80,5 +80,5 @@ export function applyNodeDetailNftDetails(options: {
         storyFetchedAt: storyData.fetchedAt,
       }
     : {};
-  return applySingleNodePatch(nodesData, id, { ...nftPatch, ...storyFields });
+  return applyNodeEnrichmentPatches(nodesData, [{ id, patch: { ...nftPatch, ...storyFields } }]);
 }

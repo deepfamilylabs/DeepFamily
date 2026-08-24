@@ -14,7 +14,9 @@
     "setup": "npm install",
     "build": "hardhat --config hardhat.config.mjs --build-profile production compile",
     "pages:build": "npm ci --workspace deepfamily-frontend --workspace @deepfamily/proof-core --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
+    "pretest": "npm run test:protocol",
     "test": "hardhat --config hardhat.config.mjs test mocha",
+    "test:protocol": "npm test --workspace @deepfamily/protocol-core",
     "test:gas": "node -e \"console.error('test:gas is not available after Hardhat 3 migration (hardhat-gas-reporter is Hardhat 2-only).'); process.exit(1)\"",
     "test:coverage": "node -e \"console.error('test:coverage is not available after Hardhat 3 migration (solidity-coverage is Hardhat 2-only).'); process.exit(1)\"",
     "deploy:net": "hardhat --config hardhat.config.mjs --build-profile production run scripts/deploy-integrated.mjs --network $npm_config_net",
@@ -23,14 +25,18 @@
     "espace:mainnet:safe:plan": "node scripts/espace-mainnet-safe-command.mjs --plan",
     "espace:mainnet:safe:execute": "node scripts/espace-mainnet-safe-command.mjs --execute",
     "espace:mainnet:safe:status": "node scripts/espace-mainnet-safe-command.mjs --status",
+    "espace:mainnet:release:projection": "node scripts/protocol-deployment-projection.mjs --chain espace",
     "espace:mainnet:release:plan": "node scripts/espace-mainnet-release-command.mjs --plan",
     "espace:mainnet:release:execute": "node scripts/espace-mainnet-release-command.mjs --execute",
     "ethereum:acceptance": "node scripts/ethereum-acceptance-command.mjs",
     "ethereum:mainnet:safe:plan": "node scripts/ethereum-mainnet-safe-command.mjs --plan",
     "ethereum:mainnet:safe:execute": "node scripts/ethereum-mainnet-safe-command.mjs --execute",
     "ethereum:mainnet:safe:status": "node scripts/ethereum-mainnet-safe-command.mjs --status",
+    "ethereum:mainnet:release:projection": "node scripts/protocol-deployment-projection.mjs --chain ethereum",
     "ethereum:mainnet:release:plan": "node scripts/ethereum-mainnet-release-command.mjs --plan",
     "ethereum:mainnet:release:execute": "node scripts/ethereum-mainnet-release-command.mjs --execute",
+    "release:kdf:device-matrix:template": "node scripts/kdf-release-evidence-template.mjs --kind device-matrix",
+    "release:kdf:attacker-study:template": "node scripts/kdf-release-evidence-template.mjs --kind attacker-study",
     "verify:net": "hardhat --config hardhat.config.mjs --build-profile production verify --network $npm_config_net",
     "check-networks": "hardhat --config hardhat.config.mjs networks:check",
     "list-networks": "hardhat --config hardhat.config.mjs networks:list",
@@ -162,6 +168,6 @@
     "poseidon-solidity": "^0.0.5"
   },
   "engines": {
-    "node": ">=22.10.0"
+    "node": ">=22.13.0"
   }
 }

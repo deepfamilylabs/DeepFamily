@@ -290,7 +290,7 @@ describe("Endorse Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1);
+    const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
     const nftHolderAddr = await nftHolder.getAddress();
     const proof = makeStubProof();
     const ps = {

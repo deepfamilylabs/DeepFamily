@@ -1,5 +1,13 @@
 import type { NodeData, NodeId } from "../../../shared/model";
-import { birthDateString, isMinted, parseNodeId, shortHash } from "../../../shared/model";
+import {
+  birthDateString,
+  clearMetadataUnlock,
+  hasMetadataUnlockFootprint,
+  isMetadataUnlockUsable,
+  isMinted,
+  parseNodeId,
+  shortHash,
+} from "../../../shared/model";
 
 export type NodeUi = {
   id: NodeId;
@@ -23,7 +31,11 @@ export type NodeUi = {
 
 export function getNodeUi(id: NodeId, nodesData: Record<string, NodeData>): NodeUi {
   const parsed = parseNodeId(id);
-  const nd = nodesData?.[id];
+  const cached = nodesData?.[id];
+  const nd =
+    cached && hasMetadataUnlockFootprint(cached) && !isMetadataUnlockUsable(cached)
+      ? clearMetadataUnlock(cached)
+      : cached;
   const minted = isMinted(nd);
   const shortHashText = shortHash(parsed.personHash);
   const fullName = nd?.fullName;

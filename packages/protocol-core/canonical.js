@@ -21,6 +21,8 @@ import { ProtocolError, protocolAssert } from "./errors.js";
 export const UNICODE_WHITE_SPACE_VERSION = "17.0";
 const UNICODE_WHITE_SPACE_RUN =
   /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu;
+const UNICODE_WHITE_SPACE_ONLY =
+  /^[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+$/u;
 const LEADING_OR_TRAILING_ASCII_SPACE = /^ +| +$/gu;
 
 const TOP_LEVEL_KEYS = ["schema", "person", "parents", "tag", "biography"];
@@ -73,6 +75,13 @@ export function canonicalizeFullName(value) {
     `Canonical fullName exceeds ${MAX_FULL_NAME_UTF8_BYTES} UTF-8 bytes`,
   );
   return collapsed;
+}
+
+/** Tests the release-frozen Unicode 17 White_Space set without host tables. */
+export function isUnicodeWhiteSpaceOnly(value) {
+  protocolAssert(typeof value === "string", "INVALID_STRING", "value must be a string");
+  assertUnicodeScalarString(value, "value");
+  return UNICODE_WHITE_SPACE_ONLY.test(value);
 }
 
 function assertCanonicalFullName(value) {

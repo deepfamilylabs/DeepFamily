@@ -4,7 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { ethers } from "ethers";
 
-import { readProductionBuildInfoState } from "../scripts/lib/releaseEvidence.mjs";
+import {
+  RELEASE_INPUT_DIRECTORY_NAMES,
+  RELEASE_INPUT_FILE_NAMES,
+  hashReleaseInputs,
+  readProductionBuildInfoState,
+} from "../scripts/lib/releaseEvidence.mjs";
 
 const PROJECT_BUILD_ID = "solc-0_8_28-project-fixture";
 const POSEIDON_BUILD_ID = "solc-0_8_28-poseidon-fixture";
@@ -259,5 +264,42 @@ describe("multi-chain production release build evidence", function () {
         }),
       /references unavailable buildInfoId/iu,
     );
+  });
+});
+
+describe("shared acceptance and mainnet release input evidence", function () {
+  it("uses one directory/file definition and includes protocol vectors in both flows", async function () {
+    expect(RELEASE_INPUT_DIRECTORY_NAMES).to.include("protocol-vectors");
+    expect(RELEASE_INPUT_FILE_NAMES).to.include("protocol-release-manifest.json");
+    const [acceptanceSource, mainnetSource] = await Promise.all([
+      fs.readFile("scripts/evm-acceptance.mjs", "utf8"),
+      fs.readFile("scripts/evm-mainnet-release.mjs", "utf8"),
+    ]);
+    for (const source of [acceptanceSource, mainnetSource]) {
+      expect(source).to.match(
+        /import\s*\{[^}]*hashReleaseInputs[^}]*\}\s*from "\.\/lib\/releaseEvidence\.mjs"/u,
+      );
+      expect(source).to.include("hashReleaseInputs(ethers)");
+    }
+    expect(acceptanceSource).not.to.include("const hashAcceptanceInputs");
+  });
+
+  it("produces the same digest and detects a protocol-vector byte change", async function () {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-shared-input-evidence-"));
+    try {
+      for (const name of RELEASE_INPUT_FILE_NAMES) await writeFile(root, name, `${name}\n`);
+      await writeFile(root, "protocol-vectors/vector.json", '{"version":1}\n');
+      const acceptanceSnapshot = await hashReleaseInputs(ethers, root);
+      const mainnetSnapshot = await hashReleaseInputs(ethers, root);
+      expect(acceptanceSnapshot).to.deep.equal(mainnetSnapshot);
+      await writeFile(root, "protocol-vectors/vector.json", '{"version":2}\n');
+      const changed = await hashReleaseInputs(ethers, root);
+      expect(changed.directories["protocol-vectors"].digest).not.to.equal(
+        acceptanceSnapshot.directories["protocol-vectors"].digest,
+      );
+      expect(changed.digest).not.to.equal(acceptanceSnapshot.digest);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });

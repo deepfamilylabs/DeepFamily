@@ -18,6 +18,7 @@ import {
   type MetadataContextInput,
   type PersonVersionMetadataInput,
 } from "@deepfamily/protocol-core";
+import { preflightPersonVersionEnvelopeSizeV1 } from "../shared/metadata/personVersionEnvelopePreflight";
 import type {
   EncryptedPersonVersionEnvelopeV1Result,
   IdentityMaterialV1Result,
@@ -54,6 +55,14 @@ type CryptoWorkerMethods = {
       derivedSecretField: number | string | bigint;
     };
     result: PreparedPersonVersionContentV1Result;
+  };
+  preflightPersonVersionEnvelopeSizeV1: {
+    params: { metadata: PersonVersionMetadataInput };
+    result: {
+      canonicalJsonLength: number;
+      compressedPlaintextLength: number;
+      envelopeLength: number;
+    };
   };
   encryptPersonVersionEnvelopeV1: {
     params: {
@@ -181,12 +190,9 @@ const handlers: {
       wipePreparedPersonVersionContent(prepared);
     }
   },
-  encryptPersonVersionEnvelopeV1: async ({
-    metadata,
-    rawPassphrase,
-    identitySuiteId,
-    context,
-  }) => {
+  preflightPersonVersionEnvelopeSizeV1: ({ metadata }) =>
+    preflightPersonVersionEnvelopeSizeV1(metadata),
+  encryptPersonVersionEnvelopeV1: async ({ metadata, rawPassphrase, identitySuiteId, context }) => {
     const encrypted = await encryptPersonVersionEnvelope({
       metadata,
       rawPassphrase,

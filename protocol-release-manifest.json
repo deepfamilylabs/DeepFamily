@@ -179,6 +179,229 @@
       "keccak256": "0x9bf4224bff73f3d304ffbd739e694221255df4b3497fec14a7beabb471b34b2b"
     }
   },
+  "contractInterfaces": {
+    "schemaVersion": 1,
+    "types": {
+      "MetadataRef": [
+        { "name": "pointer", "type": "address" },
+        { "name": "payloadHash", "type": "bytes32" },
+        { "name": "payloadLength", "type": "uint32" }
+      ]
+    },
+    "metadataArchiveV1": {
+      "abiPolicy": {
+        "nonErrorFragments": "exact-set",
+        "errorFragments": "excluded"
+      },
+      "abi": [
+        {
+          "type": "constructor",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "deepFamily", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "DEEP_FAMILY",
+          "selector": "0x4130d94c",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "MAX_PAYLOAD_LENGTH",
+          "selector": "0x0d59f004",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "uint256" }]
+        },
+        {
+          "type": "function",
+          "name": "store",
+          "selector": "0xd02205d7",
+          "stateMutability": "nonpayable",
+          "inputs": [
+            { "name": "personHash", "type": "bytes32" },
+            { "name": "versionIndex", "type": "uint256" },
+            { "name": "envelope", "type": "bytes" }
+          ],
+          "outputs": [
+            {
+              "name": "metadata",
+              "type": "tuple",
+              "components": [
+                { "name": "pointer", "type": "address" },
+                { "name": "payloadHash", "type": "bytes32" },
+                { "name": "payloadLength", "type": "uint32" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "metadataRef",
+          "selector": "0xa9014530",
+          "stateMutability": "view",
+          "inputs": [
+            { "name": "personHash", "type": "bytes32" },
+            { "name": "versionIndex", "type": "uint256" }
+          ],
+          "outputs": [
+            {
+              "name": "metadata",
+              "type": "tuple",
+              "components": [
+                { "name": "pointer", "type": "address" },
+                { "name": "payloadHash", "type": "bytes32" },
+                { "name": "payloadLength", "type": "uint32" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "MetadataStored",
+          "topic0": "0x659dc472666e26894f6256eab4c8837831e964f4ebaf5e269f1342708a1d1a80",
+          "anonymous": false,
+          "inputs": [
+            { "name": "personHash", "type": "bytes32", "indexed": true },
+            { "name": "versionIndex", "type": "uint256", "indexed": true },
+            { "name": "pointer", "type": "address", "indexed": false },
+            { "name": "payloadHash", "type": "bytes32", "indexed": false },
+            { "name": "payloadLength", "type": "uint32", "indexed": false }
+          ]
+        }
+      ],
+      "semantics": {
+        "immutableBindings": {
+          "DEEP_FAMILY": "constructor.deepFamily"
+        },
+        "constants": {
+          "MAX_PAYLOAD_LENGTH": { "type": "uint256", "value": 16384 }
+        },
+        "storeAuthorization": "msg.sender == DEEP_FAMILY",
+        "reference": {
+          "key": ["personHash", "versionIndex"],
+          "writeOnce": true,
+          "pointer": "CREATE data-contract address",
+          "payloadHash": "keccak256(envelope)",
+          "payloadLength": "envelope.length"
+        },
+        "dataContract": {
+          "runtimeEncoding": "0x00 || envelope",
+          "stopPrefix": "0x00",
+          "payloadStartsAtCodeOffset": 1,
+          "stopIncludedInPayloadHash": false,
+          "stopIncludedInPayloadLength": false
+        }
+      }
+    },
+    "deepFamilyReader": {
+      "abiPolicy": {
+        "nonErrorFragments": "declared-subset",
+        "errorFragments": "excluded"
+      },
+      "abi": [
+        {
+          "type": "constructor",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "deepFamily", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "DEEP_FAMILY",
+          "selector": "0x4130d94c",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "METADATA_ARCHIVE",
+          "selector": "0x88a7927f",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "getVersionMetadataRef",
+          "selector": "0x72b543c4",
+          "stateMutability": "view",
+          "inputs": [
+            { "name": "personHash", "type": "bytes32" },
+            { "name": "versionIndex", "type": "uint256" }
+          ],
+          "outputs": [
+            {
+              "name": "metadata",
+              "type": "tuple",
+              "components": [
+                { "name": "pointer", "type": "address" },
+                { "name": "payloadHash", "type": "bytes32" },
+                { "name": "payloadLength", "type": "uint32" }
+              ]
+            }
+          ]
+        }
+      ],
+      "semantics": {
+        "immutableBindings": {
+          "DEEP_FAMILY": "constructor.deepFamily",
+          "METADATA_ARCHIVE": "DEEP_FAMILY.metadataArchive() at construction"
+        },
+        "constructorChecks": {
+          "deepFamilyHasCode": true,
+          "metadataArchiveHasCode": true,
+          "archiveReverseBinding": "METADATA_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY"
+        },
+        "getVersionMetadataRef": {
+          "versionIndexing": "one-based",
+          "requiresExistingVersion": true,
+          "source": "METADATA_ARCHIVE.metadataRef(personHash,versionIndex)"
+        }
+      }
+    },
+    "deepFamily": {
+      "abiPolicy": {
+        "nonErrorFragments": "declared-subset",
+        "errorFragments": "excluded"
+      },
+      "abi": [
+        {
+          "type": "function",
+          "name": "metadataArchive",
+          "selector": "0x96a2d27f",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "setMetadataArchive",
+          "selector": "0x7ed53f66",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "archive", "type": "address" }],
+          "outputs": []
+        },
+        {
+          "type": "event",
+          "name": "MetadataArchiveSet",
+          "topic0": "0xe6554500890e112fa1991fb7f12a98c6d9af694db93a308469db58fa399e8047",
+          "anonymous": false,
+          "inputs": [{ "name": "archive", "type": "address", "indexed": true }]
+        }
+      ],
+      "semantics": {
+        "metadataArchiveStorageSlots": 1,
+        "initialValue": "address(0)",
+        "setterAuthorization": "owner",
+        "setterCallsMaximum": 1,
+        "archiveHasCode": true,
+        "archiveReverseBinding": "IMetadataArchiveV1(archive).DEEP_FAMILY() == address(this)"
+      }
+    }
+  },
   "proofRoutes": [
     {
       "purpose": "PersonRelation",
@@ -235,6 +458,13 @@
     "chainId": null,
     "deepFamilyProxy": null,
     "deepFamilyImplementation": null,
+    "groth16VerifierAdapter": {
+      "address": null,
+      "personVerifierImmutable": null,
+      "disclosureBindingVerifierImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
     "metadataArchiveV1": {
       "address": null,
       "deepFamilyImmutable": null,
@@ -252,16 +482,35 @@
   "goldenVectors": {
     "status": "candidate-not-production-frozen",
     "path": "protocol-vectors/onchain-biography-v1.json",
-    "sha256": "537afdf6135f526a44c02e7fc1538571de22e90d1cb362a8e2f697e364aa1d80"
+    "sha256": "89b29f59e1ad209386505b0abc0410c539019bae6bf937866115b347458fd6dd"
   },
   "releaseEvidence": {
     "kdfDeviceMatrix": {
       "status": "missing",
+      "schemaVersion": 2,
+      "evidenceType": "deepfamily/kdf-device-matrix-v2",
+      "selectedCandidateId": null,
+      "latencyBudgets": {
+        "identitySingleDerivationP95Milliseconds": null,
+        "fileSingleDerivationP95Milliseconds": null,
+        "completeAddVersionP95Milliseconds": null,
+        "serialUnlock": {
+          "versionCount": null,
+          "p95Milliseconds": null
+        }
+      },
+      "stressRequirements": {
+        "minimumDurationSeconds": 1800,
+        "minimumIterations": null
+      },
       "path": null,
       "sha256": null
     },
     "kdfAttackerCostStudy": {
       "status": "missing",
+      "schemaVersion": 2,
+      "evidenceType": "deepfamily/kdf-attacker-cost-study-v2",
+      "selectedCandidateId": null,
       "path": null,
       "sha256": null
     },

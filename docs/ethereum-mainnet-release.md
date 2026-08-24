@@ -1,13 +1,16 @@
 # Ethereum Mainnet Safe bootstrap and release
 
 The guarded Ethereum production path is fixed to Ethereum Mainnet (`mainnet`, chain ID `1`) and
-uses five explicit commands:
+uses six explicit commands:
 
 - `npm run ethereum:mainnet:safe:plan` predicts a canonical governance Safe without broadcasting;
 - `npm run ethereum:mainnet:safe:execute -- --digest 0x...` deploys or resumes that Safe only from
   its independently reviewed plan digest;
 - `npm run ethereum:mainnet:safe:status` performs read-only validation of the Safe deployment and
   the real-owner acceptance transaction;
+- `npm run ethereum:mainnet:release:projection -- --deployer <address> --nonce <decimal>` derives
+  the manifest-ready deployment projection from one explicitly reviewed release nonce without RPC
+  or broadcasting;
 - `npm run ethereum:mainnet:release:plan` creates a read-only protocol release plan;
 - `npm run ethereum:mainnet:release:execute -- --approval-file <path>` broadcasts or resumes only
   from a separate operation-specific approval JSON file.
@@ -73,31 +76,26 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
    [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
-   verifiers, and frontend proving artifacts together, then run `npm run release:preflight` from
-   that clean commit. The default path records one Phase 2 contributor under the explicit
+   verifiers, and frontend proving artifacts together. Run the final `release:preflight` only after
+   the chain-specific deployment projection below has also been frozen into the protocol manifest.
+   The default path records one Phase 2 contributor under the explicit
    `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
-2. Run `npm run ethereum:acceptance` from the intended release commit on Sepolia in
-   `release-rehearsal` mode with `MIN_DELAY >= 86400`. After self-validation succeeds, the runner
-   automatically publishes the exact evidence to the Git-ignored, Ethereum-specific
-   `tmp/release-evidence/ethereum-release-rehearsal.json`; diagnostic, failed, and recovery runs do
-   not overwrite it. Review and archive only that published successful schema-v4 report. This mode
-   rehearses a fresh release with zero Timelock waits. A diagnostic run instead uses the built-in
-   30-second delay for each of four real governance windows and always has `releaseReady=false`.
-   Require
-   `zkArtifactTrust.productionReady=true` and `zkCeremonyVerification.status=passed` in the accepted
-   report.
-3. Use a clean, isolated checkout of the reviewed commit with exact dependencies and complete the
+2. Use a clean, isolated checkout with exact dependencies and complete the
    contract, frontend, ZK artifact, and storage-layout checks.
-4. Obtain the final public addresses of three independent EOA/hardware-wallet controllers in their
+3. Obtain the final public addresses of three independent EOA/hardware-wallet controllers in their
    reviewed order. Confirm that the external signing workflow is configured for chain ID `1`.
-5. Choose one decimal Safe salt nonce and never change the salt or owner order after plan approval.
-6. Reserve a dedicated deployer EOA, fund it only to the independently approved ceilings, and use a
+4. Choose one decimal Safe salt nonce and never change the salt or owner order after plan approval.
+5. Reserve a dedicated deployer EOA, fund it only to the independently approved ceilings, and use a
    reliable `ETHEREUM_MAINNET_RPC_URL` or reviewed Infura endpoint.
-7. Configure a real Etherscan key in `EXPLORER_API_KEY`. Ethereum release execution requires source
+6. Configure a real Etherscan key in `EXPLORER_API_KEY`. Ethereum release execution requires source
    verification and does not accept the non-secret ConfluxScan `espace` placeholder.
-8. Arrange immutable off-machine storage for the complete ignored `deployments/mainnet/`
+7. Arrange immutable off-machine storage for the complete ignored `deployments/mainnet/`
    directory, release logs, review record, and explorer evidence.
+
+The required order is: bootstrap and accept the Safe, freeze the exact protocol release projection,
+commit and pass `release:preflight`, produce release-rehearsal evidence from that exact commit, then
+plan and execute Mainnet. The release tools reject a stale or cross-chain permutation.
 
 ## Environment configuration
 
@@ -141,7 +139,7 @@ Proxy becomes the sole holder of the Timelock's proposer, canceller, and executo
 Timelock becomes `DeepFamily.owner()` and the DEEP protocol treasury.
 
 The protocol release command automatically reads the Ethereum profile's fixed
-`tmp/release-evidence/ethereum-release-rehearsal.json` file. It requires a schema-v4 fresh-release
+`tmp/release-evidence/ethereum-release-rehearsal.json` file. It requires a schema-v5 fresh-release
 report with release-ready status, `evidenceType=initial-mainnet-release`,
 `governanceLifecycleIncluded=false`, the same clean commit, artifact-input digest and deployed
 `MIN_DELAY`, production ZK evidence, source verification, finality, initial governance state and
@@ -150,7 +148,7 @@ diagnostic, failed, or recovery run is rejected before any Mainnet transaction. 
 Mock, upgrade, migration, or Timelock-wait evidence are rejected as well.
 
 The acceptance runner retains its run-specific report beneath the ignored run directory and, only
-after a successful release rehearsal passes schema-v4 self-validation, publishes the exact bytes to
+after a successful release rehearsal passes schema-v5 self-validation, publishes the exact bytes to
 the fixed evidence path above. No environment setting or manual in-checkout copy selects release
 evidence. Compare the published file's SHA-256 against the immutable off-machine archive before
 planning; that archive is a review and recovery record, not an alternate input path. A later
@@ -249,7 +247,56 @@ Keep the Safe frozen at nonce `1` until the protocol release completes.
 
 ## Phase B: plan and execute the protocol release
 
-### B1. Generate a read-only release plan
+### B1. Freeze the deployment projection and final release commit
+
+Reserve the deployer EOA exclusively and query its next **pending** nonce from the reviewed Ethereum
+Mainnet RPC after the Safe factory transaction has completed:
+
+```bash
+node --env-file=.env --input-type=module -e '
+import { JsonRpcProvider } from "ethers";
+const provider = new JsonRpcProvider(process.env.ETHEREUM_MAINNET_RPC_URL);
+console.log(await provider.getTransactionCount(process.env.EVM_MAINNET_EXPECTED_DEPLOYER, "pending"));
+'
+```
+
+Independently confirm that decimal value, build the production artifacts, and emit the deterministic
+read-only projection. Substitute the reviewed deployer and nonce:
+
+```bash
+npm run build
+mkdir -p tmp/release-evidence
+npm run --silent ethereum:mainnet:release:projection -- \
+  --deployer 0xReviewedDeployer \
+  --nonce 123 > tmp/release-evidence/ethereum-mainnet-deployment-projection.json
+```
+
+Review chain ID `1`, deployer, starting nonce, every derived address and constructor immutable, all
+three artifact hashes and immutable-linked runtime hashes, and `stableProjectionSha256`. Copy the
+output's exact `deployments` object into `protocol-release-manifest.json`, finish freezing the other
+production evidence, and commit the chain-specific release state. The projection command never
+reads a private key, contacts RPC, changes the manifest, or broadcasts.
+
+From that exact clean commit, run:
+
+```bash
+npm run release:preflight
+EVM_E2E_MODE=release-rehearsal npm run ethereum:acceptance
+```
+
+Accept and archive only the exact published schema-v5
+`tmp/release-evidence/ethereum-release-rehearsal.json` with `status=passed`,
+`releaseReady=true`, matching commit/shared release-input digest and production ZK/ceremony
+evidence. Sepolia addresses and immutable-linked runtimes are verified internally against Sepolia;
+they are not compared to the manifest's Ethereum Mainnet addresses. Shared protocol, routes and
+artifact hashes remain bound across the two chains.
+
+Any deployer nonce, artifact, manifest, tracked-input or commit drift requires a regenerated and
+reviewed projection, new clean commit, new preflight, and new rehearsal. The Mainnet planner derives
+the addresses again and rejects any chain ID, address, immutable, artifact, runtime, or stable
+projection mismatch before broadcast.
+
+### B2. Generate a read-only release plan
 
 Run:
 
@@ -271,7 +318,7 @@ Safe and owner order, Safe nonce `1`, Timelock delay, ETH ceiling, expected cont
 Etherscan/finality policy, checkpoint directory, all ordered transaction intents, testnet evidence,
 and digest. The command also prints one exact UTF-8 EIP-191 approval message.
 
-### B2. Execute or resume the reviewed release
+### B3. Execute or resume the reviewed release
 
 At least two current production Safe owners must independently review the exact plan and selected
 Sepolia report, then sign the complete printed EIP-191 message with their external

@@ -30,6 +30,11 @@ import {
 import { applyTotalVersionsToNodes, parseTotalVersionsResult } from "../selectors/treeTotals";
 import { verifyTreeSessionStartup } from "../services/treeSessionStartup";
 import {
+  captureTreeNodesPersistenceRevision,
+  readTreeNodesSnapshot,
+  writeTreeNodesSnapshot,
+} from "../services/treeNodesPersistence";
+import {
   collectParentRefs,
   resolveBestSpouseVersion,
   runSpouseEnrichment,
@@ -93,6 +98,13 @@ export interface TreeGraphStateResult {
 }
 
 export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphStateResult {
+  const storageScopeRef = useRef({ storageNS: options.storageNS, generation: 0 });
+  if (storageScopeRef.current.storageNS !== options.storageNS) {
+    storageScopeRef.current = {
+      storageNS: options.storageNS,
+      generation: storageScopeRef.current.generation + 1,
+    };
+  }
   const [idbHydrated, setIdbHydrated] = useState(
     () => !USE_INDEXEDDB_CACHE || !isIndexedDBSupported(),
   );
@@ -181,16 +193,23 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     }
     setIdbHydrated(false);
     let cancelled = false;
+    const hydrationScope = options.storageNS;
+    const hydrationGeneration = storageScopeRef.current.generation;
+    const isCurrentHydration = () =>
+      !cancelled &&
+      storageScopeRef.current.storageNS === hydrationScope &&
+      storageScopeRef.current.generation === hydrationGeneration;
     (async () => {
       try {
         const [idbNodes, idbEdgesUnion, idbEdgesStrict] = await Promise.all([
-          readBlob<Record<string, NodeData>>(`${options.storageNS}::nodesData`).catch(() => null),
+          readTreeNodesSnapshot(`${options.storageNS}::nodesData`).catch(() => null),
           readBlob<EdgeStoreUnion>(options.edgesUnionKey).catch(() => null),
           readBlob<EdgeStoreStrict>(options.edgesStrictKey).catch(() => null),
         ]);
-        if (cancelled) return;
+        if (!isCurrentHydration()) return;
         if (idbNodes && Object.keys(idbNodes).length) {
           setNodesData((prev) => {
+            if (!isCurrentHydration()) return prev;
             let changed = false;
             const next = { ...prev };
             for (const [k, v] of Object.entries(idbNodes)) {
@@ -203,15 +222,15 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           });
         }
         if (idbEdgesUnion && Object.keys(idbEdgesUnion).length) {
-          setEdgesUnion((prev) => ({ ...idbEdgesUnion, ...prev }));
+          setEdgesUnion((prev) => (isCurrentHydration() ? { ...idbEdgesUnion, ...prev } : prev));
         }
         if (idbEdgesStrict && Object.keys(idbEdgesStrict).length) {
-          setEdgesStrict((prev) => ({ ...idbEdgesStrict, ...prev }));
+          setEdgesStrict((prev) => (isCurrentHydration() ? { ...idbEdgesStrict, ...prev } : prev));
         }
       } catch {
         // Ignore IDB errors; keep in-memory state only.
       } finally {
-        if (!cancelled) setIdbHydrated(true);
+        if (isCurrentHydration()) setIdbHydrated(true);
       }
     })();
     return () => {
@@ -221,8 +240,10 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
 
   useEffect(() => {
     if (!USE_INDEXEDDB_CACHE || !isIndexedDBSupported()) return;
+    const storageKey = `${options.storageNS}::nodesData`;
+    const revision = captureTreeNodesPersistenceRevision(storageKey);
     const handle = setTimeout(() => {
-      writeBlob(`${options.storageNS}::nodesData`, nodesData).catch(() => {});
+      writeTreeNodesSnapshot(storageKey, nodesData, revision).catch(() => {});
     }, 200);
     return () => clearTimeout(handle);
   }, [nodesData, options.storageNS]);
@@ -512,15 +533,22 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
   useEffect(() => {
     if (loading || !options.contract || !options.api || nodePairs.length === 0) return;
     let cancelled = false;
+    const effectScope = options.storageNS;
+    const effectGeneration = storageScopeRef.current.generation;
+    const isCurrentScope = () =>
+      !cancelled &&
+      storageScopeRef.current.storageNS === effectScope &&
+      storageScopeRef.current.generation === effectGeneration;
     (async () => {
       let snapshot: Record<string, NodeData> | null = null;
       if (USE_INDEXEDDB_CACHE && isIndexedDBSupported()) {
         try {
-          snapshot = await readBlob<Record<string, NodeData>>(`${options.storageNS}::nodesData`);
+          snapshot = await readTreeNodesSnapshot(`${effectScope}::nodesData`);
         } catch {
           snapshot = null;
         }
       }
+      if (!isCurrentScope()) return;
 
       try {
         const allSatisfied = nodePairs.every((pair) => {
@@ -529,7 +557,8 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           return isVersionDetailsFresh(node, options.versionDetailsTtlMs);
         });
         if (allSatisfied) {
-          if (!cancelled) setEndorsementsReady(true);
+          if (!isCurrentScope()) return;
+          setEndorsementsReady(true);
           if (snapshot) {
             const { backfills } = planNodeEnrichmentSlice({
               slice: nodePairs,
@@ -537,13 +566,16 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
               currentNodes: nodesDataRef.current,
               versionDetailsTtlMs: options.versionDetailsTtlMs,
             });
-            setNodesData((prev) => applyNodeDataBackfills(prev, backfills));
+            if (!isCurrentScope()) return;
+            setNodesData((prev) =>
+              isCurrentScope() ? applyNodeDataBackfills(prev, backfills) : prev,
+            );
           }
           return;
         }
       } catch {}
 
-      for (let i = 0; i < nodePairs.length && !cancelled; i += 40) {
+      for (let i = 0; i < nodePairs.length && isCurrentScope(); i += 40) {
         const slice = nodePairs.slice(i, i + 40);
         const { backfills, targets } = planNodeEnrichmentSlice({
           slice,
@@ -552,7 +584,10 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           versionDetailsTtlMs: options.versionDetailsTtlMs,
         });
         if (Object.keys(backfills).length > 0) {
-          setNodesData((prev) => applyNodeDataBackfills(prev, backfills));
+          if (!isCurrentScope()) return;
+          setNodesData((prev) =>
+            isCurrentScope() ? applyNodeDataBackfills(prev, backfills) : prev,
+          );
         }
         if (targets.length === 0) continue;
         try {
@@ -564,7 +599,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
             getVersionDetailsFetchedAt: (pair) =>
               options.queryCacheRef.current.getEntry(vdKey(pair.h, pair.v))?.fetchedAt ??
               Date.now(),
-            getCurrentNode: (id) => nodesDataRef.current[id],
+            getCurrentNode: (id) => (isCurrentScope() ? nodesDataRef.current[id] : undefined),
             readStoryMetadata: async (tokenId) => {
               const metadata = await options.contract.getStoryMetadata(tokenId);
               return {
@@ -576,26 +611,33 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
               };
             },
           });
+          if (!isCurrentScope()) return;
 
           if (patches.length > 0) {
-            setNodesData((prev) => applyNodeEnrichmentPatches(prev, patches));
+            setNodesData((prev) =>
+              isCurrentScope() ? applyNodeEnrichmentPatches(prev, patches) : prev,
+            );
           }
 
-          if (nftErrors.length > 0 && !stageLoggedRef.current.has("nft_details_batch")) {
+          if (
+            isCurrentScope() &&
+            nftErrors.length > 0 &&
+            !stageLoggedRef.current.has("nft_details_batch")
+          ) {
             stageLoggedRef.current.add("nft_details_batch");
             options.push((nftErrors[0]?.error ?? new Error("nft_details_batch")) as any, {
               stage: "nft_details_batch",
             });
           }
         } catch (error) {
-          if (!stageLoggedRef.current.has("counts_batch")) {
+          if (isCurrentScope() && !stageLoggedRef.current.has("counts_batch")) {
             stageLoggedRef.current.add("counts_batch");
             options.push(error as any, { stage: "counts_batch" });
           }
         }
       }
 
-      if (!cancelled) setEndorsementsReady(true);
+      if (isCurrentScope()) setEndorsementsReady(true);
     })();
     return () => {
       cancelled = true;

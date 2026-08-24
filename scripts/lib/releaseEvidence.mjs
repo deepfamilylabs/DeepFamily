@@ -6,6 +6,25 @@ import { summarizeProductionBuildInfo } from "./acceptanceSafety.mjs";
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+export const RELEASE_INPUT_DIRECTORY_NAMES = Object.freeze([
+  "artifacts",
+  "contracts",
+  "circuits",
+  "hardhat",
+  "lib",
+  "packages",
+  "protocol-vectors",
+  "scripts",
+  "tasks",
+]);
+
+export const RELEASE_INPUT_FILE_NAMES = Object.freeze([
+  "hardhat.config.mjs",
+  "package.json",
+  "package-lock.json",
+  "protocol-release-manifest.json",
+]);
+
 export const gitWorkingTreeState = () => {
   const commit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const porcelain = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], {
@@ -46,31 +65,15 @@ export const hashDirectory = async (ethers, directory) => {
 };
 
 export const hashReleaseInputs = async (ethers, root = process.cwd()) => {
-  const directoryNames = [
-    "artifacts",
-    "contracts",
-    "circuits",
-    "hardhat",
-    "lib",
-    "packages",
-    "scripts",
-    "tasks",
-  ];
-  const fileNames = [
-    "hardhat.config.mjs",
-    "package.json",
-    "package-lock.json",
-    "protocol-release-manifest.json",
-  ];
   const directories = {};
   const files = {};
   const entries = [];
-  for (const name of directoryNames) {
+  for (const name of RELEASE_INPUT_DIRECTORY_NAMES) {
     const evidence = await hashDirectory(ethers, path.join(root, name));
     directories[name] = evidence;
     entries.push(`directory:${name}:${evidence.fileCount}:${evidence.digest}`);
   }
-  for (const name of fileNames) {
+  for (const name of RELEASE_INPUT_FILE_NAMES) {
     const digest = ethers.keccak256(await fs.readFile(path.join(root, name)));
     files[name] = digest;
     entries.push(`file:${name}:${digest}`);

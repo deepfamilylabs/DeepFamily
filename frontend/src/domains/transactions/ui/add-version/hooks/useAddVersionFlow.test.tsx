@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => ({
     signer: {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
+      provider: { send: vi.fn(async () => "0x7b") },
     },
   } as { signer: any },
   config: {
     rpcUrl: "https://rpc.example",
     chainId: 123,
     contractAddress: "0x0000000000000000000000000000000000000abc",
+    readerAddress: "0x0000000000000000000000000000000000000def",
   },
   readonlyProvider: { id: "readonly-provider", getTransactionReceipt: vi.fn() },
   submitContract: { id: "submit-contract" },
@@ -68,10 +70,12 @@ describe("useAddVersionFlow", () => {
     mocks.wallet.signer = {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
+      provider: { send: vi.fn(async () => "0x7b") },
     };
     mocks.config.rpcUrl = "https://rpc.example";
     mocks.config.chainId = 123;
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000abc";
+    mocks.config.readerAddress = "0x0000000000000000000000000000000000000def";
     mocks.createDeepFamilyContract.mockReset();
     mocks.getReadonlyProvider.mockReset();
     mocks.executeAddVersionFlow.mockReset();
@@ -211,6 +215,125 @@ describe("useAddVersionFlow", () => {
     expect(result.current.state).toEqual({ step: "success", result: serviceResult });
   });
 
+  it("reconciles the final exact replacement hash rather than the superseded hash", async () => {
+    const originalHash = `0x${"11".repeat(32)}`;
+    const replacementHash = `0x${"22".repeat(32)}`;
+    const serviceResult = {
+      hash: "0xperson",
+      index: 1,
+      rewardAmount: 0,
+      transactionHash: replacementHash,
+      blockNumber: 10,
+      events: {
+        PersonHashZKVerified: null,
+        PersonVersionAdded: null,
+        MetadataStored: null,
+        TokenRewardDistributed: null,
+      },
+    };
+    mocks.executeAddVersionFlow
+      .mockImplementationOnce(async (params) => {
+        params.onTransactionSubmitted?.(originalHash);
+        params.onTransactionSubmitted?.(replacementHash);
+        throw new Error("RPC timeout after exact replacement");
+      })
+      .mockResolvedValueOnce(serviceResult);
+
+    const { result } = renderHook(() => useAddVersionFlow());
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toThrow("RPC timeout");
+    });
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).resolves.toBe(serviceResult);
+    });
+
+    expect(mocks.executeAddVersionFlow.mock.calls[1][0].reconcileTransactionHash).toBe(
+      replacementHash,
+    );
+    expect(mocks.executeAddVersionFlow.mock.calls[1][0].proof).toBe(flowArgs.proof);
+    expect(mocks.executeAddVersionFlow.mock.calls[1][0].metadataEnvelope).toBe(
+      flowArgs.metadataEnvelope,
+    );
+  });
+
+  it("drops a submitted hash and fails closed when its chain scope changes", async () => {
+    const transactionHash = `0x${"aa".repeat(32)}`;
+    mocks.executeAddVersionFlow.mockImplementationOnce(async (params) => {
+      params.onTransactionSubmitted?.(transactionHash);
+      throw new Error("RPC timeout while waiting for receipt");
+    });
+
+    const { result, rerender } = renderHook(() => useAddVersionFlow());
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toThrow("RPC timeout");
+    });
+
+    mocks.config.chainId = 124;
+    mocks.wallet.signer.provider.send.mockResolvedValue("0x7c");
+    rerender();
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toMatchObject({
+        code: "ADD_VERSION_SCOPE_CHANGED",
+      });
+    });
+
+    expect(mocks.executeAddVersionFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not commit a pending result after the Reader scope changes", async () => {
+    let resolveService!: (value: any) => void;
+    const pendingService = new Promise((resolve) => {
+      resolveService = resolve;
+    });
+    mocks.executeAddVersionFlow.mockImplementation(async (params) => {
+      params.onTransactionSubmitted?.(`0x${"66".repeat(32)}`);
+      return await pendingService;
+    });
+    const serviceResult = {
+      hash: "0xperson",
+      index: 1,
+      rewardAmount: 0,
+      transactionHash: `0x${"66".repeat(32)}`,
+      blockNumber: 10,
+      events: {
+        PersonHashZKVerified: null,
+        PersonVersionAdded: null,
+        MetadataStored: null,
+        TokenRewardDistributed: null,
+      },
+    };
+
+    const { result, rerender } = renderHook(() => useAddVersionFlow());
+    let pending!: Promise<any>;
+    act(() => {
+      pending = result.current.runOrThrow(flowArgs);
+    });
+    await vi.waitFor(() => expect(mocks.executeAddVersionFlow).toHaveBeenCalledTimes(1));
+
+    mocks.config.readerAddress = "0x0000000000000000000000000000000000000fed";
+    rerender();
+    resolveService(serviceResult);
+    await act(async () => {
+      await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_SCOPE_CHANGED" });
+    });
+
+    expect(result.current.state.step).not.toBe("success");
+  });
+
+  it("rejects a lagging config when the wallet provider already switched chains", async () => {
+    mocks.wallet.signer.provider.send.mockResolvedValue("0x7c");
+    const { result } = renderHook(() => useAddVersionFlow());
+
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toMatchObject({
+        code: "ADD_VERSION_SCOPE_CHANGED",
+      });
+    });
+
+    expect(mocks.executeAddVersionFlow).not.toHaveBeenCalled();
+    expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
+  });
+
   it("fails before contract creation when wallet or contract config is missing", async () => {
     mocks.wallet.signer = null;
 
@@ -227,6 +350,7 @@ describe("useAddVersionFlow", () => {
     mocks.wallet.signer = {
       id: "signer",
       getAddress: vi.fn(async () => "0x00000000000000000000000000000000000000aa"),
+      provider: { send: vi.fn(async () => "0x7b") },
     };
     mocks.config.contractAddress = "";
 

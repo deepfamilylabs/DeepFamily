@@ -54,6 +54,11 @@ import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
+import {
+  assertOnChainProtocolDeploymentRuntimes,
+  assertPlannedProtocolDeploymentMatchesManifest,
+  deriveMainnetPlannedAddresses,
+} from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
@@ -218,6 +223,7 @@ const buildFingerprint = ({
   zkArtifactTrust,
   zkCeremonyVerification,
   protocolManifestEvidence,
+  plannedProtocolDeployment,
   testnetReleaseEvidence,
 }) => ({
   schemaVersion: MAINNET_STATE_SCHEMA_VERSION,
@@ -263,6 +269,10 @@ const buildFingerprint = ({
     sha256: protocolManifestEvidence.manifestSha256,
     protocol: protocolManifestEvidence.manifest.protocol,
     protocolGeneration: protocolManifestEvidence.manifest.protocolGeneration,
+    deploymentEvidence: {
+      sha256: plannedProtocolDeployment.sha256,
+      projection: plannedProtocolDeployment.projection,
+    },
   },
   testnetReleaseEvidence: testnetReleaseEvidence.publicSummary,
   buildInfo: {
@@ -339,28 +349,6 @@ const buildFingerprint = ({
     transactionIntents: releaseIntents.map(({ data: _data, ...intent }) => intent),
   },
 });
-
-const derivePlannedAddresses = ({ ethers, deployer, startingNonce }) => {
-  const deploymentOffsets = {
-    timelock: 0,
-    token: 1,
-    poseidonT5: 2,
-    adultAgeGate: 3,
-    personCommitmentVerifier: 4,
-    disclosureBindingVerifier: 5,
-    groth16VerifierAdapter: 6,
-    deepFamilyImplementation: 7,
-    deepFamily: 8,
-    metadataArchiveV1: 10,
-    deepFamilyReader: 12,
-  };
-  return Object.fromEntries(
-    Object.entries(deploymentOffsets).map(([label, offset]) => [
-      label,
-      ethers.getCreateAddress({ from: deployer, nonce: startingNonce + offset }),
-    ]),
-  );
-};
 
 const deriveExpectedNonces = (startingNonce) =>
   Object.fromEntries(
@@ -507,6 +495,7 @@ const assertProtocolTerminalState = async ({
   deployed,
   addresses,
   checkpoint,
+  protocolManifestEvidence,
 }) => {
   await assertCanonicalSafeProfile({
     provider: ethers.provider,
@@ -621,6 +610,17 @@ const assertProtocolTerminalState = async ({
     ],
   ];
   for (const [passed, message] of invariants) if (!passed) throw new Error(message);
+  const deploymentEvidence = assertPlannedProtocolDeploymentMatchesManifest({
+    root: process.cwd(),
+    chainId: config.chainId,
+    plannedAddresses: addresses,
+    manifest: protocolManifestEvidence.manifest,
+  });
+  await assertOnChainProtocolDeploymentRuntimes({
+    provider: ethers.provider,
+    plannedAddresses: addresses,
+    deploymentArtifacts: deploymentEvidence.artifacts,
+  });
   if (protocolEndorsementFeeBps !== 500n) {
     throw new Error(
       `Initial protocol endorsement fee=${protocolEndorsementFeeBps}; expected 500 bps`,
@@ -651,6 +651,10 @@ const assertProtocolTerminalState = async ({
     totalPersonsCount,
     tokenCounter,
     protocolEndorsementFeeBps,
+    protocolDeploymentEvidence: {
+      sha256: deploymentEvidence.sha256,
+      projection: deploymentEvidence.projection,
+    },
   };
 };
 
@@ -736,6 +740,7 @@ const revalidateCompletedRelease = async ({
   checkpoint,
   sourceState,
   releaseInputs,
+  protocolManifestEvidence,
 }) => {
   if (
     checkpoint.phase !== "complete" ||
@@ -786,10 +791,7 @@ const revalidateCompletedRelease = async ({
   const deployed = {
     token: await ethers.getContractAt("DeepFamilyToken", addresses.token),
     deepFamily: await ethers.getContractAt("DeepFamily", addresses.deepFamily),
-    metadataArchive: await ethers.getContractAt(
-      "MetadataArchiveV1",
-      addresses.metadataArchiveV1,
-    ),
+    metadataArchive: await ethers.getContractAt("MetadataArchiveV1", addresses.metadataArchiveV1),
     deepFamilyReader: await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader),
     groth16VerifierAdapter: await ethers.getContractAt(
       "Groth16VerifierAdapter",
@@ -806,6 +808,7 @@ const revalidateCompletedRelease = async ({
     deployed,
     addresses,
     checkpoint,
+    protocolManifestEvidence,
   });
 
   const [finishedSourceState, finishedInputs] = await Promise.all([
@@ -942,10 +945,16 @@ export const main = async (chainProfile) => {
   if (!Number.isSafeInteger(startingNonce) || startingNonce < 0) {
     throw new Error("Checkpoint deployer nonce is invalid");
   }
-  const plannedAddresses = derivePlannedAddresses({
+  const plannedAddresses = deriveMainnetPlannedAddresses({
     ethers,
     deployer: config.expectedDeployer,
     startingNonce,
+  });
+  const plannedProtocolDeployment = assertPlannedProtocolDeploymentMatchesManifest({
+    root: process.cwd(),
+    chainId: config.chainId,
+    plannedAddresses,
+    manifest: protocolManifestEvidence.manifest,
   });
   const expectedNonces = deriveExpectedNonces(startingNonce);
   const releaseIntents = await buildMainnetReleaseIntents({
@@ -973,6 +982,7 @@ export const main = async (chainProfile) => {
     zkArtifactTrust,
     zkCeremonyVerification,
     protocolManifestEvidence,
+    plannedProtocolDeployment,
     testnetReleaseEvidence,
   });
   const planDigest = deriveMainnetPlanDigest(fingerprint);
@@ -1005,6 +1015,7 @@ export const main = async (chainProfile) => {
         checkpoint: existingCheckpoint,
         sourceState,
         releaseInputs,
+        protocolManifestEvidence,
       });
       console.log(
         `${CHAIN_PROFILE.displayName} Mainnet release is already complete; read-only ` +
@@ -1087,6 +1098,7 @@ export const main = async (chainProfile) => {
       checkpoint: existingCheckpoint,
       sourceState,
       releaseInputs,
+      protocolManifestEvidence,
     });
     console.log(
       `${CHAIN_PROFILE.displayName} Mainnet release is already complete; read-only ` +
@@ -1402,12 +1414,9 @@ export const main = async (chainProfile) => {
         addresses.deepFamilyImplementation,
         proxyInitData,
       ]),
-      await verificationEntry(
-        hre.artifacts,
-        "MetadataArchiveV1",
-        addresses.metadataArchiveV1,
-        [addresses.deepFamily],
-      ),
+      await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchiveV1, [
+        addresses.deepFamily,
+      ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
         addresses.deepFamily,
       ]),
@@ -1453,6 +1462,7 @@ export const main = async (chainProfile) => {
         deployed,
         addresses,
         checkpoint,
+        protocolManifestEvidence,
       })),
     };
     await saveCheckpoint();

@@ -488,6 +488,27 @@ describe("pinned Circom installer", function () {
     }
   });
 
+  it("keeps the source-build tool lookup fail-closed for writable Cargo directories", async function () {
+    if (process.platform === "win32") this.skip();
+
+    const trustedHome = path.join(root, "writable-cargo-home");
+    const cargoDirectory = path.join(trustedHome, ".cargo");
+    const cargoBinDirectory = path.join(cargoDirectory, "bin");
+    const cargoExecutable = path.join(cargoBinDirectory, "cargo");
+    await fs.mkdir(cargoBinDirectory, { recursive: true, mode: 0o700 });
+    await fs.writeFile(cargoExecutable, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    await fs.chmod(cargoExecutable, 0o755);
+    await fs.chmod(cargoDirectory, 0o770);
+
+    const error = await captureError(() =>
+      resolveTrustedSourceBuildTool({ name: "cargo", homeDirectory: trustedHome }),
+    );
+
+    expect(error, "expected writable Cargo directory rejection").to.be.an("error");
+    expect(error.message).to.include("must not be group- or other-writable");
+    expect(error.message).to.include(cargoDirectory);
+  });
+
   it("resolves rustup hardlink proxies before isolating HOME", async function () {
     if (process.platform === "win32") this.skip();
 

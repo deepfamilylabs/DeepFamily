@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.10.0
+          node-version: 22.23.2
 
       - name: Cache npm
         uses: actions/cache@v4
@@ -80,11 +80,68 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.10.0
+          node-version: 22.23.2
           architecture: ${{ matrix.node_arch }}
 
       - name: Check Node execution architecture
         run: node -e "if (process.arch !== '${{ matrix.node_arch }}') throw new Error('Expected ${{ matrix.node_arch }}, got ' + process.arch)"
+
+      - name: Install protected Rust toolchain for macOS source builds
+        if: matrix.name == 'macos-arm64'
+        shell: bash
+        env:
+          DEEPFAMILY_RUSTUP_VERSION: "1.28.2"
+          DEEPFAMILY_RUSTUP_INIT_SHA256: "20ef5516c31b1ac2290084199ba77dbbcaa1406c45c1d978ca68558ef5964ef5"
+          DEEPFAMILY_RUST_TOOLCHAIN: "1.89.0"
+        run: |
+          set -euo pipefail
+          umask 077
+
+          deepfamily_bootstrap_directory="$HOME/.deepfamily/rustup-bootstrap"
+          deepfamily_rustup_init="$deepfamily_bootstrap_directory/rustup-init"
+          for deepfamily_directory in \
+            "$HOME/.deepfamily" \
+            "$deepfamily_bootstrap_directory" \
+            "$HOME/.cargo" \
+            "$HOME/.cargo/bin" \
+            "$HOME/.rustup"; do
+            if [[ -L "$deepfamily_directory" ]]; then
+              echo "Rust bootstrap directory must not be a symbolic link: $deepfamily_directory" >&2
+              exit 1
+            fi
+          done
+          mkdir -p \
+            "$deepfamily_bootstrap_directory" \
+            "$HOME/.cargo/bin" \
+            "$HOME/.rustup"
+          chmod 700 \
+            "$HOME/.deepfamily" \
+            "$deepfamily_bootstrap_directory" \
+            "$HOME/.cargo" \
+            "$HOME/.cargo/bin" \
+            "$HOME/.rustup"
+
+          curl --proto '=https' --tlsv1.2 --retry 5 --retry-connrefused \
+            --location --fail --silent --show-error \
+            "https://static.rust-lang.org/rustup/archive/${DEEPFAMILY_RUSTUP_VERSION}/aarch64-apple-darwin/rustup-init" \
+            --output "$deepfamily_rustup_init"
+          deepfamily_actual_sha256="$(shasum -a 256 "$deepfamily_rustup_init" | awk '{print $1}')"
+          if [[ "$deepfamily_actual_sha256" != "$DEEPFAMILY_RUSTUP_INIT_SHA256" ]]; then
+            echo "rustup-init SHA-256 mismatch" >&2
+            exit 1
+          fi
+          chmod 700 "$deepfamily_rustup_init"
+
+          env -i \
+            HOME="$HOME" \
+            PATH="/usr/bin:/bin" \
+            CARGO_HOME="$HOME/.cargo" \
+            RUSTUP_HOME="$HOME/.rustup" \
+            "$deepfamily_rustup_init" \
+              -y \
+              --no-modify-path \
+              --profile minimal \
+              --default-toolchain "$DEEPFAMILY_RUST_TOOLCHAIN"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund

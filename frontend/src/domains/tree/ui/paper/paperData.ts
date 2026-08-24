@@ -1,5 +1,10 @@
 import type { NodeData, NodeId } from "../../../../shared/model";
-import { birthDateString, deathDateString, sortNodeIdsByBirthOrder } from "../../../../shared/model";
+import {
+  birthDateString,
+  deathDateString,
+  isMetadataUnlockUsable,
+  sortNodeIdsByBirthOrder,
+} from "../../../../shared/model";
 import type { TreeGraphData } from "../../selectors";
 import { getNodeUi, type NodeUi } from "../nodeUi";
 
@@ -51,13 +56,13 @@ export type PaperPerson = {
   relation?:
     | { kind: "root" }
     | {
-      kind: "child";
-      parentId: NodeId;
-      parentName?: string;
-      siblingIndex: number;
-      siblingCount: number;
-      rankSource: "birthDate";
-    };
+        kind: "child";
+        parentId: NodeId;
+        parentName?: string;
+        siblingIndex: number;
+        siblingCount: number;
+        rankSource: "birthDate";
+      };
   ui: NodeUi;
   nodeData?: NodeData;
   detailLines: string[];
@@ -89,10 +94,7 @@ function compactUnique(lines: Array<string | undefined | null | false>): string[
   return out;
 }
 
-export function isPaperChildrenLine(
-  line: string,
-  t?: TranslateFn,
-): boolean {
+export function isPaperChildrenLine(line: string, t?: TranslateFn): boolean {
   const childrenLabel = tFallback(t, "genealogyBook.fields.children", "Children");
   return line.trim().toLocaleLowerCase().startsWith(`${childrenLabel}:`.toLocaleLowerCase());
 }
@@ -164,7 +166,7 @@ function buildDetailLines(params: {
   const birth = ui.birthDateText || birthDateString(nodeData);
   const death = deathDateString(nodeData);
   const birthPlace = ui.birthPlace || nodeData?.birthPlace;
-  const tag = ui.tagText || nodeData?.tag;
+  const tag = isMetadataUnlockUsable(nodeData) ? ui.tagText || nodeData?.tag : undefined;
   const childrenLabel = tFallback(t, "genealogyBook.fields.children", "Children");
   const childSeparator = /[\u3400-\u9fff]/u.test(childrenLabel) ? "、" : ", ";
 
@@ -197,8 +199,9 @@ function buildClassicalLines(params: {
   const deathPlace = nodeData?.deathPlace;
   // The encrypted version biography and the NFT's public story are distinct.
   // Paper genealogy consumes only a fully validated local biography.
-  const story = nodeData?.metadataUnlockValidated ? nodeData.biography : undefined;
-  const tag = ui.tagText || nodeData?.tag;
+  const metadataUnlocked = isMetadataUnlockUsable(nodeData);
+  const story = metadataUnlocked ? nodeData?.biography : undefined;
+  const tag = metadataUnlocked ? ui.tagText || nodeData?.tag : undefined;
 
   return compactUnique([
     birth ? `${tFallback(t, "genealogyBook.fields.birth", "Birth")}: ${birth}` : undefined,
@@ -359,9 +362,7 @@ export function buildPaperGenerations(params: {
     const children = getChildRefs({ parentId: node.id, graph, nodesData });
     const childCount = children.length;
     const childNames = children.map((child) => child.name);
-    const spouses = spouseLinks
-      ? getSpouseRefs({ personId: node.id, spouseLinks, nodesData })
-      : [];
+    const spouses = spouseLinks ? getSpouseRefs({ personId: node.id, spouseLinks, nodesData }) : [];
     const people = byDepth.get(node.depth) || [];
     const childRelation = relationByChild.get(node.id);
     const person: PaperPerson = {

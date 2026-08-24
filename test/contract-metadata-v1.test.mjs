@@ -1,13 +1,102 @@
 import "../hardhat-test-setup.mjs";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect } from "chai";
 import hre from "hardhat";
 import { AbiCoder } from "ethers";
+import {
+  DFM1_MAX_CONTENT_CIPHERTEXT_BYTES,
+  DFM1_MAX_ENVELOPE_BYTES,
+  ZERO_BYTES32,
+  asUint8Array,
+  computePersonVersionContentCommitment,
+  decryptPersonVersionRuntime,
+  encryptPersonVersionEnvelope,
+  gzipV1,
+  parseCanonicalPersonVersion,
+  parseFormat1Envelope,
+  serializeCanonicalPersonVersion,
+  wipeBytes,
+  wipePreparedPersonVersionContent,
+} from "../packages/protocol-core/index.js";
 
 const PERSON_RELATION = 0;
 const DISCLOSURE_BINDING = 1;
 const PERSON_CIRCUIT_ID = 101;
 const DISCLOSURE_CIRCUIT_ID = 201;
 const VERSION_HASH_DOMAIN = hre.ethers.id("DeepFamily:VersionHash:v1");
+const protocolVectorPath = fileURLToPath(
+  new URL("../protocol-vectors/onchain-biography-v1.json", import.meta.url),
+);
+const protocolVector = JSON.parse(fs.readFileSync(protocolVectorPath, "utf8"));
+const protocolVectorMetadata = parseCanonicalPersonVersion(
+  asUint8Array(protocolVector.metadata.canonicalJsonHex),
+);
+const XorShiftAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+function xorshiftAscii(seed, length) {
+  let state = seed >>> 0;
+  let output = "";
+  for (let index = 0; index < length; index += 1) {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    output += XorShiftAlphabet[(state >>> 0) & 63];
+  }
+  return output;
+}
+
+function compressedMetadataLength(metadata) {
+  const canonicalJson = serializeCanonicalPersonVersion(metadata);
+  const compressed = gzipV1(canonicalJson);
+  try {
+    return compressed.length;
+  } finally {
+    wipeBytes(canonicalJson);
+    wipeBytes(compressed);
+  }
+}
+
+function makeMaximumEnvelopeMetadata() {
+  const target = DFM1_MAX_CONTENT_CIPHERTEXT_BYTES;
+  const tryCandidate = (seed, biographyLength) => {
+    const metadata = structuredClone(protocolVectorMetadata);
+    metadata.biography = xorshiftAscii(seed, biographyLength);
+    return compressedMetadataLength(metadata) === target ? metadata : null;
+  };
+
+  // This exact candidate makes the common path fast. The bounded deterministic
+  // fallback keeps the test resilient to small canonical-vector/gzip changes.
+  const known = tryCandidate(0x12345679, 20_922);
+  if (known) return known;
+
+  for (let seedOffset = 0; seedOffset < 16; seedOffset += 1) {
+    const seed = (0x12345678 + seedOffset) >>> 0;
+    let low = 20_000;
+    let high = 22_000;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      const metadata = structuredClone(protocolVectorMetadata);
+      metadata.biography = xorshiftAscii(seed, middle);
+      if (compressedMetadataLength(metadata) < target) low = middle + 1;
+      else high = middle;
+    }
+    for (
+      let length = Math.max(20_000, low - 96);
+      length <= Math.min(22_000, low + 96);
+      length += 1
+    ) {
+      const metadata = tryCandidate(seed, length);
+      if (metadata) return metadata;
+    }
+  }
+  throw new Error(`Could not deterministically construct a ${target}-byte gzip payload`);
+}
+
+function sequentialProtocolRandom(start = 0) {
+  let next = start;
+  return (length) => Uint8Array.from({ length }, () => next++ & 0xff);
+}
 
 function makeProof(circuitId = PERSON_CIRCUIT_ID, overrides = {}) {
   return {
@@ -346,6 +435,80 @@ describe("DeepFamily encrypted metadata v1", function () {
       expect(metadataRef.payloadLength).to.equal(16_384n);
       const runtimeCode = await hre.ethers.provider.getCode(metadataRef.pointer);
       expect(hre.ethers.getBytes(runtimeCode)).to.have.length(16_385);
+    });
+
+    it("encrypts, archives, validates and production-decrypts an exact 16,384-byte envelope", async () => {
+      const { deepFamily, archive, owner } = await deployCore();
+      const metadata = makeMaximumEnvelopeMetadata();
+      const derivedSecretField = BigInt(protocolVector.identity.derivedSecretField);
+      const identityCommitment = BigInt(protocolVector.identity.identityCommitment);
+      const prepared = computePersonVersionContentCommitment({ metadata, derivedSecretField });
+      const proxyAddress = await deepFamily.getAddress();
+      const network = await hre.ethers.provider.getNetwork();
+      const context = {
+        chainId: network.chainId,
+        deepFamilyProxy: proxyAddress,
+        personHash: metadata.person.personHash,
+        fatherHash: ZERO_BYTES32,
+        fatherVersionIndex: 0n,
+        motherHash: ZERO_BYTES32,
+        motherVersionIndex: 0n,
+        versionCommitment: prepared.versionCommitment,
+      };
+
+      try {
+        expect(personHashOf(identityCommitment)).to.equal(metadata.person.personHash);
+        const encrypted = await encryptPersonVersionEnvelope({
+          metadata,
+          rawPassphrase: protocolVector.identity.rawPassphrase,
+          identitySuiteId: 1,
+          context,
+          randomBytes: sequentialProtocolRandom(),
+        });
+        const parsed = parseFormat1Envelope(encrypted.envelope);
+        expect(parsed.contentCiphertextLength).to.equal(DFM1_MAX_CONTENT_CIPHERTEXT_BYTES);
+        expect(encrypted.envelope).to.have.length(DFM1_MAX_ENVELOPE_BYTES);
+
+        const signals = makePublicSignals(await owner.getAddress(), {
+          identityCommitment,
+          versionCommitment: prepared.versionCommitment,
+        });
+        await (
+          await deepFamily.addPersonVersion(
+            makeProof(),
+            signals,
+            0,
+            0,
+            hre.ethers.hexlify(encrypted.envelope),
+          )
+        ).wait();
+
+        const metadataRef = await archive.metadataRef(metadata.person.personHash, 1);
+        expect(metadataRef.payloadLength).to.equal(BigInt(DFM1_MAX_ENVELOPE_BYTES));
+        expect(metadataRef.payloadHash).to.equal(encrypted.payloadHash);
+        const runtimeCode = await hre.ethers.provider.getCode(metadataRef.pointer);
+        const runtimeBytes = hre.ethers.getBytes(runtimeCode);
+        expect(runtimeBytes).to.have.length(DFM1_MAX_ENVELOPE_BYTES + 1);
+        expect(runtimeBytes[0]).to.equal(0);
+        expect(hre.ethers.keccak256(runtimeBytes.slice(1))).to.equal(metadataRef.payloadHash);
+
+        const decrypted = await decryptPersonVersionRuntime({
+          runtimeCode,
+          payloadLength: metadataRef.payloadLength,
+          payloadHash: metadataRef.payloadHash,
+          rawPassphrase: protocolVector.identity.rawPassphrase,
+          context,
+        });
+        expect(decrypted.metadataUnlockValidated).to.equal(true);
+        expect(decrypted.metadata.person).to.deep.equal(metadata.person);
+        expect(decrypted.metadata.parents).to.deep.equal(metadata.parents);
+        expect(decrypted.metadata.tag).to.equal(metadata.tag);
+        expect(hre.ethers.id(decrypted.metadata.biography)).to.equal(
+          hre.ethers.id(metadata.biography),
+        );
+      } finally {
+        wipePreparedPersonVersionContent(prepared);
+      }
     });
   });
 

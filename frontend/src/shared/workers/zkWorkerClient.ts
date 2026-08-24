@@ -53,9 +53,7 @@ const rejectPending = (error: Error): void => {
   pending.clear();
 };
 
-export function terminateZkWorker(
-  reason: Error = new ZkWorkerTerminatedError(),
-): void {
+export function terminateZkWorker(reason: Error = new ZkWorkerTerminatedError()): void {
   const worker = workerSingleton;
   workerSingleton = null;
   if (worker) worker.terminate();
@@ -116,13 +114,18 @@ export function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
       }, timeoutMs);
     }
     pending.set(id, entry);
+    const request: ZkWorkerRequest = { id, method, params };
     try {
-      const request: ZkWorkerRequest = { id, method, params };
       worker.postMessage(request);
     } catch (error) {
       pending.delete(id);
       if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
       reject(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      // The Worker receives a structured clone. Clear the main-thread request
+      // envelope immediately so role witnesses and digest limbs cannot linger
+      // in an instrumentation/message buffer after dispatch.
+      request.params = undefined;
     }
   });
 }

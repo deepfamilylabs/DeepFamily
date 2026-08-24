@@ -8,6 +8,7 @@ import {
   birthDateString,
   deathDateString,
   genderText as genderTextFn,
+  isMetadataUnlockUsable,
   isMinted,
   formatUnixSeconds,
 } from "../../../shared/model";
@@ -203,6 +204,8 @@ export function NodeDetailHashRows({
   onCopy: (text: string) => void;
 }) {
   const copyLabel = t("search.copy", "Copy");
+  const unlockedMetadata = nodeData && isMetadataUnlockUsable(nodeData) ? nodeData : undefined;
+  const metadataUnlocked = Boolean(unlockedMetadata);
 
   return (
     <>
@@ -324,27 +327,27 @@ export function NodeDetailHashRows({
       <NodeDetailRow
         label={t("familyTree.nodeDetail.privateMetadata", "Private Version Metadata")}
         value={
-          nodeData?.metadataUnlockValidated
+          metadataUnlocked
             ? t("familyTree.nodeDetail.unlockedOnDevice", "Unlocked on this device")
             : t("familyTree.nodeDetail.locked", "Locked")
         }
-        color={nodeData?.metadataUnlockValidated ? "emerald" : "slate"}
+        color={metadataUnlocked ? "emerald" : "slate"}
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
-      {nodeData?.metadataUnlockValidated ? (
+      {metadataUnlocked ? (
         <>
           <NodeDetailRow
             label={t("familyTree.nodeDetail.tag")}
-            value={nodeData.tag ?? ""}
-            copy={nodeData.tag || undefined}
+            value={unlockedMetadata!.tag ?? ""}
+            copy={unlockedMetadata!.tag || undefined}
             color="slate"
             copyLabel={copyLabel}
             onCopy={onCopy}
           />
           <NodeDetailStorySection
             label={t("familyTree.nodeDetail.versionBiography", "Encrypted Version Biography")}
-            story={nodeData.biography}
+            story={unlockedMetadata!.biography}
           />
         </>
       ) : null}

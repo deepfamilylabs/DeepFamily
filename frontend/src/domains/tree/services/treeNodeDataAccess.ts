@@ -1,4 +1,4 @@
-import { readBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
+import { isIndexedDBSupported } from "../../../shared/cache/persistence";
 import {
   applyOwnerToTokenNode,
   applyStoryDataToNode,
@@ -18,6 +18,7 @@ import {
   type StoryDataResult,
   upsertNode,
 } from "../../../shared/model";
+import { readTreeNodesSnapshot } from "./treeNodesPersistence";
 
 type RefLike<T> = { current: T };
 type SetNodesData = (updater: (prev: Record<string, NodeData>) => Record<string, NodeData>) => void;
@@ -56,7 +57,7 @@ const isStale = (fetchedAt?: number, ttlMs?: number) => {
 async function readPersistedNodesData(storageNS: string): Promise<Record<string, NodeData> | null> {
   if (!isIndexedDBSupported()) return null;
   try {
-    return (await readBlob<Record<string, NodeData>>(`${storageNS}::nodesData`)) ?? null;
+    return await readTreeNodesSnapshot(`${storageNS}::nodesData`);
   } catch {
     return null;
   }

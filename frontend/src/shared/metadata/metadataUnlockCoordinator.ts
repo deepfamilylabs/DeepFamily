@@ -1,21 +1,14 @@
 import type { BigNumberish } from "@deepfamily/protocol-core";
 import type { NodeData } from "../model/graph";
-import { isMetadataUnlockUsable } from "../model/metadataUnlock";
-import {
-  CryptoWorkerTerminatedError,
-  terminateCryptoWorker,
-} from "../workers/cryptoWorkerClient";
+import { isMetadataUnlockUsable, rebaseValidatedMetadataUnlock } from "../model/metadataUnlock";
+import { CryptoWorkerTerminatedError, terminateCryptoWorker } from "../workers/cryptoWorkerClient";
 import {
   MetadataUnlockCancelledError,
   unlockPersonVersionNode,
   type MetadataCodeReader,
 } from "./metadataArchiveService";
 
-export type MetadataUnlockBatchStatus =
-  | "running"
-  | "cancelling"
-  | "completed"
-  | "cancelled";
+export type MetadataUnlockBatchStatus = "running" | "cancelling" | "completed" | "cancelled";
 
 export interface MetadataUnlockBatchProgress {
   status: MetadataUnlockBatchStatus;
@@ -52,9 +45,7 @@ export interface MetadataUnlockBatchItemInput {
   signal?: AbortSignal;
 }
 
-export type MetadataNodeUnlocker = (
-  input: MetadataUnlockBatchItemInput,
-) => Promise<NodeData>;
+export type MetadataNodeUnlocker = (input: MetadataUnlockBatchItemInput) => Promise<NodeData>;
 
 export interface MetadataUnlockBatchOptions {
   nodes: readonly NodeData[];
@@ -63,6 +54,7 @@ export interface MetadataUnlockBatchOptions {
   getCode: MetadataCodeReader;
   rawPassphrase: string;
   cacheValidatedPersonVersion: (node: NodeData) => void;
+  getCurrentNode?: (nodeId: string) => NodeData | undefined;
   persistUnlocked?: (node: NodeData) => Promise<void> | void;
   onProgress?: (progress: MetadataUnlockBatchProgress) => void;
   onPersistenceError?: (failure: MetadataUnlockPersistenceFailure) => void;
@@ -91,11 +83,14 @@ const safeFailure = (
   error: unknown,
   rawPassphrase: string,
 ): MetadataUnlockFailure => {
-  const record = error && typeof error === "object" ? (error as Record<string, unknown>) : undefined;
+  const record =
+    error && typeof error === "object" ? (error as Record<string, unknown>) : undefined;
   const name = typeof record?.name === "string" ? record.name : "MetadataUnlockError";
   const code = typeof record?.code === "string" ? record.code : undefined;
   const rawMessage =
-    typeof record?.message === "string" ? record.message : "This metadata version could not be unlocked";
+    typeof record?.message === "string"
+      ? record.message
+      : "This metadata version could not be unlocked";
   return { nodeId, name, code, message: redactSecret(rawMessage, rawPassphrase) };
 };
 
@@ -177,14 +172,18 @@ export class MetadataUnlockCoordinator {
           if (active.controller.signal.aborted) break;
 
           // unlockPersonVersionNode has already completed every cryptographic
-          // and semantic check before this callback receives plaintext.
-          options.cacheValidatedPersonVersion(unlocked);
+          // and semantic check before this callback receives plaintext. Rebase
+          // only the private fields onto the latest public snapshot so a chain
+          // refresh racing the Worker cannot be overwritten by stale anchors.
+          const current = options.getCurrentNode?.(node.id) ?? node;
+          const committed = rebaseValidatedMetadataUnlock(current, unlocked);
+          options.cacheValidatedPersonVersion(committed);
           progress.succeeded += 1;
           progress.processed += 1;
 
           if (options.persistUnlocked) {
             try {
-              await options.persistUnlocked(unlocked);
+              await options.persistUnlocked(committed);
             } catch (error) {
               const failure = safeFailure(node.id, error, options.rawPassphrase);
               persistenceFailures.push(failure);

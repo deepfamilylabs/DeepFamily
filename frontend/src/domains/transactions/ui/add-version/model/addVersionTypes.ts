@@ -4,9 +4,10 @@ import type { PersonData, ProofEnvelope } from "../../../../../shared/zk/zk";
 import type {
   AddVersionPublicSignals,
   AddVersionResult,
+  AddVersionTransactionPreview,
 } from "../../../services/addVersionService";
 
-export type { AddVersionPublicSignals, AddVersionResult };
+export type { AddVersionPublicSignals, AddVersionResult, AddVersionTransactionPreview };
 
 export type AddVersionT = TFunction;
 
@@ -53,10 +54,28 @@ export interface AddVersionConsents {
   age: boolean;
   legal: boolean;
   passphrase: boolean;
+  personPassphraseRisk: boolean;
+  fatherPassphraseRisk: boolean;
+  motherPassphraseRisk: boolean;
 }
 
 export type ParentKind = "father" | "mother";
 export type ParentStatus = "empty" | "partial" | "complete";
+export type AddVersionIdentityRole = "person" | ParentKind;
+export type AddVersionPassphraseRisk = "empty" | "unicode-whitespace" | "ordinary";
+
+export type AddVersionPassphraseRisks = Record<AddVersionIdentityRole, AddVersionPassphraseRisk>;
+
+export interface AddVersionIdentityPresence {
+  person: true;
+  father: boolean;
+  mother: boolean;
+}
+
+export interface AddVersionPassphraseConsentContext {
+  risks: AddVersionPassphraseRisks;
+  present: AddVersionIdentityPresence;
+}
 
 export interface AddVersionFlowArgs {
   proof: ProofEnvelope;

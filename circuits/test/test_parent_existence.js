@@ -32,6 +32,8 @@ const baseInput = {
   contentDigestHi: "8",
 };
 
+const MAX_UINT32 = (1n << 32n) - 1n;
+
 const zeroRole = (input, role) => ({
   ...input,
   [`${role}NameField`]: "0",
@@ -64,6 +66,15 @@ async function testParentExistence() {
   const noMother = await calculateWitnessIsolated(noMotherInput);
   const orphan = await calculateWitnessIsolated(orphanInput);
 
+  const expectedPacked = BigInt(baseInput.submitter) + (BigInt(baseInput.selfSuiteId) << 160n);
+  if (both.publicSignals[3] !== expectedPacked.toString()) {
+    throw new Error("Mixed-suite proof did not expose the packed self suite");
+  }
+  if (both.publicSignals[1] === "0" || both.publicSignals[2] === "0") {
+    throw new Error("Mixed-suite proof did not expose both parent commitments");
+  }
+  console.log("PASS: self=2/father=1/mother=1 produces a verified mixed-suite Groth16 proof");
+
   if (noFather.publicSignals[1] !== "0") throw new Error("Absent father output must be zero");
   if (noMother.publicSignals[2] !== "0") throw new Error("Absent mother output must be zero");
   if (orphan.publicSignals[1] !== "0" || orphan.publicSignals[2] !== "0") {
@@ -84,6 +95,15 @@ async function testParentExistence() {
 
   await expectRejected("hasFather is boolean", { ...baseInput, hasFather: 2 });
   await expectRejected("present father suite is nonzero", { ...baseInput, fatherSuiteId: 0 });
+  await expectRejected("present mother suite is nonzero", { ...baseInput, motherSuiteId: 0 });
+  await expectRejected("father suite is uint32", {
+    ...baseInput,
+    fatherSuiteId: (MAX_UINT32 + 1n).toString(),
+  });
+  await expectRejected("mother suite is uint32", {
+    ...baseInput,
+    motherSuiteId: (MAX_UINT32 + 1n).toString(),
+  });
   await expectRejected("absent father suite is zero", {
     ...noFatherInput,
     fatherSuiteId: 1,
@@ -109,6 +129,15 @@ async function testParentExistence() {
     throw new Error("Father suite did not change the father identity commitment");
   }
   console.log("PASS: role suite IDs affect only their own identity commitments");
+
+  const changedMotherSuite = await calculateWitnessIsolated({ ...baseInput, motherSuiteId: 3 });
+  if (changedMotherSuite.publicSignals[0] !== both.publicSignals[0]) {
+    throw new Error("Mother suite changed the self identity commitment");
+  }
+  if (changedMotherSuite.publicSignals[2] === both.publicSignals[2]) {
+    throw new Error("Mother suite did not change the mother identity commitment");
+  }
+  console.log("PASS: mother suite ID affects only the mother identity commitment");
 }
 
 testParentExistence().then(

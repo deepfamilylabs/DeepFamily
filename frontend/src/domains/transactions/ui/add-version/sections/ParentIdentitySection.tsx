@@ -28,6 +28,7 @@ interface ParentIdentitySectionProps {
   register: UseFormRegister<AddVersionFormInput>;
   onExpandedChange: (value: boolean) => void;
   onInfoChange: (value: PersonInfoPublic) => void;
+  onPassphraseChange: () => void;
 }
 
 function StatusIndicator({ status }: { status: ParentStatus }) {
@@ -59,6 +60,7 @@ export function ParentIdentitySection({
   register,
   onExpandedChange,
   onInfoChange,
+  onPassphraseChange,
 }: ParentIdentitySectionProps) {
   const isFather = kind === "father";
   const title = isFather
@@ -137,6 +139,7 @@ export function ParentIdentitySection({
             collapsible={false}
             className="border-0 shadow-none bg-transparent"
             requirePassphraseConfirmation
+            onPassphraseChange={onPassphraseChange}
             initialValues={{
               fullName: "",
               gender: isFather ? 1 : 2,

@@ -107,7 +107,19 @@ describe("transaction form accessibility", () => {
       <>
         <AddVersionConsentSection
           t={t as any}
-          consents={{ hash: false, age: false, legal: false, passphrase: false }}
+          consents={{
+            hash: false,
+            age: false,
+            legal: false,
+            passphrase: false,
+            personPassphraseRisk: false,
+            fatherPassphraseRisk: false,
+            motherPassphraseRisk: false,
+          }}
+          passphraseContext={{
+            risks: { person: "ordinary", father: "empty", mother: "empty" },
+            present: { person: true, father: false, mother: false },
+          }}
           consentError="Add version consent required"
           onToggleConsent={vi.fn()}
         />
@@ -129,13 +141,7 @@ describe("transaction form accessibility", () => {
   });
 
   it("renders only private tag/biography fields, with no legacy metadata password or CID", () => {
-    render(
-      <MetadataEncryptionSection
-        t={t as any}
-        register={register}
-        isSubmitting={false}
-      />,
-    );
+    render(<MetadataEncryptionSection t={t as any} register={register} isSubmitting={false} />);
 
     expect(screen.getByPlaceholderText("Optional private revision label")).toBeTruthy();
     expect(
@@ -146,8 +152,6 @@ describe("transaction form accessibility", () => {
     expect(screen.queryByPlaceholderText("Password (min 8 chars)")).toBeNull();
     expect(screen.queryByPlaceholderText("Confirm password")).toBeNull();
     expect(screen.queryByText("Metadata CID")).toBeNull();
-    expect(
-      screen.getByText(/No separate metadata password or CID is created/),
-    ).toBeTruthy();
+    expect(screen.getByText(/No separate metadata password or CID is created/)).toBeTruthy();
   });
 });

@@ -1,3 +1,4 @@
+import { DFM1_MAX_ENVELOPE_BYTES } from "@deepfamily/protocol-core";
 import type {
   MetadataParentDisplay,
   MetadataParentsDisplay,
@@ -29,6 +30,10 @@ const sameHex = (left: string | undefined, right: string | undefined): boolean =
   typeof left === "string" &&
   typeof right === "string" &&
   left.toLowerCase() === right.toLowerCase();
+
+const BYTES32_HEX = /^0x[0-9a-fA-F]{64}$/;
+const ADDRESS_HEX = /^0x[0-9a-fA-F]{40}$/;
+const CANONICAL_UNSIGNED_DECIMAL = /^(0|[1-9][0-9]*)$/;
 
 const copyPerson = (person: MetadataPersonDisplay): MetadataPersonDisplay => ({
   fullName: person.fullName,
@@ -68,15 +73,45 @@ export function metadataAnchorsMatch(
 export function isMetadataUnlockUsable(node: NodeData | undefined): boolean {
   return Boolean(
     node?.metadataUnlockValidated === true &&
-      node.metadataProtocolGeneration === METADATA_CACHE_PROTOCOL_GENERATION &&
-      node.metadataPerson &&
-      node.metadataParents &&
-      typeof node.tag === "string" &&
-      typeof node.biography === "string" &&
-      node.versionCommitment &&
-      node.metadataPointer &&
-      node.metadataPayloadHash &&
-      Number.isInteger(node.metadataPayloadLength),
+    node.metadataProtocolGeneration === METADATA_CACHE_PROTOCOL_GENERATION &&
+    Number.isSafeInteger(node.versionIndex) &&
+    node.versionIndex > 0 &&
+    BYTES32_HEX.test(node.personHash) &&
+    typeof node.versionCommitment === "string" &&
+    CANONICAL_UNSIGNED_DECIMAL.test(node.versionCommitment) &&
+    typeof node.metadataPointer === "string" &&
+    ADDRESS_HEX.test(node.metadataPointer) &&
+    typeof node.metadataPayloadHash === "string" &&
+    BYTES32_HEX.test(node.metadataPayloadHash) &&
+    Number.isSafeInteger(node.metadataPayloadLength) &&
+    node.metadataPayloadLength! > 0 &&
+    node.metadataPayloadLength! <= DFM1_MAX_ENVELOPE_BYTES &&
+    Number.isSafeInteger(node.metadataFormatVersion) &&
+    node.metadataFormatVersion! > 0 &&
+    Number.isSafeInteger(node.identitySuiteId) &&
+    node.identitySuiteId! > 0 &&
+    node.metadataPerson &&
+    sameHex(node.metadataPerson.personHash, node.personHash) &&
+    typeof node.metadataPerson.fullName === "string" &&
+    node.metadataPerson.fullName.length > 0 &&
+    node.metadataParents &&
+    typeof node.tag === "string" &&
+    typeof node.biography === "string",
+  );
+}
+
+/** Detects any private unlock state that must be physically removed on anchor changes. */
+export function hasMetadataUnlockFootprint(node: NodeData | undefined): boolean {
+  return Boolean(
+    node &&
+    (node.metadataUnlockValidated !== undefined ||
+      node.metadataProtocolGeneration !== undefined ||
+      node.metadataFormatVersion !== undefined ||
+      node.identitySuiteId !== undefined ||
+      node.metadataPerson !== undefined ||
+      node.metadataParents !== undefined ||
+      node.tag !== undefined ||
+      node.biography !== undefined),
   );
 }
 
@@ -120,6 +155,32 @@ export function mergeValidatedMetadataUnlock(
   };
 }
 
+export function rebaseValidatedMetadataUnlock(current: NodeData, unlocked: NodeData): NodeData {
+  if (!isMetadataUnlockUsable(unlocked)) {
+    throw new Error("Only a fully validated metadata unlock may be committed");
+  }
+
+  return mergeValidatedMetadataUnlock(
+    current,
+    {
+      personHash: unlocked.personHash,
+      versionIndex: unlocked.versionIndex,
+      versionCommitment: unlocked.versionCommitment!,
+      metadataPointer: unlocked.metadataPointer!,
+      metadataPayloadHash: unlocked.metadataPayloadHash!,
+      metadataPayloadLength: unlocked.metadataPayloadLength!,
+    },
+    {
+      person: unlocked.metadataPerson!,
+      parents: unlocked.metadataParents!,
+      tag: unlocked.tag!,
+      biography: unlocked.biography!,
+      formatVersion: unlocked.metadataFormatVersion!,
+      identitySuiteId: unlocked.identitySuiteId!,
+    },
+  );
+}
+
 export function clearMetadataUnlock(node: NodeData): NodeData {
   const next = { ...node };
   delete next.tag;
@@ -143,13 +204,24 @@ export function clearMetadataUnlock(node: NodeData): NodeData {
   return next;
 }
 
-export function clearAllMetadataUnlocks(
+export function clearAllMetadataUnlocks(nodes: Record<string, NodeData>): Record<string, NodeData> {
+  return Object.fromEntries(
+    Object.entries(nodes).map(([id, node]) => [
+      id,
+      hasMetadataUnlockFootprint(node) ? clearMetadataUnlock(node) : node,
+    ]),
+  );
+}
+
+export function sanitizeHydratedMetadataUnlocks(
   nodes: Record<string, NodeData>,
 ): Record<string, NodeData> {
   return Object.fromEntries(
     Object.entries(nodes).map(([id, node]) => [
       id,
-      node.metadataUnlockValidated ? clearMetadataUnlock(node) : node,
+      !hasMetadataUnlockFootprint(node) || isMetadataUnlockUsable(node)
+        ? node
+        : clearMetadataUnlock(node),
     ]),
   );
 }

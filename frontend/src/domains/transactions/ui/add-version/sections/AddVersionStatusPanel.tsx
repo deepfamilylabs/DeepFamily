@@ -5,12 +5,15 @@ import type {
   AddVersionErrorResultView,
   AddVersionSuccessResultView,
   AddVersionT,
+  AddVersionTransactionPreview,
 } from "../model/addVersionTypes";
+import { AddVersionTransactionPreviewPanel } from "./AddVersionTransactionPreviewPanel";
 
 interface AddVersionStatusPanelProps {
   t: AddVersionT;
   isSubmitting: boolean;
   proofGenerationStep: string;
+  transactionPreview: AddVersionTransactionPreview | null;
   successResult: AddVersionSuccessResultView | null;
   errorResult: AddVersionErrorResultView | null;
 }
@@ -19,25 +22,34 @@ export function AddVersionStatusPanel({
   t,
   isSubmitting,
   proofGenerationStep,
+  transactionPreview,
   successResult,
   errorResult,
 }: AddVersionStatusPanelProps) {
   return (
     <>
-      {isSubmitting && proofGenerationStep && !successResult && !errorResult && (
-        <TransactionProgress
-          title={t("addVersion.processing", "Processing...")}
-          message={proofGenerationStep}
-          note={
-            proofGenerationStep.includes("30-60 seconds")
-              ? t(
-                  "addVersion.proofGenerationNote",
-                  "ZK proof generation requires complex cryptographic calculations. Please wait...",
-                )
-              : undefined
-          }
-        />
+      {transactionPreview && !successResult && !errorResult && (
+        <AddVersionTransactionPreviewPanel t={t} preview={transactionPreview} />
       )}
+
+      {isSubmitting &&
+        proofGenerationStep &&
+        !transactionPreview &&
+        !successResult &&
+        !errorResult && (
+          <TransactionProgress
+            title={t("addVersion.processing", "Processing...")}
+            message={proofGenerationStep}
+            note={
+              proofGenerationStep.includes("30-60 seconds")
+                ? t(
+                    "addVersion.proofGenerationNote",
+                    "ZK proof generation requires complex cryptographic calculations. Please wait...",
+                  )
+                : undefined
+            }
+          />
+        )}
 
       {successResult && <AddVersionSuccessResult t={t} successResult={successResult} />}
 

@@ -56,7 +56,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     });
-    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1, 1, 1);
+    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1);
     const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, {
       person,
     });
@@ -78,7 +78,7 @@ describe("Mint NFT Tests", function () {
       gender: 1,
       ...personOverrides,
     });
-    const identityCommitment = computeIdentityCommitment(hre.ethers, fullName, person, 1, 1, 1);
+    const identityCommitment = computeIdentityCommitment(hre.ethers, fullName, person, 1);
     const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, {
       person,
     });
@@ -95,7 +95,7 @@ describe("Mint NFT Tests", function () {
     };
     const publicSignals = {
       identityCommitment: BigInt(identityCommitment),
-      disclosureBinding: computeDisclosureBinding(hre.ethers, fullName, basicInfo, 1, 1, 1),
+      disclosureBinding: computeDisclosureBinding(hre.ethers, fullName, basicInfo, 1),
       minter: BigInt(await signer.getAddress()),
       suiteCommitment: computeSuiteCommitment(1),
     };
@@ -133,7 +133,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     });
-    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1, 1, 1);
+    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1);
     const personHash = await addPerson(hre.ethers, deepFamily, signer, identityCommitment, {
       person,
     });
@@ -146,14 +146,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const disclosureBindingValue = computeDisclosureBinding(
-      hre.ethers,
-      FULLNAME,
-      basicInfo,
-      1,
-      1,
-      1,
-    );
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
     const signerAddr = await signer.getAddress();
 
     const proof = makeStubProof();
@@ -193,7 +186,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     });
-    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1, 1, 1);
+    const identityCommitment = computeIdentityCommitment(hre.ethers, FULLNAME, person, 1);
 
     const { personHash } = await mintPerson(
       hre.ethers,
@@ -223,8 +216,6 @@ describe("Mint NFT Tests", function () {
       FULLNAME,
       { isBirthBC: false, birthYear: 1999, birthMonth: 0, birthDay: 0, gender: 1 },
       1,
-      1,
-      1,
     );
 
     await mintPerson(hre.ethers, deepFamily, signer, identityCommitment, FULLNAME);
@@ -238,14 +229,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const disclosureBindingValue = computeDisclosureBinding(
-      hre.ethers,
-      FULLNAME,
-      basicInfo,
-      1,
-      1,
-      1,
-    );
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
     const signerAddr = await signer.getAddress();
 
     const proof = makeStubProof();
@@ -286,14 +270,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const disclosureBindingValue = computeDisclosureBinding(
-      hre.ethers,
-      FULLNAME,
-      basicInfo,
-      1,
-      1,
-      1,
-    );
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
     const signerAddr = await signer.getAddress();
 
     const proof = makeStubProof();
@@ -334,14 +311,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const disclosureBindingValue = computeDisclosureBinding(
-      hre.ethers,
-      FULLNAME,
-      basicInfo,
-      1,
-      1,
-      1,
-    );
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
     const signerAddr = await signer.getAddress();
 
     const proof = makeStubProof();
@@ -432,14 +402,7 @@ describe("Mint NFT Tests", function () {
       birthDay: 0,
       gender: 1,
     };
-    const disclosureBindingValue = computeDisclosureBinding(
-      hre.ethers,
-      FULLNAME,
-      basicInfo,
-      1,
-      1,
-      1,
-    );
+    const disclosureBindingValue = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
 
     const proof = makeStubProof();
     const publicSignals = {
@@ -544,15 +507,11 @@ describe("Mint NFT Tests", function () {
       expect(packBirthGenderField(canonicalBasicInfo)).to.not.equal(
         packBirthGenderField(formerlyAliasedBasicInfo),
       );
-      expect(
-        computeDisclosureBinding(hre.ethers, fullName, canonicalBasicInfo, 1, 1, 1),
-      ).to.not.equal(
-        computeDisclosureBinding(hre.ethers, fullName, formerlyAliasedBasicInfo, 1, 1, 1),
+      expect(computeDisclosureBinding(hre.ethers, fullName, canonicalBasicInfo, 1)).to.not.equal(
+        computeDisclosureBinding(hre.ethers, fullName, formerlyAliasedBasicInfo, 1),
       );
-      expect(
-        computeIdentityCommitment(hre.ethers, fullName, canonicalBasicInfo, 1, 1, 1),
-      ).to.not.equal(
-        computeIdentityCommitment(hre.ethers, fullName, formerlyAliasedBasicInfo, 1, 1, 1),
+      expect(computeIdentityCommitment(hre.ethers, fullName, canonicalBasicInfo, 1)).to.not.equal(
+        computeIdentityCommitment(hre.ethers, fullName, formerlyAliasedBasicInfo, 1),
       );
     });
   });
@@ -591,8 +550,6 @@ describe("Mint NFT Tests", function () {
           gender: 1,
         },
         1,
-        1,
-        1,
       );
       const person = makeTestPerson(FULLNAME, {
         isBirthBC: false,
@@ -614,7 +571,7 @@ describe("Mint NFT Tests", function () {
         birthDay: mintDay,
         gender: 1,
       };
-      const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1, 1, 1);
+      const dbVal = computeDisclosureBinding(hre.ethers, FULLNAME, basicInfo, 1);
       const signerAddr = await signer.getAddress();
 
       const publicSignals = {

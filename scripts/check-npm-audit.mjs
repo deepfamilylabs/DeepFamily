@@ -3,7 +3,6 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
@@ -22,18 +21,6 @@ const ELLIPTIC_ADVISORY = Object.freeze({
     vectorString: "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:L",
   }),
   range: "<=6.6.1",
-});
-
-const REACT_ROUTER_RSC_ADVISORY = Object.freeze({
-  source: 1124282,
-  name: "react-router",
-  dependency: "react-router",
-  title: "React Router: RSC Mode CSRF Bypass Allows Action Execution Before 400 Response",
-  url: "https://github.com/advisories/GHSA-qwww-vcr4-c8h2",
-  severity: "high",
-  cwe: Object.freeze(["CWE-352"]),
-  cvss: Object.freeze({ score: 0, vectorString: null }),
-  range: ">=7.12.0 <8.3.0",
 });
 
 const vulnerability = ({
@@ -159,34 +146,6 @@ const EXPECTED_VULNERABILITIES = Object.freeze({
     range: "4.5.1 || 5.2.1 || 6.2.1 || >=7.0.3",
     nodes: ["node_modules/ethereumjs-util"],
   }),
-  "react-router": vulnerability({
-    version: "7.18.2",
-    severity: "high",
-    isDirect: false,
-    via: [REACT_ROUTER_RSC_ADVISORY],
-    effects: ["react-router-dom"],
-    range: "7.12.0 - 8.2.0",
-    nodes: ["frontend/node_modules/react-router-dom/node_modules/react-router"],
-    fixAvailable: {
-      name: "react-router-dom",
-      version: "7.11.0",
-      isSemVerMajor: true,
-    },
-  }),
-  "react-router-dom": vulnerability({
-    version: "7.18.2",
-    severity: "high",
-    isDirect: true,
-    via: ["react-router"],
-    effects: [],
-    range: ">=7.12.0-pre.0",
-    nodes: ["frontend/node_modules/react-router-dom"],
-    fixAvailable: {
-      name: "react-router-dom",
-      version: "7.11.0",
-      isSemVerMajor: true,
-    },
-  }),
   secp256k1: vulnerability({
     version: "4.0.4",
     severity: "low",
@@ -213,13 +172,6 @@ export const NPM_AUDIT_POLICY = Object.freeze({
       rationale:
         "Upstream has no patched release. The two locked paths are tooling-only ABI/storage " +
         "analysis paths; direct imports of the affected crypto packages are prohibited.",
-    }),
-    1124282: Object.freeze({
-      ghsa: "GHSA-qwww-vcr4-c8h2",
-      package: "react-router",
-      rationale:
-        "The advisory is limited to RSC action handling. DeepFamily is a React 18 Vite SPA, " +
-        "and the gate prohibits React Router RSC imports and entry points.",
     }),
   }),
   vulnerabilities: EXPECTED_VULNERABILITIES,
@@ -341,8 +293,6 @@ const CRYPTO_MODULES = new Set([
   "@ethersproject/signing-key",
   "@ethersproject/transactions",
 ]);
-const RSC_IDENTIFIER_PATTERN =
-  /\b(?:unstable_)?(?:matchRSCServerRequest|routeRSCServerRequest|RSCStaticRouter|RSCHydratedRouter)\b|rsc-action-id/gu;
 const MODULE_REFERENCE_PATTERN =
   /\b(?:from\s+|import\s*(?:\(\s*)?|require\s*\(\s*)["']([^"']+)["']/gu;
 
@@ -367,16 +317,6 @@ const sourceModuleReferences = (source) =>
 
 export const inspectAuditExceptionReachability = ({ root = process.cwd() } = {}) => {
   const projectRoot = path.resolve(root);
-  const requireFromFrontend = createRequire(path.join(projectRoot, "frontend", "package.json"));
-  const react = JSON.parse(
-    fs.readFileSync(requireFromFrontend.resolve("react/package.json"), "utf8"),
-  );
-  const reactDom = JSON.parse(
-    fs.readFileSync(requireFromFrontend.resolve("react-dom/package.json"), "utf8"),
-  );
-  const frontendManifest = JSON.parse(
-    fs.readFileSync(path.join(projectRoot, "frontend", "package.json"), "utf8"),
-  );
   const sourceFiles = [
     ...collectSourceFiles(projectRoot, "frontend/src"),
     ...collectSourceFiles(projectRoot, "frontend/vite.config.ts"),
@@ -387,38 +327,18 @@ export const inspectAuditExceptionReachability = ({ root = process.cwd() } = {})
     ...collectSourceFiles(projectRoot, "hardhat.config.mjs"),
   ];
   const cryptoImports = [];
-  const routerRscReferences = [];
 
   for (const relativePath of sourceFiles) {
     const source = fs.readFileSync(path.join(projectRoot, ...relativePath.split("/")), "utf8");
     for (const moduleName of sourceModuleReferences(source)) {
       if (CRYPTO_MODULES.has(moduleName)) cryptoImports.push(`${relativePath}: ${moduleName}`);
-      if (
-        relativePath.startsWith("frontend/") &&
-        (moduleName === "react-router" ||
-          moduleName.startsWith("react-router/") ||
-          moduleName.startsWith("react-server-dom"))
-      ) {
-        routerRscReferences.push(`${relativePath}: ${moduleName}`);
-      }
-    }
-    if (relativePath.startsWith("frontend/")) {
-      for (const match of source.matchAll(RSC_IDENTIFIER_PATTERN)) {
-        routerRscReferences.push(`${relativePath}: ${match[0]}`);
-      }
     }
   }
 
   return {
-    reactVersion: react.version,
-    reactDomVersion: reactDom.version,
-    viteBuild: /(?:^|&&|;)\s*vite\s+build(?:\s|$)/u.test(frontendManifest.scripts?.build ?? ""),
     cryptoImports: sortStrings(new Set(cryptoImports)),
-    routerRscReferences: sortStrings(new Set(routerRscReferences)),
   };
 };
-
-const majorVersion = (version) => (/^(\d+)\./u.exec(String(version)) ?? [])[1];
 
 const assertExceptionReachability = ({ vulnerabilities, inspectReachability }) => {
   const inspection = inspectReachability();
@@ -428,24 +348,6 @@ const assertExceptionReachability = ({ vulnerabilities, inspectReachability }) =
         ", ",
       )}`,
     );
-  }
-  if (vulnerabilities["react-router"]) {
-    if (
-      majorVersion(inspection.reactVersion) !== "18" ||
-      inspection.reactVersion !== inspection.reactDomVersion ||
-      inspection.viteBuild !== true
-    ) {
-      throw new Error(
-        "React Router RSC exception requires matching React 18/React DOM 18 and a Vite SPA build",
-      );
-    }
-    if (inspection.routerRscReferences.length > 0) {
-      throw new Error(
-        `React Router RSC exception is unreachable only without RSC references: ${inspection.routerRscReferences.join(
-          ", ",
-        )}`,
-      );
-    }
   }
 };
 
@@ -616,9 +518,10 @@ export const runNpmAuditPolicy = ({
   if (evaluation.clean) {
     stdout("npm audit policy passed: no vulnerabilities found.");
   } else {
+    const exceptionLabel = evaluation.advisorySources.length === 1 ? "exception" : "exceptions";
     stdout(
       `npm audit policy passed: ${evaluation.vulnerabilityCount} vulnerable package(s) are ` +
-        `limited to ${evaluation.advisorySources.length} reviewed advisory exception(s); ` +
+        `limited to ${evaluation.advisorySources.length} reviewed advisory ${exceptionLabel}; ` +
         `review by ${evaluation.reviewBy}.`,
     );
   }

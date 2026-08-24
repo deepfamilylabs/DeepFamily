@@ -82,7 +82,7 @@ vi.mock("../../../shared/zk/zk", () => ({
   }),
 }));
 
-vi.mock("../../../shared/crypto/identityCommitment", () => ({
+vi.mock("../../../shared/identity/fullName", () => ({
   safeCanonicalizeFullName: (value: string) => value.trim(),
 }));
 
@@ -303,7 +303,25 @@ describe("MintNFTModal", () => {
         id: `${personHash}-v-2`,
         personHash,
         versionIndex: 2,
+        versionCommitment: "99",
+        metadataPointer: `0x${"34".repeat(20)}`,
+        metadataPayloadHash: `0x${"56".repeat(32)}`,
+        metadataPayloadLength: 256,
         metadataUnlockValidated: true,
+        metadataProtocolGeneration: "df-onchain-biography-v1",
+        metadataFormatVersion: 1,
+        identitySuiteId: 1,
+        metadataPerson: {
+          fullName: "Ada Lovelace",
+          gender: 2,
+          birthYear: 1815,
+          birthMonth: 12,
+          birthDay: 10,
+          isBirthBC: false,
+          personHash,
+        },
+        metadataParents: { father: null, mother: null },
+        tag: "",
         biography: "Validated private biography",
       },
     };
@@ -334,6 +352,23 @@ describe("MintNFTModal", () => {
         personHash,
         versionIndex: 2,
         biography: "Untrusted cached text",
+      },
+    };
+
+    renderMintModal();
+    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+
+    expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
+  });
+
+  it("never offers marker-only cached biography missing format and suite evidence", async () => {
+    mocks.nodesData = {
+      [`${personHash}-v-2`]: {
+        id: `${personHash}-v-2`,
+        personHash,
+        versionIndex: 2,
+        metadataUnlockValidated: true,
+        biography: "Marker-only cached text",
       },
     };
 

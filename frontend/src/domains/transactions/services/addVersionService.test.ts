@@ -1,15 +1,9 @@
-import {
-  computeVersionHash,
-  packSubmitterAndSelfSuiteId,
-} from "@deepfamily/protocol-core";
+import { computeVersionHash, packSubmitterAndSelfSuiteId } from "@deepfamily/protocol-core";
 import { ethers } from "ethers";
 import { describe, expect, it, vi } from "vitest";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
-import {
-  executeAddVersionFlow,
-  type AddVersionPublicSignals,
-} from "./addVersionService";
+import { executeAddVersionFlow, type AddVersionPublicSignals } from "./addVersionService";
 
 const CONTRACT = "0x0000000000000000000000000000000000000abc";
 const ARCHIVE = "0x0000000000000000000000000000000000000acd";
@@ -391,6 +385,260 @@ describe("addVersionService fresh-v1 flow", () => {
 
     expect(submit).toHaveBeenCalledWith(proof, signals, 0, 0, envelope, { gasLimit: 1200n });
     expect(result.transactionHash).toBe("0xtxhash");
+  });
+
+  it("awaits an exact envelope/gas preview after estimation and before wallet submission", async () => {
+    const order: string[] = [];
+    const submit = submitMethod();
+    submit.estimateGas.mockImplementation(async () => {
+      order.push("estimate");
+      return 1_000n;
+    });
+    submit.mockImplementation(async () => {
+      order.push("send");
+      return {
+        hash: "0xtxhash",
+        wait: vi.fn(async () => ({ blockNumber: 55, logs: [] })),
+      };
+    });
+    const confirmTransactionPreview = vi.fn(async (preview) => {
+      order.push("confirm");
+      expect(submit).not.toHaveBeenCalled();
+      expect(preview).toEqual({
+        envelopeBytes: 20,
+        estimatedGas: 1_000n,
+        gasLimit: 1_200n,
+        estimated: true,
+      });
+      return true;
+    });
+    const assertWalletScope = vi.fn(async () => {
+      order.push("scope");
+      expect(submit).not.toHaveBeenCalled();
+    });
+
+    await executeAddVersionFlow({
+      submitContract: { addPersonVersion: submit },
+      preflightContract: preflightContract(),
+      contractAddress: CONTRACT,
+      submitterAddress: SUBMITTER,
+      proof,
+      publicSignals: rootSignals(),
+      fatherVersionIndex: 0,
+      motherVersionIndex: 0,
+      metadataEnvelope: metadataEnvelope(),
+      confirmTransactionPreview,
+      assertWalletScope,
+    });
+
+    expect(order).toEqual(["estimate", "confirm", "scope", "send"]);
+    expect(confirmTransactionPreview).toHaveBeenCalledTimes(1);
+    expect(assertWalletScope).toHaveBeenCalledTimes(1);
+  });
+
+  it("records the hash but rejects a wallet response from a different chain", async () => {
+    const wait = vi.fn(async () => ({ blockNumber: 55, logs: [] }));
+    const submit = submitMethod();
+    submit.mockResolvedValueOnce({ hash: "0xwrongchain", chainId: 72n, wait } as any);
+    const onTransactionSubmitted = vi.fn();
+
+    await expect(
+      executeAddVersionFlow({
+        submitContract: { addPersonVersion: submit },
+        preflightContract: preflightContract(),
+        contractAddress: CONTRACT,
+        submitterAddress: SUBMITTER,
+        proof,
+        publicSignals: rootSignals(),
+        fatherVersionIndex: 0,
+        motherVersionIndex: 0,
+        metadataEnvelope: metadataEnvelope(),
+        expectedChainId: 71,
+        onTransactionSubmitted,
+      }),
+    ).rejects.toMatchObject({
+      code: "ADD_VERSION_SCOPE_CHANGED",
+      transactionReconciliationFinal: true,
+      transactionHash: "0xwrongchain",
+    });
+
+    expect(onTransactionSubmitted).toHaveBeenCalledWith("0xwrongchain");
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it("accepts an exact repriced replacement and records its final hash", async () => {
+    const signals = rootSignals();
+    const envelope = metadataEnvelope();
+    const replacementHash = `0x${"22".repeat(32)}`;
+    const originalHash = `0x${"11".repeat(32)}`;
+    const expectedData = createDeepFamilyInterface().encodeFunctionData("addPersonVersion", [
+      proof,
+      signals,
+      0,
+      0,
+      envelope,
+    ]);
+    const replacement = {
+      hash: replacementHash,
+      to: CONTRACT,
+      from: SUBMITTER,
+      data: expectedData,
+      value: 0n,
+      chainId: 71n,
+      wait: vi.fn(),
+    };
+    const replacementReceipt = {
+      hash: replacementHash,
+      status: 1,
+      blockNumber: 56,
+      logs: [],
+    };
+    const replacementError = Object.assign(new Error("repriced"), {
+      code: "TRANSACTION_REPLACED",
+      cancelled: false,
+      reason: "repriced",
+      replacement,
+      receipt: replacementReceipt,
+    });
+    const submit = submitMethod();
+    submit.mockResolvedValueOnce({
+      hash: originalHash,
+      chainId: 71n,
+      wait: vi.fn(async () => {
+        throw replacementError;
+      }),
+    } as any);
+    const onTransactionSubmitted = vi.fn();
+
+    const result = await executeAddVersionFlow({
+      submitContract: { addPersonVersion: submit },
+      preflightContract: preflightContract(),
+      contractAddress: CONTRACT,
+      submitterAddress: SUBMITTER,
+      proof,
+      publicSignals: signals,
+      fatherVersionIndex: 0,
+      motherVersionIndex: 0,
+      metadataEnvelope: envelope,
+      expectedChainId: 71,
+      onTransactionSubmitted,
+    });
+
+    expect(onTransactionSubmitted.mock.calls.map(([hash]) => hash)).toEqual([
+      originalHash,
+      replacementHash,
+    ]);
+    expect(result.transactionHash).toBe(replacementHash);
+    expect(replacement.wait).not.toHaveBeenCalled();
+  });
+
+  it("terminates a cancelled or calldata-changing nonce replacement", async () => {
+    const signals = rootSignals();
+    const envelope = metadataEnvelope();
+    const originalHash = `0x${"33".repeat(32)}`;
+    const makeSubmit = (replacementError: Error) => {
+      const submit = submitMethod();
+      submit.mockResolvedValueOnce({
+        hash: originalHash,
+        chainId: 71n,
+        wait: vi.fn(async () => {
+          throw replacementError;
+        }),
+      } as any);
+      return submit;
+    };
+    const base = {
+      preflightContract: preflightContract(),
+      contractAddress: CONTRACT,
+      submitterAddress: SUBMITTER,
+      proof,
+      publicSignals: signals,
+      fatherVersionIndex: 0,
+      motherVersionIndex: 0,
+      metadataEnvelope: envelope,
+      expectedChainId: 71,
+    };
+
+    const cancelled = Object.assign(new Error("cancelled"), {
+      code: "TRANSACTION_REPLACED",
+      cancelled: true,
+      reason: "cancelled",
+      replacement: {
+        hash: `0x${"44".repeat(32)}`,
+        to: SUBMITTER,
+        from: SUBMITTER,
+        data: "0x",
+        value: 0n,
+        chainId: 71n,
+      },
+    });
+    await expect(
+      executeAddVersionFlow({
+        ...base,
+        submitContract: { addPersonVersion: makeSubmit(cancelled) },
+      }),
+    ).rejects.toMatchObject({
+      code: "TRANSACTION_REPLACED_CANCELLED",
+      transactionReconciliationFinal: true,
+    });
+
+    const changed = Object.assign(new Error("replaced"), {
+      code: "TRANSACTION_REPLACED",
+      cancelled: false,
+      reason: "replaced",
+      replacement: {
+        hash: `0x${"55".repeat(32)}`,
+        to: CONTRACT,
+        from: SUBMITTER,
+        data: "0x1234",
+        value: 0n,
+        chainId: 71n,
+      },
+    });
+    await expect(
+      executeAddVersionFlow({
+        ...base,
+        submitContract: { addPersonVersion: makeSubmit(changed) },
+      }),
+    ).rejects.toMatchObject({
+      code: "TRANSACTION_REPLACEMENT_MISMATCH",
+      transactionReconciliationFinal: true,
+    });
+  });
+
+  it("labels fallback gas as unestimated and can cancel before a wallet request", async () => {
+    const submit = submitMethod();
+    submit.estimateGas.mockRejectedValue(new Error("RPC estimate unavailable"));
+    const confirmTransactionPreview = vi.fn(async (preview) => {
+      expect(preview).toEqual({
+        envelopeBytes: 20,
+        estimatedGas: null,
+        gasLimit: 6_500_000n,
+        estimated: false,
+      });
+      return false;
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(
+      executeAddVersionFlow({
+        submitContract: { addPersonVersion: submit },
+        preflightContract: preflightContract(),
+        contractAddress: CONTRACT,
+        submitterAddress: SUBMITTER,
+        proof,
+        publicSignals: rootSignals(),
+        fatherVersionIndex: 0,
+        motherVersionIndex: 0,
+        metadataEnvelope: metadataEnvelope(),
+        confirmTransactionPreview,
+      }),
+    ).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
+
+    expect(submit.staticCall).toHaveBeenCalledTimes(1);
+    expect(confirmTransactionPreview).toHaveBeenCalledTimes(1);
+    expect(submit).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("parses PersonVersionAdded and Archive MetadataStored without tag or CID", async () => {

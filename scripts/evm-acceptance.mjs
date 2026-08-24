@@ -58,8 +58,15 @@ import { deriveDelayUpdateSalt } from "../tasks/timelock-update-delay.mjs";
 import { resolveProductionRpcUrl } from "./lib/hardhatConfig.mjs";
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
+import { hashReleaseInputs } from "./lib/releaseEvidence.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
-import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
+import {
+  inspectProtocolDeploymentArtifacts,
+  inspectProtocolReleaseManifest,
+  protocolDeploymentEvidenceFromAcceptanceReport,
+  protocolDeploymentEvidenceSha256,
+  protocolRuntimeBytecodeSha256,
+} from "./lib/protocolReleaseManifest.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
@@ -81,6 +88,20 @@ const DISCLOSURE_BINDING_PURPOSE = 1;
 const RELEASE_PERSON_RELATION_CIRCUIT_ID = 1;
 const RELEASE_DISCLOSURE_BINDING_CIRCUIT_ID = 1;
 const GOVERNED_PERSON_RELATION_CIRCUIT_ID = 2;
+const TERMINAL_PROTOCOL_PROOF_ROUTES = Object.freeze([
+  Object.freeze({
+    purpose: PERSON_RELATION_PROOF_DESCRIPTOR.purpose,
+    purposeOrdinal: PERSON_RELATION_PURPOSE,
+    circuitId: PERSON_RELATION_PROOF_DESCRIPTOR.circuitId,
+    proofEncodingId: PERSON_RELATION_PROOF_DESCRIPTOR.proofEncodingId,
+  }),
+  Object.freeze({
+    purpose: DISCLOSURE_BINDING_PROOF_DESCRIPTOR.purpose,
+    purposeOrdinal: DISCLOSURE_BINDING_PURPOSE,
+    circuitId: DISCLOSURE_BINDING_PROOF_DESCRIPTOR.circuitId,
+    proofEncodingId: DISCLOSURE_BINDING_PROOF_DESCRIPTOR.proofEncodingId,
+  }),
+]);
 const READY_GRACE_MS = 5 * 60 * 1000;
 const POLL_INTERVAL_MS = 2_000;
 const ZERO_HASH = `0x${"0".repeat(64)}`;
@@ -156,6 +177,162 @@ const retryBounded = async (operation, { attempts = 3, timeoutMs = 30_000, label
     }
   }
   throw new Error(`${label} failed after ${attempts} attempts: ${safeErrorMessage(lastError)}`);
+};
+
+const sameAddress = (ethers, left, right) => ethers.getAddress(left) === ethers.getAddress(right);
+
+const readTerminalProtocolDeploymentEvidence = async ({
+  ethers,
+  provider,
+  terminalRead,
+  addresses,
+  deepFamily,
+  metadataArchive,
+  deepFamilyReader,
+  groth16VerifierAdapter,
+}) => {
+  const [
+    deepFamilyArchive,
+    adapterPersonVerifier,
+    adapterDisclosureBindingVerifier,
+    archiveDeepFamily,
+    readerDeepFamily,
+    readerMetadataArchive,
+  ] = await Promise.all([
+    terminalRead("terminal DeepFamily metadata archive", () => deepFamily.metadataArchive()),
+    terminalRead("terminal adapter person verifier", () => groth16VerifierAdapter.personVerifier()),
+    terminalRead("terminal adapter disclosure verifier", () =>
+      groth16VerifierAdapter.disclosureBindingVerifier(),
+    ),
+    terminalRead("terminal archive DeepFamily binding", () => metadataArchive.DEEP_FAMILY()),
+    terminalRead("terminal reader DeepFamily binding", () => deepFamilyReader.DEEP_FAMILY()),
+    terminalRead("terminal reader archive binding", () => deepFamilyReader.METADATA_ARCHIVE()),
+  ]);
+
+  assertCondition(
+    sameAddress(ethers, deepFamilyArchive, addresses.metadataArchive) &&
+      sameAddress(ethers, archiveDeepFamily, addresses.deepFamily) &&
+      sameAddress(ethers, readerDeepFamily, addresses.deepFamily) &&
+      sameAddress(ethers, readerMetadataArchive, addresses.metadataArchive),
+    "Terminal metadata archive bindings do not match the deployed protocol",
+  );
+  assertCondition(
+    sameAddress(ethers, adapterPersonVerifier, addresses.personCommitmentVerifier) &&
+      sameAddress(ethers, adapterDisclosureBindingVerifier, addresses.disclosureBindingVerifier),
+    "Terminal Groth16 adapter immutables do not match the deployed verifiers",
+  );
+
+  const deploymentArtifacts = inspectProtocolDeploymentArtifacts({
+    root: process.cwd(),
+    deployments: {
+      groth16VerifierAdapter: {
+        personVerifierImmutable: adapterPersonVerifier,
+        disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
+      },
+      metadataArchiveV1: { deepFamilyImmutable: archiveDeepFamily },
+      deepFamilyReader: {
+        deepFamilyImmutable: readerDeepFamily,
+        metadataArchiveImmutable: readerMetadataArchive,
+      },
+    },
+  });
+  const runtimeContracts = [
+    [
+      "Groth16VerifierAdapter",
+      addresses.groth16VerifierAdapter,
+      deploymentArtifacts.groth16VerifierAdapter,
+    ],
+    ["MetadataArchiveV1", addresses.metadataArchive, deploymentArtifacts.metadataArchiveV1],
+    ["DeepFamilyReader", addresses.deepFamilyReader, deploymentArtifacts.deepFamilyReader],
+  ];
+  for (const [label, address, artifact] of runtimeContracts) {
+    const runtimeBytecode = await terminalRead(`terminal ${label} runtime bytecode`, () =>
+      provider.getCode(address),
+    );
+    assertCondition(
+      runtimeBytecode.toLowerCase() === artifact.runtimeBytecode.toLowerCase(),
+      `${label} on-chain runtime bytecode does not match the immutable-linked compiled artifact`,
+    );
+    assertCondition(
+      protocolRuntimeBytecodeSha256(runtimeBytecode) === artifact.runtimeSha256,
+      `${label} on-chain runtime hash does not match the immutable-linked compiled artifact`,
+    );
+  }
+
+  return {
+    deepFamilyArchive,
+    verifierAdapter: {
+      address: addresses.groth16VerifierAdapter,
+      personVerifier: adapterPersonVerifier,
+      disclosureBindingVerifier: adapterDisclosureBindingVerifier,
+      artifactSha256: deploymentArtifacts.groth16VerifierAdapter.artifactSha256,
+      runtimeSha256: deploymentArtifacts.groth16VerifierAdapter.runtimeSha256,
+    },
+    archive: {
+      address: addresses.metadataArchive,
+      deepFamily: archiveDeepFamily,
+      artifactSha256: deploymentArtifacts.metadataArchiveV1.artifactSha256,
+      runtimeSha256: deploymentArtifacts.metadataArchiveV1.runtimeSha256,
+    },
+    reader: {
+      address: addresses.deepFamilyReader,
+      deepFamily: readerDeepFamily,
+      metadataArchive: readerMetadataArchive,
+      artifactSha256: deploymentArtifacts.deepFamilyReader.artifactSha256,
+      runtimeSha256: deploymentArtifacts.deepFamilyReader.runtimeSha256,
+    },
+    proofRoutes: TERMINAL_PROTOCOL_PROOF_ROUTES.map((route) => ({ ...route })),
+  };
+};
+
+const assertTerminalProtocolEvidenceMatchesManifest = ({
+  report,
+  manifest,
+  expectedProductionChainId,
+}) => {
+  const terminalProjection = protocolDeploymentEvidenceFromAcceptanceReport(report);
+  assertCondition(
+    BigInt(manifest.deployments?.chainId) === BigInt(expectedProductionChainId),
+    `Production protocol manifest targets chainId ${String(manifest.deployments?.chainId)}; ` +
+      `the selected acceptance profile requires chainId ${expectedProductionChainId}`,
+  );
+  const manifestRoutes = new Map(
+    manifest.proofRoutes.map((route) => [`${route.purposeOrdinal}:${route.circuitId}`, route]),
+  );
+  assertCondition(
+    terminalProjection.routes.length === manifestRoutes.size,
+    "Terminal proof route count does not match the production protocol manifest",
+  );
+  for (const route of terminalProjection.routes) {
+    const expected = manifestRoutes.get(`${route.purposeOrdinal}:${route.circuitId}`);
+    assertCondition(
+      expected?.purpose === route.purpose && expected.proofEncodingId === route.proofEncodingId,
+      `Terminal ${route.purpose} proof route does not match the production protocol manifest`,
+    );
+  }
+  for (const [label, terminalArtifact, manifestArtifact] of [
+    [
+      "Groth16VerifierAdapter",
+      terminalProjection.contracts.groth16VerifierAdapter,
+      manifest.deployments?.groth16VerifierAdapter,
+    ],
+    [
+      "MetadataArchiveV1",
+      terminalProjection.contracts.metadataArchiveV1,
+      manifest.deployments?.metadataArchiveV1,
+    ],
+    [
+      "DeepFamilyReader",
+      terminalProjection.contracts.deepFamilyReader,
+      manifest.deployments?.deepFamilyReader,
+    ],
+  ]) {
+    assertCondition(
+      terminalArtifact.artifactSha256 === manifestArtifact?.artifactSha256,
+      `${label} artifact hash does not match the production protocol manifest`,
+    );
+  }
+  return protocolDeploymentEvidenceSha256(terminalProjection);
 };
 
 const inspectCanonicalSafeInfrastructure = async ({ provider, chainId }) => {
@@ -312,45 +489,6 @@ const hashDirectory = async (ethers, directory) => {
   return {
     fileCount: entries.length,
     digest: ethers.keccak256(ethers.toUtf8Bytes(entries.join("\n"))),
-  };
-};
-
-const hashAcceptanceInputs = async (ethers) => {
-  const directoryNames = [
-    "artifacts",
-    "contracts",
-    "circuits",
-    "hardhat",
-    "lib",
-    "packages",
-    "protocol-vectors",
-    "scripts",
-    "tasks",
-  ];
-  const fileNames = [
-    "hardhat.config.mjs",
-    "package.json",
-    "package-lock.json",
-    "protocol-release-manifest.json",
-  ];
-  const entries = [];
-  const directories = {};
-  const files = {};
-  for (const name of directoryNames) {
-    const snapshot = await hashDirectory(ethers, path.join(process.cwd(), name));
-    directories[name] = snapshot;
-    entries.push(`directory:${name}:${snapshot.fileCount}:${snapshot.digest}`);
-  }
-  for (const name of fileNames) {
-    const content = await fs.readFile(path.join(process.cwd(), name));
-    const digest = ethers.keccak256(content);
-    files[name] = digest;
-    entries.push(`file:${name}:${digest}`);
-  }
-  return {
-    digest: ethers.keccak256(ethers.toUtf8Bytes(entries.join("\n"))),
-    directories,
-    files,
   };
 };
 
@@ -852,7 +990,7 @@ export const main = async (chainProfile) => {
     await Promise.all([
       hashDirectory(ethers, DEPLOYMENTS_DIR),
       hashDirectory(ethers, isolatedDeploymentDirectory),
-      hashAcceptanceInputs(ethers),
+      hashReleaseInputs(ethers),
       readProductionBuildInfoState(ethers),
     ]);
   const sourceState = gitWorkingTreeState();
@@ -3050,6 +3188,16 @@ export const main = async (chainProfile) => {
     currentStep = "terminal-governance-state";
     const terminalRead = (label, operation) =>
       retryBounded(operation, { attempts: 4, timeoutMs: 60_000, label });
+    const terminalProtocolDeployment = await readTerminalProtocolDeploymentEvidence({
+      ethers,
+      provider,
+      terminalRead,
+      addresses,
+      deepFamily,
+      metadataArchive,
+      deepFamilyReader,
+      groth16VerifierAdapter,
+    });
     if (config.runGovernanceLifecycle) {
       assertCondition(
         governanceLifecycleTerminalContext,
@@ -3214,6 +3362,7 @@ export const main = async (chainProfile) => {
           address: addresses.deepFamily,
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
+          metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           governedPersonRelationVerifier: terminalGovernedPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
@@ -3225,6 +3374,10 @@ export const main = async (chainProfile) => {
           deepFamilyContract: terminalTokenBinding,
           deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
         },
+        verifierAdapter: terminalProtocolDeployment.verifierAdapter,
+        archive: terminalProtocolDeployment.archive,
+        reader: terminalProtocolDeployment.reader,
+        proofRoutes: terminalProtocolDeployment.proofRoutes,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
       };
     } else {
@@ -3324,6 +3477,7 @@ export const main = async (chainProfile) => {
           address: addresses.deepFamily,
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
+          metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
           protocolEndorsementFeeBps: terminalProtocolFee,
@@ -3335,15 +3489,32 @@ export const main = async (chainProfile) => {
           deepFamilyTokenFromProtocol: terminalDeepFamilyToken,
         },
         reader: {
-          address: addresses.deepFamilyReader,
+          ...terminalProtocolDeployment.reader,
           deepFamily: terminalReaderBinding,
         },
+        verifierAdapter: terminalProtocolDeployment.verifierAdapter,
+        archive: terminalProtocolDeployment.archive,
+        proofRoutes: terminalProtocolDeployment.proofRoutes,
       };
     }
+    const terminalDeploymentEvidenceSha256 = protocolDeploymentEvidenceSha256(
+      protocolDeploymentEvidenceFromAcceptanceReport(report),
+    );
+    if (config.acceptanceMode === "release-rehearsal") {
+      assertCondition(
+        assertTerminalProtocolEvidenceMatchesManifest({
+          report,
+          manifest: inspectedProtocolManifest.manifest,
+          expectedProductionChainId: ACCEPTANCE_PROFILE.productionChainId,
+        }) === terminalDeploymentEvidenceSha256,
+        "Terminal deployment evidence hash changed during production manifest validation",
+      );
+    }
+    report.terminalGovernanceState.deploymentEvidenceSha256 = terminalDeploymentEvidenceSha256;
     await addStep("terminal-governance-state-verified", report.terminalGovernanceState);
 
     currentStep = "source-input-integrity";
-    const acceptanceInputsAfter = await hashAcceptanceInputs(ethers);
+    const acceptanceInputsAfter = await hashReleaseInputs(ethers);
     const gitStateAfter = gitWorkingTreeState();
     report.sourceState.after = {
       ...gitStateAfter,
@@ -3509,7 +3680,7 @@ export const main = async (chainProfile) => {
         });
       } catch (validationError) {
         originalError = new Error(
-          `release-rehearsal report failed schema-v4 self-validation: ` +
+          `release-rehearsal report failed schema-v5 self-validation: ` +
             safeErrorMessage(validationError, secretValues),
         );
         report.releaseReady = false;

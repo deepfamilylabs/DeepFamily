@@ -166,12 +166,16 @@ describe("Ethereum production tooling profiles", function () {
       "espace:mainnet:safe:plan": "node scripts/espace-mainnet-safe-command.mjs --plan",
       "espace:mainnet:safe:execute": "node scripts/espace-mainnet-safe-command.mjs --execute",
       "espace:mainnet:safe:status": "node scripts/espace-mainnet-safe-command.mjs --status",
+      "espace:mainnet:release:projection":
+        "node scripts/protocol-deployment-projection.mjs --chain espace",
       "espace:mainnet:release:plan": "node scripts/espace-mainnet-release-command.mjs --plan",
       "espace:mainnet:release:execute": "node scripts/espace-mainnet-release-command.mjs --execute",
       "ethereum:acceptance": "node scripts/ethereum-acceptance-command.mjs",
       "ethereum:mainnet:safe:plan": "node scripts/ethereum-mainnet-safe-command.mjs --plan",
       "ethereum:mainnet:safe:execute": "node scripts/ethereum-mainnet-safe-command.mjs --execute",
       "ethereum:mainnet:safe:status": "node scripts/ethereum-mainnet-safe-command.mjs --status",
+      "ethereum:mainnet:release:projection":
+        "node scripts/protocol-deployment-projection.mjs --chain ethereum",
       "ethereum:mainnet:release:plan": "node scripts/ethereum-mainnet-release-command.mjs --plan",
       "ethereum:mainnet:release:execute":
         "node scripts/ethereum-mainnet-release-command.mjs --execute",
@@ -189,12 +193,14 @@ describe("Ethereum production tooling profiles", function () {
       "espace:mainnet:safe:plan",
       "espace:mainnet:safe:execute",
       "espace:mainnet:safe:status",
+      "espace:mainnet:release:projection",
       "espace:mainnet:release:plan",
       "espace:mainnet:release:execute",
       "ethereum:acceptance",
       "ethereum:mainnet:safe:plan",
       "ethereum:mainnet:safe:execute",
       "ethereum:mainnet:safe:status",
+      "ethereum:mainnet:release:projection",
       "ethereum:mainnet:release:plan",
       "ethereum:mainnet:release:execute",
     ]) {
@@ -626,5 +632,35 @@ describe("Ethereum production tooling profiles", function () {
     expect(shared).to.include("productionBuildLockPath(ROOT)");
     expect(locks).to.include('".production-build.lock"');
     expect(shared).not.to.include("npm_config_net");
+  });
+
+  it("documents and enforces chain-specific projection freezing before both release plans", async function () {
+    const [runner, espaceRunbook, ethereumRunbook] = await Promise.all([
+      fs.readFile("scripts/evm-mainnet-release.mjs", "utf8"),
+      fs.readFile("docs/espace-mainnet-release.md", "utf8"),
+      fs.readFile("docs/ethereum-mainnet-release.md", "utf8"),
+    ]);
+    const deriveIndex = runner.indexOf("deriveMainnetPlannedAddresses({");
+    const projectionIndex = runner.indexOf(
+      "assertPlannedProtocolDeploymentMatchesManifest({",
+      deriveIndex,
+    );
+    const intentIndex = runner.indexOf("buildMainnetReleaseIntents({", projectionIndex);
+    expect(deriveIndex).to.be.greaterThan(-1);
+    expect(projectionIndex).to.be.greaterThan(deriveIndex);
+    expect(intentIndex).to.be.greaterThan(projectionIndex);
+    for (const [runbook, command, chainId] of [
+      [espaceRunbook, "espace:mainnet:release:projection", "1030"],
+      [ethereumRunbook, "ethereum:mainnet:release:projection", "1"],
+    ]) {
+      expect(runbook).to.include(command);
+      expect(runbook).to.include(`chain ID \`${chainId}\``);
+      expect(runbook).to.include("stableProjectionSha256");
+      expect(runbook).to.include("npm run release:preflight");
+      expect(runbook).to.include("EVM_E2E_MODE=release-rehearsal");
+    }
+    expect(espaceRunbook).to.include("16 ordered transaction intent hashes");
+    expect(espaceRunbook).to.include("incomplete 16-step checkpoint");
+    expect(espaceRunbook).not.to.match(/14 ordered|14-step/iu);
   });
 });

@@ -1,5 +1,5 @@
 import { makeNodeId, type NodeData, type StoryMetadata } from "./graph";
-import { clearMetadataUnlock } from "./metadataUnlock";
+import { clearMetadataUnlock, hasMetadataUnlockFootprint } from "./metadataUnlock";
 import type { ParsedNftDetails, ParsedVersionDetails } from "./personDetailParsers";
 
 export interface NodePair {
@@ -168,13 +168,41 @@ export function applyNodeEnrichmentPatches(
   const next = { ...nodesData };
   for (const { id, patch } of patches) {
     const current = next[id];
-    const merged = current ? { ...current, ...patch } : ({ ...patch } as NodeData);
+    const shouldClear = Boolean(
+      current &&
+      (patch.metadataUnlockValidated === false ||
+        (metadataAnchorPatchChanges(current, patch) && hasMetadataUnlockFootprint(current))),
+    );
+    // When this same authoritative patch reveals an NFT token, preserve its
+    // independently public core fields while removing every unlock-only field.
+    const clearBase =
+      current && patch.tokenId !== undefined ? { ...current, tokenId: patch.tokenId } : current;
+    const base = shouldClear && clearBase ? clearMetadataUnlock(clearBase) : current;
+    const merged = base ? { ...base, ...patch } : ({ ...patch } as NodeData);
     if (next[id] !== merged) {
       next[id] = merged;
       changed = true;
     }
   }
   return changed ? next : nodesData;
+}
+
+function optionalHexEquals(left: string | undefined, right: string | undefined): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return left.toLowerCase() === right.toLowerCase();
+}
+
+function metadataAnchorPatchChanges(current: NodeData, patch: Partial<NodeData>): boolean {
+  return (
+    (patch.versionCommitment !== undefined &&
+      patch.versionCommitment !== current.versionCommitment) ||
+    (patch.metadataPointer !== undefined &&
+      !optionalHexEquals(patch.metadataPointer, current.metadataPointer)) ||
+    (patch.metadataPayloadHash !== undefined &&
+      !optionalHexEquals(patch.metadataPayloadHash, current.metadataPayloadHash)) ||
+    (patch.metadataPayloadLength !== undefined &&
+      patch.metadataPayloadLength !== current.metadataPayloadLength)
+  );
 }
 
 export function buildVersionDetailsPatch(options: {
@@ -195,13 +223,17 @@ export function buildVersionDetailsPatch(options: {
     metadataFields.payloadLength ?? options.current?.metadataPayloadLength;
   const anchorsMatch =
     options.current?.versionCommitment === nextVersionCommitment &&
-    options.current?.metadataPayloadHash === nextMetadataPayloadHash &&
-    options.current?.metadataPointer === nextMetadataPointer &&
+    optionalHexEquals(options.current?.metadataPayloadHash, nextMetadataPayloadHash) &&
+    optionalHexEquals(options.current?.metadataPointer, nextMetadataPointer) &&
     options.current?.metadataPayloadLength === nextMetadataPayloadLength;
-  const current =
-    !anchorsMatch && options.current?.metadataUnlockValidated
-      ? clearMetadataUnlock(options.current)
+  const currentWithToken =
+    options.current && options.parsed.tokenId !== undefined
+      ? { ...options.current, tokenId: options.parsed.tokenId }
       : options.current;
+  const current =
+    !anchorsMatch && hasMetadataUnlockFootprint(currentWithToken)
+      ? clearMetadataUnlock(currentWithToken!)
+      : currentWithToken;
   return {
     ...(current || {
       personHash: options.original.h,
@@ -241,8 +273,7 @@ export function buildNftDetailsPatch(options: {
     versionCommitment: versionFields.versionCommitment ?? options.current?.versionCommitment,
     metadataPointer: metadataFields.pointer ?? options.current?.metadataPointer,
     metadataPayloadHash: metadataFields.payloadHash ?? options.current?.metadataPayloadHash,
-    metadataPayloadLength:
-      metadataFields.payloadLength ?? options.current?.metadataPayloadLength,
+    metadataPayloadLength: metadataFields.payloadLength ?? options.current?.metadataPayloadLength,
     addedBy: versionFields.addedBy ?? options.current?.addedBy,
     timestamp: versionFields.timestamp ?? options.current?.timestamp,
     endorsementCount: options.nftRet.endorsementCount ?? options.current?.endorsementCount,

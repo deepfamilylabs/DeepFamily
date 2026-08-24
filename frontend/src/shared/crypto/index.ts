@@ -1,8 +1,5 @@
-export * from "./disclosureBinding";
-export * from "./identityCommitment";
 export * from "./identityHash";
 export * from "./passphraseStrength";
-export * from "./secretDerivation";
 export {
   KDF_PRESETS,
   PURPOSE,

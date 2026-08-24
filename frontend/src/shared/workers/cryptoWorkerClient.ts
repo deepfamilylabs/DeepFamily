@@ -32,6 +32,12 @@ export interface PreparedPersonVersionContentV1Result {
   versionCommitment: string;
 }
 
+export interface PersonVersionEnvelopeSizePreflightV1Result {
+  canonicalJsonLength: number;
+  compressedPlaintextLength: number;
+  envelopeLength: number;
+}
+
 export interface EncryptedPersonVersionEnvelopeV1Result {
   envelopeHex: string;
   payloadHash: string;
@@ -108,6 +114,10 @@ export type CryptoWorkerCallMap = {
     };
     result: PreparedPersonVersionContentV1Result;
   };
+  preflightPersonVersionEnvelopeSizeV1: {
+    params: { metadata: PersonVersionMetadataInput };
+    result: PersonVersionEnvelopeSizePreflightV1Result;
+  };
   encryptPersonVersionEnvelopeV1: {
     params: {
       metadata: PersonVersionMetadataInput;
@@ -168,9 +178,7 @@ const rejectPending = (error: Error): void => {
   pending.clear();
 };
 
-export function terminateCryptoWorker(
-  reason: Error = new CryptoWorkerTerminatedError(),
-): void {
+export function terminateCryptoWorker(reason: Error = new CryptoWorkerTerminatedError()): void {
   const worker = workerSingleton;
   workerSingleton = null;
   if (worker) worker.terminate();
@@ -236,13 +244,19 @@ export function cryptoWorkerCall<M extends keyof CryptoWorkerCallMap>(
       }, timeoutMs);
     }
     pending.set(id, entry);
+    const request: CryptoWorkerRequest = { id, method, params };
     try {
-      const request: CryptoWorkerRequest = { id, method, params };
       worker.postMessage(request);
     } catch (error) {
       pending.delete(id);
       if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
       reject(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      // postMessage performs a synchronous structured clone. Drop the caller-
+      // realm reference immediately so a long-lived Worker wrapper, test
+      // harness, or accidental message recorder cannot retain passphrases or
+      // transient KDF material after dispatch.
+      request.params = undefined;
     }
   });
 }

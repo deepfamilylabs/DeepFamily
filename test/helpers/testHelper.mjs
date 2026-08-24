@@ -18,23 +18,22 @@ export const PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
 export const STUB_CIRCUIT_ID = 0x7fff0001;
 export const STUB_PROOF_ENCODING_ID = 1;
 
-// Transitional alias for tests that only use the ordinal, not the old ABI name.
-export const PROOF_PURPOSE_PERSON_COMMITMENT = PROOF_PURPOSE_PERSON_RELATION;
-
 const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const DOMAIN_NAME_SECRET = 1001n;
 const DOMAIN_IDENTITY = 1002n;
 const DOMAIN_DISCLOSURE = 1003n;
 
 function resolveIdentitySuiteId(source = {}, fallback = 1) {
-  return BigInt(
-    source.selfSuiteId ??
-      source.identitySuiteId ??
-      // Retain the first legacy positional option as a convenience while tests
-      // migrate to the atomic identitySuiteId vocabulary.
-      source.schemaVersion ??
-      fallback,
-  );
+  const identitySuiteId = source.identitySuiteId;
+  const roleSuiteId = source.selfSuiteId;
+  if (
+    identitySuiteId !== undefined &&
+    roleSuiteId !== undefined &&
+    BigInt(identitySuiteId) !== BigInt(roleSuiteId)
+  ) {
+    throw new Error("identitySuiteId and selfSuiteId must identify the same atomic suite");
+  }
+  return BigInt(identitySuiteId ?? roleSuiteId ?? fallback);
 }
 
 function defaultContentDigest(ethers, tag = "v1") {
@@ -103,10 +102,13 @@ export function computeIdentityCommitment(
   fullName,
   basicInfo,
   identitySuiteId = 1,
-  _legacyCryptoSuiteVersion,
-  _legacyHashAlgoId,
   derivedSecretField = 0n,
 ) {
+  if (arguments.length > 5) {
+    throw new Error(
+      "computeIdentityCommitment accepts one atomic identitySuiteId, not legacy version fields",
+    );
+  }
   const suiteCommitment = computeSuiteCommitment(identitySuiteId);
   const nameSecretCommitment = computeNameSecretCommitment(
     ethers,
@@ -123,6 +125,11 @@ export function computeIdentityCommitment(
 }
 
 export function computeDisclosureBinding(ethers, fullName, basicInfo, identitySuiteId = 1) {
+  if (arguments.length > 4) {
+    throw new Error(
+      "computeDisclosureBinding accepts one atomic identitySuiteId, not legacy version fields",
+    );
+  }
   return poseidon4([
     DOMAIN_DISCLOSURE,
     computeNameField(ethers, fullName),
@@ -151,8 +158,6 @@ export function computeProfileIdentityCommitment(ethers, person, opts = {}) {
     person.fullName,
     person,
     identitySuiteId,
-    undefined,
-    undefined,
     person.derivedSecretField ?? 0n,
   );
 }
@@ -317,7 +322,7 @@ function resolveTestPerson(opts, prefix = "") {
     birthMonth: opts.birthMonth ?? 0,
     birthDay: opts.birthDay ?? 0,
     gender: opts.gender ?? 1,
-    identitySuiteId: opts.identitySuiteId ?? opts.selfSuiteId ?? opts.schemaVersion,
+    identitySuiteId: opts.identitySuiteId ?? opts.selfSuiteId,
   });
 }
 

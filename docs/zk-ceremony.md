@@ -386,18 +386,27 @@ contract, frontend, localization, XSS, storage, and dependency checks.
 
 ## Testnet and Mainnet sequence
 
-Only after `release:preflight` passes:
+After the ZK artifacts are frozen, follow the target-chain runbook in this order:
 
-1. run the target testnet acceptance command in `release-rehearsal` mode with
-   `MIN_DELAY >= 86400`;
-2. accept only a schema-v4 fresh-release report with `status=passed`, `releaseReady=true`,
+1. bootstrap and validate the production governance Safe, then reserve the deployer EOA;
+2. query its exact next pending protocol-release nonce and use the chain-specific
+   `*:mainnet:release:projection` command to freeze the resulting deployments object into the
+   production protocol manifest;
+3. commit that chain-specific state and run `release:preflight` from the clean final commit;
+4. run the target testnet acceptance command in `release-rehearsal` mode with
+   `MIN_DELAY >= 86400` from that same commit;
+5. accept only a schema-v5 fresh-release report with `status=passed`, `releaseReady=true`,
    `evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`,
    `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
-3. archive that exact report with the release commit and ZK evidence;
-4. prepare and validate the production governance Safe;
-5. generate the read-only Mainnet release plan;
-6. obtain the required Safe-owner approvals over the exact plan;
-7. execute only the unchanged reviewed plan.
+6. archive that exact report with the release commit and ZK evidence;
+7. generate the read-only Mainnet release plan, whose derived same-chain deployment projection must
+   exactly equal the manifest;
+8. obtain the required Safe-owner approvals over the exact plan;
+9. execute only the unchanged reviewed plan.
+
+If the deployer nonce or any tracked release input changes, regenerate and recommit the projection,
+then repeat preflight and the rehearsal. Testnet addresses/runtime hashes are verified against the
+testnet deployment itself; they are not compared to the final Mainnet addresses/runtime hashes.
 
 The release rehearsal deploys that Timelock delay but schedules no Timelock operation, so it has
 zero Timelock waits. Diagnostic mode uses the built-in 30-second delay for each of four governance

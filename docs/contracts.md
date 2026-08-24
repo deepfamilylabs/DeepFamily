@@ -650,6 +650,22 @@ Timelock. The release requires this acceptance to be the Safe's first and only
 execution (`nonce == 1`); do not submit another Safe transaction before release planning and
 execution finish.
 
+Next reserve the deployer EOA, query its exact pending nonce, and freeze the manifest-ready eSpace
+deployment projection before producing the final testnet rehearsal evidence:
+
+```bash
+npm run build
+npm run espace:mainnet:release:projection -- \
+  --deployer 0xReviewedDeployer \
+  --nonce 123
+```
+
+Copy the output's exact `deployments` object into `protocol-release-manifest.json`, commit the
+chain-specific release state, run `npm run release:preflight`, and rerun eSpace acceptance in
+`release-rehearsal` mode from that exact commit. Any nonce, artifact, manifest, or commit drift
+requires a new projection, preflight, and rehearsal. The release planner independently rejects a
+chain ID, address, immutable, artifact, runtime, or stable-projection mismatch before broadcast.
+
 Then run the protocol release plan command with its separate CFX budget, block-confirmation count,
 finality timeout, and testnet evidence:
 
@@ -661,7 +677,7 @@ Before this command can plan a release, the development proving keys must have b
 `npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
 that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
-exact schema-v4 `releaseReady=true` evidence to the chain-specific, Git-ignored
+exact schema-v5 `releaseReady=true` evidence to the chain-specific, Git-ignored
 `tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
 automatically and rejects a missing file or evidence from an older commit, a different artifact
 input, or a different production `MIN_DELAY >= 86400`. Diagnostic, failed, and recovery acceptance
@@ -674,7 +690,7 @@ Acceptance modes deliberately prove different things:
 - `diagnostic` uses the built-in 30-second Testnet delay and runs all four real governance windows.
   It is fast lifecycle coverage and never release evidence.
 - `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 86400`, but schedules
-  no Timelock operation and waits zero Timelock windows. Its schema-v4 report contains no Mock,
+  no Timelock operation and waits zero Timelock windows. Its schema-v5 report contains no Mock,
   upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
   `governanceLifecycleIncluded=false`.
 - a fresh Mainnet release follows the same zero-wait shape. Its 48-hour Timelock delay constrains
@@ -728,7 +744,7 @@ The Ethereum production flow requires
 `GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
-reviewed production ZK setup artifacts, and an exact Sepolia schema-v4 fresh-release rehearsal
+reviewed production ZK setup artifacts, and an exact Sepolia schema-v5 fresh-release rehearsal
 report automatically published at the chain-specific, Git-ignored
 `tmp/release-evidence/ethereum-release-rehearsal.json`. The Ethereum Mainnet release reads that fixed
 file automatically and rejects it when missing or tied to an older commit; diagnostic, failed, and

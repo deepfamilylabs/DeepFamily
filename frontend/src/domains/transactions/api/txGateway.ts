@@ -26,7 +26,23 @@ type EstimateGasOptions<TArgs extends readonly unknown[]> = {
   label?: string;
 };
 
-export async function estimateGasWithFallback<TArgs extends readonly unknown[]>({
+export type GasEstimateDetails = {
+  /** Buffered limit that will be sent with the transaction. */
+  gasLimit: bigint;
+} & (
+  | {
+      /** Raw value returned by eth_estimateGas. */
+      estimatedGas: bigint;
+      estimated: true;
+    }
+  | {
+      /** The configured fallback is not presented as an estimate. */
+      estimatedGas: null;
+      estimated: false;
+    }
+);
+
+export async function estimateGasWithFallbackDetails<TArgs extends readonly unknown[]>({
   contractMethod,
   args,
   decodeContract,
@@ -34,11 +50,15 @@ export async function estimateGasWithFallback<TArgs extends readonly unknown[]>(
   gasBumpPercent = 120,
   isDev = false,
   label = "transaction",
-}: EstimateGasOptions<TArgs>): Promise<bigint> {
+}: EstimateGasOptions<TArgs>): Promise<GasEstimateDetails> {
   try {
     if (typeof contractMethod.estimateGas === "function") {
-      const gasEstimate = await contractMethod.estimateGas(...args);
-      return (gasEstimate * BigInt(gasBumpPercent)) / 100n;
+      const estimatedGas = await contractMethod.estimateGas(...args);
+      return {
+        estimatedGas,
+        gasLimit: (estimatedGas * BigInt(gasBumpPercent)) / 100n,
+        estimated: true,
+      };
     }
   } catch (estimateError: any) {
     console.warn(
@@ -58,7 +78,7 @@ export async function estimateGasWithFallback<TArgs extends readonly unknown[]>(
     if (typeof contractMethod.staticCall === "function") {
       try {
         await contractMethod.staticCall(...args);
-        return fallbackGas;
+        return { estimatedGas: null, gasLimit: fallbackGas, estimated: false };
       } catch (staticError: any) {
         if (isDev) {
           console.debug(
@@ -76,7 +96,28 @@ export async function estimateGasWithFallback<TArgs extends readonly unknown[]>(
     throw estimateError;
   }
 
-  return fallbackGas;
+  return { estimatedGas: null, gasLimit: fallbackGas, estimated: false };
+}
+
+export async function estimateGasWithFallback<TArgs extends readonly unknown[]>({
+  contractMethod,
+  args,
+  decodeContract,
+  fallbackGas,
+  gasBumpPercent = 120,
+  isDev = false,
+  label = "transaction",
+}: EstimateGasOptions<TArgs>): Promise<bigint> {
+  const details = await estimateGasWithFallbackDetails({
+    contractMethod,
+    args,
+    decodeContract,
+    fallbackGas,
+    gasBumpPercent,
+    isDev,
+    label,
+  });
+  return details.gasLimit;
 }
 
 export async function sendTransactionAndWait<TTx extends { wait: () => Promise<any> }>(

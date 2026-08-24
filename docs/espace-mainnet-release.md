@@ -1,6 +1,6 @@
 # Conflux eSpace Mainnet Safe bootstrap and release
 
-The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has five deliberately
+The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has six deliberately
 explicit commands:
 
 - `npm run espace:mainnet:safe:plan` predicts one canonical governance Safe without broadcasting;
@@ -8,6 +8,9 @@ explicit commands:
   Safe plan through its pinned factory call;
 - `npm run espace:mainnet:safe:status` performs read-only validation of the deployment and the
   real-owner smoke transaction;
+- `npm run espace:mainnet:release:projection -- --deployer <address> --nonce <decimal>` derives the
+  manifest-ready deployment projection from one explicitly reviewed release nonce without RPC or
+  broadcasting;
 - `npm run espace:mainnet:release:plan` produces the read-only Timelock and protocol release plan;
 - `npm run espace:mainnet:release:execute -- --approval-file <path>` verifies the separate owner
   approval file, deploys or resumes the reviewed release, verifies sources, waits for finality,
@@ -99,34 +102,30 @@ keys into this repository.
 
 1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
    [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
-   verifiers, and frontend proving artifacts together, then run `npm run release:preflight` from
-   that clean commit. The default path records one Phase 2 contributor under the explicit
+   verifiers, and frontend proving artifacts together. The final `release:preflight` must wait
+   until the chain-specific deployment projection below has also been frozen into the protocol
+   manifest. The default path records one Phase 2 contributor under the explicit
    `single-operator` trust model. A multi-party ZK ceremony is an optional enhancement, not a
    prerequisite and not related to the Safe's three-owner, 2/3 policy.
-2. Complete `npm run espace:acceptance` from the same audited release commit on eSpace Testnet in
-   `release-rehearsal` mode with the production `MIN_DELAY >= 86400`. This mode rehearses only a
-   fresh release and performs zero Timelock waits. After self-validation succeeds, the runner
-   automatically publishes the exact evidence to the Git-ignored, eSpace-specific
-   `tmp/release-evidence/espace-release-rehearsal.json`; diagnostic, failed, and recovery runs do not
-   overwrite it. Review and archive only that published schema-v4 report when its `status` is
-   `passed`, `releaseReady` is `true`,
-   `zkArtifactTrust.productionReady` is `true`, and `zkCeremonyVerification.status` is `passed`; a
-   diagnostic report is not release evidence. Diagnostic mode instead uses the built-in 30-second
-   delay for each of its four governance windows.
-3. Use a clean, isolated checkout of that commit and the reviewed Node/npm versions. Install exact
+2. Use a clean, isolated checkout and the reviewed Node/npm versions. Install exact
    dependencies with `npm ci --ignore-scripts --no-audit --no-fund`, then complete the repository's
    build, test, frontend, ZK artifact, and storage-layout checks. Do not reuse an untrusted global
    compiler or a mutable development `node_modules` directory.
-4. Have three independent production controllers supply only their final public EOA/hardware-wallet
+3. Have three independent production controllers supply only their final public EOA/hardware-wallet
    addresses in the reviewed order. Confirm that each controller can use the chosen external
    Conflux eSpace signing workflow; do not give any owner key to the deployer or repository.
-5. Choose and record one explicit Safe salt nonce. Fund only the approved deployer EOA with enough
+4. Choose and record one explicit Safe salt nonce. Fund only the approved deployer EOA with enough
    mainnet CFX for the independently reviewed Safe and release ceilings. The Safe itself needs no
    CFX for this bootstrap or protocol deployment.
-6. Use a reliable `CONFLUX_RPC_URL`. A public fallback exists, but a monitored provider is strongly
+5. Use a reliable `CONFLUX_RPC_URL`. A public fallback exists, but a monitored provider is strongly
    preferred for deployment, verification, receipt recovery, and finality checks.
-7. Ensure the release checkout can write `deployments/conflux/`, and arrange an independent archive
+6. Ensure the release checkout can write `deployments/conflux/`, and arrange an independent archive
    for that ignored local directory immediately after completion.
+
+The required order is: bootstrap and accept the Safe, freeze the exact protocol release projection,
+commit and pass `release:preflight`, produce release-rehearsal evidence from that exact commit, then
+plan and execute Mainnet. Reversing the projection and rehearsal steps creates circular or stale
+evidence and is rejected.
 
 ## Configuration
 
@@ -173,7 +172,7 @@ or changing `.env` later never changes chain state.
 
 The protocol release command automatically reads the eSpace profile's fixed
 `tmp/release-evidence/espace-release-rehearsal.json` file and validates its contents rather than
-trusting its file name. It requires schema v4, `releaseReady=true`, the current clean commit and
+trusting its file name. It requires schema v5, `releaseReady=true`, the current clean commit and
 artifact-input digest, `evidenceType=initial-mainnet-release`,
 `governanceLifecycleIncluded=false`, the same deployed `MIN_DELAY`, production ZK evidence,
 finalized fresh-release transactions, complete source verification, initial governance checks, and
@@ -182,7 +181,7 @@ diagnostic, failed, or recovery mode is rejected before any Mainnet transaction.
 no Mock deployment, upgrade, governance migration, or Timelock wait.
 
 The acceptance runner retains its run-specific report beneath the ignored run directory and, only
-after a successful release rehearsal passes schema-v4 self-validation, publishes the exact bytes to
+after a successful release rehearsal passes schema-v5 self-validation, publishes the exact bytes to
 the fixed evidence path above. No environment setting or manual in-checkout copy selects release
 evidence. Record the published file's SHA-256 and independently compare it with the immutable
 off-machine archive before planning; that archive remains a review and recovery record, not an
@@ -310,6 +309,59 @@ The protocol release independently requires the current Safe nonce to be exactly
 If the nonce advances beyond `1`, do not try to edit a report or checkpoint. The first-release gate
 will reject that Safe state; stop and obtain a new reviewed operational decision.
 
+## Freeze the deployment projection and final release commit
+
+After Safe deployment and owner acceptance, reserve the deployer EOA exclusively and query its
+next **pending** nonce from the reviewed eSpace Mainnet RPC. This is the starting nonce of the
+16-step protocol release, not the nonce used by the already-completed Safe factory transaction:
+
+```bash
+node --env-file=.env --input-type=module -e '
+import { JsonRpcProvider } from "ethers";
+const provider = new JsonRpcProvider(process.env.CONFLUX_RPC_URL);
+console.log(await provider.getTransactionCount(process.env.EVM_MAINNET_EXPECTED_DEPLOYER, "pending"));
+'
+```
+
+Independently confirm that decimal nonce against the explorer/RPC, run the production build, and
+generate the deterministic, read-only projection. Substitute the reviewed deployer and nonce; the
+projection command never reads a private key, contacts RPC, writes the manifest, or broadcasts:
+
+```bash
+npm run build
+mkdir -p tmp/release-evidence
+npm run --silent espace:mainnet:release:projection -- \
+  --deployer 0xReviewedDeployer \
+  --nonce 123 > tmp/release-evidence/espace-mainnet-deployment-projection.json
+```
+
+Review the chain ID `1030`, deployer, starting nonce, every derived address, every constructor
+immutable, the three compiled artifact hashes, the three exact immutable-linked runtime hashes,
+and `stableProjectionSha256`. Copy the output's exact `deployments` object into
+`protocol-release-manifest.json`; do not retype individual hashes or addresses. Finish freezing the
+remaining production manifest evidence and commit the complete chain-specific release state.
+
+From that clean final commit, run the full gate and then the release rehearsal:
+
+```bash
+npm run release:preflight
+EVM_E2E_MODE=release-rehearsal npm run espace:acceptance
+```
+
+The successful runner publishes
+`tmp/release-evidence/espace-release-rehearsal.json`. Accept only its schema-v5
+`status=passed`, `releaseReady=true`, production ZK/ceremony evidence, matching release commit and
+shared release-input digest. Archive its exact bytes and SHA-256. The manifest intentionally names
+the eSpace Mainnet target while the rehearsal report contains internally verified testnet
+addresses/runtimes; the validator binds shared protocol/routes/artifact hashes and never compares
+testnet addresses to Mainnet addresses.
+
+Any change to the deployer pending nonce, artifacts, manifest, tracked release inputs, or release
+commit invalidates this sequence. Regenerate the projection, review and commit it, rerun
+`release:preflight`, and produce new rehearsal evidence. The Mainnet planner independently derives
+the addresses again and fails before broadcast unless the complete same-chain manifest projection
+matches exactly.
+
 ## Plan, approve, and execute the protocol release
 
 First run the explicit read-only plan command:
@@ -323,7 +375,7 @@ the same clean production build used by execution. Review the printed chain,
 release commit and build inputs, deployer, Safe address and ordered owners, threshold, validated
 acceptance transaction, current Safe nonce `1`, delay, budget, expected contracts,
 verification/finality policy, checkpoint location, and plan digest. A second operator should also
-compare the 14 ordered transaction intent hashes with the approved release record and the chain
+compare the 16 ordered transaction intent hashes with the approved release record and the chain
 independently. Do not send another Safe transaction after this review.
 
 The plan also prints one exact UTF-8 EIP-191 approval message. At least two of the three current
@@ -431,7 +483,7 @@ For Safe creation, an incomplete execution checkpoint must be resumed with
 `espace:mainnet:safe:execute` and its original reviewed digest. The Safe plan command stops when an
 incomplete checkpoint exists, so it can never claim “no transaction was broadcast” after a planned,
 submitted, or confirmed factory step. The release plan command applies the same rule to an
-incomplete 14-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
+incomplete 16-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
 approval file. A completed execute rerun performs read-only revalidation while the pinned initial
 state remains unchanged; it does not emit a new “no broadcast” plan.
 

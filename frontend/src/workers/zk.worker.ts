@@ -75,7 +75,8 @@ const handlers: {
 };
 
 self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) => {
-  const { id, method, params } = event.data || ({} as any);
+  let request = event.data || ({} as any);
+  const { id, method } = request;
   const post = (resp: ZkWorkerResponse) => {
     (self as any).postMessage(resp);
   };
@@ -85,9 +86,15 @@ self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) =>
       post({ id, ok: false, error: { message: "Invalid ZK worker request" } });
       return;
     }
-    const result = await handler(params);
+    const result = await handler(request.params);
     post({ id, ok: true, result });
   } catch (err) {
     post({ id, ok: false, error: getErrorShape(err) });
+  } finally {
+    // Bound private witness lifetime to this job. Strings cannot be zeroed, so
+    // cancellation terminates this realm and normal completion severs the
+    // request graph before the next message is processed.
+    if (request && typeof request === "object") request.params = undefined;
+    request = undefined as any;
   }
 });

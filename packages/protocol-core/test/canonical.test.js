@@ -4,6 +4,7 @@ import {
   PERSON_VERSION_SCHEMA,
   ProtocolError,
   canonicalizeFullName,
+  isUnicodeWhiteSpaceOnly,
   parseCanonicalPersonVersion,
   serializeCanonicalPersonVersion,
   utf8Bytes,
@@ -57,6 +58,14 @@ test("canonical serializer fixes field order, escapes, lowercase hex and bigint 
 test("fullName canonicalization is NFKC with a frozen Unicode White_Space table", () => {
   assert.equal(canonicalizeFullName(" \u3000Ａlice\u00a0\tSmith \n"), "Alice Smith");
   assert.throws(() => canonicalizeFullName("\u2003\u3000"), /cannot be empty/);
+});
+
+test("Unicode White_Space classification uses the release-frozen table", () => {
+  assert.equal(isUnicodeWhiteSpaceOnly("\u0085\u1680\u2028\u3000"), true);
+  assert.equal(isUnicodeWhiteSpaceOnly("\t\n\u00a0\u2003\u202f\u205f"), true);
+  assert.equal(isUnicodeWhiteSpaceOnly(""), false);
+  assert.equal(isUnicodeWhiteSpaceOnly("\u200b"), false);
+  assert.equal(isUnicodeWhiteSpaceOnly(" \u200b"), false);
 });
 
 test("strict parser rejects noncanonical JSON, duplicate/unknown keys, BOM and invalid UTF-8", () => {
