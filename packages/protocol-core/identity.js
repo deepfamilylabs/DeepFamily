@@ -107,7 +107,14 @@ export function buildDomainSeparatedPasswordBytes(domain, rawPassphrase) {
     "Password domain must be a nonempty string without NUL",
   );
   const normalized = normalizePassphrase(rawPassphrase);
-  return concatBytes(utf8Bytes(domain), Uint8Array.of(0), utf8Bytes(normalized));
+  const domainBytes = utf8Bytes(domain);
+  const normalizedPassphraseBytes = utf8Bytes(normalized);
+  try {
+    return concatBytes(domainBytes, Uint8Array.of(0), normalizedPassphraseBytes);
+  } finally {
+    wipeBytes(domainBytes);
+    wipeBytes(normalizedPassphraseBytes);
+  }
 }
 
 export function buildIdentityPasswordBytes(rawPassphrase) {
@@ -134,12 +141,18 @@ export function deriveDeterministicIdentitySalt(
       zeroPadValue(toBeHex(packedBirthGenderField), 32),
     ],
   );
-  return getBytes(keccak256(packed)).slice(0, CANDIDATE_ARGON2ID_PROFILE.saltBytes);
+  const digest = getBytes(keccak256(packed));
+  try {
+    return digest.slice(0, CANDIDATE_ARGON2ID_PROFILE.saltBytes);
+  } finally {
+    wipeBytes(digest);
+  }
 }
 
 async function deriveCandidateArgon2id(passwordBytes, saltBytes) {
   const password = copyBytes(passwordBytes, "Argon2 password input");
   const salt = copyBytes(saltBytes, "Argon2 salt");
+  let output;
   protocolAssert(
     password.length > 0,
     "EMPTY_ARGON2_INPUT",
@@ -151,7 +164,7 @@ async function deriveCandidateArgon2id(passwordBytes, saltBytes) {
     `Argon2 salt must be ${CANDIDATE_ARGON2ID_PROFILE.saltBytes} bytes`,
   );
   try {
-    const output = await argon2id({
+    output = await argon2id({
       password,
       salt,
       parallelism: CANDIDATE_ARGON2ID_PROFILE.parallelism,
@@ -165,8 +178,15 @@ async function deriveCandidateArgon2id(passwordBytes, saltBytes) {
       "INVALID_ARGON2_OUTPUT",
       "Argon2id returned an unexpected output length",
     );
-    return new Uint8Array(output);
+    // hash-wasm already returns a fresh Uint8Array. Transfer ownership to the
+    // caller so there is only one Argon2 output buffer to wipe.
+    const ownedOutput = output;
+    output = undefined;
+    return ownedOutput;
   } finally {
+    // A malformed library result is still potentially secret; wipe it before
+    // propagating the length/type failure. A valid result transfers ownership.
+    wipeBytes(output);
     wipeBytes(password);
     wipeBytes(salt);
   }
@@ -298,7 +318,7 @@ export async function deriveIdentityMaterial(input) {
       ...result,
       // These two byte arrays are sensitive working material. Callers that need
       // them for proof construction must wipe them as soon as the package freezes.
-      identitySalt: new Uint8Array(identitySalt),
+      identitySalt,
       derivedSecretBytes,
     };
   } catch (error) {

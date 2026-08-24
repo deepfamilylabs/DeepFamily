@@ -72,8 +72,9 @@ export function assertMetadataMatchesContext(metadata, inputContext) {
 
 export function computePersonVersionContentCommitment(input) {
   const canonicalJsonBytes = serializeCanonicalPersonVersion(input.metadata);
+  let digest;
   try {
-    const digest = computeContentDigest(canonicalJsonBytes);
+    digest = computeContentDigest(canonicalJsonBytes);
     const versionCommitment = computeVersionCommitment({
       derivedSecretField: input.derivedSecretField,
       contentDigestLo: digest.contentDigestLo,
@@ -89,6 +90,7 @@ export function computePersonVersionContentCommitment(input) {
     };
   } catch (error) {
     wipeBytes(canonicalJsonBytes);
+    wipeBytes(digest?.contentDigestBytes);
     throw error;
   }
 }

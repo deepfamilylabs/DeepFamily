@@ -3,6 +3,7 @@ import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import { hardenPrivateWindowsPath } from "./privateTemporaryDirectory.mjs";
 import { validateTestnetReleaseEvidence } from "./testnetReleaseEvidence.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
@@ -154,6 +155,7 @@ export const publishTestnetReleaseEvidence = async ({
   expectedAcceptanceInputDigest,
   protocolManifestInspector,
   protocolDeploymentArtifactInspector,
+  windowsAclHardener = hardenPrivateWindowsPath,
 } = {}) => {
   const realRepositoryRoot = await requireRealRepositoryRoot(repositoryRoot);
   const destinationPath = requirePublicationDestination({
@@ -202,11 +204,21 @@ export const publishTestnetReleaseEvidence = async ({
       if (!temporaryState.isFile() || temporaryState.size !== sourceBytes.byteLength) {
         throw new Error("staged release evidence was not written completely");
       }
-      if ((temporaryState.mode & 0o077) !== 0) {
+      if (process.platform !== "win32" && (temporaryState.mode & 0o077) !== 0) {
         throw new Error("staged release evidence permissions must not grant group or world access");
       }
     } finally {
       await handle.close();
+    }
+    if (process.platform === "win32") {
+      if (typeof windowsAclHardener !== "function") {
+        throw new Error("Windows release evidence ACL hardener must be a function");
+      }
+      await windowsAclHardener({ targetPath: temporaryPath, entryType: "file" });
+      temporaryState = await fs.lstat(temporaryPath);
+      if (!temporaryState.isFile() || temporaryState.isSymbolicLink()) {
+        throw new Error("staged release evidence must remain a regular non-symlink file");
+      }
     }
 
     const validatedStage = await validateTestnetReleaseEvidence({

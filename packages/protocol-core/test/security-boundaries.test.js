@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  SNARK_SCALAR_FIELD,
   ZERO_BYTES32,
   asUint8Array,
   computeFormat1Aad,
@@ -215,6 +216,59 @@ test("a structurally valid envelope encrypted with a different file passphrase i
     wipeBytes(material.identitySalt);
     wipeBytes(material.derivedSecretBytes);
   }
+});
+
+test("encryption wipes every random-source buffer after taking ownership", async () => {
+  const retainedSourceBuffers = [];
+  let next = 0;
+  const recordingRandom = (length) => {
+    const bytes = Uint8Array.from({ length }, () => next++ & 0xff);
+    retainedSourceBuffers.push(bytes);
+    return bytes;
+  };
+
+  const encrypted = await encryptPersonVersionEnvelope({
+    metadata: vectorMetadata,
+    rawPassphrase: vector.identity.rawPassphrase,
+    identitySuiteId: 1,
+    context: vectorContext,
+    randomBytes: recordingRandom,
+  });
+
+  assert.equal(retainedSourceBuffers.length, 4);
+  for (const bytes of retainedSourceBuffers) {
+    assert.deepEqual(bytes, new Uint8Array(bytes.length));
+  }
+  assert.equal(parseFormat1Envelope(encrypted.envelope).identitySuiteId, 1);
+});
+
+test("commitment failure wipes the transient content-digest byte buffer", () => {
+  const expectedDigest = asUint8Array(vector.metadata.contentDigest);
+  const originalFill = Uint8Array.prototype.fill;
+  let observedDigestWipe = false;
+  Uint8Array.prototype.fill = function patchedFill(value, start, end) {
+    if (
+      value === 0 &&
+      this.length === expectedDigest.length &&
+      this.every((byte, index) => byte === expectedDigest[index])
+    ) {
+      observedDigestWipe = true;
+    }
+    return originalFill.call(this, value, start, end);
+  };
+  try {
+    assert.throws(
+      () =>
+        computePersonVersionContentCommitment({
+          metadata: vectorMetadata,
+          derivedSecretField: SNARK_SCALAR_FIELD,
+        }),
+      (error) => error?.code === "INTEGER_OUT_OF_RANGE",
+    );
+  } finally {
+    Uint8Array.prototype.fill = originalFill;
+  }
+  assert.equal(observedDigestWipe, true);
 });
 
 test("person, parents, tag and biography mutations symmetrically change every content derivative", async () => {

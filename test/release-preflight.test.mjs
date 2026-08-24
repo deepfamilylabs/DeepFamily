@@ -36,9 +36,11 @@ const SUPPORTED_RUNTIMES = Object.freeze([
   Object.freeze({ platform: "win32", arch: "x64" }),
 ]);
 const inspectFixtureProtocolManifest = () => ({ manifestSha256: "cd".repeat(32) });
+const FIXTURE_GIT_EXECUTABLE = path.resolve("test-tools", "git");
 const runReleasePreflight = (options) =>
   runReleasePreflightRaw({
     protocolManifestInspector: inspectFixtureProtocolManifest,
+    gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
     ...options,
   });
 

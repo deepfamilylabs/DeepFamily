@@ -2,7 +2,10 @@ import { expect } from "chai";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { createPrivateTemporaryDirectory } from "../scripts/lib/privateTemporaryDirectory.mjs";
+import {
+  createPrivateTemporaryDirectory,
+  hardenPrivateWindowsPath,
+} from "../scripts/lib/privateTemporaryDirectory.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 describe("private temporary directories", function () {
@@ -60,6 +63,61 @@ describe("private temporary directories", function () {
     });
 
     expect(directory).to.equal(hardenedDirectory);
+  });
+
+  it("uses direct .NET ACL APIs without PowerShell security-module autoloading", function () {
+    for (const entryType of ["directory", "file"]) {
+      let invocation;
+      hardenPrivateWindowsPath({
+        targetPath: path.resolve(baseDirectory, `private-${entryType}`),
+        entryType,
+        powershellRunner: (executable, args, options) => {
+          invocation = { executable, args, options };
+        },
+      });
+
+      expect(invocation.executable).to.equal("powershell.exe");
+      expect(invocation.args.slice(0, 3)).to.deep.equal([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+      ]);
+      const script = invocation.args[3];
+      expect(script).to.include(
+        entryType === "directory" ? "System.IO.DirectoryInfo" : "System.IO.FileInfo",
+      );
+      expect(script).to.include(
+        entryType === "directory"
+          ? "System.Security.AccessControl.DirectorySecurity"
+          : "System.Security.AccessControl.FileSecurity",
+      );
+      expect(script).to.include("SetAccessRuleProtection($true, $false)");
+      expect(script).to.include("AreAccessRulesProtected");
+      expect(script).to.include("$rule.InheritanceFlags -ne $inheritance");
+      expect(script).to.include("$rule.PropagationFlags -ne $propagation");
+      expect(script).not.to.match(/(?:Get|Set)-Acl|Import-Module/iu);
+      expect(invocation.options.stdio).to.deep.equal(["ignore", "pipe", "pipe"]);
+      expect(invocation.options.env.DEEPFAMILY_PRIVATE_ACL_TARGET).to.equal(
+        path.resolve(baseDirectory, `private-${entryType}`),
+      );
+      expect(invocation.options.windowsHide).to.equal(true);
+    }
+  });
+
+  it("passes an adversarial Windows ACL path out-of-band instead of interpolating it", function () {
+    const targetPath = path.resolve(baseDirectory, "private-' ; throw 'injected-$()' ");
+    let invocation;
+
+    hardenPrivateWindowsPath({
+      targetPath,
+      entryType: "directory",
+      powershellRunner: (executable, args, options) => {
+        invocation = { executable, args, options };
+      },
+    });
+
+    expect(invocation.args[3]).not.to.include(targetPath);
+    expect(invocation.options.env.DEEPFAMILY_PRIVATE_ACL_TARGET).to.equal(targetPath);
   });
 
   it("removes the directory when Windows ACL hardening fails", async function () {

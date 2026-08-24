@@ -32,9 +32,31 @@ const defaultVersionRunner = (executable) =>
     }),
   ).trim();
 
-const isInside = (parent, candidate) => {
-  const relative = path.relative(parent, candidate);
-  return relative !== "" && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+const normalizePathForComparison = (value, hostPlatform) => {
+  if (hostPlatform !== "win32") return path.normalize(value);
+  return path.win32
+    .normalize(value)
+    .replace(/^\\\\\?\\UNC\\/iu, "\\\\")
+    .replace(/^\\\\\?\\/u, "")
+    .toLowerCase();
+};
+
+export const isPathStrictlyInside = ({
+  parent,
+  candidate,
+  hostPlatform = process.platform,
+} = {}) => {
+  if (typeof parent !== "string" || typeof candidate !== "string") return false;
+  const normalizedParent = normalizePathForComparison(parent, hostPlatform);
+  const normalizedCandidate = normalizePathForComparison(candidate, hostPlatform);
+  const pathApi = hostPlatform === "win32" ? path.win32 : path;
+  const relative = pathApi.relative(normalizedParent, normalizedCandidate);
+  return (
+    relative !== "" &&
+    relative !== ".." &&
+    !relative.startsWith(`..${pathApi.sep}`) &&
+    !pathApi.isAbsolute(relative)
+  );
 };
 
 export const buildCircomOverrideEnvironment = ({ env = process.env, compiler }) => {
@@ -83,7 +105,7 @@ export const inspectCircomCompilerOverride = ({
     throw new Error("Release Circom compiler override must be a regular non-symlink file");
   }
   const temporaryDirectory = fs.realpathSync(os.tmpdir());
-  if (!isInside(temporaryDirectory, resolvedPath)) {
+  if (!isPathStrictlyInside({ parent: temporaryDirectory, candidate: resolvedPath })) {
     throw new Error("Release Circom compiler override must be inside the OS temporary directory");
   }
   const actualSha256 = createHash("sha256").update(fs.readFileSync(resolvedPath)).digest("hex");

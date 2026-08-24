@@ -1470,7 +1470,6 @@ export const runSingleOperatorProductionSetup = async ({
   try {
     stageRoot = await privateDirectoryFactory({
       prefix: "deepfamily-zk-production-",
-      platform,
     });
     const stageBuild = path.join(stageRoot, "build");
     await fsp.mkdir(path.join(stageRoot, "keys"), { recursive: true, mode: 0o700 });

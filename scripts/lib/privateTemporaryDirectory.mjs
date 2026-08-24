@@ -3,20 +3,41 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const defaultWindowsAclRunner = ({ directory }) => {
-  const quotedPath = directory.replaceAll("'", "''");
+export const hardenPrivateWindowsPath = ({
+  targetPath,
+  entryType,
+  powershellRunner = execFileSync,
+} = {}) => {
+  if (typeof targetPath !== "string" || !path.isAbsolute(targetPath)) {
+    throw new Error("Windows private ACL target must be an absolute path");
+  }
+  if (!["directory", "file"].includes(entryType) || typeof powershellRunner !== "function") {
+    throw new Error("Windows private ACL entry type or runner is invalid");
+  }
+  const targetEnvironmentName = "DEEPFAMILY_PRIVATE_ACL_TARGET";
+  const powershellEnvironment = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => name.toUpperCase() !== targetEnvironmentName),
+  );
+  powershellEnvironment[targetEnvironmentName] = targetPath;
+  const entryClass = entryType === "directory" ? "DirectoryInfo" : "FileInfo";
+  const securityClass = entryType === "directory" ? "DirectorySecurity" : "FileSecurity";
+  const inheritanceExpression =
+    entryType === "directory"
+      ? "[System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'"
+      : "[System.Security.AccessControl.InheritanceFlags]::None";
   const script = `
 $ErrorActionPreference = 'Stop'
-$target = '${quotedPath}'
+$target = [System.Environment]::GetEnvironmentVariable('${targetEnvironmentName}', 'Process')
+if ([string]::IsNullOrEmpty($target)) {
+  throw 'Private ACL target environment is unavailable'
+}
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
 $sid = $identity.User
-$acl = Get-Acl -LiteralPath $target
+$entry = [System.IO.${entryClass}]::new($target)
+$acl = [System.Security.AccessControl.${securityClass}]::new()
 $acl.SetAccessRuleProtection($true, $false)
-foreach ($rule in @($acl.Access)) {
-  [void]$acl.RemoveAccessRuleAll($rule)
-}
 $acl.SetOwner($sid)
-$inheritance = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+$inheritance = ${inheritanceExpression}
 $propagation = [System.Security.AccessControl.PropagationFlags]::None
 $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
 $type = [System.Security.AccessControl.AccessControlType]::Allow
@@ -24,11 +45,17 @@ $privateRule = [System.Security.AccessControl.FileSystemAccessRule]::new(
   $sid, $rights, $inheritance, $propagation, $type
 )
 [void]$acl.AddAccessRule($privateRule)
-Set-Acl -LiteralPath $target -AclObject $acl
-$verified = Get-Acl -LiteralPath $target
+$entry.SetAccessControl($acl)
+$verified = $entry.GetAccessControl([System.Security.AccessControl.AccessControlSections]::All)
 $owner = $verified.GetOwner([System.Security.Principal.SecurityIdentifier])
 $allow = @($verified.Access | Where-Object { $_.AccessControlType -eq 'Allow' })
-if ($owner.Value -ne $sid.Value -or $allow.Count -ne 1) {
+$deny = @($verified.Access | Where-Object { $_.AccessControlType -eq 'Deny' })
+if (
+  $owner.Value -ne $sid.Value -or
+  -not $verified.AreAccessRulesProtected -or
+  $allow.Count -ne 1 -or
+  $deny.Count -ne 0
+) {
   throw 'Private temporary directory ACL owner or allow-list is invalid'
 }
 $rule = $allow[0]
@@ -36,15 +63,22 @@ $ruleSid = $rule.IdentityReference.Translate([System.Security.Principal.Security
 if (
   $ruleSid.Value -ne $sid.Value -or
   $rule.IsInherited -or
+  $rule.InheritanceFlags -ne $inheritance -or
+  $rule.PropagationFlags -ne $propagation -or
   (($rule.FileSystemRights -band $rights) -ne $rights)
 ) {
-  throw 'Private temporary directory ACL is not exclusive to the current user'
+  throw 'Private path ACL is not exclusive to the current user'
 }
 `;
-  execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+  powershellRunner("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
     stdio: ["ignore", "pipe", "pipe"],
+    env: powershellEnvironment,
+    windowsHide: true,
   });
 };
+
+const defaultWindowsAclRunner = ({ directory }) =>
+  hardenPrivateWindowsPath({ targetPath: directory, entryType: "directory" });
 
 export const createPrivateTemporaryDirectory = async ({
   prefix,

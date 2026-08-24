@@ -542,7 +542,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
     expect(Object.isFrozen(result.publicSummary.finality)).to.equal(true);
   });
 
-  it("publishes the exact validated bytes to the fixed repository-relative path with mode 0600", async function () {
+  it("publishes the exact validated bytes to the fixed repository-relative path with private permissions", async function () {
     const raw = await writeReport();
     const expectedSha256 = createHash("sha256").update(raw).digest("hex");
 
@@ -554,7 +554,9 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       reportSha256: expectedSha256,
     });
     expect(await fs.readFile(destinationPath, "utf8")).to.equal(raw);
-    expect((await fs.lstat(destinationPath)).mode & 0o777).to.equal(0o600);
+    if (process.platform !== "win32") {
+      expect((await fs.lstat(destinationPath)).mode & 0o777).to.equal(0o600);
+    }
     expect((await validate({ reportPath: destinationPath })).reportSha256).to.equal(expectedSha256);
     await expectNoStagedEvidence();
   });
@@ -574,7 +576,9 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
     expect(await fs.readFile(destinationPath, "utf8")).to.equal(raw);
     expect(result.reportSha256).to.equal(createHash("sha256").update(raw).digest("hex"));
     expect(stateAfter.ino).to.not.equal(stateBefore.ino);
-    expect(stateAfter.mode & 0o777).to.equal(0o600);
+    if (process.platform !== "win32") {
+      expect(stateAfter.mode & 0o777).to.equal(0o600);
+    }
     await expectNoStagedEvidence();
   });
 

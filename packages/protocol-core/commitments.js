@@ -9,7 +9,7 @@ import {
   SNARK_SCALAR_FIELD,
   VERSION_HASH_DOMAIN,
 } from "./constants.js";
-import { bigintFrom, copyBytes } from "./bytes.js";
+import { bigintFrom, copyBytes, wipeBytes } from "./bytes.js";
 import { assertAddress } from "./identity.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 
@@ -28,16 +28,20 @@ function bytes32(value, label) {
 
 export function computeContentDigest(canonicalJsonBytes) {
   const bytes = copyBytes(canonicalJsonBytes, "canonical JSON bytes");
-  const contentDigest = keccak256(bytes);
-  const digestInteger = BigInt(contentDigest);
-  const contentDigestLo = digestInteger & MAX_UINT128;
-  const contentDigestHi = digestInteger >> 128n;
-  return {
-    contentDigest,
-    contentDigestBytes: getBytes(contentDigest),
-    contentDigestLo,
-    contentDigestHi,
-  };
+  try {
+    const contentDigest = keccak256(bytes);
+    const digestInteger = BigInt(contentDigest);
+    const contentDigestLo = digestInteger & MAX_UINT128;
+    const contentDigestHi = digestInteger >> 128n;
+    return {
+      contentDigest,
+      contentDigestBytes: getBytes(contentDigest),
+      contentDigestLo,
+      contentDigestHi,
+    };
+  } finally {
+    wipeBytes(bytes);
+  }
 }
 
 export function computeVersionCommitment(input) {
