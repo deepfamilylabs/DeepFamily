@@ -20,8 +20,14 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, ChevronDown, Eye, EyeOff, Info } from "lucide-react";
-import { CopyIconButton, ModalShell, useListboxA11y, useToast } from "../../../shared/ui";
+import { ChevronDown, Eye, EyeOff, Info } from "lucide-react";
+import {
+  CopyIconButton,
+  ModalShell,
+  OVERLAY_Z_INDEX,
+  useListboxA11y,
+  useToast,
+} from "../../../shared/ui";
 import { formatHashMiddle } from "../../../shared/model";
 import {
   validatePassphraseStrength,
@@ -373,16 +379,6 @@ export const PersonHashCalculator = forwardRef<
       [normalizedPassphrase],
     );
     const hasPassphrase = normalizedPassphrase.length > 0;
-    const passphraseRisk = useMemo(
-      () => classifyProtocolPassphraseRisk(passphraseInputRef.current?.value ?? ""),
-      [passphraseRevision],
-    );
-    const shouldShowPassphraseRisk =
-      passphraseRisk !== "ordinary" &&
-      (passphraseRisk === "unicode-whitespace" ||
-        passphraseRevision > 0 ||
-        safeCanonicalizeFullName(fullName || "").length > 0);
-
     // Calculate password strength
     const passwordStrength = useMemo(() => {
       return calculatePasswordStrength(normalizedPassphrase);
@@ -651,10 +647,10 @@ export const PersonHashCalculator = forwardRef<
                   ariaDescribedBy={passphraseHelpDescriptionId}
                   closeLabel={t("common.close", "Close")}
                   bare
-                  zIndex="z-50"
+                  zIndex={OVERLAY_Z_INDEX.nestedModal}
                 >
                   <div
-                    className="fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl"
+                    className={`fixed ${OVERLAY_Z_INDEX.nestedModal} top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl`}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <div className="space-y-3">
@@ -812,26 +808,6 @@ export const PersonHashCalculator = forwardRef<
                 >
                   {showConfirmPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-              </div>
-            ) : null}
-
-            {shouldShowPassphraseRisk ? (
-              <div
-                className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-100"
-                role="status"
-              >
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>
-                  {passphraseRisk === "empty"
-                    ? t(
-                        "search.hashCalculator.passphraseRisk.empty",
-                        "An empty identity passphrase has zero passphrase entropy. It is accepted without skipping the KDF, but irreversible actions require a separate high-risk confirmation.",
-                      )
-                    : t(
-                        "search.hashCalculator.passphraseRisk.unicodeWhitespace",
-                        "This identity passphrase contains only Unicode White_Space after NFKD normalization. It is not trimmed, but it is highly guessable; irreversible actions require a separate high-risk confirmation.",
-                      )}
-                </span>
               </div>
             ) : null}
 

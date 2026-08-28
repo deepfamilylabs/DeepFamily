@@ -14,18 +14,13 @@ import { useTransactionModalFrameState } from "../../shared/useTransactionModalF
 import { addVersionSchema } from "../model/addVersionSchema";
 import {
   areAddVersionConsentsSatisfied,
-  classifyAddVersionPassphrase,
-  defaultAddVersionPassphraseRisks,
   invalidateAddVersionPassphraseConsents,
-  PASSPHRASE_RISK_CONSENT_KEYS,
-  sameAddVersionPassphraseConsentContext,
 } from "../model/addVersionPassphraseConsent";
 import type {
   AddVersionConsents,
   AddVersionErrorResultView,
   AddVersionFormInput,
   AddVersionIdentityRole,
-  AddVersionPassphraseConsentContext,
   AddVersionSuccessResultView,
   AddVersionTransactionPreview,
   ParentKind,
@@ -48,12 +43,8 @@ interface UseAddVersionModalControllerArgs {
 function defaultConsents(): AddVersionConsents {
   return {
     hash: false,
-    age: false,
     legal: false,
     passphrase: false,
-    personPassphraseRisk: false,
-    fatherPassphraseRisk: false,
-    motherPassphraseRisk: false,
   };
 }
 
@@ -115,7 +106,6 @@ export function useAddVersionModalController({
 
   const [isSubmittingState, setIsSubmitting] = useState(false);
   const [consents, setConsents] = useState(defaultConsents);
-  const [passphraseRisks, setPassphraseRisks] = useState(defaultAddVersionPassphraseRisks);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<AddVersionSuccessResultView | null>(null);
   const [errorResult, setErrorResult] = useState<AddVersionErrorResultView | null>(null);
@@ -164,14 +154,7 @@ export function useAddVersionModalController({
   const motherStatus = getParentInfoStatus(motherInfo, watchedValues.motherVersionIndex);
   const fatherPresent = fatherStatus !== "empty";
   const motherPresent = motherStatus !== "empty";
-  const passphraseConsentContext = useMemo<AddVersionPassphraseConsentContext>(
-    () => ({
-      risks: passphraseRisks,
-      present: { person: true, father: fatherPresent, mother: motherPresent },
-    }),
-    [fatherPresent, motherPresent, passphraseRisks],
-  );
-  const allConsentsChecked = areAddVersionConsentsSatisfied(consents, passphraseConsentContext);
+  const allConsentsChecked = areAddVersionConsentsSatisfied(consents);
   const isTransactionSubmitting =
     addVersionStatus === "validating" || addVersionStatus === "confirming";
   const isSubmitting = isSubmittingState || isTransactionSubmitting;
@@ -185,7 +168,6 @@ export function useAddVersionModalController({
       setFatherInfo(null);
       setMotherInfo(null);
       decideTransactionPreview(false);
-      setPassphraseRisks(defaultAddVersionPassphraseRisks());
       submissionPackageRef.current = null;
       confirmedCacheRevisionRef.current = null;
       setIsSubmitting(false);
@@ -241,11 +223,7 @@ export function useAddVersionModalController({
       // otherwise draftKey (deliberately free of secrets) would silently reuse
       // an envelope encrypted under the previous passphrase.
       submissionPackageRef.current = null;
-      const risk = classifyAddVersionPassphrase(calc?.getSecretInputs().passphrase ?? "");
-      setPassphraseRisks((current) =>
-        current[role] === risk ? current : { ...current, [role]: risk },
-      );
-      setConsents((current) => invalidateAddVersionPassphraseConsents(current, role));
+      setConsents(invalidateAddVersionPassphraseConsents);
     },
     [],
   );
@@ -254,11 +232,6 @@ export function useAddVersionModalController({
     (role: ParentKind, value: PersonInfoPublic, calc: PersonHashCalculatorHandle | null) => {
       if (role === "father") setFatherInfo(value);
       else setMotherInfo(value);
-      if (!safeCanonicalizeFullName(value.fullName)) return;
-      const risk = classifyAddVersionPassphrase(calc?.getSecretInputs().passphrase ?? "");
-      setPassphraseRisks((current) =>
-        current[role] === risk ? current : { ...current, [role]: risk },
-      );
     },
     [],
   );
@@ -283,10 +256,12 @@ export function useAddVersionModalController({
           ["father", fatherPresent],
           ["mother", motherPresent],
         ] as const) {
-          if (previous[role] === present) continue;
-          next = present
-            ? invalidateAddVersionPassphraseConsents(next, role)
-            : { ...next, [PASSPHRASE_RISK_CONSENT_KEYS[role]]: false };
+          // A newly added parent contributes a passphrase the user has not
+          // reviewed yet, so the universal confirmation must be redone. Removing
+          // a parent clears nothing: parents carry no consent of their own.
+          if (previous[role] !== present && present) {
+            next = invalidateAddVersionPassphraseConsents(next);
+          }
         }
         return next;
       });
@@ -301,13 +276,13 @@ export function useAddVersionModalController({
     (key: keyof AddVersionConsents) => {
       setConsents((current) => {
         const next = { ...current, [key]: !current[key] };
-        if (consentError && areAddVersionConsentsSatisfied(next, passphraseConsentContext)) {
+        if (consentError && areAddVersionConsentsSatisfied(next)) {
           setConsentError(null);
         }
         return next;
       });
     },
-    [consentError, passphraseConsentContext],
+    [consentError],
   );
 
   const cacheConfirmedAfterTransaction = useCallback(
@@ -371,34 +346,7 @@ export function useAddVersionModalController({
       // The submission may spend minutes in KDF/proving/wallet/RPC work. A
       // later local-cache clear must fence its eventual plaintext completion.
       confirmedCacheRevisionRef.current = captureMetadataCacheRevision();
-      const fatherIsPresent = calculatorHasIdentity(fatherCalcRef.current);
-      const motherIsPresent = calculatorHasIdentity(motherCalcRef.current);
-      const currentContext: AddVersionPassphraseConsentContext = {
-        risks: {
-          person: classifyAddVersionPassphrase(
-            personCalcRef.current?.getSecretInputs().passphrase ?? "",
-          ),
-          father: fatherIsPresent
-            ? classifyAddVersionPassphrase(
-                fatherCalcRef.current?.getSecretInputs().passphrase ?? "",
-              )
-            : passphraseConsentContext.risks.father,
-          mother: motherIsPresent
-            ? classifyAddVersionPassphrase(
-                motherCalcRef.current?.getSecretInputs().passphrase ?? "",
-              )
-            : passphraseConsentContext.risks.mother,
-        },
-        present: {
-          person: true,
-          father: fatherIsPresent,
-          mother: motherIsPresent,
-        },
-      };
-      if (
-        !sameAddVersionPassphraseConsentContext(passphraseConsentContext, currentContext) ||
-        !areAddVersionConsentsSatisfied(consents, currentContext)
-      ) {
+      if (!areAddVersionConsentsSatisfied(consents)) {
         setConsentError(
           t(
             "addVersion.consentMissing",
@@ -409,7 +357,7 @@ export function useAddVersionModalController({
       }
       await submitAddVersion(data);
     },
-    [captureMetadataCacheRevision, consents, passphraseConsentContext, submitAddVersion, t],
+    [captureMetadataCacheRevision, consents, submitAddVersion, t],
   );
 
   return {
@@ -462,7 +410,6 @@ export function useAddVersionModalController({
     },
     consentSection: {
       consents,
-      passphraseContext: passphraseConsentContext,
       consentError,
       onToggleConsent: toggleConsent,
     },

@@ -37,7 +37,7 @@ function isBytes32(value: string | undefined | null) {
 }
 
 function defaultConsents(): MintConsents {
-  return { public: false, age: false, legal: false, passphraseRisk: false };
+  return { public: false, age: false, legal: false };
 }
 
 export function useMintNftModalController({
@@ -68,7 +68,6 @@ export function useMintNftModalController({
   const [personHash, setPersonHash] = useState("");
   const [versionIndex, setVersionIndex] = useState(1);
   const [consents, setConsents] = useState(defaultConsents);
-  const [passphraseRisk, setPassphraseRisk] = useState<ProtocolPassphraseRisk>("empty");
   const [consentError, setConsentError] = useState<string | null>(null);
   const [personInfo, setPersonInfo] = useState<MintPersonInfo | null>(null);
   const [showEndorseConfirm, setShowEndorseConfirm] = useState(false);
@@ -86,11 +85,7 @@ export function useMintNftModalController({
   );
   const hasTargetInputs = hasValidTarget;
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
-  const allConsentsChecked =
-    consents.public &&
-    consents.age &&
-    consents.legal &&
-    (passphraseRisk === "ordinary" || consents.passphraseRisk);
+  const allConsentsChecked = consents.public && consents.age && consents.legal;
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
   const validatedTargetBiography = useMemo(() => {
     if (!hasValidTarget) return undefined;
@@ -171,7 +166,6 @@ export function useMintNftModalController({
     setSuccessResult(null);
     setErrorResult(null);
     setConsents(defaultConsents());
-    setPassphraseRisk("empty");
     setConsentError(null);
     setShowEndorseConfirm(false);
     resetDisclosureProof();
@@ -219,7 +213,6 @@ export function useMintNftModalController({
     setSuccessResult(null);
     setErrorResult(null);
     setConsentError(null);
-    setConsents((current) => ({ ...current, passphraseRisk: false }));
     didPatchCacheRef.current = false;
     resetMintNftFlow();
   }, [isOpen, resetMintNftFlow, targetPersonHash, targetVersionIndex]);
@@ -228,24 +221,16 @@ export function useMintNftModalController({
     (key: keyof MintConsents) => {
       setConsents((current) => {
         const next = { ...current, [key]: !current[key] };
-        if (
-          consentError &&
-          next.public &&
-          next.age &&
-          next.legal &&
-          (passphraseRisk === "ordinary" || next.passphraseRisk)
-        ) {
+        if (consentError && next.public && next.age && next.legal) {
           setConsentError(null);
         }
         return next;
       });
     },
-    [consentError, passphraseRisk],
+    [consentError],
   );
 
-  const handlePassphraseChange = useCallback((risk: ProtocolPassphraseRisk) => {
-    setPassphraseRisk(risk);
-    setConsents((current) => ({ ...current, passphraseRisk: false }));
+  const handlePassphraseChange = useCallback(() => {
     setConsentError(null);
   }, []);
 
@@ -266,8 +251,6 @@ export function useMintNftModalController({
     address,
     contract,
     allConsentsChecked,
-    renderedPassphraseRisk: passphraseRisk,
-    passphraseRiskConsentChecked: consents.passphraseRisk,
     hasTargetInputs,
     hasValidTarget,
     isEndorsed,
@@ -331,7 +314,6 @@ export function useMintNftModalController({
     },
     consentSection: {
       consents,
-      passphraseRisk,
       consentError,
       onToggleConsent: toggleConsent,
     },
