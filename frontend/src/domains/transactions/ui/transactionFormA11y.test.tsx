@@ -109,24 +109,15 @@ describe("transaction form accessibility", () => {
           t={t as any}
           consents={{
             hash: false,
-            age: false,
             legal: false,
             passphrase: false,
-            personPassphraseRisk: false,
-            fatherPassphraseRisk: false,
-            motherPassphraseRisk: false,
-          }}
-          passphraseContext={{
-            risks: { person: "ordinary", father: "empty", mother: "empty" },
-            present: { person: true, father: false, mother: false },
           }}
           consentError="Add version consent required"
           onToggleConsent={vi.fn()}
         />
         <MintConsentSection
           t={t as any}
-          consents={{ public: false, age: false, legal: false, passphraseRisk: false }}
-          passphraseRisk="ordinary"
+          consents={{ public: false, age: false, legal: false }}
           consentError="Mint consent required"
           onToggleConsent={vi.fn()}
         />
@@ -153,6 +144,5 @@ describe("transaction form accessibility", () => {
     expect(screen.queryByPlaceholderText("Password (min 8 chars)")).toBeNull();
     expect(screen.queryByPlaceholderText("Confirm password")).toBeNull();
     expect(screen.queryByText("Metadata CID")).toBeNull();
-    expect(screen.getByText(/No separate metadata password or CID is created/)).toBeTruthy();
   });
 });

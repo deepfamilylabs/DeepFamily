@@ -320,56 +320,22 @@ describe("MintNFTModal", () => {
     expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
   });
 
-  it("requires and invalidates the Mint-specific Unicode whitespace confirmation", async () => {
+  it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
     renderMintModal();
 
     await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
-    const input = screen.getByLabelText("mint identity passphrase test input");
-    fireEvent.change(input, { target: { value: "\u0085\u3000" } });
+    const mintButton = () => screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement;
+    expect(mintButton().disabled).toBe(true);
 
-    const riskConsent = screen.getByRole("checkbox", {
-      name: /contains only Unicode White_Space after NFKD normalization/i,
+    // A risky passphrase adds no extra confirmation: the mint publishes the
+    // identity fields in plaintext anyway, which consentPublic already covers.
+    fireEvent.change(screen.getByLabelText("mint identity passphrase test input"), {
+      target: { value: "\u0085\u3000" },
     });
-    expect(riskConsent).toBeTruthy();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
 
     await checkAllConsents();
-    expect((screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
-
-    fireEvent.change(input, { target: { value: "\u00a0\u2028" } });
-
-    expect((screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect(
-      (
-        screen.getByRole("checkbox", {
-          name: /contains only Unicode White_Space after NFKD normalization/i,
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(false);
-  });
-
-  it("rejects a stale risk consent snapshot before proof generation", async () => {
-    renderMintModal();
-
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
-    await checkAllConsents();
-
-    // Model a programmatic mutation that bypasses the normal React change
-    // callback. The submit boundary must still compare the exact secret.
-    mocks.personPassphrase = "\u0085";
-    fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
-
-    expect(
-      await screen.findByText("Please confirm all required checkboxes before minting"),
-    ).toBeTruthy();
-    expect(mocks.zkWorkerCall).not.toHaveBeenCalledWith(
-      "generateDisclosureBindingProof",
-      expect.anything(),
-      expect.anything(),
-    );
+    expect(mintButton().disabled).toBe(false);
     expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
   });
 

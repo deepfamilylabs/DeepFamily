@@ -3,7 +3,6 @@ import { ResponsiveModalFrame } from "../../../../shared/ui";
 import { useAddVersionModalController } from "./hooks/useAddVersionModalController";
 import { AddVersionConsentSection } from "./sections/AddVersionConsentSection";
 import { AddVersionFooter } from "./sections/AddVersionFooter";
-import { AddVersionIntroNotices } from "./sections/AddVersionIntroNotices";
 import { AddVersionStatusPanel } from "./sections/AddVersionStatusPanel";
 import { MetadataEncryptionSection } from "./sections/MetadataEncryptionSection";
 import { ParentIdentitySection } from "./sections/ParentIdentitySection";
@@ -47,7 +46,6 @@ export default function AddVersionModal(props: AddVersionModalProps) {
           className="min-h-full flex flex-col"
         >
           <div className="flex-1 p-6 space-y-6">
-            <AddVersionIntroNotices t={t} />
             <PersonIdentitySection t={t} {...addVersion.personSection} />
             <ParentIdentitySection t={t} {...addVersion.fatherSection} />
             <ParentIdentitySection t={t} {...addVersion.motherSection} />

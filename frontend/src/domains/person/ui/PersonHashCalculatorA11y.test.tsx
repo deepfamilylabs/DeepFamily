@@ -120,9 +120,6 @@ describe("PersonHashCalculator accessibility", () => {
       { target: { value: "\u0085\u3000" } },
     );
 
-    expect(
-      screen.getByText(/contains only Unicode White_Space after NFKD normalization/i),
-    ).toBeTruthy();
     expect(screen.getByText("Characters after NFKD (not trimmed): 2")).toBeTruthy();
   });
 });

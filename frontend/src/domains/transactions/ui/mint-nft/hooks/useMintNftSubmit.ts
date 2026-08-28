@@ -38,8 +38,6 @@ interface UseMintNftSubmitArgs {
   address?: string | null;
   contract?: any;
   allConsentsChecked: boolean;
-  renderedPassphraseRisk: ProtocolPassphraseRisk;
-  passphraseRiskConsentChecked: boolean;
   hasTargetInputs: boolean;
   hasValidTarget: boolean;
   isEndorsed: boolean;
@@ -72,8 +70,6 @@ export function useMintNftSubmit({
   address,
   contract,
   allConsentsChecked,
-  renderedPassphraseRisk,
-  passphraseRiskConsentChecked,
   hasTargetInputs,
   hasValidTarget,
   isEndorsed,
@@ -97,14 +93,7 @@ export function useMintNftSubmit({
   return useCallback(
     async (data: MintNFTFormValues) => {
       const calculator = personCalcRef.current;
-      const currentPassphraseRisk = classifyProtocolPassphraseRisk(
-        calculator?.getSecretInputs().passphrase ?? "",
-      );
-      if (
-        !allConsentsChecked ||
-        currentPassphraseRisk !== renderedPassphraseRisk ||
-        (currentPassphraseRisk !== "ordinary" && !passphraseRiskConsentChecked)
-      ) {
+      if (!allConsentsChecked) {
         setConsentError(
           t("mintNFT.consentMissing", "Please confirm all required checkboxes before minting"),
         );
@@ -269,8 +258,6 @@ export function useMintNftSubmit({
     [
       address,
       allConsentsChecked,
-      renderedPassphraseRisk,
-      passphraseRiskConsentChecked,
       contract,
       didPatchCacheRef,
       generateDisclosureProof,

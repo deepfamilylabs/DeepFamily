@@ -433,7 +433,7 @@ describe("AddVersionModal", () => {
     vi.restoreAllMocks();
   });
 
-  it("invalidates self risk confirmations after every passphrase edit", async () => {
+  it("invalidates the passphrase confirmation after every passphrase edit", async () => {
     renderAddVersionModal();
 
     await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator")).toHaveLength(3));
@@ -441,46 +441,28 @@ describe("AddVersionModal", () => {
     const submitButton = screen.getByRole("button", { name: /Add Version/i }) as HTMLButtonElement;
     expect(submitButton.disabled).toBe(false);
 
+    const passphraseConsent = () =>
+      screen.getByRole("checkbox", { name: /guess the passphrase offline/i }) as HTMLInputElement;
+
     fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
       target: { value: "" },
     });
-    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(5));
+    // Emptying the passphrase adds no extra checkbox: the single confirmation
+    // already covers weak and empty passphrases alike.
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(3));
+    expect(passphraseConsent().checked).toBe(false);
     expect(submitButton.disabled).toBe(true);
 
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: /anyone can permanently attempt offline passphrase guesses/i,
-      }),
-    );
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: /empty identity passphrase for this person/i,
-      }),
-    );
+    fireEvent.click(passphraseConsent());
     await waitFor(() => expect(submitButton.disabled).toBe(false));
 
     fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
       target: { value: "\u00a0\u2003" },
     });
-    expect(
-      (
-        screen.getByRole("checkbox", {
-          name: /consists only of Unicode White_Space after NFKD normalization/i,
-        }) as HTMLInputElement
-      ).checked,
-    ).toBe(false);
+    expect(passphraseConsent().checked).toBe(false);
     expect(submitButton.disabled).toBe(true);
 
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: /anyone can permanently attempt offline passphrase guesses/i,
-      }),
-    );
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: /consists only of Unicode White_Space after NFKD normalization/i,
-      }),
-    );
+    fireEvent.click(passphraseConsent());
     await waitFor(() => expect(submitButton.disabled).toBe(false));
 
     // A different passphrase in the same risk class must also invalidate the
@@ -488,6 +470,7 @@ describe("AddVersionModal", () => {
     fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
       target: { value: "\t" },
     });
+    expect(passphraseConsent().checked).toBe(false);
     expect(submitButton.disabled).toBe(true);
   });
 
@@ -734,7 +717,7 @@ describe("AddVersionModal", () => {
     });
     fireEvent.click(
       screen.getByRole("checkbox", {
-        name: /anyone can permanently attempt offline passphrase guesses/i,
+        name: /guess the passphrase offline/i,
       }),
     );
 
