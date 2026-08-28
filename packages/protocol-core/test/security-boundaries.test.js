@@ -181,6 +181,54 @@ test("every chain/person/parent/version context dimension is bound into both AAD
   }
 });
 
+test("a parent versionIndex must be a bigint, not an equal-valued number", async () => {
+  const metadata = metadataWithParents();
+  const { prepared, context } = prepareMetadataContext(
+    metadata,
+    BigInt(vector.identity.derivedSecretField),
+  );
+  try {
+    for (const role of ["father", "mother"]) {
+      const numericIndex = {
+        ...metadata,
+        parents: {
+          ...metadata.parents,
+          [role]: {
+            ...metadata.parents[role],
+            versionIndex: Number(metadata.parents[role].versionIndex),
+          },
+        },
+      };
+      await assert.rejects(
+        encryptPersonVersionEnvelope({
+          metadata: numericIndex,
+          rawPassphrase: vector.identity.rawPassphrase,
+          identitySuiteId: 1,
+          context,
+          randomBytes: sequentialRandom(32),
+        }),
+        (error) => {
+          assert.equal(error?.code, "PLAINTEXT_CONTEXT_MISMATCH", role);
+          return true;
+        },
+      );
+    }
+
+    // The bigint form of the very same values is accepted, so the rejection
+    // above is about the type alone.
+    const accepted = await encryptPersonVersionEnvelope({
+      metadata,
+      rawPassphrase: vector.identity.rawPassphrase,
+      identitySuiteId: 1,
+      context,
+      randomBytes: sequentialRandom(32),
+    });
+    assert.ok(accepted.envelope.length > 0);
+  } finally {
+    wipePreparedPersonVersionContent(prepared);
+  }
+});
+
 test("a structurally valid envelope encrypted with a different file passphrase is rejected", async () => {
   const identityPassphrase = "identity-only-passphrase";
   const filePassphrase = "file-only-passphrase";

@@ -103,14 +103,14 @@ export function useAddVersionIdentityMaterials() {
             ? {
                 ...father,
                 personHash: input.fatherIdentity!.personHash,
-                versionIndex: processedData.fatherVersionIndex,
+                versionIndex: BigInt(processedData.fatherVersionIndex),
               }
             : null,
           mother: mother
             ? {
                 ...mother,
                 personHash: input.motherIdentity!.personHash,
-                versionIndex: processedData.motherVersionIndex,
+                versionIndex: BigInt(processedData.motherVersionIndex),
               }
             : null,
         },
