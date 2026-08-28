@@ -40,12 +40,18 @@ export interface PersonVersionMetadata {
   biography: string;
 }
 
+/**
+ * `versionIndex` is deliberately `bigint`, not `BigNumberish`:
+ * assertMetadataMatchesContext compares it by strict equality against a context
+ * normalized to bigint, so a `number` would fail at runtime even when the values
+ * are equal. Keep the declared type as strict as that comparison.
+ */
 export interface PersonVersionMetadataInput {
   schema: "deepfamily/person-version@1.0";
   person: MetadataIdentity;
   parents: {
-    father: (Omit<MetadataParent, "versionIndex"> & { versionIndex: BigNumberish }) | null;
-    mother: (Omit<MetadataParent, "versionIndex"> & { versionIndex: BigNumberish }) | null;
+    father: MetadataParent | null;
+    mother: MetadataParent | null;
   };
   tag: string;
   biography: string;

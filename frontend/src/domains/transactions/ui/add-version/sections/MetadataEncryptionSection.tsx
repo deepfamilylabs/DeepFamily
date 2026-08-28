@@ -34,7 +34,7 @@ export function MetadataEncryptionSection({
           {...register("biography")}
           disabled={isSubmitting}
           rows={8}
-          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all disabled:opacity-60 whitespace-pre-wrap"
+          className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all disabled:opacity-60 whitespace-pre-wrap resize-y"
           placeholder={t(
             "addVersion.biographyPlaceholder",
             "This immutable biography is encrypted on this device before it is stored on-chain.",
