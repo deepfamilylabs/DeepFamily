@@ -4,7 +4,7 @@
  * Features:
  * - Historical persons without copyright issues (public domain)
  * - 19 chunk types corresponding to real biographical content
- * - Each chunk close to 2048 byte limit
+ * - Each chunk stays within the 16 KiB UTF-8 byte limit
  * - Real family relationships
  * - Data and logic separated (loaded from JSON files)
  * - Multi-language support with batch seeding capability
@@ -188,7 +188,7 @@ function decodeEthersError(error, contract) {
 
 // ========== Constants Configuration ==========
 
-const MAX_CHUNK_CONTENT_LENGTH = 2048;
+const MAX_CHUNK_CONTENT_LENGTH = 16_384;
 const MAX_LONG_TEXT_LENGTH = 256;
 
 // Data file paths
@@ -459,7 +459,14 @@ function createSupplementInfo(personInfo) {
 /**
  * Seed a single language family data
  */
-async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
+async function seedSingleLanguage(
+  dataFile,
+  deepFamily,
+  deepFamilyReader,
+  storyArchive,
+  token,
+  signer,
+) {
   console.log("\n" + "=".repeat(60));
   console.log(`Seeding data file: ${dataFile}`);
   console.log("=".repeat(60));
@@ -546,7 +553,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     // Check on-chain progress for resume support
     console.log(`  >Checking on-chain existence for hash ${personHash}...`);
-    const progress = await getPersonProgress({ deepFamily, personHash });
+    const progress = await getPersonProgress({ deepFamily, deepFamilyReader, personHash });
 
     if (progress.exists) {
       console.log(
@@ -808,7 +815,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
       }
 
       try {
-        storyMetadata = await deepFamily.storyMetadata(tokenId);
+        storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
       } catch (e) {
         storyMetadata = null;
       }
@@ -903,7 +910,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
 
     if (!storyMetadata) {
       try {
-        storyMetadata = await deepFamily.storyMetadata(tokenId);
+        storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
       } catch (e) {
         storyMetadata = { totalChunks: 0, isSealed: false };
       }
@@ -969,7 +976,7 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         `    >Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex}, part ${chunk.partIndex})...`,
       );
       const chunkStart = Date.now();
-      const chunkTx = await deepFamily.addStoryChunk(
+      const chunkTx = await storyArchive.addStoryChunk(
         tokenId,
         chunkIndex, // Continue after on-chain chunks
         chunk.type,
@@ -985,9 +992,9 @@ async function seedSingleLanguage(dataFile, deepFamily, token, signer) {
         const chunkEventIface = new ethers.Interface([
           "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID)",
         ]);
-        const deepAddr = (deepFamily.target || deepFamily.address).toLowerCase();
+        const archiveAddress = (storyArchive.target || storyArchive.address).toLowerCase();
         for (const log of chunkReceipt?.logs || []) {
-          if ((log.address || "").toLowerCase() !== deepAddr) continue;
+          if ((log.address || "").toLowerCase() !== archiveAddress) continue;
           try {
             const parsed = chunkEventIface.parseLog(log);
             if (
@@ -1064,11 +1071,15 @@ async function main() {
   console.log("=".repeat(70));
 
   const [signer] = await ethers.getSigners();
-  const { deepFamily, token } = await ensureIntegratedSystem(connection, {
-    writeDeployments: true,
-    artifacts: hre.artifacts,
-  });
+  const { deepFamily, deepFamilyReader, storyArchive, token } = await ensureIntegratedSystem(
+    connection,
+    {
+      writeDeployments: true,
+      artifacts: hre.artifacts,
+    },
+  );
   const deepFamilyWithSigner = deepFamily.connect(signer);
+  const storyArchiveWithSigner = storyArchive.connect(signer);
   const tokenWithSigner = token.connect(signer);
 
   const deepFamilyAddr = await deepFamily.getAddress();
@@ -1090,7 +1101,14 @@ async function main() {
       console.log(`Starting: ${file}`);
       console.log("━".repeat(70));
 
-      const result = await seedSingleLanguage(file, deepFamilyWithSigner, tokenWithSigner, signer);
+      const result = await seedSingleLanguage(
+        file,
+        deepFamilyWithSigner,
+        deepFamilyReader,
+        storyArchiveWithSigner,
+        tokenWithSigner,
+        signer,
+      );
       results.push({ file, success: true, ...result });
       console.log(`${file} completed successfully`);
     } catch (error) {

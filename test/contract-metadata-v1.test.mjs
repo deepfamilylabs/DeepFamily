@@ -194,6 +194,7 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
   const deepFamily = DeepFamily.attach(await proxy.getAddress());
 
   let archive;
+  let storyArchive;
   if (configureArchive) {
     if (archiveFactory) {
       archive = await archiveFactory(await proxy.getAddress());
@@ -203,6 +204,11 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
       await archive.waitForDeployment();
     }
     await deepFamily.setMetadataArchive(await archive.getAddress());
+
+    const StoryArchive = await hre.ethers.getContractFactory("StoryArchiveV1");
+    storyArchive = await StoryArchive.deploy(await proxy.getAddress());
+    await storyArchive.waitForDeployment();
+    await deepFamily.setStoryArchive(await storyArchive.getAddress());
   }
 
   let adapter;
@@ -229,6 +235,7 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
     proxy,
     deepFamily,
     archive,
+    storyArchive,
     adapter,
   };
 }
@@ -563,12 +570,13 @@ describe("DeepFamily encrypted metadata v1", function () {
     });
 
     it("Reader freezes proxy/archive bindings and keeps array/ref indices distinct", async () => {
-      const { deepFamily, proxy, archive, owner } = await deployCore();
+      const { deepFamily, proxy, archive, storyArchive, owner } = await deployCore();
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       const reader = await Reader.deploy(await proxy.getAddress());
       await reader.waitForDeployment();
       expect(await reader.DEEP_FAMILY()).to.equal(await proxy.getAddress());
       expect(await reader.METADATA_ARCHIVE()).to.equal(await archive.getAddress());
+      expect(await reader.STORY_ARCHIVE()).to.equal(await storyArchive.getAddress());
 
       const signerAddress = await owner.getAddress();
       const personHash = personHashOf(123456n);

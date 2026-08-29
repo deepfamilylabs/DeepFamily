@@ -113,6 +113,7 @@ const CORE_DEPLOYMENT_FILES = [
   "Groth16VerifierAdapter.json",
   "DeepFamily.json",
   "MetadataArchiveV1.json",
+  "StoryArchiveV1.json",
   "DeepFamilyReader.json",
 ];
 const RELEASE_ARTIFACT_NAMES = Object.freeze([
@@ -126,6 +127,7 @@ const RELEASE_ARTIFACT_NAMES = Object.freeze([
   "DeepFamily",
   "UUPSProxy",
   "MetadataArchiveV1",
+  "StoryArchiveV1",
   "DeepFamilyReader",
 ]);
 
@@ -317,6 +319,8 @@ const buildFingerprint = ({
       },
       metadataArchiveV1: [plannedAddresses.deepFamily],
       deepFamilyMetadataArchive: plannedAddresses.metadataArchiveV1,
+      storyArchiveV1: [plannedAddresses.deepFamily],
+      deepFamilyStoryArchive: plannedAddresses.storyArchiveV1,
       deepFamilyReader: [plannedAddresses.deepFamily],
     },
   },
@@ -527,6 +531,7 @@ const assertProtocolTerminalState = async ({
     ],
     ["UUPSProxy", addresses.deepFamily, { needsLibraries: false }],
     ["MetadataArchiveV1", addresses.metadataArchiveV1, { needsLibraries: false }],
+    ["StoryArchiveV1", addresses.storyArchiveV1, { needsLibraries: false }],
     ["DeepFamilyReader", addresses.deepFamilyReader, { needsLibraries: false }],
   ];
   for (const [contractName, address, spec] of artifactChecks) {
@@ -540,7 +545,14 @@ const assertProtocolTerminalState = async ({
     });
   }
 
-  const { token, deepFamily, metadataArchive, deepFamilyReader, groth16VerifierAdapter } = deployed;
+  const {
+    token,
+    deepFamily,
+    metadataArchive,
+    storyArchive,
+    deepFamilyReader,
+    groth16VerifierAdapter,
+  } = deployed;
   const [
     owner,
     tokenOwner,
@@ -550,6 +562,9 @@ const assertProtocolTerminalState = async ({
     configuredArchive,
     archiveMain,
     readerArchive,
+    configuredStoryArchive,
+    storyArchiveMain,
+    readerStoryArchive,
     personRoute,
     disclosureRoute,
     personBackend,
@@ -567,6 +582,9 @@ const assertProtocolTerminalState = async ({
     deepFamily.metadataArchive(),
     metadataArchive.DEEP_FAMILY(),
     deepFamilyReader.METADATA_ARCHIVE(),
+    deepFamily.storyArchive(),
+    storyArchive.DEEP_FAMILY(),
+    deepFamilyReader.STORY_ARCHIVE(),
     deepFamily.verifierRegistry(0, 1),
     deepFamily.verifierRegistry(1, 1),
     groth16VerifierAdapter.personVerifier(),
@@ -590,6 +608,18 @@ const assertProtocolTerminalState = async ({
     [
       sameAddress(readerArchive, addresses.metadataArchiveV1),
       "Reader is not bound to MetadataArchiveV1",
+    ],
+    [
+      sameAddress(configuredStoryArchive, addresses.storyArchiveV1),
+      "DeepFamily is not bound to StoryArchiveV1",
+    ],
+    [
+      sameAddress(storyArchiveMain, addresses.deepFamily),
+      "Story archive is not bound to DeepFamily",
+    ],
+    [
+      sameAddress(readerStoryArchive, addresses.storyArchiveV1),
+      "Reader is not bound to StoryArchiveV1",
     ],
     [sameAddress(personRoute, addresses.groth16VerifierAdapter), "person verifier route mismatch"],
     [
@@ -760,7 +790,7 @@ const revalidateCompletedRelease = async ({
     recordedLabels.some((label, index) => label !== expectedLabels[index]) ||
     expectedLabels.some((label) => checkpoint.transactions[label]?.status !== "finalized")
   ) {
-    throw new Error("Completed mainnet checkpoint does not contain exactly 16 finalized steps");
+    throw new Error("Completed mainnet checkpoint does not contain exactly 18 finalized steps");
   }
   const verifiedContracts = checkpoint.verification.contracts ?? [];
   if (
@@ -792,6 +822,7 @@ const revalidateCompletedRelease = async ({
     token: await ethers.getContractAt("DeepFamilyToken", addresses.token),
     deepFamily: await ethers.getContractAt("DeepFamily", addresses.deepFamily),
     metadataArchive: await ethers.getContractAt("MetadataArchiveV1", addresses.metadataArchiveV1),
+    storyArchive: await ethers.getContractAt("StoryArchiveV1", addresses.storyArchiveV1),
     deepFamilyReader: await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader),
     groth16VerifierAdapter: await ethers.getContractAt(
       "Groth16VerifierAdapter",
@@ -1362,6 +1393,7 @@ export const main = async (chainProfile) => {
       deepFamily: await deployed.deepFamily.getAddress(),
       deepFamilyImplementation: deployed.deepFamilyImplementationAddress,
       metadataArchiveV1: await deployed.metadataArchive.getAddress(),
+      storyArchiveV1: await deployed.storyArchive.getAddress(),
       deepFamilyReader: await deployed.deepFamilyReader.getAddress(),
     };
     for (const [label, plannedAddress] of Object.entries(plannedAddresses)) {
@@ -1415,6 +1447,9 @@ export const main = async (chainProfile) => {
         proxyInitData,
       ]),
       await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchiveV1, [
+        addresses.deepFamily,
+      ]),
+      await verificationEntry(hre.artifacts, "StoryArchiveV1", addresses.storyArchiveV1, [
         addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [

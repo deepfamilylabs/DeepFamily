@@ -53,9 +53,13 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
     metadataArchiveV1: artifact("MetadataArchiveV1", {
       deepFamily: deployments.metadataArchiveV1.deepFamilyImmutable,
     }),
+    storyArchiveV1: artifact("StoryArchiveV1", {
+      deepFamily: deployments.storyArchiveV1.deepFamilyImmutable,
+    }),
     deepFamilyReader: artifact("DeepFamilyReader", {
       deepFamily: deployments.deepFamilyReader.deepFamilyImmutable,
       metadataArchive: deployments.deepFamilyReader.metadataArchiveImmutable,
+      storyArchive: deployments.deepFamilyReader.storyArchiveImmutable,
     }),
   });
 };
@@ -157,13 +161,18 @@ describe("planned production protocol deployment projection", function () {
             DEPLOYER),
         (manifest) => (manifest.deployments.metadataArchiveV1.address = DEPLOYER),
         (manifest) => (manifest.deployments.metadataArchiveV1.deepFamilyImmutable = DEPLOYER),
+        (manifest) => (manifest.deployments.storyArchiveV1.address = DEPLOYER),
+        (manifest) => (manifest.deployments.storyArchiveV1.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.address = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.metadataArchiveImmutable = DEPLOYER),
+        (manifest) => (manifest.deployments.deepFamilyReader.storyArchiveImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.groth16VerifierAdapter.artifactSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.groth16VerifierAdapter.runtimeSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.metadataArchiveV1.artifactSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.metadataArchiveV1.runtimeSha256 = "f".repeat(64)),
+        (manifest) => (manifest.deployments.storyArchiveV1.artifactSha256 = "f".repeat(64)),
+        (manifest) => (manifest.deployments.storyArchiveV1.runtimeSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.deepFamilyReader.artifactSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.deepFamilyReader.runtimeSha256 = "f".repeat(64)),
       ];
@@ -192,6 +201,10 @@ describe("planned production protocol deployment projection", function () {
       [
         fixture.plannedAddresses.metadataArchiveV1.toLowerCase(),
         fixture.planned.artifacts.metadataArchiveV1.runtimeBytecode,
+      ],
+      [
+        fixture.plannedAddresses.storyArchiveV1.toLowerCase(),
+        fixture.planned.artifacts.storyArchiveV1.runtimeBytecode,
       ],
       [
         fixture.plannedAddresses.deepFamilyReader.toLowerCase(),

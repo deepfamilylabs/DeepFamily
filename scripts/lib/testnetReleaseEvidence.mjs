@@ -72,6 +72,7 @@ const REQUIRED_VERIFIED_CONTRACTS = Object.freeze([
   "initial-deployment:MetadataArchiveV1",
   "initial-deployment:PersonCommitmentVerifier",
   "initial-deployment:PoseidonT5",
+  "initial-deployment:StoryArchiveV1",
   "initial-deployment:UUPSProxy",
 ]);
 const REQUIRED_VERIFICATION_PHASES = Object.freeze(["initial-deployment"]);
@@ -663,6 +664,7 @@ const requireTerminalGovernanceEvidence = ({
       "reader",
       "safe",
       "status",
+      "storyArchive",
       "timelock",
       "token",
       "verifierAdapter",
@@ -728,6 +730,7 @@ const requireTerminalGovernanceEvidence = ({
     addresses.metadataArchive,
     "addresses.metadataArchive",
   );
+  const storyArchiveAddress = requireAddress(addresses.storyArchive, "addresses.storyArchive");
   const deepFamily = requireExactRecordKeys(
     terminal.deepFamily,
     "terminalGovernanceState.deepFamily",
@@ -739,6 +742,7 @@ const requireTerminalGovernanceEvidence = ({
       "owner",
       "personCommitmentVerifier",
       "protocolEndorsementFeeBps",
+      "storyArchive",
     ],
   );
   requireSameAddress(
@@ -766,6 +770,11 @@ const requireTerminalGovernanceEvidence = ({
     deepFamily.metadataArchive,
     metadataArchiveAddress,
     "terminalGovernanceState.deepFamily.metadataArchive",
+  );
+  requireSameAddress(
+    deepFamily.storyArchive,
+    storyArchiveAddress,
+    "terminalGovernanceState.deepFamily.storyArchive",
   );
   requireExact(
     requireSafeInteger(
@@ -834,6 +843,22 @@ const requireTerminalGovernanceEvidence = ({
     "terminalGovernanceState.archive.deepFamily",
   );
 
+  const storyArchive = requireExactRecordKeys(
+    terminal.storyArchive,
+    "terminalGovernanceState.storyArchive",
+    ["address", "artifactSha256", "deepFamily", "runtimeSha256"],
+  );
+  requireSameAddress(
+    storyArchive.address,
+    storyArchiveAddress,
+    "terminalGovernanceState.storyArchive.address",
+  );
+  requireSameAddress(
+    storyArchive.deepFamily,
+    deepFamilyAddress,
+    "terminalGovernanceState.storyArchive.deepFamily",
+  );
+
   const readerAddress = requireAddress(addresses.deepFamilyReader, "addresses.deepFamilyReader");
   const reader = requireExactRecordKeys(terminal.reader, "terminalGovernanceState.reader", [
     "address",
@@ -841,6 +866,7 @@ const requireTerminalGovernanceEvidence = ({
     "deepFamily",
     "metadataArchive",
     "runtimeSha256",
+    "storyArchive",
   ]);
   requireSameAddress(reader.address, readerAddress, "terminalGovernanceState.reader.address");
   requireSameAddress(
@@ -852,6 +878,11 @@ const requireTerminalGovernanceEvidence = ({
     reader.metadataArchive,
     metadataArchiveAddress,
     "terminalGovernanceState.reader.metadataArchive",
+  );
+  requireSameAddress(
+    reader.storyArchive,
+    storyArchiveAddress,
+    "terminalGovernanceState.reader.storyArchive",
   );
 
   if (!Array.isArray(terminal.proofRoutes)) {
@@ -924,9 +955,11 @@ const requireTerminalGovernanceEvidence = ({
         disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
       },
       metadataArchiveV1: { deepFamilyImmutable: archive.deepFamily },
+      storyArchiveV1: { deepFamilyImmutable: storyArchive.deepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: reader.deepFamily,
         metadataArchiveImmutable: reader.metadataArchive,
+        storyArchiveImmutable: reader.storyArchive,
       },
     },
   });
@@ -946,6 +979,12 @@ const requireTerminalGovernanceEvidence = ({
       archive,
       inspectedArtifacts?.metadataArchiveV1,
       manifestDeployments.metadataArchiveV1,
+    ],
+    [
+      "StoryArchiveV1",
+      storyArchive,
+      inspectedArtifacts?.storyArchiveV1,
+      manifestDeployments.storyArchiveV1,
     ],
     [
       "DeepFamilyReader",

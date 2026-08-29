@@ -175,14 +175,26 @@ describe("fresh-v1 contract edge regressions", function () {
       await Promise.all([originalArchive.waitForDeployment(), laterArchive.waitForDeployment()]);
       await source.setMetadataArchive(await originalArchive.getAddress());
 
+      const StoryArchive = await hre.ethers.getContractFactory("StoryArchiveV1");
+      const originalStoryArchive = await StoryArchive.deploy(sourceAddress);
+      const laterStoryArchive = await StoryArchive.deploy(sourceAddress);
+      await Promise.all([
+        originalStoryArchive.waitForDeployment(),
+        laterStoryArchive.waitForDeployment(),
+      ]);
+      await source.setStoryArchive(await originalStoryArchive.getAddress());
+
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       const reader = await Reader.deploy(sourceAddress);
       await reader.waitForDeployment();
       await source.setMetadataArchive(await laterArchive.getAddress());
+      await source.setStoryArchive(await laterStoryArchive.getAddress());
 
       expect(await source.metadataArchive()).to.equal(await laterArchive.getAddress());
+      expect(await source.storyArchive()).to.equal(await laterStoryArchive.getAddress());
       expect(await reader.DEEP_FAMILY()).to.equal(sourceAddress);
       expect(await reader.METADATA_ARCHIVE()).to.equal(await originalArchive.getAddress());
+      expect(await reader.STORY_ARCHIVE()).to.equal(await originalStoryArchive.getAddress());
     });
   });
 

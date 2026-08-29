@@ -1,14 +1,5 @@
 import { useId } from "react";
-import {
-  Check,
-  ChevronDown,
-  FileText,
-  HelpCircle,
-  Lock,
-  Plus,
-  Save,
-  X,
-} from "lucide-react";
+import { Check, ChevronDown, FileText, HelpCircle, Lock, Plus, Save, X } from "lucide-react";
 import { CopyIconButton } from "../../../shared/ui";
 import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
@@ -121,7 +112,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                 onChange={(event) => form.updateContent(event.target.value)}
                 placeholder={t(
                   "storyChunkEditor.contentPlaceholderBytes",
-                  "Enter chunk content (max 2048 bytes, approximately 2048 English characters or ~680 Chinese characters)",
+                  "Enter chunk content (max 16384 UTF-8 bytes)",
                 )}
                 className="h-[500px] w-full resize-none rounded-2xl border-0 bg-gray-50 p-6 text-base leading-relaxed text-gray-900 transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-orange-500/20 active:ring-orange-500/20 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:bg-gray-800"
                 disabled={editor.submitting}
@@ -244,11 +235,12 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                   aria-atomic="true"
                 >
                   {form.byteLength}/{form.maxBytes} bytes
-                  {form.byteLength > form.warningOrangeBytes && form.byteLength <= form.maxBytes && (
-                    <span className="ml-2 text-xs">
-                      ({form.maxBytes - form.byteLength} remaining)
-                    </span>
-                  )}
+                  {form.byteLength > form.warningOrangeBytes &&
+                    form.byteLength <= form.maxBytes && (
+                      <span className="ml-2 text-xs">
+                        ({form.maxBytes - form.byteLength} remaining)
+                      </span>
+                    )}
                   {form.byteLength > form.maxBytes && (
                     <span className="ml-2 text-xs">
                       ({form.byteLength - form.maxBytes} over limit!)
@@ -278,9 +270,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
               <button
                 onClick={form.submit}
                 disabled={
-                  editor.submitting ||
-                  !form.data.content.trim() ||
-                  form.byteLength > form.maxBytes
+                  editor.submitting || !form.data.content.trim() || form.byteLength > form.maxBytes
                 }
                 className="flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-400 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:scale-[1.02] hover:shadow-orange-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
                 type="button"

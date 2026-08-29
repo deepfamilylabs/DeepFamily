@@ -29,8 +29,8 @@ const artifactPaths = {
     "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
   DeepFamily: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
   UUPSProxy: "artifacts/contracts/proxy/UUPSProxy.sol/UUPSProxy.json",
-  MetadataArchiveV1:
-    "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json",
+  MetadataArchiveV1: "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json",
+  StoryArchiveV1: "artifacts/contracts/StoryArchiveV1.sol/StoryArchiveV1.json",
   DeepFamilyReader: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
 };
 
@@ -54,10 +54,10 @@ const constructorData = (intent, artifact) =>
   `0x${intent.data.slice(String(artifact.bytecode).length)}`;
 
 describe("eSpace Mainnet release transaction intents", function () {
-  it("reconstructs the exact eleven deployments and five calls in nonce order", async function () {
+  it("reconstructs the exact twelve deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(16);
+    expect(intents).to.have.length(18);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -133,6 +133,8 @@ describe("eSpace Mainnet release transaction intents", function () {
     expect(readerArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
     const archiveArgs = decodeConstructor("metadataArchiveV1", "MetadataArchiveV1", ["address"]);
     expect(archiveArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
+    const storyArchiveArgs = decodeConstructor("storyArchiveV1", "StoryArchiveV1", ["address"]);
+    expect(storyArchiveArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
 
     const tokenInitialize = tokenInterface.decodeFunctionData(
       "initialize",
@@ -147,6 +149,13 @@ describe("eSpace Mainnet release transaction intents", function () {
     );
     expect(byLabel.setMetadataArchive.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
     expect(setArchive[0]).to.equal(byLabel.metadataArchiveV1.predictedAddress);
+
+    const setStoryArchive = deepInterface.decodeFunctionData(
+      "setStoryArchive",
+      byLabel.setStoryArchive.data,
+    );
+    expect(byLabel.setStoryArchive.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
+    expect(setStoryArchive[0]).to.equal(byLabel.storyArchiveV1.predictedAddress);
 
     for (const [label, purpose] of [
       ["setPersonRelationVerifier", 0n],

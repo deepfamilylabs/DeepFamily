@@ -3,17 +3,16 @@
 ## DeepFamily.sol - Core Protocol Contract
 
 **Location**: `contracts/DeepFamily.sol`
-**Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and story sharding.
+**Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and the canonical Story Archive binding.
 **Upgradeability**: Deployed behind a UUPS (ERC-1967) proxy. State is wired via `initialize(...)` rather than a constructor; upgrades are gated by `_authorizeUpgrade` (`onlyOwner`, intended owner = `TimelockController`). See [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups).
 
 ### Critical Constants
 
-| Constant                   | Value | Purpose and impact                                      |
-| -------------------------- | ----- | ------------------------------------------------------- |
-| `MAX_LONG_TEXT_LENGTH`     | 256   | Maximum bytes for NFT names, places, story, and token URI |
-| `MAX_CHUNK_CONTENT_LENGTH` | 2048  | Public NFT story chunk byte limit                       |
-| `PROTOCOL_FEE_BPS_MAX`     | 2000  | Maximum protocol endorsement fee (20%)                  |
-| `FEE_BPS_DENOMINATOR`      | 10000 | Basis-point denominator                                 |
+| Constant               | Value | Purpose and impact                                        |
+| ---------------------- | ----- | --------------------------------------------------------- |
+| `MAX_LONG_TEXT_LENGTH` | 256   | Maximum bytes for NFT names, places, story, and token URI |
+| `PROTOCOL_FEE_BPS_MAX` | 2000  | Maximum protocol endorsement fee (20%)                    |
+| `FEE_BPS_DENOMINATOR`  | 10000 | Basis-point denominator                                   |
 
 ### Core Data Structures
 
@@ -64,7 +63,10 @@ identity secret, while the encrypted envelope is randomized.
 #### Proof Transport and Public Signals
 
 ```solidity
-enum ProofPurpose { PersonRelation, DisclosureBinding }
+enum ProofPurpose {
+  PersonRelation,
+  DisclosureBinding
+}
 
 struct ProofEnvelope {
   uint32 circuitId;
@@ -112,13 +114,16 @@ struct PersonSupplementInfo {
 }
 ```
 
-#### Story Sharding Structures
+#### Story Archive Structures
+
+These types are declared by `IStoryArchiveV1` and all corresponding state is owned by
+`StoryArchiveV1`, not by the upgradeable `DeepFamily` proxy.
 
 ```solidity
 struct StoryChunk {
   uint256 chunkIndex; // Chunk index (starts from 0)
   bytes32 chunkHash; // keccak256(content)
-  string content; // Chunk content (≤2048 bytes)
+  string content; // Chunk content (≤16,384 UTF-8 bytes)
   uint256 timestamp; // Creation/update timestamp
   address editor; // Last editor address
   uint8 chunkType; // Classification (0=narrative, 1=quote, ...)
@@ -126,13 +131,22 @@ struct StoryChunk {
 }
 
 struct StoryMetadata {
-  uint256 totalChunks; // Current total chunks
+  uint64 totalChunks; // Current total chunks
   bytes32 fullStoryHash; // Rolling hash keccak(previousHash, chunkIndex, chunkHash)
-  uint256 lastUpdateTime; // Last update timestamp
+  uint64 lastUpdateTime; // Last update timestamp
   bool isSealed; // Immutability flag
-  uint256 totalLength; // Total character count
+  uint64 totalLength; // Total UTF-8 byte count
 }
 ```
+
+`StoryArchiveV1` stores the compact chunk header and `StoryMetadata`; chunk content is an immutable
+STOP-prefixed data-contract runtime (`0x00 || content`). It directly validates the NFT holder by
+calling `DeepFamily.ownerOf(tokenId)` and owns the append/seal API. `DeepFamily` retains only the
+one-time canonical `storyArchive` binding. `DeepFamilyReader` provides a read-only aggregation and
+pagination facade over the Archive.
+
+The Archive accepts 1 through 16,384 UTF-8 bytes per chunk, matching the private metadata envelope
+limit. Clients may choose smaller chunks to reduce per-transaction gas.
 
 ### Core Hash Computation
 
@@ -239,6 +253,8 @@ an explicit product action, not protocol behavior.
 
 #### Story Sharding System
 
+These functions belong to `StoryArchiveV1`, not `DeepFamily`:
+
 ```solidity
 function addStoryChunk(
     uint256 tokenId,
@@ -254,6 +270,8 @@ function sealStory(uint256 tokenId) external
 **Story Management**:
 
 - Only NFT holders can append chunks
+- `StoryArchiveV1` resolves `DeepFamily.ownerOf(tokenId)` and performs every holder/input check
+- All chunk headers, rolling metadata, sealing state, and content references live in the Archive
 - Chunks must be added sequentially starting from index 0
 - Content hash validation prevents corruption
 - Optional `chunkType` classifies content (narrative/quote/etc.)
@@ -317,35 +335,35 @@ deployment rather than routing old and new versions between Archive contracts.
 
 All envelopes accepted by the current `addPersonVersion` ABI share a permanent 20-byte prefix:
 
-| Envelope offset | Bytes | Meaning checked by DeepFamily |
-| ---: | ---: | --- |
-| `0x00` | 4 | ASCII `DFM1` (`0x44464d31`) |
-| `0x04` | 1 | nonzero `formatVersion` |
-| `0x05..0x0f` | 11 | format-specific; not interpreted by DeepFamily |
-| `0x10` | 4 | nonzero big-endian `uint32` self identity-suite ID |
+| Envelope offset | Bytes | Meaning checked by DeepFamily                      |
+| --------------: | ----: | -------------------------------------------------- |
+|          `0x00` |     4 | ASCII `DFM1` (`0x44464d31`)                        |
+|          `0x04` |     1 | nonzero `formatVersion`                            |
+|    `0x05..0x0f` |    11 | format-specific; not interpreted by DeepFamily     |
+|          `0x10` |     4 | nonzero big-endian `uint32` self identity-suite ID |
 
 The current client implements format 1 with this exact layout:
 
-| Offset | Bytes | Field | Format-1 rule |
-| ---: | ---: | --- | --- |
-| `0x00` | 4 | magic | `DFM1` |
-| `0x04` | 1 | `formatVersion` | `1` |
-| `0x05` | 1 | flags | `0` |
-| `0x06` | 1 | plaintext codec | `1`, canonical JSON v1 |
-| `0x07` | 1 | compression suite | `1`, gzip-v1 |
-| `0x08` | 1 | cipher suite | `1`, AES-256-GCM |
-| `0x09` | 1 | file-KDF suite | `1`, candidate Argon2id profile |
-| `0x0a` | 2 | header length | big-endian `112` |
-| `0x0c` | 4 | content ciphertext length `N` | big-endian, `1..16,256` |
-| `0x10` | 4 | self identity-suite ID | nonzero big-endian `uint32` |
-| `0x14` | 4 | reserved | zero |
-| `0x18` | 16 | random file salt | file-KEK salt |
-| `0x28` | 12 | wrap IV | AES-GCM DEK wrapping |
-| `0x34` | 12 | content IV | AES-GCM content encryption |
-| `0x40` | 32 | wrapped DEK | ciphertext without tag |
-| `0x60` | 16 | wrapped-DEK tag | AES-GCM tag |
-| `0x70` | `N` | content ciphertext | encrypted `gzip(canonical JSON)` |
-| `0x70 + N` | 16 | content tag | AES-GCM tag |
+|     Offset | Bytes | Field                         | Format-1 rule                    |
+| ---------: | ----: | ----------------------------- | -------------------------------- |
+|     `0x00` |     4 | magic                         | `DFM1`                           |
+|     `0x04` |     1 | `formatVersion`               | `1`                              |
+|     `0x05` |     1 | flags                         | `0`                              |
+|     `0x06` |     1 | plaintext codec               | `1`, canonical JSON v1           |
+|     `0x07` |     1 | compression suite             | `1`, gzip-v1                     |
+|     `0x08` |     1 | cipher suite                  | `1`, AES-256-GCM                 |
+|     `0x09` |     1 | file-KDF suite                | `1`, candidate Argon2id profile  |
+|     `0x0a` |     2 | header length                 | big-endian `112`                 |
+|     `0x0c` |     4 | content ciphertext length `N` | big-endian, `1..16,256`          |
+|     `0x10` |     4 | self identity-suite ID        | nonzero big-endian `uint32`      |
+|     `0x14` |     4 | reserved                      | zero                             |
+|     `0x18` |    16 | random file salt              | file-KEK salt                    |
+|     `0x28` |    12 | wrap IV                       | AES-GCM DEK wrapping             |
+|     `0x34` |    12 | content IV                    | AES-GCM content encryption       |
+|     `0x40` |    32 | wrapped DEK                   | ciphertext without tag           |
+|     `0x60` |    16 | wrapped-DEK tag               | AES-GCM tag                      |
+|     `0x70` |   `N` | content ciphertext            | encrypted `gzip(canonical JSON)` |
+| `0x70 + N` |    16 | content tag                   | AES-GCM tag                      |
 
 The envelope length is exactly `128 + N`. The data-contract STOP byte precedes envelope offset
 zero, so runtime code length is `129 + N`; none of the table offsets include STOP. Archive and
@@ -453,13 +471,10 @@ event TokenURIUpdated(uint256 indexed tokenId, address indexed owner, string old
 
 event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
-event CircuitVerifierSet(
-  uint8 indexed purpose,
-  uint32 indexed circuitId,
-  address indexed adapter
-);
+event CircuitVerifierSet(uint8 indexed purpose, uint32 indexed circuitId, address indexed adapter);
 
 event MetadataArchiveSet(address indexed archive);
+event StoryArchiveSet(address indexed archive);
 ```
 
 `MetadataArchiveV1` separately emits:
@@ -473,6 +488,8 @@ event MetadataStored(
   uint32 payloadLength
 );
 ```
+
+`StoryArchiveV1` emits the Story events below and owns the complete public-story state and logic.
 
 #### Story Events
 
@@ -509,7 +526,11 @@ mapping(uint256 => PersonCoreInfo) public nftCoreInfo;                        //
 mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      // Version => NFT mapping
 mapping(uint8 => mapping(uint32 => address)) public verifierRegistry;         // purpose => circuitId => adapter
 address public metadataArchive;                                               // One-time protocol binding
+address public storyArchive;                                                  // One-time StoryArchiveV1 binding
 ```
+
+There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders` mappings in
+`DeepFamily`; those mappings are private implementation details of `StoryArchiveV1`.
 
 ### Access Control & Security
 
@@ -539,7 +560,7 @@ address public metadataArchive;                                               //
 `DeepFamily` is deployed as a **UUPS (ERC-1967) proxy**, so its logic can evolve while its address
 and state persist. The other contracts are **not**
 upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
-`MetadataArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
+`MetadataArchiveV1`, `StoryArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
 verifiers, the verifier adapter, and the libraries.
 
 ### Proxy & Initialization

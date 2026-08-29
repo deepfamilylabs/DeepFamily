@@ -29,8 +29,8 @@ function createEditor(
       expectedHash: undefined,
     },
     byteLength: 13,
-    maxBytes: 2048,
-    warningOrangeBytes: 1800,
+    maxBytes: 16_384,
+    warningOrangeBytes: 14_000,
     updateContent: vi.fn(),
     updateChunkType: vi.fn(),
     updateAttachmentCID: vi.fn(),
@@ -144,7 +144,7 @@ describe("StoryEditorMainSection", () => {
             loading: true,
           },
           form: {
-            byteLength: 3000,
+            byteLength: 17_000,
           },
         })}
       />,
@@ -154,7 +154,7 @@ describe("StoryEditorMainSection", () => {
     expect(alerts.some((alert) => alert.textContent?.includes("Failed to load story"))).toBe(true);
 
     const textarea = screen.getByPlaceholderText(/Enter chunk content/);
-    const byteStatus = screen.getByText("3000/2048 bytes");
+    const byteStatus = screen.getByText("17000/16384 bytes");
     expect(textarea.getAttribute("aria-invalid")).toBe("true");
     expect(textarea.getAttribute("aria-describedby")).toBe(byteStatus.id);
     expect(byteStatus.getAttribute("role")).toBe("alert");

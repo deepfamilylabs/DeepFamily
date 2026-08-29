@@ -191,6 +191,27 @@
         { "name": "pointer", "type": "address" },
         { "name": "payloadHash", "type": "bytes32" },
         { "name": "payloadLength", "type": "uint32" }
+      ],
+      "StoryRef": [
+        { "name": "pointer", "type": "address" },
+        { "name": "contentHash", "type": "bytes32" },
+        { "name": "contentLength", "type": "uint32" }
+      ],
+      "StoryChunk": [
+        { "name": "chunkIndex", "type": "uint256" },
+        { "name": "chunkHash", "type": "bytes32" },
+        { "name": "content", "type": "string" },
+        { "name": "timestamp", "type": "uint256" },
+        { "name": "editor", "type": "address" },
+        { "name": "chunkType", "type": "uint8" },
+        { "name": "attachmentCID", "type": "string" }
+      ],
+      "StoryMetadata": [
+        { "name": "totalChunks", "type": "uint64" },
+        { "name": "fullStoryHash", "type": "bytes32" },
+        { "name": "lastUpdateTime", "type": "uint64" },
+        { "name": "isSealed", "type": "bool" },
+        { "name": "totalLength", "type": "uint64" }
       ]
     },
     "metadataArchiveV1": {
@@ -301,6 +322,206 @@
         }
       }
     },
+    "storyArchiveV1": {
+      "abiPolicy": {
+        "nonErrorFragments": "exact-set",
+        "errorFragments": "excluded"
+      },
+      "abi": [
+        {
+          "type": "constructor",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "deepFamily", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "DEEP_FAMILY",
+          "selector": "0x4130d94c",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "MAX_CONTENT_LENGTH",
+          "selector": "0x05b746b5",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "uint256" }]
+        },
+        {
+          "type": "function",
+          "name": "MAX_ATTACHMENT_CID_LENGTH",
+          "selector": "0x43a99326",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "uint256" }]
+        },
+        {
+          "type": "function",
+          "name": "addStoryChunk",
+          "selector": "0x5a4b65d6",
+          "stateMutability": "nonpayable",
+          "inputs": [
+            { "name": "tokenId", "type": "uint256" },
+            { "name": "chunkIndex", "type": "uint256" },
+            { "name": "chunkType", "type": "uint8" },
+            { "name": "content", "type": "string" },
+            { "name": "attachmentCID", "type": "string" },
+            { "name": "expectedHash", "type": "bytes32" }
+          ],
+          "outputs": [
+            {
+              "name": "story",
+              "type": "tuple",
+              "components": [
+                { "name": "pointer", "type": "address" },
+                { "name": "contentHash", "type": "bytes32" },
+                { "name": "contentLength", "type": "uint32" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "sealStory",
+          "selector": "0x797e57e5",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "tokenId", "type": "uint256" }],
+          "outputs": [
+            {
+              "name": "metadata",
+              "type": "tuple",
+              "components": [
+                { "name": "totalChunks", "type": "uint64" },
+                { "name": "fullStoryHash", "type": "bytes32" },
+                { "name": "lastUpdateTime", "type": "uint64" },
+                { "name": "isSealed", "type": "bool" },
+                { "name": "totalLength", "type": "uint64" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "storyRef",
+          "selector": "0x2902c6ee",
+          "stateMutability": "view",
+          "inputs": [
+            { "name": "tokenId", "type": "uint256" },
+            { "name": "chunkIndex", "type": "uint256" }
+          ],
+          "outputs": [
+            {
+              "name": "story",
+              "type": "tuple",
+              "components": [
+                { "name": "pointer", "type": "address" },
+                { "name": "contentHash", "type": "bytes32" },
+                { "name": "contentLength", "type": "uint32" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "getStoryMetadata",
+          "selector": "0x7189567c",
+          "stateMutability": "view",
+          "inputs": [{ "name": "tokenId", "type": "uint256" }],
+          "outputs": [
+            {
+              "name": "metadata",
+              "type": "tuple",
+              "components": [
+                { "name": "totalChunks", "type": "uint64" },
+                { "name": "fullStoryHash", "type": "bytes32" },
+                { "name": "lastUpdateTime", "type": "uint64" },
+                { "name": "isSealed", "type": "bool" },
+                { "name": "totalLength", "type": "uint64" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "function",
+          "name": "getStoryChunk",
+          "selector": "0xf1fad067",
+          "stateMutability": "view",
+          "inputs": [
+            { "name": "tokenId", "type": "uint256" },
+            { "name": "chunkIndex", "type": "uint256" }
+          ],
+          "outputs": [
+            {
+              "name": "chunk",
+              "type": "tuple",
+              "components": [
+                { "name": "chunkIndex", "type": "uint256" },
+                { "name": "chunkHash", "type": "bytes32" },
+                { "name": "content", "type": "string" },
+                { "name": "timestamp", "type": "uint256" },
+                { "name": "editor", "type": "address" },
+                { "name": "chunkType", "type": "uint8" },
+                { "name": "attachmentCID", "type": "string" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "StoryChunkAdded",
+          "topic0": "0xc986c8203b7382f6ec9faf400a0793cbeb1612afb4dfe81fc13c1b04a310aea7",
+          "anonymous": false,
+          "inputs": [
+            { "name": "tokenId", "type": "uint256", "indexed": true },
+            { "name": "chunkIndex", "type": "uint256", "indexed": true },
+            { "name": "chunkHash", "type": "bytes32", "indexed": false },
+            { "name": "editor", "type": "address", "indexed": true },
+            { "name": "contentLength", "type": "uint256", "indexed": false },
+            { "name": "chunkType", "type": "uint8", "indexed": false },
+            { "name": "attachmentCID", "type": "string", "indexed": false }
+          ]
+        },
+        {
+          "type": "event",
+          "name": "StorySealed",
+          "topic0": "0x896066547269dcd0db6295ca6c7f14f927d692103e47c7615259469b74bc7b5d",
+          "anonymous": false,
+          "inputs": [
+            { "name": "tokenId", "type": "uint256", "indexed": true },
+            { "name": "totalChunks", "type": "uint256", "indexed": false },
+            { "name": "fullStoryHash", "type": "bytes32", "indexed": false },
+            { "name": "sealer", "type": "address", "indexed": true }
+          ]
+        }
+      ],
+      "semantics": {
+        "immutableBindings": {
+          "DEEP_FAMILY": "constructor.deepFamily"
+        },
+        "constants": {
+          "MAX_CONTENT_LENGTH": { "type": "uint256", "value": 16384 },
+          "MAX_ATTACHMENT_CID_LENGTH": { "type": "uint256", "value": 256 }
+        },
+        "writeAuthorization": "msg.sender == ownerOf(tokenId) on DEEP_FAMILY",
+        "stateOwnership": "all StoryChunk and StoryMetadata state lives in StoryArchiveV1",
+        "reference": {
+          "key": ["tokenId", "chunkIndex"],
+          "writeOnce": true,
+          "pointer": "CREATE data-contract address",
+          "contentHash": "keccak256(content)",
+          "contentLength": "content.length"
+        },
+        "dataContract": {
+          "runtimeEncoding": "0x00 || content",
+          "stopPrefix": "0x00",
+          "contentStartsAtCodeOffset": 1,
+          "stopIncludedInContentHash": false,
+          "stopIncludedInContentLength": false
+        }
+      }
+    },
     "deepFamilyReader": {
       "abiPolicy": {
         "nonErrorFragments": "declared-subset",
@@ -330,6 +551,14 @@
         },
         {
           "type": "function",
+          "name": "STORY_ARCHIVE",
+          "selector": "0x2e44f9e4",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
           "name": "getVersionMetadataRef",
           "selector": "0x72b543c4",
           "stateMutability": "view",
@@ -353,12 +582,15 @@
       "semantics": {
         "immutableBindings": {
           "DEEP_FAMILY": "constructor.deepFamily",
-          "METADATA_ARCHIVE": "DEEP_FAMILY.metadataArchive() at construction"
+          "METADATA_ARCHIVE": "DEEP_FAMILY.metadataArchive() at construction",
+          "STORY_ARCHIVE": "DEEP_FAMILY.storyArchive() at construction"
         },
         "constructorChecks": {
           "deepFamilyHasCode": true,
           "metadataArchiveHasCode": true,
-          "archiveReverseBinding": "METADATA_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY"
+          "archiveReverseBinding": "METADATA_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY",
+          "storyArchiveHasCode": true,
+          "storyArchiveReverseBinding": "STORY_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY"
         },
         "getVersionMetadataRef": {
           "versionIndexing": "one-based",
@@ -395,6 +627,29 @@
           "topic0": "0xe6554500890e112fa1991fb7f12a98c6d9af694db93a308469db58fa399e8047",
           "anonymous": false,
           "inputs": [{ "name": "archive", "type": "address", "indexed": true }]
+        },
+        {
+          "type": "function",
+          "name": "storyArchive",
+          "selector": "0x35071271",
+          "stateMutability": "view",
+          "inputs": [],
+          "outputs": [{ "name": "", "type": "address" }]
+        },
+        {
+          "type": "function",
+          "name": "setStoryArchive",
+          "selector": "0x1053f9ef",
+          "stateMutability": "nonpayable",
+          "inputs": [{ "name": "archive", "type": "address" }],
+          "outputs": []
+        },
+        {
+          "type": "event",
+          "name": "StoryArchiveSet",
+          "topic0": "0xdd45a4b94326b729fb2efc207c5c89579cc0eea24c916ac6dc62c14dc2605506",
+          "anonymous": false,
+          "inputs": [{ "name": "archive", "type": "address", "indexed": true }]
         }
       ],
       "semantics": {
@@ -403,7 +658,13 @@
         "setterAuthorization": "owner",
         "setterCallsMaximum": 1,
         "archiveHasCode": true,
-        "archiveReverseBinding": "IMetadataArchiveV1(archive).DEEP_FAMILY() == address(this)"
+        "archiveReverseBinding": "IMetadataArchiveV1(archive).DEEP_FAMILY() == address(this)",
+        "storyArchiveStorageSlots": 1,
+        "storyArchiveInitialValue": "address(0)",
+        "storyArchiveSetterAuthorization": "owner",
+        "storyArchiveSetterCallsMaximum": 1,
+        "storyArchiveHasCode": true,
+        "storyArchiveReverseBinding": "IStoryArchiveV1(archive).DEEP_FAMILY() == address(this)"
       }
     }
   },
@@ -476,10 +737,17 @@
       "artifactSha256": null,
       "runtimeSha256": null
     },
+    "storyArchiveV1": {
+      "address": null,
+      "deepFamilyImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
     "deepFamilyReader": {
       "address": null,
       "deepFamilyImmutable": null,
       "metadataArchiveImmutable": null,
+      "storyArchiveImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null
     }

@@ -64,15 +64,16 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Contracts Overview
 
-| Contract                          | Purpose                                                                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **DeepFamily.sol**                | Core protocol — ZK proof validation, endorsement governance, NFT minting, story sharding. UUPS-upgradeable behind a proxy |
-| **MetadataArchiveV1.sol**         | Immutable opaque envelope writer/index; stores each blob in a `STOP || envelope` data contract                            |
-| **DeepFamilyReader.sol**          | Aggregated/paginated read views with immutable proxy/Archive bindings and metadata refs                                    |
-| **DeepFamilyToken.sol**           | Utility token powering endorsement and incentive mechanics                                                                |
-| **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending            |
-| **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                              |
-| **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                        |
+| Contract                          | Purpose                                                                                                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **DeepFamily.sol**                | Core protocol — ZK proof validation, endorsement governance, NFT minting, and canonical Archive bindings. UUPS proxy |
+| **MetadataArchiveV1.sol**         | Immutable opaque envelope writer/index; stores each blob in a STOP-prefixed envelope data contract                   |
+| **StoryArchiveV1.sol**            | Direct NFT-holder Story API; owns chunks, metadata, sealing, and STOP-prefixed content data contracts                |
+| **DeepFamilyReader.sol**          | Aggregated/paginated read views with immutable proxy/Archive bindings and metadata refs                              |
+| **DeepFamilyToken.sol**           | Utility token powering endorsement and incentive mechanics                                                           |
+| **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending       |
+| **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                         |
+| **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                   |
 
 ## Quick Start
 

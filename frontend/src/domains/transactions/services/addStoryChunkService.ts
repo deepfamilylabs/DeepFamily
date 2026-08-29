@@ -1,5 +1,9 @@
 import { ethers, type JsonRpcSigner } from "ethers";
-import { createDeepFamilyContract, createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
+import {
+  createDeepFamilyContract,
+  createStoryArchiveContract,
+  createStoryArchiveInterface,
+} from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
 import type { StoryChunk } from "../../../shared/model";
@@ -33,9 +37,13 @@ export async function addStoryChunkService(
   chunkType = 0,
   attachmentCID = "",
 ): Promise<AddStoryChunkResult> {
-  const contract = createDeepFamilyContract(contractAddress, signer);
+  const deepFamily = createDeepFamilyContract(contractAddress, signer);
+  let errorContract = deepFamily;
 
   try {
+    const storyArchiveAddress = await deepFamily.storyArchive();
+    const contract = createStoryArchiveContract(storyArchiveAddress, signer);
+    errorContract = contract;
     const tx = await contract.addStoryChunk(
       tokenId,
       chunkIndex,
@@ -45,8 +53,8 @@ export async function addStoryChunkService(
       expectedHash || ethers.ZeroHash,
     );
     const receipt = await waitForTransactionReceipt(tx);
-    const eventInterface = createDeepFamilyInterface();
-    const storyEvent = parseReceiptEvents(receipt, eventInterface, contractAddress).find(
+    const eventInterface = createStoryArchiveInterface();
+    const storyEvent = parseReceiptEvents(receipt, eventInterface, storyArchiveAddress).find(
       (event) => event.name === "StoryChunkAdded",
     );
 
@@ -74,7 +82,7 @@ export async function addStoryChunkService(
 
     return {
       chunkIndex: newChunk.chunkIndex,
-      contentLength: chunkAdded?.contentLength ?? content.length,
+      contentLength: chunkAdded?.contentLength ?? ethers.toUtf8Bytes(content).length,
       transactionHash: tx.hash,
       blockNumber: receipt.blockNumber,
       newChunk,
@@ -83,6 +91,6 @@ export async function addStoryChunkService(
       },
     };
   } catch (error: any) {
-    throw normalizeStoryTxError(error, contract);
+    throw normalizeStoryTxError(error, errorContract);
   }
 }

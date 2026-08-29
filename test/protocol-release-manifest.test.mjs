@@ -38,10 +38,12 @@ const HASHES = Object.freeze({
   adapterRuntime: hash("e"),
   archiveArtifact: hash("f"),
   archiveRuntime: hash("1"),
-  readerArtifact: hash("2"),
-  readerRuntime: hash("3"),
-  zkManifest: hash("4"),
-  zkTranscript: hash("5"),
+  storyArchiveArtifact: hash("2"),
+  storyArchiveRuntime: hash("3"),
+  readerArtifact: hash("4"),
+  readerRuntime: hash("5"),
+  zkManifest: hash("6"),
+  zkTranscript: hash("7"),
 });
 
 const ADDRESSES = Object.freeze({
@@ -51,7 +53,8 @@ const ADDRESSES = Object.freeze({
   disclosureVerifier: address(4),
   adapter: address(5),
   archive: address(6),
-  reader: address(7),
+  storyArchive: address(7),
+  reader: address(8),
 });
 
 const writeCanonicalJson = (filePath, value) => {
@@ -256,10 +259,17 @@ const createProductionFixture = () => {
       artifactSha256: HASHES.archiveArtifact,
       runtimeSha256: HASHES.archiveRuntime,
     },
+    storyArchiveV1: {
+      address: ADDRESSES.storyArchive,
+      deepFamilyImmutable: ADDRESSES.proxy,
+      artifactSha256: HASHES.storyArchiveArtifact,
+      runtimeSha256: HASHES.storyArchiveRuntime,
+    },
     deepFamilyReader: {
       address: ADDRESSES.reader,
       deepFamilyImmutable: ADDRESSES.proxy,
       metadataArchiveImmutable: ADDRESSES.archive,
+      storyArchiveImmutable: ADDRESSES.storyArchive,
       artifactSha256: HASHES.readerArtifact,
       runtimeSha256: HASHES.readerRuntime,
     },
@@ -432,6 +442,10 @@ const createProductionFixture = () => {
       artifactSha256: HASHES.archiveArtifact,
       runtimeSha256: HASHES.archiveRuntime,
     },
+    storyArchiveV1: {
+      artifactSha256: HASHES.storyArchiveArtifact,
+      runtimeSha256: HASHES.storyArchiveRuntime,
+    },
     deepFamilyReader: {
       artifactSha256: HASHES.readerArtifact,
       runtimeSha256: HASHES.readerRuntime,
@@ -504,6 +518,7 @@ const acceptanceReportForManifest = (manifest) => ({
       address: manifest.deployments.deepFamilyProxy,
       implementation: manifest.deployments.deepFamilyImplementation,
       metadataArchive: manifest.deployments.metadataArchiveV1.address,
+      storyArchive: manifest.deployments.storyArchiveV1.address,
     },
     verifierAdapter: {
       address: manifest.deployments.groth16VerifierAdapter.address,
@@ -519,10 +534,17 @@ const acceptanceReportForManifest = (manifest) => ({
       artifactSha256: manifest.deployments.metadataArchiveV1.artifactSha256,
       runtimeSha256: manifest.deployments.metadataArchiveV1.runtimeSha256,
     },
+    storyArchive: {
+      address: manifest.deployments.storyArchiveV1.address,
+      deepFamily: manifest.deployments.storyArchiveV1.deepFamilyImmutable,
+      artifactSha256: manifest.deployments.storyArchiveV1.artifactSha256,
+      runtimeSha256: manifest.deployments.storyArchiveV1.runtimeSha256,
+    },
     reader: {
       address: manifest.deployments.deepFamilyReader.address,
       deepFamily: manifest.deployments.deepFamilyReader.deepFamilyImmutable,
       metadataArchive: manifest.deployments.deepFamilyReader.metadataArchiveImmutable,
+      storyArchive: manifest.deployments.deepFamilyReader.storyArchiveImmutable,
       artifactSha256: manifest.deployments.deepFamilyReader.artifactSha256,
       runtimeSha256: manifest.deployments.deepFamilyReader.runtimeSha256,
     },
@@ -548,8 +570,9 @@ describe("protocol release manifest", function () {
     assert.match(evidence.manifestSha256, /^[0-9a-f]{64}$/);
     assert.equal(interfaceEvidence.status, "passed");
     assert.equal(interfaceEvidence.contracts.metadataArchiveV1.checkedFragments, 6);
-    assert.equal(interfaceEvidence.contracts.deepFamilyReader.checkedFragments, 4);
-    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 3);
+    assert.equal(interfaceEvidence.contracts.storyArchiveV1.checkedFragments, 11);
+    assert.equal(interfaceEvidence.contracts.deepFamilyReader.checkedFragments, 5);
+    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 6);
     assert.equal(
       interfaceEvidence.contracts.metadataArchiveV1.abiPolicy.nonErrorFragments,
       "exact-set",
@@ -567,6 +590,9 @@ describe("protocol release manifest", function () {
       "excluded",
     );
     assert.equal(interfaceEvidence.contracts.metadataArchiveV1.artifactNonErrorFragments, 6);
+    assert.equal(interfaceEvidence.contracts.storyArchiveV1.artifactNonErrorFragments, 11);
+    assert.equal(interfaceEvidence.contracts.storyArchiveV1.selectors.addStoryChunk, "0x5a4b65d6");
+    assert.equal(interfaceEvidence.contracts.storyArchiveV1.selectors.sealStory, "0x797e57e5");
     assert.equal(interfaceEvidence.contracts.metadataArchiveV1.selectors.store, "0xd02205d7");
     assert.equal(
       interfaceEvidence.contracts.metadataArchiveV1.eventTopics.MetadataStored,
@@ -577,6 +603,7 @@ describe("protocol release manifest", function () {
       "0x72b543c4",
     );
     assert.equal(interfaceEvidence.contracts.deepFamily.selectors.setMetadataArchive, "0x7ed53f66");
+    assert.equal(interfaceEvidence.contracts.deepFamily.selectors.setStoryArchive, "0x1053f9ef");
     assert.equal(evidence.manifest.proofRoutes[0].publicSignals.length, 5);
     assert.equal(evidence.manifest.proofRoutes[1].publicSignals.length, 4);
     assert.equal(

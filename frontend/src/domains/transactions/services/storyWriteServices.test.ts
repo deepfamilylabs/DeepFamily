@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { addStoryChunkService } from "./addStoryChunkService";
 import { sealStoryService } from "./sealStoryService";
-import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
+import { createStoryArchiveInterface } from "../../../shared/clients/contractFactory";
 
-const { createDeepFamilyContractMock } = vi.hoisted(() => ({
+const { createDeepFamilyContractMock, createStoryArchiveContractMock } = vi.hoisted(() => ({
   createDeepFamilyContractMock: vi.fn(),
+  createStoryArchiveContractMock: vi.fn(),
 }));
 
 vi.mock("../../../shared/clients/contractFactory", async () => {
@@ -14,6 +15,7 @@ vi.mock("../../../shared/clients/contractFactory", async () => {
   return {
     ...actual,
     createDeepFamilyContract: createDeepFamilyContractMock,
+    createStoryArchiveContract: createStoryArchiveContractMock,
   };
 });
 
@@ -36,6 +38,7 @@ const createDeferred = <T>(): Deferred<T> => {
 describe("storyWriteServices", () => {
   beforeEach(() => {
     createDeepFamilyContractMock.mockReset();
+    createStoryArchiveContractMock.mockReset();
   });
 
   it("does not locally timeout while waiting for wallet confirmation", async () => {
@@ -48,6 +51,9 @@ describe("storyWriteServices", () => {
 
     const deferredTx = createDeferred<typeof tx>();
     createDeepFamilyContractMock.mockReturnValue({
+      storyArchive: vi.fn().mockResolvedValue("0x0000000000000000000000000000000000000abc"),
+    });
+    createStoryArchiveContractMock.mockReturnValue({
       addStoryChunk: vi.fn(() => deferredTx.promise),
     });
 
@@ -79,7 +85,7 @@ describe("storyWriteServices", () => {
   });
 
   it("parses story events from the mined receipt", async () => {
-    const eventInterface = createDeepFamilyInterface();
+    const eventInterface = createStoryArchiveInterface();
     const chunkEvent = eventInterface.getEvent("StoryChunkAdded");
     const sealEvent = eventInterface.getEvent("StorySealed");
     if (!chunkEvent || !sealEvent) {
@@ -103,7 +109,7 @@ describe("storyWriteServices", () => {
       "0x00000000000000000000000000000000000000bb",
     ]);
 
-    const contract = {
+    const archive = {
       addStoryChunk: vi.fn(async () => ({
         hash: "0xchunk",
         wait: vi.fn(async () => ({
@@ -118,12 +124,11 @@ describe("storyWriteServices", () => {
           logs: [{ address: contractAddress, topics: sealLog.topics, data: sealLog.data }],
         })),
       })),
-      storyMetadata: vi.fn(async () => ({
-        totalChunks: 3n,
-        fullStoryHash: "0x" + "22".repeat(32),
-      })),
     };
-    createDeepFamilyContractMock.mockReturnValue(contract);
+    createDeepFamilyContractMock.mockReturnValue({
+      storyArchive: vi.fn(async () => contractAddress),
+    });
+    createStoryArchiveContractMock.mockReturnValue(archive);
 
     const signer = {
       getAddress: vi.fn().mockResolvedValue("0x00000000000000000000000000000000000000bb"),
@@ -146,7 +151,7 @@ describe("storyWriteServices", () => {
     expect(addResult.newChunk.chunkType).toBe(2);
 
     const sealResult = await sealStoryService(signer as any, contractAddress, "1");
-    expect(contract.sealStory).toHaveBeenCalledWith("1");
+    expect(archive.sealStory).toHaveBeenCalledWith("1");
     expect(sealResult.events.StorySealed?.totalChunks).toBe(3);
     expect(sealResult.fullStoryHash).toBe("0x" + "22".repeat(32));
   });

@@ -337,16 +337,16 @@ const refreshExistingDeployment = async (
   connection,
   artifacts,
   ethers,
-  { contractName, contract, isProxy = false },
+  { contractName, contract, isProxy = false, extra = {} },
 ) => {
   const artifact = await artifacts.readArtifact(contractName);
   const address = await contract.getAddress();
-  const extra = {};
+  const refreshedExtra = { ...extra };
   if (isProxy) {
     const raw = await ethers.provider.getStorage(address, ERC1967_IMPLEMENTATION_SLOT);
-    extra.implementationAddress = ethers.getAddress(ethers.dataSlice(raw, 12));
+    refreshedExtra.implementationAddress = ethers.getAddress(ethers.dataSlice(raw, 12));
   }
-  await writeDeployment(connection, contractName, address, artifact.abi, extra);
+  await writeDeployment(connection, contractName, address, artifact.abi, refreshedExtra);
 };
 
 const assertExistingIntegratedWiring = async ({
@@ -354,12 +354,14 @@ const assertExistingIntegratedWiring = async ({
   deepFamily,
   token,
   metadataArchive,
+  storyArchive,
   deepFamilyReader,
   expectedGroth16Adapter,
 }) => {
   const deepFamilyAddress = await deepFamily.getAddress();
   const tokenAddress = await token.getAddress();
-  const archiveAddress = await metadataArchive.getAddress();
+  const metadataArchiveAddress = await metadataArchive.getAddress();
+  const storyArchiveAddress = await storyArchive.getAddress();
 
   const readerMain = await deepFamilyReader.DEEP_FAMILY();
   if (!sameAddress(readerMain, deepFamilyAddress)) {
@@ -374,14 +376,31 @@ const assertExistingIntegratedWiring = async ({
     deepFamilyReader.METADATA_ARCHIVE(),
   ]);
   if (
-    !sameAddress(configuredArchive, archiveAddress) ||
+    !sameAddress(configuredArchive, metadataArchiveAddress) ||
     !sameAddress(archiveMain, deepFamilyAddress) ||
-    !sameAddress(readerArchive, archiveAddress)
+    !sameAddress(readerArchive, metadataArchiveAddress)
   ) {
     throw new Error(
       `Deployment wiring mismatch: DeepFamily archive=${configuredArchive}, ` +
         `archive.DEEP_FAMILY=${archiveMain}, reader archive=${readerArchive}; expected ` +
-        `${archiveAddress}/${deepFamilyAddress}/${archiveAddress}`,
+        `${metadataArchiveAddress}/${deepFamilyAddress}/${metadataArchiveAddress}`,
+    );
+  }
+
+  const [configuredStoryArchive, storyArchiveMain, readerStoryArchive] = await Promise.all([
+    deepFamily.storyArchive(),
+    storyArchive.DEEP_FAMILY(),
+    deepFamilyReader.STORY_ARCHIVE(),
+  ]);
+  if (
+    !sameAddress(configuredStoryArchive, storyArchiveAddress) ||
+    !sameAddress(storyArchiveMain, deepFamilyAddress) ||
+    !sameAddress(readerStoryArchive, storyArchiveAddress)
+  ) {
+    throw new Error(
+      `Deployment wiring mismatch: DeepFamily story archive=${configuredStoryArchive}, ` +
+        `story archive.DEEP_FAMILY=${storyArchiveMain}, reader story archive=${readerStoryArchive}; ` +
+        `expected ${storyArchiveAddress}/${deepFamilyAddress}/${storyArchiveAddress}`,
     );
   }
 
@@ -660,6 +679,28 @@ export const deployIntegratedSystem = async (
     );
   }
 
+  const StoryArchiveV1 = await ethers.getContractFactory("StoryArchiveV1", deployer);
+  const storyArchive = await deployContract("storyArchiveV1", StoryArchiveV1, [deepFamilyAddress]);
+  const storyArchiveAddress = await storyArchive.getAddress();
+
+  await executeTransaction(
+    "setStoryArchive",
+    await deepFamily.setStoryArchive.populateTransaction(storyArchiveAddress),
+  );
+  const [configuredStoryArchive, storyArchiveMain] = await Promise.all([
+    deepFamily.storyArchive(),
+    storyArchive.DEEP_FAMILY(),
+  ]);
+  if (
+    !sameAddress(configuredStoryArchive, storyArchiveAddress) ||
+    !sameAddress(storyArchiveMain, deepFamilyAddress)
+  ) {
+    throw new Error(
+      `StoryArchiveV1 binding invariant failed: DeepFamily archive=${configuredStoryArchive}, ` +
+        `archive.DEEP_FAMILY=${storyArchiveMain}; expected ${storyArchiveAddress}/${deepFamilyAddress}`,
+    );
+  }
+
   const DeepFamilyReader = await ethers.getContractFactory("DeepFamilyReader", deployer);
   const deepFamilyReader = await deployContract("deepFamilyReader", DeepFamilyReader, [
     deepFamilyAddress,
@@ -731,6 +772,7 @@ export const deployIntegratedSystem = async (
     const tokenArtifact = await artifacts.readArtifact("DeepFamilyToken");
     const deepArtifact = await artifacts.readArtifact("DeepFamily");
     const metadataArchiveArtifact = await artifacts.readArtifact("MetadataArchiveV1");
+    const storyArchiveArtifact = await artifacts.readArtifact("StoryArchiveV1");
     const readerArtifact = await artifacts.readArtifact("DeepFamilyReader");
     const poseidonT5Artifact = await artifacts.readArtifact("PoseidonT5");
     const adultAgeGateArtifact = await artifacts.readArtifact("AdultAgeGate");
@@ -806,6 +848,14 @@ export const deployIntegratedSystem = async (
     );
     await writeDeployment(
       connection,
+      "StoryArchiveV1",
+      storyArchiveAddress,
+      storyArchiveArtifact.abi,
+      { deepFamilyAddress },
+      deploymentDirectory,
+    );
+    await writeDeployment(
+      connection,
       "DeepFamilyReader",
       deepFamilyReaderAddress,
       readerArtifact.abi,
@@ -824,6 +874,7 @@ export const deployIntegratedSystem = async (
     groth16VerifierAdapter,
     deepFamily,
     metadataArchive,
+    storyArchive,
     deepFamilyReader,
     deepFamilyImplementationAddress,
     transactionReceipts,
@@ -836,7 +887,12 @@ export const ensureIntegratedSystem = async (
 ) => {
   assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
-  if (connection.__deepfamilyIntegrated?.deepFamily) return connection.__deepfamilyIntegrated;
+  if (
+    connection.__deepfamilyIntegrated?.deepFamily &&
+    connection.__deepfamilyIntegrated?.storyArchive
+  ) {
+    return connection.__deepfamilyIntegrated;
+  }
 
   const { ethers } = connection;
   const [defaultSigner] = await ethers.getSigners();
@@ -855,6 +911,7 @@ export const ensureIntegratedSystem = async (
   const existingDeep = await safeReadDeployment(connection, "DeepFamily");
   const existingToken = await safeReadDeployment(connection, "DeepFamilyToken");
   const existingMetadataArchive = await safeReadDeployment(connection, "MetadataArchiveV1");
+  const existingStoryArchive = await safeReadDeployment(connection, "StoryArchiveV1");
   const existingReader = await safeReadDeployment(connection, "DeepFamilyReader");
   const existingGroth16Adapter = await safeReadDeployment(connection, "Groth16VerifierAdapter");
   const existingPoseidonT5 = await safeReadDeployment(connection, "PoseidonT5");
@@ -868,6 +925,7 @@ export const ensureIntegratedSystem = async (
     ["DeepFamily", existingDeep],
     ["DeepFamilyToken", existingToken],
     ["MetadataArchiveV1", existingMetadataArchive],
+    ["StoryArchiveV1", existingStoryArchive],
     ["DeepFamilyReader", existingReader],
     ["Groth16VerifierAdapter", existingGroth16Adapter],
     ["PoseidonT5", existingPoseidonT5],
@@ -882,6 +940,7 @@ export const ensureIntegratedSystem = async (
     existingDeep?.address &&
     existingToken?.address &&
     existingMetadataArchive?.address &&
+    existingStoryArchive?.address &&
     existingReader?.address;
 
   if (recordedNames.length === 0 && !isLocalDevNetwork(connection)) {
@@ -912,6 +971,7 @@ export const ensureIntegratedSystem = async (
         ["DeepFamily", existingDeep],
         ["DeepFamilyToken", existingToken],
         ["MetadataArchiveV1", existingMetadataArchive],
+        ["StoryArchiveV1", existingStoryArchive],
         ["DeepFamilyReader", existingReader],
       ]);
 
@@ -922,6 +982,7 @@ export const ensureIntegratedSystem = async (
       if (currentArtifacts?.readArtifact) {
         const artifactBoundDeployments = [
           ["MetadataArchiveV1", existingMetadataArchive],
+          ["StoryArchiveV1", existingStoryArchive],
           ["PoseidonT5", existingPoseidonT5],
           ["AdultAgeGate", existingAdultAgeGate],
           ["PersonCommitmentVerifier", existingPersonVerifier],
@@ -990,6 +1051,11 @@ export const ensureIntegratedSystem = async (
         existingMetadataArchive.address,
         defaultSigner,
       );
+      const storyArchive = await ethers.getContractAt(
+        "StoryArchiveV1",
+        existingStoryArchive.address,
+        defaultSigner,
+      );
       const deepFamilyReader = await ethers.getContractAt(
         "DeepFamilyReader",
         existingReader.address,
@@ -1000,6 +1066,7 @@ export const ensureIntegratedSystem = async (
         deepFamily,
         token,
         metadataArchive,
+        storyArchive,
         deepFamilyReader,
         expectedGroth16Adapter: existingGroth16Adapter,
       });
@@ -1016,7 +1083,16 @@ export const ensureIntegratedSystem = async (
         const refreshTargets = [
           { contractName: "DeepFamily", contract: deepFamily, isProxy: true },
           { contractName: "DeepFamilyToken", contract: token },
-          { contractName: "MetadataArchiveV1", contract: metadataArchive },
+          {
+            contractName: "MetadataArchiveV1",
+            contract: metadataArchive,
+            extra: { deepFamilyAddress: await deepFamily.getAddress() },
+          },
+          {
+            contractName: "StoryArchiveV1",
+            contract: storyArchive,
+            extra: { deepFamilyAddress: await deepFamily.getAddress() },
+          },
           { contractName: "DeepFamilyReader", contract: deepFamilyReader },
         ];
         if (existingGroth16Adapter?.address) {
@@ -1038,6 +1114,7 @@ export const ensureIntegratedSystem = async (
         deepFamily,
         token,
         metadataArchive,
+        storyArchive,
         deepFamilyReader,
       };
       return connection.__deepfamilyIntegrated;
@@ -1063,6 +1140,7 @@ export const ensureIntegratedSystem = async (
     deepFamily: deployed.deepFamily,
     token: deployed.token,
     metadataArchive: deployed.metadataArchive,
+    storyArchive: deployed.storyArchive,
     deepFamilyReader: deployed.deepFamilyReader,
   };
   return connection.__deepfamilyIntegrated;

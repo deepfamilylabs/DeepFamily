@@ -188,6 +188,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
   addresses,
   deepFamily,
   metadataArchive,
+  storyArchive,
   deepFamilyReader,
   groth16VerifierAdapter,
 }) => {
@@ -196,8 +197,11 @@ const readTerminalProtocolDeploymentEvidence = async ({
     adapterPersonVerifier,
     adapterDisclosureBindingVerifier,
     archiveDeepFamily,
+    deepFamilyStoryArchive,
+    storyArchiveDeepFamily,
     readerDeepFamily,
     readerMetadataArchive,
+    readerStoryArchive,
   ] = await Promise.all([
     terminalRead("terminal DeepFamily metadata archive", () => deepFamily.metadataArchive()),
     terminalRead("terminal adapter person verifier", () => groth16VerifierAdapter.personVerifier()),
@@ -205,8 +209,11 @@ const readTerminalProtocolDeploymentEvidence = async ({
       groth16VerifierAdapter.disclosureBindingVerifier(),
     ),
     terminalRead("terminal archive DeepFamily binding", () => metadataArchive.DEEP_FAMILY()),
+    terminalRead("terminal DeepFamily story archive", () => deepFamily.storyArchive()),
+    terminalRead("terminal story archive DeepFamily binding", () => storyArchive.DEEP_FAMILY()),
     terminalRead("terminal reader DeepFamily binding", () => deepFamilyReader.DEEP_FAMILY()),
     terminalRead("terminal reader archive binding", () => deepFamilyReader.METADATA_ARCHIVE()),
+    terminalRead("terminal reader story archive binding", () => deepFamilyReader.STORY_ARCHIVE()),
   ]);
 
   assertCondition(
@@ -215,6 +222,12 @@ const readTerminalProtocolDeploymentEvidence = async ({
       sameAddress(ethers, readerDeepFamily, addresses.deepFamily) &&
       sameAddress(ethers, readerMetadataArchive, addresses.metadataArchive),
     "Terminal metadata archive bindings do not match the deployed protocol",
+  );
+  assertCondition(
+    sameAddress(ethers, deepFamilyStoryArchive, addresses.storyArchive) &&
+      sameAddress(ethers, storyArchiveDeepFamily, addresses.deepFamily) &&
+      sameAddress(ethers, readerStoryArchive, addresses.storyArchive),
+    "Terminal story archive bindings do not match the deployed protocol",
   );
   assertCondition(
     sameAddress(ethers, adapterPersonVerifier, addresses.personCommitmentVerifier) &&
@@ -230,9 +243,11 @@ const readTerminalProtocolDeploymentEvidence = async ({
         disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
       },
       metadataArchiveV1: { deepFamilyImmutable: archiveDeepFamily },
+      storyArchiveV1: { deepFamilyImmutable: storyArchiveDeepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: readerDeepFamily,
         metadataArchiveImmutable: readerMetadataArchive,
+        storyArchiveImmutable: readerStoryArchive,
       },
     },
   });
@@ -243,6 +258,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
       deploymentArtifacts.groth16VerifierAdapter,
     ],
     ["MetadataArchiveV1", addresses.metadataArchive, deploymentArtifacts.metadataArchiveV1],
+    ["StoryArchiveV1", addresses.storyArchive, deploymentArtifacts.storyArchiveV1],
     ["DeepFamilyReader", addresses.deepFamilyReader, deploymentArtifacts.deepFamilyReader],
   ];
   for (const [label, address, artifact] of runtimeContracts) {
@@ -261,6 +277,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
 
   return {
     deepFamilyArchive,
+    deepFamilyStoryArchive,
     verifierAdapter: {
       address: addresses.groth16VerifierAdapter,
       personVerifier: adapterPersonVerifier,
@@ -274,10 +291,17 @@ const readTerminalProtocolDeploymentEvidence = async ({
       artifactSha256: deploymentArtifacts.metadataArchiveV1.artifactSha256,
       runtimeSha256: deploymentArtifacts.metadataArchiveV1.runtimeSha256,
     },
+    storyArchive: {
+      address: addresses.storyArchive,
+      deepFamily: storyArchiveDeepFamily,
+      artifactSha256: deploymentArtifacts.storyArchiveV1.artifactSha256,
+      runtimeSha256: deploymentArtifacts.storyArchiveV1.runtimeSha256,
+    },
     reader: {
       address: addresses.deepFamilyReader,
       deepFamily: readerDeepFamily,
       metadataArchive: readerMetadataArchive,
+      storyArchive: readerStoryArchive,
       artifactSha256: deploymentArtifacts.deepFamilyReader.artifactSha256,
       runtimeSha256: deploymentArtifacts.deepFamilyReader.runtimeSha256,
     },
@@ -320,6 +344,11 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       "MetadataArchiveV1",
       terminalProjection.contracts.metadataArchiveV1,
       manifest.deployments?.metadataArchiveV1,
+    ],
+    [
+      "StoryArchiveV1",
+      terminalProjection.contracts.storyArchiveV1,
+      manifest.deployments?.storyArchiveV1,
     ],
     [
       "DeepFamilyReader",
@@ -1646,6 +1675,7 @@ export const main = async (chainProfile) => {
       groth16VerifierAdapter,
       deepFamily,
       metadataArchive,
+      storyArchive,
       deepFamilyReader,
       deepFamilyImplementationAddress,
       transactionReceipts,
@@ -1660,6 +1690,7 @@ export const main = async (chainProfile) => {
       deepFamily: await deepFamily.getAddress(),
       deepFamilyImplementation: deepFamilyImplementationAddress,
       metadataArchive: await metadataArchive.getAddress(),
+      storyArchive: await storyArchive.getAddress(),
       deepFamilyReader: await deepFamilyReader.getAddress(),
     };
     Object.assign(report.addresses, addresses);
@@ -1673,6 +1704,7 @@ export const main = async (chainProfile) => {
       Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
       DeepFamily: addresses.deepFamily,
       MetadataArchiveV1: addresses.metadataArchive,
+      StoryArchiveV1: addresses.storyArchive,
       DeepFamilyReader: addresses.deepFamilyReader,
     };
     for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
@@ -1734,6 +1766,12 @@ export const main = async (chainProfile) => {
         (await metadataArchive.DEEP_FAMILY()) === addresses.deepFamily &&
         (await deepFamilyReader.METADATA_ARCHIVE()) === addresses.metadataArchive,
       "Metadata Archive reverse binding mismatch",
+    );
+    assertCondition(
+      (await deepFamily.storyArchive()) === addresses.storyArchive &&
+        (await storyArchive.DEEP_FAMILY()) === addresses.deepFamily &&
+        (await deepFamilyReader.STORY_ARCHIVE()) === addresses.storyArchive,
+      "Story Archive reverse binding mismatch",
     );
     assertCondition(
       (await deepFamily.verifierRegistry(
@@ -1823,6 +1861,9 @@ export const main = async (chainProfile) => {
         proxyInitData,
       ]),
       await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchive, [
+        addresses.deepFamily,
+      ]),
+      await verificationEntry(hre.artifacts, "StoryArchiveV1", addresses.storyArchive, [
         addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
@@ -2280,19 +2321,19 @@ export const main = async (chainProfile) => {
     const storyHash = ethers.keccak256(ethers.toUtf8Bytes(storyContent));
     await recordTx(
       "story-add-chunk",
-      await deepFamily
+      await storyArchive
         .connect(runDeployer)
         .addStoryChunk(tokenId, 0, 0, storyContent, "", storyHash),
     );
     const storyChunk = await deepFamilyReader.getStoryChunk(tokenId, 0);
     assertCondition(storyChunk.content === storyContent, "Reader returned different story content");
     assertCondition(storyChunk.chunkHash === storyHash, "Reader returned different story hash");
-    await recordTx("story-seal", await deepFamily.connect(runDeployer).sealStory(tokenId));
+    await recordTx("story-seal", await storyArchive.connect(runDeployer).sealStory(tokenId));
     const storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
     assertCondition(storyMetadata.isSealed, "Story is not sealed");
     await expectRevert(
       () =>
-        deepFamily
+        storyArchive
           .connect(runDeployer)
           .addStoryChunk.staticCall(tokenId, 1, 0, "after seal", "", ethers.ZeroHash),
       "Writing a sealed story",
@@ -3195,6 +3236,7 @@ export const main = async (chainProfile) => {
       addresses,
       deepFamily,
       metadataArchive,
+      storyArchive,
       deepFamilyReader,
       groth16VerifierAdapter,
     });
@@ -3363,6 +3405,7 @@ export const main = async (chainProfile) => {
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
           metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
+          storyArchive: terminalProtocolDeployment.deepFamilyStoryArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           governedPersonRelationVerifier: terminalGovernedPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
@@ -3376,6 +3419,7 @@ export const main = async (chainProfile) => {
         },
         verifierAdapter: terminalProtocolDeployment.verifierAdapter,
         archive: terminalProtocolDeployment.archive,
+        storyArchive: terminalProtocolDeployment.storyArchive,
         reader: terminalProtocolDeployment.reader,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
@@ -3478,6 +3522,7 @@ export const main = async (chainProfile) => {
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
           metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
+          storyArchive: terminalProtocolDeployment.deepFamilyStoryArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
           protocolEndorsementFeeBps: terminalProtocolFee,
@@ -3494,6 +3539,7 @@ export const main = async (chainProfile) => {
         },
         verifierAdapter: terminalProtocolDeployment.verifierAdapter,
         archive: terminalProtocolDeployment.archive,
+        storyArchive: terminalProtocolDeployment.storyArchive,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
       };
     }

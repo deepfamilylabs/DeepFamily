@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 import DeepFamily from "../../abi/DeepFamily.json";
 import MetadataArchiveV1 from "../../abi/MetadataArchiveV1.json";
+import StoryArchiveV1 from "../../abi/StoryArchiveV1.json";
 import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
 
 export const DEEP_TOKEN_ABI = [
@@ -41,6 +42,17 @@ export function createMetadataArchiveContract(
   return new ethers.Contract(archiveAddress, MetadataArchiveV1.abi, runner);
 }
 
+export function createStoryArchiveContract(
+  archiveAddress: string,
+  runner: ethers.ContractRunner,
+): ethers.Contract {
+  return new ethers.Contract(archiveAddress, StoryArchiveV1.abi, runner);
+}
+
 export function createDeepFamilyInterface(): ethers.Interface {
   return new ethers.Interface(DeepFamily.abi);
+}
+
+export function createStoryArchiveInterface(): ethers.Interface {
+  return new ethers.Interface(StoryArchiveV1.abi);
 }
