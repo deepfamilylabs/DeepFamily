@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
+import {IStoryArchiveV1} from "./interfaces/IStoryArchiveV1.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -45,7 +46,6 @@ contract DeepFamily is
   error InvalidMotherVersionIndex();
   error InvalidVersionIndex();
   error InvalidFullName();
-  error InvalidCIDLength();
   error InvalidBirthPlace();
   error InvalidDeathPlace();
   error InvalidDeathMonth();
@@ -78,6 +78,8 @@ contract DeepFamily is
   error InvalidMetadataEnvelope();
   error InvalidEnvelopePrefix();
   error InvalidIdentitySuite();
+  error InvalidStoryArchive();
+  error StoryArchiveAlreadySet();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -94,12 +96,6 @@ contract DeepFamily is
   error PageSizeExceedsLimit();
   error DirectNativeCurrencyNotAccepted();
 
-  // Story sharding related errors
-  error StoryAlreadySealed();
-  error ChunkIndexOutOfRange();
-  error InvalidChunkContent();
-  error ChunkHashMismatch();
-  error StoryNotFound();
   error MustBeNFTHolder();
 
   /**
@@ -174,24 +170,6 @@ contract DeepFamily is
     uint256 childVersionIndex;
   }
 
-  struct StoryChunk {
-    uint256 chunkIndex;
-    bytes32 chunkHash;
-    string content;
-    uint256 timestamp;
-    address editor;
-    uint8 chunkType;
-    string attachmentCID;
-  }
-
-  struct StoryMetadata {
-    uint256 totalChunks;
-    bytes32 fullStoryHash;
-    uint256 lastUpdateTime;
-    bool isSealed;
-    uint256 totalLength;
-  }
-
   // ========== Core Storage Mappings ==========
 
   mapping(bytes32 => PersonVersion[]) public personVersions;
@@ -209,10 +187,9 @@ contract DeepFamily is
   mapping(uint256 => string[]) public tokenURIHistory;
   mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;
 
-  // ========== Story Sharding Storage Mappings ==========
+  // ========== Story Archive Binding ==========
 
-  mapping(uint256 => StoryMetadata) public storyMetadata;
-  mapping(uint256 => mapping(uint256 => StoryChunk)) public storyChunks;
+  address public storyArchive;
 
   // ========== Statistics Mappings ==========
 
@@ -226,7 +203,6 @@ contract DeepFamily is
 
   uint256 public constant MAX_LONG_TEXT_LENGTH = 256;
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
-  uint256 public constant MAX_CHUNK_CONTENT_LENGTH = 2048;
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
   uint256 private constant DOMAIN_DISCLOSURE = 1003;
@@ -304,23 +280,6 @@ contract DeepFamily is
     uint256 reward
   );
 
-  event StoryChunkAdded(
-    uint256 indexed tokenId,
-    uint256 indexed chunkIndex,
-    bytes32 chunkHash,
-    address indexed editor,
-    uint256 contentLength,
-    uint8 chunkType,
-    string attachmentCID
-  );
-
-  event StorySealed(
-    uint256 indexed tokenId,
-    uint256 totalChunks,
-    bytes32 fullStoryHash,
-    address indexed sealer
-  );
-
   event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
   event CircuitVerifierSet(
@@ -329,6 +288,7 @@ contract DeepFamily is
     address indexed adapter
   );
   event MetadataArchiveSet(address indexed archive);
+  event StoryArchiveSet(address indexed archive);
 
   event TrustedEndorserAdded(
     bytes32 indexed personHash,
@@ -584,6 +544,27 @@ contract DeepFamily is
 
     metadataArchive = archive;
     emit MetadataArchiveSet(archive);
+  }
+
+  /**
+   * @notice Permanently bind the archive that owns all public-story state.
+   * @dev The proxy retains only this binding; chunks, metadata, sealing state, and content
+   *      references all live in StoryArchiveV1.
+   */
+  function setStoryArchive(address archive) external onlyProxy onlyOwner {
+    if (storyArchive != address(0)) revert StoryArchiveAlreadySet();
+    if (archive == address(0) || archive.code.length == 0) revert InvalidStoryArchive();
+
+    address boundDeepFamily;
+    try IStoryArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
+      boundDeepFamily = bound;
+    } catch {
+      revert InvalidStoryArchive();
+    }
+    if (boundDeepFamily != address(this)) revert InvalidStoryArchive();
+
+    storyArchive = archive;
+    emit StoryArchiveSet(archive);
   }
 
   function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
@@ -1013,74 +994,6 @@ contract DeepFamily is
     }
     protocolEndorsementFeeBps = newBps;
     emit EndorsementFeeUpdated(previous, newBps);
-  }
-
-  function addStoryChunk(
-    uint256 tokenId,
-    uint256 chunkIndex,
-    uint8 chunkType,
-    string calldata content,
-    string calldata attachmentCID,
-    bytes32 expectedHash
-  ) external nonReentrant {
-    if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
-
-    if (bytes(content).length == 0 || bytes(content).length > MAX_CHUNK_CONTENT_LENGTH) {
-      revert InvalidChunkContent();
-    }
-
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-
-    if (metadata.isSealed) revert StoryAlreadySealed();
-    if (chunkIndex != metadata.totalChunks) revert ChunkIndexOutOfRange();
-
-    bytes32 contentHash = _hashString(content);
-    if (expectedHash != bytes32(0) && contentHash != expectedHash) {
-      revert ChunkHashMismatch();
-    }
-
-    if (bytes(attachmentCID).length > MAX_LONG_TEXT_LENGTH) revert InvalidCIDLength();
-
-    StoryChunk storage chunk = storyChunks[tokenId][chunkIndex];
-    chunk.chunkIndex = chunkIndex;
-    chunk.chunkHash = contentHash;
-    chunk.content = content;
-    chunk.timestamp = block.timestamp;
-    chunk.editor = msg.sender;
-    chunk.chunkType = chunkType;
-    chunk.attachmentCID = attachmentCID;
-
-    metadata.totalChunks = metadata.totalChunks + 1;
-    metadata.lastUpdateTime = block.timestamp;
-    metadata.totalLength = metadata.totalLength + bytes(content).length;
-
-    metadata.fullStoryHash = keccak256(
-      abi.encodePacked(metadata.fullStoryHash, chunkIndex, contentHash)
-    );
-
-    emit StoryChunkAdded(
-      tokenId,
-      chunkIndex,
-      contentHash,
-      msg.sender,
-      bytes(content).length,
-      chunkType,
-      attachmentCID
-    );
-  }
-
-  function sealStory(uint256 tokenId) external nonReentrant {
-    if (_ownerOf(tokenId) != msg.sender) revert MustBeNFTHolder();
-
-    StoryMetadata storage metadata = storyMetadata[tokenId];
-
-    if (metadata.isSealed) revert StoryAlreadySealed();
-    if (metadata.totalChunks == 0) revert StoryNotFound();
-
-    metadata.isSealed = true;
-    metadata.lastUpdateTime = block.timestamp;
-
-    emit StorySealed(tokenId, metadata.totalChunks, metadata.fullStoryHash, msg.sender);
   }
 
   // ========== Reader Primitive Getters ==========

@@ -6,6 +6,8 @@ const STORY_ERROR_MESSAGES: Record<string, string> = {
   OnlyOwner: "Only the owner can perform this action",
   StorySealed: "Story is sealed and cannot be modified",
   StoryAlreadySealed: "Story is sealed and cannot be modified",
+  InvalidStoryArchive: "Story archive configuration is invalid",
+  StoryArchiveAlreadySet: "Story archive is already configured",
   ChunkIndexExists: "Chunk at this index already exists",
   InvalidChunkIndex: "Invalid chunk index",
   ContentTooLong: "Content exceeds maximum length",

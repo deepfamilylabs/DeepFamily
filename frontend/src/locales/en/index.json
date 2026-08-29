@@ -740,7 +740,7 @@
     "chunkTypeLabel": "Chunk Type",
     "attachmentLabel": "Attachment CID (optional)",
     "attachmentPlaceholder": "CID (e.g. bafy...) or leave empty",
-    "attachmentTooLong": "Attachment CID cannot exceed 256 characters",
+    "attachmentTooLong": "Attachment CID cannot exceed 256 UTF-8 bytes",
     "invalidChunkType": "Invalid chunk type",
     "operationFailed": "Operation failed",
     "sealFailed": "Seal failed",
@@ -787,8 +787,8 @@
       "note4": "Career: For focused professional history (jobs, companies, positions)",
       "note5": "Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline"
     },
-    "contentTooLongBytes": "Content must not exceed 2048 bytes",
-    "contentPlaceholderBytes": "Enter chunk content (max 2048 bytes ≈ 2048 ASCII or ~680 CJK chars)",
+    "contentTooLongBytes": "Content must not exceed 16384 bytes",
+    "contentPlaceholderBytes": "Enter chunk content (max 16384 UTF-8 bytes)",
     "success": {
       "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",
       "chunkAddedGeneric": "Story chunk added successfully",

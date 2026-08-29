@@ -3,11 +3,14 @@ pragma solidity ^0.8.20;
 
 import {DeepFamily} from "./DeepFamily.sol";
 import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
+import {IStoryArchiveV1} from "./interfaces/IStoryArchiveV1.sol";
 
 contract DeepFamilyReader {
   error InvalidDeepFamilyAddress();
   error InvalidMetadataArchiveAddress();
   error MetadataArchiveBindingMismatch();
+  error InvalidStoryArchiveAddress();
+  error StoryArchiveBindingMismatch();
   error InvalidPersonHash();
   error InvalidVersionIndex();
   error ChunkIndexOutOfRange();
@@ -30,6 +33,7 @@ contract DeepFamilyReader {
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
   DeepFamily public immutable DEEP_FAMILY;
   IMetadataArchiveV1 public immutable METADATA_ARCHIVE;
+  IStoryArchiveV1 public immutable STORY_ARCHIVE;
 
   constructor(address deepFamily) {
     if (deepFamily == address(0) || deepFamily.code.length == 0) {
@@ -55,8 +59,27 @@ contract DeepFamilyReader {
     }
     if (archiveDeepFamily != deepFamily) revert MetadataArchiveBindingMismatch();
 
+    address storyArchive;
+    try boundDeepFamily.storyArchive() returns (address configuredStoryArchive) {
+      storyArchive = configuredStoryArchive;
+    } catch {
+      revert InvalidDeepFamilyAddress();
+    }
+    if (storyArchive == address(0) || storyArchive.code.length == 0) {
+      revert InvalidStoryArchiveAddress();
+    }
+
+    address storyArchiveDeepFamily;
+    try IStoryArchiveV1(storyArchive).DEEP_FAMILY() returns (address bound) {
+      storyArchiveDeepFamily = bound;
+    } catch {
+      revert InvalidStoryArchiveAddress();
+    }
+    if (storyArchiveDeepFamily != deepFamily) revert StoryArchiveBindingMismatch();
+
     DEEP_FAMILY = boundDeepFamily;
     METADATA_ARCHIVE = IMetadataArchiveV1(archive);
+    STORY_ARCHIVE = IStoryArchiveV1(storyArchive);
   }
 
   function getVersionDetails(
@@ -116,7 +139,7 @@ contract DeepFamilyReader {
 
   function getStoryMetadata(
     uint256 tokenId
-  ) external view returns (DeepFamily.StoryMetadata memory metadata) {
+  ) external view returns (IStoryArchiveV1.StoryMetadata memory metadata) {
     _requireOwned(tokenId);
     return _readStoryMetadata(tokenId);
   }
@@ -124,9 +147,9 @@ contract DeepFamilyReader {
   function getStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex
-  ) external view returns (DeepFamily.StoryChunk memory chunk) {
+  ) external view returns (IStoryArchiveV1.StoryChunk memory chunk) {
     _requireOwned(tokenId);
-    DeepFamily.StoryMetadata memory metadata = _readStoryMetadata(tokenId);
+    IStoryArchiveV1.StoryMetadata memory metadata = _readStoryMetadata(tokenId);
     if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
     return _readStoryChunk(tokenId, chunkIndex);
   }
@@ -371,7 +394,7 @@ contract DeepFamilyReader {
     external
     view
     returns (
-      DeepFamily.StoryChunk[] memory chunks,
+      IStoryArchiveV1.StoryChunk[] memory chunks,
       uint256 totalChunks,
       bool hasMore,
       uint256 nextOffset
@@ -381,10 +404,10 @@ contract DeepFamilyReader {
     totalChunks = _readStoryMetadata(tokenId).totalChunks;
     PaginationResult memory page = _getPaginationParams(totalChunks, offset, limit);
     if (page.resultLength == 0) {
-      return (new DeepFamily.StoryChunk[](0), totalChunks, page.hasMore, page.nextOffset);
+      return (new IStoryArchiveV1.StoryChunk[](0), totalChunks, page.hasMore, page.nextOffset);
     }
 
-    chunks = new DeepFamily.StoryChunk[](page.resultLength);
+    chunks = new IStoryArchiveV1.StoryChunk[](page.resultLength);
     for (uint256 i = 0; i < page.resultLength; i++) {
       chunks[i] = _readStoryChunk(tokenId, page.startIndex + i);
     }
@@ -451,29 +474,15 @@ contract DeepFamilyReader {
 
   function _readStoryMetadata(
     uint256 tokenId
-  ) internal view returns (DeepFamily.StoryMetadata memory metadata) {
-    (
-      metadata.totalChunks,
-      metadata.fullStoryHash,
-      metadata.lastUpdateTime,
-      metadata.isSealed,
-      metadata.totalLength
-    ) = DEEP_FAMILY.storyMetadata(tokenId);
+  ) internal view returns (IStoryArchiveV1.StoryMetadata memory metadata) {
+    return STORY_ARCHIVE.getStoryMetadata(tokenId);
   }
 
   function _readStoryChunk(
     uint256 tokenId,
     uint256 chunkIndex
-  ) internal view returns (DeepFamily.StoryChunk memory chunk) {
-    (
-      chunk.chunkIndex,
-      chunk.chunkHash,
-      chunk.content,
-      chunk.timestamp,
-      chunk.editor,
-      chunk.chunkType,
-      chunk.attachmentCID
-    ) = DEEP_FAMILY.storyChunks(tokenId, chunkIndex);
+  ) internal view returns (IStoryArchiveV1.StoryChunk memory chunk) {
+    return STORY_ARCHIVE.getStoryChunk(tokenId, chunkIndex);
   }
 
   function _readUserEndorsement(

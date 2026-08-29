@@ -25,6 +25,8 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "tokenInitialize",
   "metadataArchiveV1",
   "setMetadataArchive",
+  "storyArchiveV1",
+  "setStoryArchive",
   "deepFamilyReader",
   "setPersonRelationVerifier",
   "setDisclosureBindingVerifier",

@@ -16,7 +16,8 @@ export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   deepFamilyImplementation: 7,
   deepFamily: 8,
   metadataArchiveV1: 10,
-  deepFamilyReader: 12,
+  storyArchiveV1: 12,
+  deepFamilyReader: 14,
 });
 
 const normalizeChainId = (value) => {
@@ -66,9 +67,11 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
     },
     metadataArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
+    storyArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
     deepFamilyReader: {
       deepFamilyImmutable: plannedAddresses?.deepFamily,
       metadataArchiveImmutable: plannedAddresses?.metadataArchiveV1,
+      storyArchiveImmutable: plannedAddresses?.storyArchiveV1,
     },
   };
   const artifacts = deploymentArtifactInspector({ root, deployments: deploymentBindings });
@@ -90,10 +93,17 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       artifactSha256: artifacts?.metadataArchiveV1?.artifactSha256,
       runtimeSha256: artifacts?.metadataArchiveV1?.runtimeSha256,
     }),
+    storyArchiveV1: Object.freeze({
+      address: plannedAddresses?.storyArchiveV1,
+      deepFamilyImmutable: plannedAddresses?.deepFamily,
+      artifactSha256: artifacts?.storyArchiveV1?.artifactSha256,
+      runtimeSha256: artifacts?.storyArchiveV1?.runtimeSha256,
+    }),
     deepFamilyReader: Object.freeze({
       address: plannedAddresses?.deepFamilyReader,
       deepFamilyImmutable: plannedAddresses?.deepFamily,
       metadataArchiveImmutable: plannedAddresses?.metadataArchiveV1,
+      storyArchiveImmutable: plannedAddresses?.storyArchiveV1,
       artifactSha256: artifacts?.deepFamilyReader?.artifactSha256,
       runtimeSha256: artifacts?.deepFamilyReader?.runtimeSha256,
     }),
@@ -147,6 +157,7 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.metadataArchiveV1,
       deploymentArtifacts?.metadataArchiveV1,
     ],
+    ["StoryArchiveV1", plannedAddresses?.storyArchiveV1, deploymentArtifacts?.storyArchiveV1],
     ["DeepFamilyReader", plannedAddresses?.deepFamilyReader, deploymentArtifacts?.deepFamilyReader],
   ];
   for (const [label, address, artifact] of checks) {

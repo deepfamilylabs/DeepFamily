@@ -740,7 +740,7 @@
     "chunkTypeLabel": "分片类型",
     "attachmentLabel": "附件CID（可选）",
     "attachmentPlaceholder": "CID（例如 bafy...）或留空",
-    "attachmentTooLong": "附件CID长度不能超过256字符",
+    "attachmentTooLong": "附件 CID 不能超过 256 个 UTF-8 字节",
     "invalidChunkType": "无效的分片类型",
     "operationFailed": "操作失败",
     "sealFailed": "封存失败",
@@ -787,8 +787,8 @@
       "note4": "职业经历：用于聚焦职业历史（工作、公司、职位）",
       "note5": "早年生活 vs 生平事件：早年生活用于童年片段，生平事件用于完整时间轴"
     },
-    "contentTooLongBytes": "内容不能超过2048字节",
-    "contentPlaceholderBytes": "请输入分片内容（最多2048字节，约=2048英文或≈680汉字）",
+    "contentTooLongBytes": "内容不能超过16384字节",
+    "contentPlaceholderBytes": "请输入分片内容（最多16384个 UTF-8 字节）",
     "success": {
       "chunkAdded": "分片 #{{index}} 添加成功（{{bytes}} 字节）",
       "chunkAddedGeneric": "分片添加成功",

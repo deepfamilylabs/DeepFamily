@@ -19,10 +19,10 @@ export interface ChunkFormData {
   attachmentCID: string;
 }
 
-export const STORY_MAX_CHUNK_BYTES = 2048;
+export const STORY_MAX_CHUNK_BYTES = 16_384;
 export const STORY_WARNING_ORANGE_BYTES = STORY_MAX_CHUNK_BYTES - 200;
 export const STORY_WARNING_YELLOW_BYTES = STORY_MAX_CHUNK_BYTES - 400;
-export const STORY_MAX_ATTACHMENT_CHARS = 256;
+export const STORY_MAX_ATTACHMENT_BYTES = 256;
 
 export const initialChunkFormData: ChunkFormData = {
   content: "",
@@ -116,7 +116,10 @@ export function getValidTokenId(tokenId: string | undefined): string | undefined
   return tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined;
 }
 
-export function mapStorySubmitError(error: any, t: (key: string, fallback: string) => string): string {
+export function mapStorySubmitError(
+  error: any,
+  t: (key: string, fallback: string) => string,
+): string {
   return getFriendlyErrorMessage(
     error,
     t as any,
@@ -125,11 +128,11 @@ export function mapStorySubmitError(error: any, t: (key: string, fallback: strin
   );
 }
 
-export function mapStorySealError(error: any, t: (key: string, fallback: string) => string): string {
-  return getFriendlyErrorMessage(
-    error,
-    t as any,
-    t("storyChunkEditor.sealFailed", "Seal failed"),
-    { preferDetailsForUnknown: true },
-  );
+export function mapStorySealError(
+  error: any,
+  t: (key: string, fallback: string) => string,
+): string {
+  return getFriendlyErrorMessage(error, t as any, t("storyChunkEditor.sealFailed", "Seal failed"), {
+    preferDetailsForUnknown: true,
+  });
 }

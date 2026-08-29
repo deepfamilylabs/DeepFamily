@@ -10,10 +10,10 @@ const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
-  const { deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection, {
+  const { storyArchive, deepFamilyReader } = await ensureIntegratedSystem(connection, {
     artifacts: hre.artifacts,
   });
-  const deepFamilyWithSigner = deepFamily.connect(signer);
+  const storyArchiveWithSigner = storyArchive.connect(signer);
 
   const tokenId = BigInt(args.tokenid);
   const chunkIndex = Number(args.chunkindex);
@@ -21,8 +21,8 @@ const action = async (args, hre) => {
 
   const content = args.content;
   if (content.length === 0) throw new Error("content cannot be empty");
-  if (Buffer.byteLength(content, "utf8") > 2048) {
-    throw new Error("content exceeds 2048 byte limit");
+  if (Buffer.byteLength(content, "utf8") > 16_384) {
+    throw new Error("content exceeds 16384 byte limit");
   }
 
   const chunkType = Number(args.type || "0");
@@ -31,8 +31,8 @@ const action = async (args, hre) => {
   }
 
   const attachmentCID = args.attachment || "";
-  if (attachmentCID.length > 0 && attachmentCID.length > 256) {
-    throw new Error("attachment CID exceeds 256 characters");
+  if (Buffer.byteLength(attachmentCID, "utf8") > 256) {
+    throw new Error("attachment CID exceeds 256 UTF-8 bytes");
   }
 
   // Read metadata to validate continuity & sealed state
@@ -61,7 +61,7 @@ const action = async (args, hre) => {
     throw new Error(`Provided exphash (${expectedHash}) does not match local hash (${localHash})`);
   }
 
-  const tx = await deepFamilyWithSigner.addStoryChunk(
+  const tx = await storyArchiveWithSigner.addStoryChunk(
     tokenId,
     chunkIndex,
     chunkType,
@@ -76,9 +76,9 @@ const action = async (args, hre) => {
     const iface = new ethers.Interface([
       "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID)",
     ]);
-    const deepAddr = (await deepFamily.getAddress()).toLowerCase();
+    const archiveAddress = (await storyArchive.getAddress()).toLowerCase();
     for (const log of receipt.logs || []) {
-      if ((log.address || "").toLowerCase() !== deepAddr) continue;
+      if ((log.address || "").toLowerCase() !== archiveAddress) continue;
       try {
         const parsed = iface.parseLog(log);
         if (parsed && parsed.name === "StoryChunkAdded") {
@@ -106,7 +106,7 @@ export default task("add-story-chunk", "Add a story chunk to an NFT (story shard
   })
   .addOption({
     name: "content",
-    description: "Chunk content (<=2048 UTF-8 bytes)",
+    description: "Chunk content (<=16384 UTF-8 bytes)",
     type: ArgumentType.STRING_WITHOUT_DEFAULT,
     defaultValue: undefined,
   })

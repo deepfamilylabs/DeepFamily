@@ -8,10 +8,10 @@ const action = async (args, hre) => {
   const connection = await hre.network.connect();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
-  const { deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection, {
+  const { storyArchive, deepFamilyReader } = await ensureIntegratedSystem(connection, {
     artifacts: hre.artifacts,
   });
-  const deepFamilyWithSigner = deepFamily.connect(signer);
+  const storyArchiveWithSigner = storyArchive.connect(signer);
 
   const tokenId = BigInt(args.tokenid);
 
@@ -30,16 +30,16 @@ const action = async (args, hre) => {
     throw new Error("Cannot seal empty story (no chunks)");
   }
 
-  const tx = await deepFamilyWithSigner.sealStory(tokenId);
+  const tx = await storyArchiveWithSigner.sealStory(tokenId);
   const receipt = await tx.wait();
 
   try {
     const iface = new ethers.Interface([
       "event StorySealed(uint256 indexed tokenId, uint256 totalChunks, bytes32 fullStoryHash, address indexed sealer)",
     ]);
-    const deepAddr = (await deepFamily.getAddress()).toLowerCase();
+    const archiveAddress = (await storyArchive.getAddress()).toLowerCase();
     for (const log of receipt.logs || []) {
-      if ((log.address || "").toLowerCase() !== deepAddr) continue;
+      if ((log.address || "").toLowerCase() !== archiveAddress) continue;
       try {
         const parsed = iface.parseLog(log);
         if (parsed && parsed.name === "StorySealed") {

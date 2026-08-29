@@ -27,7 +27,7 @@ import {
   mapStorySubmitError,
   normalizeStoryChunks,
   sortStoryChunks,
-  STORY_MAX_ATTACHMENT_CHARS,
+  STORY_MAX_ATTACHMENT_BYTES,
   STORY_MAX_CHUNK_BYTES,
   STORY_WARNING_ORANGE_BYTES,
   type ChunkFormData,
@@ -269,7 +269,16 @@ export function useStoryEditorController() {
         throw error;
       }
     },
-    [addStoryChunkFlow, toast, t, chunks, meta, validTokenId, scopedQueryClient, storyQuery.refetch],
+    [
+      addStoryChunkFlow,
+      toast,
+      t,
+      chunks,
+      meta,
+      validTokenId,
+      scopedQueryClient,
+      storyQuery.refetch,
+    ],
   );
 
   const onSealStory = useCallback(
@@ -330,14 +339,14 @@ export function useStoryEditorController() {
     }
     const byteLen = getByteLength(trimmedContent);
     if (byteLen > STORY_MAX_CHUNK_BYTES) {
-      setLocalError(t("storyChunkEditor.contentTooLongBytes", "Content cannot exceed 2048 bytes"));
+      setLocalError(t("storyChunkEditor.contentTooLongBytes", "Content cannot exceed 16384 bytes"));
       return;
     }
 
     const trimmedAttachment = formData.attachmentCID.trim();
-    if (trimmedAttachment.length > STORY_MAX_ATTACHMENT_CHARS) {
+    if (getByteLength(trimmedAttachment) > STORY_MAX_ATTACHMENT_BYTES) {
       setLocalError(
-        t("storyChunkEditor.attachmentTooLong", "Attachment CID cannot exceed 256 characters"),
+        t("storyChunkEditor.attachmentTooLong", "Attachment CID cannot exceed 256 UTF-8 bytes"),
       );
       return;
     }
