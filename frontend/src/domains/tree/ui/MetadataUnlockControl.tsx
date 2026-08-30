@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { KeyRound, LoaderCircle, LockKeyhole, Trash2, X } from "lucide-react";
+import { ModalShell } from "../../../shared/ui";
 import {
   classifyProtocolPassphraseRisk,
   type ProtocolPassphraseRisk,
@@ -39,6 +41,9 @@ export function MetadataUnlockControl() {
     captureMetadataCacheRevision,
   } = useTreeMutations();
   const { rpcUrl, chainId, contractAddress } = useConfig();
+  const { t } = useTranslation();
+  const titleId = useId();
+  const descriptionId = useId();
   const coordinatorRef = useRef(new MetadataUnlockCoordinator());
   const nodesDataRef = useRef(nodesData);
   nodesDataRef.current = nodesData;
@@ -124,11 +129,21 @@ export function MetadataUnlockControl() {
 
   const prepare = async () => {
     if (!provider || !chainId || !contractAddress) {
-      setError("Configure a valid RPC endpoint, chain ID, and DeepFamily proxy first.");
+      setError(
+        t(
+          "metadataUnlock.errors.config",
+          "Configure a valid RPC endpoint, chain ID, and DeepFamily proxy first.",
+        ),
+      );
       return;
     }
     if (candidates.length === 0) {
-      setError("No loaded locked version currently has a complete Archive reference.");
+      setError(
+        t(
+          "metadataUnlock.errors.noCandidates",
+          "No loaded locked version currently has a complete Archive reference.",
+        ),
+      );
       return;
     }
 
@@ -230,11 +245,21 @@ export function MetadataUnlockControl() {
       const report = await run;
       if (currentScopeKeyRef.current !== runScopeKey) return;
       if (report.status === "completed" && report.failed > 0) {
-        setError(`${report.failed} version(s) could not be unlocked with this passphrase.`);
+        setError(
+          t(
+            "metadataUnlock.errors.partialFailure",
+            "{{count}} version(s) could not be unlocked with this passphrase.",
+            { count: report.failed },
+          ),
+        );
       }
     } catch (cause) {
       if (currentScopeKeyRef.current !== runScopeKey) return;
-      setError(cause instanceof Error ? cause.message : "Metadata unlock failed");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t("metadataUnlock.errors.failed", "Metadata unlock failed"),
+      );
     }
   };
 
@@ -248,141 +273,202 @@ export function MetadataUnlockControl() {
         className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-lg hover:border-orange-300 hover:text-orange-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
       >
         <KeyRound className="h-4 w-4" />
-        Unlock versions
+        {t("metadataUnlock.openButton", "Unlock versions")}
         {unlockedCount > 0 ? <span className="text-emerald-600">{unlockedCount}</span> : null}
       </button>
 
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <section className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
-                  <LockKeyhole className="h-5 w-5 text-orange-500" />
-                  Unlock encrypted version metadata
-                </h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  One passphrase is tried sequentially against loaded locked versions. Validated
-                  person data, label, and biography are saved as plaintext in this browser.
-                </p>
+      <ModalShell
+        isOpen={open}
+        onClose={close}
+        bare
+        ariaLabelledBy={titleId}
+        ariaDescribedBy={descriptionId}
+      >
+        {/* Scrolls from the top once the panel outgrows the viewport: the shell
+            locks body scroll, so this container owns the only scrollbar. */}
+        <div className="h-full overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <section
+              className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3
+                    id={titleId}
+                    className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"
+                  >
+                    <LockKeyhole className="h-5 w-5 text-orange-500" />
+                    {t("metadataUnlock.title", "Unlock encrypted version metadata")}
+                  </h3>
+                  <p
+                    id={descriptionId}
+                    className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400"
+                  >
+                    {t(
+                      "metadataUnlock.description",
+                      "One passphrase is tried sequentially against loaded locked versions. Validated person data, label, and biography are saved as plaintext in this browser.",
+                    )}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label={t("metadataUnlock.close", "Close")}
+                  className="p-1"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button type="button" onClick={close} aria-label="Close" className="p-1">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
 
-            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {candidates.length} locked candidate(s); {unlockedCount} already unlocked locally.
-              {preparation === "ready"
-                ? ` ${preparedNodes.length} passed Archive/header preflight; ${preflightFailures} failed before KDF.`
-                : " Archive bytes and format are checked before a passphrase is requested."}
-            </div>
-
-            {preparation === "idle" ? (
-              <button
-                type="button"
-                onClick={prepare}
-                className="mt-4 w-full rounded-xl bg-orange-600 px-4 py-2.5 font-semibold text-white hover:bg-orange-700"
-              >
-                Preflight loaded versions
-              </button>
-            ) : null}
-
-            {preparation === "preparing" ? (
-              <div className="mt-4 flex items-center justify-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-300">
-                <LoaderCircle className="h-4 w-4 animate-spin" /> Checking Archive bytes…
+              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                {t(
+                  "metadataUnlock.summary",
+                  "{{candidates}} locked candidate(s); {{unlocked}} already unlocked locally.",
+                  { candidates: candidates.length, unlocked: unlockedCount },
+                )}{" "}
+                {preparation === "ready"
+                  ? t(
+                      "metadataUnlock.summaryReady",
+                      "{{prepared}} passed Archive/header preflight; {{failed}} failed before KDF.",
+                      { prepared: preparedNodes.length, failed: preflightFailures },
+                    )
+                  : t(
+                      "metadataUnlock.summaryIdle",
+                      "Archive bytes and format are checked before a passphrase is requested.",
+                    )}
               </div>
-            ) : null}
 
-            {preparation === "ready" && preparedNodes.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Identity passphrase
-                  <input
-                    ref={passphraseRef}
-                    type="password"
-                    autoComplete="off"
-                    disabled={running}
-                    onChange={(event) => {
-                      setPassphraseRisk(classifyProtocolPassphraseRisk(event.currentTarget.value));
-                      setHighRiskConfirmed(false);
-                    }}
-                    className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
-                  />
-                </label>
-                <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={riskConfirmed}
-                    disabled={running}
-                    onChange={(event) => setRiskConfirmed(event.currentTarget.checked)}
-                  />
-                  <span>
-                    I understand the permanent on-chain ciphertext permits unlimited offline
-                    passphrase guesses and that the unlocked plaintext is stored in IndexedDB.
-                  </span>
-                </label>
-                {passphraseRisk !== "ordinary" ? (
-                  <label className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+              {preparation === "idle" ? (
+                <button
+                  type="button"
+                  onClick={prepare}
+                  className="mt-4 w-full rounded-xl bg-orange-600 px-4 py-2.5 font-semibold text-white hover:bg-orange-700"
+                >
+                  {t("metadataUnlock.preflight", "Preflight loaded versions")}
+                </button>
+              ) : null}
+
+              {preparation === "preparing" ? (
+                <div className="mt-4 flex items-center justify-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-300">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />{" "}
+                  {t("metadataUnlock.checking", "Checking Archive bytes…")}
+                </div>
+              ) : null}
+
+              {preparation === "ready" && preparedNodes.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {t("metadataUnlock.passphraseLabel", "Identity passphrase")}
+                    <input
+                      ref={passphraseRef}
+                      type="password"
+                      autoComplete="off"
+                      disabled={running}
+                      onChange={(event) => {
+                        setPassphraseRisk(
+                          classifyProtocolPassphraseRisk(event.currentTarget.value),
+                        );
+                        setHighRiskConfirmed(false);
+                      }}
+                      className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                    />
+                  </label>
+                  <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
                     <input
                       type="checkbox"
-                      checked={highRiskConfirmed}
+                      checked={riskConfirmed}
                       disabled={running}
-                      onChange={(event) => setHighRiskConfirmed(event.currentTarget.checked)}
+                      onChange={(event) => setRiskConfirmed(event.currentTarget.checked)}
                     />
                     <span>
-                      {passphraseRisk === "empty"
-                        ? "I explicitly choose an empty passphrase and understand anyone can reproduce it and decrypt this metadata."
-                        : "I explicitly confirm this whitespace-only passphrase is high risk and is not trimmed."}
+                      {t(
+                        "metadataUnlock.riskConsent",
+                        "I understand the permanent on-chain ciphertext permits unlimited offline passphrase guesses and that the unlocked plaintext is stored in IndexedDB.",
+                      )}
                     </span>
                   </label>
-                ) : null}
+                  {passphraseRisk !== "ordinary" ? (
+                    <label className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200">
+                      <input
+                        type="checkbox"
+                        checked={highRiskConfirmed}
+                        disabled={running}
+                        onChange={(event) => setHighRiskConfirmed(event.currentTarget.checked)}
+                      />
+                      <span>
+                        {passphraseRisk === "empty"
+                          ? t(
+                              "metadataUnlock.emptyPassphraseConsent",
+                              "I explicitly choose an empty passphrase and understand anyone can reproduce it and decrypt this metadata.",
+                            )
+                          : t(
+                              "metadataUnlock.whitespacePassphraseConsent",
+                              "I explicitly confirm this whitespace-only passphrase is high risk and is not trimmed.",
+                            )}
+                      </span>
+                    </label>
+                  ) : null}
 
-                {progress ? (
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    {progress.status}: {progress.processed}/{progress.total}; {progress.succeeded}
-                    successful, {progress.failed} failed, {progress.skipped} cached.
-                  </p>
-                ) : null}
+                  {progress ? (
+                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                      {t(
+                        "metadataUnlock.progress",
+                        "{{status}}: {{processed}}/{{total}}; {{succeeded}} successful, {{failed}} failed, {{skipped}} cached.",
+                        {
+                          status: t(`metadataUnlock.status.${progress.status}`, progress.status),
+                          processed: progress.processed,
+                          total: progress.total,
+                          succeeded: progress.succeeded,
+                          failed: progress.failed,
+                          skipped: progress.skipped,
+                        },
+                      )}
+                    </p>
+                  ) : null}
 
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={running ? () => coordinatorRef.current.cancel() : unlock}
-                    className="flex-1 rounded-xl bg-orange-600 px-4 py-2.5 font-semibold text-white hover:bg-orange-700"
-                  >
-                    {running ? "Cancel active Worker" : "Unlock sequentially"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={running}
-                    onClick={resetAttempt}
-                    className="rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"
-                  >
-                    Reset
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={running ? () => coordinatorRef.current.cancel() : unlock}
+                      className="flex-1 rounded-xl bg-orange-600 px-4 py-2.5 font-semibold text-white hover:bg-orange-700"
+                    >
+                      {running
+                        ? t("metadataUnlock.cancel", "Cancel active Worker")
+                        : t("metadataUnlock.unlock", "Unlock sequentially")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={running}
+                      onClick={resetAttempt}
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700"
+                    >
+                      {t("metadataUnlock.reset", "Reset")}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {error ? (
-              <p className="mt-3 text-xs text-rose-600 dark:text-rose-300">{error}</p>
-            ) : null}
+              {error ? (
+                <p className="mt-3 text-xs text-rose-600 dark:text-rose-300">{error}</p>
+              ) : null}
 
-            <button
-              type="button"
-              disabled={running || unlockedCount === 0}
-              onClick={() => {
-                clearMetadataUnlockCache();
-                resetAttempt();
-              }}
-              className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-rose-600 disabled:opacity-40"
-            >
-              <Trash2 className="h-4 w-4" /> Clear local unlocked plaintext cache
-            </button>
-          </section>
+              <button
+                type="button"
+                disabled={running || unlockedCount === 0}
+                onClick={() => {
+                  clearMetadataUnlockCache();
+                  resetAttempt();
+                }}
+                className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-rose-600 disabled:opacity-40"
+              >
+                <Trash2 className="h-4 w-4" />{" "}
+                {t("metadataUnlock.clearCache", "Clear local unlocked plaintext cache")}
+              </button>
+            </section>
+          </div>
         </div>
-      ) : null}
+      </ModalShell>
     </>
   );
 }

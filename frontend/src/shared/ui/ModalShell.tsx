@@ -112,10 +112,7 @@ export function ModalShell({
         {/* `bare` skips the default panel wrapper, not the scrim: an aria-modal
             dialog must still read as a layer over inert content. */}
         {isOutermost && (
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
-            aria-hidden
-          />
+          <div className="absolute inset-0 bg-black/40 animate-fade-in" aria-hidden />
         )}
         {/* Positioned so children paint above the absolutely positioned scrim. */}
         <div className="relative h-full">
@@ -133,12 +130,7 @@ export function ModalShell({
       role="presentation"
     >
       {/* Backdrop */}
-      {isOutermost && (
-        <div
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
-          aria-hidden
-        />
-      )}
+      {isOutermost && <div className="absolute inset-0 bg-black/40 animate-fade-in" aria-hidden />}
 
       {/* Panel */}
       <div

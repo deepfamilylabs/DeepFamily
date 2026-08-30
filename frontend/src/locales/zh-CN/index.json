@@ -661,6 +661,38 @@
       "rpcConflict": "RPC 已存在于内置网络中"
     }
   },
+  "metadataUnlock": {
+    "openButton": "解锁版本",
+    "title": "解锁加密的版本元数据",
+    "description": "使用同一个口令依次尝试已加载的锁定版本。验证通过的人物数据、标签和传记会以明文形式保存在此浏览器中。",
+    "close": "关闭",
+    "summary": "{{candidates}} 个锁定候选版本；{{unlocked}} 个已在本地解锁。",
+    "summaryReady": "{{prepared}} 个通过 Archive/头部预检；{{failed}} 个在 KDF 之前失败。",
+    "summaryIdle": "在请求口令之前会先校验 Archive 字节和格式。",
+    "preflight": "预检已加载的版本",
+    "checking": "正在校验 Archive 字节…",
+    "passphraseLabel": "身份口令",
+    "riskConsent": "我理解永久存储在链上的密文允许无限次离线口令猜测，并且解锁后的明文会保存在 IndexedDB 中。",
+    "emptyPassphraseConsent": "我明确选择使用空口令，并理解任何人都可以复现它并解密这份元数据。",
+    "whitespacePassphraseConsent": "我明确确认这个仅由空白字符组成的口令属于高风险，并且首尾空白不会被去除。",
+    "progress": "{{status}}：{{processed}}/{{total}}；成功 {{succeeded}} 个，失败 {{failed}} 个，命中缓存 {{skipped}} 个。",
+    "status": {
+      "running": "进行中",
+      "cancelling": "正在取消",
+      "cancelled": "已取消",
+      "completed": "已完成"
+    },
+    "cancel": "取消正在运行的 Worker",
+    "unlock": "依次解锁",
+    "reset": "重置",
+    "clearCache": "清除本地已解锁的明文缓存",
+    "errors": {
+      "config": "请先配置有效的 RPC 端点、链 ID 和 DeepFamily 代理地址。",
+      "noCandidates": "当前已加载的锁定版本中没有包含完整 Archive 引用的版本。",
+      "partialFailure": "有 {{count}} 个版本无法使用该口令解锁。",
+      "failed": "元数据解锁失败"
+    }
+  },
   "common": {
     "open": "查看详情",
     "dismiss": "忽略",
