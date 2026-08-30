@@ -667,7 +667,10 @@
         "female": "Female",
         "other": "Other",
         "custom": "Custom"
-      }
+      },
+      "minted": "Minted",
+      "versionLabel": "Version",
+      "onChainRecord": "On-chain record"
     },
     "personVersionDetail": {
       "title": "Person Version Details"
@@ -758,6 +761,9 @@
     "noWalletsFound": "No wallets found",
     "installWalletDesc": "To use this application, please install one of the following wallets:",
     "connected": "Wallet connected successfully",
+    "networkConnected": "Connected",
+    "extensionDetected": "Browser extension detected",
+    "switching": "Confirm in wallet…",
     "rejected": "Connection rejected by user",
     "pending": "Connection request already pending",
     "connectionFailed": "Failed to connect wallet",
@@ -944,7 +950,10 @@
     "noStoryData": "No profile data available",
     "basicStory": "Introduction",
     "noStory": "No profile content",
-    "peopleEncyclopedia": "Encyclopedia"
+    "peopleEncyclopedia": "Encyclopedia",
+    "chunkEditor": "Editor",
+    "chunkHash": "Chunk Hash",
+    "attachment": "Attachment"
   },
   "actions": {
     "title": "Blockchain Actions",
@@ -1037,7 +1046,12 @@
     "personInfo": "Person Information",
     "personInfoHint": "Plain text stays off-chain; used only for local ZK proof",
     "parentInfoNotice": "Providing both parents locally generates zero-knowledge proofs for family linking (only hashes go on-chain). The first complete two-parent commitment for a person hash may receive DEEP utility points; parents do not need to exist on-chain first. Their details must match when linking to their identities later.",
-    "proofVerificationFailed": "Generated proof verification failed"
+    "proofVerificationFailed": "Generated proof verification failed",
+    "parents": "Parents",
+    "parentsMiningHint": "Both required to mine DEEP",
+    "parentNotProvided": "Not provided",
+    "parentNeedsVersion": "Version index still missing",
+    "parentVersionShort": "version {{index}}"
   },
   "mintNFT": {
     "title": "Mint NFT",
@@ -1196,7 +1210,13 @@
     "checkingAllowance": "Checking token allowance...",
     "confirmInWallet": "Please confirm in your wallet",
     "fee": "Fee",
-    "tokenInfo": "Token Info"
+    "tokenInfo": "Token Info",
+    "cost": "Cost",
+    "feeEqualsReward": "Equal to the current mining reward",
+    "foundOnChain": "Found on chain",
+    "toNftHolder": "To NFT holder",
+    "toCreator": "To creator",
+    "protocolFee": "Protocol fee"
   },
   "transaction": {
     "pending": "Transaction pending confirmation...",

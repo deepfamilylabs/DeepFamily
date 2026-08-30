@@ -1,7 +1,16 @@
 import { useEffect, useCallback, useId } from "react";
-import { X } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { ModalShell } from "./ModalShell";
 import { OVERLAY_Z_INDEX } from "./overlayLayers";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_CLOSE_BUTTON,
+  MODAL_PANEL,
+  MODAL_TILE_BASE,
+  type ModalAccent,
+} from "./modalTokens";
+
+type ConfirmDialogType = "info" | "warning" | "danger" | "success";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -12,9 +21,28 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   confirmBtnClassName?: string;
-  type?: "info" | "warning" | "danger" | "success";
+  type?: ConfirmDialogType;
 }
 
+const TYPE_ACCENT: Record<ConfirmDialogType, ModalAccent> = {
+  info: "blue",
+  warning: "primary",
+  danger: "danger",
+  success: "emerald",
+};
+
+const CONFIRM_BUTTON: Record<ConfirmDialogType, string> = {
+  info: "bg-primary text-white hover:bg-primary-hover focus:ring-primary/40",
+  warning: "bg-primary text-white hover:bg-primary-hover focus:ring-primary/40",
+  danger: "bg-danger text-white dark:text-red-950 hover:opacity-90 focus:ring-danger/40",
+  success: "bg-success text-white dark:text-green-950 hover:opacity-90 focus:ring-success/40",
+};
+
+/**
+ * The `sm` shell (420px): a short confirmation or a blocking question. The icon
+ * sits beside the copy rather than above it in a centered column, which is what
+ * let confirmations drift to three different heights for the same amount of text.
+ */
 export default function ConfirmDialog({
   open,
   title,
@@ -44,19 +72,16 @@ export default function ConfirmDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [onKey, open]);
   if (!open) return null;
-  const typeClasses = (() => {
-    switch (type) {
-      case "danger":
-        return "bg-red-600 hover:bg-red-700 focus:ring-red-500/40 dark:bg-red-600 dark:hover:bg-red-500 dark:focus:ring-red-400/40";
-      case "warning":
-        return "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500/40 dark:bg-amber-600 dark:hover:bg-amber-500 dark:focus:ring-amber-400/40";
-      case "success":
-        return "bg-green-600 hover:bg-green-700 focus:ring-green-500/40 dark:bg-green-600 dark:hover:bg-green-500 dark:focus:ring-green-400/40";
-      case "info":
-      default:
-        return "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500/40 dark:bg-blue-600 dark:hover:bg-blue-500 dark:focus:ring-blue-400/40";
-    }
-  })();
+
+  const Icon =
+    type === "danger"
+      ? AlertCircle
+      : type === "warning"
+        ? AlertTriangle
+        : type === "success"
+          ? CheckCircle2
+          : Info;
+
   return (
     <ModalShell
       isOpen={open}
@@ -69,36 +94,40 @@ export default function ConfirmDialog({
     >
       <div className="h-full flex items-center justify-center p-4">
         <div
-          className="relative bg-white dark:bg-gray-900 dark:border dark:border-gray-700 rounded-lg shadow-xl w-[420px] max-w-[95vw] p-6 transition-colors"
+          className={`relative w-[420px] max-w-[95vw] overflow-hidden ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute top-3 right-3 p-1 rounded-sm hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-            onClick={onCancel}
-          >
-            <X size={18} />
-          </button>
-          {title ? (
-            <h3
-              id={titleId}
-              className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2"
+          <div className="flex gap-3.5 p-5">
+            <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE[TYPE_ACCENT[type]]}`}>
+              <Icon className="w-[19px] h-[19px]" aria-hidden />
+            </div>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              {title ? (
+                <h3 id={titleId} className="modal-heading font-body text-base font-semibold text-ink">
+                  {title}
+                </h3>
+              ) : null}
+              <div
+                id={messageId}
+                className="text-sm text-ink-muted whitespace-pre-line leading-relaxed"
+              >
+                {message}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Close"
+              className={MODAL_CLOSE_BUTTON}
+              onClick={onCancel}
             >
-              {title}
-            </h3>
-          ) : null}
-          <div
-            id={messageId}
-            className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line mb-5 leading-relaxed"
-          >
-            {message}
+              <X className="w-[17px] h-[17px]" />
+            </button>
           </div>
-          <div className="flex justify-end gap-3">
+          <div className="flex gap-2.5 px-5 py-3.5 border-t border-hairline bg-surface-body">
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex-1 h-10 rounded-lg border border-hairline-strong bg-surface text-ink text-sm font-semibold transition-colors hover:bg-surface-alt focus:outline-hidden focus:ring-2 focus:ring-primary/30"
             >
               {cancelText}
             </button>
@@ -106,8 +135,8 @@ export default function ConfirmDialog({
               type="button"
               onClick={onConfirm}
               className={
-                "px-4 py-2 rounded-md text-sm text-white shadow-xs focus:outline-hidden focus:ring-2 transition-colors " +
-                typeClasses +
+                "flex-1 h-10 rounded-lg text-sm font-semibold transition-colors focus:outline-hidden focus:ring-2 " +
+                CONFIRM_BUTTON[type] +
                 (confirmBtnClassName ? " " + confirmBtnClassName : "")
               }
             >

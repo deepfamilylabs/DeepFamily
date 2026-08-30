@@ -1,33 +1,26 @@
-import { Check, Star } from "lucide-react";
+import { Coins, Image, Search, ShieldCheck } from "lucide-react";
+import { MODAL_CARD } from "../../../../../shared/ui";
 import type { EndorseT } from "../model/endorseTypes";
 
 export function EndorseBenefitsPanel({ t }: { t: EndorseT }) {
   const benefits = [
-    t("endorse.benefitQuality", "Help verify and improve data quality"),
-    t("endorse.benefitPriority", "Endorsed versions get higher priority in searches"),
-    t("endorse.benefitNFT", "Required step before minting NFTs"),
-    t("endorse.benefitEconomy", "Support version creators and NFT holders"),
+    { Icon: ShieldCheck, text: t("endorse.benefitQuality", "Help verify and improve data quality") },
+    {
+      Icon: Search,
+      text: t("endorse.benefitPriority", "Endorsed versions get higher priority in searches"),
+    },
+    { Icon: Image, text: t("endorse.benefitNFT", "Required step before minting NFTs") },
+    { Icon: Coins, text: t("endorse.benefitEconomy", "Support version creators and NFT holders") },
   ];
 
   return (
-    <div className="bg-linear-to-br from-orange-50/50 to-red-50/50 dark:from-orange-900/5 dark:to-red-900/5 rounded-2xl border border-orange-100/50 dark:border-orange-900/20 p-5 mt-4">
-      <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
-        <Star className="w-4 h-4 text-orange-500 dark:text-orange-400 fill-orange-500/20" />
-        {t("endorse.benefits", "Benefits of Endorsing")}
-      </h3>
-      <ul className="space-y-2.5">
-        {benefits.map((benefit) => (
-          <li
-            key={benefit}
-            className="flex items-start gap-2.5 text-xs font-medium text-gray-600 dark:text-gray-300"
-          >
-            <div className="w-4 h-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0 mt-0.5">
-              <Check className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <span className="leading-relaxed">{benefit}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      {benefits.map(({ Icon, text }) => (
+        <div key={text} className={`${MODAL_CARD} p-3.5 flex flex-col gap-2`}>
+          <Icon className="w-[17px] h-[17px] text-emerald-600 dark:text-emerald-400" aria-hidden />
+          <span className="text-xs leading-relaxed text-ink-muted">{text}</span>
+        </div>
+      ))}
     </div>
   );
 }

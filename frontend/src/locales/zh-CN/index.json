@@ -667,7 +667,10 @@
         "female": "女",
         "other": "其他",
         "custom": "自定义"
-      }
+      },
+      "minted": "已铸造",
+      "versionLabel": "版本",
+      "onChainRecord": "链上记录"
     },
     "personVersionDetail": {
       "title": "人物版本详情"
@@ -758,6 +761,9 @@
     "noWalletsFound": "未找到钱包",
     "installWalletDesc": "要使用此应用，请安装以下钱包之一：",
     "connected": "钱包连接成功",
+    "networkConnected": "已连接",
+    "extensionDetected": "已检测到浏览器扩展",
+    "switching": "请在钱包中确认…",
     "rejected": "用户拒绝连接",
     "pending": "连接请求待处理",
     "connectionFailed": "钱包连接失败",
@@ -944,7 +950,10 @@
     "noStoryData": "暂无资料数据",
     "basicStory": "简介",
     "noStory": "暂无资料内容",
-    "peopleEncyclopedia": "人物百科"
+    "peopleEncyclopedia": "人物百科",
+    "chunkEditor": "编辑者",
+    "chunkHash": "分片哈希",
+    "attachment": "附件"
   },
   "actions": {
     "title": "链上操作",
@@ -1037,7 +1046,12 @@
     "personInfo": "人物信息",
     "personInfoHint": "明文不上链，仅用于本地零知识证明",
     "parentInfoNotice": "填写双亲信息会在本地生成零知识证明建立家族链接（仅哈希值上链）。同一人物哈希首次提交完整双亲承诺时可能获得 DEEP 功能积分；父母无需预先存在于链上。后续关联父母身份时，所填信息需与其身份一致。",
-    "proofVerificationFailed": "生成的证明校验失败"
+    "proofVerificationFailed": "生成的证明校验失败",
+    "parents": "父母",
+    "parentsMiningHint": "两者齐全才可挖矿 DEEP",
+    "parentNotProvided": "未填写",
+    "parentNeedsVersion": "还缺版本号",
+    "parentVersionShort": "版本 {{index}}"
   },
   "mintNFT": {
     "title": "铸造 NFT",
@@ -1196,7 +1210,13 @@
     "checkingAllowance": "正在检查代币授权额度...",
     "confirmInWallet": "请在钱包中确认",
     "fee": "费用",
-    "tokenInfo": "代币信息"
+    "tokenInfo": "代币信息",
+    "cost": "费用",
+    "feeEqualsReward": "等同于当前挖矿奖励",
+    "foundOnChain": "链上已找到",
+    "toNftHolder": "归 NFT 持有者",
+    "toCreator": "归创建者",
+    "protocolFee": "协议费"
   },
   "transaction": {
     "pending": "交易等待确认中...",

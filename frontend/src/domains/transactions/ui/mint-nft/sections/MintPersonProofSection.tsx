@@ -3,6 +3,7 @@ import { AlertTriangle, Check } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { MintNFTT, MintPersonInfo } from "../model/mintNftTypes";
 import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
+import { ModalSectionHeading } from "../../../../../shared/ui";
 
 export interface MintPersonProofSectionProps {
   t: MintNFTT;
@@ -24,11 +25,9 @@ export function MintPersonProofSection({
   return (
     <>
       <div className="space-y-4">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-          {t("mintNFT.basicInfo", "Basic Information")}
-        </h3>
+        <ModalSectionHeading>{t("mintNFT.basicInfo", "Basic Information")}</ModalSectionHeading>
 
-        <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+        <div className="p-3 bg-info/8 border border-info/20 rounded-xl">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
             <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">

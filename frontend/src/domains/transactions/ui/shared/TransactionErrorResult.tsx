@@ -31,28 +31,28 @@ export function TransactionErrorResult({
     <div
       role="alert"
       aria-live="assertive"
-      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-800 animate-fade-in"
+      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-800 animate-fade-in"
     >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center shrink-0">
-          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-300" />
+          <AlertTriangle className="w-5 h-5 text-danger dark:text-red-300" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-red-900 dark:text-red-100 mb-3">{title}</p>
+          <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-2">{title}</p>
           <div className="space-y-3">
             <ErrorField label={typeLabel}>
-              <code className="block bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl font-mono text-xs break-all">
+              <code className="block bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl font-mono text-xs break-all">
                 {error.type}
               </code>
             </ErrorField>
             <ErrorField label={messageLabel}>
-              <p className="bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl text-xs leading-relaxed">
+              <p className="bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl text-xs leading-relaxed">
                 {error.message}
               </p>
             </ErrorField>
             {error.details !== error.message ? (
               <ErrorField label={detailsLabel}>
-                <p className="bg-white dark:bg-black/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100 px-3 py-2 rounded-xl text-xs leading-relaxed">
+                <p className="bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl text-xs leading-relaxed">
                   {error.details}
                 </p>
               </ErrorField>
@@ -79,7 +79,7 @@ export function TransactionErrorResult({
 function ErrorField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-bold uppercase tracking-wider text-red-800 dark:text-red-200 opacity-80">
+      <span className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300 opacity-80">
         {label}
       </span>
       {children}

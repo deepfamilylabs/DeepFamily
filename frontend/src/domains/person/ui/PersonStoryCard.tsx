@@ -109,7 +109,7 @@ function PersonStoryCard({
             <button
               type="button"
               onClick={handleStoryBadgeClick}
-              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-orange-500 border border-gray-100 dark:border-gray-700 flex items-center justify-center shadow-lg hover:scale-110 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 transition-all duration-300 z-10"
+              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-surface text-orange-500 border border-hairline flex items-center justify-center shadow-lg hover:scale-110 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 transition-all duration-300 z-10"
               title={storyLabel}
               aria-label={storyLabel}
             >
@@ -120,18 +120,18 @@ function PersonStoryCard({
 
         {/* Name and Badges */}
         <div className="text-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-14">
+          <h3 className="text-xl font-bold text-ink mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-14">
             {person.fullName || `Person #${shortHash(person.personHash)}`}
           </h3>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {genderText && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 dark:bg-gray-800 text-xs font-medium text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-alt text-xs font-medium text-ink-muted border border-hairline">
                 <User className="w-3 h-3" />
                 {genderText}
               </span>
             )}
             {isMinted(person) && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-50 dark:bg-gray-800 text-xs font-mono font-medium text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-700">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-alt text-xs font-mono font-medium text-ink-muted border border-hairline">
                 <Hash className="w-3 h-3" />
                 {person.tokenId}
               </span>
@@ -142,7 +142,7 @@ function PersonStoryCard({
                   e.stopPropagation();
                   setShowEndorseModal(true);
                 }}
-                className="group/endorse inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-xs font-medium text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-900/30 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 dark:hover:text-white transition-all duration-300"
+                className="group/endorse inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary border border-primary/25 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 dark:hover:text-white transition-all duration-300"
                 title={t("people.clickToEndorse", "Click to endorse this version")}
               >
                 <Star className="w-3 h-3 fill-orange-500 text-orange-500 group-hover/endorse:text-white group-hover/endorse:fill-white transition-colors" />
@@ -155,15 +155,15 @@ function PersonStoryCard({
         {/* Life Events */}
         <div className="space-y-2 mb-6 flex-1">
           {(formatDate.birth || person.birthPlace) && (
-            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-alt/50 transition-colors group/item">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-primary/25 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
                 <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider mb-0.5">
                   {t("people.born", "Born")}
                 </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                <div className="text-sm text-ink-muted font-medium truncate">
                   {[formatDate.birth, person.birthPlace].filter(Boolean).join(" · ")}
                 </div>
               </div>
@@ -171,15 +171,15 @@ function PersonStoryCard({
           )}
 
           {(formatDate.death || person.deathPlace) && (
-            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-orange-100 dark:border-orange-900/20 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-alt/50 transition-colors group/item">
+              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-primary/25 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
                 <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider mb-0.5">
                   {t("people.died", "Died")}
                 </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300 font-medium truncate">
+                <div className="text-sm text-ink-muted font-medium truncate">
                   {[formatDate.death, person.deathPlace].filter(Boolean).join(" · ")}
                 </div>
               </div>
@@ -188,7 +188,7 @@ function PersonStoryCard({
 
           {/* Story Preview */}
           {storyPreview && (
-            <div className="mt-4 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/30 border border-gray-100 dark:border-gray-800/50 italic text-gray-600 dark:text-gray-400 text-sm leading-relaxed relative">
+            <div className="mt-4 p-4 rounded-xl bg-surface-alt/30 border border-hairline/50 italic text-ink-muted text-sm leading-relaxed relative">
               <span className="absolute top-2 left-2 text-2xl text-gray-200 dark:text-gray-700 font-serif leading-none">
                 "
               </span>
@@ -198,16 +198,16 @@ function PersonStoryCard({
         </div>
 
         {/* Footer */}
-        <div className="pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="pt-4 border-t border-hairline flex items-center justify-between">
           <div className="flex flex-col gap-1">
             {person.timestamp && (
-              <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+              <span className="flex items-center gap-1.5 text-xs text-ink-subtle font-medium">
                 <Clock className="w-3 h-3" />
                 {formatUnixDate(person.timestamp)}
               </span>
             )}
             {person.storyMetadata && (
-              <span className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+              <span className="flex items-center gap-1.5 text-xs text-ink-subtle font-medium">
                 <FileText className="w-3 h-3" />
                 {t("people.chunks", "{{count}} chunks", {
                   count: person.storyMetadata.totalChunks,
@@ -218,7 +218,7 @@ function PersonStoryCard({
 
           <button
             onClick={() => onOpen(person)}
-            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:bg-orange-600! hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
+            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-ink flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:bg-orange-600! hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
             aria-label={t("common.open", "Open details")}
           >
             <ChevronRight className="w-5 h-5" />

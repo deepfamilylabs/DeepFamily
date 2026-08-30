@@ -1,11 +1,9 @@
 import type { Ref } from "react";
+import { MODAL_CHIP, MODAL_FIELD } from "../../../../../shared/ui";
 import {
-  AlertTriangle,
-  Check,
   ChevronDown,
   ChevronRight,
   Shield,
-  UserPlus,
   Users,
 } from "lucide-react";
 import type { UseFormRegister } from "react-hook-form";
@@ -24,30 +22,13 @@ interface ParentIdentitySectionProps {
   formResetKey: number;
   expanded: boolean;
   status: ParentStatus;
+  /** One-line recap shown on the collapsed row (name · year · version). */
+  summary?: string;
   calcRef: Ref<PersonHashCalculatorHandle>;
   register: UseFormRegister<AddVersionFormInput>;
   onExpandedChange: (value: boolean) => void;
   onInfoChange: (value: PersonInfoPublic) => void;
   onPassphraseChange: () => void;
-}
-
-function StatusIndicator({ status }: { status: ParentStatus }) {
-  const config = {
-    empty: { icon: UserPlus, color: "text-gray-400", bg: "bg-gray-100 dark:bg-gray-700" },
-    partial: {
-      icon: AlertTriangle,
-      color: "text-amber-500",
-      bg: "bg-amber-100 dark:bg-amber-900/30",
-    },
-    complete: { icon: Check, color: "text-green-500", bg: "bg-green-100 dark:bg-green-900/30" },
-  };
-  const { icon: Icon, color, bg } = config[status];
-
-  return (
-    <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${bg}`}>
-      <Icon className={`w-4 h-4 ${color}`} />
-    </div>
-  );
 }
 
 export function ParentIdentitySection({
@@ -56,6 +37,7 @@ export function ParentIdentitySection({
   formResetKey,
   expanded,
   status,
+  summary,
   calcRef,
   register,
   onExpandedChange,
@@ -67,63 +49,56 @@ export function ParentIdentitySection({
     ? t("addVersion.fatherInfo", "Father Information")
     : t("addVersion.motherInfo", "Mother Information");
   const versionField = isFather ? "fatherVersionIndex" : "motherVersionIndex";
-  const iconClass =
-    status === "complete"
-      ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
-      : isFather
-        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-        : "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400";
+  const hint =
+    status === "empty"
+      ? t("addVersion.parentNotProvided", "Not provided")
+      : t("addVersion.parentNeedsVersion", "Version index still missing");
 
   return (
-    <div className={`space-y-2 ${isFather ? "" : "mt-2!"}`}>
+    <div className="space-y-2">
       <button
         type="button"
         onClick={() => onExpandedChange(!expanded)}
-        className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 group ${
-          expanded
-            ? "bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800"
-            : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:shadow-xs"
+        aria-expanded={expanded}
+        className={`w-full flex items-center gap-3.5 p-3.5 text-left rounded-xl bg-surface border transition-colors focus:outline-hidden focus:ring-3 focus:ring-primary/15 ${
+          expanded ? "border-primary/40" : "border-hairline hover:border-hairline-strong"
         }`}
       >
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
-            <Users className="w-4 h-4" />
-          </div>
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">{title}</h3>
-              {status !== "empty" && <StatusIndicator status={status} />}
-            </div>
-            {status !== "empty" && (
-              <span
-                className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                  status === "complete"
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
-                    : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                }`}
-              >
-                {status === "partial"
-                  ? t("addVersion.partial", "Partial")
-                  : t("addVersion.complete", "Complete")}
-              </span>
-            )}
-          </div>
-        </div>
+        <span className="w-9 h-9 shrink-0 rounded-[10px] bg-surface-muted flex items-center justify-center">
+          <Users className="w-[18px] h-[18px] text-ink-muted" aria-hidden />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-ink truncate">{title}</span>
+          <span className="block text-xs text-ink-muted truncate">{summary || hint}</span>
+        </span>
+        {status !== "empty" && (
+          <span
+            className={`${MODAL_CHIP} shrink-0 ${
+              status === "complete"
+                ? "border-success/25 bg-success/10 text-success"
+                : "border-warning/25 bg-warning/10 text-warning"
+            }`}
+          >
+            {status === "partial"
+              ? t("addVersion.partial", "Partial")
+              : t("addVersion.complete", "Complete")}
+          </span>
+        )}
         {expanded ? (
-          <ChevronDown className="w-5 h-5 text-gray-400" />
+          <ChevronDown className="w-[17px] h-[17px] shrink-0 text-ink-subtle" aria-hidden />
         ) : (
-          <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+          <ChevronRight className="w-[17px] h-[17px] shrink-0 text-ink-subtle" aria-hidden />
         )}
       </button>
 
       <div
         className={`p-1 space-y-4 transition-all duration-300 ease-in-out ${expanded ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0 overflow-hidden"}`}
       >
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 space-y-4">
-          <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100/50 dark:border-blue-900/30">
+        <div className="bg-surface rounded-xl border border-hairline p-4 space-y-4">
+          <div className="p-3 bg-info/8 rounded-xl border border-info/20">
             <div className="flex items-start gap-2">
-              <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed opacity-90">
+              <Shield className="w-4 h-4 text-info shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
                 {t(
                   "addVersion.parentInfoNotice",
                   "Providing both parents locally generates zero-knowledge proofs for family linking (only hashes go on-chain). The first complete two-parent commitment for a person hash may receive DEEP utility points; parents do not need to exist on-chain first. Their details must match when linking to their identities later.",
@@ -161,9 +136,9 @@ export function ParentIdentitySection({
           />
 
           <div className="w-full sm:w-auto">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-semibold text-ink mb-1.5">
               {t("addVersion.versionIndex", "Version Index")}
-              <span className="ml-2 text-xs text-gray-400 font-normal">
+              <span className="ml-2 text-xs text-ink-subtle font-normal">
                 ({t("addVersion.versionIndexHint")})
               </span>
             </label>
@@ -173,7 +148,7 @@ export function ParentIdentitySection({
               {...register(versionField, {
                 setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
               })}
-              className="w-full sm:w-32 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
+              className={`${MODAL_FIELD} sm:w-32`}
               placeholder="0"
             />
           </div>

@@ -34,14 +34,14 @@ export function AddVersionFooter({
   onEndorse,
 }: AddVersionFooterProps) {
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-4 p-6 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+    <div className="flex flex-col-reverse sm:flex-row gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
       {successResult ? (
         <>
           <TransactionButton onClick={onClose} className="flex-1">
             {t("common.close", "Close")}
           </TransactionButton>
           <TransactionButton variant="subtle" onClick={onContinueAdding} className="flex-1">
-            <UserPlus className="w-4 h-4 text-orange-600 dark:text-orange-400 opacity-60" />
+            <UserPlus className="w-4 h-4 text-primary opacity-60" />
             {t("addVersion.continueAdding", "Continue Adding")}
           </TransactionButton>
           <TransactionButton

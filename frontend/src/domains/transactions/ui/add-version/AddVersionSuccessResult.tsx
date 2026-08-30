@@ -20,7 +20,7 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 p-4 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
+      <div className="flex items-center gap-3 p-4 bg-success/10 rounded-lg border border-success/25">
         <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0">
           <Check className="w-6 h-6 text-white" />
         </div>
@@ -69,7 +69,7 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
 
         {versionEvent && (
           <details
-            className="group bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 overflow-hidden"
+            className="group bg-green-50 dark:bg-green-900/20 rounded-lg border border-success/25 overflow-hidden"
             open
           >
             <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors">
@@ -188,14 +188,14 @@ export function AddVersionSuccessResult({ t, successResult }: AddVersionSuccessR
             </div>
           </details>
         ) : (
-          <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="p-3 bg-surface-alt rounded-lg border border-hairline">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-ink-muted shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <p className="text-xs font-medium text-ink-muted mb-1">
                   {t("addVersion.noTokenReward", "No Token Reward")}
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
+                <p className="text-xs text-ink-muted">
                   {t(
                     "addVersion.tokenRewardCondition",
                     "No utility points were distributed. Possible reasons include missing a parent commitment, a reward already claimed for this person hash, or unavailable issuance capacity. Parents do not need to exist on-chain first.",

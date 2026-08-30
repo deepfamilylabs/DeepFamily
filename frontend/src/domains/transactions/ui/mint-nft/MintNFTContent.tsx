@@ -25,9 +25,9 @@ export default function MintNFTModal(props: MintNFTModalProps) {
   return (
     <ResponsiveModalFrame
       {...mint.frame}
-      accentClass="bg-purple-600"
+      accent="purple"
       ariaLabel="Mint NFT"
-      icon={<Image className="w-6 h-6 text-white" />}
+      icon={<Image className="w-[18px] h-[18px]" />}
       title={t("mintNFT.title", "Mint NFT")}
       description={t(
         "mintNFT.headerOnChainHint",
@@ -40,7 +40,7 @@ export default function MintNFTModal(props: MintNFTModalProps) {
           onSubmit={mint.form.handleSubmit(mint.form.onSubmit)}
           className="min-h-full flex flex-col"
         >
-          <div className="flex-1 p-6 space-y-6">
+          <div className="flex-1 p-5 space-y-4">
             <MintTargetSection t={t} {...mint.targetSection} />
 
             {!mint.statusPanel.isAlreadyMinted && (

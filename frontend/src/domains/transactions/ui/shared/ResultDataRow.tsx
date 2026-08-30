@@ -22,9 +22,9 @@ const colorConfig = {
     valueColor: "text-yellow-900 dark:text-yellow-100",
   },
   orange: {
-    labelColor: "text-orange-800 dark:text-orange-200",
-    valueBg: "bg-orange-100 dark:bg-orange-800",
-    valueColor: "text-orange-900 dark:text-orange-100",
+    labelColor: "text-orange-700 dark:text-orange-300",
+    valueBg: "bg-primary/15",
+    valueColor: "text-orange-700 dark:text-orange-300",
   },
 };
 

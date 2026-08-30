@@ -1,8 +1,13 @@
 import React from "react";
 import type { TFunction } from "i18next";
-import { BookOpen, Edit2, Image, Plus, ShieldCheck, Star, Trash2 } from "lucide-react";
+import { BookOpen, Edit2, Image, KeyRound, Plus, Star, Trash2 } from "lucide-react";
 import { ethers } from "ethers";
-import { CopyIconButton } from "../../../shared/ui";
+import {
+  CopyIconButton,
+  MODAL_CARD,
+  MODAL_FIELD_SM,
+  ModalSectionHeading,
+} from "../../../shared/ui";
 import {
   NodeData,
   birthDateString,
@@ -14,7 +19,6 @@ import {
 } from "../../../shared/model";
 
 type NodeDetailT = TFunction;
-type NodeDetailRowColor = "purple" | "emerald" | "blue" | "amber" | "pink" | "slate";
 
 export interface TrustedEndorserAccess {
   connectedAddress?: string | null;
@@ -37,55 +41,43 @@ function SmartAddress({ text }: { text?: string | null }) {
   return <span className="block break-all">{text}</span>;
 }
 
+/**
+ * One row of the on-chain record table: fixed label column, value, copy action.
+ * Replaces the per-row rounded card with a coloured left rule and a tinted
+ * shadow — six accent colours carried no meaning and made the list unscannable.
+ */
 function NodeDetailRow({
   label,
   value,
   copy,
-  color = "slate",
   copyLabel,
   onCopy,
+  action,
 }: {
   label: React.ReactNode;
   value: React.ReactNode;
   copy?: string;
-  color?: NodeDetailRowColor;
   copyLabel: string;
   onCopy: (text: string) => void;
+  /** Trailing control for rows that offer one (e.g. Unlock). */
+  action?: React.ReactNode;
 }) {
-  const containerClasses: Record<NodeDetailRowColor, string> = {
-    purple:
-      "border-l-purple-500/80 hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.25)]",
-    emerald:
-      "border-l-emerald-500/80 hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.25)]",
-    blue: "border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)]",
-    amber:
-      "border-l-amber-500/80 hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.25)]",
-    pink: "border-l-pink-500/80 hover:shadow-[0_8px_30px_-4px_rgba(236,72,153,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(236,72,153,0.25)]",
-    slate:
-      "border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]",
-  };
-
   return (
-    <div
-      className={`group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] ${containerClasses[color]}`}
-    >
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-          {label}
+    <div className="group flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:items-baseline sm:gap-4">
+      <div className="w-full shrink-0 break-words text-xs text-ink-muted sm:w-44">{label}</div>
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <div className="min-w-0 flex-1 break-all font-mono text-xs leading-relaxed text-ink">
+          {value}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="font-mono min-w-0 flex-1 break-all text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
-            {value}
-          </div>
-          {copy ? (
-            <CopyIconButton
-              label={copyLabel}
-              onClick={() => onCopy(copy)}
-              visibility="group-hover"
-              size="sm"
-            />
-          ) : null}
-        </div>
+        {copy ? (
+          <CopyIconButton
+            label={copyLabel}
+            onClick={() => onCopy(copy)}
+            visibility="group-hover"
+            size="sm"
+          />
+        ) : null}
+        {action}
       </div>
     </div>
   );
@@ -110,8 +102,16 @@ export function NodeDetailHeaderActions({
   onOpenPerson: () => void;
   onOpenEditor: () => void;
 }) {
+  const action =
+    "inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg border border-hairline-strong bg-surface text-ink text-[13px] font-semibold transition-colors hover:bg-surface-alt hover:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/15";
+
+  const stop = {
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  };
+
   return (
-    <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+    <>
       {nodeData?.personHash && nodeData?.versionIndex !== undefined && (
         <button
           type="button"
@@ -120,15 +120,13 @@ export function NodeDetailHeaderActions({
             e.stopPropagation();
             onOpenEndorse();
           }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
+          {...stop}
+          className="inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg bg-primary text-white dark:text-orange-950 text-[13px] font-semibold transition-colors hover:bg-primary-hover focus:outline-hidden focus:ring-3 focus:ring-primary/25"
           title={t("people.clickToEndorse", "Click to endorse this version")}
         >
-          <Star className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-          <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-            {endorsementCount}
-          </span>
+          <Star className="w-[15px] h-[15px]" strokeWidth={1.9} aria-hidden />
+          <span>{t("endorse.endorse", "Endorse")}</span>
+          <span className="font-mono opacity-80">{endorsementCount}</span>
         </button>
       )}
       {!hasNFT && nodeData?.personHash && nodeData?.versionIndex !== undefined && (
@@ -139,15 +137,12 @@ export function NodeDetailHeaderActions({
             e.stopPropagation();
             onOpenMint();
           }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
+          {...stop}
+          className={action}
           title={t("familyTree.nodeDetail.mintNFTTooltip", "Mint this person as an NFT")}
         >
-          <Image className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-          <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-            {t("actions.mintNFT", "Mint NFT")}
-          </span>
+          <Image className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+          <span className="hidden sm:inline">{t("actions.mintNFT", "Mint NFT")}</span>
         </button>
       )}
       {hasNFT && nodeData?.tokenId && (
@@ -159,13 +154,12 @@ export function NodeDetailHeaderActions({
               e.stopPropagation();
               onOpenPerson();
             }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
+            {...stop}
+            className={action}
             title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
           >
-            <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-            <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
+            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <span className="hidden sm:inline">
               {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             </span>
           </button>
@@ -176,19 +170,21 @@ export function NodeDetailHeaderActions({
               e.stopPropagation();
               onOpenEditor();
             }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden"
+            {...stop}
+            className={action}
             title={t("familyTree.nodeDetail.editStory", "Edit Story")}
           >
-            <Edit2 className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-            <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-              {t("familyTree.nodeDetail.edit", "Edit")}
-            </span>
+            <Edit2 className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <span className="hidden sm:inline">{t("familyTree.nodeDetail.edit", "Edit")}</span>
           </button>
+          <span className="flex-1" />
+          <span className="inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border border-purple-600/25 bg-purple-600/10 text-xs font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-400/15 dark:text-purple-300">
+            <Image className="w-3.5 h-3.5" strokeWidth={1.9} aria-hidden />
+            {t("familyTree.nodeDetail.minted", "Minted")} · #{nodeData.tokenId}
+          </span>
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -197,23 +193,25 @@ export function NodeDetailHashRows({
   nodeData,
   fallback,
   onCopy,
+  onRequestMetadataUnlock,
 }: {
   t: NodeDetailT;
   nodeData?: NodeData | null;
   fallback: { hash: string; versionIndex?: number };
   onCopy: (text: string) => void;
+  /** Omitted where batch unlocking is unavailable; the row then offers no action. */
+  onRequestMetadataUnlock?: () => void;
 }) {
   const copyLabel = t("search.copy", "Copy");
   const unlockedMetadata = nodeData && isMetadataUnlockUsable(nodeData) ? nodeData : undefined;
   const metadataUnlocked = Boolean(unlockedMetadata);
 
   return (
-    <>
+    <div className={`${MODAL_CARD} divide-y divide-hairline overflow-hidden`}>
       <NodeDetailRow
         label={t("familyTree.nodeDetail.hash")}
         value={<SmartHash text={nodeData?.personHash || fallback.hash} />}
         copy={nodeData?.personHash || fallback.hash}
-        color="purple"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -224,7 +222,6 @@ export function NodeDetailHashRows({
             ? String(nodeData.versionIndex)
             : "-"
         }
-        color="purple"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -236,7 +233,6 @@ export function NodeDetailHashRows({
             ? nodeData.fatherHash
             : undefined
         }
-        color="blue"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -247,7 +243,6 @@ export function NodeDetailHashRows({
             ? String(nodeData.fatherVersionIndex)
             : "-"
         }
-        color="blue"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -259,7 +254,6 @@ export function NodeDetailHashRows({
             ? nodeData.motherHash
             : undefined
         }
-        color="pink"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -270,7 +264,6 @@ export function NodeDetailHashRows({
             ? String(nodeData.motherVersionIndex)
             : "-"
         }
-        color="pink"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -278,14 +271,12 @@ export function NodeDetailHashRows({
         label={t("familyTree.nodeDetail.addedBy")}
         value={<SmartAddress text={nodeData?.addedBy} />}
         copy={nodeData?.addedBy}
-        color="emerald"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
       <NodeDetailRow
         label={t("familyTree.nodeDetail.timestamp")}
         value={formatUnixSeconds(nodeData?.timestamp)}
-        color="amber"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -293,7 +284,6 @@ export function NodeDetailHashRows({
         label={t("familyTree.nodeDetail.versionCommitment", "Version Commitment")}
         value={<SmartHash text={nodeData?.versionCommitment} />}
         copy={nodeData?.versionCommitment}
-        color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -301,7 +291,6 @@ export function NodeDetailHashRows({
         label={t("familyTree.nodeDetail.metadataPointer", "Metadata Pointer")}
         value={<SmartAddress text={nodeData?.metadataPointer} />}
         copy={nodeData?.metadataPointer}
-        color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -309,7 +298,6 @@ export function NodeDetailHashRows({
         label={t("familyTree.nodeDetail.metadataPayloadHash", "Metadata Payload Hash")}
         value={<SmartHash text={nodeData?.metadataPayloadHash} />}
         copy={nodeData?.metadataPayloadHash}
-        color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -320,7 +308,6 @@ export function NodeDetailHashRows({
             ? `${nodeData!.metadataPayloadLength} bytes`
             : "-"
         }
-        color="slate"
         copyLabel={copyLabel}
         onCopy={onCopy}
       />
@@ -331,9 +318,20 @@ export function NodeDetailHashRows({
             ? t("familyTree.nodeDetail.unlockedOnDevice", "Unlocked on this device")
             : t("familyTree.nodeDetail.locked", "Locked")
         }
-        color={metadataUnlocked ? "emerald" : "slate"}
         copyLabel={copyLabel}
         onCopy={onCopy}
+        action={
+          !metadataUnlocked && onRequestMetadataUnlock ? (
+            <button
+              type="button"
+              onClick={onRequestMetadataUnlock}
+              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink transition-colors hover:border-primary hover:bg-surface-alt focus:outline-hidden focus-visible:ring-3 focus-visible:ring-primary/15"
+            >
+              <KeyRound className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
+              {t("metadataUnlock.openButton", "Unlock versions")}
+            </button>
+          ) : null
+        }
       />
       {metadataUnlocked ? (
         <>
@@ -341,7 +339,6 @@ export function NodeDetailHashRows({
             label={t("familyTree.nodeDetail.tag")}
             value={unlockedMetadata!.tag ?? ""}
             copy={unlockedMetadata!.tag || undefined}
-            color="slate"
             copyLabel={copyLabel}
             onCopy={onCopy}
           />
@@ -351,7 +348,7 @@ export function NodeDetailHashRows({
           />
         </>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -444,75 +441,75 @@ export function NodeDetailTrustedEndorsersSection({
   };
 
   return (
-    <div className="pt-4 space-y-2.5">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
-        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+    <div className="space-y-2.5">
+      <ModalSectionHeading>
         {t("familyTree.nodeDetail.trustedEndorsers", "Recommended Sources")}
-      </h3>
-      {loading ? (
-        <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
-          {t("familyTree.nodeDetail.trustedLoading", "Loading recommended sources...")}
-        </div>
-      ) : accounts.length === 0 ? (
-        <div className="text-xs text-gray-500 dark:text-gray-400 px-1">
-          {t("familyTree.nodeDetail.trustedEmpty", "No recommended sources. Filtering is off.")}
-        </div>
-      ) : (
-        accounts.map((account) => (
-          <NodeDetailRow
-            key={account.toLowerCase()}
-            label={t("familyTree.nodeDetail.trustedAccount", "Recommended Account")}
-            value={
-              <div className="flex items-center gap-2">
-                <SmartAddress text={account} />
-                {canEdit ? (
-                  <button
-                    type="button"
-                    onClick={() => void removeAccount(account)}
-                    disabled={pending === account.toLowerCase()}
-                    className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-50"
-                    aria-label={t(
-                      "familyTree.nodeDetail.removeTrusted",
-                      "Remove recommended source",
-                    )}
-                    title={t("familyTree.nodeDetail.removeTrusted", "Remove recommended source")}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                ) : null}
-              </div>
-            }
-            copy={account}
-            color="emerald"
-            copyLabel={copyLabel}
-            onCopy={onCopy}
-          />
-        ))
-      )}
-      {canEdit ? (
-        <div className="flex items-center gap-2 px-1">
-          <input
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={t("familyTree.nodeDetail.trustedAddressPlaceholder", "0x account")}
-            aria-label={t(
-              "familyTree.nodeDetail.trustedAddressLabel",
-              "Recommended account address",
-            )}
-            className="min-w-0 flex-1 h-9 px-3 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-gray-100 font-mono"
-          />
-          <button
-            type="button"
-            onClick={() => void addAccount()}
-            disabled={pending === "add"}
-            className="inline-flex h-9 items-center gap-1.5 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            {t("familyTree.nodeDetail.addTrusted", "Add")}
-          </button>
-        </div>
-      ) : null}
-      {error ? <div className="text-xs text-red-500 dark:text-red-400 px-1">{error}</div> : null}
+      </ModalSectionHeading>
+      <div className={`${MODAL_CARD} divide-y divide-hairline overflow-hidden`}>
+        {loading ? (
+          <div className="px-4 py-2.5 text-xs text-ink-muted">
+            {t("familyTree.nodeDetail.trustedLoading", "Loading recommended sources...")}
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="px-4 py-2.5 text-xs text-ink-muted">
+            {t("familyTree.nodeDetail.trustedEmpty", "No recommended sources. Filtering is off.")}
+          </div>
+        ) : (
+          accounts.map((account) => (
+            <NodeDetailRow
+              key={account.toLowerCase()}
+              label={t("familyTree.nodeDetail.trustedAccount", "Recommended Account")}
+              value={
+                <div className="flex items-center gap-2">
+                  <SmartAddress text={account} />
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={() => void removeAccount(account)}
+                      disabled={pending === account.toLowerCase()}
+                      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-hairline text-ink-subtle transition-colors hover:border-danger/40 hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                      aria-label={t(
+                        "familyTree.nodeDetail.removeTrusted",
+                        "Remove recommended source",
+                      )}
+                      title={t("familyTree.nodeDetail.removeTrusted", "Remove recommended source")}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              }
+              copy={account}
+              copyLabel={copyLabel}
+              onCopy={onCopy}
+            />
+          ))
+        )}
+        {canEdit ? (
+          <div className="flex items-center gap-2 px-4 py-2.5">
+            <input
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder={t("familyTree.nodeDetail.trustedAddressPlaceholder", "0x account")}
+              aria-label={t(
+                "familyTree.nodeDetail.trustedAddressLabel",
+                "Recommended account address",
+              )}
+              className={`${MODAL_FIELD_SM} min-w-0 flex-1 font-mono`}
+            />
+            <button
+              type="button"
+              onClick={() => void addAccount()}
+              disabled={pending === "add"}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink transition-colors hover:border-primary hover:bg-surface-alt disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              {t("familyTree.nodeDetail.addTrusted", "Add")}
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {error ? <div className="text-xs text-danger">{error}</div> : null}
     </div>
   );
 }
@@ -521,14 +518,10 @@ function NodeDetailStorySection({ label, story }: { label: React.ReactNode; stor
   if (!story?.trim()) return null;
 
   return (
-    <div className="group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)] transition-all duration-300">
-      <div className="min-w-0 flex-1">
-        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-          {label}
-        </div>
-        <div className="text-sm text-gray-900 dark:text-gray-100 leading-relaxed whitespace-pre-wrap wrap-break-word max-h-[200px] overflow-y-auto font-medium">
-          {story}
-        </div>
+    <div className="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-4">
+      <div className="w-full shrink-0 break-words text-xs text-ink-muted sm:w-44">{label}</div>
+      <div className="min-w-0 flex-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word text-[13px] leading-relaxed text-ink">
+        {story}
       </div>
     </div>
   );
@@ -549,83 +542,73 @@ export function NodeDetailNftSection({
   const copyLabel = t("search.copy", "Copy");
 
   return (
-    <>
-      <div className="pt-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2 px-1">
-          <Image className="w-4 h-4 text-purple-600" />
-          {t("familyTree.nodeDetail.nft")}
-        </h3>
+    <div className="space-y-2.5">
+      <ModalSectionHeading>{t("familyTree.nodeDetail.nft")}</ModalSectionHeading>
+      <div className={`${MODAL_CARD} divide-y divide-hairline overflow-hidden`}>
+        <NodeDetailRow
+          label={t("familyTree.nodeDetail.tokenId")}
+          value={nodeData!.tokenId}
+          copy={nodeData!.tokenId}
+          copyLabel={copyLabel}
+          onCopy={onCopy}
+        />
+        {nodeData?.fullName && (
+          <NodeDetailRow
+            label={t("familyTree.nodeDetail.fullName")}
+            value={nodeData.fullName}
+            copyLabel={copyLabel}
+            onCopy={onCopy}
+          />
+        )}
+        {nodeData?.gender !== undefined && (
+          <NodeDetailRow
+            label={t("familyTree.nodeDetail.gender")}
+            value={genderTextFn(nodeData.gender, t as any) || "-"}
+            copyLabel={copyLabel}
+            onCopy={onCopy}
+          />
+        )}
+        <NodeDetailRow
+          label={t("familyTree.nodeDetail.birth")}
+          value={(() => {
+            const d = birthDateString(nodeData);
+            const parts = [d, nodeData?.birthPlace].filter(Boolean);
+            return parts.length ? parts.join(" · ") : "-";
+          })()}
+          copyLabel={copyLabel}
+          onCopy={onCopy}
+        />
+        <NodeDetailRow
+          label={t("familyTree.nodeDetail.death")}
+          value={(() => {
+            const d = deathDateString(nodeData);
+            const parts = [d, nodeData?.deathPlace].filter(Boolean);
+            return parts.length ? parts.join(" · ") : "-";
+          })()}
+          copyLabel={copyLabel}
+          onCopy={onCopy}
+        />
+        <NodeDetailStorySection
+          label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
+          story={nodeData?.nftPublicStory}
+        />
+        <NodeDetailRow
+          label={t("person.owner", "Owner Address")}
+          value={<SmartAddress text={owner} />}
+          copy={owner}
+          copyLabel={copyLabel}
+          onCopy={onCopy}
+        />
+        {nodeData?.nftTokenURI && (
+          <NodeDetailRow
+            label={t("familyTree.nodeDetail.uri")}
+            value={nodeData.nftTokenURI}
+            copy={nodeData.nftTokenURI}
+            copyLabel={copyLabel}
+            onCopy={onCopy}
+          />
+        )}
       </div>
-      <NodeDetailRow
-        label={t("familyTree.nodeDetail.tokenId")}
-        value={nodeData!.tokenId}
-        copy={nodeData!.tokenId}
-        color="purple"
-        copyLabel={copyLabel}
-        onCopy={onCopy}
-      />
-      {nodeData?.fullName && (
-        <NodeDetailRow
-          label={t("familyTree.nodeDetail.fullName")}
-          value={nodeData.fullName}
-          color="blue"
-          copyLabel={copyLabel}
-          onCopy={onCopy}
-        />
-      )}
-      {nodeData?.gender !== undefined && (
-        <NodeDetailRow
-          label={t("familyTree.nodeDetail.gender")}
-          value={genderTextFn(nodeData.gender, t as any) || "-"}
-          color="emerald"
-          copyLabel={copyLabel}
-          onCopy={onCopy}
-        />
-      )}
-      <NodeDetailRow
-        label={t("familyTree.nodeDetail.birth")}
-        value={(() => {
-          const d = birthDateString(nodeData);
-          const parts = [d, nodeData?.birthPlace].filter(Boolean);
-          return parts.length ? parts.join(" · ") : "-";
-        })()}
-        color="emerald"
-        copyLabel={copyLabel}
-        onCopy={onCopy}
-      />
-      <NodeDetailRow
-        label={t("familyTree.nodeDetail.death")}
-        value={(() => {
-          const d = deathDateString(nodeData);
-          const parts = [d, nodeData?.deathPlace].filter(Boolean);
-          return parts.length ? parts.join(" · ") : "-";
-        })()}
-        color="slate"
-        copyLabel={copyLabel}
-        onCopy={onCopy}
-      />
-      <NodeDetailStorySection
-        label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
-        story={nodeData?.nftPublicStory}
-      />
-      <NodeDetailRow
-        label={t("person.owner", "Owner Address")}
-        value={<SmartAddress text={owner} />}
-        copy={owner}
-        color="amber"
-        copyLabel={copyLabel}
-        onCopy={onCopy}
-      />
-      {nodeData?.nftTokenURI && (
-        <NodeDetailRow
-          label={t("familyTree.nodeDetail.uri")}
-          value={nodeData.nftTokenURI}
-          copy={nodeData.nftTokenURI}
-          color="slate"
-          copyLabel={copyLabel}
-          onCopy={onCopy}
-        />
-      )}
-    </>
+    </div>
   );
 }

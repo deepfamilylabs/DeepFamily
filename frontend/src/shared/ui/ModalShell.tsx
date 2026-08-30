@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDialogA11y } from "./useDialogA11y";
 import { OVERLAY_Z_INDEX } from "./overlayLayers";
+import { MODAL_CLOSE_BUTTON, MODAL_PANEL, MODAL_SCRIM } from "./modalTokens";
 
 export interface ModalShellProps {
   /** Whether the modal is visible */
@@ -112,7 +113,7 @@ export function ModalShell({
         {/* `bare` skips the default panel wrapper, not the scrim: an aria-modal
             dialog must still read as a layer over inert content. */}
         {isOutermost && (
-          <div className="absolute inset-0 bg-black/40 animate-fade-in" aria-hidden />
+          <div className={`${MODAL_SCRIM} animate-fade-in`} data-modal-scrim aria-hidden />
         )}
         {/* Positioned so children paint above the absolutely positioned scrim. */}
         <div className="relative h-full">
@@ -130,7 +131,9 @@ export function ModalShell({
       role="presentation"
     >
       {/* Backdrop */}
-      {isOutermost && <div className="absolute inset-0 bg-black/40 animate-fade-in" aria-hidden />}
+      {isOutermost && (
+        <div className={`${MODAL_SCRIM} animate-fade-in`} data-modal-scrim aria-hidden />
+      )}
 
       {/* Panel */}
       <div
@@ -141,17 +144,17 @@ export function ModalShell({
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
         tabIndex={-1}
-        className={`w-full ${maxWidth} bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 relative overflow-hidden outline-hidden`}
+        className={`w-full ${maxWidth} ${MODAL_PANEL} p-6 relative overflow-hidden outline-hidden`}
         onClick={(e) => e.stopPropagation()}
       >
         {!hideCloseButton && (
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
+            className={`absolute top-4 right-4 ${MODAL_CLOSE_BUTTON}`}
             aria-label={closeLabel}
           >
-            <X className="w-5 h-5" />
+            <X className="w-[17px] h-[17px]" />
           </button>
         )}
 

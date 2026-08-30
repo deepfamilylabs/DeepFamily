@@ -6,14 +6,18 @@ interface TransactionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   variant?: TransactionButtonVariant;
 }
 
+/**
+ * The primary action stays brand orange in every flow — the accent identifies
+ * the dialog (its header tile), never the button.
+ */
 const variantClasses: Record<TransactionButtonVariant, string> = {
   primary:
-    "bg-orange-600 text-white hover:bg-orange-700 focus:ring-orange-500 disabled:hover:bg-orange-600",
+    "bg-primary text-white dark:text-orange-950 hover:bg-primary-hover focus:ring-primary/40 disabled:hover:bg-primary",
   secondary:
-    "border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-gray-400",
+    "border border-hairline-strong bg-surface text-ink hover:bg-surface-alt focus:ring-primary/30",
   subtle:
-    "border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30 focus:ring-orange-500",
-  info: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:hover:bg-blue-600",
+    "border border-primary/30 bg-primary/10 text-orange-700 dark:text-orange-300 hover:bg-primary/15 focus:ring-primary/30",
+  info: "bg-info text-white dark:text-blue-950 hover:opacity-90 focus:ring-info/40 disabled:hover:bg-info",
 };
 
 export function TransactionButton({
@@ -26,7 +30,7 @@ export function TransactionButton({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold rounded-md shadow-xs transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-950 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 h-11 px-5 text-sm font-semibold rounded-lg transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2 ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className}`}
       {...props}
     >
       {children}

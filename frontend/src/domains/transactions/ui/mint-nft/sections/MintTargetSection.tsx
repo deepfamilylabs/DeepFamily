@@ -1,5 +1,11 @@
 import { AlertCircle } from "lucide-react";
-import { getFieldErrorA11y } from "../../../../../shared/ui";
+import {
+  MODAL_CHIP,
+  MODAL_FIELD,
+  ModalSectionHeading,
+  getFieldErrorA11y,
+  modalField,
+} from "../../../../../shared/ui";
 import type { MintMissingParents, MintNFTT } from "../model/mintNftTypes";
 
 export interface MintTargetSectionProps {
@@ -40,40 +46,34 @@ export function MintTargetSection({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-        {t("mintNFT.targetVersion", "Target Version")}
-      </h3>
+      <ModalSectionHeading>{t("mintNFT.targetVersion", "Target Version")}</ModalSectionHeading>
 
-      <div className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20">
+      <div className="p-4 bg-surface border border-hairline rounded-xl">
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-4">
           <div>
-            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
-              {t("mintNFT.personHash", "Person Hash")} <span className="text-red-500">*</span>
+            <label className="block text-xs font-semibold text-ink mb-1.5">
+              {t("mintNFT.personHash", "Person Hash")} <span className="text-danger">*</span>
             </label>
             <input
               type="text"
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
               {...personHashA11y.fieldProps}
-              className={`w-full h-11 rounded-xl border bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-hidden transition-all font-mono ${
-                hashInputInvalid
-                  ? "border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/10"
-                  : "border-gray-200 dark:border-gray-700 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10"
-              }`}
+              className={`${modalField(hashInputInvalid)} font-mono`}
               placeholder={t("search.versionsQuery.placeholder")}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
-              {t("mintNFT.versionIndex", "Version Index")} <span className="text-red-500">*</span>
+            <label className="block text-xs font-semibold text-ink mb-1.5">
+              {t("mintNFT.versionIndex", "Version Index")} <span className="text-danger">*</span>
             </label>
             <input
               type="number"
               min="1"
               value={versionIndex}
               onChange={(event) => onVersionIndexChange(parseInt(event.target.value) || 1)}
-              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
+              className={MODAL_FIELD}
               placeholder="1"
             />
           </div>
@@ -82,7 +82,7 @@ export function MintTargetSection({
         {hashInputInvalid && (
           <div
             {...personHashA11y.errorProps}
-            className="mt-3 p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2"
+            className="mt-3 p-3 text-sm text-red-700 dark:text-red-300 bg-danger/15 rounded-lg flex items-center gap-2"
           >
             <AlertCircle className="w-4 h-4" />
             {t(
@@ -93,15 +93,15 @@ export function MintTargetSection({
         )}
 
         {!hashInputInvalid && hasValidTarget && (
-          <div className="mt-4 pt-4 border-t border-orange-100 dark:border-orange-900/20">
+          <div className="mt-4 pt-4 border-t border-hairline">
             {isCheckingStatus ? (
-              <div className="text-sm font-medium text-orange-600 dark:text-orange-400 flex items-center gap-2">
+              <div className="text-sm font-medium text-primary flex items-center gap-2">
                 <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 {t("mintNFT.checkingStatus", "Checking status...")}
               </div>
             ) : envelopeHeaderError ? (
               <div
-                className="p-3 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center gap-2"
+                className="p-3 text-sm text-red-700 dark:text-red-300 bg-danger/15 rounded-lg flex items-center gap-2"
                 role="alert"
               >
                 <AlertCircle className="w-4 h-4 shrink-0" />
@@ -111,31 +111,28 @@ export function MintTargetSection({
                 )}
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
-                <div
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isEndorsed ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"}`}
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`${MODAL_CHIP} ${isEndorsed ? "border-success/25 bg-success/10 text-success" : "border-warning/25 bg-warning/10 text-warning"}`}
                 >
-                  <div
-                    className={`w-2 h-2 rounded-full ${isEndorsed ? "bg-green-500" : "bg-orange-500"}`}
-                  />
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
                   {isEndorsed
                     ? t("mintNFT.endorsed", "Endorsed")
                     : t("mintNFT.notEndorsed", "Not Endorsed")}
-                </div>
-                <div
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${isAlreadyMinted ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"}`}
+                </span>
+                <span
+                  className={`${MODAL_CHIP} ${isAlreadyMinted ? "border-danger/25 bg-danger/10 text-danger" : "border-success/25 bg-success/10 text-success"}`}
                 >
-                  <div
-                    className={`w-2 h-2 rounded-full ${isAlreadyMinted ? "bg-red-500" : "bg-green-500"}`}
-                  />
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
                   {isAlreadyMinted
                     ? t("mintNFT.alreadyMinted", "Already Minted")
                     : t("mintNFT.canMint", "Can Mint")}
-                </div>
+                </span>
                 {targetSelfSuiteId !== null && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    {t("mintNFT.identitySuite", "Identity suite")}: {targetSelfSuiteId}
-                  </div>
+                  <span className={`${MODAL_CHIP} border-hairline bg-surface-alt text-ink-muted`}>
+                    {t("mintNFT.identitySuite", "Identity suite")}
+                    <span className="font-mono text-ink">{targetSelfSuiteId}</span>
+                  </span>
                 )}
               </div>
             )}
@@ -145,11 +142,11 @@ export function MintTargetSection({
         {!isCheckingStatus &&
           hasMissingParents &&
           (hasMissingParents.father || hasMissingParents.mother) && (
-            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/30 rounded-xl border border-amber-100 dark:border-amber-900/30">
+            <div className="mt-3 p-3 bg-warning/10 border border-warning/25 rounded-xl">
               <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <AlertCircle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-100 mb-1">
+                  <h4 className="text-[13px] font-semibold text-amber-700 dark:text-amber-300 mb-1">
                     {t("mintNFT.missingParentsTitle", "Incomplete Parent Information")}
                   </h4>
                   <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed opacity-90">

@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KeyRound, LoaderCircle, LockKeyhole, Trash2, X } from "lucide-react";
-import { ModalShell } from "../../../shared/ui";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_FIELD,
+  MODAL_PANEL,
+  MODAL_TILE_BASE,
+  ModalShell,
+  OVERLAY_Z_INDEX,
+} from "../../../shared/ui";
 import {
   classifyProtocolPassphraseRisk,
   type ProtocolPassphraseRisk,
@@ -32,7 +39,20 @@ function hasArchiveAnchors(node: NodeData): boolean {
   );
 }
 
-export function MetadataUnlockControl() {
+export interface MetadataUnlockControlProps {
+  /**
+   * Lets another surface raise the dialog — the person-detail modal offers
+   * Unlock on its locked row. Unlocking is a batch pass over every loaded
+   * locked version, so there is one dialog per tree, not one per version.
+   */
+  open?: boolean;
+  onOpenChange?: (value: boolean) => void;
+}
+
+export function MetadataUnlockControl({
+  open: openProp,
+  onOpenChange,
+}: MetadataUnlockControlProps = {}) {
   const { nodesData } = useTreeGraphData();
   const {
     cacheValidatedPersonVersion,
@@ -49,7 +69,9 @@ export function MetadataUnlockControl() {
   nodesDataRef.current = nodesData;
   const passphraseRef = useRef<HTMLInputElement>(null);
   const preflightGenerationRef = useRef(0);
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = openProp ?? localOpen;
+  const setOpen = onOpenChange ?? setLocalOpen;
   const [preparation, setPreparation] = useState<PreparationState>("idle");
   const [preparedNodes, setPreparedNodes] = useState<NodeData[]>([]);
   const [preflightFailures, setPreflightFailures] = useState(0);
@@ -281,6 +303,7 @@ export function MetadataUnlockControl() {
         isOpen={open}
         onClose={close}
         bare
+        zIndex={OVERLAY_Z_INDEX.nestedModal}
         ariaLabelledBy={titleId}
         ariaDescribedBy={descriptionId}
       >
@@ -289,22 +312,21 @@ export function MetadataUnlockControl() {
         <div className="h-full overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
             <section
-              className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"
+              className={`w-full max-w-[560px] p-5 ${MODAL_PANEL}`}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h3
                     id={titleId}
-                    className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white"
+                    className="flex items-center gap-2.5 font-body text-base font-semibold text-ink"
                   >
-                    <LockKeyhole className="h-5 w-5 text-orange-500" />
+                    <span className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.primary}`}>
+                      <LockKeyhole className="h-[19px] w-[19px]" aria-hidden />
+                    </span>
                     {t("metadataUnlock.title", "Unlock encrypted version metadata")}
                   </h3>
-                  <p
-                    id={descriptionId}
-                    className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400"
-                  >
+                  <p id={descriptionId} className="mt-1 text-xs leading-5 text-ink-muted">
                     {t(
                       "metadataUnlock.description",
                       "One passphrase is tried sequentially against loaded locked versions. Validated person data, label, and biography are saved as plaintext in this browser.",
@@ -350,7 +372,7 @@ export function MetadataUnlockControl() {
               ) : null}
 
               {preparation === "preparing" ? (
-                <div className="mt-4 flex items-center justify-center gap-2 py-4 text-sm text-slate-600 dark:text-slate-300">
+                <div className="mt-4 flex items-center justify-center gap-2 py-4 text-sm text-ink-muted">
                   <LoaderCircle className="h-4 w-4 animate-spin" />{" "}
                   {t("metadataUnlock.checking", "Checking Archive bytes…")}
                 </div>
@@ -358,7 +380,7 @@ export function MetadataUnlockControl() {
 
               {preparation === "ready" && preparedNodes.length > 0 ? (
                 <div className="mt-4 space-y-3">
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <label className="block text-xs font-semibold text-ink-muted">
                     {t("metadataUnlock.passphraseLabel", "Identity passphrase")}
                     <input
                       ref={passphraseRef}
@@ -371,10 +393,10 @@ export function MetadataUnlockControl() {
                         );
                         setHighRiskConfirmed(false);
                       }}
-                      className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                      className={`mt-1 ${MODAL_FIELD}`}
                     />
                   </label>
-                  <label className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <label className="flex items-start gap-2 text-xs text-ink-muted">
                     <input
                       type="checkbox"
                       checked={riskConfirmed}
@@ -411,7 +433,7 @@ export function MetadataUnlockControl() {
                   ) : null}
 
                   {progress ? (
-                    <p className="text-xs text-slate-600 dark:text-slate-300">
+                    <p className="text-xs text-ink-muted">
                       {t(
                         "metadataUnlock.progress",
                         "{{status}}: {{processed}}/{{total}}; {{succeeded}} successful, {{failed}} failed, {{skipped}} cached.",

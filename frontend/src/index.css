@@ -49,6 +49,7 @@
   --color-success: var(--df-success);
   --color-warning: var(--df-warning);
   --color-info: var(--df-info);
+  --color-scrim: var(--df-scrim);
 }
 
 /*
@@ -132,6 +133,20 @@ h3 {
 }
 
 /*
+ * Dialog headings opt out of the tight display line-height above. Those h1–h6
+ * rules are unlayered, so they outrank any Tailwind `leading-*` utility no
+ * matter the source order — the line-height has to be set by a rule of higher
+ * specificity, here. At 110% an 18px title gives a 19.8px line box, which is
+ * shorter than a CJK glyph needs (PingFang SC and friends overflow the em box),
+ * and dialog titles are truncated, so `overflow: hidden` clipped 人物版本详情
+ * along the bottom edge.
+ */
+.modal-title,
+.modal-heading {
+  line-height: 1.35;
+}
+
+/*
  * Design tokens — semantic color layer (light + html.dark).
  * Plain hex for readability; Tailwind v4 handles opacity modifiers
  * (bg-primary/10, text-ink-muted/70, …) via color-mix, no channel split needed.
@@ -158,6 +173,8 @@ h3 {
   --df-success: #16a34a;
   --df-warning: #d97706;
   --df-info: #2563eb;
+  /* dialog scrim — one value for every overlay layer */
+  --df-scrim: rgba(15, 23, 42, 0.45);
 }
 html.dark {
   --df-surface-body: #0d1117;
@@ -175,6 +192,7 @@ html.dark {
   --df-success: #4ade80;
   --df-warning: #fbbf24;
   --df-info: #60a5fa;
+  --df-scrim: rgba(2, 6, 12, 0.62);
 }
 
 input:-webkit-autofill,

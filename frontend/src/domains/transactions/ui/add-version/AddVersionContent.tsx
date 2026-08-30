@@ -1,5 +1,5 @@
 import { UserPlus } from "lucide-react";
-import { ResponsiveModalFrame } from "../../../../shared/ui";
+import { ModalSectionHeading, ResponsiveModalFrame } from "../../../../shared/ui";
 import { useAddVersionModalController } from "./hooks/useAddVersionModalController";
 import { AddVersionConsentSection } from "./sections/AddVersionConsentSection";
 import { AddVersionFooter } from "./sections/AddVersionFooter";
@@ -30,9 +30,9 @@ export default function AddVersionModal(props: AddVersionModalProps) {
   return (
     <ResponsiveModalFrame
       {...addVersion.frame}
-      accentClass="bg-blue-600"
+      accent="blue"
       ariaLabel="Add Version"
-      icon={<UserPlus className="w-6 h-6 text-white" />}
+      icon={<UserPlus className="w-[18px] h-[18px]" />}
       title={t("addVersion.title", "Add Version")}
       description={t("addVersion.personInfoHint", "Secure zero-knowledge proof generation")}
     >
@@ -46,10 +46,19 @@ export default function AddVersionModal(props: AddVersionModalProps) {
           }}
           className="min-h-full flex flex-col"
         >
-          <div className="flex-1 p-6 space-y-6">
+          <div className="flex-1 p-5 space-y-4">
             <PersonIdentitySection t={t} {...addVersion.personSection} />
-            <ParentIdentitySection t={t} {...addVersion.fatherSection} />
-            <ParentIdentitySection t={t} {...addVersion.motherSection} />
+            <div className="space-y-2.5">
+              <ModalSectionHeading
+                aside={t("addVersion.parentsMiningHint", "Both required to mine DEEP")}
+              >
+                {t("addVersion.parents", "Parents")}
+              </ModalSectionHeading>
+              <div className="space-y-2">
+                <ParentIdentitySection t={t} {...addVersion.fatherSection} />
+                <ParentIdentitySection t={t} {...addVersion.motherSection} />
+              </div>
+            </div>
             <MetadataEncryptionSection t={t} {...addVersion.metadataSection} />
 
             {!addVersion.statusPanel.successResult && (

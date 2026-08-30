@@ -30,6 +30,7 @@ export interface NodeDetailProviderProps {
   nodesData: Record<string, NodeData>;
   getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
   trustedEndorserAccess?: TrustedEndorserAccess;
+  onRequestMetadataUnlock?: () => void;
   mergeNodeDetail: (
     selected: NodeKeyMinimal,
     details: {
@@ -45,6 +46,7 @@ export function NodeDetailProvider({
   nodesData,
   getOwnerOf,
   trustedEndorserAccess,
+  onRequestMetadataUnlock,
   mergeNodeDetail,
 }: NodeDetailProviderProps) {
   const [selected, setSelected] = useState<NodeKeyMinimal | null>(null);
@@ -101,6 +103,7 @@ export function NodeDetailProvider({
         error={error}
         getOwnerOf={getOwnerOf}
         trustedEndorserAccess={trustedEndorserAccess}
+        onRequestMetadataUnlock={onRequestMetadataUnlock}
       />
     </NodeDetailProviderContext.Provider>
   );

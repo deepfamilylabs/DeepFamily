@@ -1,6 +1,11 @@
 import { useId } from "react";
 import { AlertCircle } from "lucide-react";
-import { ModalShell } from "../../../../../shared/ui";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_PANEL,
+  MODAL_TILE_BASE,
+  ModalShell,
+} from "../../../../../shared/ui";
 import { OVERLAY_Z_INDEX } from "../../../../../shared/ui/overlayLayers";
 import { TransactionButton } from "../../shared/TransactionButton";
 import type { MintNFTT } from "../model/mintNftTypes";
@@ -32,29 +37,30 @@ export function EndorseRequiredDialog({
     >
       <div className="h-full flex items-center justify-center p-4">
         <div
-          className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-lg p-6"
+          className={`w-[420px] max-w-[95vw] overflow-hidden ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
-            <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="flex gap-3.5 p-5">
+            <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.emerald}`}>
+              <AlertCircle className="w-[19px] h-[19px]" aria-hidden />
+            </div>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <h3 id={titleId} className="modal-heading font-body text-base font-semibold text-ink">
+                {t("mintNFT.endorsementRequiredTitle", "Endorsement Required")}
+              </h3>
+              <p id={descriptionId} className="text-sm text-ink-muted leading-relaxed">
+                {t(
+                  "mintNFT.endorsementRequiredDesc",
+                  "You must endorse this version before minting. Would you like to go endorse now?",
+                )}
+              </p>
+            </div>
           </div>
-          <h3 id={titleId} className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
-            {t("mintNFT.endorsementRequiredTitle", "Endorsement Required")}
-          </h3>
-          <p
-            id={descriptionId}
-            className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-6 leading-relaxed"
-          >
-            {t(
-              "mintNFT.endorsementRequiredDesc",
-              "You must endorse this version before minting. Would you like to go endorse now?",
-            )}
-          </p>
-          <div className="flex gap-3">
-            <TransactionButton onClick={onCancel} className="flex-1">
+          <div className="flex gap-2.5 px-5 py-3.5 border-t border-hairline bg-surface-body">
+            <TransactionButton onClick={onCancel} className="flex-1 h-10">
               {t("common.cancel", "Cancel")}
             </TransactionButton>
-            <TransactionButton variant="info" onClick={onGoEndorse} className="flex-1">
+            <TransactionButton variant="primary" onClick={onGoEndorse} className="flex-1 h-10">
               {t("mintNFT.goEndorse", "Go Endorse")}
             </TransactionButton>
           </div>

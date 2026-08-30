@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
 import { Lock } from "lucide-react";
-import { getFieldErrorA11y } from "../../../../../shared/ui";
+import { MODAL_FIELD, MODAL_FIELD_SM, MODAL_TEXTAREA, ModalSectionHeading, getFieldErrorA11y } from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
 
@@ -47,15 +47,13 @@ export function MintSupplementForm({
 
   return (
     <>
-      <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-          {t("mintNFT.supplementalInfo", "Supplemental Information")}
-        </h3>
+      <div className="space-y-4 pt-4 border-t border-hairline">
+        <ModalSectionHeading>{t("mintNFT.supplementalInfo", "Supplemental Information")}</ModalSectionHeading>
 
-        <div className="p-3 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/30">
-          <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
-            <p className="text-xs text-orange-700 dark:text-orange-300 leading-relaxed font-medium">
+        <div className="p-3 bg-danger/8 border border-danger/20 rounded-xl">
+          <div className="flex items-start gap-2">
+            <Lock className="w-4 h-4 text-danger shrink-0 mt-0.5" aria-hidden />
+            <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
               {t(
                 "mintNFT.supplementalInfoImmutable",
                 "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
@@ -67,23 +65,23 @@ export function MintSupplementForm({
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <label className="block text-xs font-semibold text-ink mb-1.5">
                 {t("mintNFT.birthPlace", "Birth Place")}
               </label>
               <input
                 {...register("birthPlace")}
-                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
+                className={MODAL_FIELD}
                 placeholder={t("mintNFT.birthPlacePlaceholder", "Enter birth place")}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+              <label className="block text-xs font-semibold text-ink mb-1.5">
                 {t("mintNFT.deathPlace", "Death Place")}
               </label>
               <input
                 {...register("deathPlace")}
-                className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
+                className={MODAL_FIELD}
                 placeholder={t(
                   "mintNFT.deathPlacePlaceholder",
                   "Enter death place (if applicable)",
@@ -93,14 +91,14 @@ export function MintSupplementForm({
           </div>
 
           <div className="space-y-2">
-            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">
+            <h4 className="text-[13px] font-semibold text-ink">
               {t("mintNFT.deathDate", "Death Date (if applicable)")}
             </h4>
 
             <div className="flex flex-nowrap items-start gap-1">
               <div className="flex items-start gap-1">
                 <div className="w-20 relative">
-                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                     {t("search.hashCalculator.isBirthBC")}
                   </label>
                   <ThemedSelect
@@ -114,7 +112,7 @@ export function MintSupplementForm({
                 </div>
 
                 <div className="w-20 sm:w-[120px]">
-                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                  <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                     {t("mintNFT.deathYear", "Death Year")}
                   </label>
                   <input
@@ -122,7 +120,7 @@ export function MintSupplementForm({
                     min="0"
                     max={isDeathBC ? 9999 : currentYear}
                     placeholder={isDeathBC ? "<10000" : "<=" + currentYear}
-                    className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                    className={MODAL_FIELD_SM}
                     {...register("deathYear", {
                       setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                     })}
@@ -131,7 +129,7 @@ export function MintSupplementForm({
               </div>
 
               <div className="w-24">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                   {t("search.hashCalculator.birthMonthLabel")}
                 </label>
                 <input
@@ -139,7 +137,7 @@ export function MintSupplementForm({
                   min="0"
                   max="12"
                   placeholder={t("search.hashCalculator.birthMonth")}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                  className={MODAL_FIELD_SM}
                   {...register("deathMonth", {
                     setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                   })}
@@ -147,7 +145,7 @@ export function MintSupplementForm({
               </div>
 
               <div className="w-24">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                   {t("search.hashCalculator.birthDayLabel")}
                 </label>
                 <input
@@ -155,7 +153,7 @@ export function MintSupplementForm({
                   min="0"
                   max="31"
                   placeholder={t("search.hashCalculator.birthDay")}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                  className={MODAL_FIELD_SM}
                   {...register("deathDay", {
                     setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
                   })}
@@ -165,12 +163,12 @@ export function MintSupplementForm({
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <label className="block text-xs font-semibold text-ink mb-1.5">
               {t("mintNFT.story", "Life Story Summary")}
             </label>
             {canOfferBiographyCopy && (
               <div className="mb-3 space-y-3 rounded-xl border border-red-200 bg-red-50/70 p-3 dark:border-red-900/40 dark:bg-red-900/10">
-                <p className="text-xs font-medium leading-relaxed text-red-800 dark:text-red-200">
+                <p className="text-xs font-medium leading-relaxed text-red-700 dark:text-red-300">
                   {t(
                     "mintNFT.copyBiographyWarning",
                     "An unlocked private biography is available for this exact version. Copying it into the NFT story makes that text permanently public on-chain.",
@@ -178,14 +176,14 @@ export function MintSupplementForm({
                 </p>
                 <label
                   htmlFor={biographyCopyConfirmationId}
-                  className="flex cursor-pointer items-start gap-2 text-xs font-semibold text-red-900 dark:text-red-100"
+                  className="flex cursor-pointer items-start gap-2 text-xs font-semibold text-red-700 dark:text-red-300"
                 >
                   <input
                     id={biographyCopyConfirmationId}
                     type="checkbox"
                     checked={biographyCopyConfirmed}
                     onChange={(event) => setBiographyCopyConfirmed(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                    className="mt-0.5 h-4 w-4 rounded border-red-300 text-danger focus:ring-red-500"
                   />
                   <span>
                     {t(
@@ -214,11 +212,11 @@ export function MintSupplementForm({
               {...register("story")}
               rows={4}
               {...storyA11y.fieldProps}
-              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all resize-y"
+              className={MODAL_TEXTAREA}
               placeholder={t("mintNFT.storyPlaceholder", "Enter a brief life story summary...")}
             />
             {errors.story && (
-              <p {...storyA11y.errorProps} className="mt-1 text-xs text-red-500 font-bold">
+              <p {...storyA11y.errorProps} className="mt-1 text-xs text-danger font-bold">
                 {String(errors.story.message)}
               </p>
             )}
@@ -226,25 +224,25 @@ export function MintSupplementForm({
         </div>
       </div>
 
-      <div className="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+      <div className="space-y-4 pt-4 border-t border-hairline">
         <div>
-          <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <label className="block text-xs font-semibold text-ink mb-1.5">
             {t("mintNFT.tokenURI", "Token URI")}
           </label>
           <input
             {...register("tokenURI")}
             {...tokenUriA11y.fieldProps}
-            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-orange-500 dark:focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-hidden transition-all"
+            className={MODAL_FIELD}
             placeholder="https://... or ipfs://..."
           />
           <p
             id={tokenUriHintId}
-            className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium"
+            className="mt-2 text-xs text-ink-muted font-medium"
           >
             {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
           </p>
           {errors.tokenURI && (
-            <p {...tokenUriA11y.errorProps} className="mt-1 text-xs text-red-500 font-bold">
+            <p {...tokenUriA11y.errorProps} className="mt-1 text-xs text-danger font-bold">
               {String(errors.tokenURI.message)}
             </p>
           )}

@@ -2,16 +2,12 @@ import type React from "react";
 import type { TFunction } from "i18next";
 import { useEffect, useRef, useState } from "react";
 import {
-  User,
   Book,
   FileText,
-  Clock,
   ChevronDown,
   ChevronRight,
   Layers,
-  Hash,
   AlertCircle,
-  Link,
   Edit2,
   Check,
 } from "lucide-react";
@@ -21,10 +17,8 @@ import {
   isMinted,
   isMetadataUnlockUsable,
   formatUnixSeconds,
-  shortAddress,
-  formatHashMiddle,
 } from "../../../shared/model";
-import { CopyIconButton } from "../../../shared/ui";
+import { CopyIconButton, MODAL_CARD, MODAL_CHIP, ModalSectionHeading } from "../../../shared/ui";
 import { getChunkTypeIcon, getChunkTypeColorClass } from "../config/chunkTypes";
 
 export interface StoryData {
@@ -44,76 +38,54 @@ export interface StoryData {
 
 type PersonStoryT = TFunction;
 
-interface AbbreviatedTextProps {
-  text?: string | null;
-  isDesktop: boolean;
-  format: (value: string) => string;
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <ModalSectionHeading>{children}</ModalSectionHeading>;
 }
 
-function AbbreviatedText({ text, isDesktop, format }: AbbreviatedTextProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const measureRef = useRef<HTMLSpanElement | null>(null);
-  const [useAbbrev, setUseAbbrev] = useState<boolean>(() => !isDesktop);
-  const fullText = text ?? "";
-
-  useEffect(() => {
-    if (!text) {
-      setUseAbbrev(false);
-      return;
-    }
-    if (!isDesktop) {
-      setUseAbbrev(true);
-      return;
-    }
-    const container = containerRef.current;
-    const measure = measureRef.current;
-    if (!container || !measure) return;
-    setUseAbbrev(measure.scrollWidth > container.clientWidth + 1);
-  }, [fullText, isDesktop, text]);
-
-  useEffect(() => {
-    if (!isDesktop) return;
-    const onResize = () => {
-      const container = containerRef.current;
-      const measure = measureRef.current;
-      if (!container || !measure) return;
-      setUseAbbrev(measure.scrollWidth > container.clientWidth + 1);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [isDesktop]);
-
-  if (!text) return <span>-</span>;
-
+function InfoCard({ children }: { children: React.ReactNode }) {
   return (
-    <div ref={containerRef} className="relative min-w-0" title={text}>
-      <span className="block whitespace-nowrap overflow-hidden text-ellipsis">
-        {useAbbrev ? format(text) : text}
-      </span>
-      <span
-        ref={measureRef}
-        className="absolute left-0 top-0 opacity-0 pointer-events-none whitespace-nowrap"
-      >
-        {text}
-      </span>
+    <div className={`group relative flex items-start gap-4 p-4 ${MODAL_CARD}`}>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider px-1">
-      {children}
-    </h3>
-  );
-}
-
-function InfoCard({ borderClass, children }: { borderClass: string; children: React.ReactNode }) {
+/**
+ * One row of the identity table — same anatomy as the person-detail modal's
+ * on-chain record, so the two dialogs present the same data the same way.
+ */
+function RecordRow({
+  label,
+  badge,
+  value,
+  copy,
+  copyLabel,
+  onCopy,
+  inset = true,
+}: {
+  label: React.ReactNode;
+  badge?: React.ReactNode;
+  value: React.ReactNode;
+  copy?: string;
+  copyLabel: string;
+  onCopy: (text: string) => void;
+  /** false inside a card that already supplies its own horizontal padding. */
+  inset?: boolean;
+}) {
   return (
     <div
-      className={`group relative flex items-start gap-4 p-4 pl-5 rounded-r-2xl rounded-l-md bg-white dark:bg-gray-900 border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] ${borderClass} transition-all duration-300`}
+      className={`group flex flex-col gap-1 py-2.5 sm:flex-row sm:items-baseline sm:gap-4 ${inset ? "px-4" : ""}`}
     >
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="flex w-full shrink-0 items-center gap-1.5 text-xs text-ink-muted sm:w-28">
+        <span className="break-words">{label}</span>
+        {badge}
+      </div>
+      <div className="flex min-w-0 flex-1 items-start gap-2">
+        <div className="min-w-0 flex-1 break-all font-mono text-xs leading-relaxed text-ink">
+          {value}
+        </div>
+        {copy ? <CopyButton label={copyLabel} onClick={() => onCopy(copy)} /> : null}
+      </div>
     </div>
   );
 }
@@ -157,22 +129,22 @@ export function StoryLifeEventsSection({
       <SectionTitle>{t("storyChunksModal.lifeEvents", "Life Events")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {(birth || birthPlace) && (
-          <InfoCard borderClass="border-l-emerald-500/80 hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(16,185,129,0.25)]">
-            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+          <InfoCard>
+            <div className="text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
               {t("storyChunksModal.born", "Born")}
             </div>
-            <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
+            <div className="text-sm font-medium text-ink leading-relaxed">
               {[birth, birthPlace].filter(Boolean).join(" · ")}
             </div>
           </InfoCard>
         )}
 
         {(death || deathPlace) && (
-          <InfoCard borderClass="border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]">
-            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+          <InfoCard>
+            <div className="text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
               {t("storyChunksModal.died", "Died")}
             </div>
-            <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
+            <div className="text-sm font-medium text-ink leading-relaxed">
               {[death, deathPlace].filter(Boolean).join(" · ")}
             </div>
           </InfoCard>
@@ -186,13 +158,11 @@ export function StoryIdentitySection({
   t,
   person,
   owner,
-  isDesktop,
   copyText,
 }: {
   t: PersonStoryT;
   person: NodeData;
   owner?: string;
-  isDesktop: boolean;
   copyText: (text: string) => void;
 }) {
   const privateMetadataUnlocked = isMetadataUnlockUsable(person);
@@ -203,72 +173,52 @@ export function StoryIdentitySection({
   return (
     <div className="space-y-4">
       <SectionTitle>{t("storyChunksModal.blockchainIdentity", "Identity")}</SectionTitle>
-      <div className="grid grid-cols-1 gap-3">
+      <div className={`${MODAL_CARD} divide-y divide-hairline overflow-hidden`}>
         {person.personHash && (
-          <InfoCard borderClass="border-l-purple-500/80 hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(168,85,247,0.25)]">
-            <div className="flex items-center gap-2 mb-1.5">
-              <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                {t("storyChunksModal.personHash", "Person Hash")}
-              </div>
-              {person.versionIndex && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md">
+          <RecordRow
+            label={t("storyChunksModal.personHash", "Person Hash")}
+            badge={
+              person.versionIndex ? (
+                <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
                   v{person.versionIndex}
                 </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-medium text-gray-900 dark:text-white min-w-0 flex-1 font-mono break-all leading-relaxed">
-                <AbbreviatedText
-                  text={person.personHash}
-                  isDesktop={isDesktop}
-                  format={formatHashMiddle}
-                />
-              </div>
-              <CopyButton label={copyLabel} onClick={() => copyText(person.personHash)} />
-            </div>
-          </InfoCard>
+              ) : undefined
+            }
+            value={person.personHash}
+            copy={person.personHash}
+            copyLabel={copyLabel}
+            onCopy={copyText}
+          />
         )}
 
         {isMinted(person) && (
-          <InfoCard borderClass="border-l-amber-500/80 hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(245,158,11,0.25)]">
-            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-              {t("person.owner", "Owner Address")}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-medium text-gray-900 dark:text-white min-w-0 flex-1 font-mono break-all leading-relaxed">
-                <AbbreviatedText text={owner} isDesktop={isDesktop} format={shortAddress} />
-              </div>
-              {owner && <CopyButton label={copyLabel} onClick={() => copyText(owner)} />}
-            </div>
-          </InfoCard>
+          <RecordRow
+            label={t("person.owner", "Owner Address")}
+            value={owner || "-"}
+            copy={owner || undefined}
+            copyLabel={copyLabel}
+            onCopy={copyText}
+          />
         )}
 
         {visibleTag && (
-          <InfoCard borderClass="border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]">
-            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-              {t("storyChunksModal.tag", "Tag")}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-medium text-gray-900 dark:text-white leading-relaxed">
-                {visibleTag}
-              </div>
-              <CopyButton label={copyLabel} onClick={() => copyText(visibleTag)} />
-            </div>
-          </InfoCard>
+          <RecordRow
+            label={t("storyChunksModal.tag", "Tag")}
+            value={<span className="font-sans">{visibleTag}</span>}
+            copy={visibleTag}
+            copyLabel={copyLabel}
+            onCopy={copyText}
+          />
         )}
 
         {person.nftTokenURI && (
-          <InfoCard borderClass="border-l-gray-400 hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(156,163,175,0.25)]">
-            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
-              {t("familyTree.nodeDetail.uri", "Token URI")}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 break-all line-clamp-1 flex-1 font-mono leading-relaxed">
-                {person.nftTokenURI}
-              </div>
-              <CopyButton label={copyLabel} onClick={() => copyText(person.nftTokenURI!)} />
-            </div>
-          </InfoCard>
+          <RecordRow
+            label={t("familyTree.nodeDetail.uri", "Token URI")}
+            value={person.nftTokenURI}
+            copy={person.nftTokenURI}
+            copyLabel={copyLabel}
+            onCopy={copyText}
+          />
         )}
       </div>
     </div>
@@ -281,8 +231,8 @@ export function BasicStorySection({ t, story }: { t: PersonStoryT; story?: strin
   return (
     <div className="space-y-3">
       <SectionTitle>{t("storyChunksModal.basicStory", "Basic Story")}</SectionTitle>
-      <InfoCard borderClass="border-l-blue-500/80 hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.15)] dark:hover:shadow-[0_8px_30px_-4px_rgba(59,130,246,0.25)]">
-        <p className="text-sm leading-relaxed text-gray-900 dark:text-gray-100 whitespace-pre-wrap font-medium">
+      <InfoCard>
+        <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap font-medium">
           {story}
         </p>
       </InfoCard>
@@ -300,13 +250,12 @@ function StoryViewToggle({
   onChange: (mode: "chunks" | "full") => void;
 }) {
   const buttonClass = (active: boolean) =>
-    `group relative inline-flex h-9 items-center gap-2 px-4 rounded-full border transition-all duration-200 ${
+    `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-lg border text-[13px] font-semibold transition-colors focus:outline-hidden focus:ring-3 focus:ring-primary/15 ${
       active
-        ? "bg-orange-500 border-orange-500 text-white shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)]"
-        : "bg-white dark:bg-black/40 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-orange-500 hover:border-orange-500 hover:text-white hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95"
+        ? "bg-primary border-primary text-white dark:text-orange-950"
+        : "bg-surface border-hairline-strong text-ink hover:bg-surface-alt hover:border-primary"
     }`;
-  const iconClass = (active: boolean) =>
-    active ? "text-white" : "text-gray-400 group-hover:text-white transition-colors";
+  const iconClass = (active: boolean) => (active ? "" : "text-ink-muted");
 
   return (
     <div className="flex items-center gap-3">
@@ -317,7 +266,7 @@ function StoryViewToggle({
         className={buttonClass(viewMode === "chunks")}
       >
         <Layers size={14} className={iconClass(viewMode === "chunks")} />
-        <span className="text-xs font-bold tracking-wide">
+        <span>
           {t("storyChunksModal.chunks", "Chunks")}
         </span>
       </button>
@@ -328,7 +277,7 @@ function StoryViewToggle({
         className={buttonClass(viewMode === "full")}
       >
         <FileText size={14} className={iconClass(viewMode === "full")} />
-        <span className="text-xs font-bold tracking-wide">
+        <span>
           {t("storyChunksModal.fullText", "Full Text")}
         </span>
       </button>
@@ -353,7 +302,7 @@ function StoryIntegritySection({
     <div className="flex items-center justify-between gap-2 flex-wrap min-h-[32px]">
       <div>
         {person.storyMetadata?.isSealed ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-100 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-bold bg-blue-50 dark:bg-blue-900/10">
+          <span className={`${MODAL_CHIP} border-info/25 bg-info/10 text-info`}>
             <Check size={12} strokeWidth={3} />
             {t("person.sealed", "Sealed")}
           </span>
@@ -365,7 +314,7 @@ function StoryIntegritySection({
                 if (!person.tokenId) return;
                 window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer");
               }}
-              className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 border border-transparent hover:border-green-200 dark:hover:border-green-500/30 text-green-700 dark:text-green-400 text-xs font-bold transition-all duration-300"
+              className={`group ${MODAL_CHIP} border-success/25 bg-success/10 text-success transition-colors hover:bg-success/15`}
             >
               <Edit2 size={12} className="group-hover:scale-110 transition-transform" />
               {t("person.editable", "Editable")}
@@ -376,19 +325,19 @@ function StoryIntegritySection({
       {chunksCount > 0 &&
         !storyData.loading &&
         (storyData.integrityChecking ? (
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-gray-500 dark:text-gray-400 text-xs font-medium bg-gray-50 dark:bg-gray-800">
+          <span className={`${MODAL_CHIP} border-hairline bg-surface-alt text-ink-muted`}>
             <div className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
             {t("storyChunksModal.integrityChecking", "Checking...")}
           </span>
         ) : (
           storyData.integrity &&
           (integrityOk ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-green-600 dark:text-green-400 text-xs font-bold bg-green-50 dark:bg-green-900/10">
+            <span className={`${MODAL_CHIP} border-success/25 bg-success/10 text-success`}>
               <Check size={12} strokeWidth={3} />
               {t("storyChunksModal.integrityVerified", "Integrity verified")}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-amber-600 dark:text-amber-400 text-xs font-bold bg-amber-50 dark:bg-amber-900/10">
+            <span className={`${MODAL_CHIP} border-warning/25 bg-warning/10 text-warning`}>
               <AlertCircle size={12} />
               {t("storyChunksModal.integrityWarning", "Integrity failed")}
             </span>
@@ -401,9 +350,9 @@ function StoryIntegritySection({
 export function StoryEmptyState({ t, icon = "file" }: { t: PersonStoryT; icon?: "file" | "book" }) {
   const Icon = icon === "book" ? Book : FileText;
   return (
-    <div className="text-center py-16 bg-gray-50/50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
-      <Icon className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+    <div className="text-center py-16 bg-surface-alt rounded-xl border border-dashed border-hairline">
+      <Icon className="w-10 h-10 text-ink-subtle mx-auto mb-4" />
+      <p className="text-sm font-medium text-ink-muted">
         {icon === "book"
           ? t("storyChunksModal.noStory", "No story content available")
           : t("storyChunksModal.noStoryData", "No story data available")}
@@ -414,10 +363,10 @@ export function StoryEmptyState({ t, icon = "file" }: { t: PersonStoryT; icon?: 
 
 function StoryLoadingState({ t }: { t: PersonStoryT }) {
   return (
-    <div className="flex items-center justify-center py-16 bg-gray-50/50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+    <div className="flex items-center justify-center py-16 bg-surface-alt rounded-xl border border-dashed border-hairline">
       <div className="text-center">
-        <div className="animate-spin w-6 h-6 border-2 border-gray-900 dark:border-white border-t-transparent rounded-full mx-auto mb-4 opacity-50" />
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+        <div className="animate-spin w-6 h-6 border-2 border-ink border-t-transparent rounded-full mx-auto mb-4 opacity-50" />
+        <span className="text-sm font-medium text-ink-muted">
           {t("storyChunksModal.loading", "Loading story chunks...")}
         </span>
       </div>
@@ -427,18 +376,18 @@ function StoryLoadingState({ t }: { t: PersonStoryT }) {
 
 function StoryErrorState({ error }: { error: string }) {
   return (
-    <div className="text-center py-16 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-200 dark:border-red-800/20">
-      <AlertCircle className="w-10 h-10 text-red-500/50 dark:text-red-400/50 mx-auto mb-4" />
-      <p className="text-sm font-medium text-red-600 dark:text-red-400">{error}</p>
+    <div className="text-center py-16 bg-red-50 dark:bg-red-900/10 rounded-xl border border-danger/25/20">
+      <AlertCircle className="w-10 h-10 text-danger/50 dark:text-red-400/50 mx-auto mb-4" />
+      <p className="text-sm font-medium text-danger">{error}</p>
     </div>
   );
 }
 
 function StoryFullTextPanel({ fullStory }: { fullStory: string }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 sm:p-8 border border-gray-100 dark:border-gray-800 shadow-xs leading-relaxed">
+    <div className="bg-surface rounded-xl p-6 sm:p-8 border border-hairline shadow-xs leading-relaxed">
       <div className="prose prose-base dark:prose-invert max-w-none">
-        <div className="whitespace-pre-wrap text-gray-800 dark:text-gray-200 font-serif leading-relaxed">
+        <div className="whitespace-pre-wrap text-ink font-serif leading-relaxed">
           {fullStory}
         </div>
       </div>
@@ -468,10 +417,8 @@ function StoryChunkCard({
 
   return (
     <div
-      className={`group relative rounded-r-2xl rounded-l-md border-y border-r border-gray-100 dark:border-gray-800 border-l-[3px] transition-all duration-300 ${
-        isExpanded
-          ? "bg-white dark:bg-gray-900 border-l-orange-500 shadow-[0_8px_30px_-4px_rgba(249,115,22,0.15)] dark:shadow-[0_8px_30px_-4px_rgba(249,115,22,0.25)]"
-          : "bg-white dark:bg-gray-900 border-l-gray-200 dark:border-l-gray-700 hover:border-l-orange-400 hover:shadow-lg dark:hover:shadow-none hover:shadow-gray-200/50"
+      className={`group relative rounded-xl border bg-surface transition-colors ${
+        isExpanded ? "border-primary/40" : "border-hairline hover:border-hairline-strong"
       }`}
     >
       <div
@@ -485,14 +432,14 @@ function StoryChunkCard({
             onToggle(chunk.chunkIndex);
           }
         }}
-        className="w-full text-left p-4 pl-5 cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-orange-500/50 rounded-r-2xl rounded-l-md"
+        className="w-full text-left p-4 cursor-pointer rounded-xl focus:outline-hidden focus:ring-3 focus:ring-primary/15"
       >
         <div className="flex items-start gap-4">
           <div
             className={`mt-0.5 p-1.5 rounded-full transition-colors ${
               isExpanded
-                ? "bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300"
+                ? "bg-primary/12 text-primary"
+                : "bg-surface-muted text-ink-subtle"
             }`}
           >
             {isExpanded ? (
@@ -506,11 +453,11 @@ function StoryChunkCard({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <span
-                  className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-gray-900 dark:text-gray-100"}`}
+                  className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-ink"}`}
                 >
                   #{chunk.chunkIndex}
                 </span>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-black border border-gray-100 dark:border-gray-800 shadow-xs">
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-hairline shadow-xs">
                   <ChunkIcon size={12} className={iconColor} />
                   <span
                     className={`text-[10px] uppercase font-bold tracking-wider ${iconColor.replace("text-", "text-opacity-80 text-")}`}
@@ -519,79 +466,55 @@ function StoryChunkCard({
                   </span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-ink-subtle bg-surface-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
                 {chunk.content.length} {t("storyChunksModal.characters", "chars")}
               </span>
             </div>
 
             <div
-              className={`text-sm leading-relaxed ${isExpanded ? "text-gray-900 dark:text-gray-100 whitespace-pre-wrap" : "text-gray-600 dark:text-gray-400 line-clamp-2"}`}
+              className={`text-sm leading-relaxed ${isExpanded ? "text-ink whitespace-pre-wrap" : "text-ink-muted line-clamp-2"}`}
             >
               {isExpanded ? chunk.content : preview}
             </div>
 
             {isExpanded && (
               <div
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800/50"
+                className="mt-4 border-t border-hairline divide-y divide-hairline"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <User size={14} className="text-gray-400" />
-                  {chunk.editor ? (
-                    <>
-                      <span className="truncate" title={chunk.editor}>
-                        {shortAddress(chunk.editor)}
-                      </span>
-                      <CopyButton
-                        compact
-                        label={copyLabel}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyText(chunk.editor);
-                        }}
-                      />
-                    </>
-                  ) : (
-                    <span>-</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <Clock size={14} className="text-gray-400" />
-                  <span>{formatUnixSeconds(chunk.timestamp)}</span>
-                </div>
+                <RecordRow
+                  inset={false}
+                  label={t("storyChunksModal.chunkEditor", "Editor")}
+                  value={chunk.editor || "-"}
+                  copy={chunk.editor || undefined}
+                  copyLabel={copyLabel}
+                  onCopy={copyText}
+                />
+                <RecordRow
+                  inset={false}
+                  label={t("familyTree.nodeDetail.timestamp", "Timestamp")}
+                  value={formatUnixSeconds(chunk.timestamp)}
+                  copyLabel={copyLabel}
+                  onCopy={copyText}
+                />
                 {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
-                    <Link size={14} className="text-gray-400" />
-                    <span
-                      className="truncate font-mono bg-gray-50 dark:bg-gray-800 px-1.5 py-0.5 rounded-sm"
-                      title={chunk.attachmentCID}
-                    >
-                      {chunk.attachmentCID}
-                    </span>
-                    <CopyButton
-                      compact
-                      label={copyLabel}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyText(chunk.attachmentCID);
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
-                  <Hash size={14} className="text-gray-400" />
-                  <span className="font-mono truncate" title={chunk.chunkHash}>
-                    {formatHashMiddle(chunk.chunkHash)}
-                  </span>
-                  <CopyButton
-                    compact
-                    label={copyLabel}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyText(chunk.chunkHash);
-                    }}
+                  <RecordRow
+                    inset={false}
+                    label={t("storyChunksModal.attachment", "Attachment")}
+                    value={chunk.attachmentCID}
+                    copy={chunk.attachmentCID}
+                    copyLabel={copyLabel}
+                    onCopy={copyText}
                   />
-                </div>
+                )}
+                <RecordRow
+                  inset={false}
+                  label={t("storyChunksModal.chunkHash", "Chunk Hash")}
+                  value={chunk.chunkHash}
+                  copy={chunk.chunkHash}
+                  copyLabel={copyLabel}
+                  onCopy={copyText}
+                />
               </div>
             )}
           </div>
@@ -679,7 +602,7 @@ export function DetailedStorySection({
         <div className="flex items-center gap-3">
           <SectionTitle>{t("storyChunksModal.detailedStory", "Detailed Story")}</SectionTitle>
           {chunksCount > 0 && (
-            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 px-2.5 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+            <span className="text-xs font-bold text-ink-muted px-2.5 py-1 bg-surface-muted rounded-full">
               {t("storyChunksModal.chunksAndSize", "{{count}} chunks · {{size}} bytes", {
                 count: chunksCount,
                 size: lengthBytes,
