@@ -36,11 +36,6 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
     setIsOpen(false);
   }, []);
 
-  // Hide FAB on Actions page since FAB represents that page
-  if (location.pathname === "/actions") {
-    return null;
-  }
-
   const actions = [
     {
       id: "add-version",

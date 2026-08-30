@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Image, Star, Wallet, AlertCircle } from "lucide-react";
+import { Plus, Image, Star, Wallet, AlertCircle, ArrowRight } from "lucide-react";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
 import { AddVersionModal, EndorseModal, MintNFTModal } from "../domains/transactions";
 import { PageContainer } from "../shared/ui";
@@ -12,8 +12,6 @@ export default function ActionsPage() {
   const { t } = useTranslation();
   const { address } = useWallet();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<ActionTab>("add-version");
-  const hasAutoOpenedRef = useRef(false);
   const tabParam = useMemo(() => {
     const param = searchParams.get("tab") as ActionTab;
     return param && ["add-version", "mint-nft", "endorse"].includes(param) ? param : null;
@@ -24,17 +22,11 @@ export default function ActionsPage() {
     return openParam === "1" || openParam.toLowerCase() === "true";
   }, [searchParams]);
 
-  // Handle URL tab parameter
+  // `open=1` is a one-shot command rather than persistent state: consume it once
+  // handled, so the floating action button can issue the same request again
+  // without the URL already carrying the flag.
   useEffect(() => {
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
-
-  // Auto-open modal when arriving with explicit open flag
-  useEffect(() => {
-    if (!address || !shouldAutoOpen || hasAutoOpenedRef.current) return;
-    if (!tabParam) return;
+    if (!address || !shouldAutoOpen || !tabParam) return;
 
     if (tabParam === "add-version") {
       setAddVersionModal({ isOpen: true });
@@ -46,8 +38,11 @@ export default function ActionsPage() {
       setEndorseModal({ isOpen: true, personHash: undefined, versionIndex: undefined });
     }
 
-    hasAutoOpenedRef.current = true;
-  }, [address, shouldAutoOpen, tabParam]);
+    const consumed = new URLSearchParams(searchParams);
+    consumed.delete("open");
+    consumed.delete("autoOpen");
+    setSearchParams(consumed, { replace: true });
+  }, [address, shouldAutoOpen, tabParam, searchParams, setSearchParams]);
 
   // Auto-open Endorse modal if URL carries target hash/index
   useEffect(() => {
@@ -103,40 +98,49 @@ export default function ActionsPage() {
     versionData?: any;
   }>({ isOpen: false });
 
-  const tabs = useMemo(
+  // Accent classes are written out in full: Tailwind cannot see composed names.
+  const actionCards = useMemo(
     () => [
       {
         id: "add-version" as ActionTab,
-        name: t("actions.add", "Add"),
-        subtitle: t("actions.addVersion", "Add Version"),
+        title: t("actions.addVersion", "Add Version"),
         icon: Plus,
         description: t(
           "actions.addVersionDesc",
           "Add a new version of person data with zero-knowledge proofs",
         ),
-        color: "blue",
+        cta: t("actions.startAddVersion", "Start Adding Version"),
+        iconClass: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+        ctaClass: "text-blue-600 dark:text-blue-400",
+        onOpen: () => setAddVersionModal({ isOpen: true }),
       },
       {
         id: "endorse" as ActionTab,
-        name: t("actions.endorse", "Endorse"),
-        subtitle: t("actions.endorsement", "Endorsement"),
+        title: t("actions.endorsement", "Endorsement"),
         icon: Star,
         description: t(
           "actions.endorseDesc",
           "Support quality data by endorsing versions with DEEP tokens",
         ),
-        color: "green",
+        cta: t("actions.openEndorse", "Open Endorsement"),
+        iconClass: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
+        ctaClass: "text-emerald-600 dark:text-emerald-400",
+        onOpen: () =>
+          setEndorseModal({ isOpen: true, personHash: undefined, versionIndex: undefined }),
       },
       {
         id: "mint-nft" as ActionTab,
-        name: t("actions.mint", "Mint"),
-        subtitle: t("actions.mintNFT", "Mint NFT"),
+        title: t("actions.mintNFT", "Mint NFT"),
         icon: Image,
         description: t(
           "actions.mintNFTDesc",
           "Convert endorsed person data into valuable NFT collectibles",
         ),
-        color: "purple",
+        cta: t("actions.openMintNFT", "Open NFT Minting"),
+        iconClass: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
+        ctaClass: "text-purple-600 dark:text-purple-400",
+        onOpen: () =>
+          setMintNFTModal({ isOpen: true, personHash: undefined, versionIndex: undefined }),
       },
     ],
     [t],
@@ -218,102 +222,33 @@ export default function ActionsPage() {
           </p>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="mb-10 flex justify-center">
-          <nav className="inline-flex p-1.5 bg-gray-100 dark:bg-gray-800/50 rounded-full border border-gray-200 dark:border-gray-700/50 backdrop-blur-sm">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setSearchParams({ tab: tab.id });
-                  }}
-                  className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-medium transition-all duration-300 ${
-                    isActive
-                      ? "bg-white dark:bg-gray-800 text-orange-500 shadow-md shadow-gray-200/50 dark:shadow-none ring-1 ring-black/5 dark:ring-white/10"
-                      : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${isActive ? "stroke-[2.5px]" : ""}`} />
-                  <span className="whitespace-nowrap">{tab.name}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Tab Content */}
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl shadow-gray-200/50 dark:shadow-none border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-500">
-          {tabs.map((tab) => {
-            if (activeTab !== tab.id) return null;
-
-            const Icon = tab.icon;
-
+        {/* One card per action: a single click opens each modal. */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {actionCards.map((action) => {
+            const Icon = action.icon;
             return (
-              <div
-                key={tab.id}
-                className="p-12 animate-in fade-in slide-in-from-bottom-4 duration-500"
+              <button
+                key={action.id}
+                type="button"
+                onClick={action.onOpen}
+                className="group flex h-full flex-col items-start gap-4 rounded-3xl border border-gray-100 bg-white p-8 text-left shadow-xl shadow-gray-200/50 transition-all duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 active:translate-y-0 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none dark:hover:border-orange-500/40"
               >
-                <div className="text-center mb-10">
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-linear-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/10 mb-6 shadow-inner">
-                    <Icon className="w-10 h-10 text-orange-500" />
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-                    {tab.subtitle}
-                  </h2>
-                  <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                    {tab.description}
-                  </p>
-                </div>
-
-                <div className="max-w-xs mx-auto">
-                  {tab.id === "add-version" && (
-                    <button
-                      onClick={() => setAddVersionModal({ isOpen: true })}
-                      className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
-                    >
-                      {t("actions.startAddVersion", "Start Adding Version")}
-                    </button>
-                  )}
-
-                  {tab.id === "mint-nft" && (
-                    <div className="text-center">
-                      <button
-                        onClick={() =>
-                          setMintNFTModal({
-                            isOpen: true,
-                            personHash: undefined,
-                            versionIndex: undefined,
-                          })
-                        }
-                        className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
-                      >
-                        {t("actions.openMintNFT", "Open NFT Minting")}
-                      </button>
-                    </div>
-                  )}
-
-                  {tab.id === "endorse" && (
-                    <div className="text-center">
-                      <button
-                        onClick={() =>
-                          setEndorseModal({
-                            isOpen: true,
-                            personHash: undefined,
-                            versionIndex: undefined,
-                          })
-                        }
-                        className="w-full px-8 py-4 bg-linear-to-r from-orange-400 to-red-500 text-white rounded-full font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-[1.02] active:scale-95 transition-all duration-300"
-                      >
-                        {t("actions.openEndorse", "Open Endorsement")}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+                <span
+                  className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${action.iconClass}`}
+                >
+                  <Icon className="h-7 w-7" />
+                </span>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{action.title}</h2>
+                <p className="flex-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+                  {action.description}
+                </p>
+                <span
+                  className={`inline-flex items-center gap-1.5 text-sm font-semibold ${action.ctaClass}`}
+                >
+                  {action.cta}
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </span>
+              </button>
             );
           })}
         </div>

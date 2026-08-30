@@ -89,6 +89,26 @@ describe("ActionsPage", () => {
     expect(screen.queryByText("Start Adding Version")).toBeNull();
   });
 
+  it("opens every action in a single click, with no tab to select first", () => {
+    mocks.address = "0x00000000000000000000000000000000000000aa";
+
+    for (const [cta, modalTestId] of [
+      ["Start Adding Version", "add-version-modal"],
+      ["Open Endorsement", "endorse-modal"],
+      ["Open NFT Minting", "mint-nft-modal"],
+    ] as const) {
+      renderActionsPage();
+      // All three are on screen at once; none is hidden behind a tab.
+      expect(screen.getByText("Start Adding Version")).toBeTruthy();
+      expect(screen.getByText("Open Endorsement")).toBeTruthy();
+      expect(screen.getByText("Open NFT Minting")).toBeTruthy();
+
+      fireEvent.click(screen.getByText(cta));
+      expect(screen.getByTestId(modalTestId)).toBeTruthy();
+      cleanup();
+    }
+  });
+
   it("opens the add-version modal and hands off to endorse within the page shell", async () => {
     mocks.address = "0x00000000000000000000000000000000000000aa";
 
