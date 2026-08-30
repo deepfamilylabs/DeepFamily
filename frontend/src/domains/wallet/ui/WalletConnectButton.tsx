@@ -65,10 +65,12 @@ export default function WalletConnectButton({
       <button
         onClick={connect}
         disabled={isConnecting}
-        className={`inline-flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-xs backdrop-blur-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
+        className={`inline-flex items-center justify-center gap-2 rounded-full border text-sm font-medium transition-colors duration-200 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
+          alwaysShowLabel ? "px-4 py-2" : "h-9 w-9 lg:h-auto lg:w-auto lg:px-4 lg:py-2"
+        } ${
           isHomePage
-            ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
-            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
+            ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15 backdrop-blur-sm"
+            : "border-hairline bg-surface text-ink-muted hover:bg-surface-muted hover:text-ink"
         } ${className}`}
       >
         {isConnecting ? (
@@ -104,7 +106,7 @@ export default function WalletConnectButton({
               setShowNetworkSelection(true);
             }
           }}
-          className={`group flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:gap-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all hover:scale-105 whitespace-nowrap ${
+          className={`group flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:gap-1.5 rounded-full text-xs font-medium cursor-pointer transition-colors whitespace-nowrap ${
             isHomePage
               ? "bg-linear-to-r from-amber-400/20 to-orange-400/20 dark:from-amber-500/20 dark:to-orange-500/20 text-yellow-100 dark:text-yellow-200 border border-yellow-400/40 dark:border-yellow-500/40 hover:from-amber-400/30 hover:to-orange-400/30 shadow-xs shadow-amber-500/10"
               : "bg-linear-to-r from-amber-50 to-orange-50 dark:from-amber-900/30 dark:to-orange-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 hover:from-amber-100 hover:to-orange-100 dark:hover:from-amber-900/40 dark:hover:to-orange-900/40 shadow-xs"
@@ -121,10 +123,10 @@ export default function WalletConnectButton({
       )}
 
       <div
-        className={`flex items-center gap-1 lg:gap-2 px-2 py-2 lg:px-3 rounded-xl border text-xs font-medium transition-all duration-200 hover:scale-105 shadow-xs backdrop-blur-sm whitespace-nowrap min-w-0 ${
+        className={`flex items-center gap-2 rounded-full border py-1.5 pl-3 pr-1.5 text-sm font-medium whitespace-nowrap min-w-0 ${
           isHomePage
-            ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 hover:bg-white/30 dark:hover:bg-white/15"
-            : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/80 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/90 hover:border-gray-300 dark:hover:border-gray-600"
+            ? "border-white/30 dark:border-white/20 bg-white/20 dark:bg-white/10 text-white dark:text-gray-200 backdrop-blur-sm"
+            : "border-hairline bg-surface text-ink"
         }`}
       >
         <div
@@ -134,7 +136,7 @@ export default function WalletConnectButton({
         ></div>
 
         {showBalance && balance ? (
-          <div className="flex flex-col items-start gap-0.5 min-w-0">
+          <div className="flex min-w-0 flex-col items-start leading-tight">
             <span className="text-xs font-mono max-w-28 lg:max-w-32 whitespace-nowrap overflow-hidden">
               {formatAddress(address)}
             </span>
@@ -156,16 +158,15 @@ export default function WalletConnectButton({
 
         <button
           onClick={disconnect}
-          className="shrink-0 p-0 rounded-sm transition-opacity hover:opacity-70"
+          aria-label={t("wallet.disconnect", "Disconnect")}
           title={t("wallet.disconnect", "Disconnect")}
+          className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+            isHomePage
+              ? "text-white/70 hover:bg-white/20 hover:text-white dark:text-gray-300/70"
+              : "text-ink-subtle hover:bg-surface-muted hover:text-ink"
+          }`}
         >
-          <LogOut
-            className={`w-3 h-3 ${
-              isHomePage
-                ? "text-white/70 dark:text-gray-300/70"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          />
+          <LogOut className="h-3.5 w-3.5" />
         </button>
       </div>
     </div>
