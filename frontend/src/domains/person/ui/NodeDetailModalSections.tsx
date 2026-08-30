@@ -358,12 +358,15 @@ export function NodeDetailTrustedEndorsersSection({
   access,
   owner,
   onCopy,
+  managerResolving,
 }: {
   t: NodeDetailT;
   nodeData?: NodeData | null;
   access?: TrustedEndorserAccess;
   owner?: string;
   onCopy: (text: string) => void;
+  /** True only while the manager lookup is still in flight. */
+  managerResolving?: boolean;
 }) {
   const [accounts, setAccounts] = React.useState<string[]>([]);
   const [input, setInput] = React.useState("");
@@ -377,6 +380,14 @@ export function NodeDetailTrustedEndorsersSection({
   const addedBy = nodeData?.addedBy?.toLowerCase();
   const ownerAddress = owner?.toLowerCase();
   const managerAddress = isMinted(nodeData) ? ownerAddress : addedBy;
+  // Both sources arrive asynchronously — `addedBy` with the version details,
+  // `owner` from a separate lookup that only starts once tokenId is known. While
+  // one is in flight we cannot tell "not permitted" from "still checking", and
+  // rendering read-only for both made the editor look absent on a first open.
+  // Once the lookup settles without a manager we fall through to read-only
+  // rather than spinning forever.
+  const managerUnknown =
+    Boolean(access && connected) && !managerAddress && Boolean(managerResolving);
   const canEdit = Boolean(access && connected && managerAddress && connected === managerAddress);
 
   const reload = React.useCallback(async () => {
@@ -485,7 +496,12 @@ export function NodeDetailTrustedEndorsersSection({
             />
           ))
         )}
-        {canEdit ? (
+        {managerUnknown ? (
+          <div className="flex items-center gap-2 px-4 py-2.5 text-xs text-ink-muted">
+            <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-hairline-strong border-t-transparent" />
+            {t("familyTree.nodeDetail.trustedCheckingPermission", "Checking edit permission…")}
+          </div>
+        ) : canEdit ? (
           <div className="flex items-center gap-2 px-4 py-2.5">
             <input
               value={input}

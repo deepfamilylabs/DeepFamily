@@ -670,7 +670,8 @@
       },
       "minted": "已铸造",
       "versionLabel": "版本",
-      "onChainRecord": "链上记录"
+      "onChainRecord": "链上记录",
+      "trustedCheckingPermission": "正在确认编辑权限…"
     },
     "personVersionDetail": {
       "title": "人物版本详情"

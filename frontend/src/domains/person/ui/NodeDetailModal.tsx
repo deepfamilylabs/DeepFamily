@@ -74,6 +74,7 @@ export default function NodeDetailModal({
   const navigate = useNavigate();
   const { openEndorse } = useEndorseModal();
   const [owner, setOwner] = React.useState<string | undefined>(nodeData?.owner);
+  const [ownerLookupPending, setOwnerLookupPending] = React.useState(false);
   const [endorsementCount, setEndorsementCount] = React.useState<number>(
     nodeData?.endorsementCount ?? 0,
   );
@@ -131,10 +132,16 @@ export default function NodeDetailModal({
         if (!open) return;
         if (!nodeData?.tokenId || nodeData.tokenId === "0") return;
         if (owner) return;
+        // The lookup can legitimately come back empty (missing NFT contract, a
+        // token that no longer exists). Track that it SETTLED, so callers can
+        // stop waiting instead of showing a spinner that never resolves.
+        setOwnerLookupPending(true);
         const addr = await getOwnerOf?.(String(nodeData.tokenId));
         if (!cancelled) setOwner(addr || undefined);
       } catch {
         if (!cancelled) setOwner(undefined);
+      } finally {
+        if (!cancelled) setOwnerLookupPending(false);
       }
     })();
     return () => {
@@ -230,6 +237,7 @@ export default function NodeDetailModal({
             t={t}
             nodeData={nodeData}
             access={trustedEndorserAccess}
+            managerResolving={hasNFT ? ownerLookupPending : Boolean(loading)}
             owner={owner}
             onCopy={onCopy}
           />
