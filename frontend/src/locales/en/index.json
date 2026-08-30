@@ -670,7 +670,8 @@
       },
       "minted": "Minted",
       "versionLabel": "Version",
-      "onChainRecord": "On-chain record"
+      "onChainRecord": "On-chain record",
+      "trustedCheckingPermission": "Checking edit permission…"
     },
     "personVersionDetail": {
       "title": "Person Version Details"
