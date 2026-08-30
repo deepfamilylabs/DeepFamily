@@ -4,27 +4,6 @@ export type SearchPageT = TFunction;
 
 export const MAX_SEARCH_PAGE_SIZE = 100;
 
-export type SearchSectionKey =
-  | "hash"
-  | "versions"
-  | "trustedEndorsers"
-  | "endorsement"
-  | "children"
-  | "storyChunks"
-  | "uri";
-
-export type SearchOpenSections = Record<SearchSectionKey, boolean>;
-
-export const initialSearchOpenSections: SearchOpenSections = {
-  hash: true,
-  versions: false,
-  trustedEndorsers: false,
-  endorsement: false,
-  children: false,
-  storyChunks: false,
-  uri: false,
-};
-
 export type EndorsementStatsForm = {
   personHash: string;
   pageSize: number;

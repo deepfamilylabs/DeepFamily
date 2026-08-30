@@ -7,6 +7,16 @@ export type {
   PersonReadGateway,
 } from "./api/personReadGateway";
 export { usePersonGateway } from "./queries/usePersonGateway";
+export { createAccountReadGateway, identityKey } from "./api/accountReadGateway";
+export type {
+  AccountReadGateway,
+  AccountVersionRow,
+  AccountEndorsementRow,
+  AccountNftRow,
+  AccountPage,
+  MintedIdentity,
+} from "./api/accountReadGateway";
+export { useAccountGateway } from "./queries/useAccountGateway";
 export { usePersonDetails } from "./queries/usePersonDetails";
 export type { UsePersonDetailsResult } from "./queries/usePersonDetails";
 export { useNFTDetails } from "./queries/useNFTDetails";

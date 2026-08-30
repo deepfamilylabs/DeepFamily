@@ -20,7 +20,6 @@ import {
   formatNumericError,
   getPreviousPageOffset,
   getWatchedNumber,
-  initialSearchOpenSections,
   MAX_SEARCH_PAGE_SIZE,
   sanitizeNumberInput,
   type ChildrenForm,
@@ -28,7 +27,6 @@ import {
   type EndorsementStatsData,
   type EndorsementStatsForm,
   type PersonVersionsForm,
-  type SearchSectionKey,
   type StoryChunksForm,
   type TokenURIHistoryForm,
   type TrustedEndorsersForm,
@@ -237,13 +235,8 @@ export function useSearchPageController() {
   const [childrenHasMore, setChildrenHasMore] = useState<boolean>(false);
   const [childrenQueried, setChildrenQueried] = useState<boolean>(false);
 
-  const [openSections, setOpenSections] = useState(initialSearchOpenSections);
   const [hashHasPassphrase, setHashHasPassphrase] = useState(false);
   const hashCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
-
-  const toggle = useCallback((key: SearchSectionKey) => {
-    setOpenSections((sections) => ({ ...sections, [key]: !sections[key] }));
-  }, []);
 
   const endorsementForm = useForm<EndorsementStatsForm>({
     resolver: zodResolver(schemas.endorsementStats),
@@ -699,8 +692,6 @@ export function useSearchPageController() {
 
   return {
     t,
-    openSections,
-    toggle,
     sanitizeNumberInput,
     formatNumericError,
     validationMessages: {
