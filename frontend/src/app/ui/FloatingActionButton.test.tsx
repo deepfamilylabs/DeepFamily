@@ -74,19 +74,22 @@ describe("FloatingActionButton", () => {
     expect(openButton.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("can navigate to the actions page without changing hook order", () => {
+  it("collapses back to its trigger after routing to the actions page", () => {
     renderFab();
 
     fireEvent.click(screen.getByRole("button", { name: "Open actions menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Version" }));
 
-    expect(screen.queryByRole("button", { name: "Open actions menu" })).toBeNull();
+    // The menu collapses but the button stays mounted, so the shortcut is still
+    // available once the actions page has rendered.
+    const trigger = screen.getByRole("button", { name: "Open actions menu" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(mocks.setActivePath).toHaveBeenCalledWith("/actions");
   });
 
-  it("does not render on the actions page", () => {
+  it("still offers the shortcut on the actions page itself", () => {
     renderFab("/actions");
 
-    expect(screen.queryByRole("button", { name: "Open actions menu" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open actions menu" })).toBeTruthy();
   });
 });
