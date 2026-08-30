@@ -141,3 +141,19 @@ export function getLocalizedRootHash(suffix: string): string {
 export function getLocalizedRootVersionIndex(suffix: string): number {
   return getPositiveNumberEnv(`VITE_ROOT_VERSION_INDEX_${suffix}`, NaN);
 }
+
+/**
+ * Block-range settings for account-scoped event scans (`PersonVersionAdded`
+ * filtered by creator). There is no on-chain reverse index by creator, so the
+ * creator facet reads logs; public RPCs cap `eth_getLogs` ranges, hence the
+ * chunked backward scan. Deployments should set `VITE_DF_EVENT_FROM_BLOCK` to
+ * the deployment block so the scan terminates instead of walking to genesis.
+ */
+export function getEventScanConfig() {
+  return {
+    fromBlock: Math.max(0, getNumberEnv("VITE_DF_EVENT_FROM_BLOCK", 0)),
+    blockChunk: getPositiveNumberEnv("VITE_DF_EVENT_BLOCK_CHUNK", 10_000),
+    maxChunks: getPositiveNumberEnv("VITE_DF_EVENT_MAX_CHUNKS", 50),
+    maxResults: getPositiveNumberEnv("VITE_DF_EVENT_MAX_RESULTS", 1_000),
+  };
+}

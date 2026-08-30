@@ -205,7 +205,6 @@
   },
   "search": {
     "query": "查询",
-    "reset": "重置",
     "copy": "复制",
     "copied": "已复制",
     "copyFailed": "复制失败",
@@ -215,27 +214,15 @@
     "next": "下一页",
     "queryFailed": "查询失败",
     "totalResults": "结果总数",
-    "pageSizePlaceholder": "≤100",
-    "versionIndexPlaceholder": "≥0",
     "nameQuery": {
       "pageSize": "每页数量"
     },
     "endorsementQuery": {
-      "title": "背书统计查询",
-      "personHash": "人物哈希",
-      "placeholder": "0x1234...abcd (64位十六进制)",
       "version": "版本",
       "endorsementCount": "背书数",
       "tokenId": "Token ID"
     },
-    "uriQuery": {
-      "title": "URI历史查询",
-      "tokenId": "Token ID",
-      "placeholder": "请输入NFT Token ID"
-    },
     "versionsQuery": {
-      "title": "人物版本查询",
-      "personHash": "人物哈希",
       "placeholder": "0x1234...abcd (64位十六进制)",
       "creator": "创建者",
       "fatherHash": "父亲哈希",
@@ -244,18 +231,12 @@
       "unknown": "未知"
     },
     "trustedEndorsersQuery": {
-      "title": "推荐来源查询",
-      "personHash": "人物哈希",
       "versionIndex": "版本序号",
-      "versionPlaceholder": "≥1",
-      "placeholder": "0x1234...abcd (64位十六进制)",
       "account": "推荐账户",
       "totalSources": "推荐来源总数"
     },
     "storyChunksQuery": {
-      "title": "故事分片查询",
       "tokenId": "Token ID",
-      "placeholder": "请输入NFT Token ID",
       "chunkHash": "分片哈希",
       "editor": "编辑者",
       "chunkType": "分片类型",
@@ -263,12 +244,7 @@
       "totalChunks": "总分片数"
     },
     "childrenQuery": {
-      "title": "子女查询",
-      "parentHash": "父母哈希",
-      "parentVersion": "版本序号",
-      "parentHashPlaceholder": "0x1234...abcd (64位十六进制)",
       "childHash": "子女哈希",
-      "childVersion": "子女版本",
       "totalChildren": "总子女数"
     },
     "hashCalculator": {
@@ -320,7 +296,6 @@
       "entropyDisplay": "真实熵值：{{raw}} bits · 评估强度评分：{{adjusted}}",
       "passphraseCharCount": "NFKD 规范化后的字符数（不裁剪）：{{count}}",
       "nameInputPlaceholder": "例如：张三",
-      "description": "说明：身份哈希仅在本地计算，不会上传任何数据。",
       "bcOptions": {
         "ad": "公元",
         "bc": "公元前"
@@ -342,7 +317,56 @@
       "yearRange": "年份必须在0-10000之间",
       "yearExceedsCurrent": "公元年份不能超过当前年份"
     },
-    "offset": "偏移"
+    "offset": "偏移",
+    "unified": {
+      "placeholder": "0x1234...abcd（64 位十六进制）、Token ID 或钱包地址",
+      "inputLabel": "查询链上记录",
+      "clear": "清除",
+      "recent": "最近",
+      "subtitle": "输入人物哈希、Token ID 或钱包地址，查询对应的版本、背书、NFT、故事与家庭关系。",
+      "retry": "重试",
+      "searchThis": "查询该项",
+      "hexLength": "当前 {{count}} 位",
+      "unrecognized": "无法识别：请输入 64 位人物哈希、纯数字 Token ID 或 40 位钱包地址。",
+      "detected": {
+        "personHash": "人物哈希",
+        "tokenId": "Token ID",
+        "address": "钱包地址"
+      },
+      "scope": {
+        "pickVersion": "选择版本",
+        "versionInput": "版本序号",
+        "needVersion": "请先选择版本，再执行该查询。",
+        "needToken": "该版本尚未铸造为 NFT，因此没有可查看的内容。",
+        "needScope": "请选择作用域",
+        "versionLabel": "版本",
+        "notMinted": "该版本未铸造 NFT"
+      },
+      "facets": {
+        "versions": "人物版本",
+        "trustedEndorsers": "推荐来源",
+        "endorsement": "背书统计",
+        "children": "子女",
+        "storyChunks": "故事分片",
+        "uri": "URI 历史",
+        "accountVersions": "创建的版本",
+        "accountEndorsements": "作出的背书",
+        "accountNfts": "持有的 NFT",
+        "personNfts": "NFT"
+      },
+      "entry": {
+        "personHashDesc": "展开人物版本、推荐来源、背书统计、子女、NFT、故事分片与 URI 历史。",
+        "tokenIdDesc": "展开该 NFT 的故事分片与 URI 历史。",
+        "addressDesc": "展开该账户创建的版本、作出的背书与持有的 NFT。"
+      },
+      "empty": {
+        "trustedEndorsers": "该版本下没有已记录的推荐来源。",
+        "children": "该版本下没有已登记的子女。其他版本可能记录了不同的家庭关系。",
+        "truncated": "仅扫描了最近的区块，更早的记录可能缺失。将 VITE_DF_EVENT_FROM_BLOCK 设为部署区块可完整扫描。",
+        "personNfts": "该人物尚无版本被铸造为 NFT。铸造需要先完成背书。"
+      },
+      "calculatorDesc": "没有哈希？用姓名、生日与身份口令算一个，算完直接填入上方查询框。身份哈希仅在本地计算，不会上传任何数据。"
+    }
   },
   "genealogyBook": {
     "title": "谱牒纸本视图",
@@ -522,7 +546,6 @@
       "force": "力导向",
       "virtual": "树形列表"
     },
-    "versionSelector": {},
     "config": {
       "networkAndContract": "网络与模块",
       "dataSource": "数据源",
@@ -627,7 +650,7 @@
       "unlockedOnDevice": "已在此设备解锁",
       "locked": "已锁定",
       "versionBiography": "加密版本传记",
-      "nftPublicStory": "NFT 公开传记",
+      "nftPublicStory": "NFT 公开简介",
       "trustedEndorsers": "推荐来源",
       "trustedAccount": "推荐账户",
       "trustedLoading": "推荐来源加载中…",
@@ -644,8 +667,7 @@
         "female": "女",
         "other": "其他",
         "custom": "自定义"
-      },
-      "errors": {}
+      }
     },
     "personVersionDetail": {
       "title": "人物版本详情"
@@ -746,7 +768,6 @@
     "notConnected": "请连接钱包",
     "securityNote": "私钥仅存于您的钱包，我们无法访问。"
   },
-  "theme": {},
   "settings": {
     "theme": "主题",
     "language": "语言"
@@ -1101,7 +1122,6 @@
       "invalidTokenURI": "无效的 URL 或 IPFS URI",
       "yearExceedsCurrent": "公元年份不能超过当前年份"
     },
-    "errors": {},
     "missingParentsTitle": "父母信息不完善",
     "missingBothParents": "此版本的父母哈希均为空。可提交新的 ZK 版本补录父母哈希（版本号可填 0，表示父母存在但具体版本待定）。",
     "missingFather": "此版本的父亲哈希为空。可通过新的 ZK 版本补录父亲哈希；版本号为 0 时，前端会默认指向背书最高的父亲版本。",

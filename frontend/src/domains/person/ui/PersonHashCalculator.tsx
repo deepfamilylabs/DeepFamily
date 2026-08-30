@@ -209,6 +209,8 @@ export { computePersonHash, computeIdentityHash };
 interface PersonHashCalculatorProps {
   className?: string;
   onPublicFormChange?: (formData: PublicHashForm) => void;
+  /** Fires with the computed identity hash ("" while empty/computing). */
+  onComputedHashChange?: (hash: string) => void;
   onPassphraseChange?: (risk: ProtocolPassphraseRisk) => void;
   showTitle?: boolean;
   collapsible?: boolean;
@@ -242,6 +244,7 @@ export const PersonHashCalculator = forwardRef<
     {
       className = "",
       onPublicFormChange,
+      onComputedHashChange,
       onPassphraseChange,
       showTitle = true,
       collapsible = false,
@@ -408,6 +411,14 @@ export const PersonHashCalculator = forwardRef<
 
     const [computedHash, setComputedHash] = useState("");
     const [isComputingHash, setIsComputingHash] = useState(false);
+
+    const onComputedHashChangeRef = useRef(onComputedHashChange);
+    useEffect(() => {
+      onComputedHashChangeRef.current = onComputedHashChange;
+    }, [onComputedHashChange]);
+    useEffect(() => {
+      onComputedHashChangeRef.current?.(computedHash);
+    }, [computedHash]);
 
     const onPublicFormChangeRef = useRef(onPublicFormChange);
 

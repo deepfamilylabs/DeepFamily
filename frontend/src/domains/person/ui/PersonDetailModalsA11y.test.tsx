@@ -210,7 +210,7 @@ describe("person detail modals a11y", () => {
 
     expect(screen.getByText("Encrypted Version Biography")).toBeTruthy();
     expect(screen.getByText("Validated private version biography")).toBeTruthy();
-    expect(screen.getByText("Public NFT Story")).toBeTruthy();
+    expect(screen.getByText("Public NFT Summary")).toBeTruthy();
     expect(screen.getByText("Independent public NFT story")).toBeTruthy();
   });
 
@@ -219,7 +219,7 @@ describe("person detail modals a11y", () => {
 
     expect(screen.getByText("Encrypted Version Biography")).toBeTruthy();
     expect(screen.getAllByText("Validated private version biography")).toHaveLength(1);
-    expect(screen.queryByText("Public NFT Story")).toBeNull();
+    expect(screen.queryByText("Public NFT Summary")).toBeNull();
   });
 
   it("renders NFT information before recommended sources", async () => {

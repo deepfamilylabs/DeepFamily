@@ -205,7 +205,6 @@
   },
   "search": {
     "query": "Query",
-    "reset": "Reset",
     "copy": "Copy",
     "copied": "Copied",
     "copyFailed": "Copy failed",
@@ -215,27 +214,15 @@
     "next": "Next",
     "queryFailed": "Query failed",
     "totalResults": "Total results",
-    "pageSizePlaceholder": "≤100",
-    "versionIndexPlaceholder": "≥0",
     "nameQuery": {
       "pageSize": "Page Size"
     },
     "endorsementQuery": {
-      "title": "Endorsement Statistics Query",
-      "personHash": "Person Hash",
-      "placeholder": "0x1234...abcd (64-character hexadecimal)",
       "version": "Version",
       "endorsementCount": "Endorsements",
       "tokenId": "Token ID"
     },
-    "uriQuery": {
-      "title": "URI History Query",
-      "tokenId": "Token ID",
-      "placeholder": "Enter NFT Token ID"
-    },
     "versionsQuery": {
-      "title": "Person Versions Query",
-      "personHash": "Person Hash",
       "placeholder": "0x1234...abcd (64-character hexadecimal)",
       "creator": "Creator",
       "fatherHash": "Father Hash",
@@ -244,18 +231,12 @@
       "unknown": "Unknown"
     },
     "trustedEndorsersQuery": {
-      "title": "Recommended Sources Query",
-      "personHash": "Person Hash",
       "versionIndex": "Version Index",
-      "versionPlaceholder": "≥1",
-      "placeholder": "0x1234...abcd (64-character hexadecimal)",
       "account": "Recommended Account",
       "totalSources": "Total recommended sources"
     },
     "storyChunksQuery": {
-      "title": "Story Chunks Query",
       "tokenId": "Token ID",
-      "placeholder": "Enter NFT Token ID",
       "chunkHash": "Chunk Hash",
       "editor": "Editor",
       "chunkType": "Chunk Type",
@@ -263,12 +244,7 @@
       "totalChunks": "Total Chunks"
     },
     "childrenQuery": {
-      "title": "Children Query",
-      "parentHash": "Parent Hash",
-      "parentVersion": "Version Index",
-      "parentHashPlaceholder": "0x1234...abcd (64-character hexadecimal)",
       "childHash": "Child Hash",
-      "childVersion": "Child Version",
       "totalChildren": "Total Children"
     },
     "hashCalculator": {
@@ -320,7 +296,6 @@
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
       "passphraseCharCount": "Characters after NFKD (not trimmed): {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
-      "description": "Compute the identity hash locally. Nothing is uploaded.",
       "bcOptions": {
         "ad": "AD",
         "bc": "BC"
@@ -342,7 +317,56 @@
       "yearRange": "Year must be between 0-10000",
       "yearExceedsCurrent": "AD year cannot exceed current year"
     },
-    "offset": "Offset"
+    "offset": "Offset",
+    "unified": {
+      "placeholder": "0x1234...abcd (64 hex), a token ID, or a wallet address",
+      "inputLabel": "Search the chain",
+      "clear": "Clear",
+      "recent": "Recent",
+      "subtitle": "Search on-chain versions, endorsements, NFTs, stories and family links by person hash, token ID or wallet address.",
+      "retry": "Retry",
+      "searchThis": "Search this",
+      "hexLength": "currently {{count}} digits",
+      "unrecognized": "Enter a 64-hex person hash, a numeric token ID, or a 40-hex wallet address.",
+      "detected": {
+        "personHash": "Person hash",
+        "tokenId": "Token ID",
+        "address": "Wallet address"
+      },
+      "scope": {
+        "pickVersion": "Pick a version",
+        "versionInput": "Version index",
+        "needVersion": "Pick a version to run this query.",
+        "needToken": "This version has not been minted, so there is no NFT to read here.",
+        "needScope": "Pick a scope",
+        "versionLabel": "Version",
+        "notMinted": "this version has no NFT"
+      },
+      "facets": {
+        "versions": "Versions",
+        "trustedEndorsers": "Endorsement sources",
+        "endorsement": "Endorsement stats",
+        "children": "Children",
+        "storyChunks": "Story chunks",
+        "uri": "URI history",
+        "accountVersions": "Versions created",
+        "accountEndorsements": "Endorsements made",
+        "accountNfts": "NFTs held",
+        "personNfts": "NFTs"
+      },
+      "entry": {
+        "personHashDesc": "Opens versions, endorsement sources, endorsement stats, children, NFTs, stories and URI history.",
+        "tokenIdDesc": "Opens that NFT's story chunks and URI history.",
+        "addressDesc": "Opens versions that account created, endorsements it made, and NFTs it holds."
+      },
+      "empty": {
+        "trustedEndorsers": "No endorsement sources recorded for this version.",
+        "children": "No children recorded under this version. Other versions may record different family links.",
+        "truncated": "Only recent blocks were scanned, so older records may be missing. Set VITE_DF_EVENT_FROM_BLOCK to the deployment block for a complete scan.",
+        "personNfts": "No version of this person has been minted yet. Minting requires a prior endorsement."
+      },
+      "calculatorDesc": "No hash yet? Compute one from a name, birth date and passphrase — it drops straight into the query box above. Identity hashes are computed locally; nothing is uploaded."
+    }
   },
   "genealogyBook": {
     "title": "Genealogy Book",
@@ -522,7 +546,6 @@
       "force": "Force Directed",
       "virtual": "Tree List"
     },
-    "versionSelector": {},
     "config": {
       "networkAndContract": "Network & Module",
       "dataSource": "Data Source",
@@ -627,7 +650,7 @@
       "unlockedOnDevice": "Unlocked on this device",
       "locked": "Locked",
       "versionBiography": "Encrypted Version Biography",
-      "nftPublicStory": "Public NFT Story",
+      "nftPublicStory": "Public NFT Summary",
       "trustedEndorsers": "Recommended Sources",
       "trustedAccount": "Recommended Account",
       "trustedLoading": "Loading recommended sources...",
@@ -644,8 +667,7 @@
         "female": "Female",
         "other": "Other",
         "custom": "Custom"
-      },
-      "errors": {}
+      }
     },
     "personVersionDetail": {
       "title": "Person Version Details"
@@ -746,7 +768,6 @@
     "notConnected": "Please connect your wallet",
     "securityNote": "Your keys stay in your wallet. We never have access."
   },
-  "theme": {},
   "settings": {
     "theme": "Theme",
     "language": "Language"
@@ -1101,7 +1122,6 @@
       "invalidTokenURI": "Invalid URL or IPFS URI",
       "yearExceedsCurrent": "AD year cannot exceed current year"
     },
-    "errors": {},
     "missingParentsTitle": "Incomplete Parent Information",
     "missingBothParents": "Both parent hashes are empty for this version. Publish a new ZK version with parent hashes (version index can be 0 to defer choosing a parent version).",
     "missingFather": "The father hash is empty for this version. Publish a new ZK version with the father hash; index 0 lets the UI pick the highest-endorsed father version.",
