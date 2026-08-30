@@ -23,6 +23,7 @@ export default function EndorseModal(props: EndorseModalProps) {
   return (
     <ResponsiveModalFrame
       {...endorse.frame}
+      accentClass="bg-emerald-600"
       ariaLabel="Endorse"
       icon={<Star className="w-6 h-6 text-white" />}
       title={t("endorse.title", "Endorse Version")}

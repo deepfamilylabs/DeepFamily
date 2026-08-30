@@ -25,6 +25,7 @@ export default function MintNFTModal(props: MintNFTModalProps) {
   return (
     <ResponsiveModalFrame
       {...mint.frame}
+      accentClass="bg-purple-600"
       ariaLabel="Mint NFT"
       icon={<Image className="w-6 h-6 text-white" />}
       title={t("mintNFT.title", "Mint NFT")}

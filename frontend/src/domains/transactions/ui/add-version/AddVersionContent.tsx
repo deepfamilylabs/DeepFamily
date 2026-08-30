@@ -30,6 +30,7 @@ export default function AddVersionModal(props: AddVersionModalProps) {
   return (
     <ResponsiveModalFrame
       {...addVersion.frame}
+      accentClass="bg-blue-600"
       ariaLabel="Add Version"
       icon={<UserPlus className="w-6 h-6 text-white" />}
       title={t("addVersion.title", "Add Version")}

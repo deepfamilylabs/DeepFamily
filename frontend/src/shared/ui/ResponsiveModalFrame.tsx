@@ -13,6 +13,8 @@ export type ResponsiveModalFrameProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   entered: boolean;
+  /** Accent behind the header icon; defaults to the protocol orange. */
+  accentClass?: string;
   zIndex?: string;
   closeLabel?: string;
   children: React.ReactNode;
@@ -27,6 +29,7 @@ export function ResponsiveModalFrame({
   title,
   description,
   entered,
+  accentClass = "bg-orange-600",
   zIndex = OVERLAY_Z_INDEX.appModal,
   closeLabel = "Close",
   children,
@@ -46,7 +49,7 @@ export function ResponsiveModalFrame({
       <div className="overflow-x-hidden touch-pan-y h-dvh max-h-dvh md:h-full md:max-h-none">
         <div className="flex items-end md:items-center justify-center h-full w-full px-2 pt-6 pb-[env(safe-area-inset-bottom)] md:p-4">
           <div
-            className={`relative flex flex-col w-full max-w-4xl h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-lg md:rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden transform transition-transform duration-300 ease-out ${entered ? "translate-y-0" : "translate-y-full md:translate-y-0"} will-change-transform`}
+            className={`relative flex flex-col w-full max-w-4xl h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-lg md:rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden transform transition-[transform,opacity] duration-300 ease-out ${entered ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-full opacity-0 md:translate-y-0 md:scale-95"} will-change-transform`}
             onClick={(e) => e.stopPropagation()}
             style={{
               transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -70,7 +73,9 @@ export function ResponsiveModalFrame({
 
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-11 h-11 rounded-lg bg-orange-600 flex items-center justify-center shadow-xs shrink-0">
+                  <div
+                    className={`w-11 h-11 rounded-lg ${accentClass} flex items-center justify-center shadow-xs shrink-0`}
+                  >
                     {icon}
                   </div>
                   <div className="min-w-0">
