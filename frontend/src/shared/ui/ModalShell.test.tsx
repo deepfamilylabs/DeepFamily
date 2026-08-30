@@ -62,6 +62,30 @@ describe("ModalShell", () => {
     expect(document.activeElement).toBe(beforeModal);
   });
 
+  it("dims the page behind the dialog in both bare and wrapped modes", () => {
+    const scrimsOf = (container: HTMLElement | Document) =>
+      (container === document ? document.body : container).querySelectorAll(
+        "[aria-hidden].bg-black\\/40",
+      );
+
+    const { rerender } = render(
+      <ModalShell isOpen onClose={vi.fn()} ariaLabel="Wrapped modal">
+        <button type="button">Action</button>
+      </ModalShell>,
+    );
+    expect(scrimsOf(document)).toHaveLength(1);
+
+    // `bare` hands layout to the children but must keep the scrim, otherwise the
+    // panel renders directly over an undimmed page.
+    rerender(
+      <ModalShell isOpen onClose={vi.fn()} bare ariaLabel="Bare modal">
+        <button type="button">Action</button>
+      </ModalShell>,
+    );
+    expect(scrimsOf(document)).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Action" })).toBeTruthy();
+  });
+
   it("closes from Escape", () => {
     const onClose = vi.fn();
 
