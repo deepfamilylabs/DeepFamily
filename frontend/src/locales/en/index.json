@@ -661,6 +661,38 @@
       "rpcConflict": "RPC already exists in built-in networks"
     }
   },
+  "metadataUnlock": {
+    "openButton": "Unlock versions",
+    "title": "Unlock encrypted version metadata",
+    "description": "One passphrase is tried sequentially against loaded locked versions. Validated person data, label, and biography are saved as plaintext in this browser.",
+    "close": "Close",
+    "summary": "{{candidates}} locked candidate(s); {{unlocked}} already unlocked locally.",
+    "summaryReady": "{{prepared}} passed Archive/header preflight; {{failed}} failed before KDF.",
+    "summaryIdle": "Archive bytes and format are checked before a passphrase is requested.",
+    "preflight": "Preflight loaded versions",
+    "checking": "Checking Archive bytes…",
+    "passphraseLabel": "Identity passphrase",
+    "riskConsent": "I understand the permanent on-chain ciphertext permits unlimited offline passphrase guesses and that the unlocked plaintext is stored in IndexedDB.",
+    "emptyPassphraseConsent": "I explicitly choose an empty passphrase and understand anyone can reproduce it and decrypt this metadata.",
+    "whitespacePassphraseConsent": "I explicitly confirm this whitespace-only passphrase is high risk and is not trimmed.",
+    "progress": "{{status}}: {{processed}}/{{total}}; {{succeeded}} successful, {{failed}} failed, {{skipped}} cached.",
+    "status": {
+      "running": "running",
+      "cancelling": "cancelling",
+      "cancelled": "cancelled",
+      "completed": "completed"
+    },
+    "cancel": "Cancel active Worker",
+    "unlock": "Unlock sequentially",
+    "reset": "Reset",
+    "clearCache": "Clear local unlocked plaintext cache",
+    "errors": {
+      "config": "Configure a valid RPC endpoint, chain ID, and DeepFamily proxy first.",
+      "noCandidates": "No loaded locked version currently has a complete Archive reference.",
+      "partialFailure": "{{count}} version(s) could not be unlocked with this passphrase.",
+      "failed": "Metadata unlock failed"
+    }
+  },
   "common": {
     "open": "Open details",
     "dismiss": "Dismiss",

@@ -38,6 +38,22 @@ const mocks = vi.hoisted(() => ({
   clearMetadataUnlockCache: vi.fn(),
 }));
 
+// Mirrors i18next's t(key, defaultValue, options) closely enough to keep the
+// interpolated progress and summary lines assertable.
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, fallbackOrOptions?: unknown, maybeOptions?: unknown) => {
+      const fallback = typeof fallbackOrOptions === "string" ? fallbackOrOptions : key;
+      const options = (typeof fallbackOrOptions === "string" ? maybeOptions : fallbackOrOptions) as
+        | Record<string, unknown>
+        | undefined;
+      return fallback.replace(/\{\{(\w+)\}\}/g, (_match, name: string) =>
+        String(options?.[name] ?? ""),
+      );
+    },
+  }),
+}));
+
 vi.mock("../../config", () => ({
   useConfig: () => mocks.config,
 }));
@@ -119,6 +135,30 @@ describe("MetadataUnlockControl cache scope", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("opens through ModalShell, so it portals out and closes on Escape", async () => {
+    const { container } = render(<MetadataUnlockControl />);
+
+    openUnlockControl();
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    // Labelled by the visible heading rather than a duplicated aria-label.
+    const titleId = dialog.getAttribute("aria-labelledby");
+    expect(titleId).toBeTruthy();
+    expect(document.getElementById(titleId as string)?.textContent).toContain(
+      "Unlock encrypted version metadata",
+    );
+    // Portalled to the body, so tree-view stacking contexts cannot clip it.
+    expect(container.contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
+    // The shell owns the scrim; the dialog no longer paints one of its own.
+    expect(document.body.querySelectorAll("[aria-hidden].bg-black\\/40")).toHaveLength(1);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("invalidates an in-flight Archive preflight when chain or proxy scope changes", async () => {
