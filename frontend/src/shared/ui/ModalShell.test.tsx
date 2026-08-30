@@ -86,6 +86,45 @@ describe("ModalShell", () => {
     expect(screen.getByRole("button", { name: "Action" })).toBeTruthy();
   });
 
+  it("paints a single scrim when a dialog is stacked inside another", () => {
+    const scrimCount = () => document.body.querySelectorAll("[aria-hidden].bg-black\\/40").length;
+
+    // The real stack: MintNFT renders its bare ResponsiveModalFrame, and the
+    // endorse-required dialog opens inside it. Two 40% layers would read as 64%
+    // black with the blur applied twice, so only the outermost shell dims.
+    const { rerender } = render(
+      <ModalShell isOpen onClose={vi.fn()} bare ariaLabel="Outer modal">
+        <button type="button">Outer action</button>
+        <ModalShell isOpen onClose={vi.fn()} bare ariaLabel="Inner dialog">
+          <button type="button">Inner action</button>
+        </ModalShell>
+      </ModalShell>,
+    );
+
+    expect(scrimCount()).toBe(1);
+    expect(screen.getByRole("button", { name: "Inner action" })).toBeTruthy();
+
+    // Depth follows the React tree, so a wrapped child nests just as a bare one does.
+    rerender(
+      <ModalShell isOpen onClose={vi.fn()} bare ariaLabel="Outer modal">
+        <ModalShell isOpen onClose={vi.fn()} ariaLabel="Inner dialog">
+          <button type="button">Inner action</button>
+        </ModalShell>
+      </ModalShell>,
+    );
+    expect(scrimCount()).toBe(1);
+
+    // Closing the outer shell unmounts the inner one along with the only scrim.
+    rerender(
+      <ModalShell isOpen={false} onClose={vi.fn()} bare ariaLabel="Outer modal">
+        <ModalShell isOpen onClose={vi.fn()} bare ariaLabel="Inner dialog">
+          <button type="button">Inner action</button>
+        </ModalShell>
+      </ModalShell>,
+    );
+    expect(scrimCount()).toBe(0);
+  });
+
   it("closes from Escape", () => {
     const onClose = vi.fn();
 

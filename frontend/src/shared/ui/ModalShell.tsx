@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDialogA11y } from "./useDialogA11y";
@@ -37,6 +37,14 @@ export interface ModalShellProps {
 }
 
 /**
+ * Nesting depth of the shell being rendered. Only the outermost one paints the
+ * scrim: stacked shells would otherwise compound their backdrops (two 40%
+ * layers read as 64% black, and the blur applies twice). Context follows the
+ * React tree, not the DOM, so portalled children still see their parent shell.
+ */
+const ModalDepthContext = createContext(0);
+
+/**
  * Shared modal shell with:
  *  - Portal rendering to document.body
  *  - Backdrop overlay with click-to-close
@@ -62,6 +70,9 @@ export function ModalShell({
   bare,
   children,
 }: ModalShellProps) {
+  const depth = useContext(ModalDepthContext);
+  const isOutermost = depth === 0;
+
   const panelRef = useDialogA11y({
     open: isOpen,
     onEscape: onClose,
@@ -100,9 +111,16 @@ export function ModalShell({
       >
         {/* `bare` skips the default panel wrapper, not the scrim: an aria-modal
             dialog must still read as a layer over inert content. */}
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" aria-hidden />
+        {isOutermost && (
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+            aria-hidden
+          />
+        )}
         {/* Positioned so children paint above the absolutely positioned scrim. */}
-        <div className="relative h-full">{children}</div>
+        <div className="relative h-full">
+          <ModalDepthContext.Provider value={depth + 1}>{children}</ModalDepthContext.Provider>
+        </div>
       </div>,
       document.body,
     );
@@ -115,7 +133,12 @@ export function ModalShell({
       role="presentation"
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" aria-hidden />
+      {isOutermost && (
+        <div
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+          aria-hidden
+        />
+      )}
 
       {/* Panel */}
       <div
@@ -140,7 +163,7 @@ export function ModalShell({
           </button>
         )}
 
-        {children}
+        <ModalDepthContext.Provider value={depth + 1}>{children}</ModalDepthContext.Provider>
       </div>
     </div>,
     document.body,
