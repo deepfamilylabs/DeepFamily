@@ -68,7 +68,7 @@ const SiteHeader = memo(() => {
             className="flex items-center gap-1.5 group focus:outline-hidden"
             onClick={() => handleNavClick("/")}
           >
-            <Logo className="w-7 h-7 shrink-0 text-orange-500 hover:-rotate-90 transition-transform duration-300" />
+            <Logo className="w-7 h-7 shrink-0 text-orange-500 transition-transform duration-300 group-hover:-rotate-90" />
             <div className="inline-flex items-baseline gap-1">
               <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
                 Deepfamily
