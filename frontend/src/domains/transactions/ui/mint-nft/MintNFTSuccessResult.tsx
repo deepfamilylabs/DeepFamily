@@ -19,7 +19,7 @@ export function MintNFTSuccessResult({ t, successResult }: MintNFTSuccessResultP
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-3 p-4 bg-linear-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-700">
+      <div className="flex items-center gap-3 p-4 bg-success/10 rounded-xl border border-success/25">
         <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center shrink-0">
           <Check className="w-6 h-6 text-white" />
         </div>
@@ -35,16 +35,16 @@ export function MintNFTSuccessResult({ t, successResult }: MintNFTSuccessResultP
 
       {event && (
         <details
-          className="group bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700 overflow-hidden"
+          className="group overflow-hidden bg-success/10 border border-success/25 rounded-xl"
           open
         >
           <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
-              <span className="text-sm font-bold text-orange-900 dark:text-orange-100">
+              <span className="text-sm font-bold text-orange-700 dark:text-orange-300">
                 {t("mintNFT.nftDetails", "NFT Details")}
               </span>
-              <span className="ml-2 text-xs font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-800 px-2 py-0.5 rounded-full uppercase tracking-wide">
+              <span className="ml-2 text-xs font-bold text-orange-700 dark:text-orange-300 bg-primary/15 px-2 py-0.5 rounded-full uppercase tracking-wide">
                 #{successResult.tokenId}
               </span>
             </div>
@@ -81,8 +81,8 @@ export function MintNFTSuccessResult({ t, successResult }: MintNFTSuccessResultP
               />
             </div>
 
-            <div className="pt-2 border-t border-orange-200/50 dark:border-orange-700/50">
-              <p className="text-xs font-bold text-orange-800 dark:text-orange-200 mb-2 uppercase tracking-wide">
+            <div className="pt-2 border-t border-primary/25">
+              <p className="text-xs font-bold text-orange-700 dark:text-orange-300 mb-2 uppercase tracking-wide">
                 {t("mintNFT.transactionInfo", "Transaction Info")}
               </p>
               <div className="space-y-2">

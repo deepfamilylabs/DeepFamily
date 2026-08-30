@@ -154,7 +154,7 @@ describe("MetadataUnlockControl cache scope", () => {
     expect(container.contains(dialog)).toBe(false);
     expect(document.body.contains(dialog)).toBe(true);
     // The shell owns the scrim; the dialog no longer paints one of its own.
-    expect(document.body.querySelectorAll("[aria-hidden].bg-black\\/40")).toHaveLength(1);
+    expect(document.body.querySelectorAll("[aria-hidden][data-modal-scrim]")).toHaveLength(1);
 
     fireEvent.keyDown(window, { key: "Escape" });
 

@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import { ResponsiveModalFrame } from "../../../../shared/ui";
+import { ModalSectionHeading, ResponsiveModalFrame } from "../../../../shared/ui";
 import { useEndorseModalController } from "./hooks/useEndorseModalController";
 import { EndorseBenefitsPanel } from "./sections/EndorseBenefitsPanel";
 import { EndorseFeePanel } from "./sections/EndorseFeePanel";
@@ -23,17 +23,27 @@ export default function EndorseModal(props: EndorseModalProps) {
   return (
     <ResponsiveModalFrame
       {...endorse.frame}
-      accentClass="bg-emerald-600"
+      accent="emerald"
       ariaLabel="Endorse"
-      icon={<Star className="w-6 h-6 text-white" />}
+      icon={<Star className="w-[18px] h-[18px]" />}
       title={t("endorse.title", "Endorse Version")}
       description={t("endorse.description", "Support quality data by endorsing versions")}
     >
       <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0 touch-pan-y">
-        <div className="flex-1 p-6 space-y-8">
+        <div className="flex-1 p-5 space-y-4">
           <EndorseTargetForm t={t} {...endorse.targetForm} />
-          <EndorseFeePanel t={t} {...endorse.feePanel} />
-          <EndorseBenefitsPanel t={t} />
+
+          <div className="space-y-2.5">
+            <ModalSectionHeading>{t("endorse.cost", "Cost")}</ModalSectionHeading>
+            <EndorseFeePanel t={t} {...endorse.feePanel} />
+          </div>
+
+          <div className="space-y-2.5">
+            <ModalSectionHeading>
+              {t("endorse.benefits", "Benefits of Endorsing")}
+            </ModalSectionHeading>
+            <EndorseBenefitsPanel t={t} />
+          </div>
           <EndorseStatusPanel t={t} {...endorse.statusPanel} />
         </div>
 

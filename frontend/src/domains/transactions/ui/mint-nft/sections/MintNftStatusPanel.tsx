@@ -28,14 +28,14 @@ export function MintNftStatusPanel({
   return (
     <>
       {isAlreadyMinted && !successResult && (
-        <div className="p-8 rounded-3xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 text-center flex flex-col items-center justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-red-100 to-red-50 dark:from-red-900/40 dark:to-red-900/20 flex items-center justify-center mb-4 shadow-xs">
-            <AlertCircle className="w-8 h-8 text-red-600 dark:text-red-400" />
+        <div className="p-8 rounded-xl bg-surface border border-hairline text-center flex flex-col items-center justify-center">
+          <div className="w-16 h-16 rounded-xl bg-danger/12 flex items-center justify-center mb-4 shadow-xs">
+            <AlertCircle className="w-8 h-8 text-danger" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <h3 className="text-xl font-bold text-ink mb-2">
             {t("mintNFT.nftAlreadyMinted", "NFT Already Minted")}
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-sm">
+          <p className="text-ink-muted max-w-sm">
             {t(
               "mintNFT.nftAlreadyMintedDesc",
               "This version has already been minted as an NFT. Each version can only be minted once.",

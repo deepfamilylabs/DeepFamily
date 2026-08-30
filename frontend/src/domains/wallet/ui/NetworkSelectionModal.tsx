@@ -10,7 +10,14 @@ import {
   HardDrive,
   Globe,
 } from "lucide-react";
-import { ModalShell } from "../../../shared/ui";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_CLOSE_BUTTON,
+  MODAL_HEADER,
+  MODAL_TITLE,
+  MODAL_TILE_BASE,
+  ModalShell,
+} from "../../../shared/ui";
 
 interface NetworkOption {
   chainId: number;
@@ -83,26 +90,14 @@ export default function NetworkSelectionModal({
     }
   };
 
-  const getNetworkIconConfig = (type: NetworkOption["type"]) => {
+  const getNetworkIcon = (type: NetworkOption["type"]) => {
     switch (type) {
       case "mainnet":
-        return {
-          icon: <Zap className="w-5 h-5" />,
-          gradient: "from-emerald-400 via-teal-500 to-cyan-500",
-          shadow: "shadow-emerald-500/30",
-        };
+        return <Zap className="w-[19px] h-[19px] text-success" aria-hidden />;
       case "testnet":
-        return {
-          icon: <FlaskConical className="w-5 h-5" />,
-          gradient: "from-violet-400 via-purple-500 to-fuchsia-500",
-          shadow: "shadow-violet-500/30",
-        };
+        return <FlaskConical className="w-[19px] h-[19px] text-warning" aria-hidden />;
       case "local":
-        return {
-          icon: <HardDrive className="w-5 h-5" />,
-          gradient: "from-slate-400 via-gray-500 to-zinc-500",
-          shadow: "shadow-slate-500/30",
-        };
+        return <HardDrive className="w-[19px] h-[19px] text-ink-muted" aria-hidden />;
     }
   };
 
@@ -114,113 +109,88 @@ export default function NetworkSelectionModal({
       closeLabel={t("common.close", "Close")}
       bare
     >
-      <div className="flex h-full items-center justify-center p-4 transition-none">
+      <div className="flex h-full items-center justify-center p-4">
         <div
-          className="w-full max-w-md bg-white/95 dark:bg-black/90 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.3)] p-8 space-y-8 relative overflow-hidden"
+          className="w-full max-w-[560px] overflow-hidden rounded-2xl border border-hairline bg-surface-body shadow-[0_24px_48px_-24px_rgba(15,23,42,0.28),0_2px_6px_-2px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.7)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close Button */}
-          <button
-            onClick={onClose}
-            className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-white/10"
-            aria-label={t("common.close", "Close")}
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-        {/* Header Section */}
-        <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <Globe className="w-8 h-8 text-white" />
+          <div className={MODAL_HEADER}>
+            <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.primary}`}>
+              <Globe className="w-[18px] h-[18px]" aria-hidden />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className={MODAL_TITLE}>
+                {t("wallet.switchNetwork", "Switch Network")}
+              </h2>
+              <p className="text-xs text-ink-muted">
+                {t("wallet.selectNetworkDesc", "Select a network to connect")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className={MODAL_CLOSE_BUTTON}
+              aria-label={t("common.close", "Close")}
+            >
+              <X className="w-[17px] h-[17px]" />
+            </button>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-              {t("wallet.switchNetwork", "Switch Network")}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {t("wallet.selectNetworkDesc", "Select a network to connect")}
+
+          <div className="p-5 space-y-2">
+            {NETWORK_OPTIONS.map((network) => {
+              const isActive = currentChainId === network.chainId;
+              const isLoading = switchingTo === network.chainId;
+
+              return (
+                <button
+                  key={network.chainId}
+                  type="button"
+                  onClick={() => handleSelect(network.chainId)}
+                  disabled={isSwitching || isActive}
+                  className={`w-full flex items-center gap-3.5 p-3.5 text-left rounded-xl bg-surface border transition-colors focus:outline-hidden focus:ring-3 focus:ring-primary/15 disabled:cursor-not-allowed ${
+                    isActive
+                      ? "border-success/40"
+                      : "border-hairline hover:border-primary hover:bg-surface-alt"
+                  }`}
+                >
+                  <div className="w-[38px] h-[38px] shrink-0 rounded-[10px] bg-surface-muted flex items-center justify-center">
+                    {getNetworkIcon(network.type)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-ink truncate">
+                      {t(network.nameKey, network.defaultName)}
+                    </div>
+                    <div className="text-xs text-ink-muted">
+                      {t(network.tagKey, network.defaultTag)} · <span className="font-mono">chain {network.chainId}</span>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0">
+                    {isLoading ? (
+                      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-primary/30 bg-primary/10 text-xs font-semibold text-orange-700 dark:text-orange-300">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                        {t("wallet.switching", "Confirm in wallet…")}
+                      </span>
+                    ) : isActive ? (
+                      <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-success/25 bg-success/10 text-xs font-semibold text-success">
+                        <Check className="w-3.5 h-3.5" aria-hidden />
+                        {t("wallet.networkConnected", "Connected")}
+                      </span>
+                    ) : (
+                      <ChevronRight className="w-[17px] h-[17px] text-ink-subtle" aria-hidden />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="px-5 py-3.5 border-t border-hairline bg-surface">
+            <p className="text-xs text-ink-subtle text-center">
+              {t("wallet.networkWillBeAdded", "Network will be added automatically if not present")}
             </p>
           </div>
-        </div>
-
-        {/* Network Options */}
-        <div className="space-y-3">
-          {NETWORK_OPTIONS.map((network) => {
-            const isActive = currentChainId === network.chainId;
-            const isLoading = switchingTo === network.chainId;
-            const config = getNetworkIconConfig(network.type);
-
-            return (
-              <button
-                key={network.chainId}
-                onClick={() => handleSelect(network.chainId)}
-                disabled={isSwitching || isActive}
-                className={`
-                  w-full flex items-center gap-4 p-4 rounded-2xl
-                  bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10
-                  hover:border-orange-500 dark:hover:border-orange-400 hover:shadow-md hover:shadow-orange-500/10
-                  group transition-none
-                  disabled:opacity-70 disabled:cursor-not-allowed
-                  ${isActive ? "border-emerald-500 dark:border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/10" : ""}
-                `}
-              >
-                {/* Network Icon */}
-                <div className="relative shrink-0">
-                  <div
-                    className={`
-                      w-12 h-12 rounded-xl flex items-center justify-center
-                      bg-linear-to-br ${config.gradient}
-                      shadow-xs
-                    `}
-                  >
-                    <span className="text-white">{config.icon}</span>
-                  </div>
-                  {/* Status dot */}
-                  {isActive && (
-                    <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Network Info */}
-                <div className="flex-1 text-left min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-900 dark:text-white text-lg">
-                      {t(network.nameKey, network.defaultName)}
-                    </span>
-                  </div>
-                  {/* Minimal Tag */}
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {t(network.tagKey, network.defaultTag)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action Indicator */}
-                <div className="shrink-0">
-                  {isLoading ? (
-                    <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
-                  ) : isActive ? (
-                    <Check className="w-5 h-5 text-emerald-500" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-300 dark:text-gray-600 group-hover:text-orange-500" />
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="pt-2">
-          <p className="text-xs text-gray-400 dark:text-gray-500 text-center flex items-center justify-center gap-2">
-            <span className="w-1 h-1 rounded-full bg-blue-500" />
-            {t("wallet.networkWillBeAdded", "Network will be added automatically if not present")}
-            <span className="w-1 h-1 rounded-full bg-blue-500" />
-          </p>
-        </div>
         </div>
       </div>
     </ModalShell>

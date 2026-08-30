@@ -209,11 +209,11 @@ export default function EndorseCompactModal({
       <div className="space-y-8">
         {/* Header Section */}
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="h-16 w-16 rounded-2xl bg-linear-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
+          <div className="h-16 w-16 rounded-xl bg-linear-to-br from-orange-400 to-red-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transform transition-transform hover:scale-105 duration-300">
             <Star className="w-8 h-8 fill-current" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h2 className="text-2xl font-bold text-ink tracking-tight">
               {t("endorse.quickTitle", "Endorse Version")}
             </h2>
           </div>
@@ -222,31 +222,31 @@ export default function EndorseCompactModal({
         {/* Content Section */}
         <div className="space-y-4">
           {/* Target Info */}
-          <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-5 border border-gray-100 dark:border-white/5 transition-colors hover:border-gray-200 dark:hover:border-white/10 space-y-4">
+          <div className="bg-surface-alt rounded-xl p-5 border border-hairline transition-colors hover:border-hairline-strong space-y-4">
             <div>
-              <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+              <div className="text-xs font-medium text-ink-subtle uppercase tracking-wider mb-1">
                 {t("endorse.personHash", "Person Hash")}
               </div>
-              <code className="block font-mono text-xs text-gray-600 dark:text-gray-300 break-all bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-100 dark:border-white/5">
+              <code className="block font-mono text-xs text-ink-muted break-all bg-surface-alt p-3 rounded-xl border border-hairline">
                 {personHash}
               </code>
             </div>
 
             <div className="flex items-start justify-between">
               <div>
-                <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                <div className="text-xs font-medium text-ink-subtle uppercase tracking-wider mb-1">
                   {t("addVersion.versionIndex", "Version Index")}
                 </div>
-                <div className="font-mono text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="font-mono text-lg font-semibold text-ink">
                   {versionIndex}
                 </div>
               </div>
               {endorsementCount !== null && (
                 <div className="text-right">
-                  <div className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">
+                  <div className="text-xs font-medium text-ink-subtle uppercase tracking-wider mb-1">
                     {t("search.endorsementQuery.endorsementCount", "Endorsements")}
                   </div>
-                  <div className="font-mono text-lg font-semibold text-gray-900 dark:text-white">
+                  <div className="font-mono text-lg font-semibold text-ink">
                     {endorsementCount}
                   </div>
                 </div>
@@ -256,32 +256,32 @@ export default function EndorseCompactModal({
 
           {/* Token Info */}
           {(endorsementFee || userBalance) && (
-            <div className="bg-gray-50 dark:bg-white/5 rounded-2xl p-5 border border-gray-100 dark:border-white/5">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mb-3">
+            <div className="bg-surface-alt rounded-xl p-5 border border-hairline">
+              <div className="flex items-center gap-2 text-sm font-medium text-ink mb-3">
                 <Coins className="w-4 h-4 text-orange-500" />
                 <span>DEEP {t("endorse.tokenInfo", "Token Info")}</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 {endorsementFee && (
                   <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-ink-muted mb-1">
                       {t("endorse.fee", "Fee")}
                     </div>
-                    <div className="font-mono font-medium text-gray-900 dark:text-white">
+                    <div className="font-mono font-medium text-ink">
                       {endorsementFee} DEEP
                     </div>
                   </div>
                 )}
                 {userBalance && (
                   <div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    <div className="text-xs text-ink-muted mb-1">
                       {t("endorse.yourBalance", "Your Balance")}
                     </div>
                     <div
                       className={`font-mono font-medium ${
                         canAfford
                           ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-red-600 dark:text-red-400"
+                          : "text-danger"
                       }`}
                     >
                       {userBalance} DEEP
@@ -290,7 +290,7 @@ export default function EndorseCompactModal({
                 )}
               </div>
               {!canAfford && (
-                <div className="mt-3 flex items-center gap-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
+                <div className="mt-3 flex items-center gap-2 text-xs text-danger bg-danger/10 p-2 rounded-lg">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     {t(
@@ -312,11 +312,11 @@ export default function EndorseCompactModal({
                 <div className="flex flex-col items-center gap-3 animate-pulse">
                   <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
                   <div className="space-y-1">
-                    <div className="font-medium text-gray-900 dark:text-white">
+                    <div className="font-medium text-ink">
                       {getStatusMessage()}
                     </div>
                     {state === "approving" && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-center gap-1.5">
+                      <div className="text-xs text-ink-muted flex items-center justify-center gap-1.5">
                         <ShieldCheck className="w-3.5 h-3.5" />
                         <span>{t("endorse.confirmInWallet", "Please confirm in your wallet")}</span>
                       </div>
@@ -331,13 +331,13 @@ export default function EndorseCompactModal({
                     <Check className="w-6 h-6" />
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white text-lg">
+                    <div className="font-medium text-ink text-lg">
                       {state === "already-endorsed"
                         ? t("endorse.alreadyEndorsed", "You already endorsed this version")
                         : t("endorse.success", "Endorsed successfully")}
                     </div>
                     {state === "success" && txHash && (
-                      <code className="block mt-2 text-xs font-mono text-gray-500 break-all">
+                      <code className="block mt-2 text-xs font-mono text-ink-muted break-all">
                         {txHash}
                       </code>
                     )}
@@ -347,7 +347,7 @@ export default function EndorseCompactModal({
 
               {state === "error" && !isInsufficientBalance && (
                 <div className="space-y-4">
-                  <div className="flex flex-col items-center gap-2 text-red-600 dark:text-red-400">
+                  <div className="flex flex-col items-center gap-2 text-danger">
                     <AlertCircle className="w-8 h-8" />
                     <div className="text-sm text-center max-w-[280px] mx-auto">
                       {errorMessage ||
@@ -361,7 +361,7 @@ export default function EndorseCompactModal({
                         setHasTriggered(false);
                       }}
                       disabled={isProcessing}
-                      className="w-full py-3 rounded-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full py-3 rounded-full bg-gray-900 dark:bg-white text-white dark:text-ink font-medium shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />}
                       {t("common.retry", "Retry")}
@@ -371,7 +371,7 @@ export default function EndorseCompactModal({
               )}
 
               {state === "idle" && (
-                <div className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-ink-muted">
                   {t("endorse.quickWaiting", "Preparing endorsement...")}
                 </div>
               )}

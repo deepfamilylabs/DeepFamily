@@ -1,7 +1,16 @@
 import { useCallback, useId } from "react";
 import { HelpCircle, Lock, X } from "lucide-react";
 import { getChunkTypeColorClass, getChunkTypeIcon } from "../../../domains/person";
-import { ModalShell } from "../../../shared/ui";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_CLOSE_BUTTON,
+  MODAL_HEADER,
+  MODAL_PANEL,
+  MODAL_TITLE,
+  MODAL_TILE_BASE,
+  ModalShell,
+  OVERLAY_Z_INDEX,
+} from "../../../shared/ui";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 export function SealConfirmDialog({ editor }: { editor: StoryEditorController }) {
@@ -16,29 +25,25 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
       isOpen={showConfirm}
       onClose={closeDialog}
       bare
-      zIndex="z-1002"
+      zIndex={OVERLAY_Z_INDEX.confirmDialog}
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
       disableBackdropClose
     >
       <div className="h-full flex items-center justify-center p-4" data-seal-dialog>
         <div
-          className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-md border border-gray-100 dark:border-gray-800 overflow-hidden"
+          className={`relative w-[420px] max-w-[95vw] overflow-hidden ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
         >
-        <div className="p-8">
-          <div className="flex flex-col items-center text-center gap-4 mb-8">
-            <div className="shrink-0 w-16 h-16 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
-              <Lock size={32} className="text-orange-600 dark:text-orange-500" />
+          <div className="flex gap-3.5 p-5">
+            <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.danger}`}>
+              <Lock size={19} aria-hidden />
             </div>
-            <div>
-              <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <h3 id={titleId} className="modal-heading font-body text-base font-semibold text-ink">
                 {t("storyChunkEditor.sealDialog.title", "Seal Story")}
               </h3>
-              <p
-                id={descriptionId}
-                className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed max-w-xs mx-auto"
-              >
+              <p id={descriptionId} className="text-sm text-ink-muted leading-relaxed">
                 {t(
                   "storyChunkEditor.sealDialog.description",
                   "Are you sure you want to seal the story? Once sealed, it cannot be modified.",
@@ -47,12 +52,12 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
             </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-2.5 px-5 py-3.5 border-t border-hairline bg-surface-body">
             <button
               type="button"
               onClick={closeDialog}
               disabled={editor.submitting}
-              className="flex-1 px-4 py-3 text-sm font-bold text-gray-700 dark:text-gray-300 bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-full disabled:opacity-50 transition-colors"
+              className="flex-1 h-10 rounded-lg border border-hairline-strong bg-surface text-ink text-sm font-semibold transition-colors hover:bg-surface-alt disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-primary/30"
             >
               {t("storyChunkEditor.sealDialog.cancel", "Cancel")}
             </button>
@@ -60,22 +65,21 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
               type="button"
               onClick={editor.seal.execute}
               disabled={editor.submitting}
-              className="flex-1 px-4 py-3 text-sm font-bold text-white bg-linear-to-r from-orange-400 to-red-600 hover:shadow-lg shadow-orange-500/20 rounded-full disabled:opacity-50 transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+              className="flex-1 h-10 rounded-lg bg-danger text-white dark:text-red-950 text-sm font-semibold transition-colors hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-hidden focus:ring-2 focus:ring-danger/40"
             >
               {editor.submitting ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
                   <span>{t("storyChunkEditor.saving", "Saving...")}</span>
                 </>
               ) : (
                 <>
-                  <Lock size={16} />
+                  <Lock size={15} aria-hidden />
                   <span>{t("storyChunkEditor.sealDialog.confirm", "Confirm Seal")}</span>
                 </>
               )}
             </button>
           </div>
-        </div>
         </div>
       </div>
     </ModalShell>
@@ -94,7 +98,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
       isOpen={showChunkTypeHelp}
       onClose={closeDialog}
       bare
-      zIndex="z-1002"
+      zIndex={OVERLAY_Z_INDEX.confirmDialog}
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
@@ -103,33 +107,26 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
         data-chunk-help-dialog
       >
         <div
-          className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-3xl border border-gray-100 dark:border-gray-800 max-h-[75vh] overflow-hidden flex flex-col"
+          className={`w-full max-w-3xl max-h-[75vh] overflow-hidden flex flex-col ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
         >
-        <div className="flex items-center justify-between px-8 py-6 border-b border-gray-100 dark:border-gray-800">
-          <div className="flex items-center gap-4">
-            <div className="shrink-0 w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-              <HelpCircle size={24} className="text-blue-600 dark:text-blue-400" />
-            </div>
-            <h3 id={titleId} className="text-xl font-bold text-gray-900 dark:text-gray-100">
-              {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
-            </h3>
+        <div className={MODAL_HEADER}>
+          <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.blue}`}>
+            <HelpCircle size={18} aria-hidden />
           </div>
-          <button
-            onClick={closeDialog}
-            className="rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 hover:rotate-90"
-            aria-label="Close"
-            type="button"
-          >
-            <X size={24} />
+          <h2 id={titleId} className={`flex-1 min-w-0 ${MODAL_TITLE}`}>
+            {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
+          </h2>
+          <button onClick={closeDialog} className={MODAL_CLOSE_BUTTON} aria-label="Close" type="button">
+            <X size={17} />
           </button>
         </div>
 
-        <div className="overflow-y-auto p-8 space-y-8">
+        <div className="overflow-y-auto bg-surface-body p-6 space-y-7">
           <div className="prose dark:prose-invert max-w-none">
             <p
               id={descriptionId}
-              className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed"
+              className="text-sm text-ink-muted leading-relaxed"
             >
               {t(
                 "storyChunkEditor.chunkTypeHelp.intro",
@@ -231,11 +228,11 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             ].map((item) => keyedItem(item, t))}
           />
 
-          <section className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-3 uppercase tracking-wide">
+          <section className="border-t border-hairline pt-4">
+            <h4 className="text-sm font-bold text-ink mb-3 uppercase tracking-wide">
               {t("storyChunkEditor.chunkTypeHelp.usageNotes", "Usage Notes")}
             </h4>
-            <ul className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+            <ul className="space-y-2 text-xs text-ink-muted">
               {[
                 t(
                   "storyChunkEditor.chunkTypeHelp.note1",
@@ -300,17 +297,17 @@ function HelpGroup({
 }) {
   return (
     <section>
-      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 uppercase tracking-wide">
+      <h4 className="text-sm font-bold text-ink mb-2 uppercase tracking-wide">
         {title}
       </h4>
-      {intro ? <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 italic">{intro}</p> : null}
+      {intro ? <p className="text-xs text-ink-muted mb-2 italic">{intro}</p> : null}
       <div className="space-y-2">
         {items.map((item) => {
           const Icon = getChunkTypeIcon(item.value);
           return (
             <div
               key={item.value}
-              className="flex items-start gap-2 p-2 rounded-sm bg-gray-50 dark:bg-gray-800/50"
+              className="flex items-start gap-2 p-2 rounded-sm bg-surface-alt/50"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Icon
@@ -318,10 +315,10 @@ function HelpGroup({
                   className={getChunkTypeColorClass(item.value) + " shrink-0 mt-0.5"}
                 />
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  <span className="text-sm font-medium text-ink">
                     {item.label}
                   </span>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">{item.desc}</p>
+                  <p className="text-xs text-ink-muted mt-0.5">{item.desc}</p>
                 </div>
               </div>
             </div>

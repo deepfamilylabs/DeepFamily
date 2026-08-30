@@ -45,7 +45,7 @@ export function CopyIconButton({
         if (stopPropagation) event.stopPropagation();
         onClick(event);
       }}
-      className={`inline-flex shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-200 dark:focus-visible:ring-offset-gray-950 ${sizeConfig.button} ${visibilityClass} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-muted hover:text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ring-offset-surface disabled:pointer-events-none disabled:opacity-50 ${sizeConfig.button} ${visibilityClass} ${className}`}
     >
       <Clipboard size={sizeConfig.icon} strokeWidth={2.25} aria-hidden="true" />
     </button>

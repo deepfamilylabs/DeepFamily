@@ -3,6 +3,14 @@ import { X } from "lucide-react";
 import { ModalShell } from "./ModalShell";
 import { OVERLAY_Z_INDEX } from "./overlayLayers";
 import { useBottomSheetDrag } from "./useBottomSheetDrag";
+import {
+  MODAL_ACCENT_TILE,
+  MODAL_CLOSE_BUTTON,
+  MODAL_HEADER,
+  MODAL_TILE_BASE,
+  MODAL_TITLE,
+  type ModalAccent,
+} from "./modalTokens";
 
 export type ResponsiveModalFrameProps = {
   isOpen: boolean;
@@ -13,13 +21,26 @@ export type ResponsiveModalFrameProps = {
   title: React.ReactNode;
   description?: React.ReactNode;
   entered: boolean;
-  /** Accent behind the header icon; defaults to the protocol orange. */
-  accentClass?: string;
+  /** Flow identity behind the header icon; defaults to the protocol orange. */
+  accent?: ModalAccent;
+  /** Rendered between the title block and the close button (status, stepper). */
+  headerAside?: React.ReactNode;
+  /**
+   * Full-width action strip pinned under the header. For read modals whose
+   * actions belong to the record rather than to a submit, so they don't ride
+   * in the header's description slot.
+   */
+  toolbar?: React.ReactNode;
   zIndex?: string;
   closeLabel?: string;
   children: React.ReactNode;
 };
 
+/**
+ * The `lg` shell: a centered 720px dialog on desktop, a draggable bottom sheet
+ * on mobile. Header and footer sit on `surface`, the scrolling body on
+ * `surface-body`, so content cards read as one step of depth without shadows.
+ */
 export function ResponsiveModalFrame({
   isOpen,
   onClose,
@@ -29,7 +50,9 @@ export function ResponsiveModalFrame({
   title,
   description,
   entered,
-  accentClass = "bg-orange-600",
+  accent = "primary",
+  headerAside,
+  toolbar,
   zIndex = OVERLAY_Z_INDEX.appModal,
   closeLabel = "Close",
   children,
@@ -49,7 +72,7 @@ export function ResponsiveModalFrame({
       <div className="overflow-x-hidden touch-pan-y h-dvh max-h-dvh md:h-full md:max-h-none">
         <div className="flex items-end md:items-center justify-center h-full w-full px-2 pt-6 pb-[env(safe-area-inset-bottom)] md:p-4">
           <div
-            className={`relative flex flex-col w-full max-w-4xl h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[95vh] bg-white dark:bg-gray-950 rounded-t-lg md:rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden transform transition-[transform,opacity] duration-300 ease-out ${entered ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-full opacity-0 md:translate-y-0 md:scale-95"} will-change-transform`}
+            className={`relative flex flex-col w-full max-w-[720px] h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[92vh] bg-surface-body rounded-t-2xl md:rounded-2xl border border-hairline shadow-[0_24px_48px_-24px_rgba(15,23,42,0.28),0_2px_6px_-2px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.7)] overflow-hidden transform transition-[transform,opacity] duration-300 ease-out ${entered ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-full opacity-0 md:translate-y-0 md:scale-95"} will-change-transform`}
             onClick={(e) => e.stopPropagation()}
             style={{
               transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -57,7 +80,7 @@ export function ResponsiveModalFrame({
             }}
           >
             <div
-              className="sticky top-0 bg-white dark:bg-gray-950 p-5 border-b border-gray-200 dark:border-gray-800 z-20 relative touch-none cursor-grab active:cursor-grabbing select-none"
+              className={`sticky top-0 z-20 relative touch-none cursor-grab active:cursor-grabbing select-none ${MODAL_HEADER} pt-6 md:pt-4`}
               onPointerDown={(e) => {
                 (e.currentTarget as any).setPointerCapture?.(e.pointerId);
                 startDrag(e.clientY);
@@ -69,40 +92,40 @@ export function ResponsiveModalFrame({
               onTouchMove={(e) => updateDrag(e.touches[0].clientY)}
               onTouchEnd={finishDrag}
             >
-              <div className="md:hidden absolute top-3 left-1/2 -translate-x-1/2 h-1 w-12 rounded-full bg-gray-200 dark:bg-gray-800" />
+              <div className="md:hidden absolute top-2 left-1/2 -translate-x-1/2 h-1 w-10 rounded-full bg-hairline-strong" />
 
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
-                  <div
-                    className={`w-11 h-11 rounded-lg ${accentClass} flex items-center justify-center shadow-xs shrink-0`}
-                  >
-                    {icon}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-50 mb-0.5 truncate">
-                      {title}
-                    </h2>
-                    {description ? (
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{description}</div>
-                    ) : null}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onClose();
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors shrink-0 group"
-                  aria-label={closeLabel}
-                >
-                  <X className="w-5 h-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition-colors" />
-                </button>
+              <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE[accent]}`}>{icon}</div>
+
+              <div className="flex-1 min-w-0">
+                <h2 className={MODAL_TITLE}>{title}</h2>
+                {description ? (
+                  <div className="text-xs text-ink-muted">{description}</div>
+                ) : null}
               </div>
+
+              {headerAside}
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onClose();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                className={MODAL_CLOSE_BUTTON}
+                aria-label={closeLabel}
+              >
+                <X className="w-[17px] h-[17px]" />
+              </button>
             </div>
+
+            {toolbar ? (
+              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-hairline bg-surface overflow-x-auto">
+                {toolbar}
+              </div>
+            ) : null}
 
             {children}
           </div>

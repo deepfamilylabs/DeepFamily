@@ -37,13 +37,13 @@ export function MintConsentSection({
   ];
 
   return (
-    <div className="p-5 rounded-2xl border border-red-200/50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 backdrop-blur-sm mt-8!">
+    <div className="p-4 rounded-xl border border-hairline bg-surface">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-          <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
+        <div className="w-9 h-9 rounded-[10px] bg-danger/12 flex items-center justify-center shrink-0">
+          <Shield className="w-[18px] h-[18px] text-danger" aria-hidden />
         </div>
         <div className="space-y-3 w-full pt-1">
-          <p className="text-sm font-bold text-gray-900 dark:text-red-100">
+          <p className="text-[13px] font-semibold text-ink">
             {t("mintNFT.consentTitle", "Informed consent (required)")}
           </p>
           <div className="space-y-2">
@@ -59,11 +59,11 @@ export function MintConsentSection({
           </div>
           {consentError && (
             <div
-              className="flex items-center gap-2 p-3 rounded-lg bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800 animate-fade-in"
+              className="flex items-center gap-2 p-3 rounded-lg bg-danger/15 border border-danger/25 animate-fade-in"
               role="alert"
               aria-live="assertive"
             >
-              <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
               <p className="text-xs text-red-700 dark:text-red-300 font-bold">{consentError}</p>
             </div>
           )}

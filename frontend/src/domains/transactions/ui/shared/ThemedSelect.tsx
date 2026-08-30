@@ -64,17 +64,17 @@ export function ThemedSelect({ value, onChange, options, className = "" }: Theme
         type="button"
         onClick={() => setOpen((value) => !value)}
         onKeyDown={handleButtonKeyDown}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-10 px-3 rounded-lg border border-hairline-strong bg-surface text-left text-xs text-ink focus:outline-hidden focus:ring-3 focus:ring-primary/15 hover:bg-surface-alt/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         aria-activedescendant={activeOptionId}
       >
         <span className="truncate">{current}</span>
-        <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
+        <ChevronDown size={16} className="text-ink-muted" />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-hairline bg-surface shadow-lg overflow-hidden">
           <ul id={listboxId} role="listbox" className="max-h-60 overflow-auto">
             {options.map((option, index) => (
               <li
@@ -89,10 +89,10 @@ export function ThemedSelect({ value, onChange, options, className = "" }: Theme
                 }}
                 className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   option.value === value
-                    ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
+                    ? "bg-primary/10 text-orange-700 dark:text-orange-300"
                     : index === activeIndex
-                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-50"
-                    : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      ? "bg-surface-muted text-ink"
+                    : "text-ink hover:bg-surface-muted"
                 }`}
               >
                 {option.label}

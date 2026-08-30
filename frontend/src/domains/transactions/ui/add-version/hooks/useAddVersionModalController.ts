@@ -22,6 +22,7 @@ import type {
   AddVersionFormInput,
   AddVersionIdentityRole,
   AddVersionSuccessResultView,
+  AddVersionT,
   AddVersionTransactionPreview,
   ParentKind,
   ParentStatus,
@@ -56,6 +57,24 @@ function getParentInfoStatus(
   if (!info || !canonicalFullName) return "empty";
   if (typeof versionIndex === "number" && versionIndex > 0) return "complete";
   return "partial";
+}
+
+/** One-line recap for a collapsed parent row: name · birth year · version. */
+function formatParentSummary(
+  t: AddVersionT,
+  info: PersonInfoPublic | null,
+  versionIndex: number | "",
+): string | undefined {
+  const name = info?.fullName?.trim();
+  if (!name || !safeCanonicalizeFullName(name)) return undefined;
+  const parts = [name];
+  if (info?.birthYear) {
+    parts.push(info.isBirthBC ? `${info.birthYear} BC` : String(info.birthYear));
+  }
+  if (typeof versionIndex === "number" && versionIndex > 0) {
+    parts.push(t("addVersion.parentVersionShort", "version {{index}}", { index: versionIndex }));
+  }
+  return parts.join(" · ");
 }
 
 function calculatorHasIdentity(calc: PersonHashCalculatorHandle | null): boolean {
@@ -152,6 +171,8 @@ export function useAddVersionModalController({
   const watchedValues = watch();
   const fatherStatus = getParentInfoStatus(fatherInfo, watchedValues.fatherVersionIndex);
   const motherStatus = getParentInfoStatus(motherInfo, watchedValues.motherVersionIndex);
+  const fatherSummary = formatParentSummary(t, fatherInfo, watchedValues.fatherVersionIndex);
+  const motherSummary = formatParentSummary(t, motherInfo, watchedValues.motherVersionIndex);
   const fatherPresent = fatherStatus !== "empty";
   const motherPresent = motherStatus !== "empty";
   const allConsentsChecked = areAddVersionConsentsSatisfied(consents);
@@ -385,6 +406,7 @@ export function useAddVersionModalController({
       formResetKey,
       expanded: fatherExpanded,
       status: fatherStatus,
+      summary: fatherSummary,
       calcRef: fatherCalcRef,
       register,
       onExpandedChange: setFatherExpanded,
@@ -397,6 +419,7 @@ export function useAddVersionModalController({
       formResetKey,
       expanded: motherExpanded,
       status: motherStatus,
+      summary: motherSummary,
       calcRef: motherCalcRef,
       register,
       onExpandedChange: setMotherExpanded,

@@ -3,7 +3,12 @@ import { User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NodeData, isMinted } from "../../../shared/model";
 import { useNavigate } from "react-router-dom";
-import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
+import {
+  ModalSectionHeading,
+  ResponsiveModalFrame,
+  useResponsiveModalMode,
+  useToast,
+} from "../../../shared/ui";
 import { useEndorseModal } from "./EndorseModalProvider";
 import {
   NodeDetailHeaderActions,
@@ -22,6 +27,7 @@ interface NodeDetailModalProps {
   error?: string | null;
   getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
   trustedEndorserAccess?: TrustedEndorserAccess;
+  onRequestMetadataUnlock?: () => void;
 }
 
 export default function NodeDetailModal({
@@ -33,6 +39,7 @@ export default function NodeDetailModal({
   error,
   getOwnerOf,
   trustedEndorserAccess,
+  onRequestMetadataUnlock,
 }: NodeDetailModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -164,6 +171,12 @@ export default function NodeDetailModal({
     window.open(`/editor/${nodeData.tokenId}`, "_blank", "noopener,noreferrer");
   };
 
+  const personSummary = nodeData?.fullName
+    ? nodeData.versionIndex !== undefined
+      ? `${nodeData.fullName} · ${t("familyTree.nodeDetail.versionLabel", "Version")} ${nodeData.versionIndex}`
+      : nodeData.fullName
+    : undefined;
+
   const headerActions = (
     <NodeDetailHeaderActions
       t={t}
@@ -191,20 +204,27 @@ export default function NodeDetailModal({
       onClose={handleClose}
       isDesktop={isDesktop}
       ariaLabel={t("familyTree.personVersionDetail.title")}
-      icon={<User className="w-6 h-6 text-white" strokeWidth={2.5} />}
+      icon={<User className="w-[18px] h-[18px]" strokeWidth={1.75} />}
       title={t("familyTree.personVersionDetail.title")}
-      description={headerActions}
+      description={personSummary}
+      toolbar={headerActions}
       entered={entered}
       closeLabel={t("common.close", "Close")}
     >
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth text-[13px] text-gray-900 dark:text-gray-100 touch-pan-y">
-        <div className="p-6 space-y-2.5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
-          <NodeDetailHashRows
-            t={t}
-            nodeData={nodeData}
-            fallback={fallback}
-            onCopy={onCopy}
-          />
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain overflow-x-hidden scroll-smooth text-[13px] text-ink touch-pan-y">
+        <div className="p-5 space-y-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+          <div className="space-y-2.5">
+            <ModalSectionHeading>
+              {t("familyTree.nodeDetail.onChainRecord", "On-chain record")}
+            </ModalSectionHeading>
+            <NodeDetailHashRows
+              t={t}
+              nodeData={nodeData}
+              fallback={fallback}
+              onCopy={onCopy}
+              onRequestMetadataUnlock={onRequestMetadataUnlock}
+            />
+          </div>
           <NodeDetailNftSection t={t} nodeData={nodeData} owner={owner} onCopy={onCopy} />
           <NodeDetailTrustedEndorsersSection
             t={t}
@@ -217,13 +237,11 @@ export default function NodeDetailModal({
         {/* Bottom spacer to ensure last row (e.g., URI) is visible above rounded edge / safe area */}
         <div className="h-4 sm:h-2" />
         {loading && (
-          <div className="text-center text-xs text-gray-500 dark:text-gray-400 py-2">
+          <div className="text-center text-xs text-ink-muted py-2">
             {t("familyTree.nodeDetail.loading")}
           </div>
         )}
-        {error && (
-          <div className="text-center text-xs text-red-500 dark:text-red-400 py-2">{error}</div>
-        )}
+        {error && <div className="text-center text-xs text-danger py-2">{error}</div>}
       </div>
     </ResponsiveModalFrame>
   );

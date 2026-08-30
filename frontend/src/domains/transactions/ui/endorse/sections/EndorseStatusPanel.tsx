@@ -77,7 +77,7 @@ export function EndorseStatusPanel({
       )}
 
       {hasEndorsed && !successResult && (
-        <div className="bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-800 rounded-2xl p-4">
+        <div className="p-4 bg-success/10 border border-success/25 rounded-xl">
           <div className="flex items-center gap-3">
             <Star className="w-5 h-5 text-green-600 dark:text-green-400 fill-current" />
             <span className="text-sm font-bold text-green-900 dark:text-green-100">

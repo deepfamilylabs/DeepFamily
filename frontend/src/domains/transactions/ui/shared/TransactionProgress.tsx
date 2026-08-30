@@ -10,7 +10,7 @@ export function TransactionProgress({ title, message, note }: TransactionProgres
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className="p-5 bg-orange-50/50 dark:bg-orange-900/10 rounded-2xl border border-orange-100 dark:border-orange-900/20 animate-fade-in"
+      className="p-4 bg-surface border border-hairline rounded-xl animate-fade-in"
     >
       <div className="flex items-center gap-4">
         <div className="relative w-10 h-10 shrink-0">
@@ -18,12 +18,12 @@ export function TransactionProgress({ title, message, note }: TransactionProgres
           <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">{title}</p>
+          <p className="text-[13px] font-semibold text-ink mb-1">{title}</p>
           <p className="text-xs font-medium text-orange-700 dark:text-orange-300">{message}</p>
         </div>
       </div>
       {note ? (
-        <div className="mt-4 pt-4 border-t border-orange-200/50 dark:border-orange-800/50 text-xs font-medium text-orange-600 dark:text-orange-400">
+        <div className="mt-4 pt-4 border-t border-orange-200/50 dark:border-orange-800/50 text-xs font-medium text-primary">
           {note}
         </div>
       ) : null}

@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { AddVersionT, PersonInfoPublic } from "../model/addVersionTypes";
+import { ModalSectionHeading } from "../../../../../shared/ui";
 
 export interface PersonIdentitySectionProps {
   t: AddVersionT;
@@ -21,9 +22,7 @@ export function PersonIdentitySection({
 }: PersonIdentitySectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-bold text-gray-900 dark:text-gray-50">
-        {t("addVersion.personInfo", "Person Information")}
-      </h3>
+      <ModalSectionHeading>{t("addVersion.personInfo", "Person Information")}</ModalSectionHeading>
 
       <PersonHashCalculator
         ref={personCalcRef}

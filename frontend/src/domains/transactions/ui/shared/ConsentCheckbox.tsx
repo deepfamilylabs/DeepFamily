@@ -15,11 +15,11 @@ export function ConsentCheckbox({ checked, onChange, children }: ConsentCheckbox
           type="checkbox"
           checked={checked}
           onChange={onChange}
-          className="peer h-4 w-4 rounded-[4px] border-[1.5px] border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-600 focus:ring-0 focus:border-red-500 checked:bg-red-600 checked:border-red-600 transition-all cursor-pointer appearance-none"
+          className="peer h-4 w-4 rounded-[4px] border-[1.5px] border-hairline-strong bg-surface focus:ring-0 focus:border-primary checked:bg-primary checked:border-primary transition-all cursor-pointer appearance-none"
         />
         <Check className="w-3 h-3 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform scale-75 opacity-0 peer-checked:opacity-100 peer-checked:scale-75 transition-all duration-200 pointer-events-none stroke-4" />
       </span>
-      <span className="text-xs text-gray-800 dark:text-red-50 leading-relaxed font-medium group-hover:text-red-700 dark:group-hover:text-white transition-colors">
+      <span className="text-xs text-ink leading-relaxed transition-colors">
         {children}
       </span>
     </label>

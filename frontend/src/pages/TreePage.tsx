@@ -120,6 +120,7 @@ export default function TreePage() {
     defaults,
     update,
   } = useConfig();
+  const [metadataUnlockOpen, setMetadataUnlockOpen] = useState(false);
   const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
   const trustedReader = useMemo(() => {
@@ -251,6 +252,7 @@ export default function TreePage() {
           nodesData={nodesData}
           getOwnerOf={getOwnerOf}
           trustedEndorserAccess={trustedEndorserAccess}
+          onRequestMetadataUnlock={() => setMetadataUnlockOpen(true)}
           mergeNodeDetail={mergeNodeDetail}
         >
           <TreeInteractionBridge>
@@ -431,7 +433,10 @@ export default function TreePage() {
                     }}
                     hideSwitch={true}
                   />
-                  <MetadataUnlockControl />
+                  <MetadataUnlockControl
+                    open={metadataUnlockOpen}
+                    onOpenChange={setMetadataUnlockOpen}
+                  />
                 </div>
               </div>
 

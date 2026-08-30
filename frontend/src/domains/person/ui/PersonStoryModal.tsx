@@ -310,66 +310,62 @@ export default function PersonStoryModal({
   );
 
   const modalDescription = (
-    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
-      {genderText && (
-        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{genderText}</span>
-      )}
+    <div className="flex flex-wrap items-center gap-2">
+      {genderText && <span className="text-xs text-ink-muted">{genderText}</span>}
       {isMinted(person) && (
         <>
-          <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
-          <span className="font-mono text-sm font-medium text-gray-500 dark:text-gray-400">
-            #{person.tokenId}
-          </span>
+          <span className="w-1 h-1 rounded-full bg-hairline-strong" aria-hidden />
+          <span className="font-mono text-xs text-ink-muted">#{person.tokenId}</span>
         </>
-      )}
-      {(endorsementCount > 0 || isMinted(person)) && (
-        <div className="flex items-center gap-2 shrink-0">
-          {endorsementCount > 0 && (
-            <button
-              type="button"
-              aria-label={t("people.clickToEndorse", "Click to endorse this version")}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowEndorseModal(true);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden shrink-0 whitespace-nowrap"
-            >
-              <Star className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-              <span className="text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-                {endorsementCount}
-              </span>
-            </button>
-          )}
-
-          {isMinted(person) && (
-            <button
-              type="button"
-              aria-label={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
-              onClick={(e) => {
-                e.stopPropagation();
-                window.open(
-                  `/person/${person.tokenId || person.id}`,
-                  "_blank",
-                  "noopener,noreferrer",
-                );
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="group relative inline-flex h-8 items-center gap-1.5 px-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-gray-800 rounded-full cursor-pointer justify-center sm:justify-start hover:bg-orange-500 hover:border-orange-500 hover:shadow-[0_4px_15px_-3px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 focus:outline-hidden shrink-0 whitespace-nowrap"
-              title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
-            >
-              <BookOpen className="w-4 h-4 text-gray-400 group-hover:text-white" strokeWidth={2} />
-              <span className="hidden sm:inline text-xs font-bold tracking-wide text-gray-600 dark:text-gray-400 group-hover:text-white">
-                {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
-              </span>
-            </button>
-          )}
-        </div>
       )}
     </div>
   );
+
+  const action =
+    "inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg border border-hairline-strong bg-surface text-ink text-[13px] font-semibold whitespace-nowrap transition-colors hover:bg-surface-alt hover:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/15";
+
+  const modalToolbar =
+    endorsementCount > 0 || isMinted(person) ? (
+      <>
+        {endorsementCount > 0 && (
+          <button
+            type="button"
+            aria-label={t("people.clickToEndorse", "Click to endorse this version")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowEndorseModal(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg bg-primary text-white dark:text-orange-950 text-[13px] font-semibold whitespace-nowrap transition-colors hover:bg-primary-hover focus:outline-hidden focus:ring-3 focus:ring-primary/25"
+          >
+            <Star className="w-[15px] h-[15px]" strokeWidth={1.9} aria-hidden />
+            <span>{t("endorse.endorse", "Endorse")}</span>
+            <span className="font-mono opacity-80">{endorsementCount}</span>
+          </button>
+        )}
+
+        {isMinted(person) && (
+          <button
+            type="button"
+            aria-label={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(`/person/${person.tokenId || person.id}`, "_blank", "noopener,noreferrer");
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className={action}
+            title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
+          >
+            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <span className="hidden sm:inline">
+              {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+            </span>
+          </button>
+        )}
+      </>
+    ) : null;
 
   return (
     <ResponsiveModalFrame
@@ -377,9 +373,10 @@ export default function PersonStoryModal({
       onClose={onClose}
       isDesktop={isDesktop}
       ariaLabel={person.fullName || `Person ${person.personHash.slice(0, 8)}...`}
-      icon={<User className="w-6 h-6 text-white" strokeWidth={2} />}
+      icon={<User className="w-[18px] h-[18px]" strokeWidth={1.75} />}
       title={modalTitle}
       description={modalDescription}
+      toolbar={modalToolbar}
       entered={entered}
       closeLabel={t("common.close", "Close")}
     >
@@ -407,7 +404,7 @@ export default function PersonStoryModal({
         }}
       />
       <div className="flex-1 overflow-y-auto overscroll-contain overflow-x-hidden min-h-0 touch-pan-y">
-        <div className="p-6 space-y-6 pb-[calc(2rem+env(safe-area-inset-bottom))]">
+        <div className="p-5 space-y-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
           <StoryLifeEventsSection
             t={t}
             birth={formatDate.birth}
@@ -420,7 +417,6 @@ export default function PersonStoryModal({
             t={t}
             person={person}
             owner={owner}
-            isDesktop={isDesktop}
             copyText={copyText}
           />
 

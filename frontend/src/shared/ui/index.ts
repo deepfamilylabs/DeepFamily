@@ -1,6 +1,9 @@
 export { ModalShell } from "./ModalShell";
 export type { ModalShellProps } from "./ModalShell";
 export { ResponsiveModalFrame } from "./ResponsiveModalFrame";
+export { ModalSectionHeading } from "./ModalSectionHeading";
+export type { ModalSectionHeadingProps } from "./ModalSectionHeading";
+export * from "./modalTokens";
 export type { ResponsiveModalFrameProps } from "./ResponsiveModalFrame";
 export { default as PageContainer } from "./PageContainer";
 export { default as ConfirmDialog } from "./ConfirmDialog";

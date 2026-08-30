@@ -21,14 +21,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Eye, EyeOff, Info } from "lucide-react";
-import {
-  CopyIconButton,
-  ModalShell,
-  OVERLAY_Z_INDEX,
-  useListboxA11y,
-  useToast,
-} from "../../../shared/ui";
-import { formatHashMiddle } from "../../../shared/model";
+import { CopyIconButton, MODAL_FIELD_SM, ModalShell, OVERLAY_Z_INDEX, useListboxA11y, useToast } from "../../../shared/ui";
 import {
   validatePassphraseStrength,
   normalizePassphraseForHash,
@@ -49,7 +42,7 @@ const getGraphemeLength = getGraphemeLengthUtil;
 
 // Field error component
 const FieldError: React.FC<{ message?: string }> = ({ message }) => (
-  <div className={`text-xs h-4 leading-4 ${message ? "text-red-600" : "text-transparent"}`}>
+  <div className={`text-xs h-4 leading-4 ${message ? "text-danger" : "text-transparent"}`}>
     {message || "placeholder"}
   </div>
 );
@@ -113,17 +106,17 @@ const ThemedSelect: React.FC<{
         type="button"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={handleButtonKeyDown}
-        className="w-full h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-left text-xs text-gray-800 dark:text-gray-100 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition flex items-center justify-between"
+        className="w-full h-10 px-3 rounded-lg border border-hairline-strong bg-surface text-left text-xs text-ink focus:outline-hidden focus:ring-3 focus:ring-primary/15 hover:bg-surface-alt/60 transition flex items-center justify-between"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         aria-activedescendant={activeOptionId}
       >
         <span className="truncate">{current}</span>
-        <ChevronDown size={16} className="text-gray-500 dark:text-gray-400" />
+        <ChevronDown size={16} className="text-ink-muted" />
       </button>
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg overflow-hidden">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-hairline bg-surface shadow-lg overflow-hidden">
           <ul id={listboxId} role="listbox" className="max-h-60 overflow-auto">
             {options.map((o, index) => (
               <li
@@ -138,10 +131,10 @@ const ThemedSelect: React.FC<{
                 }}
                 className={`px-3 py-2 text-xs cursor-pointer select-none transition-colors ${
                   o.value === value
-                    ? "bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300"
+                    ? "bg-primary/10 text-orange-700 dark:text-orange-300"
                     : index === activeIndex
-                      ? "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-50"
-                      : "text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      ? "bg-surface-muted text-ink"
+                      : "text-ink hover:bg-surface-muted"
                 }`}
               >
                 {o.label}
@@ -536,11 +529,11 @@ export const PersonHashCalculator = forwardRef<
         <div className="w-full space-y-1">
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
-              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
-                {t("search.hashCalculator.name")} <span className="text-red-500">*</span>
+              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
+                {t("search.hashCalculator.name")} <span className="text-danger">*</span>
               </label>
               <input
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                className={MODAL_FIELD_SM}
                 placeholder={t("search.hashCalculator.nameInputPlaceholder")}
                 {...register("fullName")}
               />
@@ -548,7 +541,7 @@ export const PersonHashCalculator = forwardRef<
             </div>
 
             <div className="w-28 sm:w-28 shrink-0">
-              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                 {t("search.hashCalculator.gender")}
               </label>
               <ThemedSelect
@@ -568,7 +561,7 @@ export const PersonHashCalculator = forwardRef<
           <div className="flex flex-nowrap items-start gap-1">
             <div className="flex items-start gap-1">
               <div className="w-20">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                   {t("search.hashCalculator.isBirthBC")}
                 </label>
                 <ThemedSelect
@@ -585,7 +578,7 @@ export const PersonHashCalculator = forwardRef<
               </div>
 
               <div className="w-20 sm:w-[120px]">
-                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+                <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                   {t("search.hashCalculator.birthYearLabel")}
                 </label>
                 <input
@@ -593,7 +586,7 @@ export const PersonHashCalculator = forwardRef<
                   min="0"
                   max={isBirthBC ? 9999 : new Date().getFullYear()}
                   placeholder={isBirthBC ? "<10000" : "<=" + new Date().getFullYear()}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                  className={MODAL_FIELD_SM}
                   {...register("birthYear", {
                     setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                   })}
@@ -603,7 +596,7 @@ export const PersonHashCalculator = forwardRef<
             </div>
 
             <div className="w-24">
-              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                 {t("search.hashCalculator.birthMonthLabel")}
               </label>
               <input
@@ -611,7 +604,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="12"
                 placeholder={t("search.hashCalculator.birthMonth")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                className={MODAL_FIELD_SM}
                 {...register("birthMonth", {
                   setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
                 })}
@@ -620,7 +613,7 @@ export const PersonHashCalculator = forwardRef<
             </div>
 
             <div className="w-24">
-              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 mb-1">
+              <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted mb-1">
                 {t("search.hashCalculator.birthDayLabel")}
               </label>
               <input
@@ -628,7 +621,7 @@ export const PersonHashCalculator = forwardRef<
                 min="0"
                 max="31"
                 placeholder={t("search.hashCalculator.birthDay")}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                className={MODAL_FIELD_SM}
                 {...register("birthDay", { setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)) })}
               />
               <FieldError message={errors.birthDay?.message} />
@@ -636,14 +629,14 @@ export const PersonHashCalculator = forwardRef<
           </div>
           <div className="w-full mt-2">
             <div className="flex items-center gap-2 mb-1">
-              <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-gray-600 dark:text-gray-400 whitespace-normal sm:whitespace-nowrap leading-tight">
+              <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-ink-muted whitespace-normal sm:whitespace-nowrap leading-tight">
                 {t("search.hashCalculator.passphrase", "Identity passphrase")}
               </label>
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
-                  className="text-gray-400 dark:text-gray-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors"
+                  className="text-ink-subtle hover:text-primary transition-colors"
                   aria-label={t(
                     "search.hashCalculator.passphraseHelp.buttonAriaLabel",
                     "Identity passphrase help",
@@ -661,14 +654,14 @@ export const PersonHashCalculator = forwardRef<
                   zIndex={OVERLAY_Z_INDEX.nestedModal}
                 >
                   <div
-                    className={`fixed ${OVERLAY_Z_INDEX.nestedModal} top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl`}
+                    className={`fixed ${OVERLAY_Z_INDEX.nestedModal} top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-surface border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl`}
                     onClick={(event) => event.stopPropagation()}
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div
                           id={passphraseHelpTitleId}
-                          className="font-semibold text-gray-800 dark:text-gray-100"
+                          className="font-semibold text-ink"
                         >
                           {t(
                             "search.hashCalculator.passphraseHelp.title",
@@ -678,7 +671,7 @@ export const PersonHashCalculator = forwardRef<
                         <button
                           type="button"
                           onClick={() => setShowPassphraseHelp(false)}
-                          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-sm"
+                          className="w-6 h-6 flex items-center justify-center text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 hover:bg-surface-muted rounded-sm"
                           aria-label={t("common.close", "Close")}
                         >
                           ×
@@ -686,7 +679,7 @@ export const PersonHashCalculator = forwardRef<
                       </div>
 
                       <div id={passphraseHelpDescriptionId} className="space-y-3 text-sm">
-                        <div className="text-gray-600 dark:text-gray-300">
+                        <div className="text-ink-muted">
                           <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
                             {t(
                               "search.hashCalculator.passphraseHelp.privacy",
@@ -701,7 +694,7 @@ export const PersonHashCalculator = forwardRef<
                           </div>
                         </div>
 
-                        <div className="text-gray-600 dark:text-gray-300">
+                        <div className="text-ink-muted">
                           <div className="mb-1 font-medium text-green-600 dark:text-green-400">
                             {t(
                               "search.hashCalculator.passphraseHelp.optional",
@@ -716,8 +709,8 @@ export const PersonHashCalculator = forwardRef<
                           </div>
                         </div>
 
-                        <div className="text-gray-600 dark:text-gray-300">
-                          <div className="mb-1 font-medium text-orange-600 dark:text-orange-400">
+                        <div className="text-ink-muted">
+                          <div className="mb-1 font-medium text-primary">
                             {t("search.hashCalculator.passphraseHelp.remember", "Please Remember")}
                           </div>
                           <div className="text-xs leading-relaxed">
@@ -728,14 +721,14 @@ export const PersonHashCalculator = forwardRef<
                           </div>
                         </div>
 
-                        <div className="text-gray-600 dark:text-gray-300">
+                        <div className="text-ink-muted">
                           <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
                             {t(
                               "search.hashCalculator.passphraseHelp.privacyNoteTitle",
                               "Local Only",
                             )}
                           </div>
-                          <div className="text-xs leading-relaxed text-gray-500 dark:text-gray-300">
+                          <div className="text-xs leading-relaxed text-ink-muted dark:text-gray-300">
                             {t(
                               "search.hashCalculator.passphraseHelp.privacyNote",
                               "The passphrase is hashed locally only; nothing is uploaded or stored.",
@@ -751,7 +744,7 @@ export const PersonHashCalculator = forwardRef<
             <div className="relative">
               <input
                 type={showPassphrase ? "text" : "password"}
-                className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 focus:border-orange-500 dark:focus:border-orange-400 focus:ring-2 focus:ring-orange-500/30 dark:focus:ring-orange-400/30 outline-hidden transition"
+                className={`${MODAL_FIELD_SM} pr-10`}
                 placeholder={t(
                   "search.hashCalculator.passphrasePlaceholder",
                   "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
@@ -773,7 +766,7 @@ export const PersonHashCalculator = forwardRef<
               <button
                 type="button"
                 onClick={() => setShowPassphrase(!showPassphrase)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
                 aria-label={
                   showPassphrase
                     ? t(
@@ -794,7 +787,7 @@ export const PersonHashCalculator = forwardRef<
               <div className="relative mt-2">
                 <input
                   type={showConfirmPassphrase ? "text" : "password"}
-                  className="w-full h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 pr-10 text-xs text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 outline-hidden transition"
+                  className={`${MODAL_FIELD_SM} pr-10`}
                   placeholder={t(
                     "search.hashCalculator.confirmPassphrasePlaceholder",
                     "Repeat the identity passphrase (empty is allowed)",
@@ -810,7 +803,7 @@ export const PersonHashCalculator = forwardRef<
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassphrase((value) => !value)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 transition-colors focus:outline-hidden"
                   aria-label={
                     showConfirmPassphrase
                       ? t("search.hashCalculator.passphraseVisibility.hide", "Hide passphrase")
@@ -823,7 +816,7 @@ export const PersonHashCalculator = forwardRef<
             ) : null}
 
             {hasPassphrase && (
-              <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+              <div className="mt-1 text-[11px] text-ink-muted">
                 {t("search.hashCalculator.passphraseCharCount", {
                   count: passphraseGraphemeLength,
                 })}
@@ -883,9 +876,9 @@ export const PersonHashCalculator = forwardRef<
                   <span
                     className={`text-xs font-medium whitespace-nowrap ${
                       passwordStrength.level === "weak"
-                        ? "text-red-600 dark:text-red-400"
+                        ? "text-danger"
                         : passwordStrength.level === "medium"
-                          ? "text-orange-600 dark:text-orange-400"
+                          ? "text-primary"
                           : passwordStrength.level === "strong"
                             ? "text-yellow-600 dark:text-yellow-400"
                             : passwordStrength.level === "very-strong"
@@ -905,7 +898,7 @@ export const PersonHashCalculator = forwardRef<
                   </span>
                 </div>
                 {/* Display entropy */}
-                <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                <div className="text-[11px] text-ink-muted">
                   {t(
                     "search.hashCalculator.entropyDisplay",
                     "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
@@ -931,18 +924,18 @@ export const PersonHashCalculator = forwardRef<
           <div className="space-y-2">
             {/* Local calculation result */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:overflow-hidden">
-              <span className="shrink-0 text-xs text-gray-600 dark:text-gray-400">
+              <span className="shrink-0 text-xs text-ink-muted">
                 {t("search.hashCalculator.calculatedHash")}:
               </span>
               {isComputingHash ? (
-                <span className="font-mono text-xs text-gray-500 dark:text-gray-400">
+                <span className="font-mono text-xs text-ink-muted">
                   {t("search.hashCalculator.calculatingHash", "Computing identity hash...")}
                 </span>
               ) : (
                 <>
                   <HashInline
                     value={computedHash}
-                    className="font-mono text-sm leading-none text-gray-700 dark:text-gray-300 tracking-tight"
+                    className="font-mono text-sm leading-none text-ink-muted tracking-tight"
                     wrapOnMobile
                   />
                   <CopyIconButton
@@ -995,11 +988,11 @@ export const PersonHashCalculator = forwardRef<
 
       return (
         <div
-          className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-xs overflow-hidden ${className}`}
+          className={`rounded-lg border border-hairline/70 bg-surface shadow-xs overflow-hidden ${className}`}
         >
           {showTitle && (
-            <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 border-b border-gray-200 dark:border-gray-700/60">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 border-b border-hairline/60">
+              <h3 className="text-sm font-semibold text-ink">
                 {t("search.hashCalculator.title")}
               </h3>
             </div>
@@ -1011,20 +1004,20 @@ export const PersonHashCalculator = forwardRef<
 
     return (
       <div
-        className={`rounded-lg border border-gray-200 dark:border-gray-700/70 bg-white dark:bg-gray-900 shadow-xs overflow-hidden ${className}`}
+        className={`rounded-lg border border-hairline/70 bg-surface shadow-xs overflow-hidden ${className}`}
       >
         <div
-          className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-gray-200 dark:border-gray-700/60"
+          className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 flex items-center justify-between cursor-pointer border-b border-hairline/60"
           onClick={handleToggle}
         >
           {showTitle && (
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+            <h3 className="text-sm font-semibold text-ink">
               {t("search.hashCalculator.title")}
             </h3>
           )}
           <button
             type="button"
-            className="text-sm px-2 py-1 rounded-sm border bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="text-sm px-2 py-1 rounded-sm border bg-surface border-hairline-strong text-ink-muted hover:bg-surface-alt transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               handleToggle();
@@ -1043,57 +1036,21 @@ export const PersonHashCalculator = forwardRef<
 export default PersonHashCalculator;
 
 // Inline hash renderer: shows full when fits; otherwise 10...8 middle ellipsis
+/**
+ * Hashes and addresses render in full inside dialogs — no measure-and-truncate.
+ * `wrapOnMobile` is kept so call sites can opt into wrapping at narrow widths;
+ * everywhere else the value breaks across lines rather than being abbreviated.
+ */
 const HashInline: React.FC<{
   value: string;
   className?: string;
   titleText?: string;
-  prefix?: number;
-  suffix?: number;
   wrapOnMobile?: boolean;
-}> = ({ value, className = "", titleText, prefix = 10, suffix = 8, wrapOnMobile = false }) => {
-  const containerRef = useRef<HTMLSpanElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const [display, setDisplay] = useState<string>(value);
-
-  const recompute = () => {
-    const container = containerRef.current;
-    const meas = measureRef.current;
-    if (!container || !meas) return;
-    meas.textContent = value;
-    const fits = meas.scrollWidth <= container.clientWidth;
-    const shouldWrap =
-      wrapOnMobile &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 639px)").matches;
-    setDisplay(shouldWrap || fits ? value : formatHashMiddle(value, prefix, suffix));
-  };
-
-  useEffect(() => {
-    recompute();
-    const ro = new ResizeObserver(() => recompute());
-    if (containerRef.current) ro.observe(containerRef.current);
-    const onResize = () => recompute();
-    window.addEventListener("resize", onResize);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", onResize);
-    };
-  }, [value, prefix, suffix, wrapOnMobile]);
-
-  return (
-    <>
-      <span
-        ref={containerRef}
-        className={`min-w-0 ${wrapOnMobile ? "sm:overflow-hidden" : "overflow-hidden"} ${wrapOnMobile ? "w-full sm:w-auto break-all whitespace-normal sm:whitespace-nowrap" : "whitespace-nowrap"} ${className}`}
-        title={titleText ?? value}
-      >
-        {display}
-      </span>
-      {/* measurement node mirrors font styles to ensure accurate width */}
-      <span
-        ref={measureRef}
-        className={`absolute left-[-99999px] top-0 invisible whitespace-nowrap ${className}`}
-      />
-    </>
-  );
-};
+}> = ({ value, className = "", titleText, wrapOnMobile = false }) => (
+  <span
+    className={`min-w-0 break-all ${wrapOnMobile ? "w-full sm:w-auto" : ""} ${className}`}
+    title={titleText ?? value}
+  >
+    {value}
+  </span>
+);
