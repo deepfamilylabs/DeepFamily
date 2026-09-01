@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ethers } from "ethers";
 import { sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
 import {
   readMintTargetEnvelopeHeader,
   type MintMetadataCodeReader,
 } from "../../../services/mintNftService";
-import type { MintMissingParents } from "../model/mintNftTypes";
 
 interface UseMintTargetStatusArgs {
   isOpen: boolean;
@@ -23,19 +21,9 @@ const defaultTargetStatus = {
   isEndorsed: false,
   isAlreadyMinted: false,
   isCheckingStatus: false,
-  hasMissingParents: null as MintMissingParents,
   selfSuiteId: null as number | null,
   envelopeHeaderError: null as string | null,
 };
-
-function getMissingParents(details: any): MintMissingParents {
-  const fatherMissing =
-    !details?.version?.fatherHash || details.version.fatherHash === ethers.ZeroHash;
-  const motherMissing =
-    !details?.version?.motherHash || details.version.motherHash === ethers.ZeroHash;
-
-  return fatherMissing || motherMissing ? { father: fatherMissing, mother: motherMissing } : null;
-}
 
 export function useMintTargetStatus({
   isOpen,
@@ -101,7 +89,6 @@ export function useMintTargetStatus({
           isEndorsed: Number(endorsedIdx) === Number(targetVersionIndex),
           isAlreadyMinted: Number(details?.tokenId ?? 0) > 0,
           isCheckingStatus: false,
-          hasMissingParents: getMissingParents(details),
           selfSuiteId,
           envelopeHeaderError: null,
         });
@@ -113,7 +100,6 @@ export function useMintTargetStatus({
             isEndorsed: false,
             isAlreadyMinted: false,
             isCheckingStatus: false,
-            hasMissingParents: null,
             selfSuiteId: null,
             envelopeHeaderError: "Target metadata envelope header could not be verified",
           });

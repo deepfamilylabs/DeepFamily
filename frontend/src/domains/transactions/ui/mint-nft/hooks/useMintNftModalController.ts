@@ -7,6 +7,9 @@ import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passph
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
+import { useEndorsedVersionIndex } from "../../../hooks/useEndorsedVersionIndex";
+import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions";
+import { reconcileMintVersionSelection } from "../model/mintVersionSelection";
 import { useTreeGraphData, useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
@@ -66,7 +69,8 @@ export function useMintNftModalController({
   } = useDisclosureProof();
 
   const [personHash, setPersonHash] = useState("");
-  const [versionIndex, setVersionIndex] = useState(1);
+  // 0 means "no version chosen yet"; hasValidTarget already requires > 0.
+  const [versionIndex, setVersionIndex] = useState(0);
   const [consents, setConsents] = useState(defaultConsents);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [personInfo, setPersonInfo] = useState<MintPersonInfo | null>(null);
@@ -74,6 +78,10 @@ export function useMintNftModalController({
   const [successResult, setSuccessResult] = useState<MintNFTSuccessResultView | null>(null);
   const [errorResult, setErrorResult] = useState<MintNFTErrorResultView | null>(null);
   const previousTargetRef = useRef({ hash: "", index: 0 });
+  // The hash the version index was last decided for, so an arriving lookup
+  // overrules neither the caller's target nor a choice the user just made.
+  const decidedVersionHashRef = useRef<string | null>(null);
+  const hadValidHashRef = useRef(false);
   const didPatchCacheRef = useRef(false);
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
@@ -84,6 +92,14 @@ export function useMintNftModalController({
     targetPersonHash && isPersonHashFormatValid && targetVersionIndex > 0,
   );
   const hasTargetInputs = hasValidTarget;
+  const versionLookup = usePersonVersionOptions(
+    isOpen && isPersonHashFormatValid ? targetPersonHash : null,
+  );
+  const endorsedVersionIndex = useEndorsedVersionIndex(
+    isOpen && isPersonHashFormatValid ? targetPersonHash : null,
+    address,
+    contract,
+  );
   const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
   const allConsentsChecked = consents.public && consents.age && consents.legal;
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
@@ -125,7 +141,6 @@ export function useMintNftModalController({
     isEndorsed,
     isAlreadyMinted,
     isCheckingStatus,
-    hasMissingParents,
     selfSuiteId: targetSelfSuiteId,
     envelopeHeaderError,
     reset: resetTargetStatus,
@@ -172,13 +187,17 @@ export function useMintNftModalController({
     resetMintNftFlow();
     resetTargetStatus();
     previousTargetRef.current = { hash: "", index: 0 };
+    decidedVersionHashRef.current = null;
     didPatchCacheRef.current = false;
   }, [reset, resetDisclosureProof, resetMintNftFlow, resetTargetStatus]);
 
   useEffect(() => {
     if (isOpen) {
       const nextHash = initialPersonHash || "";
-      const nextIndex = initialVersionIndex || 1;
+      const nextIndex = initialVersionIndex || 0;
+      // A caller that names a version means that exact version; only a target
+      // the user has to fill in themselves gets a preselection.
+      decidedVersionHashRef.current = initialVersionIndex ? nextHash.trim() : null;
       setPersonHash(nextHash);
       setVersionIndex(nextIndex);
       setSuccessResult(null);
@@ -201,6 +220,37 @@ export function useMintNftModalController({
     resetMintNftFlow,
     resetBusinessState,
   ]);
+
+  useEffect(() => {
+    const hadValidHash = hadValidHashRef.current;
+    hadValidHashRef.current = isPersonHashFormatValid;
+    // Only on the transition out of a valid hash. The first render always sees
+    // the empty initial state, and clearing there would drop a caller's target.
+    if (isPersonHashFormatValid || !hadValidHash) return;
+    decidedVersionHashRef.current = null;
+    setVersionIndex(0);
+  }, [isPersonHashFormatValid]);
+
+  useEffect(() => {
+    const update = reconcileMintVersionSelection(
+      versionLookup,
+      decidedVersionHashRef.current,
+      endorsedVersionIndex,
+    );
+    if (!update) return;
+    decidedVersionHashRef.current = update.decidedForHash;
+    setVersionIndex(update.versionIndex);
+  }, [endorsedVersionIndex, versionLookup]);
+
+  const handleVersionIndexChange = useCallback(
+    (value: number) => {
+      // Freeze the decision for this hash so a still-running lookup cannot
+      // overwrite it once it resolves.
+      decidedVersionHashRef.current = versionLookup.personHash ?? targetPersonHash;
+      setVersionIndex(value);
+    },
+    [targetPersonHash, versionLookup.personHash],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -290,13 +340,10 @@ export function useMintNftModalController({
       hashInputInvalid,
       hasValidTarget,
       isCheckingStatus,
-      isEndorsed,
-      isAlreadyMinted,
-      hasMissingParents,
-      targetSelfSuiteId,
       envelopeHeaderError,
+      versionLookup,
       onPersonHashChange: setPersonHash,
-      onVersionIndexChange: setVersionIndex,
+      onVersionIndexChange: handleVersionIndexChange,
     },
     personProofSection: {
       personCalcRef,

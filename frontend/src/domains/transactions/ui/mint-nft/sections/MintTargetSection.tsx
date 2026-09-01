@@ -1,12 +1,10 @@
-import { AlertCircle } from "lucide-react";
-import {
-  MODAL_CHIP,
-  MODAL_FIELD,
-  ModalSectionHeading,
-  getFieldErrorA11y,
-  modalField,
-} from "../../../../../shared/ui";
-import type { MintMissingParents, MintNFTT } from "../model/mintNftTypes";
+import { AlertCircle, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ModalSectionHeading, getFieldErrorA11y, modalField } from "../../../../../shared/ui";
+import { ThemedSelect } from "../../shared/ThemedSelect";
+import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
+import { describeVersionOrigin } from "../../../model/personVersionMeta";
+import type { MintNFTT } from "../model/mintNftTypes";
 
 export interface MintTargetSectionProps {
   t: MintNFTT;
@@ -15,11 +13,8 @@ export interface MintTargetSectionProps {
   hashInputInvalid: boolean;
   hasValidTarget: boolean;
   isCheckingStatus: boolean;
-  isEndorsed: boolean;
-  isAlreadyMinted: boolean;
-  hasMissingParents: MintMissingParents;
-  targetSelfSuiteId: number | null;
   envelopeHeaderError: string | null;
+  versionLookup: PersonVersionLookup;
   onPersonHashChange: (value: string) => void;
   onVersionIndexChange: (value: number) => void;
 }
@@ -31,11 +26,8 @@ export function MintTargetSection({
   hashInputInvalid,
   hasValidTarget,
   isCheckingStatus,
-  isEndorsed,
-  isAlreadyMinted,
-  hasMissingParents,
-  targetSelfSuiteId,
   envelopeHeaderError,
+  versionLookup,
   onPersonHashChange,
   onVersionIndexChange,
 }: MintTargetSectionProps) {
@@ -44,14 +36,68 @@ export function MintTargetSection({
     errorId: "mint-nft-person-hash-error",
   });
 
+  const versionOptions = versionLookup.versions.map((version) => {
+    const origin = describeVersionOrigin(version);
+    return {
+      value: version.versionIndex,
+      label:
+        version.tokenId > 0
+          ? t(
+              "mintNFT.versionOptionNft",
+              "Version {{index}} · minted · {{endorsements}} endorsements",
+              { index: version.versionIndex, endorsements: version.endorsementCount },
+            )
+          : t("mintNFT.versionOption", "Version {{index}} · {{endorsements}} endorsements", {
+              index: version.versionIndex,
+              endorsements: version.endorsementCount,
+            }),
+      meta: origin.submitter
+        ? t("mintNFT.versionOptionMeta", "{{submitter}} · {{date}}", {
+            submitter: origin.submitter,
+            date: origin.date || t("mintNFT.versionDateUnknown", "date unknown"),
+          })
+        : undefined,
+    };
+  });
+  if (versionIndex > 0 && !versionOptions.some((option) => option.value === versionIndex)) {
+    // Until the lookup resolves the target still needs a label, and a caller can
+    // hand in a version this hash does not carry.
+    versionOptions.push({
+      value: versionIndex,
+      label: t("mintNFT.versionOptionBare", "Version {{index}}", { index: versionIndex }),
+      meta: undefined,
+    });
+    versionOptions.sort((a, b) => a.value - b.value);
+  }
+
+  const mintedVersions = versionLookup.versions.filter((version) => version.tokenId > 0);
+
+  const versionPlaceholder =
+    versionLookup.status === "loading"
+      ? t("mintNFT.versionLoading", "Looking up on-chain versions...")
+      : t("mintNFT.versionUnchosen", "Select a version");
+
+  const versionNote =
+    versionLookup.status === "idle"
+      ? t("mintNFT.versionNeedsHash", "Enter a person hash to list its on-chain versions.")
+      : versionLookup.status === "loading"
+        ? t("mintNFT.versionLoading", "Looking up on-chain versions...")
+        : versionLookup.status === "error"
+          ? t("mintNFT.versionLookupFailed", "Version lookup failed. Re-enter the hash to retry.")
+          : versionLookup.totalVersions === 0
+            ? t("mintNFT.versionNone", "This hash carries no on-chain version.")
+            : undefined;
+
   return (
     <div className="space-y-4">
       <ModalSectionHeading>{t("mintNFT.targetVersion", "Target Version")}</ModalSectionHeading>
 
+      {/* Stacked, not side by side: a 66-character hash needs the card's full
+          width to stay readable, and the version list grows downwards. */}
       <div className="p-4 bg-surface border border-hairline rounded-xl">
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-ink mb-1.5">
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-ink">
               {t("mintNFT.personHash", "Person Hash")} <span className="text-danger">*</span>
             </label>
             <input
@@ -64,18 +110,42 @@ export function MintTargetSection({
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-ink mb-1.5">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-ink">
               {t("mintNFT.versionIndex", "Version Index")} <span className="text-danger">*</span>
             </label>
-            <input
-              type="number"
-              min="1"
+            <ThemedSelect
               value={versionIndex}
-              onChange={(event) => onVersionIndexChange(parseInt(event.target.value) || 1)}
-              className={MODAL_FIELD}
-              placeholder="1"
+              onChange={onVersionIndexChange}
+              options={versionOptions}
+              disabled={versionOptions.length === 0}
+              placeholder={versionPlaceholder}
+              size="md"
+              className="sm:max-w-sm"
             />
+            {versionNote && <p className="text-xs text-ink-muted leading-relaxed">{versionNote}</p>}
+            {mintedVersions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-xs text-ink-subtle">
+                  {t("mintNFT.versionVerifyMinted", "Cross-check a minted version:")}
+                </span>
+                {mintedVersions.map((version) => (
+                  <Link
+                    key={version.versionIndex}
+                    to={`/person/${version.tokenId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-hairline px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+                    title={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+                  >
+                    <BookOpen size={12} aria-hidden="true" />
+                    {t("mintNFT.versionOptionBare", "Version {{index}}", {
+                      index: version.versionIndex,
+                    })}
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -92,14 +162,14 @@ export function MintTargetSection({
           </div>
         )}
 
-        {!hashInputInvalid && hasValidTarget && (
+        {!hashInputInvalid && hasValidTarget && (isCheckingStatus || envelopeHeaderError) && (
           <div className="mt-4 pt-4 border-t border-hairline">
             {isCheckingStatus ? (
               <div className="text-sm font-medium text-primary flex items-center gap-2">
                 <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 {t("mintNFT.checkingStatus", "Checking status...")}
               </div>
-            ) : envelopeHeaderError ? (
+            ) : (
               <div
                 className="p-3 text-sm text-red-700 dark:text-red-300 bg-danger/15 rounded-lg flex items-center gap-2"
                 role="alert"
@@ -110,65 +180,10 @@ export function MintTargetSection({
                   "The target metadata envelope header could not be verified. Minting is disabled.",
                 )}
               </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`${MODAL_CHIP} ${isEndorsed ? "border-success/25 bg-success/10 text-success" : "border-warning/25 bg-warning/10 text-warning"}`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
-                  {isEndorsed
-                    ? t("mintNFT.endorsed", "Endorsed")
-                    : t("mintNFT.notEndorsed", "Not Endorsed")}
-                </span>
-                <span
-                  className={`${MODAL_CHIP} ${isAlreadyMinted ? "border-danger/25 bg-danger/10 text-danger" : "border-success/25 bg-success/10 text-success"}`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-current" aria-hidden />
-                  {isAlreadyMinted
-                    ? t("mintNFT.alreadyMinted", "Already Minted")
-                    : t("mintNFT.canMint", "Can Mint")}
-                </span>
-                {targetSelfSuiteId !== null && (
-                  <span className={`${MODAL_CHIP} border-hairline bg-surface-alt text-ink-muted`}>
-                    {t("mintNFT.identitySuite", "Identity suite")}
-                    <span className="font-mono text-ink">{targetSelfSuiteId}</span>
-                  </span>
-                )}
-              </div>
             )}
           </div>
         )}
 
-        {!isCheckingStatus &&
-          hasMissingParents &&
-          (hasMissingParents.father || hasMissingParents.mother) && (
-            <div className="mt-3 p-3 bg-warning/10 border border-warning/25 rounded-xl">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-warning mt-0.5 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-[13px] font-semibold text-amber-700 dark:text-amber-300 mb-1">
-                    {t("mintNFT.missingParentsTitle", "Incomplete Parent Information")}
-                  </h4>
-                  <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed opacity-90">
-                    {hasMissingParents.father && hasMissingParents.mother
-                      ? t(
-                          "mintNFT.missingBothParents",
-                          "Both parent hashes are empty for this version. Publish a new ZK version with parent hashes; version index 0 defers picking the exact parent version.",
-                        )
-                      : hasMissingParents.father
-                        ? t(
-                            "mintNFT.missingFather",
-                            "The father hash is empty for this version. Publish a new ZK version with the father hash; index 0 will use the highest-endorsed father version by default.",
-                          )
-                        : t(
-                            "mintNFT.missingMother",
-                            "The mother hash is empty for this version. Publish a new ZK version with the mother hash; index 0 will use the highest-endorsed mother version by default.",
-                          )}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
       </div>
     </div>
   );
