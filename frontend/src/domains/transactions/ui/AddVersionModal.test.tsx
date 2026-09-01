@@ -68,6 +68,14 @@ const mocks = vi.hoisted(() => ({
   terminateZkWorkerIfIdle: vi.fn(),
   clearSecretInputs: vi.fn(),
   secretInputRead: vi.fn(),
+  listVersionEndorsements: vi.fn(async () => ({
+    versionIndices: [] as number[],
+    endorsementCounts: [] as number[],
+    tokenIds: [] as number[],
+    totalVersions: 0,
+    hasMore: false,
+    nextOffset: 0,
+  })),
   deepFamilyContract: {
     versionExists: vi.fn(),
     metadataArchive: vi.fn(),
@@ -178,6 +186,7 @@ vi.mock("../../../shared/lib/errors", () => ({
 }));
 
 vi.mock("../../person", () => ({
+  usePersonGateway: () => ({ listVersionEndorsements: mocks.listVersionEndorsements }),
   PersonHashCalculator: forwardRef((props: any, ref) => {
     const isParent = props.initialValues?.fullName === "";
     const role = !isParent ? "person" : props.initialValues?.gender === 1 ? "father" : "mother";
