@@ -205,6 +205,8 @@ interface PersonHashCalculatorProps {
   /** Fires with the computed identity hash ("" while empty/computing). */
   onComputedHashChange?: (hash: string) => void;
   onPassphraseChange?: (risk: ProtocolPassphraseRisk) => void;
+  /** Fires on confirmation edits only; the confirmation never changes the hash. */
+  onPassphraseConfirmationChange?: () => void;
   showTitle?: boolean;
   collapsible?: boolean;
   isOpen?: boolean;
@@ -239,6 +241,7 @@ export const PersonHashCalculator = forwardRef<
       onPublicFormChange,
       onComputedHashChange,
       onPassphraseChange,
+      onPassphraseConfirmationChange,
       showTitle = true,
       collapsible = false,
       isOpen = true,
@@ -799,6 +802,7 @@ export const PersonHashCalculator = forwardRef<
                   spellCheck={false}
                   lang={i18n.language}
                   ref={confirmPassphraseInputRef}
+                  onChange={() => onPassphraseConfirmationChange?.()}
                 />
                 <button
                   type="button"

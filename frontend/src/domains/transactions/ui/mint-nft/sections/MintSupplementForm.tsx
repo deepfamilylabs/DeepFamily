@@ -1,6 +1,5 @@
 import { useEffect, useId, useState } from "react";
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
-import { Lock } from "lucide-react";
 import { MODAL_FIELD, MODAL_FIELD_SM, MODAL_TEXTAREA, ModalSectionHeading, getFieldErrorA11y } from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
@@ -49,18 +48,6 @@ export function MintSupplementForm({
     <>
       <div className="space-y-4 pt-4 border-t border-hairline">
         <ModalSectionHeading>{t("mintNFT.supplementalInfo", "Supplemental Information")}</ModalSectionHeading>
-
-        <div className="p-3 bg-danger/8 border border-danger/20 rounded-xl">
-          <div className="flex items-start gap-2">
-            <Lock className="w-4 h-4 text-danger shrink-0 mt-0.5" aria-hidden />
-            <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-              {t(
-                "mintNFT.supplementalInfoImmutable",
-                "Supplemental information will be permanently stored on the blockchain and cannot be modified after submission. Please fill in carefully.",
-              )}
-            </p>
-          </div>
-        </div>
 
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

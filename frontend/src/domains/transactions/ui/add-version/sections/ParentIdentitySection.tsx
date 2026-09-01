@@ -1,15 +1,11 @@
 import type { Ref } from "react";
-import { MODAL_CHIP, MODAL_FIELD } from "../../../../../shared/ui";
-import {
-  ChevronDown,
-  ChevronRight,
-  Shield,
-  Users,
-} from "lucide-react";
-import type { UseFormRegister } from "react-hook-form";
+import { Link } from "react-router-dom";
+import { MODAL_CHIP } from "../../../../../shared/ui";
+import { BookOpen, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
+import { ThemedSelect } from "../../shared/ThemedSelect";
+import type { ParentVersionLookup } from "../hooks/useParentVersionOptions";
 import type {
-  AddVersionFormInput,
   AddVersionT,
   ParentKind,
   ParentStatus,
@@ -25,10 +21,15 @@ interface ParentIdentitySectionProps {
   /** One-line recap shown on the collapsed row (name · year · version). */
   summary?: string;
   calcRef: Ref<PersonHashCalculatorHandle>;
-  register: UseFormRegister<AddVersionFormInput>;
+  versionIndex: number | "";
+  versionLookup: ParentVersionLookup;
+  passphraseConfirmed: boolean;
   onExpandedChange: (value: boolean) => void;
   onInfoChange: (value: PersonInfoPublic) => void;
+  onComputedHashChange: (value: string) => void;
+  onVersionIndexChange: (value: number) => void;
   onPassphraseChange: () => void;
+  onPassphraseConfirmationChange: () => void;
 }
 
 export function ParentIdentitySection({
@@ -39,20 +40,83 @@ export function ParentIdentitySection({
   status,
   summary,
   calcRef,
-  register,
+  versionIndex,
+  versionLookup,
+  passphraseConfirmed,
   onExpandedChange,
   onInfoChange,
+  onComputedHashChange,
+  onVersionIndexChange,
   onPassphraseChange,
+  onPassphraseConfirmationChange,
 }: ParentIdentitySectionProps) {
   const isFather = kind === "father";
   const title = isFather
     ? t("addVersion.fatherInfo", "Father Information")
     : t("addVersion.motherInfo", "Mother Information");
-  const versionField = isFather ? "fatherVersionIndex" : "motherVersionIndex";
   const hint =
     status === "empty"
       ? t("addVersion.parentNotProvided", "Not provided")
       : t("addVersion.parentNeedsVersion", "Version index still missing");
+
+  const selectedVersion = versionIndex === "" ? 0 : versionIndex;
+
+  // Index 0 stays offered at every status: the parent may not be on chain yet,
+  // and a contributor who rejects the recorded versions is entitled to link
+  // the identity without endorsing any of them.
+  const versionOptions = [
+    { value: 0, label: t("addVersion.parentVersionUnknown", "Unknown (0)") },
+    ...versionLookup.versions.map((version) => ({
+      value: version.versionIndex,
+      label:
+        version.tokenId > 0
+          ? t("addVersion.parentVersionOptionNft", "Version {{index}} · NFT · {{endorsements}} endorsements", {
+              index: version.versionIndex,
+              endorsements: version.endorsementCount,
+            })
+          : t("addVersion.parentVersionOption", "Version {{index}} · {{endorsements}} endorsements", {
+              index: version.versionIndex,
+              endorsements: version.endorsementCount,
+            }),
+    })),
+  ];
+  if (selectedVersion > 0 && !versionOptions.some((option) => option.value === selectedVersion)) {
+    // A selection made for the previous hash outlives its options until the new
+    // lookup resolves; keep it labelled rather than blanking the control.
+    versionOptions.push({
+      value: selectedVersion,
+      label: t("addVersion.parentVersionOptionBare", "Version {{index}}", {
+        index: selectedVersion,
+      }),
+    });
+    versionOptions.sort((a, b) => a.value - b.value);
+  }
+
+  const mintedVersions = versionLookup.versions.filter((version) => version.tokenId > 0);
+
+  const lookupNote = !passphraseConfirmed
+    ? t(
+        "addVersion.parentVersionAwaitingConfirmation",
+        "The repeated identity passphrase does not match yet, so the on-chain versions are not being looked up. Two empty fields count as a match.",
+      )
+    : versionLookup.status === "idle"
+      ? t(
+          "addVersion.parentVersionNeedsIdentity",
+          "Enter the parent's name to look up their on-chain versions. Leave the identity passphrase empty if there is none.",
+        )
+        : versionLookup.status === "loading"
+          ? t("addVersion.parentVersionLoading", "Looking up on-chain versions...")
+          : versionLookup.status === "error"
+            ? t(
+                "addVersion.parentVersionLookupFailed",
+                "Version lookup failed. You can still submit with the version left unknown (0).",
+              )
+            : versionLookup.totalVersions === 0
+              ? t(
+                  "addVersion.parentVersionNone",
+                  "This hash has no on-chain version yet, so it will be submitted as unknown (0). If you expected a match, check the identity passphrase.",
+                )
+              : undefined;
 
   return (
     <div className="space-y-2">
@@ -95,18 +159,6 @@ export function ParentIdentitySection({
         className={`p-1 space-y-4 transition-all duration-300 ease-in-out ${expanded ? "opacity-100 max-h-[2000px]" : "opacity-0 max-h-0 overflow-hidden"}`}
       >
         <div className="bg-surface rounded-xl border border-hairline p-4 space-y-4">
-          <div className="p-3 bg-info/8 rounded-xl border border-info/20">
-            <div className="flex items-start gap-2">
-              <Shield className="w-4 h-4 text-info shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                {t(
-                  "addVersion.parentInfoNotice",
-                  "Providing both parents locally generates zero-knowledge proofs for family linking (only hashes go on-chain). The first complete two-parent commitment for a person hash may receive DEEP utility points; parents do not need to exist on-chain first. Their details must match when linking to their identities later.",
-                )}
-              </p>
-            </div>
-          </div>
-
           <PersonHashCalculator
             ref={calcRef}
             key={`${kind}-${formResetKey}`}
@@ -115,6 +167,8 @@ export function ParentIdentitySection({
             className="border-0 shadow-none bg-transparent"
             requirePassphraseConfirmation
             onPassphraseChange={onPassphraseChange}
+            onPassphraseConfirmationChange={onPassphraseConfirmationChange}
+            onComputedHashChange={onComputedHashChange}
             initialValues={{
               fullName: "",
               gender: isFather ? 1 : 2,
@@ -135,22 +189,39 @@ export function ParentIdentitySection({
             }}
           />
 
-          <div className="w-full sm:w-auto">
-            <label className="block text-xs font-semibold text-ink mb-1.5">
+          <div className="w-full space-y-1.5">
+            <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
               {t("addVersion.versionIndex", "Version Index")}
-              <span className="ml-2 text-xs text-ink-subtle font-normal">
-                ({t("addVersion.versionIndexHint")})
-              </span>
             </label>
-            <input
-              type="number"
-              min="0"
-              {...register(versionField, {
-                setValueAs: (value) => (value === "" ? "" : parseInt(value, 10)),
-              })}
-              className={`${MODAL_FIELD} sm:w-32`}
-              placeholder="0"
+            <ThemedSelect
+              value={selectedVersion}
+              onChange={onVersionIndexChange}
+              options={versionOptions}
+              className="w-full sm:w-72"
             />
+            {mintedVersions.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-xs text-ink-subtle">
+                  {t("addVersion.parentVersionVerifyMinted", "Cross-check a minted version:")}
+                </span>
+                {mintedVersions.map((version) => (
+                  <Link
+                    key={version.versionIndex}
+                    to={`/person/${version.tokenId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-hairline px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
+                    title={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+                  >
+                    <BookOpen size={12} aria-hidden="true" />
+                    {t("addVersion.parentVersionOptionBare", "Version {{index}}", {
+                      index: version.versionIndex,
+                    })}
+                  </Link>
+                ))}
+              </div>
+            )}
+            {lookupNote && <p className="text-xs text-ink-muted leading-relaxed">{lookupNote}</p>}
           </div>
         </div>
       </div>

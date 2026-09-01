@@ -12,6 +12,7 @@ import { useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
 import { addVersionSchema } from "../model/addVersionSchema";
+import { reconcileParentVersionSelection } from "../model/parentVersionSelection";
 import {
   areAddVersionConsentsSatisfied,
   invalidateAddVersionPassphraseConsents,
@@ -31,6 +32,7 @@ import type {
 import { useAddVersionFlow } from "./useAddVersionFlow";
 import { useAddVersionIdentityMaterials } from "./useAddVersionIdentityMaterials";
 import { useAddVersionSubmit, type RetryableAddVersionSubmission } from "./useAddVersionSubmit";
+import { useParentVersionOptions } from "./useParentVersionOptions";
 import { usePersonCommitmentProof } from "./usePersonCommitmentProof";
 
 interface UseAddVersionModalControllerArgs {
@@ -133,11 +135,23 @@ export function useAddVersionModalController({
   const personCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   const [fatherInfo, setFatherInfo] = useState<PersonInfoPublic | null>(null);
+  const [fatherHash, setFatherHash] = useState<string | null>(null);
+  // Two empty passphrase fields already agree, which is a legitimate identity.
+  const [fatherPassphraseConfirmed, setFatherPassphraseConfirmed] = useState(true);
   const fatherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
 
   const [motherInfo, setMotherInfo] = useState<PersonInfoPublic | null>(null);
+  const [motherHash, setMotherHash] = useState<string | null>(null);
+  const [motherPassphraseConfirmed, setMotherPassphraseConfirmed] = useState(true);
   const motherCalcRef = useRef<PersonHashCalculatorHandle | null>(null);
   const submissionPackageRef = useRef<RetryableAddVersionSubmission | null>(null);
+  // Tracks the hash each parent's version index was last decided for, so an
+  // arriving lookup never overrules a choice the user already made.
+  const autoAppliedVersionHashRef = useRef<Record<ParentKind, string | null>>({
+    father: null,
+    mother: null,
+  });
+
   const confirmedCacheRevisionRef = useRef<number | null>(null);
 
   const [fatherExpanded, setFatherExpanded] = useState(false);
@@ -156,6 +170,7 @@ export function useAddVersionModalController({
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
     watch,
     reset,
   } = useForm<AddVersionFormInput>({
@@ -168,6 +183,15 @@ export function useAddVersionModalController({
     },
   });
 
+  // The hash is derived from the passphrase alone, so an unconfirmed passphrase
+  // would query versions of an identity the user has not vouched for yet.
+  const fatherVersionLookup = useParentVersionOptions(
+    fatherPassphraseConfirmed ? fatherHash : null,
+  );
+  const motherVersionLookup = useParentVersionOptions(
+    motherPassphraseConfirmed ? motherHash : null,
+  );
+
   const watchedValues = watch();
   const fatherStatus = getParentInfoStatus(fatherInfo, watchedValues.fatherVersionIndex);
   const motherStatus = getParentInfoStatus(motherInfo, watchedValues.motherVersionIndex);
@@ -175,6 +199,12 @@ export function useAddVersionModalController({
   const motherSummary = formatParentSummary(t, motherInfo, watchedValues.motherVersionIndex);
   const fatherPresent = fatherStatus !== "empty";
   const motherPresent = motherStatus !== "empty";
+  // Submitting mid-lookup would silently freeze the index at 0 for a parent
+  // whose versions are about to appear, and the index is part of the immutable
+  // version hash.
+  const isParentVersionLookupPending =
+    (fatherPresent && fatherVersionLookup.status === "loading") ||
+    (motherPresent && motherVersionLookup.status === "loading");
   const allConsentsChecked = areAddVersionConsentsSatisfied(consents);
   const isTransactionSubmitting =
     addVersionStatus === "validating" || addVersionStatus === "confirming";
@@ -187,7 +217,12 @@ export function useAddVersionModalController({
       reset();
       setPersonInfo(null);
       setFatherInfo(null);
+      setFatherHash(null);
+      setFatherPassphraseConfirmed(true);
       setMotherInfo(null);
+      setMotherHash(null);
+      setMotherPassphraseConfirmed(true);
+      autoAppliedVersionHashRef.current = { father: null, mother: null };
       decideTransactionPreview(false);
       submissionPackageRef.current = null;
       confirmedCacheRevisionRef.current = null;
@@ -257,15 +292,29 @@ export function useAddVersionModalController({
     [],
   );
 
+  const syncParentPassphraseConfirmation = useCallback((role: ParentKind) => {
+    const calc = role === "father" ? fatherCalcRef.current : motherCalcRef.current;
+    const confirmed = calc?.passphrasesMatch() ?? true;
+    (role === "father" ? setFatherPassphraseConfirmed : setMotherPassphraseConfirmed)(confirmed);
+  }, []);
+
   const handlePersonPassphraseChange = useCallback(() => {
     updatePassphraseRisk("person", personCalcRef.current);
   }, [updatePassphraseRisk]);
   const handleFatherPassphraseChange = useCallback(() => {
     updatePassphraseRisk("father", fatherCalcRef.current);
-  }, [updatePassphraseRisk]);
+    syncParentPassphraseConfirmation("father");
+  }, [syncParentPassphraseConfirmation, updatePassphraseRisk]);
   const handleMotherPassphraseChange = useCallback(() => {
     updatePassphraseRisk("mother", motherCalcRef.current);
-  }, [updatePassphraseRisk]);
+    syncParentPassphraseConfirmation("mother");
+  }, [syncParentPassphraseConfirmation, updatePassphraseRisk]);
+  const handleFatherPassphraseConfirmationChange = useCallback(() => {
+    syncParentPassphraseConfirmation("father");
+  }, [syncParentPassphraseConfirmation]);
+  const handleMotherPassphraseConfirmationChange = useCallback(() => {
+    syncParentPassphraseConfirmation("mother");
+  }, [syncParentPassphraseConfirmation]);
 
   const previousParentPresenceRef = useRef({ father: false, mother: false });
   useEffect(() => {
@@ -292,6 +341,32 @@ export function useAddVersionModalController({
       };
     }
   }, [fatherPresent, motherPresent]);
+
+  useEffect(() => {
+    for (const [role, lookup, field] of [
+      ["father", fatherVersionLookup, "fatherVersionIndex"],
+      ["mother", motherVersionLookup, "motherVersionIndex"],
+    ] as const) {
+      const update = reconcileParentVersionSelection(
+        lookup,
+        autoAppliedVersionHashRef.current[role],
+      );
+      if (!update) continue;
+      autoAppliedVersionHashRef.current[role] = update.decidedForHash;
+      setValue(field, update.versionIndex);
+    }
+  }, [fatherVersionLookup, motherVersionLookup, setValue]);
+
+  const handleParentVersionIndexChange = useCallback(
+    (role: ParentKind, value: number) => {
+      const lookup = role === "father" ? fatherVersionLookup : motherVersionLookup;
+      // Freeze the decision for this hash so a still-running lookup cannot
+      // overwrite it once it resolves.
+      autoAppliedVersionHashRef.current[role] = lookup.personHash;
+      setValue(role === "father" ? "fatherVersionIndex" : "motherVersionIndex", value);
+    },
+    [fatherVersionLookup, motherVersionLookup, setValue],
+  );
 
   const toggleConsent = useCallback(
     (key: keyof AddVersionConsents) => {
@@ -408,11 +483,16 @@ export function useAddVersionModalController({
       status: fatherStatus,
       summary: fatherSummary,
       calcRef: fatherCalcRef,
-      register,
+      versionIndex: watchedValues.fatherVersionIndex,
+      versionLookup: fatherVersionLookup,
+      passphraseConfirmed: fatherPassphraseConfirmed,
       onExpandedChange: setFatherExpanded,
       onInfoChange: (value: PersonInfoPublic) =>
         updateParentInfo("father", value, fatherCalcRef.current),
+      onComputedHashChange: setFatherHash,
+      onVersionIndexChange: (value: number) => handleParentVersionIndexChange("father", value),
       onPassphraseChange: handleFatherPassphraseChange,
+      onPassphraseConfirmationChange: handleFatherPassphraseConfirmationChange,
     },
     motherSection: {
       kind: "mother" as ParentKind,
@@ -421,11 +501,16 @@ export function useAddVersionModalController({
       status: motherStatus,
       summary: motherSummary,
       calcRef: motherCalcRef,
-      register,
+      versionIndex: watchedValues.motherVersionIndex,
+      versionLookup: motherVersionLookup,
+      passphraseConfirmed: motherPassphraseConfirmed,
       onExpandedChange: setMotherExpanded,
       onInfoChange: (value: PersonInfoPublic) =>
         updateParentInfo("mother", value, motherCalcRef.current),
+      onComputedHashChange: setMotherHash,
+      onVersionIndexChange: (value: number) => handleParentVersionIndexChange("mother", value),
       onPassphraseChange: handleMotherPassphraseChange,
+      onPassphraseConfirmationChange: handleMotherPassphraseConfirmationChange,
     },
     metadataSection: {
       register,
@@ -448,6 +533,7 @@ export function useAddVersionModalController({
       isSubmitting,
       personInfo,
       allConsentsChecked,
+      isParentVersionLookupPending,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,

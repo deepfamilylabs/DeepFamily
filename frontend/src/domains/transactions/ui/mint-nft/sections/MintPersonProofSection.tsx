@@ -1,5 +1,4 @@
 import type { Ref } from "react";
-import { AlertTriangle, Check } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import type { MintNFTT, MintPersonInfo } from "../model/mintNftTypes";
 import type { ProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
@@ -26,18 +25,6 @@ export function MintPersonProofSection({
     <>
       <div className="space-y-4">
         <ModalSectionHeading>{t("mintNFT.basicInfo", "Basic Information")}</ModalSectionHeading>
-
-        <div className="p-3 bg-info/8 border border-info/20 rounded-xl">
-          <div className="flex items-center gap-2">
-            <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed font-medium">
-              {t(
-                "mintNFT.basicInfoMustMatch",
-                "The basic information you enter must exactly match the target version data. The contract will verify this on-chain before minting.",
-              )}
-            </p>
-          </div>
-        </div>
 
         <PersonHashCalculator
           ref={personCalcRef}

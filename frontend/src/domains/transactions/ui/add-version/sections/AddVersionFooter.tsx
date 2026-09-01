@@ -14,6 +14,7 @@ interface AddVersionFooterProps {
   isSubmitting: boolean;
   personInfo: PersonInfoPublic | null;
   allConsentsChecked: boolean;
+  isParentVersionLookupPending: boolean;
   transactionPreview: AddVersionTransactionPreview | null;
   onTransactionPreviewDecision: (approved: boolean) => void;
   onClose: () => void;
@@ -27,6 +28,7 @@ export function AddVersionFooter({
   isSubmitting,
   personInfo,
   allConsentsChecked,
+  isParentVersionLookupPending,
   transactionPreview,
   onTransactionPreviewDecision,
   onClose,
@@ -90,7 +92,8 @@ export function AddVersionFooter({
             disabled={
               isSubmitting ||
               !safeCanonicalizeFullName(personInfo?.fullName || "").length ||
-              !allConsentsChecked
+              !allConsentsChecked ||
+              isParentVersionLookupPending
             }
             className="flex-[1.5]"
           >
