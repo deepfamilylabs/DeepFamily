@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useContractClient } from "../../../hooks/useContractClient";
+import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions";
 import { useTreeMutations, useTreeNodeAccess } from "../../../../tree";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
@@ -9,6 +10,7 @@ import { useEndorseFlow, type ExecuteEndorseFlowResult } from "./useEndorseFlow"
 import { useEndorseFeeQuote } from "./useEndorseFeeQuote";
 import { useEndorseTargetStatus } from "./useEndorseTargetStatus";
 import { buildEndorseSuccessResultView, toEndorseErrorResult } from "../model/endorseResultView";
+import { reconcileEndorseVersionSelection } from "../model/endorseVersionSelection";
 import type { EndorseErrorResultView, EndorseSuccessResultView } from "../model/endorseTypes";
 
 interface UseEndorseModalControllerArgs {
@@ -38,7 +40,7 @@ export function useEndorseModalController({
 }: UseEndorseModalControllerArgs) {
   const { t } = useTranslation();
   const { address } = useWallet();
-  const { getVersionDetails, getNFTDetails, contract } = useContractClient();
+  const { getVersionDetails, contract } = useContractClient();
   const { bumpEndorsementCount, invalidateByTx } = useTreeMutations();
   const { getOwnerOf } = useTreeNodeAccess();
   const endorseFlow = useEndorseFlow();
@@ -46,10 +48,16 @@ export function useEndorseModalController({
   const runEndorseFlow = endorseFlow.run;
 
   const [personHash, setPersonHash] = useState("");
-  const [versionIndex, setVersionIndex] = useState(1);
+  // 0 means "no version chosen yet"; hasValidTarget already requires > 0, so an
+  // unchosen target cannot be submitted.
+  const [versionIndex, setVersionIndex] = useState(0);
   const [successResult, setSuccessResult] = useState<EndorseSuccessResultView | null>(null);
   const [errorResult, setErrorResult] = useState<EndorseErrorResultView | null>(null);
   const previousTargetRef = useRef({ hash: "", index: 0 });
+  // The hash the version index was last decided for, so an arriving lookup
+  // overrules neither the caller's target nor a choice the user just made.
+  const decidedVersionHashRef = useRef<string | null>(null);
+  const hadValidHashRef = useRef(false);
   const didPatchCacheRef = useRef(false);
   const handledResultRef = useRef<ExecuteEndorseFlowResult | null>(null);
   const activeRunTargetRef = useRef<string | null>(null);
@@ -69,13 +77,16 @@ export function useEndorseModalController({
     onClose,
   });
 
+  const versionLookup = usePersonVersionOptions(
+    isOpen && isPersonHashFormatValid ? targetPersonHash : null,
+  );
+
   const feeQuote = useEndorseFeeQuote({ isOpen, address, contract });
   const targetStatus = useEndorseTargetStatus({
     isOpen,
     address,
     contract,
     getVersionDetails: getVersionDetails ?? undefined,
-    getNFTDetails: getNFTDetails ?? undefined,
     getOwnerOf,
     targetPersonHash,
     targetVersionIndex,
@@ -90,12 +101,15 @@ export function useEndorseModalController({
 
   useEffect(() => {
     const nextHash = isOpen ? initialPersonHash || "" : "";
-    const nextIndex = isOpen ? initialVersionIndex || 1 : 1;
+    const nextIndex = isOpen ? initialVersionIndex || 0 : 0;
     setPersonHash(nextHash);
     setVersionIndex(nextIndex);
     setSuccessResult(null);
     setErrorResult(null);
     previousTargetRef.current = { hash: nextHash, index: nextIndex };
+    // A caller that names a version means that exact version; only a target the
+    // user has to fill in themselves gets a preselection.
+    decidedVersionHashRef.current = isOpen && initialVersionIndex ? nextHash.trim() : null;
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
     activeRunTargetRef.current = null;
@@ -117,6 +131,35 @@ export function useEndorseModalController({
     activeRunTargetRef.current = null;
     resetEndorseFlow();
   }, [isOpen, resetEndorseFlow, targetPersonHash, targetVersionIndex]);
+
+  useEffect(() => {
+    const hadValidHash = hadValidHashRef.current;
+    hadValidHashRef.current = isPersonHashFormatValid;
+    // Only on the transition out of a valid hash. The first render always sees
+    // the empty initial state, and clearing there would drop a caller's target.
+    if (isPersonHashFormatValid || !hadValidHash) return;
+    // The hash no longer names a target, so a version chosen for the previous
+    // one must not linger and re-appear as a bare "Version 1".
+    decidedVersionHashRef.current = null;
+    setVersionIndex(0);
+  }, [isPersonHashFormatValid]);
+
+  useEffect(() => {
+    const update = reconcileEndorseVersionSelection(versionLookup, decidedVersionHashRef.current);
+    if (!update) return;
+    decidedVersionHashRef.current = update.decidedForHash;
+    setVersionIndex(update.versionIndex);
+  }, [versionLookup]);
+
+  const handleVersionIndexChange = useCallback(
+    (value: number) => {
+      // Freeze the decision for this hash so a still-running lookup cannot
+      // overwrite it once it resolves.
+      decidedVersionHashRef.current = versionLookup.personHash ?? targetPersonHash;
+      setVersionIndex(value);
+    },
+    [targetPersonHash, versionLookup.personHash],
+  );
 
   useEffect(() => {
     if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
@@ -187,7 +230,8 @@ export function useEndorseModalController({
 
   const handleContinueEndorsing = useCallback(() => {
     setPersonHash("");
-    setVersionIndex(1);
+    setVersionIndex(0);
+    decidedVersionHashRef.current = null;
     setSuccessResult(null);
     setErrorResult(null);
     targetStatus.reset();
@@ -264,10 +308,9 @@ export function useEndorseModalController({
       hashInputInvalid,
       hasValidTarget,
       isTargetValidOnChain: targetStatus.isTargetValidOnChain,
-      displayName: targetStatus.displayName,
-      currentEndorsementCount: targetStatus.currentEndorsementCount,
+      versionLookup,
       onPersonHashChange: setPersonHash,
-      onVersionIndexChange: setVersionIndex,
+      onVersionIndexChange: handleVersionIndexChange,
     },
     feePanel: {
       deepTokenFee: feeQuote.deepTokenFee,

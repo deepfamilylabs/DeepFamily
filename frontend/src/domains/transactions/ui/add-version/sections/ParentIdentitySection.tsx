@@ -4,7 +4,8 @@ import { MODAL_CHIP } from "../../../../../shared/ui";
 import { BookOpen, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import { ThemedSelect } from "../../shared/ThemedSelect";
-import type { ParentVersionLookup } from "../hooks/useParentVersionOptions";
+import { describeVersionOrigin } from "../../../model/personVersionMeta";
+import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
 import type {
   AddVersionT,
   ParentKind,
@@ -22,7 +23,7 @@ interface ParentIdentitySectionProps {
   summary?: string;
   calcRef: Ref<PersonHashCalculatorHandle>;
   versionIndex: number | "";
-  versionLookup: ParentVersionLookup;
+  versionLookup: PersonVersionLookup;
   passphraseConfirmed: boolean;
   onExpandedChange: (value: boolean) => void;
   onInfoChange: (value: PersonInfoPublic) => void;
@@ -65,20 +66,31 @@ export function ParentIdentitySection({
   // and a contributor who rejects the recorded versions is entitled to link
   // the identity without endorsing any of them.
   const versionOptions = [
-    { value: 0, label: t("addVersion.parentVersionUnknown", "Unknown (0)") },
-    ...versionLookup.versions.map((version) => ({
-      value: version.versionIndex,
-      label:
-        version.tokenId > 0
-          ? t("addVersion.parentVersionOptionNft", "Version {{index}} · NFT · {{endorsements}} endorsements", {
-              index: version.versionIndex,
-              endorsements: version.endorsementCount,
+    { value: 0, label: t("addVersion.parentVersionUnknown", "Unknown (0)"), meta: undefined },
+    ...versionLookup.versions.map((version) => {
+      const origin = describeVersionOrigin(version);
+      return {
+        value: version.versionIndex,
+        label:
+          version.tokenId > 0
+            ? t(
+                "addVersion.parentVersionOptionNft",
+                "Version {{index}} · NFT · {{endorsements}} endorsements",
+                { index: version.versionIndex, endorsements: version.endorsementCount },
+              )
+            : t(
+                "addVersion.parentVersionOption",
+                "Version {{index}} · {{endorsements}} endorsements",
+                { index: version.versionIndex, endorsements: version.endorsementCount },
+              ),
+        meta: origin.submitter
+          ? t("addVersion.parentVersionOptionMeta", "{{submitter}} · {{date}}", {
+              submitter: origin.submitter,
+              date: origin.date || t("addVersion.parentVersionDateUnknown", "date unknown"),
             })
-          : t("addVersion.parentVersionOption", "Version {{index}} · {{endorsements}} endorsements", {
-              index: version.versionIndex,
-              endorsements: version.endorsementCount,
-            }),
-    })),
+          : undefined,
+      };
+    }),
   ];
   if (selectedVersion > 0 && !versionOptions.some((option) => option.value === selectedVersion)) {
     // A selection made for the previous hash outlives its options until the new
@@ -88,6 +100,7 @@ export function ParentIdentitySection({
       label: t("addVersion.parentVersionOptionBare", "Version {{index}}", {
         index: selectedVersion,
       }),
+      meta: undefined,
     });
     versionOptions.sort((a, b) => a.value - b.value);
   }

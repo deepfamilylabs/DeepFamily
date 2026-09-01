@@ -32,8 +32,7 @@ describe("transaction form accessibility", () => {
         hashInputInvalid
         hasValidTarget={false}
         isTargetValidOnChain={false}
-        displayName=""
-        currentEndorsementCount={0}
+        versionLookup={{ personHash: null, status: "idle", versions: [], totalVersions: 0 }}
         onPersonHashChange={vi.fn()}
         onVersionIndexChange={vi.fn()}
       />,

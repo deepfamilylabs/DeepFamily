@@ -26,15 +26,39 @@ const mocks = vi.hoisted(() => ({
   onClose: vi.fn(),
   onSuccess: vi.fn(),
   onMintNFT: vi.fn(),
+  personGateway: {
+    listVersionEndorsements: vi.fn(async () => ({
+      versionIndices: [] as number[],
+      endorsementCounts: [] as number[],
+      tokenIds: [] as number[],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    })),
+    listPersonVersionsPage: vi.fn(async () => ({
+      versions: [] as { versionIndex: number; addedBy: string; timestamp: number }[],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    })),
+  },
 }));
 
 vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  Link: ({ children, ...props }: any) => <a {...props}>{children}</a>,
+}));
+
+vi.mock("../../person", () => ({
+  usePersonGateway: () => mocks.personGateway,
 }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (_key: string, fallback?: string) => fallback ?? _key,
+    t: (key: string, fallback?: string, vars?: Record<string, unknown>) =>
+      (fallback ?? key).replace(/{{(\w+)}}/g, (match, name) =>
+        vars && name in vars ? String(vars[name]) : match,
+      ),
   }),
 }));
 
@@ -136,6 +160,15 @@ function renderConfigurableEndorseModal(props: {
   );
 }
 
+/** The submit button unlocks only once the target resolves on chain. */
+async function waitForResolvedTarget() {
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: /^Endorse$/i }).hasAttribute("disabled"),
+    ).toBe(false),
+  );
+}
+
 describe("EndorseModal", () => {
   beforeEach(() => {
     mocks.getVersionDetails.mockReset();
@@ -188,11 +221,118 @@ describe("EndorseModal", () => {
       },
     });
     mocks.getOwnerOf.mockResolvedValue(null);
+    mocks.personGateway.listVersionEndorsements.mockReset();
+    mocks.personGateway.listPersonVersionsPage.mockReset();
+    mocks.personGateway.listVersionEndorsements.mockResolvedValue({
+      versionIndices: [],
+      endorsementCounts: [],
+      tokenIds: [],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValue({
+      versions: [],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    });
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("offers no version until a hash resolves to one", async () => {
+    render(renderConfigurableEndorseModal({ isOpen: true }));
+
+    const picker = screen.getByRole("button", { name: /Select a version/ });
+    expect(picker.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText(/Version 1/)).toBeNull();
+  });
+
+  it("preselects the most endorsed version for a hash the caller did not pin", async () => {
+    mocks.personGateway.listVersionEndorsements.mockResolvedValueOnce({
+      versionIndices: [1, 2],
+      endorsementCounts: [1, 6],
+      tokenIds: [0, 0],
+      totalVersions: 2,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValueOnce({
+      versions: [
+        { versionIndex: 1, addedBy: recipient, timestamp: 1_700_000_000 },
+        { versionIndex: 2, addedBy: recipient, timestamp: 1_700_000_000 },
+      ],
+      totalVersions: 2,
+      hasMore: false,
+      nextOffset: 0,
+    });
+
+    render(renderConfigurableEndorseModal({ isOpen: true, initialPersonHash: personHash }));
+
+    expect(
+      await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ }),
+    ).toBeTruthy();
+  });
+
+  it("drops the chosen version when the hash is cleared", async () => {
+    mocks.personGateway.listVersionEndorsements.mockResolvedValue({
+      versionIndices: [1],
+      endorsementCounts: [3],
+      tokenIds: [0],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValue({
+      versions: [{ versionIndex: 1, addedBy: recipient, timestamp: 1_700_000_000 }],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+
+    render(renderConfigurableEndorseModal({ isOpen: true, initialPersonHash: personHash }));
+    await screen.findByRole("button", { name: /Version 1 · 3 endorsements/ });
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText("Search by person hash"), {
+        target: { value: "" },
+      });
+    });
+
+    const picker = await screen.findByRole("button", { name: /Select a version/ });
+    expect(picker.hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText(/Version 1/)).toBeNull();
+  });
+
+  it("carries each version's submitter and date inside the picker", async () => {
+    mocks.personGateway.listVersionEndorsements.mockResolvedValueOnce({
+      versionIndices: [1],
+      endorsementCounts: [4],
+      tokenIds: [0],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValueOnce({
+      versions: [{ versionIndex: 1, addedBy: recipient, timestamp: 1_700_000_000 }],
+      totalVersions: 1,
+      hasMore: false,
+      nextOffset: 0,
+    });
+
+    render(renderConfigurableEndorseModal({ isOpen: true, initialPersonHash: personHash }));
+
+    const picker = await screen.findByRole("button", { name: /Version 1 · 4 endorsements/ });
+    await act(async () => {
+      fireEvent.click(picker);
+    });
+
+    const expectedDate = new Date(1_700_000_000 * 1000).toLocaleDateString();
+    expect(screen.getByText(`0x00000000...000000bb · ${expectedDate}`)).toBeTruthy();
   });
 
   it("runs the endorse flow and applies success side effects", async () => {
@@ -226,7 +366,7 @@ describe("EndorseModal", () => {
 
     renderEndorseModal();
 
-    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+    await waitForResolvedTarget();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Endorse$/i }));
@@ -262,7 +402,7 @@ describe("EndorseModal", () => {
 
     renderEndorseModal();
 
-    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+    await waitForResolvedTarget();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Endorse$/i }));
@@ -322,7 +462,7 @@ describe("EndorseModal", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByText("Ada Lovelace")).toBeTruthy());
+    await waitForResolvedTarget();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Endorse$/i }));
@@ -347,7 +487,8 @@ describe("EndorseModal", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByText("Grace Hopper")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: /Version 3/ })).toBeTruthy());
+    await waitForResolvedTarget();
     expect(screen.queryByText("Endorsement Successful")).toBeNull();
     expect(screen.queryByText("0xendorse-v2")).toBeNull();
   });

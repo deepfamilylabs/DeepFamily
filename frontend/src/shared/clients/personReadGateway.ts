@@ -33,6 +33,16 @@ export interface PersonReadGateway {
     hasMore: boolean;
     nextOffset: number;
   }>;
+  listPersonVersionsPage: (
+    personHash: string,
+    offset: number,
+    limit: number,
+  ) => Promise<{
+    versions: { versionIndex: number; addedBy: string; timestamp: number }[];
+    totalVersions: number;
+    hasMore: boolean;
+    nextOffset: number;
+  }>;
   listTokenUriHistory: (
     tokenId: string | number,
     offset: number,
@@ -181,6 +191,23 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     };
   };
 
+  /** Version rows carry who submitted each version and when; endorsement counts
+   *  and mint state come from listVersionEndorsements over the same window. */
+  const listPersonVersionsPage = async (personHash: string, offset: number, limit: number) => {
+    const out = await contract.listPersonVersions(personHash, offset, limit);
+    const rows: any[] = Array.from(out?.[0] || []);
+    return {
+      versions: rows.map((row) => ({
+        versionIndex: Number(row?.versionIndex ?? row?.[3] ?? 0),
+        addedBy: String(row?.addedBy ?? row?.[7] ?? ""),
+        timestamp: Number(row?.timestamp ?? row?.[8] ?? 0),
+      })),
+      totalVersions: Number(out?.[1] || 0),
+      hasMore: Boolean(out?.[2]),
+      nextOffset: Number(out?.[3] || 0),
+    };
+  };
+
   const listTokenUriHistory = async (tokenId: string | number, offset: number, limit: number) => {
     const out = await contract.listTokenURIHistory(tokenId, offset, limit);
     return {
@@ -208,6 +235,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     getStoryMetadata,
     getStoryChunks,
     listVersionEndorsements,
+    listPersonVersionsPage,
     listTokenUriHistory,
     listStoryChunksPage,
   };
