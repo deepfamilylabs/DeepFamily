@@ -8,6 +8,7 @@ import { useResponsiveModalMode, useToast } from "../../../../../shared/ui";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
 import { useContractClient } from "../../../hooks/useContractClient";
+import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions";
 import { useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
@@ -32,7 +33,6 @@ import type {
 import { useAddVersionFlow } from "./useAddVersionFlow";
 import { useAddVersionIdentityMaterials } from "./useAddVersionIdentityMaterials";
 import { useAddVersionSubmit, type RetryableAddVersionSubmission } from "./useAddVersionSubmit";
-import { useParentVersionOptions } from "./useParentVersionOptions";
 import { usePersonCommitmentProof } from "./usePersonCommitmentProof";
 
 interface UseAddVersionModalControllerArgs {
@@ -185,10 +185,10 @@ export function useAddVersionModalController({
 
   // The hash is derived from the passphrase alone, so an unconfirmed passphrase
   // would query versions of an identity the user has not vouched for yet.
-  const fatherVersionLookup = useParentVersionOptions(
+  const fatherVersionLookup = usePersonVersionOptions(
     fatherPassphraseConfirmed ? fatherHash : null,
   );
-  const motherVersionLookup = useParentVersionOptions(
+  const motherVersionLookup = usePersonVersionOptions(
     motherPassphraseConfirmed ? motherHash : null,
   );
 

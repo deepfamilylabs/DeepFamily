@@ -1,21 +1,5 @@
-import type { ParentVersionLookup, ParentVersionOption } from "../hooks/useParentVersionOptions";
-
-/**
- * The version a contributor is most likely to mean: the one the community has
- * backed hardest. Ties fall to the earliest recorded version so the choice is
- * deterministic rather than dependent on page order.
- */
-export function preferredParentVersion(
-  versions: ParentVersionOption[],
-): ParentVersionOption | undefined {
-  return versions.reduce<ParentVersionOption | undefined>((best, candidate) => {
-    if (!best) return candidate;
-    if (candidate.endorsementCount !== best.endorsementCount) {
-      return candidate.endorsementCount > best.endorsementCount ? candidate : best;
-    }
-    return candidate.versionIndex < best.versionIndex ? candidate : best;
-  }, undefined);
-}
+import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
+import { preferredPersonVersion } from "../../../model/personVersionSelection";
 
 export interface ParentVersionSelectionUpdate {
   /** The hash this index was decided for; null once the identity is cleared. */
@@ -31,7 +15,7 @@ export interface ParentVersionSelectionUpdate {
  * lookup still in flight and a hash the user has already decided for.
  */
 export function reconcileParentVersionSelection(
-  lookup: ParentVersionLookup,
+  lookup: PersonVersionLookup,
   decidedForHash: string | null,
 ): ParentVersionSelectionUpdate | null {
   if (!lookup.personHash) {
@@ -43,6 +27,6 @@ export function reconcileParentVersionSelection(
   // Preselect the best-supported version rather than leaving the work to the
   // user. Unknown stays one click away for a contributor who does not accept
   // any recorded version.
-  const versionIndex = preferredParentVersion(lookup.versions)?.versionIndex ?? "";
+  const versionIndex = preferredPersonVersion(lookup.versions)?.versionIndex ?? "";
   return { decidedForHash: lookup.personHash, versionIndex };
 }

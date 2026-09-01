@@ -5,7 +5,6 @@ interface UseEndorseTargetStatusArgs {
   address?: string | null;
   contract?: any;
   getVersionDetails?: (personHash: string, versionIndex: number) => Promise<any>;
-  getNFTDetails?: (tokenId: number) => Promise<any>;
   getOwnerOf?: (tokenId: string) => Promise<string | null>;
   targetPersonHash: string;
   targetVersionIndex: number;
@@ -18,32 +17,13 @@ const defaultTargetStatus = {
   feeRecipient: "",
   isTargetValidOnChain: false,
   isNFTMinted: false,
-  displayName: "",
 };
-
-function getVersionDisplayName(details: any) {
-  return (
-    details?.version?.coreInfo?.supplementInfo?.fullName ||
-    details?.version?.coreInfo?.fullName ||
-    details?.version?.fullName ||
-    ""
-  );
-}
-
-function getNftDisplayName(nftDetails: any) {
-  return (
-    nftDetails?.coreInfo?.supplementInfo?.fullName ||
-    nftDetails?.coreInfo?.fullName ||
-    ""
-  );
-}
 
 export function useEndorseTargetStatus({
   isOpen,
   address,
   contract,
   getVersionDetails,
-  getNFTDetails,
   getOwnerOf,
   targetPersonHash,
   targetVersionIndex,
@@ -83,18 +63,10 @@ export function useEndorseTargetStatus({
 
         if (details) {
           const tokenId = Number(details.tokenId);
-          let displayName = getVersionDisplayName(details);
-          let feeRecipient = details?.version?.addedBy || "";
+          const version = details.version ?? {};
+          let feeRecipient = version.addedBy || "";
 
           if (tokenId > 0) {
-            if (getNFTDetails) {
-              try {
-                const nftDetails = await getNFTDetails(tokenId);
-                if (cancelled) return;
-                displayName = getNftDisplayName(nftDetails) || displayName;
-              } catch {}
-            }
-
             try {
               feeRecipient =
                 (await getOwnerOf?.(String(tokenId))) ||
@@ -109,7 +81,6 @@ export function useEndorseTargetStatus({
             feeRecipient,
             isTargetValidOnChain: true,
             isNFTMinted: tokenId > 0,
-            displayName,
           }));
         } else {
           setStatus((current) => ({ ...current, isTargetValidOnChain: false }));
@@ -142,7 +113,6 @@ export function useEndorseTargetStatus({
   }, [
     address,
     contract,
-    getNFTDetails,
     getOwnerOf,
     getVersionDetails,
     hasValidTarget,

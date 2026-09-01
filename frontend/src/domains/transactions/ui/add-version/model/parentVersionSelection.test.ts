@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { ParentVersionLookup } from "../hooks/useParentVersionOptions";
+import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
 import { reconcileParentVersionSelection } from "./parentVersionSelection";
 
 const HASH = `0x${"a".repeat(64)}`;
 const OTHER_HASH = `0x${"b".repeat(64)}`;
 
-function lookup(overrides: Partial<ParentVersionLookup> = {}): ParentVersionLookup {
+function lookup(overrides: Partial<PersonVersionLookup> = {}): PersonVersionLookup {
   return {
     personHash: HASH,
     status: "ready",
@@ -16,7 +16,7 @@ function lookup(overrides: Partial<ParentVersionLookup> = {}): ParentVersionLook
 }
 
 function version(versionIndex: number, endorsementCount = 0, tokenId = 0) {
-  return { versionIndex, endorsementCount, tokenId };
+  return { versionIndex, endorsementCount, tokenId, addedBy: "0xabc", timestamp: 1 };
 }
 
 describe("reconcileParentVersionSelection", () => {
