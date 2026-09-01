@@ -55,11 +55,8 @@ describe("transaction form accessibility", () => {
         hashInputInvalid
         hasValidTarget={false}
         isCheckingStatus={false}
-        isEndorsed={false}
-        isAlreadyMinted={false}
-        hasMissingParents={{ father: false, mother: false }}
-        targetSelfSuiteId={null}
         envelopeHeaderError={null}
+        versionLookup={{ personHash: null, status: "idle", versions: [], totalVersions: 0 }}
         onPersonHashChange={vi.fn()}
         onVersionIndexChange={vi.fn()}
       />,

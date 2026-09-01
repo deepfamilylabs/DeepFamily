@@ -37,11 +37,6 @@ export interface MintConsents {
 }
 
 
-export type MintMissingParents = {
-  father: boolean;
-  mother: boolean;
-} | null;
-
 export interface MintNftFlowArgs {
   personHash: string;
   versionIndex: number;

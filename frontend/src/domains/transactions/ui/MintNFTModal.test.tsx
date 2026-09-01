@@ -15,6 +15,22 @@ const mocks = vi.hoisted(() => ({
   getMetadataCode: vi.fn(),
   endorsedVersionIndex: vi.fn(),
   contract: {} as any,
+  personGateway: {
+    listVersionEndorsements: vi.fn(async () => ({
+      versionIndices: [] as number[],
+      endorsementCounts: [] as number[],
+      tokenIds: [] as number[],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    })),
+    listPersonVersionsPage: vi.fn(async () => ({
+      versions: [] as { versionIndex: number; addedBy: string; timestamp: number }[],
+      totalVersions: 0,
+      hasMore: false,
+      nextOffset: 0,
+    })),
+  },
   mintRunOrThrow: vi.fn(),
   mintReset: vi.fn(),
   markVersionMinted: vi.fn(),
@@ -30,6 +46,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  Link: ({ children, ...props }: any) => <a {...props}>{children}</a>,
 }));
 
 vi.mock("react-i18next", () => ({
@@ -99,6 +116,7 @@ vi.mock("../../../shared/lib/errors", () => ({
 }));
 
 vi.mock("../../person", () => ({
+  usePersonGateway: () => mocks.personGateway,
   PersonHashCalculator: forwardRef((props: any, ref) => {
     useImperativeHandle(ref, () => ({
       getSecretInputs: () => ({ passphrase: mocks.personPassphrase }),
@@ -170,6 +188,11 @@ async function checkAllConsents() {
       fireEvent.click(checkbox);
     });
   }
+}
+
+/** The mint button replaces "Go Endorse" only once the target checks out. */
+async function waitForMintableTarget() {
+  await waitFor(() => expect(screen.getByRole("button", { name: "Mint NFT" })).toBeTruthy());
 }
 
 describe("MintNFTModal", () => {
@@ -277,7 +300,7 @@ describe("MintNFTModal", () => {
 
     renderMintModal();
 
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await waitForMintableTarget();
     await checkAllConsents();
 
     await act(async () => {
@@ -323,7 +346,7 @@ describe("MintNFTModal", () => {
   it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
     renderMintModal();
 
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await waitForMintableTarget();
     const mintButton = () => screen.getByRole("button", { name: /Mint NFT/i }) as HTMLButtonElement;
     expect(mintButton().disabled).toBe(true);
 
@@ -398,7 +421,7 @@ describe("MintNFTModal", () => {
     };
 
     renderMintModal();
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await waitForMintableTarget();
 
     expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
   });
@@ -415,7 +438,7 @@ describe("MintNFTModal", () => {
     };
 
     renderMintModal();
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await waitForMintableTarget();
 
     expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
   });
@@ -425,7 +448,7 @@ describe("MintNFTModal", () => {
 
     renderMintModal();
 
-    await waitFor(() => expect(screen.getByText("Endorsed")).toBeTruthy());
+    await waitForMintableTarget();
     await checkAllConsents();
 
     await act(async () => {
@@ -444,7 +467,9 @@ describe("MintNFTModal", () => {
 
     renderMintModal();
 
-    await waitFor(() => expect(screen.getByText("Not Endorsed")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Go Endorse" })).toBeTruthy(),
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Go Endorse" }));

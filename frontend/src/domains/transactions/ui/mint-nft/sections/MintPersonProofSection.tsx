@@ -25,6 +25,12 @@ export function MintPersonProofSection({
     <>
       <div className="space-y-4">
         <ModalSectionHeading>{t("mintNFT.basicInfo", "Basic Information")}</ModalSectionHeading>
+        <p className="text-xs text-ink-muted leading-relaxed">
+          {t(
+            "mintNFT.basicInfoMustMatch",
+            "Must match the target version's data exactly; the contract verifies this on chain before minting.",
+          )}
+        </p>
 
         <PersonHashCalculator
           ref={personCalcRef}
