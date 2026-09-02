@@ -82,7 +82,7 @@ export function TreePageBar({
           <VolumeTab to="/familyTree" label={t("familyTree.volumes.chart", "Lineage")} end>
             <Network className="h-[15px] w-[15px] shrink-0" />
           </VolumeTab>
-          <VolumeTab to="/people" label={t("familyTree.volumes.people", "Encyclopedia")}>
+          <VolumeTab to="/people" label={t("familyTree.volumes.people", "People")}>
             <Book className="h-[15px] w-[15px] shrink-0" />
           </VolumeTab>
           {showPaperVolume ? (

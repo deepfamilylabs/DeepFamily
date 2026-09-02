@@ -543,7 +543,7 @@
     "volumes": {
       "chart": "世系",
       "paper": "族谱",
-      "people": "人物百科"
+      "people": "人物"
     },
     "viewModes": {
       "tree": "树形布局",
@@ -920,7 +920,7 @@
     "tokenId": "Token ID"
   },
   "people": {
-    "title": "家族人物百科",
+    "title": "家族人物",
     "subtitle": "探索保存在区块链上的家族成员档案",
     "totalPeople": "人",
     "withEncyclopedia": "百科",

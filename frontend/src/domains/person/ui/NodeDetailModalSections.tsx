@@ -1,6 +1,6 @@
 import React from "react";
 import type { TFunction } from "i18next";
-import { Book, Edit2, Image, KeyRound, Plus, Star, Trash2 } from "lucide-react";
+import { BookOpen, Edit2, Image, KeyRound, Plus, Star, Trash2 } from "lucide-react";
 import { ethers } from "ethers";
 import {
   CopyIconButton,
@@ -158,7 +158,7 @@ export function NodeDetailHeaderActions({
             className={action}
             title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
           >
-            <Book className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
             <span className="hidden sm:inline">
               {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             </span>

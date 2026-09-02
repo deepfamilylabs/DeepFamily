@@ -1,4 +1,4 @@
-import { Book, ChevronRight, FileText, Star, User } from "lucide-react";
+import { BookOpen, ChevronRight, FileText, Star, User } from "lucide-react";
 import {
   formatUnixDate,
   genderText as genderTextFn,
@@ -93,7 +93,7 @@ export function PeopleListRow({
         )}
         {chunks > 0 && (
           <span className="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-full bg-primary/10 text-primary">
-            <Book className="w-[11px] h-[11px]" strokeWidth={2.5} />
+            <BookOpen className="w-[11px] h-[11px]" strokeWidth={2.5} />
           </span>
         )}
       </div>
