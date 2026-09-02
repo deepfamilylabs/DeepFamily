@@ -6,6 +6,8 @@ export type { ModalSectionHeadingProps } from "./ModalSectionHeading";
 export * from "./modalTokens";
 export type { ResponsiveModalFrameProps } from "./ResponsiveModalFrame";
 export { default as PageContainer } from "./PageContainer";
+export { PageHead } from "./PageHead";
+export type { PageHeadProps } from "./PageHead";
 export { default as ConfirmDialog } from "./ConfirmDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
 export { CopyIconButton } from "./CopyIconButton";

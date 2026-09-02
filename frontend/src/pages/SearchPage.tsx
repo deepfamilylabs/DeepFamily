@@ -1,6 +1,7 @@
 import { BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PersonHashCalculator } from "../domains/person";
+import { PageHead } from "../shared/ui";
 import { useUnifiedSearch } from "./search/hooks/useUnifiedSearch";
 import { getFacetDescriptor, type SearchFacetKey } from "./search/model/searchSubject";
 import { FACET_LABELS, FACET_TOTAL_LABEL_KEYS, FacetPanel } from "./search/sections/SearchFacetPanels";
@@ -25,15 +26,13 @@ export default function SearchPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-8 text-ink md:pb-0">
-      <header>
-        <h1 className="mb-1.5 text-3xl text-ink sm:text-4xl">{t("navigation.search")}</h1>
-        <p className="text-base leading-relaxed text-ink-muted">
-          {t(
-            "search.unified.subtitle",
-            "Search on-chain versions, endorsements, NFTs, stories and family links by person hash, token ID or wallet address.",
-          )}
-        </p>
-      </header>
+      <PageHead
+        title={t("navigation.search")}
+        subtitle={t(
+          "search.unified.subtitle",
+          "Search on-chain versions, endorsements, NFTs, stories and family links by person hash, token ID or wallet address.",
+        )}
+      />
 
       <CommandBar
         t={t}

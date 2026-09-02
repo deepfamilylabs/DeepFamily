@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import { AlertCircle, RefreshCw, Users } from "lucide-react";
 import { PersonStoryCard, type EndorseSuccessHandler } from "../../../domains/person";
 import { PageContainer } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
@@ -9,6 +9,8 @@ interface PeopleResultsSectionProps {
   t: PeoplePageT;
   projectionEnabled: boolean;
   loading: boolean;
+  error?: string;
+  retry?: () => void;
   filters: PeoplePageController["filters"];
   view: PeoplePageController["view"];
   results: PeoplePageController["results"];
@@ -21,6 +23,8 @@ export function PeopleResultsSection({
   t,
   projectionEnabled,
   loading,
+  error,
+  retry,
   filters,
   view,
   results,
@@ -35,7 +39,11 @@ export function PeopleResultsSection({
       {isLoading ? (
         <PeopleSkeleton mode={view.mode} />
       ) : results.filteredPeople.length === 0 ? (
-        <PeopleEmptyState t={t} filters={filters} />
+        error ? (
+          <PeopleLoadError t={t} message={error} onRetry={retry} />
+        ) : (
+          <PeopleEmptyState t={t} filters={filters} />
+        )
       ) : (
         <>
           {view.mode === "grid" ? (
@@ -129,6 +137,38 @@ function PeopleSkeleton({ mode }: { mode: PeoplePageController["view"]["mode"] }
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function PeopleLoadError({
+  t,
+  message,
+  onRetry,
+}: {
+  t: PeoplePageT;
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="rounded-[20px] border border-hairline bg-surface py-20 px-8 text-center">
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-danger/10 border border-danger/20">
+        <AlertCircle className="w-7 h-7 text-danger" strokeWidth={1.5} />
+      </div>
+      <h3 className="mt-4 text-[17px] font-bold text-ink">
+        {t("people.loadFailed", "Could not load people")}
+      </h3>
+      <p className="mt-1.5 text-sm text-ink-muted max-w-md mx-auto break-words">{message}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-5 inline-flex items-center gap-2 h-9 px-6 bg-ink text-surface rounded-full text-sm font-medium hover:bg-primary-hover hover:text-white transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          {t("common.retry", "Retry")}
+        </button>
+      )}
     </div>
   );
 }

@@ -928,6 +928,7 @@
     "colMinted": "上链时间",
     "noResults": "未找到人物",
     "noResultsDesc": "请尝试调整您的搜索条件或筛选器",
+    "loadFailed": "人物加载失败",
     "viewEncyclopedia": "查看人物百科",
     "chunks": "{{count}} 个分片",
     "clickToEndorse": "点击为此版本背书",
