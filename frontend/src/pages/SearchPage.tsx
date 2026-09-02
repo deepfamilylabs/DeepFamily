@@ -1,10 +1,14 @@
-import { BookOpen } from "lucide-react";
+import { Book } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PersonHashCalculator } from "../domains/person";
 import { PageHead } from "../shared/ui";
 import { useUnifiedSearch } from "./search/hooks/useUnifiedSearch";
 import { getFacetDescriptor, type SearchFacetKey } from "./search/model/searchSubject";
-import { FACET_LABELS, FACET_TOTAL_LABEL_KEYS, FacetPanel } from "./search/sections/SearchFacetPanels";
+import {
+  FACET_LABELS,
+  FACET_TOTAL_LABEL_KEYS,
+  FacetPanel,
+} from "./search/sections/SearchFacetPanels";
 import {
   CommandBar,
   EntryCards,
@@ -108,7 +112,7 @@ function Results({ unified }: { unified: ReturnType<typeof useUnifiedSearch> }) 
               rel="noopener noreferrer"
               className="inline-flex shrink-0 items-center gap-2 rounded-full bg-surface-muted px-5 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:text-ink"
             >
-              <BookOpen size={15} aria-hidden="true" />
+              <Book size={15} aria-hidden="true" />
               {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             </Link>
           }
@@ -216,4 +220,3 @@ function facetCount(
               : search.uri.state;
   return state.queried && !state.loading ? state.total : undefined;
 }
-

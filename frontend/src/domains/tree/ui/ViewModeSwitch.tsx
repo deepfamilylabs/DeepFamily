@@ -1,14 +1,12 @@
-export type ViewMode = "tree" | "dag" | "force" | "virtual";
+export type ViewMode = "tree" | "dag" | "virtual";
 
 interface ViewModeSwitchProps {
   value: ViewMode;
   onChange: (m: ViewMode) => void;
-  labels: { tree: string; dag: string; force: string; virtual: string };
+  labels: { tree: string; dag: string; virtual: string };
   disabled?: boolean;
 }
 
-// "force" is temporarily hidden from the switcher (force-directed view quality isn't good enough yet).
-// The mode stays fully wired in ViewContainer/ViewMode, so re-enabling is just adding "force" back here.
 const order: ViewMode[] = ["tree", "dag", "virtual"];
 
 /**
@@ -68,27 +66,6 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled }: Vi
               <path d="M17.5 6.5L14 10" />
               <path d="M12 14v3" />
               <path d="M7 19h10" />
-            </svg>
-          )}
-          {m === "force" && (
-            <svg
-              className="h-3.5 w-3.5 shrink-0"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v4" />
-              <path d="M12 18v4" />
-              <path d="M2 12h4" />
-              <path d="M18 12h4" />
-              <path d="M5.6 5.6l2.8 2.8" />
-              <path d="M15.6 15.6l2.8 2.8" />
-              <path d="M18.4 5.6l-2.8 2.8" />
-              <path d="M8.4 15.6l-2.8 2.8" />
             </svg>
           )}
           {m === "virtual" && (

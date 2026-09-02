@@ -8,10 +8,6 @@ vi.mock("./ColorPalette", () => ({
   default: () => <div data-testid="color-palette" />,
 }));
 
-vi.mock("./ForceGraphView", () => ({
-  default: () => <div data-testid="force-view" />,
-}));
-
 vi.mock("./DagView", () => ({
   default: () => <div data-testid="dag-view" />,
 }));
@@ -37,7 +33,6 @@ vi.mock("./LoadingSkeleton", () => ({
 const viewModeLabels = {
   tree: "Tree",
   dag: "DAG",
-  force: "Force",
   virtual: "List",
 };
 
@@ -61,7 +56,6 @@ describe("ViewContainer", () => {
   });
 
   it.each([
-    ["force", "force-view"],
     ["dag", "dag-view"],
     ["tree", "tree-view"],
     ["virtual", "virtual-view"],

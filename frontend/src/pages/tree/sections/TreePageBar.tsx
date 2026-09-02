@@ -1,7 +1,7 @@
 import {
-  BookOpen,
-  GitMerge,
+  Book,
   KeyRound,
+  Layers,
   Network,
   RefreshCw,
   SlidersHorizontal,
@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { TFunction } from "i18next";
+import { BambooSlipsIcon } from "../../../shared/ui";
 
 export interface TreePageBarProps {
   t: TFunction;
@@ -35,8 +36,8 @@ export interface TreePageBarProps {
 /**
  * One row of page chrome for /familyTree.
  *
- * The three destinations — lineage chart, paper genealogy, encyclopedia — are the volumes of a
- * single genealogy, so they read as page-level tabs. The renderers (tree / DAG / list) are three
+ * The three destinations — lineage chart, genealogy, encyclopedia — are the volumes of a single
+ * genealogy, so they read as page-level tabs. The renderers (tree / DAG / list) are three
  * drawings of *this* volume and live on the canvas instead (see ViewContainer), which is what keeps
  * "leave this page" and "redraw this page" from wearing the same pill.
  */
@@ -78,15 +79,15 @@ export function TreePageBar({
           className="flex min-w-0 items-stretch gap-4 md:gap-5"
           aria-label={t("familyTree.title", "Family")}
         >
-          <VolumeTab to="/familyTree" label={t("familyTree.volumes.chart", "Lineage Chart")} end>
+          <VolumeTab to="/familyTree" label={t("familyTree.volumes.chart", "Lineage")} end>
             <Network className="h-[15px] w-[15px] shrink-0" />
           </VolumeTab>
           <VolumeTab to="/people" label={t("familyTree.volumes.people", "Encyclopedia")}>
-            <Users className="h-[15px] w-[15px] shrink-0" />
+            <Book className="h-[15px] w-[15px] shrink-0" />
           </VolumeTab>
           {showPaperVolume ? (
-            <VolumeTab to="/genealogyBook" label={t("familyTree.volumes.paper", "Paper Genealogy")}>
-              <BookOpen className="h-[15px] w-[15px] shrink-0" />
+            <VolumeTab to="/genealogyBook" label={t("familyTree.volumes.paper", "Genealogy")}>
+              <BambooSlipsIcon className="h-[15px] w-[15px] shrink-0" />
             </VolumeTab>
           ) : null}
         </nav>
@@ -112,7 +113,7 @@ export function TreePageBar({
           title={t("familyTree.ui.nodesLabelFull", "Nodes")}
         />
         <StatChip
-          icon={<GitMerge className="h-3.5 w-3.5 text-ink-subtle" />}
+          icon={<Layers className="h-3.5 w-3.5 text-ink-subtle" />}
           value={generationCount}
           unit={t("familyTree.ui.generationsUnit", "Generations")}
           title={t("familyTree.ui.depthLabelFull", "Depth")}

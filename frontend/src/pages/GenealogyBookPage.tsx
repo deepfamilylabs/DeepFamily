@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  BookOpen,
   ChevronDown,
   FileDown,
-  GitMerge,
+  Layers,
   Loader2,
   RefreshCw,
   SlidersHorizontal,
   Users,
 } from "lucide-react";
+import { BambooSlipsIcon } from "../shared/ui";
 import {
   buildPaperGenerations,
   buildPaperVars,
@@ -227,7 +227,7 @@ export default function GenealogyBookPage() {
       [PAPER_GENEALOGY_STYLE.OU]: t("genealogyBook.styles.ou", "Ou-style"),
       [PAPER_GENEALOGY_STYLE.SU]: t("genealogyBook.styles.su", "Su-style"),
       [PAPER_GENEALOGY_STYLE.DIEJI]: t("genealogyBook.styles.dieji", "Dieji-style"),
-      [PAPER_GENEALOGY_STYLE.LINEAGE]: t("genealogyBook.styles.lineage", "Lineage"),
+      [PAPER_GENEALOGY_STYLE.LINEAGE]: t("genealogyBook.styles.lineage", "Lineage Chart"),
       [PAPER_GENEALOGY_STYLE.MODERN]: t("genealogyBook.styles.modern", "Modern"),
     }),
     [t],
@@ -360,7 +360,7 @@ export default function GenealogyBookPage() {
       <div className="flex flex-col gap-3 border-b border-stone-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-black md:px-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-stone-200 bg-stone-50 text-stone-700 dark:border-slate-700 dark:bg-slate-900 dark:text-stone-200">
-            <BookOpen className="h-5 w-5" />
+            <BambooSlipsIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -390,7 +390,7 @@ export default function GenealogyBookPage() {
               </span>
             </span>
             <span className="inline-flex items-baseline gap-1.5 rounded-md bg-stone-100 px-2.5 py-1 dark:bg-slate-800/60">
-              <GitMerge
+              <Layers
                 className="h-3.5 w-3.5 shrink-0 self-center text-stone-400 dark:text-slate-500"
                 aria-hidden="true"
               />

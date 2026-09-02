@@ -24,7 +24,7 @@
   "navigation": {
     "home": "Home",
     "familyTree": "Family",
-    "genealogyBook": "Paper Genealogy",
+    "genealogyBook": "Genealogy",
     "search": "Search",
     "people": "People",
     "actions": "Actions"
@@ -513,7 +513,7 @@
       "ou": "Ou-style",
       "su": "Su-style",
       "dieji": "Dieji-style",
-      "lineage": "Lineage",
+      "lineage": "Lineage Chart",
       "modern": "Modern"
     },
     "fields": {
@@ -541,14 +541,13 @@
   "familyTree": {
     "title": "Family",
     "volumes": {
-      "chart": "Lineage Chart",
-      "paper": "Paper Genealogy",
+      "chart": "Lineage",
+      "paper": "Genealogy",
       "people": "Encyclopedia"
     },
     "viewModes": {
       "tree": "Tree Layout",
       "dag": "DAG",
-      "force": "Force Directed",
       "virtual": "Tree List"
     },
     "config": {

@@ -1,7 +1,6 @@
 import React from "react";
 
 export { default as ColorPalette } from "./ColorPalette";
-export const ForceGraphView = React.lazy(() => import("./ForceGraphView"));
 export const DagView = React.lazy(() => import("./DagView"));
 export const TreeLayoutView = React.lazy(() => import("./TreeLayoutView"));
 export { default as TreeDebugPanel } from "./TreeDebugPanel";

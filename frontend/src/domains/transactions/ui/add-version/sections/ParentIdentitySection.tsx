@@ -1,7 +1,7 @@
 import type { Ref } from "react";
 import { Link } from "react-router-dom";
 import { MODAL_CHIP } from "../../../../../shared/ui";
-import { BookOpen, ChevronDown, ChevronRight, Users } from "lucide-react";
+import { Book, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../../../person";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import { describeVersionOrigin } from "../../../model/personVersionMeta";
@@ -117,19 +117,19 @@ export function ParentIdentitySection({
           "addVersion.parentVersionNeedsIdentity",
           "Enter the parent's name to look up their on-chain versions. Leave the identity passphrase empty if there is none.",
         )
-        : versionLookup.status === "loading"
-          ? t("addVersion.parentVersionLoading", "Looking up on-chain versions...")
-          : versionLookup.status === "error"
+      : versionLookup.status === "loading"
+        ? t("addVersion.parentVersionLoading", "Looking up on-chain versions...")
+        : versionLookup.status === "error"
+          ? t(
+              "addVersion.parentVersionLookupFailed",
+              "Version lookup failed. You can still submit with the version left unknown (0).",
+            )
+          : versionLookup.totalVersions === 0
             ? t(
-                "addVersion.parentVersionLookupFailed",
-                "Version lookup failed. You can still submit with the version left unknown (0).",
+                "addVersion.parentVersionNone",
+                "This hash has no on-chain version yet, so it will be submitted as unknown (0). If you expected a match, check the identity passphrase.",
               )
-            : versionLookup.totalVersions === 0
-              ? t(
-                  "addVersion.parentVersionNone",
-                  "This hash has no on-chain version yet, so it will be submitted as unknown (0). If you expected a match, check the identity passphrase.",
-                )
-              : undefined;
+            : undefined;
 
   return (
     <div className="space-y-2">
@@ -226,7 +226,7 @@ export function ParentIdentitySection({
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-hairline px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
                     title={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
                   >
-                    <BookOpen size={12} aria-hidden="true" />
+                    <Book size={12} aria-hidden="true" />
                     {t("addVersion.parentVersionOptionBare", "Version {{index}}", {
                       index: version.versionIndex,
                     })}

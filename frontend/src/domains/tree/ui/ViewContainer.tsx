@@ -5,18 +5,17 @@ import TreeListView from "./TreeListView";
 import ViewModeSwitch from "./ViewModeSwitch";
 import { FamilyTreeViewConfigProvider } from "../context";
 
-const ForceGraphView = React.lazy(() => import("./ForceGraphView"));
 const DagView = React.lazy(() => import("./DagView"));
 const TreeLayoutView = React.lazy(() => import("./TreeLayoutView"));
 
 interface ViewContainerProps {
-  viewMode: "dag" | "tree" | "force" | "virtual";
+  viewMode: "dag" | "tree" | "virtual";
   hasRoot: boolean;
   contractMessage: string;
   loading: boolean;
   skeletonLines?: number;
-  onViewModeChange?: (mode: "dag" | "tree" | "force" | "virtual") => void;
-  viewModeLabels?: { tree: string; dag: string; force: string; virtual: string };
+  onViewModeChange?: (mode: "dag" | "tree" | "virtual") => void;
+  viewModeLabels?: { tree: string; dag: string; virtual: string };
   /** Sits beside the palette in the top-left overlay row — page-owned chrome, same card language. */
   overlayLeading?: React.ReactNode;
 }
@@ -32,9 +31,7 @@ export default function ViewContainer({
 }: ViewContainerProps) {
   // useVizOptions internally inside views / contexts
   const content = hasRoot ? (
-    viewMode === "force" ? (
-      <ForceGraphView />
-    ) : viewMode === "dag" ? (
+    viewMode === "dag" ? (
       <DagView />
     ) : viewMode === "tree" ? (
       <TreeLayoutView />

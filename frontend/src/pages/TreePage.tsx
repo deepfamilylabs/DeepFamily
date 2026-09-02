@@ -50,15 +50,14 @@ import { isMetadataUnlockUsable } from "../shared/model";
  * - Builds a projected graph via the tree selector layer (`buildViewGraphData`, tree rows, totals).
  *
  * Rendering (UI) — `frontend/src/domains/tree/ui/ViewContainer.tsx`:
- * - Swaps view implementations (Tree/DAG/Force/Virtual), all consuming the same projected graph.
+ * - Swaps view implementations (Tree/DAG/Virtual), all consuming the same projected graph.
  */
 function usePersistedViewMode() {
-  const [viewMode, setViewMode] = useState<"dag" | "tree" | "force" | "virtual">(() => {
+  const [viewMode, setViewMode] = useState<"dag" | "tree" | "virtual">(() => {
     const preferFlat = shouldPreferFlatTree();
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("df:viewMode");
-      if (saved === "dag" || saved === "tree" || saved === "force" || saved === "virtual")
-        return saved as any;
+      if (saved === "dag" || saved === "tree" || saved === "virtual") return saved as any;
     }
     return preferFlat ? "virtual" : "tree";
   });
@@ -303,7 +302,6 @@ export default function TreePage() {
                     viewModeLabels={{
                       tree: t("familyTree.viewModes.tree"),
                       dag: t("familyTree.viewModes.dag"),
-                      force: t("familyTree.viewModes.force"),
                       virtual: t("familyTree.viewModes.virtual"),
                     }}
                     overlayLeading={

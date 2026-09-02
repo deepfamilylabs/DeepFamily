@@ -1,13 +1,6 @@
 import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  User,
-  BookOpen,
-  Star,
-  FileText,
-  ChevronRight,
-  MapPin,
-} from "lucide-react";
+import { User, Book, Star, FileText, ChevronRight, MapPin } from "lucide-react";
 import {
   NodeData,
   hasDetailedStory as hasDetailedStoryFn,
@@ -116,7 +109,7 @@ function PersonStoryCard({
             title={storyLabel}
             aria-label={storyLabel}
           >
-            <BookOpen className="w-3.5 h-3.5" strokeWidth={2.5} />
+            <Book className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
         )}
       </div>

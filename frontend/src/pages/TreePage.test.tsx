@@ -86,7 +86,7 @@ vi.mock("../domains/tree", () => ({
   ViewContainer: ({ viewMode, hasRoot, contractMessage, loading, onViewModeChange }: any) => (
     <div data-testid="view-container">
       {JSON.stringify({ viewMode, hasRoot, contractMessage, loading })}
-      <button data-testid="view-mode-switch" onClick={() => onViewModeChange("force")}>
+      <button data-testid="view-mode-switch" onClick={() => onViewModeChange("dag")}>
         switch:{viewMode}
       </button>
     </div>
@@ -204,9 +204,9 @@ describe("TreePage", () => {
     fireEvent.click(screen.getByTestId("view-mode-switch"));
 
     await waitFor(() =>
-      expect(screen.getByTestId("view-container").textContent).toContain('"viewMode":"force"'),
+      expect(screen.getByTestId("view-container").textContent).toContain('"viewMode":"dag"'),
     );
-    expect(localStorage.getItem("df:viewMode")).toBe("force");
+    expect(localStorage.getItem("df:viewMode")).toBe("dag");
 
     // The unlock dialog is opened from the bar now, not from a pill floating over the canvas.
     expect(screen.getByTitle("Unlock versions")).toBeTruthy();
@@ -223,9 +223,9 @@ describe("TreePage", () => {
     renderTreePage();
 
     // The paper genealogy volume is Chinese-only; the mocked language is "en".
-    expect(screen.getByText("Lineage Chart").getAttribute("href")).toBe("/familyTree");
+    expect(screen.getByText("Lineage").getAttribute("href")).toBe("/familyTree");
     expect(screen.getByText("Encyclopedia").getAttribute("href")).toBe("/people");
-    expect(screen.queryByText("Paper Genealogy")).toBeNull();
+    expect(screen.queryByText("Genealogy")).toBeNull();
 
     // The drawer mounts its form on first open and keeps it, so presence is read off the dialog.
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");

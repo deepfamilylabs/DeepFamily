@@ -1,6 +1,6 @@
 import {
   AlertTriangle,
-  BookOpen,
+  Book,
   FileText,
   Image as ImageIcon,
   Link2,
@@ -16,7 +16,8 @@ import { EmptyResult, RowAction } from "../ui/UnifiedSearchUi";
 import { HashInline } from "../ui/SearchPageUi";
 
 const ROW = "p-4 transition-colors hover:bg-surface-alt";
-const CHIP = "flex items-center gap-1 rounded-md bg-surface-muted px-2 py-0.5 min-w-0 w-fit max-w-full";
+const CHIP =
+  "flex items-center gap-1 rounded-md bg-surface-muted px-2 py-0.5 min-w-0 w-fit max-w-full";
 const LABEL = "text-xs text-ink-muted whitespace-nowrap shrink-0 text-right";
 
 export function FacetPanel({ unified }: { unified: UnifiedSearch }) {
@@ -88,16 +89,22 @@ function EncyclopediaLink({ unified, tokenId }: { unified: UnifiedSearch; tokenI
       rel="noopener noreferrer"
       className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-xs text-ink-muted transition-colors hover:text-ink"
     >
-      <BookOpen size={12} aria-hidden="true" />
+      <Book size={12} aria-hidden="true" />
       {unified.t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
     </Link>
   );
 }
 
-function NoRows({ unified, icon, description }: { unified: UnifiedSearch; icon: React.ReactNode; description?: string }) {
-  return (
-    <EmptyResult icon={icon} title={unified.t("search.noData")} description={description} />
-  );
+function NoRows({
+  unified,
+  icon,
+  description,
+}: {
+  unified: UnifiedSearch;
+  icon: React.ReactNode;
+  description?: string;
+}) {
+  return <EmptyResult icon={icon} title={unified.t("search.noData")} description={description} />;
 }
 
 function VersionsPanel({ unified }: { unified: UnifiedSearch }) {
@@ -377,9 +384,7 @@ function ChildrenPanel({ unified }: { unified: UnifiedSearch }) {
     <div className="grid gap-3 p-4 sm:grid-cols-2">
       {childHashes.map((childHash, index) => {
         const identity =
-          unified.rowIdentities[
-            unified.identityKey(childHash, Number(childVersions[index] ?? 0))
-          ];
+          unified.rowIdentities[unified.identityKey(childHash, Number(childVersions[index] ?? 0))];
         return (
           // Two distinct targets: the person, and the NFT minted from them.
           // A single card-wide button swallowed the token badge's click.
@@ -457,7 +462,9 @@ function StoryChunksPanel({ unified }: { unified: UnifiedSearch }) {
 
           <div className="space-y-3">
             <div className="max-h-32 overflow-y-auto rounded-xl bg-surface-alt p-3 text-sm leading-relaxed text-ink-muted">
-              {chunk.content || <span className="text-ink-subtle italic">{t("search.noData")}</span>}
+              {chunk.content || (
+                <span className="text-ink-subtle italic">{t("search.noData")}</span>
+              )}
             </div>
             <div className="flex flex-col gap-2 text-xs text-ink-muted">
               <DataRow
@@ -477,7 +484,10 @@ function StoryChunksPanel({ unified }: { unified: UnifiedSearch }) {
                 <div className="grid grid-cols-[80px_1fr] items-center gap-2">
                   <span className={LABEL}>{t("search.storyChunksQuery.attachmentCID")}</span>
                   <div className={CHIP}>
-                    <HashInline value={String(chunk.attachmentCID)} className="min-w-0 flex-1 font-mono" />
+                    <HashInline
+                      value={String(chunk.attachmentCID)}
+                      className="min-w-0 flex-1 font-mono"
+                    />
                     <CopyIconButton
                       onClick={() => unified.onCopy(String(chunk.attachmentCID))}
                       label={t("search.copy", "Copy") as string}
@@ -743,9 +753,7 @@ function AccountVersionsPanel({ unified }: { unified: UnifiedSearch }) {
             <PersonHashCell unified={unified} personHash={row.personHash} />
             <div className="flex-1" />
             <span className="text-xs text-ink-subtle">
-              {row.timestamp
-                ? formatUnixSeconds(row.timestamp)
-                : t("search.versionsQuery.unknown")}
+              {row.timestamp ? formatUnixSeconds(row.timestamp) : t("search.versionsQuery.unknown")}
             </span>
           </div>
         ))}
