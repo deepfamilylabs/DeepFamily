@@ -40,6 +40,8 @@ export default function PeoplePage() {
         t={t}
         projectionEnabled={peoplePage.projectionEnabled}
         loading={peoplePage.loading}
+        error={peoplePage.error}
+        retry={peoplePage.retry}
         filters={peoplePage.filters}
         view={peoplePage.view}
         results={peoplePage.results}

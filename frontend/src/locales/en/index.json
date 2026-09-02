@@ -928,6 +928,7 @@
     "colMinted": "Minted",
     "noResults": "No people found",
     "noResultsDesc": "Try adjusting your search criteria or filters",
+    "loadFailed": "Could not load people",
     "viewEncyclopedia": "View Encyclopedia",
     "chunks": "{{count}} chunks",
     "clickToEndorse": "Click to endorse this version",

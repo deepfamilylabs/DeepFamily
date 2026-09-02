@@ -1,6 +1,6 @@
 import { BookOpen, Tag, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
-import { PageContainer } from "../../../shared/ui";
+import { PageContainer, PageHead } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
 import type { PeoplePageT } from "../model/peoplePageModel";
 
@@ -22,17 +22,14 @@ export function PeoplePageHead({ t, stats, personNotice }: PeoplePageHeadProps) 
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[220px] bg-[radial-gradient(ellipse_at_top,rgba(249,115,22,0.11),transparent_70%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(251,146,60,0.09),transparent_70%)]" />
 
       <PageContainer className="relative z-10 pt-7 pb-5">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-8">
-          <div className="min-w-0">
-            <h1 className="text-3xl md:text-[2.125rem] text-ink">
-              {t("people.title", "Family Encyclopedia")}
-            </h1>
-            <p className="mt-1.5 text-sm text-ink-muted">
-              {t("people.subtitle", "Explore family member profiles preserved on the blockchain")}
-            </p>
-          </div>
-          <PeopleStatStrip t={t} stats={stats} />
-        </div>
+        <PageHead
+          title={t("people.title", "Family Encyclopedia")}
+          subtitle={t(
+            "people.subtitle",
+            "Explore family member profiles preserved on the blockchain",
+          )}
+          trailing={<PeopleStatStrip t={t} stats={stats} />}
+        />
 
         <PersonProjectionWarning t={t} personNotice={personNotice} />
       </PageContainer>

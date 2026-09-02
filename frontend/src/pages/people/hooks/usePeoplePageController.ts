@@ -27,7 +27,7 @@ import {
 
 export function usePeoplePageController() {
   const { nodesData } = useTreeGraphData();
-  const { loading } = useTreeStatus();
+  const { loading, errors, refresh } = useTreeStatus();
   const [projectionEnabled, setProjectionEnabled] = useState(false);
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
@@ -102,6 +102,16 @@ export function usePeoplePageController() {
     setActivePath("/familyTree");
     navigate("/familyTree");
   }, [navigate, setActivePath]);
+
+  // The tree loads progressively and collects non-fatal errors; the newest one
+  // is what the page shows when it ends up with nothing to list.
+  const loadError = useMemo(() => {
+    const last = errors.length ? errors[errors.length - 1] : null;
+    if (!last) return "";
+    if (typeof last === "string") return last;
+    const message = (last as { message?: unknown }).message;
+    return typeof message === "string" && message ? message : String(last);
+  }, [errors]);
 
   const stats = useMemo(
     () => getPeoplePageStats({ graphNodes: graph.nodes, nodesData, people }),
@@ -202,6 +212,8 @@ export function usePeoplePageController() {
   return {
     projectionEnabled,
     loading,
+    error: loadError,
+    retry: refresh,
     stats,
     filters: {
       searchTerm,

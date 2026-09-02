@@ -29,7 +29,10 @@ export default function Layout() {
   const bgClass =
     isPeoplePage || isTreePage || isGenealogyBookPage
       ? "bg-white dark:bg-black" // Full-width pages handle their own background
-      : "bg-linear-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900";
+      : isHomePage
+        ? // The landing page keeps its own wash
+          "bg-linear-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900"
+        : "bg-surface-body";
 
   // Desktop padding logic:
   // Base strip width: w-16 (4rem) -> pl-16

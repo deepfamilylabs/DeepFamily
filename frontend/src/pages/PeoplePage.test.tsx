@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, NodeData>,
   graphNodeIds: [] as string[],
   loading: false,
+  treeErrors: [] as unknown[],
+  treeRefresh: vi.fn(),
   setActivePath: vi.fn(),
 }));
 
@@ -44,6 +46,8 @@ vi.mock("../domains/tree", () => ({
   }),
   useTreeStatus: () => ({
     loading: mocks.loading,
+    errors: mocks.treeErrors,
+    refresh: mocks.treeRefresh,
   }),
   useFamilyTreeProjection: () => ({
     graph: {
@@ -78,6 +82,13 @@ vi.mock("../domains/person", () => ({
 
 vi.mock("../shared/ui", () => ({
   PageContainer: ({ children }: any) => <div>{children}</div>,
+  PageHead: ({ title, subtitle, trailing }: any) => (
+    <div>
+      <h1>{title}</h1>
+      {subtitle ? <p>{subtitle}</p> : null}
+      {trailing}
+    </div>
+  ),
 }));
 
 function makePerson(overrides: Partial<NodeData>): NodeData {
@@ -143,6 +154,8 @@ describe("PeoplePage", () => {
     };
     mocks.graphNodeIds = [ada.id, grace.id];
     mocks.loading = false;
+    mocks.treeErrors = [];
+    mocks.treeRefresh.mockReset();
     mocks.setActivePath.mockReset();
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
