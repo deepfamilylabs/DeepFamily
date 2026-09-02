@@ -13,7 +13,7 @@ import {
   RootHashHistory,
   TraversalControls,
   TrustedSourceFilterControl,
-  VersionStepper,
+  VersionPicker,
 } from "./sections";
 
 interface FormSectionProps {
@@ -100,7 +100,7 @@ export default function FamilyTreeConfigForm() {
         >
           <div className="flex flex-col gap-4">
             <RootHashField {...ctrl.root} />
-            <VersionStepper {...ctrl.version} />
+            <VersionPicker {...ctrl.version} />
             <div className="pt-2 border-t border-slate-100 dark:border-slate-700/50">
               <RootHashHistory {...ctrl.history} />
             </div>

@@ -10,7 +10,8 @@ import {
 } from "../../../../shared/config/env";
 import { useToast } from "../../../../shared/ui";
 import { useTreeMutations, useVizOptions } from "../../../tree";
-import { isAddress, isHash32, isUrl } from "../../model";
+import { usePersonVersionOptions } from "../../../transactions/hooks/usePersonVersionOptions";
+import { isAddress, isHash32, isUrl, reconcileRootVersionSelection } from "../../model";
 import type { NetworkOption, NetworkSelection } from "../../model";
 import { getLocalizedDefaultRoot, loadCustomNetworks, saveCustomNetworks } from "../../services";
 
@@ -19,6 +20,7 @@ type FormErrors = {
   chainId?: string;
   contract?: string;
   root?: string;
+  version?: string;
 };
 
 type TooltipKey =
@@ -78,13 +80,54 @@ export function useFamilyTreeConfigForm() {
   const [customRpc, setCustomRpc] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
 
+  // The hash the version index was last decided for, so an arriving lookup only
+  // preselects a version for a hash the user has not already answered. Seeded
+  // with the saved root: its stored index is that answer.
+  const decidedVersionHashRef = useRef<string | null>(rootHash || null);
+
   useEffect(() => {
     setLocalRpcUrl(rpcUrl);
     setLocalChainId(chainId);
     setLocalReaderAddress(readerAddress);
     setLocalRootHash(rootHash);
     setLocalVersion(rootVersionIndex);
+    decidedVersionHashRef.current = rootHash || null;
   }, [rpcUrl, chainId, readerAddress, rootHash, rootVersionIndex]);
+
+  // Reads through the saved connection, not the unsaved one being edited above:
+  // a hash is looked up against the network the app is currently talking to.
+  const rootVersionLookup = usePersonVersionOptions(isHash32(localRootHash) ? localRootHash : null);
+
+  const rootHashIsValid = isHash32(localRootHash);
+  const hadValidRootHashRef = useRef(rootHashIsValid);
+
+  useEffect(() => {
+    const hadValid = hadValidRootHashRef.current;
+    hadValidRootHashRef.current = rootHashIsValid;
+    // Only on the transition out of a valid hash. The index belonged to the
+    // hash that was just erased, so it must not linger as a bare "Version 1"
+    // over whatever is typed next.
+    if (rootHashIsValid || !hadValid) return;
+    decidedVersionHashRef.current = null;
+    setLocalVersion(0);
+  }, [rootHashIsValid]);
+
+  useEffect(() => {
+    const update = reconcileRootVersionSelection(rootVersionLookup, decidedVersionHashRef.current);
+    if (!update) return;
+    decidedVersionHashRef.current = update.decidedForHash;
+    setLocalVersion(update.versionIndex);
+  }, [rootVersionLookup]);
+
+  const handleVersionChange = useCallback(
+    (value: number) => {
+      // Freeze the decision for this hash so a still-running lookup cannot
+      // overwrite what was just chosen by hand.
+      decidedVersionHashRef.current = rootVersionLookup.personHash ?? localRootHash;
+      setLocalVersion(Math.max(1, value));
+    },
+    [localRootHash, rootVersionLookup.personHash],
+  );
 
   const presetNetworks = useMemo<NetworkOption[]>(
     () =>
@@ -138,9 +181,13 @@ export function useFamilyTreeConfigForm() {
       next.chainId = "familyTree.validation.chainIdInvalid";
     if (!isAddress(localReaderAddress)) next.contract = "familyTree.validation.reader";
     if (!isHash32(localRootHash)) next.root = "familyTree.validation.root";
+    // 0 is the picker's "nothing chosen" state, which a cleared hash leaves
+    // behind; the tree cannot be loaded from it.
+    if (!Number.isFinite(localVersion) || (localVersion || 0) < 1)
+      next.version = "familyTree.validation.version";
     setErrors(next);
     return Object.keys(next).length === 0;
-  }, [localRpcUrl, localChainId, localReaderAddress, localRootHash]);
+  }, [localRpcUrl, localChainId, localReaderAddress, localRootHash, localVersion]);
 
   useEffect(() => {
     validateAll();
@@ -167,6 +214,9 @@ export function useFamilyTreeConfigForm() {
     setLocalReaderAddress(defaults.readerAddress);
     setLocalRootHash(localized.hash);
     setLocalVersion(localized.version);
+    // The defaults name their own version; the lookup for that hash must not
+    // replace it.
+    decidedVersionHashRef.current = localized.hash || null;
   }, [defaults, getLocalizedFormDefaultRoot]);
 
   const applyConfigChanges = useCallback(() => {
@@ -326,9 +376,9 @@ export function useFamilyTreeConfigForm() {
 
     version: {
       value: localVersion,
-      onChange: setLocalVersion,
-      decrement: () => setLocalVersion((v) => Math.max(1, (v || 1) - 1)),
-      increment: () => setLocalVersion((v) => (v || 1) + 1),
+      onChange: handleVersionChange,
+      lookup: rootVersionLookup,
+      error: errors.version,
     },
 
     history: {

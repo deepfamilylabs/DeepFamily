@@ -43,6 +43,18 @@ const mocks = vi.hoisted(() => ({
   toast: {
     success: vi.fn(),
   },
+  versionLookup: {
+    personHash: null as string | null,
+    status: "idle" as "idle" | "loading" | "ready" | "error",
+    versions: [] as {
+      versionIndex: number;
+      endorsementCount: number;
+      tokenId: number;
+      addedBy: string;
+      timestamp: number;
+    }[],
+    totalVersions: 0,
+  },
   envFlags: {
     isDev: false,
     showChildren: true,
@@ -71,6 +83,10 @@ vi.mock("../../../tree", () => ({
 
 vi.mock("../../../../shared/ui", () => ({
   useToast: () => mocks.toast,
+}));
+
+vi.mock("../../../transactions/hooks/usePersonVersionOptions", () => ({
+  usePersonVersionOptions: () => mocks.versionLookup,
 }));
 
 vi.mock("../../../../shared/config", () => ({
@@ -103,10 +119,73 @@ describe("useFamilyTreeConfigForm", () => {
     mocks.envFlags.showTrusted = true;
     mocks.envFlags.localizedRoot = "";
     mocks.envFlags.localizedVersion = 0;
+    mocks.versionLookup = { personHash: null, status: "idle", versions: [], totalVersions: 0 };
   });
 
   afterEach(() => {
     localStorage.clear();
+  });
+
+  it("keeps the saved version index when the lookup resolves for the saved root", () => {
+    mocks.versionLookup = {
+      personHash: mocks.config.rootHash,
+      status: "ready",
+      versions: [
+        { versionIndex: 3, endorsementCount: 9, tokenId: 0, addedBy: "0x1", timestamp: 1 },
+      ],
+      totalVersions: 1,
+    };
+    const { result } = renderHook(() => useFamilyTreeConfigForm());
+    expect(result.current.version.value).toBe(mocks.config.rootVersionIndex);
+  });
+
+  it("preselects the best version once a newly typed hash resolves", () => {
+    const nextHash = "0x" + "f".repeat(64);
+    const { result, rerender } = renderHook(() => useFamilyTreeConfigForm());
+
+    act(() => {
+      result.current.root.onChange(nextHash);
+    });
+    mocks.versionLookup = {
+      personHash: nextHash,
+      status: "ready",
+      versions: [
+        { versionIndex: 1, endorsementCount: 2, tokenId: 0, addedBy: "0x1", timestamp: 1 },
+        { versionIndex: 4, endorsementCount: 8, tokenId: 0, addedBy: "0x2", timestamp: 2 },
+      ],
+      totalVersions: 2,
+    };
+    act(() => {
+      rerender();
+    });
+
+    expect(result.current.version.value).toBe(4);
+
+    // A hand-picked index survives a fresh lookup result for the same hash.
+    act(() => {
+      result.current.version.onChange(1);
+    });
+    mocks.versionLookup = { ...mocks.versionLookup, versions: [...mocks.versionLookup.versions] };
+    act(() => {
+      rerender();
+    });
+    expect(result.current.version.value).toBe(1);
+  });
+
+  it("drops the version when the root hash is cleared, and blocks the save", () => {
+    const { result } = renderHook(() => useFamilyTreeConfigForm());
+
+    act(() => {
+      result.current.root.onChange("");
+    });
+
+    // 0 renders the picker's placeholder instead of a stale "Version 1".
+    expect(result.current.version.value).toBe(0);
+
+    act(() => {
+      result.current.actions.save();
+    });
+    expect(mocks.config.update).not.toHaveBeenCalled();
   });
 
   it("seeds local form values from config and reports no diff initially", () => {
