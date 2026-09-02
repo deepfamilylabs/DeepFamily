@@ -31,35 +31,36 @@ export default function SortButton({
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       className={`
-        group relative inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full
-        text-sm font-medium whitespace-nowrap select-none
+        group relative inline-flex items-center justify-center gap-1 h-8 px-3 rounded-full
+        text-[12.5px] font-medium whitespace-nowrap select-none
         transition-all duration-200 ease-out border
         ${
           isActive
-            ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-500/25 ring-2 ring-orange-500/20"
-            : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600"
+            ? "bg-primary border-primary text-white shadow-sm shadow-primary/30"
+            : "bg-surface border-hairline text-ink-muted hover:text-ink hover:border-hairline-strong"
         }
       `}
       aria-label={`${label} - ${sortOrder === "asc" ? "Ascending" : "Descending"}`}
     >
       <span>{label}</span>
       {isActive && showSortArrows && (
-        <div className="flex flex-col -space-y-1 items-center ml-0.5">
+        <span className="flex flex-col -space-y-1 items-center">
           <ChevronUp
-            className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "asc" ? "text-white drop-shadow-xs" : "text-white/40"
+            className={`w-3 h-3 transition-colors duration-200 ${
+              sortOrder === "asc" ? "text-white" : "text-white/45"
             }`}
             strokeWidth={2.5}
           />
           <ChevronDown
-            className={`w-3.5 h-3.5 transition-all duration-200 ${
-              sortOrder === "desc" ? "text-white drop-shadow-xs" : "text-white/40"
+            className={`w-3 h-3 transition-colors duration-200 ${
+              sortOrder === "desc" ? "text-white" : "text-white/45"
             }`}
             strokeWidth={2.5}
           />
-        </div>
+        </span>
       )}
     </button>
   );

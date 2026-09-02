@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { PersonStoryModal, type EndorseSuccessHandler } from "../domains/person";
 import { useTreeMutations, useTreeNodeAccess } from "../domains/tree";
 import { usePeoplePageController } from "./people/hooks/usePeoplePageController";
-import { PeopleFiltersPanel } from "./people/sections/PeopleFiltersPanel";
-import { PeopleHeroSection } from "./people/sections/PeopleHeroSection";
+import { PeoplePageHead } from "./people/sections/PeoplePageHead";
 import { PeopleResultsSection } from "./people/sections/PeopleResultsSection";
+import { PeopleToolbar } from "./people/sections/PeopleToolbar";
 
 export default function PeoplePage() {
   const { t } = useTranslation();
@@ -25,12 +25,13 @@ export default function PeoplePage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-black text-gray-900 dark:text-gray-100 selection:bg-orange-500/30">
-      <PeopleHeroSection t={t} stats={peoplePage.stats} personNotice={peoplePage.personNotice} />
+    <div className="min-h-screen bg-surface-body text-ink selection:bg-primary/30">
+      <PeoplePageHead t={t} stats={peoplePage.stats} personNotice={peoplePage.personNotice} />
 
-      <PeopleFiltersPanel
+      <PeopleToolbar
         t={t}
         filters={peoplePage.filters}
+        view={peoplePage.view}
         loading={peoplePage.loading}
         filteredCount={peoplePage.results.filteredPeople.length}
       />
@@ -40,6 +41,7 @@ export default function PeoplePage() {
         projectionEnabled={peoplePage.projectionEnabled}
         loading={peoplePage.loading}
         filters={peoplePage.filters}
+        view={peoplePage.view}
         results={peoplePage.results}
         modal={peoplePage.modal}
         preloadStoryData={preloadStoryData}

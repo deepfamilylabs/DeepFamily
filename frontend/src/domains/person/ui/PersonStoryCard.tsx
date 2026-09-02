@@ -2,24 +2,17 @@ import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "rea
 import { useTranslation } from "react-i18next";
 import {
   User,
-  Calendar,
   BookOpen,
   Star,
-  Clock,
   FileText,
-  Hash,
   ChevronRight,
-  Eye,
-  Baby,
-  Flower2,
+  MapPin,
 } from "lucide-react";
 import {
   NodeData,
   hasDetailedStory as hasDetailedStoryFn,
-  birthDateString,
-  deathDateString,
+  lifeSpanYears,
   genderText as genderTextFn,
-  formatUnixDate,
   isMinted,
 } from "../../../shared/model";
 import { shortHash } from "../../../shared/model";
@@ -33,6 +26,12 @@ interface PersonStoryCardProps {
   onEndorseSuccess?: EndorseSuccessHandler;
 }
 
+/**
+ * Compact person card — roughly 220px tall against the previous 520px, so four
+ * fit per row instead of three. Life dates collapse into the line under the
+ * name and the two places into a single row, replacing the old pair of 44px
+ * icon rows.
+ */
 function PersonStoryCard({
   person,
   onOpen,
@@ -56,25 +55,28 @@ function PersonStoryCard({
     }
   }, [person.tokenId, hasDetailedStory, preloadStoryData]);
 
-  // Format date
-  const formatDate = useMemo(
-    () => ({
-      birth: birthDateString(person),
-      death: deathDateString(person),
-    }),
-    [person],
-  );
-
   // Gender display
   const genderText = useMemo(() => genderTextFn(person.gender, t as any), [person.gender, t]);
 
-  // Story preview
-  const storyPreview = useMemo(() => {
-    if (!person.nftPublicStory) return "";
-    return person.nftPublicStory.length > 150
-      ? person.nftPublicStory.substring(0, 150) + "..."
-      : person.nftPublicStory;
-  }, [person.nftPublicStory]);
+  const identityLine = useMemo(
+    () => [genderText, lifeSpanYears(person)].filter(Boolean).join(" · "),
+    [genderText, person],
+  );
+
+  // "Boston → New York", or whichever half is known
+  const places = useMemo(() => {
+    const { birthPlace, deathPlace } = person;
+    if (birthPlace && deathPlace && birthPlace !== deathPlace) {
+      return `${birthPlace} → ${deathPlace}`;
+    }
+    return birthPlace || deathPlace || "";
+  }, [person]);
+
+  // The 2-line clamp does the trimming; cap the string only to bound the DOM.
+  const storyPreview = useMemo(
+    () => (person.nftPublicStory ? person.nftPublicStory.slice(0, 200) : ""),
+    [person.nftPublicStory],
+  );
 
   const handleStoryBadgeClick = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -91,140 +93,92 @@ function PersonStoryCard({
   return (
     <div
       onMouseEnter={handleMouseEnter}
-      className="group relative flex flex-col h-full bg-linear-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 rounded-4xl border border-gray-200/80 dark:border-gray-800 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:border-orange-500/30 hover:-translate-y-1 transition-all duration-500 overflow-hidden"
+      className="group relative flex flex-col h-full p-[18px] bg-surface rounded-3xl border border-hairline shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_20px_-14px_rgba(15,23,42,0.16)] hover:shadow-[0_18px_34px_-18px_rgba(15,23,42,0.28)] dark:shadow-none hover:border-primary/45 hover:-translate-y-[3px] transition-all duration-300 overflow-hidden"
     >
       {/* Top accent light - subtle gradient line */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-linear-to-r from-transparent via-orange-400/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-linear-to-r from-transparent via-orange-400/75 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-      <div className="relative flex-1 flex flex-col p-6 z-10">
-        {/* Avatar Header */}
-        <div className="flex items-center justify-center mb-6 relative">
-          {/* Glow effect behind avatar */}
-          <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full scale-150 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-
-          <div className="relative w-24 h-24 rounded-full bg-linear-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-xl shadow-orange-500/20 group-hover:scale-105 transition-transform duration-500 ring-4 ring-white dark:ring-gray-900">
-            <User className="w-10 h-10 text-white" strokeWidth={2} />
-          </div>
-          {hasDetailedStory && (
-            <button
-              type="button"
-              onClick={handleStoryBadgeClick}
-              className="absolute top-0 right-0 w-10 h-10 rounded-full bg-surface text-orange-500 border border-hairline flex items-center justify-center shadow-lg hover:scale-110 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 transition-all duration-300 z-10"
-              title={storyLabel}
-              aria-label={storyLabel}
-            >
-              <BookOpen className="w-5 h-5" strokeWidth={2.5} />
-            </button>
-          )}
+      <div className="flex items-start gap-3">
+        <div className="relative w-11 h-11 shrink-0 rounded-full bg-linear-to-br from-orange-400 to-red-600 flex items-center justify-center shadow-lg shadow-primary/25 ring-[3px] ring-surface">
+          <User className="w-5 h-5 text-white" strokeWidth={2} />
         </div>
 
-        {/* Name and Badges */}
-        <div className="text-center mb-6">
-          <h3 className="text-xl font-bold text-ink mb-3 group-hover:text-orange-500 transition-colors duration-300 line-clamp-2 min-h-14">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-bold leading-[1.35] text-ink line-clamp-2 group-hover:text-primary transition-colors duration-300">
             {person.fullName || `Person #${shortHash(person.personHash)}`}
           </h3>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {genderText && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-alt text-xs font-medium text-ink-muted border border-hairline">
-                <User className="w-3 h-3" />
-                {genderText}
-              </span>
-            )}
-            {isMinted(person) && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-alt text-xs font-mono font-medium text-ink-muted border border-hairline">
-                <Hash className="w-3 h-3" />
-                {person.tokenId}
-              </span>
-            )}
-            {endorsementCount > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowEndorseModal(true);
-                }}
-                className="group/endorse inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-xs font-medium text-primary border border-primary/25 hover:bg-orange-600 hover:text-white hover:border-orange-600 dark:hover:bg-orange-600 dark:hover:border-orange-600 dark:hover:text-white transition-all duration-300"
-                title={t("people.clickToEndorse", "Click to endorse this version")}
-              >
-                <Star className="w-3 h-3 fill-orange-500 text-orange-500 group-hover/endorse:text-white group-hover/endorse:fill-white transition-colors" />
-                {endorsementCount}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Life Events */}
-        <div className="space-y-2 mb-6 flex-1">
-          {(formatDate.birth || person.birthPlace) && (
-            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-alt/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-primary/25 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
-                <Baby className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider mb-0.5">
-                  {t("people.born", "Born")}
-                </div>
-                <div className="text-sm text-ink-muted font-medium truncate">
-                  {[formatDate.birth, person.birthPlace].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {(formatDate.death || person.deathPlace) && (
-            <div className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-surface-alt/50 transition-colors group/item">
-              <div className="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-900/10 flex items-center justify-center shrink-0 border border-primary/25 group-hover/item:border-orange-200 dark:group-hover/item:border-orange-800/30 transition-colors">
-                <Flower2 className="w-4 h-4 text-orange-500/80 group-hover/item:text-orange-600 transition-colors" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] font-bold text-ink-subtle uppercase tracking-wider mb-0.5">
-                  {t("people.died", "Died")}
-                </div>
-                <div className="text-sm text-ink-muted font-medium truncate">
-                  {[formatDate.death, person.deathPlace].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Story Preview */}
-          {storyPreview && (
-            <div className="mt-4 p-4 rounded-xl bg-surface-alt/30 border border-hairline/50 italic text-ink-muted text-sm leading-relaxed relative">
-              <span className="absolute top-2 left-2 text-2xl text-gray-200 dark:text-gray-700 font-serif leading-none">
-                "
-              </span>
-              <span className="relative z-10">{storyPreview}</span>
+          {identityLine && (
+            <div className="mt-0.5 text-xs text-ink-muted tabular-nums truncate">
+              {identityLine}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="pt-4 border-t border-hairline flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            {person.timestamp && (
-              <span className="flex items-center gap-1.5 text-xs text-ink-subtle font-medium">
-                <Clock className="w-3 h-3" />
-                {formatUnixDate(person.timestamp)}
-              </span>
-            )}
-            {person.storyMetadata && (
-              <span className="flex items-center gap-1.5 text-xs text-ink-subtle font-medium">
-                <FileText className="w-3 h-3" />
-                {t("people.chunks", "{{count}} chunks", {
-                  count: person.storyMetadata.totalChunks,
-                })}
-              </span>
-            )}
-          </div>
-
+        {hasDetailedStory && (
           <button
-            onClick={() => onOpen(person)}
-            className="w-10 h-10 rounded-full bg-gray-900 dark:bg-white text-white dark:text-ink flex items-center justify-center group-hover:bg-orange-500 dark:group-hover:bg-orange-500 group-hover:text-white hover:bg-orange-600! hover:scale-110 transition-all duration-300 shadow-lg shadow-gray-200 dark:shadow-none"
-            aria-label={t("common.open", "Open details")}
+            type="button"
+            onClick={handleStoryBadgeClick}
+            className="w-[26px] h-[26px] shrink-0 rounded-full bg-surface text-primary border border-hairline flex items-center justify-center shadow-md hover:scale-110 hover:bg-primary-hover hover:text-white hover:border-primary-hover transition-all duration-300"
+            title={storyLabel}
+            aria-label={storyLabel}
           >
-            <ChevronRight className="w-5 h-5" />
+            <BookOpen className="w-3.5 h-3.5" strokeWidth={2.5} />
           </button>
-        </div>
+        )}
       </div>
+
+      {places && (
+        <div className="mt-[11px] flex items-center gap-1.5 min-w-0">
+          <MapPin className="w-3.5 h-3.5 shrink-0 text-primary" />
+          <span className="text-xs text-ink-muted truncate">{places}</span>
+        </div>
+      )}
+
+      {storyPreview && (
+        <p className="mt-2.5 pl-2.5 border-l-2 border-primary/35 text-xs leading-[1.55] text-ink-muted italic line-clamp-2">
+          {storyPreview}
+        </p>
+      )}
+
+      <div className="flex-1 min-h-2" />
+
+      <div className="mt-3 pt-[11px] border-t border-hairline flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-3 text-[11.5px] font-medium text-ink-subtle whitespace-nowrap min-w-0">
+          {isMinted(person) && <span className="font-mono">#{person.tokenId}</span>}
+          {endorsementCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowEndorseModal(true);
+              }}
+              className="inline-flex items-center gap-1 text-primary hover:text-primary-hover transition-colors"
+              title={t("people.clickToEndorse", "Click to endorse this version")}
+            >
+              <Star className="w-3 h-3 fill-current" />
+              {endorsementCount}
+            </button>
+          )}
+          {person.storyMetadata && person.storyMetadata.totalChunks > 0 && (
+            <span className="inline-flex items-center gap-1 truncate">
+              <FileText className="w-3 h-3 shrink-0" />
+              {t("people.chunks", "{{count}} chunks", {
+                count: person.storyMetadata.totalChunks,
+              })}
+            </span>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpen(person)}
+          className="w-[30px] h-[30px] shrink-0 rounded-full bg-ink text-surface flex items-center justify-center group-hover:bg-primary group-hover:text-white hover:bg-primary-hover! hover:scale-110 transition-all duration-300"
+          aria-label={t("common.open", "Open details")}
+        >
+          <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
+        </button>
+      </div>
+
       {showEndorseModal ? (
         <EndorseCompactModal
           isOpen={true}
