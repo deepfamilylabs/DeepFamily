@@ -32,6 +32,26 @@ vi.mock("../shared/ui", () => ({
       {children}
     </div>
   ),
+  PageHead: ({ title, subtitle }: any) => (
+    <div>
+      <h1>{title}</h1>
+      {subtitle ? <p>{subtitle}</p> : null}
+    </div>
+  ),
+  EmptyState: ({ title, description, action }: any) => (
+    <div>
+      <h1>{title}</h1>
+      {description ? <p>{description}</p> : null}
+      {action}
+    </div>
+  ),
+  ActionCard: ({ title, description, cta, onClick }: any) => (
+    <button type="button" onClick={onClick}>
+      <span>{title}</span>
+      <span>{description}</span>
+      {cta ? <span>{cta}</span> : null}
+    </button>
+  ),
 }));
 
 vi.mock("../domains/transactions", () => ({

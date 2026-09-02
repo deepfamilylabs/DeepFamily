@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import React, { type ReactNode } from "react";
 import { formatYMD, genderText, placesLine, shortAddress } from "../../../shared/model";
-import { CopyIconButton } from "../../../shared/ui";
+import { ActionCard, CopyIconButton, EmptyState } from "../../../shared/ui";
 import { MAX_SEARCH_PAGE_SIZE, type SearchPageT } from "../model/searchPageModel";
 import { detectSearchSubject, type SearchSubject } from "../model/searchSubject";
 import { ButtonPrimary, HashInline } from "./SearchPageUi";
@@ -581,30 +581,7 @@ export function LoadingRows({ t, rows = 3 }: { t: T; rows?: number }) {
   );
 }
 
-export function EmptyResult({
-  icon,
-  title,
-  description,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  description?: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center px-6 py-10 text-center">
-      <span className="mb-3.5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-muted text-ink-subtle">
-        {icon}
-      </span>
-      <div className="mb-1.5 text-sm font-semibold text-ink">{title}</div>
-      {description ? (
-        <p className="mb-4 max-w-sm text-sm leading-relaxed text-ink-muted">{description}</p>
-      ) : null}
-      {action}
-    </div>
-  );
-}
+export { EmptyState as EmptyResult };
 
 export function ErrorResult({
   t,
@@ -682,7 +659,7 @@ export function EntryCards({ t }: { t: T }) {
         "search.unified.entry.personHashDesc",
         "Opens versions, endorsement sources, endorsement stats and children.",
       ),
-      tone: "bg-primary/10 text-primary",
+      tone: "primary" as const,
     },
     {
       key: "tokenId",
@@ -691,7 +668,7 @@ export function EntryCards({ t }: { t: T }) {
         "search.unified.entry.tokenIdDesc",
         "Opens that NFT's story chunks and URI history.",
       ),
-      tone: "bg-info/10 text-info",
+      tone: "info" as const,
     },
     {
       key: "address",
@@ -700,28 +677,28 @@ export function EntryCards({ t }: { t: T }) {
         "search.unified.entry.addressDesc",
         "Opens versions that account created, endorsements it made, and NFTs it holds.",
       ),
-      tone: "bg-surface-muted text-ink-muted",
+      tone: "neutral" as const,
     },
   ];
 
   return (
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {entries.map((entry) => (
-        <div key={entry.key} className={`${CARD} p-5`}>
-          <span
-            className={`mb-3.5 inline-flex h-10 w-10 items-center justify-center rounded-xl ${entry.tone}`}
-          >
-            {entry.key === "personHash" ? (
-              <User size={20} aria-hidden="true" />
+        <ActionCard
+          key={entry.key}
+          tone={entry.tone}
+          title={entry.title}
+          description={entry.description}
+          icon={
+            entry.key === "personHash" ? (
+              <User size={22} aria-hidden="true" />
             ) : entry.key === "tokenId" ? (
-              <ImageIcon size={20} aria-hidden="true" />
+              <ImageIcon size={22} aria-hidden="true" />
             ) : (
-              <Wallet size={20} aria-hidden="true" />
-            )}
-          </span>
-          <h3 className="mb-1.5 text-lg text-ink">{entry.title}</h3>
-          <p className="text-sm leading-relaxed text-ink-muted">{entry.description}</p>
-        </div>
+              <Wallet size={22} aria-hidden="true" />
+            )
+          }
+        />
       ))}
     </div>
   );
@@ -757,7 +734,7 @@ export function RowAction({
 
 export function ScopePrompt({ t, message }: { t: T; message: string }) {
   return (
-    <EmptyResult
+    <EmptyState
       icon={<Sliders size={22} aria-hidden="true" />}
       title={t("search.unified.scope.needScope", "Pick a scope")}
       description={message}
