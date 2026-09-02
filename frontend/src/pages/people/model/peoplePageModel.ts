@@ -9,6 +9,7 @@ export type PeopleFilterType =
   | "by_endorsement"
   | "by_birth_year";
 export type PeopleSortOrder = "asc" | "desc";
+export type PeopleViewMode = "grid" | "list";
 
 export const PEOPLE_PAGE_SIZE = 12;
 

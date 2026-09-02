@@ -158,6 +158,18 @@ export function deathDateString(nd: Partial<NodeData> | undefined | null): strin
   return formatYMD(nd.deathYear, nd.deathMonth, nd.deathDay, nd.isDeathBC);
 }
 
+// Year-only life span for compact rows ("1858 – 1929"). Full Y-M-D dates are
+// too wide for a 4-up card or a table cell; they stay in the detail views.
+export function lifeSpanYears(nd: Partial<NodeData> | undefined | null): string {
+  if (!nd) return "";
+  const birth = nd.birthYear ? (nd.isBirthBC ? `BC ${nd.birthYear}` : String(nd.birthYear)) : "";
+  const death = nd.deathYear ? (nd.isDeathBC ? `BC ${nd.deathYear}` : String(nd.deathYear)) : "";
+  if (birth && death) return `${birth} – ${death}`;
+  if (birth) return birth;
+  if (death) return `– ${death}`;
+  return "";
+}
+
 // Birth-order comparison shared by the projection layer and the paper genealogy view.
 // Returns null when no usable birth year is present so callers can treat the date as unknown.
 export function getBirthOrderKey(

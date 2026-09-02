@@ -22,6 +22,7 @@ import {
   type PeopleFilterType,
   type PeopleFiltersState,
   type PeopleSortOrder,
+  type PeopleViewMode,
 } from "../model/peoplePageModel";
 
 export function usePeoplePageController() {
@@ -38,6 +39,7 @@ export function usePeoplePageController() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<PeopleFilterType>("all");
   const [sortOrder, setSortOrder] = useState<PeopleSortOrder>("asc");
+  const [viewMode, setViewMode] = useState<PeopleViewMode>("grid");
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null);
   const [selectedAddresses, setSelectedAddresses] = useState<string[]>([]);
   const [addressInput, setAddressInput] = useState("");
@@ -217,6 +219,10 @@ export function usePeoplePageController() {
       clearFilters,
       hasVisibleFilters: hasVisiblePeopleFilters(filterState),
       hasRuleFilters: hasPeopleRuleFilters(filterState),
+    },
+    view: {
+      mode: viewMode,
+      setMode: setViewMode,
     },
     personNotice: {
       query: personQueryError,
