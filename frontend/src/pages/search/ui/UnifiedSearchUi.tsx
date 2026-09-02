@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import React, { type ReactNode } from "react";
-import { formatYMD, genderText, shortAddress } from "../../../shared/model";
+import { formatYMD, genderText, placesLine, shortAddress } from "../../../shared/model";
 import { CopyIconButton } from "../../../shared/ui";
 import { MAX_SEARCH_PAGE_SIZE, type SearchPageT } from "../model/searchPageModel";
 import { detectSearchSubject, type SearchSubject } from "../model/searchSubject";
@@ -276,24 +276,15 @@ export function NftIdentityCard({
   onSearchPerson?: (personHash: string) => void;
   action?: ReactNode;
 }) {
-  const birth = [
-    formatYMD(core?.birthYear, core?.birthMonth, core?.birthDay, core?.isBirthBC),
-    core?.birthPlace,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  const death = [
-    formatYMD(core?.deathYear, core?.deathMonth, core?.deathDay, core?.isDeathBC),
-    core?.deathPlace,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const birth = formatYMD(core?.birthYear, core?.birthMonth, core?.birthDay, core?.isBirthBC);
+  const death = formatYMD(core?.deathYear, core?.deathMonth, core?.deathDay, core?.isDeathBC);
   const gender = genderText(core?.gender, t as any);
 
   const facts = [
     { label: t("familyTree.nodeDetail.gender"), value: gender },
     { label: t("familyTree.nodeDetail.birth"), value: birth },
     { label: t("familyTree.nodeDetail.death"), value: death },
+    { label: t("common.places", "Places"), value: placesLine(core) },
   ].filter((fact) => Boolean(fact.value));
 
   return (
@@ -367,48 +358,92 @@ export function NftIdentityCard({
   );
 }
 
-export function FacetTabs({
+/**
+ * Facet tabs plus the result meta on one sticky band. The tabs are the primary
+ * navigation for a result set, and on a long list they used to scroll away
+ * along with the total and the page size.
+ */
+export function ResultToolbar({
+  t,
   tabs,
   activeKey,
   onSelect,
+  total,
+  totalLabel,
+  pageSize,
+  onPageSizeChange,
 }: {
+  t: T;
   tabs: { key: string; label: string; count?: number }[];
   activeKey: string;
   onSelect: (key: string) => void;
+  total: number;
+  totalLabel: string;
+  pageSize: number;
+  onPageSizeChange: (next: number) => void;
 }) {
   return (
-    <div
-      role="tablist"
-      className="flex items-center gap-1 overflow-x-auto border-b border-hairline"
-    >
-      {tabs.map((tab) => {
-        const active = tab.key === activeKey;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onSelect(tab.key)}
-            className={`inline-flex shrink-0 items-center gap-2 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
-              active
-                ? "font-semibold text-ink shadow-[inset_0_-2px_0_0_var(--df-primary)]"
-                : "font-medium text-ink-muted hover:text-ink"
-            }`}
-          >
-            {tab.label}
-            {tab.count !== undefined && (
-              <span
-                className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
-                  active ? "bg-primary/15 text-primary" : "bg-surface-muted text-ink-muted"
+    <div className="sticky top-16 z-30 border-b border-hairline bg-surface-body/90 backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-4">
+        <div role="tablist" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+          {tabs.map((tab) => {
+            const active = tab.key === activeKey;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => onSelect(tab.key)}
+                className={`inline-flex shrink-0 items-center gap-2 px-4 py-3 text-sm whitespace-nowrap transition-colors ${
+                  active
+                    ? "font-semibold text-ink shadow-[inset_0_-2px_0_0_var(--df-primary)]"
+                    : "font-medium text-ink-muted hover:text-ink"
                 }`}
               >
-                {tab.count}
-              </span>
-            )}
-          </button>
-        );
-      })}
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span
+                    className={`rounded-full px-1.5 py-px text-[11px] font-semibold ${
+                      active ? "bg-primary/15 text-primary" : "bg-surface-muted text-ink-muted"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="text-xs font-medium whitespace-nowrap text-ink-muted">
+            {totalLabel}: {total}
+          </span>
+          <label className="inline-flex items-center gap-2">
+            <span className="sr-only">{t("search.nameQuery.pageSize")}</span>
+            <span className="relative inline-flex items-center">
+              <select
+                value={pageSize}
+                onChange={(event) => onPageSizeChange(Number(event.target.value))}
+                aria-label={t("search.nameQuery.pageSize") as string}
+                className="appearance-none rounded-lg border border-hairline bg-surface-alt bg-none py-1 pl-2.5 pr-7 text-xs text-ink focus:border-primary focus:ring-0 focus:outline-hidden"
+              >
+                {[20, 50, MAX_SEARCH_PAGE_SIZE].map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={12}
+                className="pointer-events-none absolute right-2 text-ink-subtle"
+                aria-hidden="true"
+              />
+            </span>
+          </label>
+        </div>
+      </div>
     </div>
   );
 }
@@ -524,49 +559,6 @@ export function VersionScopeSelect({
  */
 export function ResultShell({ children }: { children: ReactNode }) {
   return <div className={`${CARD} overflow-hidden`}>{children}</div>;
-}
-
-export function ResultMeta({
-  t,
-  total,
-  totalLabel,
-  pageSize,
-  onPageSizeChange,
-}: {
-  t: T;
-  total: number;
-  totalLabel: string;
-  pageSize: number;
-  onPageSizeChange: (next: number) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-      <span className="text-sm font-medium text-ink-muted">
-        {totalLabel}: {total}
-      </span>
-      <label className="inline-flex items-center gap-2">
-        <span className="text-xs text-ink-subtle">{t("search.nameQuery.pageSize")}</span>
-        <span className="relative inline-flex items-center">
-          <select
-            value={pageSize}
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-            className="appearance-none rounded-xl border border-hairline bg-surface-alt bg-none py-1.5 pl-3 pr-8 text-xs text-ink focus:border-primary focus:ring-0 focus:outline-hidden"
-          >
-            {[20, 50, MAX_SEARCH_PAGE_SIZE].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={13}
-            className="pointer-events-none absolute right-2.5 text-ink-subtle"
-            aria-hidden="true"
-          />
-        </span>
-      </label>
-    </div>
-  );
 }
 
 /** Skeleton rows sized like real results, so the list does not jump on load. */

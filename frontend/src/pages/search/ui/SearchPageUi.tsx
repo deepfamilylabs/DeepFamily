@@ -7,7 +7,7 @@ export function ButtonPrimary({
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
-      className={`px-6 py-2.5 rounded-full bg-linear-to-r from-orange-400 to-red-500 text-white font-medium shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all duration-300 flex items-center justify-center gap-2 ${className}`}
+      className={`flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-2.5 font-medium text-white shadow-sm shadow-primary/30 transition-colors duration-200 hover:bg-primary-hover active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-primary ${className}`}
       {...props}
     />
   );

@@ -5,6 +5,7 @@ import {
   hasDetailedStory,
   isMinted,
   lifeSpanYears,
+  placesLine,
   shortAddress,
   shortHash,
   type NodeData,
@@ -62,10 +63,7 @@ export function PeopleListRow({
   preloadStoryData,
 }: PeopleListRowProps) {
   const lifespan = lifeSpanYears(person);
-  const places =
-    person.birthPlace && person.deathPlace && person.birthPlace !== person.deathPlace
-      ? `${person.birthPlace} → ${person.deathPlace}`
-      : person.birthPlace || person.deathPlace || "";
+  const places = placesLine(person);
   const chunks = person.storyMetadata?.totalChunks ?? 0;
   const dash = <span className="text-ink-subtle">—</span>;
 

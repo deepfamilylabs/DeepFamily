@@ -170,6 +170,18 @@ export function lifeSpanYears(nd: Partial<NodeData> | undefined | null): string 
   return "";
 }
 
+// "Boston → New York" when the two differ, else whichever is known. Shared so
+// the people card, the people list row and the search identity card agree.
+export function placesLine(
+  nd: { birthPlace?: string; deathPlace?: string } | undefined | null,
+): string {
+  if (!nd) return "";
+  const birth = nd.birthPlace?.trim() || "";
+  const death = nd.deathPlace?.trim() || "";
+  if (birth && death && birth !== death) return `${birth} → ${death}`;
+  return birth || death;
+}
+
 // Birth-order comparison shared by the projection layer and the paper genealogy view.
 // Returns null when no usable birth year is present so callers can treat the date as unknown.
 export function getBirthOrderKey(
