@@ -1,6 +1,6 @@
 import { AlertCircle, RefreshCw, Users } from "lucide-react";
 import { PersonStoryCard, type EndorseSuccessHandler } from "../../../domains/person";
-import { PageContainer } from "../../../shared/ui";
+import { EmptyState, PageContainer } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
 import type { PeoplePageT } from "../model/peoplePageModel";
 import { PeopleListHeader, PeopleListRow } from "../ui/PeopleListRow";
@@ -181,25 +181,24 @@ function PeopleEmptyState({
   filters: PeoplePageController["filters"];
 }) {
   return (
-    <div className="rounded-[20px] border border-hairline bg-surface py-20 px-8 text-center">
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-alt border border-hairline">
-        <Users className="w-7 h-7 text-hairline-strong" strokeWidth={1.5} />
-      </div>
-      <h3 className="mt-4 text-[17px] font-bold text-ink">
-        {t("people.noResults", "No stories found")}
-      </h3>
-      <p className="mt-1.5 text-sm text-ink-muted max-w-md mx-auto">
-        {t("people.noResultsDesc", "Try adjusting your search terms or filters")}
-      </p>
-      {filters.hasVisibleFilters && (
-        <button
-          type="button"
-          onClick={filters.clearFilters}
-          className="mt-5 inline-flex items-center h-9 px-6 bg-ink text-surface rounded-full text-sm font-medium hover:bg-primary-hover hover:text-white transition-colors"
-        >
-          {t("people.resetFilters", "Reset filters")}
-        </button>
-      )}
+    <div className="rounded-[20px] border border-hairline bg-surface">
+      <EmptyState
+        size="page"
+        icon={<Users className="w-7 h-7" strokeWidth={1.5} />}
+        title={t("people.noResults", "No stories found")}
+        description={t("people.noResultsDesc", "Try adjusting your search terms or filters")}
+        action={
+          filters.hasVisibleFilters ? (
+            <button
+              type="button"
+              onClick={filters.clearFilters}
+              className="inline-flex items-center h-9 px-6 bg-ink text-surface rounded-full text-sm font-medium hover:bg-primary-hover hover:text-white transition-colors"
+            >
+              {t("people.resetFilters", "Reset filters")}
+            </button>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

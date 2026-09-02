@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Image, Star, Wallet, AlertCircle, ArrowRight } from "lucide-react";
+import { Plus, Image, Star, Wallet } from "lucide-react";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
 import { AddVersionModal, EndorseModal, MintNFTModal } from "../domains/transactions";
-import { PageContainer } from "../shared/ui";
+import { ActionCard, EmptyState, PageContainer, PageHead } from "../shared/ui";
+import type { ActionCardTone } from "../shared/ui";
 
 type ActionTab = "add-version" | "mint-nft" | "endorse";
 
@@ -98,7 +99,6 @@ export default function ActionsPage() {
     versionData?: any;
   }>({ isOpen: false });
 
-  // Accent classes are written out in full: Tailwind cannot see composed names.
   const actionCards = useMemo(
     () => [
       {
@@ -110,8 +110,7 @@ export default function ActionsPage() {
           "Add a new version of person data with zero-knowledge proofs",
         ),
         cta: t("actions.startAddVersion", "Start Adding Version"),
-        iconClass: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-        ctaClass: "text-blue-600 dark:text-blue-400",
+        tone: "primary" as ActionCardTone,
         onOpen: () => setAddVersionModal({ isOpen: true }),
       },
       {
@@ -123,8 +122,7 @@ export default function ActionsPage() {
           "Support quality data by endorsing versions with DEEP tokens",
         ),
         cta: t("actions.openEndorse", "Open Endorsement"),
-        iconClass: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-        ctaClass: "text-emerald-600 dark:text-emerald-400",
+        tone: "success" as ActionCardTone,
         onOpen: () =>
           setEndorseModal({ isOpen: true, personHash: undefined, versionIndex: undefined }),
       },
@@ -137,8 +135,7 @@ export default function ActionsPage() {
           "Convert endorsed person data into valuable NFT collectibles",
         ),
         cta: t("actions.openMintNFT", "Open NFT Minting"),
-        iconClass: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-        ctaClass: "text-purple-600 dark:text-purple-400",
+        tone: "info" as ActionCardTone,
         onOpen: () =>
           setMintNFTModal({ isOpen: true, personHash: undefined, versionIndex: undefined }),
       },
@@ -148,110 +145,71 @@ export default function ActionsPage() {
 
   // Wallet not connected view
   if (!address) {
+    const features = [
+      t("actions.feature1", "Add new person versions with privacy protection"),
+      t("actions.feature2", "Endorse quality data and earn rewards"),
+      t("actions.feature3", "Mint NFTs from endorsed data"),
+    ];
+
     return (
       <PageContainer className="py-12">
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="mb-8 relative inline-block">
-            <div className="absolute inset-0 bg-linear-to-r from-orange-400 to-red-500 blur-xl opacity-20 rounded-full"></div>
-            <div className="relative bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg">
-              <Wallet className="w-12 h-12 text-orange-500" />
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
-            {t("actions.walletRequired", "Wallet Connection Required")}
-          </h1>
-
-          <p className="text-lg text-gray-500 dark:text-gray-400 mb-10 max-w-lg mx-auto leading-relaxed">
-            {t(
-              "actions.walletRequiredDesc",
-              "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
-            )}
-          </p>
-
-          <div className="space-y-8">
-            <div className="transform hover:scale-105 transition-transform duration-300">
+        <EmptyState
+          size="page"
+          icon={<Wallet className="h-7 w-7" strokeWidth={1.5} />}
+          title={t("actions.walletRequired", "Wallet Connection Required")}
+          description={t(
+            "actions.walletRequiredDesc",
+            "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
+          )}
+          action={
+            <div className="flex flex-col items-center gap-6">
               <WalletConnectButton className="mx-auto" alwaysShowLabel />
-            </div>
-
-            <div className="bg-white dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-3xl p-8 shadow-xl shadow-gray-200/50 dark:shadow-none backdrop-blur-sm">
-              <div className="flex items-start gap-5">
-                <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-                  <AlertCircle className="w-6 h-6 text-orange-500" />
+              <div className="rounded-2xl border border-hairline bg-surface px-5 py-4 text-left">
+                <div className="mb-2.5 text-[11px] font-semibold tracking-wide text-ink-subtle">
+                  {t("actions.whatYouCanDo", "What you can do after connecting:")}
                 </div>
-                <div className="text-left flex-1">
-                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-                    {t("actions.whatYouCanDo", "What you can do after connecting:")}
-                  </h3>
-                  <ul className="space-y-3">
-                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                      {t("actions.feature1", "Add new person versions with privacy protection")}
+                <ul className="flex flex-col gap-2">
+                  {features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2.5 text-sm text-ink-muted">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      {feature}
                     </li>
-                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                      {t("actions.feature2", "Endorse quality data and earn rewards")}
-                    </li>
-                    <li className="flex items-center gap-3 text-gray-600 dark:text-gray-300">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                      {t("actions.feature3", "Mint NFTs from endorsed data")}
-                    </li>
-                  </ul>
-                </div>
+                  ))}
+                </ul>
               </div>
             </div>
-          </div>
-        </div>
+          }
+        />
       </PageContainer>
     );
   }
 
   return (
-    <PageContainer className="py-12">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
-            {t("actions.title", "Blockchain Actions")}
-          </h1>
-          <p className="text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
-            {t(
-              "actions.subtitle",
-              "Interact with the DeepFamily protocol using your connected wallet",
-            )}
-          </p>
-        </div>
+    <PageContainer className="py-10">
+      <PageHead
+        title={t("actions.title", "Blockchain Actions")}
+        subtitle={t(
+          "actions.subtitle",
+          "Interact with the DeepFamily protocol using your connected wallet",
+        )}
+      />
 
-        {/* One card per action: a single click opens each modal. */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {actionCards.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                type="button"
-                onClick={action.onOpen}
-                className="group flex h-full flex-col items-start gap-4 rounded-3xl border border-gray-100 bg-white p-8 text-left shadow-xl shadow-gray-200/50 transition-all duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500 active:translate-y-0 dark:border-gray-700 dark:bg-gray-800 dark:shadow-none dark:hover:border-orange-500/40"
-              >
-                <span
-                  className={`inline-flex h-14 w-14 items-center justify-center rounded-2xl ${action.iconClass}`}
-                >
-                  <Icon className="h-7 w-7" />
-                </span>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{action.title}</h2>
-                <p className="flex-1 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
-                  {action.description}
-                </p>
-                <span
-                  className={`inline-flex items-center gap-1.5 text-sm font-semibold ${action.ctaClass}`}
-                >
-                  {action.cta}
-                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                </span>
-              </button>
-            );
-          })}
-        </div>
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {actionCards.map((action) => {
+          const Icon = action.icon;
+          return (
+            <ActionCard
+              key={action.id}
+              icon={<Icon className="h-6 w-6" />}
+              title={action.title}
+              description={action.description}
+              tone={action.tone}
+              cta={action.cta}
+              onClick={action.onOpen}
+            />
+          );
+        })}
+      </div>
 
         {/* Modals - Simplified navigation logic:
             1. Parent component only controls open/close and passes initial data
@@ -292,7 +250,6 @@ export default function ActionsPage() {
           initialPersonHash={endorseModal.personHash}
           initialVersionIndex={endorseModal.versionIndex}
         />
-      </div>
     </PageContainer>
   );
 }
