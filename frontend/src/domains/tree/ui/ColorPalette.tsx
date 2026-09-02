@@ -48,15 +48,15 @@ export default function ColorPalette() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-full bg-white dark:bg-slate-800 shadow-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700 flex items-center gap-2"
+        className="inline-flex h-8 items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-2.5 shadow-sm backdrop-blur-sm transition-colors hover:border-hairline-strong md:h-[34px] md:px-3"
         title="Change Color Theme"
         aria-label="Change color theme"
         aria-expanded={isOpen}
         aria-controls={isOpen ? paletteId : undefined}
       >
-        <Palette className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+        <Palette className="h-4 w-4 text-ink-muted" />
         <div
-          className="w-3 h-3 rounded-full"
+          className="h-3 w-3 rounded-full"
           style={{ backgroundColor: THEMES.find((t) => t.id === theme)?.color }}
           aria-hidden
         />
@@ -67,7 +67,7 @@ export default function ColorPalette() {
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div
             id={paletteId}
-            className="absolute top-full left-0 mt-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 z-50 grid grid-cols-5 gap-2 w-64"
+            className="absolute left-0 top-full z-50 mt-2 grid w-64 grid-cols-5 gap-2 rounded-xl border border-hairline bg-surface p-2 shadow-xl shadow-ink/10"
             role="group"
             aria-label="Color themes"
           >

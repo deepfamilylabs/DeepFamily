@@ -539,7 +539,12 @@
     }
   },
   "familyTree": {
-    "title": "可视化",
+    "title": "族谱",
+    "volumes": {
+      "chart": "世系图",
+      "paper": "纸质族谱",
+      "people": "人物百科"
+    },
     "viewModes": {
       "tree": "树形布局",
       "dag": "有向无环图",
@@ -576,6 +581,9 @@
       "traversal": "遍历方式",
       "nodesLabelFull": "节点",
       "depthLabelFull": "深度",
+      "rootLabel": "本源",
+      "peopleUnit": "人",
+      "generationsUnit": "世",
       "edit": "编辑",
       "save": "保存",
       "cancel": "取消",
@@ -616,7 +624,10 @@
     "actions": {
       "refresh": "刷新",
       "remove": "移除",
-      "clearAll": "清空历史"
+      "clearAll": "清空历史",
+      "more": "更多",
+      "openConfig": "谱系配置",
+      "clearCaches": "清空缓存并重载"
     },
     "nodeDetail": {
       "hash": "哈希",

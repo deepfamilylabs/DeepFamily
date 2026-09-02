@@ -19,41 +19,12 @@ describe("ViewModeSwitch", () => {
     expect(onChange).toHaveBeenCalledWith("dag");
   });
 
-  it("renders the optional extraAction as a trailing button that triggers its own onClick, not onChange", () => {
-    const onChange = vi.fn();
-    const onClick = vi.fn();
-    render(
-      <ViewModeSwitch
-        value="tree"
-        onChange={onChange}
-        labels={labels}
-        extraAction={{ label: "Genealogy", onClick }}
-      />,
-    );
+  it("renders one button per visible view mode", () => {
+    render(<ViewModeSwitch value="tree" onChange={vi.fn()} labels={labels} />);
 
-    const extraButton = screen.getByText("Genealogy");
-    expect(extraButton).toBeTruthy();
-
-    fireEvent.click(extraButton);
-
-    expect(onClick).toHaveBeenCalledTimes(1);
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("adds exactly one trailing button when extraAction is provided", () => {
-    const { rerender } = render(<ViewModeSwitch value="tree" onChange={vi.fn()} labels={labels} />);
     // Count-agnostic so hiding/adding inline view modes does not make this brittle.
-    const baseCount = screen.getAllByRole("button").length;
-
-    rerender(
-      <ViewModeSwitch
-        value="tree"
-        onChange={vi.fn()}
-        labels={labels}
-        extraAction={{ label: "Genealogy", onClick: vi.fn() }}
-      />,
-    );
-
-    expect(screen.getAllByRole("button")).toHaveLength(baseCount + 1);
+    expect(screen.getAllByRole("button").length).toBeGreaterThan(1);
+    expect(screen.getByText("Tree").closest("button")?.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("DAG").closest("button")?.getAttribute("aria-pressed")).toBe("false");
   });
 });

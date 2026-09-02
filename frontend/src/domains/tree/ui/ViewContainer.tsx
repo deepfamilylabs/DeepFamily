@@ -17,7 +17,8 @@ interface ViewContainerProps {
   skeletonLines?: number;
   onViewModeChange?: (mode: "dag" | "tree" | "force" | "virtual") => void;
   viewModeLabels?: { tree: string; dag: string; force: string; virtual: string };
-  hideSwitch?: boolean;
+  /** Sits beside the palette in the top-left overlay row — page-owned chrome, same card language. */
+  overlayLeading?: React.ReactNode;
 }
 
 export default function ViewContainer({
@@ -27,7 +28,7 @@ export default function ViewContainer({
   loading,
   onViewModeChange,
   viewModeLabels,
-  hideSwitch,
+  overlayLeading,
 }: ViewContainerProps) {
   // useVizOptions internally inside views / contexts
   const content = hasRoot ? (
@@ -41,34 +42,30 @@ export default function ViewContainer({
       <TreeListView />
     )
   ) : (
-    <div className="w-full min-h-[520px] md:min-h-[680px] bg-linear-to-br from-white via-slate-50/50 to-orange-50/30 dark:from-slate-900/90 dark:via-slate-800/60 dark:to-slate-900/90 transition-all duration-300 p-4 flex items-center justify-center">
+    <div className="flex min-h-[520px] w-full items-center justify-center bg-surface-body p-4 transition-all duration-300 md:min-h-[680px]">
       {loading ? (
         <LoadingSkeleton />
       ) : contractMessage ? (
-        <div className="text-sm text-slate-700 dark:text-slate-300">{contractMessage}</div>
+        <div className="text-sm text-ink-muted">{contractMessage}</div>
       ) : (
         <LoadingSkeleton />
       )}
     </div>
   );
   return (
-    <div className="w-full h-full transition-colors relative">
-      {/* Floating View Mode Switch - positioned above zoom controls */}
-      {!hideSwitch && onViewModeChange && viewModeLabels && (
-        <div className="absolute top-4 right-3 z-10">
+    <div className="relative h-full w-full transition-colors">
+      {/* Top-left overlay row: palette first, then whatever the page hangs beside it. */}
+      <div className="absolute left-3 top-3 z-30 flex items-center gap-2 md:left-4 md:top-4">
+        <ColorPalette />
+        {overlayLeading}
+      </div>
+
+      {/* The renderers stay on the canvas: they redraw this page rather than leave it. */}
+      {onViewModeChange && viewModeLabels ? (
+        <div className="absolute right-3 top-3 z-30 md:right-4 md:top-4">
           <ViewModeSwitch value={viewMode} onChange={onViewModeChange} labels={viewModeLabels} />
         </div>
-      )}
-
-      {/* Color Palette - positioned top-left */}
-      <div className="absolute top-4 left-4 z-30 hidden md:block">
-        <ColorPalette />
-      </div>
-
-      {/* Color Palette (mobile) - positioned top-left */}
-      <div className="absolute top-3 left-3 z-30 md:hidden">
-        <ColorPalette />
-      </div>
+      ) : null}
 
       <FamilyTreeViewConfigProvider>
         <Suspense fallback={<LoadingSkeleton />}>{content}</Suspense>
