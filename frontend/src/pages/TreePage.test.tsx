@@ -57,6 +57,7 @@ const mocks = vi.hoisted(() => ({
   getReadonlyProvider: vi.fn(),
   createDeepFamilyReaderContract: vi.fn(),
   createDeepFamilyContract: vi.fn(),
+  toggleSection: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -83,14 +84,12 @@ vi.mock("../domains/tree", () => ({
   TreeInteractionProvider: ({ children }: any) => (
     <div data-testid="tree-interaction-provider">{children}</div>
   ),
-  ViewModeSwitch: ({ value, onChange }: any) => (
-    <button data-testid="view-mode-switch" onClick={() => onChange("force")}>
-      switch:{value}
-    </button>
-  ),
-  ViewContainer: ({ viewMode, hasRoot, contractMessage, loading }: any) => (
+  ViewContainer: ({ viewMode, hasRoot, contractMessage, loading, onViewModeChange }: any) => (
     <div data-testid="view-container">
       {JSON.stringify({ viewMode, hasRoot, contractMessage, loading })}
+      <button data-testid="view-mode-switch" onClick={() => onViewModeChange("force")}>
+        switch:{viewMode}
+      </button>
     </div>
   ),
   TreeDebugPanel: () => <div data-testid="tree-debug-panel">debug</div>,
@@ -112,6 +111,10 @@ vi.mock("../domains/config", () => ({
 
 vi.mock("../domains/wallet", () => ({
   useWallet: () => mocks.wallet,
+}));
+
+vi.mock("../app/context", () => ({
+  useSidebar: () => ({ toggleSection: mocks.toggleSection }),
 }));
 
 vi.mock("../shared/clients/providerRegistry", () => ({
@@ -182,6 +185,7 @@ describe("TreePage", () => {
     mocks.createDeepFamilyReaderContract.mockReturnValue(mocks.readerContract);
     mocks.createDeepFamilyContract.mockReset();
     mocks.createDeepFamilyContract.mockReturnValue(mocks.writeContract);
+    mocks.toggleSection.mockReset();
     vi.unstubAllEnvs();
   });
 
@@ -191,14 +195,14 @@ describe("TreePage", () => {
     vi.unstubAllEnvs();
   });
 
-  it("renders toolbar stats, wires refresh/clear actions, and persists the selected view mode", async () => {
+  it("renders the page bar stats, wires refresh/clear actions, and persists the selected view mode", async () => {
     localStorage.setItem("df:viewMode", "tree");
 
     renderTreePage();
 
     expect(screen.getByText("Family Tree")).toBeTruthy();
-    expect(screen.getAllByText(/familyTree\.ui\.nodesLabelFull/)[0].textContent).toContain("12");
-    expect(screen.getAllByText(/familyTree\.ui\.depthLabelFull/)[0].textContent).toContain("4");
+    expect(screen.getByTitle("Nodes").textContent).toContain("12");
+    expect(screen.getByTitle("Depth").textContent).toContain("4");
     expect(screen.getByTestId("view-container").textContent).toContain('"hasRoot":true');
     expect(screen.getByTestId("view-container").textContent).toContain('"viewMode":"tree"');
 
@@ -209,11 +213,28 @@ describe("TreePage", () => {
     );
     expect(localStorage.getItem("df:viewMode")).toBe("force");
 
-    fireEvent.click(screen.getAllByTitle("familyTree.actions.refresh")[0]);
-    fireEvent.click(screen.getAllByTitle("Clear")[0]);
+    fireEvent.click(screen.getByTitle("Refresh"));
+
+    // The cache wipe is no longer a top-level pill; it lives behind the overflow menu.
+    fireEvent.click(screen.getByTitle("More"));
+    fireEvent.click(screen.getByTitle("Clear"));
 
     expect(mocks.treeStatus.refresh).toHaveBeenCalledTimes(1);
     expect(mocks.treeStatus.clearAllCaches).toHaveBeenCalledTimes(1);
+  });
+
+  it("links the three genealogy volumes and opens the config panel from the overflow menu", () => {
+    renderTreePage();
+
+    // The paper genealogy volume is Chinese-only; the mocked language is "en".
+    expect(screen.getByText("Lineage Chart").getAttribute("href")).toBe("/familyTree");
+    expect(screen.getByText("Encyclopedia").getAttribute("href")).toBe("/people");
+    expect(screen.queryByText("Paper Genealogy")).toBeNull();
+
+    fireEvent.click(screen.getByTitle("More"));
+    fireEvent.click(screen.getByText("Genealogy settings"));
+
+    expect(mocks.toggleSection).toHaveBeenCalledWith("familyTree");
   });
 
   it("syncs config from env defaults when forced env sync is enabled", async () => {

@@ -19,7 +19,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   onZoomIn,
   onZoomOut,
   className = "",
-  trackHeight = 220,
+  trackHeight = 130,
 }) => {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
@@ -73,8 +73,13 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
     [onPointerMove, onPointerUp],
   );
 
+  const buttonClassName =
+    "flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink active:scale-95 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 touch-manipulation select-none md:h-8 md:w-8";
+
   return (
-    <div className={`flex flex-col items-center gap-2 md:gap-3 select-none ${className}`}>
+    <div
+      className={`inline-flex select-none flex-col items-center gap-1 rounded-xl border border-hairline bg-surface/95 p-1 shadow-sm backdrop-blur-sm md:gap-1.5 md:p-1.5 ${className}`}
+    >
       <button
         onClick={onZoomIn}
         onPointerDown={(e) => {
@@ -83,10 +88,24 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
+        aria-label="Zoom in"
+        title="Zoom in"
+        className={buttonClassName}
       >
-        +
+        <svg
+          className="h-[17px] w-[17px] md:h-[15px] md:w-[15px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
       </button>
+
+      {/* Pinch is the zoom gesture on touch, so the rail is a pointer-sized affordance only. */}
       <div
         ref={trackRef}
         onPointerDown={onPointerDown}
@@ -110,20 +129,21 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
             onPointerDown(pointerEvent as any);
           }
         }}
-        className="relative w-4 md:w-6 touch-none select-none"
+        className="relative hidden w-5 touch-none select-none md:block"
         style={{ height: trackHeight }}
       >
-        <div className="absolute left-1/2 -translate-x-1/2 top-1 bottom-1 md:top-1.5 md:bottom-1.5 w-1.5 rounded-full bg-linear-to-b from-slate-200 via-slate-300 to-slate-200 dark:from-slate-600 dark:via-slate-500 dark:to-slate-600 shadow-inner backdrop-blur-sm">
+        <div className="absolute bottom-1.5 left-1/2 top-1.5 w-1 -translate-x-1/2 rounded-full bg-hairline">
           <div
-            className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 md:w-4 md:h-4 rounded-full bg-linear-to-r from-orange-400 to-red-500 shadow-lg shadow-orange-500/30 ring-2 ring-white dark:ring-slate-800 hover:scale-110 transition-all duration-200 cursor-grab active:cursor-grabbing"
+            className="absolute bottom-0 left-1/2 w-1 -translate-x-1/2 rounded-full bg-primary"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
           <div
-            className="absolute left-1/2 -translate-x-1/2 bottom-0 w-1.5 rounded-full bg-linear-to-t from-orange-400/80 to-red-500/60 dark:from-orange-500/70 dark:to-red-500/50"
+            className="absolute left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-full bg-primary shadow-xs ring-2 ring-surface transition-transform hover:scale-110 active:cursor-grabbing"
             style={{ top: `${(1 - kToNorm(k)) * 100}%` }}
           />
         </div>
       </div>
+
       <button
         onClick={onZoomOut}
         onPointerDown={(e) => {
@@ -132,9 +152,50 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onTouchStart={(e) => {
           e.stopPropagation();
         }}
-        className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-white/90 dark:bg-slate-800/90 shadow-lg border border-slate-200/60 dark:border-slate-600/60 hover:bg-orange-50 dark:hover:bg-slate-700/80 active:scale-95 transition-all duration-200 text-slate-700 dark:text-slate-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 backdrop-blur-sm hover:shadow-orange-500/20 hover:shadow-xl font-semibold text-base md:text-lg touch-manipulation select-none"
+        aria-label="Zoom out"
+        title="Zoom out"
+        className={buttonClassName}
       >
-        -
+        <svg
+          className="h-[17px] w-[17px] md:h-[15px] md:w-[15px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <path d="M5 12h14" />
+        </svg>
+      </button>
+
+      <span className="h-px w-5 bg-hairline" aria-hidden />
+
+      <button
+        onClick={() => onSetZoom(1)}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+        }}
+        aria-label="Reset zoom"
+        title="Reset zoom"
+        className={buttonClassName}
+      >
+        <svg
+          className="h-[17px] w-[17px] md:h-[15px] md:w-[15px]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+          <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+          <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+          <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+        </svg>
       </button>
     </div>
   );
@@ -161,7 +222,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 }) => {
   return (
     <div
-      className={`bg-white/90 dark:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-600/60 p-1.5 select-none transition-all duration-200 hover:shadow-2xl hover:shadow-orange-500/10 ${className}`}
+      className={`select-none rounded-xl border border-hairline bg-surface/95 p-2 shadow-sm backdrop-blur-sm ${className}`}
     >
       <svg
         ref={miniSvgRef}
@@ -175,10 +236,9 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           y={0}
           width={width}
           height={height}
-          rx={8}
-          ry={8}
-          fill="#f8fafc"
-          className="dark:fill-slate-800"
+          rx={6}
+          ry={6}
+          className="fill-surface-alt"
         />
         <g className="nodes" />
         <rect
@@ -188,11 +248,10 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           width={20}
           height={20}
           fill="none"
-          stroke="#f97316"
           strokeWidth={2}
           rx={4}
           ry={4}
-          className="dark:stroke-orange-400"
+          className="stroke-primary"
         />
         {children}
       </svg>

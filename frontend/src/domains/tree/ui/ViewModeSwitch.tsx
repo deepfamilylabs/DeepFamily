@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export type ViewMode = "tree" | "dag" | "force" | "virtual";
 
 interface ViewModeSwitchProps {
@@ -7,34 +5,37 @@ interface ViewModeSwitchProps {
   onChange: (m: ViewMode) => void;
   labels: { tree: string; dag: string; force: string; virtual: string };
   disabled?: boolean;
-  // Optional trailing button that navigates away instead of switching the inline view.
-  // It is never part of `ViewMode`, so it never touches the persisted view state.
-  extraAction?: { label: string; icon?: ReactNode; onClick: () => void };
 }
 
 // "force" is temporarily hidden from the switcher (force-directed view quality isn't good enough yet).
 // The mode stays fully wired in ViewContainer/ViewMode, so re-enabling is just adding "force" back here.
 const order: ViewMode[] = ["tree", "dag", "virtual"];
 
-export default function ViewModeSwitch({ value, onChange, labels, disabled, extraAction }: ViewModeSwitchProps) {
+/**
+ * The three renderers of the lineage chart. It floats on the canvas rather than sitting in the page
+ * bar, because switching a drawing is not the same act as opening another volume of the genealogy —
+ * those are the page bar's tabs.
+ */
+export default function ViewModeSwitch({ value, onChange, labels, disabled }: ViewModeSwitchProps) {
   return (
-    <div className="relative inline-flex h-9 md:h-10 select-none rounded-full bg-slate-100 dark:bg-slate-800 p-0.5 md:p-1 gap-0.5 md:gap-1 max-w-full border border-slate-200 dark:border-slate-700">
+    <div className="inline-flex max-w-full select-none items-center gap-0.5 rounded-xl border border-hairline bg-surface-muted/95 p-0.5 shadow-sm backdrop-blur-sm">
       {order.map((m) => (
         <button
           key={m}
           type="button"
           disabled={disabled}
           onClick={() => onChange(m)}
-          className={`relative z-10 inline-flex items-center justify-center gap-1 md:gap-1.5 px-2.5 md:px-4 rounded-full h-full transition-colors duration-200 focus:outline-hidden text-xs font-medium shrink min-w-0 touch-manipulation whitespace-nowrap ${
+          aria-pressed={value === m}
+          className={`inline-flex h-7 min-w-0 shrink touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-2.5 text-xs transition-colors duration-200 focus:outline-hidden md:h-8 md:px-3 ${
             value === m
-              ? "bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-xs ring-1 ring-black/5 dark:ring-white/5"
-              : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+              ? "bg-surface font-semibold text-primary-hover shadow-xs"
+              : "font-medium text-ink-subtle hover:text-ink-muted"
           }`}
           title={labels[m]}
         >
           {m === "tree" && (
             <svg
-              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 shrink-0"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -49,7 +50,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled, extr
           )}
           {m === "dag" && (
             <svg
-              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 shrink-0"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -71,7 +72,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled, extr
           )}
           {m === "force" && (
             <svg
-              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 shrink-0"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -92,7 +93,7 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled, extr
           )}
           {m === "virtual" && (
             <svg
-              className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 shrink-0"
+              className="h-3.5 w-3.5 shrink-0"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -106,21 +107,9 @@ export default function ViewModeSwitch({ value, onChange, labels, disabled, extr
               <rect x="14" y="14" width="7" height="6" rx="1" />
             </svg>
           )}
-          <span className="hidden md:inline whitespace-nowrap">{labels[m]}</span>
+          <span className="hidden whitespace-nowrap md:inline">{labels[m]}</span>
         </button>
       ))}
-      {extraAction && (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={extraAction.onClick}
-          title={extraAction.label}
-          className="relative z-10 ml-0.5 md:ml-1 inline-flex items-center justify-center gap-1 md:gap-1.5 pl-2.5 md:pl-4 pr-2.5 md:pr-4 rounded-full h-full transition-colors duration-200 focus:outline-hidden text-xs font-medium shrink min-w-0 touch-manipulation whitespace-nowrap border-l border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
-        >
-          {extraAction.icon}
-          <span className="hidden md:inline whitespace-nowrap">{extraAction.label}</span>
-        </button>
-      )}
     </div>
   );
 }

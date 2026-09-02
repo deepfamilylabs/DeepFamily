@@ -48,9 +48,11 @@ export default function GraphViewport({
   miniMapNodes,
   miniMapOptions,
   miniMapUpdateRef,
-  zoomControlsClassName = "absolute bottom-44 left-3 z-10 md:bottom-32",
-  zoomControlsTrackHeight = 120,
-  miniMapWrapperClassName = "absolute bottom-20 left-3 z-10 scale-75 md:scale-100 origin-bottom-left md:bottom-3",
+  // On phones the fixed bottom nav overlays the last 72px of the canvas, so the controls clear it.
+  zoomControlsClassName = "absolute bottom-[92px] left-3 z-10 md:bottom-[152px] md:left-4",
+  zoomControlsTrackHeight = 130,
+  // The minimap is desktop-only: on a phone it eats a corner of a canvas that is already small.
+  miniMapWrapperClassName = "absolute bottom-4 left-4 z-10 hidden md:block",
   children,
 }: GraphViewportProps) {
   const { miniSvgRef, viewportRef, dims, update } = useMiniMap(

@@ -539,7 +539,12 @@
     }
   },
   "familyTree": {
-    "title": "Visualization",
+    "title": "Family Tree",
+    "volumes": {
+      "chart": "Lineage Chart",
+      "paper": "Paper Genealogy",
+      "people": "Encyclopedia"
+    },
     "viewModes": {
       "tree": "Tree Layout",
       "dag": "DAG",
@@ -576,6 +581,9 @@
       "traversal": "Traversal Mode",
       "nodesLabelFull": "Nodes",
       "depthLabelFull": "Depth",
+      "rootLabel": "Root",
+      "peopleUnit": "People",
+      "generationsUnit": "Generations",
       "edit": "Edit",
       "save": "Save",
       "cancel": "Cancel",
@@ -616,7 +624,10 @@
     "actions": {
       "refresh": "Refresh",
       "remove": "Remove",
-      "clearAll": "Clear all"
+      "clearAll": "Clear all",
+      "more": "More",
+      "openConfig": "Genealogy settings",
+      "clearCaches": "Clear caches and reload"
     },
     "nodeDetail": {
       "hash": "Hash",
