@@ -57,7 +57,6 @@ const mocks = vi.hoisted(() => ({
   getReadonlyProvider: vi.fn(),
   createDeepFamilyReaderContract: vi.fn(),
   createDeepFamilyContract: vi.fn(),
-  toggleSection: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -107,14 +106,11 @@ vi.mock("../domains/person", () => ({
 
 vi.mock("../domains/config", () => ({
   useConfig: () => mocks.config,
+  FamilyTreeConfigForm: () => <div data-testid="family-tree-config-form">config-form</div>,
 }));
 
 vi.mock("../domains/wallet", () => ({
   useWallet: () => mocks.wallet,
-}));
-
-vi.mock("../app/context", () => ({
-  useSidebar: () => ({ toggleSection: mocks.toggleSection }),
 }));
 
 vi.mock("../shared/clients/providerRegistry", () => ({
@@ -185,7 +181,6 @@ describe("TreePage", () => {
     mocks.createDeepFamilyReaderContract.mockReturnValue(mocks.readerContract);
     mocks.createDeepFamilyContract.mockReset();
     mocks.createDeepFamilyContract.mockReturnValue(mocks.writeContract);
-    mocks.toggleSection.mockReset();
     vi.unstubAllEnvs();
   });
 
@@ -200,7 +195,7 @@ describe("TreePage", () => {
 
     renderTreePage();
 
-    expect(screen.getByText("Family Tree")).toBeTruthy();
+    expect(screen.getByText("Family")).toBeTruthy();
     expect(screen.getByTitle("Nodes").textContent).toContain("12");
     expect(screen.getByTitle("Depth").textContent).toContain("4");
     expect(screen.getByTestId("view-container").textContent).toContain('"hasRoot":true');
@@ -213,11 +208,12 @@ describe("TreePage", () => {
     );
     expect(localStorage.getItem("df:viewMode")).toBe("force");
 
+    // The unlock dialog is opened from the bar now, not from a pill floating over the canvas.
+    expect(screen.getByTitle("Unlock versions")).toBeTruthy();
+
     fireEvent.click(screen.getByTitle("Refresh"));
 
-    // The cache wipe is no longer a top-level pill; it lives behind the overflow menu.
-    fireEvent.click(screen.getByTitle("More"));
-    fireEvent.click(screen.getByTitle("Clear"));
+    fireEvent.click(screen.getByTitle("Clear caches and reload"));
 
     expect(mocks.treeStatus.refresh).toHaveBeenCalledTimes(1);
     expect(mocks.treeStatus.clearAllCaches).toHaveBeenCalledTimes(1);
@@ -231,10 +227,16 @@ describe("TreePage", () => {
     expect(screen.getByText("Encyclopedia").getAttribute("href")).toBe("/people");
     expect(screen.queryByText("Paper Genealogy")).toBeNull();
 
-    fireEvent.click(screen.getByTitle("More"));
-    fireEvent.click(screen.getByText("Genealogy settings"));
+    // The drawer mounts its form on first open and keeps it, so presence is read off the dialog.
+    expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
+    expect(screen.queryByTestId("family-tree-config-form")).toBeNull();
 
-    expect(mocks.toggleSection).toHaveBeenCalledWith("familyTree");
+    fireEvent.click(screen.getByTitle("Genealogy settings"));
+    expect(screen.getByRole("dialog").getAttribute("aria-hidden")).toBe("false");
+    expect(screen.getByTestId("family-tree-config-form")).toBeTruthy();
+
+    fireEvent.click(screen.getByTitle("Genealogy settings"));
+    expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
   });
 
   it("syncs config from env defaults when forced env sync is enabled", async () => {

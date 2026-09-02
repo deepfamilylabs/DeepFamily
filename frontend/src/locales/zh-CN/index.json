@@ -23,7 +23,7 @@
   },
   "navigation": {
     "home": "首页",
-    "familyTree": "族谱",
+    "familyTree": "家族",
     "genealogyBook": "纸质族谱",
     "search": "搜索",
     "people": "人物",
@@ -539,7 +539,7 @@
     }
   },
   "familyTree": {
-    "title": "族谱",
+    "title": "家族",
     "volumes": {
       "chart": "世系图",
       "paper": "纸质族谱",
@@ -625,7 +625,6 @@
       "refresh": "刷新",
       "remove": "移除",
       "clearAll": "清空历史",
-      "more": "更多",
       "openConfig": "谱系配置",
       "clearCaches": "清空缓存并重载"
     },

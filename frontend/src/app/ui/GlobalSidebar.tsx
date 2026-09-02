@@ -1,16 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Globe,
-  ChevronRight,
-  X,
-  Layers,
-  Moon,
-  Sun,
-  Image,
-} from "lucide-react";
+import { Globe, ChevronRight, X, Moon, Sun, Image } from "lucide-react";
 import { useSidebar } from "../context";
-import { FamilyTreeConfigForm } from "../../domains/config";
 import { languages } from "../config/languages";
 import Logo from "./Logo";
 
@@ -56,17 +47,6 @@ export default function GlobalSidebar() {
 
   const menuItems = useMemo(
     () => [
-      {
-        id: "familyTree",
-        icon: Layers,
-        label: t("familyTree.title", "Family Tree"),
-        panelTitle: t("familyTree.ui.contractModeConfig", "Configuration"),
-        content: (
-          <div className="p-4">
-            <FamilyTreeConfigForm />
-          </div>
-        ),
-      },
       {
         id: "language",
         icon: Globe,
