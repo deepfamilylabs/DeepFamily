@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Home, Search, Network, Book, Zap, Menu } from "lucide-react";
+import { Home, Search, Network, Zap, Menu } from "lucide-react";
 import HeaderControls from "./HeaderControls";
 import Logo from "./Logo";
 import { PageContainer } from "../../shared/ui";
@@ -102,14 +102,6 @@ const SiteHeader = memo(() => {
           >
             <Network className="w-4 h-4" />
             <span className="hidden lg:inline">{t("navigation.familyTree")}</span>
-          </NavLink>
-          <NavLink
-            to="/people"
-            className={() => getNavClasses(isPathActive("/people"))}
-            onClick={() => handleNavClick("/people")}
-          >
-            <Book className="w-4 h-4" />
-            <span className="hidden lg:inline">{t("navigation.people")}</span>
           </NavLink>
           <NavLink
             to="/search"

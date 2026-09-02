@@ -47,11 +47,18 @@ export interface MetadataUnlockControlProps {
    */
   open?: boolean;
   onOpenChange?: (value: boolean) => void;
+  /**
+   * Renders the built-in floating trigger. The tree page turns it off and opens
+   * the dialog from its page bar instead, so the corner is left to the global
+   * floating action button.
+   */
+  showTrigger?: boolean;
 }
 
 export function MetadataUnlockControl({
   open: openProp,
   onOpenChange,
+  showTrigger = true,
 }: MetadataUnlockControlProps = {}) {
   const { nodesData } = useTreeGraphData();
   const {
@@ -289,17 +296,19 @@ export function MetadataUnlockControl({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        // Stacked above the global floating action button (bottom-24 / md:bottom-10, h-14 / md:h-16)
-        // instead of underneath it, where the two used to overlap.
-        className="fixed bottom-[164px] right-6 z-30 inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-3.5 py-2 text-[13px] font-semibold text-ink shadow-sm backdrop-blur-sm transition-colors hover:border-hairline-strong md:bottom-[116px] md:right-10"
-      >
-        <KeyRound className="h-4 w-4 text-ink-muted" />
-        {t("metadataUnlock.openButton", "Unlock versions")}
-        {unlockedCount > 0 ? <span className="text-emerald-600">{unlockedCount}</span> : null}
-      </button>
+      {showTrigger ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          // Stacked above the global floating action button (bottom-24 / md:bottom-10, h-14 / md:h-16)
+          // instead of underneath it, where the two used to overlap.
+          className="fixed bottom-[164px] right-6 z-30 inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-3.5 py-2 text-[13px] font-semibold text-ink shadow-sm backdrop-blur-sm transition-colors hover:border-hairline-strong md:bottom-[116px] md:right-10"
+        >
+          <KeyRound className="h-4 w-4 text-ink-muted" />
+          {t("metadataUnlock.openButton", "Unlock versions")}
+          {unlockedCount > 0 ? <span className="text-emerald-600">{unlockedCount}</span> : null}
+        </button>
+      ) : null}
 
       <ModalShell
         isOpen={open}

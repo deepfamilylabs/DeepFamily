@@ -20,7 +20,7 @@ import {
 } from "../domains/person";
 import { useConfig } from "../domains/config";
 import { useWallet } from "../domains/wallet";
-import { useSidebar } from "../app/context";
+import { TreeConfigDrawer } from "./tree/sections/TreeConfigDrawer";
 import { TreePageBar } from "./tree/sections/TreePageBar";
 import { TreeStatsPill } from "./tree/ui/TreeStatsPill";
 import {
@@ -33,6 +33,7 @@ import {
   createDeepFamilyReaderContract,
 } from "../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../shared/clients/providerRegistry";
+import { isMetadataUnlockUsable } from "../shared/model";
 
 /**
  * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
@@ -99,7 +100,6 @@ export default function TreePage() {
   // so the volume is shown only when the active language is Chinese.
   const isChinese = (i18n.language ?? "").toLowerCase().startsWith("zh");
   const { rootId, rootExists, nodesData } = useTreeGraphData();
-  const { toggleSection } = useSidebar();
   const { getOwnerOf } = useTreeNodeAccess();
   const { address, signer } = useWallet();
   const { bumpEndorsementCount, invalidateByTx, mergeNodeDetail } = useTreeMutations();
@@ -121,9 +121,15 @@ export default function TreePage() {
     update,
   } = useConfig();
   const [metadataUnlockOpen, setMetadataUnlockOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
   const hasRoot = Boolean(rootId && rootExists);
+  // Mirrors the dialog's own tally so the bar button can carry it as a badge.
+  const unlockedCount = useMemo(
+    () => Object.values(nodesData).filter(isMetadataUnlockUsable).length,
+    [nodesData],
+  );
   // The bar names the genealogy you are looking at. Until the root's metadata is readable that name
   // is still a hash — the same thing the node cards fall back to.
   const rootLabel = useMemo(() => {
@@ -275,38 +281,46 @@ export default function TreePage() {
                 generationCount={progress?.depth || 0}
                 loading={loadingContract}
                 showPaperVolume={isChinese}
+                unlockedCount={unlockedCount}
+                onOpenUnlock={() => setMetadataUnlockOpen(true)}
                 onRefresh={refresh}
                 onClearCaches={clearAllCaches}
-                onOpenConfig={() => toggleSection("familyTree")}
+                configOpen={configOpen}
+                onToggleConfig={() => setConfigOpen((value) => !value)}
               />
 
-              {/* Visualization Area */}
-              <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-body">
-                <ViewContainer
-                  viewMode={viewMode as any}
-                  hasRoot={hasRoot}
-                  contractMessage={contractMessage}
-                  loading={loadingContract}
-                  onViewModeChange={setViewMode}
-                  viewModeLabels={{
-                    tree: t("familyTree.viewModes.tree"),
-                    dag: t("familyTree.viewModes.dag"),
-                    force: t("familyTree.viewModes.force"),
-                    virtual: t("familyTree.viewModes.virtual"),
-                  }}
-                  overlayLeading={
-                    <TreeStatsPill
-                      t={t}
-                      peopleCount={progress?.created || 0}
-                      generationCount={progress?.depth || 0}
-                      className="md:hidden"
-                    />
-                  }
-                />
-                <MetadataUnlockControl
-                  open={metadataUnlockOpen}
-                  onOpenChange={setMetadataUnlockOpen}
-                />
+              {/* Visualization Area — the settings drawer sits beside it and pushes it aside. */}
+              <div className="relative flex min-h-0 flex-1 overflow-hidden">
+                <TreeConfigDrawer t={t} open={configOpen} onClose={() => setConfigOpen(false)} />
+
+                <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-body">
+                  <ViewContainer
+                    viewMode={viewMode as any}
+                    hasRoot={hasRoot}
+                    contractMessage={contractMessage}
+                    loading={loadingContract}
+                    onViewModeChange={setViewMode}
+                    viewModeLabels={{
+                      tree: t("familyTree.viewModes.tree"),
+                      dag: t("familyTree.viewModes.dag"),
+                      force: t("familyTree.viewModes.force"),
+                      virtual: t("familyTree.viewModes.virtual"),
+                    }}
+                    overlayLeading={
+                      <TreeStatsPill
+                        t={t}
+                        peopleCount={progress?.created || 0}
+                        generationCount={progress?.depth || 0}
+                        className="md:hidden"
+                      />
+                    }
+                  />
+                  <MetadataUnlockControl
+                    open={metadataUnlockOpen}
+                    onOpenChange={setMetadataUnlockOpen}
+                    showTrigger={false}
+                  />
+                </div>
               </div>
 
               {showDebugPanel ? (

@@ -54,7 +54,7 @@ vi.mock("../config/brandBadge", () => ({
   getBadgeConfig: () => null,
 }));
 
-describe("genealogy book navigation", () => {
+describe("genealogy volume navigation", () => {
   beforeEach(() => {
     mocks.activePath = "/genealogyBook";
     mocks.setActivePath.mockReset();
@@ -65,7 +65,7 @@ describe("genealogy book navigation", () => {
     cleanup();
   });
 
-  it("no longer exposes genealogy book links in the main navigation (moved to the tree view switcher)", () => {
+  it("keeps the genealogy volumes out of the main navigation (they live on the tree page bar)", () => {
     render(
       <MemoryRouter>
         <SiteHeader />
@@ -73,11 +73,11 @@ describe("genealogy book navigation", () => {
       </MemoryRouter>,
     );
 
-    const links = screen
-      .getAllByRole("link")
-      .filter((link) => link.getAttribute("href") === "/genealogyBook");
+    const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
 
-    expect(links).toHaveLength(0);
+    expect(hrefs.filter((href) => href === "/genealogyBook")).toHaveLength(0);
+    expect(hrefs.filter((href) => href === "/people")).toHaveLength(0);
     expect(screen.queryByText("Genealogy")).toBeNull();
+    expect(screen.queryByText("People")).toBeNull();
   });
 });

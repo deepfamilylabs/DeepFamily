@@ -23,7 +23,7 @@
   },
   "navigation": {
     "home": "Home",
-    "familyTree": "Tree",
+    "familyTree": "Family",
     "genealogyBook": "Paper Genealogy",
     "search": "Search",
     "people": "People",
@@ -539,7 +539,7 @@
     }
   },
   "familyTree": {
-    "title": "Family Tree",
+    "title": "Family",
     "volumes": {
       "chart": "Lineage Chart",
       "paper": "Paper Genealogy",
@@ -625,7 +625,6 @@
       "refresh": "Refresh",
       "remove": "Remove",
       "clearAll": "Clear all",
-      "more": "More",
       "openConfig": "Genealogy settings",
       "clearCaches": "Clear caches and reload"
     },
