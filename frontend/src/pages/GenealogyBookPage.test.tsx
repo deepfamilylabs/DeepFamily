@@ -237,7 +237,7 @@ describe("GenealogyBookPage", () => {
     const cases = [
       ["Su-style", "su"],
       ["Dieji-style", "dieji"],
-      ["Lineage", "lineage"],
+      ["Lineage Chart", "lineage"],
       ["Modern", "modern"],
       ["Ou-style", "ou"],
     ] as const;

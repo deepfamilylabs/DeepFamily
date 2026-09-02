@@ -37,7 +37,7 @@ function TitleUpdater() {
         case "/familyTree":
           return `${baseName} - ${t("navigation.familyTree")}`;
         case "/genealogyBook":
-          return `${baseName} - ${t("navigation.genealogyBook", "Paper Genealogy")}`;
+          return `${baseName} - ${t("navigation.genealogyBook", "Genealogy")}`;
         case "/search":
           return `${baseName} - ${t("navigation.search")}`;
         case "/people":

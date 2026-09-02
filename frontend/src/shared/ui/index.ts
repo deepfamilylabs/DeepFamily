@@ -15,6 +15,8 @@ export type { ActionCardProps, ActionCardTone } from "./ActionCard";
 export { default as ConfirmDialog } from "./ConfirmDialog";
 export { ToastProvider, useToast } from "./ToastProvider";
 export { CopyIconButton } from "./CopyIconButton";
+export { BambooSlipsIcon } from "./BambooSlipsIcon";
+export type { BambooSlipsIconProps } from "./BambooSlipsIcon";
 export type { CopyIconButtonProps } from "./CopyIconButton";
 export { useDialogA11y } from "./useDialogA11y";
 export type { UseDialogA11yOptions } from "./useDialogA11y";

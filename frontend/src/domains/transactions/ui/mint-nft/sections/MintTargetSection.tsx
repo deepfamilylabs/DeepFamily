@@ -1,4 +1,4 @@
-import { AlertCircle, BookOpen } from "lucide-react";
+import { AlertCircle, Book } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ModalSectionHeading, getFieldErrorA11y, modalField } from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
@@ -138,7 +138,7 @@ export function MintTargetSection({
                     className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-hairline px-2.5 py-1 text-xs text-ink-muted transition-colors hover:text-ink"
                     title={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
                   >
-                    <BookOpen size={12} aria-hidden="true" />
+                    <Book size={12} aria-hidden="true" />
                     {t("mintNFT.versionOptionBare", "Version {{index}}", {
                       index: version.versionIndex,
                     })}
@@ -183,7 +183,6 @@ export function MintTargetSection({
             )}
           </div>
         )}
-
       </div>
     </div>
   );

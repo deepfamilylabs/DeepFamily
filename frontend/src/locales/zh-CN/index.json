@@ -24,7 +24,7 @@
   "navigation": {
     "home": "首页",
     "familyTree": "家族",
-    "genealogyBook": "纸质族谱",
+    "genealogyBook": "族谱",
     "search": "搜索",
     "people": "人物",
     "actions": "操作"
@@ -369,12 +369,12 @@
     }
   },
   "genealogyBook": {
-    "title": "谱牒纸本视图",
-    "subtitle": "以传统纸质族谱风格实时预览",
+    "title": "族谱纸本视图",
+    "subtitle": "以传统族谱风格实时预览",
     "peopleUnit": "人",
     "generationsUnit": "世",
     "styleLabel": "谱式",
-    "styleSwitchLabel": "谱牒样式",
+    "styleSwitchLabel": "族谱样式",
     "exportPdf": "导出 PDF",
     "exportPdfSuccess": "PDF 已导出",
     "exportPdfError": "导出失败",
@@ -541,14 +541,13 @@
   "familyTree": {
     "title": "家族",
     "volumes": {
-      "chart": "世系图",
-      "paper": "纸质族谱",
+      "chart": "世系",
+      "paper": "族谱",
       "people": "人物百科"
     },
     "viewModes": {
       "tree": "树形布局",
       "dag": "有向无环图",
-      "force": "力导向",
       "virtual": "树形列表"
     },
     "config": {

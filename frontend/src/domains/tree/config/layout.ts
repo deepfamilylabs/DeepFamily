@@ -19,13 +19,6 @@ export const LAYOUT = {
   DAG_NODE_HEIGHT: 120,
   DAG_MAX_NODE_WIDTH: 168,
 
-  // Force view (d3-force SVG)
-  FORCE_DRAW_NODE_R: 12,
-  FORCE_COLLIDE_NODE_R: 15,
-  FORCE_VIEWBOX_WIDTH: 800,
-  FORCE_MINIMAP_WIDTH: 120,
-  FORCE_MINIMAP_HEIGHT: 90,
-
   // Virtualized list
   ROW_HEIGHT: 40,
 } as const;
