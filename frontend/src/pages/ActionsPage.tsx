@@ -45,37 +45,38 @@ export default function ActionsPage() {
     setSearchParams(consumed, { replace: true });
   }, [address, shouldAutoOpen, tabParam, searchParams, setSearchParams]);
 
-  // Auto-open Endorse modal if URL carries target hash/index
+  // `?tab=endorse|mint-nft` plus a target opens that modal on the version the
+  // URL names. This is where the person detail dialog's mint button lands — it
+  // opens /actions in a new tab carrying hash + version.
+  //
+  // Opening is one-shot per target: `address` is a dependency, so without this
+  // guard switching wallet accounts re-ran the effect and popped the modal back
+  // open after the user had closed it. The target stays in the URL (unlike
+  // `open=1` above) so the link remains shareable and survives a reload.
+  const handledTargetRef = useRef<string | null>(null);
   useEffect(() => {
     if (!address) return;
-    const tabParam = searchParams.get("tab") as ActionTab;
-    if (tabParam !== "endorse") return;
-    const qHash = searchParams.get("hash") || searchParams.get("personHash") || "";
-    const qIndexStr =
-      searchParams.get("vi") ||
-      searchParams.get("version") ||
-      searchParams.get("versionIndex") ||
-      "";
-    const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN;
-    if (qHash && Number.isFinite(qIndex) && qIndex > 0) {
-      setEndorseModal({ isOpen: true, personHash: qHash, versionIndex: qIndex });
-    }
-  }, [address, searchParams]);
+    const tab = searchParams.get("tab") as ActionTab;
+    if (tab !== "endorse" && tab !== "mint-nft") return;
 
-  // Auto-open MintNFT modal if URL carries target hash/index
-  useEffect(() => {
-    if (!address) return;
-    const tabParam = searchParams.get("tab") as ActionTab;
-    if (tabParam !== "mint-nft") return;
-    const qHash = searchParams.get("hash") || searchParams.get("personHash") || "";
-    const qIndexStr =
+    const personHash = searchParams.get("hash") || searchParams.get("personHash") || "";
+    const rawIndex =
       searchParams.get("vi") ||
       searchParams.get("version") ||
       searchParams.get("versionIndex") ||
       "";
-    const qIndex = qIndexStr ? parseInt(qIndexStr, 10) : NaN;
-    if (qHash && Number.isFinite(qIndex) && qIndex > 0) {
-      setMintNFTModal({ isOpen: true, personHash: qHash, versionIndex: qIndex });
+    const versionIndex = rawIndex ? parseInt(rawIndex, 10) : NaN;
+    if (!personHash || !Number.isFinite(versionIndex) || versionIndex <= 0) return;
+
+    const target = `${tab}:${personHash}:${versionIndex}`;
+    if (handledTargetRef.current === target) return;
+    handledTargetRef.current = target;
+
+    const open = { isOpen: true, personHash, versionIndex };
+    if (tab === "endorse") {
+      setEndorseModal(open);
+    } else {
+      setMintNFTModal(open);
     }
   }, [address, searchParams]);
 

@@ -82,14 +82,18 @@ vi.mock("../domains/transactions", () => ({
     ) : null,
 }));
 
-function renderActionsPage(initialEntry = "/actions") {
-  return render(
+function actionsTree(initialEntry: string) {
+  return (
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/actions" element={<ActionsPage />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderActionsPage(initialEntry = "/actions") {
+  return render(actionsTree(initialEntry));
 }
 
 describe("ActionsPage", () => {
@@ -161,5 +165,23 @@ describe("ActionsPage", () => {
     expect(screen.queryByTestId("endorse-modal")).toBeNull();
     expect(screen.getByTestId("mint-hash").textContent).toBe("0xendorse");
     expect(screen.getByTestId("mint-version").textContent).toBe("5");
+  });
+
+  it("keeps a URL-targeted modal closed when the wallet account changes", async () => {
+    mocks.address = "0x00000000000000000000000000000000000000aa";
+    const target = "/actions?tab=mint-nft&hash=0xfeed&vi=2";
+
+    const view = renderActionsPage(target);
+    await waitFor(() => expect(screen.getByTestId("mint-nft-modal")).toBeTruthy());
+
+    fireEvent.click(screen.getByText("close-mint"));
+    expect(screen.queryByTestId("mint-nft-modal")).toBeNull();
+
+    // `address` is a dependency of the URL-target effect, so switching accounts
+    // re-runs it; the already-handled target must not pop the modal back open.
+    mocks.address = "0x00000000000000000000000000000000000000bb";
+    view.rerender(actionsTree(target));
+
+    expect(screen.queryByTestId("mint-nft-modal")).toBeNull();
   });
 });
