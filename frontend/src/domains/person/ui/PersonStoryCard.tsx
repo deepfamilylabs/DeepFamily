@@ -12,6 +12,7 @@ import {
   NodeData,
   hasDetailedStory as hasDetailedStoryFn,
   lifeSpanYears,
+  placesLine,
   genderText as genderTextFn,
   isMinted,
 } from "../../../shared/model";
@@ -63,14 +64,7 @@ function PersonStoryCard({
     [genderText, person],
   );
 
-  // "Boston → New York", or whichever half is known
-  const places = useMemo(() => {
-    const { birthPlace, deathPlace } = person;
-    if (birthPlace && deathPlace && birthPlace !== deathPlace) {
-      return `${birthPlace} → ${deathPlace}`;
-    }
-    return birthPlace || deathPlace || "";
-  }, [person]);
+  const places = useMemo(() => placesLine(person), [person]);
 
   // The 2-line clamp does the trimming; cap the string only to bound the DOM.
   const storyPreview = useMemo(

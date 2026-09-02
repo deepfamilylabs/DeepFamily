@@ -8,12 +8,11 @@ import {
   CommandBar,
   EntryCards,
   ErrorResult,
-  FacetTabs,
   LoadingRows,
   NftIdentityCard,
   Pagination,
-  ResultMeta,
   ResultShell,
+  ResultToolbar,
   ResolvedNftBadge,
   ScopeBar,
   ScopePrompt,
@@ -117,10 +116,15 @@ function Results({ unified }: { unified: ReturnType<typeof useUnifiedSearch> }) 
         />
       ) : null}
 
-      <FacetTabs
+      <ResultToolbar
+        t={t}
         tabs={tabs}
         activeKey={unified.activeFacet}
         onSelect={(key) => unified.selectFacet(key as SearchFacetKey)}
+        total={state.total}
+        totalLabel={t(totalLabelKey)}
+        pageSize={unified.pageSize}
+        onPageSizeChange={unified.changePageSize}
       />
 
       <ResultShell>
@@ -139,14 +143,6 @@ function Results({ unified }: { unified: ReturnType<typeof useUnifiedSearch> }) 
               ) : null}
             </ScopeBar>
           )}
-
-        <ResultMeta
-          t={t}
-          total={state.total}
-          totalLabel={t(totalLabelKey)}
-          pageSize={unified.pageSize}
-          onPageSizeChange={unified.changePageSize}
-        />
 
         {!unified.activeRunnable ? (
           <ScopePrompt
