@@ -223,9 +223,9 @@ describe("TreePage", () => {
     renderTreePage();
 
     // The paper genealogy volume is Chinese-only; the mocked language is "en".
-    expect(screen.getByText("Lineage").getAttribute("href")).toBe("/familyTree");
-    expect(screen.getByText("Encyclopedia").getAttribute("href")).toBe("/people");
-    expect(screen.queryByText("Genealogy")).toBeNull();
+    expect(screen.getByRole("link", { name: "Lineage" }).getAttribute("href")).toBe("/familyTree");
+    expect(screen.getByRole("link", { name: "People" }).getAttribute("href")).toBe("/people");
+    expect(screen.queryByRole("link", { name: "Genealogy" })).toBeNull();
 
     // The drawer mounts its form on first open and keeps it, so presence is read off the dialog.
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");

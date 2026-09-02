@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { User, Book, Star } from "lucide-react";
+import { User, BookOpen, Star } from "lucide-react";
 import EndorseCompactModal from "./EndorseCompactModal";
 import {
   NodeData,
@@ -351,18 +351,14 @@ export default function PersonStoryModal({
             aria-label={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
             onClick={(e) => {
               e.stopPropagation();
-              window.open(
-                `/person/${person.tokenId || person.id}`,
-                "_blank",
-                "noopener,noreferrer",
-              );
+              window.open(`/person/${person.tokenId || person.id}`, "_blank", "noopener,noreferrer");
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             className={action}
             title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
           >
-            <Book className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
             <span className="hidden sm:inline">
               {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             </span>
@@ -417,7 +413,12 @@ export default function PersonStoryModal({
             deathPlace={person.deathPlace}
           />
 
-          <StoryIdentitySection t={t} person={person} owner={owner} copyText={copyText} />
+          <StoryIdentitySection
+            t={t}
+            person={person}
+            owner={owner}
+            copyText={copyText}
+          />
 
           {/* Story Content */}
           <div className="space-y-6">

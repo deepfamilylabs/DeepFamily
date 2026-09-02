@@ -543,7 +543,7 @@
     "volumes": {
       "chart": "Lineage",
       "paper": "Genealogy",
-      "people": "Encyclopedia"
+      "people": "People"
     },
     "viewModes": {
       "tree": "Tree Layout",
@@ -920,7 +920,7 @@
     "tokenId": "Token ID"
   },
   "people": {
-    "title": "Family People Encyclopedia",
+    "title": "Family People",
     "subtitle": "Explore family member profiles preserved on the blockchain",
     "totalPeople": "People",
     "withEncyclopedia": "Encyclopedia",

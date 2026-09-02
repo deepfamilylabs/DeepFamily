@@ -1,4 +1,4 @@
-import { Book, Tag, Users, X } from "lucide-react";
+import { BookOpen, Tag, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageContainer, PageHead } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
@@ -23,7 +23,7 @@ export function PeoplePageHead({ t, stats, personNotice }: PeoplePageHeadProps) 
 
       <PageContainer className="relative z-10 pt-7 pb-5">
         <PageHead
-          title={t("people.title", "Family Encyclopedia")}
+          title={t("people.title", "Family People")}
           subtitle={t(
             "people.subtitle",
             "Explore family member profiles preserved on the blockchain",
@@ -37,7 +37,13 @@ export function PeoplePageHead({ t, stats, personNotice }: PeoplePageHeadProps) 
   );
 }
 
-function PeopleStatStrip({ t, stats }: { t: PeoplePageT; stats: PeoplePageController["stats"] }) {
+function PeopleStatStrip({
+  t,
+  stats,
+}: {
+  t: PeoplePageT;
+  stats: PeoplePageController["stats"];
+}) {
   return (
     <div className="flex items-end gap-5 sm:gap-6 shrink-0">
       <Metric
@@ -47,7 +53,7 @@ function PeopleStatStrip({ t, stats }: { t: PeoplePageT; stats: PeoplePageContro
       />
       <div className="w-px h-8 bg-hairline" />
       <Metric
-        icon={<Book className="w-3.5 h-3.5" />}
+        icon={<BookOpen className="w-3.5 h-3.5" />}
         label={t("people.withEncyclopedia", "Encyclopedia")}
         value={stats.storyCount}
       />
