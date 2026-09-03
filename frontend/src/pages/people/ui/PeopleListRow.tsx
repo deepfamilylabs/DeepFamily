@@ -39,7 +39,7 @@ export function PeopleListHeader({ t }: { t: PeoplePageT }) {
         {t("people.filterByEndorsement", "Endorsements")}
       </div>
       <div className={`${COL.chunks} ${cell}`}>{t("people.colChunks", "Chunks")}</div>
-      <div className={`${COL.token} ${cell}`}>Token</div>
+      <div className={`${COL.token} ${cell}`}>{t("people.colToken", "Token ID")}</div>
       <div className={`${COL.creator} ${cell}`}>{t("people.colCreator", "Creator")}</div>
       <div className={`${COL.minted} ${cell}`}>{t("people.colMinted", "Minted")}</div>
       <div className={COL.open} />
@@ -50,6 +50,7 @@ export function PeopleListHeader({ t }: { t: PeoplePageT }) {
 interface PeopleListRowProps {
   t: PeoplePageT;
   person: NodeData;
+  generation?: number;
   isFirst: boolean;
   onOpen: (person: NodeData) => void;
   preloadStoryData?: (tokenId: string) => void;
@@ -58,6 +59,7 @@ interface PeopleListRowProps {
 export function PeopleListRow({
   t,
   person,
+  generation,
   isFirst,
   onOpen,
   preloadStoryData,
@@ -89,6 +91,11 @@ export function PeopleListRow({
         {person.gender !== undefined && (
           <span className="hidden sm:inline-flex items-center h-[19px] px-[7px] shrink-0 rounded-full bg-surface-muted text-[11px] text-ink-muted">
             {genderTextFn(person.gender, t as any)}
+          </span>
+        )}
+        {generation !== undefined && (
+          <span className="hidden sm:inline-flex items-center h-[19px] px-[7px] shrink-0 rounded-full bg-surface-muted text-[11px] text-ink-muted whitespace-nowrap">
+            {t("people.generationShort", "Gen {{number}}", { number: generation })}
           </span>
         )}
         {chunks > 0 && (

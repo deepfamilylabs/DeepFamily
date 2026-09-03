@@ -4,9 +4,9 @@ import {
   User,
   BookOpen,
   Star,
-  FileText,
   ChevronRight,
   MapPin,
+  Rows3,
 } from "lucide-react";
 import {
   NodeData,
@@ -22,6 +22,8 @@ import type { EndorseSuccessHandler } from "./EndorseModalProvider";
 
 interface PersonStoryCardProps {
   person: NodeData;
+  /** Generation number in the current projection; shown so a filtered list says what it is filtered to. */
+  generation?: number;
   onOpen: (person: NodeData) => void;
   preloadStoryData?: (tokenId: string) => void;
   onEndorseSuccess?: EndorseSuccessHandler;
@@ -35,6 +37,7 @@ interface PersonStoryCardProps {
  */
 function PersonStoryCard({
   person,
+  generation,
   onOpen,
   preloadStoryData,
   onEndorseSuccess,
@@ -138,6 +141,12 @@ function PersonStoryCard({
 
       <div className="mt-3 pt-[11px] border-t border-hairline flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-3 text-[11.5px] font-medium text-ink-subtle whitespace-nowrap min-w-0">
+          {generation !== undefined && (
+            <span className="inline-flex items-center gap-1">
+              <Rows3 className="w-3 h-3 shrink-0" />
+              {t("people.generationShort", "Gen {{number}}", { number: generation })}
+            </span>
+          )}
           {isMinted(person) && <span className="font-mono">#{person.tokenId}</span>}
           {endorsementCount > 0 && (
             <button
@@ -152,14 +161,6 @@ function PersonStoryCard({
               <Star className="w-3 h-3 fill-current" />
               {endorsementCount}
             </button>
-          )}
-          {person.storyMetadata && person.storyMetadata.totalChunks > 0 && (
-            <span className="inline-flex items-center gap-1 truncate">
-              <FileText className="w-3 h-3 shrink-0" />
-              {t("people.chunks", "{{count}} chunks", {
-                count: person.storyMetadata.totalChunks,
-              })}
-            </span>
           )}
         </div>
 

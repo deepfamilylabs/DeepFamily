@@ -52,6 +52,7 @@ export function PeopleResultsSection({
                 <PersonStoryCard
                   key={person.id}
                   person={person}
+                  generation={results.generationOf(person)}
                   onOpen={modal.openPerson}
                   preloadStoryData={preloadStoryData}
                   onEndorseSuccess={onEndorseSuccess}
@@ -66,6 +67,7 @@ export function PeopleResultsSection({
                   key={person.id}
                   t={t}
                   person={person}
+                  generation={results.generationOf(person)}
                   isFirst={index === 0}
                   onOpen={modal.openPerson}
                   preloadStoryData={preloadStoryData}

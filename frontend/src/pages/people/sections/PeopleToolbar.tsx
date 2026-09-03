@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { PageContainer } from "../../../shared/ui";
 import type { PeoplePageController } from "../hooks/usePeoplePageController";
 import type { PeopleFilterType, PeoplePageT, PeopleViewMode } from "../model/peoplePageModel";
-import SortButton from "../ui/SortButton";
+import GenerationFilter from "../ui/GenerationFilter";
+import SortMenu from "../ui/SortMenu";
 
 interface PeopleToolbarProps {
   t: PeoplePageT;
@@ -18,7 +19,8 @@ const sortOptions: Array<{ type: PeopleFilterType; key: string; label: string }>
   { type: "by_create_time", key: "people.filterByCreateTime", label: "Creation Time" },
   { type: "by_name", key: "people.filterByName", label: "Name" },
   { type: "by_endorsement", key: "people.filterByEndorsement", label: "Endorsements" },
-  { type: "by_birth_year", key: "people.filterByBirthYear", label: "Birth Year" },
+  { type: "by_generation", key: "people.filterByGeneration", label: "Generation order" },
+  { type: "by_birth_date", key: "people.filterByBirthDate", label: "Birth Date" },
 ];
 
 /**
@@ -51,7 +53,12 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
     };
   }, [addressOpen]);
 
+  // The generation rule only means something once the projection carries generations.
+  const visibleSortOptions = sortOptions.filter(
+    (option) => option.type !== "by_generation" || filters.generationOptions.length > 0,
+  );
   const addressCount = filters.selectedAddresses.length;
+  const generationCount = filters.selectedGenerations.length;
 
   return (
     <div className="sticky top-16 z-40 border-b border-hairline bg-surface/90 backdrop-blur-xl">
@@ -71,24 +78,17 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
             />
           </div>
 
-          <div className="hidden lg:block w-px h-5.5 bg-hairline shrink-0" />
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="hidden lg:inline text-[11px] font-semibold tracking-wide text-ink-subtle">
-              {t("people.sortRules", "Sort Rules")}
-            </span>
-            {sortOptions.map((option) => (
-              <SortButton
-                key={option.type}
-                label={t(option.key, option.label)}
-                isActive={filters.filterType === option.type}
-                sortOrder={filters.sortOrder}
-                onClick={() => filters.setFilterType(option.type)}
-                onSortOrderChange={filters.setSortOrder}
-                showSortArrows
-              />
-            ))}
-          </div>
+          <SortMenu
+            t={t}
+            options={visibleSortOptions.map((option) => ({
+              type: option.type,
+              label: t(option.key, option.label),
+            }))}
+            activeType={filters.filterType}
+            sortOrder={filters.sortOrder}
+            onSelect={filters.setFilterType}
+            onSortOrderChange={filters.setSortOrder}
+          />
 
           <div className="flex items-center gap-2 ml-auto">
             <span className="flex items-center gap-2 text-xs font-medium text-ink-muted whitespace-nowrap">
@@ -101,6 +101,15 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
                   })
                 : t("people.allResults", "{{count}} total results", { count: filteredCount })}
             </span>
+
+            <GenerationFilter
+              t={t}
+              options={filters.generationOptions}
+              selected={filters.selectedGenerations}
+              onToggle={filters.toggleGeneration}
+              onSelectRange={filters.selectGenerationRange}
+              onClear={filters.clearGenerations}
+            />
 
             <div ref={anchorRef} className="relative">
               <button
@@ -177,8 +186,26 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
           </div>
         </div>
 
-        {addressCount > 0 && (
+        {addressCount + generationCount > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            {filters.selectedGenerations.map((generation) => (
+              <span
+                key={`generation-${generation}`}
+                className="inline-flex items-center gap-1.5 h-7 pl-3 pr-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/25"
+              >
+                <span>
+                  {t("people.generationLabel", "Generation {{number}}", { number: generation })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => filters.toggleGeneration(generation)}
+                  aria-label={t("common.close", "Close")}
+                  className="p-0.5 rounded-full hover:bg-primary/20 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
             {filters.selectedAddresses.map((address) => (
               <span
                 key={address}
