@@ -777,7 +777,8 @@ export function ModernBookRenderer({
 
   return (
     <div
-      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4 md:p-6"
+      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto scroll-smooth p-4 pb-24 md:p-6 md:pb-24"
+      data-paper-scroller=""
       style={paperVars ?? PAPER_VARS}
       data-testid="paper-modern"
     >
@@ -791,7 +792,7 @@ export function ModernBookRenderer({
       >
         {spreadItems.length ? (
           <section
-            className="border p-(--df-paper-leaf-margin) shadow-xs"
+            className="paper-book-shadow border p-(--df-paper-leaf-margin)"
             style={{
               ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,
@@ -804,7 +805,11 @@ export function ModernBookRenderer({
                 <div
                   key={`${chart.index}-${spread.index}`}
                   ref={chart.index === 1 && spread.index === 1 ? spreadRef : undefined}
-                  className="relative grid h-[872px] min-w-[1180px] shrink-0 overflow-hidden border"
+                  // No fixed height: the frame's border and padding sit OUTSIDE the 872px page, so
+                  // pinning the spread to 872 too (with box-sizing: border-box) left the page taller
+                  // than its own content box and overflow-hidden clipped the last row — 18px of it on
+                  // the default 文武边. Every other style sizes the spread from its page; match them.
+                  className="relative grid min-w-[1180px] shrink-0 overflow-hidden border"
                   style={{
                     borderColor: PAPER_LINE.strong,
                     borderWidth: "var(--df-paper-frame-outer)",

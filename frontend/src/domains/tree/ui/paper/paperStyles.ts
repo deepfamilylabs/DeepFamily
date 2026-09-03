@@ -224,3 +224,8 @@ export function paperSvgTextStyle(role: PaperTextRole): CSSProperties {
 // Matches the renderer content column `max-w-[1320px]`. Spreads inside are min-w-[1180px].
 
 export const PAPER_PREVIEW_MAX_WIDTH_PX = 1320;
+
+// Every style lays a spread out at the same fixed leaf height (see each renderer's `h-[872px]`),
+// which is what lets the reading view compute "fit page" from constants instead of measuring a
+// element whose own size depends on the zoom it is being asked to produce.
+export const PAPER_SPREAD_HEIGHT_PX = 872;

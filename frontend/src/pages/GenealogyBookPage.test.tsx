@@ -24,6 +24,14 @@ const mocks = vi.hoisted(() => ({
   },
   getStoryData: vi.fn().mockResolvedValue(null),
   exportPdf: vi.fn().mockResolvedValue(undefined),
+  chromeCollapsed: false,
+  readingView: {
+    goPrev: vi.fn(),
+    goNext: vi.fn(),
+    zoomIn: vi.fn(),
+    zoomOut: vi.fn(),
+    fitPage: vi.fn(),
+  },
 }));
 
 vi.mock("react-i18next", () => ({
@@ -192,6 +200,18 @@ vi.mock("../domains/tree", () => ({
     nodesData: mocks.projection.nodesData,
   }),
   useTreeStatus: () => mocks.status,
+  usePaperReadingView: ({ fontScale = 1 }: { fontScale?: number }) => ({
+    sheetScale: fontScale,
+    zoomPercent: Math.round(fontScale * 100),
+    fitMode: false,
+    canZoomIn: true,
+    canZoomOut: true,
+    leaf: { index: 2, count: 7, volume: 1, isCover: false },
+    chromeCollapsed: mocks.chromeCollapsed,
+    canGoPrev: true,
+    canGoNext: true,
+    ...mocks.readingView,
+  }),
   MetadataUnlockControl: () => <div data-testid="metadata-unlock-control" />,
 }));
 
@@ -206,6 +226,8 @@ describe("GenealogyBookPage", () => {
     mocks.status.clearAllCaches.mockReset();
     mocks.getStoryData.mockReset();
     mocks.getStoryData.mockResolvedValue(null);
+    Object.values(mocks.readingView).forEach((spy) => spy.mockReset());
+    mocks.chromeCollapsed = false;
     mocks.projection.rootId = "0xroot-v-1";
     mocks.projection.nodesData = {};
     mocks.projection.graph = {
@@ -220,6 +242,16 @@ describe("GenealogyBookPage", () => {
     vi.restoreAllMocks();
   });
 
+  // The settings are a slide-over now rather than a docked column, and their four groups are tabs
+  // rather than stacked accordions, so a test that touches a control opens the drawer and selects
+  // the tab that owns it.
+  type SettingsTab = "book" | "cover" | "paper" | "typesetting";
+  const openSettings = (tab: SettingsTab = "book") => {
+    const toggle = screen.getByTestId("paper-settings-toggle");
+    if (toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+    fireEvent.click(screen.getByTestId(`paper-settings-tab-${tab}`));
+  };
+
   it("renders the paper view and persists style changes in realtime", () => {
     render(<GenealogyBookPage />);
 
@@ -231,12 +263,13 @@ describe("GenealogyBookPage", () => {
     const toolbarActions = screen.getByTestId("paper-toolbar-actions");
     const exportButton = screen.getByTestId("paper-export-button");
     expect(screen.getByText("Style")).toBeTruthy();
-    expect(toolbar.className).toContain("gap-x-3");
+    // One 46px row that the 族谱 volume owns, with no title block repeating the volume tab above it.
+    expect(toolbar.className).toContain("h-[46px]");
     expect(toolbarActions.className).toContain("gap-2");
     expect(
       styleSwitcher.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
-    expect(exportButton.className).toContain("bg-orange-600");
+    expect(exportButton.className).toContain("bg-primary");
 
     const cases = [
       ["Su-style", "su"],
@@ -266,8 +299,24 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("false");
   });
 
+  it("keeps the family bar in place when there is no genealogy to read", () => {
+    mocks.rootExists = false;
+    // Even if the reading view were to report a collapse, an empty page must keep the bar: it
+    // carries refresh, clear-caches and settings, which are the only ways out of that state.
+    mocks.chromeCollapsed = true;
+
+    render(<GenealogyBookPage />);
+
+    const slot = screen.getByTestId("paper-family-bar-slot");
+    expect(slot.dataset.collapsed).toBe("false");
+    expect(slot.style.height).toBe("56px");
+    expect(slot.style.visibility).toBe("visible");
+    expect(screen.getByTitle("Refresh")).toBeTruthy();
+  });
+
   it("prefills the spine title input with the auto title and persists overrides per root", () => {
     render(<GenealogyBookPage />);
+    openSettings("book");
 
     const input = screen.getByTestId("paper-spine-title-input") as HTMLInputElement;
     // Default: prefilled with the auto title, and no override is forwarded to the view.
@@ -294,6 +343,7 @@ describe("GenealogyBookPage", () => {
     localStorage.setItem("df:paperSpineTitle:0xroot-v-1", "曹氏宗谱");
 
     render(<GenealogyBookPage />);
+    openSettings("book");
 
     expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
       "曹氏宗谱",
@@ -306,6 +356,7 @@ describe("GenealogyBookPage", () => {
   it("keeps spine title overrides isolated between different roots", () => {
     mocks.projection.rootId = "0xrootA-v-1";
     const { unmount } = render(<GenealogyBookPage />);
+    openSettings("book");
     fireEvent.change(screen.getByTestId("paper-spine-title-input"), {
       target: { value: "曹氏宗谱" },
     });
@@ -316,6 +367,7 @@ describe("GenealogyBookPage", () => {
     // A different root starts from the auto title, unaffected by the other root's override.
     mocks.projection.rootId = "0xrootB-v-1";
     render(<GenealogyBookPage />);
+    openSettings("book");
     const inputB = screen.getByTestId("paper-spine-title-input") as HTMLInputElement;
     expect(inputB.value).toBe("自动族谱");
     expect(screen.getByTestId("paper-view").getAttribute("data-spine-title-override")).toBe("");
@@ -329,33 +381,33 @@ describe("GenealogyBookPage", () => {
   it("applies the default appearance and forwards it to the view", () => {
     render(<GenealogyBookPage />);
 
-    expect(screen.getByText("Paper book settings")).toBeTruthy();
-    expect(screen.getByText("Book information")).toBeTruthy();
-    expect(screen.getByText("Front & back cover")).toBeTruthy();
-    expect(screen.getByText("Paper appearance")).toBeTruthy();
-    expect(screen.getByText("Typesetting")).toBeTruthy();
-    expect(screen.getByLabelText("Enable front & back cover")).toBeTruthy();
+    // The page opens on the book, not on its settings: the drawer is mounted only once asked for.
+    expect(screen.queryByTestId("paper-settings-drawer")).toBeNull();
+    expect(screen.queryByTestId("paper-spine-title-input")).toBeNull();
 
-    for (const section of ["info", "appearance", "typesetting"]) {
-      const settings = screen.getByTestId(`paper-${section}-settings`);
-      const summary = screen.getByTestId(`paper-${section}-settings-summary`);
-      expect(settings.classList.contains("group/settings")).toBe(true);
-      expect(settings.classList.contains("group")).toBe(false);
-      expect(summary.className).toContain("text-[13px]");
-      expect(summary.className).toContain("text-slate-800");
-      expect(summary.className).toContain("py-1.5");
-      expect(settings.hasAttribute("open")).toBe(true);
-      fireEvent.click(summary);
-      expect(settings.hasAttribute("open")).toBe(false);
-      fireEvent.click(summary);
-      expect(settings.hasAttribute("open")).toBe(true);
+    openSettings("book");
+    expect(screen.getByTestId("paper-settings-drawer")).toBeTruthy();
+    expect(screen.getByTestId("paper-info-settings")).toBeTruthy();
+    expect(screen.getByTestId("paper-hall-name-input")).toBeTruthy();
+
+    // Each group is one tab away, and only the selected group is mounted.
+    const groups = [
+      ["cover", "paper-cover-settings"],
+      ["paper", "paper-appearance-settings"],
+      ["typesetting", "paper-typesetting-settings"],
+    ] as const;
+    for (const [tab, panel] of groups) {
+      openSettings(tab);
+      expect(screen.getByTestId(panel)).toBeTruthy();
+      expect(screen.getByTestId(`paper-settings-tab-${tab}`).getAttribute("aria-selected")).toBe(
+        "true",
+      );
+      expect(screen.queryByTestId("paper-info-settings")).toBeNull();
     }
 
-    const coverSettings = screen.getByTestId("paper-cover-settings");
-    expect(coverSettings.hasAttribute("open")).toBe(false);
-    fireEvent.click(screen.getByTestId("paper-cover-settings-summary"));
-    expect(coverSettings.hasAttribute("open")).toBe(true);
-    const coverFieldset = coverSettings.querySelector("fieldset");
+    openSettings("cover");
+    expect(screen.getByLabelText("Enable front & back cover")).toBeTruthy();
+    const coverFieldset = screen.getByTestId("paper-cover-settings").querySelector("fieldset");
     const frontCoverSettings = screen.getByTestId("paper-front-cover-settings");
     const spineSettings = screen.getByTestId("paper-spine-settings");
     const backCoverSettings = screen.getByTestId("paper-back-cover-settings");
@@ -378,11 +430,6 @@ describe("GenealogyBookPage", () => {
       coverInscriptionInput.compareDocumentPosition(backCoverButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
-    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
     expect(
       screen.getByTestId("paper-cover-style-traditional-slip").getAttribute("aria-pressed"),
     ).toBe("true");
@@ -411,6 +458,10 @@ describe("GenealogyBookPage", () => {
       false,
     );
     expect(coverFieldset?.hasAttribute("disabled")).toBe(true);
+
+    openSettings("paper");
+    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("paper-color-theme-plain").className).toContain(
       "hover:border-orange-300",
     );
@@ -420,6 +471,11 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-color-theme-plain").classList.contains("group")).toBe(false);
     expect(screen.getByTestId("paper-border-style-single").className).toContain(
       "hover:border-orange-300",
+    );
+
+    openSettings("typesetting");
+    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
+      "true",
     );
     expect(screen.getByTestId("paper-font-preset-song").className).toContain(
       "hover:text-orange-700",
@@ -434,12 +490,87 @@ describe("GenealogyBookPage", () => {
     expect(view.getAttribute("data-texture")).toBe("subtle");
   });
 
+  it("closes the settings drawer again from its own header", () => {
+    render(<GenealogyBookPage />);
+
+    openSettings("book");
+    expect(screen.getByTestId("paper-settings-toggle").getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(screen.getByTestId("paper-settings-close"));
+    expect(screen.queryByTestId("paper-settings-drawer")).toBeNull();
+    expect(screen.getByTestId("paper-settings-toggle").getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("floats a reading bar over the sheet and wires it to the reading view", () => {
+    render(<GenealogyBookPage />);
+
+    const bar = screen.getByTestId("paper-reading-bar");
+    // The address the book never had, plus the scale that stops the outer leaf being clipped.
+    expect(screen.getByTestId("paper-reading-position").textContent).toContain("Volume 1");
+    expect(screen.getByTestId("paper-reading-position").textContent).toContain("Leaf 2 / 7");
+    expect(screen.getByTestId("paper-reading-zoom").textContent).toBe("100%");
+    // The book opens at 100%; fit page is an action the reader takes, not the starting state.
+    expect(screen.getByTestId("paper-reading-fit").getAttribute("aria-pressed")).toBe("false");
+    expect(bar.className).toContain("bg-surface/95");
+
+    fireEvent.click(screen.getByTestId("paper-reading-next"));
+    fireEvent.click(screen.getByTestId("paper-reading-prev"));
+    fireEvent.click(screen.getByTestId("paper-reading-zoom-in"));
+    fireEvent.click(screen.getByTestId("paper-reading-zoom-out"));
+    fireEvent.click(screen.getByTestId("paper-reading-fit"));
+
+    expect(mocks.readingView.goNext).toHaveBeenCalledTimes(1);
+    expect(mocks.readingView.goPrev).toHaveBeenCalledTimes(1);
+    expect(mocks.readingView.zoomIn).toHaveBeenCalledTimes(1);
+    expect(mocks.readingView.zoomOut).toHaveBeenCalledTimes(1);
+    expect(mocks.readingView.fitPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("folds the shared family bar away while reading down the book", () => {
+    const { unmount } = render(<GenealogyBookPage />);
+
+    // Expanded: the bar holds its own height and stays in the focus order.
+    const slot = screen.getByTestId("paper-family-bar-slot");
+    expect(slot.dataset.collapsed).toBe("false");
+    expect(slot.style.height).toBe("56px");
+    expect(slot.style.visibility).toBe("visible");
+
+    unmount();
+    cleanup();
+    mocks.chromeCollapsed = true;
+    render(<GenealogyBookPage />);
+
+    const collapsed = screen.getByTestId("paper-family-bar-slot");
+    expect(collapsed.dataset.collapsed).toBe("true");
+    expect(collapsed.style.height).toBe("0px");
+    // `visibility` as well as height, so the hidden nav cannot be tabbed into.
+    expect(collapsed.style.visibility).toBe("hidden");
+    // The 谱式 row is what meets the site header once the family bar folds away.
+    expect(screen.getByTestId("paper-book-toolbar")).toBeTruthy();
+  });
+
+  it("turns leaves with the arrow keys, but not while a settings field has focus", () => {
+    render(<GenealogyBookPage />);
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(mocks.readingView.goNext).toHaveBeenCalledTimes(1);
+    expect(mocks.readingView.goPrev).toHaveBeenCalledTimes(1);
+
+    openSettings("book");
+    const input = screen.getByTestId("paper-spine-title-input");
+    fireEvent.keyDown(input, { key: "ArrowRight" });
+    expect(mocks.readingView.goNext).toHaveBeenCalledTimes(1);
+  });
+
   it("persists color theme, font and texture changes globally and forwards them to the view", () => {
     render(<GenealogyBookPage />);
 
+    openSettings("paper");
     fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
-    fireEvent.click(screen.getByTestId("paper-font-preset-lishu"));
     fireEvent.click(screen.getByTestId("paper-texture-strong"));
+    openSettings("typesetting");
+    fireEvent.click(screen.getByTestId("paper-font-preset-lishu"));
 
     const view = screen.getByTestId("paper-view");
     expect(view.getAttribute("data-color-theme")).toBe("bamboo");
@@ -454,6 +585,7 @@ describe("GenealogyBookPage", () => {
 
   it("persists the paired cover layout, back-cover mode and spine visibility", () => {
     render(<GenealogyBookPage />);
+    openSettings("cover");
 
     fireEvent.click(screen.getByTestId("paper-cover-enabled-input"));
     fireEvent.click(screen.getByTestId("paper-cover-style-archive-frame"));
@@ -473,6 +605,7 @@ describe("GenealogyBookPage", () => {
 
   it("restores the sidebar display settings to their defaults", () => {
     render(<GenealogyBookPage />);
+    openSettings("book");
 
     const resetButton = screen.getByTestId("paper-reset-display-settings") as HTMLButtonElement;
     expect(resetButton.disabled).toBe(true);
@@ -481,10 +614,12 @@ describe("GenealogyBookPage", () => {
       target: { value: "曹氏宗谱" },
     });
     fireEvent.change(screen.getByTestId("paper-hall-name-input"), { target: { value: "忠义堂" } });
+    openSettings("paper");
     fireEvent.click(screen.getByTestId("paper-color-theme-bamboo"));
-    fireEvent.click(screen.getByTestId("paper-font-preset-song"));
     fireEvent.click(screen.getByTestId("paper-texture-strong"));
     fireEvent.click(screen.getByTestId("paper-border-style-double"));
+    openSettings("typesetting");
+    fireEvent.click(screen.getByTestId("paper-font-preset-song"));
     fireEvent.change(screen.getByTestId("paper-font-scale-input"), { target: { value: "1.3" } });
     fireEvent.change(screen.getByTestId("paper-export-margin-input"), { target: { value: "72" } });
     expect(resetButton.disabled).toBe(false);
@@ -506,22 +641,24 @@ describe("GenealogyBookPage", () => {
       backCoverMode: "matched",
       showCoverSpine: true,
     });
+    expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1");
+    expect((screen.getByTestId("paper-export-margin-input") as HTMLInputElement).value).toBe("48");
+    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    openSettings("paper");
+    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("paper-border-style-wenwu").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+    openSettings("book");
     expect((screen.getByTestId("paper-spine-title-input") as HTMLInputElement).value).toBe(
       "自动族谱",
     );
     expect((screen.getByTestId("paper-hall-name-input") as HTMLInputElement).value).toBe(
       "DeepFamily",
     );
-    expect(screen.getByTestId("paper-color-theme-xuan").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("paper-font-preset-classic").getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    expect(screen.getByTestId("paper-texture-subtle").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("paper-border-style-wenwu").getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-    expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1");
-    expect((screen.getByTestId("paper-export-margin-input") as HTMLInputElement).value).toBe("48");
     expect(resetButton.disabled).toBe(true);
   });
 
@@ -538,15 +675,19 @@ describe("GenealogyBookPage", () => {
 
     render(<GenealogyBookPage />);
 
+    openSettings("paper");
     expect(screen.getByTestId("paper-color-theme-azure").getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByTestId("paper-font-preset-sans").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByTestId("paper-texture-plain").getAttribute("aria-pressed")).toBe("true");
+    openSettings("typesetting");
+    expect(screen.getByTestId("paper-font-preset-sans").getAttribute("aria-pressed")).toBe("true");
+    openSettings("book");
     expect((screen.getByTestId("paper-hall-name-input") as HTMLInputElement).value).toBe("忠义堂");
     expect(screen.getByTestId("paper-view").getAttribute("data-hall-name")).toBe("忠义堂");
   });
 
   it("applies the default font scale and forwards it to the view", () => {
     render(<GenealogyBookPage />);
+    openSettings("typesetting");
 
     const slider = screen.getByTestId("paper-font-scale-input") as HTMLInputElement;
     expect(slider.value).toBe("1");
@@ -555,6 +696,7 @@ describe("GenealogyBookPage", () => {
 
   it("persists font scale changes globally and forwards them to the view", () => {
     render(<GenealogyBookPage />);
+    openSettings("typesetting");
 
     fireEvent.change(screen.getByTestId("paper-font-scale-input"), { target: { value: "1.3" } });
 
@@ -578,6 +720,7 @@ describe("GenealogyBookPage", () => {
 
   it("adjusts and persists the export margin, forwarding it to export", () => {
     render(<GenealogyBookPage />);
+    openSettings("typesetting");
 
     fireEvent.change(screen.getByTestId("paper-export-margin-input"), { target: { value: "72" } });
     expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").exportMarginPx).toBe(72);
@@ -604,6 +747,7 @@ describe("GenealogyBookPage", () => {
     );
 
     render(<GenealogyBookPage />);
+    openSettings("typesetting");
 
     expect((screen.getByTestId("paper-font-scale-input") as HTMLInputElement).value).toBe("1.4");
     expect(screen.getByTestId("paper-view").getAttribute("data-font-scale")).toBe("1.4");
@@ -611,6 +755,7 @@ describe("GenealogyBookPage", () => {
 
   it("prefills the hall name with the default and persists overrides globally", () => {
     render(<GenealogyBookPage />);
+    openSettings("book");
 
     const input = screen.getByTestId("paper-hall-name-input") as HTMLInputElement;
     // Default: prefilled with the i18n hall name; no override forwarded to the view.
