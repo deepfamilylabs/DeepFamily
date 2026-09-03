@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Field } from "./ConfigControls";
 import { ThemedSelect } from "../../../transactions/ui/shared/ThemedSelect";
 import { describeVersionOrigin } from "../../../transactions/model/personVersionMeta";
 import type { PersonVersionLookup } from "../../../transactions/hooks/usePersonVersionOptions";
@@ -71,10 +72,12 @@ export default function VersionPicker({ value, onChange, lookup, error }: Versio
             : undefined;
 
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-        {t("familyTree.ui.versionNumber")}:
-      </label>
+    <Field
+      label={t("familyTree.ui.versionNumber")}
+      hint={note}
+      error={error ? t(error, "Select an on-chain version") : undefined}
+      errorProps={{ id: "config-root-version-error", role: "alert" }}
+    >
       <ThemedSelect
         value={value}
         onChange={onChange}
@@ -86,13 +89,6 @@ export default function VersionPicker({ value, onChange, lookup, error }: Versio
             : t("familyTree.config.versionUnchosen", "Select a version")
         }
       />
-      {error ? (
-        <p className="text-xs font-medium text-red-500 dark:text-red-400">
-          {t(error, "Select an on-chain version")}
-        </p>
-      ) : note ? (
-        <p className="text-xs leading-relaxed text-ink-muted">{note}</p>
-      ) : null}
-    </div>
+    </Field>
   );
 }

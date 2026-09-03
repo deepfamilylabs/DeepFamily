@@ -23,13 +23,6 @@ type FormErrors = {
   version?: string;
 };
 
-type TooltipKey =
-  | "traversal"
-  | "childrenMode"
-  | "includeV0"
-  | "deduplicate"
-  | "trustedSourceFilter";
-
 export type FamilyTreeConfigFormController = ReturnType<typeof useFamilyTreeConfigForm>;
 
 export function useFamilyTreeConfigForm() {
@@ -72,7 +65,6 @@ export function useFamilyTreeConfigForm() {
   const [localRootHash, setLocalRootHash] = useState(rootHash);
   const [localVersion, setLocalVersion] = useState(rootVersionIndex);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [activeTooltip, setActiveTooltip] = useState<TooltipKey | null>(null);
 
   const [customNetworks, setCustomNetworks] = useState<NetworkOption[]>(() => loadCustomNetworks());
   const [customName, setCustomName] = useState("");
@@ -319,10 +311,6 @@ export function useFamilyTreeConfigForm() {
     toast,
   ]);
 
-  const toggleTooltip = useCallback((key: TooltipKey) => {
-    setActiveTooltip((prev) => (prev === key ? null : key));
-  }, []);
-
   return {
     isDev,
     showNodeModeToggle,
@@ -391,33 +379,23 @@ export function useFamilyTreeConfigForm() {
     traversal: {
       value: traversal,
       onChange: setTraversal,
-      tooltipOpen: activeTooltip === "traversal",
-      onToggleTooltip: () => toggleTooltip("traversal"),
     },
 
     children: {
       mode: childrenMode,
       onModeChange: setChildrenMode,
-      modeTooltipOpen: activeTooltip === "childrenMode",
-      onToggleModeTooltip: () => toggleTooltip("childrenMode"),
       includeUnversioned: strictIncludeUnversionedChildren,
       onIncludeUnversionedChange: setStrictIncludeUnversionedChildren,
-      includeV0TooltipOpen: activeTooltip === "includeV0",
-      onToggleIncludeV0Tooltip: () => toggleTooltip("includeV0"),
     },
 
     deduplicate: {
       value: deduplicateChildren,
       onChange: setDeduplicateChildren,
-      tooltipOpen: activeTooltip === "deduplicate",
-      onToggleTooltip: () => toggleTooltip("deduplicate"),
     },
 
     trustedSourceFilter: {
       value: trustedSourceFilterEnabled,
       onChange: setTrustedSourceFilterEnabled,
-      tooltipOpen: activeTooltip === "trustedSourceFilter",
-      onToggleTooltip: () => toggleTooltip("trustedSourceFilter"),
     },
   } as const;
 }

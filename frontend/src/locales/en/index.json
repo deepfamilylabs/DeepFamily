@@ -579,6 +579,9 @@
       "versionNone": "This hash carries no on-chain version.",
       "clearAndRefresh": "Clear",
       "rootHistory": "Root hash history",
+      "displayAppliesInstantly": "Applies instantly",
+      "unsavedChanges": "Unsaved changes",
+      "savedMatches": "Matches saved settings",
       "reset": "Reset",
       "resetToDefaults": "Reset to environment defaults"
     },

@@ -1,28 +1,22 @@
 import { useTranslation } from "react-i18next";
-import ToggleControl from "./ToggleControl";
+import { SwitchRow } from "./ConfigControls";
 
 export interface TrustedSourceFilterControlProps {
   value: boolean;
   onChange: (v: boolean) => void;
-  tooltipOpen: boolean;
-  onToggleTooltip: () => void;
 }
 
 export default function TrustedSourceFilterControl({
   value,
   onChange,
-  tooltipOpen,
-  onToggleTooltip,
 }: TrustedSourceFilterControlProps) {
   const { t } = useTranslation();
   return (
-    <ToggleControl
+    <SwitchRow
       label={t("familyTree.ui.trustedSourceFilter", "Trusted Sources")}
       value={value}
       onChange={onChange}
-      tooltipOpen={tooltipOpen}
-      onToggleTooltip={onToggleTooltip}
-      tooltip={
+      description={
         value
           ? t(
               "familyTree.ui.trustedSourceFilterTooltip.enabled",
