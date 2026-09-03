@@ -381,9 +381,8 @@ describe("GenealogyBookPage", () => {
   it("applies the default appearance and forwards it to the view", () => {
     render(<GenealogyBookPage />);
 
-    // The page opens on the book, not on its settings: the drawer is mounted only once asked for.
-    expect(screen.queryByTestId("paper-settings-drawer")).toBeNull();
-    expect(screen.queryByTestId("paper-spine-title-input")).toBeNull();
+    // The settings drawer opens with the page so its controls are in reach right away.
+    expect(screen.getByTestId("paper-settings-drawer")).toBeTruthy();
 
     openSettings("book");
     expect(screen.getByTestId("paper-settings-drawer")).toBeTruthy();

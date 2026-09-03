@@ -128,7 +128,7 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
 export default function GenealogyBookPage() {
   const { t } = useTranslation();
   const [familySettingsOpen, setFamilySettingsOpen] = useState(false);
-  const [paperSettingsOpen, setPaperSettingsOpen] = useState(false);
+  const [paperSettingsOpen, setPaperSettingsOpen] = useState(true);
   const [metadataUnlockOpen, setMetadataUnlockOpen] = useState(false);
   const { style, setStyle } = usePersistedPaperStyle();
   const projection = useFamilyTreeProjection();
