@@ -799,8 +799,11 @@
     "securityNote": "私钥仅存于您的钱包，我们无法访问。"
   },
   "settings": {
+    "title": "设置",
     "theme": "主题",
-    "language": "语言"
+    "language": "语言",
+    "close": "关闭设置",
+    "open": "打开设置"
   },
   "storyEditor": {
     "title": "传记编辑器"

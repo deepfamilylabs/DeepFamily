@@ -2,7 +2,7 @@
 
 @plugin '@tailwindcss/forms';
 
-/* Class-based dark mode: GlobalSidebar toggles `.dark` on <html>. */
+/* Class-based dark mode: public/theme-boot.js and ThemeContext toggle `.dark` on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
@@ -218,6 +218,15 @@ html.dark select:-webkit-autofill:focus {
     0 0 0 1000px var(--df-surface-alt) inset,
     0 0 0 1px #2563eb inset !important;
   -webkit-text-fill-color: #f3f4f6 !important;
+}
+
+/* Root color-scheme follows the theme class (set by public/theme-boot.js before
+   first paint), so form controls and scrollbars never flash the wrong scheme. */
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
 }
 
 html.dark input,
@@ -534,7 +543,7 @@ html {
 
 /* Safe area padding for devices with notches */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  nav.fixed.bottom-0 {
+  .app-bottom-nav {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
@@ -549,7 +558,7 @@ html {
   }
 
   /* Prevent bottom navigation from disappearing during scroll */
-  nav.fixed.bottom-0 {
+  .app-bottom-nav {
     position: fixed !important;
     bottom: 0 !important;
     z-index: 9999 !important;

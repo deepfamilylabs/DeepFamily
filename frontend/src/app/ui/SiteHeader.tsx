@@ -6,6 +6,7 @@ import HeaderControls from "./HeaderControls";
 import Logo from "./Logo";
 import { PageContainer } from "../../shared/ui";
 import { getBadgeConfig } from "../config/brandBadge";
+import { resolveNavSection } from "../config/navSections";
 import { useActivePath, useSidebar } from "../context";
 
 /**
@@ -18,19 +19,16 @@ const SiteHeader = memo(() => {
   const location = useLocation();
   const isHomePage = location.pathname === "/";
   const badgeConfig = getBadgeConfig();
-  const { toggleMobileSidebar } = useSidebar();
+  const { isMobileOpen, toggleMobileSidebar } = useSidebar();
   const { activePath, setActivePath } = useActivePath();
 
   const handleNavClick = (path: string) => {
     setActivePath(path);
   };
 
-  const isPathActive = (path: string, end: boolean = false) => {
-    if (end) {
-      return activePath === path;
-    }
-    return activePath.startsWith(path);
-  };
+  // Detail routes (a person, a story, the other family volumes) keep the
+  // section they belong to selected.
+  const activeSection = resolveNavSection(activePath);
 
   // Base classes for nav links
   const baseNavClasses =
@@ -57,9 +55,12 @@ const SiteHeader = memo(() => {
         {/* Logo Section */}
         <div className="flex items-center">
           <button
+            type="button"
             onClick={toggleMobileSidebar}
             className="md:hidden p-2 -ml-2 mr-0 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            aria-label="Toggle sidebar"
+            aria-label={t("settings.open", "Open settings")}
+            aria-expanded={isMobileOpen}
+            aria-controls="global-sidebar"
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -88,7 +89,7 @@ const SiteHeader = memo(() => {
         <nav className="hidden md:flex items-center gap-1">
           <NavLink
             to="/"
-            className={() => getNavClasses(isPathActive("/", true))}
+            className={() => getNavClasses(activeSection === "home")}
             onClick={() => handleNavClick("/")}
             end
           >
@@ -97,7 +98,7 @@ const SiteHeader = memo(() => {
           </NavLink>
           <NavLink
             to="/familyTree"
-            className={() => getNavClasses(isPathActive("/familyTree"))}
+            className={() => getNavClasses(activeSection === "familyTree")}
             onClick={() => handleNavClick("/familyTree")}
           >
             <TreePine className="w-4 h-4" />
@@ -105,7 +106,7 @@ const SiteHeader = memo(() => {
           </NavLink>
           <NavLink
             to="/search"
-            className={() => getNavClasses(isPathActive("/search"))}
+            className={() => getNavClasses(activeSection === "search")}
             onClick={() => handleNavClick("/search")}
           >
             <Search className="w-4 h-4" />
@@ -113,7 +114,7 @@ const SiteHeader = memo(() => {
           </NavLink>
           <NavLink
             to="/actions"
-            className={() => getNavClasses(isPathActive("/actions"))}
+            className={() => getNavClasses(activeSection === "actions")}
             onClick={() => handleNavClick("/actions")}
           >
             <Zap className="w-4 h-4" />

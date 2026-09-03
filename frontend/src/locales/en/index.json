@@ -799,8 +799,11 @@
     "securityNote": "Your keys stay in your wallet. We never have access."
   },
   "settings": {
+    "title": "Settings",
     "theme": "Theme",
-    "language": "Language"
+    "language": "Language",
+    "close": "Close settings",
+    "open": "Open settings"
   },
   "storyEditor": {
     "title": "Story Editor"

@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Home, Search, TreePine } from "lucide-react";
 import { useActivePath } from "../context";
+import { resolveNavSection } from "../config/navSections";
 
 export default function BottomNav() {
   const { t } = useTranslation();
@@ -11,12 +12,8 @@ export default function BottomNav() {
     setActivePath(path);
   };
 
-  const isPathActive = (path: string, end: boolean = false) => {
-    if (end) {
-      return activePath === path;
-    }
-    return activePath.startsWith(path);
-  };
+  // Same ownership rules as the header: a person page still belongs to Family.
+  const activeSection = resolveNavSection(activePath);
 
   const getNavItemClasses = (isActive: boolean) => {
     const baseClasses =
@@ -33,16 +30,16 @@ export default function BottomNav() {
     }`;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10 shadow-2xl shadow-orange-500/5 z-9999 transform-gpu pb-[env(safe-area-inset-bottom)]">
+    <nav className="app-bottom-nav fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-black/90 backdrop-blur-xl border-t border-gray-100 dark:border-white/10 shadow-2xl shadow-orange-500/5 z-9999 transform-gpu pb-[env(safe-area-inset-bottom)]">
       <div className="flex h-16 w-full px-4 gap-2 justify-between items-stretch max-w-lg mx-auto">
         <NavLink
           to="/"
-          className={() => getNavItemClasses(isPathActive("/", true))}
+          className={() => getNavItemClasses(activeSection === "home")}
           onClick={() => handleNavClick("/")}
           end
         >
           {() => {
-            const isActive = isPathActive("/", true);
+            const isActive = activeSection === "home";
             return (
               <>
                 <div className={getIconContainerClass(isActive)}>
@@ -59,11 +56,11 @@ export default function BottomNav() {
         </NavLink>
         <NavLink
           to="/familyTree"
-          className={() => getNavItemClasses(isPathActive("/familyTree"))}
+          className={() => getNavItemClasses(activeSection === "familyTree")}
           onClick={() => handleNavClick("/familyTree")}
         >
           {() => {
-            const isActive = isPathActive("/familyTree");
+            const isActive = activeSection === "familyTree";
             return (
               <>
                 <div className={getIconContainerClass(isActive)}>
@@ -80,11 +77,11 @@ export default function BottomNav() {
         </NavLink>
         <NavLink
           to="/search"
-          className={() => getNavItemClasses(isPathActive("/search"))}
+          className={() => getNavItemClasses(activeSection === "search")}
           onClick={() => handleNavClick("/search")}
         >
           {() => {
-            const isActive = isPathActive("/search");
+            const isActive = activeSection === "search";
             return (
               <>
                 <div className={getIconContainerClass(isActive)}>

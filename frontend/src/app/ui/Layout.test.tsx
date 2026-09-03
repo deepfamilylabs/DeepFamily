@@ -1,19 +1,9 @@
 // @vitest-environment jsdom
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Layout from "./Layout";
-
-const mocks = vi.hoisted(() => ({
-  activeSection: null as string | null,
-}));
-
-vi.mock("../context", () => ({
-  useSidebar: () => ({
-    activeSection: mocks.activeSection,
-  }),
-}));
 
 vi.mock("../../shared/ui", () => ({
   PageContainer: ({ children, className }: any) => (
@@ -65,10 +55,6 @@ function renderLayout(initialEntry: string) {
 }
 
 describe("Layout", () => {
-  beforeEach(() => {
-    mocks.activeSection = null;
-  });
-
   afterEach(() => {
     cleanup();
   });
@@ -85,9 +71,7 @@ describe("Layout", () => {
     expect(screen.getByTestId("floating-action-button")).toBeTruthy();
   });
 
-  it("wraps non-full-width pages in PageContainer and applies expanded sidebar padding", () => {
-    mocks.activeSection = "familyTree";
-
+  it("wraps non-full-width pages in PageContainer and keeps the rail offset", () => {
     const { container } = renderLayout("/actions");
 
     expect(screen.getByTestId("page-container")).toBeTruthy();
@@ -95,10 +79,10 @@ describe("Layout", () => {
     expect(screen.getByTestId("page-content").textContent).toBe("actions-content");
 
     const main = container.querySelector("main");
-    expect(main?.className).toContain("md:pl-96");
+    expect(main?.className).toContain("md:pl-16");
   });
 
-  it("keeps tree route full-width even when sidebar is collapsed", () => {
+  it("keeps tree route full-width behind the same rail offset", () => {
     const { container } = renderLayout("/familyTree");
 
     expect(screen.getByTestId("page-content").textContent).toBe("tree-content");
