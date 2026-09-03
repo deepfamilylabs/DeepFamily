@@ -14,11 +14,9 @@ import SiteHeader from "./SiteHeader";
 import FloatingActionButton from "./FloatingActionButton";
 import SiteFooter from "./SiteFooter";
 import GlobalSidebar from "./GlobalSidebar";
-import { useSidebar } from "../context";
 
 export default function Layout() {
   const location = useLocation();
-  const { activeSection } = useSidebar();
   const isHomePage = location.pathname === "/";
   const isPeoplePage = location.pathname === "/people";
   const isTreePage = location.pathname === "/familyTree";
@@ -34,16 +32,13 @@ export default function Layout() {
           "bg-linear-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900"
         : "bg-surface-body";
 
-  // Desktop padding logic:
-  // Base strip width: w-16 (4rem) -> pl-16
-  // Expanded width: w-16 + w-80 (20rem) = 24rem -> pl-96
-  const desktopPadding = activeSection ? "md:pl-96" : "md:pl-16";
-
+  // The desktop rail is 4rem wide and its open states overlay the page, so the
+  // content offset is constant — opening the sidebar never reflows the page.
   return (
     <div className={`${bgClass} min-h-screen transition-colors duration-300`}>
       <SiteHeader />
       <GlobalSidebar />
-      <main className={`relative transition-all duration-300 ${desktopPadding}`}>
+      <main className="relative md:pl-16">
         {isFullWidthPage ? (
           <Outlet />
         ) : (

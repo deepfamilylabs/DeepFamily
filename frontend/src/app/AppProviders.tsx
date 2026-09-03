@@ -3,7 +3,7 @@ import { ConfigProvider, LocalizedRootSync } from "../domains/config";
 import { ToastProvider } from "../shared/ui";
 import { TreeViewProvider, VizOptionsProvider } from "../domains/tree";
 import { WalletProvider, NetworkSelectionLayer, WalletSelectionLayer } from "../domains/wallet";
-import { ActivePathProvider, SidebarProvider } from "./context";
+import { ActivePathProvider, SidebarProvider, ThemeProvider } from "./context";
 import { ErrorBoundary } from "./error-boundary";
 
 /**
@@ -15,20 +15,22 @@ import { ErrorBoundary } from "./error-boundary";
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
-      <ConfigProvider>
-        <LocalizedRootSync />
-        <ToastProvider>
-          <WalletProvider>
-            <SidebarProvider>
-              <WalletSelectionLayer />
-              <NetworkSelectionLayer />
-              <VizOptionsProvider>
-                <TreeViewProvider>{children}</TreeViewProvider>
-              </VizOptionsProvider>
-            </SidebarProvider>
-          </WalletProvider>
-        </ToastProvider>
-      </ConfigProvider>
+      <ThemeProvider>
+        <ConfigProvider>
+          <LocalizedRootSync />
+          <ToastProvider>
+            <WalletProvider>
+              <SidebarProvider>
+                <WalletSelectionLayer />
+                <NetworkSelectionLayer />
+                <VizOptionsProvider>
+                  <TreeViewProvider>{children}</TreeViewProvider>
+                </VizOptionsProvider>
+              </SidebarProvider>
+            </WalletProvider>
+          </ToastProvider>
+        </ConfigProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

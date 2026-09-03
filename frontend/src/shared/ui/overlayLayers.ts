@@ -2,10 +2,10 @@
  * Overlay stacking order.
  *
  * Everything here must sit ABOVE the app chrome, which is itself fixed and
- * layered: GlobalSidebar is z-10002, BottomNav z-9999, FloatingActionButton
- * z-10000, SiteHeader z-100. A dialog below that band leaves the sidebar
- * painted over its own scrim, which is what the low z-1200/z-1300 layers used
- * to do.
+ * layered: FloatingActionButton z-10000, BottomNav z-9999, the GlobalSidebar
+ * mobile drawer z-10005 (its desktop rail sits below the header at z-90),
+ * SiteHeader z-100. A dialog below that band ends up painted over by the
+ * chrome, which is what the low z-1200/z-1300 layers used to do.
  */
 export const OVERLAY_Z_INDEX = {
   /** Page-level confirmations. */

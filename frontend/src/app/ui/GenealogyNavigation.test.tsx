@@ -80,4 +80,29 @@ describe("genealogy volume navigation", () => {
     expect(screen.queryByText("Genealogy")).toBeNull();
     expect(screen.queryByText("People")).toBeNull();
   });
+
+  it("keeps the family entry selected on the other volumes and on detail routes", () => {
+    for (const path of ["/familyTree", "/people", "/genealogyBook", "/person/7", "/editor/7"]) {
+      mocks.activePath = path;
+
+      render(
+        <MemoryRouter>
+          <SiteHeader />
+          <BottomNav />
+        </MemoryRouter>,
+      );
+
+      const familyEntries = screen
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("href") === "/familyTree")
+        .map((link) => link.className);
+
+      expect(familyEntries).toHaveLength(2);
+      // Header pill and bottom-nav item both light up for the whole section.
+      expect(familyEntries.some((className) => className.includes("bg-slate-900"))).toBe(true);
+      expect(familyEntries.some((className) => className.includes("text-orange-600"))).toBe(true);
+
+      cleanup();
+    }
+  });
 });
