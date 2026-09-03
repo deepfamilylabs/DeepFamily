@@ -16,7 +16,7 @@ import {
 } from "./sections";
 
 /**
- * The genealogy settings panel: one flat, scrolling column under three group
+ * The family settings panel: one flat, scrolling column under two group
  * headings, with the save actions docked at the bottom.
  *
  * It used to be three collapsible cards, which put every field at least one
@@ -36,18 +36,16 @@ export default function FamilyTreeConfigForm() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface text-ink">
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-3 py-3.5">
-        <GroupHeading title={t("familyTree.config.networkAndContract", "Network & Contract")} />
+        <GroupHeading title={t("familyTree.config.dataSource", "Data Source")} />
         <NetworkPicker {...ctrl.network} />
         {ctrl.customForm.visible ? <CustomNetworkForm {...ctrl.customForm} /> : null}
         <ContractAddressField {...ctrl.contract} />
-
-        <GroupHeading title={t("familyTree.config.dataSource", "Data Source")} />
         <RootHashField {...ctrl.root} />
         <RootHashHistory {...ctrl.history} />
         <VersionPicker {...ctrl.version} />
 
         <GroupHeading
-          title={t("familyTree.config.displayOptions", "Display Options")}
+          title={t("familyTree.config.displayOptions", "Lineage Display")}
           note={t("familyTree.config.displayAppliesInstantly", "Applies instantly")}
         />
         {ctrl.showNodeModeToggle ? <ChildrenModeControls {...ctrl.children} /> : null}

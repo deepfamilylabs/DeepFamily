@@ -94,10 +94,7 @@ function TreeInteractionBridge({ children }: { children: ReactNode }) {
 export default function TreePage() {
   const { viewMode, setViewMode } = usePersistedViewMode();
 
-  const { t, i18n } = useTranslation();
-  // The paper genealogy layout is only typeset for Chinese; other languages break its formatting,
-  // so the volume is shown only when the active language is Chinese.
-  const isChinese = (i18n.language ?? "").toLowerCase().startsWith("zh");
+  const { t } = useTranslation();
   const { rootId, rootExists, nodesData } = useTreeGraphData();
   const { getOwnerOf } = useTreeNodeAccess();
   const { address, signer } = useWallet();
@@ -279,7 +276,6 @@ export default function TreePage() {
                 peopleCount={progress?.created || 0}
                 generationCount={progress?.depth || 0}
                 loading={loadingContract}
-                showPaperVolume={isChinese}
                 unlockedCount={unlockedCount}
                 onOpenUnlock={() => setMetadataUnlockOpen(true)}
                 onRefresh={refresh}
@@ -288,7 +284,7 @@ export default function TreePage() {
                 onToggleConfig={() => setConfigOpen((value) => !value)}
               />
 
-              {/* Visualization Area — the settings drawer sits beside it and pushes it aside. */}
+              {/* Family settings share this push-on-desktop, overlay-on-mobile content row. */}
               <div className="relative flex min-h-0 flex-1 overflow-hidden">
                 <TreeConfigDrawer t={t} open={configOpen} onClose={() => setConfigOpen(false)} />
 

@@ -546,14 +546,13 @@
       "people": "People"
     },
     "viewModes": {
-      "tree": "Tree Layout",
-      "dag": "DAG",
-      "virtual": "Tree List"
+      "tree": "Tree",
+      "dag": "Graph",
+      "virtual": "List"
     },
     "config": {
-      "networkAndContract": "Network & Module",
       "dataSource": "Data Source",
-      "displayOptions": "Display Options",
+      "displayOptions": "Display",
       "rpc": "RPC",
       "customNetwork": "Custom network",
       "customNetworks": "Custom",
@@ -637,7 +636,7 @@
       "refresh": "Refresh",
       "remove": "Remove",
       "clearAll": "Clear all",
-      "openConfig": "Genealogy settings",
+      "openConfig": "Family settings",
       "clearCaches": "Clear caches and reload"
     },
     "nodeDetail": {
@@ -957,10 +956,10 @@
     "clickToEndorse": "Click to endorse this version",
     "resetFilters": "Reset filters",
     "personNotInTree": {
-      "title": "This person isn’t in the current tree projection",
+      "title": "This person isn’t in the current lineage projection",
       "query": "Query",
-      "hint": "Adjust the global tree configuration (root/contract/network) to include it, or open the Tree page.",
-      "openTree": "Open Tree"
+      "hint": "Adjust the family settings (root/contract/network) to include it, or open the Lineage page.",
+      "openTree": "Open Lineage"
     }
   },
   "storyChunksModal": {

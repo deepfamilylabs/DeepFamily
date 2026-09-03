@@ -42,12 +42,16 @@ vi.mock("../app/context", () => ({
 
 vi.mock("../domains/tree", () => ({
   useTreeGraphData: () => ({
+    rootId: mocks.graphNodeIds[0] ?? null,
+    rootExists: mocks.graphNodeIds.length > 0,
     nodesData: mocks.nodesData,
   }),
   useTreeStatus: () => ({
     loading: mocks.loading,
     errors: mocks.treeErrors,
     refresh: mocks.treeRefresh,
+    clearAllCaches: vi.fn(),
+    progress: { created: mocks.graphNodeIds.length, depth: mocks.graphNodeIds.length ? 1 : 0 },
   }),
   useFamilyTreeProjection: () => ({
     graph: {
@@ -63,6 +67,12 @@ vi.mock("../domains/tree", () => ({
     bumpEndorsementCount: vi.fn(),
     invalidateByTx: vi.fn(),
   }),
+  MetadataUnlockControl: () => <div data-testid="metadata-unlock-control" />,
+}));
+
+vi.mock("../domains/config", () => ({
+  useConfig: () => ({ rootHash: "", rootVersionIndex: 1 }),
+  FamilyTreeConfigForm: () => <div data-testid="family-tree-config-form" />,
 }));
 
 vi.mock("../domains/person", () => ({
@@ -181,6 +191,11 @@ describe("PeoplePage", () => {
   it("opens the selected person modal from the URL when the person exists in the current projection", async () => {
     renderPeoplePage("/people?person=7");
 
+    const searchToolbar = screen
+      .getByPlaceholderText("Search by name, location, or story content...")
+      .closest(".sticky");
+    expect(searchToolbar?.classList.contains("top-16")).toBe(true);
+
     await waitFor(() => expect(screen.getByTestId("person-story-modal")).toBeTruthy());
     expect(screen.getByTestId("person-story-name").textContent).toBe("Ada Lovelace");
     expect(screen.getByTestId("location-search").textContent).toBe("?person=7");
@@ -190,13 +205,13 @@ describe("PeoplePage", () => {
     renderPeoplePage("/people?person=999");
 
     await waitFor(() =>
-      expect(screen.getByText("This person isn’t in the current tree projection")).toBeTruthy(),
+      expect(screen.getByText("This person isn’t in the current lineage projection")).toBeTruthy(),
     );
     expect(screen.getByText("Query: 999")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Dismiss"));
 
     await waitFor(() => expect(screen.getByTestId("location-search").textContent).toBe(""));
-    expect(screen.queryByText("This person isn’t in the current tree projection")).toBeNull();
+    expect(screen.queryByText("This person isn’t in the current lineage projection")).toBeNull();
   });
 });

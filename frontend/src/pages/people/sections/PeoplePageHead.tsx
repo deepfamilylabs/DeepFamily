@@ -95,7 +95,10 @@ function PersonProjectionWarning({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="font-semibold">
-            {t("people.personNotInTree.title", "This person isn’t in the current tree projection")}
+            {t(
+              "people.personNotInTree.title",
+              "This person isn’t in the current lineage projection",
+            )}
           </div>
           <div className="mt-1 text-xs text-amber-800/90 dark:text-amber-200/90 break-all">
             {t("people.personNotInTree.query", "Query")}: {personNotice.query}
@@ -103,7 +106,7 @@ function PersonProjectionWarning({
           <div className="mt-1.5 text-xs text-amber-800/80 dark:text-amber-200/80">
             {t(
               "people.personNotInTree.hint",
-              "Adjust the global tree configuration (root/contract/network) to include it, or open the Tree page.",
+              "Adjust the family settings (root/contract/network) to include it, or open the Lineage page.",
             )}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -112,7 +115,7 @@ function PersonProjectionWarning({
               onClick={personNotice.openTree}
               className="px-3 py-1.5 rounded-full bg-amber-900/90 text-amber-50 hover:bg-amber-900 transition-colors text-xs font-semibold"
             >
-              {t("people.personNotInTree.openTree", "Open Tree")}
+              {t("people.personNotInTree.openTree", "Open Lineage")}
             </button>
             <button
               type="button"

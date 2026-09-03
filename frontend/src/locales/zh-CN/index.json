@@ -546,14 +546,13 @@
       "people": "人物"
     },
     "viewModes": {
-      "tree": "树形布局",
-      "dag": "有向无环图",
-      "virtual": "树形列表"
+      "tree": "树形",
+      "dag": "图谱",
+      "virtual": "列表"
     },
     "config": {
-      "networkAndContract": "网络与模块",
       "dataSource": "数据源",
-      "displayOptions": "显示选项",
+      "displayOptions": "显示",
       "rpc": "RPC",
       "customNetwork": "自定义网络",
       "customNetworks": "自定义",
@@ -637,7 +636,7 @@
       "refresh": "刷新",
       "remove": "移除",
       "clearAll": "清空历史",
-      "openConfig": "谱系配置",
+      "openConfig": "家族设置",
       "clearCaches": "清空缓存并重载"
     },
     "nodeDetail": {
@@ -957,10 +956,10 @@
     "clickToEndorse": "点击为此版本背书",
     "resetFilters": "重置筛选",
     "personNotInTree": {
-      "title": "此人不在当前的系谱投影中",
+      "title": "此人不在当前的世系投影中",
       "query": "查询",
-      "hint": "请调整全局系谱配置（根节点/合约/网络）以包含此人，或打开系谱页面。",
-      "openTree": "打开系谱"
+      "hint": "请调整家族设置（根节点/合约/网络）以包含此人，或打开世系页面。",
+      "openTree": "打开世系"
     }
   },
   "storyChunksModal": {
