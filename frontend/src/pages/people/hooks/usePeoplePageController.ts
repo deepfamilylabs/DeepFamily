@@ -6,19 +6,25 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useActivePath } from "../../../app/context";
 import { useFamilyTreeProjection, useTreeGraphData, useTreeStatus } from "../../../domains/tree";
 import type { NodeData } from "../../../shared/model";
 import {
+  buildGenerationIndex,
   createProjectedPeopleLookup,
   filterPeople,
+  generationRange,
+  getGenerationOptions,
   getPeoplePageStats,
+  getPersonGeneration,
   hasPeopleRuleFilters,
   hasVisiblePeopleFilters,
   PEOPLE_PAGE_SIZE,
   resolveProjectedPerson,
   selectProjectedMintedPeople,
+  toggleGenerationSelection,
   type PeopleFilterType,
   type PeopleFiltersState,
   type PeopleSortOrder,
@@ -32,6 +38,7 @@ export function usePeoplePageController() {
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
   const navigate = useNavigate();
+  const { i18n } = useTranslation();
   const { setActivePath } = useActivePath();
   const openedViaClickRef = useRef(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +49,7 @@ export function usePeoplePageController() {
   const [viewMode, setViewMode] = useState<PeopleViewMode>("grid");
   const [selectedPerson, setSelectedPerson] = useState<NodeData | null>(null);
   const [selectedAddresses, setSelectedAddresses] = useState<string[]>([]);
+  const [selectedGenerations, setSelectedGenerations] = useState<number[]>([]);
   const [addressInput, setAddressInput] = useState("");
   const [personQueryError, setPersonQueryError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PEOPLE_PAGE_SIZE);
@@ -73,8 +81,19 @@ export function usePeoplePageController() {
     [addAddress],
   );
 
+  const toggleGeneration = useCallback((generation: number) => {
+    setSelectedGenerations((prev) => toggleGenerationSelection(prev, generation));
+  }, []);
+
+  const selectGenerationRange = useCallback((from: number, to: number) => {
+    setSelectedGenerations(generationRange(from, to));
+  }, []);
+
+  const clearGenerations = useCallback(() => setSelectedGenerations([]), []);
+
   const clearFilters = useCallback(() => {
     setSelectedAddresses([]);
+    setSelectedGenerations([]);
     setAddressInput("");
     setSearchTerm("");
     setFilterType("all");
@@ -87,6 +106,20 @@ export function usePeoplePageController() {
   );
 
   const projectedLookup = useMemo(() => createProjectedPeopleLookup(people), [people]);
+
+  // The projection stamps a depth on every node; generation = depth + 1, so the
+  // filter, the per-generation counts and the badge all read the one index.
+  const generationIndex = useMemo(() => buildGenerationIndex(graph.nodes), [graph.nodes]);
+
+  const generationOptions = useMemo(
+    () => getGenerationOptions(people, generationIndex),
+    [generationIndex, people],
+  );
+
+  const generationOf = useCallback(
+    (person: NodeData) => getPersonGeneration(person, generationIndex),
+    [generationIndex],
+  );
 
   const clearPersonQuery = useCallback(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -173,11 +206,21 @@ export function usePeoplePageController() {
       filterType,
       sortOrder,
       selectedAddresses,
+      selectedGenerations,
     }),
-    [filterType, searchTerm, selectedAddresses, sortOrder],
+    [filterType, searchTerm, selectedAddresses, selectedGenerations, sortOrder],
   );
 
-  const filteredPeople = useMemo(() => filterPeople(people, filterState), [people, filterState]);
+  // One collator for the whole sort rather than a localeCompare() per comparison.
+  const collator = useMemo(
+    () => new Intl.Collator(i18n?.language || undefined, { usage: "sort", numeric: true }),
+    [i18n?.language],
+  );
+
+  const filteredPeople = useMemo(
+    () => filterPeople(people, filterState, { generations: generationIndex, collator }),
+    [collator, generationIndex, people, filterState],
+  );
 
   useEffect(() => {
     setVisibleCount(PEOPLE_PAGE_SIZE);
@@ -223,6 +266,11 @@ export function usePeoplePageController() {
       sortOrder,
       setSortOrder,
       selectedAddresses,
+      selectedGenerations,
+      generationOptions,
+      toggleGeneration,
+      selectGenerationRange,
+      clearGenerations,
       addressInput,
       setAddressInput,
       addAddress,
@@ -247,6 +295,7 @@ export function usePeoplePageController() {
       visibleCount,
       hasMore: visibleCount < filteredPeople.length,
       loadMoreSentinelRef,
+      generationOf,
     },
     modal: {
       selectedPerson,

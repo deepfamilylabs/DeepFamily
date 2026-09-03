@@ -9,6 +9,7 @@ import { makeNodeId, type NodeData } from "../shared/model";
 const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, NodeData>,
   graphNodeIds: [] as string[],
+  graphNodeDepths: {} as Record<string, number>,
   loading: false,
   treeErrors: [] as unknown[],
   treeRefresh: vi.fn(),
@@ -55,7 +56,7 @@ vi.mock("../domains/tree", () => ({
   }),
   useFamilyTreeProjection: () => ({
     graph: {
-      nodes: mocks.graphNodeIds.map((id) => ({ id })),
+      nodes: mocks.graphNodeIds.map((id) => ({ id, depth: mocks.graphNodeDepths[id] })),
     },
   }),
   useTreeNodeAccess: () => ({
@@ -163,6 +164,7 @@ describe("PeoplePage", () => {
       [grace.id]: grace,
     };
     mocks.graphNodeIds = [ada.id, grace.id];
+    mocks.graphNodeDepths = {};
     mocks.loading = false;
     mocks.treeErrors = [];
     mocks.treeRefresh.mockReset();
@@ -213,5 +215,29 @@ describe("PeoplePage", () => {
 
     await waitFor(() => expect(screen.getByTestId("location-search").textContent).toBe(""));
     expect(screen.queryByText("This person isn’t in the current lineage projection")).toBeNull();
+  });
+  it("filters the list down to a picked generation and shows it as a chip", async () => {
+    const [adaId, graceId] = mocks.graphNodeIds;
+    mocks.graphNodeDepths = { [adaId]: 0, [graceId]: 1 };
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByTestId("person-card-7")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Generations" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generation 2" }));
+
+    await waitFor(() => expect(screen.queryByTestId("person-card-7")).toBeNull());
+    expect(screen.getByTestId("person-card-8")).toBeTruthy();
+    // the panel summary and the toolbar chip both name it
+    expect(screen.getAllByText("Generation 2").length).toBeGreaterThan(0);
+    expect(screen.getByText("1 filtered results")).toBeTruthy();
+  });
+
+  it("hides the generation control when the projection carries no depths", async () => {
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByTestId("person-card-7")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Generations" })).toBeNull();
   });
 });
