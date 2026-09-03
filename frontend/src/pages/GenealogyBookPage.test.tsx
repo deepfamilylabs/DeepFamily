@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     progress: { created: 1, depth: 1 },
     contractMessage: "ready",
     refresh: vi.fn(),
+    clearAllCaches: vi.fn(),
   },
   getStoryData: vi.fn().mockResolvedValue(null),
   exportPdf: vi.fn().mockResolvedValue(undefined),
@@ -42,6 +43,15 @@ vi.mock("react-i18next", () => ({
       return key;
     },
   }),
+}));
+
+vi.mock("./family/FamilyVolumeNav", () => ({
+  FamilyVolumeNav: () => <nav data-testid="family-volume-nav" />,
+}));
+
+vi.mock("../domains/config", () => ({
+  useConfig: () => ({ rootHash: "0xroot", rootVersionIndex: 1 }),
+  FamilyTreeConfigForm: () => <div data-testid="family-tree-config-form" />,
 }));
 
 vi.mock("../domains/tree", () => ({
@@ -176,8 +186,13 @@ vi.mock("../domains/tree", () => ({
   useFamilyTreeProjection: () => mocks.projection,
   usePaperPdfExport: () => ({ exporting: false, exportPdf: mocks.exportPdf }),
   useTreeNodeAccess: () => ({ getStoryData: mocks.getStoryData }),
-  useTreeGraphData: () => ({ rootExists: mocks.rootExists }),
+  useTreeGraphData: () => ({
+    rootId: mocks.projection.rootId,
+    rootExists: mocks.rootExists,
+    nodesData: mocks.projection.nodesData,
+  }),
   useTreeStatus: () => mocks.status,
+  MetadataUnlockControl: () => <div data-testid="metadata-unlock-control" />,
 }));
 
 describe("GenealogyBookPage", () => {
@@ -188,6 +203,7 @@ describe("GenealogyBookPage", () => {
     mocks.status.progress = { created: 1, depth: 1 };
     mocks.status.contractMessage = "ready";
     mocks.status.refresh.mockReset();
+    mocks.status.clearAllCaches.mockReset();
     mocks.getStoryData.mockReset();
     mocks.getStoryData.mockResolvedValue(null);
     mocks.projection.rootId = "0xroot-v-1";
@@ -211,27 +227,15 @@ describe("GenealogyBookPage", () => {
     expect(screen.getByTestId("paper-view").dataset.hasRoot).toBe("true");
 
     const toolbar = screen.getByTestId("paper-book-toolbar");
-    const stats = screen.getByTestId("paper-book-stats");
     const styleSwitcher = screen.getByTestId("paper-style-switcher");
     const toolbarActions = screen.getByTestId("paper-toolbar-actions");
-    const refreshButton = screen.getByTestId("paper-refresh-button");
     const exportButton = screen.getByTestId("paper-export-button");
     expect(screen.getByText("Style")).toBeTruthy();
-    expect(stats.textContent).toContain("1People");
-    expect(stats.textContent).toContain("1Generations");
     expect(toolbar.className).toContain("gap-x-3");
-    expect(stats.children.length).toBe(2);
     expect(toolbarActions.className).toContain("gap-2");
     expect(
-      stats.compareDocumentPosition(styleSwitcher) & Node.DOCUMENT_POSITION_FOLLOWING,
+      styleSwitcher.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
-    expect(
-      styleSwitcher.compareDocumentPosition(refreshButton) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(
-      refreshButton.compareDocumentPosition(exportButton) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-    expect(refreshButton.className).toContain("w-8");
     expect(exportButton.className).toContain("bg-orange-600");
 
     const cases = [

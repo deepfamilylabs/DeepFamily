@@ -231,11 +231,11 @@ describe("TreePage", () => {
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
     expect(screen.queryByTestId("family-tree-config-form")).toBeNull();
 
-    fireEvent.click(screen.getByTitle("Genealogy settings"));
+    fireEvent.click(screen.getByTitle("Family settings"));
     expect(screen.getByRole("dialog").getAttribute("aria-hidden")).toBe("false");
     expect(screen.getByTestId("family-tree-config-form")).toBeTruthy();
 
-    fireEvent.click(screen.getByTitle("Genealogy settings"));
+    fireEvent.click(screen.getByTitle("Family settings"));
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
   });
 

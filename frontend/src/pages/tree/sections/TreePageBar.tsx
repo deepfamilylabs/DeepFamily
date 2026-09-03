@@ -1,16 +1,12 @@
 import {
-  Book,
   KeyRound,
   Layers,
-  Network,
   RefreshCw,
-  SlidersHorizontal,
   Trash2,
   Users,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
 import type { TFunction } from "i18next";
-import { BambooSlipsIcon } from "../../../shared/ui";
+import { FamilyVolumeNav } from "../../family/FamilyVolumeNav";
 
 export interface TreePageBarProps {
   t: TFunction;
@@ -21,8 +17,6 @@ export interface TreePageBarProps {
   peopleCount: number;
   generationCount: number;
   loading: boolean;
-  /** The paper genealogy is only typeset for Chinese, so its volume is language-gated. */
-  showPaperVolume: boolean;
   /** Versions whose metadata is already unlocked in this browser. */
   unlockedCount: number;
   onOpenUnlock: () => void;
@@ -49,7 +43,6 @@ export function TreePageBar({
   peopleCount,
   generationCount,
   loading,
-  showPaperVolume,
   unlockedCount,
   onOpenUnlock,
   onRefresh,
@@ -60,37 +53,7 @@ export function TreePageBar({
   return (
     <div className="flex h-14 shrink-0 items-stretch justify-between gap-3 border-b border-hairline bg-surface px-3 md:px-6">
       <div className="flex min-w-0 items-stretch gap-3 md:gap-5">
-        <span className="flex shrink-0 items-center">
-          <ToolbarButton
-            label={t("familyTree.actions.openConfig", "Genealogy settings")}
-            onClick={onToggleConfig}
-            active={configOpen}
-            expanded={configOpen}
-          >
-            <SlidersHorizontal className="h-[15px] w-[15px]" />
-          </ToolbarButton>
-        </span>
-
-        <h1 className="hidden shrink-0 items-center text-xl text-ink md:flex">
-          {t("familyTree.title", "Family")}
-        </h1>
-
-        <nav
-          className="flex min-w-0 items-stretch gap-4 md:gap-5"
-          aria-label={t("familyTree.title", "Family")}
-        >
-          <VolumeTab to="/familyTree" label={t("familyTree.volumes.chart", "Lineage")} end>
-            <Network className="h-[15px] w-[15px] shrink-0" />
-          </VolumeTab>
-          <VolumeTab to="/people" label={t("familyTree.volumes.people", "People")}>
-            <Book className="h-[15px] w-[15px] shrink-0" />
-          </VolumeTab>
-          {showPaperVolume ? (
-            <VolumeTab to="/genealogyBook" label={t("familyTree.volumes.paper", "Genealogy")}>
-              <BambooSlipsIcon className="h-[15px] w-[15px] shrink-0" />
-            </VolumeTab>
-          ) : null}
-        </nav>
+        <FamilyVolumeNav settingsOpen={configOpen} onToggleSettings={onToggleConfig} />
       </div>
 
       <div className="flex shrink-0 items-center gap-2.5">
@@ -149,36 +112,6 @@ export function TreePageBar({
   );
 }
 
-function VolumeTab({
-  to,
-  label,
-  end,
-  children,
-}: {
-  to: string;
-  label: string;
-  end?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <NavLink
-      to={to}
-      end={end}
-      title={label}
-      className={({ isActive }) =>
-        `inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 text-[13px] transition-colors md:gap-2 ${
-          isActive
-            ? "border-primary font-semibold text-ink"
-            : "border-transparent font-medium text-ink-muted hover:text-ink"
-        }`
-      }
-    >
-      {children}
-      {label}
-    </NavLink>
-  );
-}
-
 function StatChip({
   icon,
   value,
@@ -212,8 +145,6 @@ function ToolbarButton({
   onClick,
   disabled,
   tone = "neutral",
-  active = false,
-  expanded,
   badge = 0,
   children,
 }: {
@@ -221,9 +152,6 @@ function ToolbarButton({
   onClick: () => void;
   disabled?: boolean;
   tone?: "neutral" | "danger";
-  /** Held-down look while the button owns an open panel. */
-  active?: boolean;
-  expanded?: boolean;
   /** Count carried in the corner; hidden at zero. */
   badge?: number;
   children: React.ReactNode;
@@ -235,13 +163,7 @@ function ToolbarButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      aria-expanded={expanded}
-      aria-haspopup={expanded === undefined ? undefined : "dialog"}
-      className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:opacity-50 ${
-        active
-          ? "border-hairline-strong bg-surface-muted text-ink"
-          : "border-hairline bg-surface text-ink-muted"
-      } ${
+      className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline bg-surface text-ink-muted transition-colors disabled:opacity-50 ${
         tone === "danger"
           ? "hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
           : "hover:border-hairline-strong hover:text-ink"

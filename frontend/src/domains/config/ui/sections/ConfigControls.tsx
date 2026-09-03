@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
  * The control vocabulary of the genealogy settings drawer.
  *
  * The panel is one flat column: group headings and hairlines carry the structure
- * that three collapsible cards used to, so nothing is more than a scroll away.
+ * that collapsible cards used to, so nothing is more than a scroll away.
  * These primitives keep one label size, one control height and one switch across
  * every field, and consume the semantic tokens rather than raw slate/orange.
  */
