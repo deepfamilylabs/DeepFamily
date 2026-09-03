@@ -75,9 +75,8 @@ export function TreeConfigDrawer({ t, open, onClose }: TreeConfigDrawerProps) {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-            {mounted ? <FamilyTreeConfigForm /> : null}
-          </div>
+          {/* The form owns its own scroll region and docked footer. */}
+          <div className="min-h-0 flex-1">{mounted ? <FamilyTreeConfigForm /> : null}</div>
         </div>
       </aside>
     </>

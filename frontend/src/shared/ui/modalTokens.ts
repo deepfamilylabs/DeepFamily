@@ -58,11 +58,19 @@ export const MODAL_FIELD_INVALID = `${FIELD_BASE} ${FIELD_ERROR} h-11 px-3.5 tex
 /** Compact field for dense rows (address chips, per-item inputs). */
 export const MODAL_FIELD_SM = `${FIELD_BASE} ${FIELD_REST} h-10 px-3 text-xs`;
 
+/** Swap for MODAL_FIELD_SM when the value fails validation. */
+export const MODAL_FIELD_SM_INVALID = `${FIELD_BASE} ${FIELD_ERROR} h-10 px-3 text-xs`;
+
 export const MODAL_TEXTAREA = `${FIELD_BASE} ${FIELD_REST} px-3.5 py-3 text-sm leading-relaxed resize-y`;
 
 /** Pick the field class for a validated input. */
 export function modalField(invalid?: boolean) {
   return invalid ? MODAL_FIELD_INVALID : MODAL_FIELD;
+}
+
+/** Pick the compact field class for a validated input. */
+export function modalFieldSm(invalid?: boolean) {
+  return invalid ? MODAL_FIELD_SM_INVALID : MODAL_FIELD_SM;
 }
 
 /** 36px header tile at a 12% tint of the flow's accent. */

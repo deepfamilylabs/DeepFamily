@@ -1,28 +1,19 @@
 import { useTranslation } from "react-i18next";
-import ToggleControl from "./ToggleControl";
+import { SwitchRow } from "./ConfigControls";
 
 export interface DeduplicateControlProps {
   value: boolean;
   onChange: (v: boolean) => void;
-  tooltipOpen: boolean;
-  onToggleTooltip: () => void;
 }
 
-export default function DeduplicateControl({
-  value,
-  onChange,
-  tooltipOpen,
-  onToggleTooltip,
-}: DeduplicateControlProps) {
+export default function DeduplicateControl({ value, onChange }: DeduplicateControlProps) {
   const { t } = useTranslation();
   return (
-    <ToggleControl
+    <SwitchRow
       label={t("familyTree.ui.deduplicateChildren", "Deduplicate Children")}
       value={value}
       onChange={onChange}
-      tooltipOpen={tooltipOpen}
-      onToggleTooltip={onToggleTooltip}
-      tooltip={
+      description={
         value
           ? t(
               "familyTree.ui.deduplicateChildrenTooltip.enabled",

@@ -1,99 +1,56 @@
-import { HelpCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import ToggleControl from "./ToggleControl";
+import { Field, SegmentedControl, SwitchRow } from "./ConfigControls";
 
 export interface ChildrenModeControlsProps {
   mode: "union" | "strict";
   onModeChange: (v: "union" | "strict") => void;
-  modeTooltipOpen: boolean;
-  onToggleModeTooltip: () => void;
   includeUnversioned: boolean;
   onIncludeUnversionedChange: (v: boolean) => void;
-  includeV0TooltipOpen: boolean;
-  onToggleIncludeV0Tooltip: () => void;
 }
 
 export default function ChildrenModeControls({
   mode,
   onModeChange,
-  modeTooltipOpen,
-  onToggleModeTooltip,
   includeUnversioned,
   onIncludeUnversionedChange,
-  includeV0TooltipOpen,
-  onToggleIncludeV0Tooltip,
 }: ChildrenModeControlsProps) {
   const { t } = useTranslation();
-  const buttonBase =
-    "px-3 py-1.5 text-xs transition-all duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-500/60 dark:focus-visible:ring-orange-400/60 font-medium";
-  const active = "bg-linear-to-r from-orange-400 to-red-500 text-white shadow-md";
-  const idle =
-    "bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700";
+  const label = t("familyTree.ui.childrenMode", "Node Mode");
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2 shrink-0 relative">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-            {t("familyTree.ui.childrenMode", "Node Mode")}:
-          </span>
-          <button
-            type="button"
-            onClick={onToggleModeTooltip}
-            className="text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors focus:outline-hidden"
-          >
-            <HelpCircle size={14} />
-          </button>
-        </div>
-        <div className="inline-flex rounded-2xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 overflow-hidden">
-          <button
-            type="button"
-            aria-label={`${t("familyTree.ui.childrenMode", "Node Mode")}: ${t(
-              "familyTree.ui.childrenModeUnion",
-              "Merge",
-            )}`}
-            onClick={() => onModeChange("union")}
-            className={`${buttonBase} ${mode === "union" ? active : idle}`}
-          >
-            {t("familyTree.ui.childrenModeUnion", "Merge")}
-          </button>
-          <div className="relative group border-l border-slate-300 dark:border-slate-600">
-            <button
-              type="button"
-              aria-label={`${t("familyTree.ui.childrenMode", "Node Mode")}: ${t(
-                "familyTree.ui.childrenModeStrict",
-                "Exact",
-              )}`}
-              onClick={() => onModeChange("strict")}
-              className={`${buttonBase} ${mode === "strict" ? active : idle}`}
-            >
-              {t("familyTree.ui.childrenModeStrict", "Exact")}
-            </button>
-          </div>
-        </div>
-        {modeTooltipOpen && (
-          <div className="absolute bottom-full left-0 z-9999 mb-2 w-64 whitespace-normal rounded-lg bg-slate-900/95 dark:bg-slate-950/95 px-3 py-2 text-[10px] leading-relaxed text-white shadow-lg animate-in fade-in zoom-in-95 duration-200">
-            {mode === "strict"
-              ? t(
-                  "familyTree.ui.childrenModeTooltip.strict",
-                  "Exact: at every generation, query children linked to the current person version; unspecified parent versions are controlled separately",
-                )
-              : t(
-                  "familyTree.ui.childrenModeTooltip.union",
-                  "Merge: at every generation, combine children linked to all known versions of the current person, including unspecified parent-version references",
-                )}
-          </div>
-        )}
-      </div>
+    <div className="flex flex-col gap-3.5">
+      <Field
+        label={label}
+        hint={
+          mode === "strict"
+            ? t(
+                "familyTree.ui.childrenModeTooltip.strict",
+                "Exact: at every generation, query children linked to the current person version; unspecified parent versions are controlled separately",
+              )
+            : t(
+                "familyTree.ui.childrenModeTooltip.union",
+                "Merge: at every generation, combine children linked to all known versions of the current person, including unspecified parent-version references",
+              )
+        }
+      >
+        <SegmentedControl
+          label={label}
+          value={mode}
+          onChange={onModeChange}
+          options={[
+            { value: "union", label: t("familyTree.ui.childrenModeUnion", "Merge") },
+            { value: "strict", label: t("familyTree.ui.childrenModeStrict", "Exact") },
+          ]}
+        />
+      </Field>
 
-      {mode === "strict" && (
-        <ToggleControl
+      {/* Only "exact" has parent versions to be unspecified about. */}
+      {mode === "strict" ? (
+        <SwitchRow
           label={t("familyTree.ui.strictIncludeV0", "Unspecified Version")}
           value={includeUnversioned}
           onChange={onIncludeUnversionedChange}
-          tooltipOpen={includeV0TooltipOpen}
-          onToggleTooltip={onToggleIncludeV0Tooltip}
-          tooltip={
+          description={
             includeUnversioned
               ? t(
                   "familyTree.ui.strictIncludeV0Tooltip.on",
@@ -105,7 +62,7 @@ export default function ChildrenModeControls({
                 )
           }
         />
-      )}
+      ) : null}
     </div>
   );
 }

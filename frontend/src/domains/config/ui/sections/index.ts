@@ -9,3 +9,4 @@ export { default as TraversalControls } from "./TraversalControls";
 export { default as ChildrenModeControls } from "./ChildrenModeControls";
 export { default as DeduplicateControl } from "./DeduplicateControl";
 export { default as TrustedSourceFilterControl } from "./TrustedSourceFilterControl";
+export { GroupHeading } from "./ConfigControls";

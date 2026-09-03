@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next";
+import { MODAL_FIELD_SM } from "../../../../shared/ui";
+import { CONFIG_HINT } from "./ConfigControls";
 
 export interface CustomNetworkFormProps {
   name: string;
@@ -25,63 +27,58 @@ export default function CustomNetworkForm({
 }: CustomNetworkFormProps) {
   const { t } = useTranslation();
 
-  const inputClass =
-    "px-3 py-1.5 text-xs rounded-xl border bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-all duration-200 border-slate-300 dark:border-slate-600 focus:border-orange-500 focus:ring-orange-500/60 dark:focus:border-orange-400 dark:focus:ring-orange-400/60 shadow-xs";
-
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-3 space-y-2.5">
-      <div className="flex flex-col gap-2.5">
-        <input
-          type="text"
-          placeholder={t("familyTree.config.customNetworkName", "Network name")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={`${inputClass} w-full`}
-        />
-        <input
-          type="number"
-          placeholder={t("familyTree.config.chainId", "Chain ID")}
-          value={chainId}
-          onChange={(e) => setChainId(e.target.value === "" ? "" : Number(e.target.value))}
-          className={`${inputClass} w-full`}
-        />
-        <input
-          type="text"
-          placeholder="https://"
-          value={rpc}
-          onChange={(e) => setRpc(e.target.value)}
-          className={`${inputClass} w-full font-mono`}
-        />
-      </div>
+    <div className="flex flex-col gap-2.5 rounded-xl border border-hairline bg-surface-alt p-3">
+      <input
+        type="text"
+        placeholder={t("familyTree.config.customNetworkName", "Network name")}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className={MODAL_FIELD_SM}
+      />
+      <input
+        type="number"
+        placeholder={t("familyTree.config.chainId", "Chain ID")}
+        value={chainId}
+        onChange={(e) => setChainId(e.target.value === "" ? "" : Number(e.target.value))}
+        className={MODAL_FIELD_SM}
+      />
+      <input
+        type="text"
+        placeholder="https://"
+        value={rpc}
+        onChange={(e) => setRpc(e.target.value)}
+        className={`${MODAL_FIELD_SM} font-mono`}
+      />
 
-      <div className="flex items-center justify-between gap-3 pt-1">
-        <div className="space-y-1 flex-1">
-          <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className={CONFIG_HINT}>
             {t("familyTree.config.addCustomNetworkHint", "Fill in and save to reuse later")}
-          </div>
-          {showCspHint && (
-            <div className="text-[10px] text-orange-500/80 dark:text-orange-400/80 leading-tight">
+          </span>
+          {showCspHint ? (
+            <span className="text-[11px] leading-relaxed text-warning">
               {t(
                 "familyTree.config.customNetworkCspHint",
                 "In preview/production, the RPC origin must be allowlisted by CSP (connect-src).",
               )}
-            </div>
-          )}
+            </span>
+          ) : null}
         </div>
         <button
           type="button"
           onClick={submit}
-          className="shrink-0 px-3 py-1.5 text-xs rounded-full bg-linear-to-r from-orange-400 to-red-500 hover:from-orange-500 hover:to-red-600 text-white font-semibold shadow-xs hover:shadow-md transition-all duration-200"
+          className="h-8 shrink-0 rounded-lg bg-primary px-3 text-xs font-semibold text-white transition-colors hover:bg-primary-hover"
         >
           {t("familyTree.config.addCustomNetwork", "Save custom")}
         </button>
       </div>
 
-      {error && (
-        <div className="text-red-500 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-2 py-1.5 rounded-lg border border-red-100 dark:border-red-800/50">
+      {error ? (
+        <p role="alert" className="rounded-lg border border-danger/30 bg-danger/10 px-2.5 py-1.5 text-[11px] font-medium text-danger">
           {error}
-        </div>
-      )}
+        </p>
+      ) : null}
     </div>
   );
 }
