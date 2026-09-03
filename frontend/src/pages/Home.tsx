@@ -57,7 +57,7 @@ const CTAButtons = memo(() => {
       <NavLink
         to="/familyTree"
         onClick={() => setActivePath("/familyTree")}
-        className="relative inline-flex h-14 overflow-hidden rounded-full p-[2px] focus:outline-hidden focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-50 hover:scale-105 transition-transform duration-300"
+        className="relative inline-flex h-14 overflow-hidden rounded-full p-[2px] focus:outline-hidden focus:ring-2 focus:ring-hairline-strong focus:ring-offset-2 focus:ring-offset-slate-50 hover:scale-105 transition-transform duration-300"
       >
         <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ffffff_0%,#ff9e64_50%,#ffffff_100%)]" />
         <span className="relative z-10 inline-flex h-full w-full cursor-pointer items-center justify-center rounded-full bg-linear-to-r from-orange-400 to-red-500 px-10 py-1 text-base font-bold text-white transition-opacity hover:opacity-90">

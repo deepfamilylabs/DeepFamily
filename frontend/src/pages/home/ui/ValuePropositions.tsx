@@ -9,18 +9,18 @@ const BorderLine = ({ side, className = "" }: { side: "left" | "right"; classNam
     className={`hidden md:block absolute top-0 bottom-0 w-px transition-colors duration-300
       ${side === "left" ? "left-0" : "right-0"}
       ${className}
-      group-hover:bg-slate-300
+      group-hover:bg-hairline-strong
     `}
   >
     {/* Top Cap */}
     <div
-      className={`absolute top-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute top-0 h-px w-3 bg-hairline-strong transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
     {/* Bottom Cap */}
     <div
-      className={`absolute bottom-0 h-px w-3 bg-slate-300 transition-opacity duration-300 opacity-0 group-hover:opacity-100
+      className={`absolute bottom-0 h-px w-3 bg-hairline-strong transition-opacity duration-300 opacity-0 group-hover:opacity-100
         ${side === "left" ? "left-0" : "right-0"}
       `}
     />
@@ -58,24 +58,24 @@ const ValuePropositions = memo(() => {
   ];
 
   return (
-    <section className="py-24 lg:py-32 bg-white relative overflow-hidden">
+    <section className="py-24 lg:py-32 bg-surface relative overflow-hidden">
       <PageContainer>
         {/* Section Header */}
         <div
           className={`text-center mb-12 lg:mb-20 max-w-3xl mx-auto ${ANIMATION_CLASSES.FADE_IN_UP}`}
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 mb-6 border border-slate-200">
-            <TrendingUp className="w-3.5 h-3.5 text-orange-600" />
-            <span className="text-sm font-bold text-slate-600 tracking-wide uppercase">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface-alt mb-6 border border-hairline">
+            <TrendingUp className="w-3.5 h-3.5 text-primary" />
+            <span className="text-sm font-bold text-ink-muted tracking-wide uppercase">
               Value Propositions
             </span>
           </div>
 
-          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight leading-[1.1]">
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-ink mb-6 tracking-tight leading-[1.1]">
             {t("home.valueProps.title")}
           </h2>
 
-          <p className="text-xl text-slate-500 leading-relaxed">{t("home.valueProps.subtitle")}</p>
+          <p className="text-xl text-ink-muted leading-relaxed">{t("home.valueProps.subtitle")}</p>
         </div>
 
         {/* Grid - xAI Style - 2 Row 3 Cols */}
@@ -90,8 +90,8 @@ const ValuePropositions = memo(() => {
             // Construct border classes for responsiveness
             const rightBorderClass = `
               bg-transparent 
-              md:${isLastInRowMd ? "bg-slate-200" : "bg-transparent"} 
-              lg:${isLastInRowLg ? "bg-slate-200" : "bg-transparent"}
+              md:${isLastInRowMd ? "bg-hairline" : "bg-transparent"} 
+              lg:${isLastInRowLg ? "bg-hairline" : "bg-transparent"}
             `;
 
             return (
@@ -99,32 +99,32 @@ const ValuePropositions = memo(() => {
                 {/* Interactive Area Layer (Background & Lines) */}
                 <div className="absolute inset-x-0 top-2 bottom-2 pointer-events-none">
                   {/* Hover Background - Gradient matching Theme */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-r from-orange-50 to-transparent" />
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-linear-to-r from-primary/10 to-transparent" />
 
                   {/* Left Border Line */}
-                  <BorderLine side="left" className="bg-slate-200" />
+                  <BorderLine side="left" className="bg-hairline" />
 
                   {/* Right Border Line (Logic applied) */}
                   <BorderLine side="right" className={rightBorderClass} />
 
                   {/* Mobile Line (Simple left border for <md) */}
-                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-px bg-slate-200" />
+                  <div className="md:hidden absolute left-0 top-0 bottom-0 w-px bg-hairline" />
                 </div>
 
                 {/* Content Layer */}
                 <div className="relative z-10 p-10 lg:p-12 h-full flex flex-col">
                   {/* Icon */}
                   <div className="mb-6 lg:mb-8">
-                    <feature.icon className="w-10 h-10 lg:w-12 lg:h-12 text-slate-400 group-hover:text-orange-600 transition-colors duration-300 stroke-[1.5]" />
+                    <feature.icon className="w-10 h-10 lg:w-12 lg:h-12 text-ink-subtle group-hover:text-primary transition-colors duration-300 stroke-[1.5]" />
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-2xl font-bold text-slate-900 mb-4">
+                  <h3 className="text-2xl font-bold text-ink mb-4">
                     {t(`home.valueProps.${feature.key}.title`)}
                   </h3>
 
                   {/* Description */}
-                  <p className="text-lg text-slate-500 group-hover:text-slate-900 transition-colors duration-300 leading-relaxed">
+                  <p className="text-lg text-ink-muted group-hover:text-ink transition-colors duration-300 leading-relaxed">
                     {t(`home.valueProps.${feature.key}.description`)}
                   </p>
                 </div>

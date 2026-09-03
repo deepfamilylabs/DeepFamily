@@ -27,7 +27,10 @@
     "genealogyBook": "族谱",
     "search": "搜索",
     "people": "人物",
-    "actions": "操作"
+    "actions": "操作",
+    "title": "主导航",
+    "openMenu": "打开菜单",
+    "closeMenu": "关闭菜单"
   },
   "story": {
     "addingChunk": "正在添加故事分段...",
@@ -366,7 +369,8 @@
         "personNfts": "该人物尚无版本被铸造为 NFT。铸造需要先完成背书。"
       },
       "calculatorDesc": "没有哈希？用姓名、生日与身份口令算一个，算完直接填入上方查询框。身份哈希仅在本地计算，不会上传任何数据。"
-    }
+    },
+    "headerPlaceholder": "哈希 / Token ID / 地址"
   },
   "genealogyBook": {
     "peopleUnit": "人",
@@ -812,9 +816,7 @@
   "settings": {
     "title": "设置",
     "theme": "主题",
-    "language": "语言",
-    "close": "关闭设置",
-    "open": "打开设置"
+    "language": "语言"
   },
   "storyEditor": {
     "title": "传记编辑器"
@@ -1494,10 +1496,24 @@
     "unknown": "提交失败，请稍后重试或核对输入。"
   },
   "footer": {
-    "tagline": "您的去中心化数字族谱平台。保存历史，验证真相，构建传承。",
-    "documentation": "文档",
     "privacy": "隐私政策",
     "terms": "服务条款",
     "rights": "© 2026 DeepFamily. MIT License."
+  },
+  "statusBar": {
+    "title": "站点状态",
+    "live": "已连接",
+    "connecting": "连接中",
+    "offline": "已断开",
+    "rpcStatus": "RPC 状态",
+    "headBlock": "最新区块",
+    "unknownNetwork": "未知网络",
+    "changeNetwork": "切换网络"
+  },
+  "legal": {
+    "draftNotice": "该文件尚未发布。在正式发布之前，本页内容不构成任何具有约束力的协议。",
+    "contact": "在此期间如有疑问：",
+    "termsSummary": "未来适用于 DeepFamily dApp 使用的条款。",
+    "privacySummary": "本 dApp 读取什么、什么只留在你的浏览器里、什么在链上公开。"
   }
 }

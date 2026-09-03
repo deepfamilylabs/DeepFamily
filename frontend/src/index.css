@@ -147,6 +147,23 @@ h3 {
 }
 
 /*
+ * Chrome metrics. The header and the desktop status bar are both fixed, so any
+ * surface that sizes itself to the viewport has to subtract them rather than
+ * repeat the magic numbers (see TreePage, GenealogyBookPage, FamilySettingsDrawer).
+ * The status bar is desktop-only — below md the bottom nav owns that edge.
+ */
+:root {
+  --app-header-h: 4rem;
+  --app-statusbar-h: 0rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-statusbar-h: 2rem;
+  }
+}
+
+/*
  * Design tokens — semantic color layer (light + html.dark).
  * Plain hex for readability; Tailwind v4 handles opacity modifiers
  * (bg-primary/10, text-ink-muted/70, …) via color-mix, no channel split needed.

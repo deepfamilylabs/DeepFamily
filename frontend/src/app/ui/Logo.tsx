@@ -2,6 +2,8 @@
  * DeepFamily Logo Component
  * Custom tree-based logo for the DeepFamily application
  */
+import { useId } from "react";
+
 interface LogoProps {
   className?: string;
   size?: number;
@@ -10,6 +12,10 @@ interface LogoProps {
 export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
   const width = size ?? undefined;
   const height = size ?? undefined;
+  // Every instance needs its own gradient id: `url(#id)` resolves to the first
+  // match in the document, so a shared id lets a hidden copy (the header brand
+  // below `md`, say) steal the reference and paint nothing.
+  const gradientId = `brand-gradient-${useId().replace(/:/g, "")}`;
 
   return (
     <svg
@@ -22,7 +28,7 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
     >
       <defs>
         <linearGradient
-          id="brand-gradient"
+          id={gradientId}
           x1="14"
           y1="14"
           x2="114"
@@ -35,7 +41,7 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
       </defs>
       <g
         fill="none"
-        stroke="url(#brand-gradient)"
+        stroke={`url(#${gradientId})`}
         strokeWidth="14"
         strokeLinecap="round"
         strokeLinejoin="round"

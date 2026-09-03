@@ -29,8 +29,8 @@ vi.mock("./FloatingActionButton", () => ({
   default: () => <div data-testid="floating-action-button">floating-action-button</div>,
 }));
 
-vi.mock("./SiteFooter", () => ({
-  default: () => <div data-testid="site-footer">site-footer</div>,
+vi.mock("./StatusBar", () => ({
+  default: () => <div data-testid="status-bar">status-bar</div>,
 }));
 
 function renderLayout(initialEntry: string) {
@@ -59,23 +59,22 @@ describe("Layout", () => {
     cleanup();
   });
 
-  it("renders home as a full-width page shell with footer", () => {
+  it("renders home as a full-width page shell", () => {
     renderLayout("/");
 
     expect(screen.getByTestId("site-header")).toBeTruthy();
     expect(screen.getByTestId("global-sidebar")).toBeTruthy();
     expect(screen.getByTestId("page-content").textContent).toBe("home-content");
     expect(screen.queryByTestId("page-container")).toBeNull();
-    expect(screen.getByTestId("site-footer")).toBeTruthy();
     expect(screen.getByTestId("bottom-nav")).toBeTruthy();
     expect(screen.getByTestId("floating-action-button")).toBeTruthy();
+    expect(screen.getByTestId("status-bar")).toBeTruthy();
   });
 
   it("wraps non-full-width pages in PageContainer and keeps the rail offset", () => {
     const { container } = renderLayout("/actions");
 
     expect(screen.getByTestId("page-container")).toBeTruthy();
-    expect(screen.queryByTestId("site-footer")).toBeNull();
     expect(screen.getByTestId("page-content").textContent).toBe("actions-content");
 
     const main = container.querySelector("main");
@@ -97,5 +96,11 @@ describe("Layout", () => {
 
     expect(screen.getByTestId("page-content").textContent).toBe("genealogy-content");
     expect(screen.queryByTestId("page-container")).toBeNull();
+  });
+
+  it("keeps the status bar on every route — it replaced the landing-page footer", () => {
+    renderLayout("/actions");
+
+    expect(screen.getByTestId("status-bar")).toBeTruthy();
   });
 });

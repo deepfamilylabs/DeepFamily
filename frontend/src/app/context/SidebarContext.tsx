@@ -4,24 +4,28 @@ interface SidebarContextType {
   isMobileOpen: boolean;
   toggleMobileSidebar: () => void;
   closeMobileSidebar: () => void;
-  /** Which sidebar panel is open, on either breakpoint. Null means none. */
-  activeSection: string | null;
-  toggleSection: (section: string) => void;
-  closeSection: () => void;
+  /**
+   * Which settings panel is expanded, on either breakpoint. Null means none.
+   * Distinct from the nav section the rail highlights — that comes from the
+   * route (see navSections).
+   */
+  activePanel: string | null;
+  togglePanel: (panel: string) => void;
+  closePanel: () => void;
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
 
   // Stable identities: consumers put these in effect dependency lists.
   const toggleMobileSidebar = useCallback(() => setIsMobileOpen((prev) => !prev), []);
   const closeMobileSidebar = useCallback(() => setIsMobileOpen(false), []);
-  const closeSection = useCallback(() => setActiveSection(null), []);
-  const toggleSection = useCallback(
-    (section: string) => setActiveSection((prev) => (prev === section ? null : section)),
+  const closePanel = useCallback(() => setActivePanel(null), []);
+  const togglePanel = useCallback(
+    (panel: string) => setActivePanel((prev) => (prev === panel ? null : panel)),
     [],
   );
 
@@ -30,11 +34,11 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       isMobileOpen,
       toggleMobileSidebar,
       closeMobileSidebar,
-      activeSection,
-      toggleSection,
-      closeSection,
+      activePanel,
+      togglePanel,
+      closePanel,
     }),
-    [isMobileOpen, toggleMobileSidebar, closeMobileSidebar, activeSection, toggleSection, closeSection],
+    [isMobileOpen, toggleMobileSidebar, closeMobileSidebar, activePanel, togglePanel, closePanel],
   );
 
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
