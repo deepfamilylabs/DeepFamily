@@ -372,7 +372,8 @@ export function OuBookRenderer({
 
   return (
     <div
-      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto p-4 md:p-6"
+      className="h-full min-h-0 min-w-0 overflow-x-auto overflow-y-auto scroll-smooth p-4 pb-24 md:p-6 md:pb-24"
+      data-paper-scroller=""
       style={paperVars ?? PAPER_VARS}
       data-testid="paper-ou"
     >
@@ -386,7 +387,7 @@ export function OuBookRenderer({
       >
         {spreadItems.length ? (
           <section
-            className="border p-(--df-paper-leaf-margin) shadow-xs"
+            className="paper-book-shadow border p-(--df-paper-leaf-margin)"
             style={{
               ...PAPER_LEAF_STYLE,
               borderColor: PAPER_LINE.strong,

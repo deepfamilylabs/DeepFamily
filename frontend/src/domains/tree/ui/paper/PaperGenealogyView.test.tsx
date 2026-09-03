@@ -570,7 +570,11 @@ describe("PaperGenealogyView", () => {
 
     expect(screen.getByTestId("paper-modern")).toBeTruthy();
     expect(screen.getByTestId("paper-modern-chart").className).toContain("border");
-    expect(screen.getByTestId("paper-modern-page").className).toContain("h-[872px]");
+    // The spread must NOT pin its own height. Its frame border and padding sit OUTSIDE the 872px
+    // page, so with box-sizing: border-box a fixed 872 here left the page taller than the content
+    // box and overflow-hidden clipped the ledger's last row (18px of it on the default 文武边).
+    expect(screen.getByTestId("paper-modern-page").className).not.toContain("h-[872px]");
+    expect(screen.getByTestId("paper-modern-left-1-1").className).toContain("h-[872px]");
     expect(screen.getByTestId("paper-modern-page").className).toContain("min-w-[1180px]");
     expect(screen.getByTestId("paper-modern-page").className).toContain("overflow-hidden");
     expect(screen.getByTestId("paper-modern-page").style.background).toBe("var(--df-paper-sheet)");

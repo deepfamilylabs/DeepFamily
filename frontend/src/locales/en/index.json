@@ -369,12 +369,19 @@
     }
   },
   "genealogyBook": {
-    "title": "Genealogy Book",
-    "subtitle": "Paper-style genealogy preview",
     "peopleUnit": "People",
     "generationsUnit": "Generations",
     "styleLabel": "Style",
     "styleSwitchLabel": "Genealogy book style",
+    "reading": {
+      "leafPosition": "Leaf {{index}} / {{count}}",
+      "coverLeaf": "Cover",
+      "prevLeaf": "Previous leaf",
+      "nextLeaf": "Next leaf",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitPage": "Fit page"
+    },
     "exportPdf": "Export PDF",
     "exportPdfSuccess": "PDF exported",
     "exportPdfError": "Export failed",
@@ -441,9 +448,6 @@
     "settings": {
       "title": "Paper book settings",
       "resetDefault": "Reset defaults",
-      "paperInfoLabel": "Book information",
-      "paperAppearanceLabel": "Paper appearance",
-      "typesettingLabel": "Typesetting",
       "spineTitleLabel": "Genealogy title",
       "spineTitleHint": "Leave blank to use the auto-generated title",
       "hallNameLabel": "Hall name",
@@ -507,7 +511,14 @@
         "double": "Double rule",
         "sides": "Side double",
         "wenwu": "Thick-thin"
-      }
+      },
+      "tabs": {
+        "book": "Book",
+        "cover": "Cover",
+        "paper": "Paper",
+        "typesetting": "Layout"
+      },
+      "livePreviewHint": "Changes show on the sheet at once"
     },
     "styles": {
       "ou": "Ou-style",

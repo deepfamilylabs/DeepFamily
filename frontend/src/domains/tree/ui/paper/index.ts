@@ -54,3 +54,12 @@ export {
   type PaperFontPresetId,
   type PaperTextureId,
 } from "./paperAppearance";
+export {
+  usePaperReadingView,
+  PAPER_VIEW_ZOOM_MAX,
+  PAPER_VIEW_ZOOM_MIN,
+  PAPER_VIEW_ZOOM_STEP,
+  type PaperReadingLeaf,
+  type PaperReadingView,
+} from "./usePaperReadingView";
+export { PAPER_PREVIEW_MAX_WIDTH_PX, PAPER_SPREAD_HEIGHT_PX } from "./paperStyles";

@@ -369,12 +369,19 @@
     }
   },
   "genealogyBook": {
-    "title": "族谱纸本视图",
-    "subtitle": "以传统族谱风格实时预览",
     "peopleUnit": "人",
     "generationsUnit": "世",
     "styleLabel": "谱式",
     "styleSwitchLabel": "族谱样式",
+    "reading": {
+      "leafPosition": "第 {{index}} / {{count}} 叶",
+      "coverLeaf": "封面",
+      "prevLeaf": "上一叶",
+      "nextLeaf": "下一叶",
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "fitPage": "适页"
+    },
     "exportPdf": "导出 PDF",
     "exportPdfSuccess": "PDF 已导出",
     "exportPdfError": "导出失败",
@@ -441,9 +448,6 @@
     "settings": {
       "title": "纸谱设置",
       "resetDefault": "恢复默认",
-      "paperInfoLabel": "谱书信息",
-      "paperAppearanceLabel": "纸张外观",
-      "typesettingLabel": "排版设置",
       "spineTitleLabel": "谱名",
       "spineTitleHint": "留空则使用自动生成的标题",
       "hallNameLabel": "堂号",
@@ -507,7 +511,14 @@
         "double": "四周双边",
         "sides": "左右双边",
         "wenwu": "文武边"
-      }
+      },
+      "tabs": {
+        "book": "谱书",
+        "cover": "封面",
+        "paper": "纸张",
+        "typesetting": "排版"
+      },
+      "livePreviewHint": "改动即时反映在书页上"
     },
     "styles": {
       "ou": "欧式",
