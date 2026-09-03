@@ -1,5 +1,6 @@
+import { useEffect, useRef } from "react";
 import { BookOpen } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PersonHashCalculator } from "../domains/person";
 import { PageHead } from "../shared/ui";
 import { useUnifiedSearch } from "./search/hooks/useUnifiedSearch";
@@ -23,6 +24,19 @@ import {
 export default function SearchPage() {
   const unified = useUnifiedSearch();
   const { t, search, submitted } = unified;
+
+  // The header's search box hands its query over as ?q=; run it once per query
+  // so a re-render (or a changing searchFor identity) can't re-issue it.
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q")?.trim() ?? "";
+  const { searchFor } = unified;
+  const appliedQueryRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!query || appliedQueryRef.current === query) return;
+    appliedQueryRef.current = query;
+    void searchFor(query);
+  }, [query, searchFor]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 pb-8 text-ink md:pb-0">

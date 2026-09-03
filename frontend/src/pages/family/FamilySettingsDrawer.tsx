@@ -51,7 +51,7 @@ export function FamilySettingsDrawer({
         aria-hidden={!open}
         className={`absolute inset-y-0 left-0 z-40 w-[min(20rem,88vw)] shrink-0 overflow-hidden shadow-xl shadow-ink/10 transition-transform duration-300 ease-out md:z-auto md:translate-x-0 md:shadow-none md:transition-[width] ${
           layout === "document"
-            ? "md:sticky md:top-16 md:bottom-auto md:h-[calc(100vh-4rem)] md:self-start"
+            ? "md:sticky md:top-16 md:bottom-auto md:h-[calc(100vh-var(--app-header-h)-var(--app-statusbar-h))] md:self-start"
             : "md:static"
         } ${
           open ? "translate-x-0 md:w-80" : "pointer-events-none -translate-x-full md:w-0"

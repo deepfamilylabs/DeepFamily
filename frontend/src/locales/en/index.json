@@ -27,7 +27,10 @@
     "genealogyBook": "Genealogy",
     "search": "Search",
     "people": "People",
-    "actions": "Actions"
+    "actions": "Actions",
+    "title": "Main navigation",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "story": {
     "addingChunk": "Adding story chunk...",
@@ -366,7 +369,8 @@
         "personNfts": "No version of this person has been minted yet. Minting requires a prior endorsement."
       },
       "calculatorDesc": "No hash yet? Compute one from a name, birth date and passphrase — it drops straight into the query box above. Identity hashes are computed locally; nothing is uploaded."
-    }
+    },
+    "headerPlaceholder": "Hash, token ID or address"
   },
   "genealogyBook": {
     "peopleUnit": "People",
@@ -812,9 +816,7 @@
   "settings": {
     "title": "Settings",
     "theme": "Theme",
-    "language": "Language",
-    "close": "Close settings",
-    "open": "Open settings"
+    "language": "Language"
   },
   "storyEditor": {
     "title": "Story Editor"
@@ -1494,10 +1496,24 @@
     "unknown": "Submission failed. Please retry later or verify your inputs."
   },
   "footer": {
-    "tagline": "Your decentralized digital genealogy platform. Preserve history, verify truth, and build legacy.",
-    "documentation": "Documentation",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
     "rights": "© 2026 DeepFamily. MIT License."
+  },
+  "statusBar": {
+    "title": "Site status",
+    "live": "Live",
+    "connecting": "Connecting",
+    "offline": "Offline",
+    "rpcStatus": "RPC status",
+    "headBlock": "Head block",
+    "unknownNetwork": "Unknown network",
+    "changeNetwork": "Change network"
+  },
+  "legal": {
+    "draftNotice": "This document has not been published yet. Until it is, nothing here should be read as a binding agreement.",
+    "contact": "Questions in the meantime:",
+    "termsSummary": "The terms that will govern use of the DeepFamily dApp.",
+    "privacySummary": "What this dApp reads, what stays in your browser, and what is public on-chain."
   }
 }

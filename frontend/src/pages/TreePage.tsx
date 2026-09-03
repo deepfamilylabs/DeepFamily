@@ -267,7 +267,7 @@ export default function TreePage() {
           mergeNodeDetail={mergeNodeDetail}
         >
           <TreeInteractionBridge>
-            <div className="relative flex h-[calc(100vh-4rem)] w-full flex-col overflow-hidden bg-surface">
+            <div className="relative flex h-[calc(100vh-var(--app-header-h)-var(--app-statusbar-h))] w-full flex-col overflow-hidden bg-surface">
               <TreePageBar
                 t={t}
                 rootLabel={rootLabel}

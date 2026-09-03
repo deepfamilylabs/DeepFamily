@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   graphNodeDepths: {} as Record<string, number>,
   loading: false,
   treeErrors: [] as unknown[],
+  contractMessage: "",
   treeRefresh: vi.fn(),
   setActivePath: vi.fn(),
 }));
@@ -49,6 +50,7 @@ vi.mock("../domains/tree", () => ({
   }),
   useTreeStatus: () => ({
     loading: mocks.loading,
+    contractMessage: mocks.contractMessage,
     errors: mocks.treeErrors,
     refresh: mocks.treeRefresh,
     clearAllCaches: vi.fn(),
@@ -93,6 +95,13 @@ vi.mock("../domains/person", () => ({
 
 vi.mock("../shared/ui", () => ({
   PageContainer: ({ children }: any) => <div>{children}</div>,
+  EmptyState: ({ title, description, action }: any) => (
+    <div>
+      <p>{title}</p>
+      {description ? <p>{description}</p> : null}
+      {action}
+    </div>
+  ),
   PageHead: ({ title, subtitle, trailing }: any) => (
     <div>
       <h1>{title}</h1>
@@ -167,6 +176,7 @@ describe("PeoplePage", () => {
     mocks.graphNodeDepths = {};
     mocks.loading = false;
     mocks.treeErrors = [];
+    mocks.contractMessage = "";
     mocks.treeRefresh.mockReset();
     mocks.setActivePath.mockReset();
 
@@ -232,6 +242,30 @@ describe("PeoplePage", () => {
     // the panel summary and the toolbar chip both name it
     expect(screen.getAllByText("Generation 2").length).toBeGreaterThan(0);
     expect(screen.getByText("1 filtered results")).toBeTruthy();
+  });
+
+  it("keeps a recovered build error off the page — the cold start retries and succeeds", async () => {
+    // The tree logs non-fatal errors as it goes and never clears them, so the
+    // first cold run's revert used to keep the failure UI up after the retry.
+    mocks.treeErrors = [{ message: "execution reverted: InvalidVersionIndex()" }];
+    mocks.nodesData = {};
+    mocks.graphNodeIds = [];
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByText("No stories found")).toBeTruthy());
+    expect(screen.queryByText("Could not load people")).toBeNull();
+  });
+
+  it("shows the failure only while the session itself reports one", async () => {
+    mocks.contractMessage = "Root node not found";
+    mocks.nodesData = {};
+    mocks.graphNodeIds = [];
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByText("Could not load people")).toBeTruthy());
+    expect(screen.getByText("Root node not found")).toBeTruthy();
   });
 
   it("hides the generation control when the projection carries no depths", async () => {

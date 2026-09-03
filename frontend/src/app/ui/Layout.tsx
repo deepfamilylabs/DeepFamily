@@ -12,8 +12,8 @@ import BottomNav from "./BottomNav";
 import { PageContainer } from "../../shared/ui";
 import SiteHeader from "./SiteHeader";
 import FloatingActionButton from "./FloatingActionButton";
-import SiteFooter from "./SiteFooter";
 import GlobalSidebar from "./GlobalSidebar";
+import StatusBar from "./StatusBar";
 
 export default function Layout() {
   const location = useLocation();
@@ -32,8 +32,9 @@ export default function Layout() {
           "bg-linear-to-b from-sky-50 to-white dark:from-gray-950 dark:to-gray-900"
         : "bg-surface-body";
 
-  // The desktop rail is 4rem wide and its open states overlay the page, so the
-  // content offset is constant — opening the sidebar never reflows the page.
+  // The desktop rail is 4rem wide and runs the full viewport height, so the
+  // header, the page and the status bar all clear it by the same constant 4rem.
+  // Its open states overlay the page, so opening the sidebar never reflows it.
   return (
     <div className={`${bgClass} min-h-screen transition-colors duration-300`}>
       <SiteHeader />
@@ -42,12 +43,12 @@ export default function Layout() {
         {isFullWidthPage ? (
           <Outlet />
         ) : (
-          <PageContainer className="pt-10 pb-16 md:pb-6">
+          <PageContainer className="pt-10 pb-16 md:pb-12">
             <Outlet />
           </PageContainer>
         )}
       </main>
-      {isHomePage && <SiteFooter />}
+      <StatusBar />
       <div className="md:hidden">
         <BottomNav />
       </div>

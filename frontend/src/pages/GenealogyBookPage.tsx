@@ -306,7 +306,7 @@ export default function GenealogyBookPage() {
   }, [readingView]);
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full flex-col overflow-hidden bg-stone-100 dark:bg-slate-950">
+    <div className="flex h-[calc(100vh-var(--app-header-h)-var(--app-statusbar-h))] w-full flex-col overflow-hidden bg-stone-100 dark:bg-slate-950">
       {/* Reading down the book folds the shared family bar away so the 谱式 row meets the site
       header, giving the sheet another 56px; any upward scroll brings it straight back. Hidden via
       `visibility` as well as height so the collapsed nav leaves the focus order. */}

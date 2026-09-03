@@ -33,7 +33,7 @@ import {
 
 export function usePeoplePageController() {
   const { nodesData } = useTreeGraphData();
-  const { loading, errors, refresh } = useTreeStatus();
+  const { loading, contractMessage, refresh } = useTreeStatus();
   const [projectionEnabled, setProjectionEnabled] = useState(false);
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
@@ -136,15 +136,13 @@ export function usePeoplePageController() {
     navigate("/familyTree");
   }, [navigate, setActivePath]);
 
-  // The tree loads progressively and collects non-fatal errors; the newest one
-  // is what the page shows when it ends up with nothing to list.
-  const loadError = useMemo(() => {
-    const last = errors.length ? errors[errors.length - 1] : null;
-    if (!last) return "";
-    if (typeof last === "string") return last;
-    const message = (last as { message?: unknown }).message;
-    return typeof message === "string" && message ? message : String(last);
-  }, [errors]);
+  // The build session's own status, not the tree's error log. That log is an
+  // append-only diagnostic record — a failure a later run recovered from stays
+  // in it for the life of the page, so reading its newest entry showed "could
+  // not load people" over the cold-start retry and then over every empty filter
+  // result afterwards. `contractMessage` is cleared at the start of each run and
+  // set only by a run that actually failed.
+  const loadError = contractMessage || "";
 
   const stats = useMemo(
     () => getPeoplePageStats({ graphNodes: graph.nodes, nodesData, people }),

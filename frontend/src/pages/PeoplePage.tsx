@@ -51,7 +51,7 @@ export default function PeoplePage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface-body text-ink selection:bg-primary/30">
+    <div className="min-h-screen bg-surface-body pb-[var(--app-statusbar-h)] text-ink selection:bg-primary/30">
       <TreePageBar
         t={t}
         rootLabel={rootLabel}

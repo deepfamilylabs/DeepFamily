@@ -4,12 +4,15 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import BottomNav from "./BottomNav";
-import SiteHeader from "./SiteHeader";
+import GlobalSidebar from "./GlobalSidebar";
 
 const mocks = vi.hoisted(() => ({
   activePath: "/genealogyBook",
   setActivePath: vi.fn(),
-  toggleMobileSidebar: vi.fn(),
+  closeMobileSidebar: vi.fn(),
+  togglePanel: vi.fn(),
+  closePanel: vi.fn(),
+  toggleTheme: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -17,7 +20,7 @@ vi.mock("react-i18next", () => ({
     t: (key: string, fallback?: string) => {
       const labels: Record<string, string> = {
         "navigation.home": "Home",
-        "navigation.familyTree": "Tree",
+        "navigation.familyTree": "Family",
         "navigation.people": "People",
         "navigation.genealogyBook": "Genealogy",
         "navigation.search": "Search",
@@ -25,6 +28,7 @@ vi.mock("react-i18next", () => ({
       };
       return labels[key] || fallback || key;
     },
+    i18n: { language: "en", changeLanguage: vi.fn() },
   }),
 }));
 
@@ -34,31 +38,37 @@ vi.mock("../context", () => ({
     setActivePath: mocks.setActivePath,
   }),
   useSidebar: () => ({
-    toggleMobileSidebar: mocks.toggleMobileSidebar,
+    isMobileOpen: false,
+    closeMobileSidebar: mocks.closeMobileSidebar,
+    activePanel: null,
+    togglePanel: mocks.togglePanel,
+    closePanel: mocks.closePanel,
   }),
+  useTheme: () => ({ isDark: false, toggleTheme: mocks.toggleTheme }),
 }));
 
 vi.mock("../../shared/ui", () => ({
-  PageContainer: ({ children, className }: any) => <div className={className}>{children}</div>,
-}));
-
-vi.mock("./HeaderControls", () => ({
-  default: () => <div data-testid="header-controls" />,
+  useResponsiveModalMode: () => true,
 }));
 
 vi.mock("./Logo", () => ({
   default: (props: any) => <svg data-testid="logo" {...props} />,
 }));
 
-vi.mock("../config/brandBadge", () => ({
-  getBadgeConfig: () => null,
-}));
+/** The two surfaces that carry section entries: the rail and the bottom nav. */
+function renderNavigation() {
+  return render(
+    <MemoryRouter>
+      <GlobalSidebar />
+      <BottomNav />
+    </MemoryRouter>,
+  );
+}
 
 describe("genealogy volume navigation", () => {
   beforeEach(() => {
     mocks.activePath = "/genealogyBook";
     mocks.setActivePath.mockReset();
-    mocks.toggleMobileSidebar.mockReset();
   });
 
   afterEach(() => {
@@ -66,12 +76,7 @@ describe("genealogy volume navigation", () => {
   });
 
   it("keeps the genealogy volumes out of the main navigation (they live on the tree page bar)", () => {
-    render(
-      <MemoryRouter>
-        <SiteHeader />
-        <BottomNav />
-      </MemoryRouter>,
-    );
+    renderNavigation();
 
     const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
 
@@ -85,22 +90,20 @@ describe("genealogy volume navigation", () => {
     for (const path of ["/familyTree", "/people", "/genealogyBook", "/person/7", "/editor/7"]) {
       mocks.activePath = path;
 
-      render(
-        <MemoryRouter>
-          <SiteHeader />
-          <BottomNav />
-        </MemoryRouter>,
-      );
+      renderNavigation();
 
       const familyEntries = screen
         .getAllByRole("link")
-        .filter((link) => link.getAttribute("href") === "/familyTree")
-        .map((link) => link.className);
+        .filter((link) => link.getAttribute("href") === "/familyTree");
 
+      // Both surfaces light up for the whole section.
       expect(familyEntries).toHaveLength(2);
-      // Header pill and bottom-nav item both light up for the whole section.
-      expect(familyEntries.some((className) => className.includes("bg-slate-900"))).toBe(true);
-      expect(familyEntries.some((className) => className.includes("text-orange-600"))).toBe(true);
+      for (const entry of familyEntries) {
+        expect(entry.className).toContain("text-orange-600");
+      }
+      expect(
+        familyEntries.some((entry) => entry.getAttribute("aria-current") === "page"),
+      ).toBe(true);
 
       cleanup();
     }
