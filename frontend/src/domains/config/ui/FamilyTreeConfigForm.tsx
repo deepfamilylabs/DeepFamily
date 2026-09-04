@@ -3,11 +3,8 @@ import { useFamilyTreeConfigForm } from "./hooks/useFamilyTreeConfigForm";
 import {
   ChildrenModeControls,
   ConfigFormActions,
-  ContractAddressField,
-  CustomNetworkForm,
   DeduplicateControl,
   GroupHeading,
-  NetworkPicker,
   RootHashField,
   RootHashHistory,
   TraversalControls,
@@ -25,9 +22,15 @@ import {
  * and say what each one does, so the structure is carried by headings and
  * hairlines instead.
  *
- * The two halves behave differently, and the panel says so: network and data
- * source are staged locally and only applied on save (the footer tracks that),
- * while the display options drive the current view as soon as they are touched.
+ * The two halves behave differently, and the panel says so: the data source is
+ * staged locally and only applied on save (the footer tracks that), while the
+ * display options drive the current view as soon as they are touched.
+ *
+ * Which network to read from is deliberately not here, and neither is the entry
+ * contract. Neither is a property of a family: the network belongs to the whole
+ * session and is picked from the status bar chip (the sidebar drawer on mobile),
+ * and the contract address belongs to a deployment, so it comes from the
+ * environment. What is left is which family, and how to draw it.
  */
 export default function FamilyTreeConfigForm() {
   const ctrl = useFamilyTreeConfigForm();
@@ -37,9 +40,6 @@ export default function FamilyTreeConfigForm() {
     <div className="flex h-full min-h-0 flex-col bg-surface text-ink">
       <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-3 py-3.5">
         <GroupHeading title={t("familyTree.config.dataSource", "Data Source")} />
-        <NetworkPicker {...ctrl.network} />
-        {ctrl.customForm.visible ? <CustomNetworkForm {...ctrl.customForm} /> : null}
-        <ContractAddressField {...ctrl.contract} />
         <RootHashField {...ctrl.root} />
         <RootHashHistory {...ctrl.history} />
         <VersionPicker {...ctrl.version} />

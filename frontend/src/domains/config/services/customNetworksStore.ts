@@ -20,6 +20,9 @@ export function loadCustomNetworks(): NetworkOption[] {
         chainId: n.chainId as number,
         name: n.name as string,
         rpcUrl: n.rpcUrl as string,
+        // Records saved before custom networks carried one load without it; the
+        // switch then falls back the way any unknown chain does.
+        readerAddress: typeof n.readerAddress === "string" ? n.readerAddress : undefined,
         isCustom: true,
       }));
   } catch {
@@ -29,7 +32,12 @@ export function loadCustomNetworks(): NetworkOption[] {
 
 export function saveCustomNetworks(list: NetworkOption[]): void {
   try {
-    const serialized = list.map(({ chainId, name, rpcUrl }) => ({ chainId, name, rpcUrl }));
+    const serialized = list.map(({ chainId, name, rpcUrl, readerAddress }) => ({
+      chainId,
+      name,
+      rpcUrl,
+      ...(readerAddress ? { readerAddress } : {}),
+    }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
   } catch {
     /* ignore quota / serialization errors */

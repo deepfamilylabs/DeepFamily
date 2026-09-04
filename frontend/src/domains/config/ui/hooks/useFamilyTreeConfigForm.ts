@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../context";
-import { NETWORK_PRESETS } from "../../../../shared/config";
 import {
-  isDevMode,
   shouldShowDeduplicateToggle,
   shouldShowNodeModeToggle,
   shouldShowTrustedSourceFilterToggle,
 } from "../../../../shared/config/env";
-import { useToast } from "../../../../shared/ui";
 import { useTreeMutations, useVizOptions } from "../../../tree";
 import { usePersonVersionOptions } from "../../../transactions/hooks/usePersonVersionOptions";
-import { isAddress, isHash32, isUrl, reconcileRootVersionSelection } from "../../model";
-import type { NetworkOption, NetworkSelection } from "../../model";
-import { getLocalizedDefaultRoot, loadCustomNetworks, saveCustomNetworks } from "../../services";
+import { isHash32, reconcileRootVersionSelection, summarizeDataSourceHealth } from "../../model";
+import type { ReaderHealth } from "../../model";
+import type { RootHashPresence } from "../sections/RootHashField";
+import { getLocalizedDefaultRoot } from "../../services";
+import { useNetworkName } from "./useNetworkName";
 
 type FormErrors = {
-  rpc?: string;
-  chainId?: string;
-  contract?: string;
   root?: string;
   version?: string;
 };
@@ -26,12 +22,11 @@ type FormErrors = {
 export type FamilyTreeConfigFormController = ReturnType<typeof useFamilyTreeConfigForm>;
 
 export function useFamilyTreeConfigForm() {
-  const { t, i18n } = useTranslation();
-  const toast = useToast();
+  const { i18n } = useTranslation();
   const {
-    rpcUrl,
-    chainId,
     readerAddress,
+    contractAddress,
+    moduleResolutionError,
     rootHash,
     rootVersionIndex,
     update,
@@ -53,24 +48,15 @@ export function useFamilyTreeConfigForm() {
     setTrustedSourceFilterEnabled,
   } = useVizOptions();
   const { clearAllCaches } = useTreeMutations();
+  const networkName = useNetworkName();
 
-  const isDev = isDevMode();
   const showNodeModeToggle = useMemo(() => shouldShowNodeModeToggle(), []);
   const showDeduplicateToggle = useMemo(() => shouldShowDeduplicateToggle(), []);
   const showTrustedSourceFilterToggle = useMemo(() => shouldShowTrustedSourceFilterToggle(), []);
 
-  const [localRpcUrl, setLocalRpcUrl] = useState(rpcUrl);
-  const [localChainId, setLocalChainId] = useState(chainId);
-  const [localReaderAddress, setLocalReaderAddress] = useState(readerAddress);
   const [localRootHash, setLocalRootHash] = useState(rootHash);
   const [localVersion, setLocalVersion] = useState(rootVersionIndex);
   const [errors, setErrors] = useState<FormErrors>({});
-
-  const [customNetworks, setCustomNetworks] = useState<NetworkOption[]>(() => loadCustomNetworks());
-  const [customName, setCustomName] = useState("");
-  const [customChainId, setCustomChainId] = useState<number | "">("");
-  const [customRpc, setCustomRpc] = useState("");
-  const [customError, setCustomError] = useState<string | null>(null);
 
   // The hash the version index was last decided for, so an arriving lookup only
   // preselects a version for a hash the user has not already answered. Seeded
@@ -78,13 +64,10 @@ export function useFamilyTreeConfigForm() {
   const decidedVersionHashRef = useRef<string | null>(rootHash || null);
 
   useEffect(() => {
-    setLocalRpcUrl(rpcUrl);
-    setLocalChainId(chainId);
-    setLocalReaderAddress(readerAddress);
     setLocalRootHash(rootHash);
     setLocalVersion(rootVersionIndex);
     decidedVersionHashRef.current = rootHash || null;
-  }, [rpcUrl, chainId, readerAddress, rootHash, rootVersionIndex]);
+  }, [rootHash, rootVersionIndex]);
 
   // Reads through the saved connection, not the unsaved one being edited above:
   // a hash is looked up against the network the app is currently talking to.
@@ -121,76 +104,63 @@ export function useFamilyTreeConfigForm() {
     [localRootHash, rootVersionLookup.personHash],
   );
 
-  const presetNetworks = useMemo<NetworkOption[]>(
-    () =>
-      NETWORK_PRESETS.map((n) => ({
-        chainId: n.chainId,
-        name: t(n.nameKey, n.defaultName) || n.defaultName,
-        rpcUrl: n.rpcUrl,
-      })),
-    [t, i18n.language],
-  );
+  /**
+   * What the configured reader turned out to be on the chain in use — the same
+   * judgment the status bar reports, so the two never disagree.
+   *
+   * Nothing here can change it: the entry contract is a property of a
+   * deployment, not of a family, so it comes from the environment (and from the
+   * per-chain address book a switch consults). The panel only needs to know when
+   * it is broken, because then the root lookups below mean nothing.
+   */
+  const readerHealth: ReaderHealth = summarizeDataSourceHealth({
+    readerAddress,
+    contractAddress,
+    moduleResolutionError,
+    root: "idle",
+  }).reader;
 
-  const allNetworks = useMemo<NetworkOption[]>(
-    () => [...presetNetworks, ...customNetworks],
-    [presetNetworks, customNetworks],
-  );
+  /**
+   * Whether the chain carries the hash in the field — the unsaved one, checked
+   * as it is typed, the way the version list below has always been.
+   *
+   * Only ever about the hash the lookup actually ran for: a stale answer from
+   * the previous hash would condemn whatever is being typed over it.
+   */
+  const rootPresence: RootHashPresence = !rootHashIsValid
+    ? "idle"
+    : // A dead reader fails every lookup here; that is the reader's fault, and
+      // the version field below already points at it.
+      readerHealth === "unreachable"
+      ? "idle"
+      : rootVersionLookup.personHash !== localRootHash || rootVersionLookup.status === "loading"
+        ? "checking"
+        : rootVersionLookup.status === "ready"
+          ? rootVersionLookup.totalVersions > 0
+            ? "present"
+            : "absent"
+          : "idle";
 
-  const inferNetworkSelection = useCallback(
-    (rpc: string): NetworkSelection => {
-      const found = allNetworks.find((n) => n.rpcUrl === rpc);
-      return found ? found.chainId : "custom";
-    },
-    [allNetworks],
-  );
-
-  const [selectedNetwork, setSelectedNetwork] = useState<NetworkSelection>(() =>
-    inferNetworkSelection(rpcUrl),
-  );
-  const [isNetworkDropdownOpen, setIsNetworkDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsNetworkDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    setSelectedNetwork(inferNetworkSelection(localRpcUrl));
-    const found = allNetworks.find((n) => n.rpcUrl === localRpcUrl);
-    if (found) setLocalChainId(found.chainId);
-  }, [localRpcUrl, allNetworks, inferNetworkSelection]);
+  const rootIsAbsent = rootPresence === "absent";
 
   const validateAll = useCallback(() => {
     const next: FormErrors = {};
-    if (!isUrl(localRpcUrl)) next.rpc = "familyTree.validation.rpc";
-    if (!Number.isFinite(localChainId) || (localChainId || 0) <= 0)
-      next.chainId = "familyTree.validation.chainIdInvalid";
-    if (!isAddress(localReaderAddress)) next.contract = "familyTree.validation.reader";
     if (!isHash32(localRootHash)) next.root = "familyTree.validation.root";
     // 0 is the picker's "nothing chosen" state, which a cleared hash leaves
-    // behind; the tree cannot be loaded from it.
-    if (!Number.isFinite(localVersion) || (localVersion || 0) < 1)
+    // behind; the tree cannot be loaded from it. But a hash the chain does not
+    // carry offers nothing to pick, and this demand would sit in the one slot
+    // the field has — burying the note that says why the list is empty.
+    if (!rootIsAbsent && (!Number.isFinite(localVersion) || (localVersion || 0) < 1))
       next.version = "familyTree.validation.version";
     setErrors(next);
     return Object.keys(next).length === 0;
-  }, [localRpcUrl, localChainId, localReaderAddress, localRootHash, localVersion]);
+  }, [localRootHash, localVersion, rootIsAbsent]);
 
   useEffect(() => {
     validateAll();
   }, [validateAll]);
 
-  const hasDiff =
-    localRpcUrl !== rpcUrl ||
-    localChainId !== chainId ||
-    localReaderAddress !== readerAddress ||
-    localRootHash !== rootHash ||
-    localVersion !== rootVersionIndex;
+  const hasDiff = localRootHash !== rootHash || localVersion !== rootVersionIndex;
 
   const getLocalizedFormDefaultRoot = useCallback(() => {
     return getLocalizedDefaultRoot(i18n.language, {
@@ -201,9 +171,6 @@ export function useFamilyTreeConfigForm() {
 
   const resetToDefaults = useCallback(() => {
     const localized = getLocalizedFormDefaultRoot();
-    setLocalRpcUrl(defaults.rpcUrl);
-    setLocalChainId(defaults.chainId);
-    setLocalReaderAddress(defaults.readerAddress);
     setLocalRootHash(localized.hash);
     setLocalVersion(localized.version);
     // The defaults name their own version; the lookup for that hash must not
@@ -213,106 +180,16 @@ export function useFamilyTreeConfigForm() {
 
   const applyConfigChanges = useCallback(() => {
     if (!validateAll()) return;
+    // Only the root moves from here now. The reader and the addresses derived
+    // from it belong to the connection, which this panel no longer edits, so
+    // clearing them would cost a resolution round trip for nothing.
     update({
-      rpcUrl: localRpcUrl,
-      chainId: localChainId,
-      readerAddress: localReaderAddress,
-      contractAddress: "",
-      tokenAddress: "",
       rootHash: localRootHash,
       rootVersionIndex: localVersion,
     });
-  }, [
-    update,
-    validateAll,
-    localRpcUrl,
-    localChainId,
-    localReaderAddress,
-    localRootHash,
-    localVersion,
-  ]);
-
-  const persistCustomNetworks = useCallback((list: NetworkOption[]) => {
-    setCustomNetworks(list);
-    saveCustomNetworks(list);
-  }, []);
-
-  const handleNetworkChange = useCallback(
-    (value: string) => {
-      if (value === "custom") {
-        setSelectedNetwork("custom");
-        setLocalChainId(0);
-        return;
-      }
-      const id = Number(value);
-      const network = allNetworks.find((n) => n.chainId === id);
-      if (network) {
-        setSelectedNetwork(id);
-        setLocalRpcUrl(network.rpcUrl);
-        setLocalChainId(network.chainId);
-      } else {
-        setSelectedNetwork("custom");
-      }
-    },
-    [allNetworks],
-  );
-
-  const addCustomNetwork = useCallback(() => {
-    setCustomError(null);
-    const idNum = typeof customChainId === "number" ? customChainId : Number(customChainId);
-    if (!customName.trim() || !Number.isFinite(idNum) || idNum <= 0 || !isUrl(customRpc)) {
-      setCustomError(
-        t(
-          "familyTree.validation.customNetwork",
-          "Please enter network name, valid chain ID, and RPC URL",
-        ),
-      );
-      return;
-    }
-    if (presetNetworks.some((n) => n.chainId === idNum)) {
-      setCustomError(
-        t("familyTree.validation.chainIdConflict", "Chain ID already exists in built-in networks"),
-      );
-      return;
-    }
-    const trimmedRpc = customRpc.trim();
-    if (presetNetworks.some((n) => n.rpcUrl === trimmedRpc)) {
-      setCustomError(
-        t("familyTree.validation.rpcConflict", "RPC already exists in built-in networks"),
-      );
-      return;
-    }
-    const newNetwork: NetworkOption = {
-      chainId: idNum,
-      name: customName.trim(),
-      rpcUrl: trimmedRpc,
-      isCustom: true,
-    };
-    const next = [
-      ...customNetworks.filter((n) => n.chainId !== idNum && n.rpcUrl !== trimmedRpc),
-      newNetwork,
-    ];
-    persistCustomNetworks(next);
-    setLocalRpcUrl(trimmedRpc);
-    setLocalChainId(idNum);
-    setSelectedNetwork(idNum);
-    setCustomName("");
-    setCustomChainId("");
-    setCustomRpc("");
-    toast.success(t("familyTree.config.customNetworkAdded", "Custom network added"));
-  }, [
-    customChainId,
-    customName,
-    customNetworks,
-    customRpc,
-    persistCustomNetworks,
-    presetNetworks,
-    t,
-    toast,
-  ]);
+  }, [update, validateAll, localRootHash, localVersion]);
 
   return {
-    isDev,
     showNodeModeToggle,
     showDeduplicateToggle,
     showTrustedSourceFilterToggle,
@@ -324,42 +201,12 @@ export function useFamilyTreeConfigForm() {
       clearAllCaches,
     },
 
-    network: {
-      selected: selectedNetwork,
-      isOpen: isNetworkDropdownOpen,
-      setOpen: setIsNetworkDropdownOpen,
-      dropdownRef,
-      presets: presetNetworks,
-      custom: customNetworks,
-      onChange: handleNetworkChange,
-      rpcUrl: localRpcUrl,
-      chainId: localChainId,
-      rpcError: errors.rpc,
-    },
-
-    customForm: {
-      visible: selectedNetwork === "custom",
-      name: customName,
-      chainId: customChainId,
-      rpc: customRpc,
-      error: customError,
-      showCspHint: !isDev,
-      setName: setCustomName,
-      setChainId: setCustomChainId,
-      setRpc: setCustomRpc,
-      submit: addCustomNetwork,
-    },
-
-    contract: {
-      value: localReaderAddress,
-      onChange: setLocalReaderAddress,
-      error: errors.contract,
-    },
-
     root: {
       value: localRootHash,
       onChange: setLocalRootHash,
       error: errors.root,
+      presence: rootPresence,
+      networkName,
     },
 
     version: {
@@ -367,6 +214,12 @@ export function useFamilyTreeConfigForm() {
       onChange: handleVersionChange,
       lookup: rootVersionLookup,
       error: errors.version,
+      // A reader that does not answer makes every version lookup fail, and the
+      // picker must not read that as a fault of the hash above it.
+      readerBlocked: readerHealth === "unreachable",
+      // The chain answered: there is nothing to offer. Synthesising the saved
+      // index below would contradict the note saying so.
+      rootAbsent: rootIsAbsent,
     },
 
     history: {

@@ -568,19 +568,22 @@
     "config": {
       "dataSource": "数据源",
       "displayOptions": "显示",
-      "rpc": "RPC",
       "customNetwork": "自定义网络",
       "customNetworks": "自定义",
       "customNetworkName": "网络名称",
+      "customNetworkRpc": "RPC 地址 (https://…)",
+      "customNetworkContract": "合约地址 (0x…)",
       "chainId": "链 ID",
       "addCustomNetwork": "保存自定义网络",
       "addCustomNetworkHint": "填写后保存，可重复使用",
       "customNetworkCspHint": "在 preview/production 环境下，RPC 源必须加入 CSP 的 connect-src 白名单。若连接失败，请在运行 preview/build 时通过 DEEP_CSP_CONNECT_SRC 添加该源。",
       "customNetworkAdded": "已添加自定义网络",
-      "unknownNetwork": "未知",
       "contract": "合约",
-      "readerAddress": "Reader 地址",
+      "unnamedNetwork": "链 {{chainId}}",
+      "versionNeedsContract": "合约未部署，无法读取版本",
       "root": "根节点哈希",
+      "rootChecking": "正在查找此人…",
+      "rootAbsent": "该哈希对应的人不在 {{network}}",
       "versionOption": "版本 {{index}} · {{endorsements}} 次背书",
       "versionOptionNft": "版本 {{index}} · NFT · {{endorsements}} 次背书",
       "versionOptionBare": "版本 {{index}}",
@@ -588,9 +591,9 @@
       "versionDateUnknown": "日期未知",
       "versionUnchosen": "选择版本",
       "versionLoading": "正在查询链上版本…",
-      "versionNeedsHash": "输入根哈希以列出其链上版本。",
-      "versionLookupFailed": "版本查询失败，请重新输入哈希重试。",
-      "versionNone": "该哈希在链上没有任何版本。",
+      "versionNeedsHash": "输入根哈希以列出其链上版本",
+      "versionLookupFailed": "版本查询失败，请重新输入哈希重试",
+      "versionNone": "该哈希在链上没有任何版本",
       "clearAndRefresh": "清空",
       "rootHistory": "根哈希历史",
       "displayAppliesInstantly": "即时生效",
@@ -713,13 +716,10 @@
       "title": "人物版本详情"
     },
     "validation": {
-      "rpc": "请输入有效的 RPC 地址",
       "contract": "请输入有效的合约地址 (0x + 40位16进制)",
-      "reader": "请输入有效的 Reader 地址 (0x + 40位16进制)",
       "root": "请输入有效的根哈希 (0x + 64位16进制)",
       "version": "请选择链上版本",
-      "chainIdInvalid": "请输入有效的链 ID",
-      "customNetwork": "请输入网络名称、有效的链 ID 和 RPC URL",
+      "customNetwork": "请输入网络名称、有效的链 ID、RPC URL 和合约地址",
       "chainIdConflict": "链 ID 已存在于内置网络中",
       "rpcConflict": "RPC 已存在于内置网络中"
     }
@@ -1497,8 +1497,19 @@
   },
   "footer": {
     "privacy": "隐私政策",
-    "terms": "服务条款",
-    "rights": "© 2026 DeepFamily. MIT License."
+    "terms": "服务条款"
+  },
+  "dataSource": {
+    "readerUnset": "未配置合约",
+    "readerUnsetDetail": "该网络尚未配置合约地址",
+    "readerUnreachable": "合约不存在",
+    "readerUnreachableDetail": "所配置的地址上没有部署合约",
+    "rootMissing": "根节点不存在",
+    "rootMissingDetail": "该网络上没有这个根节点，请在家族设置中更换",
+    "rootVersionMissing": "根节点版本不存在",
+    "rootVersionMissingDetail": "根节点存在，但没有所选的这个版本，请在家族设置中重新选择",
+    "rootUnreachable": "根节点校验失败",
+    "rootUnreachableDetail": "无法校验根节点，RPC 可能不稳定"
   },
   "statusBar": {
     "title": "站点状态",
@@ -1508,7 +1519,8 @@
     "rpcStatus": "RPC 状态",
     "headBlock": "最新区块",
     "unknownNetwork": "未知网络",
-    "changeNetwork": "切换网络"
+    "changeNetwork": "切换网络",
+    "rpcNetwork": "RPC 网络"
   },
   "legal": {
     "draftNotice": "该文件尚未发布。在正式发布之前，本页内容不构成任何具有约束力的协议。",

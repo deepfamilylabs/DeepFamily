@@ -126,6 +126,22 @@ export function getDefaultReaderAddress(): string {
   return getDefaultEntryReaderAddress();
 }
 
+/**
+ * The reader deployed on one specific chain — `VITE_READER_ADDRESS_31337=0x…`.
+ *
+ * The unsuffixed pair above names a single deployment, so it only fits whichever
+ * chain `VITE_RPC_URL` points at. These let a build carry an address book, so
+ * switching networks can bring the entry contract with it. Same suffix shape as
+ * the localized roots, and the same precedence as the unsuffixed pair.
+ */
+export function getChainEntryReaderAddress(chainId: number): string {
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) return "";
+  return (
+    getStringEnv(`VITE_CONTRACT_ADDRESS_${chainId}`) ||
+    getStringEnv(`VITE_READER_ADDRESS_${chainId}`)
+  );
+}
+
 export function getDefaultRootHash(): string {
   return getStringEnv("VITE_ROOT_PERSON_HASH");
 }

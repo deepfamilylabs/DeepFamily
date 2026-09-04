@@ -16,8 +16,24 @@ const __dirname = path.dirname(__filename);
 const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
 const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, "deployments", "localhost");
+const LOCAL_CHAIN_ID = readDeployedChainId(31337);
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, ".env.local");
 const { loadMultiLanguageRoots, checkPersonExists, computePersonHash } = seedHelpers;
+
+/**
+ * The chain the local deployment lives on, so the per-chain reader variable
+ * below is keyed the way the frontend looks it up. Hardhat writes it beside the
+ * artifacts; the default only covers a deployments dir that predates that.
+ */
+function readDeployedChainId(fallback) {
+  try {
+    const raw = fs.readFileSync(path.join(DEPLOYMENTS_DIR, ".chainId"), "utf8").trim();
+    const parsed = Number(raw);
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 const LANGUAGE_LABELS = {
   en: "English Root (Kennedy Family)",
@@ -191,6 +207,9 @@ async function updateLocalConfig() {
       VITE_RPC_URL: "http://127.0.0.1:8545",
       VITE_CONTRACT_ADDRESS: readerAddress,
       VITE_READER_ADDRESS: readerAddress,
+      // Keyed by chain, so switching networks in the app can find its way back
+      // here without the reader having to be retyped.
+      [`VITE_READER_ADDRESS_${LOCAL_CHAIN_ID}`]: readerAddress,
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };
