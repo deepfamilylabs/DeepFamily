@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     rpcUrl: "http://rpc.local",
     chainId: 31337,
     contractAddress: "0x" + "a".repeat(40),
+    moduleResolutionError: null as string | null,
     readerAddress: "0x" + "1".repeat(40),
     tokenAddress: "0x" + "3".repeat(40),
     rootHash: "0x" + "b".repeat(64),
@@ -40,9 +41,6 @@ const mocks = vi.hoisted(() => ({
   treeMutations: {
     clearAllCaches: vi.fn(),
   },
-  toast: {
-    success: vi.fn(),
-  },
   versionLookup: {
     personHash: null as string | null,
     status: "idle" as "idle" | "loading" | "ready" | "error",
@@ -56,7 +54,6 @@ const mocks = vi.hoisted(() => ({
     totalVersions: 0,
   },
   envFlags: {
-    isDev: false,
     showChildren: true,
     showDedup: true,
     showTrusted: true,
@@ -81,23 +78,15 @@ vi.mock("../../../tree", () => ({
   useVizOptions: () => mocks.viz,
 }));
 
-vi.mock("../../../../shared/ui", () => ({
-  useToast: () => mocks.toast,
-}));
-
 vi.mock("../../../transactions/hooks/usePersonVersionOptions", () => ({
   usePersonVersionOptions: () => mocks.versionLookup,
 }));
 
-vi.mock("../../../../shared/config", () => ({
-  NETWORK_PRESETS: [
-    { chainId: 1, rpcUrl: "http://preset-1", nameKey: "n.one", defaultName: "Preset One" },
-    { chainId: 2, rpcUrl: "http://preset-2", nameKey: "n.two", defaultName: "Preset Two" },
-  ],
+vi.mock("./useNetworkName", () => ({
+  useNetworkName: () => "Localhost",
 }));
 
 vi.mock("../../../../shared/config/env", () => ({
-  isDevMode: () => mocks.envFlags.isDev,
   shouldShowDeduplicateToggle: () => mocks.envFlags.showDedup,
   shouldShowNodeModeToggle: () => mocks.envFlags.showChildren,
   shouldShowTrustedSourceFilterToggle: () => mocks.envFlags.showTrusted,
@@ -107,13 +96,17 @@ vi.mock("../../../../shared/config/env", () => ({
 
 import { useFamilyTreeConfigForm } from "./useFamilyTreeConfigForm";
 
+// Network selection moved out to useRpcNetworkMenu — this form now stages only
+// the reader address, root hash and version.
 describe("useFamilyTreeConfigForm", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.config.contractAddress = "0x" + "a".repeat(40);
+    mocks.config.moduleResolutionError = null;
+    mocks.config.readerAddress = "0x" + "1".repeat(40);
     mocks.config.update.mockReset();
     mocks.config.removeRootFromHistory.mockReset();
     mocks.config.clearRootHistory.mockReset();
-    mocks.toast.success.mockReset();
     mocks.viz.setTrustedSourceFilterEnabled.mockReset();
     mocks.viz.trustedSourceFilterEnabled = true;
     mocks.envFlags.showTrusted = true;
@@ -190,8 +183,6 @@ describe("useFamilyTreeConfigForm", () => {
 
   it("seeds local form values from config and reports no diff initially", () => {
     const { result } = renderHook(() => useFamilyTreeConfigForm());
-    expect(result.current.network.rpcUrl).toBe(mocks.config.rpcUrl);
-    expect(result.current.contract.value).toBe(mocks.config.readerAddress);
     expect(result.current.root.value).toBe(mocks.config.rootHash);
     expect(result.current.version.value).toBe(mocks.config.rootVersionIndex);
     expect(result.current.actions.hasDiff).toBe(false);
@@ -210,17 +201,10 @@ describe("useFamilyTreeConfigForm", () => {
     expect(mocks.viz.setTrustedSourceFilterEnabled).toHaveBeenCalledWith(true);
   });
 
-  it("resolves preset selection by current rpcUrl", () => {
-    mocks.config.rpcUrl = "http://preset-2";
-    const { result } = renderHook(() => useFamilyTreeConfigForm());
-    expect(result.current.network.selected).toBe(2);
-    mocks.config.rpcUrl = "http://rpc.local";
-  });
-
-  it("save() forwards local form to config.update only when validation passes", () => {
+  it("save() sends only the root, leaving the connection alone", () => {
     const { result } = renderHook(() => useFamilyTreeConfigForm());
     act(() => {
-      result.current.contract.onChange("not-an-address");
+      result.current.root.onChange("not-a-hash");
     });
     act(() => {
       result.current.actions.save();
@@ -228,19 +212,19 @@ describe("useFamilyTreeConfigForm", () => {
     expect(mocks.config.update).not.toHaveBeenCalled();
 
     act(() => {
-      result.current.contract.onChange("0x" + "f".repeat(40));
+      result.current.root.onChange("0x" + "f".repeat(64));
+    });
+    // Clearing the hash on the way cleared the index with it; the picker is how
+    // it comes back.
+    act(() => {
+      result.current.version.onChange(2);
     });
     act(() => {
       result.current.actions.save();
     });
     expect(mocks.config.update).toHaveBeenCalledWith({
-      rpcUrl: mocks.config.rpcUrl,
-      chainId: mocks.config.chainId,
-      readerAddress: "0x" + "f".repeat(40),
-      contractAddress: "",
-      tokenAddress: "",
-      rootHash: mocks.config.rootHash,
-      rootVersionIndex: mocks.config.rootVersionIndex,
+      rootHash: "0x" + "f".repeat(64),
+      rootVersionIndex: 2,
     });
   });
 
@@ -249,8 +233,6 @@ describe("useFamilyTreeConfigForm", () => {
     act(() => {
       result.current.actions.reset();
     });
-    expect(result.current.network.rpcUrl).toBe(mocks.config.defaults.rpcUrl);
-    expect(result.current.contract.value).toBe(mocks.config.defaults.readerAddress);
     expect(result.current.root.value).toBe(mocks.config.defaults.rootHash);
     expect(result.current.version.value).toBe(mocks.config.defaults.rootVersionIndex);
   });
@@ -266,43 +248,91 @@ describe("useFamilyTreeConfigForm", () => {
     expect(result.current.version.value).toBe(42);
   });
 
-  it("addCustomNetwork rejects chainId conflicts with presets", () => {
-    const { result } = renderHook(() => useFamilyTreeConfigForm());
-    act(() => {
-      result.current.network.onChange("custom");
-    });
-    act(() => {
-      result.current.customForm.setName("Local");
-      result.current.customForm.setChainId(1);
-      result.current.customForm.setRpc("http://my-local");
-    });
-    act(() => {
-      result.current.customForm.submit();
-    });
-    expect(result.current.customForm.error).toMatch(/Chain ID/);
-    expect(localStorage.getItem("ft:customNetworks")).toBeNull();
+  it("lets the empty-hash note through, however the hash was entered", () => {
+    // Typed over a selection the hash goes invalid on the way, which clears the
+    // version index and used to fill the field's one message slot with "select a
+    // version" — burying the note that explains why there is nothing to select.
+    // Pasted whole it never goes invalid. Both have to end up saying the same.
+    for (const entry of [["", "0x" + "c".repeat(64)], ["0x" + "c".repeat(64)]] as string[][]) {
+      const { result, rerender, unmount } = renderHook(() => useFamilyTreeConfigForm());
+      entry.forEach((next) => act(() => result.current.root.onChange(next)));
+
+      mocks.versionLookup = {
+        personHash: entry[entry.length - 1],
+        status: "ready",
+        versions: [],
+        totalVersions: 0,
+      };
+      rerender();
+
+      expect(result.current.root.presence).toBe("absent");
+      expect(result.current.version.rootAbsent).toBe(true);
+      expect(result.current.version.error).toBeUndefined();
+      unmount();
+    }
   });
 
-  it("addCustomNetwork persists a valid network and selects it", () => {
-    const { result } = renderHook(() => useFamilyTreeConfigForm());
+  it("keeps asking for a version when the hash does carry some", () => {
+    const { result, rerender } = renderHook(() => useFamilyTreeConfigForm());
     act(() => {
-      result.current.network.onChange("custom");
+      result.current.root.onChange("");
     });
     act(() => {
-      result.current.customForm.setName("My Local");
-      result.current.customForm.setChainId(31338);
-      result.current.customForm.setRpc("http://my-local");
+      result.current.root.onChange("0x" + "c".repeat(64));
     });
+
+    mocks.versionLookup = {
+      personHash: "0x" + "c".repeat(64),
+      status: "ready",
+      versions: [{ versionIndex: 2, endorsementCount: 0, tokenId: 0, addedBy: "", timestamp: 0 }],
+      totalVersions: 2,
+    };
+    rerender();
+
+    expect(result.current.root.presence).toBe("present");
+    expect(result.current.version.rootAbsent).toBe(false);
+  });
+
+  it("does not call a hash absent on an answer that was about a different one", () => {
+    const { result, rerender } = renderHook(() => useFamilyTreeConfigForm());
     act(() => {
-      result.current.customForm.submit();
+      result.current.root.onChange("0x" + "c".repeat(64));
     });
-    expect(result.current.network.selected).toBe(31338);
-    expect(result.current.network.rpcUrl).toBe("http://my-local");
-    expect(result.current.network.chainId).toBe(31338);
-    expect(JSON.parse(localStorage.getItem("ft:customNetworks") || "[]")).toEqual([
-      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local" },
-    ]);
-    expect(mocks.toast.success).toHaveBeenCalledWith("Custom network added");
+
+    // The lookup still describes the hash that was there before.
+    mocks.versionLookup = {
+      personHash: "0x" + "d".repeat(64),
+      status: "ready",
+      versions: [],
+      totalVersions: 0,
+    };
+    rerender();
+
+    // Still waiting on an answer for what is actually in the field.
+    expect(result.current.root.presence).toBe("checking");
+    expect(result.current.version.rootAbsent).toBe(false);
+  });
+
+  it("does not call a hash absent when the reader is the one at fault", () => {
+    mocks.config.contractAddress = "";
+    mocks.config.moduleResolutionError = "bad module wiring";
+    const { result, rerender } = renderHook(() => useFamilyTreeConfigForm());
+    act(() => {
+      result.current.root.onChange("0x" + "c".repeat(64));
+    });
+
+    // A dead reader fails the lookup; it never reaches "ready".
+    mocks.versionLookup = {
+      personHash: "0x" + "c".repeat(64),
+      status: "error",
+      versions: [],
+      totalVersions: 0,
+    };
+    rerender();
+
+    expect(result.current.root.presence).toBe("idle");
+    expect(result.current.version.rootAbsent).toBe(false);
+    expect(result.current.version.readerBlocked).toBe(true);
   });
 
   it("history selectors push hash into the root field", () => {

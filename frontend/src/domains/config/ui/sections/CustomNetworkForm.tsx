@@ -6,11 +6,14 @@ export interface CustomNetworkFormProps {
   name: string;
   chainId: number | "";
   rpc: string;
+  /** The entry contract on this chain; nothing else knows it for a custom one. */
+  reader: string;
   error: string | null;
   showCspHint: boolean;
   setName: (v: string) => void;
   setChainId: (v: number | "") => void;
   setRpc: (v: string) => void;
+  setReader: (v: string) => void;
   submit: () => void;
 }
 
@@ -18,11 +21,13 @@ export default function CustomNetworkForm({
   name,
   chainId,
   rpc,
+  reader,
   error,
   showCspHint,
   setName,
   setChainId,
   setRpc,
+  setReader,
   submit,
 }: CustomNetworkFormProps) {
   const { t } = useTranslation();
@@ -45,9 +50,16 @@ export default function CustomNetworkForm({
       />
       <input
         type="text"
-        placeholder="https://"
+        placeholder={t("familyTree.config.customNetworkRpc", "RPC URL (https://…)")}
         value={rpc}
         onChange={(e) => setRpc(e.target.value)}
+        className={`${MODAL_FIELD_SM} font-mono`}
+      />
+      <input
+        type="text"
+        placeholder={t("familyTree.config.customNetworkContract", "Contract address (0x…)")}
+        value={reader}
+        onChange={(e) => setReader(e.target.value)}
         className={`${MODAL_FIELD_SM} font-mono`}
       />
 

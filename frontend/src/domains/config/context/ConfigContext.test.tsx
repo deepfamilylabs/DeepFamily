@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     rootVersionIndex: 1,
   },
   resolveModuleAddresses: vi.fn(),
+  rememberChainReader: vi.fn(),
 }));
 
 vi.mock("../../../shared/config", () => ({
@@ -27,6 +28,7 @@ vi.mock("../../../shared/config/env", () => ({
 
 vi.mock("../services", () => ({
   resolveModuleAddresses: mocks.resolveModuleAddresses,
+  rememberChainReader: mocks.rememberChainReader,
 }));
 
 const mainAddress = "0x0000000000000000000000000000000000000202";
@@ -39,6 +41,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 describe("ConfigContext module address resolution", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.rememberChainReader.mockReset();
     mocks.resolveModuleAddresses.mockReset();
     mocks.resolveModuleAddresses.mockImplementation(
       async ({ readerAddress }: { readerAddress: string }) => ({
@@ -80,6 +83,22 @@ describe("ConfigContext module address resolution", () => {
     await waitFor(() => expect(result.current.moduleResolutionError).toBe("bad module wiring"));
     expect(result.current.contractAddress).toBe("");
     expect(result.current.tokenAddress).toBe("");
+  });
+
+  it("records the reader that answered, under the chain it answered on", async () => {
+    const { result } = renderHook(() => useConfig(), { wrapper });
+
+    await waitFor(() => expect(result.current.contractAddress).toBe(mainAddress));
+    expect(mocks.rememberChainReader).toHaveBeenCalledWith(31337, mocks.env.readerAddress);
+  });
+
+  it("records nothing when the reader fails to resolve", async () => {
+    mocks.resolveModuleAddresses.mockRejectedValue(new Error("bad module wiring"));
+
+    const { result } = renderHook(() => useConfig(), { wrapper });
+
+    await waitFor(() => expect(result.current.moduleResolutionError).toBe("bad module wiring"));
+    expect(mocks.rememberChainReader).not.toHaveBeenCalled();
   });
 
   it("clears derived addresses when the entry reader changes", async () => {

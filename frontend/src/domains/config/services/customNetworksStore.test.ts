@@ -42,10 +42,30 @@ describe("customNetworksStore", () => {
   });
 
   it("persists only chainId/name/rpcUrl on save", () => {
-    saveCustomNetworks([
-      { chainId: 9, name: "Foo", rpcUrl: "http://foo", isCustom: true },
-    ]);
+    saveCustomNetworks([{ chainId: 9, name: "Foo", rpcUrl: "http://foo", isCustom: true }]);
     const raw = localStorage.getItem(STORAGE_KEY);
     expect(raw).toBe(JSON.stringify([{ chainId: 9, name: "Foo", rpcUrl: "http://foo" }]));
+  });
+  it("carries the entry contract, which nothing else on this build knows", () => {
+    const reader = "0x" + "9".repeat(40);
+    saveCustomNetworks([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: reader },
+    ]);
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")).toEqual([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: reader },
+    ]);
+    expect(loadCustomNetworks()[0].readerAddress).toBe(reader);
+  });
+
+  it("still loads records saved before custom networks carried a contract", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([{ chainId: 31338, name: "My Local", rpcUrl: "http://my-local" }]),
+    );
+
+    const [loaded] = loadCustomNetworks();
+    expect(loaded.chainId).toBe(31338);
+    expect(loaded.readerAddress).toBeUndefined();
   });
 });

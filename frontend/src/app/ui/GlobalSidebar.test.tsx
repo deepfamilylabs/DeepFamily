@@ -41,6 +41,10 @@ vi.mock("../context", () => ({
   useActivePath: () => ({ activePath: mocks.activePath, setActivePath: mocks.setActivePath }),
 }));
 
+vi.mock("../../domains/config", () => ({
+  RpcNetworkList: () => <div data-testid="rpc-network-list" />,
+}));
+
 vi.mock("../../shared/ui", () => ({
   useResponsiveModalMode: () => mocks.isDesktop,
 }));
@@ -127,6 +131,22 @@ describe("GlobalSidebar", () => {
     expect(screen.queryByLabelText("Home")).toBeNull();
     expect(screen.queryByLabelText("Family")).toBeNull();
     expect(screen.getByLabelText("Actions")).toBeTruthy();
+  });
+
+  it("carries the network menu on mobile, where the status bar does not exist", () => {
+    mocks.isDesktop = false;
+    mocks.isMobileOpen = true;
+    renderSidebar();
+
+    expect(screen.getByRole("button", { name: "RPC network" })).toBeTruthy();
+    expect(screen.getByTestId("rpc-network-list")).toBeTruthy();
+  });
+
+  it("leaves the network menu to the status bar on desktop", () => {
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: "RPC network" })).toBeNull();
+    expect(screen.queryByTestId("rpc-network-list")).toBeNull();
   });
 
   it("closes the drawer when a route row is picked", () => {

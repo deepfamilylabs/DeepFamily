@@ -568,19 +568,22 @@
     "config": {
       "dataSource": "Data Source",
       "displayOptions": "Display",
-      "rpc": "RPC",
       "customNetwork": "Custom network",
       "customNetworks": "Custom",
       "customNetworkName": "Network name",
+      "customNetworkRpc": "RPC URL (https://…)",
+      "customNetworkContract": "Contract address (0x…)",
       "chainId": "Chain ID",
       "addCustomNetwork": "Save custom",
       "addCustomNetworkHint": "Fill in and save to reuse later",
       "customNetworkCspHint": "In preview/production, the RPC origin must be allowlisted by CSP (connect-src). If it fails to connect, add the origin via DEEP_CSP_CONNECT_SRC when running preview/build.",
       "customNetworkAdded": "Custom network added",
-      "unknownNetwork": "Unknown",
       "contract": "Contract",
-      "readerAddress": "Reader Address",
+      "unnamedNetwork": "chain {{chainId}}",
+      "versionNeedsContract": "No contract deployed, so versions cannot be read",
       "root": "Root Hash",
+      "rootChecking": "Looking for this person…",
+      "rootAbsent": "No person with this hash on {{network}}",
       "versionOption": "Version {{index}} · {{endorsements}} endorsements",
       "versionOptionNft": "Version {{index}} · NFT · {{endorsements}} endorsements",
       "versionOptionBare": "Version {{index}}",
@@ -588,9 +591,9 @@
       "versionDateUnknown": "date unknown",
       "versionUnchosen": "Select a version",
       "versionLoading": "Looking up on-chain versions...",
-      "versionNeedsHash": "Enter a root hash to list its on-chain versions.",
-      "versionLookupFailed": "Version lookup failed. Re-enter the hash to retry.",
-      "versionNone": "This hash carries no on-chain version.",
+      "versionNeedsHash": "Enter a root hash to list its on-chain versions",
+      "versionLookupFailed": "Version lookup failed. Re-enter the hash to retry",
+      "versionNone": "This hash carries no on-chain version",
       "clearAndRefresh": "Clear",
       "rootHistory": "Root hash history",
       "displayAppliesInstantly": "Applies instantly",
@@ -713,13 +716,10 @@
       "title": "Person Version Details"
     },
     "validation": {
-      "rpc": "Please enter a valid RPC URL",
       "contract": "Please enter a valid contract address (0x + 40 hex chars)",
-      "reader": "Please enter a valid reader address (0x + 40 hex chars)",
       "root": "Please enter a valid root hash (0x + 64 hex chars)",
       "version": "Please select an on-chain version",
-      "chainIdInvalid": "Please enter a valid chain ID",
-      "customNetwork": "Please enter network name, valid chain ID, and RPC URL",
+      "customNetwork": "Please enter network name, valid chain ID, RPC URL and contract address",
       "chainIdConflict": "Chain ID already exists in built-in networks",
       "rpcConflict": "RPC already exists in built-in networks"
     }
@@ -1497,8 +1497,19 @@
   },
   "footer": {
     "privacy": "Privacy Policy",
-    "terms": "Terms of Service",
-    "rights": "© 2026 DeepFamily. MIT License."
+    "terms": "Terms of Service"
+  },
+  "dataSource": {
+    "readerUnset": "No contract set",
+    "readerUnsetDetail": "No contract address is configured for this network",
+    "readerUnreachable": "Contract not found",
+    "readerUnreachableDetail": "No contract is deployed at the configured address",
+    "rootMissing": "Root not found",
+    "rootMissingDetail": "This root person is not recorded on this network. Pick another root in family settings",
+    "rootVersionMissing": "Root version missing",
+    "rootVersionMissingDetail": "The root person is here, but not the version selected. Pick a version in family settings",
+    "rootUnreachable": "Root check failed",
+    "rootUnreachableDetail": "The root person could not be checked. The RPC may be flaky"
   },
   "statusBar": {
     "title": "Site status",
@@ -1508,7 +1519,8 @@
     "rpcStatus": "RPC status",
     "headBlock": "Head block",
     "unknownNetwork": "Unknown network",
-    "changeNetwork": "Change network"
+    "changeNetwork": "Change network",
+    "rpcNetwork": "RPC network"
   },
   "legal": {
     "draftNotice": "This document has not been published yet. Until it is, nothing here should be read as a binding agreement.",

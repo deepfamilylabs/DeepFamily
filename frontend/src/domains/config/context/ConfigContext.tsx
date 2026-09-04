@@ -6,7 +6,7 @@ import {
   getDefaultRpcUrl,
   getDefaultReaderAddress,
 } from "../../../shared/config/env";
-import { resolveModuleAddresses } from "../services";
+import { rememberChainReader, resolveModuleAddresses } from "../services";
 
 type ConfigValues = {
   rpcUrl: string;
@@ -168,6 +168,9 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       .then((resolved) => {
         if (cancelled) return;
         setModuleResolutionError(null);
+        // It answered on this chain, so it is worth restoring the next time the
+        // app comes back to it.
+        rememberChainReader(state.chainId, resolved.readerAddress);
         setState((prev) => {
           if (prev.rpcUrl.trim() !== rpcUrl || prev.readerAddress.trim() !== readerAddress) {
             return prev;

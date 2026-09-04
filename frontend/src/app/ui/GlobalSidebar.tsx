@@ -2,11 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
-import { Globe, ChevronRight, X, Moon, Sun, Image, Home, TreePine, Zap } from "lucide-react";
+import {
+  Globe,
+  ChevronRight,
+  X,
+  Moon,
+  Sun,
+  Image,
+  Home,
+  TreePine,
+  Zap,
+  Server,
+} from "lucide-react";
 import { useActivePath, useSidebar, useTheme } from "../context";
 import { resolveNavSection, type NavSection } from "../config/navSections";
 import { useResponsiveModalMode } from "../../shared/ui";
 import { languages } from "../config/languages";
+import { RpcNetworkList } from "../../domains/config";
 import Logo from "./Logo";
 
 /**
@@ -317,6 +329,23 @@ export default function GlobalSidebar() {
 
   const settingItems = useMemo<SidebarItem[]>(
     () => [
+      // Which chain the app reads from lives in the desktop status bar, which
+      // does not exist below md — so on mobile the drawer is the only way to it.
+      ...(isDesktop
+        ? []
+        : [
+            {
+              id: "network",
+              kind: "panel",
+              icon: Server,
+              label: t("statusBar.rpcNetwork", "RPC network"),
+              content: (
+                <div className="p-4">
+                  <RpcNetworkList onPicked={closePanel} />
+                </div>
+              ),
+            } as SidebarItem,
+          ]),
       {
         id: "language",
         kind: "panel",
@@ -369,7 +398,7 @@ export default function GlobalSidebar() {
         onClick: () => window.open("/logo.html", "_blank", "noopener,noreferrer"),
       },
     ],
-    [t, i18n.language, changeLanguage, isDark, toggleTheme],
+    [t, i18n.language, changeLanguage, isDark, toggleTheme, isDesktop, closePanel],
   );
 
   // Below md, Home and Family are already one tap away in the bottom nav.
