@@ -2,6 +2,7 @@ import { BookOpen, ChevronRight, FileText, Star, User } from "lucide-react";
 import {
   formatUnixDate,
   genderText as genderTextFn,
+  getStoryPresentation,
   hasDetailedStory,
   isMinted,
   lifeSpanYears,
@@ -66,7 +67,7 @@ export function PeopleListRow({
 }: PeopleListRowProps) {
   const lifespan = lifeSpanYears(person);
   const places = placesLine(person);
-  const chunks = person.storyMetadata?.totalChunks ?? 0;
+  const chunks = getStoryPresentation(person.storyChunks, person.storyMetadata).totalChunks;
   const dash = <span className="text-ink-subtle">—</span>;
 
   const handleMouseEnter = () => {

@@ -1,5 +1,6 @@
 import {
   buildStorySnapshot,
+  getStoryPresentation,
   type NodeData,
   type StoryChunk,
   type StoryMetadata,
@@ -109,9 +110,8 @@ export function buildPrefetchedStoryDetailData(
   if (prefetched.tokenId && String(prefetched.tokenId) !== String(tokenId)) return null;
 
   const storyChunks = prefetched.storyChunks?.map(normalizeStoryChunk);
-  const initialFullStory =
-    prefetched.fullStory ||
-    (storyChunks && storyChunks.length > 0 ? storyChunks.map((chunk) => chunk.content).join("") : undefined);
+  const presentation = getStoryPresentation(storyChunks, prefetched.storyMetadata);
+  const initialFullStory = storyChunks ? presentation.fullStory : prefetched.fullStory;
 
   return {
     tokenId,
@@ -119,7 +119,10 @@ export function buildPrefetchedStoryDetailData(
     versionIndex: prefetched.versionIndex,
     fullName: prefetched.fullName,
     owner: prefetched.owner,
-    nftCoreInfo: prefetched.nftCoreInfo,
+    nftCoreInfo:
+      presentation.biography && !presentation.biography.unsupportedSchema
+        ? { ...prefetched.nftCoreInfo, story: presentation.biography.content }
+        : prefetched.nftCoreInfo,
     storyMetadata: prefetched.storyMetadata,
     storyChunks,
     fullStory: initialFullStory,
@@ -174,14 +177,14 @@ export function getFullStoryParagraphs(
 
 export function getChunkParagraphs(chunks: StoryChunk[] | undefined): string[] {
   if (!chunks || chunks.length === 0) return [];
-  return [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex).map((chunk) => chunk.content);
+  return getStoryPresentation(chunks).chunks.map((chunk) => chunk.content);
 }
 
 export function groupStoryChunks(chunks: StoryChunk[] | undefined): GroupedStoryChunks[] {
   if (!chunks || chunks.length === 0) return [];
 
   const groups = new Map<number, StoryChunk[]>();
-  chunks.forEach((chunk) => {
+  getStoryPresentation(chunks).chunks.forEach((chunk) => {
     const type = normalizeChunkType(chunk.chunkType);
     if (!groups.has(type)) {
       groups.set(type, []);
@@ -226,7 +229,9 @@ export function getFreshCachedStoryDetail(
   };
 }
 
-export function buildNftCoreInfo(node: NodeData | null | undefined): StoryDetailData["nftCoreInfo"] {
+export function buildNftCoreInfo(
+  node: NodeData | null | undefined,
+): StoryDetailData["nftCoreInfo"] {
   if (!node) return undefined;
   return {
     gender: node.gender,
@@ -251,15 +256,20 @@ export function buildStoryDetailData(options: {
   owner?: string;
 }): StoryDetailData {
   const { tokenId, node, story, owner } = options;
+  const presentation = getStoryPresentation(story?.chunks, story?.metadata);
+  const coreInfo = buildNftCoreInfo(node);
   return {
     tokenId,
     personHash: node?.personHash,
     versionIndex: node?.versionIndex,
     fullName: node?.fullName,
-    nftCoreInfo: buildNftCoreInfo(node),
+    nftCoreInfo:
+      presentation.biography && !presentation.biography.unsupportedSchema
+        ? { ...coreInfo, story: presentation.biography.content }
+        : coreInfo,
     storyMetadata: story?.metadata,
     storyChunks: story?.chunks,
-    fullStory: story?.fullStory,
+    fullStory: story?.chunks ? presentation.fullStory : story?.fullStory,
     owner,
     integrity: story?.integrity,
   };

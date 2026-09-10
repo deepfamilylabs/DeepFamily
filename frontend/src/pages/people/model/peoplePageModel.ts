@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import {
   compareBirthOrderKey,
   getBirthOrderKey,
+  hasDetailedStory,
   isMinted,
   type NodeData,
 } from "../../../shared/model";
@@ -109,9 +110,7 @@ export function getPeoplePageStats(params: {
     uniquePeople.add(String(data.personHash || "").toLowerCase());
   }
 
-  const storyCount = params.people.filter(
-    (person) => person.storyMetadata && person.storyMetadata.totalChunks > 0,
-  ).length;
+  const storyCount = params.people.filter(hasDetailedStory).length;
 
   return {
     totalCount: uniquePeople.size,
@@ -347,8 +346,7 @@ export function filterPeople(
   if (searchTerm) {
     filtered = filtered.sort(
       (a, b) =>
-        Number(!matchesText(a.fullName, searchTerm)) -
-        Number(!matchesText(b.fullName, searchTerm)),
+        Number(!matchesText(a.fullName, searchTerm)) - Number(!matchesText(b.fullName, searchTerm)),
     );
   }
 

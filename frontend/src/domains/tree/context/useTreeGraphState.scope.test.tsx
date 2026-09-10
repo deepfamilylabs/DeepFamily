@@ -178,8 +178,8 @@ describe("tree plaintext IndexedDB scope", () => {
       return Promise.resolve(persistenceMocks.blobs.get(key) ?? null);
     });
     const queryCacheRef = { current: new QueryCache() };
-    const api = { getVersionDetails: vi.fn(), getNFTDetails: vi.fn() };
-    const contract = { getStoryMetadata: vi.fn() };
+    const api = { getVersionDetails: vi.fn(), getNFTDetails: vi.fn(), getStoryMetadata: vi.fn() };
+    const contract = {};
     const { result, rerender } = renderHook(
       ({ storageNS, enabled }: { storageNS: string; enabled: boolean }) =>
         useTreeGraphState({
@@ -293,8 +293,6 @@ describe("tree plaintext IndexedDB scope", () => {
             resolveNft = resolve;
           }),
       ),
-    };
-    const contract = {
       getStoryMetadata: vi.fn(async () => ({
         totalChunks: 0,
         totalLength: 0,
@@ -303,6 +301,7 @@ describe("tree plaintext IndexedDB scope", () => {
         fullStoryHash: `0x${"00".repeat(32)}`,
       })),
     };
+    const contract = {};
     const queryCacheRef = { current: new QueryCache() };
     const { result, rerender } = renderHook(
       ({ storageNS, enabled }: { storageNS: string; enabled: boolean }) =>

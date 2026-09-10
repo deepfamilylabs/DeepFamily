@@ -35,8 +35,10 @@ export function PersonSectionNavigation({ person }: { person: PersonPageControll
           />
 
           <SectionNavButton
-            active={typeof person.activeSection === "number" || person.activeSection === "profileTop"}
-            count={person.data.storyChunks?.length || 0}
+            active={
+              typeof person.activeSection === "number" || person.activeSection === "profileTop"
+            }
+            count={person.groupedChunks.reduce((count, group) => count + group.chunks.length, 0)}
             icon={<Layers size={14} />}
             label={t("person.profileData", "Profile Data")}
             onClick={() => person.scrollToSection("profileTop")}
@@ -88,8 +90,7 @@ function SectionNavButton({
 }) {
   const activeClass =
     "bg-orange-50 dark:bg-orange-900/20 border-l-2 border-orange-500 dark:border-orange-400";
-  const inactiveClass =
-    "hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent";
+  const inactiveClass = "hover:bg-gray-50 dark:hover:bg-gray-800/50 border-l-2 border-transparent";
   const iconColor = active
     ? "text-orange-600 dark:text-orange-400"
     : iconClassName || "text-gray-500 dark:text-gray-400";

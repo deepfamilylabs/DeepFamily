@@ -118,7 +118,6 @@ export function useDisclosureProof() {
           deathMonth: processedData.deathMonth,
           deathDay: processedData.deathDay,
           deathPlace: processedData.deathPlace,
-          story: processedData.story,
         },
       };
 

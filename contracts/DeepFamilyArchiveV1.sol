@@ -34,17 +34,22 @@ contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
   error StoryHeadMismatch();
   error StoryAlreadySealed();
   error StoryNotFound();
+  error StoryAlreadyInitialized();
+  error InvalidStoryAuthor();
 
   uint256 public constant MAX_SEGMENT_PAYLOAD_LENGTH = 16_384;
   uint256 public constant MAX_MANIFEST_ENTRIES = 1_024;
   bytes32 public constant STORY_RECORD_DOMAIN = keccak256("deepfamily.archive.story-record.v1");
   bytes32 public constant STORY_HEAD_DOMAIN = keccak256("deepfamily.archive.story-head.v1");
+  bytes32 public constant BIOGRAPHY_SCHEMA_ID =
+    keccak256("deepfamily/story-biography-envelope@1.0");
   address public immutable override DEEP_FAMILY;
 
   mapping(bytes32 personHash => mapping(uint256 versionIndex => BlobRef blob))
     private _metadataRefs;
   mapping(uint256 tokenId => mapping(uint64 index => StoryRecordRef record)) private _storyRecords;
   mapping(uint256 tokenId => StoryState state) private _storyStates;
+  mapping(uint256 tokenId => bool initialized) private _storyInitialized;
 
   constructor(address deepFamily) {
     if (deepFamily == address(0) || deepFamily.code.length == 0) revert InvalidDeepFamilyAddress();
@@ -87,6 +92,24 @@ contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
     return _metadataRefs[personHash][versionIndex];
   }
 
+  /** @notice Seed a mint's immutable biography before its ERC721 receiver callback. */
+  function initializeStory(
+    uint256 tokenId,
+    address author,
+    bytes calldata payload,
+    bytes32 expectedPayloadHash
+  ) external override {
+    if (msg.sender != DEEP_FAMILY) revert UnauthorizedCaller();
+    _requireActive();
+    StoryState storage state = _storyStates[tokenId];
+    if (_storyInitialized[tokenId] || state.totalRecords != 0 || state.isSealed)
+      revert StoryAlreadyInitialized();
+    if (author == address(0)) revert InvalidStoryAuthor();
+    if (keccak256(payload) != expectedPayloadHash) revert PayloadHashMismatch();
+    _storyInitialized[tokenId] = true;
+    if (payload.length != 0) _appendRecord(tokenId, BIOGRAPHY_SCHEMA_ID, payload, author);
+  }
+
   function appendStoryRecord(
     uint256 tokenId,
     uint64 expectedIndex,
@@ -101,24 +124,35 @@ contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
     if (state.isSealed) revert StoryAlreadySealed();
     if (expectedIndex != state.totalRecords) revert StoryIndexMismatch();
     if (expectedHead != state.recordsHead) revert StoryHeadMismatch();
-    if (schemaId == bytes32(0)) revert InvalidSchemaId();
+    if (schemaId == bytes32(0) || schemaId == BIOGRAPHY_SCHEMA_ID) revert InvalidSchemaId();
     if (keccak256(payload) != expectedPayloadHash) revert PayloadHashMismatch();
+    return _appendRecord(tokenId, schemaId, payload, msg.sender);
+  }
+
+  function _appendRecord(
+    uint256 tokenId,
+    bytes32 schemaId,
+    bytes calldata payload,
+    address author
+  ) internal returns (StoryRecordRef memory record) {
+    StoryState storage state = _storyStates[tokenId];
+    uint64 index = state.totalRecords;
     record = StoryRecordRef({
       blob: _storeBlob(payload),
       schemaId: schemaId,
-      author: msg.sender,
+      author: author,
       timestamp: uint64(block.timestamp)
     });
-    bytes32 recordHash = _recordHash(block.chainid, address(this), tokenId, expectedIndex, record);
+    bytes32 recordHash = _recordHash(block.chainid, address(this), tokenId, index, record);
     bytes32 newHead = _nextHead(state.recordsHead, recordHash);
-    _storyRecords[tokenId][expectedIndex] = record;
+    _storyRecords[tokenId][index] = record;
     state.recordsHead = newHead;
     state.totalRecords += 1;
     state.totalPayloadLength += record.blob.payloadLength;
     state.lastUpdateTime = record.timestamp;
     emit StoryRecordAppended(
       tokenId,
-      expectedIndex,
+      index,
       record.blob,
       schemaId,
       record.author,

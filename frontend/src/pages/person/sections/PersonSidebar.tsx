@@ -7,7 +7,13 @@ import {
   getChunkTypeIcon,
   getChunkTypeOptions,
 } from "../../../domains/person";
-import { formatHashMiddle, formatUnixSeconds, shortAddress, type StoryChunk } from "../../../shared/model";
+import {
+  formatHashMiddle,
+  formatUnixSeconds,
+  getStoryPresentation,
+  shortAddress,
+  type StoryChunk,
+} from "../../../shared/model";
 import type { PersonPageController } from "../hooks/usePersonPageController";
 import { getChunkTypeLabel } from "../model/personPageModel";
 import { CopyIconButton } from "../../../shared/ui";
@@ -29,11 +35,8 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
   const data = person.data;
   const sortedChunks = useMemo(
-    () =>
-      data?.storyChunks
-        ? [...data.storyChunks].sort((a, b) => a.chunkIndex - b.chunkIndex)
-        : [],
-    [data?.storyChunks],
+    () => getStoryPresentation(data?.storyChunks, data?.storyMetadata).chunks,
+    [data?.storyChunks, data?.storyMetadata],
   );
 
   if (!data) return null;
@@ -43,9 +46,9 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
       <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
           {t("person.chunkList", "Chunk List")}
-          {data.storyChunks && data.storyChunks.length > 0 && (
+          {sortedChunks.length > 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-sm">
-              {data.storyChunks.length}
+              {sortedChunks.length}
             </span>
           )}
         </h3>
@@ -67,18 +70,11 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
   );
 }
 
-function ChunkListItem({
-  chunk,
-  person,
-}: {
-  chunk: StoryChunk;
-  person: PersonPageController;
-}) {
+function ChunkListItem({ chunk, person }: { chunk: StoryChunk; person: PersonPageController }) {
   const { t } = useTranslation();
   const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
   const open = person.expandedChunks.has(chunk.chunkIndex);
-  const preview =
-    chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content;
+  const preview = chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content;
   const ChunkIcon = getChunkTypeIcon(chunk.chunkType);
   const iconColor = getChunkTypeColorClass(chunk.chunkType);
   const borderColor = getChunkTypeBorderColorClass(chunk.chunkType);
@@ -104,7 +100,7 @@ function ChunkListItem({
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                #{chunk.chunkIndex}
+                #{chunk.displayIndex ?? chunk.chunkIndex + 1}
               </span>
               <div className="flex items-center gap-1.5">
                 <ChunkIcon size={14} className={iconColor} />
@@ -119,9 +115,7 @@ function ChunkListItem({
                 </span>
               </div>
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {chunk.content.length}
-            </span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{chunk.content.length}</span>
           </div>
           <div
             className={`text-xs text-gray-600 dark:text-gray-400 ${
@@ -137,13 +131,7 @@ function ChunkListItem({
   );
 }
 
-function ChunkDetails({
-  chunk,
-  person,
-}: {
-  chunk: StoryChunk;
-  person: PersonPageController;
-}) {
+function ChunkDetails({ chunk, person }: { chunk: StoryChunk; person: PersonPageController }) {
   const { t } = useTranslation();
 
   return (
@@ -222,11 +210,11 @@ function DesktopMetadataCard({ person }: { person: PersonPageController }) {
         <DesktopMetadataValue label={t("person.tokenId", "Token ID")} value={`#${data.tokenId}`} />
         <DesktopMetadataValue
           label={t("person.totalChunks", "Total Chunks")}
-          value={data.storyMetadata.totalChunks}
+          value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalChunks}
         />
         <DesktopMetadataValue
           label={t("person.totalLength", "Total Length")}
-          value={data.storyMetadata.totalLength}
+          value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalLength}
         />
         <DesktopMetadataValue
           label={t("person.lastUpdate", "Last Update")}
@@ -313,13 +301,7 @@ function DesktopCopyValue({
         >
           {value}
         </div>
-        {onCopy && (
-          <CopyIconButton
-            onClick={onCopy}
-            label={t("search.copy")}
-            size="xs"
-          />
-        )}
+        {onCopy && <CopyIconButton onClick={onCopy} label={t("search.copy")} size="xs" />}
       </div>
     </div>
   );

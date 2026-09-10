@@ -262,7 +262,15 @@ describe("Proof transport layer tests", function () {
       await expect(
         deepFamily
           .connect(signer)
-          .mintPersonVersionNFT(attempt.proof, attempt.publicSignals, 1, "", attempt.coreInfo),
+          .mintPersonVersionNFT(
+            attempt.proof,
+            attempt.publicSignals,
+            1,
+            "",
+            attempt.coreInfo,
+            "0x",
+            hre.ethers.keccak256("0x"),
+          ),
       ).to.be.revertedWithCustomError(deepFamily, "VerifierRouteNotSet");
     });
 
@@ -285,7 +293,15 @@ describe("Proof transport layer tests", function () {
       await expect(
         deepFamily
           .connect(signer)
-          .mintPersonVersionNFT(attempt.proof, attempt.publicSignals, 1, "", attempt.coreInfo),
+          .mintPersonVersionNFT(
+            attempt.proof,
+            attempt.publicSignals,
+            1,
+            "",
+            attempt.coreInfo,
+            "0x",
+            hre.ethers.keccak256("0x"),
+          ),
       ).to.be.revertedWithCustomError(deepFamily, "InvalidZKProof");
     });
   });

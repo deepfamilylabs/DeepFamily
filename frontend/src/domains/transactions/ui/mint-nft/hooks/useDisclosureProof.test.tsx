@@ -147,7 +147,6 @@ describe("useDisclosureProof", () => {
             fullName: "Ada Lovelace",
             birthPlace: "London",
             deathYear: 0,
-            story: "Math",
           }),
         }),
       }),

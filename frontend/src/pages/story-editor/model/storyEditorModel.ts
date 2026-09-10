@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { encodeStoryRecord } from "@deepfamily/protocol-core";
+import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
 import { formatHashMiddle } from "../../../shared/model";
@@ -27,7 +27,7 @@ export const STORY_MAX_ATTACHMENT_BYTES = 256;
 
 export const initialChunkFormData: ChunkFormData = {
   content: "",
-  chunkType: 0,
+  chunkType: 1,
   attachmentCID: "",
   expectedHash: undefined,
 };
@@ -53,8 +53,8 @@ export function normalizeStoryChunks(chunks: StoryChunk[] | undefined): StoryChu
   }));
 }
 
-export function computeContentHash(content: string, chunkType = 0, attachmentCID = ""): string {
-  return ethers.keccak256(encodeStoryRecord({ content, chunkType, attachmentCID }));
+export function computeContentHash(content: string, chunkType = 1, attachmentCID = ""): string {
+  return ethers.keccak256(encodePublicStoryRecord({ content, chunkType, attachmentCID }));
 }
 
 export function formatStoryHash(hash?: string): string {
@@ -85,7 +85,7 @@ export function getByteWarningColor(byteLen: number): string {
 export function isChunkFormDirty(formData: ChunkFormData): boolean {
   const trimmed = (formData.content || "").trim();
   return (
-    trimmed.length > 0 || (formData.attachmentCID || "").length > 0 || formData.chunkType !== 0
+    trimmed.length > 0 || (formData.attachmentCID || "").length > 0 || formData.chunkType !== 1
   );
 }
 

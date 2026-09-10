@@ -1,9 +1,17 @@
-import { AbiCoder, keccak256 } from "ethers";
+import { AbiCoder, getBytes, hexlify, keccak256 } from "ethers";
 import {
+  COMPRESSION_SUITE_GZIP_V1,
   MAX_UINT64,
+  PLAINTEXT_CODEC_CANONICAL_JSON_V1,
+  STORY_BIOGRAPHY_SCHEMA_ID,
   STORY_CHUNK_SCHEMA,
   STORY_CHUNK_SCHEMA_ID,
+  STORY_DEFAULT_COMPRESSION_SUITE,
+  STORY_ENVELOPE_FORMAT_1,
+  STORY_ENVELOPE_HEADER_BYTES,
+  STORY_ENVELOPE_MAGIC_BYTES,
   STORY_HEAD_DOMAIN,
+  STORY_MAX_CANONICAL_JSON_BYTES,
   STORY_MAX_ATTACHMENT_CID_BYTES,
   STORY_RECORD_DOMAIN,
   ZERO_BYTES32,
@@ -15,12 +23,15 @@ import {
   bigintFrom,
   decodeUtf8Fatal,
   equalBytesConstantTime,
+  readUint32BE,
   utf8Bytes,
+  writeUint32BE,
 } from "./bytes.js";
 import { escapeCanonicalJsonString } from "./canonical.js";
 import { assertAddress } from "./identity.js";
 import { readArchiveBlob } from "./archive.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
+import { gunzipV1Strict, gzipV1 } from "./gzip.js";
 
 // Freeze ECMAScript String.trim WhiteSpace + LineTerminator membership, instead
 // of inheriting a future host Unicode table. U+0085 is not in this set; FEFF is.
@@ -94,18 +105,29 @@ function validateStoryRecord(input) {
  * otherwise. Unicode scalar text (including slash, emoji and U+2028/2029) is
  * emitted literally. Integers use unsigned decimal without exponent or zeros.
  */
-export function encodeStoryRecord(input) {
+export function encodeCanonicalStoryRecord(input) {
   const record = validateStoryRecord(input);
-  return utf8Bytes(
+  const bytes = utf8Bytes(
     `{"schema":${escapeCanonicalJsonString(record.schema)}` +
       `,"content":${escapeCanonicalJsonString(record.content)}` +
       `,"chunkType":${record.chunkType}` +
       `,"attachmentCID":${escapeCanonicalJsonString(record.attachmentCID)}}`,
   );
+  protocolAssert(
+    bytes.length <= STORY_MAX_CANONICAL_JSON_BYTES,
+    "STORY_PLAINTEXT_TOO_LARGE",
+    `Story JSON exceeds ${STORY_MAX_CANONICAL_JSON_BYTES} bytes`,
+  );
+  return bytes;
 }
 
-export function decodeStoryRecord(payload) {
+export function decodeCanonicalStoryRecord(payload) {
   const bytes = asUint8Array(payload, "DFS1 payload");
+  protocolAssert(
+    bytes.length <= STORY_MAX_CANONICAL_JSON_BYTES,
+    "STORY_PLAINTEXT_TOO_LARGE",
+    `Story JSON exceeds ${STORY_MAX_CANONICAL_JSON_BYTES} bytes`,
+  );
   const text = decodeUtf8Fatal(bytes);
   let parsed;
   try {
@@ -119,12 +141,117 @@ export function decodeStoryRecord(payload) {
   // Also rejects duplicate keys, alternate escapes, omitted schema, numeric
   // exponents, reordered keys, BOM and all insignificant JSON whitespace.
   protocolAssert(
-    equalBytesConstantTime(bytes, encodeStoryRecord(record)),
+    equalBytesConstantTime(bytes, encodeCanonicalStoryRecord(record)),
     "NON_CANONICAL_STORY_JSON",
     "DFS1 bytes do not match their canonical encoding",
   );
   return record;
 }
+
+/**
+ * DFSE v1: magic[4], version[1], codec[1], compression[1], flags[1],
+ * originalLength[8, big endian], originalKeccak256[32], compressed body.
+ * Suite numbers are permanent protocol identifiers, independent of the
+ * application's configured writer suite. No size-dependent fallback occurs.
+ */
+export function encodeStoryRecord(input, options = {}) {
+  const compressionSuite = options.compressionSuite ?? STORY_DEFAULT_COMPRESSION_SUITE;
+  protocolAssert(
+    compressionSuite === COMPRESSION_SUITE_GZIP_V1,
+    "UNSUPPORTED_STORY_COMPRESSION",
+    `Unsupported configured story compression suite: ${compressionSuite}`,
+  );
+  const plaintext = encodeCanonicalStoryRecord(input);
+  const compressed = gzipV1(plaintext, {
+    maximumInputBytes: STORY_MAX_CANONICAL_JSON_BYTES,
+  });
+  const payload = new Uint8Array(STORY_ENVELOPE_HEADER_BYTES + compressed.length);
+  payload.set(STORY_ENVELOPE_MAGIC_BYTES);
+  payload[4] = STORY_ENVELOPE_FORMAT_1;
+  payload[5] = PLAINTEXT_CODEC_CANONICAL_JSON_V1;
+  payload[6] = compressionSuite;
+  writeUint32BE(payload, 8, BigInt(plaintext.length) >> 32n);
+  writeUint32BE(payload, 12, BigInt(plaintext.length) & 0xffff_ffffn);
+  payload.set(getBytes(keccak256(plaintext)), 16);
+  payload.set(compressed, STORY_ENVELOPE_HEADER_BYTES);
+  return payload;
+}
+
+/** Inspect supported DFSE metadata before allocating decompressed output. */
+export function inspectStoryEnvelope(payload) {
+  const bytes = asUint8Array(payload, "DFSE payload");
+  protocolAssert(bytes.length >= 8, "TRUNCATED_STORY_ENVELOPE", "DFSE prefix is truncated");
+  protocolAssert(
+    equalBytesConstantTime(bytes.subarray(0, 4), STORY_ENVELOPE_MAGIC_BYTES),
+    "INVALID_STORY_ENVELOPE_MAGIC",
+    "Story envelope must start with DFSE",
+  );
+  protocolAssert(
+    bytes[4] === STORY_ENVELOPE_FORMAT_1,
+    "UNSUPPORTED_STORY_ENVELOPE_VERSION",
+    `Unsupported story envelope version: ${bytes[4]}`,
+  );
+  protocolAssert(
+    bytes[5] === PLAINTEXT_CODEC_CANONICAL_JSON_V1,
+    "UNSUPPORTED_STORY_PLAINTEXT_CODEC",
+    `Unsupported story plaintext codec: ${bytes[5]}`,
+  );
+  protocolAssert(
+    bytes[6] === COMPRESSION_SUITE_GZIP_V1,
+    "UNSUPPORTED_STORY_COMPRESSION",
+    `Unsupported story compression suite: ${bytes[6]}`,
+  );
+  protocolAssert(
+    bytes[7] === 0,
+    "UNSUPPORTED_STORY_ENVELOPE_FLAGS",
+    `Unsupported story envelope flags: ${bytes[7]}`,
+  );
+  protocolAssert(
+    bytes.length >= STORY_ENVELOPE_HEADER_BYTES,
+    "TRUNCATED_STORY_ENVELOPE",
+    "DFSE header is truncated",
+  );
+  const originalLength = (BigInt(readUint32BE(bytes, 8)) << 32n) | BigInt(readUint32BE(bytes, 12));
+  protocolAssert(
+    originalLength > 0n && originalLength <= BigInt(STORY_MAX_CANONICAL_JSON_BYTES),
+    "STORY_PLAINTEXT_TOO_LARGE",
+    `Story plaintext length must be 1 through ${STORY_MAX_CANONICAL_JSON_BYTES} bytes`,
+  );
+  return {
+    formatVersion: bytes[4],
+    plaintextCodec: bytes[5],
+    compressionSuite: bytes[6],
+    flags: bytes[7],
+    originalLength: Number(originalLength),
+    originalHash: hexlify(bytes.subarray(16, 48)),
+    body: bytes.subarray(STORY_ENVELOPE_HEADER_BYTES),
+  };
+}
+
+export function decodeStoryRecord(payload) {
+  const envelope = inspectStoryEnvelope(payload);
+  const plaintext = gunzipV1Strict(envelope.body, {
+    maximumOutputBytes: envelope.originalLength,
+  });
+  protocolAssert(
+    plaintext.length === envelope.originalLength,
+    "STORY_PLAINTEXT_LENGTH_MISMATCH",
+    "Decompressed story length does not match its envelope",
+  );
+  protocolAssert(
+    keccak256(plaintext) === envelope.originalHash,
+    "STORY_PLAINTEXT_HASH_MISMATCH",
+    "Decompressed story hash does not match its envelope",
+  );
+  return decodeCanonicalStoryRecord(plaintext);
+}
+
+const UNSUPPORTED_ENVELOPE_CODES = new Set([
+  "UNSUPPORTED_STORY_ENVELOPE_VERSION",
+  "UNSUPPORTED_STORY_PLAINTEXT_CODEC",
+  "UNSUPPORTED_STORY_COMPRESSION",
+  "UNSUPPORTED_STORY_ENVELOPE_FLAGS",
+]);
 
 /** Unknown schemas are returned as verified raw records with decoded: null. */
 export async function readStoryRecord(input) {
@@ -149,12 +276,32 @@ export async function readStoryRecord(input) {
     concurrency: input.concurrency,
     blockTag: input.blockTag,
   });
+  let decoded = null;
+  let unsupportedReason;
+  if (schemaId === STORY_CHUNK_SCHEMA_ID || schemaId === STORY_BIOGRAPHY_SCHEMA_ID) {
+    try {
+      decoded = decodeStoryRecord(blob.payload);
+    } catch (error) {
+      if (!UNSUPPORTED_ENVELOPE_CODES.has(error.code)) throw error;
+      unsupportedReason = error.code;
+    }
+    if (decoded !== null) {
+      protocolAssert(
+        (schemaId === STORY_BIOGRAPHY_SCHEMA_ID) === (decoded.chunkType === 0),
+        "STORY_RECORD_TYPE_SCHEMA_MISMATCH",
+        "Type 0 must use the biography schema; ordinary stories must use types 1 through 255",
+      );
+    }
+  } else {
+    unsupportedReason = "UNSUPPORTED_STORY_SCHEMA";
+  }
   return {
     ...blob,
     schemaId,
     author,
     timestamp,
-    decoded: schemaId === STORY_CHUNK_SCHEMA_ID ? decodeStoryRecord(blob.payload) : null,
+    decoded,
+    ...(unsupportedReason ? { unsupportedReason } : {}),
   };
 }
 

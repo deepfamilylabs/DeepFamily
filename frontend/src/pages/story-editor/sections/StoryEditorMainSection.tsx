@@ -239,7 +239,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                     <span className="ml-2 text-xs">
                       {t(
                         "archive.largeStory",
-                        "Multiple storage segments; review the estimated cost before signing",
+                        "Long text; review the compressed storage size and estimated fee before signing",
                       )}
                     </span>
                   )}

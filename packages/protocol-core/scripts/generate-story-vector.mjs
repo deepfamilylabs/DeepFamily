@@ -11,6 +11,8 @@ import {
   computeStoryRecordHash,
   computeStoryHead,
   encodeStoryRecord,
+  encodeCanonicalStoryRecord,
+  STORY_ENVELOPE_SCHEMA,
 } from "../index.js";
 
 const contents = [
@@ -42,7 +44,7 @@ const records = contents.map((input, index) => {
   const newHead = computeStoryHead({ previousHead, recordHash });
   const record = {
     input,
-    canonicalJson: new TextDecoder().decode(payload),
+    canonicalJson: new TextDecoder().decode(encodeCanonicalStoryRecord(input)),
     canonicalHex: hexlify(payload),
     commitment,
     previousHead,
@@ -53,7 +55,8 @@ const records = contents.map((input, index) => {
   return record;
 });
 const vector = {
-  schema: STORY_CHUNK_SCHEMA,
+  schema: STORY_ENVELOPE_SCHEMA,
+  plaintextSchema: STORY_CHUNK_SCHEMA,
   schemaId: STORY_CHUNK_SCHEMA_ID,
   recordDomainText: STORY_RECORD_DOMAIN_TEXT,
   recordDomain: STORY_RECORD_DOMAIN,

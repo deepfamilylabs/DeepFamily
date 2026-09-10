@@ -11,11 +11,13 @@ import {
 import {
   formatUnixSeconds,
   formatYMD,
+  getStoryPresentation,
   genderText as genderTextFn,
 } from "../../../shared/model";
 import type { PersonPageController } from "../hooks/usePersonPageController";
 import { hasStoryIntegrityIssues } from "../model/personPageModel";
 import { CopyIconButton } from "../../../shared/ui";
+import { UnsupportedStoryRecord } from "../../../shared/ui/UnsupportedStoryRecord";
 
 export function PersonMainContent({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
@@ -126,6 +128,7 @@ function BasicInfoSection({ person }: { person: PersonPageController }) {
   const data = person.data;
 
   if (!data) return null;
+  const biography = getStoryPresentation(data.storyChunks, data.storyMetadata).biography;
 
   return (
     <>
@@ -187,10 +190,15 @@ function BasicInfoSection({ person }: { person: PersonPageController }) {
           </InfoRow>
         )}
 
-        {data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== "" && (
+        {(biography?.unsupportedSchema ||
+          (data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== "")) && (
           <InfoRow align="start" label={t("familyTree.nodeDetail.story", "Story")} padded>
             <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap flex-1 min-w-0">
-              {data.nftCoreInfo.story}
+              {biography?.unsupportedSchema ? (
+                <UnsupportedStoryRecord record={biography} />
+              ) : (
+                data.nftCoreInfo?.story
+              )}
             </div>
           </InfoRow>
         )}
@@ -314,13 +322,14 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
         </div>
       ) : person.viewMode === "paragraph" && person.fullStoryParagraphs.length > 0 ? (
         <div className="space-y-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-          {(person.chunkParagraphs.length > 0 ? person.chunkParagraphs : person.fullStoryParagraphs).map(
-            (content, index) => (
-              <p key={index} className="whitespace-pre-wrap">
-                {content}
-              </p>
-            ),
-          )}
+          {(person.chunkParagraphs.length > 0
+            ? person.chunkParagraphs
+            : person.fullStoryParagraphs
+          ).map((content, index) => (
+            <p key={index} className="whitespace-pre-wrap">
+              {content}
+            </p>
+          ))}
         </div>
       ) : person.viewMode === "paragraph" && data.fullStory ? (
         <div className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
@@ -422,11 +431,11 @@ function MobileMetadataCard({ person }: { person: PersonPageController }) {
           <MetadataValue label={t("person.tokenId", "Token ID")} value={`#${data.tokenId}`} />
           <MetadataValue
             label={t("person.totalChunks", "Total Chunks")}
-            value={data.storyMetadata.totalChunks}
+            value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalChunks}
           />
           <MetadataValue
             label={t("person.totalLength", "Total Length")}
-            value={data.storyMetadata.totalLength}
+            value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalLength}
           />
         </div>
         <div className="text-sm mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
@@ -502,12 +511,7 @@ function MobileCopyValue({
           {value}
         </div>
         {onCopy && (
-          <CopyIconButton
-            onClick={onCopy}
-            label={t("search.copy")}
-            size="sm"
-            className="ml-3"
-          />
+          <CopyIconButton onClick={onCopy} label={t("search.copy")} size="sm" className="ml-3" />
         )}
       </div>
     </div>

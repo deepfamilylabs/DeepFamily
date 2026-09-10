@@ -79,7 +79,6 @@ describe("mintService executeMintFlow", () => {
           deathMonth: 0,
           deathDay: 0,
           deathPlace: "",
-          story: "",
         },
       },
       mintPersonVersionNFT: vi.fn(),
@@ -122,7 +121,6 @@ describe("mintService executeMintFlow", () => {
             deathMonth: 0,
             deathDay: 0,
             deathPlace: "",
-            story: "",
           },
         },
         mintPersonVersionNFT: vi.fn(),
@@ -200,7 +198,6 @@ describe("mintService executeMintFlow", () => {
           deathMonth: 0,
           deathDay: 0,
           deathPlace: "",
-          story: "",
         },
       },
       mintPersonVersionNFT,
@@ -225,6 +222,8 @@ describe("mintService executeMintFlow", () => {
       expect.objectContaining({
         basicInfo: expect.objectContaining({ identityCommitment: identityCommitmentHex }),
       }),
+      "0x",
+      ethers.keccak256("0x"),
     );
     expect(getVersionDetails).toHaveBeenCalledWith(
       "0x00000000000000000000000000000000000000000000000000000000000000aa",

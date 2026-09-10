@@ -1,3 +1,4 @@
+import { encodeStoryRecord } from "@deepfamily/protocol-core";
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
@@ -36,7 +37,15 @@ describe("Mint NFT Tests", function () {
   ) {
     return deepFamily
       .connect(signer)
-      .mintPersonVersionNFT(proof, ps, versionIndex, tokenURI, coreInfo);
+      .mintPersonVersionNFT(
+        proof,
+        ps,
+        versionIndex,
+        tokenURI,
+        coreInfo,
+        "0x",
+        hre.ethers.keccak256("0x"),
+      );
   }
 
   async function baseSetup() {
@@ -122,6 +131,61 @@ describe("Mint NFT Tests", function () {
       coreInfo,
     };
   }
+
+  it("initializes biography before the receiver callback and rolls it back on rejection", async () => {
+    const { deepFamily, signer, personHash, publicSignals, coreInfo } =
+      await prepareBasicInfoMintAttempt("Receiver Biography");
+    const archive = await hre.ethers.getContractAt(
+      "DeepFamilyArchiveV1",
+      await deepFamily.archive(),
+    );
+    const receiver = await (
+      await hre.ethers.getContractFactory("MintBiographyReceiver")
+    ).deploy(await archive.getAddress());
+    const address = await receiver.getAddress();
+    const token = await hre.ethers.getContractAt(
+      "DeepFamilyToken",
+      await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
+    );
+    const fee = await token.recentReward();
+    if (fee > 0n) await token.connect(signer).transfer(address, fee);
+    await receiver.execute(
+      await token.getAddress(),
+      token.interface.encodeFunctionData("approve", [
+        await deepFamily.getAddress(),
+        hre.ethers.MaxUint256,
+      ]),
+    );
+    await receiver.execute(
+      await deepFamily.getAddress(),
+      deepFamily.interface.encodeFunctionData("endorseVersion", [personHash, 1]),
+    );
+    const payload = encodeStoryRecord({
+      content: "Original biography before the receiver callback",
+      chunkType: 0,
+      attachmentCID: "",
+    });
+    const data = deepFamily.interface.encodeFunctionData("mintPersonVersionNFT", [
+      makeStubProof(),
+      { ...publicSignals, minter: BigInt(address) },
+      1,
+      "",
+      coreInfo,
+      payload,
+      hre.ethers.keccak256(payload),
+    ]);
+    await receiver.setRejectReceipt(true);
+    await expect(receiver.execute(await deepFamily.getAddress(), data)).to.be.revertedWith(
+      "receiver rejected mint",
+    );
+    expect(await deepFamily.tokenCounter()).to.equal(0n);
+    expect((await archive.storyState(1n)).totalRecords).to.equal(0n);
+    await receiver.setRejectReceipt(false);
+    await receiver.execute(await deepFamily.getAddress(), data);
+    expect(await receiver.recordsAtReceipt()).to.equal(1n);
+    expect(await receiver.authorAtReceipt()).to.equal(address);
+    expect((await archive.storyState(1n)).isSealed).to.equal(true);
+  });
 
   it("fails mint before endorsement", async () => {
     const { deepFamily, signer } = await baseSetup();

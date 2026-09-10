@@ -1,5 +1,7 @@
 import { ethers } from "ethers";
+import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { computeStoryHash } from "./story";
+import { getStoryPresentation } from "./storyPresentation";
 import type { NodeData, StoryChunk, StoryMetadata } from "./graph";
 
 export interface StoryIntegrity {
@@ -32,7 +34,7 @@ export function buildStorySnapshot(
   const sorted = [...chunks]
     .filter((chunk) => Number.isFinite(Number(chunk?.chunkIndex)))
     .sort((a, b) => a.chunkIndex - b.chunkIndex);
-  const fullStory = sorted.map((chunk) => chunk.content).join("");
+  const fullStory = getStoryPresentation(sorted, metadata).fullStory;
   const encoder = new TextEncoder();
   const computedLength = sorted.reduce(
     (acc, chunk) => acc + (chunk.payloadLength ?? encoder.encode(chunk.content).length),
@@ -129,13 +131,17 @@ export function applyStoryDataToNode(
 ): Record<string, NodeData> {
   const current = nodesData[nodeId];
   if (!current) return nodesData;
-  const hasCompleteStory =
-    storyData.fullStory.trim().length > 0 && storyData.integrity.missing.length === 0;
+  const biography = storyData.chunks.find(
+    (chunk) =>
+      chunk.chunkIndex === 0 &&
+      chunk.schemaId === STORY_BIOGRAPHY_SCHEMA_ID &&
+      !chunk.unsupportedSchema,
+  );
   return {
     ...nodesData,
     [nodeId]: {
       ...current,
-      nftPublicStory: hasCompleteStory ? storyData.fullStory : current.nftPublicStory,
+      nftPublicStory: biography?.content ?? current.nftPublicStory,
       storyMetadata: storyData.metadata,
       storyChunks: storyData.chunks,
       storyFetchedAt: storyData.fetchedAt,

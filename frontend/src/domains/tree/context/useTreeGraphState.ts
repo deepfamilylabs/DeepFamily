@@ -601,13 +601,14 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
               Date.now(),
             getCurrentNode: (id) => (isCurrentScope() ? nodesDataRef.current[id] : undefined),
             readStoryMetadata: async (tokenId) => {
-              const metadata = await options.contract.getStoryMetadata(tokenId);
+              const metadata = await options.api.getStoryMetadata(tokenId);
               return {
                 totalChunks: Number(metadata.totalChunks),
                 totalLength: Number(metadata.totalLength),
                 isSealed: Boolean(metadata.isSealed),
                 lastUpdateTime: Number(metadata.lastUpdateTime),
                 fullStoryHash: metadata.fullStoryHash,
+                biographyPayloadLength: metadata.biographyPayloadLength,
               };
             },
           });
@@ -708,13 +709,14 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           getVersionDetailsFetchedAt: () => Date.now(),
           getCurrentNode: (id) => nodesDataRef.current[id],
           readStoryMetadata: async (tokenId) => {
-            const metadata = await options.contract.getStoryMetadata(tokenId);
+            const metadata = await options.api.getStoryMetadata(tokenId);
             return {
               totalChunks: Number(metadata.totalChunks),
               totalLength: Number(metadata.totalLength),
               isSealed: Boolean(metadata.isSealed),
               lastUpdateTime: Number(metadata.lastUpdateTime),
               fullStoryHash: metadata.fullStoryHash,
+              biographyPayloadLength: metadata.biographyPayloadLength,
             };
           },
         });

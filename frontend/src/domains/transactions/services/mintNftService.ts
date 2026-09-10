@@ -1,3 +1,5 @@
+import { hexlify, keccak256 } from "ethers";
+import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents } from "../api/txGateway";
 import {
@@ -80,7 +82,6 @@ export type MintCoreInfo = {
     deathMonth: number;
     deathDay: number;
     deathPlace: string;
-    story: string;
   };
 };
 
@@ -90,6 +91,8 @@ export type MintPersonVersionNFTFn = (
   versionIndex: number,
   tokenURI: string,
   coreInfo: MintCoreInfo,
+  storyPayload: string,
+  expectedStoryPayloadHash: string,
 ) => Promise<any>;
 
 export type MintReceiptEvent = {
@@ -111,6 +114,7 @@ export type ExecuteMintFlowParams = {
   selfSuiteId: number;
   tokenURI: string;
   coreInfo: MintCoreInfo;
+  story?: string;
   mintPersonVersionNFT: MintPersonVersionNFTFn;
   getVersionDetails?: (personHash: string, versionIndex: number) => Promise<any>;
 };
@@ -138,6 +142,7 @@ export async function executeMintFlow({
   selfSuiteId,
   tokenURI,
   coreInfo,
+  story = "",
   mintPersonVersionNFT,
   getVersionDetails,
 }: ExecuteMintFlowParams): Promise<ExecuteMintFlowResult> {
@@ -148,6 +153,12 @@ export async function executeMintFlow({
     throw new Error("Disclosure suite commitment does not match the target envelope header");
   }
 
+  const payload =
+    story === ""
+      ? "0x"
+      : hexlify(encodePublicStoryRecord({ content: story, chunkType: 0, attachmentCID: "" }));
+  const payloadHash = keccak256(payload);
+  const frozenCoreInfo = structuredClone(coreInfo);
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
   if (Number(endorsedIdx) !== Number(versionIndex)) {
     return { requiresEndorsement: true };
@@ -159,7 +170,9 @@ export async function executeMintFlow({
     publicSignals,
     versionIndex,
     tokenURI,
-    coreInfo,
+    frozenCoreInfo,
+    payload,
+    payloadHash,
   );
 
   const eventInterface = createDeepFamilyInterface();

@@ -313,12 +313,18 @@ function assertGzipV1Header(input) {
   protocolAssert(input[8] === 0, "INVALID_GZIP_XFL", "gzip-v1 level 6 requires XFL=0");
 }
 
-export function gzipV1(bytes) {
+export function gzipV1(bytes, options = {}) {
   const input = asUint8Array(bytes, "gzip plaintext");
+  const maximumInput = options.maximumInputBytes ?? MAX_CANONICAL_JSON_BYTES;
   protocolAssert(
-    input.length <= MAX_CANONICAL_JSON_BYTES,
+    Number.isSafeInteger(maximumInput) && maximumInput >= 0,
+    "INVALID_GZIP_LIMIT",
+    "gzip input limit must be a nonnegative safe integer",
+  );
+  protocolAssert(
+    input.length <= maximumInput,
     "CANONICAL_JSON_TOO_LARGE",
-    `gzip-v1 plaintext exceeds ${MAX_CANONICAL_JSON_BYTES} bytes`,
+    `gzip-v1 plaintext exceeds ${maximumInput} bytes`,
   );
   const compressed = gzipSync(input, { level: 6, mtime: 0 });
   assertGzipV1Header(compressed);

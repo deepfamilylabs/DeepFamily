@@ -197,6 +197,7 @@ export function useMintNftSubmit({
           publicSignals: proof.publicSignals,
           tokenURI: proof.tokenURI,
           coreInfo: proof.coreInfo,
+          story: data.story,
         });
 
         if (mintResult.requiresEndorsement) {

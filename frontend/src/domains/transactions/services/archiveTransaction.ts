@@ -36,14 +36,16 @@ export async function estimateArchiveTransaction(input: {
   provider: any;
   calldata: string;
   payload: string;
-  kind: "Story" | "Metadata" | "Seal";
+  kind: "Story" | "Metadata" | "Seal" | "Mint";
 }): Promise<ArchiveTransactionPreview> {
   const guidance =
     input.kind === "Story"
       ? "Split the text into another logical story record."
-      : input.kind === "Metadata"
-        ? "The current network cannot atomically store this metadata."
-        : "Refresh the story and try again.";
+      : input.kind === "Mint"
+        ? "Reduce the public biography before minting; the NFT and biography must fit in one transaction."
+        : input.kind === "Metadata"
+          ? "The current network cannot atomically store this metadata."
+          : "Refresh the story and try again.";
   let estimatedGas: bigint;
   try {
     if (typeof input.contractMethod.estimateGas !== "function")

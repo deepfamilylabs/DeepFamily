@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
@@ -7,7 +7,8 @@ import {
   createDeepFamilyReaderContract,
 } from "../../../../../shared/clients/contractFactory";
 import { getFriendlyError } from "../../../../../shared/lib/errors";
-import { waitForTransactionReceipt } from "../../../api/txGateway";
+import { mintBiographyTransaction } from "../../../services/mintBiographyTransaction";
+import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import { executeMintFlow } from "../../../services/mintNftService";
 import { initialMintNftFlowState, mintNftReducer } from "../model/mintNftReducer";
 import type { ExecuteMintFlowResult, MintNftFlowArgs } from "../model/mintNftTypes";
@@ -20,6 +21,34 @@ export function useMintNftFlow() {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(mintNftReducer, initialMintNftFlowState);
   const runIdRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [transactionPreview, setTransactionPreview] = useState<ArchiveTransactionPreview | null>(
+    null,
+  );
+  const previewResolver = useRef<((value: boolean) => void) | null>(null);
+  const resolveTransactionPreview = useCallback((approved: boolean) => {
+    previewResolver.current?.(approved);
+    previewResolver.current = null;
+    setTransactionPreview(null);
+  }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      runIdRef.current += 1;
+      previewResolver.current?.(false);
+      previewResolver.current = null;
+    };
+  }, []);
+  const confirmPreview = useCallback(async (preview: ArchiveTransactionPreview, runId: number) => {
+    if (!mountedRef.current || runIdRef.current !== runId) return false;
+    const approved = await new Promise<boolean>((resolve) => {
+      previewResolver.current?.(false);
+      previewResolver.current = resolve;
+      setTransactionPreview(preview);
+    });
+    return approved && mountedRef.current && runIdRef.current === runId;
+  }, []);
 
   const stepMessage = useMemo(() => {
     switch (state.step) {
@@ -35,13 +64,16 @@ export function useMintNftFlow() {
   }, [state.step, t]);
 
   const reset = useCallback(() => {
+    resolveTransactionPreview(false);
     runIdRef.current += 1;
     dispatch({ type: "reset" });
-  }, []);
+  }, [resolveTransactionPreview]);
 
   const runOrThrow = useCallback(
     async (args: MintNftFlowArgs): Promise<ExecuteMintFlowResult> => {
+      if (!mountedRef.current) throw new Error("Mint NFT flow was closed");
       const thisRunId = ++runIdRef.current;
+      resolveTransactionPreview(false);
       dispatch({ type: "stage", step: "validating" });
 
       try {
@@ -57,21 +89,30 @@ export function useMintNftFlow() {
           versionIndex: number,
           tokenURI: string,
           coreInfo: MintNftFlowArgs["coreInfo"],
+          storyPayload: string,
+          expectedStoryPayloadHash: string,
         ) => {
-          if (runIdRef.current === thisRunId) {
-            dispatch({ type: "stage", step: "submitting" });
-          }
-          const tx = await contract.mintPersonVersionNFT(
-            proof,
-            publicSignals,
-            versionIndex,
-            tokenURI,
-            coreInfo,
-          );
-          if (runIdRef.current === thisRunId) {
-            dispatch({ type: "stage", step: "confirming" });
-          }
-          return await waitForTransactionReceipt(tx);
+          if (!mountedRef.current || runIdRef.current !== thisRunId)
+            throw new Error("Mint NFT flow was superseded by a newer request");
+          dispatch({ type: "stage", step: "submitting" });
+          return mintBiographyTransaction({
+            contract,
+            signer,
+            personHash: args.personHash,
+            args: [
+              proof,
+              publicSignals,
+              versionIndex,
+              tokenURI,
+              coreInfo,
+              storyPayload,
+              expectedStoryPayloadHash,
+            ],
+            confirm: (preview) => confirmPreview(preview, thisRunId),
+            onSubmitted: () => {
+              if (runIdRef.current === thisRunId) dispatch({ type: "stage", step: "confirming" });
+            },
+          });
         };
 
         const getVersionDetails = readerAddress
@@ -91,6 +132,7 @@ export function useMintNftFlow() {
           publicSignals: args.publicSignals,
           tokenURI: args.tokenURI,
           coreInfo: args.coreInfo,
+          story: args.story,
           mintPersonVersionNFT,
           getVersionDetails,
         });
@@ -110,7 +152,7 @@ export function useMintNftFlow() {
         throw error;
       }
     },
-    [address, contractAddress, readerAddress, signer, t],
+    [address, contractAddress, readerAddress, signer, t, confirmPreview, resolveTransactionPreview],
   );
 
   const run = useCallback(
@@ -123,6 +165,8 @@ export function useMintNftFlow() {
   );
 
   return {
+    transactionPreview,
+    resolveTransactionPreview,
     state,
     status: state.step,
     stepMessage,

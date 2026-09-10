@@ -184,7 +184,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               title={t("storyChunkEditor.chunkTypeHelp.opening", "Opening")}
               items={[
                 {
-                  value: 0,
+                  value: 1,
                   label: t("chunkTypes.summary", "Summary"),
                   desc: t(
                     "storyChunkEditor.chunkTypeHelp.summaryDesc",
@@ -198,7 +198,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               title={t("storyChunkEditor.chunkTypeHelp.earlyYears", "Early Years")}
               items={[
                 {
-                  value: 1,
+                  value: 2,
                   label: t("chunkTypes.earlyLife", "Early Life"),
                   desc: t(
                     "storyChunkEditor.chunkTypeHelp.earlyLifeDesc",
@@ -206,7 +206,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
                   ),
                 },
                 {
-                  value: 2,
+                  value: 3,
                   label: t("chunkTypes.education", "Education"),
                   desc: t(
                     "storyChunkEditor.chunkTypeHelp.educationDesc",
@@ -220,7 +220,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               title={t("storyChunkEditor.chunkTypeHelp.mainNarrative", "Main Narrative")}
               items={[
                 {
-                  value: 3,
+                  value: 4,
                   label: t("chunkTypes.lifeEvents", "Life Events"),
                   desc: t(
                     "storyChunkEditor.chunkTypeHelp.lifeEventsDesc",
@@ -238,24 +238,24 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               )}
               items={[
                 {
-                  value: 4,
+                  value: 5,
                   key: "career",
                   desc: "Professional history, positions, job transitions",
                 },
-                { value: 5, key: "works", desc: "Publications, creations, products, projects" },
-                { value: 6, key: "achievements", desc: "Awards, honors, recognitions, milestones" },
-                { value: 7, key: "philosophy", desc: "Beliefs, values, theoretical contributions" },
-                { value: 8, key: "quotes", desc: "Famous sayings, memorable statements" },
+                { value: 6, key: "works", desc: "Publications, creations, products, projects" },
+                { value: 7, key: "achievements", desc: "Awards, honors, recognitions, milestones" },
+                { value: 8, key: "philosophy", desc: "Beliefs, values, theoretical contributions" },
+                { value: 9, key: "quotes", desc: "Famous sayings, memorable statements" },
               ].map((item) => keyedItem(item, t))}
             />
 
             <HelpGroup
               title={t("storyChunkEditor.chunkTypeHelp.personalLife", "Personal Life")}
               items={[
-                { value: 9, key: "family", desc: "Spouse, children, close relatives" },
-                { value: 10, key: "lifestyle", desc: "Hobbies, habits, interests, daily routines" },
+                { value: 10, key: "family", desc: "Spouse, children, close relatives" },
+                { value: 11, key: "lifestyle", desc: "Hobbies, habits, interests, daily routines" },
                 {
-                  value: 11,
+                  value: 12,
                   key: "relations",
                   desc: "Friendships, mentorships, collaborations, rivalries",
                 },
@@ -266,27 +266,27 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               title={t("storyChunkEditor.chunkTypeHelp.socialEngagement", "Social Engagement")}
               items={[
                 {
-                  value: 12,
+                  value: 13,
                   key: "activities",
                   desc: "Public service, charity, speeches, social causes",
                 },
-                { value: 13, key: "anecdotes", desc: "Interesting stories, lesser-known facts" },
-                { value: 14, key: "controversies", desc: "Disputes, criticisms, scandals" },
+                { value: 14, key: "anecdotes", desc: "Interesting stories, lesser-known facts" },
+                { value: 15, key: "controversies", desc: "Disputes, criticisms, scandals" },
               ].map((item) => keyedItem(item, t))}
             />
 
             <HelpGroup
               title={t("storyChunkEditor.chunkTypeHelp.closing", "Closing")}
               items={[
-                { value: 15, key: "legacy", desc: "Historical impact, influence, commemorations" },
+                { value: 16, key: "legacy", desc: "Historical impact, influence, commemorations" },
                 {
-                  value: 16,
+                  value: 17,
                   key: "gallery",
                   desc: "Photos, videos, audio, documents, and multimedia",
                 },
-                { value: 17, key: "references", desc: "Sources, citations, bibliography" },
+                { value: 18, key: "references", desc: "Sources, citations, bibliography" },
                 {
-                  value: 18,
+                  value: 19,
                   key: "notes",
                   desc: "Additional remarks, corrections, clarifications",
                 },

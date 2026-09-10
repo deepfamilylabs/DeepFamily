@@ -35,10 +35,10 @@ describe("storyEditorModel", () => {
   });
 
   it("tracks dirty form state by meaningful story input fields", () => {
-    expect(isChunkFormDirty({ content: " ", chunkType: 0, attachmentCID: "" })).toBe(false);
-    expect(isChunkFormDirty({ content: "story", chunkType: 0, attachmentCID: "" })).toBe(true);
-    expect(isChunkFormDirty({ content: "", chunkType: 1, attachmentCID: "" })).toBe(true);
-    expect(isChunkFormDirty({ content: "", chunkType: 0, attachmentCID: "cid" })).toBe(true);
+    expect(isChunkFormDirty({ content: " ", chunkType: 1, attachmentCID: "" })).toBe(false);
+    expect(isChunkFormDirty({ content: "story", chunkType: 1, attachmentCID: "" })).toBe(true);
+    expect(isChunkFormDirty({ content: "", chunkType: 2, attachmentCID: "" })).toBe(true);
+    expect(isChunkFormDirty({ content: "", chunkType: 1, attachmentCID: "cid" })).toBe(true);
   });
 
   it("counts bytes and resolves ipfs attachment URLs", () => {

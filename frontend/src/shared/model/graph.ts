@@ -1,7 +1,12 @@
+import { getStoryPresentation } from "./storyPresentation";
+
 export type NodeLabelInput = { personHash: string; versionIndex: number };
 
 export interface StoryChunk {
+  /** Actual Archive record index, including the initial biography when present. */
   chunkIndex: number;
+  /** One-based ordinary story number, assigned only for presentation. */
+  displayIndex?: number;
   chunkHash: string;
   content: string;
   timestamp: number;
@@ -17,11 +22,14 @@ export interface StoryChunk {
 }
 
 export interface StoryMetadata {
+  /** Archive totals include the biography and are used for paging and verification. */
   totalChunks: number;
   fullStoryHash: string;
   lastUpdateTime: number;
   isSealed: boolean;
   totalLength: number;
+  /** Present only when Archive record 0 is the reserved public biography. */
+  biographyPayloadLength?: number;
 }
 
 export interface StoryChunkCreateData {
@@ -129,15 +137,8 @@ export function nodeLabel(node: NodeLabelInput): string {
 // Check if person has detailed story chunks (not just basic story field)
 export function hasDetailedStory(nd: Partial<NodeData> | undefined | null): boolean {
   if (!nd) return false;
-  // Only return true if there are actual story chunks, not just basic story field
-  if (Array.isArray(nd.storyChunks) && nd.storyChunks.length > 0) return true;
-  if (
-    nd.storyMetadata &&
-    typeof nd.storyMetadata.totalChunks === "number" &&
-    nd.storyMetadata.totalChunks > 0
-  )
-    return true;
-  return false;
+  const story = getStoryPresentation(nd.storyChunks, nd.storyMetadata);
+  return story.chunks.length > 0 || story.totalChunks > 0;
 }
 
 export function isMinted(nd: Partial<NodeData> | undefined | null): boolean {

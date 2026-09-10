@@ -1,3 +1,4 @@
+import { encodeStoryRecord } from "@deepfamily/protocol-core";
 /**
  * Contract-test helpers for the v1 proof and encrypted-metadata ABI.
  *
@@ -461,7 +462,6 @@ export async function mintPerson(
       deathMonth: 0,
       deathDay: 0,
       deathPlace: "",
-      story: opts.story ?? "",
     },
   };
 
@@ -473,6 +473,17 @@ export async function mintPerson(
       1,
       opts.tokenURI ?? "",
       coreInfo,
+      opts.storyPayload ??
+        (opts.story
+          ? encodeStoryRecord({ content: opts.story, chunkType: 0, attachmentCID: "" })
+          : "0x"),
+      opts.expectedStoryPayloadHash ??
+        ethers.keccak256(
+          opts.storyPayload ??
+            (opts.story
+              ? encodeStoryRecord({ content: opts.story, chunkType: 0, attachmentCID: "" })
+              : "0x"),
+        ),
     );
   const receipt = await tx.wait();
 

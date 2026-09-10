@@ -2292,7 +2292,7 @@ export const main = async (chainProfile) => {
       archive: archive.connect(runDeployer),
       tokenId,
       content: storyContent,
-      chunkType: 0,
+      chunkType: 1,
       attachmentCID: "",
     });
     const storyHash = storyResult.recordRef.blob.payloadHash;
@@ -2357,7 +2357,7 @@ export const main = async (chainProfile) => {
     assertCondition(storyState.isSealed, "Story is not sealed");
     const rejectedPayload = encodeStoryRecord({
       content: "after seal",
-      chunkType: 0,
+      chunkType: 1,
       attachmentCID: "",
     });
     await expectRevert(

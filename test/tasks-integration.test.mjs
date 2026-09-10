@@ -133,7 +133,7 @@ describe("Hardhat Tasks Integration", function () {
 
     await hre.tasks.getTask("add-story-chunk").run({
       tokenid: tokenId.toString(),
-      chunkindex: "0",
+      chunkindex: "1",
       content: "Task-generated story chunk",
       type: "1",
       attachment: "",
@@ -148,11 +148,13 @@ describe("Hardhat Tasks Integration", function () {
 
     const [chunks, totalChunks, hasMore, nextOffset] = taskResult;
 
-    expect(Number(totalChunks)).to.equal(1);
+    expect(Number(totalChunks)).to.equal(2);
     expect(hasMore).to.equal(false);
-    expect(Number(nextOffset)).to.equal(1);
-    expect(chunks).to.have.lengthOf(1);
-    expect(chunks[0].decoded.content).to.equal("Task-generated story chunk");
+    expect(Number(nextOffset)).to.equal(2);
+    expect(chunks).to.have.lengthOf(2);
+    expect(chunks[0].decoded.content).to.equal("Task integration flow");
+    expect(chunks[0].decoded.chunkType).to.equal(0);
+    expect(chunks[1].decoded.content).to.equal("Task-generated story chunk");
 
     await hre.tasks.getTask("seal-story").run({
       tokenid: tokenId.toString(),

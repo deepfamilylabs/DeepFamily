@@ -45,7 +45,15 @@ async function mintPersonVersionNFT(
 ) {
   return deepFamily
     .connect(signer)
-    .mintPersonVersionNFT(proof, ps, versionIndex, tokenURI, coreInfo);
+    .mintPersonVersionNFT(
+      proof,
+      ps,
+      versionIndex,
+      tokenURI,
+      coreInfo,
+      "0x",
+      hre.ethers.keccak256("0x"),
+    );
 }
 
 describe("Endorse Tests", function () {

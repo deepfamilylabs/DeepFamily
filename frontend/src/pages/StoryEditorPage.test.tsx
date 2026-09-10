@@ -214,14 +214,14 @@ describe("StoryEditorPage", () => {
         tokenId: "42",
         chunkIndex: 1,
         content: "new story",
-        chunkType: 0,
+        chunkType: 1,
         attachmentCID: "",
         expectedHash: expect.stringMatching(/^0x[0-9a-f]{64}$/),
       }),
     );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Chunk #1 added successfully (9 bytes)");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Chunk #2 added successfully (9 bytes)");
     expect(await screen.findByText("new story")).toBeTruthy();
   });
 

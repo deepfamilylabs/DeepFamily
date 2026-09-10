@@ -7,4 +7,5 @@ export * from "./nodeState";
 export * from "./personDetailParsers";
 export * from "./story";
 export * from "./storyData";
+export * from "./storyPresentation";
 export * from "./tokenNode";

@@ -153,7 +153,7 @@ export function parseCoreInfo(coreInfo: any): CoreInfoFields {
     coreInfo?.supplementInfo?.isDeathBC !== undefined
       ? Boolean(coreInfo.supplementInfo.isDeathBC)
       : undefined;
-  const nftPublicStory = coreInfo?.supplementInfo?.story;
+  const nftPublicStory = undefined; // Public biography is read from the Archive.
   return {
     fullName,
     gender,

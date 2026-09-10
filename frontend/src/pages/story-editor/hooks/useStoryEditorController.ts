@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
-import { getChunkTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
+import { getEditableChunkTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
 import { useAddStoryChunkFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
 import {
+  getStoryPresentation,
   type NodeData,
   type StoryChunk,
   type StoryChunkCreateData,
@@ -25,7 +26,6 @@ import {
   mapStorySealError,
   mapStorySubmitError,
   normalizeStoryChunks,
-  sortStoryChunks,
   STORY_MAX_ATTACHMENT_BYTES,
   STORY_SEGMENT_BYTES,
   STORY_WARNING_ORANGE_BYTES,
@@ -109,7 +109,7 @@ export function useStoryEditorController() {
   const sealStoryFlow = useSealStoryFlow();
   const nftQuery = useNFTDetails(validTokenId);
   const storyQuery = useStoryData(validTokenId);
-  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
+  const chunkTypeOptions = useMemo(() => getEditableChunkTypeOptions(t), [t]);
 
   useEffect(() => {
     if (storyQuery.data) setOptimistic(null);
@@ -117,6 +117,14 @@ export function useStoryEditorController() {
 
   const meta = optimistic?.meta ?? storyQuery.data?.metadata ?? prefetched?.storyMetadata;
   const chunks = optimistic?.chunks ?? storyQuery.data?.chunks ?? prefetchedChunks;
+  const presentation = useMemo(() => getStoryPresentation(chunks, meta), [chunks, meta]);
+  const displayMeta = useMemo(
+    () =>
+      meta
+        ? { ...meta, totalChunks: presentation.totalChunks, totalLength: presentation.totalLength }
+        : undefined,
+    [meta, presentation.totalChunks, presentation.totalLength],
+  );
   const loading = !meta && storyQuery.loading;
   const queryError = meta ? null : storyQuery.error;
 
@@ -204,7 +212,7 @@ export function useStoryEditorController() {
     setNodeDetails(buildNodeDetailsFromNft(nftQuery.data, validTokenId));
   }, [nftQuery.data, validTokenId]);
 
-  const sortedChunks = useMemo(() => sortStoryChunks(chunks), [chunks]);
+  const sortedChunks = presentation.chunks;
   const isSealed = meta?.isSealed || false;
 
   const handleCancelEdit = useCallback(() => {
@@ -249,7 +257,13 @@ export function useStoryEditorController() {
           chunkIndex: data.chunkIndex,
           content: data.content,
           expectedHash: data.expectedHash || "",
-          chunkType: data.chunkType ?? 0,
+          chunkType:
+            typeof data.chunkType === "number" &&
+            Number.isInteger(data.chunkType) &&
+            data.chunkType >= 1 &&
+            data.chunkType <= 255
+              ? data.chunkType
+              : 1,
           attachmentCID: data.attachmentCID ?? "",
           confirmTransactionPreview,
         });
@@ -279,7 +293,7 @@ export function useStoryEditorController() {
               "storyChunkEditor.success.chunkAdded",
               "Chunk #{{index}} added successfully ({{bytes}} bytes)",
               {
-                index: result.events.StoryRecordAppended.chunkIndex,
+                index: getStoryPresentation(newChunks, newMeta).totalChunks,
                 bytes: result.events.StoryRecordAppended.contentLength,
               },
             ),
@@ -338,7 +352,7 @@ export function useStoryEditorController() {
               "storyChunkEditor.success.storySealed",
               "Story sealed successfully ({{total}} chunks)",
               {
-                total: result.events.StorySealed.totalChunks,
+                total: getStoryPresentation(chunks, newMeta).totalChunks,
               },
             ),
           );
@@ -388,8 +402,8 @@ export function useStoryEditorController() {
       return;
     }
 
-    const chunkTypeValue = Number(formData.chunkType || 0);
-    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 0 || chunkTypeValue > 255) {
+    const chunkTypeValue = Number(formData.chunkType ?? 1);
+    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 1 || chunkTypeValue > 255) {
       setLocalError(t("storyChunkEditor.invalidChunkType", "Invalid chunk type"));
       return;
     }
@@ -452,7 +466,7 @@ export function useStoryEditorController() {
     transactionPreview,
     resolveTransactionPreview,
     validTokenId,
-    meta,
+    meta: displayMeta,
     nodeDetails,
     titleText,
     loading,
