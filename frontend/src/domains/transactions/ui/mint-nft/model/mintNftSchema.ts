@@ -31,7 +31,7 @@ export const createMintNFTSchema = (t: MintNFTT) =>
         return typeof value === "string" ? (value === "" ? 0 : parseInt(value, 10)) : value;
       }),
       deathPlace: z.string().max(256, t("mintNFT.validation.deathPlaceTooLong")),
-      story: z.string().max(256, t("mintNFT.validation.storyTooLong")),
+      story: z.string(),
       tokenURI: z
         .string()
         .max(256, t("mintNFT.validation.tokenURITooLong"))

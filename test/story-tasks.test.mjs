@@ -49,14 +49,14 @@ describe("Story Tasks Integration", function () {
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
     expect(chunk0.decoded.content).to.equal("First chunk content");
-    expect(chunk0.decoded.chunkType).to.equal(0);
+    expect(chunk0.decoded.chunkType).to.equal(1);
     expect(chunk0.decoded.attachmentCID).to.equal("");
     const chunk1 = await readStoryRecord({
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 1),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
     expect(chunk1.decoded.content).to.equal("Second chunk content");
-    expect(chunk1.decoded.chunkType).to.equal(0);
+    expect(chunk1.decoded.chunkType).to.equal(1);
     expect(chunk1.decoded.attachmentCID).to.equal("");
 
     await hre.run("list-story-chunks", { tokenid: "1", offset: "0", limit: "10" });

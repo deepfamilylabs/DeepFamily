@@ -1,5 +1,6 @@
 import { Image } from "lucide-react";
 import { ResponsiveModalFrame } from "../../../../shared/ui";
+import { MintBiographyPreviewDialog } from "./sections/MintBiographyPreviewDialog";
 import { useMintNftModalController } from "./hooks/useMintNftModalController";
 import { EndorseRequiredDialog } from "./sections/EndorseRequiredDialog";
 import { MintConsentSection } from "./sections/MintConsentSection";
@@ -62,6 +63,10 @@ export default function MintNFTModal(props: MintNFTModalProps) {
       </div>
 
       <EndorseRequiredDialog t={t} {...mint.endorseDialog} />
+      <MintBiographyPreviewDialog
+        preview={mint.transactionPreview}
+        resolve={mint.resolveTransactionPreview}
+      />
     </ResponsiveModalFrame>
   );
 }

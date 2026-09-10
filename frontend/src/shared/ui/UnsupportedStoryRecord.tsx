@@ -8,7 +8,7 @@ export function UnsupportedStoryRecord({ record }: { record: StoryChunk }) {
       <p>
         {t(
           "archive.unknownSchema",
-          "This record uses an unsupported schema. Its original bytes have been verified.",
+          "This record uses a story format or compression method this app does not support yet. Its stored bytes have been verified.",
         )}
       </p>
       <code className="break-all text-xs">{record.schemaId}</code>

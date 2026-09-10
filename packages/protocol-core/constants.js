@@ -80,7 +80,28 @@ export const ARCHIVE_MAX_MANIFEST_ENTRIES = 1_024;
 export const ARCHIVE_MANIFEST_HEADER_LENGTH = 86;
 export const ARCHIVE_DEFAULT_READ_CONCURRENCY = 8;
 export const STORY_CHUNK_SCHEMA = "deepfamily/story-chunk@1.0";
-export const STORY_CHUNK_SCHEMA_ID = keccak256(toUtf8Bytes(STORY_CHUNK_SCHEMA));
+export const STORY_ENVELOPE_SCHEMA = "deepfamily/story-envelope@1.0";
+export const STORY_BIOGRAPHY_SCHEMA = "deepfamily/story-biography-envelope@1.0";
+export const STORY_CHUNK_SCHEMA_ID = keccak256(toUtf8Bytes(STORY_ENVELOPE_SCHEMA));
+export const STORY_BIOGRAPHY_SCHEMA_ID = keccak256(toUtf8Bytes(STORY_BIOGRAPHY_SCHEMA));
+export const STORY_ENVELOPE_MAGIC_TEXT = "DFSE";
+export const STORY_ENVELOPE_MAGIC_BYTES = Uint8Array.of(0x44, 0x46, 0x53, 0x45);
+export const STORY_ENVELOPE_FORMAT_1 = 1;
+export const STORY_ENVELOPE_HEADER_BYTES = 48;
+export const STORY_ENVELOPE_OFFSETS = Object.freeze({
+  magic: 0,
+  formatVersion: 4,
+  plaintextCodec: 5,
+  compressionSuite: 6,
+  flags: 7,
+  originalLength: 8,
+  originalHash: 16,
+  body: 48,
+});
+export const STORY_DEFAULT_COMPRESSION_SUITE = COMPRESSION_SUITE_GZIP_V1;
+// Public records have their own decompression resource bound. This does not
+// change the private person-version JSON/envelope limits above.
+export const STORY_MAX_CANONICAL_JSON_BYTES = 16_777_216;
 export const STORY_MAX_ATTACHMENT_CID_BYTES = 256;
 export const STORY_RECORD_DOMAIN_TEXT = "deepfamily.archive.story-record.v1";
 export const STORY_HEAD_DOMAIN_TEXT = "deepfamily.archive.story-head.v1";

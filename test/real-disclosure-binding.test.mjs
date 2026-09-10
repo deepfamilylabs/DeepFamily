@@ -101,6 +101,8 @@ describe("Real disclosure binding proof", function () {
           1,
           tokenURI,
           coreInfo,
+          "0x",
+          hre.ethers.keccak256("0x"),
         ),
     )
       .to.emit(deepFamily, "PersonNFTMinted")

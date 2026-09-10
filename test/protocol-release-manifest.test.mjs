@@ -550,9 +550,9 @@ describe("protocol release manifest", function () {
 
     assert.match(evidence.manifestSha256, /^[0-9a-f]{64}$/);
     assert.equal(interfaceEvidence.status, "passed");
-    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.checkedFragments, 18);
+    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.checkedFragments, 20);
     assert.equal(interfaceEvidence.contracts.deepFamilyReader.checkedFragments, 7);
-    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 3);
+    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 4);
     assert.equal(
       interfaceEvidence.contracts.deepFamilyArchiveV1.abiPolicy.nonErrorFragments,
       "exact-set",
@@ -569,7 +569,7 @@ describe("protocol release manifest", function () {
       interfaceEvidence.contracts.deepFamilyArchiveV1.abiPolicy.errorFragments,
       "excluded",
     );
-    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.artifactNonErrorFragments, 18);
+    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.artifactNonErrorFragments, 20);
     assert.equal(
       interfaceEvidence.contracts.deepFamilyArchiveV1.selectors.appendStoryRecord,
       "0xd6180410",

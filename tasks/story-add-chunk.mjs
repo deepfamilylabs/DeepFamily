@@ -12,7 +12,7 @@ const action = async (args, hre) => {
     tokenId: BigInt(args.tokenid),
     expectedIndex: BigInt(args.chunkindex),
     content: args.content,
-    chunkType: Number(args.type ?? 0),
+    chunkType: Number(args.type ?? 1),
     attachmentCID: args.attachment ?? "",
     expectedPayloadHash: args.exphash || undefined,
   });
@@ -39,9 +39,9 @@ export default task("add-story-chunk", "Add a story chunk to an NFT (story shard
   })
   .addOption({
     name: "type",
-    description: "Chunk classification (uint8, default 0)",
+    description: "Chunk classification (1–255, default 1; 0 is reserved for mint biography)",
     type: ArgumentType.STRING,
-    defaultValue: "0",
+    defaultValue: "1",
   })
   .addOption({
     name: "attachment",
@@ -51,7 +51,7 @@ export default task("add-story-chunk", "Add a story chunk to an NFT (story shard
   })
   .addOption({
     name: "exphash",
-    description: "Expected keccak256 of canonical DFS1 payload (optional)",
+    description: "Expected keccak256 of the compressed story envelope (optional)",
     type: ArgumentType.STRING,
     defaultValue: "",
   })

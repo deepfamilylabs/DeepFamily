@@ -1,6 +1,7 @@
+import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { ethers, type JsonRpcSigner } from "ethers";
 import {
-  encodeStoryRecord,
+  decodeStoryRecord,
   STORY_CHUNK_SCHEMA_ID,
   computeStoryRecordHash,
   computeStoryHead,
@@ -47,7 +48,7 @@ export async function addStoryChunkService(
   chunkIndex: number,
   content: string,
   expectedHash: string,
-  chunkType = 0,
+  chunkType = 1,
   attachmentCID = "",
   confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>,
 ): Promise<AddStoryChunkResult> {
@@ -55,7 +56,11 @@ export async function addStoryChunkService(
   let errorContract = deepFamily;
   try {
     // Freeze the exact DFS1 bytes before any RPC/wallet await.
-    const payload = ethers.hexlify(encodeStoryRecord({ content, chunkType, attachmentCID }));
+    if (!Number.isInteger(chunkType) || chunkType < 1 || chunkType > 255)
+      throw archiveValidationError("Type 0 is reserved for the mint biography");
+    const payload = ethers.hexlify(encodePublicStoryRecord({ content, chunkType, attachmentCID }));
+    if (decodeStoryRecord(payload).content !== content)
+      throw archiveValidationError("Story compression did not preserve the original text");
     const payloadHash = ethers.keccak256(payload);
     if (expectedHash && expectedHash.toLowerCase() !== payloadHash.toLowerCase()) {
       throw archiveValidationError("Expected hash does not match canonical story bytes");

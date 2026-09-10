@@ -19,7 +19,8 @@
     "gallery": "Media",
     "references": "References",
     "notes": "Notes",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "biography": "Biography"
   },
   "navigation": {
     "home": "Home",
@@ -1163,8 +1164,8 @@
     "deathPlacePlaceholder": "Enter death place (if applicable)",
     "deathDate": "Death Date (if applicable)",
     "deathYear": "Death Year",
-    "story": "Introduction",
-    "storyPlaceholder": "Enter a brief introduction...",
+    "story": "Public biography",
+    "storyPlaceholder": "Enter the full public biography, or import the unlocked private biography.",
     "copyBiographyWarning": "An unlocked private biography is available for this exact version. Copying it into the NFT story makes that text permanently public on-chain.",
     "copyBiographyConfirm": "I understand this copies decrypted private biography text into a public, immutable NFT field.",
     "copyBiographyToStory": "Copy biography into public story",
@@ -1490,7 +1491,9 @@
       "TRANSACTION_REPLACEMENT_MISMATCH": "The replacement transaction differs from the frozen Add Version package and was rejected.",
       "WALLET_POPUP_TIMEOUT": "Wallet confirmation timed out. Please try again and confirm in your wallet.",
       "WALLET_REQUEST_PENDING": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-      "CALL_EXCEPTION": "Contract validation failed. Please check input data."
+      "CALL_EXCEPTION": "Contract validation failed. Please check input data.",
+      "StoryAlreadyInitialized": "The mint biography has already been initialized.",
+      "InvalidStoryAuthor": "The mint biography author is invalid."
     },
     "unknown": "Submission failed. Please retry later or verify your inputs."
   },
@@ -1537,11 +1540,12 @@
     "segmentCost": "This record creates multiple storage segments. Each new segment increases transaction cost.",
     "feeChanges": "Network fees can change before your wallet submits the transaction.",
     "exactBytes": "View exact payload bytes and hash",
-    "unknownSchema": "This record uses an unsupported schema. Its original bytes have been verified.",
+    "unknownSchema": "This record uses a story format or compression method this app does not support yet. Its stored bytes have been verified.",
     "rawRecord": "View verified raw record",
-    "largeStory": "Multiple storage segments; review the estimated cost before signing",
+    "largeStory": "Long text; review the compressed storage size and estimated fee before signing",
     "reviewStory": "Review story transaction",
     "confirm": "Continue to wallet",
-    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes"
+    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
+    "reviewMint": "Review mint and biography"
   }
 }

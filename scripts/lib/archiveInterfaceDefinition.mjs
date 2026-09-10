@@ -242,6 +242,19 @@ const definition = {
       },
       {
         type: "function",
+        name: "BIOGRAPHY_SCHEMA_ID",
+        selector: "0x106556ce",
+        stateMutability: "view",
+        inputs: [],
+        outputs: [
+          {
+            name: "",
+            type: "bytes32",
+          },
+        ],
+      },
+      {
+        type: "function",
         name: "DEEP_FAMILY",
         selector: "0x4130d94c",
         stateMutability: "view",
@@ -404,6 +417,31 @@ const definition = {
             type: "bytes32",
           },
         ],
+      },
+      {
+        type: "function",
+        name: "initializeStory",
+        selector: "0x9396cfc5",
+        stateMutability: "nonpayable",
+        inputs: [
+          {
+            name: "tokenId",
+            type: "uint256",
+          },
+          {
+            name: "author",
+            type: "address",
+          },
+          {
+            name: "payload",
+            type: "bytes",
+          },
+          {
+            name: "expectedPayloadHash",
+            type: "bytes32",
+          },
+        ],
+        outputs: [],
       },
       {
         type: "function",
@@ -675,6 +713,10 @@ const definition = {
           type: "bytes32",
           value: "0x53b5e51d2cea7f54d1dc5c2bb4e490b0cfe0dd605c62c0fd8445117109736ca8",
         },
+        BIOGRAPHY_SCHEMA_ID: {
+          type: "bytes32",
+          value: "0x22253a7cc8948414ca943f8c643c363f1c46ea9d5d77ee6949bd5ff0f6b5ae86",
+        },
       },
       activeBinding: "DEEP_FAMILY.archive() == address(this)",
       metadata: {
@@ -684,7 +726,7 @@ const definition = {
       },
       story: {
         authorization: "msg.sender == DEEP_FAMILY.ownerOf(tokenId)",
-        schema: "nonzero, opaque to contract",
+        schema: "nonzero opaque bytes; reserved biography schema rejected by ordinary append",
         expectedPayloadHash: "mandatory keccak256(payload)",
         concurrency: ["expectedIndex == totalRecords", "expectedHead == recordsHead"],
         initialHead: "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -693,6 +735,39 @@ const definition = {
         newHead:
           "keccak256(abi.encode(STORY_HEAD_DOMAIN, bytes32(previousHead), bytes32(recordHash)))",
         seal: "owner only; expected count/head; nonempty; irreversible",
+        initialization: {
+          authorization: "msg.sender == DEEP_FAMILY",
+          maximumCalls: 1,
+          emptyPayload: "hash verified; no record; initialization remains consumed",
+          author: "actual minter",
+          timing: "before ERC721 receiver callback; atomic with mint",
+          schemaId: "0x22253a7cc8948414ca943f8c643c363f1c46ea9d5d77ee6949bd5ff0f6b5ae86",
+        },
+        publicEnvelope: {
+          magic: "DFSE",
+          schema: "deepfamily/story-envelope@1.0",
+          biographySchema: "deepfamily/story-biography-envelope@1.0",
+          formatVersion: 1,
+          headerBytes: 48,
+          plaintextCodec: 1,
+          compressionSuite: 1,
+          compression: "gzip-v1; level 6; mtime 0; one member; no trailing data",
+          automaticFallback: false,
+          maximumOriginalBytes: 16777216,
+          offsets: {
+            magic: 0,
+            formatVersion: 4,
+            plaintextCodec: 5,
+            compressionSuite: 6,
+            flags: 7,
+            originalLength: 8,
+            originalHash: 16,
+            body: 48,
+          },
+          originalHash: "keccak256(complete canonical story JSON bytes)",
+          biographyType: 0,
+          editableTypes: [1, 19],
+        },
       },
       blob: {
         emptyPayload: "rejected",
@@ -1025,6 +1100,141 @@ const definition = {
         ],
         outputs: [],
       },
+      {
+        type: "function",
+        name: "mintPersonVersionNFT",
+        selector: "0x51d634e3",
+        stateMutability: "nonpayable",
+        inputs: [
+          {
+            name: "proof",
+            type: "tuple",
+            components: [
+              {
+                name: "circuitId",
+                type: "uint32",
+              },
+              {
+                name: "proofEncodingId",
+                type: "uint8",
+              },
+              {
+                name: "proofData",
+                type: "bytes",
+              },
+            ],
+          },
+          {
+            name: "publicSignals",
+            type: "tuple",
+            components: [
+              {
+                name: "identityCommitment",
+                type: "uint256",
+              },
+              {
+                name: "disclosureBinding",
+                type: "uint256",
+              },
+              {
+                name: "minter",
+                type: "uint256",
+              },
+              {
+                name: "suiteCommitment",
+                type: "uint256",
+              },
+            ],
+          },
+          {
+            name: "versionIndex",
+            type: "uint256",
+          },
+          {
+            name: "_tokenURI",
+            type: "string",
+          },
+          {
+            name: "coreInfo",
+            type: "tuple",
+            components: [
+              {
+                name: "basicInfo",
+                type: "tuple",
+                components: [
+                  {
+                    name: "identityCommitment",
+                    type: "bytes32",
+                  },
+                  {
+                    name: "isBirthBC",
+                    type: "bool",
+                  },
+                  {
+                    name: "birthYear",
+                    type: "uint16",
+                  },
+                  {
+                    name: "birthMonth",
+                    type: "uint8",
+                  },
+                  {
+                    name: "birthDay",
+                    type: "uint8",
+                  },
+                  {
+                    name: "gender",
+                    type: "uint8",
+                  },
+                ],
+              },
+              {
+                name: "supplementInfo",
+                type: "tuple",
+                components: [
+                  {
+                    name: "fullName",
+                    type: "string",
+                  },
+                  {
+                    name: "birthPlace",
+                    type: "string",
+                  },
+                  {
+                    name: "isDeathBC",
+                    type: "bool",
+                  },
+                  {
+                    name: "deathYear",
+                    type: "uint16",
+                  },
+                  {
+                    name: "deathMonth",
+                    type: "uint8",
+                  },
+                  {
+                    name: "deathDay",
+                    type: "uint8",
+                  },
+                  {
+                    name: "deathPlace",
+                    type: "string",
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            name: "storyPayload",
+            type: "bytes",
+          },
+          {
+            name: "expectedStoryPayloadHash",
+            type: "bytes32",
+          },
+        ],
+        outputs: [],
+      },
     ],
     semantics: {
       archiveStorageSlots: 1,
@@ -1036,6 +1246,8 @@ const definition = {
       archiveKind: "0xbc9b8c5e2836ffe8b3db14ba7b3e2b5a7c8714f4a9e01b435aad3396f45af12c",
       apiVersion: 1,
       erc165: true,
+      mintBiography:
+        "optional compressed payload; initialized in Archive before safeMint; no supplementInfo.story",
     },
   },
 };

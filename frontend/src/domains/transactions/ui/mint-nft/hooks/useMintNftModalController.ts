@@ -58,6 +58,8 @@ export function useMintNftModalController({
   const { nodesData } = useTreeGraphData();
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t]);
   const {
+    transactionPreview,
+    resolveTransactionPreview,
     status: mintNftStatus,
     reset: resetMintNftFlow,
     runOrThrow: runMintNftOrThrow,
@@ -323,6 +325,8 @@ export function useMintNftModalController({
   });
 
   return {
+    transactionPreview,
+    resolveTransactionPreview,
     t,
     frame: {
       isOpen,

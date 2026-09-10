@@ -2,6 +2,7 @@
 import React from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PersonPage from "./PersonPage";
 import { makeNodeId, type NodeData, type StoryChunk, type StoryMetadata } from "../shared/model";
@@ -19,9 +20,8 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   t: (key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
     if (typeof fallbackOrOptions === "string") {
-      return fallbackOrOptions.replace(
-        /{{\s*(\w+)\s*}}/g,
-        (_match, name) => String(options?.[name] ?? ""),
+      return fallbackOrOptions.replace(/{{\s*(\w+)\s*}}/g, (_match, name) =>
+        String(options?.[name] ?? ""),
       );
     }
     if (fallbackOrOptions && typeof fallbackOrOptions === "object") {
@@ -160,5 +160,32 @@ describe("PersonPage", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByText("Invalid token ID")).toBeTruthy();
+  });
+
+  it("shows the archived biography once as the basic story and counts only later chunks", async () => {
+    const person = makePerson({
+      storyMetadata: makeMetadata({ totalLength: 150, biographyPayloadLength: 100 }),
+      storyChunks: [
+        makeChunk({
+          schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
+          content: "Original public biography",
+          payloadLength: 100,
+        }),
+        makeChunk({ chunkIndex: 1, chunkType: 1, content: "A later story", payloadLength: 50 }),
+      ],
+    });
+    mocks.nodesData = { [person.id]: person };
+    renderPersonPage("/person/42");
+
+    expect(await screen.findByText("Original public biography")).toBeTruthy();
+    expect(screen.getAllByText("Original public biography")).toHaveLength(1);
+    expect(screen.queryByText("#0")).toBeNull();
+    expect(screen.getByText("#1")).toBeTruthy();
+    for (const label of screen.getAllByText("Total Chunks")) {
+      expect(label.parentElement?.textContent).toBe("Total Chunks1");
+    }
+    for (const label of screen.getAllByText("Total Length")) {
+      expect(label.parentElement?.textContent).toBe("Total Length50");
+    }
   });
 });

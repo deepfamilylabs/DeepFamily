@@ -336,7 +336,7 @@ export function computeFormat1Aad(input: {
 };
 
 export function crc32(bytes: BytesLike): number;
-export function gzipV1(bytes: BytesLike): Uint8Array;
+export function gzipV1(bytes: BytesLike, options?: { maximumInputBytes?: number }): Uint8Array;
 export function gunzipV1Strict(
   bytes: BytesLike,
   options?: { maximumOutputBytes?: number },
@@ -414,6 +414,16 @@ export function readMetadataEnvelopeFromRef(input: BlobRef & ArchiveReadOptions)
 
 export const STORY_CHUNK_SCHEMA: "deepfamily/story-chunk@1.0";
 export const STORY_CHUNK_SCHEMA_ID: string;
+export const STORY_ENVELOPE_SCHEMA: "deepfamily/story-envelope@1.0";
+export const STORY_BIOGRAPHY_SCHEMA: "deepfamily/story-biography-envelope@1.0";
+export const STORY_BIOGRAPHY_SCHEMA_ID: string;
+export const STORY_ENVELOPE_MAGIC_TEXT: "DFSE";
+export const STORY_ENVELOPE_MAGIC_BYTES: Uint8Array;
+export const STORY_ENVELOPE_FORMAT_1: 1;
+export const STORY_ENVELOPE_HEADER_BYTES: 48;
+export const STORY_ENVELOPE_OFFSETS: Readonly<Record<string, number>>;
+export const STORY_DEFAULT_COMPRESSION_SUITE: 1;
+export const STORY_MAX_CANONICAL_JSON_BYTES: 16777216;
 export const STORY_MAX_ATTACHMENT_CID_BYTES: 256;
 export const STORY_RECORD_DOMAIN_TEXT: "deepfamily.archive.story-record.v1";
 export const STORY_HEAD_DOMAIN_TEXT: "deepfamily.archive.story-head.v1";
@@ -428,8 +438,22 @@ export interface StoryRecordInput {
 export interface DecodedStoryRecord extends StoryRecordInput {
   schema: "deepfamily/story-chunk@1.0";
 }
-export function encodeStoryRecord(input: StoryRecordInput): Uint8Array;
+export function encodeCanonicalStoryRecord(input: StoryRecordInput): Uint8Array;
+export function decodeCanonicalStoryRecord(payload: BytesLike): DecodedStoryRecord;
+export function encodeStoryRecord(
+  input: StoryRecordInput,
+  options?: { compressionSuite?: number },
+): Uint8Array;
 export function decodeStoryRecord(payload: BytesLike): DecodedStoryRecord;
+export function inspectStoryEnvelope(payload: BytesLike): {
+  formatVersion: number;
+  plaintextCodec: number;
+  compressionSuite: number;
+  flags: number;
+  originalLength: number;
+  originalHash: string;
+  body: Uint8Array;
+};
 export function readStoryRecord(
   input: ArchiveReadOptions & {
     recordRef: StoryRecordRef;
@@ -440,6 +464,7 @@ export function readStoryRecord(
     author: string;
     timestamp: bigint;
     decoded: DecodedStoryRecord | null;
+    unsupportedReason?: string;
   }
 >;
 export interface StoryRecordCommitmentInput {

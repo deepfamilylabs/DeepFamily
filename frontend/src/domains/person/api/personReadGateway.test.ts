@@ -1,5 +1,9 @@
 import { ethers } from "ethers";
-import { encodeStoryRecord, STORY_CHUNK_SCHEMA_ID } from "@deepfamily/protocol-core";
+import {
+  encodeStoryRecord,
+  STORY_BIOGRAPHY_SCHEMA_ID,
+  STORY_CHUNK_SCHEMA_ID,
+} from "@deepfamily/protocol-core";
 import { describe, expect, it, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
 import { createPersonReadGateway } from "./personReadGateway";
@@ -80,6 +84,7 @@ describe("personReadGateway", () => {
   it("deduplicates inflight nft detail requests", async () => {
     let resolveRequest: ((value: any) => void) | undefined;
     const contract = {
+      listStoryRecords: vi.fn().mockResolvedValue({ records: [] }),
       getNFTDetails: vi.fn(
         () =>
           new Promise((resolve) => {
@@ -137,7 +142,7 @@ describe("personReadGateway", () => {
         birthMonth: 5,
         birthDay: 10,
         birthPlace: "HK",
-        nftPublicStory: "hello",
+        nftPublicStory: undefined,
       },
       endorsementCount: 9,
       nftTokenURI: "ipfs://token",
@@ -171,6 +176,7 @@ describe("personReadGateway", () => {
         lastUpdateTime: 12n,
         isSealed: false,
       })),
+      getStoryRecordRef: vi.fn(async () => ref),
       listStoryRecords: vi.fn(async () => ({
         records: [ref],
         totalRecords: 1n,
@@ -185,6 +191,8 @@ describe("personReadGateway", () => {
     expect(one.totalChunks).toBe(1);
     expect(one.totalLength).toBe(bytes.length);
     expect(contract.getStoryState).toHaveBeenCalledTimes(1);
+    expect(contract.getStoryRecordRef).toHaveBeenCalledWith("42", 0);
+    expect(one.biographyPayloadLength).toBeUndefined();
     const chunks = await gateway.getStoryChunks("42", 0, 10);
     expect(chunks).toHaveLength(1);
     expect(chunks[0]).toMatchObject({
@@ -196,6 +204,38 @@ describe("personReadGateway", () => {
       rawPayload: ethers.hexlify(bytes),
     });
     expect(getCode).toHaveBeenCalledWith(pointer, "latest");
+  });
+
+  it("identifies the biography in metadata without downloading or decoding its payload", async () => {
+    const contract = {
+      getStoryState: vi.fn().mockResolvedValue({
+        totalRecords: 2n,
+        totalPayloadLength: 300n,
+        recordsHead: ethers.id("head"),
+        lastUpdateTime: 12n,
+        isSealed: false,
+      }),
+      getStoryRecordRef: vi.fn().mockResolvedValue({
+        schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
+        blob: { payloadLength: 200n },
+      }),
+    };
+    const gateway = createPersonReadGateway(contract, new QueryCache());
+    const metadata = await gateway.getStoryMetadata("42");
+    expect(metadata).toMatchObject({
+      totalChunks: 2,
+      totalLength: 300,
+      biographyPayloadLength: 200,
+    });
+    contract.getStoryState.mockResolvedValue({
+      totalRecords: 0n,
+      totalPayloadLength: 0n,
+      recordsHead: ethers.ZeroHash,
+      lastUpdateTime: 0n,
+      isSealed: false,
+    });
+    expect((await gateway.getStoryMetadata("43")).biographyPayloadLength).toBeUndefined();
+    expect(contract.getStoryRecordRef).toHaveBeenCalledTimes(1);
   });
 
   it("parses endorsement/URI pages and preserves verified unknown Story schemas", async () => {

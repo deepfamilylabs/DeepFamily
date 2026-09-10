@@ -57,7 +57,7 @@ export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            #{chunk.chunkIndex}
+                            #{chunk.displayIndex}
                           </span>
                           {(() => {
                             const ChunkIcon = getChunkTypeIcon(chunk.chunkType);

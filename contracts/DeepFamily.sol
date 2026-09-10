@@ -53,7 +53,6 @@ contract DeepFamily is
   error InvalidBirthMonth();
   error InvalidBirthDay();
   error InvalidBirthYear();
-  error InvalidStory();
   error InvalidTokenURI();
   error InvalidZKProof();
   error InvalidVerifierAddress();
@@ -129,7 +128,6 @@ contract DeepFamily is
     uint8 deathMonth;
     uint8 deathDay;
     string deathPlace;
-    string story;
   }
 
   struct PersonCoreInfo {
@@ -385,7 +383,6 @@ contract DeepFamily is
     if (bytes(coreInfo.supplementInfo.fullName).length > MAX_LONG_TEXT_LENGTH) {
       revert InvalidFullName();
     }
-    if (bytes(coreInfo.supplementInfo.story).length > MAX_LONG_TEXT_LENGTH) revert InvalidStory();
     if (bytes(coreInfo.supplementInfo.birthPlace).length > MAX_LONG_TEXT_LENGTH) {
       revert InvalidBirthPlace();
     }
@@ -449,7 +446,9 @@ contract DeepFamily is
     bytes32 personHash,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    bytes calldata storyPayload,
+    bytes32 expectedStoryPayloadHash
   ) internal returns (uint256 newTokenId) {
     newTokenId = ++tokenCounter;
 
@@ -459,6 +458,13 @@ contract DeepFamily is
     nftCoreInfo[newTokenId] = coreInfo;
     _setTokenURI(newTokenId, _tokenURI);
 
+    if (archive == address(0)) revert ArchiveNotSet();
+    IDeepFamilyArchiveV1(archive).initializeStory(
+      newTokenId,
+      msg.sender,
+      storyPayload,
+      expectedStoryPayloadHash
+    );
     _safeMint(msg.sender, newTokenId);
   }
 
@@ -916,7 +922,9 @@ contract DeepFamily is
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    bytes calldata storyPayload,
+    bytes32 expectedStoryPayloadHash
   ) external nonReentrant {
     bytes32 personHash = _wrapIdentityCommitmentAsPersonHash(publicSignals.identityCommitment);
     if (personHash == bytes32(0)) revert InvalidPersonHash();
@@ -935,7 +943,14 @@ contract DeepFamily is
       coreInfo.basicInfo.birthDay
     );
 
-    uint256 newTokenId = _mintInternal(personHash, versionIndex, _tokenURI, coreInfo);
+    uint256 newTokenId = _mintInternal(
+      personHash,
+      versionIndex,
+      _tokenURI,
+      coreInfo,
+      storyPayload,
+      expectedStoryPayloadHash
+    );
 
     emit PersonNFTMinted(
       personHash,

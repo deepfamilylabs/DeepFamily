@@ -226,14 +226,28 @@ export function StoryIdentitySection({
   );
 }
 
-export function BasicStorySection({ t, story }: { t: PersonStoryT; story?: string }) {
-  if (!story) return null;
+export function BasicStorySection({
+  t,
+  story,
+  biography,
+}: {
+  t: PersonStoryT;
+  story?: string;
+  biography?: StoryChunk;
+}) {
+  if (!story && !biography?.unsupportedSchema) return null;
 
   return (
     <div className="space-y-3">
       <SectionTitle>{t("storyChunksModal.basicStory", "Basic Story")}</SectionTitle>
       <InfoCard>
-        <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap font-medium">{story}</p>
+        {biography?.unsupportedSchema ? (
+          <UnsupportedStoryRecord record={biography} />
+        ) : (
+          <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap font-medium">
+            {story}
+          </p>
+        )}
       </InfoCard>
     </div>
   );
@@ -446,7 +460,7 @@ function StoryChunkCard({
                 <span
                   className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-ink"}`}
                 >
-                  #{chunk.chunkIndex}
+                  #{chunk.displayIndex ?? chunk.chunkIndex + 1}
                 </span>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-hairline shadow-xs">
                   <ChunkIcon size={12} className={iconColor} />

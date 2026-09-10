@@ -155,7 +155,7 @@ describe("storyData buildStorySnapshot", () => {
     );
 
     expect(next["0xabc-v-1"]?.storyMetadata?.totalChunks).toBe(1);
-    expect(next["0xabc-v-1"]?.nftPublicStory).toBe("Hello");
+    expect(next["0xabc-v-1"]?.nftPublicStory).toBeUndefined();
     expect(next["0xabc-v-1"]?.storyFetchedAt).toBe(123);
     expect(next["0xabc-v-1"]?.storyChunks?.[0]?.content).toBe("Hello");
   });

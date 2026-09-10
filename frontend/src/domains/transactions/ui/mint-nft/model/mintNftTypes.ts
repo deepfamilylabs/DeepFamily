@@ -36,7 +36,6 @@ export interface MintConsents {
   legal: boolean;
 }
 
-
 export interface MintNftFlowArgs {
   personHash: string;
   versionIndex: number;
@@ -45,6 +44,7 @@ export interface MintNftFlowArgs {
   publicSignals: MintDisclosurePublicSignals;
   tokenURI: string;
   coreInfo: MintCoreInfo;
+  story?: string;
 }
 
 export type MintNftFlowStep =

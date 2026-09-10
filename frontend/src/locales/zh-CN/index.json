@@ -19,7 +19,8 @@
     "gallery": "媒体资料",
     "references": "参考资料",
     "notes": "补充备注",
-    "unknown": "未知"
+    "unknown": "未知",
+    "biography": "传记"
   },
   "navigation": {
     "home": "首页",
@@ -1163,8 +1164,8 @@
     "deathPlacePlaceholder": "如适用请输入死亡地",
     "deathDate": "死亡日期（如适用）",
     "deathYear": "死亡年",
-    "story": "简介",
-    "storyPlaceholder": "请输入简介...",
+    "story": "公开传记",
+    "storyPlaceholder": "填写完整的公开传记，或导入已解锁的私密传记。",
     "copyBiographyWarning": "此版本已有在本机解锁的私密传记。将其复制到 NFT 传记会使这些文字永久公开上链。",
     "copyBiographyConfirm": "我理解此操作会把已解密的私密传记复制到公开且不可修改的 NFT 字段。",
     "copyBiographyToStory": "将传记复制到公开 NFT 传记",
@@ -1490,7 +1491,9 @@
       "TRANSACTION_REPLACEMENT_MISMATCH": "替换交易与已冻结的添加版本提交包不同，已拒绝继续处理。",
       "WALLET_POPUP_TIMEOUT": "钱包确认超时，请重试并在钱包中确认。",
       "WALLET_REQUEST_PENDING": "钱包中已有待处理请求，请先在钱包中确认或取消后再重试。",
-      "CALL_EXCEPTION": "合约校验未通过，请检查输入数据。"
+      "CALL_EXCEPTION": "合约校验未通过，请检查输入数据。",
+      "StoryAlreadyInitialized": "铸造传记已初始化，不能再次写入。",
+      "InvalidStoryAuthor": "铸造传记的作者地址无效。"
     },
     "unknown": "提交失败，请稍后重试或核对输入。"
   },
@@ -1537,11 +1540,12 @@
     "segmentCost": "这条记录需要创建多个存储分段。每增加一段都会增加交易成本。",
     "feeChanges": "钱包提交交易前，网络费用可能发生变化。",
     "exactBytes": "查看完整载荷字节及哈希",
-    "unknownSchema": "这条记录使用了暂不支持的格式，原始字节已通过完整性校验。",
+    "unknownSchema": "此记录使用了当前应用尚不支持的故事格式或压缩方式。已验证其存储字节完整。",
     "rawRecord": "查看已验证的原始记录",
-    "largeStory": "需要多个存储分段，请在签名前查看费用估算",
+    "largeStory": "原文较长，请在签名前查看压缩后的存储大小与费用估算",
     "reviewStory": "确认故事交易",
     "confirm": "前往钱包确认",
-    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节"
+    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节",
+    "reviewMint": "确认铸造和传记写入"
   }
 }

@@ -1,10 +1,10 @@
 /**
  * Story Chunk Types Configuration
  *
- * Defines the 19 comprehensive chunk types for person biographies
+ * Defines the reserved mint biography and 19 editable chunk types for person biographies
  *
  * Each chunk type includes:
- * - value: Numeric identifier (0-18)
+ * - value: Numeric identifier (0-19)
  * - key: Translation key for i18n
  * - icon: Lucide icon component
  * - colorClass: Tailwind color classes for text
@@ -58,68 +58,21 @@ export interface ChunkTypeOption {
 }
 
 /**
- * All 19 chunk types for person biographies
- *
- * ==================== STRUCTURE OVERVIEW ====================
- *
- * 【OPENING】(0)
- *   Summary - Brief overview of the person's life and significance
- *
- * 【EARLY YEARS】(1-2)
- *   Early Life - Birth, childhood, family background
- *   Education - Schools, degrees, mentors, academic training
- *
- * 【MAIN NARRATIVE】(3)
- *   Life Events - Chronological life story from birth to present/death
- *                 (Can include career, family, society - a complete timeline)
- *
- * 【SPECIALIZED TOPICS】(4-8) - Thematic deep dives extracted from life narrative
- *   Career - Professional history, positions, job transitions
- *   Works - Publications, creations, products, projects
- *   Achievements - Awards, honors, recognitions, milestones
- *   Philosophy - Beliefs, values, theoretical contributions
- *   Quotes - Famous sayings, memorable statements
- *
- * 【PERSONAL LIFE】(9-11)
- *   Family - Spouse, children, close relatives
- *   Lifestyle - Hobbies, habits, interests, daily routines
- *   Relations - Friendships, mentorships, collaborations, rivalries
- *
- * 【SOCIAL ENGAGEMENT】(12-14)
- *   Activities - Public service, charity, speeches, social causes
- *   Anecdotes - Interesting stories, lesser-known facts
- *   Controversies - Disputes, criticisms, scandals
- *
- * 【CLOSING】(15-18)
- *   Legacy - Historical impact, influence, commemorations
- *   Gallery - Photos, images, multimedia
- *   References - Sources, citations, bibliography
- *   Notes - Additional remarks, corrections, clarifications
- *
- * ==================== USAGE NOTES ====================
- *
- * 1. These are CONTENT TYPE TAGS, not exclusive chapters:
- *    - You can have multiple chunks of the same type
- *    - Example: 5 chunks all tagged as "Life Events" covering different periods
- *
- * 2. Types are NOT mutually exclusive:
- *    - Feel free to use types in any order
- *    - A person's biography might have: Summary → Life Events → Career → Life Events → Quotes
- *
- * 3. Recommended usage patterns:
- *    - Life Events: For chronological narrative (birth → childhood → adulthood → death)
- *    - Career: For focused professional history (jobs, companies, positions)
- *    - Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline
- *
- * 4. Chinese context additions:
- *    - Philosophy: Common for political figures, scholars, thought leaders
- *    - Quotes: Common for leaders, celebrities, influential figures
- *    - Positions: Common for officials, executives, academic roles
+ * Type 0 is the immutable mint biography. The 19 editable content tags occupy
+ * 1–19, from Summary through Notes. Tags may repeat and appear in any order.
  */
 export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
-  // ==================== OPENING ====================
   {
     value: 0,
+    key: "biography",
+    label: "Biography",
+    icon: BookOpen,
+    colorClass: "text-blue-600 dark:text-blue-400",
+    borderColorClass: "border-blue-600 dark:border-blue-400",
+  },
+  // ==================== OPENING ====================
+  {
+    value: 1,
     key: "summary",
     label: "Summary",
     icon: FileCheck,
@@ -129,7 +82,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== EARLY YEARS ====================
   {
-    value: 1,
+    value: 2,
     key: "earlyLife",
     label: "Early Life",
     icon: Baby,
@@ -137,7 +90,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-pink-600 dark:border-pink-400",
   },
   {
-    value: 2,
+    value: 3,
     key: "education",
     label: "Education",
     icon: GraduationCap,
@@ -147,7 +100,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== MAIN NARRATIVE ====================
   {
-    value: 3,
+    value: 4,
     key: "lifeEvents",
     label: "Life Events",
     icon: Calendar,
@@ -157,7 +110,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== SPECIALIZED TOPICS ====================
   {
-    value: 4,
+    value: 5,
     key: "career",
     label: "Career",
     icon: Briefcase,
@@ -165,7 +118,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-slate-600 dark:border-slate-400",
   },
   {
-    value: 5,
+    value: 6,
     key: "works",
     label: "Works",
     icon: BookOpen,
@@ -173,7 +126,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-green-600 dark:border-green-400",
   },
   {
-    value: 6,
+    value: 7,
     key: "achievements",
     label: "Achievements",
     icon: Award,
@@ -181,7 +134,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-yellow-600 dark:border-yellow-400",
   },
   {
-    value: 7,
+    value: 8,
     key: "philosophy",
     label: "Philosophy",
     icon: Lightbulb,
@@ -189,7 +142,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-amber-600 dark:border-amber-400",
   },
   {
-    value: 8,
+    value: 9,
     key: "quotes",
     label: "Quotes",
     icon: Quote,
@@ -199,7 +152,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== PERSONAL LIFE ====================
   {
-    value: 9,
+    value: 10,
     key: "family",
     label: "Family",
     icon: Home,
@@ -207,7 +160,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-red-600 dark:border-red-400",
   },
   {
-    value: 10,
+    value: 11,
     key: "lifestyle",
     label: "Lifestyle",
     icon: Heart,
@@ -215,7 +168,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-rose-600 dark:border-rose-400",
   },
   {
-    value: 11,
+    value: 12,
     key: "relations",
     label: "Relations",
     icon: Users,
@@ -225,7 +178,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== SOCIAL ENGAGEMENT ====================
   {
-    value: 12,
+    value: 13,
     key: "activities",
     label: "Activities",
     icon: Handshake,
@@ -233,7 +186,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-emerald-600 dark:border-emerald-400",
   },
   {
-    value: 13,
+    value: 14,
     key: "anecdotes",
     label: "Anecdotes",
     icon: MessageSquare,
@@ -241,7 +194,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-orange-600 dark:border-orange-400",
   },
   {
-    value: 14,
+    value: 15,
     key: "controversies",
     label: "Controversies",
     icon: AlertCircle,
@@ -251,7 +204,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 
   // ==================== CLOSING ====================
   {
-    value: 15,
+    value: 16,
     key: "legacy",
     label: "Legacy",
     icon: Star,
@@ -259,7 +212,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-violet-600 dark:border-violet-400",
   },
   {
-    value: 16,
+    value: 17,
     key: "gallery",
     label: "Media",
     icon: Image,
@@ -267,7 +220,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-fuchsia-600 dark:border-fuchsia-400",
   },
   {
-    value: 17,
+    value: 18,
     key: "references",
     label: "References",
     icon: BookMarked,
@@ -275,7 +228,7 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
     borderColorClass: "border-blue-700 dark:border-blue-300",
   },
   {
-    value: 18,
+    value: 19,
     key: "notes",
     label: "Notes",
     icon: StickyNote,
@@ -355,4 +308,9 @@ export function getChunkTypeOptions(t: any): ChunkTypeOption[] {
     icon: type.icon,
     color: type.colorClass,
   }));
+}
+
+/** Type zero is initialized only by NFT minting. */
+export function getEditableChunkTypeOptions(t: any): ChunkTypeOption[] {
+  return getChunkTypeOptions(t).filter((type) => type.value !== 0);
 }

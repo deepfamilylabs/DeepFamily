@@ -59,6 +59,12 @@ interface IDeepFamilyArchiveV1 is IERC165 {
     bytes32 personHash,
     uint256 versionIndex
   ) external view returns (BlobRef memory blob);
+  function initializeStory(
+    uint256 tokenId,
+    address author,
+    bytes calldata payload,
+    bytes32 expectedPayloadHash
+  ) external;
   function appendStoryRecord(
     uint256 tokenId,
     uint64 expectedIndex,

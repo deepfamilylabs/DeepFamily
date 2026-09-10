@@ -46,12 +46,7 @@ describe("peoplePageModel", () => {
       [adaV2.id]: adaV2,
       [draft.id]: draft,
     };
-    const graphNodes = [
-      { id: adaV1.id },
-      { id: adaV2.id },
-      { id: draft.id },
-      { id: missingId },
-    ];
+    const graphNodes = [{ id: adaV1.id }, { id: adaV2.id }, { id: draft.id }, { id: missingId }];
 
     const people = selectProjectedMintedPeople(graphNodes, nodesData);
     const stats = getPeoplePageStats({ graphNodes, nodesData, people });
@@ -70,6 +65,33 @@ describe("peoplePageModel", () => {
     expect(resolveProjectedPerson(`0x${"A".repeat(64)}`, lookup)).toBe(ada);
     expect(resolveProjectedPerson("7", lookup)).toBe(ada);
     expect(resolveProjectedPerson("0xada", lookup)).toBeNull();
+  });
+
+  it("does not count a public biography as detailed story content", () => {
+    const biographyOnly = makePerson({
+      personHash: "0xbio",
+      nftPublicStory: "Public biography",
+      storyMetadata: {
+        totalChunks: 1,
+        totalLength: 100,
+        biographyPayloadLength: 100,
+        fullStoryHash: "0xhead",
+        lastUpdateTime: 1,
+        isSealed: false,
+      },
+    });
+    const withOrdinary = makePerson({
+      personHash: "0xordinary",
+      storyMetadata: { ...biographyOnly.storyMetadata!, totalChunks: 2, totalLength: 130 },
+    });
+    const people = [biographyOnly, withOrdinary];
+    expect(
+      getPeoplePageStats({
+        graphNodes: people.map(({ id }) => ({ id })),
+        nodesData: Object.fromEntries(people.map((person) => [person.id, person])),
+        people,
+      }).storyCount,
+    ).toBe(1);
   });
 
   it("filters by public search text and address before applying sort order", () => {
@@ -158,9 +180,9 @@ describe("peoplePageModel", () => {
     ]);
     const filters = { ...baseFilters, selectedGenerations: [2, 3] };
 
-    expect(
-      filterPeople(people, filters, { generations }).map((person) => person.fullName),
-    ).toEqual(["Child", "Grandchild"]);
+    expect(filterPeople(people, filters, { generations }).map((person) => person.fullName)).toEqual(
+      ["Child", "Grandchild"],
+    );
     expect(filterPeople(people, filters).map((person) => person.fullName)).toEqual([
       "Root",
       "Child",
@@ -208,20 +230,8 @@ describe("peoplePageModel", () => {
         (person) => person.fullName,
       );
 
-    expect(sortByBirth("asc")).toEqual([
-      "200 BC",
-      "1868",
-      "March 1868",
-      "June 1868",
-      "Undated",
-    ]);
-    expect(sortByBirth("desc")).toEqual([
-      "June 1868",
-      "March 1868",
-      "1868",
-      "200 BC",
-      "Undated",
-    ]);
+    expect(sortByBirth("asc")).toEqual(["200 BC", "1868", "March 1868", "June 1868", "Undated"]);
+    expect(sortByBirth("desc")).toEqual(["June 1868", "March 1868", "1868", "200 BC", "Undated"]);
   });
 
   it("floats people whose name matches above the ones whose biography mentions them", () => {
@@ -285,19 +295,9 @@ describe("peoplePageModel", () => {
         { generations },
       ).map((person) => person.fullName);
 
-    expect(sortByGeneration("asc")).toEqual([
-      "Root",
-      "Elder child",
-      "Younger child",
-      "Unplaced",
-    ]);
+    expect(sortByGeneration("asc")).toEqual(["Root", "Elder child", "Younger child", "Unplaced"]);
     // the direction flips generations, not the elder-first order inside one
-    expect(sortByGeneration("desc")).toEqual([
-      "Elder child",
-      "Younger child",
-      "Root",
-      "Unplaced",
-    ]);
+    expect(sortByGeneration("desc")).toEqual(["Elder child", "Younger child", "Root", "Unplaced"]);
   });
   it("sorts names with the given collator and leaves unnamed people last", () => {
     const people = [
@@ -332,27 +332,27 @@ describe("peoplePageModel", () => {
         birthYear: 1868,
         endorsementCount: 2,
       }),
-      makePerson({ personHash: "0xundated", tokenId: "7", fullName: "Undated", endorsementCount: 2 }),
-      makePerson({ personHash: "0xstar", tokenId: "1", fullName: "Most endorsed", endorsementCount: 9 }),
+      makePerson({
+        personHash: "0xundated",
+        tokenId: "7",
+        fullName: "Undated",
+        endorsementCount: 2,
+      }),
+      makePerson({
+        personHash: "0xstar",
+        tokenId: "1",
+        fullName: "Most endorsed",
+        endorsementCount: 9,
+      }),
     ];
     const sortByEndorsement = (sortOrder: PeopleFiltersState["sortOrder"]) =>
       filterPeople(people, { ...baseFilters, filterType: "by_endorsement", sortOrder }).map(
         (person) => person.fullName,
       );
 
-    expect(sortByEndorsement("desc")).toEqual([
-      "Most endorsed",
-      "Elder",
-      "Younger",
-      "Undated",
-    ]);
+    expect(sortByEndorsement("desc")).toEqual(["Most endorsed", "Elder", "Younger", "Undated"]);
     // the tie order stays the same either way; only the counts flip
-    expect(sortByEndorsement("asc")).toEqual([
-      "Elder",
-      "Younger",
-      "Undated",
-      "Most endorsed",
-    ]);
+    expect(sortByEndorsement("asc")).toEqual(["Elder", "Younger", "Undated", "Most endorsed"]);
   });
   it("breaks creation-time and birth-date ties the same way", () => {
     const elder = makePerson({

@@ -12,6 +12,8 @@ import {
   computeStoryHead,
   decodeStoryRecord,
   encodeStoryRecord,
+  encodeCanonicalStoryRecord,
+  decodeCanonicalStoryRecord,
   utf8Bytes,
 } from "../index.js";
 
@@ -32,7 +34,10 @@ test("DFS1 shared golden bytes, schema hash and multiple-record semantic head ma
   for (const record of vector.records) {
     const payload = encodeStoryRecord(record.input);
     assert.equal(hexlify(payload), record.canonicalHex);
-    assert.equal(new TextDecoder().decode(payload), record.canonicalJson);
+    assert.equal(
+      new TextDecoder().decode(encodeCanonicalStoryRecord(record.input)),
+      record.canonicalJson,
+    );
     assert.equal(keccak256(payload), record.commitment.payloadHash);
     assert.equal(payload.length, Number(record.commitment.payloadLength));
     assert.deepEqual(decodeStoryRecord(payload), { schema: STORY_CHUNK_SCHEMA, ...record.input });
@@ -118,7 +123,7 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
 
 test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invalid UTF8", () => {
   const canonical = new TextDecoder().decode(
-    encodeStoryRecord({ content: "中/\n", chunkType: 3, attachmentCID: "" }),
+    encodeCanonicalStoryRecord({ content: "中/\n", chunkType: 3, attachmentCID: "" }),
   );
   for (const text of [
     canonical + "\n",
@@ -137,9 +142,9 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
     '{"content":"中/\\n","schema":"deepfamily/story-chunk@1.0","chunkType":3,"attachmentCID":""}',
     "\ufeff" + canonical,
   ])
-    assert.throws(() => decodeStoryRecord(utf8Bytes(text)), text);
+    assert.throws(() => decodeCanonicalStoryRecord(utf8Bytes(text)), text);
   assert.throws(
-    () => decodeStoryRecord(Uint8Array.of(0xc0, 0xaf)),
+    () => decodeCanonicalStoryRecord(Uint8Array.of(0xc0, 0xaf)),
     (error) => error.code === "INVALID_UTF8",
   );
 });

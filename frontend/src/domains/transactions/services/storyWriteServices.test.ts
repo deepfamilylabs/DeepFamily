@@ -165,17 +165,19 @@ describe("Archive story writes", () => {
     expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
     expect(f.confirm).not.toHaveBeenCalled();
   });
-  it("accepts a 16,385-byte logical record and previews two physical segments", async () => {
+  it("compresses a long original and previews the actual stored byte length", async () => {
     const f = setup();
-    const overhead =
-      encodeStoryRecord({ content: "x", chunkType: 2, attachmentCID: "" }).length - 1;
-    const result = await f.submit("x".repeat(16_385 - overhead));
-    expect(result.contentLength).toBe(16_385);
+    const content = "长传记 😀\n".repeat(4000);
+    const bytes = encodeStoryRecord({ content, chunkType: 2, attachmentCID: "" });
+    const result = await f.submit(content);
+    expect(result.contentLength).toBe(bytes.length);
+    expect(bytes.length).toBeLessThan(16384);
     expect(f.confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ payloadBytes: 16_385, segmentCount: 2 }),
+      expect.objectContaining({ payloadBytes: bytes.length, segmentCount: 1 }),
     );
-    expect(result.newChunk.segmentCount).toBe(2);
+    expect(result.newChunk.content).toBe(content);
   });
+
   it("rejects buffered transaction cap overflow", async () => {
     const f = setup();
     f.signer.provider.getNetwork.mockResolvedValue({ chainId: 1n });

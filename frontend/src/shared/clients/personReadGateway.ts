@@ -9,7 +9,11 @@ import {
 } from "../model/personDetailParsers";
 import type { StoryChunk, StoryMetadata } from "../model";
 import { ethers } from "ethers";
-import { readStoryRecord, computeStoryRecordHash } from "@deepfamily/protocol-core";
+import {
+  readStoryRecord,
+  computeStoryRecordHash,
+  STORY_BIOGRAPHY_SCHEMA_ID,
+} from "@deepfamily/protocol-core";
 
 export type { ParsedVersionDetails, ParsedNftDetails, DetailQueryOptions };
 
@@ -123,6 +127,11 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
       async () => {
         const ret = await contract.getNFTDetails(tokenId);
         const parsed = parseNftDetailsResult(ret);
+        const initial = (await getStoryChunks(tokenId, 0, 1))[0];
+        parsed.core.nftPublicStory =
+          initial?.schemaId === STORY_BIOGRAPHY_SCHEMA_ID && !initial.unsupportedSchema
+            ? initial.content
+            : undefined;
         options?.onFetched?.();
         return parsed;
       },
@@ -157,6 +166,12 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
           lastUpdateTime: Number(ret.lastUpdateTime),
           fullStoryHash: String(ret.recordsHead),
         };
+        if (metadata.totalChunks > 0) {
+          const initial = await contract.getStoryRecordRef(tokenId, 0);
+          if (initial.schemaId === STORY_BIOGRAPHY_SCHEMA_ID) {
+            metadata.biographyPayloadLength = Number(initial.blob.payloadLength);
+          }
+        }
         options?.onFetched?.();
         return metadata;
       },
@@ -169,6 +184,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     offset: number,
     records: any[],
   ): Promise<StoryChunk[]> => {
+    if (records.length === 0) return [];
     const provider = contract.runner?.provider ?? contract.runner;
     const [network, archive] = await Promise.all([provider.getNetwork(), contract.ARCHIVE()]);
     return Promise.all(

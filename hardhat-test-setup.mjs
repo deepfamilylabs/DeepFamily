@@ -187,7 +187,7 @@ hre.run = async (taskName, args = {}) => {
         tokenId: BigInt(args.tokenid),
         expectedIndex: BigInt(args.chunkindex),
         content: String(args.content),
-        chunkType: Number(args.type ?? 0),
+        chunkType: Number(args.type ?? 1),
         attachmentCID: String(args.attachment ?? ""),
         expectedPayloadHash: args.exphash || undefined,
       });

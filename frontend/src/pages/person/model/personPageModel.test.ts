@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { makeNodeId, type NodeData, type StoryChunk, type StoryMetadata } from "../../../shared/model";
+import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
+import {
+  makeNodeId,
+  type NodeData,
+  type StoryChunk,
+  type StoryMetadata,
+} from "../../../shared/model";
 import {
   buildPrefetchedStoryDetailData,
   getChunkParagraphs,
@@ -91,6 +97,26 @@ describe("personPageModel", () => {
     expect(getFullStoryParagraphs("One. Two. Three.", "paragraph")).toEqual(["One. Two. Three."]);
     expect(getFullStoryParagraphs("One.\n\nTwo.", "paragraph")).toEqual(["One.", "Two."]);
     expect(getFullStoryParagraphs("raw", "raw")).toEqual([]);
+  });
+
+  it("keeps archived biography in the basic story while excluding it from ordinary views", () => {
+    const biography = makeChunk({
+      schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
+      content: "Original public biography",
+    });
+    const ordinary = makeChunk({ chunkIndex: 1, chunkType: 1, content: "A later story" });
+    const data = buildPrefetchedStoryDetailData("42", {
+      storyChunks: [biography, ordinary],
+      fullStory: "Original public biographyA later story",
+    });
+
+    expect(data?.nftCoreInfo?.story).toBe(biography.content);
+    expect(data?.fullStory).toBe(ordinary.content);
+    expect(data?.storyChunks).toEqual([biography, ordinary]);
+    expect(getChunkParagraphs(data?.storyChunks)).toEqual([ordinary.content]);
+    const groups = groupStoryChunks(data?.storyChunks);
+    expect(groups.map((group) => group.type)).toEqual([1]);
+    expect(groups[0].chunks[0]).toMatchObject({ chunkIndex: 1, displayIndex: 1 });
   });
 
   it("uses fresh cached story data only inside the expected ttl", () => {

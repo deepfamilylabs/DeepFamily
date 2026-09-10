@@ -9,6 +9,7 @@ import {
   deathDateString,
   genderText as genderTextFn,
   isMinted,
+  getStoryPresentation,
 } from "../../../shared/model";
 import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { getChunkTypeOptions } from "../config/chunkTypes";
@@ -93,17 +94,20 @@ export default function PersonStoryModal({
     setEndorsementCount(person.endorsementCount ?? 0);
   }, [person.endorsementCount, person.personHash, person.versionIndex]);
 
-  // Computed meta for compact row under Detailed Story
-  const chunksCount = useMemo(
-    () => person.storyMetadata?.totalChunks ?? storyData.chunks.length,
-    [person.storyMetadata, storyData.chunks],
+  const presentation = useMemo(
+    () => getStoryPresentation(storyData.chunks, person.storyMetadata),
+    [storyData.chunks, person.storyMetadata],
   );
-  const lengthBytes = useMemo(
-    () =>
-      person.storyMetadata?.totalLength ??
-      (storyData.integrity.computedLength || storyData.fullStory.length),
-    [person.storyMetadata, storyData.integrity.computedLength, storyData.fullStory.length],
-  );
+  const presentedStoryData = {
+    ...storyData,
+    chunks: presentation.chunks,
+    fullStory: presentation.fullStory,
+  };
+  const biography = presentation.biography;
+  const basicStory =
+    biography && !biography.unsupportedSchema ? biography.content : person.nftPublicStory;
+  const chunksCount = presentation.totalChunks;
+  const lengthBytes = presentation.totalLength;
   const integrityOk = useMemo(
     () =>
       !!storyData.integrity &&
@@ -351,7 +355,11 @@ export default function PersonStoryModal({
             aria-label={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
             onClick={(e) => {
               e.stopPropagation();
-              window.open(`/person/${person.tokenId || person.id}`, "_blank", "noopener,noreferrer");
+              window.open(
+                `/person/${person.tokenId || person.id}`,
+                "_blank",
+                "noopener,noreferrer",
+              );
             }}
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
@@ -413,20 +421,15 @@ export default function PersonStoryModal({
             deathPlace={person.deathPlace}
           />
 
-          <StoryIdentitySection
-            t={t}
-            person={person}
-            owner={owner}
-            copyText={copyText}
-          />
+          <StoryIdentitySection t={t} person={person} owner={owner} copyText={copyText} />
 
           {/* Story Content */}
           <div className="space-y-6">
-            <BasicStorySection t={t} story={person.nftPublicStory} />
+            <BasicStorySection t={t} story={basicStory} biography={biography} />
             <DetailedStorySection
               t={t}
               person={person}
-              storyData={storyData}
+              storyData={presentedStoryData}
               chunksCount={chunksCount}
               lengthBytes={lengthBytes}
               integrityOk={integrityOk}

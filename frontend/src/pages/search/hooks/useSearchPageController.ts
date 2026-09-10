@@ -11,7 +11,7 @@ import {
 } from "../../../domains/person";
 import { useTreeGateway } from "../../../domains/tree";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
-import type { StoryChunk } from "../../../shared/model";
+import { getStoryPresentation, type StoryChunk } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import {
   emptyChildrenPageData,
@@ -220,6 +220,7 @@ export function useSearchPageController() {
   const [trustedEndorsersQueried, setTrustedEndorsersQueried] = useState<boolean>(false);
 
   const [storyChunksOffset, setStoryChunksOffset] = useState<number>(0);
+  const [storyChunksPageStart, setStoryChunksPageStart] = useState<number>(0);
   const [storyChunksLoading, setStoryChunksLoading] = useState<boolean>(false);
   const [storyChunksError, setStoryChunksError] = useState<string | null>(null);
   const [storyChunksData, setStoryChunksData] = useState<StoryChunk[]>([]);
@@ -570,12 +571,22 @@ export function useSearchPageController() {
         if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
           throw new Error(t("search.validation.tokenIdRequired"));
         }
-        const out = await personGateway.listStoryChunksPage(data.tokenId, offset, data.pageSize);
-        const { chunks, totalChunks, hasMore, nextOffset } = out;
-        setStoryChunksData(chunks);
-        setStoryChunksTotal(totalChunks);
-        setStoryChunksHasMore(hasMore);
-        setStoryChunksOffset(nextOffset);
+        const metadata = await personGateway.getStoryMetadata(String(data.tokenId));
+        const biographyOffset = metadata.biographyPayloadLength !== undefined ? 1 : 0;
+        const out = await personGateway.listStoryChunksPage(
+          data.tokenId,
+          offset + biographyOffset,
+          data.pageSize,
+        );
+        const story = getStoryPresentation(out.chunks, {
+          ...metadata,
+          totalChunks: out.totalChunks,
+        });
+        setStoryChunksData(story.chunks);
+        setStoryChunksTotal(story.totalChunks);
+        setStoryChunksHasMore(out.hasMore);
+        setStoryChunksOffset(Math.max(0, out.nextOffset - biographyOffset));
+        setStoryChunksPageStart(offset);
       } catch (error: any) {
         setStoryChunksError(getQueryErrorMessage(error));
       } finally {
@@ -590,6 +601,7 @@ export function useSearchPageController() {
     setStoryChunksTotal(0);
     setStoryChunksHasMore(false);
     setStoryChunksOffset(0);
+    setStoryChunksPageStart(0);
     setStoryChunksError(null);
     setStoryChunksQueried(false);
   }, []);
@@ -604,14 +616,14 @@ export function useSearchPageController() {
   }, [onQueryStoryChunks, storyChunksForm, storyChunksPageSize, t]);
 
   const onStoryChunksPrev = useCallback(async () => {
-    const prev = getPreviousPageOffset(storyChunksOffset, storyChunksPageSize);
+    const prev = Math.max(0, storyChunksPageStart - storyChunksPageSize);
     const tokenId = getWatchedNumber(storyChunksForm.watch("tokenId"));
     if (tokenId === undefined) {
       setStoryChunksError(t("search.validation.tokenIdRequired"));
       return;
     }
     await onQueryStoryChunks({ tokenId, pageSize: storyChunksPageSize }, prev);
-  }, [onQueryStoryChunks, storyChunksForm, storyChunksOffset, storyChunksPageSize, t]);
+  }, [onQueryStoryChunks, storyChunksForm, storyChunksPageStart, storyChunksPageSize, t]);
 
   const onQueryChildren = useCallback(
     async (data: ChildrenForm, startOffset?: number) => {

@@ -1,3 +1,4 @@
+import { ethers } from "ethers";
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   createDeepFamilyReaderContract: vi.fn(),
   waitForTransactionReceipt: vi.fn(),
   executeMintFlow: vi.fn(),
+  mintBiographyTransaction: vi.fn(),
 }));
 
 vi.mock("../../../../wallet", () => ({
@@ -49,6 +51,10 @@ vi.mock("../../../api/txGateway", () => ({
 
 vi.mock("../../../services/mintNftService", () => ({
   executeMintFlow: mocks.executeMintFlow,
+}));
+
+vi.mock("../../../services/mintBiographyTransaction", () => ({
+  mintBiographyTransaction: mocks.mintBiographyTransaction,
 }));
 
 const flowArgs = {
@@ -85,6 +91,26 @@ const flowArgs = {
   },
 };
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function invokeMint(params: any) {
+  return params.mintPersonVersionNFT(
+    flowArgs.proofEnvelope,
+    flowArgs.publicSignals,
+    flowArgs.versionIndex,
+    flowArgs.tokenURI,
+    flowArgs.coreInfo,
+    "0x",
+    ethers.keccak256("0x"),
+  );
+}
+
 describe("useMintNftFlow", () => {
   beforeEach(() => {
     mocks.wallet.signer = { id: "signer" };
@@ -97,6 +123,7 @@ describe("useMintNftFlow", () => {
     mocks.createDeepFamilyReaderContract.mockReset();
     mocks.waitForTransactionReceipt.mockReset();
     mocks.executeMintFlow.mockReset();
+    mocks.mintBiographyTransaction.mockReset().mockResolvedValue(mocks.receipt);
     mocks.contract.mintPersonVersionNFT.mockResolvedValue(mocks.tx);
     mocks.contract.getVersionDetails.mockResolvedValue({ tokenId: 17 });
     mocks.createDeepFamilyContract.mockReturnValue(mocks.contract);
@@ -120,6 +147,8 @@ describe("useMintNftFlow", () => {
         flowArgs.versionIndex,
         flowArgs.tokenURI,
         flowArgs.coreInfo,
+        "0x",
+        ethers.keccak256("0x"),
       );
       const versionDetails = await params.getVersionDetails(
         flowArgs.personHash,
@@ -140,14 +169,22 @@ describe("useMintNftFlow", () => {
       mocks.config.contractAddress,
       mocks.wallet.signer,
     );
-    expect(mocks.contract.mintPersonVersionNFT).toHaveBeenCalledWith(
-      flowArgs.proofEnvelope,
-      flowArgs.publicSignals,
-      flowArgs.versionIndex,
-      flowArgs.tokenURI,
-      flowArgs.coreInfo,
+    expect(mocks.mintBiographyTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contract: mocks.contract,
+        signer: mocks.wallet.signer,
+        args: [
+          flowArgs.proofEnvelope,
+          flowArgs.publicSignals,
+          flowArgs.versionIndex,
+          flowArgs.tokenURI,
+          flowArgs.coreInfo,
+          "0x",
+          ethers.keccak256("0x"),
+        ],
+        confirm: expect.any(Function),
+      }),
     );
-    expect(mocks.waitForTransactionReceipt).toHaveBeenCalledWith(mocks.tx);
     expect(mocks.contract.getVersionDetails).toHaveBeenCalledWith(
       flowArgs.personHash,
       flowArgs.versionIndex,
@@ -209,4 +246,64 @@ describe("useMintNftFlow", () => {
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeMintFlow).not.toHaveBeenCalled();
   });
+
+  it.each(["reset", "unmount"] as const)(
+    "does not start a mint when validation finishes after %s",
+    async (cancel) => {
+      const validation = deferred();
+      mocks.executeMintFlow.mockImplementation(async (params) => {
+        await validation.promise;
+        return invokeMint(params);
+      });
+      const hook = renderHook(() => useMintNftFlow());
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending = hook.result.current.runOrThrow(flowArgs);
+      });
+      const rejected = expect(pending).rejects.toThrow(/superseded/);
+      act(() => {
+        if (cancel === "reset") hook.result.current.reset();
+        else hook.unmount();
+      });
+      await act(async () => {
+        validation.resolve();
+        await rejected;
+      });
+      expect(mocks.mintBiographyTransaction).not.toHaveBeenCalled();
+      expect(hook.result.current.transactionPreview).toBeNull();
+    },
+  );
+
+  it.each(["reset", "unmount"] as const)(
+    "rejects a delayed gas preview after %s without opening confirmation",
+    async (cancel) => {
+      const estimation = deferred();
+      const approved = vi.fn();
+      const preview = { payloadBytes: 100 };
+      mocks.executeMintFlow.mockImplementation(invokeMint);
+      mocks.mintBiographyTransaction.mockImplementation(async (input) => {
+        await estimation.promise;
+        const confirmation = await input.confirm(preview);
+        approved(confirmation);
+        if (!confirmation) throw new Error("Mint cancelled before wallet request");
+        return mocks.receipt;
+      });
+      const hook = renderHook(() => useMintNftFlow());
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending = hook.result.current.runOrThrow(flowArgs);
+      });
+      const rejected = expect(pending).rejects.toThrow(/cancelled/);
+      act(() => {
+        if (cancel === "reset") hook.result.current.reset();
+        else hook.unmount();
+      });
+      await act(async () => {
+        estimation.resolve();
+        await rejected;
+      });
+      expect(approved).toHaveBeenCalledWith(false);
+      expect(hook.result.current.transactionPreview).toBeNull();
+    },
+  );
 });

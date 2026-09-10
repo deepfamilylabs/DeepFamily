@@ -1,3 +1,12 @@
+import {
+  readStoryRecord,
+  STORY_BIOGRAPHY_SCHEMA_ID,
+  STORY_CHUNK_SCHEMA_ID,
+} from "@deepfamily/protocol-core";
+import {
+  buildHistoricalStoryChunks,
+  getHistoricalStoryResume,
+} from "../lib/historicalStoryChunks.js";
 import { appendDfsStoryRecord } from "../lib/archiveOperations.js";
 /**
  * seed-historical.js
@@ -189,9 +198,6 @@ function decodeEthersError(error, contract) {
 
 // ========== Constants Configuration ==========
 
-const MAX_CHUNK_CONTENT_LENGTH = 16_384;
-const MAX_LONG_TEXT_LENGTH = 256;
-
 // Data file paths
 const DATA_DIR = path.join(__dirname, "..", "data", "persons");
 
@@ -215,46 +221,6 @@ const SEED_MEMBER_LIMIT =
     : null;
 
 // ========== Utility Functions ==========
-
-// UTF-8 byte length calculation
-function utf8ByteLen(s) {
-  return Buffer.byteLength(s, "utf8");
-}
-
-// UTF-8 safe truncation (avoid cutting multi-byte characters)
-function truncateUtf8Bytes(str, maxBytes) {
-  if (utf8ByteLen(str) <= maxBytes) return str;
-  let res = "";
-  for (const ch of str) {
-    const nb = utf8ByteLen(ch);
-    if (utf8ByteLen(res) + nb > maxBytes) break;
-    res += ch;
-  }
-  return res;
-}
-
-function splitUtf8Chunks(str, maxBytes) {
-  const chunks = [];
-  let current = "";
-  let currentBytes = 0;
-  for (const ch of str) {
-    const nb = utf8ByteLen(ch);
-    if (current && currentBytes + nb > maxBytes) {
-      chunks.push(current);
-      current = "";
-      currentBytes = 0;
-    }
-    current += ch;
-    currentBytes += nb;
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-// keccak256 string hash
-function solidityStringHash(content) {
-  return ethers.keccak256(ethers.toUtf8Bytes(content));
-}
 
 // ========== Data Loading and Validation ==========
 
@@ -397,26 +363,6 @@ function validateFamilyData(data) {
   console.log("Data validation passed");
 }
 
-// ========== Story Data Processing ==========
-// Story data is now stored directly in JSON as arrays of strings
-// Each array element represents one chunk of content
-
-function pushStoryContentChunks(availableChunks, { type, content, arrayIndex }) {
-  if (typeof content !== "string") return;
-  const normalized = content.trim();
-  if (!normalized) return;
-
-  const parts = splitUtf8Chunks(normalized, MAX_CHUNK_CONTENT_LENGTH);
-  parts.forEach((part, partIndex) => {
-    availableChunks.push({
-      type,
-      content: part,
-      arrayIndex,
-      partIndex,
-    });
-  });
-}
-
 // ========== Person Data Creation Helper Functions ==========
 
 function createPersonData(personInfo) {
@@ -441,8 +387,7 @@ function createPersonDataWithPassphrase(personInfo, _familyData) {
 
 function createSupplementInfo(personInfo) {
   // The JSON story field is the canonical narrative source.
-  // Contract supplementInfo.story is capped, so it stores only a preview;
-  // the complete story is written into story chunks below.
+  // Mint archives the complete initial biography atomically.
   const storyPreview = personInfo.story || "";
 
   return {
@@ -451,7 +396,7 @@ function createSupplementInfo(personInfo) {
     deathDay: personInfo.deathDay ?? 0,
     birthPlace: personInfo.birthPlace || "",
     deathPlace: personInfo.deathPlace || "",
-    story: truncateUtf8Bytes(storyPreview, MAX_LONG_TEXT_LENGTH),
+    story: storyPreview,
   };
 }
 
@@ -825,92 +770,31 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
       continue;
     }
 
-    // Add Story Chunks from JSON. Prefer the canonical story field; keep storyData
-    // as a compatibility fallback for older data files that have not been migrated.
-    const availableChunks = [];
-    let storyChunkSource = "";
-    const storyText = typeof person.story === "string" ? person.story.trim() : "";
-
-    if (storyText) {
-      storyChunkSource = "story";
-      pushStoryContentChunks(availableChunks, {
-        type: 0,
-        content: storyText,
-        arrayIndex: 0,
-      });
-    } else {
-      storyChunkSource = "storyData";
-      const storyData = person.storyData || {};
-
-      // Map chunk type to storyData field
-      const chunkFieldMap = {
-        0: "summary",
-        1: "earlyLife",
-        2: "education",
-        3: "lifeEvents",
-        4: "career",
-        5: "works",
-        6: "achievements",
-        7: "philosophy",
-        8: "quotes",
-        9: "family",
-        10: "lifestyle",
-        11: "relations",
-        12: "activities",
-        13: "anecdotes",
-        14: "controversies",
-        15: "legacy",
-        16: "gallery",
-        17: "references",
-        18: "notes",
-      };
-
-      // Check which chunks have real data in JSON.
-      // Supports both string and array-of-strings formats.
-      for (let chunkType = 0; chunkType < 19; chunkType++) {
-        const fieldName = chunkFieldMap[chunkType];
-        if (!fieldName || !storyData[fieldName]) continue;
-
-        const fieldData = storyData[fieldName];
-
-        if (Array.isArray(fieldData)) {
-          fieldData.forEach((content, arrayIndex) => {
-            pushStoryContentChunks(availableChunks, {
-              type: chunkType,
-              content,
-              arrayIndex,
-            });
-          });
-        } else {
-          pushStoryContentChunks(availableChunks, {
-            type: chunkType,
-            content: fieldData,
-            arrayIndex: 0,
-          });
-        }
-      }
-    }
-
-    if (availableChunks.length === 0) {
-      console.log(`  ⊘ No story content available in JSON, skipping chunks`);
-      continue;
-    }
-
+    // The mint story and categorized storyData are independent sources.
+    // Archive record 0 may store the biography; only storyData supplies ordinary chunks.
+    const availableChunks = buildHistoricalStoryChunks(person);
     const targetChunkCount = availableChunks.length;
-    console.log(
-      `  >Story chunks prepared from JSON ${storyChunkSource}: ${targetChunkCount} chunk(s)`,
-    );
     expectedChunks += targetChunkCount;
-
-    if (!storyState) {
-      try {
-        storyState = await deepFamilyReader.getStoryState(tokenId);
-      } catch (e) {
-        storyState = { totalRecords: 0, isSealed: false };
-      }
+    storyState = await archive.storyState(tokenId);
+    let biographyRecordCount = 0;
+    let initialRef;
+    if (storyState.totalRecords > 0n) {
+      initialRef = await archive.storyRecordRef(tokenId, 0);
+      biographyRecordCount = initialRef.schemaId === STORY_BIOGRAPHY_SCHEMA_ID ? 1 : 0;
     }
-
-    const existingChunks = Number(storyState?.totalRecords || 0);
+    if (typeof person.story === "string" && person.story.length > 0) {
+      if (biographyRecordCount !== 1) throw new Error("Expected mint biography is missing");
+      const initial = await readStoryRecord({
+        recordRef: initialRef,
+        getCode: (address, block) => signer.provider.getCode(address, block),
+      });
+      if (initial.decoded?.chunkType !== 0 || initial.decoded.content !== person.story) {
+        throw new Error("Mint biography differs from the full source narrative");
+      }
+      console.log("  [ok]Public biography verified separately from ordinary story chunks");
+    }
+    const existingChunks = Number(storyState.totalRecords) - biographyRecordCount;
+    console.log(`  >Story chunks prepared from JSON storyData: ${targetChunkCount} chunk(s)`);
 
     // Ensure signer owns the NFT before writing chunks (reading metadata is permissionless)
     let owner = person.owner;
@@ -946,7 +830,27 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
       continue;
     }
 
-    const pendingChunks = availableChunks.slice(existingChunks);
+    const { pendingChunks, nextRecordIndex } = getHistoricalStoryResume({
+      totalRecords: storyState.totalRecords,
+      biographyRecordCount,
+      chunks: availableChunks,
+    });
+    // Resume only when the existing ordinary prefix matches this JSON source.
+    for (let index = 0; index < existingChunks; index++) {
+      const stored = await readStoryRecord({
+        recordRef: await archive.storyRecordRef(tokenId, biographyRecordCount + index),
+        getCode: (address, block) => signer.provider.getCode(address, block),
+      });
+      const expected = availableChunks[index];
+      if (
+        stored.schemaId !== STORY_CHUNK_SCHEMA_ID ||
+        stored.decoded?.content !== expected.content ||
+        stored.decoded?.chunkType !== expected.type ||
+        stored.decoded?.attachmentCID !== ""
+      ) {
+        throw new Error(`Existing story chunk ${index + 1} differs from JSON; refusing to resume`);
+      }
+    }
     if (pendingChunks.length === 0) {
       console.log(
         `  -Story already complete on-chain (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
@@ -956,12 +860,12 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
     }
 
     console.log(
-      `  Adding ${pendingChunks.length} story chunk(s) (resume from index ${existingChunks})...`,
+      `  Adding ${pendingChunks.length} story chunk(s) (resume from Archive index ${nextRecordIndex})...`,
     );
 
     for (let i = 0; i < pendingChunks.length; i++) {
       const chunk = pendingChunks[i];
-      const chunkIndex = existingChunks + i;
+      const chunkIndex = nextRecordIndex + i;
       const chunkStart = Date.now();
       const result = await appendDfsStoryRecord({
         archive,
