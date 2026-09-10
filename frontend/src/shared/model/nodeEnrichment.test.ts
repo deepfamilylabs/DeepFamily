@@ -28,6 +28,7 @@ describe("nodeEnrichment patch builders", () => {
         metadata: {
           pointer: "0x00000000000000000000000000000000000000aa",
           payloadHash: "0xpayload",
+          segmentCount: 1,
           payloadLength: 128,
         },
         endorsementCount: 9,
@@ -57,6 +58,7 @@ describe("nodeEnrichment patch builders", () => {
       versionCommitment: "old-commitment",
       metadataPointer: "0x00000000000000000000000000000000000000aa",
       metadataPayloadHash: "0xold-payload",
+      metadataSegmentCount: 1,
       metadataPayloadLength: 128,
       metadataUnlockValidated: true,
       metadataProtocolGeneration: "df-onchain-biography-v1",
@@ -94,6 +96,7 @@ describe("nodeEnrichment patch builders", () => {
         metadata: {
           pointer: "0x00000000000000000000000000000000000000bb",
           payloadHash: "0xnew-payload",
+          segmentCount: 1,
           payloadLength: 256,
         },
         endorsementCount: 1,
@@ -114,6 +117,7 @@ describe("nodeEnrichment patch builders", () => {
       versionCommitment: "new-commitment",
       metadataPointer: "0x00000000000000000000000000000000000000bb",
       metadataPayloadHash: "0xnew-payload",
+      metadataSegmentCount: 1,
       metadataPayloadLength: 256,
     });
     for (const key of [
@@ -146,6 +150,7 @@ describe("nodeEnrichment patch builders", () => {
       versionCommitment: "old-commitment",
       metadataPointer: "0x00000000000000000000000000000000000000aa",
       metadataPayloadHash: "0xold-payload",
+      metadataSegmentCount: 1,
       metadataPayloadLength: 128,
       metadataUnlockValidated: false,
       metadataProtocolGeneration: "df-onchain-biography-v1",
@@ -175,6 +180,7 @@ describe("nodeEnrichment patch builders", () => {
         metadata: {
           pointer: "0x00000000000000000000000000000000000000bb",
           payloadHash: "0xnew-payload",
+          segmentCount: 1,
           payloadLength: 256,
         },
         endorsementCount: 1,

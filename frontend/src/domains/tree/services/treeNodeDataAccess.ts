@@ -12,7 +12,6 @@ import {
   getMissingStoryOffset,
   getOwnerFromTokenNode,
   mergeStoryChunkRecords,
-  parseStoryChunkRecord,
   type NodeData,
   type ParsedNftDetails,
   type StoryDataResult,
@@ -20,12 +19,16 @@ import {
 } from "../../../shared/model";
 import { readTreeNodesSnapshot } from "./treeNodesPersistence";
 
+import type { PersonReadGateway } from "../../../shared/clients/personReadGateway";
+
 type RefLike<T> = { current: T };
 type SetNodesData = (updater: (prev: Record<string, NodeData>) => Record<string, NodeData>) => void;
 
 interface TreeNodeDataAccessOptions {
   api: {
     getNFTDetails: (tokenId: string, options?: { ttlMs?: number }) => Promise<ParsedNftDetails>;
+    getStoryMetadata?: PersonReadGateway["getStoryMetadata"];
+    listStoryChunksPage?: PersonReadGateway["listStoryChunksPage"];
   } | null;
   contract: any;
   nftContract?: any;
@@ -120,14 +123,10 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
         : [];
       let mergedChunks = [...existingChunks];
 
-      const metadata = await options.contract.getStoryMetadata(effectiveTokenId);
-      const storyMetadata = {
-        totalChunks: Number(metadata.totalChunks),
-        totalLength: Number(metadata.totalLength),
-        isSealed: Boolean(metadata.isSealed),
-        lastUpdateTime: Number(metadata.lastUpdateTime),
-        fullStoryHash: metadata.fullStoryHash,
-      };
+      if (!options.api?.getStoryMetadata || !options.api?.listStoryChunksPage) {
+        throw new Error("Story reference reader is unavailable");
+      }
+      const storyMetadata = await options.api.getStoryMetadata(effectiveTokenId);
 
       const total = Number(storyMetadata.totalChunks || 0);
       if (total > 0) {
@@ -135,15 +134,15 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
         if (offset < total) {
           let hasMore = true;
           while (hasMore && offset < total) {
-            const out: any = await options.contract.listStoryChunks(
+            const out = await options.api.listStoryChunksPage(
               effectiveTokenId,
               offset,
-              options.storyPageLimit,
+              Math.min(options.storyPageLimit, 100),
             );
-            const nextChunks = Array.from(out?.chunks ?? out?.[0] ?? []).map(parseStoryChunkRecord);
+            const nextChunks = out.chunks;
             mergedChunks = mergeStoryChunkRecords(mergedChunks, nextChunks, total);
-            hasMore = Boolean(out?.hasMore ?? out?.[2]);
-            const nextOffset = Number(out?.nextOffset ?? out?.[3] ?? 0);
+            hasMore = Boolean(out.hasMore);
+            const nextOffset = Number(out.nextOffset);
             if (!Number.isFinite(nextOffset) || nextOffset <= offset) break;
             offset = nextOffset;
           }

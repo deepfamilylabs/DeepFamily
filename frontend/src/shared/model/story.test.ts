@@ -1,3 +1,4 @@
+import { ethers } from "ethers";
 import { describe, expect, it } from "vitest";
 import { computeStoryHash } from "./story";
 
@@ -5,10 +6,12 @@ describe("story", () => {
   it("computes a stable story hash independent of chunk order", () => {
     const chunkA = {
       chunkIndex: 1,
+      recordHash: ethers.id("record A"),
       chunkHash: "0x" + "11".repeat(32),
     };
     const chunkB = {
       chunkIndex: 0,
+      recordHash: ethers.id("record B"),
       chunkHash: "0x" + "22".repeat(32),
     };
 

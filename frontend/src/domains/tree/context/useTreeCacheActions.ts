@@ -90,6 +90,7 @@ function projectConfirmedPersonVersion(node: NodeData): NodeData {
     metadataPointer: node.metadataPointer,
     metadataPayloadHash: node.metadataPayloadHash,
     metadataPayloadLength: node.metadataPayloadLength,
+    metadataSegmentCount: node.metadataSegmentCount,
     ...(node.fatherHash !== undefined ? { fatherHash: node.fatherHash } : {}),
     ...(node.motherHash !== undefined ? { motherHash: node.motherHash } : {}),
     ...(node.fatherVersionIndex !== undefined

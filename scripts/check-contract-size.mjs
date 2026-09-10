@@ -4,14 +4,12 @@ import path from "node:path";
 // Keep the stricter Ethereum EIP-170 ceiling so one artifact remains deployable on every
 // supported network. Conflux eSpace currently permits up to 49,152 deployed bytes.
 const CROSS_CHAIN_MAX_DEPLOYED_BYTES = 24_576;
-const MAX_METADATA_DATA_CONTRACT_RUNTIME_BYTES = 16_385;
-const MAX_STORY_DATA_CONTRACT_RUNTIME_BYTES = 16_385;
+const MAX_SEGMENT_RUNTIME_BYTES = 16_385;
+const MAX_MANIFEST_RUNTIME_BYTES = 20_566;
 const ARTIFACTS = [
   ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
-  ["MetadataArchiveV1", "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json"],
-  ["MetadataBlobV1", "artifacts/contracts/MetadataArchiveV1.sol/MetadataBlobV1.json"],
-  ["StoryArchiveV1", "artifacts/contracts/StoryArchiveV1.sol/StoryArchiveV1.json"],
-  ["StoryBlobV1", "artifacts/contracts/StoryArchiveV1.sol/StoryBlobV1.json"],
+  ["DeepFamilyArchiveV1", "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json"],
+  ["ArchiveDataV1", "artifacts/contracts/DeepFamilyArchiveV1.sol/ArchiveDataV1.json"],
   ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
   ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],
@@ -45,8 +43,8 @@ function getDeployedBytecodeSize(artifact) {
 async function main() {
   let failed = false;
   const dataContractMaximums = [
-    ["Metadata data-contract (maximum)", MAX_METADATA_DATA_CONTRACT_RUNTIME_BYTES],
-    ["Story data-contract (maximum)", MAX_STORY_DATA_CONTRACT_RUNTIME_BYTES],
+    ["Archive segment (maximum)", MAX_SEGMENT_RUNTIME_BYTES],
+    ["Archive manifest page (maximum)", MAX_MANIFEST_RUNTIME_BYTES],
   ];
   for (const [name, bytes] of dataContractMaximums) {
     const status = bytes <= CROSS_CHAIN_MAX_DEPLOYED_BYTES ? "ok" : "oversize";

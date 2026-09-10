@@ -13,7 +13,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
   const chunkTypeValueId = useId();
   const chunkTypeListboxId = useId();
   const contentByteStatusId = useId();
-  const contentOverLimit = form.byteLength > form.maxBytes;
+
   const selectedChunkTypeIndex = editor.chunkTypeOptions.findIndex(
     (option) => option.value === form.data.chunkType,
   );
@@ -112,11 +112,11 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                 onChange={(event) => form.updateContent(event.target.value)}
                 placeholder={t(
                   "storyChunkEditor.contentPlaceholderBytes",
-                  "Enter chunk content (max 16384 UTF-8 bytes)",
+                  "Enter story content; network gas capacity determines the record size",
                 )}
                 className="h-[500px] w-full resize-none rounded-2xl border-0 bg-gray-50 p-6 text-base leading-relaxed text-gray-900 transition-all placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-orange-500/20 active:ring-orange-500/20 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:bg-gray-800"
                 disabled={editor.submitting}
-                aria-invalid={contentOverLimit}
+                aria-invalid={false}
                 aria-describedby={contentByteStatusId}
               />
 
@@ -230,20 +230,17 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
                 <div
                   id={contentByteStatusId}
                   className={`font-medium ${editor.getByteWarningColor(form.byteLength)}`}
-                  role={contentOverLimit ? "alert" : "status"}
-                  aria-live={contentOverLimit ? "assertive" : "polite"}
+                  role="status"
+                  aria-live="polite"
                   aria-atomic="true"
                 >
-                  {form.byteLength}/{form.maxBytes} bytes
-                  {form.byteLength > form.warningOrangeBytes &&
-                    form.byteLength <= form.maxBytes && (
-                      <span className="ml-2 text-xs">
-                        ({form.maxBytes - form.byteLength} remaining)
-                      </span>
-                    )}
-                  {form.byteLength > form.maxBytes && (
+                  {form.byteLength} bytes
+                  {form.byteLength >= form.segmentBytes && (
                     <span className="ml-2 text-xs">
-                      ({form.byteLength - form.maxBytes} over limit!)
+                      {t(
+                        "archive.largeStory",
+                        "Multiple storage segments; review the estimated cost before signing",
+                      )}
                     </span>
                   )}
                 </div>
@@ -269,9 +266,7 @@ export function StoryEditorMainSection({ editor }: { editor: StoryEditorControll
             <footer className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 onClick={form.submit}
-                disabled={
-                  editor.submitting || !form.data.content.trim() || form.byteLength > form.maxBytes
-                }
+                disabled={editor.submitting || !form.data.content.trim()}
                 className="flex items-center justify-center gap-2 rounded-full bg-linear-to-r from-orange-400 to-red-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition-all hover:scale-[1.02] hover:shadow-orange-500/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale"
                 type="button"
               >

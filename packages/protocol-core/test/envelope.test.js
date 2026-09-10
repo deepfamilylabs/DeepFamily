@@ -8,7 +8,6 @@ import {
   computePayloadHash,
   parseEnvelopeCommonPrefix,
   parseFormat1Envelope,
-  verifyMetadataRuntimeCode,
   ZERO_BYTES32,
 } from "../index.js";
 
@@ -79,50 +78,6 @@ test("format parser rejects flags/reserved/length tampering and accepts exact 16
   assert.equal(maximum.length, 16_384);
   assert.equal(parseFormat1Envelope(maximum).contentCiphertextLength, 16_256);
   assert.throws(() => envelope(DFM1_MAX_CONTENT_CIPHERTEXT_BYTES + 1), /out of range/);
-});
-
-test("MetadataRef runtime verification strips STOP and checks exact length/hash", () => {
-  const bytes = envelope();
-  const runtime = new Uint8Array(bytes.length + 1);
-  runtime.set(bytes, 1);
-  const payloadHash = computePayloadHash(bytes);
-  const verified = verifyMetadataRuntimeCode({
-    runtimeCode: runtime,
-    payloadLength: bytes.length,
-    payloadHash,
-    requireCommonPrefix: true,
-  });
-  assert.deepEqual(verified.envelope, bytes);
-  assert.equal(verified.prefix.identitySuiteId, 1);
-
-  const missingStop = runtime.slice();
-  missingStop[0] = 1;
-  assert.throws(
-    () =>
-      verifyMetadataRuntimeCode({
-        runtimeCode: missingStop,
-        payloadLength: bytes.length,
-        payloadHash,
-      }),
-    /begin with STOP/,
-  );
-  assert.throws(
-    () =>
-      verifyMetadataRuntimeCode({
-        runtimeCode: runtime,
-        payloadLength: bytes.length - 1,
-        payloadHash,
-      }),
-    /runtime length/,
-  );
-  const changed = runtime.slice();
-  changed.at(-1);
-  changed[changed.length - 1] ^= 1;
-  assert.throws(
-    () =>
-      verifyMetadataRuntimeCode({ runtimeCode: changed, payloadLength: bytes.length, payloadHash }),
-    /does not match/,
-  );
 });
 
 test("format 1 AAD is exactly 15 ABI words and context changes alter both authentication domains", () => {

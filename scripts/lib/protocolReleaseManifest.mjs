@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { id } from "ethers";
+import { expectedContractInterfaces } from "./archiveInterfaceDefinition.mjs";
 
 import {
   AES_GCM_IV_BYTES,
@@ -70,36 +71,25 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
     sourceName: "contracts/adapters/Groth16VerifierAdapter.sol",
     immutableFields: Object.freeze(["personVerifier", "disclosureBindingVerifier"]),
   }),
-  metadataArchiveV1: Object.freeze({
-    path: "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json",
-    contractName: "MetadataArchiveV1",
-    sourceName: "contracts/MetadataArchiveV1.sol",
-    immutableFields: Object.freeze(["DEEP_FAMILY"]),
-  }),
-  storyArchiveV1: Object.freeze({
-    path: "artifacts/contracts/StoryArchiveV1.sol/StoryArchiveV1.json",
-    contractName: "StoryArchiveV1",
-    sourceName: "contracts/StoryArchiveV1.sol",
+  deepFamilyArchiveV1: Object.freeze({
+    path: "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json",
+    contractName: "DeepFamilyArchiveV1",
+    sourceName: "contracts/DeepFamilyArchiveV1.sol",
     immutableFields: Object.freeze(["DEEP_FAMILY"]),
   }),
   deepFamilyReader: Object.freeze({
     path: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
     contractName: "DeepFamilyReader",
     sourceName: "contracts/DeepFamilyReader.sol",
-    immutableFields: Object.freeze(["DEEP_FAMILY", "METADATA_ARCHIVE", "STORY_ARCHIVE"]),
+    immutableFields: Object.freeze(["DEEP_FAMILY", "ARCHIVE"]),
   }),
 });
 
 export const PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS = Object.freeze({
-  metadataArchiveV1: Object.freeze({
-    path: "artifacts/contracts/MetadataArchiveV1.sol/MetadataArchiveV1.json",
-    contractName: "MetadataArchiveV1",
-    sourceName: "contracts/MetadataArchiveV1.sol",
-  }),
-  storyArchiveV1: Object.freeze({
-    path: "artifacts/contracts/StoryArchiveV1.sol/StoryArchiveV1.json",
-    contractName: "StoryArchiveV1",
-    sourceName: "contracts/StoryArchiveV1.sol",
+  deepFamilyArchiveV1: Object.freeze({
+    path: "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json",
+    contractName: "DeepFamilyArchiveV1",
+    sourceName: "contracts/DeepFamilyArchiveV1.sol",
   }),
   deepFamilyReader: Object.freeze({
     path: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
@@ -199,423 +189,8 @@ const expectedArgon2idProfile = () => ({
   outputBytes: CANDIDATE_ARGON2ID_PROFILE.outputBytes,
 });
 
-const expectedMetadataRefComponents = () => [
-  { name: "pointer", type: "address" },
-  { name: "payloadHash", type: "bytes32" },
-  { name: "payloadLength", type: "uint32" },
-];
-
-const expectedMetadataRefOutput = () => [
-  { name: "metadata", type: "tuple", components: expectedMetadataRefComponents() },
-];
-
-const expectedStoryRefComponents = () => [
-  { name: "pointer", type: "address" },
-  { name: "contentHash", type: "bytes32" },
-  { name: "contentLength", type: "uint32" },
-];
-
-const expectedStoryRefOutput = () => [
-  { name: "story", type: "tuple", components: expectedStoryRefComponents() },
-];
-
-const expectedStoryChunkComponents = () => [
-  { name: "chunkIndex", type: "uint256" },
-  { name: "chunkHash", type: "bytes32" },
-  { name: "content", type: "string" },
-  { name: "timestamp", type: "uint256" },
-  { name: "editor", type: "address" },
-  { name: "chunkType", type: "uint8" },
-  { name: "attachmentCID", type: "string" },
-];
-
-const expectedStoryMetadataComponents = () => [
-  { name: "totalChunks", type: "uint64" },
-  { name: "fullStoryHash", type: "bytes32" },
-  { name: "lastUpdateTime", type: "uint64" },
-  { name: "isSealed", type: "bool" },
-  { name: "totalLength", type: "uint64" },
-];
-
-const expectedStoryMetadataOutput = () => [
-  { name: "metadata", type: "tuple", components: expectedStoryMetadataComponents() },
-];
-
 const functionSelector = (signature) => id(signature).slice(0, 10);
 const eventTopic0 = (signature) => id(signature);
-
-const expectedContractInterfaces = () => ({
-  schemaVersion: 1,
-  types: {
-    MetadataRef: expectedMetadataRefComponents(),
-    StoryChunk: expectedStoryChunkComponents(),
-    StoryMetadata: expectedStoryMetadataComponents(),
-    StoryRef: expectedStoryRefComponents(),
-  },
-  metadataArchiveV1: {
-    abiPolicy: {
-      nonErrorFragments: "exact-set",
-      errorFragments: "excluded",
-    },
-    abi: [
-      {
-        type: "constructor",
-        stateMutability: "nonpayable",
-        inputs: [{ name: "deepFamily", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "DEEP_FAMILY",
-        selector: functionSelector("DEEP_FAMILY()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "MAX_PAYLOAD_LENGTH",
-        selector: functionSelector("MAX_PAYLOAD_LENGTH()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256" }],
-      },
-      {
-        type: "function",
-        name: "store",
-        selector: functionSelector("store(bytes32,uint256,bytes)"),
-        stateMutability: "nonpayable",
-        inputs: [
-          { name: "personHash", type: "bytes32" },
-          { name: "versionIndex", type: "uint256" },
-          { name: "envelope", type: "bytes" },
-        ],
-        outputs: expectedMetadataRefOutput(),
-      },
-      {
-        type: "function",
-        name: "metadataRef",
-        selector: functionSelector("metadataRef(bytes32,uint256)"),
-        stateMutability: "view",
-        inputs: [
-          { name: "personHash", type: "bytes32" },
-          { name: "versionIndex", type: "uint256" },
-        ],
-        outputs: expectedMetadataRefOutput(),
-      },
-      {
-        type: "event",
-        name: "MetadataStored",
-        topic0: eventTopic0("MetadataStored(bytes32,uint256,address,bytes32,uint32)"),
-        anonymous: false,
-        inputs: [
-          { name: "personHash", type: "bytes32", indexed: true },
-          { name: "versionIndex", type: "uint256", indexed: true },
-          { name: "pointer", type: "address", indexed: false },
-          { name: "payloadHash", type: "bytes32", indexed: false },
-          { name: "payloadLength", type: "uint32", indexed: false },
-        ],
-      },
-    ],
-    semantics: {
-      immutableBindings: { DEEP_FAMILY: "constructor.deepFamily" },
-      constants: {
-        MAX_PAYLOAD_LENGTH: { type: "uint256", value: DFM1_MAX_ENVELOPE_BYTES },
-      },
-      storeAuthorization: "msg.sender == DEEP_FAMILY",
-      reference: {
-        key: ["personHash", "versionIndex"],
-        writeOnce: true,
-        pointer: "CREATE data-contract address",
-        payloadHash: "keccak256(envelope)",
-        payloadLength: "envelope.length",
-      },
-      dataContract: {
-        runtimeEncoding: "0x00 || envelope",
-        stopPrefix: "0x00",
-        payloadStartsAtCodeOffset: 1,
-        stopIncludedInPayloadHash: false,
-        stopIncludedInPayloadLength: false,
-      },
-    },
-  },
-  storyArchiveV1: {
-    abiPolicy: {
-      nonErrorFragments: "exact-set",
-      errorFragments: "excluded",
-    },
-    abi: [
-      {
-        type: "constructor",
-        stateMutability: "nonpayable",
-        inputs: [{ name: "deepFamily", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "DEEP_FAMILY",
-        selector: functionSelector("DEEP_FAMILY()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "MAX_CONTENT_LENGTH",
-        selector: functionSelector("MAX_CONTENT_LENGTH()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256" }],
-      },
-      {
-        type: "function",
-        name: "MAX_ATTACHMENT_CID_LENGTH",
-        selector: functionSelector("MAX_ATTACHMENT_CID_LENGTH()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "uint256" }],
-      },
-      {
-        type: "function",
-        name: "addStoryChunk",
-        selector: functionSelector("addStoryChunk(uint256,uint256,uint8,string,string,bytes32)"),
-        stateMutability: "nonpayable",
-        inputs: [
-          { name: "tokenId", type: "uint256" },
-          { name: "chunkIndex", type: "uint256" },
-          { name: "chunkType", type: "uint8" },
-          { name: "content", type: "string" },
-          { name: "attachmentCID", type: "string" },
-          { name: "expectedHash", type: "bytes32" },
-        ],
-        outputs: expectedStoryRefOutput(),
-      },
-      {
-        type: "function",
-        name: "sealStory",
-        selector: functionSelector("sealStory(uint256)"),
-        stateMutability: "nonpayable",
-        inputs: [{ name: "tokenId", type: "uint256" }],
-        outputs: expectedStoryMetadataOutput(),
-      },
-      {
-        type: "function",
-        name: "storyRef",
-        selector: functionSelector("storyRef(uint256,uint256)"),
-        stateMutability: "view",
-        inputs: [
-          { name: "tokenId", type: "uint256" },
-          { name: "chunkIndex", type: "uint256" },
-        ],
-        outputs: expectedStoryRefOutput(),
-      },
-      {
-        type: "function",
-        name: "getStoryMetadata",
-        selector: functionSelector("getStoryMetadata(uint256)"),
-        stateMutability: "view",
-        inputs: [{ name: "tokenId", type: "uint256" }],
-        outputs: expectedStoryMetadataOutput(),
-      },
-      {
-        type: "function",
-        name: "getStoryChunk",
-        selector: functionSelector("getStoryChunk(uint256,uint256)"),
-        stateMutability: "view",
-        inputs: [
-          { name: "tokenId", type: "uint256" },
-          { name: "chunkIndex", type: "uint256" },
-        ],
-        outputs: [{ name: "chunk", type: "tuple", components: expectedStoryChunkComponents() }],
-      },
-      {
-        type: "event",
-        name: "StoryChunkAdded",
-        topic0: eventTopic0(
-          "StoryChunkAdded(uint256,uint256,bytes32,address,uint256,uint8,string)",
-        ),
-        anonymous: false,
-        inputs: [
-          { name: "tokenId", type: "uint256", indexed: true },
-          { name: "chunkIndex", type: "uint256", indexed: true },
-          { name: "chunkHash", type: "bytes32", indexed: false },
-          { name: "editor", type: "address", indexed: true },
-          { name: "contentLength", type: "uint256", indexed: false },
-          { name: "chunkType", type: "uint8", indexed: false },
-          { name: "attachmentCID", type: "string", indexed: false },
-        ],
-      },
-      {
-        type: "event",
-        name: "StorySealed",
-        topic0: eventTopic0("StorySealed(uint256,uint256,bytes32,address)"),
-        anonymous: false,
-        inputs: [
-          { name: "tokenId", type: "uint256", indexed: true },
-          { name: "totalChunks", type: "uint256", indexed: false },
-          { name: "fullStoryHash", type: "bytes32", indexed: false },
-          { name: "sealer", type: "address", indexed: true },
-        ],
-      },
-    ],
-    semantics: {
-      immutableBindings: { DEEP_FAMILY: "constructor.deepFamily" },
-      constants: {
-        MAX_CONTENT_LENGTH: { type: "uint256", value: 16_384 },
-        MAX_ATTACHMENT_CID_LENGTH: { type: "uint256", value: 256 },
-      },
-      writeAuthorization: "msg.sender == ownerOf(tokenId) on DEEP_FAMILY",
-      stateOwnership: "all StoryChunk and StoryMetadata state lives in StoryArchiveV1",
-      reference: {
-        key: ["tokenId", "chunkIndex"],
-        writeOnce: true,
-        pointer: "CREATE data-contract address",
-        contentHash: "keccak256(content)",
-        contentLength: "content.length",
-      },
-      dataContract: {
-        runtimeEncoding: "0x00 || content",
-        stopPrefix: "0x00",
-        contentStartsAtCodeOffset: 1,
-        stopIncludedInContentHash: false,
-        stopIncludedInContentLength: false,
-      },
-    },
-  },
-  deepFamilyReader: {
-    abiPolicy: {
-      nonErrorFragments: "declared-subset",
-      errorFragments: "excluded",
-    },
-    abi: [
-      {
-        type: "constructor",
-        stateMutability: "nonpayable",
-        inputs: [{ name: "deepFamily", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "DEEP_FAMILY",
-        selector: functionSelector("DEEP_FAMILY()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "METADATA_ARCHIVE",
-        selector: functionSelector("METADATA_ARCHIVE()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "STORY_ARCHIVE",
-        selector: functionSelector("STORY_ARCHIVE()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "getVersionMetadataRef",
-        selector: functionSelector("getVersionMetadataRef(bytes32,uint256)"),
-        stateMutability: "view",
-        inputs: [
-          { name: "personHash", type: "bytes32" },
-          { name: "versionIndex", type: "uint256" },
-        ],
-        outputs: expectedMetadataRefOutput(),
-      },
-    ],
-    semantics: {
-      immutableBindings: {
-        DEEP_FAMILY: "constructor.deepFamily",
-        METADATA_ARCHIVE: "DEEP_FAMILY.metadataArchive() at construction",
-        STORY_ARCHIVE: "DEEP_FAMILY.storyArchive() at construction",
-      },
-      constructorChecks: {
-        deepFamilyHasCode: true,
-        metadataArchiveHasCode: true,
-        archiveReverseBinding: "METADATA_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY",
-        storyArchiveHasCode: true,
-        storyArchiveReverseBinding: "STORY_ARCHIVE.DEEP_FAMILY() == DEEP_FAMILY",
-      },
-      getVersionMetadataRef: {
-        versionIndexing: "one-based",
-        requiresExistingVersion: true,
-        source: "METADATA_ARCHIVE.metadataRef(personHash,versionIndex)",
-      },
-    },
-  },
-  deepFamily: {
-    abiPolicy: {
-      nonErrorFragments: "declared-subset",
-      errorFragments: "excluded",
-    },
-    abi: [
-      {
-        type: "function",
-        name: "metadataArchive",
-        selector: functionSelector("metadataArchive()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "setMetadataArchive",
-        selector: functionSelector("setMetadataArchive(address)"),
-        stateMutability: "nonpayable",
-        inputs: [{ name: "archive", type: "address" }],
-        outputs: [],
-      },
-      {
-        type: "event",
-        name: "MetadataArchiveSet",
-        topic0: eventTopic0("MetadataArchiveSet(address)"),
-        anonymous: false,
-        inputs: [{ name: "archive", type: "address", indexed: true }],
-      },
-      {
-        type: "function",
-        name: "storyArchive",
-        selector: functionSelector("storyArchive()"),
-        stateMutability: "view",
-        inputs: [],
-        outputs: [{ name: "", type: "address" }],
-      },
-      {
-        type: "function",
-        name: "setStoryArchive",
-        selector: functionSelector("setStoryArchive(address)"),
-        stateMutability: "nonpayable",
-        inputs: [{ name: "archive", type: "address" }],
-        outputs: [],
-      },
-      {
-        type: "event",
-        name: "StoryArchiveSet",
-        topic0: eventTopic0("StoryArchiveSet(address)"),
-        anonymous: false,
-        inputs: [{ name: "archive", type: "address", indexed: true }],
-      },
-    ],
-    semantics: {
-      metadataArchiveStorageSlots: 1,
-      initialValue: "address(0)",
-      setterAuthorization: "owner",
-      setterCallsMaximum: 1,
-      archiveHasCode: true,
-      archiveReverseBinding: "IMetadataArchiveV1(archive).DEEP_FAMILY() == address(this)",
-      storyArchiveStorageSlots: 1,
-      storyArchiveInitialValue: "address(0)",
-      storyArchiveSetterAuthorization: "owner",
-      storyArchiveSetterCallsMaximum: 1,
-      storyArchiveHasCode: true,
-      storyArchiveReverseBinding: "IStoryArchiveV1(archive).DEEP_FAMILY() == address(this)",
-    },
-  },
-});
 
 const validateFrozenV1Constants = ({
   manifest,
@@ -628,7 +203,6 @@ const validateFrozenV1Constants = ({
   assertExactJson(
     manifest.envelope,
     {
-      maximumBytes: DFM1_MAX_ENVELOPE_BYTES,
       payloadHash: "keccak256(envelope)",
       universalPrefix: {
         minimumBytes: DFM1_COMMON_PREFIX_BYTES,
@@ -642,7 +216,8 @@ const validateFrozenV1Constants = ({
         },
       },
       dataContract: {
-        runtimeEncoding: "0x00 || envelope",
+        runtimeEncoding:
+          "Archive BlobRef: STOP-prefixed segments, DFBP manifests for multiple segments",
         stopPrefix: "0x00",
         payloadStartsAtCodeOffset: 1,
         payloadLengthIncludesStop: false,
@@ -658,6 +233,7 @@ const validateFrozenV1Constants = ({
     formatDefinition,
     {
       name: "DFM1-format-1",
+      maximumBytes: DFM1_MAX_ENVELOPE_BYTES,
       headerLength: DFM1_FORMAT_1_HEADER_BYTES,
       fixedEnvelopeOverhead: DFM1_FORMAT_1_OVERHEAD_BYTES,
       maximumContentCiphertextBytes: DFM1_MAX_CONTENT_CIPHERTEXT_BYTES,
@@ -919,7 +495,7 @@ const normalizeAbiParameter = (parameter, { event = false } = {}) => {
     name: parameter?.name ?? "",
     type: parameter?.type,
   };
-  if (parameter?.type === "tuple") {
+  if (String(parameter?.type ?? "").startsWith("tuple")) {
     normalized.components = (parameter.components ?? []).map((component) =>
       normalizeAbiParameter(component),
     );
@@ -974,7 +550,7 @@ const abiFragmentLabel = (fragment) =>
 
 /**
  * Cross-checks the release-frozen external ABI projection against current Hardhat artifacts.
- * Both Archive contracts freeze their complete non-error ABI; Reader and DeepFamily intentionally
+ * The Archive contract freezes their complete non-error ABI; Reader and DeepFamily intentionally
  * freeze only the declared projection. Error fragments are outside both policies. `internalType`
  * is excluded because it is compiler metadata, not ABI encoding.
  */
@@ -1235,8 +811,7 @@ export const inspectProtocolDeploymentArtifact = ({
 
 export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deployments } = {}) => {
   const adapter = deployments?.groth16VerifierAdapter;
-  const archive = deployments?.metadataArchiveV1;
-  const storyArchive = deployments?.storyArchiveV1;
+  const archive = deployments?.deepFamilyArchiveV1;
   const reader = deployments?.deepFamilyReader;
   return Object.freeze({
     groth16VerifierAdapter: inspectProtocolDeploymentArtifact({
@@ -1247,23 +822,17 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
         disclosureBindingVerifier: adapter?.disclosureBindingVerifierImmutable,
       },
     }),
-    metadataArchiveV1: inspectProtocolDeploymentArtifact({
+    deepFamilyArchiveV1: inspectProtocolDeploymentArtifact({
       root,
-      artifactName: "metadataArchiveV1",
+      artifactName: "deepFamilyArchiveV1",
       immutableValues: { DEEP_FAMILY: archive?.deepFamilyImmutable },
-    }),
-    storyArchiveV1: inspectProtocolDeploymentArtifact({
-      root,
-      artifactName: "storyArchiveV1",
-      immutableValues: { DEEP_FAMILY: storyArchive?.deepFamilyImmutable },
     }),
     deepFamilyReader: inspectProtocolDeploymentArtifact({
       root,
       artifactName: "deepFamilyReader",
       immutableValues: {
         DEEP_FAMILY: reader?.deepFamilyImmutable,
-        METADATA_ARCHIVE: reader?.metadataArchiveImmutable,
-        STORY_ARCHIVE: reader?.storyArchiveImmutable,
+        ARCHIVE: reader?.archiveImmutable,
       },
     }),
   });
@@ -1302,7 +871,9 @@ const normalizedRouteProjection = ({ routes, adapterAddress }) => {
 
 const normalizeDeploymentChainId = (value, label) => {
   const normalized =
-    typeof value === "string" && /^[1-9][0-9]*$/.test(value) ? Number(value) : value;
+    typeof value === "bigint" || (typeof value === "string" && /^[1-9][0-9]*$/.test(value))
+      ? Number(value)
+      : value;
   assert(Number.isSafeInteger(normalized) && normalized > 0, `${label} is invalid`);
   return normalized;
 };
@@ -1316,8 +887,7 @@ const normalizeDeploymentChainId = (value, label) => {
 export const protocolDeploymentEvidenceFromManifest = (manifest) => {
   const deployments = manifest?.deployments;
   const adapter = deployments?.groth16VerifierAdapter;
-  const archive = deployments?.metadataArchiveV1;
-  const storyArchive = deployments?.storyArchiveV1;
+  const archive = deployments?.deepFamilyArchiveV1;
   const reader = deployments?.deepFamilyReader;
   const chainId = normalizeDeploymentChainId(deployments?.chainId, "deployment chainId");
   return Object.freeze({
@@ -1332,8 +902,7 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
           deployments.deepFamilyImplementation,
           "DeepFamily implementation",
         ),
-        metadataArchive: assertAddress(archive?.address, "DeepFamily MetadataArchiveV1 binding"),
-        storyArchive: assertAddress(storyArchive?.address, "DeepFamily StoryArchiveV1 binding"),
+        archive: assertAddress(archive?.address, "DeepFamily DeepFamilyArchiveV1 binding"),
       }),
       groth16VerifierAdapter: Object.freeze({
         address: assertAddress(adapter?.address, "Groth16VerifierAdapter address"),
@@ -1351,23 +920,14 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
         ),
         runtimeSha256: assertSha256(adapter?.runtimeSha256, "Groth16VerifierAdapter runtimeSha256"),
       }),
-      metadataArchiveV1: Object.freeze({
-        address: assertAddress(archive?.address, "MetadataArchiveV1 address"),
+      deepFamilyArchiveV1: Object.freeze({
+        address: assertAddress(archive?.address, "DeepFamilyArchiveV1 address"),
         deepFamilyImmutable: assertAddress(
           archive?.deepFamilyImmutable,
-          "MetadataArchiveV1 DEEP_FAMILY immutable",
+          "DeepFamilyArchiveV1 DEEP_FAMILY immutable",
         ),
-        artifactSha256: assertSha256(archive?.artifactSha256, "MetadataArchiveV1 artifactSha256"),
-        runtimeSha256: assertSha256(archive?.runtimeSha256, "MetadataArchiveV1 runtimeSha256"),
-      }),
-      storyArchiveV1: Object.freeze({
-        address: assertAddress(storyArchive?.address, "StoryArchiveV1 address"),
-        deepFamilyImmutable: assertAddress(
-          storyArchive?.deepFamilyImmutable,
-          "StoryArchiveV1 DEEP_FAMILY immutable",
-        ),
-        artifactSha256: assertSha256(storyArchive?.artifactSha256, "StoryArchiveV1 artifactSha256"),
-        runtimeSha256: assertSha256(storyArchive?.runtimeSha256, "StoryArchiveV1 runtimeSha256"),
+        artifactSha256: assertSha256(archive?.artifactSha256, "DeepFamilyArchiveV1 artifactSha256"),
+        runtimeSha256: assertSha256(archive?.runtimeSha256, "DeepFamilyArchiveV1 runtimeSha256"),
       }),
       deepFamilyReader: Object.freeze({
         address: assertAddress(reader?.address, "DeepFamilyReader address"),
@@ -1375,13 +935,9 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
           reader?.deepFamilyImmutable,
           "DeepFamilyReader DEEP_FAMILY immutable",
         ),
-        metadataArchiveImmutable: assertAddress(
-          reader?.metadataArchiveImmutable,
+        archiveImmutable: assertAddress(
+          reader?.archiveImmutable,
           "DeepFamilyReader archive immutable",
-        ),
-        storyArchiveImmutable: assertAddress(
-          reader?.storyArchiveImmutable,
-          "DeepFamilyReader story archive immutable",
         ),
         artifactSha256: assertSha256(reader?.artifactSha256, "DeepFamilyReader artifactSha256"),
         runtimeSha256: assertSha256(reader?.runtimeSha256, "DeepFamilyReader runtimeSha256"),
@@ -1399,7 +955,6 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
   const deepFamily = terminal?.deepFamily;
   const adapter = terminal?.verifierAdapter;
   const archive = terminal?.archive;
-  const storyArchive = terminal?.storyArchive;
   const reader = terminal?.reader;
   const proxyAddress = assertAddress(addresses?.deepFamily, "acceptance DeepFamily proxy");
   assert(
@@ -1418,13 +973,9 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
           deepFamily?.implementation,
           "acceptance DeepFamily implementation",
         ),
-        metadataArchive: assertAddress(
-          deepFamily?.metadataArchive,
-          "acceptance DeepFamily MetadataArchiveV1 binding",
-        ),
-        storyArchive: assertAddress(
-          deepFamily?.storyArchive,
-          "acceptance DeepFamily StoryArchiveV1 binding",
+        archive: assertAddress(
+          deepFamily?.archive,
+          "acceptance DeepFamily DeepFamilyArchiveV1 binding",
         ),
       }),
       groth16VerifierAdapter: Object.freeze({
@@ -1446,34 +997,19 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
           "acceptance Groth16VerifierAdapter runtimeSha256",
         ),
       }),
-      metadataArchiveV1: Object.freeze({
-        address: assertAddress(archive?.address, "acceptance MetadataArchiveV1 address"),
+      deepFamilyArchiveV1: Object.freeze({
+        address: assertAddress(archive?.address, "acceptance DeepFamilyArchiveV1 address"),
         deepFamilyImmutable: assertAddress(
           archive?.deepFamily,
-          "acceptance MetadataArchiveV1 DEEP_FAMILY immutable",
+          "acceptance DeepFamilyArchiveV1 DEEP_FAMILY immutable",
         ),
         artifactSha256: assertSha256(
           archive?.artifactSha256,
-          "acceptance MetadataArchiveV1 artifactSha256",
+          "acceptance DeepFamilyArchiveV1 artifactSha256",
         ),
         runtimeSha256: assertSha256(
           archive?.runtimeSha256,
-          "acceptance MetadataArchiveV1 runtimeSha256",
-        ),
-      }),
-      storyArchiveV1: Object.freeze({
-        address: assertAddress(storyArchive?.address, "acceptance StoryArchiveV1 address"),
-        deepFamilyImmutable: assertAddress(
-          storyArchive?.deepFamily,
-          "acceptance StoryArchiveV1 DEEP_FAMILY immutable",
-        ),
-        artifactSha256: assertSha256(
-          storyArchive?.artifactSha256,
-          "acceptance StoryArchiveV1 artifactSha256",
-        ),
-        runtimeSha256: assertSha256(
-          storyArchive?.runtimeSha256,
-          "acceptance StoryArchiveV1 runtimeSha256",
+          "acceptance DeepFamilyArchiveV1 runtimeSha256",
         ),
       }),
       deepFamilyReader: Object.freeze({
@@ -1482,13 +1018,9 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
           reader?.deepFamily,
           "acceptance DeepFamilyReader DEEP_FAMILY immutable",
         ),
-        metadataArchiveImmutable: assertAddress(
-          reader?.metadataArchive,
+        archiveImmutable: assertAddress(
+          reader?.archive,
           "acceptance DeepFamilyReader archive immutable",
-        ),
-        storyArchiveImmutable: assertAddress(
-          reader?.storyArchive,
-          "acceptance DeepFamilyReader story archive immutable",
         ),
         artifactSha256: assertSha256(
           reader?.artifactSha256,
@@ -1553,7 +1085,10 @@ export const inspectProtocolReleaseManifest = ({
     manifest.releaseStatus === "development" || manifest.releaseStatus === "production",
     "releaseStatus is invalid",
   );
-  assert(manifest.envelope?.maximumBytes === 16_384, "envelope maximum must be 16,384");
+  assert(
+    manifest.formats?.["1"]?.maximumBytes === 16_384,
+    "format 1 envelope maximum must be 16,384",
+  );
   assert(manifest.envelope?.universalPrefix?.minimumBytes === 20, "prefix must be 20 bytes");
   assert(manifest.envelope?.universalPrefix?.magic === "0x44464d31", "magic must be DFM1");
   assert(
@@ -1565,7 +1100,8 @@ export const inspectProtocolReleaseManifest = ({
     "self identity suite offset must be 16",
   );
   assert(
-    manifest.envelope?.dataContract?.runtimeEncoding === "0x00 || envelope",
+    manifest.envelope?.dataContract?.runtimeEncoding ===
+      "Archive BlobRef: STOP-prefixed segments, DFBP manifests for multiple segments",
     "data-contract runtime encoding changed",
   );
 
@@ -1847,8 +1383,7 @@ export const inspectProtocolReleaseManifest = ({
       "deepFamilyProxy",
       "deepFamilyImplementation",
       "groth16VerifierAdapter",
-      "metadataArchiveV1",
-      "storyArchiveV1",
+      "deepFamilyArchiveV1",
       "deepFamilyReader",
     ],
     "deployment definition",
@@ -1865,25 +1400,13 @@ export const inspectProtocolReleaseManifest = ({
     "Groth16VerifierAdapter deployment",
   );
   assertExactKeys(
-    deployments.metadataArchiveV1,
+    deployments.deepFamilyArchiveV1,
     ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-    "MetadataArchiveV1 deployment",
-  );
-  assertExactKeys(
-    deployments.storyArchiveV1,
-    ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-    "StoryArchiveV1 deployment",
+    "DeepFamilyArchiveV1 deployment",
   );
   assertExactKeys(
     deployments.deepFamilyReader,
-    [
-      "address",
-      "deepFamilyImmutable",
-      "metadataArchiveImmutable",
-      "storyArchiveImmutable",
-      "artifactSha256",
-      "runtimeSha256",
-    ],
+    ["address", "deepFamilyImmutable", "archiveImmutable", "artifactSha256", "runtimeSha256"],
     "DeepFamilyReader deployment",
   );
   assert(
@@ -1897,8 +1420,7 @@ export const inspectProtocolReleaseManifest = ({
         deployments.deepFamilyProxy,
         deployments.deepFamilyImplementation,
         ...Object.values(deployments.groth16VerifierAdapter),
-        ...Object.values(deployments.metadataArchiveV1),
-        ...Object.values(deployments.storyArchiveV1),
+        ...Object.values(deployments.deepFamilyArchiveV1),
         ...Object.values(deployments.deepFamilyReader),
       ].every((value) => value === null),
       "not-deployed state must not claim deployment evidence",
@@ -2002,8 +1524,7 @@ export const inspectProtocolReleaseManifest = ({
         "deepFamilyProxy",
         "deepFamilyImplementation",
         "groth16VerifierAdapter",
-        "metadataArchiveV1",
-        "storyArchiveV1",
+        "deepFamilyArchiveV1",
         "deepFamilyReader",
       ],
       "production deployment definition",
@@ -2015,8 +1536,7 @@ export const inspectProtocolReleaseManifest = ({
     const proxyAddress = assertAddress(manifest.deployments?.deepFamilyProxy, "DeepFamily proxy");
     assertAddress(manifest.deployments?.deepFamilyImplementation, "DeepFamily implementation");
     const adapter = manifest.deployments?.groth16VerifierAdapter;
-    const archive = manifest.deployments?.metadataArchiveV1;
-    const storyArchive = manifest.deployments?.storyArchiveV1;
+    const archive = manifest.deployments?.deepFamilyArchiveV1;
     const reader = manifest.deployments?.deepFamilyReader;
     assertExactKeys(
       adapter,
@@ -2032,23 +1552,11 @@ export const inspectProtocolReleaseManifest = ({
     assertExactKeys(
       archive,
       ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-      "MetadataArchiveV1 deployment",
-    );
-    assertExactKeys(
-      storyArchive,
-      ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-      "StoryArchiveV1 deployment",
+      "DeepFamilyArchiveV1 deployment",
     );
     assertExactKeys(
       reader,
-      [
-        "address",
-        "deepFamilyImmutable",
-        "metadataArchiveImmutable",
-        "storyArchiveImmutable",
-        "artifactSha256",
-        "runtimeSha256",
-      ],
+      ["address", "deepFamilyImmutable", "archiveImmutable", "artifactSha256", "runtimeSha256"],
       "DeepFamilyReader deployment",
     );
     assertAddress(adapter?.address, "Groth16VerifierAdapter address");
@@ -2059,22 +1567,14 @@ export const inspectProtocolReleaseManifest = ({
     );
     assertSha256(adapter?.artifactSha256, "Groth16VerifierAdapter artifactSha256");
     assertSha256(adapter?.runtimeSha256, "Groth16VerifierAdapter runtimeSha256");
-    assertAddress(archive?.address, "MetadataArchiveV1 address");
+    assertAddress(archive?.address, "DeepFamilyArchiveV1 address");
     assert(
-      assertAddress(archive?.deepFamilyImmutable, "MetadataArchiveV1 DEEP_FAMILY immutable") ===
+      assertAddress(archive?.deepFamilyImmutable, "DeepFamilyArchiveV1 DEEP_FAMILY immutable") ===
         proxyAddress,
-      "MetadataArchiveV1 must bind the declared DeepFamily proxy",
+      "DeepFamilyArchiveV1 must bind the declared DeepFamily proxy",
     );
-    assertSha256(archive?.artifactSha256, "MetadataArchiveV1 artifactSha256");
-    assertSha256(archive?.runtimeSha256, "MetadataArchiveV1 runtimeSha256");
-    assertAddress(storyArchive?.address, "StoryArchiveV1 address");
-    assert(
-      assertAddress(storyArchive?.deepFamilyImmutable, "StoryArchiveV1 DEEP_FAMILY immutable") ===
-        proxyAddress,
-      "StoryArchiveV1 must bind the declared DeepFamily proxy",
-    );
-    assertSha256(storyArchive?.artifactSha256, "StoryArchiveV1 artifactSha256");
-    assertSha256(storyArchive?.runtimeSha256, "StoryArchiveV1 runtimeSha256");
+    assertSha256(archive?.artifactSha256, "DeepFamilyArchiveV1 artifactSha256");
+    assertSha256(archive?.runtimeSha256, "DeepFamilyArchiveV1 runtimeSha256");
     assertAddress(reader?.address, "DeepFamilyReader address");
     assert(
       assertAddress(reader?.deepFamilyImmutable, "DeepFamilyReader DEEP_FAMILY immutable") ===
@@ -2082,14 +1582,9 @@ export const inspectProtocolReleaseManifest = ({
       "DeepFamilyReader must bind the declared DeepFamily proxy",
     );
     assert(
-      assertAddress(reader?.metadataArchiveImmutable, "DeepFamilyReader archive immutable") ===
+      assertAddress(reader?.archiveImmutable, "DeepFamilyReader archive immutable") ===
         archive.address.toLowerCase(),
-      "DeepFamilyReader must bind the declared MetadataArchiveV1",
-    );
-    assert(
-      assertAddress(reader?.storyArchiveImmutable, "DeepFamilyReader story archive immutable") ===
-        storyArchive.address.toLowerCase(),
-      "DeepFamilyReader must bind the declared StoryArchiveV1",
+      "DeepFamilyReader must bind the declared DeepFamilyArchiveV1",
     );
     assertSha256(reader?.artifactSha256, "DeepFamilyReader artifactSha256");
     assertSha256(reader?.runtimeSha256, "DeepFamilyReader runtimeSha256");
@@ -2102,8 +1597,7 @@ export const inspectProtocolReleaseManifest = ({
         adapter.disclosureBindingVerifierImmutable,
         "Groth16VerifierAdapter disclosure verifier",
       ),
-      assertAddress(archive.address, "MetadataArchiveV1 address"),
-      assertAddress(storyArchive.address, "StoryArchiveV1 address"),
+      assertAddress(archive.address, "DeepFamilyArchiveV1 address"),
       assertAddress(reader.address, "DeepFamilyReader address"),
     ];
     assert(
@@ -2125,8 +1619,7 @@ export const inspectProtocolReleaseManifest = ({
     });
     for (const [label, declared, actual] of [
       ["Groth16VerifierAdapter", adapter, deploymentArtifacts.groth16VerifierAdapter],
-      ["MetadataArchiveV1", archive, deploymentArtifacts.metadataArchiveV1],
-      ["StoryArchiveV1", storyArchive, deploymentArtifacts.storyArchiveV1],
+      ["DeepFamilyArchiveV1", archive, deploymentArtifacts.deepFamilyArchiveV1],
       ["DeepFamilyReader", reader, deploymentArtifacts.deepFamilyReader],
     ]) {
       assert(

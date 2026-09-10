@@ -16,6 +16,7 @@ const lockedNode = {
   versionCommitment: "123",
   metadataPointer: POINTER,
   metadataPayloadHash: PAYLOAD_HASH,
+  metadataSegmentCount: 1,
   metadataPayloadLength: 128,
 };
 

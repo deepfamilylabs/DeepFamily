@@ -8,7 +8,7 @@ import {
   ZERO_BYTES32,
   asUint8Array,
   computePersonVersionContentCommitment,
-  decryptPersonVersionRuntime,
+  decryptPersonVersionEnvelope,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
   parseCanonicalPersonVersion,
@@ -199,7 +199,7 @@ describe("Real person commitment proof", function () {
   });
 
   it("round-trips production DFM1 and exposes the real-proof false-digest boundary", async () => {
-    const { deepFamily, metadataArchive, deepFamilyReader } =
+    const { deepFamily, archive, deepFamilyReader } =
       await hre.networkHelpers.loadFixture(deployIntegratedFixture);
     const [signer] = await hre.ethers.getSigners();
     const signerAddress = await signer.getAddress();
@@ -278,16 +278,14 @@ describe("Real person commitment proof", function () {
       const details = await deepFamilyReader.getVersionDetails(identityMaterial.personHash, 1);
       expect(details.version.versionCommitment).to.equal(generated.versionCommitment);
       expect(details.metadata).to.deep.equal(
-        await metadataArchive.metadataRef(identityMaterial.personHash, 1),
+        await archive.metadataRef(identityMaterial.personHash, 1),
       );
       expect(details.metadata.payloadHash).to.equal(encrypted.payloadHash);
       expect(details.metadata.payloadLength).to.equal(BigInt(encrypted.envelope.length));
 
       const runtimeCode = await hre.ethers.provider.getCode(details.metadata.pointer);
-      const decoded = await decryptPersonVersionRuntime({
-        runtimeCode,
-        payloadLength: details.metadata.payloadLength,
-        payloadHash: details.metadata.payloadHash,
+      const decoded = await decryptPersonVersionEnvelope({
+        envelope: hre.ethers.getBytes(runtimeCode).slice(1),
         rawPassphrase: protocolVector.identity.rawPassphrase,
         context,
       });
@@ -314,7 +312,7 @@ describe("Real person commitment proof", function () {
           ),
       ).to.be.revertedWithCustomError(deepFamily, "DuplicateVersionCommitment");
       expect(await deepFamily.personVersionsCount(identityMaterial.personHash)).to.equal(1n);
-      expect(await metadataArchive.metadataRef(identityMaterial.personHash, 1)).to.deep.equal(
+      expect(await archive.metadataRef(identityMaterial.personHash, 1)).to.deep.equal(
         details.metadata,
       );
 
@@ -361,10 +359,8 @@ describe("Real person commitment proof", function () {
       const maliciousRuntime = await hre.ethers.provider.getCode(maliciousDetails.metadata.pointer);
       let maliciousDecodeError;
       try {
-        await decryptPersonVersionRuntime({
-          runtimeCode: maliciousRuntime,
-          payloadLength: maliciousDetails.metadata.payloadLength,
-          payloadHash: maliciousDetails.metadata.payloadHash,
+        await decryptPersonVersionEnvelope({
+          envelope: hre.ethers.getBytes(maliciousRuntime).slice(1),
           rawPassphrase: protocolVector.identity.rawPassphrase,
           context: maliciousContext,
         });
@@ -373,7 +369,7 @@ describe("Real person commitment proof", function () {
       }
       expect(maliciousDecodeError?.code).to.equal("VERSION_COMMITMENT_MISMATCH");
       expect(await deepFamily.personVersionsCount(identityMaterial.personHash)).to.equal(2n);
-      expect(await metadataArchive.metadataRef(identityMaterial.personHash, 1)).to.deep.equal(
+      expect(await archive.metadataRef(identityMaterial.personHash, 1)).to.deep.equal(
         details.metadata,
       );
     } finally {

@@ -54,7 +54,7 @@ export function useContractClient() {
 
   const getMetadataCode = useMemo(() => {
     if (!readonlyProvider) return null;
-    return async (pointer: string, blockTag: "latest") => {
+    return async (pointer: string, blockTag: string | number) => {
       return await readonlyProvider.getCode(pointer, blockTag);
     };
   }, [readonlyProvider]);

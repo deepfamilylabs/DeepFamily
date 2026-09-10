@@ -1,3 +1,5 @@
+import { ethers } from "ethers";
+import { encodeStoryRecord, STORY_CHUNK_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { describe, expect, it, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
 import { createPersonReadGateway } from "./personReadGateway";
@@ -20,6 +22,7 @@ describe("personReadGateway", () => {
         {
           pointer: "0x00000000000000000000000000000000000000cc",
           payloadHash: "0xpayload",
+          segmentCount: 1,
           payloadLength: 512,
         },
         7,
@@ -61,6 +64,7 @@ describe("personReadGateway", () => {
       metadata: {
         pointer: "0x00000000000000000000000000000000000000cc",
         payloadHash: "0xpayload",
+        segmentCount: 1,
         payloadLength: 512,
       },
       endorsementCount: 7,
@@ -100,6 +104,7 @@ describe("personReadGateway", () => {
       {
         pointer: "0x00000000000000000000000000000000000000cc",
         payloadHash: "0xpayload",
+        segmentCount: 1,
         payloadLength: 512,
       },
       {
@@ -122,6 +127,7 @@ describe("personReadGateway", () => {
       metadata: {
         pointer: "0x00000000000000000000000000000000000000cc",
         payloadHash: "0xpayload",
+        segmentCount: 1,
         payloadLength: 512,
       },
       core: {
@@ -138,73 +144,87 @@ describe("personReadGateway", () => {
     });
   });
 
-  it("caches story metadata and parses chunk tuples", async () => {
-    const contract = {
-      getStoryMetadata: vi.fn(async () => ({
-        totalChunks: 2,
-        totalLength: 11,
-        isSealed: true,
-        lastUpdateTime: 123,
-        fullStoryHash: "0xhash",
-      })),
-      listStoryChunks: vi.fn(async () => [
-        [
-          [0, "0x1", "hello ", 11, "0x00000000000000000000000000000000000000aa", 0, ""],
-          [1, "0x2", "world", 12, "0x00000000000000000000000000000000000000aa", 1, "cid://a"],
-        ],
-      ]),
+  it("caches StoryState and verifies canonical records from bytecode", async () => {
+    const bytes = encodeStoryRecord({ content: "hello 🙂", chunkType: 1, attachmentCID: "" });
+    const pointer = "0x0000000000000000000000000000000000000011";
+    const archive = "0x0000000000000000000000000000000000000022";
+    const author = "0x0000000000000000000000000000000000000033";
+    const ref = {
+      blob: {
+        pointer,
+        payloadHash: ethers.keccak256(bytes),
+        payloadLength: bytes.length,
+        segmentCount: 1,
+      },
+      schemaId: STORY_CHUNK_SCHEMA_ID,
+      author,
+      timestamp: 12n,
     };
-    const cache = new QueryCache();
-    const gateway = createPersonReadGateway(contract, cache);
-
-    const metadata1 = await gateway.getStoryMetadata("42", { ttlMs: 60_000 });
-    const metadata2 = await gateway.getStoryMetadata("42", { ttlMs: 60_000 });
+    const getCode = vi.fn(async () => ethers.hexlify(ethers.concat(["0x00", bytes])));
+    const contract = {
+      runner: { getNetwork: async () => ({ chainId: 31337n }), getCode },
+      ARCHIVE: async () => archive,
+      getStoryState: vi.fn(async () => ({
+        totalRecords: 1n,
+        totalPayloadLength: BigInt(bytes.length),
+        recordsHead: ethers.ZeroHash,
+        lastUpdateTime: 12n,
+        isSealed: false,
+      })),
+      listStoryRecords: vi.fn(async () => ({
+        records: [ref],
+        totalRecords: 1n,
+        hasMore: false,
+        nextOffset: 1n,
+      })),
+    };
+    const gateway = createPersonReadGateway(contract, new QueryCache());
+    const one = await gateway.getStoryMetadata("42", { ttlMs: 60000 });
+    const two = await gateway.getStoryMetadata("42", { ttlMs: 60000 });
+    expect(one).toEqual(two);
+    expect(one.totalChunks).toBe(1);
+    expect(one.totalLength).toBe(bytes.length);
+    expect(contract.getStoryState).toHaveBeenCalledTimes(1);
     const chunks = await gateway.getStoryChunks("42", 0, 10);
-
-    expect(contract.getStoryMetadata).toHaveBeenCalledTimes(1);
-    expect(metadata2).toEqual(metadata1);
-    expect(metadata1).toEqual({
-      totalChunks: 2,
-      totalLength: 11,
-      isSealed: true,
-      lastUpdateTime: 123,
-      fullStoryHash: "0xhash",
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]).toMatchObject({
+      content: "hello 🙂",
+      chunkIndex: 0,
+      chunkType: 1,
+      schemaId: STORY_CHUNK_SCHEMA_ID,
+      unsupportedSchema: false,
+      rawPayload: ethers.hexlify(bytes),
     });
-    expect(chunks).toEqual([
-      {
-        chunkIndex: 0,
-        chunkHash: "0x1",
-        content: "hello ",
-        timestamp: 11,
-        editor: "0x00000000000000000000000000000000000000aa",
-        chunkType: 0,
-        attachmentCID: "",
-      },
-      {
-        chunkIndex: 1,
-        chunkHash: "0x2",
-        content: "world",
-        timestamp: 12,
-        editor: "0x00000000000000000000000000000000000000aa",
-        chunkType: 1,
-        attachmentCID: "cid://a",
-      },
-    ]);
+    expect(getCode).toHaveBeenCalledWith(pointer, "latest");
   });
 
-  it("parses endorsement, token URI, and story chunk page listings", async () => {
+  it("parses endorsement/URI pages and preserves verified unknown Story schemas", async () => {
+    const payload = "0x1234";
+    const schemaId = ethers.id("future schema");
+    const ref = {
+      blob: {
+        pointer: "0x0000000000000000000000000000000000000011",
+        payloadHash: ethers.keccak256(payload),
+        payloadLength: 2n,
+        segmentCount: 1n,
+      },
+      schemaId,
+      author: "0x0000000000000000000000000000000000000033",
+      timestamp: 12n,
+    };
     const contract = {
+      runner: { getNetwork: async () => ({ chainId: 31337n }), getCode: async () => "0x001234" },
+      ARCHIVE: async () => "0x0000000000000000000000000000000000000022",
       listVersionEndorsements: vi.fn(async () => [[1n, 2n], [3n, 5n], [10n, 11n], 7n, true, 2n]),
       listTokenURIHistory: vi.fn(async () => [["ipfs://a", "ipfs://b"], 4n, true, 2n]),
-      listStoryChunks: vi.fn(async () => ({
-        chunks: [[0, "0x1", "hello", 1, "0x00000000000000000000000000000000000000aa", 0, ""]],
-        totalChunks: 3n,
+      listStoryRecords: vi.fn(async () => ({
+        records: [ref],
+        totalRecords: 3n,
         hasMore: true,
         nextOffset: 1n,
       })),
     };
     const gateway = createPersonReadGateway(contract, new QueryCache());
-
     await expect(gateway.listVersionEndorsements("0xabc", 0, 2)).resolves.toEqual({
       versionIndices: [1, 2],
       endorsementCounts: [3, 5],
@@ -219,21 +239,14 @@ describe("personReadGateway", () => {
       hasMore: true,
       nextOffset: 2,
     });
-    await expect(gateway.listStoryChunksPage("42", 0, 1)).resolves.toEqual({
-      chunks: [
-        {
-          chunkIndex: 0,
-          chunkHash: "0x1",
-          content: "hello",
-          timestamp: 1,
-          editor: "0x00000000000000000000000000000000000000aa",
-          chunkType: 0,
-          attachmentCID: "",
-        },
-      ],
+    const page = await gateway.listStoryChunksPage("42", 0, 1);
+    expect(page).toMatchObject({
       totalChunks: 3,
       hasMore: true,
       nextOffset: 1,
+      chunks: [
+        { chunkIndex: 0, content: "", rawPayload: payload, schemaId, unsupportedSchema: true },
+      ],
     });
   });
 });

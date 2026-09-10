@@ -57,6 +57,7 @@ function makeUnlockedMintedPerson(nftPublicStory: string): NodeData {
     versionCommitment: "99",
     metadataPointer: `0x${"34".repeat(20)}`,
     metadataPayloadHash: `0x${"56".repeat(32)}`,
+    metadataSegmentCount: 1,
     metadataPayloadLength: 256,
     metadataUnlockValidated: true,
     metadataProtocolGeneration: "df-onchain-biography-v1",

@@ -1,3 +1,5 @@
+import { appendDfsStoryRecord, sealArchiveStory } from "./lib/archiveOperations.js";
+import { readStoryRecord } from "@deepfamily/protocol-core";
 import hre from "hardhat";
 import seedHelpers from "./lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "./hardhat/integratedDeployment.mjs";
@@ -79,8 +81,7 @@ if (typeof process !== "undefined" && process.on) {
 hre.run = async (taskName, args = {}) => {
   const { ethers } = hre;
   const [signer] = await ethers.getSigners();
-  const { deepFamily, deepFamilyReader, storyArchive, token } =
-    await ensureIntegratedSystem(connection);
+  const { deepFamily, deepFamilyReader, archive, token } = await ensureIntegratedSystem(connection);
 
   switch (taskName) {
     case "add-person": {
@@ -180,32 +181,31 @@ hre.run = async (taskName, args = {}) => {
       });
     }
 
-    case "add-story-chunk": {
-      const tokenId = BigInt(String(args.tokenid));
-      const chunkIndex = Number(args.chunkindex);
-      const chunkType = Number(args.type ?? 0);
-      const content = String(args.content);
-      const attachmentCID = String(args.attachment ?? "");
-      const expectedHash = String(args.exphash ?? ethers.ZeroHash);
-
-      const tx = await storyArchive
-        .connect(signer)
-        .addStoryChunk(tokenId, chunkIndex, chunkType, content, attachmentCID, expectedHash);
-      return tx.wait();
-    }
-
+    case "add-story-chunk":
+      return appendDfsStoryRecord({
+        archive: archive.connect(signer),
+        tokenId: BigInt(args.tokenid),
+        expectedIndex: BigInt(args.chunkindex),
+        content: String(args.content),
+        chunkType: Number(args.type ?? 0),
+        attachmentCID: String(args.attachment ?? ""),
+        expectedPayloadHash: args.exphash || undefined,
+      });
     case "list-story-chunks": {
-      const tokenId = BigInt(String(args.tokenid));
-      const offset = Number(args.offset ?? 0);
-      const limit = Number(args.limit ?? 20);
-      return deepFamilyReader.listStoryChunks(tokenId, offset, limit);
+      const [refs, totalRecords, hasMore, nextOffset] = await deepFamilyReader.listStoryRecords(
+        BigInt(args.tokenid),
+        BigInt(args.offset ?? 0),
+        BigInt(args.limit ?? 20),
+      );
+      const records = await Promise.all(
+        refs.map((recordRef) =>
+          readStoryRecord({ recordRef, getCode: (a, b) => ethers.provider.getCode(a, b) }),
+        ),
+      );
+      return [records, totalRecords, hasMore, nextOffset];
     }
-
-    case "seal-story": {
-      const tokenId = BigInt(String(args.tokenid));
-      const tx = await storyArchive.connect(signer).sealStory(tokenId);
-      return tx.wait();
-    }
+    case "seal-story":
+      return sealArchiveStory({ archive: archive.connect(signer), tokenId: BigInt(args.tokenid) });
 
     default: {
       // Fall back to Hardhat v3 task runner if needed.

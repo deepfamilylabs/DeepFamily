@@ -2,6 +2,12 @@
 pragma solidity ^0.8.24;
 
 contract StoryNFTOwnerMock {
+  address public archive;
+
+  function setArchive(address candidate) external {
+    archive = candidate;
+  }
+
   mapping(uint256 tokenId => address owner) private _owners;
 
   function setOwner(uint256 tokenId, address owner) external {

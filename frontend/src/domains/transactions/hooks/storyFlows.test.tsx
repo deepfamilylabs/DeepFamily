@@ -58,7 +58,7 @@ describe("story transaction flows", () => {
         timestamp: 1,
         editor: "0xeditor",
       },
-      events: { StoryChunkAdded: null },
+      events: { StoryRecordAppended: null },
     };
     mocks.addStoryChunkService.mockResolvedValue(serviceResult);
 
@@ -86,6 +86,7 @@ describe("story transaction flows", () => {
       "0xexpected",
       1,
       "ipfs://chunk",
+      undefined,
     );
     expect(result.current.status).toBe("success");
     expect(result.current.result).toBe(serviceResult);
@@ -111,6 +112,7 @@ describe("story transaction flows", () => {
       mocks.wallet.signer,
       mocks.config.contractAddress,
       "9",
+      undefined,
     );
     expect(result.current.status).toBe("success");
     expect(result.current.result).toBe(serviceResult);

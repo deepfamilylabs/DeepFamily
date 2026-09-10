@@ -20,10 +20,10 @@ export type MintTargetEnvelopeHeader = {
 
 export type MintVersionDetailsReader = (personHash: string, versionIndex: number) => Promise<any>;
 
-export type MintMetadataCodeReader = (pointer: string, blockTag: "latest") => Promise<BytesLike>;
-
-const readMetadataField = (metadata: any, name: string, tupleIndex: number): unknown =>
-  metadata?.[name] ?? metadata?.[tupleIndex];
+export type MintMetadataCodeReader = (
+  pointer: string,
+  blockTag: string | number,
+) => Promise<BytesLike>;
 
 /**
  * Resolves the suite from the target version's hash/length-authenticated data-contract envelope.
@@ -41,9 +41,9 @@ export async function readMintTargetEnvelopeHeader(input: {
     throw new Error("Target version does not contain a metadata reference");
   }
 
-  const pointer = readMetadataField(metadata, "pointer", 0);
-  const payloadHash = readMetadataField(metadata, "payloadHash", 1);
-  const payloadLength = readMetadataField(metadata, "payloadLength", 2);
+  const pointer = metadata.pointer;
+  const payloadHash = metadata.payloadHash;
+  const payloadLength = metadata.payloadLength;
   if (typeof pointer !== "string" || typeof payloadHash !== "string") {
     throw new Error("Target version metadata reference is incomplete");
   }
@@ -53,6 +53,7 @@ export async function readMintTargetEnvelopeHeader(input: {
     pointer,
     payloadHash,
     payloadLength: payloadLength as bigint | number | string,
+    segmentCount: metadata.segmentCount,
   });
 
   return {

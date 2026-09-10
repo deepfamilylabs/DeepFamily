@@ -18,6 +18,7 @@ const anchors: MetadataUnlockAnchors = {
   versionCommitment: "123",
   metadataPointer: `0x${"22".repeat(20)}`,
   metadataPayloadHash: `0x${"33".repeat(32)}`,
+  metadataSegmentCount: 1,
   metadataPayloadLength: 512,
 };
 
@@ -121,7 +122,7 @@ describe("validated NodeData metadata cache", () => {
     const invalidEntries: Record<string, NodeData> = {
       missingFormat: { ...valid, metadataFormatVersion: undefined },
       missingSuite: { ...valid, identitySuiteId: undefined },
-      zeroPayload: { ...valid, metadataPayloadLength: 0 },
+      zeroPayload: { ...valid, metadataSegmentCount: 1, metadataPayloadLength: 0 },
       zeroVersion: { ...valid, versionIndex: 0 },
       malformedPersonHash: { ...valid, personHash: "0x1234" },
       malformedPointer: { ...valid, metadataPointer: "0x1234" },

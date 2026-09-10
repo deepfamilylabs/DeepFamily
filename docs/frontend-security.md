@@ -108,7 +108,7 @@ tampering. Re-establishing authenticity requires clearing/replacing it with a fr
 and complete unlock.
 
 Private `biography` is part of this encrypted metadata snapshot. The NFT supplement `story` and
-on-chain `StoryChunk` records are separate, intentionally public data. The UI must not silently copy
+on-chain DFS1 Story records are separate, intentionally public data. The UI must not silently copy
 private biography text into the public NFT story; any copy is an explicit user action with public
 disclosure confirmation.
 

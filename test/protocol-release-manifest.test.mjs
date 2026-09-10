@@ -38,8 +38,6 @@ const HASHES = Object.freeze({
   adapterRuntime: hash("e"),
   archiveArtifact: hash("f"),
   archiveRuntime: hash("1"),
-  storyArchiveArtifact: hash("2"),
-  storyArchiveRuntime: hash("3"),
   readerArtifact: hash("4"),
   readerRuntime: hash("5"),
   zkManifest: hash("6"),
@@ -53,7 +51,6 @@ const ADDRESSES = Object.freeze({
   disclosureVerifier: address(4),
   adapter: address(5),
   archive: address(6),
-  storyArchive: address(7),
   reader: address(8),
 });
 
@@ -105,7 +102,10 @@ const createContractInterfaceArtifactFixture = () => {
       abi: artifact.abi,
     });
   }
-  const archivePath = path.join(root, PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS.metadataArchiveV1.path);
+  const archivePath = path.join(
+    root,
+    PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS.deepFamilyArchiveV1.path,
+  );
   return {
     root,
     contractInterfaces,
@@ -253,23 +253,16 @@ const createProductionFixture = () => {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
     },
-    metadataArchiveV1: {
+    deepFamilyArchiveV1: {
       address: ADDRESSES.archive,
       deepFamilyImmutable: ADDRESSES.proxy,
       artifactSha256: HASHES.archiveArtifact,
       runtimeSha256: HASHES.archiveRuntime,
     },
-    storyArchiveV1: {
-      address: ADDRESSES.storyArchive,
-      deepFamilyImmutable: ADDRESSES.proxy,
-      artifactSha256: HASHES.storyArchiveArtifact,
-      runtimeSha256: HASHES.storyArchiveRuntime,
-    },
     deepFamilyReader: {
       address: ADDRESSES.reader,
       deepFamilyImmutable: ADDRESSES.proxy,
-      metadataArchiveImmutable: ADDRESSES.archive,
-      storyArchiveImmutable: ADDRESSES.storyArchive,
+      archiveImmutable: ADDRESSES.archive,
       artifactSha256: HASHES.readerArtifact,
       runtimeSha256: HASHES.readerRuntime,
     },
@@ -438,13 +431,9 @@ const createProductionFixture = () => {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
     },
-    metadataArchiveV1: {
+    deepFamilyArchiveV1: {
       artifactSha256: HASHES.archiveArtifact,
       runtimeSha256: HASHES.archiveRuntime,
-    },
-    storyArchiveV1: {
-      artifactSha256: HASHES.storyArchiveArtifact,
-      runtimeSha256: HASHES.storyArchiveRuntime,
     },
     deepFamilyReader: {
       artifactSha256: HASHES.readerArtifact,
@@ -517,8 +506,7 @@ const acceptanceReportForManifest = (manifest) => ({
     deepFamily: {
       address: manifest.deployments.deepFamilyProxy,
       implementation: manifest.deployments.deepFamilyImplementation,
-      metadataArchive: manifest.deployments.metadataArchiveV1.address,
-      storyArchive: manifest.deployments.storyArchiveV1.address,
+      archive: manifest.deployments.deepFamilyArchiveV1.address,
     },
     verifierAdapter: {
       address: manifest.deployments.groth16VerifierAdapter.address,
@@ -529,22 +517,15 @@ const acceptanceReportForManifest = (manifest) => ({
       runtimeSha256: manifest.deployments.groth16VerifierAdapter.runtimeSha256,
     },
     archive: {
-      address: manifest.deployments.metadataArchiveV1.address,
-      deepFamily: manifest.deployments.metadataArchiveV1.deepFamilyImmutable,
-      artifactSha256: manifest.deployments.metadataArchiveV1.artifactSha256,
-      runtimeSha256: manifest.deployments.metadataArchiveV1.runtimeSha256,
-    },
-    storyArchive: {
-      address: manifest.deployments.storyArchiveV1.address,
-      deepFamily: manifest.deployments.storyArchiveV1.deepFamilyImmutable,
-      artifactSha256: manifest.deployments.storyArchiveV1.artifactSha256,
-      runtimeSha256: manifest.deployments.storyArchiveV1.runtimeSha256,
+      address: manifest.deployments.deepFamilyArchiveV1.address,
+      deepFamily: manifest.deployments.deepFamilyArchiveV1.deepFamilyImmutable,
+      artifactSha256: manifest.deployments.deepFamilyArchiveV1.artifactSha256,
+      runtimeSha256: manifest.deployments.deepFamilyArchiveV1.runtimeSha256,
     },
     reader: {
       address: manifest.deployments.deepFamilyReader.address,
       deepFamily: manifest.deployments.deepFamilyReader.deepFamilyImmutable,
-      metadataArchive: manifest.deployments.deepFamilyReader.metadataArchiveImmutable,
-      storyArchive: manifest.deployments.deepFamilyReader.storyArchiveImmutable,
+      archive: manifest.deployments.deepFamilyReader.archiveImmutable,
       artifactSha256: manifest.deployments.deepFamilyReader.artifactSha256,
       runtimeSha256: manifest.deployments.deepFamilyReader.runtimeSha256,
     },
@@ -569,12 +550,11 @@ describe("protocol release manifest", function () {
 
     assert.match(evidence.manifestSha256, /^[0-9a-f]{64}$/);
     assert.equal(interfaceEvidence.status, "passed");
-    assert.equal(interfaceEvidence.contracts.metadataArchiveV1.checkedFragments, 6);
-    assert.equal(interfaceEvidence.contracts.storyArchiveV1.checkedFragments, 11);
-    assert.equal(interfaceEvidence.contracts.deepFamilyReader.checkedFragments, 5);
-    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 6);
+    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.checkedFragments, 18);
+    assert.equal(interfaceEvidence.contracts.deepFamilyReader.checkedFragments, 7);
+    assert.equal(interfaceEvidence.contracts.deepFamily.checkedFragments, 3);
     assert.equal(
-      interfaceEvidence.contracts.metadataArchiveV1.abiPolicy.nonErrorFragments,
+      interfaceEvidence.contracts.deepFamilyArchiveV1.abiPolicy.nonErrorFragments,
       "exact-set",
     );
     assert.equal(
@@ -586,24 +566,28 @@ describe("protocol release manifest", function () {
       "declared-subset",
     );
     assert.equal(
-      interfaceEvidence.contracts.metadataArchiveV1.abiPolicy.errorFragments,
+      interfaceEvidence.contracts.deepFamilyArchiveV1.abiPolicy.errorFragments,
       "excluded",
     );
-    assert.equal(interfaceEvidence.contracts.metadataArchiveV1.artifactNonErrorFragments, 6);
-    assert.equal(interfaceEvidence.contracts.storyArchiveV1.artifactNonErrorFragments, 11);
-    assert.equal(interfaceEvidence.contracts.storyArchiveV1.selectors.addStoryChunk, "0x5a4b65d6");
-    assert.equal(interfaceEvidence.contracts.storyArchiveV1.selectors.sealStory, "0x797e57e5");
-    assert.equal(interfaceEvidence.contracts.metadataArchiveV1.selectors.store, "0xd02205d7");
+    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.artifactNonErrorFragments, 18);
     assert.equal(
-      interfaceEvidence.contracts.metadataArchiveV1.eventTopics.MetadataStored,
-      "0x659dc472666e26894f6256eab4c8837831e964f4ebaf5e269f1342708a1d1a80",
+      interfaceEvidence.contracts.deepFamilyArchiveV1.selectors.appendStoryRecord,
+      "0xd6180410",
+    );
+    assert.equal(interfaceEvidence.contracts.deepFamilyArchiveV1.selectors.sealStory, "0xa65f15a6");
+    assert.equal(
+      interfaceEvidence.contracts.deepFamilyArchiveV1.selectors.storeMetadata,
+      "0xed9db949",
+    );
+    assert.equal(
+      interfaceEvidence.contracts.deepFamilyArchiveV1.eventTopics.MetadataStored,
+      "0x74f16ce0ab387b28ad33a7a3e2ea7f6096d64e0c04df1626c7df48eaebf80e4e",
     );
     assert.equal(
       interfaceEvidence.contracts.deepFamilyReader.selectors.getVersionMetadataRef,
       "0x72b543c4",
     );
-    assert.equal(interfaceEvidence.contracts.deepFamily.selectors.setMetadataArchive, "0x7ed53f66");
-    assert.equal(interfaceEvidence.contracts.deepFamily.selectors.setStoryArchive, "0x1053f9ef");
+    assert.equal(interfaceEvidence.contracts.deepFamily.selectors.setArchive, "0x499dfd71");
     assert.equal(evidence.manifest.proofRoutes[0].publicSignals.length, 5);
     assert.equal(evidence.manifest.proofRoutes[1].publicSignals.length, 4);
     assert.equal(
@@ -717,17 +701,20 @@ describe("protocol release manifest", function () {
     try {
       fixture.mutateArchive((archive) => {
         archive.abi.find(
-          (fragment) => fragment.type === "function" && fragment.name === "store",
+          (fragment) => fragment.type === "function" && fragment.name === "storeMetadata",
         ).inputs[1].type = "uint32";
       });
 
-      assert.throws(() => fixture.inspect(), /MetadataArchiveV1 function store ABI does not match/);
+      assert.throws(
+        () => fixture.inspect(),
+        /DeepFamilyArchiveV1 function storeMetadata ABI does not match/,
+      );
     } finally {
       fixture.cleanup();
     }
   });
 
-  it("rejects an extra MetadataArchiveV1 external mutator", function () {
+  it("rejects an extra DeepFamilyArchiveV1 external mutator", function () {
     const fixture = createContractInterfaceArtifactFixture();
     try {
       fixture.mutateArchive((archive) => {
@@ -742,14 +729,14 @@ describe("protocol release manifest", function () {
 
       assert.throws(
         () => fixture.inspect(),
-        /MetadataArchiveV1 non-error ABI fragment set changed/,
+        /DeepFamilyArchiveV1 non-error ABI fragment set changed/,
       );
     } finally {
       fixture.cleanup();
     }
   });
 
-  it("rejects an extra MetadataArchiveV1 event", function () {
+  it("rejects an extra DeepFamilyArchiveV1 event", function () {
     const fixture = createContractInterfaceArtifactFixture();
     try {
       fixture.mutateArchive((archive) => {
@@ -763,14 +750,14 @@ describe("protocol release manifest", function () {
 
       assert.throws(
         () => fixture.inspect(),
-        /MetadataArchiveV1 non-error ABI fragment set changed/,
+        /DeepFamilyArchiveV1 non-error ABI fragment set changed/,
       );
     } finally {
       fixture.cleanup();
     }
   });
 
-  it("allows MetadataArchiveV1 custom errors under the explicit excluded-error policy", function () {
+  it("allows DeepFamilyArchiveV1 custom errors under the explicit excluded-error policy", function () {
     const fixture = createContractInterfaceArtifactFixture();
     try {
       fixture.mutateArchive((archive) => {
@@ -896,21 +883,21 @@ describe("production protocol release manifest evidence", function () {
     [
       "contract interface field deletion",
       (manifest) => {
-        delete manifest.contractInterfaces.metadataArchiveV1.semantics.reference.payloadHash;
+        delete manifest.contractInterfaces.deepFamilyArchiveV1.semantics.blob.atomic;
       },
       /contract interface definition does not match/,
     ],
     [
       "contract interface constant",
       (manifest) => {
-        manifest.contractInterfaces.metadataArchiveV1.semantics.constants.MAX_PAYLOAD_LENGTH.value = 16_383;
+        manifest.contractInterfaces.deepFamilyArchiveV1.semantics.constants.MAX_SEGMENT_PAYLOAD_LENGTH.value = 16_383;
       },
       /contract interface definition does not match/,
     ],
     [
       "contract ABI completeness policy",
       (manifest) => {
-        manifest.contractInterfaces.metadataArchiveV1.abiPolicy.nonErrorFragments =
+        manifest.contractInterfaces.deepFamilyArchiveV1.abiPolicy.nonErrorFragments =
           "declared-subset";
       },
       /contract interface definition does not match/,
@@ -918,17 +905,17 @@ describe("production protocol release manifest evidence", function () {
     [
       "contract function selector",
       (manifest) => {
-        const store = manifest.contractInterfaces.metadataArchiveV1.abi.find(
-          (fragment) => fragment.type === "function" && fragment.name === "store",
+        const store = manifest.contractInterfaces.deepFamilyArchiveV1.abi.find(
+          (fragment) => fragment.type === "function" && fragment.name === "storeMetadata",
         );
         store.selector = "0x00000000";
       },
       /contract interface definition does not match/,
     ],
     [
-      "MetadataRef field order",
+      "BlobRef field order",
       (manifest) => {
-        const fields = manifest.contractInterfaces.types.MetadataRef;
+        const fields = manifest.contractInterfaces.types.BlobRef;
         [fields[0], fields[1]] = [fields[1], fields[0]];
       },
       /contract interface definition does not match/,
@@ -936,7 +923,7 @@ describe("production protocol release manifest evidence", function () {
     [
       "MetadataStored indexed field",
       (manifest) => {
-        const event = manifest.contractInterfaces.metadataArchiveV1.abi.find(
+        const event = manifest.contractInterfaces.deepFamilyArchiveV1.abi.find(
           (fragment) => fragment.type === "event" && fragment.name === "MetadataStored",
         );
         event.inputs[1].indexed = false;
@@ -946,16 +933,16 @@ describe("production protocol release manifest evidence", function () {
     [
       "Reader immutable binding",
       (manifest) => {
-        manifest.contractInterfaces.deepFamilyReader.semantics.immutableBindings.METADATA_ARCHIVE =
+        manifest.contractInterfaces.deepFamilyReader.semantics.immutableBindings.ARCHIVE =
           "constructor.archive";
       },
       /contract interface definition does not match/,
     ],
     [
-      "DeepFamily metadataArchive setter ABI",
+      "DeepFamily archive setter ABI",
       (manifest) => {
         const setter = manifest.contractInterfaces.deepFamily.abi.find(
-          (fragment) => fragment.type === "function" && fragment.name === "setMetadataArchive",
+          (fragment) => fragment.type === "function" && fragment.name === "setArchive",
         );
         setter.inputs[0].type = "bytes32";
       },
@@ -1309,11 +1296,11 @@ describe("production protocol release manifest evidence", function () {
   });
 
   it("rejects a compiled artifact hash drift", function () {
-    fixture.deploymentArtifacts.metadataArchiveV1.artifactSha256 = hash("0");
+    fixture.deploymentArtifacts.deepFamilyArchiveV1.artifactSha256 = hash("0");
 
     assert.throws(
       () => fixture.inspect(),
-      /MetadataArchiveV1 artifactSha256 does not match the compiled artifact file/,
+      /DeepFamilyArchiveV1 artifactSha256 does not match the compiled artifact file/,
     );
   });
 
@@ -1327,12 +1314,12 @@ describe("production protocol release manifest evidence", function () {
   });
 
   it("rejects an Archive immutable that does not bind the declared proxy", function () {
-    fixture.manifest.deployments.metadataArchiveV1.deepFamilyImmutable = address(99);
+    fixture.manifest.deployments.deepFamilyArchiveV1.deepFamilyImmutable = address(99);
     fixture.writeManifest();
 
     assert.throws(
       () => fixture.inspect(),
-      /MetadataArchiveV1 must bind the declared DeepFamily proxy/,
+      /DeepFamilyArchiveV1 must bind the declared DeepFamily proxy/,
     );
   });
 
@@ -1394,6 +1381,27 @@ describe("stable target deployment projection", function () {
     assert.equal(protocolCanonicalJson(second), protocolCanonicalJson(first));
   });
 
+  it("projects an in-memory ethers bigint chainId identically to its persisted report", function () {
+    const report = acceptanceReportForManifest(fixture.manifest);
+    const persisted = protocolDeploymentEvidenceFromAcceptanceReport(report);
+    report.network.chainId = BigInt(report.network.chainId);
+    assert.equal(
+      protocolCanonicalJson(protocolDeploymentEvidenceFromAcceptanceReport(report)),
+      protocolCanonicalJson(persisted),
+    );
+  });
+
+  it("rejects nonpositive and unsafe bigint chain IDs before conversion", function () {
+    const report = acceptanceReportForManifest(fixture.manifest);
+    for (const chainId of [0n, -1n, BigInt(Number.MAX_SAFE_INTEGER) + 1n]) {
+      report.network.chainId = chainId;
+      assert.throws(
+        () => protocolDeploymentEvidenceFromAcceptanceReport(report),
+        /chainId is invalid/,
+      );
+    }
+  });
+
   for (const [label, mutate] of [
     [
       "address",
@@ -1422,7 +1430,7 @@ describe("stable target deployment projection", function () {
     [
       "DeepFamily reverse Archive binding",
       (report) => {
-        report.terminalGovernanceState.deepFamily.metadataArchive = address(96);
+        report.terminalGovernanceState.deepFamily.archive = address(96);
       },
     ],
   ]) {

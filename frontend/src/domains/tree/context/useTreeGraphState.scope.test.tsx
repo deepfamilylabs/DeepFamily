@@ -39,6 +39,7 @@ const unlockedNode: NodeData = {
   versionCommitment: "123456789",
   metadataPointer: `0x${"34".repeat(20)}`,
   metadataPayloadHash: `0x${"56".repeat(32)}`,
+  metadataSegmentCount: 1,
   metadataPayloadLength: 256,
   metadataUnlockValidated: true,
   metadataProtocolGeneration: "df-onchain-biography-v1",
@@ -280,6 +281,7 @@ describe("tree plaintext IndexedDB scope", () => {
         metadata: {
           pointer: unlockedNode.metadataPointer,
           payloadHash: unlockedNode.metadataPayloadHash,
+          segmentCount: 1,
           payloadLength: unlockedNode.metadataPayloadLength,
         },
         endorsementCount: 2,

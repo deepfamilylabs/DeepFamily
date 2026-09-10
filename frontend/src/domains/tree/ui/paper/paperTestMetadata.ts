@@ -20,6 +20,7 @@ export function withValidatedPaperMetadata(
           metadataPointer: node.metadataPointer ?? `0x${"11".repeat(20)}`,
           metadataPayloadHash: node.metadataPayloadHash ?? `0x${"22".repeat(32)}`,
           metadataPayloadLength: node.metadataPayloadLength ?? 256,
+          metadataSegmentCount: node.metadataSegmentCount ?? 1,
           metadataProtocolGeneration: node.metadataProtocolGeneration ?? "df-onchain-biography-v1",
           metadataFormatVersion: node.metadataFormatVersion ?? 1,
           identitySuiteId: node.identitySuiteId ?? 1,

@@ -19,10 +19,7 @@ import {
   type ValidatedPersonVersionV1Result,
 } from "../workers/cryptoWorkerClient";
 
-export type MetadataCodeReader = (
-  pointer: string,
-  blockTag: "latest",
-) => Promise<BytesLike>;
+export type MetadataCodeReader = (pointer: string, blockTag: string | number) => Promise<BytesLike>;
 
 export interface ReadPersonVersionEnvelopeInput {
   node: NodeData;
@@ -97,6 +94,9 @@ export function metadataUnlockAnchorsFromNode(node: NodeData): MetadataUnlockAnc
   if (!Number.isSafeInteger(payloadLength) || Number(payloadLength) < 1) {
     throw new Error("A positive metadata payloadLength is required before metadata can be read");
   }
+  if (!Number.isSafeInteger(node.metadataSegmentCount) || Number(node.metadataSegmentCount) < 1) {
+    throw new Error("A positive metadata segmentCount is required before metadata can be read");
+  }
   return {
     personHash: requireNonemptyString(node.personHash, "personHash"),
     versionIndex,
@@ -104,6 +104,7 @@ export function metadataUnlockAnchorsFromNode(node: NodeData): MetadataUnlockAnc
     metadataPointer: requireNonemptyString(node.metadataPointer, "metadata pointer"),
     metadataPayloadHash: requireNonemptyString(node.metadataPayloadHash, "metadata payloadHash"),
     metadataPayloadLength: Number(payloadLength),
+    metadataSegmentCount: Number(node.metadataSegmentCount),
   };
 }
 
@@ -143,6 +144,7 @@ export async function readPersonVersionEnvelope(
     pointer: anchors.metadataPointer,
     payloadLength: anchors.metadataPayloadLength,
     payloadHash: anchors.metadataPayloadHash,
+    segmentCount: anchors.metadataSegmentCount,
   });
 
   // readMetadataEnvelopeFromRef validates STOP/length/hash/common prefix.

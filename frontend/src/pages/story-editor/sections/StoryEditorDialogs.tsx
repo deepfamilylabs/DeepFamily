@@ -13,6 +13,52 @@ import {
 } from "../../../shared/ui";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
+import { ArchiveTransactionDetails } from "../../../domains/transactions";
+
+export function StoryTransactionPreviewDialog({ editor }: { editor: StoryEditorController }) {
+  const titleId = useId();
+  const close = useCallback(() => editor.resolveTransactionPreview(false), [editor]);
+  return (
+    <ModalShell
+      isOpen={Boolean(editor.transactionPreview)}
+      onClose={close}
+      bare
+      ariaLabelledBy={titleId}
+      zIndex={OVERLAY_Z_INDEX.confirmDialog}
+    >
+      <div className="h-full flex items-center justify-center p-4">
+        <div
+          onClick={(event) => event.stopPropagation()}
+          className={`w-full max-w-xl max-h-[85vh] overflow-auto p-5 space-y-4 ${MODAL_PANEL}`}
+        >
+          <h2 id={titleId} className={MODAL_TITLE}>
+            {editor.t("archive.reviewStory", "Review story transaction")}
+          </h2>
+          {editor.transactionPreview && (
+            <ArchiveTransactionDetails preview={editor.transactionPreview} />
+          )}
+          <div className="flex gap-4">
+            <button
+              className="flex-1 h-10 rounded-lg border border-hairline-strong text-sm font-semibold hover:bg-surface-alt focus:outline-hidden focus:ring-2 focus:ring-primary/30"
+              type="button"
+              onClick={close}
+            >
+              {editor.t("common.cancel", "Cancel")}
+            </button>
+            <button
+              className="flex-1 h-10 rounded-lg bg-primary text-white text-sm font-semibold hover:opacity-90 focus:outline-hidden focus:ring-2 focus:ring-primary/30"
+              type="button"
+              onClick={() => editor.resolveTransactionPreview(true)}
+            >
+              {editor.t("archive.confirm", "Continue to wallet")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 export function SealConfirmDialog({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
   const titleId = useId();
@@ -102,167 +148,186 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
-      <div
-        className="h-full flex items-center justify-center p-4"
-        data-chunk-help-dialog
-      >
+      <div className="h-full flex items-center justify-center p-4" data-chunk-help-dialog>
         <div
           className={`w-full max-w-3xl max-h-[75vh] overflow-hidden flex flex-col ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
         >
-        <div className={MODAL_HEADER}>
-          <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.blue}`}>
-            <HelpCircle size={18} aria-hidden />
-          </div>
-          <h2 id={titleId} className={`flex-1 min-w-0 ${MODAL_TITLE}`}>
-            {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
-          </h2>
-          <button onClick={closeDialog} className={MODAL_CLOSE_BUTTON} aria-label="Close" type="button">
-            <X size={17} />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto bg-surface-body p-6 space-y-7">
-          <div className="prose dark:prose-invert max-w-none">
-            <p
-              id={descriptionId}
-              className="text-sm text-ink-muted leading-relaxed"
+          <div className={MODAL_HEADER}>
+            <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE.blue}`}>
+              <HelpCircle size={18} aria-hidden />
+            </div>
+            <h2 id={titleId} className={`flex-1 min-w-0 ${MODAL_TITLE}`}>
+              {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
+            </h2>
+            <button
+              onClick={closeDialog}
+              className={MODAL_CLOSE_BUTTON}
+              aria-label="Close"
+              type="button"
             >
-              {t(
-                "storyChunkEditor.chunkTypeHelp.intro",
-                "Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.",
-              )}
-            </p>
+              <X size={17} />
+            </button>
           </div>
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.opening", "Opening")}
-            items={[
-              {
-                value: 0,
-                label: t("chunkTypes.summary", "Summary"),
-                desc: t(
-                  "storyChunkEditor.chunkTypeHelp.summaryDesc",
-                  "Brief overview of the person's life and significance",
-                ),
-              },
-            ]}
-          />
+          <div className="overflow-y-auto bg-surface-body p-6 space-y-7">
+            <div className="prose dark:prose-invert max-w-none">
+              <p id={descriptionId} className="text-sm text-ink-muted leading-relaxed">
+                {t(
+                  "storyChunkEditor.chunkTypeHelp.intro",
+                  "Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.",
+                )}
+              </p>
+            </div>
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.earlyYears", "Early Years")}
-            items={[
-              {
-                value: 1,
-                label: t("chunkTypes.earlyLife", "Early Life"),
-                desc: t(
-                  "storyChunkEditor.chunkTypeHelp.earlyLifeDesc",
-                  "Birth, childhood, family background",
-                ),
-              },
-              {
-                value: 2,
-                label: t("chunkTypes.education", "Education"),
-                desc: t(
-                  "storyChunkEditor.chunkTypeHelp.educationDesc",
-                  "Schools, degrees, mentors, academic training",
-                ),
-              },
-            ]}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.opening", "Opening")}
+              items={[
+                {
+                  value: 0,
+                  label: t("chunkTypes.summary", "Summary"),
+                  desc: t(
+                    "storyChunkEditor.chunkTypeHelp.summaryDesc",
+                    "Brief overview of the person's life and significance",
+                  ),
+                },
+              ]}
+            />
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.mainNarrative", "Main Narrative")}
-            items={[
-              {
-                value: 3,
-                label: t("chunkTypes.lifeEvents", "Life Events"),
-                desc: t(
-                  "storyChunkEditor.chunkTypeHelp.lifeEventsDesc",
-                  "Chronological life story from birth to present/death. Can include career, family, society - a complete timeline.",
-                ),
-              },
-            ]}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.earlyYears", "Early Years")}
+              items={[
+                {
+                  value: 1,
+                  label: t("chunkTypes.earlyLife", "Early Life"),
+                  desc: t(
+                    "storyChunkEditor.chunkTypeHelp.earlyLifeDesc",
+                    "Birth, childhood, family background",
+                  ),
+                },
+                {
+                  value: 2,
+                  label: t("chunkTypes.education", "Education"),
+                  desc: t(
+                    "storyChunkEditor.chunkTypeHelp.educationDesc",
+                    "Schools, degrees, mentors, academic training",
+                  ),
+                },
+              ]}
+            />
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.specializedTopics", "Specialized Topics")}
-            intro={t(
-              "storyChunkEditor.chunkTypeHelp.specializedDesc",
-              "Thematic deep dives extracted from life narrative",
-            )}
-            items={[
-              { value: 4, key: "career", desc: "Professional history, positions, job transitions" },
-              { value: 5, key: "works", desc: "Publications, creations, products, projects" },
-              { value: 6, key: "achievements", desc: "Awards, honors, recognitions, milestones" },
-              { value: 7, key: "philosophy", desc: "Beliefs, values, theoretical contributions" },
-              { value: 8, key: "quotes", desc: "Famous sayings, memorable statements" },
-            ].map((item) => keyedItem(item, t))}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.mainNarrative", "Main Narrative")}
+              items={[
+                {
+                  value: 3,
+                  label: t("chunkTypes.lifeEvents", "Life Events"),
+                  desc: t(
+                    "storyChunkEditor.chunkTypeHelp.lifeEventsDesc",
+                    "Chronological life story from birth to present/death. Can include career, family, society - a complete timeline.",
+                  ),
+                },
+              ]}
+            />
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.personalLife", "Personal Life")}
-            items={[
-              { value: 9, key: "family", desc: "Spouse, children, close relatives" },
-              { value: 10, key: "lifestyle", desc: "Hobbies, habits, interests, daily routines" },
-              { value: 11, key: "relations", desc: "Friendships, mentorships, collaborations, rivalries" },
-            ].map((item) => keyedItem(item, t))}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.specializedTopics", "Specialized Topics")}
+              intro={t(
+                "storyChunkEditor.chunkTypeHelp.specializedDesc",
+                "Thematic deep dives extracted from life narrative",
+              )}
+              items={[
+                {
+                  value: 4,
+                  key: "career",
+                  desc: "Professional history, positions, job transitions",
+                },
+                { value: 5, key: "works", desc: "Publications, creations, products, projects" },
+                { value: 6, key: "achievements", desc: "Awards, honors, recognitions, milestones" },
+                { value: 7, key: "philosophy", desc: "Beliefs, values, theoretical contributions" },
+                { value: 8, key: "quotes", desc: "Famous sayings, memorable statements" },
+              ].map((item) => keyedItem(item, t))}
+            />
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.socialEngagement", "Social Engagement")}
-            items={[
-              { value: 12, key: "activities", desc: "Public service, charity, speeches, social causes" },
-              { value: 13, key: "anecdotes", desc: "Interesting stories, lesser-known facts" },
-              { value: 14, key: "controversies", desc: "Disputes, criticisms, scandals" },
-            ].map((item) => keyedItem(item, t))}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.personalLife", "Personal Life")}
+              items={[
+                { value: 9, key: "family", desc: "Spouse, children, close relatives" },
+                { value: 10, key: "lifestyle", desc: "Hobbies, habits, interests, daily routines" },
+                {
+                  value: 11,
+                  key: "relations",
+                  desc: "Friendships, mentorships, collaborations, rivalries",
+                },
+              ].map((item) => keyedItem(item, t))}
+            />
 
-          <HelpGroup
-            title={t("storyChunkEditor.chunkTypeHelp.closing", "Closing")}
-            items={[
-              { value: 15, key: "legacy", desc: "Historical impact, influence, commemorations" },
-              { value: 16, key: "gallery", desc: "Photos, videos, audio, documents, and multimedia" },
-              { value: 17, key: "references", desc: "Sources, citations, bibliography" },
-              { value: 18, key: "notes", desc: "Additional remarks, corrections, clarifications" },
-            ].map((item) => keyedItem(item, t))}
-          />
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.socialEngagement", "Social Engagement")}
+              items={[
+                {
+                  value: 12,
+                  key: "activities",
+                  desc: "Public service, charity, speeches, social causes",
+                },
+                { value: 13, key: "anecdotes", desc: "Interesting stories, lesser-known facts" },
+                { value: 14, key: "controversies", desc: "Disputes, criticisms, scandals" },
+              ].map((item) => keyedItem(item, t))}
+            />
 
-          <section className="border-t border-hairline pt-4">
-            <h4 className="text-sm font-bold text-ink mb-3 uppercase tracking-wide">
-              {t("storyChunkEditor.chunkTypeHelp.usageNotes", "Usage Notes")}
-            </h4>
-            <ul className="space-y-2 text-xs text-ink-muted">
-              {[
-                t(
-                  "storyChunkEditor.chunkTypeHelp.note1",
-                  "These are content type tags, not exclusive chapters - you can have multiple chunks of the same type",
-                ),
-                t(
-                  "storyChunkEditor.chunkTypeHelp.note2",
-                  "Types are not mutually exclusive - feel free to use types in any order",
-                ),
-                t(
-                  "storyChunkEditor.chunkTypeHelp.note3",
-                  "Life Events: For chronological narrative (birth → childhood → adulthood → death)",
-                ),
-                t(
-                  "storyChunkEditor.chunkTypeHelp.note4",
-                  "Career: For focused professional history (jobs, companies, positions)",
-                ),
-                t(
-                  "storyChunkEditor.chunkTypeHelp.note5",
-                  "Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline",
-                ),
-              ].map((note) => (
-                <li key={note} className="flex items-start gap-2">
-                  <span className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">•</span>
-                  <span>{note}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+            <HelpGroup
+              title={t("storyChunkEditor.chunkTypeHelp.closing", "Closing")}
+              items={[
+                { value: 15, key: "legacy", desc: "Historical impact, influence, commemorations" },
+                {
+                  value: 16,
+                  key: "gallery",
+                  desc: "Photos, videos, audio, documents, and multimedia",
+                },
+                { value: 17, key: "references", desc: "Sources, citations, bibliography" },
+                {
+                  value: 18,
+                  key: "notes",
+                  desc: "Additional remarks, corrections, clarifications",
+                },
+              ].map((item) => keyedItem(item, t))}
+            />
+
+            <section className="border-t border-hairline pt-4">
+              <h4 className="text-sm font-bold text-ink mb-3 uppercase tracking-wide">
+                {t("storyChunkEditor.chunkTypeHelp.usageNotes", "Usage Notes")}
+              </h4>
+              <ul className="space-y-2 text-xs text-ink-muted">
+                {[
+                  t(
+                    "storyChunkEditor.chunkTypeHelp.note1",
+                    "These are content type tags, not exclusive chapters - you can have multiple chunks of the same type",
+                  ),
+                  t(
+                    "storyChunkEditor.chunkTypeHelp.note2",
+                    "Types are not mutually exclusive - feel free to use types in any order",
+                  ),
+                  t(
+                    "storyChunkEditor.chunkTypeHelp.note3",
+                    "Life Events: For chronological narrative (birth → childhood → adulthood → death)",
+                  ),
+                  t(
+                    "storyChunkEditor.chunkTypeHelp.note4",
+                    "Career: For focused professional history (jobs, companies, positions)",
+                  ),
+                  t(
+                    "storyChunkEditor.chunkTypeHelp.note5",
+                    "Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline",
+                  ),
+                ].map((note) => (
+                  <li key={note} className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5">•</span>
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
         </div>
       </div>
     </ModalShell>
@@ -286,20 +351,10 @@ function keyedItem(
   };
 }
 
-function HelpGroup({
-  title,
-  intro,
-  items,
-}: {
-  title: string;
-  intro?: string;
-  items: HelpItem[];
-}) {
+function HelpGroup({ title, intro, items }: { title: string; intro?: string; items: HelpItem[] }) {
   return (
     <section>
-      <h4 className="text-sm font-bold text-ink mb-2 uppercase tracking-wide">
-        {title}
-      </h4>
+      <h4 className="text-sm font-bold text-ink mb-2 uppercase tracking-wide">{title}</h4>
       {intro ? <p className="text-xs text-ink-muted mb-2 italic">{intro}</p> : null}
       <div className="space-y-2">
         {items.map((item) => {
@@ -315,9 +370,7 @@ function HelpGroup({
                   className={getChunkTypeColorClass(item.value) + " shrink-0 mt-0.5"}
                 />
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-ink">
-                    {item.label}
-                  </span>
+                  <span className="text-sm font-medium text-ink">{item.label}</span>
                   <p className="text-xs text-ink-muted mt-0.5">{item.desc}</p>
                 </div>
               </div>

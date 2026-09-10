@@ -250,9 +250,9 @@ async function verifyConfirmedVersion(input: {
   const deepFamily = createDeepFamilyContract(input.contractAddress, input.runner);
   const reader = createDeepFamilyReaderContract(input.readerAddress, input.runner);
   const [configuredArchive, readerDeepFamily, readerArchive, rawDetails] = await Promise.all([
-    deepFamily.metadataArchive(),
+    deepFamily.archive(),
     reader.DEEP_FAMILY(),
-    reader.METADATA_ARCHIVE(),
+    reader.ARCHIVE(),
     reader.getVersionDetails(input.result.hash, input.result.index),
   ]);
   if (
@@ -291,7 +291,8 @@ async function verifyConfirmedVersion(input: {
     pointerIsValid &&
     sameHex(metadata.pointer, input.expectedMetadataPointer) &&
     sameHex(metadata.payloadHash, input.expectedPayloadHash) &&
-    metadata.payloadLength === input.expectedPayloadLength;
+    metadata.payloadLength === input.expectedPayloadLength &&
+    metadata.segmentCount === Math.ceil(input.expectedPayloadLength / 16_384);
   if (!versionMatches || !metadataMatches) {
     throw new Error(
       "Confirmed Reader version or Archive reference does not match the prepared submission",
@@ -465,6 +466,7 @@ export function useAddVersionSubmit({
           metadataPointer: confirmed.metadata.pointer!,
           metadataPayloadHash: confirmed.metadata.payloadHash!,
           metadataPayloadLength: confirmed.metadata.payloadLength!,
+          metadataSegmentCount: confirmed.metadata.segmentCount!,
         };
         const baseNode: NodeData = {
           id: makeNodeId(result.hash, result.index),

@@ -6,39 +6,15 @@ import {
   buildStorySnapshot,
   getMissingStoryOffset,
   mergeStoryChunkRecords,
-  parseStoryChunkRecord,
 } from "./storyData";
 import { computeStoryHash } from "./story";
-
-describe("storyData parseStoryChunkRecord", () => {
-  it("normalizes tuple-like chunk records", () => {
-    const parsed = parseStoryChunkRecord([
-      2,
-      "0xhash",
-      "hello",
-      123,
-      "0x00000000000000000000000000000000000000aa",
-      1,
-      "cid",
-    ]);
-
-    expect(parsed).toEqual({
-      chunkIndex: 2,
-      chunkHash: "0xhash",
-      content: "hello",
-      timestamp: 123,
-      editor: "0x00000000000000000000000000000000000000aa",
-      chunkType: 1,
-      attachmentCID: "cid",
-    });
-  });
-});
 
 describe("storyData buildStorySnapshot", () => {
   it("computes full story and integrity for complete chunk sets", () => {
     const chunks = [
       {
         chunkIndex: 1,
+        recordHash: ethers.id("verified record"),
         chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
         content: "world",
         timestamp: 2,
@@ -48,6 +24,7 @@ describe("storyData buildStorySnapshot", () => {
       },
       {
         chunkIndex: 0,
+        recordHash: ethers.id("verified record"),
         chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
         content: "hello ",
         timestamp: 1,
@@ -56,16 +33,13 @@ describe("storyData buildStorySnapshot", () => {
         attachmentCID: "",
       },
     ];
-    const snapshot = buildStorySnapshot(
-      chunks,
-      {
-        totalChunks: 2,
-        totalLength: 11,
-        isSealed: true,
-        lastUpdateTime: 0,
-        fullStoryHash: computeStoryHash(chunks),
-      },
-    );
+    const snapshot = buildStorySnapshot(chunks, {
+      totalChunks: 2,
+      totalLength: 11,
+      isSealed: true,
+      lastUpdateTime: 0,
+      fullStoryHash: computeStoryHash(chunks),
+    });
 
     expect(snapshot.fullStory).toBe("hello world");
     expect(snapshot.integrity.missing).toEqual([]);
@@ -78,6 +52,7 @@ describe("storyData buildStorySnapshot", () => {
       [
         {
           chunkIndex: 1,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
           content: "world",
           timestamp: 2,
@@ -105,6 +80,7 @@ describe("storyData buildStorySnapshot", () => {
       [
         {
           chunkIndex: 0,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x1",
           content: "A",
           timestamp: 1,
@@ -116,6 +92,7 @@ describe("storyData buildStorySnapshot", () => {
       [
         {
           chunkIndex: 2,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x3",
           content: "C",
           timestamp: 3,
@@ -125,6 +102,7 @@ describe("storyData buildStorySnapshot", () => {
         },
         {
           chunkIndex: 1,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x2",
           content: "B",
           timestamp: 2,
@@ -145,6 +123,7 @@ describe("storyData buildStorySnapshot", () => {
       [
         {
           chunkIndex: 0,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x1",
           content: "Hello",
           timestamp: 1,
@@ -186,6 +165,7 @@ describe("storyData buildStorySnapshot", () => {
       [
         {
           chunkIndex: 1,
+          recordHash: ethers.id("verified record"),
           chunkHash: "0x1",
           content: "tail",
           timestamp: 1,

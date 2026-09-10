@@ -1,21 +1,12 @@
 import { ethers } from "ethers";
+import { computeStoryHead } from "@deepfamily/protocol-core";
 import type { StoryChunk } from "./graph";
 
 export function computeStoryHash(chunks: StoryChunk[]): string {
-  if (!chunks || chunks.length === 0) return ethers.ZeroHash;
-  const sorted = [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex);
-  let accumulator = ethers.ZeroHash;
-  for (const chunk of sorted) {
-    accumulator = ethers.keccak256(
-      ethers.solidityPacked(
-        ["bytes32", "uint256", "bytes32"],
-        [accumulator, BigInt(chunk.chunkIndex), chunk.chunkHash],
-      ),
-    );
+  let head = ethers.ZeroHash;
+  for (const chunk of [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex)) {
+    if (!chunk.recordHash) throw new Error("Verified story record commitment is missing");
+    head = computeStoryHead({ previousHead: head, recordHash: chunk.recordHash });
   }
-  return accumulator;
+  return head;
 }
-
-/**
- * Result from adding a story chunk
- */

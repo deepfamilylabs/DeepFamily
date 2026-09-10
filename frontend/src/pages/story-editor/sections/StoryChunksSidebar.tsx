@@ -1,12 +1,5 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Hash,
-  Link,
-  Lock,
-  User,
-} from "lucide-react";
+import { UnsupportedStoryRecord } from "../../../shared/ui/UnsupportedStoryRecord";
+import { ChevronDown, ChevronRight, Clock, Hash, Link, Lock, User } from "lucide-react";
 import {
   getChunkTypeBorderColorClass,
   getChunkTypeColorClass,
@@ -94,7 +87,13 @@ export function StoryChunksSidebar({ editor }: { editor: StoryEditorController }
                       <p
                         className={`text-xs text-gray-600 dark:text-gray-400 ${isExpanded ? "whitespace-pre-wrap" : "line-clamp-2"}`}
                       >
-                        {isExpanded ? chunk.content : preview}
+                        {chunk.unsupportedSchema ? (
+                          <UnsupportedStoryRecord record={chunk} />
+                        ) : isExpanded ? (
+                          chunk.content
+                        ) : (
+                          preview
+                        )}
                       </p>
                       {isExpanded && <ExpandedChunkDetails editor={editor} chunk={chunk} />}
                     </div>
@@ -191,7 +190,10 @@ function StoryMetadataCard({ editor }: { editor: StoryEditorController }) {
         </h3>
       </header>
       <div className="p-4 space-y-2.5 text-sm">
-        <MetadataRow label={t("person.tokenId", "Token ID")} value={`#${editor.validTokenId || "-"}`} />
+        <MetadataRow
+          label={t("person.tokenId", "Token ID")}
+          value={`#${editor.validTokenId || "-"}`}
+        />
         <MetadataRow label={t("person.totalChunks", "Total Chunks")} value={meta.totalChunks} />
         <MetadataRow label={t("person.totalLength", "Total Length")} value={meta.totalLength} />
         <div className="flex justify-between items-center">
@@ -273,13 +275,7 @@ function HashCopyBlock({
         <div className="font-mono text-xs break-all leading-snug bg-gray-50 dark:bg-gray-800 px-1.5 py-1.5 rounded-md select-all text-gray-600 dark:text-gray-400 flex-1 border border-gray-200 dark:border-gray-700">
           {value}
         </div>
-        {canCopy && (
-          <CopyIconButton
-            onClick={onCopy}
-            label={copyLabel}
-            size="xs"
-          />
-        )}
+        {canCopy && <CopyIconButton onClick={onCopy} label={copyLabel} size="xs" />}
       </div>
     </div>
   );

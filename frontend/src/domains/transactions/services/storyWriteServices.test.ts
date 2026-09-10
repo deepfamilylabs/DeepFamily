@@ -1,158 +1,262 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ethers } from "ethers";
+import {
+  computeStoryRecordHash,
+  computeStoryHead,
+  encodeStoryRecord,
+  STORY_CHUNK_SCHEMA_ID,
+} from "@deepfamily/protocol-core";
 import { addStoryChunkService } from "./addStoryChunkService";
 import { sealStoryService } from "./sealStoryService";
-import { createStoryArchiveInterface } from "../../../shared/clients/contractFactory";
-
-const { createDeepFamilyContractMock, createStoryArchiveContractMock } = vi.hoisted(() => ({
-  createDeepFamilyContractMock: vi.fn(),
-  createStoryArchiveContractMock: vi.fn(),
-}));
-
-vi.mock("../../../shared/clients/contractFactory", async () => {
-  const actual = await vi.importActual<typeof import("../../../shared/clients/contractFactory")>(
+import { createArchiveInterface } from "../../../shared/clients/contractFactory";
+const mocks = vi.hoisted(() => ({ main: vi.fn(), archive: vi.fn() }));
+vi.mock("../../../shared/clients/contractFactory", async () => ({
+  ...(await vi.importActual<typeof import("../../../shared/clients/contractFactory")>(
     "../../../shared/clients/contractFactory",
-  );
-  return {
-    ...actual,
-    createDeepFamilyContract: createDeepFamilyContractMock,
-    createStoryArchiveContract: createStoryArchiveContractMock,
+  )),
+  createDeepFamilyContract: mocks.main,
+  createArchiveContract: mocks.archive,
+}));
+const ADDRESS = "0x0000000000000000000000000000000000000aBc";
+const AUTHOR = "0x00000000000000000000000000000000000000bb";
+const POINTER = "0x00000000000000000000000000000000000000cc";
+const iface = createArchiveInterface();
+function setup() {
+  let state = {
+    recordsHead: ethers.ZeroHash,
+    totalRecords: 0n,
+    totalPayloadLength: 0n,
+    lastUpdateTime: 0n,
+    isSealed: false,
   };
-});
-
-type Deferred<T> = {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-  reject: (reason?: unknown) => void;
-};
-
-const createDeferred = <T>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
+  let ref: any;
+  const log = (name: string, values: unknown[]) => ({
+    address: ADDRESS,
+    ...iface.encodeEventLog(iface.getEvent(name)!, values),
   });
-  return { promise, resolve, reject };
-};
-
-describe("storyWriteServices", () => {
-  beforeEach(() => {
-    createDeepFamilyContractMock.mockReset();
-    createStoryArchiveContractMock.mockReset();
-  });
-
-  it("does not locally timeout while waiting for wallet confirmation", async () => {
-    vi.useFakeTimers();
-
-    const tx = {
-      hash: "0xtx",
-      wait: vi.fn().mockResolvedValue({ blockNumber: 12, logs: [] }),
-    };
-
-    const deferredTx = createDeferred<typeof tx>();
-    createDeepFamilyContractMock.mockReturnValue({
-      storyArchive: vi.fn().mockResolvedValue("0x0000000000000000000000000000000000000abc"),
-    });
-    createStoryArchiveContractMock.mockReturnValue({
-      addStoryChunk: vi.fn(() => deferredTx.promise),
-    });
-
-    const signer = {
-      getAddress: vi.fn().mockResolvedValue("0x1234"),
-    };
-
-    let settled = "pending";
-    const promise = addStoryChunkService(signer as any, "0xcontract", "1", 0, "hello", "");
-    promise.then(
-      () => {
-        settled = "fulfilled";
-      },
-      () => {
-        settled = "rejected";
-      },
-    );
-
-    await vi.advanceTimersByTimeAsync(31_000);
-    await Promise.resolve();
-
-    expect(settled).toBe("pending");
-
-    deferredTx.resolve(tx);
-    await expect(promise).resolves.toMatchObject({
-      transactionHash: "0xtx",
-      blockNumber: 12,
-    });
-  });
-
-  it("parses story events from the mined receipt", async () => {
-    const eventInterface = createStoryArchiveInterface();
-    const chunkEvent = eventInterface.getEvent("StoryChunkAdded");
-    const sealEvent = eventInterface.getEvent("StorySealed");
-    if (!chunkEvent || !sealEvent) {
-      throw new Error("Missing story events in ABI");
-    }
-
-    const contractAddress = "0x0000000000000000000000000000000000000abc";
-    const chunkLog = eventInterface.encodeEventLog(chunkEvent, [
-      1n,
-      0n,
-      "0x" + "11".repeat(32),
-      "0x00000000000000000000000000000000000000bb",
-      5n,
-      2,
-      "ipfs://chunk",
-    ]);
-    const sealLog = eventInterface.encodeEventLog(sealEvent, [
-      1n,
-      3n,
-      "0x" + "22".repeat(32),
-      "0x00000000000000000000000000000000000000bb",
-    ]);
-
-    const archive = {
-      addStoryChunk: vi.fn(async () => ({
-        hash: "0xchunk",
+  const append = Object.assign(
+    vi.fn(async (...args: any[]) => {
+      const [tokenId, index, previousHead, schemaId, payload, payloadHash] = args;
+      const blob = {
+        pointer: POINTER,
+        payloadHash,
+        payloadLength: BigInt(ethers.getBytes(payload).length),
+        segmentCount: BigInt(Math.ceil(ethers.getBytes(payload).length / 16384)),
+      };
+      ref = { blob, schemaId, author: AUTHOR, timestamp: 100n };
+      const recordHash = computeStoryRecordHash({
+        chainId: 31337n,
+        archive: ADDRESS,
+        tokenId,
+        index,
+        schemaId,
+        payloadHash,
+        payloadLength: blob.payloadLength,
+        author: AUTHOR,
+        timestamp: 100n,
+      });
+      const head = computeStoryHead({ previousHead, recordHash });
+      state = {
+        recordsHead: head,
+        totalRecords: BigInt(index) + 1n,
+        totalPayloadLength: blob.payloadLength,
+        lastUpdateTime: 100n,
+        isSealed: false,
+      };
+      return {
+        hash: "0xappend",
         wait: vi.fn(async () => ({
-          blockNumber: 20,
-          logs: [{ address: contractAddress, topics: chunkLog.topics, data: chunkLog.data }],
+          status: 1,
+          hash: "0xappend",
+          blockNumber: 12,
+          logs: [
+            log("StoryRecordAppended", [
+              tokenId,
+              index,
+              blob,
+              schemaId,
+              AUTHOR,
+              100n,
+              recordHash,
+              head,
+            ]),
+          ],
         })),
-      })),
-      sealStory: vi.fn(async () => ({
+      };
+    }),
+    { estimateGas: vi.fn(async () => 1001n), staticCall: vi.fn(async () => {}) },
+  );
+  const seal = Object.assign(
+    vi.fn(async (tokenId: string) => {
+      state = { ...state, isSealed: true, lastUpdateTime: 101n };
+      return {
         hash: "0xseal",
         wait: vi.fn(async () => ({
-          blockNumber: 21,
-          logs: [{ address: contractAddress, topics: sealLog.topics, data: sealLog.data }],
+          status: 1,
+          hash: "0xseal",
+          blockNumber: 13,
+          logs: [
+            log("StorySealed", [
+              tokenId,
+              state.totalRecords,
+              state.recordsHead,
+              state.totalPayloadLength,
+              AUTHOR,
+              101n,
+            ]),
+          ],
         })),
-      })),
-    };
-    createDeepFamilyContractMock.mockReturnValue({
-      storyArchive: vi.fn(async () => contractAddress),
-    });
-    createStoryArchiveContractMock.mockReturnValue(archive);
-
-    const signer = {
-      getAddress: vi.fn().mockResolvedValue("0x00000000000000000000000000000000000000bb"),
-      provider: {
-        getNetwork: vi.fn().mockResolvedValue({ chainId: 31337n }),
-      },
-    };
-
-    const addResult = await addStoryChunkService(
-      signer as any,
-      contractAddress,
+      };
+    }),
+    { estimateGas: vi.fn(async () => 1000n) },
+  );
+  const archive = {
+    interface: iface,
+    appendStoryRecord: append,
+    sealStory: seal,
+    storyState: vi.fn(async () => ({ ...state })),
+    storyRecordRef: vi.fn(async () => ref),
+  };
+  const signer = {
+    getAddress: vi.fn(async () => AUTHOR),
+    provider: {
+      getNetwork: vi.fn(async () => ({ chainId: 31337n })),
+      getBlock: vi.fn(async () => ({ gasLimit: 30000000n })),
+      getFeeData: vi.fn(async () => ({ gasPrice: 1n, maxFeePerGas: 2n })),
+    },
+  };
+  mocks.main.mockReturnValue({ archive: vi.fn(async () => ADDRESS) });
+  mocks.archive.mockReturnValue(archive);
+  const confirm = vi.fn(async () => true);
+  const submit = (content = "  原文\n🙂  ") =>
+    addStoryChunkService(signer as any, ADDRESS, "1", 0, content, "", 2, "", confirm);
+  return { archive, signer, confirm, submit };
+}
+describe("Archive story writes", () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+  it("previews and submits exact canonical bytes with integer-ceiling gas and reconciles refs", async () => {
+    const f = setup();
+    const result = await f.submit();
+    const bytes = ethers.hexlify(
+      encodeStoryRecord({ content: "  原文\n🙂  ", chunkType: 2, attachmentCID: "" }),
+    );
+    expect(f.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ canonicalPayload: bytes, gasLimit: 1202n, segmentCount: 1 }),
+    );
+    expect(f.archive.appendStoryRecord).toHaveBeenCalledWith(
       "1",
       0,
-      "hello",
-      "",
-      2,
-      "ipfs://chunk",
+      ethers.ZeroHash,
+      STORY_CHUNK_SCHEMA_ID,
+      bytes,
+      ethers.keccak256(bytes),
+      { gasLimit: 1202n },
     );
-    expect(addResult.events.StoryChunkAdded?.contentLength).toBe(5);
-    expect(addResult.newChunk.chunkType).toBe(2);
-
-    const sealResult = await sealStoryService(signer as any, contractAddress, "1");
-    expect(archive.sealStory).toHaveBeenCalledWith("1");
-    expect(sealResult.events.StorySealed?.totalChunks).toBe(3);
-    expect(sealResult.fullStoryHash).toBe("0x" + "22".repeat(32));
+    expect(result.newChunk.content).toBe("  原文\n🙂  ");
+    expect(result.newChunk.recordHash).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+  it("rejects estimate failure even when staticCall succeeds and never requests signature", async () => {
+    const f = setup();
+    f.archive.appendStoryRecord.estimateGas.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(f.submit()).rejects.toThrow(/estimat/i);
+    expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
+    expect(f.confirm).not.toHaveBeenCalled();
+  });
+  it("accepts a 16,385-byte logical record and previews two physical segments", async () => {
+    const f = setup();
+    const overhead =
+      encodeStoryRecord({ content: "x", chunkType: 2, attachmentCID: "" }).length - 1;
+    const result = await f.submit("x".repeat(16_385 - overhead));
+    expect(result.contentLength).toBe(16_385);
+    expect(f.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ payloadBytes: 16_385, segmentCount: 2 }),
+    );
+    expect(result.newChunk.segmentCount).toBe(2);
+  });
+  it("rejects buffered transaction cap overflow", async () => {
+    const f = setup();
+    f.signer.provider.getNetwork.mockResolvedValue({ chainId: 1n });
+    f.archive.appendStoryRecord.estimateGas.mockResolvedValue(14000000n);
+    await expect(f.submit()).rejects.toThrow(/limit/i);
+    expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
+  });
+  it("does not send after preview cancellation", async () => {
+    const f = setup();
+    f.confirm.mockResolvedValue(false);
+    await expect(f.submit()).rejects.toThrow(/cancel/i);
+    expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
+  });
+  it("does not locally timeout while awaiting wallet confirmation", async () => {
+    vi.useFakeTimers();
+    const f = setup();
+    const original = f.archive.appendStoryRecord.getMockImplementation()!;
+    let release!: () => void;
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    f.archive.appendStoryRecord.mockImplementation(async (...args: any[]) => {
+      await wait;
+      return original(...args);
+    });
+    let settled = false;
+    const promise = f.submit().finally(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(31000);
+    expect(settled).toBe(false);
+    release();
+    await expect(promise).resolves.toMatchObject({ transactionHash: "0xappend" });
+  });
+  it("fails receipt reconciliation on an altered stored ref", async () => {
+    const f = setup();
+    f.archive.storyRecordRef.mockResolvedValue({
+      blob: { pointer: POINTER, payloadHash: ethers.ZeroHash, payloadLength: 1n, segmentCount: 1n },
+    });
+    await expect(f.submit()).rejects.toThrow(/reference|payload/i);
+  });
+  it("seals the exact count/head and validates event and final state", async () => {
+    const f = setup();
+    const added = await f.submit();
+    const sealed = await sealStoryService(f.signer as any, ADDRESS, "1", f.confirm);
+    expect(f.archive.sealStory).toHaveBeenCalledWith("1", 1n, added.recordsHead, {
+      gasLimit: 1200n,
+    });
+    expect(sealed.events.StorySealed.totalChunks).toBe(1);
+    expect(sealed.fullStoryHash).toBe(added.recordsHead);
+  });
+  it("stops sealing before the wallet if gas estimation fails", async () => {
+    const f = setup();
+    await f.submit();
+    f.confirm.mockClear();
+    f.archive.sealStory.estimateGas.mockRejectedValue(new Error("RPC unavailable"));
+    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
+      /estimat/i,
+    );
+    expect(f.archive.sealStory).not.toHaveBeenCalled();
+    expect(f.confirm).not.toHaveBeenCalled();
+  });
+  it("stops sealing when the gas preview is cancelled", async () => {
+    const f = setup();
+    await f.submit();
+    f.confirm.mockResolvedValue(false);
+    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
+      /cancel/i,
+    );
+    expect(f.archive.sealStory).not.toHaveBeenCalled();
+  });
+  it("stops sealing if the wallet changes account during the preview", async () => {
+    const f = setup();
+    await f.submit();
+    f.confirm.mockImplementation(async () => {
+      f.signer.getAddress.mockResolvedValue(POINTER);
+      return true;
+    });
+    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
+      /account changed/i,
+    );
+    expect(f.archive.sealStory).not.toHaveBeenCalled();
   });
 });

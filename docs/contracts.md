@@ -3,7 +3,7 @@
 ## DeepFamily.sol - Core Protocol Contract
 
 **Location**: `contracts/DeepFamily.sol`
-**Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and the canonical Story Archive binding.
+**Description**: Main family tree protocol implementing multi-version person management, ZK-proof verification, community endorsement, NFT minting, and the canonical Archive binding.
 **Upgradeability**: Deployed behind a UUPS (ERC-1967) proxy. State is wired via `initialize(...)` rather than a constructor; upgrades are gated by `_authorizeUpgrade` (`onlyOwner`, intended owner = `TimelockController`). See [Upgradeability & Governance (UUPS)](#upgradeability--governance-uups).
 
 ### Critical Constants
@@ -116,37 +116,7 @@ struct PersonSupplementInfo {
 
 #### Story Archive Structures
 
-These types are declared by `IStoryArchiveV1` and all corresponding state is owned by
-`StoryArchiveV1`, not by the upgradeable `DeepFamily` proxy.
-
-```solidity
-struct StoryChunk {
-  uint256 chunkIndex; // Chunk index (starts from 0)
-  bytes32 chunkHash; // keccak256(content)
-  string content; // Chunk content (≤16,384 UTF-8 bytes)
-  uint256 timestamp; // Creation/update timestamp
-  address editor; // Last editor address
-  uint8 chunkType; // Classification (0=narrative, 1=quote, ...)
-  string attachmentCID; // Optional external attachment CID
-}
-
-struct StoryMetadata {
-  uint64 totalChunks; // Current total chunks
-  bytes32 fullStoryHash; // Rolling hash keccak(previousHash, chunkIndex, chunkHash)
-  uint64 lastUpdateTime; // Last update timestamp
-  bool isSealed; // Immutability flag
-  uint64 totalLength; // Total UTF-8 byte count
-}
-```
-
-`StoryArchiveV1` stores the compact chunk header and `StoryMetadata`; chunk content is an immutable
-STOP-prefixed data-contract runtime (`0x00 || content`). It directly validates the NFT holder by
-calling `DeepFamily.ownerOf(tokenId)` and owns the append/seal API. `DeepFamily` retains only the
-one-time canonical `storyArchive` binding. `DeepFamilyReader` provides a read-only aggregation and
-pagination facade over the Archive.
-
-The Archive accepts 1 through 16,384 UTF-8 bytes per chunk, matching the private metadata envelope
-limit. Clients may choose smaller chunks to reduce per-transaction gas.
+`IDeepFamilyArchiveV1` declares `BlobRef`, `StoryRecordRef` and `StoryState`. The immutable Archive owns metadata refs and all Story records/state. DeepFamily holds one `archive` binding. See the [Archive V1 specification](archive-v1.md) for exact structures, commitments, encoding and bytecode layout.
 
 ### Core Hash Computation
 
@@ -181,7 +151,7 @@ function addPersonVersion(
 
 **Verification Process**:
 
-1. Requires the one-time `metadataArchive` binding to be configured.
+1. Requires the one-time `archive` binding to be configured.
 2. Reads only the 20-byte envelope common prefix: magic `DFM1`, nonzero `formatVersion`, and the
    nonzero big-endian self suite at bytes `0x10..0x13`.
 3. Requires `submitterAndSelfSuiteId` to equal the caller in the low 160 bits plus that header suite
@@ -251,85 +221,11 @@ Mint contract itself does not read or parse the envelope header. Private encrypt
 the public NFT `PersonSupplementInfo.story` are independent fields; copying one into the other is
 an explicit product action, not protocol behavior.
 
-#### Story Sharding System
+#### Atomic Story and Metadata Archive
 
-These functions belong to `StoryArchiveV1`, not `DeepFamily`:
+`DeepFamilyArchiveV1` exposes `storeMetadata`, `metadataRef`, `appendStoryRecord`, `sealStory`, `storyRecordRef` and `storyState`. Metadata keys are write-once and only DeepFamily may store them. Story append/seal requires the current NFT owner and matching expected index/count plus head. Nonempty payloads are segmented into 16 KiB bytecode contracts and paged manifests atomically; the Archive has no business total-length cap. DFM1 format-1 alone retains its 16 KiB envelope limit.
 
-```solidity
-function addStoryChunk(
-    uint256 tokenId,
-    uint256 chunkIndex,
-    uint8 chunkType,
-    string calldata content,
-    string calldata attachmentCID,
-    bytes32 expectedHash
-) external
-function sealStory(uint256 tokenId) external
-```
-
-**Story Management**:
-
-- Only NFT holders can append chunks
-- `StoryArchiveV1` resolves `DeepFamily.ownerOf(tokenId)` and performs every holder/input check
-- All chunk headers, rolling metadata, sealing state, and content references live in the Archive
-- Chunks must be added sequentially starting from index 0
-- Content hash validation prevents corruption
-- Optional `chunkType` classifies content (narrative/quote/etc.)
-- Optional `attachmentCID` links to decentralized media evidence
-- Sealing makes stories permanently immutable
-
-**chunkType Mapping**
-
-| Value | Meaning                         |
-| ----- | ------------------------------- |
-| 0     | Narrative (primary storyline)   |
-| 1     | Work / Achievement              |
-| 2     | Quote                           |
-| 3     | Media (photo/audio/video notes) |
-| 4     | Timeline event                  |
-| 5     | Commentary                      |
-| 6     | Source / citation               |
-| 7     | Correction                      |
-| 8     | Editorial note                  |
-
-## MetadataArchiveV1.sol - Opaque On-Chain Metadata Archive
-
-`MetadataArchiveV1` is a non-upgradeable, ownerless blob writer and reference index. Its constructor
-immutably binds one DeepFamily proxy in `DEEP_FAMILY`; only that address can call `store`.
-
-```solidity
-struct MetadataRef {
-  address pointer;
-  bytes32 payloadHash;
-  uint32 payloadLength;
-}
-
-function store(
-  bytes32 personHash,
-  uint256 versionIndex,
-  bytes calldata envelope
-) external returns (MetadataRef memory metadata);
-
-function metadataRef(
-  bytes32 personHash,
-  uint256 versionIndex
-) external view returns (MetadataRef memory metadata);
-```
-
-For every nonempty envelope of at most 16,384 bytes, the Archive deploys a data contract whose
-runtime code is exactly `0x00 || envelope`. The leading `0x00` is a safe `STOP` opcode and is not
-included in `payloadLength` or `payloadHash`. The Archive derives
-`payloadHash = keccak256(envelope)` and `payloadLength = envelope.length` from the actual calldata,
-stores one immutable ref per `(personHash,versionIndex)`, and emits `MetadataStored`.
-
-The Archive deliberately does not understand DFM1, `formatVersion`, JSON, compression, KDFs,
-ciphers, or identity suites. `V1` names the storage/ref ABI, not the envelope format. As long as the
-data-contract encoding, 16 KiB limit, and `MetadataRef` ABI remain unchanged, the same Archive can
-hold later envelope formats. DeepFamily permanently binds one Archive with the one-time,
-proxy-only, owner-only `setMetadataArchive`; there is no Archive ID, registry, active route, or
-per-version Archive selection. If the data-contract encoding, size limit, ref ABI, or Archive logic
-itself must change incompatibly, this simplified generation requires a new DeepFamily protocol
-deployment rather than routing old and new versions between Archive contracts.
+The full API, events, authorization, DFS1 text codec and wire format are documented in [Archive V1](archive-v1.md).
 
 ### DFM1 Contract-Visible Prefix and Format-1 Layout
 
@@ -387,9 +283,9 @@ with `eth_getCode`, require runtime length `payloadLength + 1`, require the lead
 
 ```solidity
 function getVersionDetails(bytes32 personHash, uint256 versionIndex)
-  external view returns (PersonVersion memory, MetadataRef memory, uint256, uint256)
+  external view returns (PersonVersion memory, IDeepFamilyArchiveV1.BlobRef memory, uint256, uint256)
 function listPersonVersions(bytes32 personHash, uint256 offset, uint256 limit) external view returns (PersonVersion[] memory, uint256, bool, uint256)
-function getVersionMetadataRef(bytes32 personHash, uint256 versionIndex) external view returns (MetadataRef memory)
+function getVersionMetadataRef(bytes32 personHash, uint256 versionIndex) external view returns (IDeepFamilyArchiveV1.BlobRef memory)
 ```
 
 #### Family Tree Queries
@@ -402,15 +298,15 @@ function listChildren(bytes32 parentHash, uint256 parentVersionIndex, uint256 of
 
 ```solidity
 function getNFTDetails(uint256 tokenId)
-  external view returns (bytes32, uint256, PersonVersion memory, MetadataRef memory, PersonCoreInfo memory, uint256, string memory)
+  external view returns (bytes32, uint256, PersonVersion memory, IDeepFamilyArchiveV1.BlobRef memory, PersonCoreInfo memory, uint256, string memory)
 ```
 
 #### Story Queries
 
 ```solidity
-function getStoryMetadata(uint256 tokenId) external view returns (StoryMetadata memory)
-function getStoryChunk(uint256 tokenId, uint256 chunkIndex) external view returns (StoryChunk memory)
-function listStoryChunks(uint256 tokenId, uint256 offset, uint256 limit) external view returns (StoryChunk[] memory, uint256, bool, uint256)
+function getStoryState(uint256 tokenId) external view returns (IDeepFamilyArchiveV1.StoryState memory state)
+function getStoryRecordRef(uint256 tokenId, uint64 index) external view returns (IDeepFamilyArchiveV1.StoryRecordRef memory record)
+function listStoryRecords(uint256 tokenId, uint256 offset, uint256 limit) external view returns (IDeepFamilyArchiveV1.StoryRecordRef[] memory records, uint256 totalRecords, bool hasMore, uint256 nextOffset)
 ```
 
 ### Events System
@@ -473,44 +369,10 @@ event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 
 event CircuitVerifierSet(uint8 indexed purpose, uint32 indexed circuitId, address indexed adapter);
 
-event MetadataArchiveSet(address indexed archive);
-event StoryArchiveSet(address indexed archive);
+event ArchiveSet(address indexed archive);
 ```
 
-`MetadataArchiveV1` separately emits:
-
-```solidity
-event MetadataStored(
-  bytes32 indexed personHash,
-  uint256 indexed versionIndex,
-  address pointer,
-  bytes32 payloadHash,
-  uint32 payloadLength
-);
-```
-
-`StoryArchiveV1` emits the Story events below and owns the complete public-story state and logic.
-
-#### Story Events
-
-```solidity
-event StoryChunkAdded(
-  uint256 indexed tokenId,
-  uint256 indexed chunkIndex,
-  bytes32 chunkHash,
-  address indexed editor,
-  uint256 contentLength,
-  uint8 chunkType,
-  string attachmentCID
-);
-
-event StorySealed(
-  uint256 indexed tokenId,
-  uint256 totalChunks,
-  bytes32 fullStoryHash,
-  address indexed sealer
-);
-```
+`DeepFamilyArchiveV1` emits `MetadataStored`, `StoryRecordAppended` and `StorySealed`. All events carry complete reference or final-state commitments; see [Archive V1](archive-v1.md).
 
 ### Key Storage Mappings
 
@@ -525,12 +387,11 @@ mapping(uint256 => uint256) public tokenIdToVersionIndex;                     //
 mapping(uint256 => PersonCoreInfo) public nftCoreInfo;                        // NFT core data
 mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      // Version => NFT mapping
 mapping(uint8 => mapping(uint32 => address)) public verifierRegistry;         // purpose => circuitId => adapter
-address public metadataArchive;                                               // One-time protocol binding
-address public storyArchive;                                                  // One-time StoryArchiveV1 binding
+address public archive; // One-time protocol binding
 ```
 
 There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders` mappings in
-`DeepFamily`; those mappings are private implementation details of `StoryArchiveV1`.
+`DeepFamily`; those mappings are private implementation details of `DeepFamilyArchiveV1`.
 
 ### Access Control & Security
 
@@ -560,7 +421,7 @@ There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders`
 `DeepFamily` is deployed as a **UUPS (ERC-1967) proxy**, so its logic can evolve while its address
 and state persist. The other contracts are **not**
 upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
-`MetadataArchiveV1`, `StoryArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
+`DeepFamilyArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
 verifiers, the verifier adapter, and the libraries.
 
 ### Proxy & Initialization
@@ -601,7 +462,7 @@ verifiers, the verifier adapter, and the libraries.
   single-signer policies, lookalike contracts that merely expose `getMinDelay()`, open roles, and
   extra role holders.
 
-The one-time `metadataArchive` setter and once-set verifier routes are protocol invariants expected
+The one-time `archive` setter and once-set verifier routes are protocol invariants expected
 of every supported implementation. Because DeepFamily remains a governed UUPS proxy, a malicious
 upgrade could deliberately violate storage semantics; the storage-layout and release gates reduce
 accidental changes but are not an immutable trust root.
@@ -615,8 +476,8 @@ Token
 → Poseidon/age-gate libraries, both Groth16 verifiers, and their adapter
 → DeepFamily implementation and ERC-1967 proxy
 → initialize proxy and perform the one-time Token/DeepFamily binding
-→ MetadataArchiveV1(proxy)
-→ proxy.setMetadataArchive(archive) exactly once
+→ DeepFamilyArchiveV1(proxy)
+→ proxy.setArchive(archive) exactly once
 → DeepFamilyReader(proxy), after Archive binding
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
@@ -1075,7 +936,7 @@ cancelled with `governance-cancel` while the old Timelock still owns `main`.
   before staging an upgrade through the timelock. When `upgrade-schedule` deploys a candidate, it
   prints an exact source-verification command and exits without scheduling; after explorer
   verification succeeds, rerun with that address in `--implementation` to create the operation.
-- The current baseline includes the single `metadataArchive` slot and the `PersonVersion`
+- The current baseline includes the single `archive` slot and the `PersonVersion`
   `versionCommitment` field. A supported implementation must not move, reuse, clear, or reinterpret
   that Archive binding, and must not reintroduce the retired plaintext version fields.
 

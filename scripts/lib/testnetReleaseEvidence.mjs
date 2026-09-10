@@ -61,20 +61,21 @@ const SHA_256_PATTERN = /^[0-9a-f]{64}$/u;
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
 const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
 const ZERO_HASH = `0x${"0".repeat(64)}`;
-const REQUIRED_VERIFIED_CONTRACTS = Object.freeze([
-  "initial-deployment:AdultAgeGate",
-  "initial-deployment:DeepFamily",
-  "initial-deployment:DeepFamilyReader",
-  "initial-deployment:DeepFamilyToken",
-  "initial-deployment:DisclosureBindingVerifier",
-  "initial-deployment:GovernanceTimelock",
-  "initial-deployment:Groth16VerifierAdapter",
-  "initial-deployment:MetadataArchiveV1",
-  "initial-deployment:PersonCommitmentVerifier",
-  "initial-deployment:PoseidonT5",
-  "initial-deployment:StoryArchiveV1",
-  "initial-deployment:UUPSProxy",
-]);
+const REQUIRED_VERIFIED_CONTRACTS = Object.freeze(
+  [
+    "initial-deployment:AdultAgeGate",
+    "initial-deployment:DeepFamily",
+    "initial-deployment:DeepFamilyReader",
+    "initial-deployment:DeepFamilyToken",
+    "initial-deployment:DisclosureBindingVerifier",
+    "initial-deployment:GovernanceTimelock",
+    "initial-deployment:Groth16VerifierAdapter",
+    "initial-deployment:DeepFamilyArchiveV1",
+    "initial-deployment:PersonCommitmentVerifier",
+    "initial-deployment:PoseidonT5",
+    "initial-deployment:UUPSProxy",
+  ].sort(),
+);
 const REQUIRED_VERIFICATION_PHASES = Object.freeze(["initial-deployment"]);
 const FORBIDDEN_GOVERNANCE_LIFECYCLE_FIELDS = Object.freeze([
   "governance",
@@ -664,7 +665,6 @@ const requireTerminalGovernanceEvidence = ({
       "reader",
       "safe",
       "status",
-      "storyArchive",
       "timelock",
       "token",
       "verifierAdapter",
@@ -726,11 +726,7 @@ const requireTerminalGovernanceEvidence = ({
     addresses.disclosureBindingVerifier,
     "addresses.disclosureBindingVerifier",
   );
-  const metadataArchiveAddress = requireAddress(
-    addresses.metadataArchive,
-    "addresses.metadataArchive",
-  );
-  const storyArchiveAddress = requireAddress(addresses.storyArchive, "addresses.storyArchive");
+  const archiveAddress = requireAddress(addresses.archive, "addresses.archive");
   const deepFamily = requireExactRecordKeys(
     terminal.deepFamily,
     "terminalGovernanceState.deepFamily",
@@ -738,11 +734,10 @@ const requireTerminalGovernanceEvidence = ({
       "address",
       "disclosureBindingVerifier",
       "implementation",
-      "metadataArchive",
+      "archive",
       "owner",
       "personCommitmentVerifier",
       "protocolEndorsementFeeBps",
-      "storyArchive",
     ],
   );
   requireSameAddress(
@@ -767,14 +762,9 @@ const requireTerminalGovernanceEvidence = ({
     "terminalGovernanceState.deepFamily.disclosureBindingVerifier",
   );
   requireSameAddress(
-    deepFamily.metadataArchive,
-    metadataArchiveAddress,
-    "terminalGovernanceState.deepFamily.metadataArchive",
-  );
-  requireSameAddress(
-    deepFamily.storyArchive,
-    storyArchiveAddress,
-    "terminalGovernanceState.deepFamily.storyArchive",
+    deepFamily.archive,
+    archiveAddress,
+    "terminalGovernanceState.deepFamily.archive",
   );
   requireExact(
     requireSafeInteger(
@@ -832,31 +822,11 @@ const requireTerminalGovernanceEvidence = ({
     "deepFamily",
     "runtimeSha256",
   ]);
-  requireSameAddress(
-    archive.address,
-    metadataArchiveAddress,
-    "terminalGovernanceState.archive.address",
-  );
+  requireSameAddress(archive.address, archiveAddress, "terminalGovernanceState.archive.address");
   requireSameAddress(
     archive.deepFamily,
     deepFamilyAddress,
     "terminalGovernanceState.archive.deepFamily",
-  );
-
-  const storyArchive = requireExactRecordKeys(
-    terminal.storyArchive,
-    "terminalGovernanceState.storyArchive",
-    ["address", "artifactSha256", "deepFamily", "runtimeSha256"],
-  );
-  requireSameAddress(
-    storyArchive.address,
-    storyArchiveAddress,
-    "terminalGovernanceState.storyArchive.address",
-  );
-  requireSameAddress(
-    storyArchive.deepFamily,
-    deepFamilyAddress,
-    "terminalGovernanceState.storyArchive.deepFamily",
   );
 
   const readerAddress = requireAddress(addresses.deepFamilyReader, "addresses.deepFamilyReader");
@@ -864,9 +834,8 @@ const requireTerminalGovernanceEvidence = ({
     "address",
     "artifactSha256",
     "deepFamily",
-    "metadataArchive",
+    "archive",
     "runtimeSha256",
-    "storyArchive",
   ]);
   requireSameAddress(reader.address, readerAddress, "terminalGovernanceState.reader.address");
   requireSameAddress(
@@ -874,16 +843,7 @@ const requireTerminalGovernanceEvidence = ({
     deepFamilyAddress,
     "terminalGovernanceState.reader.deepFamily",
   );
-  requireSameAddress(
-    reader.metadataArchive,
-    metadataArchiveAddress,
-    "terminalGovernanceState.reader.metadataArchive",
-  );
-  requireSameAddress(
-    reader.storyArchive,
-    storyArchiveAddress,
-    "terminalGovernanceState.reader.storyArchive",
-  );
+  requireSameAddress(reader.archive, archiveAddress, "terminalGovernanceState.reader.archive");
 
   if (!Array.isArray(terminal.proofRoutes)) {
     throw new Error("terminalGovernanceState.proofRoutes must be an array");
@@ -954,12 +914,10 @@ const requireTerminalGovernanceEvidence = ({
         personVerifierImmutable: verifierAdapter.personVerifier,
         disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
       },
-      metadataArchiveV1: { deepFamilyImmutable: archive.deepFamily },
-      storyArchiveV1: { deepFamilyImmutable: storyArchive.deepFamily },
+      deepFamilyArchiveV1: { deepFamilyImmutable: archive.deepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: reader.deepFamily,
-        metadataArchiveImmutable: reader.metadataArchive,
-        storyArchiveImmutable: reader.storyArchive,
+        archiveImmutable: reader.archive,
       },
     },
   });
@@ -975,16 +933,10 @@ const requireTerminalGovernanceEvidence = ({
       manifestDeployments.groth16VerifierAdapter,
     ],
     [
-      "MetadataArchiveV1",
+      "DeepFamilyArchiveV1",
       archive,
-      inspectedArtifacts?.metadataArchiveV1,
-      manifestDeployments.metadataArchiveV1,
-    ],
-    [
-      "StoryArchiveV1",
-      storyArchive,
-      inspectedArtifacts?.storyArchiveV1,
-      manifestDeployments.storyArchiveV1,
+      inspectedArtifacts?.deepFamilyArchiveV1,
+      manifestDeployments.deepFamilyArchiveV1,
     ],
     [
       "DeepFamilyReader",

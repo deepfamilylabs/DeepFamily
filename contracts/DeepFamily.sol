@@ -6,9 +6,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
-import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
+import {IDeepFamilyArchiveV1} from "./interfaces/IDeepFamilyArchiveV1.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
-import {IStoryArchiveV1} from "./interfaces/IStoryArchiveV1.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
@@ -72,14 +72,12 @@ contract DeepFamily is
   error CallerOrIdentitySuiteMismatch();
   error InvalidParentHash();
   error MustBeAdult();
-  error InvalidMetadataArchive();
-  error MetadataArchiveAlreadySet();
-  error MetadataArchiveNotSet();
+  error InvalidArchive();
+  error ArchiveAlreadySet();
+  error ArchiveNotSet();
   error InvalidMetadataEnvelope();
   error InvalidEnvelopePrefix();
   error InvalidIdentitySuite();
-  error InvalidStoryArchive();
-  error StoryArchiveAlreadySet();
 
   // Token-related errors
   error TokenContractNotSet();
@@ -187,10 +185,6 @@ contract DeepFamily is
   mapping(uint256 => string[]) public tokenURIHistory;
   mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;
 
-  // ========== Story Archive Binding ==========
-
-  address public storyArchive;
-
   // ========== Statistics Mappings ==========
 
   mapping(bytes32 => mapping(uint256 => uint256)) public versionEndorsementCount;
@@ -210,7 +204,7 @@ contract DeepFamily is
   bytes32 internal constant VERSION_HASH_DOMAIN = keccak256("DeepFamily:VersionHash:v1");
 
   address public DEEP_FAMILY_TOKEN_CONTRACT;
-  address public metadataArchive;
+  address public archive;
   mapping(uint8 purpose => mapping(uint32 circuitId => address adapter)) public verifierRegistry;
   mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public trustedEndorserOf;
   mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
@@ -287,8 +281,7 @@ contract DeepFamily is
     uint32 indexed circuitId,
     address indexed adapter
   );
-  event MetadataArchiveSet(address indexed archive);
-  event StoryArchiveSet(address indexed archive);
+  event ArchiveSet(address indexed archive);
 
   event TrustedEndorserAdded(
     bytes32 indexed personHash,
@@ -525,46 +518,31 @@ contract DeepFamily is
     emit CircuitVerifierSet(uint8(purpose), circuitId, adapter);
   }
 
-  /**
-   * @notice Permanently bind the one metadata archive used by this protocol deployment.
-   * @dev `onlyProxy` intentionally runs before `onlyOwner`, so direct implementation calls
-   *      fail on the proxy-context invariant regardless of implementation ownership state.
-   */
-  function setMetadataArchive(address archive) external onlyProxy onlyOwner {
-    if (metadataArchive != address(0)) revert MetadataArchiveAlreadySet();
-    if (archive == address(0) || archive.code.length == 0) revert InvalidMetadataArchive();
-
-    address boundDeepFamily;
-    try IMetadataArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
-      boundDeepFamily = bound;
-    } catch {
-      revert InvalidMetadataArchive();
+  /** @notice Permanently bind the immutable archive for metadata and public stories. */
+  function setArchive(address candidate) external onlyProxy onlyOwner {
+    if (archive != address(0)) revert ArchiveAlreadySet();
+    if (candidate == address(0) || candidate.code.length == 0) revert InvalidArchive();
+    if (!ERC165Checker.supportsInterface(candidate, type(IDeepFamilyArchiveV1).interfaceId)) {
+      revert InvalidArchive();
     }
-    if (boundDeepFamily != address(this)) revert InvalidMetadataArchive();
-
-    metadataArchive = archive;
-    emit MetadataArchiveSet(archive);
-  }
-
-  /**
-   * @notice Permanently bind the archive that owns all public-story state.
-   * @dev The proxy retains only this binding; chunks, metadata, sealing state, and content
-   *      references all live in StoryArchiveV1.
-   */
-  function setStoryArchive(address archive) external onlyProxy onlyOwner {
-    if (storyArchive != address(0)) revert StoryArchiveAlreadySet();
-    if (archive == address(0) || archive.code.length == 0) revert InvalidStoryArchive();
-
-    address boundDeepFamily;
-    try IStoryArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
-      boundDeepFamily = bound;
+    IDeepFamilyArchiveV1 target = IDeepFamilyArchiveV1(candidate);
+    try target.DEEP_FAMILY() returns (address bound) {
+      if (bound != address(this)) revert InvalidArchive();
     } catch {
-      revert InvalidStoryArchive();
+      revert InvalidArchive();
     }
-    if (boundDeepFamily != address(this)) revert InvalidStoryArchive();
-
-    storyArchive = archive;
-    emit StoryArchiveSet(archive);
+    try target.archiveKind() returns (bytes32 kind) {
+      if (kind != keccak256("deepfamily.archive.v1")) revert InvalidArchive();
+    } catch {
+      revert InvalidArchive();
+    }
+    try target.apiVersion() returns (uint256 version) {
+      if (version != 1) revert InvalidArchive();
+    } catch {
+      revert InvalidArchive();
+    }
+    archive = candidate;
+    emit ArchiveSet(candidate);
   }
 
   function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
@@ -698,7 +676,7 @@ contract DeepFamily is
       })
     );
 
-    IMetadataArchiveV1(metadataArchive).store(personHash, versionIndex, metadataEnvelope);
+    IDeepFamilyArchiveV1(archive).storeMetadata(personHash, versionIndex, metadataEnvelope);
 
     _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {
@@ -750,7 +728,7 @@ contract DeepFamily is
     uint256 motherVersionIndex,
     bytes calldata metadataEnvelope
   ) external nonReentrant {
-    if (metadataArchive == address(0)) revert MetadataArchiveNotSet();
+    if (archive == address(0)) revert ArchiveNotSet();
     _validateMetadataEnvelope(metadataEnvelope, publicSignals.submitterAndSelfSuiteId);
 
     address adapter = _getVerifier(proof.circuitId, ProofPurpose.PersonRelation);

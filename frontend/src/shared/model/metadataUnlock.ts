@@ -15,6 +15,7 @@ export interface MetadataUnlockAnchors {
   metadataPointer: string;
   metadataPayloadHash: string;
   metadataPayloadLength: number;
+  metadataSegmentCount: number;
 }
 
 export interface ValidatedMetadataUnlock {
@@ -57,6 +58,7 @@ export function metadataAnchorsMatch(
     | "metadataPointer"
     | "metadataPayloadHash"
     | "metadataPayloadLength"
+    | "metadataSegmentCount"
   >,
   anchors: MetadataUnlockAnchors,
 ): boolean {
@@ -66,7 +68,8 @@ export function metadataAnchorsMatch(
     node.versionCommitment === anchors.versionCommitment &&
     sameHex(node.metadataPointer, anchors.metadataPointer) &&
     sameHex(node.metadataPayloadHash, anchors.metadataPayloadHash) &&
-    node.metadataPayloadLength === anchors.metadataPayloadLength
+    node.metadataPayloadLength === anchors.metadataPayloadLength &&
+    node.metadataSegmentCount === anchors.metadataSegmentCount
   );
 }
 
@@ -169,6 +172,7 @@ export function rebaseValidatedMetadataUnlock(current: NodeData, unlocked: NodeD
       metadataPointer: unlocked.metadataPointer!,
       metadataPayloadHash: unlocked.metadataPayloadHash!,
       metadataPayloadLength: unlocked.metadataPayloadLength!,
+      metadataSegmentCount: unlocked.metadataSegmentCount!,
     },
     {
       person: unlocked.metadataPerson!,

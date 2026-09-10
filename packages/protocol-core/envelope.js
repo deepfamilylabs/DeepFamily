@@ -64,11 +64,6 @@ export function parseEnvelopeCommonPrefix(envelope) {
     `Metadata envelope must contain the ${DFM1_COMMON_PREFIX_BYTES}-byte common prefix`,
   );
   protocolAssert(
-    bytes.length <= DFM1_MAX_ENVELOPE_BYTES,
-    "ENVELOPE_TOO_LARGE",
-    `Metadata envelope exceeds ${DFM1_MAX_ENVELOPE_BYTES} bytes`,
-  );
-  protocolAssert(
     equalBytesConstantTime(bytes.subarray(0, 4), DFM1_MAGIC_BYTES),
     "INVALID_ENVELOPE_MAGIC",
     "Metadata envelope magic must be DFM1",
@@ -94,6 +89,11 @@ export function parseFormat1Envelope(envelope) {
       `Unsupported metadata envelope format ${prefix.formatVersion}`,
     );
   }
+  protocolAssert(
+    bytes.length <= DFM1_MAX_ENVELOPE_BYTES,
+    "ENVELOPE_TOO_LARGE",
+    `DFM1 format 1 envelope exceeds ${DFM1_MAX_ENVELOPE_BYTES} bytes`,
+  );
   protocolAssert(
     bytes.length >= DFM1_FORMAT_1_OVERHEAD_BYTES + 1,
     "TRUNCATED_FORMAT_1_ENVELOPE",

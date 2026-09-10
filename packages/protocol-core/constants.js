@@ -57,6 +57,7 @@ export const SNARK_SCALAR_FIELD = BigInt(
 export const MAX_UINT8 = (1n << 8n) - 1n;
 export const MAX_UINT16 = (1n << 16n) - 1n;
 export const MAX_UINT32 = (1n << 32n) - 1n;
+export const MAX_UINT64 = (1n << 64n) - 1n;
 export const MAX_UINT128 = (1n << 128n) - 1n;
 export const MAX_UINT160 = (1n << 160n) - 1n;
 export const MAX_UINT256 = (1n << 256n) - 1n;
@@ -73,6 +74,18 @@ export const METADATA_CONTEXT_AAD_DOMAIN = keccak256(toUtf8Bytes(METADATA_CONTEX
 export const METADATA_WRAP_AAD_DOMAIN = keccak256(toUtf8Bytes(METADATA_WRAP_AAD_DOMAIN_TEXT));
 export const METADATA_CONTENT_AAD_DOMAIN = keccak256(toUtf8Bytes(METADATA_CONTENT_AAD_DOMAIN_TEXT));
 export const VERSION_HASH_DOMAIN = keccak256(toUtf8Bytes(VERSION_HASH_DOMAIN_TEXT));
+
+export const ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH = 16_384;
+export const ARCHIVE_MAX_MANIFEST_ENTRIES = 1_024;
+export const ARCHIVE_MANIFEST_HEADER_LENGTH = 86;
+export const ARCHIVE_DEFAULT_READ_CONCURRENCY = 8;
+export const STORY_CHUNK_SCHEMA = "deepfamily/story-chunk@1.0";
+export const STORY_CHUNK_SCHEMA_ID = keccak256(toUtf8Bytes(STORY_CHUNK_SCHEMA));
+export const STORY_MAX_ATTACHMENT_CID_BYTES = 256;
+export const STORY_RECORD_DOMAIN_TEXT = "deepfamily.archive.story-record.v1";
+export const STORY_HEAD_DOMAIN_TEXT = "deepfamily.archive.story-head.v1";
+export const STORY_RECORD_DOMAIN = keccak256(toUtf8Bytes(STORY_RECORD_DOMAIN_TEXT));
+export const STORY_HEAD_DOMAIN = keccak256(toUtf8Bytes(STORY_HEAD_DOMAIN_TEXT));
 
 // The KDF profile is deliberately marked provisional until the required device
 // matrix and attacker-cost studies have been completed. Suite ID 1 must not be

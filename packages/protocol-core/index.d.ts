@@ -192,6 +192,7 @@ export const SNARK_SCALAR_FIELD: bigint;
 export const MAX_UINT8: bigint;
 export const MAX_UINT16: bigint;
 export const MAX_UINT32: bigint;
+export const MAX_UINT64: bigint;
 export const MAX_UINT128: bigint;
 export const MAX_UINT160: bigint;
 export const MAX_UINT256: bigint;
@@ -368,28 +369,92 @@ export function decryptFormat1Compressed(input: {
 }): Promise<{ compressedPlaintext: Uint8Array; header: ParsedFormat1Envelope }>;
 export function computePayloadHash(envelope: BytesLike): string;
 
-export function verifyMetadataRuntimeCode(input: {
-  runtimeCode: BytesLike;
-  payloadLength: BigNumberish;
+export interface BlobRef {
   payloadHash: string;
-  requireCommonPrefix?: boolean;
-}): {
-  envelope: Uint8Array;
-  payloadHash: string;
-  payloadLength: number;
-  prefix?: EnvelopeCommonPrefix;
-};
-export function readMetadataEnvelopeFromRef(input: {
-  getCode: (pointer: string, blockTag: "latest") => Promise<BytesLike>;
   pointer: string;
   payloadLength: BigNumberish;
-  payloadHash: string;
-}): Promise<{
-  envelope: Uint8Array;
+  segmentCount: BigNumberish;
+}
+export interface StoryRecordRef {
+  blob: BlobRef;
+  schemaId: string;
+  author: string;
+  timestamp: BigNumberish;
+}
+export interface StoryState {
+  recordsHead: string;
+  totalRecords: BigNumberish;
+  totalPayloadLength: BigNumberish;
+  lastUpdateTime: BigNumberish;
+  isSealed: boolean;
+}
+export interface ArchiveReadOptions {
+  getCode: (pointer: string, blockTag: string | number) => Promise<BytesLike>;
+  concurrency?: number;
+  blockTag?: string | number;
+}
+export interface VerifiedArchiveBlob {
+  payload: Uint8Array;
   payloadHash: string;
   payloadLength: number;
-  prefix: EnvelopeCommonPrefix;
-}>;
+  segmentCount: number;
+}
+export const ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH: 16384;
+export const ARCHIVE_MAX_MANIFEST_ENTRIES: 1024;
+export const ARCHIVE_MANIFEST_HEADER_LENGTH: 86;
+export const ARCHIVE_DEFAULT_READ_CONCURRENCY: 8;
+export function predictArchiveSegmentCount(payloadLength: BigNumberish): number;
+export function readArchiveBlob(input: BlobRef & ArchiveReadOptions): Promise<VerifiedArchiveBlob>;
+export function readMetadataEnvelopeFromRef(input: BlobRef & ArchiveReadOptions): Promise<
+  VerifiedArchiveBlob & {
+    envelope: Uint8Array;
+    prefix: EnvelopeCommonPrefix;
+  }
+>;
+
+export const STORY_CHUNK_SCHEMA: "deepfamily/story-chunk@1.0";
+export const STORY_CHUNK_SCHEMA_ID: string;
+export const STORY_MAX_ATTACHMENT_CID_BYTES: 256;
+export const STORY_RECORD_DOMAIN_TEXT: "deepfamily.archive.story-record.v1";
+export const STORY_HEAD_DOMAIN_TEXT: "deepfamily.archive.story-head.v1";
+export const STORY_RECORD_DOMAIN: string;
+export const STORY_HEAD_DOMAIN: string;
+export interface StoryRecordInput {
+  schema?: "deepfamily/story-chunk@1.0";
+  content: string;
+  chunkType: number;
+  attachmentCID: string;
+}
+export interface DecodedStoryRecord extends StoryRecordInput {
+  schema: "deepfamily/story-chunk@1.0";
+}
+export function encodeStoryRecord(input: StoryRecordInput): Uint8Array;
+export function decodeStoryRecord(payload: BytesLike): DecodedStoryRecord;
+export function readStoryRecord(
+  input: ArchiveReadOptions & {
+    recordRef: StoryRecordRef;
+  },
+): Promise<
+  VerifiedArchiveBlob & {
+    schemaId: string;
+    author: string;
+    timestamp: bigint;
+    decoded: DecodedStoryRecord | null;
+  }
+>;
+export interface StoryRecordCommitmentInput {
+  chainId: BigNumberish;
+  archive: string;
+  tokenId: BigNumberish;
+  index: BigNumberish;
+  schemaId: string;
+  payloadHash: string;
+  payloadLength: BigNumberish;
+  author: string;
+  timestamp: BigNumberish;
+}
+export function computeStoryRecordHash(input: StoryRecordCommitmentInput): string;
+export function computeStoryHead(input: { previousHead: string; recordHash: string }): string;
 
 export function assertMetadataMatchesContext(
   metadata: PersonVersionMetadata,
@@ -436,21 +501,13 @@ export function roundTripPersonVersionEnvelope(input: {
   submitterAndSelfSuiteId?: BigNumberish;
   expectedSubmitter?: string;
 }): Promise<ValidatedPersonVersion>;
-export function decryptPersonVersionRuntime(input: {
-  runtimeCode: BytesLike;
-  payloadLength: BigNumberish;
-  payloadHash: string;
-  rawPassphrase: string;
-  context: MetadataContextInput;
-}): Promise<ValidatedPersonVersion>;
-export function readAndDecryptPersonVersion(input: {
-  getCode: (pointer: string, blockTag: "latest") => Promise<BytesLike>;
-  pointer: string;
-  payloadLength: BigNumberish;
-  payloadHash: string;
-  rawPassphrase: string;
-  context: MetadataContextInput;
-}): Promise<ValidatedPersonVersion>;
+export function readAndDecryptPersonVersion(
+  input: BlobRef &
+    ArchiveReadOptions & {
+      rawPassphrase: string;
+      context: MetadataContextInput;
+    },
+): Promise<ValidatedPersonVersion>;
 export function computePreparedVersionHash(input: {
   context: MetadataContextInput;
   versionCommitment: BigNumberish;

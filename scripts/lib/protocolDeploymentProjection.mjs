@@ -15,9 +15,8 @@ export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   groth16VerifierAdapter: 6,
   deepFamilyImplementation: 7,
   deepFamily: 8,
-  metadataArchiveV1: 10,
-  storyArchiveV1: 12,
-  deepFamilyReader: 14,
+  deepFamilyArchiveV1: 10,
+  deepFamilyReader: 12,
 });
 
 const normalizeChainId = (value) => {
@@ -66,12 +65,10 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       personVerifierImmutable: plannedAddresses?.personCommitmentVerifier,
       disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
     },
-    metadataArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
-    storyArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
+    deepFamilyArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
     deepFamilyReader: {
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      metadataArchiveImmutable: plannedAddresses?.metadataArchiveV1,
-      storyArchiveImmutable: plannedAddresses?.storyArchiveV1,
+      archiveImmutable: plannedAddresses?.deepFamilyArchiveV1,
     },
   };
   const artifacts = deploymentArtifactInspector({ root, deployments: deploymentBindings });
@@ -87,23 +84,16 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       artifactSha256: artifacts?.groth16VerifierAdapter?.artifactSha256,
       runtimeSha256: artifacts?.groth16VerifierAdapter?.runtimeSha256,
     }),
-    metadataArchiveV1: Object.freeze({
-      address: plannedAddresses?.metadataArchiveV1,
+    deepFamilyArchiveV1: Object.freeze({
+      address: plannedAddresses?.deepFamilyArchiveV1,
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      artifactSha256: artifacts?.metadataArchiveV1?.artifactSha256,
-      runtimeSha256: artifacts?.metadataArchiveV1?.runtimeSha256,
-    }),
-    storyArchiveV1: Object.freeze({
-      address: plannedAddresses?.storyArchiveV1,
-      deepFamilyImmutable: plannedAddresses?.deepFamily,
-      artifactSha256: artifacts?.storyArchiveV1?.artifactSha256,
-      runtimeSha256: artifacts?.storyArchiveV1?.runtimeSha256,
+      artifactSha256: artifacts?.deepFamilyArchiveV1?.artifactSha256,
+      runtimeSha256: artifacts?.deepFamilyArchiveV1?.runtimeSha256,
     }),
     deepFamilyReader: Object.freeze({
       address: plannedAddresses?.deepFamilyReader,
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      metadataArchiveImmutable: plannedAddresses?.metadataArchiveV1,
-      storyArchiveImmutable: plannedAddresses?.storyArchiveV1,
+      archiveImmutable: plannedAddresses?.deepFamilyArchiveV1,
       artifactSha256: artifacts?.deepFamilyReader?.artifactSha256,
       runtimeSha256: artifacts?.deepFamilyReader?.runtimeSha256,
     }),
@@ -153,11 +143,10 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       deploymentArtifacts?.groth16VerifierAdapter,
     ],
     [
-      "MetadataArchiveV1",
-      plannedAddresses?.metadataArchiveV1,
-      deploymentArtifacts?.metadataArchiveV1,
+      "DeepFamilyArchiveV1",
+      plannedAddresses?.deepFamilyArchiveV1,
+      deploymentArtifacts?.deepFamilyArchiveV1,
     ],
-    ["StoryArchiveV1", plannedAddresses?.storyArchiveV1, deploymentArtifacts?.storyArchiveV1],
     ["DeepFamilyReader", plannedAddresses?.deepFamilyReader, deploymentArtifacts?.deepFamilyReader],
   ];
   for (const [label, address, artifact] of checks) {

@@ -2,18 +2,16 @@
 pragma solidity ^0.8.20;
 
 import {DeepFamily} from "./DeepFamily.sol";
-import {IMetadataArchiveV1} from "./interfaces/IMetadataArchiveV1.sol";
-import {IStoryArchiveV1} from "./interfaces/IStoryArchiveV1.sol";
+import {IDeepFamilyArchiveV1} from "./interfaces/IDeepFamilyArchiveV1.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 contract DeepFamilyReader {
   error InvalidDeepFamilyAddress();
-  error InvalidMetadataArchiveAddress();
-  error MetadataArchiveBindingMismatch();
-  error InvalidStoryArchiveAddress();
-  error StoryArchiveBindingMismatch();
+  error InvalidArchiveAddress();
+  error ArchiveBindingMismatch();
   error InvalidPersonHash();
   error InvalidVersionIndex();
-  error ChunkIndexOutOfRange();
+  error RecordIndexOutOfRange();
   error PageSizeExceedsLimit();
 
   struct PaginationResult {
@@ -32,8 +30,8 @@ contract DeepFamilyReader {
 
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
   DeepFamily public immutable DEEP_FAMILY;
-  IMetadataArchiveV1 public immutable METADATA_ARCHIVE;
-  IStoryArchiveV1 public immutable STORY_ARCHIVE;
+  uint256 public constant MAX_STORY_PAGE_SIZE = 100;
+  IDeepFamilyArchiveV1 public immutable ARCHIVE;
 
   constructor(address deepFamily) {
     if (deepFamily == address(0) || deepFamily.code.length == 0) {
@@ -42,44 +40,36 @@ contract DeepFamilyReader {
 
     DeepFamily boundDeepFamily = DeepFamily(payable(deepFamily));
     address archive;
-    try boundDeepFamily.metadataArchive() returns (address configuredArchive) {
+    try boundDeepFamily.archive() returns (address configuredArchive) {
       archive = configuredArchive;
     } catch {
       revert InvalidDeepFamilyAddress();
     }
-    if (archive == address(0) || archive.code.length == 0) {
-      revert InvalidMetadataArchiveAddress();
+    if (
+      archive == address(0) ||
+      archive.code.length == 0 ||
+      !ERC165Checker.supportsInterface(archive, type(IDeepFamilyArchiveV1).interfaceId)
+    ) {
+      revert InvalidArchiveAddress();
     }
-
-    address archiveDeepFamily;
-    try IMetadataArchiveV1(archive).DEEP_FAMILY() returns (address bound) {
-      archiveDeepFamily = bound;
+    IDeepFamilyArchiveV1 boundArchive = IDeepFamilyArchiveV1(archive);
+    try boundArchive.DEEP_FAMILY() returns (address bound) {
+      if (bound != deepFamily) revert ArchiveBindingMismatch();
     } catch {
-      revert InvalidMetadataArchiveAddress();
+      revert InvalidArchiveAddress();
     }
-    if (archiveDeepFamily != deepFamily) revert MetadataArchiveBindingMismatch();
-
-    address storyArchive;
-    try boundDeepFamily.storyArchive() returns (address configuredStoryArchive) {
-      storyArchive = configuredStoryArchive;
+    try boundArchive.archiveKind() returns (bytes32 kind) {
+      if (kind != keccak256("deepfamily.archive.v1")) revert InvalidArchiveAddress();
     } catch {
-      revert InvalidDeepFamilyAddress();
+      revert InvalidArchiveAddress();
     }
-    if (storyArchive == address(0) || storyArchive.code.length == 0) {
-      revert InvalidStoryArchiveAddress();
-    }
-
-    address storyArchiveDeepFamily;
-    try IStoryArchiveV1(storyArchive).DEEP_FAMILY() returns (address bound) {
-      storyArchiveDeepFamily = bound;
+    try boundArchive.apiVersion() returns (uint256 version) {
+      if (version != 1) revert InvalidArchiveAddress();
     } catch {
-      revert InvalidStoryArchiveAddress();
+      revert InvalidArchiveAddress();
     }
-    if (storyArchiveDeepFamily != deepFamily) revert StoryArchiveBindingMismatch();
-
     DEEP_FAMILY = boundDeepFamily;
-    METADATA_ARCHIVE = IMetadataArchiveV1(archive);
-    STORY_ARCHIVE = IStoryArchiveV1(storyArchive);
+    ARCHIVE = boundArchive;
   }
 
   function getVersionDetails(
@@ -90,7 +80,7 @@ contract DeepFamilyReader {
     view
     returns (
       DeepFamily.PersonVersion memory version,
-      IMetadataArchiveV1.MetadataRef memory metadata,
+      IDeepFamilyArchiveV1.BlobRef memory metadata,
       uint256 endorsementCount,
       uint256 tokenId
     )
@@ -112,7 +102,7 @@ contract DeepFamilyReader {
       bytes32 personHash,
       uint256 versionIndex,
       DeepFamily.PersonVersion memory version,
-      IMetadataArchiveV1.MetadataRef memory metadata,
+      IDeepFamilyArchiveV1.BlobRef memory metadata,
       DeepFamily.PersonCoreInfo memory coreInfo,
       uint256 endorsementCount,
       string memory nftTokenURI
@@ -132,26 +122,25 @@ contract DeepFamilyReader {
   function getVersionMetadataRef(
     bytes32 personHash,
     uint256 versionIndex
-  ) external view returns (IMetadataArchiveV1.MetadataRef memory metadata) {
+  ) external view returns (IDeepFamilyArchiveV1.BlobRef memory metadata) {
     _validateVersion(personHash, versionIndex);
     return _readMetadataRef(personHash, versionIndex);
   }
 
-  function getStoryMetadata(
+  function getStoryState(
     uint256 tokenId
-  ) external view returns (IStoryArchiveV1.StoryMetadata memory metadata) {
+  ) external view returns (IDeepFamilyArchiveV1.StoryState memory state) {
     _requireOwned(tokenId);
-    return _readStoryMetadata(tokenId);
+    return ARCHIVE.storyState(tokenId);
   }
 
-  function getStoryChunk(
+  function getStoryRecordRef(
     uint256 tokenId,
-    uint256 chunkIndex
-  ) external view returns (IStoryArchiveV1.StoryChunk memory chunk) {
+    uint64 index
+  ) external view returns (IDeepFamilyArchiveV1.StoryRecordRef memory record) {
     _requireOwned(tokenId);
-    IStoryArchiveV1.StoryMetadata memory metadata = _readStoryMetadata(tokenId);
-    if (chunkIndex >= metadata.totalChunks) revert ChunkIndexOutOfRange();
-    return _readStoryChunk(tokenId, chunkIndex);
+    if (index >= ARCHIVE.storyState(tokenId).totalRecords) revert RecordIndexOutOfRange();
+    return ARCHIVE.storyRecordRef(tokenId, index);
   }
 
   function listChildren(
@@ -386,7 +375,7 @@ contract DeepFamilyReader {
     return (uris, totalCount, page.hasMore, page.nextOffset);
   }
 
-  function listStoryChunks(
+  function listStoryRecords(
     uint256 tokenId,
     uint256 offset,
     uint256 limit
@@ -394,24 +383,21 @@ contract DeepFamilyReader {
     external
     view
     returns (
-      IStoryArchiveV1.StoryChunk[] memory chunks,
-      uint256 totalChunks,
+      IDeepFamilyArchiveV1.StoryRecordRef[] memory records,
+      uint256 totalRecords,
       bool hasMore,
       uint256 nextOffset
     )
   {
     _requireOwned(tokenId);
-    totalChunks = _readStoryMetadata(tokenId).totalChunks;
-    PaginationResult memory page = _getPaginationParams(totalChunks, offset, limit);
-    if (page.resultLength == 0) {
-      return (new IStoryArchiveV1.StoryChunk[](0), totalChunks, page.hasMore, page.nextOffset);
+    if (limit > MAX_STORY_PAGE_SIZE) revert PageSizeExceedsLimit();
+    totalRecords = ARCHIVE.storyState(tokenId).totalRecords;
+    PaginationResult memory page = _getPaginationParams(totalRecords, offset, limit);
+    records = new IDeepFamilyArchiveV1.StoryRecordRef[](page.resultLength);
+    for (uint256 i; i < page.resultLength; i++) {
+      records[i] = ARCHIVE.storyRecordRef(tokenId, uint64(page.startIndex + i));
     }
-
-    chunks = new IStoryArchiveV1.StoryChunk[](page.resultLength);
-    for (uint256 i = 0; i < page.resultLength; i++) {
-      chunks[i] = _readStoryChunk(tokenId, page.startIndex + i);
-    }
-    return (chunks, totalChunks, page.hasMore, page.nextOffset);
+    return (records, totalRecords, page.hasMore, page.nextOffset);
   }
 
   function _getPaginationParams(
@@ -462,27 +448,14 @@ contract DeepFamilyReader {
   function _readMetadataRef(
     bytes32 personHash,
     uint256 versionIndex
-  ) internal view returns (IMetadataArchiveV1.MetadataRef memory metadata) {
-    return METADATA_ARCHIVE.metadataRef(personHash, versionIndex);
+  ) internal view returns (IDeepFamilyArchiveV1.BlobRef memory metadata) {
+    return ARCHIVE.metadataRef(personHash, versionIndex);
   }
 
   function _readCoreInfo(
     uint256 tokenId
   ) internal view returns (DeepFamily.PersonCoreInfo memory coreInfo) {
     (coreInfo.basicInfo, coreInfo.supplementInfo) = DEEP_FAMILY.nftCoreInfo(tokenId);
-  }
-
-  function _readStoryMetadata(
-    uint256 tokenId
-  ) internal view returns (IStoryArchiveV1.StoryMetadata memory metadata) {
-    return STORY_ARCHIVE.getStoryMetadata(tokenId);
-  }
-
-  function _readStoryChunk(
-    uint256 tokenId,
-    uint256 chunkIndex
-  ) internal view returns (IStoryArchiveV1.StoryChunk memory chunk) {
-    return STORY_ARCHIVE.getStoryChunk(tokenId, chunkIndex);
   }
 
   function _readUserEndorsement(

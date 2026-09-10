@@ -23,6 +23,7 @@ export interface MetadataRefFields {
   pointer?: string;
   payloadHash?: string;
   payloadLength?: number;
+  segmentCount?: number;
 }
 
 export interface CoreInfoFields {
@@ -107,15 +108,14 @@ export function parseVersionStruct(versionStruct: any): VersionStructFields {
 
 export function parseMetadataRef(metadataRef: any): MetadataRefFields {
   if (!metadataRef) return {};
-  const pointer = metadataRef.pointer || metadataRef[0];
-  const payloadHash = metadataRef.payloadHash || metadataRef[1];
-  const payloadLengthRaw =
-    metadataRef.payloadLength !== undefined ? metadataRef.payloadLength : metadataRef[2];
-  const payloadLength =
-    payloadLengthRaw !== undefined && payloadLengthRaw !== null
-      ? Number(payloadLengthRaw)
-      : undefined;
-  return { pointer, payloadHash, payloadLength };
+  return {
+    pointer: metadataRef.pointer,
+    payloadHash: metadataRef.payloadHash,
+    payloadLength:
+      metadataRef.payloadLength === undefined ? undefined : Number(metadataRef.payloadLength),
+    segmentCount:
+      metadataRef.segmentCount === undefined ? undefined : Number(metadataRef.segmentCount),
+  };
 }
 
 export function parseCoreInfo(coreInfo: any): CoreInfoFields {

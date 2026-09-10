@@ -1,3 +1,4 @@
+import { appendDfsStoryRecord } from "../lib/archiveOperations.js";
 /**
  * seed-historical.js
  * Generate demo data using real historical person data
@@ -459,14 +460,7 @@ function createSupplementInfo(personInfo) {
 /**
  * Seed a single language family data
  */
-async function seedSingleLanguage(
-  dataFile,
-  deepFamily,
-  deepFamilyReader,
-  storyArchive,
-  token,
-  signer,
-) {
+async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archive, token, signer) {
   console.log("\n" + "=".repeat(60));
   console.log(`Seeding data file: ${dataFile}`);
   console.log("=".repeat(60));
@@ -568,7 +562,7 @@ async function seedSingleLanguage(
         version: progress.versionIndex || 1,
         personData: personDataWithPassphrase,
         tokenId: progress.tokenId || 0,
-        storyMetadata: progress.storyMetadata,
+        storyState: progress.storyState,
         owner: progress.owner,
         isExisting: true,
       };
@@ -678,7 +672,7 @@ async function seedSingleLanguage(
       version: 1, // Newly added version index is 1
       personData: personDataWithPassphrase,
       tokenId: 0,
-      storyMetadata: null,
+      storyState: null,
       owner: signer.address,
       isExisting: false,
       metadataPayloadHash: addResult.payloadHash,
@@ -725,7 +719,7 @@ async function seedSingleLanguage(
     );
 
     let tokenId = Number(person.tokenId || 0);
-    let storyMetadata = person.storyMetadata || null;
+    let storyState = person.storyState || null;
     console.log(
       `  Info: Version info — hash: ${person.hash.slice(0, 10)}..., version: ${person.version}, tokenId: ${tokenId}`,
     );
@@ -815,9 +809,9 @@ async function seedSingleLanguage(
       }
 
       try {
-        storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
+        storyState = await deepFamilyReader.getStoryState(tokenId);
       } catch (e) {
-        storyMetadata = null;
+        storyState = null;
       }
 
       person.tokenId = tokenId;
@@ -908,15 +902,15 @@ async function seedSingleLanguage(
     );
     expectedChunks += targetChunkCount;
 
-    if (!storyMetadata) {
+    if (!storyState) {
       try {
-        storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
+        storyState = await deepFamilyReader.getStoryState(tokenId);
       } catch (e) {
-        storyMetadata = { totalChunks: 0, isSealed: false };
+        storyState = { totalRecords: 0, isSealed: false };
       }
     }
 
-    const existingChunks = Number(storyMetadata?.totalChunks || 0);
+    const existingChunks = Number(storyState?.totalRecords || 0);
 
     // Ensure signer owns the NFT before writing chunks (reading metadata is permissionless)
     let owner = person.owner;
@@ -936,7 +930,7 @@ async function seedSingleLanguage(
       continue;
     }
 
-    if (storyMetadata?.isSealed) {
+    if (storyState?.isSealed) {
       console.log(
         `  ⊘ Story sealed on-chain, chunks (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
       );
@@ -967,48 +961,19 @@ async function seedSingleLanguage(
 
     for (let i = 0; i < pendingChunks.length; i++) {
       const chunk = pendingChunks[i];
-      const content = truncateUtf8Bytes(chunk.content, MAX_CHUNK_CONTENT_LENGTH);
-      const expectedHash = solidityStringHash(content);
-      const attachmentCID = "";
       const chunkIndex = existingChunks + i;
-
-      console.log(
-        `    >Adding chunk ${chunkIndex}/${targetChunkCount - 1} (type ${chunk.type}, arrayIndex ${chunk.arrayIndex}, part ${chunk.partIndex})...`,
-      );
       const chunkStart = Date.now();
-      const chunkTx = await storyArchive.addStoryChunk(
+      const result = await appendDfsStoryRecord({
+        archive,
         tokenId,
-        chunkIndex, // Continue after on-chain chunks
-        chunk.type,
-        content,
-        attachmentCID,
-        expectedHash,
+        expectedIndex: chunkIndex,
+        content: chunk.content,
+        chunkType: chunk.type,
+        attachmentCID: "",
+      });
+      console.log(
+        `    [ok]Record ${chunkIndex} added (${Date.now() - chunkStart}ms) — hash: ${result.recordRef.blob.payloadHash}`,
       );
-      console.log(`    ⧗ Chunk tx sent: ${chunkTx.hash}`);
-      const chunkReceipt = await chunkTx.wait();
-      const chunkElapsed = Date.now() - chunkStart;
-      let emittedHash = expectedHash;
-      try {
-        const chunkEventIface = new ethers.Interface([
-          "event StoryChunkAdded(uint256 indexed tokenId, uint256 indexed chunkIndex, bytes32 chunkHash, address indexed editor, uint256 contentLength, uint8 chunkType, string attachmentCID)",
-        ]);
-        const archiveAddress = (storyArchive.target || storyArchive.address).toLowerCase();
-        for (const log of chunkReceipt?.logs || []) {
-          if ((log.address || "").toLowerCase() !== archiveAddress) continue;
-          try {
-            const parsed = chunkEventIface.parseLog(log);
-            if (
-              parsed &&
-              parsed.name === "StoryChunkAdded" &&
-              parsed.args.chunkIndex == chunkIndex
-            ) {
-              emittedHash = parsed.args.chunkHash;
-              break;
-            }
-          } catch (_) {}
-        }
-      } catch (_) {}
-      console.log(`    [ok]Chunk ${chunkIndex} added (${chunkElapsed}ms) — hash: ${emittedHash}`);
       totalChunks++;
     }
 
@@ -1071,7 +1036,7 @@ async function main() {
   console.log("=".repeat(70));
 
   const [signer] = await ethers.getSigners();
-  const { deepFamily, deepFamilyReader, storyArchive, token } = await ensureIntegratedSystem(
+  const { deepFamily, deepFamilyReader, archive, token } = await ensureIntegratedSystem(
     connection,
     {
       writeDeployments: true,
@@ -1079,7 +1044,7 @@ async function main() {
     },
   );
   const deepFamilyWithSigner = deepFamily.connect(signer);
-  const storyArchiveWithSigner = storyArchive.connect(signer);
+  const archiveWithSigner = archive.connect(signer);
   const tokenWithSigner = token.connect(signer);
 
   const deepFamilyAddr = await deepFamily.getAddress();
@@ -1105,7 +1070,7 @@ async function main() {
         file,
         deepFamilyWithSigner,
         deepFamilyReader,
-        storyArchiveWithSigner,
+        archiveWithSigner,
         tokenWithSigner,
         signer,
       );

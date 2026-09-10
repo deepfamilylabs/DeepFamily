@@ -112,8 +112,7 @@ const CORE_DEPLOYMENT_FILES = [
   "DisclosureBindingVerifier.json",
   "Groth16VerifierAdapter.json",
   "DeepFamily.json",
-  "MetadataArchiveV1.json",
-  "StoryArchiveV1.json",
+  "DeepFamilyArchiveV1.json",
   "DeepFamilyReader.json",
 ];
 const RELEASE_ARTIFACT_NAMES = Object.freeze([
@@ -126,8 +125,7 @@ const RELEASE_ARTIFACT_NAMES = Object.freeze([
   "Groth16VerifierAdapter",
   "DeepFamily",
   "UUPSProxy",
-  "MetadataArchiveV1",
-  "StoryArchiveV1",
+  "DeepFamilyArchiveV1",
   "DeepFamilyReader",
 ]);
 
@@ -317,10 +315,8 @@ const buildFingerprint = ({
         token: plannedAddresses.token,
         initialOwner: config.expectedDeployer,
       },
-      metadataArchiveV1: [plannedAddresses.deepFamily],
-      deepFamilyMetadataArchive: plannedAddresses.metadataArchiveV1,
-      storyArchiveV1: [plannedAddresses.deepFamily],
-      deepFamilyStoryArchive: plannedAddresses.storyArchiveV1,
+      deepFamilyArchiveV1: [plannedAddresses.deepFamily],
+      deepFamilyArchive: plannedAddresses.deepFamilyArchiveV1,
       deepFamilyReader: [plannedAddresses.deepFamily],
     },
   },
@@ -530,8 +526,7 @@ const assertProtocolTerminalState = async ({
       },
     ],
     ["UUPSProxy", addresses.deepFamily, { needsLibraries: false }],
-    ["MetadataArchiveV1", addresses.metadataArchiveV1, { needsLibraries: false }],
-    ["StoryArchiveV1", addresses.storyArchiveV1, { needsLibraries: false }],
+    ["DeepFamilyArchiveV1", addresses.deepFamilyArchiveV1, { needsLibraries: false }],
     ["DeepFamilyReader", addresses.deepFamilyReader, { needsLibraries: false }],
   ];
   for (const [contractName, address, spec] of artifactChecks) {
@@ -545,14 +540,7 @@ const assertProtocolTerminalState = async ({
     });
   }
 
-  const {
-    token,
-    deepFamily,
-    metadataArchive,
-    storyArchive,
-    deepFamilyReader,
-    groth16VerifierAdapter,
-  } = deployed;
+  const { token, deepFamily, archive, deepFamilyReader, groth16VerifierAdapter } = deployed;
   const [
     owner,
     tokenOwner,
@@ -562,9 +550,6 @@ const assertProtocolTerminalState = async ({
     configuredArchive,
     archiveMain,
     readerArchive,
-    configuredStoryArchive,
-    storyArchiveMain,
-    readerStoryArchive,
     personRoute,
     disclosureRoute,
     personBackend,
@@ -579,12 +564,9 @@ const assertProtocolTerminalState = async ({
     token.deepFamilyContract(),
     deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
     deepFamilyReader.DEEP_FAMILY(),
-    deepFamily.metadataArchive(),
-    metadataArchive.DEEP_FAMILY(),
-    deepFamilyReader.METADATA_ARCHIVE(),
-    deepFamily.storyArchive(),
-    storyArchive.DEEP_FAMILY(),
-    deepFamilyReader.STORY_ARCHIVE(),
+    deepFamily.archive(),
+    archive.DEEP_FAMILY(),
+    deepFamilyReader.ARCHIVE(),
     deepFamily.verifierRegistry(0, 1),
     deepFamily.verifierRegistry(1, 1),
     groth16VerifierAdapter.personVerifier(),
@@ -601,25 +583,13 @@ const assertProtocolTerminalState = async ({
     [sameAddress(mainToken, addresses.token), "DeepFamily is not bound to Token"],
     [sameAddress(readerMain, addresses.deepFamily), "Reader is not bound to DeepFamily"],
     [
-      sameAddress(configuredArchive, addresses.metadataArchiveV1),
-      "DeepFamily is not bound to MetadataArchiveV1",
+      sameAddress(configuredArchive, addresses.deepFamilyArchiveV1),
+      "DeepFamily is not bound to DeepFamilyArchiveV1",
     ],
     [sameAddress(archiveMain, addresses.deepFamily), "Archive is not bound to DeepFamily"],
     [
-      sameAddress(readerArchive, addresses.metadataArchiveV1),
-      "Reader is not bound to MetadataArchiveV1",
-    ],
-    [
-      sameAddress(configuredStoryArchive, addresses.storyArchiveV1),
-      "DeepFamily is not bound to StoryArchiveV1",
-    ],
-    [
-      sameAddress(storyArchiveMain, addresses.deepFamily),
-      "Story archive is not bound to DeepFamily",
-    ],
-    [
-      sameAddress(readerStoryArchive, addresses.storyArchiveV1),
-      "Reader is not bound to StoryArchiveV1",
+      sameAddress(readerArchive, addresses.deepFamilyArchiveV1),
+      "Reader is not bound to DeepFamilyArchiveV1",
     ],
     [sameAddress(personRoute, addresses.groth16VerifierAdapter), "person verifier route mismatch"],
     [
@@ -821,8 +791,7 @@ const revalidateCompletedRelease = async ({
   const deployed = {
     token: await ethers.getContractAt("DeepFamilyToken", addresses.token),
     deepFamily: await ethers.getContractAt("DeepFamily", addresses.deepFamily),
-    metadataArchive: await ethers.getContractAt("MetadataArchiveV1", addresses.metadataArchiveV1),
-    storyArchive: await ethers.getContractAt("StoryArchiveV1", addresses.storyArchiveV1),
+    archive: await ethers.getContractAt("DeepFamilyArchiveV1", addresses.deepFamilyArchiveV1),
     deepFamilyReader: await ethers.getContractAt("DeepFamilyReader", addresses.deepFamilyReader),
     groth16VerifierAdapter: await ethers.getContractAt(
       "Groth16VerifierAdapter",
@@ -1392,8 +1361,7 @@ export const main = async (chainProfile) => {
       groth16VerifierAdapter: await deployed.groth16VerifierAdapter.getAddress(),
       deepFamily: await deployed.deepFamily.getAddress(),
       deepFamilyImplementation: deployed.deepFamilyImplementationAddress,
-      metadataArchiveV1: await deployed.metadataArchive.getAddress(),
-      storyArchiveV1: await deployed.storyArchive.getAddress(),
+      deepFamilyArchiveV1: await deployed.archive.getAddress(),
       deepFamilyReader: await deployed.deepFamilyReader.getAddress(),
     };
     for (const [label, plannedAddress] of Object.entries(plannedAddresses)) {
@@ -1446,10 +1414,7 @@ export const main = async (chainProfile) => {
         addresses.deepFamilyImplementation,
         proxyInitData,
       ]),
-      await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchiveV1, [
-        addresses.deepFamily,
-      ]),
-      await verificationEntry(hre.artifacts, "StoryArchiveV1", addresses.storyArchiveV1, [
+      await verificationEntry(hre.artifacts, "DeepFamilyArchiveV1", addresses.deepFamilyArchiveV1, [
         addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
