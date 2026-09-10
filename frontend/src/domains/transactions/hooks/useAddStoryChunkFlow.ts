@@ -2,12 +2,11 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
 import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
-import {
-  addStoryChunkService,
-  type AddStoryChunkResult,
-} from "../services/addStoryChunkService";
+import { addStoryChunkService, type AddStoryChunkResult } from "../services/addStoryChunkService";
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
+
+import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
 
 export type AddStoryChunkFlowArgs = {
   tokenId: string;
@@ -16,6 +15,7 @@ export type AddStoryChunkFlowArgs = {
   expectedHash: string;
   chunkType?: number;
   attachmentCID?: string;
+  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
 };
 
 export function useAddStoryChunkFlow() {
@@ -40,6 +40,7 @@ export function useAddStoryChunkFlow() {
         args.expectedHash,
         args.chunkType,
         args.attachmentCID,
+        args.confirmTransactionPreview,
       );
     },
     [signer, contractAddress, t],

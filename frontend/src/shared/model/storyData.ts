@@ -25,18 +25,6 @@ export interface StoryDataResult {
   fetchedAt: number;
 }
 
-export function parseStoryChunkRecord(chunk: any): StoryChunk {
-  return {
-    chunkIndex: Number(chunk?.chunkIndex ?? chunk?.[0] ?? 0),
-    chunkHash: String(chunk?.chunkHash ?? chunk?.[1] ?? ethers.ZeroHash),
-    content: String(chunk?.content ?? chunk?.[2] ?? ""),
-    timestamp: Number(chunk?.timestamp ?? chunk?.[3] ?? 0),
-    editor: String(chunk?.editor ?? chunk?.[4] ?? ethers.ZeroAddress),
-    chunkType: Number(chunk?.chunkType ?? chunk?.[5] ?? 0),
-    attachmentCID: String(chunk?.attachmentCID ?? chunk?.[6] ?? ""),
-  };
-}
-
 export function buildStorySnapshot(
   chunks: StoryChunk[],
   metadata?: StoryMetadata | null,
@@ -47,7 +35,7 @@ export function buildStorySnapshot(
   const fullStory = sorted.map((chunk) => chunk.content).join("");
   const encoder = new TextEncoder();
   const computedLength = sorted.reduce(
-    (acc, chunk) => acc + encoder.encode(chunk.content).length,
+    (acc, chunk) => acc + (chunk.payloadLength ?? encoder.encode(chunk.content).length),
     0,
   );
 
@@ -62,6 +50,7 @@ export function buildStorySnapshot(
   if (
     missing.length === 0 &&
     totalChunks > 0 &&
+    sorted.every((chunk) => Boolean(chunk.recordHash)) &&
     metadata?.fullStoryHash &&
     metadata.fullStoryHash !== ethers.ZeroHash
   ) {

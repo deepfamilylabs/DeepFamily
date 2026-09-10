@@ -10,7 +10,7 @@ import {
   ZERO_BYTES32,
   asUint8Array,
   computePersonVersionContentCommitment,
-  decryptPersonVersionRuntime,
+  decryptPersonVersionEnvelope,
   encryptPersonVersionEnvelope,
   gzipV1,
   parseCanonicalPersonVersion,
@@ -194,21 +194,15 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
   const deepFamily = DeepFamily.attach(await proxy.getAddress());
 
   let archive;
-  let storyArchive;
   if (configureArchive) {
     if (archiveFactory) {
       archive = await archiveFactory(await proxy.getAddress());
     } else {
-      const Archive = await hre.ethers.getContractFactory("MetadataArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
       archive = await Archive.deploy(await proxy.getAddress());
       await archive.waitForDeployment();
     }
-    await deepFamily.setMetadataArchive(await archive.getAddress());
-
-    const StoryArchive = await hre.ethers.getContractFactory("StoryArchiveV1");
-    storyArchive = await StoryArchive.deploy(await proxy.getAddress());
-    await storyArchive.waitForDeployment();
-    await deepFamily.setStoryArchive(await storyArchive.getAddress());
+    await deepFamily.setArchive(await archive.getAddress());
   }
 
   let adapter;
@@ -235,7 +229,6 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
     proxy,
     deepFamily,
     archive,
-    storyArchive,
     adapter,
   };
 }
@@ -267,40 +260,69 @@ describe("DeepFamily encrypted metadata v1", function () {
         registerRoutes: false,
       });
       const [, nonOwner, eoa] = await hre.ethers.getSigners();
-      const Archive = await hre.ethers.getContractFactory("MetadataArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
       const archive = await Archive.deploy(await proxy.getAddress());
       await archive.waitForDeployment();
 
       await expect(
-        implementation.setMetadataArchive(await archive.getAddress()),
+        implementation.setArchive(await archive.getAddress()),
       ).to.be.revertedWithCustomError(implementation, "UUPSUnauthorizedCallContext");
       await expect(
-        deepFamily.connect(nonOwner).setMetadataArchive(await archive.getAddress()),
+        deepFamily.connect(nonOwner).setArchive(await archive.getAddress()),
       ).to.be.revertedWithCustomError(deepFamily, "OwnableUnauthorizedAccount");
-      await expect(
-        deepFamily.setMetadataArchive(hre.ethers.ZeroAddress),
-      ).to.be.revertedWithCustomError(deepFamily, "InvalidMetadataArchive");
-      await expect(
-        deepFamily.setMetadataArchive(await eoa.getAddress()),
-      ).to.be.revertedWithCustomError(deepFamily, "InvalidMetadataArchive");
+      await expect(deepFamily.setArchive(hre.ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        deepFamily,
+        "InvalidArchive",
+      );
+      await expect(deepFamily.setArchive(await eoa.getAddress())).to.be.revertedWithCustomError(
+        deepFamily,
+        "InvalidArchive",
+      );
 
       const wrongArchive = await Archive.deploy(await implementation.getAddress());
       await wrongArchive.waitForDeployment();
       await expect(
-        deepFamily.setMetadataArchive(await wrongArchive.getAddress()),
-      ).to.be.revertedWithCustomError(deepFamily, "InvalidMetadataArchive");
+        deepFamily.setArchive(await wrongArchive.getAddress()),
+      ).to.be.revertedWithCustomError(deepFamily, "InvalidArchive");
 
-      await expect(deepFamily.setMetadataArchive(await archive.getAddress()))
-        .to.emit(deepFamily, "MetadataArchiveSet")
+      await expect(deepFamily.setArchive(await archive.getAddress()))
+        .to.emit(deepFamily, "ArchiveSet")
         .withArgs(await archive.getAddress());
-      expect(await deepFamily.metadataArchive()).to.equal(await archive.getAddress());
+      expect(await deepFamily.archive()).to.equal(await archive.getAddress());
 
+      await expect(deepFamily.setArchive(hre.ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        deepFamily,
+        "ArchiveAlreadySet",
+      );
       await expect(
-        deepFamily.setMetadataArchive(hre.ethers.ZeroAddress),
-      ).to.be.revertedWithCustomError(deepFamily, "MetadataArchiveAlreadySet");
-      await expect(
-        deepFamily.setMetadataArchive(await wrongArchive.getAddress()),
-      ).to.be.revertedWithCustomError(deepFamily, "MetadataArchiveAlreadySet");
+        deepFamily.setArchive(await wrongArchive.getAddress()),
+      ).to.be.revertedWithCustomError(deepFamily, "ArchiveAlreadySet");
+    });
+
+    it("rejects wrong protocol kind/version and invalid ERC-165 claims before binding", async () => {
+      const { deepFamily, proxy } = await deployCore({
+        configureArchive: false,
+        registerRoutes: false,
+      });
+      const Mock = await hre.ethers.getContractFactory("ArchiveBindingMock");
+      const kind = hre.ethers.id("deepfamily.archive.v1");
+      for (const [candidateKind, version, capabilities] of [
+        [hre.ethers.id("other.archive"), 1n, 1],
+        [kind, 2n, 1],
+        [kind, 1n, 0],
+        [kind, 1n, 2],
+      ]) {
+        const candidate = await Mock.deploy(
+          await proxy.getAddress(),
+          candidateKind,
+          version,
+          capabilities,
+        );
+        await expect(
+          deepFamily.setArchive(await candidate.getAddress()),
+        ).to.be.revertedWithCustomError(deepFamily, "InvalidArchive");
+        expect(await deepFamily.archive()).to.equal(hre.ethers.ZeroAddress);
+      }
     });
 
     it("rejects AddVersion while the archive is unset", async () => {
@@ -308,13 +330,13 @@ describe("DeepFamily encrypted metadata v1", function () {
       const signals = makePublicSignals(await owner.getAddress());
       await expect(
         deepFamily.addPersonVersion(makeProof(), signals, 0, 0, makeEnvelope()),
-      ).to.be.revertedWithCustomError(deepFamily, "MetadataArchiveNotSet");
+      ).to.be.revertedWithCustomError(deepFamily, "ArchiveNotSet");
     });
 
-    it("rolls back version and duplicate-key state when Archive.store fails", async () => {
+    it("rolls back version and duplicate-key state when Archive.storeMetadata fails", async () => {
       const deployed = await deployCore({
         archiveFactory: async (proxyAddress) => {
-          const Stub = await hre.ethers.getContractFactory("StubMetadataArchive");
+          const Stub = await hre.ethers.getContractFactory("StubArchive");
           const archive = await Stub.deploy(proxyAddress, true);
           await archive.waitForDeployment();
           return archive;
@@ -502,10 +524,8 @@ describe("DeepFamily encrypted metadata v1", function () {
         expect(runtimeBytes[0]).to.equal(0);
         expect(hre.ethers.keccak256(runtimeBytes.slice(1))).to.equal(metadataRef.payloadHash);
 
-        const decrypted = await decryptPersonVersionRuntime({
-          runtimeCode,
-          payloadLength: metadataRef.payloadLength,
-          payloadHash: metadataRef.payloadHash,
+        const decrypted = await decryptPersonVersionEnvelope({
+          envelope: runtimeBytes.slice(1),
           rawPassphrase: protocolVector.identity.rawPassphrase,
           context,
         });
@@ -570,13 +590,12 @@ describe("DeepFamily encrypted metadata v1", function () {
     });
 
     it("Reader freezes proxy/archive bindings and keeps array/ref indices distinct", async () => {
-      const { deepFamily, proxy, archive, storyArchive, owner } = await deployCore();
+      const { deepFamily, proxy, archive, owner } = await deployCore();
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       const reader = await Reader.deploy(await proxy.getAddress());
       await reader.waitForDeployment();
       expect(await reader.DEEP_FAMILY()).to.equal(await proxy.getAddress());
-      expect(await reader.METADATA_ARCHIVE()).to.equal(await archive.getAddress());
-      expect(await reader.STORY_ARCHIVE()).to.equal(await storyArchive.getAddress());
+      expect(await reader.ARCHIVE()).to.equal(await archive.getAddress());
 
       const signerAddress = await owner.getAddress();
       const personHash = personHashOf(123456n);
@@ -614,7 +633,7 @@ describe("DeepFamily encrypted metadata v1", function () {
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       await expect(Reader.deploy(await proxy.getAddress())).to.be.revertedWithCustomError(
         Reader,
-        "InvalidMetadataArchiveAddress",
+        "InvalidArchiveAddress",
       );
     });
   });

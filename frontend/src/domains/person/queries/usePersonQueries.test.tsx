@@ -48,7 +48,9 @@ const storyMetadata = (overrides: Partial<StoryMetadata> = {}): StoryMetadata =>
 
 const storyChunk = (chunkIndex: number, content: string): StoryChunk => ({
   chunkIndex,
-  chunkHash: `0x${String(chunkIndex + 1).repeat(64).slice(0, 64)}`,
+  chunkHash: `0x${String(chunkIndex + 1)
+    .repeat(64)
+    .slice(0, 64)}`,
   content,
   timestamp: 100 + chunkIndex,
   editor: "0x00000000000000000000000000000000000000aa",
@@ -82,6 +84,7 @@ describe("person query hooks", () => {
         metadata: {
           pointer: "0x00000000000000000000000000000000000000cc",
           payloadHash: "0xpayload",
+          segmentCount: 1,
           payloadLength: 512,
         },
         endorsementCount: 7,
@@ -97,6 +100,7 @@ describe("person query hooks", () => {
       metadata: {
         pointer: "0x00000000000000000000000000000000000000cc",
         payloadHash: "0xpayload",
+        segmentCount: 1,
         payloadLength: 512,
       },
     });

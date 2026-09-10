@@ -137,7 +137,7 @@ describe("Hardhat Tasks Integration", function () {
       content: "Task-generated story chunk",
       type: "1",
       attachment: "",
-      exphash: "0x" + "0".repeat(64),
+      exphash: "",
     });
 
     const taskResult = await hre.tasks.getTask("list-story-chunks").run({
@@ -152,13 +152,13 @@ describe("Hardhat Tasks Integration", function () {
     expect(hasMore).to.equal(false);
     expect(Number(nextOffset)).to.equal(1);
     expect(chunks).to.have.lengthOf(1);
-    expect(chunks[0].content).to.equal("Task-generated story chunk");
+    expect(chunks[0].decoded.content).to.equal("Task-generated story chunk");
 
     await hre.tasks.getTask("seal-story").run({
       tokenid: tokenId.toString(),
     });
 
-    const metadata = await deepFamilyReader.getStoryMetadata(tokenId);
+    const metadata = await deepFamilyReader.getStoryState(tokenId);
     expect(metadata.isSealed).to.equal(true);
   });
 

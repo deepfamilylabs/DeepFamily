@@ -132,6 +132,7 @@ describe("NodeDetailProvider", () => {
           metadata: {
             pointer: "0x00000000000000000000000000000000000000cc",
             payloadHash: "0xpayload",
+            segmentCount: 1,
             payloadLength: 512,
           },
           endorsementCount: 8,
@@ -154,6 +155,7 @@ describe("NodeDetailProvider", () => {
           metadata: {
             pointer: "0x00000000000000000000000000000000000000cc",
             payloadHash: "0xpayload",
+            segmentCount: 1,
             payloadLength: 512,
           },
           core: {

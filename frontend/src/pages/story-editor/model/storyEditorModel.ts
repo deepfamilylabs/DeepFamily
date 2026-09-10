@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { encodeStoryRecord } from "@deepfamily/protocol-core";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
 import { formatHashMiddle } from "../../../shared/model";
@@ -19,9 +20,9 @@ export interface ChunkFormData {
   attachmentCID: string;
 }
 
-export const STORY_MAX_CHUNK_BYTES = 16_384;
-export const STORY_WARNING_ORANGE_BYTES = STORY_MAX_CHUNK_BYTES - 200;
-export const STORY_WARNING_YELLOW_BYTES = STORY_MAX_CHUNK_BYTES - 400;
+export const STORY_SEGMENT_BYTES = 16_384;
+export const STORY_WARNING_ORANGE_BYTES = STORY_SEGMENT_BYTES - 200;
+export const STORY_WARNING_YELLOW_BYTES = STORY_SEGMENT_BYTES - 400;
 export const STORY_MAX_ATTACHMENT_BYTES = 256;
 
 export const initialChunkFormData: ChunkFormData = {
@@ -52,8 +53,8 @@ export function normalizeStoryChunks(chunks: StoryChunk[] | undefined): StoryChu
   }));
 }
 
-export function computeContentHash(content: string): string {
-  return ethers.keccak256(ethers.toUtf8Bytes(content));
+export function computeContentHash(content: string, chunkType = 0, attachmentCID = ""): string {
+  return ethers.keccak256(encodeStoryRecord({ content, chunkType, attachmentCID }));
 }
 
 export function formatStoryHash(hash?: string): string {
@@ -73,7 +74,7 @@ export function resolveAttachmentUrl(cid: string): string {
 }
 
 export function getByteWarningColor(byteLen: number): string {
-  if (byteLen > STORY_MAX_CHUNK_BYTES) return "text-red-600 dark:text-red-400 font-semibold";
+  if (byteLen > STORY_SEGMENT_BYTES) return "text-orange-600 dark:text-orange-400 font-medium";
   if (byteLen > STORY_WARNING_ORANGE_BYTES) {
     return "text-orange-600 dark:text-orange-400 font-medium";
   }

@@ -29,7 +29,7 @@ function createEditor(
       expectedHash: undefined,
     },
     byteLength: 13,
-    maxBytes: 16_384,
+    segmentBytes: 16_384,
     warningOrangeBytes: 14_000,
     updateContent: vi.fn(),
     updateChunkType: vi.fn(),
@@ -153,14 +153,16 @@ describe("StoryEditorMainSection", () => {
     const alerts = screen.getAllByRole("alert");
     expect(alerts.some((alert) => alert.textContent?.includes("Failed to load story"))).toBe(true);
 
-    const textarea = screen.getByPlaceholderText(/Enter chunk content/);
-    const byteStatus = screen.getByText("17000/16384 bytes");
-    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+    const textarea = screen.getByPlaceholderText(/Enter story content/);
+    const byteStatus = screen.getByText(/17000 bytes/);
+    expect(textarea.getAttribute("aria-invalid")).toBe("false");
     expect(textarea.getAttribute("aria-describedby")).toBe(byteStatus.id);
-    expect(byteStatus.getAttribute("role")).toBe("alert");
-    expect(byteStatus.getAttribute("aria-live")).toBe("assertive");
+    expect(byteStatus.getAttribute("role")).toBe("status");
+    expect(byteStatus.getAttribute("aria-live")).toBe("polite");
 
-    const loading = screen.getByRole("status");
+    const loading = screen
+      .getAllByRole("status")
+      .find((el) => el.getAttribute("aria-busy") === "true")!;
     expect(loading.getAttribute("aria-live")).toBe("polite");
     expect(loading.getAttribute("aria-busy")).toBe("true");
   });

@@ -17,6 +17,7 @@ describe("tokenNode", () => {
       metadata: {
         pointer: "0x00000000000000000000000000000000000000aa",
         payloadHash: "0xpayload",
+        segmentCount: 1,
         payloadLength: 128,
       },
       core: {
@@ -38,18 +39,15 @@ describe("tokenNode", () => {
   });
 
   it("backfills persisted entries and updates owner by token id", () => {
-    const backfilled = backfillPersistedTokenNode(
-      {},
-      [
-        "0xabc-v-2",
-        {
-          personHash: "0xabc",
-          versionIndex: 2,
-          id: "0xabc-v-2",
-          tokenId: "42",
-        },
-      ],
-    );
+    const backfilled = backfillPersistedTokenNode({}, [
+      "0xabc-v-2",
+      {
+        personHash: "0xabc",
+        versionIndex: 2,
+        id: "0xabc-v-2",
+        tokenId: "42",
+      },
+    ]);
 
     expect(backfilled["0xabc-v-2"]?.tokenId).toBe("42");
     expect(getOwnerFromTokenNode(backfilled, "42")).toBeNull();

@@ -44,6 +44,7 @@ describe("getNodeUi metadata visibility", () => {
       versionCommitment: "123",
       metadataPointer: `0x${"22".repeat(20)}`,
       metadataPayloadHash: `0x${"33".repeat(32)}`,
+      metadataSegmentCount: 1,
       metadataPayloadLength: 256,
       metadataUnlockValidated: true,
       metadataProtocolGeneration: "df-onchain-biography-v1",

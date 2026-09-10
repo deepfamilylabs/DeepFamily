@@ -1,9 +1,26 @@
 import { computeVersionHash, packSubmitterAndSelfSuiteId } from "@deepfamily/protocol-core";
 import { ethers } from "ethers";
 import { describe, expect, it, vi } from "vitest";
-import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
+import {
+  createDeepFamilyInterface,
+  createArchiveInterface,
+} from "../../../shared/clients/contractFactory";
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
 import { executeAddVersionFlow, type AddVersionPublicSignals } from "./addVersionService";
+
+vi.mock("../../../shared/clients/contractFactory", async () => ({
+  ...(await vi.importActual<typeof import("../../../shared/clients/contractFactory")>(
+    "../../../shared/clients/contractFactory",
+  )),
+  createArchiveContract: () => ({
+    metadataRef: async () => ({
+      pointer: "0x0000000000000000000000000000000000000b10",
+      payloadHash: ethers.keccak256(metadataEnvelope()),
+      payloadLength: 20n,
+      segmentCount: 1n,
+    }),
+  }),
+}));
 
 const CONTRACT = "0x0000000000000000000000000000000000000abc";
 const ARCHIVE = "0x0000000000000000000000000000000000000acd";
@@ -39,19 +56,65 @@ const parentedSignals = (): AddVersionPublicSignals => ({
   versionCommitment: 99n,
 });
 
-const submitMethod = (receipt: any = { blockNumber: 55, logs: [] }) =>
+const receiptFor = (args: any[], hash = "0xtxhash") => {
+  const [, signals, fatherVersionIndex, motherVersionIndex, envelope] = args;
+  const iface = createDeepFamilyInterface();
+  const archive = createArchiveInterface();
+  const personHash = wrapIdentityCommitmentAsPersonHash(signals.identityCommitment);
+  const fatherHash =
+    signals.fatherIdentityCommitment === 0n
+      ? ethers.ZeroHash
+      : wrapIdentityCommitmentAsPersonHash(signals.fatherIdentityCommitment);
+  const motherHash =
+    signals.motherIdentityCommitment === 0n
+      ? ethers.ZeroHash
+      : wrapIdentityCommitmentAsPersonHash(signals.motherIdentityCommitment);
+  return {
+    hash,
+    status: 1,
+    blockNumber: 55,
+    logs: [
+      {
+        address: CONTRACT,
+        ...iface.encodeEventLog(iface.getEvent("PersonVersionAdded")!, [
+          personHash,
+          1n,
+          SUBMITTER,
+          123n,
+          fatherHash,
+          fatherVersionIndex,
+          motherHash,
+          motherVersionIndex,
+          signals.versionCommitment,
+        ]),
+      },
+      {
+        address: ARCHIVE,
+        ...archive.encodeEventLog(archive.getEvent("MetadataStored")!, [
+          personHash,
+          1n,
+          {
+            pointer: "0x0000000000000000000000000000000000000b10",
+            payloadHash: ethers.keccak256(envelope),
+            payloadLength: ethers.getBytes(envelope).length,
+            segmentCount: 1,
+          },
+        ]),
+      },
+    ],
+  };
+};
+const submitMethod = (receipt?: any) =>
   Object.assign(
-    vi.fn(async () => ({
+    vi.fn(async (...args: any[]) => ({
       hash: "0xtxhash",
-      wait: vi.fn(async () => receipt),
+      wait: vi.fn(async () => receipt ?? receiptFor(args)),
     })),
-    {
-      estimateGas: vi.fn(async () => 1000n),
-      staticCall: vi.fn(async () => undefined),
-    },
+    { estimateGas: vi.fn(async () => 1000n), staticCall: vi.fn(async () => undefined) },
   );
 
 const preflightContract = (overrides: Record<string, unknown> = {}) => ({
+  archive: vi.fn(async () => ARCHIVE),
   versionExists: vi.fn(async () => false),
   verifierRegistry: vi.fn(async () => VERIFIER),
   personVersionsCount: vi.fn(async () => 2n),
@@ -66,7 +129,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflight,
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -95,7 +167,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const submit = submitMethod();
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract({
           verifierRegistry: vi.fn(async () => ethers.ZeroAddress),
         }),
@@ -113,7 +194,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
   it("rejects packed submitter or self-suite values that disagree with caller/header", async () => {
     const base = {
-      submitContract: { addPersonVersion: submitMethod() },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submitMethod(),
+      },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
       proof,
@@ -144,7 +234,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const submit = submitMethod();
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract(),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -159,7 +258,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const count = vi.fn(async () => 0n);
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract({ personVersionsCount: count }),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -179,7 +287,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const personHash = wrapIdentityCommitmentAsPersonHash(signals.identityCommitment);
     const eventInterface = createDeepFamilyInterface();
     const archiveInterface = new ethers.Interface([
-      "event MetadataStored(bytes32 indexed personHash,uint256 indexed versionIndex,address pointer,bytes32 payloadHash,uint32 payloadLength)",
+      "event MetadataStored(bytes32 indexed personHash,uint256 indexed versionIndex,(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount) blob)",
     ]);
     const added = eventInterface.getEvent("PersonVersionAdded")!;
     const stored = archiveInterface.getEvent("MetadataStored")!;
@@ -200,9 +308,7 @@ describe("addVersionService fresh-v1 flow", () => {
     const storedLog = archiveInterface.encodeEventLog(stored, [
       personHash,
       1n,
-      pointer,
-      payloadHash,
-      envelope.length,
+      { pointer, payloadHash, payloadLength: envelope.length, segmentCount: 1 },
     ]);
     const receipt = {
       hash: transactionHash,
@@ -227,7 +333,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflight,
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -247,7 +362,16 @@ describe("addVersionService fresh-v1 flow", () => {
     versionExists.mockResolvedValue(true);
 
     const result = await executeAddVersionFlow({
-      submitContract: { addPersonVersion: submit },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submit,
+      },
       preflightContract: preflight,
       contractAddress: CONTRACT,
       submitterAddress: SUBMITTER,
@@ -283,7 +407,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract({ versionExists }),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -308,7 +441,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract({ versionExists: vi.fn(async () => true) }),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -340,7 +482,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract({ versionExists }),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -368,7 +519,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const signals = rootSignals();
     const envelope = metadataEnvelope();
     const result = await executeAddVersionFlow({
-      submitContract: { addPersonVersion: submit },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submit,
+      },
       preflightContract: preflightContract({
         versionExists: vi.fn(async () => {
           throw new Error("rpc unavailable");
@@ -383,7 +543,9 @@ describe("addVersionService fresh-v1 flow", () => {
       metadataEnvelope: envelope,
     });
 
-    expect(submit).toHaveBeenCalledWith(proof, signals, 0, 0, envelope, { gasLimit: 1200n });
+    expect(submit).toHaveBeenCalledWith(proof, signals, 0, 0, ethers.hexlify(envelope), {
+      gasLimit: 1200n,
+    });
     expect(result.transactionHash).toBe("0xtxhash");
   });
 
@@ -394,17 +556,17 @@ describe("addVersionService fresh-v1 flow", () => {
       order.push("estimate");
       return 1_000n;
     });
-    submit.mockImplementation(async () => {
+    submit.mockImplementation(async (...args: any[]) => {
       order.push("send");
       return {
         hash: "0xtxhash",
-        wait: vi.fn(async () => ({ blockNumber: 55, logs: [] })),
+        wait: vi.fn(async () => receiptFor(args, "0xtxhash")),
       };
     });
     const confirmTransactionPreview = vi.fn(async (preview) => {
       order.push("confirm");
       expect(submit).not.toHaveBeenCalled();
-      expect(preview).toEqual({
+      expect(preview).toMatchObject({
         envelopeBytes: 20,
         estimatedGas: 1_000n,
         gasLimit: 1_200n,
@@ -418,7 +580,16 @@ describe("addVersionService fresh-v1 flow", () => {
     });
 
     await executeAddVersionFlow({
-      submitContract: { addPersonVersion: submit },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submit,
+      },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
       submitterAddress: SUBMITTER,
@@ -444,7 +615,16 @@ describe("addVersionService fresh-v1 flow", () => {
 
     await expect(
       executeAddVersionFlow({
-        submitContract: { addPersonVersion: submit },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: submit,
+        },
         preflightContract: preflightContract(),
         contractAddress: CONTRACT,
         submitterAddress: SUBMITTER,
@@ -488,10 +668,10 @@ describe("addVersionService fresh-v1 flow", () => {
       wait: vi.fn(),
     };
     const replacementReceipt = {
+      ...receiptFor([proof, signals, 0, 0, envelope], replacementHash),
       hash: replacementHash,
       status: 1,
       blockNumber: 56,
-      logs: [],
     };
     const replacementError = Object.assign(new Error("repriced"), {
       code: "TRANSACTION_REPLACED",
@@ -511,7 +691,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const onTransactionSubmitted = vi.fn();
 
     const result = await executeAddVersionFlow({
-      submitContract: { addPersonVersion: submit },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submit,
+      },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
       submitterAddress: SUBMITTER,
@@ -575,7 +764,16 @@ describe("addVersionService fresh-v1 flow", () => {
     await expect(
       executeAddVersionFlow({
         ...base,
-        submitContract: { addPersonVersion: makeSubmit(cancelled) },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: makeSubmit(cancelled),
+        },
       }),
     ).rejects.toMatchObject({
       code: "TRANSACTION_REPLACED_CANCELLED",
@@ -598,7 +796,16 @@ describe("addVersionService fresh-v1 flow", () => {
     await expect(
       executeAddVersionFlow({
         ...base,
-        submitContract: { addPersonVersion: makeSubmit(changed) },
+        submitContract: {
+          runner: {
+            provider: {
+              getNetwork: async () => ({ chainId: 31337n }),
+              getBlock: async () => ({ gasLimit: 30000000n }),
+              getFeeData: async () => ({ gasPrice: 1n }),
+            },
+          },
+          addPersonVersion: makeSubmit(changed),
+        },
       }),
     ).rejects.toMatchObject({
       code: "TRANSACTION_REPLACEMENT_MISMATCH",
@@ -606,20 +813,10 @@ describe("addVersionService fresh-v1 flow", () => {
     });
   });
 
-  it("labels fallback gas as unestimated and can cancel before a wallet request", async () => {
+  it("rejects failed estimation despite successful staticCall before preview or signature", async () => {
     const submit = submitMethod();
     submit.estimateGas.mockRejectedValue(new Error("RPC estimate unavailable"));
-    const confirmTransactionPreview = vi.fn(async (preview) => {
-      expect(preview).toEqual({
-        envelopeBytes: 20,
-        estimatedGas: null,
-        gasLimit: 6_500_000n,
-        estimated: false,
-      });
-      return false;
-    });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
+    const confirmTransactionPreview = vi.fn(async () => true);
     await expect(
       executeAddVersionFlow({
         submitContract: { addPersonVersion: submit },
@@ -633,12 +830,9 @@ describe("addVersionService fresh-v1 flow", () => {
         metadataEnvelope: metadataEnvelope(),
         confirmTransactionPreview,
       }),
-    ).rejects.toMatchObject({ code: "ADD_VERSION_PREVIEW_REJECTED" });
-
-    expect(submit.staticCall).toHaveBeenCalledTimes(1);
-    expect(confirmTransactionPreview).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow(/estimation failed/i);
     expect(submit).not.toHaveBeenCalled();
-    warn.mockRestore();
+    expect(confirmTransactionPreview).not.toHaveBeenCalled();
   });
 
   it("parses PersonVersionAdded and Archive MetadataStored without tag or CID", async () => {
@@ -648,14 +842,14 @@ describe("addVersionService fresh-v1 flow", () => {
     const motherHash = wrapIdentityCommitmentAsPersonHash(signals.motherIdentityCommitment);
     const eventInterface = createDeepFamilyInterface();
     const archiveInterface = new ethers.Interface([
-      "event MetadataStored(bytes32 indexed personHash,uint256 indexed versionIndex,address pointer,bytes32 payloadHash,uint32 payloadLength)",
+      "event MetadataStored(bytes32 indexed personHash,uint256 indexed versionIndex,(bytes32 payloadHash,address pointer,uint64 payloadLength,uint32 segmentCount) blob)",
     ]);
     const verified = eventInterface.getEvent("PersonHashZKVerified")!;
     const added = eventInterface.getEvent("PersonVersionAdded")!;
     const rewarded = eventInterface.getEvent("TokenRewardDistributed")!;
     const stored = archiveInterface.getEvent("MetadataStored")!;
     const pointer = "0x0000000000000000000000000000000000000b10";
-    const payloadHash = `0x${"44".repeat(32)}`;
+    const payloadHash = ethers.keccak256(metadataEnvelope());
     const encodedLogs = [
       { address: CONTRACT, ...eventInterface.encodeEventLog(verified, [personHash, SUBMITTER]) },
       {
@@ -683,10 +877,16 @@ describe("addVersionService fresh-v1 flow", () => {
       },
       {
         address: ARCHIVE,
-        ...archiveInterface.encodeEventLog(stored, [personHash, 2n, pointer, payloadHash, 20]),
+        ...archiveInterface.encodeEventLog(stored, [
+          personHash,
+          2n,
+          { pointer, payloadHash, payloadLength: 20, segmentCount: 1 },
+        ]),
       },
     ];
     const receipt = {
+      hash: "0xtxhash",
+      status: 1,
       blockNumber: 55,
       logs: encodedLogs.map((log) => ({
         address: log.address,
@@ -699,7 +899,16 @@ describe("addVersionService fresh-v1 flow", () => {
     const envelope = metadataEnvelope();
 
     const result = await executeAddVersionFlow({
-      submitContract: { addPersonVersion: submit },
+      submitContract: {
+        runner: {
+          provider: {
+            getNetwork: async () => ({ chainId: 31337n }),
+            getBlock: async () => ({ gasLimit: 30000000n }),
+            getFeeData: async () => ({ gasPrice: 1n }),
+          },
+        },
+        addPersonVersion: submit,
+      },
       preflightContract: preflightContract(),
       contractAddress: CONTRACT,
       submitterAddress: SUBMITTER,
@@ -712,7 +921,9 @@ describe("addVersionService fresh-v1 flow", () => {
     });
 
     expect(onTransactionSubmitted).toHaveBeenCalledWith("0xtxhash");
-    expect(submit).toHaveBeenCalledWith(proof, signals, 1, 1, envelope, { gasLimit: 1200n });
+    expect(submit).toHaveBeenCalledWith(proof, signals, 1, 1, ethers.hexlify(envelope), {
+      gasLimit: 1200n,
+    });
     expect(result).toMatchObject({
       hash: personHash,
       index: 2,
@@ -730,6 +941,7 @@ describe("addVersionService fresh-v1 flow", () => {
           versionIndex: 2,
           pointer: ethers.getAddress(pointer),
           payloadHash,
+          segmentCount: 1,
           payloadLength: 20,
         },
       },

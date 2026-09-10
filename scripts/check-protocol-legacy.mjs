@@ -18,6 +18,12 @@ export const PROTOCOL_RUNTIME_ROOTS = Object.freeze([
 ]);
 
 export const FORBIDDEN_PROTOCOL_IDENTIFIERS = Object.freeze([
+  "decryptPersonVersionRuntime",
+  "verifyMetadataRuntimeCode",
+  "MetadataArchiveV1",
+  "StoryArchiveV1",
+  "setMetadataArchive",
+  "setStoryArchive",
   "metadataCID",
   "metadataArchiveId",
   "proofSystemId",

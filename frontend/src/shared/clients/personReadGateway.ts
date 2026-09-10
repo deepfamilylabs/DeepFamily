@@ -8,7 +8,8 @@ import {
   type DetailQueryOptions,
 } from "../model/personDetailParsers";
 import type { StoryChunk, StoryMetadata } from "../model";
-import { parseStoryChunkRecord } from "../model/storyData";
+import { ethers } from "ethers";
+import { readStoryRecord, computeStoryRecordHash } from "@deepfamily/protocol-core";
 
 export type { ParsedVersionDetails, ParsedNftDetails, DetailQueryOptions };
 
@@ -148,13 +149,13 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     return queryCache.fetchQuery(
       key,
       async () => {
-        const ret = await contract.getStoryMetadata(tokenId);
+        const ret = await contract.getStoryState(tokenId);
         const metadata: StoryMetadata = {
-          totalChunks: Number(ret?.totalChunks ?? ret?.[0] ?? 0),
-          totalLength: Number(ret?.totalLength ?? ret?.[1] ?? 0),
-          isSealed: Boolean(ret?.isSealed ?? ret?.[2] ?? false),
-          lastUpdateTime: Number(ret?.lastUpdateTime ?? ret?.[3] ?? 0),
-          fullStoryHash: String(ret?.fullStoryHash ?? ret?.[4] ?? ""),
+          totalChunks: Number(ret.totalRecords),
+          totalLength: Number(ret.totalPayloadLength),
+          isSealed: Boolean(ret.isSealed),
+          lastUpdateTime: Number(ret.lastUpdateTime),
+          fullStoryHash: String(ret.recordsHead),
         };
         options?.onFetched?.();
         return metadata;
@@ -163,20 +164,66 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     );
   };
 
+  const hydrateStoryRecords = async (
+    tokenId: string | number,
+    offset: number,
+    records: any[],
+  ): Promise<StoryChunk[]> => {
+    const provider = contract.runner?.provider ?? contract.runner;
+    const [network, archive] = await Promise.all([provider.getNetwork(), contract.ARCHIVE()]);
+    return Promise.all(
+      records.map(async (ref, position) => {
+        const verified = await readStoryRecord({
+          getCode: (address, blockTag) => provider.getCode(address, blockTag),
+          recordRef: {
+            blob: {
+              pointer: ref.blob.pointer,
+              payloadHash: ref.blob.payloadHash,
+              payloadLength: ref.blob.payloadLength,
+              segmentCount: ref.blob.segmentCount,
+            },
+            schemaId: ref.schemaId,
+            author: ref.author,
+            timestamp: ref.timestamp,
+          },
+        });
+        const index = offset + position;
+        return {
+          chunkIndex: index,
+          chunkHash: verified.payloadHash,
+          content: verified.decoded?.content ?? "",
+          chunkType: verified.decoded?.chunkType ?? 0,
+          attachmentCID: verified.decoded?.attachmentCID ?? "",
+          timestamp: Number(ref.timestamp),
+          editor: ref.author,
+          schemaId: ref.schemaId,
+          unsupportedSchema: verified.decoded === null,
+          rawPayload: ethers.hexlify(verified.payload),
+          payloadLength: verified.payloadLength,
+          segmentCount: verified.segmentCount,
+          recordHash: computeStoryRecordHash({
+            chainId: network.chainId,
+            archive,
+            tokenId,
+            index,
+            schemaId: ref.schemaId,
+            payloadHash: verified.payloadHash,
+            payloadLength: verified.payloadLength,
+            author: ref.author,
+            timestamp: ref.timestamp,
+          }),
+        };
+      }),
+    );
+  };
+
   const getStoryChunks = async (
     tokenId: string,
     offset: number,
     limit: number,
   ): Promise<StoryChunk[]> => {
-    const ret: any = await contract.listStoryChunks(tokenId, offset, limit);
-    const rawChunks = Array.isArray(ret?.chunks)
-      ? ret.chunks
-      : Array.isArray(ret?.[0])
-        ? ret[0]
-        : Array.isArray(ret)
-          ? ret
-          : [];
-    return rawChunks.map(parseStoryChunkRecord);
+    const result = await contract.listStoryRecords(tokenId, offset, limit);
+    return hydrateStoryRecords(tokenId, offset, Array.from(result.records));
   };
 
   const listVersionEndorsements = async (personHash: string, offset: number, limit: number) => {
@@ -219,13 +266,12 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
   };
 
   const listStoryChunksPage = async (tokenId: string | number, offset: number, limit: number) => {
-    const out: any = await contract.listStoryChunks(tokenId, offset, limit);
-    const rawChunks: any[] = Array.from(out?.chunks ?? out?.[0] ?? []);
+    const out = await contract.listStoryRecords(tokenId, offset, limit);
     return {
-      chunks: rawChunks.map(parseStoryChunkRecord),
-      totalChunks: Number(out?.totalChunks ?? out?.[1] ?? 0),
-      hasMore: Boolean(out?.hasMore ?? out?.[2]),
-      nextOffset: Number(out?.nextOffset ?? out?.[3] ?? 0),
+      chunks: await hydrateStoryRecords(tokenId, offset, Array.from(out.records)),
+      totalChunks: Number(out.totalRecords),
+      hasMore: Boolean(out.hasMore),
+      nextOffset: Number(out.nextOffset),
     };
   };
 

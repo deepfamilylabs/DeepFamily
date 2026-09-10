@@ -59,12 +59,7 @@ export async function syncAbi(contractName, { cwd = process.cwd() } = {}) {
 }
 
 export async function main() {
-  for (const contractName of [
-    "DeepFamily",
-    "MetadataArchiveV1",
-    "StoryArchiveV1",
-    "DeepFamilyReader",
-  ]) {
+  for (const contractName of ["DeepFamily", "DeepFamilyArchiveV1", "DeepFamilyReader"]) {
     await syncAbi(contractName);
   }
 }

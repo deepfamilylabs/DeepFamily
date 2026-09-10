@@ -6,12 +6,18 @@ import {
 } from "@deepfamily/protocol-core";
 import type { ProofEnvelope } from "../../../shared/zk/zk";
 import { wrapIdentityCommitmentAsPersonHash } from "../../../shared/zk/zk";
-import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
 import {
-  estimateGasWithFallbackDetails,
-  parseReceiptEvents,
-  waitForTransactionReceipt,
-} from "../api/txGateway";
+  createDeepFamilyInterface,
+  createArchiveContract,
+  createArchiveInterface,
+} from "../../../shared/clients/contractFactory";
+import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
+
+import {
+  assertBlobRefMatches,
+  estimateArchiveTransaction,
+  type ArchiveTransactionPreview,
+} from "./archiveTransaction";
 
 export type AddVersionPublicSignals = {
   identityCommitment: bigint;
@@ -49,6 +55,7 @@ export type AddVersionResult = {
       pointer: string;
       payloadHash: string;
       payloadLength: number;
+      segmentCount: number;
     } | null;
     TokenRewardDistributed: {
       miner: string;
@@ -59,10 +66,7 @@ export type AddVersionResult = {
   };
 };
 
-export type AddVersionTransactionPreview = {
-  envelopeBytes: number;
-  gasLimit: bigint;
-} & ({ estimatedGas: bigint; estimated: true } | { estimatedGas: null; estimated: false });
+export type AddVersionTransactionPreview = ArchiveTransactionPreview & { envelopeBytes: number };
 
 export type ExecuteAddVersionFlowParams = {
   submitContract: any;
@@ -74,7 +78,6 @@ export type ExecuteAddVersionFlowParams = {
   fatherVersionIndex: number;
   motherVersionIndex: number;
   metadataEnvelope: Uint8Array | string;
-  fallbackGas?: bigint;
   isDev?: boolean;
   onTransactionSubmitted?: (txHash: string) => void;
   expectedChainId?: number | bigint | null;
@@ -217,8 +220,9 @@ function parseAddVersionReceipt(input: {
   receipt: any;
   transactionHash: string;
   contractAddress?: string | null;
+  archiveAddress: string;
 }): AddVersionResult {
-  const { receipt, transactionHash, contractAddress } = input;
+  const { receipt, transactionHash, contractAddress, archiveAddress } = input;
   const events: AddVersionResult["events"] = {
     PersonHashZKVerified: null,
     PersonVersionAdded: null,
@@ -230,9 +234,7 @@ function parseAddVersionReceipt(input: {
   let versionIndex = 0;
   let rewardAmount = 0;
   const eventInterface = createDeepFamilyInterface();
-  const metadataArchiveInterface = new ethers.Interface([
-    "event MetadataStored(bytes32 indexed personHash,uint256 indexed versionIndex,address pointer,bytes32 payloadHash,uint32 payloadLength)",
-  ]);
+  const archiveInterface = createArchiveInterface();
 
   for (const parsedEvent of parseReceiptEvents(receipt, eventInterface, contractAddress)) {
     switch (parsedEvent.name) {
@@ -269,20 +271,16 @@ function parseAddVersionReceipt(input: {
     }
   }
 
-  for (const log of receipt.logs || []) {
-    try {
-      const parsedEvent = metadataArchiveInterface.parseLog(log);
-      if (parsedEvent?.name !== "MetadataStored") continue;
-      events.MetadataStored = {
-        personHash: parsedEvent.args.personHash,
-        versionIndex: Number(parsedEvent.args.versionIndex),
-        pointer: parsedEvent.args.pointer,
-        payloadHash: parsedEvent.args.payloadHash,
-        payloadLength: Number(parsedEvent.args.payloadLength),
-      };
-    } catch {
-      // Other receipt logs belong to DeepFamily, the token, or the verifier path.
-    }
+  for (const parsedEvent of parseReceiptEvents(receipt, archiveInterface, archiveAddress)) {
+    if (parsedEvent.name !== "MetadataStored") continue;
+    events.MetadataStored = {
+      personHash: parsedEvent.args.personHash,
+      versionIndex: Number(parsedEvent.args.versionIndex),
+      pointer: parsedEvent.args.blob.pointer,
+      payloadHash: parsedEvent.args.blob.payloadHash,
+      payloadLength: Number(parsedEvent.args.blob.payloadLength),
+      segmentCount: Number(parsedEvent.args.blob.segmentCount),
+    };
   }
 
   return {
@@ -341,7 +339,8 @@ function assertReconciledAddVersion(input: {
     sameHex(metadata.personHash, input.expectedPersonHash) &&
     metadata.versionIndex === version.versionIndex &&
     sameHex(metadata.payloadHash, expectedPayloadHash) &&
-    metadata.payloadLength === expectedPayloadLength;
+    metadata.payloadLength === expectedPayloadLength &&
+    metadata.segmentCount === Math.ceil(expectedPayloadLength / 16_384);
 
   if (!matches) {
     throw makeReconciliationError(
@@ -362,7 +361,6 @@ export async function executeAddVersionFlow({
   fatherVersionIndex,
   motherVersionIndex,
   metadataEnvelope,
-  fallbackGas = 6_500_000n,
   isDev = false,
   onTransactionSubmitted,
   expectedChainId,
@@ -371,6 +369,9 @@ export async function executeAddVersionFlow({
   getTransactionReceipt,
   confirmTransactionPreview,
 }: ExecuteAddVersionFlowParams): Promise<AddVersionResult> {
+  metadataEnvelope = ethers.hexlify(metadataEnvelope);
+  const archiveAddress = await preflightContract.archive();
+  const archive = createArchiveContract(archiveAddress, preflightContract.runner);
   const addPersonArgs = [
     proof,
     publicSignals,
@@ -452,6 +453,7 @@ export async function executeAddVersionFlow({
       receipt,
       transactionHash: reconcileTransactionHash,
       contractAddress,
+      archiveAddress,
     });
     assertReconciledAddVersion({
       receipt,
@@ -466,6 +468,10 @@ export async function executeAddVersionFlow({
       versionCommitment: publicSignals.versionCommitment,
       metadataEnvelope,
     });
+    const ref = await archive.metadataRef(expectedPersonHash, result.index, {
+      blockTag: receipt.blockNumber,
+    });
+    assertBlobRefMatches(ref, result.events.MetadataStored!);
     return result;
   }
 
@@ -514,30 +520,20 @@ export async function executeAddVersionFlow({
     }
   }
 
-  const gasDetails = await estimateGasWithFallbackDetails({
+  const gasDetails = await estimateArchiveTransaction({
     contractMethod: submitContract.addPersonVersion,
     args: addPersonArgs,
-    decodeContract: submitContract ?? preflightContract,
-    fallbackGas,
-    isDev,
-    label: "addPersonVersion",
+    provider: submitContract.runner?.provider ?? submitContract.runner,
+    calldata: expectedTransactionData,
+    payload: metadataEnvelope,
+    kind: "Metadata",
   });
 
   if (confirmTransactionPreview) {
-    const envelopeBytes = ethers.getBytes(metadataEnvelope).length;
-    const preview: AddVersionTransactionPreview = gasDetails.estimated
-      ? {
-          envelopeBytes,
-          estimatedGas: gasDetails.estimatedGas,
-          gasLimit: gasDetails.gasLimit,
-          estimated: true,
-        }
-      : {
-          envelopeBytes,
-          estimatedGas: null,
-          gasLimit: gasDetails.gasLimit,
-          estimated: false,
-        };
+    const preview: AddVersionTransactionPreview = {
+      ...gasDetails,
+      envelopeBytes: gasDetails.payloadBytes,
+    };
     const approved = await confirmTransactionPreview(preview);
     if (!approved) {
       throw Object.assign(new Error("Add Version submission cancelled before wallet request"), {
@@ -580,9 +576,28 @@ export async function executeAddVersionFlow({
     expectedData: expectedTransactionData,
     onTransactionSubmitted,
   });
-  return parseAddVersionReceipt({
+  const result = parseAddVersionReceipt({
     receipt: finalTransaction.receipt,
     transactionHash: finalTransaction.transactionHash,
     contractAddress,
+    archiveAddress,
   });
+  assertReconciledAddVersion({
+    receipt: finalTransaction.receipt,
+    result,
+    transactionHash: finalTransaction.transactionHash,
+    expectedPersonHash,
+    expectedFatherHash,
+    expectedMotherHash,
+    expectedSubmitter,
+    fatherVersionIndex,
+    motherVersionIndex,
+    versionCommitment: publicSignals.versionCommitment,
+    metadataEnvelope,
+  });
+  const ref = await archive.metadataRef(expectedPersonHash, result.index, {
+    blockTag: finalTransaction.receipt.blockNumber,
+  });
+  assertBlobRefMatches(ref, result.events.MetadataStored!);
+  return result;
 }

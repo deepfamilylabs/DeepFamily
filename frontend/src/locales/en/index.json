@@ -886,8 +886,7 @@
       "note4": "Career: For focused professional history (jobs, companies, positions)",
       "note5": "Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline"
     },
-    "contentTooLongBytes": "Content must not exceed 16384 bytes",
-    "contentPlaceholderBytes": "Enter chunk content (max 16384 UTF-8 bytes)",
+    "contentPlaceholderBytes": "Enter story content; network gas capacity determines the record size",
     "success": {
       "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",
       "chunkAddedGeneric": "Story chunk added successfully",
@@ -1527,5 +1526,22 @@
     "contact": "Questions in the meantime:",
     "termsSummary": "The terms that will govern use of the DeepFamily dApp.",
     "privacySummary": "What this dApp reads, what stays in your browser, and what is public on-chain."
+  },
+  "archive": {
+    "payloadBytes": "Canonical payload bytes",
+    "segments": "Storage segments",
+    "estimatedGas": "RPC estimated gas",
+    "gasLimit": "Gas limit (+20%)",
+    "estimatedFee": "Estimated fee",
+    "maximumFee": "Buffered fee estimate",
+    "segmentCost": "This record creates multiple storage segments. Each new segment increases transaction cost.",
+    "feeChanges": "Network fees can change before your wallet submits the transaction.",
+    "exactBytes": "View exact payload bytes and hash",
+    "unknownSchema": "This record uses an unsupported schema. Its original bytes have been verified.",
+    "rawRecord": "View verified raw record",
+    "largeStory": "Multiple storage segments; review the estimated cost before signing",
+    "reviewStory": "Review story transaction",
+    "confirm": "Continue to wallet",
+    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes"
   }
 }

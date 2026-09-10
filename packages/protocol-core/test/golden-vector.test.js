@@ -18,7 +18,7 @@ import {
   computeVersionHash,
   computeIdentityFromDerivedSecret,
   decryptPersonVersionEnvelope,
-  decryptPersonVersionRuntime,
+  readAndDecryptPersonVersion,
   deriveFileKekBytes,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
@@ -247,8 +247,10 @@ test("fixed randomness reproduces the byte-exact DFM1 envelope and production ro
 
   const runtime = new Uint8Array(encrypted.envelope.length + 1);
   runtime.set(encrypted.envelope, 1);
-  const fromRuntime = await decryptPersonVersionRuntime({
-    runtimeCode: runtime,
+  const fromRuntime = await readAndDecryptPersonVersion({
+    segmentCount: 1,
+    pointer: "0x1111111111111111111111111111111111111111",
+    getCode: async () => runtime,
     payloadLength: encrypted.envelope.length,
     payloadHash: encrypted.payloadHash,
     rawPassphrase: "",

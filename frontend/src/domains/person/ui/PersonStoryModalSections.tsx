@@ -1,3 +1,4 @@
+import { UnsupportedStoryRecord } from "../../../shared/ui/UnsupportedStoryRecord";
 import type React from "react";
 import type { TFunction } from "i18next";
 import { useEffect, useRef, useState } from "react";
@@ -232,9 +233,7 @@ export function BasicStorySection({ t, story }: { t: PersonStoryT; story?: strin
     <div className="space-y-3">
       <SectionTitle>{t("storyChunksModal.basicStory", "Basic Story")}</SectionTitle>
       <InfoCard>
-        <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap font-medium">
-          {story}
-        </p>
+        <p className="text-sm leading-relaxed text-ink whitespace-pre-wrap font-medium">{story}</p>
       </InfoCard>
     </div>
   );
@@ -266,9 +265,7 @@ function StoryViewToggle({
         className={buttonClass(viewMode === "chunks")}
       >
         <Layers size={14} className={iconClass(viewMode === "chunks")} />
-        <span>
-          {t("storyChunksModal.chunks", "Chunks")}
-        </span>
+        <span>{t("storyChunksModal.chunks", "Chunks")}</span>
       </button>
       <button
         type="button"
@@ -277,9 +274,7 @@ function StoryViewToggle({
         className={buttonClass(viewMode === "full")}
       >
         <FileText size={14} className={iconClass(viewMode === "full")} />
-        <span>
-          {t("storyChunksModal.fullText", "Full Text")}
-        </span>
+        <span>{t("storyChunksModal.fullText", "Full Text")}</span>
       </button>
     </div>
   );
@@ -387,9 +382,7 @@ function StoryFullTextPanel({ fullStory }: { fullStory: string }) {
   return (
     <div className="bg-surface rounded-xl p-6 sm:p-8 border border-hairline shadow-xs leading-relaxed">
       <div className="prose prose-base dark:prose-invert max-w-none">
-        <div className="whitespace-pre-wrap text-ink font-serif leading-relaxed">
-          {fullStory}
-        </div>
+        <div className="whitespace-pre-wrap text-ink font-serif leading-relaxed">{fullStory}</div>
       </div>
     </div>
   );
@@ -437,9 +430,7 @@ function StoryChunkCard({
         <div className="flex items-start gap-4">
           <div
             className={`mt-0.5 p-1.5 rounded-full transition-colors ${
-              isExpanded
-                ? "bg-primary/12 text-primary"
-                : "bg-surface-muted text-ink-subtle"
+              isExpanded ? "bg-primary/12 text-primary" : "bg-surface-muted text-ink-subtle"
             }`}
           >
             {isExpanded ? (
@@ -474,7 +465,13 @@ function StoryChunkCard({
             <div
               className={`text-sm leading-relaxed ${isExpanded ? "text-ink whitespace-pre-wrap" : "text-ink-muted line-clamp-2"}`}
             >
-              {isExpanded ? chunk.content : preview}
+              {chunk.unsupportedSchema ? (
+                <UnsupportedStoryRecord record={chunk} />
+              ) : isExpanded ? (
+                chunk.content
+              ) : (
+                preview
+              )}
             </div>
 
             {isExpanded && (

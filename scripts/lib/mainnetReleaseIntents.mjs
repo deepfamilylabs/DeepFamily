@@ -76,7 +76,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the exact eighteen-transaction EVM mainnet release intent without a signer or RPC.
+ * Rebuilds the exact sixteen-transaction EVM mainnet release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -110,8 +110,7 @@ export const buildMainnetReleaseIntents = async ({
     "Groth16VerifierAdapter",
     "DeepFamily",
     "UUPSProxy",
-    "MetadataArchiveV1",
-    "StoryArchiveV1",
+    "DeepFamilyArchiveV1",
     "DeepFamilyReader",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
@@ -130,11 +129,9 @@ export const buildMainnetReleaseIntents = async ({
     deepFamilyImplementation: addressAt(7),
     deepFamilyProxy: addressAt(8),
     // nonce 9 is the tokenInitialize call.
-    metadataArchiveV1: addressAt(10),
-    // nonce 11 is the one-time setMetadataArchive call.
-    storyArchiveV1: addressAt(12),
-    // nonce 13 is the one-time setStoryArchive call.
-    deepFamilyReader: addressAt(14),
+    deepFamilyArchiveV1: addressAt(10),
+    // nonce 11 is the one-time setArchive call.
+    deepFamilyReader: addressAt(12),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -216,17 +213,11 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyToken,
     tokenInterface.encodeFunctionData("initialize", [addresses.deepFamilyProxy]),
   );
-  await pushDeployment("metadataArchiveV1", "MetadataArchiveV1", [addresses.deepFamilyProxy]);
+  await pushDeployment("deepFamilyArchiveV1", "DeepFamilyArchiveV1", [addresses.deepFamilyProxy]);
   pushCall(
-    "setMetadataArchive",
+    "setArchive",
     addresses.deepFamilyProxy,
-    deepFamilyInterface.encodeFunctionData("setMetadataArchive", [addresses.metadataArchiveV1]),
-  );
-  await pushDeployment("storyArchiveV1", "StoryArchiveV1", [addresses.deepFamilyProxy]);
-  pushCall(
-    "setStoryArchive",
-    addresses.deepFamilyProxy,
-    deepFamilyInterface.encodeFunctionData("setStoryArchive", [addresses.storyArchiveV1]),
+    deepFamilyInterface.encodeFunctionData("setArchive", [addresses.deepFamilyArchiveV1]),
   );
   await pushDeployment("deepFamilyReader", "DeepFamilyReader", [addresses.deepFamilyProxy]);
   pushCall(

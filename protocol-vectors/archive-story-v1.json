@@ -1,0 +1,71 @@
+{
+  "schema": "deepfamily/story-chunk@1.0",
+  "schemaId": "0x9f539ede836a9e6f94b418aeebb0b1143be9dee6d1dda3665ae5fee00c3f06f8",
+  "recordDomainText": "deepfamily.archive.story-record.v1",
+  "recordDomain": "0x11c45f73aceb35bc7e9827edf3c5d495de8edc96001c2cd2bb7940c161f15a98",
+  "headDomainText": "deepfamily.archive.story-head.v1",
+  "headDomain": "0x53b5e51d2cea7f54d1dc5c2bb4e490b0cfe0dd605c62c0fd8445117109736ca8",
+  "initialHead": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "recordAbiTypes": [
+    "bytes32",
+    "uint256",
+    "address",
+    "uint256",
+    "uint64",
+    "bytes32",
+    "bytes32",
+    "uint64",
+    "address",
+    "uint64"
+  ],
+  "headAbiTypes": ["bytes32", "bytes32", "bytes32"],
+  "records": [
+    {
+      "input": {
+        "content": "  中😀 é\n\"quote\" \\ /\t\u0000\u001f    ",
+        "chunkType": 3,
+        "attachmentCID": "ipfs://例子/😀"
+      },
+      "canonicalJson": "{\"schema\":\"deepfamily/story-chunk@1.0\",\"content\":\"  中😀 é\\n\\\"quote\\\" \\\\ /\\t\\u0000\\u001f    \",\"chunkType\":3,\"attachmentCID\":\"ipfs://例子/😀\"}",
+      "canonicalHex": "0x7b22736368656d61223a226465657066616d696c792f73746f72792d6368756e6b40312e30222c22636f6e74656e74223a222020e4b8adf09f98802065cc815c6e5c2271756f74655c22205c5c202f5c745c75303030305c7530303166e280a8e280a92020222c226368756e6b54797065223a332c226174746163686d656e74434944223a22697066733a2f2fe4be8be5ad902ff09f9880227d",
+      "commitment": {
+        "chainId": "31337",
+        "archive": "0x1111111111111111111111111111111111111111",
+        "tokenId": "7",
+        "index": "0",
+        "schemaId": "0x9f539ede836a9e6f94b418aeebb0b1143be9dee6d1dda3665ae5fee00c3f06f8",
+        "payloadHash": "0x2c1fb025e9f9eee002cdc3b71d249daceb2b0e7c758ce2a731ed3831b9522239",
+        "payloadLength": "154",
+        "author": "0x2222222222222222222222222222222222222222",
+        "timestamp": "1700000000"
+      },
+      "previousHead": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "recordHash": "0xa45d320bb77ab8f624a53dfeb53061cc5b97e739e3bfa183e1da8b28ceb0c1c7",
+      "newHead": "0x14aebfbb73d78e1a15a0da9a1721c2ff5fdd77b83e44021bc87c5d18d18e1351"
+    },
+    {
+      "input": {
+        "content": "Second record\r\nkeeps its final newline.\n",
+        "chunkType": 255,
+        "attachmentCID": ""
+      },
+      "canonicalJson": "{\"schema\":\"deepfamily/story-chunk@1.0\",\"content\":\"Second record\\r\\nkeeps its final newline.\\n\",\"chunkType\":255,\"attachmentCID\":\"\"}",
+      "canonicalHex": "0x7b22736368656d61223a226465657066616d696c792f73746f72792d6368756e6b40312e30222c22636f6e74656e74223a225365636f6e64207265636f72645c725c6e6b65657073206974732066696e616c206e65776c696e652e5c6e222c226368756e6b54797065223a3235352c226174746163686d656e74434944223a22227d",
+      "commitment": {
+        "chainId": "31337",
+        "archive": "0x1111111111111111111111111111111111111111",
+        "tokenId": "7",
+        "index": "1",
+        "schemaId": "0x9f539ede836a9e6f94b418aeebb0b1143be9dee6d1dda3665ae5fee00c3f06f8",
+        "payloadHash": "0xff838398b6e957b9072f3a9af823c938effcf41e738d48e7cb206095f9441790",
+        "payloadLength": "130",
+        "author": "0x3333333333333333333333333333333333333333",
+        "timestamp": "1700000001"
+      },
+      "previousHead": "0x14aebfbb73d78e1a15a0da9a1721c2ff5fdd77b83e44021bc87c5d18d18e1351",
+      "recordHash": "0x504b081a1489a1d746214b4752efc510ac7c21f1d9cad4b4af77398311bb8f46",
+      "newHead": "0xd367b139f7762123210ed8618f7f4c452ba4e188061ad6f8a1890db2c7da07e4"
+    }
+  ],
+  "finalHead": "0xd367b139f7762123210ed8618f7f4c452ba4e188061ad6f8a1890db2c7da07e4"
+}

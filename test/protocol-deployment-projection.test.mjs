@@ -50,16 +50,12 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
       disclosureBindingVerifier:
         deployments.groth16VerifierAdapter.disclosureBindingVerifierImmutable,
     }),
-    metadataArchiveV1: artifact("MetadataArchiveV1", {
-      deepFamily: deployments.metadataArchiveV1.deepFamilyImmutable,
-    }),
-    storyArchiveV1: artifact("StoryArchiveV1", {
-      deepFamily: deployments.storyArchiveV1.deepFamilyImmutable,
+    deepFamilyArchiveV1: artifact("DeepFamilyArchiveV1", {
+      deepFamily: deployments.deepFamilyArchiveV1.deepFamilyImmutable,
     }),
     deepFamilyReader: artifact("DeepFamilyReader", {
       deepFamily: deployments.deepFamilyReader.deepFamilyImmutable,
-      metadataArchive: deployments.deepFamilyReader.metadataArchiveImmutable,
-      storyArchive: deployments.deepFamilyReader.storyArchiveImmutable,
+      archive: deployments.deepFamilyReader.archiveImmutable,
     }),
   });
 };
@@ -159,20 +155,15 @@ describe("planned production protocol deployment projection", function () {
         (manifest) =>
           (manifest.deployments.groth16VerifierAdapter.disclosureBindingVerifierImmutable =
             DEPLOYER),
-        (manifest) => (manifest.deployments.metadataArchiveV1.address = DEPLOYER),
-        (manifest) => (manifest.deployments.metadataArchiveV1.deepFamilyImmutable = DEPLOYER),
-        (manifest) => (manifest.deployments.storyArchiveV1.address = DEPLOYER),
-        (manifest) => (manifest.deployments.storyArchiveV1.deepFamilyImmutable = DEPLOYER),
+        (manifest) => (manifest.deployments.deepFamilyArchiveV1.address = DEPLOYER),
+        (manifest) => (manifest.deployments.deepFamilyArchiveV1.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.address = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.deepFamilyImmutable = DEPLOYER),
-        (manifest) => (manifest.deployments.deepFamilyReader.metadataArchiveImmutable = DEPLOYER),
-        (manifest) => (manifest.deployments.deepFamilyReader.storyArchiveImmutable = DEPLOYER),
+        (manifest) => (manifest.deployments.deepFamilyReader.archiveImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.groth16VerifierAdapter.artifactSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.groth16VerifierAdapter.runtimeSha256 = "f".repeat(64)),
-        (manifest) => (manifest.deployments.metadataArchiveV1.artifactSha256 = "f".repeat(64)),
-        (manifest) => (manifest.deployments.metadataArchiveV1.runtimeSha256 = "f".repeat(64)),
-        (manifest) => (manifest.deployments.storyArchiveV1.artifactSha256 = "f".repeat(64)),
-        (manifest) => (manifest.deployments.storyArchiveV1.runtimeSha256 = "f".repeat(64)),
+        (manifest) => (manifest.deployments.deepFamilyArchiveV1.artifactSha256 = "f".repeat(64)),
+        (manifest) => (manifest.deployments.deepFamilyArchiveV1.runtimeSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.deepFamilyReader.artifactSha256 = "f".repeat(64)),
         (manifest) => (manifest.deployments.deepFamilyReader.runtimeSha256 = "f".repeat(64)),
       ];
@@ -199,12 +190,8 @@ describe("planned production protocol deployment projection", function () {
         fixture.planned.artifacts.groth16VerifierAdapter.runtimeBytecode,
       ],
       [
-        fixture.plannedAddresses.metadataArchiveV1.toLowerCase(),
-        fixture.planned.artifacts.metadataArchiveV1.runtimeBytecode,
-      ],
-      [
-        fixture.plannedAddresses.storyArchiveV1.toLowerCase(),
-        fixture.planned.artifacts.storyArchiveV1.runtimeBytecode,
+        fixture.plannedAddresses.deepFamilyArchiveV1.toLowerCase(),
+        fixture.planned.artifacts.deepFamilyArchiveV1.runtimeBytecode,
       ],
       [
         fixture.plannedAddresses.deepFamilyReader.toLowerCase(),

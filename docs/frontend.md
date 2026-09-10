@@ -257,16 +257,16 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Commonly used optional vars**
 
-| Variable                                                         | Purpose                                                  |
-| ---------------------------------------------------------------- | -------------------------------------------------------- |
-| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)          |
-| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for NFT/attachment CIDs; must match CSP allowlist |
-| `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs           |
-| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                       |
-| `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                         |
-| `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                 |
+| Variable                                                         | Purpose                                                                    |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
+| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for NFT/attachment CIDs; must match CSP allowlist        |
+| `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs                             |
+| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                                         |
+| `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                                           |
+| `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                                   |
 | `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                         | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
-| `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                   |
+| `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                                     |
 
 ### Local auto-config
 
@@ -395,7 +395,7 @@ does not protect browser-profile backups or defend against same-origin XSS. Pass
 salts, derived secrets, KEK/DEK, witnesses, and `contentDigest` are never part of `NodeData` or the
 cache.
 
-Private `biography` is distinct from the NFT supplement `story` and public on-chain `StoryChunk`
+Private `biography` is distinct from the NFT supplement `story` and public on-chain DFS1 Story
 data. Any UI action that copies private text into an NFT story must require explicit confirmation
 that the destination is public. Attachment CIDs and NFT token URIs remain supported; the legacy
 external person-metadata/decryption flow is retired.
@@ -443,9 +443,13 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 | Symptom                         | First thing to check                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS` (DeepFamilyReader), and that the node is reachable |
+| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS` (DeepFamilyReader), and that the node is reachable  |
 | ABI mismatch / missing methods  | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`)                              |
 | Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
 | Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |
 | Stale tree/query data           | Clear IndexedDB (`VITE_USE_INDEXEDDB_CACHE=1`) or toggle it off for a run                   |
 | Root node not found             | Verify `VITE_ROOT_PERSON_HASH` / `VITE_ROOT_VERSION_INDEX` (or their per-language variants) |
+
+## Archive V1 reads and writes
+
+The frontend reads named BlobRef and StoryRecordRef fields and verifies complete segmented bytecode via `protocol-core` before decoding. Story content uses exact canonical DFS1 bytes; unknown schemas remain verified raw records. Metadata and Story submissions require successful full-call gas estimation and a 20% integer-ceiling buffer within network limits. The confirmation preview exposes bytes, segment count, gas and fees. See [Archive V1](archive-v1.md) for the frozen protocol rules.

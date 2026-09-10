@@ -41,6 +41,7 @@ const successfulFlowResult = () => ({
       versionIndex: 3,
       pointer,
       payloadHash,
+      segmentCount: 1,
       payloadLength: 20,
     },
     TokenRewardDistributed: null,
@@ -86,11 +87,11 @@ const mocks = vi.hoisted(() => ({
   },
   deepFamilyContract: {
     versionExists: vi.fn(),
-    metadataArchive: vi.fn(),
+    archive: vi.fn(),
   },
   readerContract: {
     DEEP_FAMILY: vi.fn(),
-    METADATA_ARCHIVE: vi.fn(),
+    ARCHIVE: vi.fn(),
     getVersionDetails: vi.fn(),
   },
   createDeepFamilyContract: vi.fn(),
@@ -311,9 +312,9 @@ describe("AddVersionModal", () => {
     mocks.captureMetadataCacheRevision.mockReset();
     mocks.captureMetadataCacheRevision.mockReturnValue(11);
     mocks.deepFamilyContract.versionExists.mockReset();
-    mocks.deepFamilyContract.metadataArchive.mockReset();
+    mocks.deepFamilyContract.archive.mockReset();
     mocks.readerContract.DEEP_FAMILY.mockReset();
-    mocks.readerContract.METADATA_ARCHIVE.mockReset();
+    mocks.readerContract.ARCHIVE.mockReset();
     mocks.readerContract.getVersionDetails.mockReset();
     mocks.createDeepFamilyContract.mockReset();
     mocks.createDeepFamilyReaderContract.mockReset();
@@ -336,9 +337,9 @@ describe("AddVersionModal", () => {
 
     mocks.signer.getAddress.mockResolvedValue(submitter);
     mocks.deepFamilyContract.versionExists.mockResolvedValue(false);
-    mocks.deepFamilyContract.metadataArchive.mockResolvedValue(archiveAddress);
+    mocks.deepFamilyContract.archive.mockResolvedValue(archiveAddress);
     mocks.readerContract.DEEP_FAMILY.mockResolvedValue(contractAddress);
-    mocks.readerContract.METADATA_ARCHIVE.mockResolvedValue(archiveAddress);
+    mocks.readerContract.ARCHIVE.mockResolvedValue(archiveAddress);
     mocks.readerContract.getVersionDetails.mockResolvedValue([
       {
         personHash,
@@ -351,7 +352,7 @@ describe("AddVersionModal", () => {
         addedBy: submitter,
         timestamp: 789n,
       },
-      { pointer, payloadHash, payloadLength: 20n },
+      { pointer, payloadHash, segmentCount: 1n, payloadLength: 20n },
       0n,
       0n,
     ]);
@@ -584,7 +585,7 @@ describe("AddVersionModal", () => {
       },
       // The frozen package contains exactly 20 bytes. A Reader response for a
       // different Archive ref must not produce an unlocked NodeData record.
-      { pointer, payloadHash, payloadLength: 19n },
+      { pointer, payloadHash, segmentCount: 1n, payloadLength: 19n },
       0n,
       0n,
     ]);
@@ -625,6 +626,7 @@ describe("AddVersionModal", () => {
       {
         pointer: "0x0000000000000000000000000000000000000b11",
         payloadHash,
+        segmentCount: 1,
         payloadLength: 20n,
       },
       0n,
@@ -825,6 +827,13 @@ describe("AddVersionModal", () => {
     mocks.addVersionRunOrThrow.mockImplementation(async () => {
       const approved = await mocks.confirmTransactionPreview?.({
         envelopeBytes: 20,
+        payloadBytes: 20,
+        segmentCount: 1,
+        canonicalPayload: "0x1234",
+        payloadHash: "0x" + "11".repeat(32),
+        estimatedFee: 1n,
+        maximumFee: 2n,
+        nativeSymbol: "ETH",
         estimatedGas: 123_456n,
         gasLimit: 148_147n,
         estimated: true,
@@ -842,7 +851,7 @@ describe("AddVersionModal", () => {
     });
 
     expect(await screen.findByText("Review before opening your wallet")).toBeTruthy();
-    expect(screen.getByText("20 / 16,384")).toBeTruthy();
+    expect(screen.getAllByText("20")[0]).toBeTruthy();
     expect(screen.getByText("123,456")).toBeTruthy();
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
 

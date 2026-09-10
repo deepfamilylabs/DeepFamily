@@ -1,5 +1,9 @@
 import { useStoryEditorController } from "./story-editor/hooks/useStoryEditorController";
-import { SealConfirmDialog, ChunkTypeHelpDialog } from "./story-editor/sections/StoryEditorDialogs";
+import {
+  SealConfirmDialog,
+  ChunkTypeHelpDialog,
+  StoryTransactionPreviewDialog,
+} from "./story-editor/sections/StoryEditorDialogs";
 import { StoryEditorMainSection } from "./story-editor/sections/StoryEditorMainSection";
 import { StoryChunksSidebar } from "./story-editor/sections/StoryChunksSidebar";
 
@@ -15,6 +19,7 @@ export default function StoryEditorPage() {
         </div>
       </div>
 
+      <StoryTransactionPreviewDialog editor={editor} />
       <SealConfirmDialog editor={editor} />
       <ChunkTypeHelpDialog editor={editor} />
     </>

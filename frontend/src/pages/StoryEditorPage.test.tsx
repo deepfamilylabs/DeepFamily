@@ -89,7 +89,8 @@ vi.mock("../shared/cache/queryClient", () => ({
   }),
 }));
 
-vi.mock("../domains/transactions", () => ({
+vi.mock("../domains/transactions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../domains/transactions")>()),
   useAddStoryChunkFlow: () => ({
     runOrThrow: mocks.addStoryRunOrThrow,
   }),
@@ -102,6 +103,7 @@ const bytes32 = (hex: string) => `0x${hex.repeat(32)}`;
 
 const existingChunk: StoryChunk = {
   chunkIndex: 0,
+  recordHash: bytes32("a1"),
   chunkHash: bytes32("11"),
   content: "existing story",
   timestamp: 100,
@@ -183,7 +185,7 @@ describe("StoryEditorPage", () => {
       blockNumber: 99,
       newChunk: addedChunk,
       events: {
-        StoryChunkAdded: {
+        StoryRecordAppended: {
           chunkIndex: 1,
           contentLength: addedChunk.content.length,
         },
@@ -194,7 +196,7 @@ describe("StoryEditorPage", () => {
 
     await waitFor(() => expect(screen.getByText("Ada Lovelace Biography")).toBeTruthy());
 
-    fireEvent.change(screen.getByPlaceholderText(/Enter chunk content/), {
+    fireEvent.change(screen.getByPlaceholderText(/Enter story content/), {
       target: { value: "new story" },
     });
 
@@ -202,7 +204,11 @@ describe("StoryEditorPage", () => {
       fireEvent.click(screen.getByText("Save Chunk"));
     });
 
-    await waitFor(() => expect(mocks.addStoryRunOrThrow).toHaveBeenCalledTimes(1));
+    await waitFor(() => {
+      const alerts = screen.queryAllByRole("alert");
+      if (alerts.length) throw new Error(alerts.map((el) => el.textContent).join("; "));
+      expect(mocks.addStoryRunOrThrow).toHaveBeenCalledTimes(1);
+    });
     expect(mocks.addStoryRunOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         tokenId: "42",
@@ -215,10 +221,26 @@ describe("StoryEditorPage", () => {
     );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith(
-      "Chunk #1 added successfully (9 bytes)",
-    );
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Chunk #1 added successfully (9 bytes)");
     expect(await screen.findByText("new story")).toBeTruthy();
+  });
+
+  it("shows the actionable capacity guidance when a story cannot fit the network limit", async () => {
+    const message =
+      "Buffered archive gas exceeds the network transaction limit. Split the text into another logical story record.";
+    mocks.addStoryRunOrThrow.mockRejectedValue(
+      Object.assign(new Error(message), {
+        code: "ARCHIVE_VALIDATION_FAILED",
+        type: "VALIDATION_ERROR",
+      }),
+    );
+    render(<StoryEditorPage />);
+    fireEvent.change(screen.getByPlaceholderText(/Enter story content/), {
+      target: { value: "A story" },
+    });
+    fireEvent.click(screen.getByText("Save Chunk"));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain(message));
+    expect(screen.getByRole("alert").textContent).not.toContain("Network error");
   });
 
   it("seals the story through the confirmation dialog and updates local sealed state", async () => {
@@ -246,7 +268,12 @@ describe("StoryEditorPage", () => {
       fireEvent.click(screen.getByText("Confirm Seal"));
     });
 
-    await waitFor(() => expect(mocks.sealStoryRunOrThrow).toHaveBeenCalledWith({ tokenId: "42" }));
+    await waitFor(() =>
+      expect(mocks.sealStoryRunOrThrow).toHaveBeenCalledWith({
+        tokenId: "42",
+        confirmTransactionPreview: expect.any(Function),
+      }),
+    );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Story sealed successfully (1 chunks)");

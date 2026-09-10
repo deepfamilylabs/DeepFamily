@@ -7,7 +7,9 @@ const textEncoder = new TextEncoder();
 export function utf8Bytes(value) {
   protocolAssert(typeof value === "string", "INVALID_STRING", "Expected a string");
   assertUnicodeScalarString(value);
-  return textEncoder.encode(value);
+  // A host-provided encoder may return bytes from another realm (for example
+  // jsdom or an iframe). Return this module's Uint8Array for BytesLike consumers.
+  return new Uint8Array(textEncoder.encode(value));
 }
 
 export function decodeUtf8Fatal(bytes) {

@@ -201,7 +201,9 @@ function metadataAnchorPatchChanges(current: NodeData, patch: Partial<NodeData>)
     (patch.metadataPayloadHash !== undefined &&
       !optionalHexEquals(patch.metadataPayloadHash, current.metadataPayloadHash)) ||
     (patch.metadataPayloadLength !== undefined &&
-      patch.metadataPayloadLength !== current.metadataPayloadLength)
+      patch.metadataPayloadLength !== current.metadataPayloadLength) ||
+    (patch.metadataSegmentCount !== undefined &&
+      patch.metadataSegmentCount !== current.metadataSegmentCount)
   );
 }
 
@@ -219,13 +221,16 @@ export function buildVersionDetailsPatch(options: {
   const nextMetadataPayloadHash =
     metadataFields.payloadHash ?? options.current?.metadataPayloadHash;
   const nextMetadataPointer = metadataFields.pointer ?? options.current?.metadataPointer;
+  const nextMetadataSegmentCount =
+    metadataFields.segmentCount ?? options.current?.metadataSegmentCount;
   const nextMetadataPayloadLength =
     metadataFields.payloadLength ?? options.current?.metadataPayloadLength;
   const anchorsMatch =
     options.current?.versionCommitment === nextVersionCommitment &&
     optionalHexEquals(options.current?.metadataPayloadHash, nextMetadataPayloadHash) &&
     optionalHexEquals(options.current?.metadataPointer, nextMetadataPointer) &&
-    options.current?.metadataPayloadLength === nextMetadataPayloadLength;
+    options.current?.metadataPayloadLength === nextMetadataPayloadLength &&
+    options.current?.metadataSegmentCount === nextMetadataSegmentCount;
   const currentWithToken =
     options.current && options.parsed.tokenId !== undefined
       ? { ...options.current, tokenId: options.parsed.tokenId }
@@ -250,6 +255,7 @@ export function buildVersionDetailsPatch(options: {
     metadataPointer: nextMetadataPointer,
     metadataPayloadHash: nextMetadataPayloadHash,
     metadataPayloadLength: nextMetadataPayloadLength,
+    metadataSegmentCount: nextMetadataSegmentCount,
     addedBy: versionFields.addedBy,
     timestamp: versionFields.timestamp,
     versionDetailsFetchedAt: options.versionDetailsFetchedAt,
@@ -274,6 +280,7 @@ export function buildNftDetailsPatch(options: {
     metadataPointer: metadataFields.pointer ?? options.current?.metadataPointer,
     metadataPayloadHash: metadataFields.payloadHash ?? options.current?.metadataPayloadHash,
     metadataPayloadLength: metadataFields.payloadLength ?? options.current?.metadataPayloadLength,
+    metadataSegmentCount: metadataFields.segmentCount ?? options.current?.metadataSegmentCount,
     addedBy: versionFields.addedBy ?? options.current?.addedBy,
     timestamp: versionFields.timestamp ?? options.current?.timestamp,
     endorsementCount: options.nftRet.endorsementCount ?? options.current?.endorsementCount,

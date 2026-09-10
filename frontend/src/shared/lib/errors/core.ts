@@ -157,6 +157,18 @@ export const formatErrorSummaryForDev = (error: any): string => {
 
 // Contract selector -> error name
 export const ERROR_SELECTOR_MAP: Record<string, string> = {
+  "0x30116425": "DeploymentFailed",
+  "0x1a4b1b63": "ArchiveAlreadySet",
+  "0x8545827a": "ArchiveNotSet",
+  "0xf83b295e": "InvalidArchive",
+  "0xc236eff4": "ArchiveBindingMismatch",
+  "0xca773707": "InvalidArchiveAddress",
+  "0xbd593a67": "RecordIndexOutOfRange",
+  "0x1f442cd1": "ArchiveNotActive",
+  "0x30ccdca1": "InvalidSchemaId",
+  "0x2190c4b9": "PayloadHashMismatch",
+  "0xb54d2efa": "StoryHeadMismatch",
+  "0xbc80e3d2": "StoryIndexMismatch",
   // DeepFamily contract errors (keccak256 selector first 4 bytes)
   "0xe5d242ed": "InvalidPersonHash",
   "0x1f9510eb": "InvalidFatherVersionIndex",
@@ -191,17 +203,8 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x99348b06": "DuplicateVersionCommitment",
   "0x82361e2c": "CallerOrIdentitySuiteMismatch",
   "0x91cecad6": "InvalidIdentitySuite",
-  "0x692ed5a3": "InvalidMetadataArchive",
-  "0x79a9801c": "MetadataArchiveAlreadySet",
-  "0xcb3e11dd": "MetadataArchiveNotSet",
-  "0x665b988e": "InvalidStoryArchive",
-  "0x79870302": "StoryArchiveAlreadySet",
   "0x181a3087": "InvalidMetadataEnvelope",
   "0x79e15e62": "InvalidEnvelopePrefix",
-  "0xb4c4bb30": "InvalidMetadataArchiveAddress",
-  "0xf3aeffc9": "MetadataArchiveBindingMismatch",
-  "0x3417d37d": "InvalidStoryArchiveAddress",
-  "0x8b281a14": "StoryArchiveBindingMismatch",
   "0x1ffb7a6a": "InvalidStoryContent",
   "0x5c427cd9": "UnauthorizedCaller",
   "0x5e7407c2": "InvalidPayloadLength",
@@ -304,17 +307,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   CallerOrIdentitySuiteMismatch:
     "Caller address or identity suite does not match the submitted proof.",
   InvalidIdentitySuite: "Identity suite identifier is invalid.",
-  InvalidMetadataArchive: "Metadata Archive contract is invalid.",
-  MetadataArchiveAlreadySet: "Metadata Archive is already configured and cannot be replaced.",
-  MetadataArchiveNotSet: "Metadata Archive is not configured.",
-  InvalidStoryArchive: "Story Archive contract is invalid.",
-  StoryArchiveAlreadySet: "Story Archive is already configured and cannot be replaced.",
   InvalidMetadataEnvelope: "Encrypted metadata envelope is invalid.",
   InvalidEnvelopePrefix: "Encrypted metadata envelope header is invalid.",
-  InvalidMetadataArchiveAddress: "Metadata Archive address is invalid.",
-  MetadataArchiveBindingMismatch: "Metadata Archive is not bound to this DeepFamily contract.",
-  InvalidStoryArchiveAddress: "Story Archive address is invalid.",
-  StoryArchiveBindingMismatch: "Story Archive is not bound to this DeepFamily contract.",
   InvalidStoryContent: "Archived story content failed integrity validation.",
   UnauthorizedCaller: "Current contract is not authorized to write to the archive.",
   InvalidPayloadLength: "Encrypted metadata payload length is invalid.",
@@ -694,6 +688,22 @@ export const deriveReadableError = (err: any): string | null => {
 };
 
 export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
+  // Capacity guidance is already a user-facing validation result. Words such
+  // as "network" or "gas" must not replace it with a generic RPC error.
+  if (error?.code === "ARCHIVE_VALIDATION_FAILED") {
+    const message = truncate(
+      error.message || deriveReadableError(error) || "Archive validation failed",
+      MAX_ERROR_DETAILS_LENGTH,
+    );
+    return {
+      type: "VALIDATION_ERROR",
+      message,
+      details: message,
+      reason: "ARCHIVE_VALIDATION_FAILED",
+      code: "ARCHIVE_VALIDATION_FAILED",
+      retryable: false,
+    };
+  }
   const reason = resolveErrorReason(error);
   const humanMessage = error?.humanMessage || error?.message;
   const derivedRaw = deriveReadableError(error);

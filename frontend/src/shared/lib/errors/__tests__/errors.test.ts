@@ -279,3 +279,20 @@ describe("errors", () => {
     expect((normalized as any).code).toBe("INSUFFICIENT_DEEP_BALANCE");
   });
 });
+
+describe("Archive validation guidance", () => {
+  it("preserves capacity guidance across service, flow and UI normalization", () => {
+    const message =
+      "Buffered archive gas exceeds the network transaction limit. Split the text into another logical story record.";
+    const error = Object.assign(new Error(message), { code: "ARCHIVE_VALIDATION_FAILED" });
+    const normalized = normalizeErrorToError(error, passthroughT as any);
+    expect(normalized).toMatchObject({ code: "ARCHIVE_VALIDATION_FAILED", message });
+    expect(getFriendlyErrorMessage(normalized, passthroughT as any, "Operation failed")).toBe(
+      message,
+    );
+    expect(normalizeFriendlyError(normalized, passthroughT as any)).toMatchObject({
+      message,
+      retryable: false,
+    });
+  });
+});

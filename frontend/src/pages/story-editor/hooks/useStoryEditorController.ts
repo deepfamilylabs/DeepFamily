@@ -7,7 +7,6 @@ import { useAddStoryChunkFlow, useSealStoryFlow } from "../../../domains/transac
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
 import {
-  computeStoryHash,
   type NodeData,
   type StoryChunk,
   type StoryChunkCreateData,
@@ -28,11 +27,13 @@ import {
   normalizeStoryChunks,
   sortStoryChunks,
   STORY_MAX_ATTACHMENT_BYTES,
-  STORY_MAX_CHUNK_BYTES,
+  STORY_SEGMENT_BYTES,
   STORY_WARNING_ORANGE_BYTES,
   type ChunkFormData,
   type PrefetchedStoryState,
 } from "../model/storyEditorModel";
+
+import type { ArchiveTransactionPreview } from "../../../domains/transactions";
 
 export function useStoryEditorController() {
   const { tokenId } = useParams<{ tokenId: string }>();
@@ -62,6 +63,30 @@ export function useStoryEditorController() {
   const [dirty, setDirty] = useState<boolean>(false);
   const [formData, setFormData] = useState<ChunkFormData>(initialChunkFormData);
   const [submitting, setSubmitting] = useState(false);
+  const [transactionPreview, setTransactionPreview] = useState<ArchiveTransactionPreview | null>(
+    null,
+  );
+  const previewDecision = useRef<((approved: boolean) => void) | null>(null);
+  const confirmTransactionPreview = useCallback(
+    (preview: ArchiveTransactionPreview) =>
+      new Promise<boolean>((resolve) => {
+        previewDecision.current?.(false);
+        previewDecision.current = resolve;
+        setTransactionPreview(preview);
+      }),
+    [],
+  );
+  const resolveTransactionPreview = useCallback((approved: boolean) => {
+    previewDecision.current?.(approved);
+    previewDecision.current = null;
+    setTransactionPreview(null);
+  }, []);
+  useEffect(
+    () => () => {
+      previewDecision.current?.(false);
+    },
+    [],
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   const [showSealConfirm, setShowSealConfirm] = useState(false);
   const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
@@ -203,7 +228,7 @@ export function useStoryEditorController() {
     setFormData((prev) => ({
       ...prev,
       content,
-      expectedHash: content ? computeContentHash(content) : undefined,
+      expectedHash: undefined,
     }));
   }, []);
 
@@ -226,10 +251,11 @@ export function useStoryEditorController() {
           expectedHash: data.expectedHash || "",
           chunkType: data.chunkType ?? 0,
           attachmentCID: data.attachmentCID ?? "",
+          confirmTransactionPreview,
         });
 
         const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk];
-        const newFullStoryHash = computeStoryHash(newChunks);
+        const newFullStoryHash = result.recordsHead;
         const newMeta: StoryMetadata | undefined = meta
           ? {
               ...meta,
@@ -247,14 +273,14 @@ export function useStoryEditorController() {
         }
         storyQuery.refetch();
 
-        if (result.events.StoryChunkAdded) {
+        if (result.events.StoryRecordAppended) {
           toast.success(
             t(
               "storyChunkEditor.success.chunkAdded",
               "Chunk #{{index}} added successfully ({{bytes}} bytes)",
               {
-                index: result.events.StoryChunkAdded.chunkIndex,
-                bytes: result.events.StoryChunkAdded.contentLength,
+                index: result.events.StoryRecordAppended.chunkIndex,
+                bytes: result.events.StoryRecordAppended.contentLength,
               },
             ),
           );
@@ -271,6 +297,7 @@ export function useStoryEditorController() {
     },
     [
       addStoryChunkFlow,
+      confirmTransactionPreview,
       toast,
       t,
       chunks,
@@ -284,7 +311,7 @@ export function useStoryEditorController() {
   const onSealStory = useCallback(
     async (tid: string) => {
       try {
-        const result = await sealStoryFlow.runOrThrow({ tokenId: tid });
+        const result = await sealStoryFlow.runOrThrow({ tokenId: tid, confirmTransactionPreview });
 
         const newMeta: StoryMetadata | undefined = meta
           ? {
@@ -326,7 +353,17 @@ export function useStoryEditorController() {
         throw error;
       }
     },
-    [sealStoryFlow, toast, t, meta, chunks, validTokenId, scopedQueryClient, storyQuery.refetch],
+    [
+      sealStoryFlow,
+      toast,
+      t,
+      meta,
+      chunks,
+      validTokenId,
+      scopedQueryClient,
+      storyQuery.refetch,
+      confirmTransactionPreview,
+    ],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -337,22 +374,22 @@ export function useStoryEditorController() {
       setLocalError(t("storyChunkEditor.contentRequired", "Content cannot be empty"));
       return;
     }
-    const byteLen = getByteLength(trimmedContent);
-    if (byteLen > STORY_MAX_CHUNK_BYTES) {
-      setLocalError(t("storyChunkEditor.contentTooLongBytes", "Content cannot exceed 16384 bytes"));
-      return;
-    }
-
-    const trimmedAttachment = formData.attachmentCID.trim();
-    if (getByteLength(trimmedAttachment) > STORY_MAX_ATTACHMENT_BYTES) {
+    const attachment = formData.attachmentCID;
+    if (
+      attachment !== attachment.trim() ||
+      getByteLength(attachment) > STORY_MAX_ATTACHMENT_BYTES
+    ) {
       setLocalError(
-        t("storyChunkEditor.attachmentTooLong", "Attachment CID cannot exceed 256 UTF-8 bytes"),
+        t(
+          "archive.attachmentInvalid",
+          "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
+        ),
       );
       return;
     }
 
     const chunkTypeValue = Number(formData.chunkType || 0);
-    if (!Number.isFinite(chunkTypeValue) || chunkTypeValue < 0 || chunkTypeValue > 255) {
+    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 0 || chunkTypeValue > 255) {
       setLocalError(t("storyChunkEditor.invalidChunkType", "Invalid chunk type"));
       return;
     }
@@ -361,15 +398,15 @@ export function useStoryEditorController() {
     setLocalError(null);
 
     try {
-      const expectedHash = computeContentHash(trimmedContent);
+      const expectedHash = computeContentHash(formData.content, chunkTypeValue, attachment);
       const nextIndex = meta?.totalChunks || 0;
       await onAddChunk({
         tokenId: validTokenId,
         chunkIndex: nextIndex,
-        content: trimmedContent,
+        content: formData.content,
         expectedHash,
         chunkType: chunkTypeValue,
-        attachmentCID: trimmedAttachment,
+        attachmentCID: attachment,
       });
 
       handleCancelEdit();
@@ -387,6 +424,7 @@ export function useStoryEditorController() {
 
   const executeSeal = useCallback(async () => {
     if (!validTokenId) return;
+    setShowSealConfirm(false);
     setSubmitting(true);
     setLocalError(null);
     try {
@@ -411,6 +449,8 @@ export function useStoryEditorController() {
 
   return {
     t,
+    transactionPreview,
+    resolveTransactionPreview,
     validTokenId,
     meta,
     nodeDetails,
@@ -440,7 +480,7 @@ export function useStoryEditorController() {
     form: {
       data: formData,
       byteLength: formByteLength,
-      maxBytes: STORY_MAX_CHUNK_BYTES,
+      segmentBytes: STORY_SEGMENT_BYTES,
       warningOrangeBytes: STORY_WARNING_ORANGE_BYTES,
       updateContent,
       updateChunkType,

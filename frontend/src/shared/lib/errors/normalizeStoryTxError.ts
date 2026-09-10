@@ -4,17 +4,16 @@ const STORY_ERROR_MESSAGES: Record<string, string> = {
   MustBeNFTHolder: "You must own this NFT to edit its story",
   Unauthorized: "Not authorized to perform this action",
   OnlyOwner: "Only the owner can perform this action",
-  StorySealed: "Story is sealed and cannot be modified",
   StoryAlreadySealed: "Story is sealed and cannot be modified",
-  InvalidStoryArchive: "Story archive configuration is invalid",
-  StoryArchiveAlreadySet: "Story archive is already configured",
-  ChunkIndexExists: "Chunk at this index already exists",
-  InvalidChunkIndex: "Invalid chunk index",
-  ContentTooLong: "Content exceeds maximum length",
-  ExpectedHashMismatch: "Expected hash does not match",
-  ChunkHashMismatch: "Chunk content does not match expected hash",
-  ChunkIndexOutOfRange: "Chunk index is out of valid range",
-  InvalidChunkContent: "Story chunk content invalid",
+  InvalidArchive: "Archive configuration is invalid",
+  ArchiveAlreadySet: "Archive is already configured",
+  ArchiveNotActive: "This archive is not the configured archive",
+  InvalidSchemaId: "Story schema must be nonzero",
+  InvalidPayloadLength: "Story payload cannot be empty",
+  PayloadHashMismatch: "Story payload differs from the expected hash",
+  StoryIndexMismatch: "Story changed; refresh before appending",
+  StoryHeadMismatch: "Story changed; refresh before appending",
+  StoryNotFound: "Story has no records",
 };
 
 const makeTypedError = (message: string, type: string, code?: string): Error => {
@@ -30,6 +29,8 @@ const makeTypedError = (message: string, type: string, code?: string): Error => 
  * detection pipeline so story flows do not maintain a separate parser.
  */
 export function normalizeStoryTxError(error: any, contract: any): Error {
+  if (error?.code === "ARCHIVE_VALIDATION_FAILED")
+    return makeTypedError(error.message, "VALIDATION_ERROR", error.code);
   const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {
     contract,
     fallbackMessage: error?.message || "An unknown error occurred",

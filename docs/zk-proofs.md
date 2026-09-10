@@ -274,7 +274,7 @@ birth/gender calldata, requires `minter == msg.sender`, and derives the target `
 public identity commitment.
 
 Private encrypted `biography` is not a mint public signal and is not automatically copied into the
-NFT. `PersonSupplementInfo.story`, token URI, and `StoryChunk` content are separate intentionally
+NFT. `PersonSupplementInfo.story`, token URI, and DFS1 Story content are separate intentionally
 public NFT data.
 
 ## Proof Transport and Permanent Routing

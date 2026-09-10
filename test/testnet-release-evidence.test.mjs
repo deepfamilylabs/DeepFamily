@@ -47,14 +47,11 @@ const READER = address(10);
 const SAFE_OWNERS = [address(11), address(12), address(13)];
 const PERSON_VERIFIER = address(14);
 const DISCLOSURE_BINDING_VERIFIER = address(15);
-const METADATA_ARCHIVE = address(16);
-const STORY_ARCHIVE = address(17);
+const ARCHIVE = address(16);
 const ADAPTER_ARTIFACT_SHA256 = "31".repeat(32);
 const ADAPTER_RUNTIME_SHA256 = "32".repeat(32);
 const ARCHIVE_ARTIFACT_SHA256 = "33".repeat(32);
 const ARCHIVE_RUNTIME_SHA256 = "34".repeat(32);
-const STORY_ARCHIVE_ARTIFACT_SHA256 = "37".repeat(32);
-const STORY_ARCHIVE_RUNTIME_SHA256 = "38".repeat(32);
 const READER_ARTIFACT_SHA256 = "35".repeat(32);
 const READER_RUNTIME_SHA256 = "36".repeat(32);
 const COMPONENT_HASH = `0x${"ab".repeat(32)}`;
@@ -69,8 +66,7 @@ const VERIFIED_CONTRACTS = [
   ["initial-deployment", "PersonCommitmentVerifier"],
   ["initial-deployment", "DisclosureBindingVerifier"],
   ["initial-deployment", "Groth16VerifierAdapter"],
-  ["initial-deployment", "MetadataArchiveV1"],
-  ["initial-deployment", "StoryArchiveV1"],
+  ["initial-deployment", "DeepFamilyArchiveV1"],
   ["initial-deployment", "DeepFamily"],
   ["initial-deployment", "UUPSProxy"],
   ["initial-deployment", "DeepFamilyReader"],
@@ -154,8 +150,7 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
       ],
       deployments: {
         groth16VerifierAdapter: { artifactSha256: ADAPTER_ARTIFACT_SHA256 },
-        metadataArchiveV1: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
-        storyArchiveV1: { artifactSha256: STORY_ARCHIVE_ARTIFACT_SHA256 },
+        deepFamilyArchiveV1: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
       },
     },
@@ -168,12 +163,10 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
       personVerifierImmutable: PERSON_VERIFIER,
       disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
     },
-    metadataArchiveV1: { deepFamilyImmutable: DEEP_FAMILY },
-    storyArchiveV1: { deepFamilyImmutable: DEEP_FAMILY },
+    deepFamilyArchiveV1: { deepFamilyImmutable: DEEP_FAMILY },
     deepFamilyReader: {
       deepFamilyImmutable: DEEP_FAMILY,
-      metadataArchiveImmutable: METADATA_ARCHIVE,
-      storyArchiveImmutable: STORY_ARCHIVE,
+      archiveImmutable: ARCHIVE,
     },
   });
   return {
@@ -181,13 +174,9 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
       artifactSha256: ADAPTER_ARTIFACT_SHA256,
       runtimeSha256: ADAPTER_RUNTIME_SHA256,
     },
-    metadataArchiveV1: {
+    deepFamilyArchiveV1: {
       artifactSha256: ARCHIVE_ARTIFACT_SHA256,
       runtimeSha256: ARCHIVE_RUNTIME_SHA256,
-    },
-    storyArchiveV1: {
-      artifactSha256: STORY_ARCHIVE_ARTIFACT_SHA256,
-      runtimeSha256: STORY_ARCHIVE_RUNTIME_SHA256,
     },
     deepFamilyReader: {
       artifactSha256: READER_ARTIFACT_SHA256,
@@ -272,8 +261,7 @@ const validReportTemplate = () => ({
     personCommitmentVerifier: PERSON_VERIFIER,
     disclosureBindingVerifier: DISCLOSURE_BINDING_VERIFIER,
     groth16VerifierAdapter: VERIFIER_ADAPTER,
-    metadataArchive: METADATA_ARCHIVE,
-    storyArchive: STORY_ARCHIVE,
+    archive: ARCHIVE,
     deepFamilyReader: READER,
   },
   timelockDeployment: { minDelaySeconds: MIN_DELAY },
@@ -364,8 +352,7 @@ const validReportTemplate = () => ({
       address: DEEP_FAMILY,
       owner: TIMELOCK,
       implementation: DEEP_FAMILY_IMPLEMENTATION,
-      metadataArchive: METADATA_ARCHIVE,
-      storyArchive: STORY_ARCHIVE,
+      archive: ARCHIVE,
       personCommitmentVerifier: VERIFIER_ADAPTER,
       disclosureBindingVerifier: VERIFIER_ADAPTER,
       protocolEndorsementFeeBps: "500",
@@ -379,8 +366,7 @@ const validReportTemplate = () => ({
     reader: {
       address: READER,
       deepFamily: DEEP_FAMILY,
-      metadataArchive: METADATA_ARCHIVE,
-      storyArchive: STORY_ARCHIVE,
+      archive: ARCHIVE,
       artifactSha256: READER_ARTIFACT_SHA256,
       runtimeSha256: READER_RUNTIME_SHA256,
     },
@@ -392,16 +378,10 @@ const validReportTemplate = () => ({
       runtimeSha256: ADAPTER_RUNTIME_SHA256,
     },
     archive: {
-      address: METADATA_ARCHIVE,
+      address: ARCHIVE,
       deepFamily: DEEP_FAMILY,
       artifactSha256: ARCHIVE_ARTIFACT_SHA256,
       runtimeSha256: ARCHIVE_RUNTIME_SHA256,
-    },
-    storyArchive: {
-      address: STORY_ARCHIVE,
-      deepFamily: DEEP_FAMILY,
-      artifactSha256: STORY_ARCHIVE_ARTIFACT_SHA256,
-      runtimeSha256: STORY_ARCHIVE_RUNTIME_SHA256,
     },
     proofRoutes: [
       {
@@ -1225,8 +1205,8 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
         /terminalGovernanceState\.reader\.deepFamily/iu,
       ],
       [
-        (report) => (report.terminalGovernanceState.deepFamily.metadataArchive = address(999)),
-        /terminalGovernanceState\.deepFamily\.metadataArchive/iu,
+        (report) => (report.terminalGovernanceState.deepFamily.archive = address(999)),
+        /terminalGovernanceState\.deepFamily\.archive/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.verifierAdapter.personVerifier = address(999)),
@@ -1237,8 +1217,8 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
         /terminalGovernanceState\.archive\.deepFamily/iu,
       ],
       [
-        (report) => (report.terminalGovernanceState.reader.metadataArchive = address(999)),
-        /terminalGovernanceState\.reader\.metadataArchive/iu,
+        (report) => (report.terminalGovernanceState.reader.archive = address(999)),
+        /terminalGovernanceState\.reader\.archive/iu,
       ],
       [
         (report) =>
@@ -1247,7 +1227,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => (report.terminalGovernanceState.archive.runtimeSha256 = "92".repeat(32)),
-        /MetadataArchiveV1 runtimeSha256/iu,
+        /DeepFamilyArchiveV1 runtimeSha256/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.proofRoutes[0].proofEncodingId = 2),

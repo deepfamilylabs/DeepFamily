@@ -2,7 +2,15 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
-import { ChunkTypeHelpDialog, SealConfirmDialog } from "./StoryEditorDialogs";
+import {
+  ChunkTypeHelpDialog,
+  SealConfirmDialog,
+  StoryTransactionPreviewDialog,
+} from "./StoryEditorDialogs";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
+}));
 
 const t = ((_: string, fallback?: string | Record<string, unknown>) => {
   if (typeof fallback === "string") return fallback;
@@ -123,5 +131,46 @@ describe("StoryEditorDialogs", () => {
 
     rerender(renderDialog(false));
     expect(document.activeElement).toBe(beforeDialog);
+  });
+});
+
+function editorPreview(payloadBytes = 16_385) {
+  return {
+    t: (_key: string, fallback: string) => fallback,
+    resolveTransactionPreview: vi.fn(),
+    transactionPreview: {
+      canonicalPayload: "0x1234",
+      payloadHash: "0xhash",
+      payloadBytes,
+      segmentCount: payloadBytes ? 2 : 0,
+      estimated: true,
+      estimatedGas: 1_000_001n,
+      gasLimit: 1_200_002n,
+      estimatedFee: 1_000_001n,
+      maximumFee: 2_400_004n,
+      nativeSymbol: "CFX",
+    },
+  } as unknown as StoryEditorController;
+}
+
+describe("story transaction review", () => {
+  it("keeps the review open while inspecting exact bytes and only approves on the wallet button", () => {
+    const editor = editorPreview();
+    render(<StoryTransactionPreviewDialog editor={editor} />);
+    expect(screen.getByRole("dialog", { name: "Review story transaction" })).toBeTruthy();
+    fireEvent.click(screen.getByText("View exact payload bytes and hash"));
+    fireEvent.click(screen.getByText("0x1234"));
+    expect(editor.resolveTransactionPreview).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to wallet" }));
+    expect(editor.resolveTransactionPreview).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("shows fees for sealing without a fictitious new payload and supports cancellation", () => {
+    const editor = editorPreview(0);
+    render(<StoryTransactionPreviewDialog editor={editor} />);
+    expect(screen.queryByText("Canonical payload bytes")).toBeNull();
+    expect(screen.getByText("Gas limit (+20%)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(editor.resolveTransactionPreview).toHaveBeenCalledExactlyOnceWith(false);
   });
 });

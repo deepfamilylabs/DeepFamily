@@ -17,7 +17,7 @@ import {
   ZERO_BYTES32,
   asUint8Array,
   computePersonVersionContentCommitment,
-  decryptPersonVersionRuntime,
+  decryptPersonVersionEnvelope,
   encryptPersonVersionEnvelope,
   parseCanonicalPersonVersion,
   parseFormat1Envelope,
@@ -133,68 +133,56 @@ describe("fresh-v1 contract edge regressions", function () {
   describe("DeepFamilyReader constructor bindings", () => {
     it("rejects a codeless Archive returned by an otherwise callable source", async () => {
       const [, eoa] = await hre.ethers.getSigners();
-      const Source = await hre.ethers.getContractFactory("MutableMetadataArchiveSourceMock");
+      const Source = await hre.ethers.getContractFactory("MutableArchiveSourceMock");
       const source = await Source.deploy();
       await source.waitForDeployment();
-      await source.setMetadataArchive(await eoa.getAddress());
+      await source.setArchive(await eoa.getAddress());
 
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       await expect(Reader.deploy(await source.getAddress())).to.be.revertedWithCustomError(
         Reader,
-        "InvalidMetadataArchiveAddress",
+        "InvalidArchiveAddress",
       );
     });
 
     it("rejects an Archive whose immutable reverse binding names another source", async () => {
-      const Source = await hre.ethers.getContractFactory("MutableMetadataArchiveSourceMock");
+      const Source = await hre.ethers.getContractFactory("MutableArchiveSourceMock");
       const source = await Source.deploy();
       const otherSource = await Source.deploy();
       await Promise.all([source.waitForDeployment(), otherSource.waitForDeployment()]);
 
-      const Archive = await hre.ethers.getContractFactory("MetadataArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
       const wrongArchive = await Archive.deploy(await otherSource.getAddress());
       await wrongArchive.waitForDeployment();
-      await source.setMetadataArchive(await wrongArchive.getAddress());
+      await source.setArchive(await wrongArchive.getAddress());
 
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       await expect(Reader.deploy(await source.getAddress())).to.be.revertedWithCustomError(
         Reader,
-        "MetadataArchiveBindingMismatch",
+        "ArchiveBindingMismatch",
       );
     });
 
     it("keeps the constructor-selected Archive immutable if the source getter later changes", async () => {
-      const Source = await hre.ethers.getContractFactory("MutableMetadataArchiveSourceMock");
+      const Source = await hre.ethers.getContractFactory("MutableArchiveSourceMock");
       const source = await Source.deploy();
       await source.waitForDeployment();
       const sourceAddress = await source.getAddress();
 
-      const Archive = await hre.ethers.getContractFactory("MetadataArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
       const originalArchive = await Archive.deploy(sourceAddress);
       const laterArchive = await Archive.deploy(sourceAddress);
       await Promise.all([originalArchive.waitForDeployment(), laterArchive.waitForDeployment()]);
-      await source.setMetadataArchive(await originalArchive.getAddress());
-
-      const StoryArchive = await hre.ethers.getContractFactory("StoryArchiveV1");
-      const originalStoryArchive = await StoryArchive.deploy(sourceAddress);
-      const laterStoryArchive = await StoryArchive.deploy(sourceAddress);
-      await Promise.all([
-        originalStoryArchive.waitForDeployment(),
-        laterStoryArchive.waitForDeployment(),
-      ]);
-      await source.setStoryArchive(await originalStoryArchive.getAddress());
+      await source.setArchive(await originalArchive.getAddress());
 
       const Reader = await hre.ethers.getContractFactory("DeepFamilyReader");
       const reader = await Reader.deploy(sourceAddress);
       await reader.waitForDeployment();
-      await source.setMetadataArchive(await laterArchive.getAddress());
-      await source.setStoryArchive(await laterStoryArchive.getAddress());
+      await source.setArchive(await laterArchive.getAddress());
 
-      expect(await source.metadataArchive()).to.equal(await laterArchive.getAddress());
-      expect(await source.storyArchive()).to.equal(await laterStoryArchive.getAddress());
+      expect(await source.archive()).to.equal(await laterArchive.getAddress());
       expect(await reader.DEEP_FAMILY()).to.equal(sourceAddress);
-      expect(await reader.METADATA_ARCHIVE()).to.equal(await originalArchive.getAddress());
-      expect(await reader.STORY_ARCHIVE()).to.equal(await originalStoryArchive.getAddress());
+      expect(await reader.ARCHIVE()).to.equal(await originalArchive.getAddress());
     });
   });
 
@@ -271,8 +259,7 @@ describe("fresh-v1 contract edge regressions", function () {
 
   describe("opaque Archive acceptance versus production decoding", () => {
     it("archives a structurally valid envelope with invalid GCM authentication that clients reject", async () => {
-      const { deepFamily, metadataArchive } =
-        await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+      const { deepFamily, archive } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
       const [signer] = await hre.ethers.getSigners();
       await setupStubVerifiers(hre.ethers, deepFamily);
       const prepared = computePersonVersionContentCommitment({
@@ -307,14 +294,12 @@ describe("fresh-v1 contract edge regressions", function () {
             )
         ).wait();
 
-        const metadata = await metadataArchive.metadataRef(context.personHash, 1);
+        const metadata = await archive.metadataRef(context.personHash, 1);
         const runtimeCode = await hre.ethers.provider.getCode(metadata.pointer);
         expect(metadata.payloadHash).to.equal(hre.ethers.keccak256(corruptedEnvelope));
         await assert.rejects(
-          decryptPersonVersionRuntime({
-            runtimeCode,
-            payloadLength: metadata.payloadLength,
-            payloadHash: metadata.payloadHash,
+          decryptPersonVersionEnvelope({
+            envelope: hre.ethers.getBytes(runtimeCode).slice(1),
             rawPassphrase: protocolVector.identity.rawPassphrase,
             context,
           }),
@@ -326,8 +311,7 @@ describe("fresh-v1 contract edge regressions", function () {
     });
 
     it("archives an authenticated envelope whose false chain commitment clients reject", async () => {
-      const { deepFamily, metadataArchive } =
-        await hre.networkHelpers.loadFixture(deployIntegratedFixture);
+      const { deepFamily, archive } = await hre.networkHelpers.loadFixture(deployIntegratedFixture);
       const [signer] = await hre.ethers.getSigners();
       await setupStubVerifiers(hre.ethers, deepFamily);
       const prepared = computePersonVersionContentCommitment({
@@ -359,14 +343,12 @@ describe("fresh-v1 contract edge regressions", function () {
             )
         ).wait();
 
-        const metadata = await metadataArchive.metadataRef(context.personHash, 1);
+        const metadata = await archive.metadataRef(context.personHash, 1);
         const runtimeCode = await hre.ethers.provider.getCode(metadata.pointer);
         expect(metadata.payloadHash).to.equal(encrypted.payloadHash);
         await assert.rejects(
-          decryptPersonVersionRuntime({
-            runtimeCode,
-            payloadLength: metadata.payloadLength,
-            payloadHash: metadata.payloadHash,
+          decryptPersonVersionEnvelope({
+            envelope: hre.ethers.getBytes(runtimeCode).slice(1),
             rawPassphrase: protocolVector.identity.rawPassphrase,
             context,
           }),
@@ -442,26 +424,26 @@ describe("fresh-v1 contract edge regressions", function () {
       expect(allParameterNames(abi)).not.to.include.members([
         "tag",
         "metadataCID",
-        "metadataArchiveId",
+        "archiveId",
         "proofSystemId",
       ]);
     });
 
     it("freezes the one-way Archive binding and permanent verifier registry ABI", async () => {
       const { abi } = await hre.artifacts.readArtifact("DeepFamily");
-      const setArchive = abiEntry(abi, "function", "setMetadataArchive");
+      const setArchive = abiEntry(abi, "function", "setArchive");
       expect(setArchive.inputs.map(parameterSnapshot)).to.deep.equal([
-        scalar("archive", "address"),
+        scalar("candidate", "address"),
       ]);
       expect(setArchive.outputs).to.deep.equal([]);
       expect(setArchive.stateMutability).to.equal("nonpayable");
 
-      const getArchive = abiEntry(abi, "function", "metadataArchive");
+      const getArchive = abiEntry(abi, "function", "archive");
       expect(getArchive.inputs).to.deep.equal([]);
       expect(getArchive.outputs.map(parameterSnapshot)).to.deep.equal([scalar("", "address")]);
       expect(getArchive.stateMutability).to.equal("view");
 
-      const archiveSet = abiEntry(abi, "event", "MetadataArchiveSet");
+      const archiveSet = abiEntry(abi, "event", "ArchiveSet");
       expect(archiveSet.inputs.map(parameterSnapshot)).to.deep.equal([
         eventField("archive", "address", true),
       ]);
@@ -480,26 +462,29 @@ describe("fresh-v1 contract edge regressions", function () {
       ]);
     });
 
-    it("freezes MetadataRef, MetadataStored and Reader aggregate return structs", async () => {
-      const archiveArtifact = await hre.artifacts.readArtifact("MetadataArchiveV1");
+    it("freezes BlobRef, MetadataStored and Reader aggregate return structs", async () => {
+      const archiveArtifact = await hre.artifacts.readArtifact("DeepFamilyArchiveV1");
       const metadataRefFields = [
-        scalar("pointer", "address"),
         scalar("payloadHash", "bytes32"),
-        scalar("payloadLength", "uint32"),
+        scalar("pointer", "address"),
+        scalar("payloadLength", "uint64"),
+        scalar("segmentCount", "uint32"),
       ];
       const metadataTuple = tuple(
         "metadata",
-        "struct IMetadataArchiveV1.MetadataRef",
+        "struct IDeepFamilyArchiveV1.BlobRef",
         metadataRefFields,
       );
 
-      const store = abiEntry(archiveArtifact.abi, "function", "store");
+      const store = abiEntry(archiveArtifact.abi, "function", "storeMetadata");
       expect(store.inputs.map(parameterSnapshot)).to.deep.equal([
         scalar("personHash", "bytes32"),
         scalar("versionIndex", "uint256"),
         scalar("envelope", "bytes"),
       ]);
-      expect(store.outputs.map(parameterSnapshot)).to.deep.equal([metadataTuple]);
+      expect(store.outputs.map(parameterSnapshot)).to.deep.equal([
+        { ...metadataTuple, name: "blob" },
+      ]);
       expect(store.stateMutability).to.equal("nonpayable");
 
       const metadataRef = abiEntry(archiveArtifact.abi, "function", "metadataRef");
@@ -507,16 +492,16 @@ describe("fresh-v1 contract edge regressions", function () {
         scalar("personHash", "bytes32"),
         scalar("versionIndex", "uint256"),
       ]);
-      expect(metadataRef.outputs.map(parameterSnapshot)).to.deep.equal([metadataTuple]);
+      expect(metadataRef.outputs.map(parameterSnapshot)).to.deep.equal([
+        { ...metadataTuple, name: "blob" },
+      ]);
       expect(metadataRef.stateMutability).to.equal("view");
 
       const stored = abiEntry(archiveArtifact.abi, "event", "MetadataStored");
       expect(stored.inputs.map(parameterSnapshot)).to.deep.equal([
         eventField("personHash", "bytes32", true),
         eventField("versionIndex", "uint256", true),
-        eventField("pointer", "address", false),
-        eventField("payloadHash", "bytes32", false),
-        eventField("payloadLength", "uint32", false),
+        { ...metadataTuple, name: "blob", indexed: false },
       ]);
 
       const deepFamilyGetter = abiEntry(archiveArtifact.abi, "function", "DEEP_FAMILY");

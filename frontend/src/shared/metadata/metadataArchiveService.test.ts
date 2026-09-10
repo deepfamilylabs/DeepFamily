@@ -36,6 +36,7 @@ const nodeForEnvelope = (envelope: Uint8Array): NodeData => ({
   versionCommitment: VERSION_COMMITMENT,
   metadataPointer: POINTER,
   metadataPayloadHash: keccak256(envelope),
+  metadataSegmentCount: 1,
   metadataPayloadLength: envelope.length,
 });
 

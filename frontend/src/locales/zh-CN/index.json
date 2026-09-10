@@ -886,8 +886,7 @@
       "note4": "职业经历：用于聚焦职业历史（工作、公司、职位）",
       "note5": "早年生活 vs 生平事件：早年生活用于童年片段，生平事件用于完整时间轴"
     },
-    "contentTooLongBytes": "内容不能超过16384字节",
-    "contentPlaceholderBytes": "请输入分片内容（最多16384个 UTF-8 字节）",
+    "contentPlaceholderBytes": "请输入故事内容；可保存的记录大小取决于当前网络的交易容量",
     "success": {
       "chunkAdded": "分片 #{{index}} 添加成功（{{bytes}} 字节）",
       "chunkAddedGeneric": "分片添加成功",
@@ -1527,5 +1526,22 @@
     "contact": "在此期间如有疑问：",
     "termsSummary": "未来适用于 DeepFamily dApp 使用的条款。",
     "privacySummary": "本 dApp 读取什么、什么只留在你的浏览器里、什么在链上公开。"
+  },
+  "archive": {
+    "payloadBytes": "规范编码后的字节数",
+    "segments": "存储分段数",
+    "estimatedGas": "RPC 估算 Gas",
+    "gasLimit": "Gas 上限（含 20% 缓冲）",
+    "estimatedFee": "预计费用",
+    "maximumFee": "含缓冲的费用估算",
+    "segmentCost": "这条记录需要创建多个存储分段。每增加一段都会增加交易成本。",
+    "feeChanges": "钱包提交交易前，网络费用可能发生变化。",
+    "exactBytes": "查看完整载荷字节及哈希",
+    "unknownSchema": "这条记录使用了暂不支持的格式，原始字节已通过完整性校验。",
+    "rawRecord": "查看已验证的原始记录",
+    "largeStory": "需要多个存储分段，请在签名前查看费用估算",
+    "reviewStory": "确认故事交易",
+    "confirm": "前往钱包确认",
+    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节"
   }
 }

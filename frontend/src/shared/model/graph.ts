@@ -8,6 +8,12 @@ export interface StoryChunk {
   editor: string;
   chunkType: number;
   attachmentCID: string;
+  schemaId?: string;
+  rawPayload?: string;
+  payloadLength?: number;
+  segmentCount?: number;
+  recordHash?: string;
+  unsupportedSchema?: boolean;
 }
 
 export interface StoryMetadata {
@@ -62,6 +68,7 @@ export interface NodeData {
   metadataPointer?: string;
   metadataPayloadHash?: string;
   metadataPayloadLength?: number;
+  metadataSegmentCount?: number;
   metadataUnlockValidated?: boolean;
   metadataProtocolGeneration?: string;
   metadataFormatVersion?: number;

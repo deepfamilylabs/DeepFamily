@@ -15,6 +15,7 @@ describe("mintService executeMintFlow", () => {
       metadata: {
         pointer,
         payloadHash: ethers.keccak256(envelope),
+        segmentCount: 1,
         payloadLength: ethers.getBytes(envelope).length,
       },
     };

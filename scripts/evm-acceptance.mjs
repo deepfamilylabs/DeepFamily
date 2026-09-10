@@ -1,3 +1,13 @@
+import {
+  appendDfsStoryRecord,
+  sealArchiveStory,
+  estimateArchiveCall,
+} from "../lib/archiveOperations.js";
+import {
+  STORY_CHUNK_SCHEMA_ID,
+  encodeStoryRecord,
+  readArchiveBlob,
+} from "@deepfamily/protocol-core";
 /**
  * Shared guarded EVM testnet acceptance engine.
  *
@@ -9,7 +19,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { Contract, id as solidityId, Interface, JsonRpcProvider, keccak256 } from "ethers";
-import { decryptPersonVersionRuntime } from "@deepfamily/protocol-core";
+import { readAndDecryptPersonVersion } from "@deepfamily/protocol-core";
 
 import hre from "hardhat";
 
@@ -187,8 +197,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
   terminalRead,
   addresses,
   deepFamily,
-  metadataArchive,
-  storyArchive,
+  archive,
   deepFamilyReader,
   groth16VerifierAdapter,
 }) => {
@@ -197,37 +206,25 @@ const readTerminalProtocolDeploymentEvidence = async ({
     adapterPersonVerifier,
     adapterDisclosureBindingVerifier,
     archiveDeepFamily,
-    deepFamilyStoryArchive,
-    storyArchiveDeepFamily,
     readerDeepFamily,
-    readerMetadataArchive,
-    readerStoryArchive,
+    readerArchive,
   ] = await Promise.all([
-    terminalRead("terminal DeepFamily metadata archive", () => deepFamily.metadataArchive()),
+    terminalRead("terminal DeepFamily metadata archive", () => deepFamily.archive()),
     terminalRead("terminal adapter person verifier", () => groth16VerifierAdapter.personVerifier()),
     terminalRead("terminal adapter disclosure verifier", () =>
       groth16VerifierAdapter.disclosureBindingVerifier(),
     ),
-    terminalRead("terminal archive DeepFamily binding", () => metadataArchive.DEEP_FAMILY()),
-    terminalRead("terminal DeepFamily story archive", () => deepFamily.storyArchive()),
-    terminalRead("terminal story archive DeepFamily binding", () => storyArchive.DEEP_FAMILY()),
+    terminalRead("terminal archive DeepFamily binding", () => archive.DEEP_FAMILY()),
     terminalRead("terminal reader DeepFamily binding", () => deepFamilyReader.DEEP_FAMILY()),
-    terminalRead("terminal reader archive binding", () => deepFamilyReader.METADATA_ARCHIVE()),
-    terminalRead("terminal reader story archive binding", () => deepFamilyReader.STORY_ARCHIVE()),
+    terminalRead("terminal reader archive binding", () => deepFamilyReader.ARCHIVE()),
   ]);
 
   assertCondition(
-    sameAddress(ethers, deepFamilyArchive, addresses.metadataArchive) &&
+    sameAddress(ethers, deepFamilyArchive, addresses.archive) &&
       sameAddress(ethers, archiveDeepFamily, addresses.deepFamily) &&
       sameAddress(ethers, readerDeepFamily, addresses.deepFamily) &&
-      sameAddress(ethers, readerMetadataArchive, addresses.metadataArchive),
+      sameAddress(ethers, readerArchive, addresses.archive),
     "Terminal metadata archive bindings do not match the deployed protocol",
-  );
-  assertCondition(
-    sameAddress(ethers, deepFamilyStoryArchive, addresses.storyArchive) &&
-      sameAddress(ethers, storyArchiveDeepFamily, addresses.deepFamily) &&
-      sameAddress(ethers, readerStoryArchive, addresses.storyArchive),
-    "Terminal story archive bindings do not match the deployed protocol",
   );
   assertCondition(
     sameAddress(ethers, adapterPersonVerifier, addresses.personCommitmentVerifier) &&
@@ -242,12 +239,10 @@ const readTerminalProtocolDeploymentEvidence = async ({
         personVerifierImmutable: adapterPersonVerifier,
         disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
       },
-      metadataArchiveV1: { deepFamilyImmutable: archiveDeepFamily },
-      storyArchiveV1: { deepFamilyImmutable: storyArchiveDeepFamily },
+      deepFamilyArchiveV1: { deepFamilyImmutable: archiveDeepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: readerDeepFamily,
-        metadataArchiveImmutable: readerMetadataArchive,
-        storyArchiveImmutable: readerStoryArchive,
+        archiveImmutable: readerArchive,
       },
     },
   });
@@ -257,8 +252,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
       addresses.groth16VerifierAdapter,
       deploymentArtifacts.groth16VerifierAdapter,
     ],
-    ["MetadataArchiveV1", addresses.metadataArchive, deploymentArtifacts.metadataArchiveV1],
-    ["StoryArchiveV1", addresses.storyArchive, deploymentArtifacts.storyArchiveV1],
+    ["DeepFamilyArchiveV1", addresses.archive, deploymentArtifacts.deepFamilyArchiveV1],
     ["DeepFamilyReader", addresses.deepFamilyReader, deploymentArtifacts.deepFamilyReader],
   ];
   for (const [label, address, artifact] of runtimeContracts) {
@@ -277,7 +271,6 @@ const readTerminalProtocolDeploymentEvidence = async ({
 
   return {
     deepFamilyArchive,
-    deepFamilyStoryArchive,
     verifierAdapter: {
       address: addresses.groth16VerifierAdapter,
       personVerifier: adapterPersonVerifier,
@@ -286,22 +279,15 @@ const readTerminalProtocolDeploymentEvidence = async ({
       runtimeSha256: deploymentArtifacts.groth16VerifierAdapter.runtimeSha256,
     },
     archive: {
-      address: addresses.metadataArchive,
+      address: addresses.archive,
       deepFamily: archiveDeepFamily,
-      artifactSha256: deploymentArtifacts.metadataArchiveV1.artifactSha256,
-      runtimeSha256: deploymentArtifacts.metadataArchiveV1.runtimeSha256,
-    },
-    storyArchive: {
-      address: addresses.storyArchive,
-      deepFamily: storyArchiveDeepFamily,
-      artifactSha256: deploymentArtifacts.storyArchiveV1.artifactSha256,
-      runtimeSha256: deploymentArtifacts.storyArchiveV1.runtimeSha256,
+      artifactSha256: deploymentArtifacts.deepFamilyArchiveV1.artifactSha256,
+      runtimeSha256: deploymentArtifacts.deepFamilyArchiveV1.runtimeSha256,
     },
     reader: {
       address: addresses.deepFamilyReader,
       deepFamily: readerDeepFamily,
-      metadataArchive: readerMetadataArchive,
-      storyArchive: readerStoryArchive,
+      archive: readerArchive,
       artifactSha256: deploymentArtifacts.deepFamilyReader.artifactSha256,
       runtimeSha256: deploymentArtifacts.deepFamilyReader.runtimeSha256,
     },
@@ -341,14 +327,9 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       manifest.deployments?.groth16VerifierAdapter,
     ],
     [
-      "MetadataArchiveV1",
-      terminalProjection.contracts.metadataArchiveV1,
-      manifest.deployments?.metadataArchiveV1,
-    ],
-    [
-      "StoryArchiveV1",
-      terminalProjection.contracts.storyArchiveV1,
-      manifest.deployments?.storyArchiveV1,
+      "DeepFamilyArchiveV1",
+      terminalProjection.contracts.deepFamilyArchiveV1,
+      manifest.deployments?.deepFamilyArchiveV1,
     ],
     [
       "DeepFamilyReader",
@@ -1674,8 +1655,7 @@ export const main = async (chainProfile) => {
       nameDisclosureVerifier,
       groth16VerifierAdapter,
       deepFamily,
-      metadataArchive,
-      storyArchive,
+      archive,
       deepFamilyReader,
       deepFamilyImplementationAddress,
       transactionReceipts,
@@ -1689,8 +1669,7 @@ export const main = async (chainProfile) => {
       groth16VerifierAdapter: await groth16VerifierAdapter.getAddress(),
       deepFamily: await deepFamily.getAddress(),
       deepFamilyImplementation: deepFamilyImplementationAddress,
-      metadataArchive: await metadataArchive.getAddress(),
-      storyArchive: await storyArchive.getAddress(),
+      archive: await archive.getAddress(),
       deepFamilyReader: await deepFamilyReader.getAddress(),
     };
     Object.assign(report.addresses, addresses);
@@ -1703,8 +1682,7 @@ export const main = async (chainProfile) => {
       DisclosureBindingVerifier: addresses.disclosureBindingVerifier,
       Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
       DeepFamily: addresses.deepFamily,
-      MetadataArchiveV1: addresses.metadataArchive,
-      StoryArchiveV1: addresses.storyArchive,
+      DeepFamilyArchiveV1: addresses.archive,
       DeepFamilyReader: addresses.deepFamilyReader,
     };
     for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
@@ -1762,16 +1740,10 @@ export const main = async (chainProfile) => {
       "Reader to DeepFamily binding mismatch",
     );
     assertCondition(
-      (await deepFamily.metadataArchive()) === addresses.metadataArchive &&
-        (await metadataArchive.DEEP_FAMILY()) === addresses.deepFamily &&
-        (await deepFamilyReader.METADATA_ARCHIVE()) === addresses.metadataArchive,
+      (await deepFamily.archive()) === addresses.archive &&
+        (await archive.DEEP_FAMILY()) === addresses.deepFamily &&
+        (await deepFamilyReader.ARCHIVE()) === addresses.archive,
       "Metadata Archive reverse binding mismatch",
-    );
-    assertCondition(
-      (await deepFamily.storyArchive()) === addresses.storyArchive &&
-        (await storyArchive.DEEP_FAMILY()) === addresses.deepFamily &&
-        (await deepFamilyReader.STORY_ARCHIVE()) === addresses.storyArchive,
-      "Story Archive reverse binding mismatch",
     );
     assertCondition(
       (await deepFamily.verifierRegistry(
@@ -1860,10 +1832,7 @@ export const main = async (chainProfile) => {
         addresses.deepFamilyImplementation,
         proxyInitData,
       ]),
-      await verificationEntry(hre.artifacts, "MetadataArchiveV1", addresses.metadataArchive, [
-        addresses.deepFamily,
-      ]),
-      await verificationEntry(hre.artifacts, "StoryArchiveV1", addresses.storyArchive, [
+      await verificationEntry(hre.artifacts, "DeepFamilyArchiveV1", addresses.archive, [
         addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
@@ -2225,9 +2194,10 @@ export const main = async (chainProfile) => {
       Number(metadataRef.payloadLength) === addResult.metadataEnvelope.length,
       "Reader MetadataRef payloadLength does not match the submitted envelope",
     );
-    const metadataRuntimeCode = await provider.getCode(metadataRef.pointer);
-    const decodedMetadata = await decryptPersonVersionRuntime({
-      runtimeCode: metadataRuntimeCode,
+    const decodedMetadata = await readAndDecryptPersonVersion({
+      getCode: (address, blockTag) => provider.getCode(address, blockTag),
+      pointer: metadataRef.pointer,
+      segmentCount: metadataRef.segmentCount,
       payloadLength: metadataRef.payloadLength,
       payloadHash: metadataRef.payloadHash,
       rawPassphrase: acceptancePassphrase,
@@ -2318,24 +2288,90 @@ export const main = async (chainProfile) => {
     );
 
     const storyContent = `${CHAIN_PROFILE.displayName} automated acceptance ${config.runId}`;
-    const storyHash = ethers.keccak256(ethers.toUtf8Bytes(storyContent));
-    await recordTx(
-      "story-add-chunk",
-      await storyArchive
-        .connect(runDeployer)
-        .addStoryChunk(tokenId, 0, 0, storyContent, "", storyHash),
+    const storyResult = await appendDfsStoryRecord({
+      archive: archive.connect(runDeployer),
+      tokenId,
+      content: storyContent,
+      chunkType: 0,
+      attachmentCID: "",
+    });
+    const storyHash = storyResult.recordRef.blob.payloadHash;
+    await recordTx("story-add-record", storyResult.tx);
+    assertCondition(
+      storyResult.record.decoded.content === storyContent,
+      "Reader returned different story content",
     );
-    const storyChunk = await deepFamilyReader.getStoryChunk(tokenId, 0);
-    assertCondition(storyChunk.content === storyContent, "Reader returned different story content");
-    assertCondition(storyChunk.chunkHash === storyHash, "Reader returned different story hash");
-    await recordTx("story-seal", await storyArchive.connect(runDeployer).sealStory(tokenId));
-    const storyMetadata = await deepFamilyReader.getStoryMetadata(tokenId);
-    assertCondition(storyMetadata.isSealed, "Story is not sealed");
+    // Network acceptance uses actual complete calls for both sides of the segment boundary.
+    const archiveCapacity = [];
+    for (const payloadLength of [16_384, 16_385]) {
+      const payload = ethers.hexlify(new Uint8Array(payloadLength).fill(0x61));
+      const before = await archive.storyState(tokenId);
+      const args = [
+        tokenId,
+        before.totalRecords,
+        before.recordsHead,
+        ethers.id("deepfamily/acceptance-raw@1"),
+        payload,
+        ethers.keccak256(payload),
+      ];
+      const method = archive.connect(runDeployer).appendStoryRecord;
+      const gas = await estimateArchiveCall({ method, args, provider });
+      const receipt = await recordTx(
+        `archive-boundary-${payloadLength}`,
+        await method(...args, { gasLimit: gas.gasLimit }),
+      );
+      const ref = await archive.storyRecordRef(tokenId, before.totalRecords);
+      const verified = await readArchiveBlob({
+        ...Object.fromEntries(
+          ["pointer", "payloadHash", "payloadLength", "segmentCount"].map((key) => [
+            key,
+            ref.blob[key],
+          ]),
+        ),
+        getCode: (address, blockTag) => provider.getCode(address, blockTag),
+      });
+      assertCondition(
+        verified.payloadLength === payloadLength &&
+          ref.blob.segmentCount === BigInt(Math.ceil(payloadLength / 16_384)),
+        "Archive boundary readback differs",
+      );
+      archiveCapacity.push({
+        payloadLength,
+        segmentCount: Number(ref.blob.segmentCount),
+        estimatedGas: gas.estimatedGas.toString(),
+        gasLimit: gas.gasLimit.toString(),
+        gasUsed: receipt.gasUsed.toString(),
+        transactionHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        blockGasLimit: (await provider.getBlock(receipt.blockNumber)).gasLimit.toString(),
+      });
+    }
+    report.archiveCapacity = {
+      status: "passed",
+      observedAt: new Date().toISOString(),
+      samples: archiveCapacity,
+    };
+    const sealed = await sealArchiveStory({ archive: archive.connect(runDeployer), tokenId });
+    await recordTx("story-seal", sealed.tx);
+    const storyState = await deepFamilyReader.getStoryState(tokenId);
+    assertCondition(storyState.isSealed, "Story is not sealed");
+    const rejectedPayload = encodeStoryRecord({
+      content: "after seal",
+      chunkType: 0,
+      attachmentCID: "",
+    });
     await expectRevert(
       () =>
-        storyArchive
+        archive
           .connect(runDeployer)
-          .addStoryChunk.staticCall(tokenId, 1, 0, "after seal", "", ethers.ZeroHash),
+          .appendStoryRecord.staticCall(
+            tokenId,
+            storyState.totalRecords,
+            storyState.recordsHead,
+            STORY_CHUNK_SCHEMA_ID,
+            rejectedPayload,
+            ethers.keccak256(rejectedPayload),
+          ),
       "Writing a sealed story",
       {
         expectedErrorNames: ["StoryAlreadySealed"],
@@ -2542,11 +2578,11 @@ export const main = async (chainProfile) => {
         (await deepFamilyV2.endorsedVersionIndex(personHash, runDeployer.address)) === 0n,
         "Upgrade changed the cancelled endorsement state",
       );
-      const storyMetadataAfterUpgrade = await deepFamilyReader.getStoryMetadata(tokenId);
+      const storyStateAfterUpgrade = await deepFamilyReader.getStoryState(tokenId);
       assertCondition(
-        storyMetadataAfterUpgrade.isSealed &&
-          storyMetadataAfterUpgrade.totalChunks === storyMetadata.totalChunks &&
-          storyMetadataAfterUpgrade.fullStoryHash === storyMetadata.fullStoryHash,
+        storyStateAfterUpgrade.isSealed &&
+          storyStateAfterUpgrade.totalRecords === storyState.totalRecords &&
+          storyStateAfterUpgrade.recordsHead === storyState.recordsHead,
         "Upgrade changed the sealed story state",
       );
       await recordTx("v2-set-new-value", await deepFamilyV2.setNewValue(42));
@@ -3235,8 +3271,7 @@ export const main = async (chainProfile) => {
       terminalRead,
       addresses,
       deepFamily,
-      metadataArchive,
-      storyArchive,
+      archive,
       deepFamilyReader,
       groth16VerifierAdapter,
     });
@@ -3404,8 +3439,7 @@ export const main = async (chainProfile) => {
           address: addresses.deepFamily,
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
-          metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
-          storyArchive: terminalProtocolDeployment.deepFamilyStoryArchive,
+          archive: terminalProtocolDeployment.deepFamilyArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           governedPersonRelationVerifier: terminalGovernedPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
@@ -3419,7 +3453,6 @@ export const main = async (chainProfile) => {
         },
         verifierAdapter: terminalProtocolDeployment.verifierAdapter,
         archive: terminalProtocolDeployment.archive,
-        storyArchive: terminalProtocolDeployment.storyArchive,
         reader: terminalProtocolDeployment.reader,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
@@ -3521,8 +3554,7 @@ export const main = async (chainProfile) => {
           address: addresses.deepFamily,
           owner: terminalDeepFamilyOwner,
           implementation: terminalDeepFamilyImplementation,
-          metadataArchive: terminalProtocolDeployment.deepFamilyArchive,
-          storyArchive: terminalProtocolDeployment.deepFamilyStoryArchive,
+          archive: terminalProtocolDeployment.deepFamilyArchive,
           personCommitmentVerifier: terminalPersonVerifier,
           disclosureBindingVerifier: terminalDisclosureVerifier,
           protocolEndorsementFeeBps: terminalProtocolFee,
@@ -3539,7 +3571,6 @@ export const main = async (chainProfile) => {
         },
         verifierAdapter: terminalProtocolDeployment.verifierAdapter,
         archive: terminalProtocolDeployment.archive,
-        storyArchive: terminalProtocolDeployment.storyArchive,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
       };
     }

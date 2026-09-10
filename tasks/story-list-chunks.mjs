@@ -1,14 +1,7 @@
+import { readStoryRecord } from "@deepfamily/protocol-core";
 import { task } from "hardhat/config";
 import { ArgumentType } from "hardhat/types/arguments";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
-
-// Helper query task for debugging story chunks with pagination
-
-// listStoryChunks(tokenId, offset, limit)
-// getStoryMetadata(tokenId) for summary
-
-// Usage example:
-// npx hardhat list-story-chunks --tokenid 1 --offset 0 --limit 10 --network localhost
 
 const action = async (args, hre) => {
   const connection = await hre.network.connect();
@@ -16,12 +9,20 @@ const action = async (args, hre) => {
     artifacts: hre.artifacts,
   });
   const tokenId = BigInt(args.tokenid);
-  const offset = Number(args.offset);
-  const limit = Number(args.limit);
-
-  await deepFamilyReader.getStoryMetadata(tokenId);
-
-  return deepFamilyReader.listStoryChunks(tokenId, offset, limit);
+  const [refs, totalRecords, hasMore, nextOffset] = await deepFamilyReader.listStoryRecords(
+    tokenId,
+    BigInt(args.offset),
+    BigInt(args.limit),
+  );
+  const records = await Promise.all(
+    refs.map((recordRef) =>
+      readStoryRecord({
+        recordRef,
+        getCode: (address, blockTag) => connection.ethers.provider.getCode(address, blockTag),
+      }),
+    ),
+  );
+  return [records, totalRecords, hasMore, nextOffset];
 };
 
 export default task("list-story-chunks", "List story chunks for an NFT with pagination")

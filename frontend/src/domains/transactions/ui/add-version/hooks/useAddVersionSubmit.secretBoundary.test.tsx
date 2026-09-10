@@ -82,11 +82,11 @@ const mocks = vi.hoisted(() => ({
   terminateZkWorkerIfIdle: vi.fn(() => true),
   deepFamily: {
     versionExists: vi.fn(),
-    metadataArchive: vi.fn(),
+    archive: vi.fn(),
   },
   reader: {
     DEEP_FAMILY: vi.fn(),
-    METADATA_ARCHIVE: vi.fn(),
+    ARCHIVE: vi.fn(),
     getVersionDetails: vi.fn(),
   },
 }));
@@ -113,9 +113,9 @@ describe("AddVersion secret-state boundary", () => {
     mocks.terminateCryptoWorkerIfIdle.mockReturnValue(true);
     mocks.terminateZkWorkerIfIdle.mockReturnValue(true);
     mocks.deepFamily.versionExists.mockResolvedValue(false);
-    mocks.deepFamily.metadataArchive.mockResolvedValue(ARCHIVE);
+    mocks.deepFamily.archive.mockResolvedValue(ARCHIVE);
     mocks.reader.DEEP_FAMILY.mockResolvedValue(CONTRACT);
-    mocks.reader.METADATA_ARCHIVE.mockResolvedValue(ARCHIVE);
+    mocks.reader.ARCHIVE.mockResolvedValue(ARCHIVE);
     mocks.reader.getVersionDetails.mockResolvedValue([
       {
         personHash: PERSON_HASH,
@@ -128,7 +128,7 @@ describe("AddVersion secret-state boundary", () => {
         addedBy: SUBMITTER,
         timestamp: 123n,
       },
-      { pointer: POINTER, payloadHash: PAYLOAD_HASH, payloadLength: 20n },
+      { pointer: POINTER, payloadHash: PAYLOAD_HASH, segmentCount: 1n, payloadLength: 20n },
       0n,
       0n,
     ]);
@@ -307,6 +307,7 @@ describe("AddVersion secret-state boundary", () => {
           versionIndex: 1,
           pointer: POINTER,
           payloadHash: PAYLOAD_HASH,
+          segmentCount: 1,
           payloadLength: 20,
         },
         TokenRewardDistributed: null,

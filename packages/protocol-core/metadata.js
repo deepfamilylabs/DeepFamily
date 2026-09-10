@@ -22,7 +22,7 @@ import {
 } from "./envelope.js";
 import { normalizeMetadataContext } from "./aad.js";
 import { deriveIdentityMaterial } from "./identity.js";
-import { readMetadataEnvelopeFromRef, verifyMetadataRuntimeCode } from "./archive.js";
+import { readMetadataEnvelopeFromRef } from "./archive.js";
 import { protocolAssert } from "./errors.js";
 
 function assertParentMatchesContext(parent, hash, versionIndex, role) {
@@ -234,24 +234,13 @@ export async function roundTripPersonVersionEnvelope(input) {
   }
 }
 
-export async function decryptPersonVersionRuntime(input) {
-  const verified = verifyMetadataRuntimeCode({
-    runtimeCode: input.runtimeCode,
-    payloadLength: input.payloadLength,
-    payloadHash: input.payloadHash,
-    requireCommonPrefix: true,
-  });
-  return decryptValidatedEnvelope({
-    envelope: verified.envelope,
-    rawPassphrase: input.rawPassphrase,
-    context: input.context,
-  });
-}
-
 export async function readAndDecryptPersonVersion(input) {
   const verified = await readMetadataEnvelopeFromRef({
     getCode: input.getCode,
     pointer: input.pointer,
+    segmentCount: input.segmentCount,
+    concurrency: input.concurrency,
+    blockTag: input.blockTag,
     payloadLength: input.payloadLength,
     payloadHash: input.payloadHash,
   });

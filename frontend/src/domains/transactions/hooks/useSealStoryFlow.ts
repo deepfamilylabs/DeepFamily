@@ -6,8 +6,11 @@ import { sealStoryService, type SealStoryResult } from "../services/sealStorySer
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
 
+import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
+
 export type SealStoryFlowArgs = {
   tokenId: string;
+  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
 };
 
 export function useSealStoryFlow() {
@@ -23,7 +26,12 @@ export function useSealStoryFlow() {
 
       update("submitting", t("story.sealing", "Sealing story..."));
 
-      return await sealStoryService(signer as any, contractAddress, args.tokenId);
+      return await sealStoryService(
+        signer as any,
+        contractAddress,
+        args.tokenId,
+        args.confirmTransactionPreview,
+      );
     },
     [signer, contractAddress, t],
   );

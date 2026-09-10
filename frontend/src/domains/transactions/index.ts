@@ -8,3 +8,6 @@ export {
   type EndorseServiceStage,
 } from "./ui/endorse/hooks/useEndorseFlow";
 export * from "./ui";
+
+export type { ArchiveTransactionPreview } from "./services/archiveTransaction";
+export { ArchiveTransactionDetails } from "./ui/ArchiveTransactionDetails";
