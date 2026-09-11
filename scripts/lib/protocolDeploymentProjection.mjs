@@ -15,7 +15,7 @@ export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   groth16VerifierAdapter: 6,
   deepFamilyImplementation: 7,
   deepFamily: 8,
-  deepFamilyArchiveV1: 10,
+  deepFamilyArchive: 10,
   deepFamilyReader: 12,
 });
 
@@ -65,10 +65,10 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       personVerifierImmutable: plannedAddresses?.personCommitmentVerifier,
       disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
     },
-    deepFamilyArchiveV1: { deepFamilyImmutable: plannedAddresses?.deepFamily },
+    deepFamilyArchive: { deepFamilyImmutable: plannedAddresses?.deepFamily },
     deepFamilyReader: {
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      archiveImmutable: plannedAddresses?.deepFamilyArchiveV1,
+      archiveImmutable: plannedAddresses?.deepFamilyArchive,
     },
   };
   const artifacts = deploymentArtifactInspector({ root, deployments: deploymentBindings });
@@ -84,16 +84,16 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       artifactSha256: artifacts?.groth16VerifierAdapter?.artifactSha256,
       runtimeSha256: artifacts?.groth16VerifierAdapter?.runtimeSha256,
     }),
-    deepFamilyArchiveV1: Object.freeze({
-      address: plannedAddresses?.deepFamilyArchiveV1,
+    deepFamilyArchive: Object.freeze({
+      address: plannedAddresses?.deepFamilyArchive,
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      artifactSha256: artifacts?.deepFamilyArchiveV1?.artifactSha256,
-      runtimeSha256: artifacts?.deepFamilyArchiveV1?.runtimeSha256,
+      artifactSha256: artifacts?.deepFamilyArchive?.artifactSha256,
+      runtimeSha256: artifacts?.deepFamilyArchive?.runtimeSha256,
     }),
     deepFamilyReader: Object.freeze({
       address: plannedAddresses?.deepFamilyReader,
       deepFamilyImmutable: plannedAddresses?.deepFamily,
-      archiveImmutable: plannedAddresses?.deepFamilyArchiveV1,
+      archiveImmutable: plannedAddresses?.deepFamilyArchive,
       artifactSha256: artifacts?.deepFamilyReader?.artifactSha256,
       runtimeSha256: artifacts?.deepFamilyReader?.runtimeSha256,
     }),
@@ -143,9 +143,9 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       deploymentArtifacts?.groth16VerifierAdapter,
     ],
     [
-      "DeepFamilyArchiveV1",
-      plannedAddresses?.deepFamilyArchiveV1,
-      deploymentArtifacts?.deepFamilyArchiveV1,
+      "DeepFamilyArchive",
+      plannedAddresses?.deepFamilyArchive,
+      deploymentArtifacts?.deepFamilyArchive,
     ],
     ["DeepFamilyReader", plannedAddresses?.deepFamilyReader, deploymentArtifacts?.deepFamilyReader],
   ];

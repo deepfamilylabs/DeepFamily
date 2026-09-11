@@ -29,7 +29,7 @@ const artifactPaths = {
     "artifacts/contracts/adapters/Groth16VerifierAdapter.sol/Groth16VerifierAdapter.json",
   DeepFamily: "artifacts/contracts/DeepFamily.sol/DeepFamily.json",
   UUPSProxy: "artifacts/contracts/proxy/UUPSProxy.sol/UUPSProxy.json",
-  DeepFamilyArchiveV1: "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json",
+  DeepFamilyArchive: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
   DeepFamilyReader: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
 };
 
@@ -130,7 +130,7 @@ describe("eSpace Mainnet release transaction intents", function () {
 
     const readerArgs = decodeConstructor("deepFamilyReader", "DeepFamilyReader", ["address"]);
     expect(readerArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
-    const archiveArgs = decodeConstructor("deepFamilyArchiveV1", "DeepFamilyArchiveV1", [
+    const archiveArgs = decodeConstructor("deepFamilyArchive", "DeepFamilyArchive", [
       "address",
     ]);
     expect(archiveArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
@@ -144,7 +144,7 @@ describe("eSpace Mainnet release transaction intents", function () {
 
     const setArchive = deepInterface.decodeFunctionData("setArchive", byLabel.setArchive.data);
     expect(byLabel.setArchive.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
-    expect(setArchive[0]).to.equal(byLabel.deepFamilyArchiveV1.predictedAddress);
+    expect(setArchive[0]).to.equal(byLabel.deepFamilyArchive.predictedAddress);
 
     for (const [label, purpose] of [
       ["setPersonRelationVerifier", 0n],

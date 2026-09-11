@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {DeepFamilyArchiveV1} from "../DeepFamilyArchiveV1.sol";
+import {DeepFamilyArchive} from "../DeepFamilyArchive.sol";
 
-contract ArchiveManifestHarness is DeepFamilyArchiveV1 {
+contract ArchiveManifestHarness is DeepFamilyArchive {
   error DeploymentFailed();
   uint256 public deploymentCount;
   uint256 public failOnDeployment;
   address public manifest;
 
-  constructor(address deepFamily) DeepFamilyArchiveV1(deepFamily) {}
+  constructor(address deepFamily) DeepFamilyArchive(deepFamily) {}
 
   function setFailOnDeployment(uint256 count) external {
     failOnDeployment = count;

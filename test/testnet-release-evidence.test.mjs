@@ -66,7 +66,7 @@ const VERIFIED_CONTRACTS = [
   ["initial-deployment", "PersonCommitmentVerifier"],
   ["initial-deployment", "DisclosureBindingVerifier"],
   ["initial-deployment", "Groth16VerifierAdapter"],
-  ["initial-deployment", "DeepFamilyArchiveV1"],
+  ["initial-deployment", "DeepFamilyArchive"],
   ["initial-deployment", "DeepFamily"],
   ["initial-deployment", "UUPSProxy"],
   ["initial-deployment", "DeepFamilyReader"],
@@ -150,7 +150,7 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
       ],
       deployments: {
         groth16VerifierAdapter: { artifactSha256: ADAPTER_ARTIFACT_SHA256 },
-        deepFamilyArchiveV1: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
+        deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
       },
     },
@@ -163,7 +163,7 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
       personVerifierImmutable: PERSON_VERIFIER,
       disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
     },
-    deepFamilyArchiveV1: { deepFamilyImmutable: DEEP_FAMILY },
+    deepFamilyArchive: { deepFamilyImmutable: DEEP_FAMILY },
     deepFamilyReader: {
       deepFamilyImmutable: DEEP_FAMILY,
       archiveImmutable: ARCHIVE,
@@ -174,7 +174,7 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
       artifactSha256: ADAPTER_ARTIFACT_SHA256,
       runtimeSha256: ADAPTER_RUNTIME_SHA256,
     },
-    deepFamilyArchiveV1: {
+    deepFamilyArchive: {
       artifactSha256: ARCHIVE_ARTIFACT_SHA256,
       runtimeSha256: ARCHIVE_RUNTIME_SHA256,
     },
@@ -1227,7 +1227,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => (report.terminalGovernanceState.archive.runtimeSha256 = "92".repeat(32)),
-        /DeepFamilyArchiveV1 runtimeSha256/iu,
+        /DeepFamilyArchive runtimeSha256/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.proofRoutes[0].proofEncodingId = 2),

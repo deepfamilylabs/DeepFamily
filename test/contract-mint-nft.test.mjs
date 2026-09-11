@@ -136,7 +136,7 @@ describe("Mint NFT Tests", function () {
     const { deepFamily, signer, personHash, publicSignals, coreInfo } =
       await prepareBasicInfoMintAttempt("Receiver Biography");
     const archive = await hre.ethers.getContractAt(
-      "DeepFamilyArchiveV1",
+      "DeepFamilyArchive",
       await deepFamily.archive(),
     );
     const receiver = await (

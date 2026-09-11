@@ -13,10 +13,10 @@ export function blobInput(blob) {
   };
 }
 
-describe("DeepFamilyArchiveV1 metadata and physical blobs", function () {
+describe("DeepFamilyArchive metadata and physical blobs", function () {
   this.timeout(120_000);
 
-  async function fixture(name = "DeepFamilyArchiveV1") {
+  async function fixture(name = "DeepFamilyArchive") {
     const Caller = await hre.ethers.getContractFactory("ArchiveCallerHarness");
     const caller = await Caller.deploy();
     const Archive = await hre.ethers.getContractFactory(name);
@@ -26,7 +26,7 @@ describe("DeepFamilyArchiveV1 metadata and physical blobs", function () {
   }
 
   it("rejects zero and codeless bindings and advertises the frozen protocol identity", async () => {
-    const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
+    const Archive = await hre.ethers.getContractFactory("DeepFamilyArchive");
     const [, eoa] = await hre.ethers.getSigners();
     for (const address of [hre.ethers.ZeroAddress, await eoa.getAddress()]) {
       await expect(Archive.deploy(address)).to.be.revertedWithCustomError(

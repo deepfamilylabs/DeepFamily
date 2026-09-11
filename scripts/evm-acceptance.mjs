@@ -239,7 +239,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
         personVerifierImmutable: adapterPersonVerifier,
         disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
       },
-      deepFamilyArchiveV1: { deepFamilyImmutable: archiveDeepFamily },
+      deepFamilyArchive: { deepFamilyImmutable: archiveDeepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: readerDeepFamily,
         archiveImmutable: readerArchive,
@@ -252,7 +252,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
       addresses.groth16VerifierAdapter,
       deploymentArtifacts.groth16VerifierAdapter,
     ],
-    ["DeepFamilyArchiveV1", addresses.archive, deploymentArtifacts.deepFamilyArchiveV1],
+    ["DeepFamilyArchive", addresses.archive, deploymentArtifacts.deepFamilyArchive],
     ["DeepFamilyReader", addresses.deepFamilyReader, deploymentArtifacts.deepFamilyReader],
   ];
   for (const [label, address, artifact] of runtimeContracts) {
@@ -281,8 +281,8 @@ const readTerminalProtocolDeploymentEvidence = async ({
     archive: {
       address: addresses.archive,
       deepFamily: archiveDeepFamily,
-      artifactSha256: deploymentArtifacts.deepFamilyArchiveV1.artifactSha256,
-      runtimeSha256: deploymentArtifacts.deepFamilyArchiveV1.runtimeSha256,
+      artifactSha256: deploymentArtifacts.deepFamilyArchive.artifactSha256,
+      runtimeSha256: deploymentArtifacts.deepFamilyArchive.runtimeSha256,
     },
     reader: {
       address: addresses.deepFamilyReader,
@@ -327,9 +327,9 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       manifest.deployments?.groth16VerifierAdapter,
     ],
     [
-      "DeepFamilyArchiveV1",
-      terminalProjection.contracts.deepFamilyArchiveV1,
-      manifest.deployments?.deepFamilyArchiveV1,
+      "DeepFamilyArchive",
+      terminalProjection.contracts.deepFamilyArchive,
+      manifest.deployments?.deepFamilyArchive,
     ],
     [
       "DeepFamilyReader",
@@ -1682,7 +1682,7 @@ export const main = async (chainProfile) => {
       DisclosureBindingVerifier: addresses.disclosureBindingVerifier,
       Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
       DeepFamily: addresses.deepFamily,
-      DeepFamilyArchiveV1: addresses.archive,
+      DeepFamilyArchive: addresses.archive,
       DeepFamilyReader: addresses.deepFamilyReader,
     };
     for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
@@ -1832,7 +1832,7 @@ export const main = async (chainProfile) => {
         addresses.deepFamilyImplementation,
         proxyInitData,
       ]),
-      await verificationEntry(hre.artifacts, "DeepFamilyArchiveV1", addresses.archive, [
+      await verificationEntry(hre.artifacts, "DeepFamilyArchive", addresses.archive, [
         addresses.deepFamily,
       ]),
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [

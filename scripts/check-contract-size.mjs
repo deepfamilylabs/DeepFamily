@@ -8,8 +8,8 @@ const MAX_SEGMENT_RUNTIME_BYTES = 16_385;
 const MAX_MANIFEST_RUNTIME_BYTES = 20_566;
 const ARTIFACTS = [
   ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
-  ["DeepFamilyArchiveV1", "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json"],
-  ["ArchiveDataV1", "artifacts/contracts/DeepFamilyArchiveV1.sol/ArchiveDataV1.json"],
+  ["DeepFamilyArchive", "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json"],
+  ["ArchiveData", "artifacts/contracts/DeepFamilyArchive.sol/ArchiveData.json"],
   ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
   ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],

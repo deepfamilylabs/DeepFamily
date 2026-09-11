@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDeepFamilyArchiveV1} from "../interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "../interfaces/IDeepFamilyArchive.sol";
 
 contract StoryNFTOwnerMock {
   address public archive;
@@ -16,7 +16,7 @@ contract StoryNFTOwnerMock {
     bytes calldata payload,
     bytes32 expectedPayloadHash
   ) external {
-    IDeepFamilyArchiveV1(archive).initializeStory(tokenId, author, payload, expectedPayloadHash);
+    IDeepFamilyArchive(archive).initializeStory(tokenId, author, payload, expectedPayloadHash);
   }
 
   mapping(uint256 tokenId => address owner) private _owners;

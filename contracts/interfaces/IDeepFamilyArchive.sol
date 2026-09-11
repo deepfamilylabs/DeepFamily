@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /** @notice Immutable metadata and append-only story archive protocol. */
-interface IDeepFamilyArchiveV1 is IERC165 {
+interface IDeepFamilyArchive is IERC165 {
   struct BlobRef {
     bytes32 payloadHash;
     address pointer;

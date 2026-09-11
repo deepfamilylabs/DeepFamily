@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDeepFamilyArchiveV1} from "../interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "../interfaces/IDeepFamilyArchive.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /** @dev Independently malformed capability claims for one-time binding tests. */
@@ -22,6 +22,6 @@ contract ArchiveBindingMock {
     if (capability == 2) return true;
     return
       capability == 1 &&
-      (id == type(IERC165).interfaceId || id == type(IDeepFamilyArchiveV1).interfaceId);
+      (id == type(IERC165).interfaceId || id == type(IDeepFamilyArchive).interfaceId);
   }
 }

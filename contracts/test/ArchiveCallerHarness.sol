@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDeepFamilyArchiveV1} from "../interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "../interfaces/IDeepFamilyArchive.sol";
 
 contract ArchiveCallerHarness {
   address public archive;
@@ -15,7 +15,7 @@ contract ArchiveCallerHarness {
     bytes32 personHash,
     uint256 versionIndex,
     bytes calldata envelope
-  ) external returns (IDeepFamilyArchiveV1.BlobRef memory blob) {
-    return IDeepFamilyArchiveV1(target).storeMetadata(personHash, versionIndex, envelope);
+  ) external returns (IDeepFamilyArchive.BlobRef memory blob) {
+    return IDeepFamilyArchive(target).storeMetadata(personHash, versionIndex, envelope);
   }
 }

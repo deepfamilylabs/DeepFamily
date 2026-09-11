@@ -11,10 +11,10 @@ function args(payload, index = 0n, head = hre.ethers.ZeroHash, schema = SCHEMA) 
   return [1n, index, head, schema, payload, hre.ethers.keccak256(payload)];
 }
 
-describe("DeepFamilyArchiveV1 story records", function () {
+describe("DeepFamilyArchive story records", function () {
   this.timeout(120_000);
 
-  async function fixture(name = "DeepFamilyArchiveV1") {
+  async function fixture(name = "DeepFamilyArchive") {
     const [owner, other] = await hre.ethers.getSigners();
     const Owner = await hre.ethers.getContractFactory("StoryNFTOwnerMock");
     const nft = await Owner.deploy();

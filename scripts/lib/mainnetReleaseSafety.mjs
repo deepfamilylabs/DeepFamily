@@ -23,7 +23,7 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "deepFamilyImplementation",
   "deepFamilyProxy",
   "tokenInitialize",
-  "deepFamilyArchiveV1",
+  "deepFamilyArchive",
   "setArchive",
   "deepFamilyReader",
   "setPersonRelationVerifier",

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {DeepFamilyArchiveV1} from "../DeepFamilyArchiveV1.sol";
+import {DeepFamilyArchive} from "../DeepFamilyArchive.sol";
 
-contract StubArchive is DeepFamilyArchiveV1 {
+contract StubArchive is DeepFamilyArchive {
   error StoreFailed();
   bool public immutable shouldRevert;
 
-  constructor(address deepFamily, bool fail) DeepFamilyArchiveV1(deepFamily) {
+  constructor(address deepFamily, bool fail) DeepFamilyArchive(deepFamily) {
     shouldRevert = fail;
   }
 

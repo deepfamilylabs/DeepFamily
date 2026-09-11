@@ -79,7 +79,7 @@ const definition = {
       },
     ],
   },
-  deepFamilyArchiveV1: {
+  deepFamilyArchive: {
     abiPolicy: {
       nonErrorFragments: "exact-set",
       errorFragments: "excluded",
@@ -1242,7 +1242,7 @@ const definition = {
       setterAuthorization: "owner via proxy",
       setterCallsMaximum: 1,
       archiveHasCode: true,
-      archiveReverseBinding: "IDeepFamilyArchiveV1(candidate).DEEP_FAMILY() == address(this)",
+      archiveReverseBinding: "IDeepFamilyArchive(candidate).DEEP_FAMILY() == address(this)",
       archiveKind: "0xbc9b8c5e2836ffe8b3db14ba7b3e2b5a7c8714f4a9e01b435aad3396f45af12c",
       apiVersion: 1,
       erc165: true,

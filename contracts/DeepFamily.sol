@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
-import {IDeepFamilyArchiveV1} from "./interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "./interfaces/IDeepFamilyArchive.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
@@ -459,7 +459,7 @@ contract DeepFamily is
     _setTokenURI(newTokenId, _tokenURI);
 
     if (archive == address(0)) revert ArchiveNotSet();
-    IDeepFamilyArchiveV1(archive).initializeStory(
+    IDeepFamilyArchive(archive).initializeStory(
       newTokenId,
       msg.sender,
       storyPayload,
@@ -528,10 +528,10 @@ contract DeepFamily is
   function setArchive(address candidate) external onlyProxy onlyOwner {
     if (archive != address(0)) revert ArchiveAlreadySet();
     if (candidate == address(0) || candidate.code.length == 0) revert InvalidArchive();
-    if (!ERC165Checker.supportsInterface(candidate, type(IDeepFamilyArchiveV1).interfaceId)) {
+    if (!ERC165Checker.supportsInterface(candidate, type(IDeepFamilyArchive).interfaceId)) {
       revert InvalidArchive();
     }
-    IDeepFamilyArchiveV1 target = IDeepFamilyArchiveV1(candidate);
+    IDeepFamilyArchive target = IDeepFamilyArchive(candidate);
     try target.DEEP_FAMILY() returns (address bound) {
       if (bound != address(this)) revert InvalidArchive();
     } catch {
@@ -682,7 +682,7 @@ contract DeepFamily is
       })
     );
 
-    IDeepFamilyArchiveV1(archive).storeMetadata(personHash, versionIndex, metadataEnvelope);
+    IDeepFamilyArchive(archive).storeMetadata(personHash, versionIndex, metadataEnvelope);
 
     _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {

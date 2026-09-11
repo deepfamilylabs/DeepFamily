@@ -87,7 +87,7 @@ describe("Atomic compressed mint biography", function () {
     const [owner] = await hre.ethers.getSigners();
     const nft = await (await hre.ethers.getContractFactory("StoryNFTOwnerMock")).deploy();
     const archive = await (
-      await hre.ethers.getContractFactory("DeepFamilyArchiveV1")
+      await hre.ethers.getContractFactory("DeepFamilyArchive")
     ).deploy(await nft.getAddress());
     await nft.setArchive(await archive.getAddress());
     const hash = hre.ethers.keccak256("0x");
