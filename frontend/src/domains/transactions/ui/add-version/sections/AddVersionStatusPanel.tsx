@@ -1,4 +1,5 @@
 import { TransactionErrorResult } from "../../shared/TransactionErrorResult";
+import { TransactionPreviewPanel } from "../../shared/TransactionPreviewPanel";
 import { TransactionProgress } from "../../shared/TransactionProgress";
 import { AddVersionSuccessResult } from "../AddVersionSuccessResult";
 import type {
@@ -7,7 +8,6 @@ import type {
   AddVersionT,
   AddVersionTransactionPreview,
 } from "../model/addVersionTypes";
-import { AddVersionTransactionPreviewPanel } from "./AddVersionTransactionPreviewPanel";
 
 interface AddVersionStatusPanelProps {
   t: AddVersionT;
@@ -29,7 +29,14 @@ export function AddVersionStatusPanel({
   return (
     <>
       {transactionPreview && !successResult && !errorResult && (
-        <AddVersionTransactionPreviewPanel t={t} preview={transactionPreview} />
+        <TransactionPreviewPanel
+          preview={transactionPreview}
+          title={t("addVersion.transactionPreviewTitle", "Review before opening your wallet")}
+          description={t(
+            "addVersion.transactionPreviewDescription",
+            "The proof and encrypted envelope are frozen. Confirm these exact transaction details before continuing.",
+          )}
+        />
       )}
 
       {isSubmitting &&

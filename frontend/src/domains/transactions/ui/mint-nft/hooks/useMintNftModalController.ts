@@ -325,8 +325,6 @@ export function useMintNftModalController({
   });
 
   return {
-    transactionPreview,
-    resolveTransactionPreview,
     t,
     frame: {
       isOpen,
@@ -371,6 +369,7 @@ export function useMintNftModalController({
     statusPanel: {
       isSubmitting,
       proofGenerationStep,
+      transactionPreview,
       successResult,
       errorResult,
       isAlreadyMinted,
@@ -386,6 +385,8 @@ export function useMintNftModalController({
       hasTargetInputs,
       hasValidTarget,
       hasVerifiedTargetEnvelope: targetSelfSuiteId !== null,
+      transactionPreview,
+      onTransactionPreviewDecision: resolveTransactionPreview,
       onClose: handleClose,
       onContinueMinting: handleContinueMinting,
       onShowEndorseConfirm: () => setShowEndorseConfirm(true),

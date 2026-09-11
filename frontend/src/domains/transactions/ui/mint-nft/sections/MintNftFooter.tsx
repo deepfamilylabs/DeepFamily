@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { TransactionButton } from "../../shared/TransactionButton";
+import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import type { MintNFTSuccessResultView, MintNFTT } from "../model/mintNftTypes";
 
 export interface MintNftFooterProps {
@@ -14,6 +15,8 @@ export interface MintNftFooterProps {
   hasTargetInputs: boolean;
   hasValidTarget: boolean;
   hasVerifiedTargetEnvelope: boolean;
+  transactionPreview: ArchiveTransactionPreview | null;
+  onTransactionPreviewDecision: (approved: boolean) => void;
   onClose: () => void;
   onContinueMinting: () => void;
   onShowEndorseConfirm: () => void;
@@ -31,6 +34,8 @@ export function MintNftFooter({
   hasTargetInputs,
   hasValidTarget,
   hasVerifiedTargetEnvelope,
+  transactionPreview,
+  onTransactionPreviewDecision,
   onClose,
   onContinueMinting,
   onShowEndorseConfirm,
@@ -44,6 +49,23 @@ export function MintNftFooter({
           </TransactionButton>
           <TransactionButton variant="primary" onClick={onContinueMinting} className="flex-1">
             {t("mintNFT.continueMinting", "Continue Minting")}
+          </TransactionButton>
+        </>
+      ) : transactionPreview ? (
+        <>
+          <TransactionButton
+            onClick={() => onTransactionPreviewDecision(false)}
+            className="flex-1"
+          >
+            {t("mintNFT.cancelSubmission", "Cancel Submission")}
+          </TransactionButton>
+          <TransactionButton
+            variant="primary"
+            onClick={() => onTransactionPreviewDecision(true)}
+            className="flex-[1.5]"
+          >
+            <span>{t("mintNFT.continueToWallet", "Continue to Wallet")}</span>
+            <ChevronRight className="w-4 h-4 opacity-80" />
           </TransactionButton>
         </>
       ) : (

@@ -1175,6 +1175,10 @@
     "nftAlreadyMintedDesc": "该版本已铸造为 NFT。每个版本只能铸造一次。",
     "mint": "铸造 NFT",
     "minting": "正在铸造...",
+    "transactionPreviewTitle": "打开钱包前请确认",
+    "transactionPreviewDescription": "证明、核心信息和传记已冻结。NFT 与传记在这一笔交易中一并铸造，请确认这些精确参数后再继续。",
+    "cancelSubmission": "取消提交",
+    "continueToWallet": "继续到钱包",
     "goEndorse": "去背书",
     "endorsementRequiredTitle": "需要背书",
     "endorsementRequiredDesc": "您必须先背书此版本才能铸造。是否前往背书？",
@@ -1545,7 +1549,6 @@
     "largeStory": "原文较长，请在签名前查看压缩后的存储大小与费用估算",
     "reviewStory": "确认故事交易",
     "confirm": "前往钱包确认",
-    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节",
-    "reviewMint": "确认铸造和传记写入"
+    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节"
   }
 }
