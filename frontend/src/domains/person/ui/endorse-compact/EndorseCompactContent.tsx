@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, Loader2, AlertCircle, Star, ShieldCheck, Coins } from "lucide-react";
 import {
+  resolveTransactionPhase,
   useContractClient,
   useEndorseFlow,
+  useTransactionCenterEntry,
   type ExecuteEndorseFlowResult,
 } from "../../../transactions";
 import { useWallet } from "../../../wallet";
@@ -66,6 +68,18 @@ export default function EndorseCompactModal({
   const flowError = flowBelongsToCurrentTarget ? endorseFlow.error : null;
   const isAlreadyEndorsed = flowResult?.alreadyEndorsed === true;
   const successResult = flowResult && !flowResult.alreadyEndorsed ? flowResult : null;
+  useTransactionCenterEntry({
+    kind: "endorse",
+    label: t("endorse.title", "Endorse Version"),
+    phase: resolveTransactionPhase({
+      successResult,
+      errorResult: flowError,
+      isBusy: flowStatus === "validating" || flowStatus === "approving" || flowStatus === "submitting",
+    }),
+    transactionHash: successResult?.transactionHash,
+    error: flowError,
+  });
+
   const endorsementFee = successResult?.feeFormatted ?? null;
   const endorsementFeeRaw = successResult?.fee ?? 0n;
   const userBalance = successResult?.balanceFormatted ?? null;
@@ -167,7 +181,7 @@ export default function EndorseCompactModal({
     if (hasValidTarget && address) {
       setHasTriggered(true);
       activeRunTargetRef.current = currentTargetKey;
-      runEndorseFlow({ personHash, versionIndex, suppressToasts: true });
+      runEndorseFlow({ personHash, versionIndex });
     }
   }, [
     address,

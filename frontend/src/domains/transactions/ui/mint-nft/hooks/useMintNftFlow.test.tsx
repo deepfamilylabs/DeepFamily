@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useMintNftFlow } from "./useMintNftFlow";
+import { useTransactionPreviewDecision } from "../../shared/useTransactionPreviewDecision";
 
 const mocks = vi.hoisted(() => ({
   wallet: {
@@ -111,6 +112,26 @@ function invokeMint(params: any) {
   );
 }
 
+/**
+ * The flow and the custody of its pending decision, as the modal pairs them.
+ * Cancellation is a property of that pairing, not of either half alone.
+ */
+function renderFlowWithPreviewCustody() {
+  const custody = useTransactionPreviewDecision<any>();
+  const flow = useMintNftFlow({ confirmTransactionPreview: custody.confirmTransactionPreview });
+  return {
+    ...flow,
+    transactionPreview: custody.transactionPreview,
+    resolvePreviewForTest: () => custody.decideTransactionPreview(true),
+    // What the modal does when it closes: abandon the run and the decision it
+    // is blocked on. Either half alone would leave the other hanging.
+    reset: () => {
+      custody.decideTransactionPreview(false);
+      flow.reset();
+    },
+  };
+}
+
 describe("useMintNftFlow", () => {
   beforeEach(() => {
     mocks.wallet.signer = { id: "signer" };
@@ -204,7 +225,8 @@ describe("useMintNftFlow", () => {
         getVersionDetails: expect.any(Function),
       }),
     );
-    expect(result.current.state).toEqual({ step: "success", result: flowResult });
+    expect(result.current.status).toBe("success");
+    expect(result.current.result).toEqual(flowResult);
   });
 
   it("fails before contract creation when wallet, address, or contract config is missing", async () => {
@@ -216,7 +238,7 @@ describe("useMintNftFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingSigner.result.current.state.step).toBe("error");
+    expect(missingSigner.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeMintFlow).not.toHaveBeenCalled();
 
@@ -229,7 +251,7 @@ describe("useMintNftFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingAddress.result.current.state.step).toBe("error");
+    expect(missingAddress.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeMintFlow).not.toHaveBeenCalled();
 
@@ -242,7 +264,7 @@ describe("useMintNftFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingContract.result.current.state.step).toBe("error");
+    expect(missingContract.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeMintFlow).not.toHaveBeenCalled();
   });
@@ -255,7 +277,7 @@ describe("useMintNftFlow", () => {
         await validation.promise;
         return invokeMint(params);
       });
-      const hook = renderHook(() => useMintNftFlow());
+      const hook = renderHook(() => renderFlowWithPreviewCustody());
       let pending!: Promise<unknown>;
       act(() => {
         pending = hook.result.current.runOrThrow(flowArgs);
@@ -275,6 +297,50 @@ describe("useMintNftFlow", () => {
   );
 
   it.each(["reset", "unmount"] as const)(
+    "carries on to the receipt after %s once the transaction is away",
+    async (cancel) => {
+      const walletSend = deferred();
+      const verifiedAfterSubmission = vi.fn();
+      mocks.executeMintFlow.mockImplementation(invokeMint);
+      mocks.mintBiographyTransaction.mockImplementation(async (input) => {
+        await input.confirm({ payloadBytes: 0 });
+        // The wallet is deciding; the modal is abandoned while it does.
+        await walletSend.promise;
+        input.onSubmitted?.();
+        // Stands in for the receipt wait and readback verification after it.
+        verifiedAfterSubmission();
+        return mocks.receipt;
+      });
+
+      const hook = renderHook(() => renderFlowWithPreviewCustody());
+      let pending!: Promise<unknown>;
+      act(() => {
+        pending = hook.result.current.runOrThrow(flowArgs);
+      });
+      await act(async () => {
+        await Promise.resolve();
+        hook.result.current.transactionPreview !== null &&
+          hook.result.current.resolvePreviewForTest?.();
+      });
+
+      await vi.waitFor(() => expect(mocks.mintBiographyTransaction).toHaveBeenCalled());
+
+      act(() => {
+        if (cancel === "reset") hook.result.current.reset();
+        else hook.unmount();
+      });
+
+      // Abandoning the modal must not abandon a transaction already on chain:
+      // the receipt wait and the verification after it still have to happen.
+      await act(async () => {
+        walletSend.resolve();
+        await pending.catch(() => undefined);
+      });
+      expect(verifiedAfterSubmission).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["reset", "unmount"] as const)(
     "rejects a delayed gas preview after %s without opening confirmation",
     async (cancel) => {
       const estimation = deferred();
@@ -288,7 +354,7 @@ describe("useMintNftFlow", () => {
         if (!confirmation) throw new Error("Mint cancelled before wallet request");
         return mocks.receipt;
       });
-      const hook = renderHook(() => useMintNftFlow());
+      const hook = renderHook(() => renderFlowWithPreviewCustody());
       let pending!: Promise<unknown>;
       act(() => {
         pending = hook.result.current.runOrThrow(flowArgs);

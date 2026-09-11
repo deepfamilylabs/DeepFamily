@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ethers } from "ethers";
 import { createDeepTokenContract } from "../../../../../shared/clients/contractFactory";
-import type { ExecuteEndorseFlowResult } from "../model/endorseTypes";
+import type { EndorseFeeQuote, ExecuteEndorseFlowResult } from "../model/endorseTypes";
 
 interface UseEndorseFeeQuoteArgs {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface UseEndorseFeeQuoteArgs {
 }
 
 const defaultFeeQuote = {
+  // Until the chain answers there is no quote to hold the submission to.
+  loaded: false,
   deepTokenFee: "0",
   deepTokenFeeRaw: 0n,
   userDeepBalance: "0",
@@ -49,6 +51,7 @@ export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQ
 
         if (cancelled) return;
         setQuote({
+          loaded: true,
           deepTokenFee: ethers.formatUnits(fee, decimals),
           deepTokenFeeRaw: BigInt(fee),
           userDeepBalance: ethers.formatUnits(balance, decimals),
@@ -71,6 +74,18 @@ export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQ
     };
   }, [address, contract, isOpen]);
 
+  /** The fee the submission actually read, so the panel stops showing a stale one. */
+  const applyFeeQuote = useCallback((next: EndorseFeeQuote) => {
+    setQuote((current) => ({
+      ...current,
+      loaded: true,
+      deepTokenFee: next.feeFormatted,
+      deepTokenFeeRaw: next.fee,
+      deepTokenDecimals: next.decimals,
+      deepTokenSymbol: next.symbol,
+    }));
+  }, []);
+
   const applySuccessResult = useCallback((result: Extract<ExecuteEndorseFlowResult, { alreadyEndorsed: false }>) => {
     setQuote((current) => {
       const nextBalance = result.balanceBefore - result.fee;
@@ -90,8 +105,9 @@ export function useEndorseFeeQuote({ isOpen, address, contract }: UseEndorseFeeQ
     () => ({
       ...quote,
       canAffordEndorsement: quote.userDeepBalanceRaw >= quote.deepTokenFeeRaw,
+      applyFeeQuote,
       applySuccessResult,
     }),
-    [applySuccessResult, quote],
+    [applyFeeQuote, applySuccessResult, quote],
   );
 }

@@ -8,6 +8,7 @@ import {
   type PersonVersionMetadataInput,
 } from "@deepfamily/protocol-core";
 import type { PersonHashCalculatorHandle } from "../../../../person";
+import type { AddVersionProofStep } from "./usePersonCommitmentProof";
 import {
   createDeepFamilyContract,
   createDeepFamilyReaderContract,
@@ -81,7 +82,7 @@ interface UseAddVersionSubmitArgs {
     contentDigestLo: string | bigint;
     contentDigestHi: string | bigint;
   }) => Promise<{ proof: ProofEnvelope; publicSignals: AddVersionPublicSignals }>;
-  setProofGenerationStep: (value: string) => void;
+  setProofStep: (value: AddVersionProofStep) => void;
   runAddVersionOrThrow: (args: {
     proof: ProofEnvelope;
     publicSignals: AddVersionPublicSignals;
@@ -99,6 +100,12 @@ interface UseAddVersionSubmitArgs {
   setSuccessResult: (value: AddVersionSuccessResultView | null) => void;
   setIsSubmitting: (value: boolean) => void;
   submissionPackageRef: MutableRefObject<RetryableAddVersionSubmission | null>;
+  /** Records the outcome even if this modal is gone by the time it lands. */
+  settleTransaction: (outcome: {
+    phase: "done" | "failed";
+    transactionHash?: string;
+    error?: any;
+  }) => void;
 }
 
 export interface RetryableAddVersionSubmission {
@@ -316,7 +323,7 @@ export function useAddVersionSubmit({
   resolveIdentityMaterial,
   buildMetadataPayload,
   generatePersonCommitmentProof,
-  setProofGenerationStep,
+  setProofStep,
   runAddVersionOrThrow,
   cacheValidatedPersonVersion,
   toastSuccess,
@@ -328,6 +335,7 @@ export function useAddVersionSubmit({
   setSuccessResult,
   setIsSubmitting,
   submissionPackageRef,
+  settleTransaction,
 }: UseAddVersionSubmitArgs) {
   const latestRuntimeScopeRef = useRef({
     signer,
@@ -387,14 +395,7 @@ export function useAddVersionSubmit({
       setSuccessResult(null);
       setErrorResult(null);
       setIsSubmitting(true);
-      setProofGenerationStep(
-        submissionPackageRef.current
-          ? t(
-              "addVersion.reusingSubmission",
-              "Reusing the previously verified submission package...",
-            )
-          : t("addVersion.preparingData", "Deriving identity material..."),
-      );
+      setProofStep("preparing");
 
       let rawPassphrase = "";
       let personIdentity: IdentityMaterial | null = null;
@@ -422,12 +423,7 @@ export function useAddVersionSubmit({
         };
 
         await assertCurrentScope();
-        setProofGenerationStep(
-          t(
-            "addVersion.submittingToBlockchain",
-            `Submitting ${submission.args.metadataEnvelope.length}-byte envelope to blockchain...`,
-          ),
-        );
+        setProofStep("handoff");
         const result = await runAddVersionOrThrow(submission.args);
         // A receipt now proves this exact package is on-chain. Never retry it,
         // even if a subsequent Reader/cache check fails.
@@ -493,8 +489,9 @@ export function useAddVersionSubmit({
         submissionPackageRef.current = null;
 
         toastSuccess(t("contract.addVersionSuccess", "Person version added successfully"));
+        settleTransaction({ phase: "done", transactionHash: result.transactionHash });
         setSuccessResult(buildAddVersionSuccessResultView(result));
-        setProofGenerationStep("");
+        setProofStep("");
         invalidateByTx({
           events: { PersonVersionAdded: result.events?.PersonVersionAdded || null },
           hints: { personHash: result.hash, versionIndex: result.index },
@@ -592,12 +589,7 @@ export function useAddVersionSubmit({
           { metadata },
           { timeoutMs: 120_000 },
         );
-        setProofGenerationStep(
-          t(
-            "addVersion.metadataSizeReady",
-            `Metadata fits in an exact ${sizePreflight.envelopeLength}-byte envelope.`,
-          ),
-        );
+        setProofStep("preparing");
 
         zkWorkStarted = true;
         const { proof, publicSignals } = await generatePersonCommitmentProof({
@@ -615,7 +607,7 @@ export function useAddVersionSubmit({
           throw new Error("Relation proof versionCommitment does not match canonical metadata");
         }
 
-        setProofGenerationStep(t("addVersion.encryptingMetadata", "Encrypting metadata..."));
+        setProofStep("encrypting");
         encrypted = await cryptoWorkerCall(
           "encryptPersonVersionEnvelopeV1",
           {
@@ -709,11 +701,12 @@ export function useAddVersionSubmit({
           submissionPackageRef.current = null;
         }
         if ((error as any)?.code === "ADD_VERSION_PREVIEW_REJECTED") {
-          setProofGenerationStep("");
+          setProofStep("");
           return;
         }
         console.error("Add version failed:", sanitizeErrorForLogging(error));
         const friendly = getFriendlyError(error, t);
+        settleTransaction({ phase: "failed", error: friendly });
         toastError(
           t("contract.addVersionFailed", "Failed to add person version") + ": " + friendly.message,
         );
@@ -723,7 +716,7 @@ export function useAddVersionSubmit({
           details: friendly.details,
           retryable: friendly.retryable,
         });
-        setProofGenerationStep("");
+        setProofStep("");
       } finally {
         rawPassphrase = "";
         personIdentity = null;
@@ -757,7 +750,7 @@ export function useAddVersionSubmit({
       setConsentError,
       setErrorResult,
       setIsSubmitting,
-      setProofGenerationStep,
+      setProofStep,
       setSuccessResult,
       signer,
       submissionPackageRef,

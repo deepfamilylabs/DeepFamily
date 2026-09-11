@@ -1,6 +1,7 @@
 import React from "react";
 import { ConfigProvider, LocalizedRootSync } from "../domains/config";
 import { ToastProvider } from "../shared/ui";
+import { TransactionCenterProvider } from "../domains/transactions";
 import { TreeViewProvider, VizOptionsProvider } from "../domains/tree";
 import { WalletProvider, NetworkSelectionLayer, WalletSelectionLayer } from "../domains/wallet";
 import { ActivePathProvider, SidebarProvider, ThemeProvider } from "./context";
@@ -23,9 +24,11 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
               <SidebarProvider>
                 <WalletSelectionLayer />
                 <NetworkSelectionLayer />
-                <VizOptionsProvider>
-                  <TreeViewProvider>{children}</TreeViewProvider>
-                </VizOptionsProvider>
+                <TransactionCenterProvider>
+                  <VizOptionsProvider>
+                    <TreeViewProvider>{children}</TreeViewProvider>
+                  </VizOptionsProvider>
+                </TransactionCenterProvider>
               </SidebarProvider>
             </WalletProvider>
           </ToastProvider>

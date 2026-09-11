@@ -63,6 +63,12 @@ interface UseMintNftSubmitArgs {
   setErrorResult: (value: MintNFTErrorResultView | null) => void;
   setSuccessResult: (value: MintNFTSuccessResultView | null) => void;
   setShowEndorseConfirm: (value: boolean) => void;
+  /** Records the outcome even if this modal is gone by the time it lands. */
+  settleTransaction: (outcome: {
+    phase: "done" | "failed";
+    transactionHash?: string;
+    error?: any;
+  }) => void;
 }
 
 export function useMintNftSubmit({
@@ -89,6 +95,7 @@ export function useMintNftSubmit({
   setErrorResult,
   setSuccessResult,
   setShowEndorseConfirm,
+  settleTransaction,
 }: UseMintNftSubmitArgs) {
   return useCallback(
     async (data: MintNFTFormValues) => {
@@ -183,6 +190,14 @@ export function useMintNftSubmit({
           getPassphrase: () => personCalcRef.current?.getSecretInputs().passphrase || "",
         });
 
+        // The proof, core info and token URI are built, so the passphrase is
+        // not needed again. Clear the secret input before any wallet or RPC
+        // wait, the same point add-version clears at.
+        // The proof, core info and token URI are built, so the passphrase is
+        // not needed again. Clear the secret input before any wallet or RPC
+        // wait, the same point add-version clears at.
+        personCalcRef.current?.clearSecretInputs();
+
         const finalPersonHash = targetPersonHash || proof.computedPersonHash;
         if (!finalPersonHash) {
           throw new Error(t("mintNFT.personHashRequired", "Unable to compute person hash"));
@@ -230,6 +245,11 @@ export function useMintNftSubmit({
           } catch {}
         }
 
+        settleTransaction({
+          phase: "done",
+          transactionHash: successfulResult.transactionHash,
+        });
+
         setSuccessResult(
           buildMintNFTSuccessResultView({
             result: successfulResult,
@@ -246,6 +266,7 @@ export function useMintNftSubmit({
       } catch (error) {
         console.error("Mint NFT failed:", sanitizeErrorForLogging(error));
         const friendly = getFriendlyError(error, t);
+        settleTransaction({ phase: "failed", error: friendly });
         setErrorResult({
           type: friendly.reason || friendly.type || "UNKNOWN_ERROR",
           message: friendly.message,
@@ -276,6 +297,7 @@ export function useMintNftSubmit({
       setErrorResult,
       setShowEndorseConfirm,
       setSuccessResult,
+      settleTransaction,
       t,
       targetPersonHash,
       targetSelfSuiteId,

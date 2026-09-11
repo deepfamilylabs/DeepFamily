@@ -12,6 +12,10 @@ import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions"
 import { useTreeMutations } from "../../../../tree";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
+import { resolveTransactionPhase } from "../../shared/transactionPhase";
+import { buildTimeline, useTimelineProgress } from "../../shared/TransactionTimeline";
+import { ADD_VERSION_TIMELINE_STEPS, addVersionTimelineStep } from "../../shared/timelineSteps";
+import { useTransactionCenterEntry } from "../../shared/useTransactionCenterEntry";
 import { addVersionSchema } from "../model/addVersionSchema";
 import { reconcileParentVersionSelection } from "../model/parentVersionSelection";
 import {
@@ -209,6 +213,28 @@ export function useAddVersionModalController({
   const isTransactionSubmitting =
     addVersionStatus === "validating" || addVersionStatus === "confirming";
   const isSubmitting = isSubmittingState || isTransactionSubmitting;
+  const timelineStep = useTimelineProgress(
+    ADD_VERSION_TIMELINE_STEPS,
+    addVersionTimelineStep({
+      proofStep: commitmentProof.proofStep,
+      isBusy: isSubmitting,
+      hasPreview: Boolean(transactionPreview),
+      status: addVersionStatus,
+    }),
+  );
+  const phase = resolveTransactionPhase({
+    successResult,
+    errorResult,
+    transactionPreview,
+    isBusy: isSubmitting,
+  });
+
+  const { settle: settleTransaction } = useTransactionCenterEntry({
+    kind: "addVersion",
+    label: t("addVersion.title", "Add Version"),
+    phase,
+    error: errorResult,
+  });
 
   const resetCommitmentProof = commitmentProof.reset;
 
@@ -416,7 +442,7 @@ export function useAddVersionModalController({
     motherCalcRef,
     buildMetadataPayload: identityMaterials.buildMetadataPayload,
     generatePersonCommitmentProof: commitmentProof.generatePersonCommitmentProof,
-    setProofGenerationStep: commitmentProof.setProofGenerationStep,
+    setProofStep: commitmentProof.setProofStep,
     runAddVersionOrThrow,
     cacheValidatedPersonVersion: cacheConfirmedAfterTransaction,
     toastSuccess: toast.success,
@@ -428,6 +454,7 @@ export function useAddVersionModalController({
     setSuccessResult,
     setIsSubmitting,
     submissionPackageRef,
+    settleTransaction,
   });
 
   const onSubmit = useCallback(
@@ -522,18 +549,63 @@ export function useAddVersionModalController({
       onToggleConsent: toggleConsent,
     },
     statusPanel: {
-      isSubmitting,
-      proofGenerationStep: commitmentProof.proofGenerationStep,
+      phase,
+      timeline: buildTimeline({
+        steps: [
+          {
+            id: "identity",
+            label: t("transaction.stepIdentity", "Derive identity material"),
+          },
+          {
+            id: "proof",
+            label: t("transaction.stepProof", "Generate zero-knowledge proof"),
+            // Says what the label cannot: how long, and what it needs from you.
+            detail: commitmentProof.proofStep === "verifying"
+                ? t("addVersion.verifyingProof", "Verifying proof...")
+                : t(
+                    "transaction.proofDuration",
+                    "This can take 30–60 seconds; keep this tab active.",
+                  ),
+          },
+          { id: "encrypt", label: t("addVersion.stepEncrypt", "Encrypt the metadata envelope") },
+          {
+            id: "review",
+            label: t("transaction.stepReview", "Confirm the transaction"),
+            // Before it is your turn, this row is the flow assembling what you
+            // will be asked to confirm.
+            detail:
+              phase === "review"
+                ? t(
+                    "transaction.stepReviewDetail",
+                    "Waiting for you to confirm and open your wallet",
+                  )
+                : t("transaction.stepEstimating", "Estimating the transaction fee…"),
+          },
+          {
+            id: "confirm",
+            label: t("transaction.stepConfirm", "Waiting for on-chain confirmation"),
+          },
+        ],
+        currentId: timelineStep,
+        failed: phase === "failed",
+        complete: phase === "done",
+        // This step stops for the user; it must not look like work in progress.
+        awaiting: phase === "review",
+      }),
       transactionPreview,
       successResult,
       errorResult,
     },
     footer: {
+      phase,
       successResult,
       isSubmitting,
       personInfo,
       allConsentsChecked,
       isParentVersionLookupPending,
+      // Only once the transaction is away. Before that, closing cancels, so
+      // offering to "continue in background" would be a lie.
+      onRunInBackground: addVersionStatus === "confirming" ? handleClose : undefined,
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,

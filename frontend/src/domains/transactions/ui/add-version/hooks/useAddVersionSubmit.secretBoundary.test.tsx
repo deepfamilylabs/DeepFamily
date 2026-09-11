@@ -77,6 +77,7 @@ function expectNoSecretSentinels(value: unknown): void {
 }
 
 const mocks = vi.hoisted(() => ({
+  settleTransaction: vi.fn(),
   cryptoWorkerCall: vi.fn(),
   terminateCryptoWorkerIfIdle: vi.fn(() => true),
   terminateZkWorkerIfIdle: vi.fn(() => true),
@@ -357,7 +358,7 @@ describe("AddVersion secret-state boundary", () => {
           biography: "encrypted biography",
         }),
         generatePersonCommitmentProof,
-        setProofGenerationStep: vi.fn(),
+        setProofStep: vi.fn(),
         runAddVersionOrThrow,
         cacheValidatedPersonVersion,
         toastSuccess: vi.fn(),
@@ -368,6 +369,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult: vi.fn(),
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
+      settleTransaction: mocks.settleTransaction,
       }),
     );
 
@@ -500,7 +502,7 @@ describe("AddVersion secret-state boundary", () => {
         resolveIdentityMaterial,
         buildMetadataPayload: vi.fn(),
         generatePersonCommitmentProof,
-        setProofGenerationStep: vi.fn(),
+        setProofStep: vi.fn(),
         runAddVersionOrThrow,
         cacheValidatedPersonVersion: vi.fn(),
         toastSuccess: vi.fn(),
@@ -511,6 +513,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult: vi.fn(),
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
+      settleTransaction: mocks.settleTransaction,
       }),
     );
 
@@ -622,7 +625,7 @@ describe("AddVersion secret-state boundary", () => {
         resolveIdentityMaterial: vi.fn(),
         buildMetadataPayload: vi.fn(),
         generatePersonCommitmentProof: vi.fn(),
-        setProofGenerationStep: vi.fn(),
+        setProofStep: vi.fn(),
         runAddVersionOrThrow,
         cacheValidatedPersonVersion,
         toastSuccess: vi.fn(),
@@ -633,6 +636,7 @@ describe("AddVersion secret-state boundary", () => {
         setSuccessResult,
         setIsSubmitting: vi.fn(),
         submissionPackageRef,
+      settleTransaction: mocks.settleTransaction,
       }),
     );
 

@@ -1,12 +1,14 @@
-import { Check, Star } from "lucide-react";
-import { TransactionErrorResult } from "../../shared/TransactionErrorResult";
-import { TransactionProgress } from "../../shared/TransactionProgress";
+import { Star } from "lucide-react";
+import { TransactionStatusView } from "../../shared/TransactionStatusView";
+import type { TransactionPhase } from "../../shared/transactionPhase";
+import type { TimelineStep } from "../../shared/TransactionTimeline";
 import { EndorseSuccessResult } from "../EndorseSuccessResult";
 import type { EndorseErrorResultView, EndorseSuccessResultView, EndorseT } from "../model/endorseTypes";
 
 export interface EndorseStatusPanelProps {
   t: EndorseT;
-  isSubmitting: boolean;
+  phase: TransactionPhase;
+  timeline: TimelineStep[];
   isApproving: boolean;
   successResult: EndorseSuccessResultView | null;
   errorResult: EndorseErrorResultView | null;
@@ -19,7 +21,8 @@ export interface EndorseStatusPanelProps {
 
 export function EndorseStatusPanel({
   t,
-  isSubmitting,
+  phase,
+  timeline,
   isApproving,
   successResult,
   errorResult,
@@ -31,39 +34,23 @@ export function EndorseStatusPanel({
 }: EndorseStatusPanelProps) {
   return (
     <>
-      {(isSubmitting || isApproving) && !successResult && !errorResult && (
-        <TransactionProgress
-          title={
-            isApproving
-              ? t("endorse.approving", "Approving DEEP tokens...")
-              : t("endorse.endorsing", "Endorsing version...")
-          }
-          message={
-            isApproving
-              ? t("endorse.approvingDesc", "Please confirm the token approval in your wallet")
-              : t("endorse.endorsingDesc", "Processing endorsement on the blockchain...")
-          }
-        />
-      )}
-
-      {successResult && (
-        <EndorseSuccessResult
-          t={t}
-          successResult={successResult}
-          deepTokenDecimals={deepTokenDecimals}
-          deepTokenSymbol={deepTokenSymbol}
-        />
-      )}
-
-      {errorResult && (
-        <TransactionErrorResult
-          title={t("endorse.endorseFailed", "Endorsement Failed")}
-          error={errorResult}
-          typeLabel={t("endorse.errorType", "Error Type")}
-          messageLabel={t("endorse.errorMessage", "Message")}
-          detailsLabel={t("endorse.errorDetails", "Details")}
-          retry={
-            errorResult.retryable
+      <TransactionStatusView
+        t={t}
+        phase={phase}
+        slots={{
+          timeline,
+          done: successResult ? (
+            <EndorseSuccessResult
+              t={t}
+              successResult={successResult}
+              deepTokenDecimals={deepTokenDecimals}
+              deepTokenSymbol={deepTokenSymbol}
+            />
+          ) : null,
+          failed: {
+            title: t("endorse.endorseFailed", "Endorsement Failed"),
+            error: errorResult,
+            retry: errorResult?.retryable
               ? {
                   label: t("endorse.retryTransaction", "Retry Transaction"),
                   onClick: () => {
@@ -71,12 +58,13 @@ export function EndorseStatusPanel({
                     onRetry();
                   },
                 }
-              : undefined
-          }
-        />
-      )}
+              : undefined,
+          },
+        }}
+      />
 
-      {hasEndorsed && !successResult && (
+      {/* Orthogonal to the phase: context for the target, not a state of its own. */}
+      {hasEndorsed && phase !== "done" && (
         <div className="p-4 bg-success/10 border border-success/25 rounded-xl">
           <div className="flex items-center gap-3">
             <Star className="w-5 h-5 text-green-600 dark:text-green-400 fill-current" />

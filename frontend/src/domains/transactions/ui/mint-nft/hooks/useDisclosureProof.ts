@@ -26,12 +26,15 @@ function toNumberOrZero(value: number | string | undefined) {
   return value === "" || value === undefined ? 0 : Number(value);
 }
 
+/** Where proof generation is, as a step the timeline can place. */
+export type DisclosureProofStep = "" | "preparing" | "generating" | "verifying" | "verified";
+
 export function useDisclosureProof() {
   const { t } = useTranslation();
-  const [proofGenerationStep, setProofGenerationStep] = useState("");
+  const [proofStep, setProofStep] = useState<DisclosureProofStep>("");
 
   const reset = useCallback(() => {
-    setProofGenerationStep("");
+    setProofStep("");
   }, []);
 
   const generateDisclosureProof = useCallback(
@@ -43,7 +46,7 @@ export function useDisclosureProof() {
       selfSuiteId,
       getPassphrase,
     }: GenerateDisclosureProofArgs) => {
-      setProofGenerationStep(t("mintNFT.preparingProof", "Preparing proof inputs..."));
+      setProofStep("preparing");
 
       const normalizedFullName = safeCanonicalizeFullName(personInfo.fullName || "");
       if (!normalizedFullName) {
@@ -121,12 +124,7 @@ export function useDisclosureProof() {
         },
       };
 
-      setProofGenerationStep(
-        t(
-          "mintNFT.generatingProof",
-          "Generating zero-knowledge proof... (this may take 30-60 seconds)",
-        ),
-      );
+      setProofStep("generating");
       const { proof: generatedProof, publicSignals } = await zkWorkerCall(
         "generateDisclosureBindingProof",
         {
@@ -137,7 +135,7 @@ export function useDisclosureProof() {
         { timeoutMs: 240_000 },
       );
 
-      setProofGenerationStep(t("mintNFT.verifyingProof", "Verifying zero-knowledge proof..."));
+      setProofStep("verifying");
       const { ok: isProofValid } = await zkWorkerCall(
         "verifyDisclosureBindingProof",
         { proof: generatedProof, publicSignals },
@@ -166,9 +164,7 @@ export function useDisclosureProof() {
         throw new Error("Disclosure suite commitment mismatch");
       }
 
-      setProofGenerationStep(
-        t("mintNFT.proofVerified", "Zero-knowledge proof verified. Submitting transaction..."),
-      );
+      setProofStep("verified");
 
       return {
         computedPersonHash,
@@ -182,7 +178,7 @@ export function useDisclosureProof() {
   );
 
   return {
-    proofGenerationStep,
+    proofStep,
     generateDisclosureProof,
     reset,
   };

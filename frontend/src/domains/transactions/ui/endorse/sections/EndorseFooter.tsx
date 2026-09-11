@@ -1,9 +1,12 @@
 import { Check, Image, Star } from "lucide-react";
 import { TransactionButton } from "../../shared/TransactionButton";
+import { TransactionFooterBar } from "../../shared/TransactionFooterBar";
+import type { TransactionPhase } from "../../shared/transactionPhase";
 import type { EndorseSuccessResultView, EndorseT } from "../model/endorseTypes";
 
 export interface EndorseFooterProps {
   t: EndorseT;
+  phase: TransactionPhase;
   successResult: EndorseSuccessResultView | null;
   isSubmitting: boolean;
   isApproving: boolean;
@@ -12,6 +15,7 @@ export interface EndorseFooterProps {
   hasValidTarget: boolean;
   isTargetValidOnChain: boolean;
   isPersonHashFormatValid: boolean;
+  onRunInBackground?: () => void;
   onClose: () => void;
   onContinueEndorsing: () => void;
   onEndorse: () => void;
@@ -20,6 +24,7 @@ export interface EndorseFooterProps {
 
 export function EndorseFooter({
   t,
+  phase,
   successResult,
   isSubmitting,
   isApproving,
@@ -28,14 +33,19 @@ export function EndorseFooter({
   hasValidTarget,
   isTargetValidOnChain,
   isPersonHashFormatValid,
+  onRunInBackground,
   onClose,
   onContinueEndorsing,
   onEndorse,
   onMintNFT,
 }: EndorseFooterProps) {
   return (
-    <div className="flex gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
-      {successResult ? (
+    <TransactionFooterBar
+      phase={phase}
+      slots={{
+        onRunInBackground,
+        // The phase is derived from this result, so it is always present here.
+        done: successResult ? (
         <div className="flex flex-col sm:flex-row gap-3 w-full">
           <TransactionButton
             onClick={onClose}
@@ -64,7 +74,10 @@ export function EndorseFooter({
             {t("endorse.goToMintNFT", "Go to Mint NFT")}
           </TransactionButton>
         </div>
-      ) : (
+        ) : null,
+        // Nothing else about endorsing changes the actions: the button's own
+        // disabled state already covers waiting, and a failure is retried here.
+        active: (
         <div className="flex gap-3 w-full">
           <TransactionButton
             onClick={onClose}
@@ -109,7 +122,8 @@ export function EndorseFooter({
             )}
           </TransactionButton>
         </div>
-      )}
-    </div>
+        ),
+      }}
+    />
   );
 }

@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
 import MintNFTModal from "./MintNFTModal";
+import { formSectionsHidden, precedesFormSections } from "./transactionPhaseContract";
 
 const personHash = `0x${"12".repeat(32)}`;
 const ownerAddress = "0x00000000000000000000000000000000000000aa";
@@ -33,6 +34,8 @@ const mocks = vi.hoisted(() => ({
   },
   mintRunOrThrow: vi.fn(),
   mintReset: vi.fn(),
+  mintFlow: { status: "idle" } as { status: string },
+  confirmTransactionPreview: null as null | ((preview: any) => Promise<boolean> | boolean),
   markVersionMinted: vi.fn(),
   onClose: vi.fn(),
   onSuccess: vi.fn(),
@@ -42,6 +45,7 @@ const mocks = vi.hoisted(() => ({
   nodesData: {} as Record<string, any>,
   personPassphrase: "",
   passphrasesMatch: true,
+  clearSecretInputs: vi.fn(),
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -77,11 +81,14 @@ vi.mock("../../tree", () => ({
 }));
 
 vi.mock("./mint-nft/hooks/useMintNftFlow", () => ({
-  useMintNftFlow: () => ({
-    status: "idle",
-    reset: mocks.mintReset,
-    runOrThrow: mocks.mintRunOrThrow,
-  }),
+  useMintNftFlow: (options?: any) => {
+    mocks.confirmTransactionPreview = options?.confirmTransactionPreview ?? null;
+    return {
+      status: mocks.mintFlow.status,
+      reset: mocks.mintReset,
+      runOrThrow: mocks.mintRunOrThrow,
+    };
+  },
 }));
 
 vi.mock("../../../shared/workers/zkWorkerClient", () => ({
@@ -130,6 +137,7 @@ vi.mock("../../person", () => ({
       }),
       hasPassphrase: () => mocks.personPassphrase.length > 0,
       passphrasesMatch: () => mocks.passphrasesMatch,
+      clearSecretInputs: () => mocks.clearSecretInputs(),
     }));
 
     useEffect(() => {
@@ -168,8 +176,8 @@ vi.mock("../../person", () => ({
   }),
 }));
 
-function renderMintModal(overrides: Partial<React.ComponentProps<typeof MintNFTModal>> = {}) {
-  return render(
+function mintModalElement(overrides: Partial<React.ComponentProps<typeof MintNFTModal>> = {}) {
+  return (
     <MintNFTModal
       isOpen
       initialPersonHash={personHash}
@@ -178,8 +186,14 @@ function renderMintModal(overrides: Partial<React.ComponentProps<typeof MintNFTM
       onSuccess={mocks.onSuccess}
       onGoEndorse={mocks.onGoEndorse}
       {...overrides}
-    />,
+    />
   );
+}
+
+function renderMintModal(overrides: Partial<React.ComponentProps<typeof MintNFTModal>> = {}) {
+  const result = render(mintModalElement(overrides));
+  /** Re-renders with the current mock state, for phases the flow enters later. */
+  return { ...result, refresh: () => result.rerender(mintModalElement(overrides)) };
 }
 
 async function checkAllConsents() {
@@ -206,6 +220,8 @@ describe("MintNFTModal", () => {
     };
     mocks.mintRunOrThrow.mockReset();
     mocks.mintReset.mockReset();
+    mocks.mintFlow = { status: "idle" };
+    mocks.confirmTransactionPreview = null;
     mocks.markVersionMinted.mockReset();
     mocks.onClose.mockReset();
     mocks.onSuccess.mockReset();
@@ -215,6 +231,7 @@ describe("MintNFTModal", () => {
     mocks.nodesData = {};
     mocks.personPassphrase = "";
     mocks.passphrasesMatch = true;
+    mocks.clearSecretInputs.mockReset();
 
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb: FrameRequestCallback) => {
       cb(0);
@@ -341,7 +358,13 @@ describe("MintNFTModal", () => {
       receipt: { hash: "0xmint" },
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(77);
+    // The passphrase must be gone before the wallet wait, not merely by the end.
+    expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(1);
+    expect(mocks.clearSecretInputs.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.mintRunOrThrow.mock.invocationCallOrder[0],
+    );
     expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
+    expect(formSectionsHidden()).toBe(true);
   });
 
   it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
@@ -460,8 +483,120 @@ describe("MintNFTModal", () => {
     await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
     expect(mocks.onSuccess).not.toHaveBeenCalled();
     expect(mocks.markVersionMinted).not.toHaveBeenCalled();
-    expect(await screen.findByText("NFT Minting Failed")).toBeTruthy();
+    const alert = await screen.findByRole("alert");
     expect(screen.getAllByText("mint reverted").length).toBeGreaterThan(0);
+    // The form stays up to be corrected, so the alert has to come to the user.
+    expect(formSectionsHidden()).toBe(false);
+    expect(document.activeElement).toBe(alert);
+    expect(precedesFormSections(alert)).toBe(true);
+  });
+
+  it("drops the chosen version when the hash is cleared", async () => {
+    renderMintModal();
+    await waitForMintableTarget();
+
+    await act(async () => {
+      // The placeholder here carries no fallback, so the mocked t() yields the key.
+      fireEvent.change(screen.getByPlaceholderText("search.versionsQuery.placeholder"), {
+        target: { value: "" },
+      });
+    });
+
+    // A version decided for the previous hash must not linger as a bare choice.
+    const picker = await screen.findByRole("button", { name: /Select a version/ });
+    expect(picker.hasAttribute("disabled")).toBe(true);
+  });
+
+  describe("what the modal shows in each phase", () => {
+    const preview = {
+      canonicalPayload: "0x00",
+      payloadHash: "0xhash",
+      payloadBytes: 1,
+      segmentCount: 1,
+      estimated: true as const,
+      estimatedGas: 100n,
+      gasLimit: 120n,
+      estimatedFee: 200n,
+      maximumFee: 240n,
+      nativeSymbol: "ETH",
+    };
+
+    it("shares its spine with adding a version, minus what minting does not do", async () => {
+      renderMintModal();
+      await waitForMintableTarget();
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+
+      const labels = Array.from(document.querySelectorAll("ol li")).map(
+        (li) => li.querySelector("div")?.nextElementSibling?.firstElementChild?.textContent ?? "",
+      );
+      // Minting publishes plain text, so it has no envelope to encrypt; every
+      // other step is work both flows do and must present the same way.
+      expect(labels).toEqual([
+        "Derive identity material",
+        "Generate zero-knowledge proof",
+        "Confirm the transaction",
+        "Waiting for on-chain confirmation",
+      ]);
+    });
+
+    it("waits on the user at the confirm step rather than looking busy", async () => {
+      renderMintModal();
+      await waitForMintableTarget();
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+      // A spinner here would claim the flow is working when it is the user's
+      // turn, which reads as a step already under way.
+      const marks = Array.from(document.querySelectorAll("ol li")).map(
+        (li) => li.querySelector("svg")?.getAttribute("class")?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
+      );
+      const confirmIndex = marks.length - 2;
+      expect(marks[confirmIndex]).toBe("arrow-right");
+      expect(marks.slice(0, confirmIndex).every((mark) => mark === "check")).toBe(true);
+      expect(marks[marks.length - 1]).toBe("dot");
+    });
+
+    it("keeps the form on screen while it is the user's turn", async () => {
+      renderMintModal();
+      await waitForMintableTarget();
+
+      expect(formSectionsHidden()).toBe(false);
+    });
+
+    it("hides the form and shows progress while the flow is busy", async () => {
+      mocks.mintFlow.status = "submitting";
+
+      renderMintModal();
+      // Submitting with no proof step under way means the gas estimate that
+      // produces the preview: the confirm row, not yet the user's turn.
+      const progress = await screen.findByRole("status", {
+        name: "Transactions: Confirm the transaction",
+      });
+      expect(screen.getByText("Estimating the transaction fee…")).toBeTruthy();
+
+      expect(formSectionsHidden()).toBe(true);
+      expect(precedesFormSections(progress)).toBe(true);
+    });
+
+    it("hides the form and focuses the frozen package while it awaits a decision", async () => {
+      renderMintModal();
+      await waitForMintableTarget();
+
+      // The flow asks the controller to confirm; that is what raises the panel,
+      // mid-submission and long after the dialog took focus on open.
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+
+      const panel = screen.getByRole("group", { name: "Review before opening your wallet" });
+
+      expect(formSectionsHidden()).toBe(true);
+      expect(document.activeElement).toBe(panel);
+      expect(precedesFormSections(panel)).toBe(true);
+      expect(screen.getByRole("button", { name: /Continue to Wallet/i })).toBeTruthy();
+    });
   });
 
   it("opens the endorsement handoff when the target version is not endorsed", async () => {

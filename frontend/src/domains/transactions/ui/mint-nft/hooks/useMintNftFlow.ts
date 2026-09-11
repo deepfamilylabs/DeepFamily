@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer, useRef, useState, useEffect } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
@@ -6,174 +6,100 @@ import {
   createDeepFamilyContract,
   createDeepFamilyReaderContract,
 } from "../../../../../shared/clients/contractFactory";
-import { getFriendlyError } from "../../../../../shared/lib/errors";
+import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
+import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
 import { mintBiographyTransaction } from "../../../services/mintBiographyTransaction";
 import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import { executeMintFlow } from "../../../services/mintNftService";
-import { initialMintNftFlowState, mintNftReducer } from "../model/mintNftReducer";
 import type { ExecuteMintFlowResult, MintNftFlowArgs } from "../model/mintNftTypes";
 
 export type { ExecuteMintFlowResult, MintNftFlowArgs };
 
-export function useMintNftFlow() {
+interface UseMintNftFlowOptions {
+  confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
+}
+
+export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
   const { signer, address } = useWallet();
   const { contractAddress, readerAddress } = useConfig();
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(mintNftReducer, initialMintNftFlowState);
-  const runIdRef = useRef(0);
-  const mountedRef = useRef(true);
-  const [transactionPreview, setTransactionPreview] = useState<ArchiveTransactionPreview | null>(
-    null,
-  );
-  const previewResolver = useRef<((value: boolean) => void) | null>(null);
-  const resolveTransactionPreview = useCallback((approved: boolean) => {
-    previewResolver.current?.(approved);
-    previewResolver.current = null;
-    setTransactionPreview(null);
-  }, []);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      runIdRef.current += 1;
-      previewResolver.current?.(false);
-      previewResolver.current = null;
-    };
-  }, []);
-  const confirmPreview = useCallback(async (preview: ArchiveTransactionPreview, runId: number) => {
-    if (!mountedRef.current || runIdRef.current !== runId) return false;
-    const approved = await new Promise<boolean>((resolve) => {
-      previewResolver.current?.(false);
-      previewResolver.current = resolve;
-      setTransactionPreview(preview);
-    });
-    return approved && mountedRef.current && runIdRef.current === runId;
-  }, []);
+  const { confirmTransactionPreview } = options;
 
-  const stepMessage = useMemo(() => {
-    switch (state.step) {
-      case "validating":
-        return t("mintNFT.checkingEndorsement", "Checking endorsement status...");
-      case "submitting":
-        return t("mintNFT.submittingMintTx", "Submitting mint transaction...");
-      case "confirming":
-        return t("mintNFT.waitingConfirmation", "Waiting for confirmation...");
-      default:
-        return null;
-    }
-  }, [state.step, t]);
-
-  const reset = useCallback(() => {
-    resolveTransactionPreview(false);
-    runIdRef.current += 1;
-    dispatch({ type: "reset" });
-  }, [resolveTransactionPreview]);
-
-  const runOrThrow = useCallback(
-    async (args: MintNftFlowArgs): Promise<ExecuteMintFlowResult> => {
-      if (!mountedRef.current) throw new Error("Mint NFT flow was closed");
-      const thisRunId = ++runIdRef.current;
-      resolveTransactionPreview(false);
-      dispatch({ type: "stage", step: "validating" });
-
-      try {
-        if (!signer || !address || !contractAddress) {
-          throw new Error(t("wallet.notConnected", "Please connect your wallet"));
-        }
-
-        const contract = createDeepFamilyContract(contractAddress, signer);
-
-        const mintPersonVersionNFT = async (
-          proof: any,
-          publicSignals: MintNftFlowArgs["publicSignals"],
-          versionIndex: number,
-          tokenURI: string,
-          coreInfo: MintNftFlowArgs["coreInfo"],
-          storyPayload: string,
-          expectedStoryPayloadHash: string,
-        ) => {
-          if (!mountedRef.current || runIdRef.current !== thisRunId)
-            throw new Error("Mint NFT flow was superseded by a newer request");
-          dispatch({ type: "stage", step: "submitting" });
-          return mintBiographyTransaction({
-            contract,
-            signer,
-            personHash: args.personHash,
-            args: [
-              proof,
-              publicSignals,
-              versionIndex,
-              tokenURI,
-              coreInfo,
-              storyPayload,
-              expectedStoryPayloadHash,
-            ],
-            confirm: (preview) => confirmPreview(preview, thisRunId),
-            onSubmitted: () => {
-              if (runIdRef.current === thisRunId) dispatch({ type: "stage", step: "confirming" });
-            },
-          });
-        };
-
-        const getVersionDetails = readerAddress
-          ? async (personHash: string, versionIndex: number) => {
-              const readContract = createDeepFamilyReaderContract(readerAddress, signer);
-              return await readContract.getVersionDetails(personHash, versionIndex);
-            }
-          : undefined;
-
-        const result = await executeMintFlow({
-          contract,
-          address,
-          personHash: args.personHash,
-          versionIndex: args.versionIndex,
-          selfSuiteId: args.selfSuiteId,
-          proofEnvelope: args.proofEnvelope,
-          publicSignals: args.publicSignals,
-          tokenURI: args.tokenURI,
-          coreInfo: args.coreInfo,
-          story: args.story,
-          mintPersonVersionNFT,
-          getVersionDetails,
-        });
-
-        if (runIdRef.current !== thisRunId) {
-          throw new Error("Mint NFT flow was superseded by a newer request");
-        }
-
-        dispatch({ type: "success", result });
-        return result;
-      } catch (error) {
-        if (runIdRef.current !== thisRunId) {
-          throw error;
-        }
-
-        dispatch({ type: "error", error: getFriendlyError(error, t) });
-        throw error;
+  const runner: TxFlowRunner<ExecuteMintFlowResult, [MintNftFlowArgs]> = useCallback(
+    async (update, args) => {
+      if (!signer || !address || !contractAddress) {
+        throw new Error(t("wallet.notConnected", "Please connect your wallet"));
       }
+
+      update("validating", t("mintNFT.checkingEndorsement", "Checking endorsement status..."));
+
+      const contract = createDeepFamilyContract(contractAddress, signer);
+
+      const mintPersonVersionNFT = async (
+        proof: any,
+        publicSignals: MintNftFlowArgs["publicSignals"],
+        versionIndex: number,
+        tokenURI: string,
+        coreInfo: MintNftFlowArgs["coreInfo"],
+        storyPayload: string,
+        expectedStoryPayloadHash: string,
+      ) => {
+        update("submitting", t("mintNFT.submittingMintTx", "Submitting mint transaction..."));
+        return mintBiographyTransaction({
+          contract,
+          signer,
+          personHash: args.personHash,
+          args: [
+            proof,
+            publicSignals,
+            versionIndex,
+            tokenURI,
+            coreInfo,
+            storyPayload,
+            expectedStoryPayloadHash,
+          ],
+          // An abandoned run has nobody left to answer, and no custodian means
+          // nobody can approve. Both are refusals — never a silent pass through
+          // to the wallet, and never a decision left hanging.
+          confirm: async (preview) =>
+            update.isCurrent() ? ((await confirmTransactionPreview?.(preview)) ?? false) : false,
+          // Past the point of no return: the transaction is away, so an
+          // abandoned run must carry on to the receipt and the readback rather
+          // than abort here and leave a mint nobody verified.
+          onSubmitted: () => {
+            if (update.isCurrent()) {
+              update("confirming", t("mintNFT.waitingConfirmation", "Waiting for confirmation..."));
+            }
+          },
+        });
+      };
+
+      const getVersionDetails = readerAddress
+        ? async (personHash: string, versionIndex: number) => {
+            const readContract = createDeepFamilyReaderContract(readerAddress, signer);
+            return await readContract.getVersionDetails(personHash, versionIndex);
+          }
+        : undefined;
+
+      return await executeMintFlow({
+        contract,
+        address,
+        personHash: args.personHash,
+        versionIndex: args.versionIndex,
+        selfSuiteId: args.selfSuiteId,
+        proofEnvelope: args.proofEnvelope,
+        publicSignals: args.publicSignals,
+        tokenURI: args.tokenURI,
+        coreInfo: args.coreInfo,
+        story: args.story,
+        mintPersonVersionNFT,
+        getVersionDetails,
+      });
     },
-    [address, contractAddress, readerAddress, signer, t, confirmPreview, resolveTransactionPreview],
+    [address, confirmTransactionPreview, contractAddress, readerAddress, signer, t],
   );
 
-  const run = useCallback(
-    async (args: MintNftFlowArgs) => {
-      try {
-        await runOrThrow(args);
-      } catch {}
-    },
-    [runOrThrow],
-  );
-
-  return {
-    transactionPreview,
-    resolveTransactionPreview,
-    state,
-    status: state.step,
-    stepMessage,
-    error: state.step === "error" ? state.error : null,
-    result: state.step === "success" ? state.result : null,
-    reset,
-    run,
-    runOrThrow,
-  };
+  return useTxFlow<ExecuteMintFlowResult, [MintNftFlowArgs], FriendlyError>(runner, {
+    normalizeError: (error) => getFriendlyError(error, t),
+  });
 }

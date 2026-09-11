@@ -14,11 +14,21 @@ interface GeneratePersonCommitmentProofArgs {
   contentDigestHi: string | bigint;
 }
 
+/** Where the add-version work is, as a step the timeline can place. */
+export type AddVersionProofStep =
+  | ""
+  | "preparing"
+  | "generating"
+  | "verifying"
+  | "encrypting"
+  /** The frozen package has been handed to the flow; not yet on chain. */
+  | "handoff";
+
 export function usePersonCommitmentProof(t: AddVersionT) {
-  const [proofGenerationStep, setProofGenerationStep] = useState("");
+  const [proofStep, setProofStep] = useState<AddVersionProofStep>("");
 
   const reset = useCallback(() => {
-    setProofGenerationStep("");
+    setProofStep("");
   }, []);
 
   const generatePersonCommitmentProof = useCallback(
@@ -30,12 +40,7 @@ export function usePersonCommitmentProof(t: AddVersionT) {
       contentDigestLo,
       contentDigestHi,
     }: GeneratePersonCommitmentProofArgs) => {
-      setProofGenerationStep(
-        t(
-          "addVersion.generatingProof",
-          "Generating zero-knowledge proof... (this may take 30-60 seconds)",
-        ),
-      );
+      setProofStep("generating");
 
       const { proof, publicSignals } = await zkWorkerCall(
         "generatePersonRelationProof",
@@ -53,7 +58,7 @@ export function usePersonCommitmentProof(t: AddVersionT) {
         { timeoutMs: 240_000 },
       );
 
-      setProofGenerationStep(t("addVersion.verifyingProof", "Verifying proof..."));
+      setProofStep("verifying");
 
       const { ok: isValid } = await zkWorkerCall(
         "verifyPersonRelationProof",
@@ -78,8 +83,8 @@ export function usePersonCommitmentProof(t: AddVersionT) {
   );
 
   return {
-    proofGenerationStep,
-    setProofGenerationStep,
+    proofStep,
+    setProofStep,
     generatePersonCommitmentProof,
     reset,
   };

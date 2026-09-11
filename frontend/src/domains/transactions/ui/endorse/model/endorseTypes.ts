@@ -1,31 +1,20 @@
 import type { FriendlyError } from "../../../../../shared/lib/errors";
-import type { ExecuteEndorseFlowResult, EndorseServiceStage } from "../../../services/endorseService";
+import type {
+  EndorseFeeQuote,
+  ExecuteEndorseFlowResult,
+  EndorseServiceStage,
+} from "../../../services/endorseService";
 
-export type { ExecuteEndorseFlowResult, EndorseServiceStage };
+export type { EndorseFeeQuote, ExecuteEndorseFlowResult, EndorseServiceStage };
 
 export interface EndorseFlowArgs {
   personHash: string;
   versionIndex: number;
   deepTokenAddress?: string;
-  suppressToasts?: boolean;
+  quotedFee?: bigint;
   onStageChange?: (stage: EndorseServiceStage) => void;
+  onFeeQuoteChange?: (quote: EndorseFeeQuote) => void;
 }
-
-export type EndorseFlowStep = "idle" | "validating" | "approving" | "submitting" | "success" | "error";
-
-export type EndorseFlowState =
-  | { step: "idle"; result?: undefined; error?: undefined }
-  | { step: "validating"; result?: undefined; error?: undefined }
-  | { step: "approving"; result?: undefined; error?: undefined }
-  | { step: "submitting"; result?: undefined; error?: undefined }
-  | { step: "success"; result: ExecuteEndorseFlowResult; error?: undefined }
-  | { step: "error"; result?: undefined; error: FriendlyError };
-
-export type EndorseFlowAction =
-  | { type: "reset" }
-  | { type: "stage"; step: Extract<EndorseFlowStep, "validating" | "approving" | "submitting"> }
-  | { type: "success"; result: ExecuteEndorseFlowResult }
-  | { type: "error"; error: FriendlyError };
 
 export type EndorseT = (
   key: string,

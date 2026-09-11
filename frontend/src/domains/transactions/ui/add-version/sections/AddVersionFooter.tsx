@@ -1,6 +1,8 @@
 import { ChevronRight, Star, UserPlus } from "lucide-react";
 import { safeCanonicalizeFullName } from "../../../../../shared/identity/fullName";
 import { TransactionButton } from "../../shared/TransactionButton";
+import { TransactionFooterBar } from "../../shared/TransactionFooterBar";
+import type { TransactionPhase } from "../../shared/transactionPhase";
 import type {
   AddVersionSuccessResultView,
   AddVersionT,
@@ -10,6 +12,7 @@ import type {
 
 interface AddVersionFooterProps {
   t: AddVersionT;
+  phase: TransactionPhase;
   successResult: AddVersionSuccessResultView | null;
   isSubmitting: boolean;
   personInfo: PersonInfoPublic | null;
@@ -17,6 +20,7 @@ interface AddVersionFooterProps {
   isParentVersionLookupPending: boolean;
   transactionPreview: AddVersionTransactionPreview | null;
   onTransactionPreviewDecision: (approved: boolean) => void;
+  onRunInBackground?: () => void;
   onClose: () => void;
   onContinueAdding: () => void;
   onEndorse?: (personHash: string, versionIndex: number) => void;
@@ -24,6 +28,7 @@ interface AddVersionFooterProps {
 
 export function AddVersionFooter({
   t,
+  phase,
   successResult,
   isSubmitting,
   personInfo,
@@ -31,13 +36,17 @@ export function AddVersionFooter({
   isParentVersionLookupPending,
   transactionPreview,
   onTransactionPreviewDecision,
+  onRunInBackground,
   onClose,
   onContinueAdding,
   onEndorse,
 }: AddVersionFooterProps) {
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
-      {successResult ? (
+    <TransactionFooterBar
+      phase={phase}
+      slots={{
+        onRunInBackground,
+        done: successResult ? (
         <>
           <TransactionButton onClick={onClose} className="flex-1">
             {t("common.close", "Close")}
@@ -67,7 +76,8 @@ export function AddVersionFooter({
             {t("addVersion.goToEndorse", "Endorse Now")}
           </TransactionButton>
         </>
-      ) : transactionPreview ? (
+        ) : null,
+        review: (
         <>
           <TransactionButton onClick={() => onTransactionPreviewDecision(false)} className="flex-1">
             {t("addVersion.cancelSubmission", "Cancel Submission")}
@@ -81,7 +91,9 @@ export function AddVersionFooter({
             <ChevronRight className="w-4 h-4 opacity-80" />
           </TransactionButton>
         </>
-      ) : (
+        ),
+        // Adding a version is never blocked on its target, so no blocked slot.
+        active: (
         <>
           <TransactionButton onClick={onClose} className="flex-1">
             {t("common.cancel", "Cancel")}
@@ -110,7 +122,8 @@ export function AddVersionFooter({
             )}
           </TransactionButton>
         </>
-      )}
-    </div>
+        ),
+      }}
+    />
   );
 }

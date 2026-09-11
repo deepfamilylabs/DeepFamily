@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConsentCheckbox } from "./ConsentCheckbox";
 import { ThemedSelect } from "./ThemedSelect";
 import { TransactionButton } from "./TransactionButton";
 import { TransactionErrorResult } from "./TransactionErrorResult";
+import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
+import { TransactionTimeline, buildTimeline, useTimelineProgress } from "./TransactionTimeline";
+import { TransactionSuccessSummary } from "./TransactionSuccessSummary";
 import { TransactionProgress } from "./TransactionProgress";
 
 afterEach(() => {
@@ -22,6 +25,142 @@ describe("transaction UI primitives", () => {
     expect(status.getAttribute("aria-busy")).toBe("true");
     expect(screen.getByText("Submitting transaction")).toBeTruthy();
     expect(screen.getByText("Waiting for signature")).toBeTruthy();
+  });
+
+  it("takes focus and names itself when the wallet-bound preview appears", () => {
+    render(
+      <TransactionPreviewPanel
+        title="Review before opening your wallet"
+        description="These exact details will be submitted."
+        preview={{
+          canonicalPayload: "0x00",
+          payloadHash: "0xhash",
+          payloadBytes: 1,
+          segmentCount: 1,
+          estimated: true,
+          estimatedGas: 100n,
+          gasLimit: 120n,
+          estimatedFee: 200n,
+          maximumFee: 240n,
+          nativeSymbol: "ETH",
+        }}
+      />,
+    );
+
+    const panel = screen.getByRole("group", { name: "Review before opening your wallet" });
+
+    expect(document.activeElement).toBe(panel);
+    expect(panel.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("marks everything before the current step done and everything after pending", () => {
+    const steps = buildTimeline({
+      steps: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }],
+      currentId: "b",
+    });
+
+    expect(steps.map((step) => step.state)).toEqual(["done", "current", "pending"]);
+  });
+
+  it("marks the step a failed flow stopped on rather than still working it", () => {
+    const steps = buildTimeline({
+      steps: [{ id: "a", label: "A" }, { id: "b", label: "B" }],
+      currentId: "b",
+      failed: true,
+    });
+
+    expect(steps.map((step) => step.state)).toEqual(["done", "failed"]);
+  });
+
+  it("names the step it is on so the whole list is not read out as the status", () => {
+    render(
+      <TransactionTimeline
+        label="Transactions"
+        steps={buildTimeline({
+          steps: [
+            { id: "proof", label: "Generate proof" },
+            { id: "confirm", label: "Waiting for confirmation", detail: "Still on chain" },
+          ],
+          currentId: "confirm",
+        })}
+      />,
+    );
+
+    const status = screen.getByRole("status", { name: "Transactions: Waiting for confirmation" });
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    // A detail belongs to the current step only.
+    expect(screen.getByText("Still on chain")).toBeTruthy();
+  });
+
+  it("never walks the marker backwards when a signal arrives out of step order", () => {
+    const steps = ["prepare", "proof", "encrypt", "review", "confirm"] as const;
+    const { result, rerender } = renderHook(
+      ({ current }: { current: string | null }) => useTimelineProgress(steps, current),
+      { initialProps: { current: "prepare" as string | null } },
+    );
+
+    rerender({ current: "proof" });
+    expect(result.current).toBe("proof");
+
+    // Encryption reports as "prepare" in some flows; progress does not reverse.
+    rerender({ current: "prepare" });
+    expect(result.current).toBe("proof");
+
+    rerender({ current: "review" });
+    expect(result.current).toBe("review");
+    rerender({ current: "prepare" });
+    expect(result.current).toBe("review");
+  });
+
+  it("starts over once the run ends", () => {
+    const steps = ["a", "b"] as const;
+    const { result, rerender } = renderHook(
+      ({ current }: { current: string | null }) => useTimelineProgress(steps, current),
+      { initialProps: { current: "b" as string | null } },
+    );
+    expect(result.current).toBe("b");
+
+    rerender({ current: null });
+    expect(result.current).toBeNull();
+
+    rerender({ current: "a" });
+    expect(result.current).toBe("a");
+  });
+
+  it("drops a detail that only restates its own step label", () => {
+    const steps = buildTimeline({
+      steps: [
+        { id: "proof", label: "生成零知识证明", detail: "生成零知识证明..." },
+        { id: "wait", label: "Waiting", detail: "Still on chain" },
+      ],
+      currentId: "proof",
+    });
+
+    expect(steps[0].detail).toBeUndefined();
+    expect(steps[1].detail).toBe("Still on chain");
+  });
+
+  it("copies a hash from the row it belongs to, with no provider in sight", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    render(
+      <TransactionSuccessSummary
+        t={(_key: string, fallback: string) => fallback}
+        title="Minted"
+        description="Done"
+        rows={[
+          { label: "Hash", value: "0xabc", mono: true },
+          { label: "Reward", value: "12 DEEP" },
+        ]}
+      />,
+    );
+
+    // A plain amount needs no copy button; a hash does.
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(writeText).toHaveBeenCalledWith("0xabc");
   });
 
   it("announces transaction errors assertively and keeps retry actionable", () => {

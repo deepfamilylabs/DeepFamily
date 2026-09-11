@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TxFlowState, TxFlowActions, TxFlowStatus } from "../model/txStatus";
 
 /**
@@ -20,10 +20,22 @@ import type { TxFlowState, TxFlowActions, TxFlowStatus } from "../model/txStatus
  * });
  * ```
  */
+/**
+ * Reports progress, and throws if the run has been superseded — by a newer run,
+ * a reset, or an unmount. `isCurrent` asks the same question without throwing,
+ * for the places that must decline rather than abort: a decision nobody is
+ * waiting on any more has to resolve as a refusal.
+ */
+export type TxFlowUpdate = ((status: TxFlowStatus, stepMessage?: string) => void) & {
+  isCurrent: () => boolean;
+};
+
 export type TxFlowRunner<TResult, TArgs extends unknown[]> = (
-  update: (status: TxFlowStatus, stepMessage?: string) => void,
+  update: TxFlowUpdate,
   ...args: TArgs
 ) => Promise<TResult>;
+
+const SUPERSEDED = "Transaction flow was superseded by a newer request";
 
 export type UseTxFlowOptions<TError = unknown> = {
   normalizeError?: (error: unknown) => TError;
@@ -47,6 +59,15 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
   const [result, setResult] = useState<TResult | null>(null);
 
   const runIdRef = useRef(0);
+
+  // An unmounted flow supersedes its own in-flight run: nothing left can show
+  // the outcome, so it must not write state or report success to a caller.
+  useEffect(
+    () => () => {
+      runIdRef.current += 1;
+    },
+    [],
+  );
   const normalizeError = options.normalizeError;
   const toFlowError = useCallback(
     (err: unknown): TError => (normalizeError ? normalizeError(err) : (err as TError)),
@@ -57,6 +78,23 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
     setStatus(nextStatus);
     if (message !== undefined) setStepMessage(message);
   }, []);
+
+  /**
+   * A run that has been superseded — by a newer run, a reset, or an unmount —
+   * stops at its next step boundary. Silently ignoring the progress report
+   * would let an abandoned flow carry on to the wallet.
+   */
+  const guardedUpdate = useCallback(
+    (runId: number): TxFlowUpdate => {
+      const report = (nextStatus: TxFlowStatus, message?: string) => {
+        if (runIdRef.current !== runId) throw new Error(SUPERSEDED);
+        update(nextStatus, message);
+      };
+      report.isCurrent = () => runIdRef.current === runId;
+      return report;
+    },
+    [update],
+  );
 
   const resetState = useCallback(() => {
     setStatus("idle");
@@ -79,13 +117,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
 
       try {
         setStatus("validating");
-        const flowResult = await runner(
-          (s, m) => {
-            if (runIdRef.current !== thisRunId) return;
-            update(s, m);
-          },
-          ...args,
-        );
+        const flowResult = await runner(guardedUpdate(thisRunId), ...args);
 
         if (runIdRef.current !== thisRunId) return;
 
@@ -100,7 +132,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
         setStepMessage(null);
       }
     },
-    [runner, resetState, toFlowError, update],
+    [runner, resetState, toFlowError, guardedUpdate],
   );
 
   const runOrThrow = useCallback(
@@ -110,16 +142,10 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
 
       try {
         setStatus("validating");
-        const flowResult = await runner(
-          (s, m) => {
-            if (runIdRef.current !== thisRunId) return;
-            update(s, m);
-          },
-          ...args,
-        );
+        const flowResult = await runner(guardedUpdate(thisRunId), ...args);
 
         if (runIdRef.current !== thisRunId) {
-          throw new Error("Transaction flow was superseded by a newer request");
+          throw new Error(SUPERSEDED);
         }
 
         setResult(flowResult);
@@ -137,7 +163,7 @@ export function useTxFlow<TResult = unknown, TArgs extends unknown[] = [], TErro
         throw err;
       }
     },
-    [runner, resetState, toFlowError, update],
+    [runner, resetState, toFlowError, guardedUpdate],
   );
 
   return { status, stepMessage, error, txHash, receipt, result, reset, run, runOrThrow };
