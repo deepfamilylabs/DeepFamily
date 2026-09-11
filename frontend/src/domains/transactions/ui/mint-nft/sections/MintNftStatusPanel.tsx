@@ -1,7 +1,9 @@
 import { AlertCircle } from "lucide-react";
 import { TransactionErrorResult } from "../../shared/TransactionErrorResult";
+import { TransactionPreviewPanel } from "../../shared/TransactionPreviewPanel";
 import { TransactionProgress } from "../../shared/TransactionProgress";
 import { MintNFTSuccessResult } from "../MintNFTSuccessResult";
+import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import type {
   MintNFTErrorResultView,
   MintNFTSuccessResultView,
@@ -12,6 +14,7 @@ export interface MintNftStatusPanelProps {
   t: MintNFTT;
   isSubmitting: boolean;
   proofGenerationStep: string;
+  transactionPreview: ArchiveTransactionPreview | null;
   successResult: MintNFTSuccessResultView | null;
   errorResult: MintNFTErrorResultView | null;
   isAlreadyMinted: boolean;
@@ -21,6 +24,7 @@ export function MintNftStatusPanel({
   t,
   isSubmitting,
   proofGenerationStep,
+  transactionPreview,
   successResult,
   errorResult,
   isAlreadyMinted,
@@ -44,7 +48,18 @@ export function MintNftStatusPanel({
         </div>
       )}
 
-      {isSubmitting && !successResult && !errorResult && (
+      {transactionPreview && !successResult && !errorResult && (
+        <TransactionPreviewPanel
+          preview={transactionPreview}
+          title={t("mintNFT.transactionPreviewTitle", "Review before opening your wallet")}
+          description={t(
+            "mintNFT.transactionPreviewDescription",
+            "The proof, core info and biography are frozen. The NFT and its biography are minted in this one transaction; confirm these exact details before continuing.",
+          )}
+        />
+      )}
+
+      {isSubmitting && !transactionPreview && !successResult && !errorResult && (
         <TransactionProgress
           title={
             proofGenerationStep

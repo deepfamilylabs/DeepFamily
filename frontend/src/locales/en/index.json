@@ -1175,6 +1175,10 @@
     "nftAlreadyMintedDesc": "This version has already been minted as an NFT. Each version can only be minted once.",
     "mint": "Mint NFT",
     "minting": "Minting...",
+    "transactionPreviewTitle": "Review before opening your wallet",
+    "transactionPreviewDescription": "The proof, core info and biography are frozen. The NFT and its biography are minted in this one transaction; confirm these exact details before continuing.",
+    "cancelSubmission": "Cancel Submission",
+    "continueToWallet": "Continue to Wallet",
     "goEndorse": "Go Endorse",
     "endorsementRequiredTitle": "Endorsement Required",
     "endorsementRequiredDesc": "You must endorse this version before minting. Would you like to go endorse now?",
@@ -1545,7 +1549,6 @@
     "largeStory": "Long text; review the compressed storage size and estimated fee before signing",
     "reviewStory": "Review story transaction",
     "confirm": "Continue to wallet",
-    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
-    "reviewMint": "Review mint and biography"
+    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes"
   }
 }
