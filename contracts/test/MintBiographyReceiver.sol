@@ -2,17 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import {IDeepFamilyArchiveV1} from "../interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "../interfaces/IDeepFamilyArchive.sol";
 
 /** @dev Exercises initialization visibility and rollback at the safe-mint callback. */
 contract MintBiographyReceiver is IERC721Receiver {
-  IDeepFamilyArchiveV1 private immutable _archive;
+  IDeepFamilyArchive private immutable _archive;
   bool public rejectReceipt;
   uint64 public recordsAtReceipt;
   address public authorAtReceipt;
 
   constructor(address archive) {
-    _archive = IDeepFamilyArchiveV1(archive);
+    _archive = IDeepFamilyArchive(archive);
   }
 
   function setRejectReceipt(bool reject) external {
@@ -35,7 +35,7 @@ contract MintBiographyReceiver is IERC721Receiver {
     bytes calldata
   ) external returns (bytes4) {
     require(!rejectReceipt, "receiver rejected mint");
-    IDeepFamilyArchiveV1.StoryState memory state = _archive.storyState(tokenId);
+    IDeepFamilyArchive.StoryState memory state = _archive.storyState(tokenId);
     recordsAtReceipt = state.totalRecords;
     authorAtReceipt = _archive.storyRecordRef(tokenId, 0).author;
     // A receiver can immediately use the owner interface; the initial head must already exist.

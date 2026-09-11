@@ -116,7 +116,7 @@ struct PersonSupplementInfo {
 
 #### Story Archive Structures
 
-`IDeepFamilyArchiveV1` declares `BlobRef`, `StoryRecordRef` and `StoryState`. The immutable Archive owns metadata refs and all Story records/state. DeepFamily holds one `archive` binding. See the [Archive V1 specification](archive-v1.md) for exact structures, commitments, encoding and bytecode layout.
+`IDeepFamilyArchive` declares `BlobRef`, `StoryRecordRef` and `StoryState`. The immutable Archive owns metadata refs and all Story records/state. DeepFamily holds one `archive` binding. See the [Archive interface](../contracts/interfaces/IDeepFamilyArchive.sol) and [shared Archive codec](../packages/protocol-core/archive.js) for structures, commitments and bytecode layout.
 
 ### Core Hash Computation
 
@@ -223,9 +223,9 @@ an explicit product action, not protocol behavior.
 
 #### Atomic Story and Metadata Archive
 
-`DeepFamilyArchiveV1` exposes `storeMetadata`, `metadataRef`, `appendStoryRecord`, `sealStory`, `storyRecordRef` and `storyState`. Metadata keys are write-once and only DeepFamily may store them. Story append/seal requires the current NFT owner and matching expected index/count plus head. Nonempty payloads are segmented into 16 KiB bytecode contracts and paged manifests atomically; the Archive has no business total-length cap. DFM1 format-1 alone retains its 16 KiB envelope limit.
+`DeepFamilyArchive` exposes `storeMetadata`, `metadataRef`, `appendStoryRecord`, `sealStory`, `storyRecordRef` and `storyState`. Metadata keys are write-once and only DeepFamily may store them. Story append/seal requires the current NFT owner and matching expected index/count plus head. Nonempty payloads are segmented into 16 KiB bytecode contracts and paged manifests atomically; the Archive has no business total-length cap. DFM1 format-1 alone retains its 16 KiB envelope limit.
 
-The full API, events, authorization, DFS1 text codec and wire format are documented in [Archive V1](archive-v1.md).
+The [Archive contract](../contracts/DeepFamilyArchive.sol) defines the API, events and authorization; the [shared Story codec](../packages/protocol-core/story.js) defines the DFS1 text encoding. Contract and interface names have no version suffix. `archiveKind()` and `apiVersion()` identify the supported protocol, while payload formats and compression codecs carry their own version identifiers.
 
 ### DFM1 Contract-Visible Prefix and Format-1 Layout
 
@@ -283,9 +283,9 @@ with `eth_getCode`, require runtime length `payloadLength + 1`, require the lead
 
 ```solidity
 function getVersionDetails(bytes32 personHash, uint256 versionIndex)
-  external view returns (PersonVersion memory, IDeepFamilyArchiveV1.BlobRef memory, uint256, uint256)
+  external view returns (PersonVersion memory, IDeepFamilyArchive.BlobRef memory, uint256, uint256)
 function listPersonVersions(bytes32 personHash, uint256 offset, uint256 limit) external view returns (PersonVersion[] memory, uint256, bool, uint256)
-function getVersionMetadataRef(bytes32 personHash, uint256 versionIndex) external view returns (IDeepFamilyArchiveV1.BlobRef memory)
+function getVersionMetadataRef(bytes32 personHash, uint256 versionIndex) external view returns (IDeepFamilyArchive.BlobRef memory)
 ```
 
 #### Family Tree Queries
@@ -298,15 +298,15 @@ function listChildren(bytes32 parentHash, uint256 parentVersionIndex, uint256 of
 
 ```solidity
 function getNFTDetails(uint256 tokenId)
-  external view returns (bytes32, uint256, PersonVersion memory, IDeepFamilyArchiveV1.BlobRef memory, PersonCoreInfo memory, uint256, string memory)
+  external view returns (bytes32, uint256, PersonVersion memory, IDeepFamilyArchive.BlobRef memory, PersonCoreInfo memory, uint256, string memory)
 ```
 
 #### Story Queries
 
 ```solidity
-function getStoryState(uint256 tokenId) external view returns (IDeepFamilyArchiveV1.StoryState memory state)
-function getStoryRecordRef(uint256 tokenId, uint64 index) external view returns (IDeepFamilyArchiveV1.StoryRecordRef memory record)
-function listStoryRecords(uint256 tokenId, uint256 offset, uint256 limit) external view returns (IDeepFamilyArchiveV1.StoryRecordRef[] memory records, uint256 totalRecords, bool hasMore, uint256 nextOffset)
+function getStoryState(uint256 tokenId) external view returns (IDeepFamilyArchive.StoryState memory state)
+function getStoryRecordRef(uint256 tokenId, uint64 index) external view returns (IDeepFamilyArchive.StoryRecordRef memory record)
+function listStoryRecords(uint256 tokenId, uint256 offset, uint256 limit) external view returns (IDeepFamilyArchive.StoryRecordRef[] memory records, uint256 totalRecords, bool hasMore, uint256 nextOffset)
 ```
 
 ### Events System
@@ -372,7 +372,7 @@ event CircuitVerifierSet(uint8 indexed purpose, uint32 indexed circuitId, addres
 event ArchiveSet(address indexed archive);
 ```
 
-`DeepFamilyArchiveV1` emits `MetadataStored`, `StoryRecordAppended` and `StorySealed`. All events carry complete reference or final-state commitments; see [Archive V1](archive-v1.md).
+`DeepFamilyArchive` emits `MetadataStored`, `StoryRecordAppended` and `StorySealed`. All events carry complete reference or final-state commitments; see the [Archive interface](../contracts/interfaces/IDeepFamilyArchive.sol).
 
 ### Key Storage Mappings
 
@@ -391,7 +391,7 @@ address public archive; // One-time protocol binding
 ```
 
 There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders` mappings in
-`DeepFamily`; those mappings are private implementation details of `DeepFamilyArchiveV1`.
+`DeepFamily`; those mappings are private implementation details of `DeepFamilyArchive`.
 
 ### Access Control & Security
 
@@ -421,7 +421,7 @@ There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders`
 `DeepFamily` is deployed as a **UUPS (ERC-1967) proxy**, so its logic can evolve while its address
 and state persist. The other contracts are **not**
 upgradeable by design: `DeepFamilyToken` (the value contract is kept minimal/immutable),
-`DeepFamilyArchiveV1`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
+`DeepFamilyArchive`, `DeepFamilyReader` (immutable bindings; redeploy to change read logic), the ZK
 verifiers, the verifier adapter, and the libraries.
 
 ### Proxy & Initialization
@@ -476,7 +476,7 @@ Token
 → Poseidon/age-gate libraries, both Groth16 verifiers, and their adapter
 → DeepFamily implementation and ERC-1967 proxy
 → initialize proxy and perform the one-time Token/DeepFamily binding
-→ DeepFamilyArchiveV1(proxy)
+→ DeepFamilyArchive(proxy)
 → proxy.setArchive(archive) exactly once
 → DeepFamilyReader(proxy), after Archive binding
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDeepFamilyArchiveV1} from "./interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "./interfaces/IDeepFamilyArchive.sol";
 import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
@@ -11,7 +11,7 @@ interface IArchiveDeepFamily {
 }
 
 /** @dev Constructor-only data contract shared by segments and manifest pages. */
-contract ArchiveDataV1 {
+contract ArchiveData {
   constructor(bytes memory data) {
     bytes memory runtime = bytes.concat(hex"00", data);
     assembly ("memory-safe") {
@@ -21,7 +21,7 @@ contract ArchiveDataV1 {
 }
 
 /** @notice Immutable archive. Each logical blob and all its pages are created atomically. */
-contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
+contract DeepFamilyArchive is IDeepFamilyArchive, ERC165 {
   error InvalidDeepFamilyAddress();
   error UnauthorizedCaller();
   error ArchiveNotActive();
@@ -68,7 +68,7 @@ contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
     bytes4 interfaceId
   ) public view override(ERC165, IERC165) returns (bool) {
     return
-      interfaceId == type(IDeepFamilyArchiveV1).interfaceId || super.supportsInterface(interfaceId);
+      interfaceId == type(IDeepFamilyArchive).interfaceId || super.supportsInterface(interfaceId);
   }
 
   function storeMetadata(
@@ -284,7 +284,7 @@ contract DeepFamilyArchiveV1 is IDeepFamilyArchiveV1, ERC165 {
   }
 
   function _deployData(bytes memory data) internal virtual returns (address) {
-    return address(new ArchiveDataV1(data));
+    return address(new ArchiveData(data));
   }
 
   function _requireActive() private view {

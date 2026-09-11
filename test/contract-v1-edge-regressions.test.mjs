@@ -151,7 +151,7 @@ describe("fresh-v1 contract edge regressions", function () {
       const otherSource = await Source.deploy();
       await Promise.all([source.waitForDeployment(), otherSource.waitForDeployment()]);
 
-      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchive");
       const wrongArchive = await Archive.deploy(await otherSource.getAddress());
       await wrongArchive.waitForDeployment();
       await source.setArchive(await wrongArchive.getAddress());
@@ -169,7 +169,7 @@ describe("fresh-v1 contract edge regressions", function () {
       await source.waitForDeployment();
       const sourceAddress = await source.getAddress();
 
-      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchive");
       const originalArchive = await Archive.deploy(sourceAddress);
       const laterArchive = await Archive.deploy(sourceAddress);
       await Promise.all([originalArchive.waitForDeployment(), laterArchive.waitForDeployment()]);
@@ -463,7 +463,7 @@ describe("fresh-v1 contract edge regressions", function () {
     });
 
     it("freezes BlobRef, MetadataStored and Reader aggregate return structs", async () => {
-      const archiveArtifact = await hre.artifacts.readArtifact("DeepFamilyArchiveV1");
+      const archiveArtifact = await hre.artifacts.readArtifact("DeepFamilyArchive");
       const metadataRefFields = [
         scalar("payloadHash", "bytes32"),
         scalar("pointer", "address"),
@@ -472,7 +472,7 @@ describe("fresh-v1 contract edge regressions", function () {
       ];
       const metadataTuple = tuple(
         "metadata",
-        "struct IDeepFamilyArchiveV1.BlobRef",
+        "struct IDeepFamilyArchive.BlobRef",
         metadataRefFields,
       );
 

@@ -85,7 +85,7 @@ describe("Upgrade tooling & governance deploy path", function () {
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
         expect(files).to.have.length(9);
-        expect(files).to.include.members(["DeepFamilyArchiveV1.json", "DeepFamilyReader.json"]);
+        expect(files).to.include.members(["DeepFamilyArchive.json", "DeepFamilyReader.json"]);
         const deepFamilyMetadata = JSON.parse(
           await fs.readFile(path.join(deploymentDirectory, "DeepFamily.json"), "utf8"),
         );

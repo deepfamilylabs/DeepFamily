@@ -70,7 +70,7 @@ const REQUIRED_VERIFIED_CONTRACTS = Object.freeze(
     "initial-deployment:DisclosureBindingVerifier",
     "initial-deployment:GovernanceTimelock",
     "initial-deployment:Groth16VerifierAdapter",
-    "initial-deployment:DeepFamilyArchiveV1",
+    "initial-deployment:DeepFamilyArchive",
     "initial-deployment:PersonCommitmentVerifier",
     "initial-deployment:PoseidonT5",
     "initial-deployment:UUPSProxy",
@@ -914,7 +914,7 @@ const requireTerminalGovernanceEvidence = ({
         personVerifierImmutable: verifierAdapter.personVerifier,
         disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
       },
-      deepFamilyArchiveV1: { deepFamilyImmutable: archive.deepFamily },
+      deepFamilyArchive: { deepFamilyImmutable: archive.deepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: reader.deepFamily,
         archiveImmutable: reader.archive,
@@ -933,10 +933,10 @@ const requireTerminalGovernanceEvidence = ({
       manifestDeployments.groth16VerifierAdapter,
     ],
     [
-      "DeepFamilyArchiveV1",
+      "DeepFamilyArchive",
       archive,
-      inspectedArtifacts?.deepFamilyArchiveV1,
-      manifestDeployments.deepFamilyArchiveV1,
+      inspectedArtifacts?.deepFamilyArchive,
+      manifestDeployments.deepFamilyArchive,
     ],
     [
       "DeepFamilyReader",

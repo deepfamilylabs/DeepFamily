@@ -67,7 +67,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | Contract                          | Purpose                                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | **DeepFamily.sol**                | Core protocol — ZK proof validation, endorsement governance, NFT minting, and canonical Archive binding. UUPS proxy |
-| **DeepFamilyArchiveV1.sol**       | Immutable Metadata + Story archive; atomic 16 KiB segments, paged manifests, owner append/seal                      |
+| **DeepFamilyArchive.sol**         | Immutable Metadata + Story archive; atomic 16 KiB segments, paged manifests, owner append/seal                      |
 | **DeepFamilyReader.sol**          | Aggregated/paginated read views with immutable proxy/Archive bindings and metadata refs                             |
 | **DeepFamilyToken.sol**           | Utility token powering endorsement and incentive mechanics                                                          |
 | **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending      |

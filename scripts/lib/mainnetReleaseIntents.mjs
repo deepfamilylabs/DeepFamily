@@ -110,7 +110,7 @@ export const buildMainnetReleaseIntents = async ({
     "Groth16VerifierAdapter",
     "DeepFamily",
     "UUPSProxy",
-    "DeepFamilyArchiveV1",
+    "DeepFamilyArchive",
     "DeepFamilyReader",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
@@ -129,7 +129,7 @@ export const buildMainnetReleaseIntents = async ({
     deepFamilyImplementation: addressAt(7),
     deepFamilyProxy: addressAt(8),
     // nonce 9 is the tokenInitialize call.
-    deepFamilyArchiveV1: addressAt(10),
+    deepFamilyArchive: addressAt(10),
     // nonce 11 is the one-time setArchive call.
     deepFamilyReader: addressAt(12),
   });
@@ -213,11 +213,11 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyToken,
     tokenInterface.encodeFunctionData("initialize", [addresses.deepFamilyProxy]),
   );
-  await pushDeployment("deepFamilyArchiveV1", "DeepFamilyArchiveV1", [addresses.deepFamilyProxy]);
+  await pushDeployment("deepFamilyArchive", "DeepFamilyArchive", [addresses.deepFamilyProxy]);
   pushCall(
     "setArchive",
     addresses.deepFamilyProxy,
-    deepFamilyInterface.encodeFunctionData("setArchive", [addresses.deepFamilyArchiveV1]),
+    deepFamilyInterface.encodeFunctionData("setArchive", [addresses.deepFamilyArchive]),
   );
   await pushDeployment("deepFamilyReader", "DeepFamilyReader", [addresses.deepFamilyProxy]);
   pushCall(

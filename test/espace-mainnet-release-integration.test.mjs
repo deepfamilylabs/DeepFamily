@@ -89,7 +89,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       },
     });
     const Proxy = await ethers.getContractFactory("UUPSProxy", deployer);
-    const Archive = await ethers.getContractFactory("DeepFamilyArchiveV1", deployer);
+    const Archive = await ethers.getContractFactory("DeepFamilyArchive", deployer);
     const Reader = await ethers.getContractFactory("DeepFamilyReader", deployer);
     const initializeData = DeepFamily.interface.encodeFunctionData("initialize", [
       address("deepFamilyToken"),
@@ -111,7 +111,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         address("deepFamilyImplementation"),
         initializeData,
       ),
-      deepFamilyArchiveV1: await Archive.getDeployTransaction(address("deepFamilyProxy")),
+      deepFamilyArchive: await Archive.getDeployTransaction(address("deepFamilyProxy")),
       deepFamilyReader: await Reader.getDeployTransaction(address("deepFamilyProxy")),
       tokenInitialize: {
         to: address("deepFamilyToken"),
@@ -120,7 +120,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       setArchive: {
         to: address("deepFamilyProxy"),
         data: DeepFamily.interface.encodeFunctionData("setArchive", [
-          address("deepFamilyArchiveV1"),
+          address("deepFamilyArchive"),
         ]),
       },
       setPersonRelationVerifier: {

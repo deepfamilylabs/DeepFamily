@@ -636,8 +636,8 @@ export const deployIntegratedSystem = async (
     );
   }
 
-  const DeepFamilyArchiveV1 = await ethers.getContractFactory("DeepFamilyArchiveV1", deployer);
-  const archive = await deployContract("deepFamilyArchiveV1", DeepFamilyArchiveV1, [
+  const DeepFamilyArchive = await ethers.getContractFactory("DeepFamilyArchive", deployer);
+  const archive = await deployContract("deepFamilyArchive", DeepFamilyArchive, [
     deepFamilyAddress,
   ]);
   const archiveAddress = await archive.getAddress();
@@ -655,7 +655,7 @@ export const deployIntegratedSystem = async (
     !sameAddress(archiveMain, deepFamilyAddress)
   ) {
     throw new Error(
-      `DeepFamilyArchiveV1 binding invariant failed: DeepFamily archive=${configuredArchive}, ` +
+      `DeepFamilyArchive binding invariant failed: DeepFamily archive=${configuredArchive}, ` +
         `archive.DEEP_FAMILY=${archiveMain}; expected ${archiveAddress}/${deepFamilyAddress}`,
     );
   }
@@ -730,7 +730,7 @@ export const deployIntegratedSystem = async (
 
     const tokenArtifact = await artifacts.readArtifact("DeepFamilyToken");
     const deepArtifact = await artifacts.readArtifact("DeepFamily");
-    const archiveArtifact = await artifacts.readArtifact("DeepFamilyArchiveV1");
+    const archiveArtifact = await artifacts.readArtifact("DeepFamilyArchive");
     const readerArtifact = await artifacts.readArtifact("DeepFamilyReader");
     const poseidonT5Artifact = await artifacts.readArtifact("PoseidonT5");
     const adultAgeGateArtifact = await artifacts.readArtifact("AdultAgeGate");
@@ -798,7 +798,7 @@ export const deployIntegratedSystem = async (
     );
     await writeDeployment(
       connection,
-      "DeepFamilyArchiveV1",
+      "DeepFamilyArchive",
       archiveAddress,
       archiveArtifact.abi,
       { deepFamilyAddress },
@@ -856,7 +856,7 @@ export const ensureIntegratedSystem = async (
 
   const existingDeep = await safeReadDeployment(connection, "DeepFamily");
   const existingToken = await safeReadDeployment(connection, "DeepFamilyToken");
-  const existingArchive = await safeReadDeployment(connection, "DeepFamilyArchiveV1");
+  const existingArchive = await safeReadDeployment(connection, "DeepFamilyArchive");
   const existingReader = await safeReadDeployment(connection, "DeepFamilyReader");
   const existingGroth16Adapter = await safeReadDeployment(connection, "Groth16VerifierAdapter");
   const existingPoseidonT5 = await safeReadDeployment(connection, "PoseidonT5");
@@ -869,7 +869,7 @@ export const ensureIntegratedSystem = async (
   const recordedDeployments = [
     ["DeepFamily", existingDeep],
     ["DeepFamilyToken", existingToken],
-    ["DeepFamilyArchiveV1", existingArchive],
+    ["DeepFamilyArchive", existingArchive],
     ["DeepFamilyReader", existingReader],
     ["Groth16VerifierAdapter", existingGroth16Adapter],
     ["PoseidonT5", existingPoseidonT5],
@@ -913,7 +913,7 @@ export const ensureIntegratedSystem = async (
       await assertDeploymentCode(ethers, [
         ["DeepFamily", existingDeep],
         ["DeepFamilyToken", existingToken],
-        ["DeepFamilyArchiveV1", existingArchive],
+        ["DeepFamilyArchive", existingArchive],
         ["DeepFamilyReader", existingReader],
       ]);
 
@@ -923,7 +923,7 @@ export const ensureIntegratedSystem = async (
 
       if (currentArtifacts?.readArtifact) {
         const artifactBoundDeployments = [
-          ["DeepFamilyArchiveV1", existingArchive],
+          ["DeepFamilyArchive", existingArchive],
           ["PoseidonT5", existingPoseidonT5],
           ["AdultAgeGate", existingAdultAgeGate],
           ["PersonCommitmentVerifier", existingPersonVerifier],
@@ -988,7 +988,7 @@ export const ensureIntegratedSystem = async (
         defaultSigner,
       );
       const archive = await ethers.getContractAt(
-        "DeepFamilyArchiveV1",
+        "DeepFamilyArchive",
         existingArchive.address,
         defaultSigner,
       );
@@ -1019,7 +1019,7 @@ export const ensureIntegratedSystem = async (
           { contractName: "DeepFamily", contract: deepFamily, isProxy: true },
           { contractName: "DeepFamilyToken", contract: token },
           {
-            contractName: "DeepFamilyArchiveV1",
+            contractName: "DeepFamilyArchive",
             contract: archive,
             extra: { deepFamilyAddress: await deepFamily.getAddress() },
           },

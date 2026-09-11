@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {DeepFamily} from "./DeepFamily.sol";
-import {IDeepFamilyArchiveV1} from "./interfaces/IDeepFamilyArchiveV1.sol";
+import {IDeepFamilyArchive} from "./interfaces/IDeepFamilyArchive.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 contract DeepFamilyReader {
@@ -31,7 +31,7 @@ contract DeepFamilyReader {
   uint256 public constant MAX_QUERY_PAGE_SIZE = 200;
   DeepFamily public immutable DEEP_FAMILY;
   uint256 public constant MAX_STORY_PAGE_SIZE = 100;
-  IDeepFamilyArchiveV1 public immutable ARCHIVE;
+  IDeepFamilyArchive public immutable ARCHIVE;
 
   constructor(address deepFamily) {
     if (deepFamily == address(0) || deepFamily.code.length == 0) {
@@ -48,11 +48,11 @@ contract DeepFamilyReader {
     if (
       archive == address(0) ||
       archive.code.length == 0 ||
-      !ERC165Checker.supportsInterface(archive, type(IDeepFamilyArchiveV1).interfaceId)
+      !ERC165Checker.supportsInterface(archive, type(IDeepFamilyArchive).interfaceId)
     ) {
       revert InvalidArchiveAddress();
     }
-    IDeepFamilyArchiveV1 boundArchive = IDeepFamilyArchiveV1(archive);
+    IDeepFamilyArchive boundArchive = IDeepFamilyArchive(archive);
     try boundArchive.DEEP_FAMILY() returns (address bound) {
       if (bound != deepFamily) revert ArchiveBindingMismatch();
     } catch {
@@ -80,7 +80,7 @@ contract DeepFamilyReader {
     view
     returns (
       DeepFamily.PersonVersion memory version,
-      IDeepFamilyArchiveV1.BlobRef memory metadata,
+      IDeepFamilyArchive.BlobRef memory metadata,
       uint256 endorsementCount,
       uint256 tokenId
     )
@@ -102,7 +102,7 @@ contract DeepFamilyReader {
       bytes32 personHash,
       uint256 versionIndex,
       DeepFamily.PersonVersion memory version,
-      IDeepFamilyArchiveV1.BlobRef memory metadata,
+      IDeepFamilyArchive.BlobRef memory metadata,
       DeepFamily.PersonCoreInfo memory coreInfo,
       uint256 endorsementCount,
       string memory nftTokenURI
@@ -122,14 +122,14 @@ contract DeepFamilyReader {
   function getVersionMetadataRef(
     bytes32 personHash,
     uint256 versionIndex
-  ) external view returns (IDeepFamilyArchiveV1.BlobRef memory metadata) {
+  ) external view returns (IDeepFamilyArchive.BlobRef memory metadata) {
     _validateVersion(personHash, versionIndex);
     return _readMetadataRef(personHash, versionIndex);
   }
 
   function getStoryState(
     uint256 tokenId
-  ) external view returns (IDeepFamilyArchiveV1.StoryState memory state) {
+  ) external view returns (IDeepFamilyArchive.StoryState memory state) {
     _requireOwned(tokenId);
     return ARCHIVE.storyState(tokenId);
   }
@@ -137,7 +137,7 @@ contract DeepFamilyReader {
   function getStoryRecordRef(
     uint256 tokenId,
     uint64 index
-  ) external view returns (IDeepFamilyArchiveV1.StoryRecordRef memory record) {
+  ) external view returns (IDeepFamilyArchive.StoryRecordRef memory record) {
     _requireOwned(tokenId);
     if (index >= ARCHIVE.storyState(tokenId).totalRecords) revert RecordIndexOutOfRange();
     return ARCHIVE.storyRecordRef(tokenId, index);
@@ -383,7 +383,7 @@ contract DeepFamilyReader {
     external
     view
     returns (
-      IDeepFamilyArchiveV1.StoryRecordRef[] memory records,
+      IDeepFamilyArchive.StoryRecordRef[] memory records,
       uint256 totalRecords,
       bool hasMore,
       uint256 nextOffset
@@ -393,7 +393,7 @@ contract DeepFamilyReader {
     if (limit > MAX_STORY_PAGE_SIZE) revert PageSizeExceedsLimit();
     totalRecords = ARCHIVE.storyState(tokenId).totalRecords;
     PaginationResult memory page = _getPaginationParams(totalRecords, offset, limit);
-    records = new IDeepFamilyArchiveV1.StoryRecordRef[](page.resultLength);
+    records = new IDeepFamilyArchive.StoryRecordRef[](page.resultLength);
     for (uint256 i; i < page.resultLength; i++) {
       records[i] = ARCHIVE.storyRecordRef(tokenId, uint64(page.startIndex + i));
     }
@@ -448,7 +448,7 @@ contract DeepFamilyReader {
   function _readMetadataRef(
     bytes32 personHash,
     uint256 versionIndex
-  ) internal view returns (IDeepFamilyArchiveV1.BlobRef memory metadata) {
+  ) internal view returns (IDeepFamilyArchive.BlobRef memory metadata) {
     return ARCHIVE.metadataRef(personHash, versionIndex);
   }
 

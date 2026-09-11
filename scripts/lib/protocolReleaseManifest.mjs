@@ -71,10 +71,10 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
     sourceName: "contracts/adapters/Groth16VerifierAdapter.sol",
     immutableFields: Object.freeze(["personVerifier", "disclosureBindingVerifier"]),
   }),
-  deepFamilyArchiveV1: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json",
-    contractName: "DeepFamilyArchiveV1",
-    sourceName: "contracts/DeepFamilyArchiveV1.sol",
+  deepFamilyArchive: Object.freeze({
+    path: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
+    contractName: "DeepFamilyArchive",
+    sourceName: "contracts/DeepFamilyArchive.sol",
     immutableFields: Object.freeze(["DEEP_FAMILY"]),
   }),
   deepFamilyReader: Object.freeze({
@@ -86,10 +86,10 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
 });
 
 export const PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS = Object.freeze({
-  deepFamilyArchiveV1: Object.freeze({
-    path: "artifacts/contracts/DeepFamilyArchiveV1.sol/DeepFamilyArchiveV1.json",
-    contractName: "DeepFamilyArchiveV1",
-    sourceName: "contracts/DeepFamilyArchiveV1.sol",
+  deepFamilyArchive: Object.freeze({
+    path: "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json",
+    contractName: "DeepFamilyArchive",
+    sourceName: "contracts/DeepFamilyArchive.sol",
   }),
   deepFamilyReader: Object.freeze({
     path: "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json",
@@ -811,7 +811,7 @@ export const inspectProtocolDeploymentArtifact = ({
 
 export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deployments } = {}) => {
   const adapter = deployments?.groth16VerifierAdapter;
-  const archive = deployments?.deepFamilyArchiveV1;
+  const archive = deployments?.deepFamilyArchive;
   const reader = deployments?.deepFamilyReader;
   return Object.freeze({
     groth16VerifierAdapter: inspectProtocolDeploymentArtifact({
@@ -822,9 +822,9 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
         disclosureBindingVerifier: adapter?.disclosureBindingVerifierImmutable,
       },
     }),
-    deepFamilyArchiveV1: inspectProtocolDeploymentArtifact({
+    deepFamilyArchive: inspectProtocolDeploymentArtifact({
       root,
-      artifactName: "deepFamilyArchiveV1",
+      artifactName: "deepFamilyArchive",
       immutableValues: { DEEP_FAMILY: archive?.deepFamilyImmutable },
     }),
     deepFamilyReader: inspectProtocolDeploymentArtifact({
@@ -887,7 +887,7 @@ const normalizeDeploymentChainId = (value, label) => {
 export const protocolDeploymentEvidenceFromManifest = (manifest) => {
   const deployments = manifest?.deployments;
   const adapter = deployments?.groth16VerifierAdapter;
-  const archive = deployments?.deepFamilyArchiveV1;
+  const archive = deployments?.deepFamilyArchive;
   const reader = deployments?.deepFamilyReader;
   const chainId = normalizeDeploymentChainId(deployments?.chainId, "deployment chainId");
   return Object.freeze({
@@ -902,7 +902,7 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
           deployments.deepFamilyImplementation,
           "DeepFamily implementation",
         ),
-        archive: assertAddress(archive?.address, "DeepFamily DeepFamilyArchiveV1 binding"),
+        archive: assertAddress(archive?.address, "DeepFamily DeepFamilyArchive binding"),
       }),
       groth16VerifierAdapter: Object.freeze({
         address: assertAddress(adapter?.address, "Groth16VerifierAdapter address"),
@@ -920,14 +920,14 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
         ),
         runtimeSha256: assertSha256(adapter?.runtimeSha256, "Groth16VerifierAdapter runtimeSha256"),
       }),
-      deepFamilyArchiveV1: Object.freeze({
-        address: assertAddress(archive?.address, "DeepFamilyArchiveV1 address"),
+      deepFamilyArchive: Object.freeze({
+        address: assertAddress(archive?.address, "DeepFamilyArchive address"),
         deepFamilyImmutable: assertAddress(
           archive?.deepFamilyImmutable,
-          "DeepFamilyArchiveV1 DEEP_FAMILY immutable",
+          "DeepFamilyArchive DEEP_FAMILY immutable",
         ),
-        artifactSha256: assertSha256(archive?.artifactSha256, "DeepFamilyArchiveV1 artifactSha256"),
-        runtimeSha256: assertSha256(archive?.runtimeSha256, "DeepFamilyArchiveV1 runtimeSha256"),
+        artifactSha256: assertSha256(archive?.artifactSha256, "DeepFamilyArchive artifactSha256"),
+        runtimeSha256: assertSha256(archive?.runtimeSha256, "DeepFamilyArchive runtimeSha256"),
       }),
       deepFamilyReader: Object.freeze({
         address: assertAddress(reader?.address, "DeepFamilyReader address"),
@@ -975,7 +975,7 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
         ),
         archive: assertAddress(
           deepFamily?.archive,
-          "acceptance DeepFamily DeepFamilyArchiveV1 binding",
+          "acceptance DeepFamily DeepFamilyArchive binding",
         ),
       }),
       groth16VerifierAdapter: Object.freeze({
@@ -997,19 +997,19 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
           "acceptance Groth16VerifierAdapter runtimeSha256",
         ),
       }),
-      deepFamilyArchiveV1: Object.freeze({
-        address: assertAddress(archive?.address, "acceptance DeepFamilyArchiveV1 address"),
+      deepFamilyArchive: Object.freeze({
+        address: assertAddress(archive?.address, "acceptance DeepFamilyArchive address"),
         deepFamilyImmutable: assertAddress(
           archive?.deepFamily,
-          "acceptance DeepFamilyArchiveV1 DEEP_FAMILY immutable",
+          "acceptance DeepFamilyArchive DEEP_FAMILY immutable",
         ),
         artifactSha256: assertSha256(
           archive?.artifactSha256,
-          "acceptance DeepFamilyArchiveV1 artifactSha256",
+          "acceptance DeepFamilyArchive artifactSha256",
         ),
         runtimeSha256: assertSha256(
           archive?.runtimeSha256,
-          "acceptance DeepFamilyArchiveV1 runtimeSha256",
+          "acceptance DeepFamilyArchive runtimeSha256",
         ),
       }),
       deepFamilyReader: Object.freeze({
@@ -1383,7 +1383,7 @@ export const inspectProtocolReleaseManifest = ({
       "deepFamilyProxy",
       "deepFamilyImplementation",
       "groth16VerifierAdapter",
-      "deepFamilyArchiveV1",
+      "deepFamilyArchive",
       "deepFamilyReader",
     ],
     "deployment definition",
@@ -1400,9 +1400,9 @@ export const inspectProtocolReleaseManifest = ({
     "Groth16VerifierAdapter deployment",
   );
   assertExactKeys(
-    deployments.deepFamilyArchiveV1,
+    deployments.deepFamilyArchive,
     ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-    "DeepFamilyArchiveV1 deployment",
+    "DeepFamilyArchive deployment",
   );
   assertExactKeys(
     deployments.deepFamilyReader,
@@ -1420,7 +1420,7 @@ export const inspectProtocolReleaseManifest = ({
         deployments.deepFamilyProxy,
         deployments.deepFamilyImplementation,
         ...Object.values(deployments.groth16VerifierAdapter),
-        ...Object.values(deployments.deepFamilyArchiveV1),
+        ...Object.values(deployments.deepFamilyArchive),
         ...Object.values(deployments.deepFamilyReader),
       ].every((value) => value === null),
       "not-deployed state must not claim deployment evidence",
@@ -1524,7 +1524,7 @@ export const inspectProtocolReleaseManifest = ({
         "deepFamilyProxy",
         "deepFamilyImplementation",
         "groth16VerifierAdapter",
-        "deepFamilyArchiveV1",
+        "deepFamilyArchive",
         "deepFamilyReader",
       ],
       "production deployment definition",
@@ -1536,7 +1536,7 @@ export const inspectProtocolReleaseManifest = ({
     const proxyAddress = assertAddress(manifest.deployments?.deepFamilyProxy, "DeepFamily proxy");
     assertAddress(manifest.deployments?.deepFamilyImplementation, "DeepFamily implementation");
     const adapter = manifest.deployments?.groth16VerifierAdapter;
-    const archive = manifest.deployments?.deepFamilyArchiveV1;
+    const archive = manifest.deployments?.deepFamilyArchive;
     const reader = manifest.deployments?.deepFamilyReader;
     assertExactKeys(
       adapter,
@@ -1552,7 +1552,7 @@ export const inspectProtocolReleaseManifest = ({
     assertExactKeys(
       archive,
       ["address", "deepFamilyImmutable", "artifactSha256", "runtimeSha256"],
-      "DeepFamilyArchiveV1 deployment",
+      "DeepFamilyArchive deployment",
     );
     assertExactKeys(
       reader,
@@ -1567,14 +1567,14 @@ export const inspectProtocolReleaseManifest = ({
     );
     assertSha256(adapter?.artifactSha256, "Groth16VerifierAdapter artifactSha256");
     assertSha256(adapter?.runtimeSha256, "Groth16VerifierAdapter runtimeSha256");
-    assertAddress(archive?.address, "DeepFamilyArchiveV1 address");
+    assertAddress(archive?.address, "DeepFamilyArchive address");
     assert(
-      assertAddress(archive?.deepFamilyImmutable, "DeepFamilyArchiveV1 DEEP_FAMILY immutable") ===
+      assertAddress(archive?.deepFamilyImmutable, "DeepFamilyArchive DEEP_FAMILY immutable") ===
         proxyAddress,
-      "DeepFamilyArchiveV1 must bind the declared DeepFamily proxy",
+      "DeepFamilyArchive must bind the declared DeepFamily proxy",
     );
-    assertSha256(archive?.artifactSha256, "DeepFamilyArchiveV1 artifactSha256");
-    assertSha256(archive?.runtimeSha256, "DeepFamilyArchiveV1 runtimeSha256");
+    assertSha256(archive?.artifactSha256, "DeepFamilyArchive artifactSha256");
+    assertSha256(archive?.runtimeSha256, "DeepFamilyArchive runtimeSha256");
     assertAddress(reader?.address, "DeepFamilyReader address");
     assert(
       assertAddress(reader?.deepFamilyImmutable, "DeepFamilyReader DEEP_FAMILY immutable") ===
@@ -1584,7 +1584,7 @@ export const inspectProtocolReleaseManifest = ({
     assert(
       assertAddress(reader?.archiveImmutable, "DeepFamilyReader archive immutable") ===
         archive.address.toLowerCase(),
-      "DeepFamilyReader must bind the declared DeepFamilyArchiveV1",
+      "DeepFamilyReader must bind the declared DeepFamilyArchive",
     );
     assertSha256(reader?.artifactSha256, "DeepFamilyReader artifactSha256");
     assertSha256(reader?.runtimeSha256, "DeepFamilyReader runtimeSha256");
@@ -1597,7 +1597,7 @@ export const inspectProtocolReleaseManifest = ({
         adapter.disclosureBindingVerifierImmutable,
         "Groth16VerifierAdapter disclosure verifier",
       ),
-      assertAddress(archive.address, "DeepFamilyArchiveV1 address"),
+      assertAddress(archive.address, "DeepFamilyArchive address"),
       assertAddress(reader.address, "DeepFamilyReader address"),
     ];
     assert(
@@ -1619,7 +1619,7 @@ export const inspectProtocolReleaseManifest = ({
     });
     for (const [label, declared, actual] of [
       ["Groth16VerifierAdapter", adapter, deploymentArtifacts.groth16VerifierAdapter],
-      ["DeepFamilyArchiveV1", archive, deploymentArtifacts.deepFamilyArchiveV1],
+      ["DeepFamilyArchive", archive, deploymentArtifacts.deepFamilyArchive],
       ["DeepFamilyReader", reader, deploymentArtifacts.deepFamilyReader],
     ]) {
       assert(

@@ -198,7 +198,7 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
     if (archiveFactory) {
       archive = await archiveFactory(await proxy.getAddress());
     } else {
-      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchive");
       archive = await Archive.deploy(await proxy.getAddress());
       await archive.waitForDeployment();
     }
@@ -260,7 +260,7 @@ describe("DeepFamily encrypted metadata v1", function () {
         registerRoutes: false,
       });
       const [, nonOwner, eoa] = await hre.ethers.getSigners();
-      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchiveV1");
+      const Archive = await hre.ethers.getContractFactory("DeepFamilyArchive");
       const archive = await Archive.deploy(await proxy.getAddress());
       await archive.waitForDeployment();
 

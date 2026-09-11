@@ -452,4 +452,4 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 ## Archive V1 reads and writes
 
-The frontend reads named BlobRef and StoryRecordRef fields and verifies complete segmented bytecode via `protocol-core` before decoding. Story content uses exact canonical DFS1 bytes; unknown schemas remain verified raw records. Metadata and Story submissions require successful full-call gas estimation and a 20% integer-ceiling buffer within network limits. The confirmation preview exposes bytes, segment count, gas and fees. See [Archive V1](archive-v1.md) for the frozen protocol rules.
+The frontend reads named BlobRef and StoryRecordRef fields and verifies complete segmented bytecode via `protocol-core` before decoding. Story content uses exact canonical DFS1 bytes; unknown schemas remain verified raw records. Metadata and Story submissions require successful full-call gas estimation and a 20% integer-ceiling buffer within network limits. The confirmation preview exposes bytes, segment count, gas and fees. See the [protocol release manifest](../protocol-release-manifest.json) for the frozen protocol rules.
