@@ -3,6 +3,7 @@ import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EndorseModal from "./EndorseModal";
+import { formSectionsHidden, precedesFormSections } from "./transactionPhaseContract";
 
 const personHash = `0x${"cd".repeat(32)}`;
 const address = "0x00000000000000000000000000000000000000aa";
@@ -110,12 +111,22 @@ vi.mock("./endorse/hooks/useEndorseFlow", async () => {
         },
         [rerender],
       );
+      const runOrThrow = React.useCallback(
+        async (args: any) => {
+          run(args);
+          // The tests drive the outcome by setting flowState inside endorseRun.
+          if (mocks.flowState.status === "error") throw mocks.flowState.error;
+          return mocks.flowState.result;
+        },
+        [run],
+      );
       return {
         status: mocks.flowState.status,
         result: mocks.flowState.result,
         error: mocks.flowState.error,
         reset,
         run,
+        runOrThrow,
       };
     },
   };
@@ -130,8 +141,8 @@ vi.mock("../../../shared/lib/errors", () => ({
   }),
 }));
 
-function renderEndorseModal() {
-  return render(
+function endorseModalElement() {
+  return (
     <EndorseModal
       isOpen
       initialPersonHash={personHash}
@@ -139,8 +150,14 @@ function renderEndorseModal() {
       onClose={mocks.onClose}
       onSuccess={mocks.onSuccess}
       onMintNFT={mocks.onMintNFT}
-    />,
+    />
   );
+}
+
+function renderEndorseModal() {
+  const result = render(endorseModalElement());
+  /** Re-renders with the current mock state, for phases the flow enters later. */
+  return { ...result, refresh: () => result.rerender(endorseModalElement()) };
 }
 
 function renderConfigurableEndorseModal(props: {
@@ -308,6 +325,48 @@ describe("EndorseModal", () => {
     expect(screen.queryByText(/Version 1/)).toBeNull();
   });
 
+  it("preselects again when the same hash is cleared and retyped", async () => {
+    mocks.personGateway.listVersionEndorsements.mockResolvedValue({
+      versionIndices: [1, 2],
+      endorsementCounts: [1, 6],
+      tokenIds: [0, 0],
+      totalVersions: 2,
+      hasMore: false,
+      nextOffset: 0,
+    });
+    mocks.personGateway.listPersonVersionsPage.mockResolvedValue({
+      versions: [
+        { versionIndex: 1, addedBy: recipient, timestamp: 1_700_000_000 },
+        { versionIndex: 2, addedBy: recipient, timestamp: 1_700_000_000 },
+      ],
+      totalVersions: 2,
+      hasMore: false,
+      nextOffset: 0,
+    });
+
+    render(renderConfigurableEndorseModal({ isOpen: true }));
+    const input = screen.getByPlaceholderText("Search by person hash");
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: personHash } });
+    });
+    await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ });
+
+    await act(async () => {
+      fireEvent.change(input, { target: { value: "" } });
+    });
+    await screen.findByRole("button", { name: /Select a version/ });
+
+    // The decision recorded for this hash must not outlive the hash itself,
+    // or retyping it would leave the picker permanently unchosen.
+    await act(async () => {
+      fireEvent.change(input, { target: { value: personHash } });
+    });
+    expect(
+      await screen.findByRole("button", { name: /Version 2 · 6 endorsements/ }),
+    ).toBeTruthy();
+  });
+
   it("carries each version's submitter and date inside the picker", async () => {
     mocks.personGateway.listVersionEndorsements.mockResolvedValueOnce({
       versionIndices: [1],
@@ -333,6 +392,49 @@ describe("EndorseModal", () => {
 
     const expectedDate = new Date(1_700_000_000 * 1000).toLocaleDateString();
     expect(screen.getByText(`0x00000000...000000bb · ${expectedDate}`)).toBeTruthy();
+  });
+
+  describe("what the modal shows in each phase", () => {
+    it("keeps the form on screen while it is the user's turn", async () => {
+      renderEndorseModal();
+      await waitForResolvedTarget();
+
+      expect(formSectionsHidden()).toBe(false);
+    });
+
+    /**
+     * Opening the modal resets the flow, so a phase has to be entered after the
+     * target settles rather than pre-set on the first render.
+     */
+    async function enterPhase(status: string) {
+      const { refresh } = renderEndorseModal();
+      await waitForResolvedTarget();
+
+      mocks.flowState.status = status;
+      await act(async () => {
+        refresh();
+      });
+    }
+
+    it("hides the form and shows progress while the flow is busy", async () => {
+      await enterPhase("submitting");
+
+      const progress = screen.getByRole("status", {
+        name: "Transactions: Submit the endorsement",
+      });
+      expect(formSectionsHidden()).toBe(true);
+      expect(precedesFormSections(progress)).toBe(true);
+    });
+
+    it("hides the form and shows progress while the approval is pending", async () => {
+      await enterPhase("approving");
+
+      const progress = screen.getByRole("status", {
+        name: "Transactions: Approve DEEP tokens",
+      });
+      expect(formSectionsHidden()).toBe(true);
+      expect(precedesFormSections(progress)).toBe(true);
+    });
   });
 
   it("runs the endorse flow and applies success side effects", async () => {
@@ -378,7 +480,6 @@ describe("EndorseModal", () => {
         personHash,
         versionIndex: 2,
         deepTokenAddress,
-        suppressToasts: false,
       }),
     );
     expect(mocks.invalidateByTx).toHaveBeenCalledWith({
@@ -390,6 +491,8 @@ describe("EndorseModal", () => {
       endorsementCount: 5,
     });
     expect(await screen.findByText("Endorsement Successful")).toBeTruthy();
+    // The spent form gets out of the way once the result owns the view.
+    expect(formSectionsHidden()).toBe(true);
   });
 
   it("shows a friendly error when the endorse flow fails", async () => {
@@ -413,6 +516,12 @@ describe("EndorseModal", () => {
     expect(mocks.invalidateByTx).not.toHaveBeenCalled();
     expect(mocks.onSuccess).not.toHaveBeenCalled();
     expect(screen.getAllByText("endorse reverted").length).toBeGreaterThan(0);
+
+    // The form stays up to be corrected, so the alert has to come to the user.
+    const alert = screen.getByRole("alert");
+    expect(formSectionsHidden()).toBe(false);
+    expect(document.activeElement).toBe(alert);
+    expect(precedesFormSections(alert)).toBe(true);
   });
 
   it("does not reuse a previous success result when reopened for another version", async () => {

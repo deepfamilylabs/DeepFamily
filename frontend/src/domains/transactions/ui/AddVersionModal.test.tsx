@@ -3,6 +3,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef } from "react
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AddVersionModal from "./AddVersionModal";
+import { formSectionsHidden, precedesFormSections } from "./transactionPhaseContract";
 
 const personHash = `0x${"ab".repeat(32)}`;
 const submitter = "0x00000000000000000000000000000000000000aa";
@@ -53,6 +54,7 @@ const mocks = vi.hoisted(() => ({
     getAddress: vi.fn(),
   },
   addVersionRunOrThrow: vi.fn(),
+  addVersionFlow: { status: "idle" } as { status: string },
   addVersionReset: vi.fn(),
   confirmTransactionPreview: null as null | ((preview: any) => Promise<boolean> | boolean),
   invalidateByTx: vi.fn(),
@@ -150,7 +152,7 @@ vi.mock("./add-version/hooks/useAddVersionFlow", () => ({
   useAddVersionFlow: (options?: any) => {
     mocks.confirmTransactionPreview = options?.confirmTransactionPreview ?? null;
     return {
-      status: "idle",
+      status: mocks.addVersionFlow.status,
       reset: mocks.addVersionReset,
       runOrThrow: mocks.addVersionRunOrThrow,
     };
@@ -250,15 +252,21 @@ vi.mock("../../person", () => ({
   }),
 }));
 
-function renderAddVersionModal() {
-  return render(
+function addVersionModalElement() {
+  return (
     <AddVersionModal
       isOpen
       onClose={mocks.onClose}
       onSuccess={mocks.onSuccess}
       onEndorse={mocks.onEndorse}
-    />,
+    />
   );
+}
+
+function renderAddVersionModal() {
+  const result = render(addVersionModalElement());
+  /** Re-renders with the current mock state, for phases the flow enters later. */
+  return { ...result, refresh: () => result.rerender(addVersionModalElement()) };
 }
 
 async function checkConsentBoxes() {
@@ -291,6 +299,7 @@ describe("AddVersionModal", () => {
   beforeEach(() => {
     mocks.signer.getAddress.mockReset();
     mocks.addVersionRunOrThrow.mockReset();
+    mocks.addVersionFlow = { status: "idle" };
     mocks.addVersionReset.mockReset();
     mocks.confirmTransactionPreview = null;
     mocks.invalidateByTx.mockReset();
@@ -541,6 +550,18 @@ describe("AddVersionModal", () => {
       }),
       11,
     );
+    // The spent form gets out of the way once the result owns the view.
+    expect(formSectionsHidden()).toBe(true);
+    // Short on purpose: what was created, what it earned, and how to look it
+    // up. The parent hashes the user just typed in are not a result.
+    const summary = screen.getByRole("status", { name: /Version Added Successfully/i });
+    // This submission mined nothing, and a zero reward is not a result.
+    expect(Array.from(summary.querySelectorAll("dt")).map((dt) => dt.textContent)).toEqual([
+      "Hash",
+      "Version",
+      "Transaction",
+    ]);
+    expect(summary.textContent).not.toContain("0x331690");
     expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(3);
     expect(mocks.terminateCryptoWorkerIfIdle).toHaveBeenCalledOnce();
     expect(mocks.terminateZkWorkerIfIdle).toHaveBeenCalledOnce();
@@ -763,6 +784,99 @@ describe("AddVersionModal", () => {
     expect(mocks.deepFamilyContract.versionExists).toHaveBeenCalledTimes(2);
   });
 
+  describe("what the modal shows in each phase", () => {
+    const preview = {
+      canonicalPayload: "0x00",
+      payloadHash: "0xhash",
+      payloadBytes: 1,
+      segmentCount: 1,
+      estimated: true as const,
+      estimatedGas: 100n,
+      gasLimit: 120n,
+      estimatedFee: 200n,
+      maximumFee: 240n,
+      nativeSymbol: "ETH",
+      envelopeBytes: 20,
+    };
+
+    async function openModal() {
+      const view = renderAddVersionModal();
+      await waitFor(() => expect(screen.getAllByTestId("person-hash-calculator").length).toBe(3));
+      return view;
+    }
+
+    it("shares its spine with minting, plus the envelope only it encrypts", async () => {
+      await openModal();
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+
+      const labels = Array.from(document.querySelectorAll("ol li")).map(
+        (li) => li.querySelector("div")?.nextElementSibling?.firstElementChild?.textContent ?? "",
+      );
+      expect(labels).toEqual([
+        "Derive identity material",
+        "Generate zero-knowledge proof",
+        "Encrypt the metadata envelope",
+        "Confirm the transaction",
+        "Waiting for on-chain confirmation",
+      ]);
+    });
+
+    it("waits on the user at the confirm step rather than looking busy", async () => {
+      await openModal();
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+      // A spinner here would claim the flow is working when it is the user's
+      // turn, which reads as a step already under way.
+      const marks = Array.from(document.querySelectorAll("ol li")).map(
+        (li) => li.querySelector("svg")?.getAttribute("class")?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
+      );
+      const confirmIndex = marks.length - 2;
+      expect(marks[confirmIndex]).toBe("arrow-right");
+      expect(marks.slice(0, confirmIndex).every((mark) => mark === "check")).toBe(true);
+      expect(marks[marks.length - 1]).toBe("dot");
+    });
+
+    it("keeps the form on screen while it is the user's turn", async () => {
+      await openModal();
+
+      expect(formSectionsHidden()).toBe(false);
+    });
+
+    it("hides the form and shows progress while the flow is busy", async () => {
+      const { refresh } = await openModal();
+
+      // Opening resets the flow, so the phase is entered after the first render.
+      mocks.addVersionFlow.status = "confirming";
+      await act(async () => {
+        refresh();
+      });
+
+      const progress = screen.getByRole("status", {
+        name: "Transactions: Waiting for on-chain confirmation",
+      });
+      expect(formSectionsHidden()).toBe(true);
+      expect(precedesFormSections(progress)).toBe(true);
+    });
+
+    it("hides the form and focuses the frozen package while it awaits a decision", async () => {
+      await openModal();
+
+      // The flow asks the controller to confirm; that is what raises the panel.
+      await act(async () => {
+        void mocks.confirmTransactionPreview?.(preview);
+      });
+
+      const panel = screen.getByRole("group", { name: "Review before opening your wallet" });
+      expect(formSectionsHidden()).toBe(true);
+      expect(document.activeElement).toBe(panel);
+      expect(precedesFormSections(panel)).toBe(true);
+      expect(screen.getByRole("button", { name: /Continue to Wallet/i })).toBeTruthy();
+    });
+  });
+
   it("shows a friendly error when the add-version flow fails", async () => {
     mocks.addVersionRunOrThrow.mockRejectedValue(new Error("add version reverted"));
 
@@ -786,6 +900,12 @@ describe("AddVersionModal", () => {
     );
     expect(await screen.findByText("Transaction Failed")).toBeTruthy();
     expect(screen.getAllByText("add version reverted").length).toBeGreaterThan(0);
+
+    // The form stays up to be corrected, so the alert has to come to the user.
+    const alert = screen.getByRole("alert");
+    expect(formSectionsHidden()).toBe(false);
+    expect(document.activeElement).toBe(alert);
+    expect(precedesFormSections(alert)).toBe(true);
   });
 
   it("stops before Groth16, encryption, or transaction submission when gzip cannot fit", async () => {

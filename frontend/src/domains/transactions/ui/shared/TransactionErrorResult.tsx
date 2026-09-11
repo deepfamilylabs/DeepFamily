@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import type React from "react";
+import { useFocusOnMount } from "./useFocusOnMount";
 
 type ErrorResult = {
   type: string;
@@ -27,11 +28,17 @@ export function TransactionErrorResult({
   detailsLabel,
   retry,
 }: TransactionErrorResultProps) {
+  // The form stays on screen after a failure so it can be corrected, which
+  // leaves this below the fold; focus is what makes it findable.
+  const panelRef = useFocusOnMount<HTMLDivElement>();
+
   return (
     <div
+      ref={panelRef}
       role="alert"
       aria-live="assertive"
-      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-800 animate-fade-in"
+      tabIndex={-1}
+      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-800 animate-fade-in outline-hidden"
     >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center shrink-0">

@@ -155,8 +155,6 @@ describe("useDisclosureProof", () => {
       circuitId: 1,
       proofEncodingId: 1,
     });
-    expect(result.current.proofGenerationStep).toBe(
-      "Zero-knowledge proof verified. Submitting transaction...",
-    );
+    expect(result.current.proofStep).toBe("verified");
   });
 });

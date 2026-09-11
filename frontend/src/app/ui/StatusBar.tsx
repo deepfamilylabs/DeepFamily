@@ -11,6 +11,7 @@ import {
   useDataSourceHealth,
   useNetworkName,
 } from "../../domains/config";
+import { TransactionCenterChip } from "../../domains/transactions";
 import { useChainStatus, type ChainLiveness } from "./useChainStatus";
 
 /**
@@ -124,6 +125,7 @@ export default function StatusBar() {
             </div>
           ) : null}
         </div>
+        <TransactionCenterChip />
         {blockNumber !== null && (
           <span
             className="tabular-nums text-ink-subtle"

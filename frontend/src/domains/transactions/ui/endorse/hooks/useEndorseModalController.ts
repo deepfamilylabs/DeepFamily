@@ -6,6 +6,12 @@ import { usePersonVersionOptions } from "../../../hooks/usePersonVersionOptions"
 import { useTreeMutations, useTreeNodeAccess } from "../../../../tree";
 import { useResponsiveModalMode } from "../../../../../shared/ui";
 import { useTransactionModalFrameState } from "../../shared/useTransactionModalFrameState";
+import { resolveTransactionPhase } from "../../shared/transactionPhase";
+import { buildTimeline, useTimelineProgress } from "../../shared/TransactionTimeline";
+import { ENDORSE_TIMELINE_STEPS, endorseTimelineStep } from "../../shared/timelineSteps";
+import { useTransactionCenterEntry } from "../../shared/useTransactionCenterEntry";
+import { useTransactionTargetSelection } from "../../shared/useTransactionTargetSelection";
+import { getFriendlyError } from "../../../../../shared/lib/errors";
 import { useEndorseFlow, type ExecuteEndorseFlowResult } from "./useEndorseFlow";
 import { useEndorseFeeQuote } from "./useEndorseFeeQuote";
 import { useEndorseTargetStatus } from "./useEndorseTargetStatus";
@@ -45,29 +51,30 @@ export function useEndorseModalController({
   const { getOwnerOf } = useTreeNodeAccess();
   const endorseFlow = useEndorseFlow();
   const resetEndorseFlow = endorseFlow.reset;
-  const runEndorseFlow = endorseFlow.run;
+  const runEndorseFlowOrThrow = endorseFlow.runOrThrow;
 
-  const [personHash, setPersonHash] = useState("");
-  // 0 means "no version chosen yet"; hasValidTarget already requires > 0, so an
-  // unchosen target cannot be submitted.
-  const [versionIndex, setVersionIndex] = useState(0);
+  const {
+    personHash,
+    setPersonHash,
+    versionIndex,
+    targetPersonHash,
+    isPersonHashFormatValid,
+    hasValidTarget,
+    hashInputInvalid,
+    versionLookup,
+    seedTarget,
+    handleVersionIndexChange,
+    getDecidedVersionHash,
+    applyVersionDecision,
+  } = useTransactionTargetSelection({ isOpen });
+  const targetVersionIndex = versionIndex;
+  const currentTargetKey = getTargetKey(targetPersonHash, targetVersionIndex);
   const [successResult, setSuccessResult] = useState<EndorseSuccessResultView | null>(null);
   const [errorResult, setErrorResult] = useState<EndorseErrorResultView | null>(null);
   const previousTargetRef = useRef({ hash: "", index: 0 });
-  // The hash the version index was last decided for, so an arriving lookup
-  // overrules neither the caller's target nor a choice the user just made.
-  const decidedVersionHashRef = useRef<string | null>(null);
-  const hadValidHashRef = useRef(false);
   const didPatchCacheRef = useRef(false);
   const handledResultRef = useRef<ExecuteEndorseFlowResult | null>(null);
   const activeRunTargetRef = useRef<string | null>(null);
-
-  const targetPersonHash = personHash.trim();
-  const targetVersionIndex = versionIndex;
-  const currentTargetKey = getTargetKey(targetPersonHash, targetVersionIndex);
-  const isPersonHashFormatValid = isBytes32(targetPersonHash);
-  const hasValidTarget = Boolean(targetPersonHash && isPersonHashFormatValid && targetVersionIndex > 0);
-  const hashInputInvalid = Boolean(targetPersonHash && !isPersonHashFormatValid);
 
   const isDesktop = useResponsiveModalMode();
   const { entered, requestClose: handleClose } = useTransactionModalFrameState({
@@ -76,10 +83,6 @@ export function useEndorseModalController({
     modalId: "EndorseModal",
     onClose,
   });
-
-  const versionLookup = usePersonVersionOptions(
-    isOpen && isPersonHashFormatValid ? targetPersonHash : null,
-  );
 
   const feeQuote = useEndorseFeeQuote({ isOpen, address, contract });
   const targetStatus = useEndorseTargetStatus({
@@ -96,25 +99,39 @@ export function useEndorseModalController({
   const isSubmitting =
     endorseFlow.status === "validating" ||
     endorseFlow.status === "approving" ||
-    endorseFlow.status === "submitting";
+    endorseFlow.status === "submitting" ||
+    endorseFlow.status === "confirming";
   const isApproving = endorseFlow.status === "approving";
+  const timelineStep = useTimelineProgress(
+    ENDORSE_TIMELINE_STEPS,
+    endorseTimelineStep(endorseFlow.status),
+  );
+  const phase = resolveTransactionPhase({
+    successResult,
+    errorResult,
+    isBusy: isSubmitting || isApproving,
+  });
+
+  const { settle: settleTransaction } = useTransactionCenterEntry({
+    kind: "endorse",
+    label: t("endorse.title", "Endorse Version"),
+    phase,
+    transactionHash: successResult?.transactionHash,
+    error: errorResult,
+  });
 
   useEffect(() => {
     const nextHash = isOpen ? initialPersonHash || "" : "";
     const nextIndex = isOpen ? initialVersionIndex || 0 : 0;
-    setPersonHash(nextHash);
-    setVersionIndex(nextIndex);
+    seedTarget(nextHash, nextIndex);
     setSuccessResult(null);
     setErrorResult(null);
     previousTargetRef.current = { hash: nextHash, index: nextIndex };
-    // A caller that names a version means that exact version; only a target the
-    // user has to fill in themselves gets a preselection.
-    decidedVersionHashRef.current = isOpen && initialVersionIndex ? nextHash.trim() : null;
     didPatchCacheRef.current = false;
     handledResultRef.current = null;
     activeRunTargetRef.current = null;
     resetEndorseFlow();
-  }, [initialPersonHash, initialVersionIndex, isOpen, resetEndorseFlow]);
+  }, [initialPersonHash, initialVersionIndex, isOpen, resetEndorseFlow, seedTarget]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -131,35 +148,6 @@ export function useEndorseModalController({
     activeRunTargetRef.current = null;
     resetEndorseFlow();
   }, [isOpen, resetEndorseFlow, targetPersonHash, targetVersionIndex]);
-
-  useEffect(() => {
-    const hadValidHash = hadValidHashRef.current;
-    hadValidHashRef.current = isPersonHashFormatValid;
-    // Only on the transition out of a valid hash. The first render always sees
-    // the empty initial state, and clearing there would drop a caller's target.
-    if (isPersonHashFormatValid || !hadValidHash) return;
-    // The hash no longer names a target, so a version chosen for the previous
-    // one must not linger and re-appear as a bare "Version 1".
-    decidedVersionHashRef.current = null;
-    setVersionIndex(0);
-  }, [isPersonHashFormatValid]);
-
-  useEffect(() => {
-    const update = reconcileEndorseVersionSelection(versionLookup, decidedVersionHashRef.current);
-    if (!update) return;
-    decidedVersionHashRef.current = update.decidedForHash;
-    setVersionIndex(update.versionIndex);
-  }, [versionLookup]);
-
-  const handleVersionIndexChange = useCallback(
-    (value: number) => {
-      // Freeze the decision for this hash so a still-running lookup cannot
-      // overwrite it once it resolves.
-      decidedVersionHashRef.current = versionLookup.personHash ?? targetPersonHash;
-      setVersionIndex(value);
-    },
-    [targetPersonHash, versionLookup.personHash],
-  );
 
   useEffect(() => {
     if (!isOpen || activeRunTargetRef.current !== currentTargetKey) return;
@@ -213,6 +201,7 @@ export function useEndorseModalController({
     targetPersonHash,
     targetStatus,
     targetVersionIndex,
+    settleTransaction,
   ]);
 
   useEffect(() => {
@@ -228,10 +217,12 @@ export function useEndorseModalController({
     });
   }, [currentTargetKey, endorseFlow.error, endorseFlow.status, isOpen]);
 
+  useEffect(() => {
+    applyVersionDecision(reconcileEndorseVersionSelection(versionLookup, getDecidedVersionHash()));
+  }, [applyVersionDecision, getDecidedVersionHash, versionLookup]);
+
   const handleContinueEndorsing = useCallback(() => {
-    setPersonHash("");
-    setVersionIndex(0);
-    decidedVersionHashRef.current = null;
+    seedTarget("", 0);
     setSuccessResult(null);
     setErrorResult(null);
     targetStatus.reset();
@@ -277,21 +268,36 @@ export function useEndorseModalController({
     setErrorResult(null);
     handledResultRef.current = null;
     activeRunTargetRef.current = currentTargetKey;
-    runEndorseFlow({
+    // The outcome is reported through settle rather than the status effects
+    // below, so an endorsement outlives the modal that started it.
+    runEndorseFlowOrThrow({
       personHash: targetPersonHash,
       versionIndex: Number(targetVersionIndex),
       deepTokenAddress: feeQuote.deepTokenAddress || undefined,
-      suppressToasts: false,
-    });
+      // Hold the submission to the fee actually on screen. A quote that never
+      // loaded is not a promise to the user, so it constrains nothing.
+      quotedFee: feeQuote.loaded ? feeQuote.deepTokenFeeRaw : undefined,
+      onFeeQuoteChange: feeQuote.applyFeeQuote,
+    }).then(
+      (result) => {
+        if (!result.alreadyEndorsed) {
+          settleTransaction({ phase: "done", transactionHash: result.transactionHash });
+        }
+      },
+      (error) => {
+        settleTransaction({ phase: "failed", error: getFriendlyError(error, t) });
+      },
+    );
   }, [
     address,
     feeQuote,
     hasValidTarget,
     currentTargetKey,
-    runEndorseFlow,
+    runEndorseFlowOrThrow,
     t,
     targetPersonHash,
     targetVersionIndex,
+    settleTransaction,
   ]);
 
   return {
@@ -321,7 +327,28 @@ export function useEndorseModalController({
       protocolFeeBps: feeQuote.protocolFeeBps,
     },
     statusPanel: {
-      isSubmitting,
+      phase,
+      timeline: buildTimeline({
+        steps: [
+          { id: "allowance", label: t("endorse.stepAllowance", "Check token allowance") },
+          {
+            id: "approve",
+            label: t("endorse.stepApprove", "Approve DEEP tokens"),
+            detail: t(
+              "endorse.approvingDesc",
+              "Please confirm the token approval in your wallet",
+            ),
+          },
+          { id: "submit", label: t("endorse.stepSubmit", "Submit the endorsement") },
+          {
+            id: "confirm",
+            label: t("transaction.stepConfirm", "Waiting for on-chain confirmation"),
+          },
+        ],
+        currentId: timelineStep,
+        failed: phase === "failed",
+        complete: phase === "done",
+      }),
       isApproving,
       successResult,
       errorResult,
@@ -332,6 +359,7 @@ export function useEndorseModalController({
       onRetry: handleEndorse,
     },
     footer: {
+      phase,
       successResult,
       isSubmitting,
       isApproving,
@@ -339,6 +367,9 @@ export function useEndorseModalController({
       hasEndorsed: targetStatus.hasEndorsed,
       hasValidTarget,
       isTargetValidOnChain: targetStatus.isTargetValidOnChain,
+      // Only once the transaction is away. Before that, closing cancels, so
+      // offering to "continue in background" would be a lie.
+      onRunInBackground: endorseFlow.status === "confirming" ? handleClose : undefined,
       isPersonHashFormatValid,
       onClose: handleClose,
       onContinueEndorsing: handleContinueEndorsing,

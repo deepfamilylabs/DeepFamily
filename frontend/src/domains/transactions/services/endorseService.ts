@@ -20,11 +20,18 @@ export type EndorseReceiptEvent = {
   timestamp: number;
 };
 
+/** The fee the chain will actually charge, read as late as possible. */
+export type EndorseFeeQuote = {
+  fee: bigint;
+  feeFormatted: string;
+  decimals: number;
+  symbol: string;
+};
+
 export type EndorseVersionFn = (
   personHash: string,
   versionIndex: number,
   overrides?: Record<string, unknown>,
-  txOptions?: { suppressToasts?: boolean },
 ) => Promise<any>;
 
 export type ExecuteEndorseFlowParams = {
@@ -36,8 +43,10 @@ export type ExecuteEndorseFlowParams = {
   endorseVersion: EndorseVersionFn;
   deepTokenAddress?: string;
   fallbackGas?: bigint;
-  suppressToasts?: boolean;
+  /** The fee the user was shown. A drift from the chain aborts before spending. */
+  quotedFee?: bigint;
   onStageChange?: (stage: EndorseServiceStage) => void;
+  onFeeQuoteChange?: (quote: EndorseFeeQuote) => void;
 };
 
 export type ExecuteEndorseFlowResult =
@@ -92,8 +101,9 @@ export async function executeEndorseFlow({
   endorseVersion,
   deepTokenAddress,
   fallbackGas = 400_000n,
-  suppressToasts = false,
+  quotedFee,
   onStageChange,
+  onFeeQuoteChange,
 }: ExecuteEndorseFlowParams): Promise<ExecuteEndorseFlowResult> {
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
   if (Number(endorsedIdx) === Number(versionIndex)) {
@@ -124,6 +134,21 @@ export async function executeEndorseFlow({
     if (nextSymbol) symbol = nextSymbol;
   } catch {
     symbol = "DEEP";
+  }
+
+  // recentReward moves every time anyone mines a version, so the fee quoted
+  // when the dialog opened can be stale by the time the user presses the
+  // button. Publish what the chain says now, then make a drift the user's
+  // decision instead of silently approving and spending the new amount.
+  const feeFormatted = ethers.formatUnits(fee, decimals);
+  onFeeQuoteChange?.({ fee, feeFormatted, decimals, symbol });
+  if (quotedFee !== undefined && fee !== quotedFee) {
+    throw attachErrorCode(
+      new Error(
+        `Endorsement fee changed from ${ethers.formatUnits(quotedFee, decimals)} to ${feeFormatted} ${symbol}`,
+      ),
+      "ENDORSEMENT_FEE_CHANGED",
+    );
   }
 
   const balanceBefore: bigint = await tokenContract.balanceOf(address);
@@ -161,7 +186,6 @@ export async function executeEndorseFlow({
     personHash,
     versionIndex,
     gasLimit ? { gasLimit } : undefined,
-    { suppressToasts },
   );
 
   const contractAddress = spender;
@@ -178,7 +202,7 @@ export async function executeEndorseFlow({
     approvalTxHash,
     deepTokenAddress: tokenAddress,
     fee,
-    feeFormatted: ethers.formatUnits(fee, decimals),
+    feeFormatted,
     balanceBefore,
     balanceFormatted: ethers.formatUnits(balanceBefore, decimals),
     decimals,

@@ -377,6 +377,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   OUT_OF_GAS: "Transaction ran out of gas during execution.",
   INSUFFICIENT_FUNDS: "Insufficient balance to cover gas fees.",
   INSUFFICIENT_DEEP_BALANCE: "Insufficient DEEP token balance for endorsement.",
+  ENDORSEMENT_FEE_CHANGED:
+    "The endorsement fee changed while this dialog was open. The updated fee is shown above; endorse again to pay it.",
   NETWORK_ERROR: "Network error. Please check your connection.",
   USER_REJECTED: "Transaction was cancelled by user.",
   WALLET_NOT_CONNECTED: "Please connect your wallet.",
@@ -405,6 +407,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
 
 const RETRYABLE_REASONS = new Set([
   "USER_REJECTED",
+  "ENDORSEMENT_FEE_CHANGED",
   "WALLET_POPUP_TIMEOUT",
   "WALLET_REQUEST_PENDING",
   "NETWORK_ERROR",

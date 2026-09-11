@@ -8,6 +8,7 @@ const personHash = `0x${"ab".repeat(32)}`;
 
 const mocks = vi.hoisted(() => ({
   getVersionDetails: vi.fn(),
+  transactionCenterEntry: vi.fn(),
   resetEndorseFlow: vi.fn(),
   runEndorseFlow: vi.fn(),
 }));
@@ -36,6 +37,9 @@ vi.mock("../../../transactions", () => ({
     reset: mocks.resetEndorseFlow,
     run: mocks.runEndorseFlow,
   }),
+  useTransactionCenterEntry: (entry: any) => mocks.transactionCenterEntry(entry),
+  resolveTransactionPhase: (input: any) =>
+    input.successResult ? "done" : input.errorResult ? "failed" : input.isBusy ? "busy" : "form",
 }));
 
 function zValue(className: string) {

@@ -1,15 +1,17 @@
 import { ChevronRight } from "lucide-react";
 import { TransactionButton } from "../../shared/TransactionButton";
+import { TransactionFooterBar } from "../../shared/TransactionFooterBar";
+import type { TransactionPhase } from "../../shared/transactionPhase";
 import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import type { MintNFTSuccessResultView, MintNFTT } from "../model/mintNftTypes";
 
 export interface MintNftFooterProps {
   t: MintNFTT;
+  phase: TransactionPhase;
   successResult: MintNFTSuccessResultView | null;
   isSubmitting: boolean;
   isCheckingStatus: boolean;
   isEndorsed: boolean;
-  isAlreadyMinted: boolean;
   allConsentsChecked: boolean;
   hasPersonInfo: boolean;
   hasTargetInputs: boolean;
@@ -17,6 +19,7 @@ export interface MintNftFooterProps {
   hasVerifiedTargetEnvelope: boolean;
   transactionPreview: ArchiveTransactionPreview | null;
   onTransactionPreviewDecision: (approved: boolean) => void;
+  onRunInBackground?: () => void;
   onClose: () => void;
   onContinueMinting: () => void;
   onShowEndorseConfirm: () => void;
@@ -24,11 +27,11 @@ export interface MintNftFooterProps {
 
 export function MintNftFooter({
   t,
+  phase,
   successResult,
   isSubmitting,
   isCheckingStatus,
   isEndorsed,
-  isAlreadyMinted,
   allConsentsChecked,
   hasPersonInfo,
   hasTargetInputs,
@@ -36,23 +39,28 @@ export function MintNftFooter({
   hasVerifiedTargetEnvelope,
   transactionPreview,
   onTransactionPreviewDecision,
+  onRunInBackground,
   onClose,
   onContinueMinting,
   onShowEndorseConfirm,
 }: MintNftFooterProps) {
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
-      {successResult ? (
-        <>
+    <TransactionFooterBar
+      phase={phase}
+      slots={{
+        onRunInBackground,
+        done: successResult ? (
+          <>
           <TransactionButton onClick={onClose} className="flex-1">
             {t("common.close", "Close")}
           </TransactionButton>
-          <TransactionButton variant="primary" onClick={onContinueMinting} className="flex-1">
-            {t("mintNFT.continueMinting", "Continue Minting")}
-          </TransactionButton>
-        </>
-      ) : transactionPreview ? (
-        <>
+            <TransactionButton variant="primary" onClick={onContinueMinting} className="flex-1">
+              {t("mintNFT.continueMinting", "Continue Minting")}
+            </TransactionButton>
+          </>
+        ) : null,
+        review: (
+          <>
           <TransactionButton
             onClick={() => onTransactionPreviewDecision(false)}
             className="flex-1"
@@ -65,16 +73,21 @@ export function MintNftFooter({
             className="flex-[1.5]"
           >
             <span>{t("mintNFT.continueToWallet", "Continue to Wallet")}</span>
-            <ChevronRight className="w-4 h-4 opacity-80" />
-          </TransactionButton>
-        </>
-      ) : (
-        <>
+              <ChevronRight className="w-4 h-4 opacity-80" />
+            </TransactionButton>
+          </>
+        ),
+        // Nothing left to mint on this target; only the picker above is useful.
+        blocked: (
           <TransactionButton onClick={onClose} className="flex-1">
             {t("common.cancel", "Cancel")}
           </TransactionButton>
-
-          {!isAlreadyMinted && (
+        ),
+        active: (
+          <>
+            <TransactionButton onClick={onClose} className="flex-1">
+              {t("common.cancel", "Cancel")}
+            </TransactionButton>
             <>
               {hasValidTarget && !isEndorsed ? (
                 <TransactionButton
@@ -113,9 +126,9 @@ export function MintNftFooter({
                 </TransactionButton>
               )}
             </>
-          )}
-        </>
-      )}
-    </div>
+          </>
+        ),
+      }}
+    />
   );
 }

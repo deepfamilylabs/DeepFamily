@@ -1,13 +1,13 @@
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useWallet } from "../../../../wallet";
 import { useConfig } from "../../../../config";
 import { createDeepFamilyContract } from "../../../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import { isDevMode } from "../../../../../shared/config/env";
-import { getFriendlyError } from "../../../../../shared/lib/errors";
+import { getFriendlyError, type FriendlyError } from "../../../../../shared/lib/errors";
+import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
 import { executeAddVersionFlow } from "../../../services/addVersionService";
-import { addVersionReducer, initialAddVersionFlowState } from "../model/addVersionReducer";
 import type { AddVersionFlowArgs, AddVersionResult } from "../model/addVersionTypes";
 import type { AddVersionTransactionPreview } from "../model/addVersionTypes";
 import {
@@ -29,49 +29,27 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
   const { signer } = useWallet();
   const { rpcUrl, chainId, contractAddress, readerAddress } = useConfig();
   const { t } = useTranslation();
-  const [state, dispatch] = useReducer(addVersionReducer, initialAddVersionFlowState);
-  const runIdRef = useRef(0);
   const latestRuntimeScopeRef = useRef({ signer, chainId, contractAddress, readerAddress });
   latestRuntimeScopeRef.current = { signer, chainId, contractAddress, readerAddress };
-  const renderScopeKey = `${chainId}:${contractAddress.toLowerCase()}:${readerAddress.toLowerCase()}`;
-  const renderScopeKeyRef = useRef(renderScopeKey);
-  if (renderScopeKeyRef.current !== renderScopeKey) {
-    renderScopeKeyRef.current = renderScopeKey;
-    runIdRef.current += 1;
-  }
+  // Survives a run: an uncertain send is reconciled by the next attempt rather
+  // than resubmitted, so this outlives the flow state and only `reset` clears it.
   const submittedTransactionRef = useRef<{
     args: AddVersionFlowArgs;
     transactionHash: string;
     scope: AddVersionTransactionScope;
   } | null>(null);
 
-  const stepMessage = useMemo(() => {
-    switch (state.step) {
-      case "validating":
-        return t("addVersion.validating", "Validating version...");
-      case "confirming":
-        return t("transaction.submitted", "Transaction submitted...");
-      default:
-        return null;
-    }
-  }, [state.step, t]);
+  const { confirmTransactionPreview } = options;
 
-  const reset = useCallback(() => {
-    runIdRef.current += 1;
-    submittedTransactionRef.current = null;
-    dispatch({ type: "reset" });
-  }, []);
+  const runner: TxFlowRunner<AddVersionResult, [AddVersionFlowArgs]> = useCallback(
+    async (update, args) => {
+      if (!signer || !contractAddress) {
+        throw new Error(t("wallet.notConnected", "Please connect your wallet"));
+      }
 
-  const runOrThrow = useCallback(
-    async (args: AddVersionFlowArgs): Promise<AddVersionResult> => {
-      const thisRunId = ++runIdRef.current;
-      dispatch({ type: "stage", step: "validating" });
+      update("validating", t("addVersion.validating", "Validating version..."));
 
       try {
-        if (!signer || !contractAddress) {
-          throw new Error(t("wallet.notConnected", "Please connect your wallet"));
-        }
-
         const submitterAddress = await signer.getAddress();
         const transactionScope = createAddVersionTransactionScope({
           chainId,
@@ -136,57 +114,43 @@ export function useAddVersionFlow(options: UseAddVersionFlowOptions = {}) {
           getTransactionReceipt,
           assertWalletScope: assertCurrentScope,
           onTransactionSubmitted: (transactionHash) => {
+            // Recorded even for an abandoned run: the transaction is already on
+            // its way, and only this hash lets the next attempt reconcile it
+            // instead of sending a second one.
             submittedTransactionRef.current = { args, transactionHash, scope: transactionScope };
-            if (runIdRef.current === thisRunId) {
-              dispatch({ type: "stage", step: "confirming" });
+            if (update.isCurrent()) {
+              update("confirming", t("transaction.submitted", "Transaction submitted..."));
             }
           },
-          confirmTransactionPreview: options.confirmTransactionPreview,
+          confirmTransactionPreview,
         });
 
         await assertCurrentScope();
-        if (runIdRef.current !== thisRunId) {
-          throw new Error("Add Version flow was superseded by a newer request");
-        }
-
-        dispatch({ type: "success", result });
         submittedTransactionRef.current = null;
         return result;
       } catch (error) {
+        // A settled outcome, however bad, leaves nothing to reconcile.
         if (
           (error as any)?.transactionReconciliationFinal === true ||
           (error as any)?.code === ADD_VERSION_SCOPE_CHANGED
         ) {
           submittedTransactionRef.current = null;
         }
-        if (runIdRef.current !== thisRunId) {
-          throw error;
-        }
-
-        dispatch({ type: "error", error: getFriendlyError(error, t) });
         throw error;
       }
     },
-    [chainId, contractAddress, options.confirmTransactionPreview, readerAddress, rpcUrl, signer, t],
+    [chainId, confirmTransactionPreview, contractAddress, readerAddress, rpcUrl, signer, t],
   );
 
-  const run = useCallback(
-    async (args: AddVersionFlowArgs) => {
-      try {
-        await runOrThrow(args);
-      } catch {}
-    },
-    [runOrThrow],
-  );
+  const flow = useTxFlow<AddVersionResult, [AddVersionFlowArgs], FriendlyError>(runner, {
+    normalizeError: (error) => getFriendlyError(error, t),
+  });
 
-  return {
-    state,
-    status: state.step,
-    stepMessage,
-    error: state.step === "error" ? state.error : null,
-    result: state.step === "success" ? state.result : null,
-    reset,
-    run,
-    runOrThrow,
-  };
+  const resetFlow = flow.reset;
+  const reset = useCallback(() => {
+    submittedTransactionRef.current = null;
+    resetFlow();
+  }, [resetFlow]);
+
+  return useMemo(() => ({ ...flow, reset }), [flow, reset]);
 }

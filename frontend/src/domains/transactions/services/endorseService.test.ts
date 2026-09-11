@@ -105,7 +105,6 @@ describe("endorseService executeEndorseFlow", () => {
       personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
       versionIndex: 2,
       endorseVersion,
-      suppressToasts: true,
     });
 
     expect(result.alreadyEndorsed).toBe(false);
@@ -117,11 +116,97 @@ describe("endorseService executeEndorseFlow", () => {
       "0x00000000000000000000000000000000000000000000000000000000000000aa",
       2,
       { gasLimit: 120n },
-      { suppressToasts: true },
     );
     expect(result.approvalTxHash).toBe("0xapprove");
     expect(result.event?.endorsementFee).toBe("10");
     expect(result.event?.recipient).toBe("0x00000000000000000000000000000000000000cc");
     expect(result.transactionHash).toBe("0xtxhash");
+  });
+
+  it("publishes the fee it actually read and proceeds when it matches the quote", async () => {
+    const tokenContract = {
+      recentReward: vi.fn(async () => 10n),
+      balanceOf: vi.fn(async () => 100n),
+      allowance: vi.fn(async () => 50n),
+      approve: vi.fn(),
+      increaseAllowance: vi.fn(),
+      decimals: vi.fn(async () => 18),
+      symbol: vi.fn(async () => "DEEP"),
+    };
+    createDeepTokenContractMock.mockReturnValue(tokenContract);
+
+    const contract = {
+      endorsedVersionIndex: vi.fn(async () => 0),
+      DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
+      getAddress: vi.fn(async () => "0x0000000000000000000000000000000000000abc"),
+      endorseVersion: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
+    } as any;
+
+    const onFeeQuoteChange = vi.fn();
+    const endorseVersion = vi.fn(async () => ({ hash: "0xtxhash", blockNumber: 5, logs: [] }));
+
+    const result = await executeEndorseFlow({
+      contract,
+      signer: {} as any,
+      address: "0x00000000000000000000000000000000000000bb",
+      personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
+      versionIndex: 2,
+      endorseVersion,
+      quotedFee: 10n,
+      onFeeQuoteChange,
+    });
+
+    expect(onFeeQuoteChange).toHaveBeenCalledWith({
+      fee: 10n,
+      feeFormatted: "0.00000000000000001",
+      decimals: 18,
+      symbol: "DEEP",
+    });
+    expect(result.alreadyEndorsed).toBe(false);
+    expect(endorseVersion).toHaveBeenCalled();
+  });
+
+  it("aborts without spending when the fee drifted from the quote", async () => {
+    const tokenContract = {
+      recentReward: vi.fn(async () => 25n),
+      balanceOf: vi.fn(async () => 100n),
+      allowance: vi.fn(async () => 0n),
+      approve: vi.fn(),
+      increaseAllowance: vi.fn(),
+      decimals: vi.fn(async () => 18),
+      symbol: vi.fn(async () => "DEEP"),
+    };
+    createDeepTokenContractMock.mockReturnValue(tokenContract);
+
+    const contract = {
+      endorsedVersionIndex: vi.fn(async () => 0),
+      DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
+      getAddress: vi.fn(async () => "0x0000000000000000000000000000000000000abc"),
+      endorseVersion: Object.assign(vi.fn(), { estimateGas: vi.fn(async () => 100n) }),
+    } as any;
+
+    const onFeeQuoteChange = vi.fn();
+    const endorseVersion = vi.fn();
+
+    await expect(
+      executeEndorseFlow({
+        contract,
+        signer: {} as any,
+        address: "0x00000000000000000000000000000000000000bb",
+        personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
+        versionIndex: 2,
+        endorseVersion,
+        quotedFee: 10n,
+        onFeeQuoteChange,
+      }),
+    ).rejects.toMatchObject({ code: "ENDORSEMENT_FEE_CHANGED" });
+
+    // The panel learns the real fee even though the submission stopped.
+    expect(onFeeQuoteChange).toHaveBeenCalledWith(
+      expect.objectContaining({ fee: 25n, symbol: "DEEP" }),
+    );
+    expect(tokenContract.balanceOf).not.toHaveBeenCalled();
+    expect(tokenContract.approve).not.toHaveBeenCalled();
+    expect(endorseVersion).not.toHaveBeenCalled();
   });
 });

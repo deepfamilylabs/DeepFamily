@@ -51,7 +51,6 @@ const flowArgs = {
   personHash: "0xperson",
   versionIndex: 2,
   deepTokenAddress: "0xtoken",
-  suppressToasts: true,
 };
 
 describe("useEndorseFlow", () => {
@@ -126,11 +125,11 @@ describe("useEndorseFlow", () => {
         versionIndex: 2,
         endorseVersion: expect.any(Function),
         deepTokenAddress: "0xtoken",
-        suppressToasts: true,
-        onStageChange: expect.any(Function),
+              onStageChange: expect.any(Function),
       }),
     );
-    expect(result.current.state).toEqual({ step: "success", result: serviceResult });
+    expect(result.current.status).toBe("success");
+    expect(result.current.result).toEqual(serviceResult);
   });
 
   it("calls endorseVersion without overrides when no gas overrides are provided", async () => {
@@ -146,7 +145,8 @@ describe("useEndorseFlow", () => {
     });
 
     expect(mocks.contract.endorseVersion).toHaveBeenCalledWith(flowArgs.personHash, 2);
-    expect(result.current.state).toEqual({ step: "success", result: { alreadyEndorsed: true } });
+    expect(result.current.status).toBe("success");
+    expect(result.current.result).toEqual({ alreadyEndorsed: true });
   });
 
   it("fails before contract creation when wallet, address, or contract config is missing", async () => {
@@ -158,7 +158,7 @@ describe("useEndorseFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingSigner.result.current.state.step).toBe("error");
+    expect(missingSigner.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeEndorseFlow).not.toHaveBeenCalled();
 
@@ -171,7 +171,7 @@ describe("useEndorseFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingAddress.result.current.state.step).toBe("error");
+    expect(missingAddress.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeEndorseFlow).not.toHaveBeenCalled();
 
@@ -184,7 +184,7 @@ describe("useEndorseFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingContract.result.current.state.step).toBe("error");
+    expect(missingContract.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeEndorseFlow).not.toHaveBeenCalled();
   });

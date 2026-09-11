@@ -135,7 +135,8 @@ describe("useAddVersionFlow", () => {
         onTransactionSubmitted: expect.any(Function),
       }),
     );
-    expect(result.current.state).toEqual({ step: "success", result: serviceResult });
+    expect(result.current.status).toBe("success");
+    expect(result.current.result).toEqual(serviceResult);
   });
 
   it("uses submit contract for preflight when rpcUrl is empty", async () => {
@@ -212,7 +213,8 @@ describe("useAddVersionFlow", () => {
     expect(second.metadataEnvelope).toBe(first.metadataEnvelope);
     await expect(second.getTransactionReceipt(transactionHash)).resolves.toBe(receipt);
     expect(mocks.readonlyProvider.getTransactionReceipt).toHaveBeenCalledWith(transactionHash);
-    expect(result.current.state).toEqual({ step: "success", result: serviceResult });
+    expect(result.current.status).toBe("success");
+    expect(result.current.result).toEqual(serviceResult);
   });
 
   it("reconciles the final exact replacement hash rather than the superseded hash", async () => {
@@ -317,7 +319,7 @@ describe("useAddVersionFlow", () => {
       await expect(pending).rejects.toMatchObject({ code: "ADD_VERSION_SCOPE_CHANGED" });
     });
 
-    expect(result.current.state.step).not.toBe("success");
+    expect(result.current.status).not.toBe("success");
   });
 
   it("rejects a lagging config when the wallet provider already switched chains", async () => {
@@ -343,7 +345,7 @@ describe("useAddVersionFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingWallet.result.current.state.step).toBe("error");
+    expect(missingWallet.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeAddVersionFlow).not.toHaveBeenCalled();
 
@@ -360,7 +362,7 @@ describe("useAddVersionFlow", () => {
         "Please connect your wallet",
       );
     });
-    expect(missingContract.result.current.state.step).toBe("error");
+    expect(missingContract.result.current.status).toBe("error");
     expect(mocks.createDeepFamilyContract).not.toHaveBeenCalled();
     expect(mocks.executeAddVersionFlow).not.toHaveBeenCalled();
   });
