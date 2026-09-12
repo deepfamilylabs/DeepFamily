@@ -30,6 +30,12 @@ export const DATA_SOURCE_PROBLEM_TEXT: Record<DataSourceProblem, DataSourceProbl
     detailKey: "dataSource.readerUnreachableDetail",
     detailFallback: "No contract is deployed at the configured address",
   },
+  rootUnset: {
+    labelKey: "dataSource.rootUnset",
+    labelFallback: "No root set",
+    detailKey: "dataSource.rootUnsetDetail",
+    detailFallback: "Pick a root person in family settings to start reading this network",
+  },
   rootMissing: {
     labelKey: "dataSource.rootMissing",
     labelFallback: "Root not found",

@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NETWORK_PRESETS } from "../../../../shared/config";
-import { getChainEntryReaderAddress, isDevMode } from "../../../../shared/config/env";
+import { isDevMode } from "../../../../shared/config/env";
 import { useToast } from "../../../../shared/ui";
 import { useConfig } from "../../context";
 import { isAddress, isUrl } from "../../model";
 import type { NetworkOption, NetworkSelection } from "../../model";
-import { getChainReader, loadCustomNetworks, saveCustomNetworks } from "../../services";
+import { loadCustomNetworks, resolveEntryReaderForChain, saveCustomNetworks } from "../../services";
 
 /**
  * Which chain the app reads from, as a menu.
@@ -19,8 +19,8 @@ import { getChainReader, loadCustomNetworks, saveCustomNetworks } from "../../se
  *
  * Picking one clears the resolved module addresses the way the settings save
  * always did: they belong to the chain being left, and `ConfigProvider`
- * re-derives them from the reader against the new RPC. The reader itself is
- * per-chain too, so it travels with the switch — see `readerFor`.
+ * re-derives them from the reader against the new RPC. The reader and the root
+ * are per-chain too — see `switchTo`.
  */
 export function useRpcNetworkMenu() {
   const { t, i18n } = useTranslation();
@@ -57,42 +57,43 @@ export function useRpcNetworkMenu() {
   }, [allNetworks, rpcUrl]);
 
   /**
-   * The entry reader to use on a chain, best knowledge first: one that has
-   * actually resolved there before, then an address the build was given for it,
-   * then the unsuffixed env pair — which describes whichever chain
-   * `VITE_RPC_URL` points at, and nothing else.
-   *
-   * `null` means nothing is known, and the reader in config is left alone rather
-   * than replaced by a guess.
+   * The entry reader for a chain, derived — never remembered. `""` means the
+   * build knows none for it, which the menu shows on the row and `switchTo`
+   * applies as-is.
    */
   const readerFor = useCallback(
-    (targetChainId: number): string | null => {
-      // A custom network's own declaration comes first: it is the only place
-      // that address is written down, and editing it has to take effect —
-      // otherwise a correction would lose to whatever resolved before it.
-      const declared = customNetworks.find((n) => n.chainId === targetChainId)?.readerAddress;
-      if (declared) return declared;
-      const remembered = getChainReader(targetChainId);
-      if (remembered) return remembered;
-      const fromEnv = getChainEntryReaderAddress(targetChainId);
-      if (fromEnv) return fromEnv;
-      if (targetChainId === defaults.chainId && defaults.readerAddress) {
-        return defaults.readerAddress;
-      }
-      return null;
-    },
+    (targetChainId: number): string =>
+      resolveEntryReaderForChain(targetChainId, {
+        customNetworks,
+        envChainId: defaults.chainId,
+        envReaderAddress: defaults.readerAddress,
+      }),
     [customNetworks, defaults.chainId, defaults.readerAddress],
+  );
+
+  /** Whether a row can actually be read through, for the menu to mark. */
+  const isConfigured = useCallback(
+    (targetChainId: number): boolean => Boolean(readerFor(targetChainId)),
+    [readerFor],
   );
 
   const switchTo = useCallback(
     (targetRpcUrl: string, targetChainId: number, explicitReader?: string) => {
-      const reader = explicitReader || readerFor(targetChainId);
       update({
         rpcUrl: targetRpcUrl,
         chainId: targetChainId,
         contractAddress: "",
         tokenAddress: "",
-        ...(reader ? { readerAddress: reader } : {}),
+        // Applied even when empty: the previous chain's entrypoint is not a
+        // stand-in for this one, and keeping it would report a misconfigured
+        // network as one whose contract has gone missing.
+        readerAddress: explicitReader || readerFor(targetChainId),
+        // A person hash names a record on one chain. Carrying it across would
+        // ask the new chain about a root it has never heard of, so the root is
+        // dropped and picked again — from history, or from the env defaults
+        // when this is the chain the build describes.
+        rootHash: "",
+        rootVersionIndex: 1,
       });
     },
     [readerFor, update],
@@ -102,9 +103,25 @@ export function useRpcNetworkMenu() {
     (id: number) => {
       const network = allNetworks.find((n) => n.chainId === id);
       if (!network || network.rpcUrl === rpcUrl) return;
-      switchTo(network.rpcUrl, network.chainId);
+      switchTo(network.rpcUrl, network.chainId, network.readerAddress);
     },
     [allNetworks, rpcUrl, switchTo],
+  );
+
+  /**
+   * Forget a custom network. The connection is left alone: deleting a row from
+   * a list is not a request to be disconnected from whatever it named, and the
+   * status bar keeps reporting the chain in use as an unlisted one.
+   */
+  const remove = useCallback(
+    (targetChainId: number) => {
+      const next = customNetworks.filter((n) => n.chainId !== targetChainId);
+      if (next.length === customNetworks.length) return;
+      setCustomNetworks(next);
+      saveCustomNetworks(next);
+      toast.success(t("familyTree.config.customNetworkRemoved", "Custom network removed"));
+    },
+    [customNetworks, t, toast],
   );
 
   const addCustomNetwork = useCallback(() => {
@@ -184,6 +201,9 @@ export function useRpcNetworkMenu() {
     chainId,
     rpcUrl,
     select,
+    remove,
+    readerFor,
+    isConfigured,
     addForm: {
       isOpen: isAddOpen,
       toggle: () => {

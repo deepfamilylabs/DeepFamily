@@ -56,6 +56,19 @@ describe("summarizeDataSourceHealth", () => {
     expect(health.problem).toBe("readerUnreachable");
   });
 
+  it("asks for a root when the switch left none, before asking the chain", () => {
+    const health = summarizeDataSourceHealth(input({ root: "unset" }));
+    expect(health.problem).toBe("rootUnset");
+    expect(health.isChecking).toBe(false);
+  });
+
+  it("blames the reader over a missing root, which is the consequence", () => {
+    const health = summarizeDataSourceHealth(
+      input({ readerAddress: "", contractAddress: "", root: "unset" }),
+    );
+    expect(health.problem).toBe("readerUnset");
+  });
+
   it("reports a root hash that is not recorded on this chain", () => {
     expect(summarizeDataSourceHealth(input({ root: "missing" })).problem).toBe("rootMissing");
   });

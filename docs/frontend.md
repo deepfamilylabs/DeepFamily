@@ -250,7 +250,7 @@ The frontend reads configuration from `frontend/.env` and `frontend/.env.local` 
 
 ```bash
 VITE_RPC_URL=...
-VITE_CONTRACT_ADDRESS=... # DeepFamilyReader address
+VITE_READER_ADDRESS=...   # DeepFamilyReader entry address
 VITE_ROOT_PERSON_HASH=...
 VITE_ROOT_VERSION_INDEX=...
 ```
@@ -443,7 +443,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 | Symptom                         | First thing to check                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_CONTRACT_ADDRESS` (DeepFamilyReader), and that the node is reachable  |
+| "Network Error" / read failures | `VITE_RPC_URL`, `VITE_READER_ADDRESS` (DeepFamilyReader), and that the node is reachable    |
 | ABI mismatch / missing methods  | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`)                              |
 | Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
 | Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |

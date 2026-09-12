@@ -205,7 +205,8 @@ async function updateLocalConfig() {
 
     const updates = {
       VITE_RPC_URL: "http://127.0.0.1:8545",
-      VITE_CONTRACT_ADDRESS: readerAddress,
+      // The one address the app is given; it derives the rest by asking this
+      // reader. The retired `VITE_CONTRACT_ADDRESS` spelling is swept up below.
       VITE_READER_ADDRESS: readerAddress,
       // Keyed by chain, so switching networks in the app can find its way back
       // here without the reader having to be retyped.
@@ -236,7 +237,25 @@ async function updateLocalConfig() {
       }
     }
 
-    fs.writeFileSync(ENV_LOCAL_PATH, updatedContent);
+    // The reader address was once written under a name that says "contract".
+    // That name is not read anywhere any more, so a line left over from an
+    // older run does nothing at all — which is exactly why it is swept up:
+    // editing an inert variable and seeing no effect is worse than not having
+    // it. Removing it here keeps a long-lived .env.local honest.
+    for (const legacyKey of ["VITE_CONTRACT_ADDRESS", `VITE_CONTRACT_ADDRESS_${LOCAL_CHAIN_ID}`]) {
+      const legacyLine = new RegExp(`^${legacyKey}=.*\\n?`, "m");
+      if (legacyLine.test(updatedContent)) {
+        updatedContent = updatedContent.replace(legacyLine, "");
+        console.log(
+          `Removed retired ${legacyKey} (no longer read; use ${legacyKey.replace("CONTRACT", "READER")})`,
+        );
+      }
+    }
+
+    // End on exactly one newline. New keys are appended as `\n${key}=${value}`,
+    // which leaves the file without a trailing one, and the next thing appended
+    // by hand then lands glued onto the last variable's value.
+    fs.writeFileSync(ENV_LOCAL_PATH, `${updatedContent.replace(/\n*$/, "")}\n`);
 
     if (isNewFile) {
       console.log("\nCreated .env.local with local deployment configuration!");
@@ -246,8 +265,8 @@ async function updateLocalConfig() {
 
     console.log("\nCurrent configuration:");
     console.log(`   RPC URL: http://127.0.0.1:8545`);
-    console.log(`   Contract: ${contractAddress}`);
-    console.log(`   Reader: ${readerAddress}`);
+    console.log(`   Reader (VITE_READER_ADDRESS): ${readerAddress}`);
+    console.log(`   DeepFamily behind it: ${contractAddress}`);
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
 
     console.log("\nYou can now start the frontend with: npm run dev");

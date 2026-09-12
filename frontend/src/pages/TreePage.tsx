@@ -23,11 +23,7 @@ import { useWallet } from "../domains/wallet";
 import { TreeConfigDrawer } from "./tree/sections/TreeConfigDrawer";
 import { TreePageBar } from "./tree/sections/TreePageBar";
 import { TreeStatsPill } from "./tree/ui/TreeStatsPill";
-import {
-  isForceEnvConfigSyncEnabled,
-  isTreeDebugEnabled,
-  shouldPreferFlatTree,
-} from "../shared/config/env";
+import { isTreeDebugEnabled, shouldPreferFlatTree } from "../shared/config/env";
 import {
   createDeepFamilyContract,
   createDeepFamilyReaderContract,
@@ -118,7 +114,6 @@ export default function TreePage() {
   } = useConfig();
   const [metadataUnlockOpen, setMetadataUnlockOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
-  const forceEnvConfigSync = useMemo(() => isForceEnvConfigSyncEnabled(), []);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
   const hasRoot = Boolean(rootId && rootExists);
   // Mirrors the dialog's own tally so the bar button can carry it as a badge.
@@ -185,68 +180,6 @@ export default function TreePage() {
     };
   }, [address, clearAllCaches, contractAddress, refresh, signer, trustedReader]);
 
-  useEffect(() => {
-    if (!forceEnvConfigSync) return;
-    const envRpcUrl = (defaults.rpcUrl || "").trim();
-    const envReader = (defaults.readerAddress || "").trim();
-    const envRootHash = (defaults.rootHash || "").trim();
-    const envRootVersion = Number(defaults.rootVersionIndex);
-    const envChainId = Number(defaults.chainId);
-
-    // Nothing to enforce.
-    if (!envRpcUrl && !envReader) return;
-
-    const nextUpdate: any = {};
-    const normalize = (v: string) => v.trim();
-    const normalizeAddr = (v: string) => normalize(v).toLowerCase();
-    const normalizeHash = (v: string) => normalize(v).toLowerCase();
-    const isValidRootHash = (v: string) => /^0x[a-fA-F0-9]{64}$/.test(v);
-
-    if (envRpcUrl && normalize(envRpcUrl) !== normalize(rpcUrl || ""))
-      nextUpdate.rpcUrl = envRpcUrl;
-    if (Number.isFinite(envChainId) && envChainId > 0 && envChainId !== Number(chainId || 0)) {
-      nextUpdate.chainId = envChainId;
-    }
-    if (envReader && normalizeAddr(envReader) !== normalizeAddr(readerAddress || "")) {
-      nextUpdate.readerAddress = envReader;
-      nextUpdate.contractAddress = "";
-      nextUpdate.tokenAddress = "";
-    }
-    const hasEnvRoot = isValidRootHash(envRootHash);
-    if (hasEnvRoot && normalizeHash(envRootHash) !== normalizeHash(rootHash || "")) {
-      nextUpdate.rootHash = envRootHash;
-    }
-    if (
-      hasEnvRoot &&
-      Number.isFinite(envRootVersion) &&
-      envRootVersion >= 1 &&
-      envRootVersion !== Number(rootVersionIndex || 0)
-    ) {
-      nextUpdate.rootVersionIndex = envRootVersion;
-    }
-
-    if (!Object.keys(nextUpdate).length) return;
-
-    // Important: clear old namespace caches BEFORE updating config.
-    clearAllCaches();
-    update(nextUpdate);
-    refresh();
-  }, [
-    forceEnvConfigSync,
-    defaults.rpcUrl,
-    defaults.readerAddress,
-    defaults.rootHash,
-    defaults.rootVersionIndex,
-    defaults.chainId,
-    rpcUrl,
-    chainId,
-    readerAddress,
-    rootHash,
-    rootVersionIndex,
-    clearAllCaches,
-    update,
-    refresh,
-  ]);
 
   return (
     <ColorThemeProvider>

@@ -60,10 +60,6 @@ export function shouldPreferFlatTree(): boolean {
   return getBooleanEnv("VITE_USE_FLAT_TREE");
 }
 
-export function isForceEnvConfigSyncEnabled(): boolean {
-  return getBooleanEnv("VITE_FORCE_ENV_CONFIG_SYNC");
-}
-
 export function isTreeDebugEnabled(): boolean {
   return getBooleanEnv("VITE_SHOW_DEBUG");
 }
@@ -114,32 +110,28 @@ export function getDefaultRpcUrl(): string {
   return getStringEnv("VITE_RPC_URL");
 }
 
-export function getDefaultEntryReaderAddress(): string {
-  return getStringEnv("VITE_CONTRACT_ADDRESS") || getStringEnv("VITE_READER_ADDRESS");
-}
-
-export function getDefaultContractAddress(): string {
-  return getDefaultEntryReaderAddress();
-}
-
+/**
+ * The entry reader for the chain `VITE_RPC_URL` points at.
+ *
+ * The one address a build has to be given: the app asks this reader for the
+ * DeepFamily contract, and asks DeepFamily for the token, so everything else
+ * is derived rather than configured.
+ */
 export function getDefaultReaderAddress(): string {
-  return getDefaultEntryReaderAddress();
+  return getStringEnv("VITE_READER_ADDRESS");
 }
 
 /**
  * The reader deployed on one specific chain — `VITE_READER_ADDRESS_31337=0x…`.
  *
- * The unsuffixed pair above names a single deployment, so it only fits whichever
+ * The unsuffixed one above names a single deployment, so it only fits whichever
  * chain `VITE_RPC_URL` points at. These let a build carry an address book, so
  * switching networks can bring the entry contract with it. Same suffix shape as
- * the localized roots, and the same precedence as the unsuffixed pair.
+ * the localized roots.
  */
 export function getChainEntryReaderAddress(chainId: number): string {
   if (!Number.isSafeInteger(chainId) || chainId <= 0) return "";
-  return (
-    getStringEnv(`VITE_CONTRACT_ADDRESS_${chainId}`) ||
-    getStringEnv(`VITE_READER_ADDRESS_${chainId}`)
-  );
+  return getStringEnv(`VITE_READER_ADDRESS_${chainId}`);
 }
 
 export function getDefaultRootHash(): string {

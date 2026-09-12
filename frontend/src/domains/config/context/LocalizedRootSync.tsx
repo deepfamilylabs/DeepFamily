@@ -9,7 +9,7 @@ function sameHash(a: string, b: string): boolean {
 
 export function LocalizedRootSync() {
   const { i18n } = useTranslation();
-  const { rootHash, rootVersionIndex, defaults, update } = useConfig();
+  const { rootHash, rootVersionIndex, chainId, defaults, update } = useConfig();
   const lastAppliedRef = useRef<string | null>(null);
 
   const localizedRoot = useMemo(
@@ -23,6 +23,11 @@ export function LocalizedRootSync() {
 
   useEffect(() => {
     if (!localizedRoot.hash) return;
+    // These roots name records on the chain the env's RPC points at, and only
+    // there. Switching networks clears the root precisely because a person hash
+    // does not travel between chains, so on any other chain an empty root is
+    // waiting for the user to pick one — not a slot to refill from the build.
+    if (defaults.chainId && chainId && chainId !== defaults.chainId) return;
     if (
       !shouldAutoSwitchLocalizedRoot({
         currentRootHash: rootHash,
@@ -53,6 +58,8 @@ export function LocalizedRootSync() {
     localizedRoot.version,
     rootHash,
     rootVersionIndex,
+    chainId,
+    defaults.chainId,
     defaults.rootHash,
     defaults.rootVersionIndex,
     update,
