@@ -14,6 +14,8 @@ import {
   type StoryMetadata,
 } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
+import { segmentManuscript } from "../model/manuscriptSegments";
+import { buildStoryOutline } from "../model/storyOutline";
 import {
   buildNodeDetailsFromNft,
   computeContentHash,
@@ -93,6 +95,7 @@ export function useStoryEditorController() {
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null);
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null);
   const [showChunkTypeDropdown, setShowChunkTypeDropdown] = useState(false);
+  const [runExpanded, setRunExpanded] = useState(false);
   const [showChunkTypeHelp, setShowChunkTypeHelp] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -180,6 +183,22 @@ export function useStoryEditorController() {
 
   const isDirty = useMemo(() => isChunkFormDirty(formData), [formData]);
 
+  // Hash of the chunk as it currently stands. handleSubmit recomputes the value
+  // it actually submits; this one exists so the record panel can show the
+  // caller what they are about to sign.
+  const draftContentHash = useMemo(() => {
+    if (!formData.content.trim()) return undefined;
+    const chunkTypeValue = Number(formData.chunkType ?? 1);
+    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 1 || chunkTypeValue > 255) {
+      return undefined;
+    }
+    try {
+      return computeContentHash(formData.content, chunkTypeValue, formData.attachmentCID);
+    } catch {
+      return undefined;
+    }
+  }, [formData.content, formData.chunkType, formData.attachmentCID]);
+
   useEffect(() => {
     setDirty(isDirty);
   }, [isDirty]);
@@ -214,6 +233,31 @@ export function useStoryEditorController() {
 
   const sortedChunks = presentation.chunks;
   const isSealed = meta?.isSealed || false;
+
+  // Contents outline for the left column, and the number the composer's draft
+  // will take once it is written.
+  const outline = useMemo(
+    () => buildStoryOutline(sortedChunks, getChunkTypeLabel, t as never),
+    [sortedChunks, getChunkTypeLabel, t],
+  );
+  const draftDisplayIndex = presentation.totalChunks + 1;
+
+  // Long manuscripts fold their middle; Contents still lists every chunk, so a
+  // jump into a folded entry has to open the fold before it can scroll.
+  const segments = useMemo(() => segmentManuscript(sortedChunks), [sortedChunks]);
+  const collapsedIndexes = useMemo(
+    () => new Set(segments.collapsed.map((chunk) => chunk.chunkIndex)),
+    [segments.collapsed],
+  );
+  const revealChunk = useCallback(
+    (chunkIndex: number) => {
+      if (runExpanded || !collapsedIndexes.has(chunkIndex)) return false;
+      setRunExpanded(true);
+      return true;
+    },
+    [collapsedIndexes, runExpanded],
+  );
+  const toggleRun = useCallback(() => setRunExpanded((prev) => !prev), []);
 
   const handleCancelEdit = useCallback(() => {
     setFormData(initialChunkFormData);
@@ -468,6 +512,7 @@ export function useStoryEditorController() {
     validTokenId,
     meta: displayMeta,
     nodeDetails,
+    personName,
     titleText,
     loading,
     submitting,
@@ -477,6 +522,16 @@ export function useStoryEditorController() {
     errorMessage,
     showEmptySealed,
     sortedChunks,
+    manuscript: {
+      head: segments.head,
+      collapsed: segments.collapsed,
+      tail: segments.tail,
+      isExpanded: runExpanded,
+      toggle: toggleRun,
+      reveal: revealChunk,
+    },
+    outline,
+    draftDisplayIndex,
     expandedChunks,
     toggleChunkExpansion,
     copyText,
@@ -493,6 +548,7 @@ export function useStoryEditorController() {
     },
     form: {
       data: formData,
+      draftContentHash,
       byteLength: formByteLength,
       segmentBytes: STORY_SEGMENT_BYTES,
       warningOrangeBytes: STORY_WARNING_ORANGE_BYTES,

@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @plugin '@tailwindcss/forms';
 
@@ -20,8 +20,8 @@
     "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
     BlinkMacSystemFont, "Segoe UI", "Roboto", Arial, sans-serif;
   --font-display:
-    "Zain", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Zain", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
   --font-body:
     "Inter", -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC",
     BlinkMacSystemFont, "Segoe UI", "Roboto", Arial, sans-serif;
@@ -144,6 +144,20 @@ h3 {
 .modal-title,
 .modal-heading {
   line-height: 1.35;
+}
+
+/*
+ * Card and panel labels that are headings structurally but UI text visually —
+ * a 13px "Contents" is a label, not a display title. Same escape hatch as
+ * .modal-title above: the h1–h6 rules are unlayered, so they outrank a
+ * `font-body` utility and the body font has to be restored by a class, which
+ * wins on specificity.
+ */
+.ui-heading {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1.4;
 }
 
 /*

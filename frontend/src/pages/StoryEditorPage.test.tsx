@@ -20,10 +20,15 @@ const mocks = vi.hoisted(() => ({
   toastShow: vi.fn(),
 }));
 
-vi.mock("react-router-dom", () => ({
-  useParams: () => ({ tokenId: mocks.tokenId }),
-  useLocation: () => ({ state: mocks.locationState }),
-}));
+vi.mock("react-router-dom", async () => {
+  const { createElement } = await import("react");
+  return {
+    useParams: () => ({ tokenId: mocks.tokenId }),
+    useLocation: () => ({ state: mocks.locationState }),
+    Link: ({ to, children, ...rest }: any) =>
+      createElement("a", { href: String(to), ...rest }, children),
+  };
+});
 
 vi.mock("react-i18next", () => {
   const interpolate = (template: string, values?: Record<string, unknown>) =>
@@ -194,14 +199,14 @@ describe("StoryEditorPage", () => {
 
     render(<StoryEditorPage />);
 
-    await waitFor(() => expect(screen.getByText("Ada Lovelace Biography")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Ada Lovelace" })).toBeTruthy());
 
     fireEvent.change(screen.getByPlaceholderText(/Enter story content/), {
       target: { value: "new story" },
     });
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Save Chunk"));
+      fireEvent.click(screen.getByRole("button", { name: /Review & sign/ }));
     });
 
     await waitFor(() => {
@@ -238,7 +243,7 @@ describe("StoryEditorPage", () => {
     fireEvent.change(screen.getByPlaceholderText(/Enter story content/), {
       target: { value: "A story" },
     });
-    fireEvent.click(screen.getByText("Save Chunk"));
+    fireEvent.click(screen.getByRole("button", { name: /Review & sign/ }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain(message));
     expect(screen.getByRole("alert").textContent).not.toContain("Network error");
   });
@@ -258,10 +263,10 @@ describe("StoryEditorPage", () => {
 
     render(<StoryEditorPage />);
 
-    await waitFor(() => expect(screen.getByText("Seal Story")).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Seal permanently" })).toBeTruthy());
 
     await act(async () => {
-      fireEvent.click(screen.getByText("Seal Story"));
+      fireEvent.click(screen.getByRole("button", { name: "Seal permanently" }));
     });
 
     await act(async () => {

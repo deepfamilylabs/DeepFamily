@@ -137,3 +137,22 @@ export function mapStorySealError(
     preferDetailsForUnknown: true,
   });
 }
+
+/**
+ * Tone of the composer's byte meter. The editor used to surface the byte budget
+ * as one coloured line of text; the meter needs the same thresholds as a value
+ * it can style a track with.
+ */
+export type ByteMeterTone = "normal" | "warn" | "over";
+
+export function getByteMeterTone(byteLen: number): ByteMeterTone {
+  if (byteLen > STORY_SEGMENT_BYTES) return "over";
+  if (byteLen > STORY_WARNING_YELLOW_BYTES) return "warn";
+  return "normal";
+}
+
+/** Fill fraction (0–1) of the byte meter track. */
+export function getByteMeterRatio(byteLen: number): number {
+  if (STORY_SEGMENT_BYTES <= 0) return 0;
+  return Math.max(0, Math.min(1, byteLen / STORY_SEGMENT_BYTES));
+}
