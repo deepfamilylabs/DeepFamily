@@ -3,8 +3,8 @@ import { act, cleanup, render, renderHook, screen } from "@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID, STORY_CHUNK_SCHEMA_ID } from "@deepfamily/protocol-core";
 import type { StoryChunk, StoryMetadata } from "../../../shared/model";
-import { StoryEditorMainSection } from "../sections/StoryEditorMainSection";
-import { StoryChunksSidebar } from "../sections/StoryChunksSidebar";
+import { StoryManuscript } from "../sections/StoryManuscript";
+import { StoryRecordPanel } from "../sections/StoryRecordPanel";
 import { useStoryEditorController } from "./useStoryEditorController";
 
 const mocks = vi.hoisted(() => ({
@@ -103,13 +103,13 @@ describe("useStoryEditorController biography presentation", () => {
     expect(result.current.meta).toMatchObject({ totalChunks: 0, totalLength: 0 });
     render(
       <>
-        <StoryEditorMainSection editor={result.current} />
-        <StoryChunksSidebar editor={result.current} />
+        <StoryManuscript editor={result.current} />
+        <StoryRecordPanel editor={result.current} />
       </>,
     );
-    expect(screen.queryByRole("button", { name: "Seal Story" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Seal permanently" })).toBeNull();
     expect(screen.queryByText(records[0].content)).toBeNull();
-    expect(screen.getByText("storyChunkEditor.noChunks")).toBeTruthy();
+    expect(screen.getByText("No profile chunks yet.")).toBeTruthy();
   });
 
   it.each([false, true])(
@@ -134,7 +134,7 @@ describe("useStoryEditorController biography presentation", () => {
       expect(result.current.sortedChunks).toEqual([{ ...added, displayIndex: 1 }]);
       expect(result.current.meta).toMatchObject({ totalChunks: 1, totalLength: 100 });
       expect(mocks.toast.success).toHaveBeenCalledWith("Chunk #1 added successfully (100 bytes)");
-      render(<StoryChunksSidebar editor={result.current} />);
+      render(<StoryManuscript editor={result.current} />);
       expect(screen.getByText("#1")).toBeTruthy();
       expect(screen.queryByText("#0")).toBeNull();
     },
