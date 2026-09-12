@@ -99,13 +99,15 @@ describe("useDataSourceHealth", () => {
     expect(mocks.gateway?.listVersionEndorsements).not.toHaveBeenCalled();
   });
 
-  it("does not ask about a root hash that is not a hash", async () => {
+  it("asks for a root rather than asking about one that is not a hash", async () => {
+    // What a network switch leaves behind: the reader answers, and the root it
+    // was paired with belonged to the chain just left.
     mocks.config.rootHash = "not-a-hash";
     const { result } = renderHook(() => useDataSourceHealth());
 
-    await waitFor(() => expect(result.current.reader).toBe("ok"));
+    await waitFor(() => expect(result.current.problem).toBe("rootUnset"));
+    expect(result.current.reader).toBe("ok");
     expect(mocks.gateway?.listVersionEndorsements).not.toHaveBeenCalled();
-    expect(result.current.problem).toBeNull();
   });
 
   it("reports an unset reader rather than a false all-clear", async () => {

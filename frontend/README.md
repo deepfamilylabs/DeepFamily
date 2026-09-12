@@ -49,7 +49,7 @@ npm run dev:local
 For manual configuration, copy `.env.example` to `.env` and set at minimum:
 
 - `VITE_RPC_URL`
-- `VITE_CONTRACT_ADDRESS` (DeepFamilyReader module entry address)
+- `VITE_READER_ADDRESS` (DeepFamilyReader entry address; the app derives DeepFamily and the token from it)
 - `VITE_ROOT_PERSON_HASH`
 - `VITE_ROOT_VERSION_INDEX`
 

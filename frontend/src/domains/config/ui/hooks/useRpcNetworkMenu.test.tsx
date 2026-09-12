@@ -52,6 +52,12 @@ vi.mock("../../../../shared/config/env", () => ({
 
 import { useRpcNetworkMenu } from "./useRpcNetworkMenu";
 
+const CUSTOM_READER = "0x" + "9".repeat(40);
+
+function saveCustom(entries: unknown[]) {
+  localStorage.setItem("ft:customNetworks", JSON.stringify(entries));
+}
+
 describe("useRpcNetworkMenu", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -76,7 +82,7 @@ describe("useRpcNetworkMenu", () => {
     expect(result.current.selected).toBe("custom");
   });
 
-  it("applies a pick straight away, dropping the leaving chain's resolved addresses", () => {
+  it("applies a pick straight away, dropping everything tied to the chain being left", () => {
     const { result } = renderHook(() => useRpcNetworkMenu());
     act(() => {
       result.current.select(2);
@@ -86,23 +92,13 @@ describe("useRpcNetworkMenu", () => {
       chainId: 2,
       contractAddress: "",
       tokenAddress: "",
+      readerAddress: "",
+      rootHash: "",
+      rootVersionIndex: 1,
     });
   });
 
-  it("carries the reader that last resolved on the chain being switched to", () => {
-    const remembered = "0x" + "a".repeat(40);
-    localStorage.setItem("ft:readerByChain", JSON.stringify({ "2": remembered }));
-
-    const { result } = renderHook(() => useRpcNetworkMenu());
-    act(() => {
-      result.current.select(2);
-    });
-    expect(mocks.config.update).toHaveBeenCalledWith(
-      expect.objectContaining({ chainId: 2, readerAddress: remembered }),
-    );
-  });
-
-  it("falls back to the address the build was given for that chain", () => {
+  it("takes the reader from the address book the build was given", () => {
     mocks.env.chainReaders = { 2: "0x" + "b".repeat(40) };
 
     const { result } = renderHook(() => useRpcNetworkMenu());
@@ -111,20 +107,6 @@ describe("useRpcNetworkMenu", () => {
     });
     expect(mocks.config.update).toHaveBeenCalledWith(
       expect.objectContaining({ readerAddress: "0x" + "b".repeat(40) }),
-    );
-  });
-
-  it("prefers what actually resolved over what the build was given", () => {
-    const remembered = "0x" + "a".repeat(40);
-    localStorage.setItem("ft:readerByChain", JSON.stringify({ "2": remembered }));
-    mocks.env.chainReaders = { 2: "0x" + "b".repeat(40) };
-
-    const { result } = renderHook(() => useRpcNetworkMenu());
-    act(() => {
-      result.current.select(2);
-    });
-    expect(mocks.config.update).toHaveBeenCalledWith(
-      expect.objectContaining({ readerAddress: remembered }),
     );
   });
 
@@ -141,12 +123,41 @@ describe("useRpcNetworkMenu", () => {
     );
   });
 
-  it("leaves the reader alone when nothing is known about the target chain", () => {
+  it("clears the reader when the build knows none for the target chain", () => {
+    // Leaving the previous chain's address in place is what turns a network
+    // nobody configured into one whose contract appears to have gone missing.
     const { result } = renderHook(() => useRpcNetworkMenu());
     act(() => {
       result.current.select(2);
     });
-    expect(mocks.config.update.mock.calls[0][0]).not.toHaveProperty("readerAddress");
+    expect(mocks.config.update.mock.calls[0][0]).toMatchObject({ readerAddress: "" });
+  });
+
+  it("drops the root, which named a record on the chain being left", () => {
+    mocks.env.chainReaders = { 2: "0x" + "b".repeat(40) };
+
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    act(() => {
+      result.current.select(2);
+    });
+    expect(mocks.config.update).toHaveBeenCalledWith(
+      expect.objectContaining({ rootHash: "", rootVersionIndex: 1 }),
+    );
+  });
+
+  it("reports which networks can actually be read through", () => {
+    mocks.env.chainReaders = { 2: "0x" + "b".repeat(40) };
+    saveCustom([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: CUSTOM_READER },
+    ]);
+
+    const { result } = renderHook(() => useRpcNetworkMenu());
+
+    expect(result.current.isConfigured(1)).toBe(true); // the env's own chain
+    expect(result.current.isConfigured(2)).toBe(true); // the address book
+    expect(result.current.isConfigured(31338)).toBe(true); // its own declaration
+    expect(result.current.isConfigured(999)).toBe(false);
+    expect(result.current.readerFor(999)).toBe("");
   });
 
   it("ignores a pick of the network already in use", () => {
@@ -163,7 +174,7 @@ describe("useRpcNetworkMenu", () => {
       result.current.addForm.setName("Local");
       result.current.addForm.setChainId(1);
       result.current.addForm.setRpc("http://my-local");
-      result.current.addForm.setReader("0x" + "9".repeat(40));
+      result.current.addForm.setReader(CUSTOM_READER);
     });
     act(() => {
       result.current.addForm.submit();
@@ -179,7 +190,7 @@ describe("useRpcNetworkMenu", () => {
       result.current.addForm.setName("Copy");
       result.current.addForm.setChainId(31338);
       result.current.addForm.setRpc("http://preset-2");
-      result.current.addForm.setReader("0x" + "9".repeat(40));
+      result.current.addForm.setReader(CUSTOM_READER);
     });
     act(() => {
       result.current.addForm.submit();
@@ -195,7 +206,7 @@ describe("useRpcNetworkMenu", () => {
       result.current.addForm.setName("My Local");
       result.current.addForm.setChainId(31338);
       result.current.addForm.setRpc("http://my-local");
-      result.current.addForm.setReader("0x" + "9".repeat(40));
+      result.current.addForm.setReader(CUSTOM_READER);
     });
     act(() => {
       result.current.addForm.submit();
@@ -206,7 +217,7 @@ describe("useRpcNetworkMenu", () => {
         chainId: 31338,
         name: "My Local",
         rpcUrl: "http://my-local",
-        readerAddress: "0x" + "9".repeat(40),
+        readerAddress: CUSTOM_READER,
       },
     ]);
     // The declared address rides along with the switch: nothing else on this
@@ -216,14 +227,16 @@ describe("useRpcNetworkMenu", () => {
       chainId: 31338,
       contractAddress: "",
       tokenAddress: "",
-      readerAddress: "0x" + "9".repeat(40),
+      readerAddress: CUSTOM_READER,
+      rootHash: "",
+      rootVersionIndex: 1,
     });
     expect(result.current.custom).toEqual([
       {
         chainId: 31338,
         name: "My Local",
         rpcUrl: "http://my-local",
-        readerAddress: "0x" + "9".repeat(40),
+        readerAddress: CUSTOM_READER,
         isCustom: true,
       },
     ]);
@@ -250,21 +263,11 @@ describe("useRpcNetworkMenu", () => {
     expect(mocks.config.update).not.toHaveBeenCalled();
   });
 
-  it("prefers a custom network's declared address over one that resolved before", () => {
-    // Re-declaring is how a custom network's contract gets corrected; the
-    // address that resolved under the old one must not win.
-    localStorage.setItem(
-      "ft:customNetworks",
-      JSON.stringify([
-        {
-          chainId: 31338,
-          name: "My Local",
-          rpcUrl: "http://my-local",
-          readerAddress: "0x" + "9".repeat(40),
-        },
-      ]),
-    );
-    localStorage.setItem("ft:readerByChain", JSON.stringify({ "31338": "0x" + "a".repeat(40) }));
+  it("prefers a custom network's own declaration over the build's address book", () => {
+    saveCustom([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: CUSTOM_READER },
+    ]);
+    mocks.env.chainReaders = { 31338: "0x" + "a".repeat(40) };
 
     const { result } = renderHook(() => useRpcNetworkMenu());
     act(() => {
@@ -272,8 +275,35 @@ describe("useRpcNetworkMenu", () => {
     });
 
     expect(mocks.config.update).toHaveBeenCalledWith(
-      expect.objectContaining({ chainId: 31338, readerAddress: "0x" + "9".repeat(40) }),
+      expect.objectContaining({ chainId: 31338, readerAddress: CUSTOM_READER }),
     );
+  });
+
+  it("forgets a custom network without disturbing the connection in use", () => {
+    saveCustom([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: CUSTOM_READER },
+      { chainId: 31339, name: "Other", rpcUrl: "http://other", readerAddress: CUSTOM_READER },
+    ]);
+
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    act(() => {
+      result.current.remove(31338);
+    });
+
+    expect(result.current.custom.map((n) => n.chainId)).toEqual([31339]);
+    expect(JSON.parse(localStorage.getItem("ft:customNetworks") || "[]")).toEqual([
+      { chainId: 31339, name: "Other", rpcUrl: "http://other", readerAddress: CUSTOM_READER },
+    ]);
+    expect(mocks.config.update).not.toHaveBeenCalled();
+    expect(mocks.toast.success).toHaveBeenCalledWith("Custom network removed");
+  });
+
+  it("says nothing when asked to forget a network it does not have", () => {
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    act(() => {
+      result.current.remove(4242);
+    });
+    expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 
   it("warns about CSP only outside dev, where a stray origin is actually blocked", () => {

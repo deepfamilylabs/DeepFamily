@@ -6,7 +6,7 @@ import {
   getDefaultRpcUrl,
   getDefaultReaderAddress,
 } from "../../../shared/config/env";
-import { rememberChainReader, resolveModuleAddresses } from "../services";
+import { resolveEntryReaderForChain, resolveModuleAddresses } from "../services";
 
 type ConfigValues = {
   rpcUrl: string;
@@ -69,39 +69,42 @@ function loadStoredConfig(): Partial<ConfigValues> | null {
 
 function normalizeStoredConfig(defaults: ConfigValues): ConfigValues {
   const stored = loadStoredConfig() || {};
-  const readerAddress = String(stored.readerAddress || defaults.readerAddress || "").trim();
+  const merged = { ...defaults, ...stored };
+  const chainId = Number(merged.chainId) || 0;
 
   return {
-    ...defaults,
-    ...stored,
-    readerAddress,
+    ...merged,
+    // Worked out from the chain on every boot, so a redeployment that rewrites
+    // the environment is picked up rather than lost behind a saved address.
+    // Chain 0 means the RPC matched no known network, and then the unsuffixed
+    // env pair is all there is to go on — it describes exactly that one RPC.
+    readerAddress: chainId
+      ? resolveEntryReaderForChain(chainId, {
+          envChainId: defaults.chainId,
+          envReaderAddress: defaults.readerAddress,
+        })
+      : defaults.readerAddress,
     contractAddress: "",
     tokenAddress: "",
   };
 }
 
+/**
+ * What the user chose, and nothing that was worked out from it.
+ *
+ * The three addresses are all derived — the reader from the chain, the other
+ * two from the reader — so none of them are written here. A derived address
+ * that outlives the deployment it came from is worse than no address at all:
+ * a redeploy shifts every address, and the stale one usually still holds a
+ * contract, just a different one, so the app reports a missing contract while
+ * the environment it was told to use is perfectly correct.
+ */
 function persistConfig(next: ConfigValues): void {
   try {
-    const {
-      rpcUrl,
-      contractAddress,
-      readerAddress,
-      tokenAddress,
-      rootHash,
-      rootVersionIndex,
-      chainId,
-    } = next;
+    const { rpcUrl, rootHash, rootVersionIndex, chainId } = next;
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({
-        rpcUrl,
-        contractAddress,
-        readerAddress,
-        tokenAddress,
-        rootHash,
-        rootVersionIndex,
-        chainId,
-      }),
+      JSON.stringify({ rpcUrl, rootHash, rootVersionIndex, chainId }),
     );
   } catch {}
 }
@@ -168,9 +171,6 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
       .then((resolved) => {
         if (cancelled) return;
         setModuleResolutionError(null);
-        // It answered on this chain, so it is worth restoring the next time the
-        // app comes back to it.
-        rememberChainReader(state.chainId, resolved.readerAddress);
         setState((prev) => {
           if (prev.rpcUrl.trim() !== rpcUrl || prev.readerAddress.trim() !== readerAddress) {
             return prev;

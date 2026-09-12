@@ -1,8 +1,20 @@
 /** How the entry reader is doing on the chain currently configured. */
 export type ReaderHealth = "unset" | "checking" | "ok" | "unreachable";
 
-/** Whether the configured root person is actually on that chain. */
-export type RootHealth = "idle" | "checking" | "ok" | "missing" | "versionMissing" | "unreachable";
+/**
+ * Whether the configured root person is actually on that chain.
+ *
+ * `unset` is the state a network switch leaves behind: the root was dropped
+ * with the chain it belonged to, and the next one has to be picked.
+ */
+export type RootHealth =
+  | "idle"
+  | "unset"
+  | "checking"
+  | "ok"
+  | "missing"
+  | "versionMissing"
+  | "unreachable";
 
 /**
  * The one thing worth telling the user, worst first. `null` means the network,
@@ -11,6 +23,7 @@ export type RootHealth = "idle" | "checking" | "ok" | "missing" | "versionMissin
 export type DataSourceProblem =
   | "readerUnset"
   | "readerUnreachable"
+  | "rootUnset"
   | "rootMissing"
   | "rootVersionMissing"
   | "rootUnreachable";
@@ -53,6 +66,7 @@ export function summarizeDataSourceHealth(input: DataSourceHealthInput): DataSou
   const problem = ((): DataSourceProblem | null => {
     if (reader === "unset") return "readerUnset";
     if (reader === "unreachable") return "readerUnreachable";
+    if (root === "unset") return "rootUnset";
     if (root === "missing") return "rootMissing";
     if (root === "versionMissing") return "rootVersionMissing";
     if (root === "unreachable") return "rootUnreachable";

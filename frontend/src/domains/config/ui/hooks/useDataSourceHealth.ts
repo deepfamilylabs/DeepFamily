@@ -26,11 +26,20 @@ export function useDataSourceHealth(): DataSourceHealth {
   const gateway = usePersonGateway();
   const [root, setRoot] = useState<RootHealth>("idle");
 
-  const rootIsAskable = Boolean(gateway) && Boolean(contractAddress) && isHash32(rootHash);
+  const readerResolved = Boolean(gateway) && Boolean(contractAddress);
+  const rootIsAskable = readerResolved && isHash32(rootHash);
 
   useEffect(() => {
-    if (!gateway || !rootIsAskable) {
+    if (!gateway || !readerResolved) {
       setRoot("idle");
+      return;
+    }
+    // The reader answers, but there is no root to ask it about: a network
+    // switch drops the previous chain's root, and one has to be picked before
+    // anything can be read. Distinct from a root that was asked for and is not
+    // there — that one means the hash is wrong for this chain.
+    if (!rootIsAskable) {
+      setRoot("unset");
       return;
     }
 
@@ -57,7 +66,7 @@ export function useDataSourceHealth(): DataSourceHealth {
     return () => {
       cancelled = true;
     };
-  }, [gateway, rootIsAskable, rootHash, rootVersionIndex]);
+  }, [gateway, readerResolved, rootIsAskable, rootHash, rootVersionIndex]);
 
   return useMemo(
     () =>

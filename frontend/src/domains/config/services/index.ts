@@ -1,10 +1,5 @@
 export { loadCustomNetworks, saveCustomNetworks } from "./customNetworksStore";
-export {
-  getChainReader,
-  loadChainReaders,
-  rememberChainReader,
-  type ChainReaderMap,
-} from "./chainReaderStore";
+export { resolveEntryReaderForChain, type EntryReaderLookup } from "./entryReaderResolver";
 export {
   resolveModuleAddresses,
   type ResolvedModuleAddresses,

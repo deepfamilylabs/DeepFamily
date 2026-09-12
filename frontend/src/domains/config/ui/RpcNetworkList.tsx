@@ -1,4 +1,4 @@
-import { Check, Plus } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useRpcNetworkMenu } from "./hooks/useRpcNetworkMenu";
 import { CustomNetworkForm } from "./sections";
@@ -20,12 +20,17 @@ const ROW_BASE =
  * exist. Neither owns the semantics — the config domain does — so this holds
  * the rows and the custom-network form, and the host supplies only its chrome.
  *
- * Whether the reader and the root exist on the chain in use is the status bar
- * chip's to report; a list of networks is for picking one.
+ * Each row carries the entry contract it would read through, because that is
+ * what decides whether picking it leads anywhere: a preset gets its address
+ * from the build's address book and a custom network from its own record, so a
+ * row with neither is shown as unconfigured rather than left to fail after the
+ * switch. Whether the reader and the root then check out on the chain is the
+ * status bar chip's to report; a list of networks is for picking one.
  */
 export default function RpcNetworkList({ onPicked }: RpcNetworkListProps) {
   const { t } = useTranslation();
-  const { presets, custom, selected, chainId, rpcUrl, select, addForm } = useRpcNetworkMenu();
+  const { presets, custom, selected, chainId, rpcUrl, select, remove, readerFor, addForm } =
+    useRpcNetworkMenu();
 
   const handleSelect = (id: number) => {
     select(id);
@@ -34,9 +39,10 @@ export default function RpcNetworkList({ onPicked }: RpcNetworkListProps) {
 
   const renderRow = (network: NetworkOption, key: string) => {
     const active = selected === network.chainId;
-    return (
+    const reader = network.readerAddress?.trim() || readerFor(network.chainId);
+
+    const row = (
       <button
-        key={key}
         type="button"
         role="radio"
         aria-checked={active}
@@ -53,15 +59,48 @@ export default function RpcNetworkList({ onPicked }: RpcNetworkListProps) {
             <span className="shrink-0 font-mono text-[10px] text-ink-subtle">
               {network.chainId}
             </span>
+            {reader ? null : (
+              <span className="shrink-0 rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide text-amber-700 ring-1 ring-amber-600/30 dark:text-amber-300 dark:ring-amber-400/30">
+                {t("familyTree.config.networkUnconfigured", "No contract")}
+              </span>
+            )}
           </span>
           <span className="mt-0.5 block truncate font-mono text-[10px] text-ink-subtle">
             {network.rpcUrl}
           </span>
+          {reader ? (
+            <span className="mt-px block truncate font-mono text-[10px] text-ink-subtle/80">
+              {reader}
+            </span>
+          ) : null}
         </span>
         {active ? (
           <Check className="h-3.5 w-3.5 shrink-0 text-orange-700 dark:text-orange-300" />
         ) : null}
       </button>
+    );
+
+    // A custom network is the only kind this app can forget: a preset comes
+    // from the build, and its address from the environment. Editing one is not
+    // offered — removing and adding it back is the same two fields, without a
+    // half-saved record in between.
+    if (!network.isCustom) return <div key={key}>{row}</div>;
+
+    return (
+      <div key={key} className="group/net flex items-center gap-1">
+        <span className="min-w-0 flex-1">{row}</span>
+        <button
+          type="button"
+          onClick={() => remove(network.chainId)}
+          aria-label={t("familyTree.config.removeCustomNetwork", "Remove {{name}}", {
+            name: network.name,
+          })}
+          title={t("familyTree.config.removeCustomNetworkShort", "Remove network")}
+          className="shrink-0 rounded-md p-1.5 text-ink-subtle opacity-0 transition-opacity hover:bg-surface-muted hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary group-hover/net:opacity-100"
+        >
+          <X className="h-3 w-3" aria-hidden />
+        </button>
+      </div>
     );
   };
 

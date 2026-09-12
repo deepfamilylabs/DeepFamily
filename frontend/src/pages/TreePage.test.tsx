@@ -38,7 +38,6 @@ const mocks = vi.hoisted(() => ({
     update: vi.fn(),
   },
   env: {
-    isForceEnvConfigSyncEnabled: vi.fn(() => false),
     isTreeDebugEnabled: vi.fn(() => false),
     shouldPreferFlatTree: vi.fn(() => false),
   },
@@ -123,7 +122,6 @@ vi.mock("../shared/clients/contractFactory", () => ({
 }));
 
 vi.mock("../shared/config/env", () => ({
-  isForceEnvConfigSyncEnabled: mocks.env.isForceEnvConfigSyncEnabled,
   isTreeDebugEnabled: mocks.env.isTreeDebugEnabled,
   shouldPreferFlatTree: mocks.env.shouldPreferFlatTree,
 }));
@@ -164,8 +162,6 @@ describe("TreePage", () => {
       rootVersionIndex: 1,
     };
     mocks.config.update.mockReset();
-    mocks.env.isForceEnvConfigSyncEnabled.mockReset();
-    mocks.env.isForceEnvConfigSyncEnabled.mockReturnValue(false);
     mocks.env.isTreeDebugEnabled.mockReset();
     mocks.env.isTreeDebugEnabled.mockReturnValue(false);
     mocks.env.shouldPreferFlatTree.mockReset();
@@ -239,33 +235,4 @@ describe("TreePage", () => {
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("syncs config from env defaults when forced env sync is enabled", async () => {
-    mocks.env.isForceEnvConfigSyncEnabled.mockReturnValue(true);
-
-    mocks.config.defaults = {
-      rpcUrl: "https://rpc.env",
-      chainId: 10,
-      contractAddress: "",
-      readerAddress: "0x00000000000000000000000000000000000000aa",
-      tokenAddress: "",
-      rootHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      rootVersionIndex: 2,
-    };
-
-    renderTreePage();
-
-    await waitFor(() =>
-      expect(mocks.config.update).toHaveBeenCalledWith({
-        rpcUrl: "https://rpc.env",
-        chainId: 10,
-        readerAddress: "0x00000000000000000000000000000000000000aa",
-        contractAddress: "",
-        tokenAddress: "",
-        rootHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        rootVersionIndex: 2,
-      }),
-    );
-    expect(mocks.treeStatus.clearAllCaches).toHaveBeenCalledTimes(1);
-    expect(mocks.treeStatus.refresh).toHaveBeenCalledTimes(1);
-  });
 });

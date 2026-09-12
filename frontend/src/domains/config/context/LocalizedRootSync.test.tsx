@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
   config: {
     rootHash: "0x" + "e".repeat(64),
     rootVersionIndex: 1,
+    chainId: 31337,
     defaults: {
+      chainId: 31337,
       rootHash: "0x" + "e".repeat(64),
       rootVersionIndex: 1,
     },
@@ -47,6 +49,8 @@ describe("LocalizedRootSync", () => {
     mocks.config.rootVersionIndex = 1;
     mocks.config.defaults.rootHash = mocks.localizedRoots.EN;
     mocks.config.defaults.rootVersionIndex = 1;
+    mocks.config.chainId = 31337;
+    mocks.config.defaults.chainId = 31337;
     mocks.config.update.mockReset();
   });
 
@@ -70,5 +74,41 @@ describe("LocalizedRootSync", () => {
     render(<LocalizedRootSync />);
 
     expect(mocks.config.update).not.toHaveBeenCalled();
+  });
+  it("leaves the root alone on a chain the env roots say nothing about", async () => {
+    // Switching networks clears the root on purpose: a person hash names a
+    // record on one chain. Refilling it from the build would put the local
+    // deployment's root in front of a public chain that has never seen it.
+    mocks.config.chainId = 71;
+    mocks.config.rootHash = "";
+
+    render(<LocalizedRootSync />);
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mocks.config.update).not.toHaveBeenCalled();
+  });
+
+  it("fills an empty root back in once the app returns to the env's own chain", async () => {
+    mocks.config.rootHash = "";
+
+    render(<LocalizedRootSync />);
+
+    await waitFor(() =>
+      expect(mocks.config.update).toHaveBeenCalledWith({
+        rootHash: mocks.localizedRoots.EN,
+        rootVersionIndex: 1,
+      }),
+    );
+  });
+
+  it("still applies when the env RPC matches no known chain", async () => {
+    // Nothing identified the env's chain, so there is no mismatch to act on.
+    mocks.config.defaults.chainId = 0;
+    mocks.config.chainId = 71;
+    mocks.config.rootHash = "";
+
+    render(<LocalizedRootSync />);
+
+    await waitFor(() => expect(mocks.config.update).toHaveBeenCalled());
   });
 });
