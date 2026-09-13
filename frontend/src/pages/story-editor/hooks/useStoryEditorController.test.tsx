@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID, STORY_ENVELOPE_SCHEMA_ID } from "@deepfamily/protocol-core";
 import type { StoryRecord, StoryMetadata } from "../../../shared/model";
@@ -8,6 +8,17 @@ import { StoryRecordPanel } from "../sections/StoryRecordPanel";
 import { useStoryEditorController } from "./useStoryEditorController";
 
 const mocks = vi.hoisted(() => ({
+  access: {
+    scope: {} as object,
+    canEdit: true,
+    isOwner: true,
+    checking: false,
+    error: false,
+    connected: true,
+    correctNetwork: true,
+    refresh: vi.fn(),
+    recheck: vi.fn(async () => true),
+  },
   location: { state: undefined as unknown },
   storyQuery: { data: undefined as any, loading: false, error: null, refetch: vi.fn() },
   addFlow: { runOrThrow: vi.fn() },
@@ -36,6 +47,7 @@ vi.mock("../../../domains/config", () => ({
   useConfig: () => ({ rpcUrl: "http://localhost:8545", chainId: 31337, contractAddress: "0xabc" }),
 }));
 vi.mock("../../../domains/person", () => ({
+  useNftStoryAccess: () => mocks.access,
   useNFTDetails: () => ({ data: undefined }),
   useStoryData: () => mocks.storyQuery,
   getEditableRecordTypeOptions: () => [],
@@ -83,6 +95,16 @@ function metadata(records: StoryRecord[]): StoryMetadata {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  Object.assign(mocks.access, {
+    scope: {},
+    canEdit: true,
+    isOwner: true,
+    checking: false,
+    error: false,
+    connected: true,
+    correctNetwork: true,
+  });
+  mocks.access.recheck.mockReset().mockResolvedValue(true);
   mocks.location.state = undefined;
   mocks.storyQuery.data = undefined;
   mocks.storyQuery.loading = false;
@@ -183,4 +205,92 @@ describe("useStoryEditorController biography presentation", () => {
     expect(result.current.meta).toMatchObject({ totalRecords: 0, totalPayloadLength: 0 });
     expect(result.current.sortedRecords).toEqual([]);
   });
+});
+
+describe("story editor write authorization", () => {
+  it("blocks both writes and sealing when access is denied, even with prefetched data", async () => {
+    const records = [record(0)];
+    mocks.location.state = {
+      prefetchedStory: { storyRecords: records, storyMetadata: metadata(records) },
+    };
+    mocks.access.canEdit = false;
+    mocks.access.isOwner = false;
+    const { result } = renderHook(() => useStoryEditorController());
+    act(() => result.current.form.updateContent("Denied draft"));
+    await act(async () => {
+      await result.current.form.submit();
+      result.current.seal.handleSeal();
+      await result.current.seal.execute();
+    });
+    expect(result.current.showEditorForm).toBe(false);
+    expect(result.current.seal.showConfirm).toBe(false);
+    expect(mocks.addFlow.runOrThrow).not.toHaveBeenCalled();
+    expect(mocks.sealFlow.runOrThrow).not.toHaveBeenCalled();
+  });
+
+  it("rechecks ownership before sending either transaction", async () => {
+    mocks.storyQuery.data = { records: [record(0)], metadata: metadata([record(0)]) };
+    mocks.access.recheck.mockResolvedValue(false);
+    const { result } = renderHook(() => useStoryEditorController());
+    act(() => result.current.form.updateContent("Draft before transfer"));
+    await act(async () => {
+      await result.current.form.submit();
+    });
+    await act(async () => {
+      await result.current.seal.execute();
+    });
+    expect(mocks.access.recheck).toHaveBeenCalledTimes(2);
+    expect(mocks.addFlow.runOrThrow).not.toHaveBeenCalled();
+    expect(mocks.sealFlow.runOrThrow).not.toHaveBeenCalled();
+    expect(result.current.errorMessage).toContain("Only the current NFT owner");
+  });
+
+  it("closes an open seal confirmation when the wallet loses ownership", () => {
+    mocks.storyQuery.data = { records: [record(0)], metadata: metadata([record(0)]) };
+    const { result, rerender } = renderHook(() => useStoryEditorController());
+    act(() => result.current.seal.handleSeal());
+    expect(result.current.seal.showConfirm).toBe(true);
+    mocks.access.canEdit = false;
+    mocks.access.isOwner = false;
+    rerender();
+    expect(result.current.showEditorForm).toBe(false);
+    expect(result.current.seal.showConfirm).toBe(false);
+  });
+});
+
+describe("story preview scope", () => {
+  it.each([false, true])(
+    "cancels old-scope submissions after a wallet/context switch (preview visible: %s)",
+    async (previewVisible) => {
+      mocks.storyQuery.data = { records: [record(0)], metadata: metadata([record(0)]) };
+      let releasePreflight!: () => void;
+      const preflight = new Promise<void>((resolve) => {
+        releasePreflight = resolve;
+      });
+      const decisions: boolean[] = [];
+      mocks.addFlow.runOrThrow.mockImplementation(async (args) => {
+        if (!previewVisible) await preflight;
+        const approved = await args.confirmTransactionPreview({ kind: "Story" });
+        decisions.push(approved);
+        throw new Error("Cancelled");
+      });
+      const { result, rerender } = renderHook(() => useStoryEditorController());
+      act(() => result.current.form.updateContent("Draft for original scope"));
+      let submission!: Promise<void>;
+      act(() => {
+        submission = result.current.form.submit();
+      });
+      await waitFor(() => expect(mocks.addFlow.runOrThrow).toHaveBeenCalled());
+      if (previewVisible)
+        await waitFor(() => expect(result.current.transactionPreview).not.toBeNull());
+      mocks.access.scope = {};
+      rerender();
+      await act(async () => {
+        releasePreflight();
+        await submission;
+      });
+      expect(decisions).toEqual([false]);
+      expect(result.current.transactionPreview).toBeNull();
+    },
+  );
 });

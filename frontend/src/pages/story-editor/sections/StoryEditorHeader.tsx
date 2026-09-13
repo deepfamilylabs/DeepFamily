@@ -86,6 +86,14 @@ function StoryStatusPill({ editor }: { editor: StoryEditorController }) {
     );
   }
 
+  if (!editor.canEdit) {
+    return (
+      <span className="rounded-full border border-hairline bg-surface-alt px-3 py-1.5 text-xs font-semibold text-ink-muted">
+        {t("storyRecordEditor.readOnly", "Read only")}
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
       <span aria-hidden className="h-[7px] w-[7px] rounded-full bg-green-500 dark:bg-green-400" />

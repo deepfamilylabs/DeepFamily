@@ -934,7 +934,13 @@
     "collapseRun": "收起 {{total}} 个记录",
     "listSeparator": "、",
     "recordTitleLabel": "标题（可选）",
-    "recordTitlePlaceholder": "为这条记录起个名字"
+    "recordTitlePlaceholder": "为这条记录起个名字",
+    "readOnly": "只读",
+    "connectOwnerWallet": "连接 NFT 所有者的钱包后方可编辑，故事仍可公开阅读。",
+    "switchNetworkToEdit": "请将钱包切换到此故事所在的网络后再编辑。",
+    "checkingOwnership": "正在核实 NFT 所有者…",
+    "ownershipUnavailable": "暂时无法核实 NFT 所有者，验证成功前不可编辑。",
+    "ownerOnly": "只有当前 NFT 所有者可以编辑此故事。"
   },
   "person": {
     "encyclopedia": "人物百科",

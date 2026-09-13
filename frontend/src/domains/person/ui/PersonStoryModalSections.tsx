@@ -304,12 +304,14 @@ function StoryViewToggle({
 function StoryIntegritySection({
   t,
   person,
+  canEditStory,
   recordsCount,
   storyData,
   integrityOk,
 }: {
   t: PersonStoryT;
   person: NodeData;
+  canEditStory: boolean;
   recordsCount: number;
   storyData: StoryData;
   integrityOk: boolean;
@@ -323,11 +325,12 @@ function StoryIntegritySection({
             {t("person.sealed", "Sealed")}
           </span>
         ) : (
+          canEditStory &&
           person.tokenId && (
             <button
               type="button"
               onClick={() => {
-                if (!person.tokenId) return;
+                if (!person.tokenId || !canEditStory) return;
                 window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer");
               }}
               className={`group ${MODAL_CHIP} border-success/25 bg-success/10 text-success transition-colors hover:bg-success/15`}
@@ -581,6 +584,7 @@ function StoryRecordList({
 export function DetailedStorySection({
   t,
   person,
+  canEditStory,
   storyData,
   recordsCount,
   lengthBytes,
@@ -595,6 +599,7 @@ export function DetailedStorySection({
 }: {
   t: PersonStoryT;
   person: NodeData;
+  canEditStory: boolean;
   storyData: StoryData;
   recordsCount: number;
   lengthBytes: number;
@@ -638,6 +643,7 @@ export function DetailedStorySection({
       <StoryIntegritySection
         t={t}
         person={person}
+        canEditStory={canEditStory}
         recordsCount={recordsCount}
         storyData={storyData}
         integrityOk={integrityOk}

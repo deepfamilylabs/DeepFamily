@@ -10,6 +10,7 @@ import {
   useToast,
 } from "../../../shared/ui";
 import { useEndorseModal } from "./EndorseModalProvider";
+import { useNftStoryAccess } from "../queries/useNftStoryAccess";
 import {
   NodeDetailHeaderActions,
   NodeDetailHashRows,
@@ -43,6 +44,7 @@ export default function NodeDetailModal({
 }: NodeDetailModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
+  const storyAccess = useNftStoryAccess(open ? nodeData?.tokenId : null);
   // Track close origin to coordinate with history state
   const pushedRef = React.useRef(false);
   const closedBySelfRef = React.useRef(false);
@@ -174,7 +176,7 @@ export default function NodeDetailModal({
   };
 
   const openEditor = () => {
-    if (!nodeData?.tokenId) return;
+    if (!nodeData?.tokenId || !storyAccess.canEdit) return;
     window.open(`/editor/${nodeData.tokenId}`, "_blank", "noopener,noreferrer");
   };
 
@@ -189,6 +191,7 @@ export default function NodeDetailModal({
       t={t}
       nodeData={nodeData}
       hasNFT={hasNFT}
+      canEditStory={storyAccess.canEdit}
       endorsementCount={endorsementCount}
       onOpenEndorse={() => {
         if (!nodeData?.personHash || nodeData.versionIndex === undefined) return;

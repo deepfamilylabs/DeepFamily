@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useConfig } from "../domains/config";
 import { useStoryEditorController } from "./story-editor/hooks/useStoryEditorController";
 import {
   SealConfirmDialog,
@@ -26,6 +28,12 @@ const PANES: { id: EditorPane; key: string; fallback: string }[] = [
  * side, so a toggle group swaps between them and the manuscript leads.
  */
 export default function StoryEditorPage() {
+  const { tokenId } = useParams<{ tokenId: string }>();
+  const { rpcUrl, contractAddress, chainId } = useConfig();
+  return <StoryEditorScreen key={JSON.stringify([tokenId, rpcUrl, contractAddress, chainId])} />;
+}
+
+function StoryEditorScreen() {
   const editor = useStoryEditorController();
   const [pane, setPane] = useState<EditorPane>("story");
   const paneClass = (id: EditorPane) => (pane === id ? "" : "hidden xl:block");
@@ -34,6 +42,23 @@ export default function StoryEditorPage() {
     <>
       <div data-story-editor-page className="flex w-full flex-col gap-7 py-8">
         <StoryEditorHeader editor={editor} />
+        {editor.accessMessage && (
+          <div
+            role="status"
+            className="rounded-xl border border-hairline bg-surface-alt p-4 text-sm text-ink-muted"
+          >
+            <p>{editor.accessMessage}</p>
+            {editor.access.error && (
+              <button
+                type="button"
+                onClick={editor.access.refresh}
+                className="mt-2 underline underline-offset-4"
+              >
+                {editor.t("common.retry", "Retry")}
+              </button>
+            )}
+          </div>
+        )}
 
         <div
           role="group"

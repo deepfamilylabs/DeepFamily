@@ -6,6 +6,16 @@ import StoryEditorPage from "./StoryEditorPage";
 import type { StoryRecord } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
+  access: {
+    canEdit: true,
+    isOwner: true,
+    checking: false,
+    error: false,
+    connected: true,
+    correctNetwork: true,
+    refresh: vi.fn(),
+    recheck: vi.fn(async () => true),
+  },
   tokenId: "42",
   locationState: undefined as any,
   nftDetails: null as any,
@@ -73,6 +83,7 @@ vi.mock("../domains/person", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../domains/person")>();
   return {
     ...actual,
+    useNftStoryAccess: () => mocks.access,
     useNFTDetails: () => ({
       data: mocks.nftDetails,
       loading: false,
@@ -144,6 +155,15 @@ function baseStoryData(isSealed = false) {
 describe("StoryEditorPage", () => {
   beforeEach(() => {
     mocks.tokenId = "42";
+    Object.assign(mocks.access, {
+      canEdit: true,
+      isOwner: true,
+      checking: false,
+      error: false,
+      connected: true,
+      correctNetwork: true,
+    });
+    mocks.access.recheck.mockReset().mockResolvedValue(true);
     mocks.locationState = undefined;
     mocks.nftDetails = {
       personHash: "0xperson",
@@ -288,5 +308,40 @@ describe("StoryEditorPage", () => {
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Story sealed successfully (1 records)");
     expect(screen.getAllByText("Sealed").length).toBeGreaterThan(0);
+  });
+  it.each([
+    { connected: false, isOwner: false, checking: false, correctNetwork: true, error: false },
+    { connected: true, isOwner: false, checking: false, correctNetwork: true, error: false },
+    { connected: true, isOwner: false, checking: true, correctNetwork: true, error: false },
+    { connected: true, isOwner: true, checking: false, correctNetwork: false, error: false },
+    { connected: true, isOwner: false, checking: false, correctNetwork: true, error: true },
+  ])("keeps a direct editor URL read-only when access is unavailable (%j)", async (access) => {
+    Object.assign(mocks.access, access, { canEdit: false });
+    render(<StoryEditorPage />);
+    expect(await screen.findByText("existing story")).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/Enter story content/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Review & sign/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Seal permanently" })).toBeNull();
+    expect(screen.queryByText("Open for writing")).toBeNull();
+    expect(screen.getAllByText("Read only").length).toBeGreaterThan(0);
+    expect(mocks.addStoryRunOrThrow).not.toHaveBeenCalled();
+  });
+  it("clears the previous token's draft and story on a direct route change", async () => {
+    const view = render(<StoryEditorPage />);
+    fireEvent.change(screen.getByPlaceholderText(/Enter story content/), {
+      target: { value: "Token 42 draft" },
+    });
+    mocks.tokenId = "43";
+    mocks.storyData = null;
+    mocks.nftDetails = null;
+    mocks.storyLoading = true;
+    view.rerender(<StoryEditorPage />);
+    expect(screen.queryByText("existing story")).toBeNull();
+    expect(screen.queryByDisplayValue("Token 42 draft")).toBeNull();
+    expect(screen.queryByPlaceholderText(/Enter story content/)).toBeNull();
+    mocks.storyData = baseStoryData();
+    mocks.storyLoading = false;
+    view.rerender(<StoryEditorPage />);
+    expect(await screen.findByPlaceholderText(/Enter story content/)).toHaveProperty("value", "");
   });
 });

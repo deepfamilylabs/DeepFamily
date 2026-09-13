@@ -87,6 +87,7 @@ export function NodeDetailHeaderActions({
   t,
   nodeData,
   hasNFT,
+  canEditStory,
   endorsementCount,
   onOpenEndorse,
   onOpenMint,
@@ -96,6 +97,7 @@ export function NodeDetailHeaderActions({
   t: NodeDetailT;
   nodeData?: NodeData | null;
   hasNFT: boolean;
+  canEditStory: boolean;
   endorsementCount: number;
   onOpenEndorse: () => void;
   onOpenMint: () => void;
@@ -163,20 +165,22 @@ export function NodeDetailHeaderActions({
               {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
             </span>
           </button>
-          <button
-            type="button"
-            aria-label={t("familyTree.nodeDetail.editStory", "Edit Story")}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenEditor();
-            }}
-            {...stop}
-            className={action}
-            title={t("familyTree.nodeDetail.editStory", "Edit Story")}
-          >
-            <Edit2 className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
-            <span className="hidden sm:inline">{t("familyTree.nodeDetail.edit", "Edit")}</span>
-          </button>
+          {canEditStory && (
+            <button
+              type="button"
+              aria-label={t("familyTree.nodeDetail.editStory", "Edit Story")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenEditor();
+              }}
+              {...stop}
+              className={action}
+              title={t("familyTree.nodeDetail.editStory", "Edit Story")}
+            >
+              <Edit2 className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
+              <span className="hidden sm:inline">{t("familyTree.nodeDetail.edit", "Edit")}</span>
+            </button>
+          )}
           <span className="flex-1" />
           <span className="inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border border-purple-600/25 bg-purple-600/10 text-xs font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-400/15 dark:text-purple-300">
             <Image className="w-3.5 h-3.5" strokeWidth={1.9} aria-hidden />

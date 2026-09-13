@@ -37,6 +37,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import seedHelpers from "../lib/seedHelpers.js";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import { resolveHistoricalSeedSigner } from "./lib/seedSigner.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -946,7 +947,8 @@ async function main() {
   console.log("DeepFamily Historical Data Seeding");
   console.log("=".repeat(70));
 
-  const [signer] = await ethers.getSigners();
+  const signer = await resolveHistoricalSeedSigner(connection);
+  console.log(`\nUsing seed signer from PRIVATE_KEY: ${signer.address}`);
   const { deepFamily, deepFamilyReader, archive, token } = await ensureIntegratedSystem(
     connection,
     {
@@ -960,7 +962,6 @@ async function main() {
 
   const deepFamilyAddr = await deepFamily.getAddress();
   const tokenAddr = await token.getAddress();
-  console.log(`\nUsing signer: ${signer.address}`);
   console.log(`DeepFamily contract: ${deepFamilyAddr}`);
   console.log(`DeepFamilyToken contract: ${tokenAddr}`);
   console.log("=".repeat(70));

@@ -934,7 +934,13 @@
     "collapseRun": "Collapse {{total}} records",
     "listSeparator": ", ",
     "recordTitleLabel": "Title (optional)",
-    "recordTitlePlaceholder": "Give this record a name"
+    "recordTitlePlaceholder": "Give this record a name",
+    "readOnly": "Read only",
+    "connectOwnerWallet": "Connect the NFT owner's wallet to edit. This story is available to read.",
+    "switchNetworkToEdit": "Switch your wallet to this story's network to edit.",
+    "checkingOwnership": "Checking NFT ownership…",
+    "ownershipUnavailable": "Unable to verify NFT ownership. Editing is unavailable until verification succeeds.",
+    "ownerOnly": "Only the current NFT owner can edit this story."
   },
   "person": {
     "encyclopedia": "Encyclopedia",
