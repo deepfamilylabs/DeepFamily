@@ -4,7 +4,7 @@ import hre from "hardhat";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import { setupStubVerifiers, mintPerson } from "./helpers/testHelper.mjs";
 import { encodeStoryRecord, readStoryRecord } from "../packages/protocol-core/story.js";
-import { STORY_CHUNK_SCHEMA_ID } from "../packages/protocol-core/constants.js";
+import { STORY_ENVELOPE_SCHEMA_ID } from "../packages/protocol-core/constants.js";
 
 describe("Unified Archive and Reader integration", function () {
   this.timeout(120_000);
@@ -24,8 +24,8 @@ describe("Unified Archive and Reader integration", function () {
     return { deepFamily, archive: archive.connect(signer), reader, signer, other, tokenId: 1n };
   }
 
-  async function append(archive, tokenId, content, schemaId = STORY_CHUNK_SCHEMA_ID) {
-    const payload = encodeStoryRecord({ content, chunkType: 3, attachmentCID: "ipfs://source" });
+  async function append(archive, tokenId, content, schemaId = STORY_ENVELOPE_SCHEMA_ID) {
+    const payload = encodeStoryRecord({ content, recordType: 3, attachmentCID: "ipfs://source" });
     const state = await archive.storyState(tokenId);
     await archive.appendStoryRecord(
       tokenId,
@@ -68,7 +68,7 @@ describe("Unified Archive and Reader integration", function () {
     });
     expect(hre.ethers.hexlify(hydrated.payload)).to.equal(hre.ethers.hexlify(payload));
     expect(hydrated.decoded.content).to.equal(content);
-    expect(hydrated.decoded.chunkType).to.equal(3);
+    expect(hydrated.decoded.recordType).to.equal(3);
     expect(hydrated.decoded.attachmentCID).to.equal("ipfs://source");
     expect(await reader.getStoryState(tokenId)).to.deep.equal(await archive.storyState(tokenId));
   });
@@ -113,14 +113,14 @@ describe("Unified Archive and Reader integration", function () {
     const state = await archive.storyState(tokenId);
     const payload = encodeStoryRecord({
       content: "after transfer",
-      chunkType: 0,
+      recordType: 0,
       attachmentCID: "",
     });
     const args = [
       tokenId,
       state.totalRecords,
       state.recordsHead,
-      STORY_CHUNK_SCHEMA_ID,
+      STORY_ENVELOPE_SCHEMA_ID,
       payload,
       hre.ethers.keccak256(payload),
     ];

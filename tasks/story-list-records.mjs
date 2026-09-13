@@ -25,7 +25,7 @@ const action = async (args, hre) => {
   return [records, totalRecords, hasMore, nextOffset];
 };
 
-export default task("list-story-chunks", "List story chunks for an NFT with pagination")
+export default task("list-story-records", "List story records for an NFT with pagination")
   .addOption({
     name: "tokenid",
     description: "NFT tokenId",

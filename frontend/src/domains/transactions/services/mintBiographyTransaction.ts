@@ -115,7 +115,7 @@ export async function mintBiographyTransaction(input: {
     blockTag,
     getCode: (address, block) => signer.provider.getCode(address, block),
   });
-  if (ethers.hexlify(restored.payload) !== payload || restored.decoded?.chunkType !== 0)
+  if (ethers.hexlify(restored.payload) !== payload || restored.decoded?.recordType !== 0)
     throw archiveValidationError("Mint biography readback does not match the submitted bytes");
   const recordHash = computeStoryRecordHash({
     chainId: network.chainId,

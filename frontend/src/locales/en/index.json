@@ -1,5 +1,5 @@
 {
-  "chunkTypes": {
+  "recordTypes": {
     "summary": "Summary",
     "earlyLife": "Early Life",
     "education": "Education",
@@ -34,7 +34,7 @@
     "closeMenu": "Close menu"
   },
   "story": {
-    "addingChunk": "Adding story chunk...",
+    "addingRecord": "Adding story record...",
     "sealing": "Sealing story..."
   },
   "home": {
@@ -64,9 +64,9 @@
         "title": "NFT Biographies",
         "description": "Endorsed versions can be minted as NFT biographies with full biographical data, recognizing quality contributions"
       },
-      "storyShardingSealing": {
-        "title": "Biographical Storage & Sealing",
-        "description": "Append biographical details with hash verification; sealing makes them permanently immutable so archives stay rich and trustworthy"
+      "storyRecordsSealing": {
+        "title": "Biographical Records & Sealing",
+        "description": "Append immutable biographical records with hash verification; sealing closes the archive to further records"
       }
     },
     "valueSystem": {
@@ -134,9 +134,9 @@
         "title": "NFT Biographies",
         "description": "Endorsed versions mint into NFT biographies that disclose core biographical info; holders can extend them with detailed narratives."
       },
-      "storySharding": {
-        "title": "Biographical Storage & Sealing",
-        "description": "Append life stories in verified on-chain segments, then seal them for immutable, trustworthy archives."
+      "storyRecords": {
+        "title": "Biographical Records & Sealing",
+        "description": "Append life stories as verifiable, immutable on-chain records, then seal the archive to prevent further records."
       },
       "versionNotarization": {
         "title": "Collaboration & Private Modes",
@@ -239,13 +239,13 @@
       "account": "Recommended Account",
       "totalSources": "Total recommended sources"
     },
-    "storyChunksQuery": {
+    "storyRecordsQuery": {
       "tokenId": "Token ID",
-      "chunkHash": "Chunk Hash",
-      "editor": "Editor",
-      "chunkType": "Chunk Type",
+      "payloadHash": "Payload Hash",
+      "author": "Author",
+      "recordType": "Record Type",
       "attachmentCID": "Attachment CID",
-      "totalChunks": "Total Chunks"
+      "totalRecords": "Total Records"
     },
     "childrenQuery": {
       "childHash": "Child Hash",
@@ -351,7 +351,7 @@
         "trustedEndorsers": "Endorsement sources",
         "endorsement": "Endorsement stats",
         "children": "Children",
-        "storyChunks": "Story chunks",
+        "storyRecords": "Story records",
         "uri": "URI history",
         "accountVersions": "Versions created",
         "accountEndorsements": "Endorsements made",
@@ -360,7 +360,7 @@
       },
       "entry": {
         "personHashDesc": "Opens versions, endorsement sources, endorsement stats, children, NFTs, stories and URI history.",
-        "tokenIdDesc": "Opens that NFT's story chunks and URI history.",
+        "tokenIdDesc": "Opens that NFT's story records and URI history.",
         "addressDesc": "Opens versions that account created, endorsements it made, and NFTs it holds."
       },
       "empty": {
@@ -826,22 +826,22 @@
   "storyEditor": {
     "title": "Story Editor"
   },
-  "storyChunkEditor": {
+  "storyRecordEditor": {
     "titleWithName": "{{name}} Profile Data",
     "titleFallback": "Profile Data",
-    "totalLength": "Total Length",
-    "addChunk": "Add New Chunk",
+    "totalPayloadLength": "Total payload bytes",
+    "addRecord": "Add New Record",
     "saving": "Saving...",
     "cancel": "Cancel",
     "loading": "Loading...",
     "contentRequired": "Content cannot be empty",
-    "noChunks": "No profile chunks yet.",
-    "noChunksSealed": "This profile is sealed with no chunks.",
-    "chunkTypeLabel": "Chunk Type",
+    "noRecords": "No profile records yet.",
+    "noRecordsSealed": "This profile is sealed with no records.",
+    "recordTypeLabel": "Record Type",
     "attachmentLabel": "Attachment CID (optional)",
     "attachmentPlaceholder": "CID (e.g. bafy...) or leave empty",
     "attachmentTooLong": "Attachment CID cannot exceed 256 UTF-8 bytes",
-    "invalidChunkType": "Invalid chunk type",
+    "invalidRecordType": "Invalid record type",
     "operationFailed": "Operation failed",
     "sealFailed": "Seal failed",
     "sealDialog": {
@@ -850,9 +850,9 @@
       "cancel": "Cancel",
       "confirm": "Confirm Seal"
     },
-    "chunkTypeHelp": {
-      "title": "Story Chunk Types Guide",
-      "intro": "Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.",
+    "recordTypeHelp": {
+      "title": "Story Record Types Guide",
+      "intro": "Story records are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple records of the same type in any order.",
       "opening": "Opening",
       "summaryDesc": "Brief overview of the person's life and significance",
       "earlyYears": "Early Years",
@@ -881,7 +881,7 @@
       "referencesDesc": "Sources, citations, bibliography",
       "notesDesc": "Additional remarks, corrections, clarifications",
       "usageNotes": "Usage Notes",
-      "note1": "These are content type tags, not exclusive chapters - you can have multiple chunks of the same type",
+      "note1": "These are content type tags, not exclusive chapters - you can have multiple records of the same type",
       "note2": "Types are not mutually exclusive - feel free to use types in any order",
       "note3": "Life Events: For chronological narrative (birth → childhood → adulthood → death)",
       "note4": "Career: For focused professional history (jobs, companies, positions)",
@@ -889,9 +889,9 @@
     },
     "contentPlaceholderBytes": "Enter story content; network gas capacity determines the record size",
     "success": {
-      "chunkAdded": "Chunk #{{index}} added successfully ({{bytes}} bytes)",
-      "chunkAddedGeneric": "Story chunk added successfully",
-      "storySealed": "Story sealed successfully ({{total}} chunks)",
+      "recordAdded": "Record #{{index}} added successfully ({{bytes}} bytes)",
+      "recordAddedGeneric": "Story record added successfully",
+      "storySealed": "Story sealed successfully ({{total}} records)",
       "storySealedGeneric": "Story sealed successfully"
     },
     "errors": {
@@ -902,34 +902,34 @@
     },
     "backToProfile": "Back to profile",
     "contents": "Contents",
-    "chunkCount": "{{total}} chunks",
+    "recordCount": "{{total}} records",
     "bytesOnChain": "{{bytes}} bytes on chain",
     "openForWriting": "Open for writing",
     "sealedReadOnly": "Sealed — read only",
-    "closedToNewChunks": "Closed to new chunks",
-    "newChunk": "New chunk",
-    "readFullChunk": "Read the full chunk",
-    "collapseChunk": "Collapse",
+    "closedToNewRecords": "Closed to new records",
+    "newRecord": "New record",
+    "readFullRecord": "Read the full record",
+    "collapseRecord": "Collapse",
     "reviewAndSign": "Review & sign",
     "segmentBudget": "of {{limit}} per record",
     "tagPickerHint": "Tags describe content, not chapters — repeat a tag as often as you like and use them in any order.",
     "thisWrite": "This write",
     "landsAt": "Lands at",
     "payload": "Payload",
-    "contentHash": "Content hash",
+    "payloadHash": "Payload hash",
     "onChainRecord": "On-chain record",
     "sealedNotice": "This profile is final. It stays readable and verifiable forever, and no further writes are accepted.",
     "sealCard": {
       "title": "Seal this profile",
-      "body": "Writes the final profile hash on chain. After sealing, no chunk can ever be added, edited or removed — by anyone.",
+      "body": "Seals the current record-chain head on chain. After sealing, no further records can be appended.",
       "action": "Seal permanently"
     },
     "paneStory": "Profile",
     "paneRecord": "Record",
     "paneSwitcher": "Editor section",
-    "collapsedRun": "{{total}} chunks collapsed",
+    "collapsedRun": "{{total}} records collapsed",
     "expandRun": "Expand",
-    "collapseRun": "Collapse {{total}} chunks",
+    "collapseRun": "Collapse {{total}} records",
     "listSeparator": ", "
   },
   "person": {
@@ -938,15 +938,15 @@
     "sealed": "Sealed",
     "profileData": "Profile Data",
     "noProfileData": "No profile data",
-    "chunkList": "Profile Chunks",
-    "noChunks": "No profile chunks",
+    "recordList": "Profile Records",
+    "noRecords": "No profile records",
     "metadata": "Metadata",
-    "totalChunks": "Total Chunks",
-    "totalLength": "Total Length",
+    "totalRecords": "Total Records",
+    "totalPayloadLength": "Total payload bytes",
     "lastUpdate": "Last Update",
     "status": "Status",
     "editable": "Editable",
-    "storyHash": "Profile Hash",
+    "recordsHead": "Record-chain head",
     "owner": "Owner Address",
     "basicInfo": "Basic Info",
     "sections": "Sections",
@@ -1004,7 +1004,7 @@
     "colPerson": "Person",
     "colLife": "Life",
     "colPlaces": "Places",
-    "colChunks": "Chunks",
+    "colRecords": "Records",
     "colToken": "Token ID",
     "colCreator": "Creator",
     "colMinted": "Minted",
@@ -1021,29 +1021,29 @@
       "openTree": "Open Lineage"
     }
   },
-  "storyChunksModal": {
+  "storyRecordsModal": {
     "fetchError": "Failed to load story data",
     "lifeEvents": "Life Events",
     "blockchainIdentity": "Blockchain Identity",
     "born": "Born",
     "died": "Died",
-    "chunksAndSize": "{{count}} chunks · {{size}} bytes",
+    "recordsAndSize": "{{count}} records · {{size}} bytes",
     "tag": "Tag",
     "personHash": "Person Hash",
     "detailedStory": "Detailed Profile",
-    "chunks": "Profile Chunks",
+    "records": "Profile Records",
     "fullText": "Full Text",
     "integrityChecking": "Checking integrity...",
     "integrityVerified": "Story integrity verified",
     "integrityWarning": "Story integrity issues detected",
-    "loading": "Loading story chunks...",
+    "loading": "Loading story records...",
     "characters": "characters",
     "noStoryData": "No profile data available",
     "basicStory": "Introduction",
     "noStory": "No profile content",
     "peopleEncyclopedia": "Encyclopedia",
-    "chunkEditor": "Editor",
-    "chunkHash": "Chunk Hash",
+    "author": "Author",
+    "payloadHash": "Payload Hash",
     "attachment": "Attachment"
   },
   "actions": {
@@ -1417,7 +1417,7 @@
       "InvalidMetadataArchiveAddress": "Metadata Archive address is invalid.",
       "MetadataArchiveBindingMismatch": "Metadata Archive is not bound to this DeepFamily contract.",
       "UnauthorizedCaller": "Current contract is not authorized to write to the Metadata Archive.",
-      "InvalidPayloadLength": "Encrypted metadata payload length is invalid.",
+      "InvalidPayloadLength": "Archive payload length is invalid.",
       "MetadataAlreadyStored": "Encrypted metadata has already been stored for this version.",
       "StoreFailed": "Metadata Archive rejected the encrypted metadata write.",
       "InvalidTrustedEndorser": "Recommended source account is invalid.",
@@ -1452,9 +1452,8 @@
       "PageSizeExceedsLimit": "Page size exceeds the allowed limit.",
       "DirectNativeCurrencyNotAccepted": "Direct native currency transfers are not accepted.",
       "StoryAlreadySealed": "Story has already been sealed.",
-      "ChunkIndexOutOfRange": "Story chunk index is out of range.",
-      "InvalidChunkContent": "Story chunk content is invalid.",
-      "ChunkHashMismatch": "Story chunk hash mismatch.",
+      "RecordIndexOutOfRange": "Story record index is out of range.",
+      "PayloadHashMismatch": "Story payload hash mismatch.",
       "StoryNotFound": "Story not found.",
       "MustBeNFTHolder": "You must be the NFT holder to perform this action.",
       "OnlyDeepFamilyContract": "Only the DeepFamily contract can call this token function.",

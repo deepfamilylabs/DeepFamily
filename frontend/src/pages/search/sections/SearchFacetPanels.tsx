@@ -30,8 +30,8 @@ export function FacetPanel({ unified }: { unified: UnifiedSearch }) {
       return <EndorsementPanel unified={unified} />;
     case "children":
       return <ChildrenPanel unified={unified} />;
-    case "storyChunks":
-      return <StoryChunksPanel unified={unified} />;
+    case "storyRecords":
+      return <StoryRecordsPanel unified={unified} />;
     case "uri":
       return <UriPanel unified={unified} />;
     case "personNfts":
@@ -342,10 +342,10 @@ function EndorsementPanel({ unified }: { unified: UnifiedSearch }) {
             {tokenId > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 <RowAction
-                  onClick={() => unified.focusToken(tokenId, "storyChunks")}
+                  onClick={() => unified.focusToken(tokenId, "storyRecords")}
                   icon={<FileText size={12} aria-hidden="true" />}
                 >
-                  {t(FACET_LABELS.storyChunks.key, FACET_LABELS.storyChunks.fallback)}
+                  {t(FACET_LABELS.storyRecords.key, FACET_LABELS.storyRecords.fallback)}
                 </RowAction>
                 <RowAction
                   onClick={() => unified.focusToken(tokenId, "uri")}
@@ -431,65 +431,65 @@ function ChildrenPanel({ unified }: { unified: UnifiedSearch }) {
   );
 }
 
-function StoryChunksPanel({ unified }: { unified: UnifiedSearch }) {
+function StoryRecordsPanel({ unified }: { unified: UnifiedSearch }) {
   const { t, search } = unified;
-  const chunks = search.storyChunks.state.data ?? [];
+  const records = search.storyRecords.state.data ?? [];
 
-  if (chunks.length === 0) {
+  if (records.length === 0) {
     return <NoRows unified={unified} icon={<FileText size={22} aria-hidden="true" />} />;
   }
 
   return (
     <div className="divide-y divide-hairline">
-      {chunks.map((chunk: any, index: number) => (
+      {records.map((record: any, index: number) => (
         <div key={index} className={ROW}>
           <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-semibold text-ink-muted">
-              #{Number(chunk.displayIndex ?? Number(chunk.chunkIndex) + 1)}
+              #{Number(record.displayIndex ?? Number(record.recordIndex) + 1)}
             </span>
             <span className="text-xs text-ink-subtle">
-              {chunk.timestamp
-                ? formatUnixSeconds(chunk.timestamp)
+              {record.timestamp
+                ? formatUnixSeconds(record.timestamp)
                 : t("search.versionsQuery.unknown")}
             </span>
             <div className="ml-auto flex items-center gap-2 text-ink-muted">
-              <span className="text-xs">{t("search.storyChunksQuery.chunkType")}:</span>
+              <span className="text-xs">{t("search.storyRecordsQuery.recordType")}:</span>
               <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-medium text-primary">
-                {search.chunkTypes.getChunkTypeLabel(Number(chunk.chunkType ?? 0))}
+                {search.recordTypes.getRecordTypeLabel(Number(record.recordType ?? 0))}
               </span>
             </div>
           </div>
 
           <div className="space-y-3">
             <div className="max-h-32 overflow-y-auto rounded-xl bg-surface-alt p-3 text-sm leading-relaxed text-ink-muted">
-              {chunk.content || (
+              {record.content || (
                 <span className="text-ink-subtle italic">{t("search.noData")}</span>
               )}
             </div>
             <div className="flex flex-col gap-2 text-xs text-ink-muted">
               <DataRow
                 unified={unified}
-                label={t("search.storyChunksQuery.chunkHash")}
-                value={String(chunk.chunkHash || "")}
+                label={t("search.storyRecordsQuery.payloadHash")}
+                value={String(record.payloadHash || "")}
               />
-              {chunk.editor ? (
+              {record.author ? (
                 <DataRow
                   unified={unified}
-                  label={t("search.storyChunksQuery.editor")}
-                  value={String(chunk.editor)}
+                  label={t("search.storyRecordsQuery.author")}
+                  value={String(record.author)}
                   searchable
                 />
               ) : null}
-              {chunk.attachmentCID && chunk.attachmentCID.length > 0 ? (
+              {record.attachmentCID && record.attachmentCID.length > 0 ? (
                 <div className="grid grid-cols-[80px_1fr] items-center gap-2">
-                  <span className={LABEL}>{t("search.storyChunksQuery.attachmentCID")}</span>
+                  <span className={LABEL}>{t("search.storyRecordsQuery.attachmentCID")}</span>
                   <div className={CHIP}>
                     <HashInline
-                      value={String(chunk.attachmentCID)}
+                      value={String(record.attachmentCID)}
                       className="min-w-0 flex-1 font-mono"
                     />
                     <CopyIconButton
-                      onClick={() => unified.onCopy(String(chunk.attachmentCID))}
+                      onClick={() => unified.onCopy(String(record.attachmentCID))}
                       label={t("search.copy", "Copy") as string}
                       size="xs"
                     />
@@ -631,10 +631,10 @@ function PersonNftsPanel({ unified }: { unified: UnifiedSearch }) {
               ) : null}
               <div className="flex flex-wrap items-center gap-1.5">
                 <RowAction
-                  onClick={() => unified.focusToken(row.tokenId, "storyChunks")}
+                  onClick={() => unified.focusToken(row.tokenId, "storyRecords")}
                   icon={<FileText size={12} aria-hidden="true" />}
                 >
-                  {t(FACET_LABELS.storyChunks.key, FACET_LABELS.storyChunks.fallback)}
+                  {t(FACET_LABELS.storyRecords.key, FACET_LABELS.storyRecords.fallback)}
                 </RowAction>
                 <RowAction
                   onClick={() => unified.focusToken(row.tokenId, "uri")}
@@ -850,7 +850,7 @@ export const FACET_LABELS: Record<SearchFacetKey, { key: string; fallback: strin
   endorsement: { key: "search.unified.facets.endorsement", fallback: "Endorsement stats" },
   children: { key: "search.unified.facets.children", fallback: "Children" },
   personNfts: { key: "search.unified.facets.personNfts", fallback: "NFTs" },
-  storyChunks: { key: "search.unified.facets.storyChunks", fallback: "Story chunks" },
+  storyRecords: { key: "search.unified.facets.storyRecords", fallback: "Story records" },
   uri: { key: "search.unified.facets.uri", fallback: "URI history" },
   accountVersions: { key: "search.unified.facets.accountVersions", fallback: "Versions created" },
   accountEndorsements: {
@@ -866,7 +866,7 @@ export const FACET_TOTAL_LABEL_KEYS: Record<SearchFacetKey, string> = {
   endorsement: "search.totalResults",
   children: "search.childrenQuery.totalChildren",
   personNfts: "search.totalResults",
-  storyChunks: "search.storyChunksQuery.totalChunks",
+  storyRecords: "search.storyRecordsQuery.totalRecords",
   uri: "search.totalResults",
   accountVersions: "search.totalResults",
   accountEndorsements: "search.totalResults",

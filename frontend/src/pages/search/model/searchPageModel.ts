@@ -25,7 +25,7 @@ export type TrustedEndorsersForm = {
   pageSize: number;
 };
 
-export type StoryChunksForm = {
+export type StoryRecordsForm = {
   tokenId: number;
   pageSize: number;
 };

@@ -14,16 +14,16 @@ import {
 } from "lucide-react";
 import {
   NodeData,
-  StoryChunk,
+  StoryRecord,
   isMinted,
   isMetadataUnlockUsable,
   formatUnixSeconds,
 } from "../../../shared/model";
 import { CopyIconButton, MODAL_CARD, MODAL_CHIP, ModalSectionHeading } from "../../../shared/ui";
-import { getChunkTypeIcon, getChunkTypeColorClass } from "../config/chunkTypes";
+import { getRecordTypeIcon, getRecordTypeColorClass } from "../config/recordTypes";
 
 export interface StoryData {
-  chunks: StoryChunk[];
+  records: StoryRecord[];
   fullStory: string;
   integrity: {
     missing: number[];
@@ -127,12 +127,12 @@ export function StoryLifeEventsSection({
 
   return (
     <div className="space-y-4">
-      <SectionTitle>{t("storyChunksModal.lifeEvents", "Life Events")}</SectionTitle>
+      <SectionTitle>{t("storyRecordsModal.lifeEvents", "Life Events")}</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {(birth || birthPlace) && (
           <InfoCard>
             <div className="text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
-              {t("storyChunksModal.born", "Born")}
+              {t("storyRecordsModal.born", "Born")}
             </div>
             <div className="text-sm font-medium text-ink leading-relaxed">
               {[birth, birthPlace].filter(Boolean).join(" · ")}
@@ -143,7 +143,7 @@ export function StoryLifeEventsSection({
         {(death || deathPlace) && (
           <InfoCard>
             <div className="text-xs font-bold uppercase tracking-wider text-ink-muted mb-1.5">
-              {t("storyChunksModal.died", "Died")}
+              {t("storyRecordsModal.died", "Died")}
             </div>
             <div className="text-sm font-medium text-ink leading-relaxed">
               {[death, deathPlace].filter(Boolean).join(" · ")}
@@ -173,11 +173,11 @@ export function StoryIdentitySection({
 
   return (
     <div className="space-y-4">
-      <SectionTitle>{t("storyChunksModal.blockchainIdentity", "Identity")}</SectionTitle>
+      <SectionTitle>{t("storyRecordsModal.blockchainIdentity", "Identity")}</SectionTitle>
       <div className={`${MODAL_CARD} divide-y divide-hairline overflow-hidden`}>
         {person.personHash && (
           <RecordRow
-            label={t("storyChunksModal.personHash", "Person Hash")}
+            label={t("storyRecordsModal.personHash", "Person Hash")}
             badge={
               person.versionIndex ? (
                 <span className="rounded-sm bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-ink-muted">
@@ -204,7 +204,7 @@ export function StoryIdentitySection({
 
         {visibleTag && (
           <RecordRow
-            label={t("storyChunksModal.tag", "Tag")}
+            label={t("storyRecordsModal.tag", "Tag")}
             value={<span className="font-sans">{visibleTag}</span>}
             copy={visibleTag}
             copyLabel={copyLabel}
@@ -233,13 +233,13 @@ export function BasicStorySection({
 }: {
   t: PersonStoryT;
   story?: string;
-  biography?: StoryChunk;
+  biography?: StoryRecord;
 }) {
   if (!story && !biography?.unsupportedSchema) return null;
 
   return (
     <div className="space-y-3">
-      <SectionTitle>{t("storyChunksModal.basicStory", "Basic Story")}</SectionTitle>
+      <SectionTitle>{t("storyRecordsModal.basicStory", "Basic Story")}</SectionTitle>
       <InfoCard>
         {biography?.unsupportedSchema ? (
           <UnsupportedStoryRecord record={biography} />
@@ -259,8 +259,8 @@ function StoryViewToggle({
   onChange,
 }: {
   t: PersonStoryT;
-  viewMode: "chunks" | "full";
-  onChange: (mode: "chunks" | "full") => void;
+  viewMode: "records" | "full";
+  onChange: (mode: "records" | "full") => void;
 }) {
   const buttonClass = (active: boolean) =>
     `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-lg border text-[13px] font-semibold transition-colors focus:outline-hidden focus:ring-3 focus:ring-primary/15 ${
@@ -274,12 +274,12 @@ function StoryViewToggle({
     <div className="flex items-center gap-3">
       <button
         type="button"
-        aria-pressed={viewMode === "chunks"}
-        onClick={() => onChange("chunks")}
-        className={buttonClass(viewMode === "chunks")}
+        aria-pressed={viewMode === "records"}
+        onClick={() => onChange("records")}
+        className={buttonClass(viewMode === "records")}
       >
-        <Layers size={14} className={iconClass(viewMode === "chunks")} />
-        <span>{t("storyChunksModal.chunks", "Chunks")}</span>
+        <Layers size={14} className={iconClass(viewMode === "records")} />
+        <span>{t("storyRecordsModal.records", "Records")}</span>
       </button>
       <button
         type="button"
@@ -288,7 +288,7 @@ function StoryViewToggle({
         className={buttonClass(viewMode === "full")}
       >
         <FileText size={14} className={iconClass(viewMode === "full")} />
-        <span>{t("storyChunksModal.fullText", "Full Text")}</span>
+        <span>{t("storyRecordsModal.fullText", "Full Text")}</span>
       </button>
     </div>
   );
@@ -297,13 +297,13 @@ function StoryViewToggle({
 function StoryIntegritySection({
   t,
   person,
-  chunksCount,
+  recordsCount,
   storyData,
   integrityOk,
 }: {
   t: PersonStoryT;
   person: NodeData;
-  chunksCount: number;
+  recordsCount: number;
   storyData: StoryData;
   integrityOk: boolean;
 }) {
@@ -331,24 +331,24 @@ function StoryIntegritySection({
           )
         )}
       </div>
-      {chunksCount > 0 &&
+      {recordsCount > 0 &&
         !storyData.loading &&
         (storyData.integrityChecking ? (
           <span className={`${MODAL_CHIP} border-hairline bg-surface-alt text-ink-muted`}>
             <div className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
-            {t("storyChunksModal.integrityChecking", "Checking...")}
+            {t("storyRecordsModal.integrityChecking", "Checking...")}
           </span>
         ) : (
           storyData.integrity &&
           (integrityOk ? (
             <span className={`${MODAL_CHIP} border-success/25 bg-success/10 text-success`}>
               <Check size={12} strokeWidth={3} />
-              {t("storyChunksModal.integrityVerified", "Integrity verified")}
+              {t("storyRecordsModal.integrityVerified", "Integrity verified")}
             </span>
           ) : (
             <span className={`${MODAL_CHIP} border-warning/25 bg-warning/10 text-warning`}>
               <AlertCircle size={12} />
-              {t("storyChunksModal.integrityWarning", "Integrity failed")}
+              {t("storyRecordsModal.integrityWarning", "Integrity failed")}
             </span>
           ))
         ))}
@@ -363,8 +363,8 @@ export function StoryEmptyState({ t, icon = "file" }: { t: PersonStoryT; icon?: 
       <Icon className="w-10 h-10 text-ink-subtle mx-auto mb-4" />
       <p className="text-sm font-medium text-ink-muted">
         {icon === "book"
-          ? t("storyChunksModal.noStory", "No story content available")
-          : t("storyChunksModal.noStoryData", "No story data available")}
+          ? t("storyRecordsModal.noStory", "No story content available")
+          : t("storyRecordsModal.noStoryData", "No story data available")}
       </p>
     </div>
   );
@@ -376,7 +376,7 @@ function StoryLoadingState({ t }: { t: PersonStoryT }) {
       <div className="text-center">
         <div className="animate-spin w-6 h-6 border-2 border-ink border-t-transparent rounded-full mx-auto mb-4 opacity-50" />
         <span className="text-sm font-medium text-ink-muted">
-          {t("storyChunksModal.loading", "Loading story chunks...")}
+          {t("storyRecordsModal.loading", "Loading story records...")}
         </span>
       </div>
     </div>
@@ -402,24 +402,24 @@ function StoryFullTextPanel({ fullStory }: { fullStory: string }) {
   );
 }
 
-function StoryChunkCard({
+function StoryRecordCard({
   t,
-  chunk,
+  record,
   isExpanded,
-  getChunkTypeLabel,
+  getRecordTypeLabel,
   onToggle,
   copyText,
 }: {
   t: PersonStoryT;
-  chunk: StoryChunk;
+  record: StoryRecord;
   isExpanded: boolean;
-  getChunkTypeLabel: (type: number | string | null | undefined) => string;
+  getRecordTypeLabel: (type: number | string | null | undefined) => string;
   onToggle: (index: number) => void;
   copyText: (text: string) => void;
 }) {
-  const preview = chunk.content.length > 120 ? `${chunk.content.slice(0, 120)}...` : chunk.content;
-  const ChunkIcon = getChunkTypeIcon(chunk.chunkType);
-  const iconColor = getChunkTypeColorClass(chunk.chunkType);
+  const preview = record.content.length > 120 ? `${record.content.slice(0, 120)}...` : record.content;
+  const RecordIcon = getRecordTypeIcon(record.recordType);
+  const iconColor = getRecordTypeColorClass(record.recordType);
   const copyLabel = t("common.copy", "Copy");
 
   return (
@@ -432,11 +432,11 @@ function StoryChunkCard({
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}
-        onClick={() => onToggle(chunk.chunkIndex)}
+        onClick={() => onToggle(record.recordIndex)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onToggle(chunk.chunkIndex);
+            onToggle(record.recordIndex);
           }
         }}
         className="w-full text-left p-4 cursor-pointer rounded-xl focus:outline-hidden focus:ring-3 focus:ring-primary/15"
@@ -460,29 +460,29 @@ function StoryChunkCard({
                 <span
                   className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-ink"}`}
                 >
-                  #{chunk.displayIndex ?? chunk.chunkIndex + 1}
+                  #{record.displayIndex ?? record.recordIndex + 1}
                 </span>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-hairline shadow-xs">
-                  <ChunkIcon size={12} className={iconColor} />
+                  <RecordIcon size={12} className={iconColor} />
                   <span
                     className={`text-[10px] uppercase font-bold tracking-wider ${iconColor.replace("text-", "text-opacity-80 text-")}`}
                   >
-                    {getChunkTypeLabel(chunk.chunkType)}
+                    {getRecordTypeLabel(record.recordType)}
                   </span>
                 </div>
               </div>
               <span className="text-[10px] font-bold text-ink-subtle bg-surface-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
-                {chunk.content.length} {t("storyChunksModal.characters", "chars")}
+                {record.content.length} {t("storyRecordsModal.characters", "chars")}
               </span>
             </div>
 
             <div
               className={`text-sm leading-relaxed ${isExpanded ? "text-ink whitespace-pre-wrap" : "text-ink-muted line-clamp-2"}`}
             >
-              {chunk.unsupportedSchema ? (
-                <UnsupportedStoryRecord record={chunk} />
+              {record.unsupportedSchema ? (
+                <UnsupportedStoryRecord record={record} />
               ) : isExpanded ? (
-                chunk.content
+                record.content
               ) : (
                 preview
               )}
@@ -495,34 +495,34 @@ function StoryChunkCard({
               >
                 <RecordRow
                   inset={false}
-                  label={t("storyChunksModal.chunkEditor", "Editor")}
-                  value={chunk.editor || "-"}
-                  copy={chunk.editor || undefined}
+                  label={t("storyRecordsModal.author", "Author")}
+                  value={record.author || "-"}
+                  copy={record.author || undefined}
                   copyLabel={copyLabel}
                   onCopy={copyText}
                 />
                 <RecordRow
                   inset={false}
                   label={t("familyTree.nodeDetail.timestamp", "Timestamp")}
-                  value={formatUnixSeconds(chunk.timestamp)}
+                  value={formatUnixSeconds(record.timestamp)}
                   copyLabel={copyLabel}
                   onCopy={copyText}
                 />
-                {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
+                {record.attachmentCID && record.attachmentCID.trim().length > 0 && (
                   <RecordRow
                     inset={false}
-                    label={t("storyChunksModal.attachment", "Attachment")}
-                    value={chunk.attachmentCID}
-                    copy={chunk.attachmentCID}
+                    label={t("storyRecordsModal.attachment", "Attachment")}
+                    value={record.attachmentCID}
+                    copy={record.attachmentCID}
                     copyLabel={copyLabel}
                     onCopy={copyText}
                   />
                 )}
                 <RecordRow
                   inset={false}
-                  label={t("storyChunksModal.chunkHash", "Chunk Hash")}
-                  value={chunk.chunkHash}
-                  copy={chunk.chunkHash}
+                  label={t("storyRecordsModal.payloadHash", "Record Hash")}
+                  value={record.payloadHash}
+                  copy={record.payloadHash}
                   copyLabel={copyLabel}
                   onCopy={copyText}
                 />
@@ -535,31 +535,31 @@ function StoryChunkCard({
   );
 }
 
-function StoryChunkList({
+function StoryRecordList({
   t,
-  chunks,
-  expandedChunks,
-  getChunkTypeLabel,
-  onToggleChunk,
+  records,
+  expandedRecords,
+  getRecordTypeLabel,
+  onToggleRecord,
   copyText,
 }: {
   t: PersonStoryT;
-  chunks: StoryChunk[];
-  expandedChunks: Set<number>;
-  getChunkTypeLabel: (type: number | string | null | undefined) => string;
-  onToggleChunk: (index: number) => void;
+  records: StoryRecord[];
+  expandedRecords: Set<number>;
+  getRecordTypeLabel: (type: number | string | null | undefined) => string;
+  onToggleRecord: (index: number) => void;
   copyText: (text: string) => void;
 }) {
   return (
     <div className="space-y-3">
-      {chunks.map((chunk) => (
-        <StoryChunkCard
-          key={chunk.chunkIndex}
+      {records.map((record) => (
+        <StoryRecordCard
+          key={record.recordIndex}
           t={t}
-          chunk={chunk}
-          isExpanded={expandedChunks.has(chunk.chunkIndex)}
-          getChunkTypeLabel={getChunkTypeLabel}
-          onToggle={onToggleChunk}
+          record={record}
+          isExpanded={expandedRecords.has(record.recordIndex)}
+          getRecordTypeLabel={getRecordTypeLabel}
+          onToggle={onToggleRecord}
           copyText={copyText}
         />
       ))}
@@ -571,36 +571,36 @@ export function DetailedStorySection({
   t,
   person,
   storyData,
-  chunksCount,
+  recordsCount,
   lengthBytes,
   integrityOk,
   viewMode,
-  expandedChunks,
+  expandedRecords,
   personHasDetailedStory,
   onViewModeChange,
-  onToggleChunk,
-  getChunkTypeLabel,
+  onToggleRecord,
+  getRecordTypeLabel,
   copyText,
 }: {
   t: PersonStoryT;
   person: NodeData;
   storyData: StoryData;
-  chunksCount: number;
+  recordsCount: number;
   lengthBytes: number;
   integrityOk: boolean;
-  viewMode: "chunks" | "full";
-  expandedChunks: Set<number>;
+  viewMode: "records" | "full";
+  expandedRecords: Set<number>;
   personHasDetailedStory: boolean;
-  onViewModeChange: (mode: "chunks" | "full") => void;
-  onToggleChunk: (index: number) => void;
-  getChunkTypeLabel: (type: number | string | null | undefined) => string;
+  onViewModeChange: (mode: "records" | "full") => void;
+  onToggleRecord: (index: number) => void;
+  getRecordTypeLabel: (type: number | string | null | undefined) => string;
   copyText: (text: string) => void;
 }) {
   const shouldRender =
     personHasDetailedStory ||
     person.storyMetadata ||
     storyData.loading ||
-    storyData.chunks.length > 0 ||
+    storyData.records.length > 0 ||
     !!storyData.fullStory ||
     storyData.integrity.computedLength > 0 ||
     isMinted(person);
@@ -611,11 +611,11 @@ export function DetailedStorySection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <SectionTitle>{t("storyChunksModal.detailedStory", "Detailed Story")}</SectionTitle>
-          {chunksCount > 0 && (
+          <SectionTitle>{t("storyRecordsModal.detailedStory", "Detailed Story")}</SectionTitle>
+          {recordsCount > 0 && (
             <span className="text-xs font-bold text-ink-muted px-2.5 py-1 bg-surface-muted rounded-full">
-              {t("storyChunksModal.chunksAndSize", "{{count}} chunks · {{size}} bytes", {
-                count: chunksCount,
+              {t("storyRecordsModal.recordsAndSize", "{{count}} records · {{size}} bytes", {
+                count: recordsCount,
                 size: lengthBytes,
               })}
             </span>
@@ -627,7 +627,7 @@ export function DetailedStorySection({
       <StoryIntegritySection
         t={t}
         person={person}
-        chunksCount={chunksCount}
+        recordsCount={recordsCount}
         storyData={storyData}
         integrityOk={integrityOk}
       />
@@ -636,13 +636,13 @@ export function DetailedStorySection({
         <StoryLoadingState t={t} />
       ) : storyData.error ? (
         <StoryErrorState error={storyData.error} />
-      ) : viewMode === "chunks" && storyData.chunks.length > 0 ? (
-        <StoryChunkList
+      ) : viewMode === "records" && storyData.records.length > 0 ? (
+        <StoryRecordList
           t={t}
-          chunks={storyData.chunks}
-          expandedChunks={expandedChunks}
-          getChunkTypeLabel={getChunkTypeLabel}
-          onToggleChunk={onToggleChunk}
+          records={storyData.records}
+          expandedRecords={expandedRecords}
+          getRecordTypeLabel={getRecordTypeLabel}
+          onToggleRecord={onToggleRecord}
           copyText={copyText}
         />
       ) : viewMode === "full" && storyData.fullStory ? (

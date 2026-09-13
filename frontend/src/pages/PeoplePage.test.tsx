@@ -155,11 +155,11 @@ describe("PeoplePage", () => {
       tokenId: "7",
       fullName: "Ada Lovelace",
       storyMetadata: {
-        totalChunks: 1,
-        fullStoryHash: "0xstory",
+        totalRecords: 1,
+        recordsHead: "0xstory",
         lastUpdateTime: 1,
         isSealed: false,
-        totalLength: 42,
+        totalPayloadLength: 42,
       },
     });
     const grace = makePerson({

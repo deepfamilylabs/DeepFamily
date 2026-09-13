@@ -1,12 +1,12 @@
 import { ethers } from "ethers";
 import { computeStoryHead } from "@deepfamily/protocol-core";
-import type { StoryChunk } from "./graph";
+import type { StoryRecord } from "./graph";
 
-export function computeStoryHash(chunks: StoryChunk[]): string {
+export function computeStoryRecordsHead(records: StoryRecord[]): string {
   let head = ethers.ZeroHash;
-  for (const chunk of [...chunks].sort((a, b) => a.chunkIndex - b.chunkIndex)) {
-    if (!chunk.recordHash) throw new Error("Verified story record commitment is missing");
-    head = computeStoryHead({ previousHead: head, recordHash: chunk.recordHash });
+  for (const record of [...records].sort((a, b) => a.recordIndex - b.recordIndex)) {
+    if (!record.recordHash) throw new Error("Verified story record commitment is missing");
+    head = computeStoryHead({ previousHead: head, recordHash: record.recordHash });
   }
   return head;
 }

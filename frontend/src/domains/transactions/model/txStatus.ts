@@ -1,7 +1,7 @@
 /**
  * Unified transaction flow state model.
  *
- * All transaction flows (endorse, mint, addVersion, addStoryChunk, sealStory)
+ * All transaction flows (endorse, mint, addVersion, addStoryRecord, sealStory)
  * expose their state through this type. UI components consume `status` and
  * `stepMessage` to render progress, and `error` / `result` for outcomes.
  */

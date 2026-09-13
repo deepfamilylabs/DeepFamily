@@ -2,7 +2,7 @@ import {
   buildStorySnapshot,
   getStoryPresentation,
   type NodeData,
-  type StoryChunk,
+  type StoryRecord,
   type StoryMetadata,
 } from "../../../shared/model";
 import { getFriendlyErrorMessage, resolveErrorReason } from "../../../shared/lib/errors";
@@ -24,7 +24,7 @@ export interface StoryDetailData {
   versionIndex?: number;
   fullName?: string;
   storyMetadata?: StoryMetadata;
-  storyChunks?: StoryChunk[];
+  storyRecords?: StoryRecord[];
   fullStory?: string;
   owner?: string;
   nftCoreInfo?: {
@@ -48,19 +48,19 @@ export interface PrefetchedStoryDetailState {
   prefetchedStory?: Partial<StoryDetailData>;
 }
 
-export interface GroupedStoryChunks {
+export interface GroupedStoryRecords {
   type: number;
-  chunks: StoryChunk[];
+  records: StoryRecord[];
 }
 
-export interface ChunkTypeOption {
+export interface RecordTypeOption {
   value: number;
   label: string;
 }
 
 export interface CachedStoryDetail {
   metadata?: StoryMetadata;
-  chunks?: StoryChunk[];
+  records?: StoryRecord[];
   fullStory?: string;
   integrity?: PersonStoryIntegrity;
 }
@@ -71,7 +71,7 @@ export function isValidPersonTokenId(tokenId: string | undefined): tokenId is st
   return Boolean(tokenId && /^\d+$/.test(tokenId));
 }
 
-export function normalizeChunkType(type: number | string | null | undefined): number {
+export function normalizeRecordType(type: number | string | null | undefined): number {
   if (type === null || type === undefined || type === "") return 0;
   if (typeof type === "number" && Number.isFinite(type)) return type;
   if (typeof type === "string") {
@@ -84,20 +84,20 @@ export function normalizeChunkType(type: number | string | null | undefined): nu
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function normalizeStoryChunk(chunk: StoryChunk): StoryChunk {
+export function normalizeStoryRecord(record: StoryRecord): StoryRecord {
   return {
-    ...chunk,
-    chunkType: normalizeChunkType(chunk.chunkType),
-    attachmentCID: chunk.attachmentCID ?? "",
+    ...record,
+    recordType: normalizeRecordType(record.recordType),
+    attachmentCID: record.attachmentCID ?? "",
   };
 }
 
-export function getChunkTypeLabel(
+export function getRecordTypeLabel(
   type: number | string | null | undefined,
-  options: ChunkTypeOption[],
+  options: RecordTypeOption[],
   fallback: string,
 ): string {
-  const numericType = normalizeChunkType(type);
+  const numericType = normalizeRecordType(type);
   const match = options.find((option) => option.value === numericType);
   return match ? match.label : fallback;
 }
@@ -109,9 +109,9 @@ export function buildPrefetchedStoryDetailData(
   if (!prefetched) return null;
   if (prefetched.tokenId && String(prefetched.tokenId) !== String(tokenId)) return null;
 
-  const storyChunks = prefetched.storyChunks?.map(normalizeStoryChunk);
-  const presentation = getStoryPresentation(storyChunks, prefetched.storyMetadata);
-  const initialFullStory = storyChunks ? presentation.fullStory : prefetched.fullStory;
+  const storyRecords = prefetched.storyRecords?.map(normalizeStoryRecord);
+  const presentation = getStoryPresentation(storyRecords, prefetched.storyMetadata);
+  const initialFullStory = storyRecords ? presentation.fullStory : prefetched.fullStory;
 
   return {
     tokenId,
@@ -124,7 +124,7 @@ export function buildPrefetchedStoryDetailData(
         ? { ...prefetched.nftCoreInfo, story: presentation.biography.content }
         : prefetched.nftCoreInfo,
     storyMetadata: prefetched.storyMetadata,
-    storyChunks,
+    storyRecords,
     fullStory: initialFullStory,
     integrity: prefetched.integrity,
   };
@@ -175,33 +175,33 @@ export function getFullStoryParagraphs(
   return parts;
 }
 
-export function getChunkParagraphs(chunks: StoryChunk[] | undefined): string[] {
-  if (!chunks || chunks.length === 0) return [];
-  return getStoryPresentation(chunks).chunks.map((chunk) => chunk.content);
+export function getRecordParagraphs(records: StoryRecord[] | undefined): string[] {
+  if (!records || records.length === 0) return [];
+  return getStoryPresentation(records).records.map((record) => record.content);
 }
 
-export function groupStoryChunks(chunks: StoryChunk[] | undefined): GroupedStoryChunks[] {
-  if (!chunks || chunks.length === 0) return [];
+export function groupStoryRecords(records: StoryRecord[] | undefined): GroupedStoryRecords[] {
+  if (!records || records.length === 0) return [];
 
-  const groups = new Map<number, StoryChunk[]>();
-  getStoryPresentation(chunks).chunks.forEach((chunk) => {
-    const type = normalizeChunkType(chunk.chunkType);
+  const groups = new Map<number, StoryRecord[]>();
+  getStoryPresentation(records).records.forEach((record) => {
+    const type = normalizeRecordType(record.recordType);
     if (!groups.has(type)) {
       groups.set(type, []);
     }
-    groups.get(type)!.push({ ...chunk, chunkType: type });
+    groups.get(type)!.push({ ...record, recordType: type });
   });
 
   return Array.from(groups.entries())
     .sort(([typeA], [typeB]) => typeA - typeB)
-    .map(([type, groupedChunks]) => ({
+    .map(([type, groupedRecords]) => ({
       type,
-      chunks: [...groupedChunks].sort((a, b) => a.chunkIndex - b.chunkIndex),
+      records: [...groupedRecords].sort((a, b) => a.recordIndex - b.recordIndex),
     }));
 }
 
 export function hasStoryIntegrityIssues(data: StoryDetailData | null | undefined): boolean {
-  if (!data?.integrity || !data.storyMetadata || data.storyMetadata.totalChunks <= 0) return false;
+  if (!data?.integrity || !data.storyMetadata || data.storyMetadata.totalRecords <= 0) return false;
   return (
     data.integrity.missing.length > 0 ||
     !data.integrity.lengthMatch ||
@@ -213,17 +213,17 @@ export function getFreshCachedStoryDetail(
   node: NodeData | null | undefined,
   now = Date.now(),
 ): CachedStoryDetail | null {
-  if (!node?.storyMetadata || !Array.isArray(node.storyChunks)) return null;
+  if (!node?.storyMetadata || !Array.isArray(node.storyRecords)) return null;
   const fetchedAt = Number(node.storyFetchedAt || 0);
   const isSealed = Boolean(node.storyMetadata?.isSealed);
   const ttl = isSealed ? 7 * 24 * 60 * 60 * 1000 : 2 * 60 * 1000;
   const expired = !fetchedAt || now - fetchedAt > ttl;
   if (expired) return null;
 
-  const { fullStory, integrity } = buildStorySnapshot(node.storyChunks, node.storyMetadata);
+  const { fullStory, integrity } = buildStorySnapshot(node.storyRecords, node.storyMetadata);
   return {
     metadata: node.storyMetadata,
-    chunks: node.storyChunks,
+    records: node.storyRecords,
     fullStory,
     integrity,
   };
@@ -256,7 +256,7 @@ export function buildStoryDetailData(options: {
   owner?: string;
 }): StoryDetailData {
   const { tokenId, node, story, owner } = options;
-  const presentation = getStoryPresentation(story?.chunks, story?.metadata);
+  const presentation = getStoryPresentation(story?.records, story?.metadata);
   const coreInfo = buildNftCoreInfo(node);
   return {
     tokenId,
@@ -268,8 +268,8 @@ export function buildStoryDetailData(options: {
         ? { ...coreInfo, story: presentation.biography.content }
         : coreInfo,
     storyMetadata: story?.metadata,
-    storyChunks: story?.chunks,
-    fullStory: story?.chunks ? presentation.fullStory : story?.fullStory,
+    storyRecords: story?.records,
+    fullStory: story?.records ? presentation.fullStory : story?.fullStory,
     owner,
     integrity: story?.integrity,
   };

@@ -3,7 +3,7 @@ import React, { forwardRef, useEffect, useImperativeHandle } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STORY_BIOGRAPHY_SCHEMA_ID, STORY_CHUNK_SCHEMA_ID } from "@deepfamily/protocol-core";
+import { STORY_BIOGRAPHY_SCHEMA_ID, STORY_ENVELOPE_SCHEMA_ID } from "@deepfamily/protocol-core";
 import SearchPage from "./SearchPage";
 
 const personHashA = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   personGateway: {
     listVersionEndorsements: vi.fn(),
     listTokenUriHistory: vi.fn(),
-    listStoryChunksPage: vi.fn(),
+    listStoryRecordsPage: vi.fn(),
     getStoryMetadata: vi.fn(),
     getNFTDetails: vi.fn(),
   },
@@ -134,12 +134,12 @@ describe("SearchPage", () => {
     mocks.toastError.mockReset();
     mocks.personGateway.listVersionEndorsements.mockReset();
     mocks.personGateway.listTokenUriHistory.mockReset();
-    mocks.personGateway.listStoryChunksPage.mockReset();
+    mocks.personGateway.listStoryRecordsPage.mockReset();
     mocks.personGateway.getStoryMetadata.mockReset();
     mocks.personGateway.getStoryMetadata.mockResolvedValue({
-      totalChunks: 0,
-      totalLength: 0,
-      fullStoryHash: "0xstory",
+      totalRecords: 0,
+      totalPayloadLength: 0,
+      recordsHead: "0xstory",
       lastUpdateTime: 1710000000,
       isSealed: false,
     });
@@ -283,16 +283,16 @@ describe("SearchPage", () => {
     expect(screen.queryByText("#0")).toBeNull();
 
     // Clicking the token id resolves it as a subject in its own right.
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [],
-      totalChunks: 0,
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [],
+      totalRecords: 0,
       hasMore: false,
       nextOffset: 0,
     });
     fireEvent.click(screen.getByRole("button", { name: "#128" }));
 
     await waitFor(() =>
-      expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalledWith(128, 0, 100),
+      expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
     );
     expect(await screen.findByText(/familyTree.nodeDetail.tokenId/)).toBeTruthy();
   });
@@ -320,7 +320,7 @@ describe("SearchPage", () => {
     );
   });
 
-  it("scopes story chunks to the person's own NFT instead of asking for a token id", async () => {
+  it("scopes story records to the person's own NFT instead of asking for a token id", async () => {
     mocks.treeGateway.listPersonVersionsPage.mockResolvedValue(versionsPage1);
     mocks.personGateway.listVersionEndorsements.mockResolvedValue({
       versionIndices: [2],
@@ -330,9 +330,9 @@ describe("SearchPage", () => {
       hasMore: false,
       nextOffset: 1,
     });
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [],
-      totalChunks: 0,
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [],
+      totalRecords: 0,
       hasMore: false,
       nextOffset: 0,
     });
@@ -341,13 +341,13 @@ describe("SearchPage", () => {
     submitQuery(personHashA);
     await waitFor(() => expect(mocks.personGateway.listVersionEndorsements).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole("tab", { name: /Story chunks/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Story records/ }));
 
     // The version scope resolves the NFT; there is no separate token control.
     await waitFor(() =>
-      expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalledWith(128, 0, 100),
+      expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
     );
-    expect(screen.queryByTitle("search.storyChunksQuery.tokenId")).toBeNull();
+    expect(screen.queryByTitle("search.storyRecordsQuery.tokenId")).toBeNull();
     expect(screen.getByText("Version")).toBeTruthy();
     expect(screen.getByText("#128")).toBeTruthy();
   });
@@ -386,16 +386,16 @@ describe("SearchPage", () => {
     expect(screen.getAllByText("search.childrenQuery.childHash")).toHaveLength(1);
 
     // The token badge must resolve the NFT, not fall through to the person hash.
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [],
-      totalChunks: 0,
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [],
+      totalRecords: 0,
       hasMore: false,
       nextOffset: 0,
     });
     fireEvent.click(screen.getByRole("button", { name: /#55/ }));
 
     await waitFor(() =>
-      expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalledWith(55, 0, 100),
+      expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(55, 0, 100),
     );
   });
 
@@ -452,18 +452,18 @@ describe("SearchPage", () => {
     expect(await screen.findByText("search.trustedEndorsersQuery.totalSources: 1")).toBeTruthy();
   });
 
-  it("routes a numeric token id straight to the story-chunks facet", async () => {
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [
+  it("routes a numeric token id straight to the story-records facet", async () => {
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [
         {
-          chunkIndex: 0,
-          chunkType: 1,
-          chunkHash: "0xchunk-1",
-          content: "First chunk",
+          recordIndex: 0,
+          recordType: 1,
+          payloadHash: "0xrecord-1",
+          content: "First record",
           timestamp: 1710000000,
         },
       ],
-      totalChunks: 1,
+      totalRecords: 1,
       hasMore: false,
       nextOffset: 1,
     });
@@ -488,9 +488,9 @@ describe("SearchPage", () => {
     submitQuery("128");
 
     await waitFor(() =>
-      expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalledWith(128, 0, 100),
+      expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
     );
-    expect(await screen.findByText("First chunk")).toBeTruthy();
+    expect(await screen.findByText("First record")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
     expect(mocks.treeGateway.listPersonVersionsPage).not.toHaveBeenCalled();
 
@@ -506,9 +506,9 @@ describe("SearchPage", () => {
   });
 
   it("keeps a token search usable when the NFT identity cannot be read", async () => {
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [],
-      totalChunks: 0,
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [],
+      totalRecords: 0,
       hasMore: false,
       nextOffset: 0,
     });
@@ -517,14 +517,14 @@ describe("SearchPage", () => {
     renderPage();
     submitQuery("128");
 
-    await waitFor(() => expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalled());
     expect(await screen.findByText(/familyTree.nodeDetail.tokenId/)).toBeTruthy();
   });
 
   it("pages ordinary stories after the biography and returns from a short last page without skipping", async () => {
     const biography = {
-      chunkIndex: 0,
-      chunkType: 0,
+      recordIndex: 0,
+      recordType: 0,
       schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
       content: "Basic archived biography",
       payloadLength: 100,
@@ -532,26 +532,26 @@ describe("SearchPage", () => {
     const records = [
       biography,
       ...Array.from({ length: 101 }, (_, index) => ({
-        chunkIndex: index + 1,
-        chunkType: 1,
-        schemaId: STORY_CHUNK_SCHEMA_ID,
+        recordIndex: index + 1,
+        recordType: 1,
+        schemaId: STORY_ENVELOPE_SCHEMA_ID,
         content: `Ordinary story ${index + 1}`,
-        chunkHash: `0x${index + 1}`,
+        payloadHash: `0x${index + 1}`,
         timestamp: 1710000000,
         payloadLength: 20,
       })),
     ];
     mocks.personGateway.getStoryMetadata.mockResolvedValue({
-      totalChunks: records.length,
-      totalLength: 2120,
+      totalRecords: records.length,
+      totalPayloadLength: 2120,
       biographyPayloadLength: 100,
-      fullStoryHash: "0xstory",
+      recordsHead: "0xstory",
       lastUpdateTime: 1710000000,
       isSealed: false,
     });
-    mocks.personGateway.listStoryChunksPage.mockImplementation(async (_token, offset, limit) => ({
-      chunks: records.slice(offset, offset + limit),
-      totalChunks: records.length,
+    mocks.personGateway.listStoryRecordsPage.mockImplementation(async (_token, offset, limit) => ({
+      records: records.slice(offset, offset + limit),
+      totalRecords: records.length,
       nextOffset: Math.min(records.length, offset + limit),
       hasMore: offset + limit < records.length,
     }));
@@ -559,38 +559,38 @@ describe("SearchPage", () => {
     submitQuery("128");
     expect(await screen.findByText("Ordinary story 1")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
-    expect(screen.getByText("search.storyChunksQuery.totalChunks: 101")).toBeTruthy();
+    expect(screen.getByText("search.storyRecordsQuery.totalRecords: 101")).toBeTruthy();
     expect(screen.queryByText("Basic archived biography")).toBeNull();
-    expect(mocks.personGateway.listStoryChunksPage).toHaveBeenLastCalledWith(128, 1, 100);
+    expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenLastCalledWith(128, 1, 100);
     fireEvent.click(screen.getByRole("button", { name: "search.next" }));
     expect(await screen.findByText("Ordinary story 101")).toBeTruthy();
     expect(screen.getByText("#101")).toBeTruthy();
-    expect(mocks.personGateway.listStoryChunksPage).toHaveBeenLastCalledWith(128, 101, 100);
+    expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenLastCalledWith(128, 101, 100);
     fireEvent.click(screen.getByRole("button", { name: "search.prev" }));
     expect(await screen.findByText("Ordinary story 1")).toBeTruthy();
-    expect(mocks.personGateway.listStoryChunksPage).toHaveBeenLastCalledWith(128, 1, 100);
+    expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenLastCalledWith(128, 1, 100);
     expect(screen.queryByText("#0")).toBeNull();
   });
 
-  it("shows zero ordinary chunks for a biography-only token", async () => {
+  it("shows zero ordinary records for a biography-only token", async () => {
     mocks.personGateway.getStoryMetadata.mockResolvedValue({
-      totalChunks: 1,
-      totalLength: 100,
+      totalRecords: 1,
+      totalPayloadLength: 100,
       biographyPayloadLength: 100,
-      fullStoryHash: "0xstory",
+      recordsHead: "0xstory",
       lastUpdateTime: 1,
       isSealed: false,
     });
-    mocks.personGateway.listStoryChunksPage.mockResolvedValue({
-      chunks: [],
-      totalChunks: 1,
+    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+      records: [],
+      totalRecords: 1,
       hasMore: false,
       nextOffset: 1,
     });
     renderPage();
     submitQuery("128");
-    expect(await screen.findByText("search.storyChunksQuery.totalChunks: 0")).toBeTruthy();
-    expect(mocks.personGateway.listStoryChunksPage).toHaveBeenCalledWith(128, 1, 100);
+    expect(await screen.findByText("search.storyRecordsQuery.totalRecords: 0")).toBeTruthy();
+    expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 1, 100);
     expect(screen.queryByText("#0")).toBeNull();
   });
 

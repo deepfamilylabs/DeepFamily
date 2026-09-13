@@ -4,7 +4,7 @@ import {
   estimateArchiveCall,
 } from "../lib/archiveOperations.js";
 import {
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
   encodeStoryRecord,
   readArchiveBlob,
 } from "@deepfamily/protocol-core";
@@ -2292,7 +2292,7 @@ export const main = async (chainProfile) => {
       archive: archive.connect(runDeployer),
       tokenId,
       content: storyContent,
-      chunkType: 1,
+      recordType: 1,
       attachmentCID: "",
     });
     const storyHash = storyResult.recordRef.blob.payloadHash;
@@ -2357,7 +2357,7 @@ export const main = async (chainProfile) => {
     assertCondition(storyState.isSealed, "Story is not sealed");
     const rejectedPayload = encodeStoryRecord({
       content: "after seal",
-      chunkType: 1,
+      recordType: 1,
       attachmentCID: "",
     });
     await expectRevert(
@@ -2368,7 +2368,7 @@ export const main = async (chainProfile) => {
             tokenId,
             storyState.totalRecords,
             storyState.recordsHead,
-            STORY_CHUNK_SCHEMA_ID,
+            STORY_ENVELOPE_SCHEMA_ID,
             rejectedPayload,
             ethers.keccak256(rejectedPayload),
           ),

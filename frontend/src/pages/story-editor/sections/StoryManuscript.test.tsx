@@ -16,25 +16,25 @@ const t = ((
   return base.replace(/\{\{(\w+)\}\}/g, (_m, name) => String(options?.[name] ?? ""));
 }) as unknown as StoryEditorController["t"];
 
-function chunk(index: number, chunkType: number) {
+function record(index: number, recordType: number) {
   return {
-    chunkIndex: index,
+    recordIndex: index,
     displayIndex: index + 1,
-    chunkType,
-    content: `Body of chunk ${index + 1}`,
-    chunkHash: `0x${String(index).repeat(4)}`,
+    recordType,
+    content: `Body of record ${index + 1}`,
+    payloadHash: `0x${String(index).repeat(4)}`,
     timestamp: 1_700_000_000,
-    editor: "0x0000000000000000000000000000000000000001",
+    author: "0x0000000000000000000000000000000000000001",
     attachmentCID: "",
     payloadLength: 40,
   };
 }
 
 function createEditor(
-  chunks: ReturnType<typeof chunk>[],
+  records: ReturnType<typeof record>[],
   overrides: Partial<StoryEditorController> = {},
 ) {
-  const segments = segmentManuscript(chunks);
+  const segments = segmentManuscript(records);
   return {
     t,
     loading: false,
@@ -42,7 +42,7 @@ function createEditor(
     errorMessage: null,
     showEmptySealed: false,
     showEditorForm: false,
-    sortedChunks: chunks,
+    sortedRecords: records,
     manuscript: {
       head: segments.head,
       collapsed: segments.collapsed,
@@ -51,9 +51,9 @@ function createEditor(
       toggle: vi.fn(),
       reveal: vi.fn(),
     },
-    expandedChunks: new Set<number>(),
-    toggleChunkExpansion: vi.fn(),
-    getChunkTypeLabel: (value: number) => `Type ${value}`,
+    expandedRecords: new Set<number>(),
+    toggleRecordExpansion: vi.fn(),
+    getRecordTypeLabel: (value: number) => `Type ${value}`,
     getByteLength: (value: string) => value.length,
     formatHash: (value: string) => value,
     copyText: vi.fn(),
@@ -68,26 +68,26 @@ afterEach(() => {
 
 describe("StoryManuscript fold", () => {
   it("renders every entry when the manuscript is short enough", () => {
-    const chunks = [chunk(0, 1), chunk(1, 2), chunk(2, 3)];
-    render(<StoryManuscript editor={createEditor(chunks)} />);
+    const records = [record(0, 1), record(1, 2), record(2, 3)];
+    render(<StoryManuscript editor={createEditor(records)} />);
 
     expect(document.querySelectorAll("article")).toHaveLength(3);
-    expect(screen.queryByText(/chunks collapsed/)).toBeNull();
+    expect(screen.queryByText(/records collapsed/)).toBeNull();
   });
 
   it("folds the middle and summarises what it hides", () => {
-    const chunks = [chunk(0, 1), chunk(1, 2), chunk(2, 3), chunk(3, 5), chunk(4, 7), chunk(5, 16)];
-    const editor = createEditor(chunks);
+    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    const editor = createEditor(records);
     render(<StoryManuscript editor={editor} />);
 
     // head (2) + tail (1) stay on the page; the middle three are behind the fold
     expect(document.querySelectorAll("article")).toHaveLength(3);
-    expect(screen.getByText(/Body of chunk 1/)).toBeTruthy();
-    expect(screen.getByText(/Body of chunk 6/)).toBeTruthy();
-    expect(screen.queryByText(/Body of chunk 3/)).toBeNull();
+    expect(screen.getByText(/Body of record 1/)).toBeTruthy();
+    expect(screen.getByText(/Body of record 6/)).toBeTruthy();
+    expect(screen.queryByText(/Body of record 3/)).toBeNull();
 
     const row = screen.getByRole("button", { expanded: false });
-    expect(row.textContent).toContain("3 chunks collapsed");
+    expect(row.textContent).toContain("3 records collapsed");
     expect(row.textContent).toContain("Type 3");
     expect(row.textContent).toContain("Type 5");
     expect(row.textContent).toContain("Type 7");
@@ -97,8 +97,8 @@ describe("StoryManuscript fold", () => {
   });
 
   it("drops the stand-in summary once the entries are actually on the page", () => {
-    const chunks = [chunk(0, 1), chunk(1, 2), chunk(2, 3), chunk(3, 5), chunk(4, 7), chunk(5, 16)];
-    const editor = createEditor(chunks);
+    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    const editor = createEditor(records);
     editor.manuscript.isExpanded = true;
     render(<StoryManuscript editor={editor} />);
 
@@ -107,10 +107,10 @@ describe("StoryManuscript fold", () => {
     // one control at each end of the run, so the way back is never a scroll away
     const rows = screen.getAllByRole("button", { expanded: true });
     expect(rows).toHaveLength(2);
-    for (const row of rows) expect(row.textContent).toBe("Collapse 3 chunks");
+    for (const row of rows) expect(row.textContent).toBe("Collapse 3 records");
 
     // nothing is collapsed any more, and the types are visible below
-    expect(screen.queryByText(/chunks collapsed/)).toBeNull();
+    expect(screen.queryByText(/records collapsed/)).toBeNull();
     expect(rows[0].textContent).not.toContain("Type 3");
 
     fireEvent.click(rows[1]);
@@ -118,8 +118,8 @@ describe("StoryManuscript fold", () => {
   });
 
   it("keeps a single control while the run is folded", () => {
-    const chunks = [chunk(0, 1), chunk(1, 2), chunk(2, 3), chunk(3, 5), chunk(4, 7), chunk(5, 16)];
-    render(<StoryManuscript editor={createEditor(chunks)} />);
+    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    render(<StoryManuscript editor={createEditor(records)} />);
 
     expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(1);
   });

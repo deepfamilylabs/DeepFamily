@@ -1,5 +1,5 @@
 export * from "./hooks/useContractClient";
-export * from "./hooks/useAddStoryChunkFlow";
+export * from "./hooks/useAddStoryRecordFlow";
 export * from "./hooks/useSealStoryFlow";
 export {
   useEndorseFlow,

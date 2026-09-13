@@ -1,5 +1,5 @@
 {
-  "chunkTypes": {
+  "recordTypes": {
     "summary": "概述",
     "earlyLife": "早年经历",
     "education": "教育背景",
@@ -34,7 +34,7 @@
     "closeMenu": "关闭菜单"
   },
   "story": {
-    "addingChunk": "正在添加故事分段...",
+    "addingRecord": "正在添加故事记录...",
     "sealing": "正在封存故事..."
   },
   "home": {
@@ -64,9 +64,9 @@
         "title": "NFT人物百科",
         "description": "经背书的版本可铸造为NFT人物百科，公开完整传记信息，认可高质量贡献"
       },
-      "storyShardingSealing": {
-        "title": "传记存储与封存",
-        "description": "传记内容增量写入并哈希校验，封存后即可形成永久不可篡改的链上档案，既保留细节也保证可信度"
+      "storyRecordsSealing": {
+        "title": "传记记录与封存",
+        "description": "追加不可篡改的传记记录并通过哈希校验，封存后档案不再接受新记录"
       }
     },
     "valueSystem": {
@@ -134,9 +134,9 @@
         "title": "NFT人物百科",
         "description": "经背书版本可铸造为NFT人物百科，公开核心传记信息，持有人可继续追加详细叙事。"
       },
-      "storySharding": {
-        "title": "传记存储与封存",
-        "description": "增量记录生平并链上验证，封存后永不可改，形成永久可信的链上档案。"
+      "storyRecords": {
+        "title": "传记记录与封存",
+        "description": "将生平写入可验证、不可篡改的链上记录，封存档案后不再接受新记录。"
       },
       "versionNotarization": {
         "title": "协作与私有模式",
@@ -239,13 +239,13 @@
       "account": "推荐账户",
       "totalSources": "推荐来源总数"
     },
-    "storyChunksQuery": {
+    "storyRecordsQuery": {
       "tokenId": "Token ID",
-      "chunkHash": "分片哈希",
-      "editor": "编辑者",
-      "chunkType": "分片类型",
+      "payloadHash": "载荷哈希",
+      "author": "作者",
+      "recordType": "记录类型",
       "attachmentCID": "附件CID",
-      "totalChunks": "总分片数"
+      "totalRecords": "总记录数"
     },
     "childrenQuery": {
       "childHash": "子女哈希",
@@ -351,7 +351,7 @@
         "trustedEndorsers": "推荐来源",
         "endorsement": "背书统计",
         "children": "子女",
-        "storyChunks": "故事分片",
+        "storyRecords": "故事记录",
         "uri": "URI 历史",
         "accountVersions": "创建的版本",
         "accountEndorsements": "作出的背书",
@@ -359,8 +359,8 @@
         "personNfts": "NFT"
       },
       "entry": {
-        "personHashDesc": "展开人物版本、推荐来源、背书统计、子女、NFT、故事分片与 URI 历史。",
-        "tokenIdDesc": "展开该 NFT 的故事分片与 URI 历史。",
+        "personHashDesc": "展开人物版本、推荐来源、背书统计、子女、NFT、故事记录与 URI 历史。",
+        "tokenIdDesc": "展开该 NFT 的故事记录与 URI 历史。",
         "addressDesc": "展开该账户创建的版本、作出的背书与持有的 NFT。"
       },
       "empty": {
@@ -826,22 +826,22 @@
   "storyEditor": {
     "title": "传记编辑器"
   },
-  "storyChunkEditor": {
+  "storyRecordEditor": {
     "titleWithName": "{{name}}的人物资料",
     "titleFallback": "人物资料",
-    "totalLength": "总长度",
-    "addChunk": "添加新分片",
+    "totalPayloadLength": "总载荷字节数",
+    "addRecord": "添加新记录",
     "saving": "保存中...",
     "cancel": "取消",
     "loading": "加载中...",
     "contentRequired": "内容不能为空",
-    "noChunks": "暂无资料分片",
-    "noChunksSealed": "此资料已封存且无分片内容",
-    "chunkTypeLabel": "分片类型",
+    "noRecords": "暂无资料记录",
+    "noRecordsSealed": "此资料已封存且无记录内容",
+    "recordTypeLabel": "记录类型",
     "attachmentLabel": "附件CID（可选）",
     "attachmentPlaceholder": "CID（例如 bafy...）或留空",
     "attachmentTooLong": "附件 CID 不能超过 256 个 UTF-8 字节",
-    "invalidChunkType": "无效的分片类型",
+    "invalidRecordType": "无效的记录类型",
     "operationFailed": "操作失败",
     "sealFailed": "封存失败",
     "sealDialog": {
@@ -850,9 +850,9 @@
       "cancel": "取消",
       "confirm": "确认封存"
     },
-    "chunkTypeHelp": {
-      "title": "传记分片类型指南",
-      "intro": "传记分片是用于组织人物传记叙事和生平故事的内容类型标签。这19种类型支持灵活叙事——您可以按任意顺序使用同一类型的多个分片。",
+    "recordTypeHelp": {
+      "title": "传记记录类型指南",
+      "intro": "传记记录是用于组织人物传记叙事和生平故事的内容类型标签。这19种类型支持灵活叙事——您可以按任意顺序使用同一类型的多个记录。",
       "opening": "开篇",
       "summaryDesc": "人物生平和重要性的简要概述",
       "earlyYears": "早年经历",
@@ -881,7 +881,7 @@
       "referencesDesc": "来源、引用、参考文献",
       "notesDesc": "附加说明、更正、澄清",
       "usageNotes": "使用说明",
-      "note1": "这些是内容类型标签，而非独占章节——您可以使用同一类型的多个分片",
+      "note1": "这些是内容类型标签，而非独占章节——您可以使用同一类型的多个记录",
       "note2": "类型不是互斥的——请随意按任何顺序使用各类型",
       "note3": "生平事件：用于时间线叙事（出生 → 童年 → 成年 → 去世）",
       "note4": "职业经历：用于聚焦职业历史（工作、公司、职位）",
@@ -889,9 +889,9 @@
     },
     "contentPlaceholderBytes": "请输入故事内容；可保存的记录大小取决于当前网络的交易容量",
     "success": {
-      "chunkAdded": "分片 #{{index}} 添加成功（{{bytes}} 字节）",
-      "chunkAddedGeneric": "分片添加成功",
-      "storySealed": "传记封存成功（共 {{total}} 个分片）",
+      "recordAdded": "记录 #{{index}} 添加成功（{{bytes}} 字节）",
+      "recordAddedGeneric": "记录添加成功",
+      "storySealed": "传记封存成功（共 {{total}} 个记录）",
       "storySealedGeneric": "传记封存成功"
     },
     "errors": {
@@ -902,34 +902,34 @@
     },
     "backToProfile": "返回人物页",
     "contents": "目录",
-    "chunkCount": "{{total}} 个分片",
+    "recordCount": "{{total}} 个记录",
     "bytesOnChain": "链上 {{bytes}} 字节",
     "openForWriting": "可继续写入",
     "sealedReadOnly": "已封存 · 只读",
-    "closedToNewChunks": "不再接受新分片",
-    "newChunk": "新建分片",
-    "readFullChunk": "展开全文",
-    "collapseChunk": "收起",
+    "closedToNewRecords": "不再接受新记录",
+    "newRecord": "新建记录",
+    "readFullRecord": "展开全文",
+    "collapseRecord": "收起",
     "reviewAndSign": "确认并签名",
     "segmentBudget": "单条上限 {{limit}}",
     "tagPickerHint": "标签描述的是内容而非章节 —— 同一标签可以重复使用，顺序也不受限制。",
     "thisWrite": "本次写入",
     "landsAt": "写入位置",
     "payload": "数据量",
-    "contentHash": "内容哈希",
+    "payloadHash": "载荷哈希",
     "onChainRecord": "链上记录",
     "sealedNotice": "该资料已定稿，可永久读取与校验，不再接受任何写入。",
     "sealCard": {
       "title": "封存该资料",
-      "body": "将最终资料哈希写入链上。封存之后，任何人都无法再新增、修改或删除分片。",
+      "body": "在链上封存当前记录链头。封存之后，无法再追加记录。",
       "action": "永久封存"
     },
     "paneStory": "资料",
     "paneRecord": "链上记录",
     "paneSwitcher": "编辑区域",
-    "collapsedRun": "已折叠 {{total}} 个分片",
+    "collapsedRun": "已折叠 {{total}} 个记录",
     "expandRun": "展开",
-    "collapseRun": "收起 {{total}} 个分片",
+    "collapseRun": "收起 {{total}} 个记录",
     "listSeparator": "、"
   },
   "person": {
@@ -938,15 +938,15 @@
     "sealed": "已封存",
     "profileData": "人物资料",
     "noProfileData": "暂无人物资料",
-    "chunkList": "资料分片",
-    "noChunks": "暂无资料分片",
+    "recordList": "资料记录",
+    "noRecords": "暂无资料记录",
     "metadata": "元数据",
-    "totalChunks": "总分片数",
-    "totalLength": "总长度",
+    "totalRecords": "总记录数",
+    "totalPayloadLength": "总载荷字节数",
     "lastUpdate": "最后更新",
     "status": "状态",
     "editable": "可编辑",
-    "storyHash": "资料哈希",
+    "recordsHead": "记录链头",
     "owner": "所有者地址",
     "basicInfo": "基础信息",
     "sections": "章节",
@@ -1004,7 +1004,7 @@
     "colPerson": "人物",
     "colLife": "生卒",
     "colPlaces": "出生地 → 逝世地",
-    "colChunks": "分片",
+    "colRecords": "记录",
     "colToken": "Token ID",
     "colCreator": "创建者",
     "colMinted": "上链时间",
@@ -1021,29 +1021,29 @@
       "openTree": "打开世系"
     }
   },
-  "storyChunksModal": {
+  "storyRecordsModal": {
     "fetchError": "加载传记数据失败",
     "lifeEvents": "重要事件",
     "blockchainIdentity": "链上身份",
     "born": "出生",
     "died": "逝世",
-    "chunksAndSize": "{{count}} 个分片 · {{size}} 字节",
+    "recordsAndSize": "{{count}} 个记录 · {{size}} 字节",
     "tag": "标签",
     "personHash": "人物哈希",
     "detailedStory": "详细资料",
-    "chunks": "资料分片",
+    "records": "资料记录",
     "fullText": "全文",
     "integrityChecking": "正在检查完整性...",
     "integrityVerified": "传记完整性已验证",
     "integrityWarning": "检测到传记完整性问题",
-    "loading": "加载传记分片中...",
+    "loading": "加载传记记录中...",
     "characters": "个字符",
     "noStoryData": "暂无资料数据",
     "basicStory": "简介",
     "noStory": "暂无资料内容",
     "peopleEncyclopedia": "人物百科",
-    "chunkEditor": "编辑者",
-    "chunkHash": "分片哈希",
+    "author": "作者",
+    "payloadHash": "载荷哈希",
     "attachment": "附件"
   },
   "actions": {
@@ -1417,7 +1417,7 @@
       "InvalidMetadataArchiveAddress": "Metadata Archive 地址无效。",
       "MetadataArchiveBindingMismatch": "Metadata Archive 未绑定到当前 DeepFamily 合约。",
       "UnauthorizedCaller": "当前合约无权向 Metadata Archive 写入数据。",
-      "InvalidPayloadLength": "加密元数据载荷长度无效。",
+      "InvalidPayloadLength": "归档载荷长度无效。",
       "MetadataAlreadyStored": "该版本的加密元数据已存储。",
       "StoreFailed": "Metadata Archive 拒绝写入加密元数据。",
       "InvalidTrustedEndorser": "推荐来源账户无效。",
@@ -1452,9 +1452,8 @@
       "PageSizeExceedsLimit": "分页大小超出限制。",
       "DirectNativeCurrencyNotAccepted": "不接受直接转入目标网络的原生代币。",
       "StoryAlreadySealed": "故事已封存。",
-      "ChunkIndexOutOfRange": "故事分片索引超出范围。",
-      "InvalidChunkContent": "故事分片内容无效。",
-      "ChunkHashMismatch": "故事分片哈希不匹配。",
+      "RecordIndexOutOfRange": "故事记录索引超出范围。",
+      "PayloadHashMismatch": "故事载荷哈希不匹配。",
       "StoryNotFound": "未找到故事。",
       "MustBeNFTHolder": "需要 NFT 持有者权限。",
       "OnlyDeepFamilyContract": "只有 DeepFamily 合约可以调用该代币函数。",

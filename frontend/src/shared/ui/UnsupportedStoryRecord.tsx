@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import type { StoryChunk } from "../model";
+import type { StoryRecord } from "../model";
 
-export function UnsupportedStoryRecord({ record }: { record: StoryChunk }) {
+export function UnsupportedStoryRecord({ record }: { record: StoryRecord }) {
   const { t } = useTranslation();
   return (
     <div className="space-y-2 text-sm">

@@ -13,11 +13,11 @@ export interface NodeKeyMinimal {
 }
 
 export const EMPTY_STORY_METADATA = {
-  totalChunks: 0,
-  totalLength: 0,
+  totalRecords: 0,
+  totalPayloadLength: 0,
   isSealed: false,
   lastUpdateTime: 0,
-  fullStoryHash: "",
+  recordsHead: "",
 };
 
 export function resolveSelectedNodeData(
@@ -76,7 +76,7 @@ export function applyNodeDetailNftDetails(options: {
   const storyFields = storyData
     ? {
         storyMetadata: storyData.metadata,
-        storyChunks: storyData.chunks,
+        storyRecords: storyData.records,
         storyFetchedAt: storyData.fetchedAt,
       }
     : {};

@@ -4,8 +4,8 @@ import {
   MAX_UINT64,
   PLAINTEXT_CODEC_CANONICAL_JSON_V1,
   STORY_BIOGRAPHY_SCHEMA_ID,
-  STORY_CHUNK_SCHEMA,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_RECORD_SCHEMA,
+  STORY_ENVELOPE_SCHEMA_ID,
   STORY_DEFAULT_COMPRESSION_SUITE,
   STORY_ENVELOPE_FORMAT_1,
   STORY_ENVELOPE_HEADER_BYTES,
@@ -39,7 +39,7 @@ const DFS1_TRIM_ONLY =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*$/u;
 const DFS1_TRIM_EDGE =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]|[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$/u;
-const INPUT_KEYS = ["content", "chunkType", "attachmentCID"];
+const INPUT_KEYS = ["content", "recordType", "attachmentCID"];
 const CANONICAL_KEYS = ["schema", ...INPUT_KEYS];
 
 function validateStoryRecord(input) {
@@ -61,9 +61,9 @@ function validateStoryRecord(input) {
     "DFS1 record has missing or unknown keys",
   );
   protocolAssert(
-    !Object.hasOwn(input, "schema") || input.schema === STORY_CHUNK_SCHEMA,
+    !Object.hasOwn(input, "schema") || input.schema === STORY_RECORD_SCHEMA,
     "UNSUPPORTED_STORY_SCHEMA",
-    `DFS1 schema must be ${STORY_CHUNK_SCHEMA}`,
+    `DFS1 schema must be ${STORY_RECORD_SCHEMA}`,
   );
   assertUnicodeScalarString(input.content, "content");
   protocolAssert(
@@ -72,13 +72,13 @@ function validateStoryRecord(input) {
     "Story content must not be empty or whitespace-only",
   );
   protocolAssert(
-    typeof input.chunkType === "number" &&
-      Number.isInteger(input.chunkType) &&
-      input.chunkType >= 0 &&
-      input.chunkType <= 255 &&
-      !Object.is(input.chunkType, -0),
-    "INVALID_STORY_CHUNK_TYPE",
-    "chunkType must be an integer from 0 through 255",
+    typeof input.recordType === "number" &&
+      Number.isInteger(input.recordType) &&
+      input.recordType >= 0 &&
+      input.recordType <= 255 &&
+      !Object.is(input.recordType, -0),
+    "INVALID_STORY_RECORD_TYPE",
+    "recordType must be an integer from 0 through 255",
   );
   assertUnicodeScalarString(input.attachmentCID, "attachmentCID");
   protocolAssert(
@@ -92,9 +92,9 @@ function validateStoryRecord(input) {
     "attachmentCID must not exceed 256 UTF-8 bytes",
   );
   return {
-    schema: STORY_CHUNK_SCHEMA,
+    schema: STORY_RECORD_SCHEMA,
     content: input.content,
-    chunkType: input.chunkType,
+    recordType: input.recordType,
     attachmentCID: input.attachmentCID,
   };
 }
@@ -110,7 +110,7 @@ export function encodeCanonicalStoryRecord(input) {
   const bytes = utf8Bytes(
     `{"schema":${escapeCanonicalJsonString(record.schema)}` +
       `,"content":${escapeCanonicalJsonString(record.content)}` +
-      `,"chunkType":${record.chunkType}` +
+      `,"recordType":${record.recordType}` +
       `,"attachmentCID":${escapeCanonicalJsonString(record.attachmentCID)}}`,
   );
   protocolAssert(
@@ -278,7 +278,7 @@ export async function readStoryRecord(input) {
   });
   let decoded = null;
   let unsupportedReason;
-  if (schemaId === STORY_CHUNK_SCHEMA_ID || schemaId === STORY_BIOGRAPHY_SCHEMA_ID) {
+  if (schemaId === STORY_ENVELOPE_SCHEMA_ID || schemaId === STORY_BIOGRAPHY_SCHEMA_ID) {
     try {
       decoded = decodeStoryRecord(blob.payload);
     } catch (error) {
@@ -287,7 +287,7 @@ export async function readStoryRecord(input) {
     }
     if (decoded !== null) {
       protocolAssert(
-        (schemaId === STORY_BIOGRAPHY_SCHEMA_ID) === (decoded.chunkType === 0),
+        (schemaId === STORY_BIOGRAPHY_SCHEMA_ID) === (decoded.recordType === 0),
         "STORY_RECORD_TYPE_SCHEMA_MISMATCH",
         "Type 0 must use the biography schema; ordinary stories must use types 1 through 255",
       );

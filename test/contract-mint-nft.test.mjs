@@ -135,10 +135,7 @@ describe("Mint NFT Tests", function () {
   it("initializes biography before the receiver callback and rolls it back on rejection", async () => {
     const { deepFamily, signer, personHash, publicSignals, coreInfo } =
       await prepareBasicInfoMintAttempt("Receiver Biography");
-    const archive = await hre.ethers.getContractAt(
-      "DeepFamilyArchive",
-      await deepFamily.archive(),
-    );
+    const archive = await hre.ethers.getContractAt("DeepFamilyArchive", await deepFamily.archive());
     const receiver = await (
       await hre.ethers.getContractFactory("MintBiographyReceiver")
     ).deploy(await archive.getAddress());
@@ -162,7 +159,7 @@ describe("Mint NFT Tests", function () {
     );
     const payload = encodeStoryRecord({
       content: "Original biography before the receiver callback",
-      chunkType: 0,
+      recordType: 0,
       attachmentCID: "",
     });
     const data = deepFamily.interface.encodeFunctionData("mintPersonVersionNFT", [

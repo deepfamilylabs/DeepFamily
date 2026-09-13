@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useStoryEditorController } from "./story-editor/hooks/useStoryEditorController";
 import {
   SealConfirmDialog,
-  ChunkTypeHelpDialog,
+  RecordTypeHelpDialog,
   StoryTransactionPreviewDialog,
 } from "./story-editor/sections/StoryEditorDialogs";
 import { StoryContentsOutline } from "./story-editor/sections/StoryContentsOutline";
@@ -13,9 +13,9 @@ import { StoryRecordPanel } from "./story-editor/sections/StoryRecordPanel";
 type EditorPane = "story" | "contents" | "record";
 
 const PANES: { id: EditorPane; key: string; fallback: string }[] = [
-  { id: "story", key: "storyChunkEditor.paneStory", fallback: "Profile" },
-  { id: "contents", key: "storyChunkEditor.contents", fallback: "Contents" },
-  { id: "record", key: "storyChunkEditor.paneRecord", fallback: "Record" },
+  { id: "story", key: "storyRecordEditor.paneStory", fallback: "Profile" },
+  { id: "contents", key: "storyRecordEditor.contents", fallback: "Contents" },
+  { id: "record", key: "storyRecordEditor.paneRecord", fallback: "Record" },
 ];
 
 /**
@@ -37,7 +37,7 @@ export default function StoryEditorPage() {
 
         <div
           role="group"
-          aria-label={editor.t("storyChunkEditor.paneSwitcher", "Editor section")}
+          aria-label={editor.t("storyRecordEditor.paneSwitcher", "Editor section")}
           className="grid grid-cols-3 gap-1 rounded-full bg-surface-muted p-1 xl:hidden"
         >
           {PANES.map((item) => (
@@ -74,7 +74,7 @@ export default function StoryEditorPage() {
 
       <StoryTransactionPreviewDialog editor={editor} />
       <SealConfirmDialog editor={editor} />
-      <ChunkTypeHelpDialog editor={editor} />
+      <RecordTypeHelpDialog editor={editor} />
     </>
   );
 }

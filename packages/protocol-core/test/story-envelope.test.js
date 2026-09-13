@@ -8,13 +8,13 @@ import {
   encodeCanonicalStoryRecord,
   inspectStoryEnvelope,
   readStoryRecord,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
   STORY_BIOGRAPHY_SCHEMA_ID,
 } from "../index.js";
 
 const input = {
   content: '  中文\r\n\n😀 e\u0301 "引号" \\路径\t  ',
-  chunkType: 1,
+  recordType: 1,
   attachmentCID: "ipfs://test",
 };
 test("public writes always gzip, including a short record that grows; exact source survives", () => {
@@ -23,7 +23,7 @@ test("public writes always gzip, including a short record that grows; exact sour
   assert.equal(header.compressionSuite, 1);
   assert.equal(header.originalHash, keccak256(encodeCanonicalStoryRecord(input)));
   assert.equal(header.originalLength, encodeCanonicalStoryRecord(input).length);
-  assert.deepEqual(decodeStoryRecord(payload), { schema: "deepfamily/story-chunk@1.0", ...input });
+  assert.deepEqual(decodeStoryRecord(payload), { schema: "deepfamily/story-record@1.0", ...input });
   assert.throws(
     () => encodeStoryRecord(input, { compressionSuite: 0 }),
     (error) => error.code === "UNSUPPORTED_STORY_COMPRESSION",
@@ -56,7 +56,7 @@ test("public records have their own resource bound and can exceed private metada
   );
 });
 const pointer = "0x1111111111111111111111111111111111111111";
-async function read(payload, schemaId = STORY_CHUNK_SCHEMA_ID) {
+async function read(payload, schemaId = STORY_ENVELOPE_SCHEMA_ID) {
   return readStoryRecord({
     recordRef: {
       schemaId,
@@ -82,8 +82,8 @@ test("unknown future compression/format stays verified raw; reserved biography s
     assert.ok(result.unsupportedReason);
     assert.deepEqual(result.payload, future);
   }
-  const biography = encodeStoryRecord({ ...input, chunkType: 0 });
-  assert.equal((await read(biography, STORY_BIOGRAPHY_SCHEMA_ID)).decoded.chunkType, 0);
+  const biography = encodeStoryRecord({ ...input, recordType: 0 });
+  assert.equal((await read(biography, STORY_BIOGRAPHY_SCHEMA_ID)).decoded.recordType, 0);
   await assert.rejects(
     read(biography),
     (error) => error.code === "STORY_RECORD_TYPE_SCHEMA_MISMATCH",
@@ -102,7 +102,7 @@ test("a gzip body crossing physical segment boundaries reassembles before decomp
   for (let offset = 0; offset < payload.length; offset += 16_384)
     restored.set(payload.slice(offset, offset + 16_384), offset);
   assert.deepEqual(decodeStoryRecord(restored), {
-    schema: "deepfamily/story-chunk@1.0",
+    schema: "deepfamily/story-record@1.0",
     ...record,
   });
 });

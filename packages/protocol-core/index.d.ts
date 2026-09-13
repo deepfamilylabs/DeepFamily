@@ -412,8 +412,8 @@ export function readMetadataEnvelopeFromRef(input: BlobRef & ArchiveReadOptions)
   }
 >;
 
-export const STORY_CHUNK_SCHEMA: "deepfamily/story-chunk@1.0";
-export const STORY_CHUNK_SCHEMA_ID: string;
+export const STORY_RECORD_SCHEMA: "deepfamily/story-record@1.0";
+export const STORY_ENVELOPE_SCHEMA_ID: string;
 export const STORY_ENVELOPE_SCHEMA: "deepfamily/story-envelope@1.0";
 export const STORY_BIOGRAPHY_SCHEMA: "deepfamily/story-biography-envelope@1.0";
 export const STORY_BIOGRAPHY_SCHEMA_ID: string;
@@ -430,13 +430,13 @@ export const STORY_HEAD_DOMAIN_TEXT: "deepfamily.archive.story-head.v1";
 export const STORY_RECORD_DOMAIN: string;
 export const STORY_HEAD_DOMAIN: string;
 export interface StoryRecordInput {
-  schema?: "deepfamily/story-chunk@1.0";
+  schema?: "deepfamily/story-record@1.0";
   content: string;
-  chunkType: number;
+  recordType: number;
   attachmentCID: string;
 }
 export interface DecodedStoryRecord extends StoryRecordInput {
-  schema: "deepfamily/story-chunk@1.0";
+  schema: "deepfamily/story-record@1.0";
 }
 export function encodeCanonicalStoryRecord(input: StoryRecordInput): Uint8Array;
 export function decodeCanonicalStoryRecord(payload: BytesLike): DecodedStoryRecord;

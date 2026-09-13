@@ -771,7 +771,7 @@ describe("GenealogyBookPage", () => {
     expect(JSON.parse(localStorage.getItem("df:paperAppearance") || "{}").hallName).toBeNull();
   });
 
-  it("preloads missing story chunks for paper records", async () => {
+  it("preloads missing story records for paper records", async () => {
     mocks.projection.nodesData = {
       "0xroot-v-1": {
         id: "0xroot-v-1",
@@ -779,20 +779,20 @@ describe("GenealogyBookPage", () => {
         versionIndex: 1,
         tokenId: "7",
         storyMetadata: {
-          totalChunks: 2,
-          fullStoryHash: "",
+          totalRecords: 2,
+          recordsHead: "",
           lastUpdateTime: 1,
           isSealed: false,
-          totalLength: 100,
+          totalPayloadLength: 100,
         },
-        storyChunks: [
+        storyRecords: [
           {
-            chunkIndex: 0,
-            chunkHash: "0x1",
+            recordIndex: 0,
+            payloadHash: "0x1",
             content: "first",
             timestamp: 1,
-            editor: "0x0000000000000000000000000000000000000000",
-            chunkType: 0,
+            author: "0x0000000000000000000000000000000000000000",
+            recordType: 0,
             attachmentCID: "",
           },
         ],

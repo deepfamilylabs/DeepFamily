@@ -2,20 +2,20 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Clock, Hash, Link, User } from "lucide-react";
 import {
-  getChunkTypeBorderColorClass,
-  getChunkTypeColorClass,
-  getChunkTypeIcon,
-  getChunkTypeOptions,
+  getRecordTypeBorderColorClass,
+  getRecordTypeColorClass,
+  getRecordTypeIcon,
+  getRecordTypeOptions,
 } from "../../../domains/person";
 import {
   formatHashMiddle,
   formatUnixSeconds,
   getStoryPresentation,
   shortAddress,
-  type StoryChunk,
+  type StoryRecord,
 } from "../../../shared/model";
 import type { PersonPageController } from "../hooks/usePersonPageController";
-import { getChunkTypeLabel } from "../model/personPageModel";
+import { getRecordTypeLabel } from "../model/personPageModel";
 import { CopyIconButton } from "../../../shared/ui";
 
 export function PersonSidebar({ person }: { person: PersonPageController }) {
@@ -25,18 +25,18 @@ export function PersonSidebar({ person }: { person: PersonPageController }) {
 
   return (
     <div className="space-y-4 xl:sticky xl:top-20 xl:self-start">
-      <ChunkListCard person={person} />
+      <RecordListCard person={person} />
       {data.storyMetadata && <DesktopMetadataCard person={person} />}
     </div>
   );
 }
 
-function ChunkListCard({ person }: { person: PersonPageController }) {
+function RecordListCard({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
   const data = person.data;
-  const sortedChunks = useMemo(
-    () => getStoryPresentation(data?.storyChunks, data?.storyMetadata).chunks,
-    [data?.storyChunks, data?.storyMetadata],
+  const sortedRecords = useMemo(
+    () => getStoryPresentation(data?.storyRecords, data?.storyMetadata).records,
+    [data?.storyRecords, data?.storyMetadata],
   );
 
   if (!data) return null;
@@ -45,24 +45,24 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
     <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
       <div className="px-4 pt-5 pb-3 border-b border-gray-200 dark:border-gray-800">
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-          {t("person.chunkList", "Chunk List")}
-          {sortedChunks.length > 0 && (
+          {t("person.recordList", "Record List")}
+          {sortedRecords.length > 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-sm">
-              {sortedChunks.length}
+              {sortedRecords.length}
             </span>
           )}
         </h3>
       </div>
-      {sortedChunks.length > 0 ? (
+      {sortedRecords.length > 0 ? (
         <div className="divide-y divide-gray-200 dark:divide-gray-800 max-h-[500px] overflow-y-auto scrollbar-gutter-stable">
-          {sortedChunks.map((chunk) => (
-            <ChunkListItem key={chunk.chunkIndex} chunk={chunk} person={person} />
+          {sortedRecords.map((record) => (
+            <RecordListItem key={record.recordIndex} record={record} person={person} />
           ))}
         </div>
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 dark:text-gray-500 text-sm">
-            {t("person.noChunks", "No chunks")}
+            {t("person.noRecords", "No records")}
           </p>
         </div>
       )}
@@ -70,25 +70,25 @@ function ChunkListCard({ person }: { person: PersonPageController }) {
   );
 }
 
-function ChunkListItem({ chunk, person }: { chunk: StoryChunk; person: PersonPageController }) {
+function RecordListItem({ record, person }: { record: StoryRecord; person: PersonPageController }) {
   const { t } = useTranslation();
-  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
-  const open = person.expandedChunks.has(chunk.chunkIndex);
-  const preview = chunk.content.length > 60 ? `${chunk.content.slice(0, 60)}...` : chunk.content;
-  const ChunkIcon = getChunkTypeIcon(chunk.chunkType);
-  const iconColor = getChunkTypeColorClass(chunk.chunkType);
-  const borderColor = getChunkTypeBorderColorClass(chunk.chunkType);
+  const recordTypeOptions = useMemo(() => getRecordTypeOptions(t), [t]);
+  const open = person.expandedRecords.has(record.recordIndex);
+  const preview = record.content.length > 60 ? `${record.content.slice(0, 60)}...` : record.content;
+  const RecordIcon = getRecordTypeIcon(record.recordType);
+  const iconColor = getRecordTypeColorClass(record.recordType);
+  const borderColor = getRecordTypeBorderColorClass(record.recordType);
 
   return (
     <div className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
       <div
         role="button"
         tabIndex={0}
-        onClick={() => person.toggleChunk(chunk.chunkIndex)}
+        onClick={() => person.toggleRecord(record.recordIndex)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            person.toggleChunk(chunk.chunkIndex);
+            person.toggleRecord(record.recordIndex);
           }
         }}
         className="w-full text-left flex items-start gap-1.5 cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 rounded-sm"
@@ -100,38 +100,38 @@ function ChunkListItem({ chunk, person }: { chunk: StoryChunk; person: PersonPag
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                #{chunk.displayIndex ?? chunk.chunkIndex + 1}
+                #{record.displayIndex ?? record.recordIndex + 1}
               </span>
               <div className="flex items-center gap-1.5">
-                <ChunkIcon size={14} className={iconColor} />
+                <RecordIcon size={14} className={iconColor} />
                 <span
                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide border ${iconColor} ${borderColor} bg-white dark:bg-gray-900`}
                 >
-                  {getChunkTypeLabel(
-                    chunk.chunkType,
-                    chunkTypeOptions,
-                    t("chunkTypes.unknown", "Unknown"),
+                  {getRecordTypeLabel(
+                    record.recordType,
+                    recordTypeOptions,
+                    t("recordTypes.unknown", "Unknown"),
                   )}
                 </span>
               </div>
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">{chunk.content.length}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{record.content.length}</span>
           </div>
           <div
             className={`text-xs text-gray-600 dark:text-gray-400 ${
               open ? "whitespace-pre-wrap" : "line-clamp-2"
             }`}
           >
-            {open ? chunk.content : preview}
+            {open ? record.content : preview}
           </div>
-          {open && <ChunkDetails chunk={chunk} person={person} />}
+          {open && <RecordDetails record={record} person={person} />}
         </div>
       </div>
     </div>
   );
 }
 
-function ChunkDetails({ chunk, person }: { chunk: StoryChunk; person: PersonPageController }) {
+function RecordDetails({ record, person }: { record: StoryRecord; person: PersonPageController }) {
   const { t } = useTranslation();
 
   return (
@@ -141,14 +141,14 @@ function ChunkDetails({ chunk, person }: { chunk: StoryChunk; person: PersonPage
     >
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
         <User size={12} className="shrink-0" />
-        {chunk.editor ? (
+        {record.author ? (
           <>
-            <span className="truncate" title={chunk.editor}>
-              {shortAddress(chunk.editor)}
+            <span className="truncate" title={record.author}>
+              {shortAddress(record.author)}
             </span>
             <CopyIconButton
               label={t("search.copy")}
-              onClick={() => person.copyText(chunk.editor)}
+              onClick={() => person.copyText(record.author)}
               size="xs"
               stopPropagation
             />
@@ -159,19 +159,19 @@ function ChunkDetails({ chunk, person }: { chunk: StoryChunk; person: PersonPage
       </div>
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
         <Clock size={12} className="shrink-0" />
-        <span>{formatUnixSeconds(chunk.timestamp)}</span>
+        <span>{formatUnixSeconds(record.timestamp)}</span>
       </div>
-      {chunk.attachmentCID && chunk.attachmentCID.trim().length > 0 && (
+      {record.attachmentCID && record.attachmentCID.trim().length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
           <Link size={12} className="shrink-0" />
-          <span className="truncate font-mono" title={chunk.attachmentCID}>
-            {chunk.attachmentCID.length > 20
-              ? `${chunk.attachmentCID.slice(0, 8)}...${chunk.attachmentCID.slice(-8)}`
-              : chunk.attachmentCID}
+          <span className="truncate font-mono" title={record.attachmentCID}>
+            {record.attachmentCID.length > 20
+              ? `${record.attachmentCID.slice(0, 8)}...${record.attachmentCID.slice(-8)}`
+              : record.attachmentCID}
           </span>
           <CopyIconButton
             label={t("search.copy")}
-            onClick={() => person.copyText(chunk.attachmentCID)}
+            onClick={() => person.copyText(record.attachmentCID)}
             size="xs"
             stopPropagation
           />
@@ -179,12 +179,12 @@ function ChunkDetails({ chunk, person }: { chunk: StoryChunk; person: PersonPage
       )}
       <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
         <Hash size={12} className="shrink-0" />
-        <span className="font-mono truncate" title={chunk.chunkHash}>
-          {formatHashMiddle(chunk.chunkHash)}
+        <span className="font-mono truncate" title={record.payloadHash}>
+          {formatHashMiddle(record.payloadHash)}
         </span>
         <CopyIconButton
           label={t("search.copy")}
-          onClick={() => person.copyText(chunk.chunkHash)}
+          onClick={() => person.copyText(record.payloadHash)}
           size="xs"
           stopPropagation
         />
@@ -209,12 +209,12 @@ function DesktopMetadataCard({ person }: { person: PersonPageController }) {
       <div className="p-4 space-y-2.5 text-sm">
         <DesktopMetadataValue label={t("person.tokenId", "Token ID")} value={`#${data.tokenId}`} />
         <DesktopMetadataValue
-          label={t("person.totalChunks", "Total Chunks")}
-          value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalChunks}
+          label={t("person.totalRecords", "Total Records")}
+          value={getStoryPresentation(data.storyRecords, data.storyMetadata).totalRecords}
         />
         <DesktopMetadataValue
-          label={t("person.totalLength", "Total Length")}
-          value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalLength}
+          label={t("person.totalPayloadLength", "Total payload bytes")}
+          value={getStoryPresentation(data.storyRecords, data.storyMetadata).totalPayloadLength}
         />
         <DesktopMetadataValue
           label={t("person.lastUpdate", "Last Update")}
@@ -224,9 +224,9 @@ function DesktopMetadataCard({ person }: { person: PersonPageController }) {
       </div>
       <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
         <DesktopCopyValue
-          label={t("person.storyHash", "Story Hash")}
-          value={data.storyMetadata.fullStoryHash}
-          onCopy={() => person.copyText(data.storyMetadata!.fullStoryHash)}
+          label={t("person.recordsHead", "Record-chain head")}
+          value={data.storyMetadata.recordsHead}
+          onCopy={() => person.copyText(data.storyMetadata!.recordsHead)}
         />
         <DesktopCopyValue
           label={t("person.owner", "Owner Address")}

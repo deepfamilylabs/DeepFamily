@@ -1,4 +1,4 @@
-export * from "./config/chunkTypes";
+export * from "./config/recordTypes";
 export { createPersonReadGateway } from "./api/personReadGateway";
 export type {
   DetailQueryOptions,

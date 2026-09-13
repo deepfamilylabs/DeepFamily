@@ -1,22 +1,22 @@
 import { ethers } from "ethers";
 import { describe, expect, it } from "vitest";
-import { computeStoryHash } from "./story";
+import { computeStoryRecordsHead } from "./story";
 
 describe("story", () => {
-  it("computes a stable story hash independent of chunk order", () => {
-    const chunkA = {
-      chunkIndex: 1,
+  it("computes a stable story hash independent of record order", () => {
+    const recordA = {
+      recordIndex: 1,
       recordHash: ethers.id("record A"),
-      chunkHash: "0x" + "11".repeat(32),
+      payloadHash: "0x" + "11".repeat(32),
     };
-    const chunkB = {
-      chunkIndex: 0,
+    const recordB = {
+      recordIndex: 0,
       recordHash: ethers.id("record B"),
-      chunkHash: "0x" + "22".repeat(32),
+      payloadHash: "0x" + "22".repeat(32),
     };
 
-    const hash1 = computeStoryHash([chunkA as any, chunkB as any]);
-    const hash2 = computeStoryHash([chunkB as any, chunkA as any]);
+    const hash1 = computeStoryRecordsHead([recordA as any, recordB as any]);
+    const hash2 = computeStoryRecordsHead([recordB as any, recordA as any]);
 
     expect(hash1).toBe(hash2);
     expect(hash1).not.toBe("0x" + "00".repeat(32));

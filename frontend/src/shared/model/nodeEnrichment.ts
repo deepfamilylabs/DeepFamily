@@ -312,11 +312,11 @@ async function readStoryMetadataOrDefault(
     return await readStoryMetadata(tokenId);
   } catch {
     return {
-      totalChunks: 0,
-      totalLength: 0,
+      totalRecords: 0,
+      totalPayloadLength: 0,
       isSealed: false,
       lastUpdateTime: 0,
-      fullStoryHash: "",
+      recordsHead: "",
     };
   }
 }

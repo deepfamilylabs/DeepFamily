@@ -250,11 +250,11 @@ describe("nodeEnrichment patch builders", () => {
         nftTokenURI: "ipfs://token",
       },
       storyMetadata: {
-        totalChunks: 0,
-        totalLength: 0,
+        totalRecords: 0,
+        totalPayloadLength: 0,
         isSealed: false,
         lastUpdateTime: 0,
-        fullStoryHash: "",
+        recordsHead: "",
       },
     });
 
@@ -288,11 +288,11 @@ describe("nodeEnrichment fetchNodeEnrichmentBatch", () => {
     };
 
     const readStoryMetadata = vi.fn(async () => ({
-      totalChunks: 2,
-      totalLength: 10,
+      totalRecords: 2,
+      totalPayloadLength: 10,
       isSealed: true,
       lastUpdateTime: 1,
-      fullStoryHash: "0xhash",
+      recordsHead: "0xhash",
     }));
 
     const result = await fetchNodeEnrichmentBatch({
@@ -319,7 +319,7 @@ describe("nodeEnrichment fetchNodeEnrichmentBatch", () => {
       patch: {
         fullName: "Alice",
         tokenId: "88",
-        storyMetadata: { totalChunks: 2, isSealed: true },
+        storyMetadata: { totalRecords: 2, isSealed: true },
       },
     });
   });
@@ -387,11 +387,11 @@ describe("nodeEnrichment fetchNodeEnrichmentBatch", () => {
         id,
       }),
       readStoryMetadata: vi.fn(async () => ({
-        totalChunks: 0,
-        totalLength: 0,
+        totalRecords: 0,
+        totalPayloadLength: 0,
         isSealed: false,
         lastUpdateTime: 0,
-        fullStoryHash: "",
+        recordsHead: "",
       })),
     });
 

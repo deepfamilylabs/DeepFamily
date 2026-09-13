@@ -10,15 +10,15 @@ const action = async (args, hre) => {
   return appendDfsStoryRecord({
     archive: archive.connect(signer),
     tokenId: BigInt(args.tokenid),
-    expectedIndex: BigInt(args.chunkindex),
+    expectedIndex: BigInt(args.recordindex),
     content: args.content,
-    chunkType: Number(args.type ?? 1),
+    recordType: Number(args.type ?? 1),
     attachmentCID: args.attachment ?? "",
     expectedPayloadHash: args.exphash || undefined,
   });
 };
 
-export default task("add-story-chunk", "Add a story chunk to an NFT (story sharding)")
+export default task("add-story-record", "Append a story record to an NFT archive")
   .addOption({
     name: "tokenid",
     description: "NFT tokenId (uint256)",
@@ -26,8 +26,8 @@ export default task("add-story-chunk", "Add a story chunk to an NFT (story shard
     defaultValue: undefined,
   })
   .addOption({
-    name: "chunkindex",
-    description: "Chunk index to add (must equal current totalRecords, starts at 0)",
+    name: "recordindex",
+    description: "Record index to add (must equal current totalRecords, starts at 0)",
     type: ArgumentType.STRING_WITHOUT_DEFAULT,
     defaultValue: undefined,
   })
@@ -39,7 +39,7 @@ export default task("add-story-chunk", "Add a story chunk to an NFT (story shard
   })
   .addOption({
     name: "type",
-    description: "Chunk classification (1–255, default 1; 0 is reserved for mint biography)",
+    description: "Record classification (1–255, default 1; 0 is reserved for mint biography)",
     type: ArgumentType.STRING,
     defaultValue: "1",
   })

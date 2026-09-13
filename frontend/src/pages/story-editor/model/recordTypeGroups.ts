@@ -1,86 +1,86 @@
 /**
- * Chunk type taxonomy groups.
+ * Record type taxonomy groups.
  *
- * The 19 editable chunk types fall into seven reading-order groups. The help
+ * The 19 editable record types fall into seven reading-order groups. The help
  * dialog has always described them; the Contents outline and the composer's tag
  * picker now show them directly, so the grouping lives here rather than being
  * spelled out again in each surface.
  */
 
-import type { ChunkTypeOption } from "../../../domains/person";
+import type { RecordTypeOption } from "../../../domains/person";
 
-export interface ChunkTypeGroup {
+export interface RecordTypeGroup {
   id: string;
-  /** i18n key, shared with the chunk type help dialog. */
+  /** i18n key, shared with the record type help dialog. */
   labelKey: string;
   fallbackLabel: string;
   values: readonly number[];
 }
 
-export const CHUNK_TYPE_GROUPS: readonly ChunkTypeGroup[] = [
+export const RECORD_TYPE_GROUPS: readonly RecordTypeGroup[] = [
   {
     id: "opening",
-    labelKey: "storyChunkEditor.chunkTypeHelp.opening",
+    labelKey: "storyRecordEditor.recordTypeHelp.opening",
     fallbackLabel: "Opening",
     values: [1],
   },
   {
     id: "earlyYears",
-    labelKey: "storyChunkEditor.chunkTypeHelp.earlyYears",
+    labelKey: "storyRecordEditor.recordTypeHelp.earlyYears",
     fallbackLabel: "Early Years",
     values: [2, 3],
   },
   {
     id: "mainNarrative",
-    labelKey: "storyChunkEditor.chunkTypeHelp.mainNarrative",
+    labelKey: "storyRecordEditor.recordTypeHelp.mainNarrative",
     fallbackLabel: "Main Narrative",
     values: [4],
   },
   {
     id: "specializedTopics",
-    labelKey: "storyChunkEditor.chunkTypeHelp.specializedTopics",
+    labelKey: "storyRecordEditor.recordTypeHelp.specializedTopics",
     fallbackLabel: "Specialized Topics",
     values: [5, 6, 7, 8, 9],
   },
   {
     id: "personalLife",
-    labelKey: "storyChunkEditor.chunkTypeHelp.personalLife",
+    labelKey: "storyRecordEditor.recordTypeHelp.personalLife",
     fallbackLabel: "Personal Life",
     values: [10, 11, 12],
   },
   {
     id: "socialEngagement",
-    labelKey: "storyChunkEditor.chunkTypeHelp.socialEngagement",
+    labelKey: "storyRecordEditor.recordTypeHelp.socialEngagement",
     fallbackLabel: "Social Engagement",
     values: [13, 14, 15],
   },
   {
     id: "closing",
-    labelKey: "storyChunkEditor.chunkTypeHelp.closing",
+    labelKey: "storyRecordEditor.recordTypeHelp.closing",
     fallbackLabel: "Closing",
     values: [16, 17, 18, 19],
   },
 ] as const;
 
-const GROUP_BY_VALUE = new Map<number, ChunkTypeGroup>(
-  CHUNK_TYPE_GROUPS.flatMap((group) => group.values.map((value) => [value, group] as const)),
+const GROUP_BY_VALUE = new Map<number, RecordTypeGroup>(
+  RECORD_TYPE_GROUPS.flatMap((group) => group.values.map((value) => [value, group] as const)),
 );
 
-export function getChunkTypeGroup(value: number | null | undefined): ChunkTypeGroup | undefined {
+export function getRecordTypeGroup(value: number | null | undefined): RecordTypeGroup | undefined {
   if (value === null || value === undefined) return undefined;
   return GROUP_BY_VALUE.get(Number(value));
 }
 
 /** An option plus its index in the flat option list the listbox keyboard model uses. */
-export interface GroupedChunkTypeOption {
-  option: ChunkTypeOption;
+export interface GroupedRecordTypeOption {
+  option: RecordTypeOption;
   index: number;
 }
 
-export interface GroupedChunkTypeOptions {
+export interface GroupedRecordTypeOptions {
   id: string;
   label: string;
-  options: GroupedChunkTypeOption[];
+  options: GroupedRecordTypeOption[];
 }
 
 /**
@@ -89,15 +89,15 @@ export interface GroupedChunkTypeOptions {
  * up with what is rendered. Anything outside the known taxonomy is appended in
  * its own group rather than dropped.
  */
-export function groupChunkTypeOptions(
-  options: ChunkTypeOption[],
+export function groupRecordTypeOptions(
+  options: RecordTypeOption[],
   t: (key: string, fallback: string) => string,
-): GroupedChunkTypeOptions[] {
-  const buckets = new Map<string, GroupedChunkTypeOption[]>();
-  const ungrouped: GroupedChunkTypeOption[] = [];
+): GroupedRecordTypeOptions[] {
+  const buckets = new Map<string, GroupedRecordTypeOption[]>();
+  const ungrouped: GroupedRecordTypeOption[] = [];
 
   options.forEach((option, index) => {
-    const group = getChunkTypeGroup(option.value);
+    const group = getRecordTypeGroup(option.value);
     if (!group) {
       ungrouped.push({ option, index });
       return;
@@ -107,7 +107,7 @@ export function groupChunkTypeOptions(
     else buckets.set(group.id, [{ option, index }]);
   });
 
-  const grouped = CHUNK_TYPE_GROUPS.map((group) => ({
+  const grouped = RECORD_TYPE_GROUPS.map((group) => ({
     id: group.id,
     label: t(group.labelKey, group.fallbackLabel),
     options: buckets.get(group.id) ?? [],
@@ -116,7 +116,7 @@ export function groupChunkTypeOptions(
   if (ungrouped.length > 0) {
     grouped.push({
       id: "other",
-      label: t("chunkTypes.unknown", "Unknown"),
+      label: t("recordTypes.unknown", "Unknown"),
       options: ungrouped,
     });
   }

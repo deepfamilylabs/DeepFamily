@@ -5,40 +5,40 @@ import {
   buildStoryDataResult,
   buildStorySnapshot,
   getMissingStoryOffset,
-  mergeStoryChunkRecords,
+  mergeStoryRecords,
 } from "./storyData";
-import { computeStoryHash } from "./story";
+import { computeStoryRecordsHead } from "./story";
 
 describe("storyData buildStorySnapshot", () => {
-  it("computes full story and integrity for complete chunk sets", () => {
-    const chunks = [
+  it("computes full story and integrity for complete record sets", () => {
+    const records = [
       {
-        chunkIndex: 1,
+        recordIndex: 1,
         recordHash: ethers.id("verified record"),
-        chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
+        payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
         content: "world",
         timestamp: 2,
-        editor: ethers.ZeroAddress,
-        chunkType: 0,
+        author: ethers.ZeroAddress,
+        recordType: 0,
         attachmentCID: "",
       },
       {
-        chunkIndex: 0,
+        recordIndex: 0,
         recordHash: ethers.id("verified record"),
-        chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
+        payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
         content: "hello ",
         timestamp: 1,
-        editor: ethers.ZeroAddress,
-        chunkType: 0,
+        author: ethers.ZeroAddress,
+        recordType: 0,
         attachmentCID: "",
       },
     ];
-    const snapshot = buildStorySnapshot(chunks, {
-      totalChunks: 2,
-      totalLength: 11,
+    const snapshot = buildStorySnapshot(records, {
+      totalRecords: 2,
+      totalPayloadLength: 11,
       isSealed: true,
       lastUpdateTime: 0,
-      fullStoryHash: computeStoryHash(chunks),
+      recordsHead: computeStoryRecordsHead(records),
     });
 
     expect(snapshot.fullStory).toBe("hello world");
@@ -47,74 +47,74 @@ describe("storyData buildStorySnapshot", () => {
     expect(snapshot.integrity.hashMatch).toBe(true);
   });
 
-  it("reports missing indices when chunk data is incomplete", () => {
+  it("reports missing indices when record data is incomplete", () => {
     const snapshot = buildStorySnapshot(
       [
         {
-          chunkIndex: 1,
+          recordIndex: 1,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
+          payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
           content: "world",
           timestamp: 2,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
       ],
       {
-        totalChunks: 3,
-        totalLength: 5,
+        totalRecords: 3,
+        totalPayloadLength: 5,
         isSealed: false,
         lastUpdateTime: 0,
-        fullStoryHash: ethers.ZeroHash,
+        recordsHead: ethers.ZeroHash,
       },
     );
 
-    expect(snapshot.chunks).toHaveLength(1);
+    expect(snapshot.records).toHaveLength(1);
     expect(snapshot.integrity.missing).toEqual([0, 2]);
     expect(snapshot.integrity.hashMatch).toBeNull();
   });
 
-  it("merges chunks and computes the first missing offset", () => {
-    const merged = mergeStoryChunkRecords(
+  it("merges records and computes the first missing offset", () => {
+    const merged = mergeStoryRecords(
       [
         {
-          chunkIndex: 0,
+          recordIndex: 0,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x1",
+          payloadHash: "0x1",
           content: "A",
           timestamp: 1,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
       ],
       [
         {
-          chunkIndex: 2,
+          recordIndex: 2,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x3",
+          payloadHash: "0x3",
           content: "C",
           timestamp: 3,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
         {
-          chunkIndex: 1,
+          recordIndex: 1,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x2",
+          payloadHash: "0x2",
           content: "B",
           timestamp: 2,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
       ],
       3,
     );
 
-    expect(merged.map((chunk) => chunk.chunkIndex).sort((a, b) => a - b)).toEqual([0, 1, 2]);
+    expect(merged.map((record) => record.recordIndex).sort((a, b) => a - b)).toEqual([0, 1, 2]);
     expect(getMissingStoryOffset(merged)).toBe(3);
   });
 
@@ -122,22 +122,22 @@ describe("storyData buildStorySnapshot", () => {
     const storyData = buildStoryDataResult(
       [
         {
-          chunkIndex: 0,
+          recordIndex: 0,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x1",
+          payloadHash: "0x1",
           content: "Hello",
           timestamp: 1,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
       ],
       {
-        totalChunks: 1,
-        totalLength: 5,
+        totalRecords: 1,
+        totalPayloadLength: 5,
         isSealed: false,
         lastUpdateTime: 1,
-        fullStoryHash: "",
+        recordsHead: "",
       },
       123,
     );
@@ -154,32 +154,32 @@ describe("storyData buildStorySnapshot", () => {
       storyData,
     );
 
-    expect(next["0xabc-v-1"]?.storyMetadata?.totalChunks).toBe(1);
+    expect(next["0xabc-v-1"]?.storyMetadata?.totalRecords).toBe(1);
     expect(next["0xabc-v-1"]?.nftPublicStory).toBeUndefined();
     expect(next["0xabc-v-1"]?.storyFetchedAt).toBe(123);
-    expect(next["0xabc-v-1"]?.storyChunks?.[0]?.content).toBe("Hello");
+    expect(next["0xabc-v-1"]?.storyRecords?.[0]?.content).toBe("Hello");
   });
 
-  it("does not replace the node story with incomplete chunks", () => {
+  it("does not replace the node story with incomplete records", () => {
     const storyData = buildStoryDataResult(
       [
         {
-          chunkIndex: 1,
+          recordIndex: 1,
           recordHash: ethers.id("verified record"),
-          chunkHash: "0x1",
+          payloadHash: "0x1",
           content: "tail",
           timestamp: 1,
-          editor: ethers.ZeroAddress,
-          chunkType: 0,
+          author: ethers.ZeroAddress,
+          recordType: 0,
           attachmentCID: "",
         },
       ],
       {
-        totalChunks: 2,
-        totalLength: 8,
+        totalRecords: 2,
+        totalPayloadLength: 8,
         isSealed: false,
         lastUpdateTime: 1,
-        fullStoryHash: "",
+        recordsHead: "",
       },
       123,
     );
@@ -198,6 +198,6 @@ describe("storyData buildStorySnapshot", () => {
     );
 
     expect(next["0xabc-v-1"]?.nftPublicStory).toBe("preview");
-    expect(next["0xabc-v-1"]?.storyChunks?.[0]?.content).toBe("tail");
+    expect(next["0xabc-v-1"]?.storyRecords?.[0]?.content).toBe("tail");
   });
 });

@@ -4,9 +4,9 @@ import {
   computeStoryRecordHash,
   computeStoryHead,
   encodeStoryRecord,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
 } from "@deepfamily/protocol-core";
-import { addStoryChunkService } from "./addStoryChunkService";
+import { addStoryRecordService } from "./addStoryRecordService";
 import { sealStoryService } from "./sealStoryService";
 import { createArchiveInterface } from "../../../shared/clients/contractFactory";
 const mocks = vi.hoisted(() => ({ main: vi.fn(), archive: vi.fn() }));
@@ -129,7 +129,7 @@ function setup() {
   mocks.archive.mockReturnValue(archive);
   const confirm = vi.fn(async () => true);
   const submit = (content = "  原文\n🙂  ") =>
-    addStoryChunkService(signer as any, ADDRESS, "1", 0, content, "", 2, "", confirm);
+    addStoryRecordService(signer as any, ADDRESS, "1", 0, content, "", 2, "", confirm);
   return { archive, signer, confirm, submit };
 }
 describe("Archive story writes", () => {
@@ -141,7 +141,7 @@ describe("Archive story writes", () => {
     const f = setup();
     const result = await f.submit();
     const bytes = ethers.hexlify(
-      encodeStoryRecord({ content: "  原文\n🙂  ", chunkType: 2, attachmentCID: "" }),
+      encodeStoryRecord({ content: "  原文\n🙂  ", recordType: 2, attachmentCID: "" }),
     );
     expect(f.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ canonicalPayload: bytes, gasLimit: 1202n, segmentCount: 1 }),
@@ -150,13 +150,13 @@ describe("Archive story writes", () => {
       "1",
       0,
       ethers.ZeroHash,
-      STORY_CHUNK_SCHEMA_ID,
+      STORY_ENVELOPE_SCHEMA_ID,
       bytes,
       ethers.keccak256(bytes),
       { gasLimit: 1202n },
     );
-    expect(result.newChunk.content).toBe("  原文\n🙂  ");
-    expect(result.newChunk.recordHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(result.newRecord.content).toBe("  原文\n🙂  ");
+    expect(result.newRecord.recordHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
   it("rejects estimate failure even when staticCall succeeds and never requests signature", async () => {
     const f = setup();
@@ -168,14 +168,14 @@ describe("Archive story writes", () => {
   it("compresses a long original and previews the actual stored byte length", async () => {
     const f = setup();
     const content = "长传记 😀\n".repeat(4000);
-    const bytes = encodeStoryRecord({ content, chunkType: 2, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ content, recordType: 2, attachmentCID: "" });
     const result = await f.submit(content);
-    expect(result.contentLength).toBe(bytes.length);
+    expect(result.payloadLength).toBe(bytes.length);
     expect(bytes.length).toBeLessThan(16384);
     expect(f.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ payloadBytes: bytes.length, segmentCount: 1 }),
     );
-    expect(result.newChunk.content).toBe(content);
+    expect(result.newRecord.content).toBe(content);
   });
 
   it("rejects buffered transaction cap overflow", async () => {
@@ -226,8 +226,8 @@ describe("Archive story writes", () => {
     expect(f.archive.sealStory).toHaveBeenCalledWith("1", 1n, added.recordsHead, {
       gasLimit: 1200n,
     });
-    expect(sealed.events.StorySealed.totalChunks).toBe(1);
-    expect(sealed.fullStoryHash).toBe(added.recordsHead);
+    expect(sealed.events.StorySealed.totalRecords).toBe(1);
+    expect(sealed.recordsHead).toBe(added.recordsHead);
   });
   it("stops sealing before the wallet if gas estimation fails", async () => {
     const f = setup();

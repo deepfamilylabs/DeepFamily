@@ -12,7 +12,7 @@ import {
   readArchiveBlob,
   readMetadataEnvelopeFromRef,
   readStoryRecord,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
   writeUint32BE,
 } from "../index.js";
 
@@ -237,16 +237,16 @@ test("segment RPC uses default concurrency 8, preserves order and propagates blo
 test("DFS1 emoji and JSON escapes split at segment boundaries decode only after reassembly", async () => {
   for (const suffix of ["😀", "\n", "\\", '"']) {
     const prefix = new TextEncoder().encode(
-      '{"schema":"deepfamily/story-chunk@1.0","content":"',
+      '{"schema":"deepfamily/story-record@1.0","content":"',
     ).length;
     const content = "a".repeat(ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH - prefix - 1) + suffix + "  ";
-    const bytes = encodeStoryRecord({ content, chunkType: 3, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ content, recordType: 3, attachmentCID: "" });
     const fixture = archiveFixture(bytes);
     const result = await readStoryRecord({
       getCode: fixture.getCode,
       recordRef: {
         blob: fixture.ref,
-        schemaId: STORY_CHUNK_SCHEMA_ID,
+        schemaId: STORY_ENVELOPE_SCHEMA_ID,
         author: address(999),
         timestamp: 123n,
       },
@@ -276,7 +276,7 @@ test("unknown Story schema preserves verified non-UTF8 raw bytes", async () => {
 test("Story reader accepts ethers Result refs using their named tuple fields", async () => {
   const payload = encodeStoryRecord({
     content: "Exact chain result",
-    chunkType: 3,
+    recordType: 3,
     attachmentCID: "",
   });
   const fixture = archiveFixture(payload);
@@ -290,7 +290,7 @@ test("Story reader accepts ethers Result refs using their named tuple fields", a
       [
         {
           blob: fixture.ref,
-          schemaId: STORY_CHUNK_SCHEMA_ID,
+          schemaId: STORY_ENVELOPE_SCHEMA_ID,
           author: address(100),
           timestamp: 123n,
         },

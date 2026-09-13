@@ -125,14 +125,14 @@ describe("nodeDetailSync", () => {
 
   it("applies nft and story details onto an existing node", () => {
     const storyData: StoryDataResult = {
-      chunks: [
+      records: [
         {
-          chunkIndex: 0,
-          chunkHash: "0x1",
+          recordIndex: 0,
+          payloadHash: "0x1",
           content: "hello",
           timestamp: 1,
-          editor: "0x00000000000000000000000000000000000000aa",
-          chunkType: 0,
+          author: "0x00000000000000000000000000000000000000aa",
+          recordType: 0,
           attachmentCID: "",
         },
       ],
@@ -145,11 +145,11 @@ describe("nodeDetailSync", () => {
         computedHash: "0xstory",
       },
       metadata: {
-        totalChunks: 1,
-        totalLength: 5,
+        totalRecords: 1,
+        totalPayloadLength: 5,
         isSealed: true,
         lastUpdateTime: 55,
-        fullStoryHash: "0xstory",
+        recordsHead: "0xstory",
       },
       loading: false,
       fetchedAt: 777,
@@ -206,7 +206,7 @@ describe("nodeDetailSync", () => {
       storyFetchedAt: 777,
     });
     expect(out["0xabc-v-2"]?.storyMetadata).toEqual(storyData.metadata);
-    expect(out["0xabc-v-2"]?.storyChunks).toEqual(storyData.chunks);
+    expect(out["0xabc-v-2"]?.storyRecords).toEqual(storyData.records);
   });
 
   it("drops decrypted metadata when NFT details carry different authoritative anchors", () => {

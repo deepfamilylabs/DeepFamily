@@ -603,11 +603,11 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
             readStoryMetadata: async (tokenId) => {
               const metadata = await options.api.getStoryMetadata(tokenId);
               return {
-                totalChunks: Number(metadata.totalChunks),
-                totalLength: Number(metadata.totalLength),
+                totalRecords: Number(metadata.totalRecords),
+                totalPayloadLength: Number(metadata.totalPayloadLength),
                 isSealed: Boolean(metadata.isSealed),
                 lastUpdateTime: Number(metadata.lastUpdateTime),
-                fullStoryHash: metadata.fullStoryHash,
+                recordsHead: metadata.recordsHead,
                 biographyPayloadLength: metadata.biographyPayloadLength,
               };
             },
@@ -711,11 +711,11 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           readStoryMetadata: async (tokenId) => {
             const metadata = await options.api.getStoryMetadata(tokenId);
             return {
-              totalChunks: Number(metadata.totalChunks),
-              totalLength: Number(metadata.totalLength),
+              totalRecords: Number(metadata.totalRecords),
+              totalPayloadLength: Number(metadata.totalPayloadLength),
               isSealed: Boolean(metadata.isSealed),
               lastUpdateTime: Number(metadata.lastUpdateTime),
-              fullStoryHash: metadata.fullStoryHash,
+              recordsHead: metadata.recordsHead,
               biographyPayloadLength: metadata.biographyPayloadLength,
             };
           },

@@ -2,7 +2,7 @@
  * Unified search subject model.
  *
  * The search page resolves ONE subject from a single query box and then hangs
- * every facet (versions, endorsers, children, story chunks, ...) off it, so a
+ * every facet (versions, endorsers, children, story records, ...) off it, so a
  * person hash is pasted once instead of once per query section.
  */
 
@@ -65,7 +65,7 @@ export type SearchFacetKey =
   | "endorsement"
   | "children"
   | "personNfts"
-  | "storyChunks"
+  | "storyRecords"
   | "uri"
   | "accountVersions"
   | "accountEndorsements"
@@ -93,7 +93,7 @@ export const SEARCH_FACETS: readonly SearchFacetDescriptor[] = [
   { key: "endorsement", scope: "person", minVersionIndex: 0 },
   { key: "children", scope: "personVersion", minVersionIndex: 0 },
   { key: "personNfts", scope: "person", minVersionIndex: 0 },
-  { key: "storyChunks", scope: "token", minVersionIndex: 0 },
+  { key: "storyRecords", scope: "token", minVersionIndex: 0 },
   { key: "uri", scope: "token", minVersionIndex: 0 },
   { key: "accountVersions", scope: "account", minVersionIndex: 0 },
   { key: "accountEndorsements", scope: "account", minVersionIndex: 0 },
@@ -117,7 +117,7 @@ export function getFacetsForSubject(
 }
 
 export function getDefaultFacet(subject: ResolvedSearchSubject): SearchFacetKey {
-  if (subject.kind === "tokenId") return "storyChunks";
+  if (subject.kind === "tokenId") return "storyRecords";
   if (subject.kind === "address") return "accountVersions";
   return "versions";
 }

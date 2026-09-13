@@ -5,7 +5,7 @@ import hre from "hardhat";
 import { readArchiveBlob } from "../packages/protocol-core/archive.js";
 import { computeStoryRecordHash, computeStoryHead } from "../packages/protocol-core/story.js";
 
-const SCHEMA = hre.ethers.id("deepfamily/story-chunk@1.0");
+const SCHEMA = hre.ethers.id("example/plain-text-story@1.0");
 const bytes = (text) => hre.ethers.toUtf8Bytes(text);
 function args(payload, index = 0n, head = hre.ethers.ZeroHash, schema = SCHEMA) {
   return [1n, index, head, schema, payload, hre.ethers.keccak256(payload)];

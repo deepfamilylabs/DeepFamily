@@ -53,7 +53,7 @@ const CoreFeatures = memo(() => {
     },
     {
       icon: FileText,
-      key: "storySharding",
+      key: "storyRecords",
     },
   ];
 

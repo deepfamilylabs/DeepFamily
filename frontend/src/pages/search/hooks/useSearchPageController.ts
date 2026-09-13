@@ -4,14 +4,14 @@ import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import {
-  getChunkTypeOptions,
-  type ChunkTypeOption,
+  getRecordTypeOptions,
+  type RecordTypeOption,
   usePersonGateway,
   type PersonHashCalculatorHandle,
 } from "../../../domains/person";
 import { useTreeGateway } from "../../../domains/tree";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
-import { getStoryPresentation, type StoryChunk } from "../../../shared/model";
+import { getStoryPresentation, type StoryRecord } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import {
   emptyChildrenPageData,
@@ -27,7 +27,7 @@ import {
   type EndorsementStatsData,
   type EndorsementStatsForm,
   type PersonVersionsForm,
-  type StoryChunksForm,
+  type StoryRecordsForm,
   type TokenURIHistoryForm,
   type TrustedEndorsersForm,
   type TrustedEndorsersPageData,
@@ -101,7 +101,7 @@ export function useSearchPageController() {
             message: t("search.validation.pageSizeRange", { max: MAX_SEARCH_PAGE_SIZE }),
           }),
       }),
-      storyChunks: z.object({
+      storyRecords: z.object({
         tokenId: z
           .number({ message: t("search.validation.tokenIdRequired") })
           .int({ message: t("search.validation.tokenIdRequired") })
@@ -219,14 +219,14 @@ export function useSearchPageController() {
   const [trustedEndorsersHasMore, setTrustedEndorsersHasMore] = useState<boolean>(false);
   const [trustedEndorsersQueried, setTrustedEndorsersQueried] = useState<boolean>(false);
 
-  const [storyChunksOffset, setStoryChunksOffset] = useState<number>(0);
-  const [storyChunksPageStart, setStoryChunksPageStart] = useState<number>(0);
-  const [storyChunksLoading, setStoryChunksLoading] = useState<boolean>(false);
-  const [storyChunksError, setStoryChunksError] = useState<string | null>(null);
-  const [storyChunksData, setStoryChunksData] = useState<StoryChunk[]>([]);
-  const [storyChunksTotal, setStoryChunksTotal] = useState<number>(0);
-  const [storyChunksHasMore, setStoryChunksHasMore] = useState<boolean>(false);
-  const [storyChunksQueried, setStoryChunksQueried] = useState<boolean>(false);
+  const [storyRecordsOffset, setStoryRecordsOffset] = useState<number>(0);
+  const [storyRecordsPageStart, setStoryRecordsPageStart] = useState<number>(0);
+  const [storyRecordsLoading, setStoryRecordsLoading] = useState<boolean>(false);
+  const [storyRecordsError, setStoryRecordsError] = useState<string | null>(null);
+  const [storyRecordsData, setStoryRecordsData] = useState<StoryRecord[]>([]);
+  const [storyRecordsTotal, setStoryRecordsTotal] = useState<number>(0);
+  const [storyRecordsHasMore, setStoryRecordsHasMore] = useState<boolean>(false);
+  const [storyRecordsQueried, setStoryRecordsQueried] = useState<boolean>(false);
 
   const [childrenOffset, setChildrenOffset] = useState<number>(0);
   const [childrenLoading, setChildrenLoading] = useState<boolean>(false);
@@ -259,8 +259,8 @@ export function useSearchPageController() {
       pageSize: MAX_SEARCH_PAGE_SIZE,
     },
   });
-  const storyChunksForm = useForm<StoryChunksForm>({
-    resolver: zodResolver(schemas.storyChunks),
+  const storyRecordsForm = useForm<StoryRecordsForm>({
+    resolver: zodResolver(schemas.storyRecords),
     defaultValues: { tokenId: undefined as any, pageSize: MAX_SEARCH_PAGE_SIZE },
   });
   const childrenForm = useForm<ChildrenForm>({
@@ -278,17 +278,17 @@ export function useSearchPageController() {
   const trustedEndorsersPageSize = Number(
     trustedEndorsersForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE,
   );
-  const storyChunksPageSize = Number(storyChunksForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
+  const storyRecordsPageSize = Number(storyRecordsForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
   const childrenPageSize = Number(childrenForm.watch("pageSize") || MAX_SEARCH_PAGE_SIZE);
 
-  const chunkTypeOptions = useMemo((): ChunkTypeOption[] => getChunkTypeOptions(t), [t]);
-  const getChunkTypeLabel = useCallback(
+  const recordTypeOptions = useMemo((): RecordTypeOption[] => getRecordTypeOptions(t), [t]);
+  const getRecordTypeLabel = useCallback(
     (type: number) => {
       const numericType = Number.isFinite(type) ? Number(type) : 0;
-      const match = chunkTypeOptions.find((option) => option.value === numericType);
-      return match ? match.label : t("chunkTypes.unknown", "Unknown");
+      const match = recordTypeOptions.find((option) => option.value === numericType);
+      return match ? match.label : t("recordTypes.unknown", "Unknown");
     },
-    [chunkTypeOptions, t],
+    [recordTypeOptions, t],
   );
 
   const onHashPublicFormChange = useCallback(() => {
@@ -554,76 +554,76 @@ export function useSearchPageController() {
     trustedEndorsersPageSize,
   ]);
 
-  const onQueryStoryChunks = useCallback(
-    async (data: StoryChunksForm, startOffset?: number) => {
-      setStoryChunksQueried(true);
+  const onQueryStoryRecords = useCallback(
+    async (data: StoryRecordsForm, startOffset?: number) => {
+      setStoryRecordsQueried(true);
       if ((startOffset ?? 0) === 0) {
-        setStoryChunksData([]);
-        setStoryChunksTotal(0);
-        setStoryChunksHasMore(false);
-        setStoryChunksOffset(0);
+        setStoryRecordsData([]);
+        setStoryRecordsTotal(0);
+        setStoryRecordsHasMore(false);
+        setStoryRecordsOffset(0);
       }
-      setStoryChunksLoading(true);
-      setStoryChunksError(null);
+      setStoryRecordsLoading(true);
+      setStoryRecordsError(null);
       try {
         if (!personGateway) throw new Error(t("search.queryFailed"));
-        const offset = startOffset !== undefined ? startOffset : storyChunksOffset;
+        const offset = startOffset !== undefined ? startOffset : storyRecordsOffset;
         if (data.tokenId === undefined || !Number.isFinite(data.tokenId)) {
           throw new Error(t("search.validation.tokenIdRequired"));
         }
         const metadata = await personGateway.getStoryMetadata(String(data.tokenId));
         const biographyOffset = metadata.biographyPayloadLength !== undefined ? 1 : 0;
-        const out = await personGateway.listStoryChunksPage(
+        const out = await personGateway.listStoryRecordsPage(
           data.tokenId,
           offset + biographyOffset,
           data.pageSize,
         );
-        const story = getStoryPresentation(out.chunks, {
+        const story = getStoryPresentation(out.records, {
           ...metadata,
-          totalChunks: out.totalChunks,
+          totalRecords: out.totalRecords,
         });
-        setStoryChunksData(story.chunks);
-        setStoryChunksTotal(story.totalChunks);
-        setStoryChunksHasMore(out.hasMore);
-        setStoryChunksOffset(Math.max(0, out.nextOffset - biographyOffset));
-        setStoryChunksPageStart(offset);
+        setStoryRecordsData(story.records);
+        setStoryRecordsTotal(story.totalRecords);
+        setStoryRecordsHasMore(out.hasMore);
+        setStoryRecordsOffset(Math.max(0, out.nextOffset - biographyOffset));
+        setStoryRecordsPageStart(offset);
       } catch (error: any) {
-        setStoryChunksError(getQueryErrorMessage(error));
+        setStoryRecordsError(getQueryErrorMessage(error));
       } finally {
-        setStoryChunksLoading(false);
+        setStoryRecordsLoading(false);
       }
     },
-    [getQueryErrorMessage, personGateway, storyChunksOffset, t],
+    [getQueryErrorMessage, personGateway, storyRecordsOffset, t],
   );
 
-  const onResetStoryChunksQuery = useCallback(() => {
-    setStoryChunksData([]);
-    setStoryChunksTotal(0);
-    setStoryChunksHasMore(false);
-    setStoryChunksOffset(0);
-    setStoryChunksPageStart(0);
-    setStoryChunksError(null);
-    setStoryChunksQueried(false);
+  const onResetStoryRecordsQuery = useCallback(() => {
+    setStoryRecordsData([]);
+    setStoryRecordsTotal(0);
+    setStoryRecordsHasMore(false);
+    setStoryRecordsOffset(0);
+    setStoryRecordsPageStart(0);
+    setStoryRecordsError(null);
+    setStoryRecordsQueried(false);
   }, []);
 
-  const onStoryChunksNext = useCallback(async () => {
-    const tokenId = getWatchedNumber(storyChunksForm.watch("tokenId"));
+  const onStoryRecordsNext = useCallback(async () => {
+    const tokenId = getWatchedNumber(storyRecordsForm.watch("tokenId"));
     if (tokenId === undefined) {
-      setStoryChunksError(t("search.validation.tokenIdRequired"));
+      setStoryRecordsError(t("search.validation.tokenIdRequired"));
       return;
     }
-    await onQueryStoryChunks({ tokenId, pageSize: storyChunksPageSize });
-  }, [onQueryStoryChunks, storyChunksForm, storyChunksPageSize, t]);
+    await onQueryStoryRecords({ tokenId, pageSize: storyRecordsPageSize });
+  }, [onQueryStoryRecords, storyRecordsForm, storyRecordsPageSize, t]);
 
-  const onStoryChunksPrev = useCallback(async () => {
-    const prev = Math.max(0, storyChunksPageStart - storyChunksPageSize);
-    const tokenId = getWatchedNumber(storyChunksForm.watch("tokenId"));
+  const onStoryRecordsPrev = useCallback(async () => {
+    const prev = Math.max(0, storyRecordsPageStart - storyRecordsPageSize);
+    const tokenId = getWatchedNumber(storyRecordsForm.watch("tokenId"));
     if (tokenId === undefined) {
-      setStoryChunksError(t("search.validation.tokenIdRequired"));
+      setStoryRecordsError(t("search.validation.tokenIdRequired"));
       return;
     }
-    await onQueryStoryChunks({ tokenId, pageSize: storyChunksPageSize }, prev);
-  }, [onQueryStoryChunks, storyChunksForm, storyChunksPageStart, storyChunksPageSize, t]);
+    await onQueryStoryRecords({ tokenId, pageSize: storyRecordsPageSize }, prev);
+  }, [onQueryStoryRecords, storyRecordsForm, storyRecordsPageStart, storyRecordsPageSize, t]);
 
   const onQueryChildren = useCallback(
     async (data: ChildrenForm, startOffset?: number) => {
@@ -718,8 +718,8 @@ export function useSearchPageController() {
       hasPassphrase: hashHasPassphrase,
       onPublicFormChange: onHashPublicFormChange,
     },
-    chunkTypes: {
-      getChunkTypeLabel,
+    recordTypes: {
+      getRecordTypeLabel,
     },
     versions: {
       form: versionsForm,
@@ -793,22 +793,22 @@ export function useSearchPageController() {
         prev: onChildrenPrev,
       },
     },
-    storyChunks: {
-      form: storyChunksForm,
+    storyRecords: {
+      form: storyRecordsForm,
       state: {
-        data: storyChunksData,
-        total: storyChunksTotal,
-        offset: storyChunksOffset,
-        loading: storyChunksLoading,
-        error: storyChunksError,
-        queried: storyChunksQueried,
-        hasMore: storyChunksHasMore,
+        data: storyRecordsData,
+        total: storyRecordsTotal,
+        offset: storyRecordsOffset,
+        loading: storyRecordsLoading,
+        error: storyRecordsError,
+        queried: storyRecordsQueried,
+        hasMore: storyRecordsHasMore,
       },
       actions: {
-        query: onQueryStoryChunks,
-        reset: onResetStoryChunksQuery,
-        next: onStoryChunksNext,
-        prev: onStoryChunksPrev,
+        query: onQueryStoryRecords,
+        reset: onResetStoryRecordsQuery,
+        next: onStoryRecordsNext,
+        prev: onStoryRecordsPrev,
       },
     },
     uri: {

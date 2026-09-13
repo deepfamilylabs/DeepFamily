@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
-import type { NodeData, StoryChunk, StoryMetadata } from "../../../shared/model";
+import type { NodeData, StoryRecord, StoryMetadata } from "../../../shared/model";
 import { formatHashMiddle } from "../../../shared/model";
 
 export interface PrefetchedStoryState {
@@ -9,14 +9,14 @@ export interface PrefetchedStoryState {
     tokenId: string;
     fullName?: string;
     storyMetadata?: StoryMetadata;
-    storyChunks?: StoryChunk[];
+    storyRecords?: StoryRecord[];
   };
 }
 
-export interface ChunkFormData {
+export interface RecordFormData {
   content: string;
-  expectedHash?: string;
-  chunkType: number;
+  expectedPayloadHash?: string;
+  recordType: number;
   attachmentCID: string;
 }
 
@@ -25,14 +25,14 @@ export const STORY_WARNING_ORANGE_BYTES = STORY_SEGMENT_BYTES - 200;
 export const STORY_WARNING_YELLOW_BYTES = STORY_SEGMENT_BYTES - 400;
 export const STORY_MAX_ATTACHMENT_BYTES = 256;
 
-export const initialChunkFormData: ChunkFormData = {
+export const initialRecordFormData: RecordFormData = {
   content: "",
-  chunkType: 1,
+  recordType: 1,
   attachmentCID: "",
-  expectedHash: undefined,
+  expectedPayloadHash: undefined,
 };
 
-export function convertChunkTypeToNumber(type: number | string | null | undefined): number {
+export function convertRecordTypeToNumber(type: number | string | null | undefined): number {
   if (type === null || type === undefined || type === "") return 0;
   if (typeof type === "number" && Number.isFinite(type)) return type;
   if (typeof type === "string") {
@@ -45,16 +45,16 @@ export function convertChunkTypeToNumber(type: number | string | null | undefine
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function normalizeStoryChunks(chunks: StoryChunk[] | undefined): StoryChunk[] | undefined {
-  return chunks?.map((chunk) => ({
-    ...chunk,
-    chunkType: convertChunkTypeToNumber(chunk.chunkType),
-    attachmentCID: chunk.attachmentCID ?? "",
+export function normalizeStoryRecords(records: StoryRecord[] | undefined): StoryRecord[] | undefined {
+  return records?.map((record) => ({
+    ...record,
+    recordType: convertRecordTypeToNumber(record.recordType),
+    attachmentCID: record.attachmentCID ?? "",
   }));
 }
 
-export function computeContentHash(content: string, chunkType = 1, attachmentCID = ""): string {
-  return ethers.keccak256(encodePublicStoryRecord({ content, chunkType, attachmentCID }));
+export function computeStoryPayloadHash(content: string, recordType = 1, attachmentCID = ""): string {
+  return ethers.keccak256(encodePublicStoryRecord({ content, recordType, attachmentCID }));
 }
 
 export function formatStoryHash(hash?: string): string {
@@ -82,15 +82,15 @@ export function getByteWarningColor(byteLen: number): string {
   return "text-gray-500 dark:text-gray-400";
 }
 
-export function isChunkFormDirty(formData: ChunkFormData): boolean {
+export function isRecordFormDirty(formData: RecordFormData): boolean {
   const trimmed = (formData.content || "").trim();
   return (
-    trimmed.length > 0 || (formData.attachmentCID || "").length > 0 || formData.chunkType !== 1
+    trimmed.length > 0 || (formData.attachmentCID || "").length > 0 || formData.recordType !== 1
   );
 }
 
-export function sortStoryChunks(chunks: StoryChunk[] | undefined): StoryChunk[] {
-  return [...(chunks || [])].sort((a, b) => a.chunkIndex - b.chunkIndex);
+export function sortStoryRecords(records: StoryRecord[] | undefined): StoryRecord[] {
+  return [...(records || [])].sort((a, b) => a.recordIndex - b.recordIndex);
 }
 
 export function buildNodeDetailsFromNft(data: any, tokenId: string | undefined): NodeData {
@@ -124,7 +124,7 @@ export function mapStorySubmitError(
   return getFriendlyErrorMessage(
     error,
     t as any,
-    t("storyChunkEditor.operationFailed", "Operation failed"),
+    t("storyRecordEditor.operationFailed", "Operation failed"),
     { preferDetailsForUnknown: true },
   );
 }
@@ -133,7 +133,7 @@ export function mapStorySealError(
   error: any,
   t: (key: string, fallback: string) => string,
 ): string {
-  return getFriendlyErrorMessage(error, t as any, t("storyChunkEditor.sealFailed", "Seal failed"), {
+  return getFriendlyErrorMessage(error, t as any, t("storyRecordEditor.sealFailed", "Seal failed"), {
     preferDetailsForUnknown: true,
   });
 }

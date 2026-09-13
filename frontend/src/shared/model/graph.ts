@@ -2,16 +2,16 @@ import { getStoryPresentation } from "./storyPresentation";
 
 export type NodeLabelInput = { personHash: string; versionIndex: number };
 
-export interface StoryChunk {
+export interface StoryRecord {
   /** Actual Archive record index, including the initial biography when present. */
-  chunkIndex: number;
+  recordIndex: number;
   /** One-based ordinary story number, assigned only for presentation. */
   displayIndex?: number;
-  chunkHash: string;
+  payloadHash: string;
   content: string;
   timestamp: number;
-  editor: string;
-  chunkType: number;
+  author: string;
+  recordType: number;
   attachmentCID: string;
   schemaId?: string;
   rawPayload?: string;
@@ -23,21 +23,21 @@ export interface StoryChunk {
 
 export interface StoryMetadata {
   /** Archive totals include the biography and are used for paging and verification. */
-  totalChunks: number;
-  fullStoryHash: string;
+  totalRecords: number;
+  recordsHead: string;
   lastUpdateTime: number;
   isSealed: boolean;
-  totalLength: number;
+  totalPayloadLength: number;
   /** Present only when Archive record 0 is the reserved public biography. */
   biographyPayloadLength?: number;
 }
 
-export interface StoryChunkCreateData {
+export interface StoryRecordCreateData {
   tokenId: string;
-  chunkIndex: number;
+  recordIndex: number;
   content: string;
-  expectedHash?: string;
-  chunkType?: number;
+  expectedPayloadHash?: string;
+  recordType?: number;
   attachmentCID?: string;
 }
 
@@ -102,7 +102,7 @@ export interface NodeData {
   nftPublicStory?: string;
   nftTokenURI?: string;
   storyMetadata?: StoryMetadata;
-  storyChunks?: StoryChunk[];
+  storyRecords?: StoryRecord[];
   storyFetchedAt?: number;
   totalVersions?: number; // Total number of versions for this personHash (from contract)
 }
@@ -134,11 +134,11 @@ export function nodeLabel(node: NodeLabelInput): string {
 }
 
 // Derived helpers
-// Check if person has detailed story chunks (not just basic story field)
+// Check if person has detailed story records (not just basic story field)
 export function hasDetailedStory(nd: Partial<NodeData> | undefined | null): boolean {
   if (!nd) return false;
-  const story = getStoryPresentation(nd.storyChunks, nd.storyMetadata);
-  return story.chunks.length > 0 || story.totalChunks > 0;
+  const story = getStoryPresentation(nd.storyRecords, nd.storyMetadata);
+  return story.records.length > 0 || story.totalRecords > 0;
 }
 
 export function isMinted(nd: Partial<NodeData> | undefined | null): boolean {

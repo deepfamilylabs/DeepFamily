@@ -28,38 +28,38 @@ describe("Story Tasks Integration", function () {
     const tokenCounter = await deepFamily.tokenCounter();
     expect(tokenCounter).to.equal(1n);
 
-    await hre.run("add-story-chunk", {
+    await hre.run("add-story-record", {
       tokenid: "1",
-      chunkindex: "0",
-      content: "First chunk content",
+      recordindex: "0",
+      content: "First record content",
     });
 
-    await hre.run("add-story-chunk", {
+    await hre.run("add-story-record", {
       tokenid: "1",
-      chunkindex: "1",
-      content: "Second chunk content",
+      recordindex: "1",
+      content: "Second record content",
     });
 
     const meta = await deepFamilyReader.getStoryState(1n);
     expect(meta.totalRecords).to.equal(2n);
     expect(meta.isSealed).to.equal(false);
 
-    const chunk0 = await readStoryRecord({
+    const record0 = await readStoryRecord({
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 0),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
-    expect(chunk0.decoded.content).to.equal("First chunk content");
-    expect(chunk0.decoded.chunkType).to.equal(1);
-    expect(chunk0.decoded.attachmentCID).to.equal("");
-    const chunk1 = await readStoryRecord({
+    expect(record0.decoded.content).to.equal("First record content");
+    expect(record0.decoded.recordType).to.equal(1);
+    expect(record0.decoded.attachmentCID).to.equal("");
+    const record1 = await readStoryRecord({
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 1),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
-    expect(chunk1.decoded.content).to.equal("Second chunk content");
-    expect(chunk1.decoded.chunkType).to.equal(1);
-    expect(chunk1.decoded.attachmentCID).to.equal("");
+    expect(record1.decoded.content).to.equal("Second record content");
+    expect(record1.decoded.recordType).to.equal(1);
+    expect(record1.decoded.attachmentCID).to.equal("");
 
-    await hre.run("list-story-chunks", { tokenid: "1", offset: "0", limit: "10" });
+    await hre.run("list-story-records", { tokenid: "1", offset: "0", limit: "10" });
 
     await hre.run("seal-story", { tokenid: "1" });
 
@@ -68,9 +68,9 @@ describe("Story Tasks Integration", function () {
 
     let failed = false;
     try {
-      await hre.run("add-story-chunk", {
+      await hre.run("add-story-record", {
         tokenid: "1",
-        chunkindex: "2",
+        recordindex: "2",
         content: "Should fail after seal",
       });
     } catch (e) {
@@ -78,7 +78,7 @@ describe("Story Tasks Integration", function () {
       expect(String(e.message || e)).to.match(/sealed/i);
     }
     if (!failed) {
-      throw new Error("Expected add-story-chunk after sealing to fail");
+      throw new Error("Expected add-story-record after sealing to fail");
     }
   });
 });

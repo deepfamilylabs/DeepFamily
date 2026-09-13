@@ -72,17 +72,17 @@ describe("peoplePageModel", () => {
       personHash: "0xbio",
       nftPublicStory: "Public biography",
       storyMetadata: {
-        totalChunks: 1,
-        totalLength: 100,
+        totalRecords: 1,
+        totalPayloadLength: 100,
         biographyPayloadLength: 100,
-        fullStoryHash: "0xhead",
+        recordsHead: "0xhead",
         lastUpdateTime: 1,
         isSealed: false,
       },
     });
     const withOrdinary = makePerson({
       personHash: "0xordinary",
-      storyMetadata: { ...biographyOnly.storyMetadata!, totalChunks: 2, totalLength: 130 },
+      storyMetadata: { ...biographyOnly.storyMetadata!, totalRecords: 2, totalPayloadLength: 130 },
     });
     const people = [biographyOnly, withOrdinary];
     expect(
