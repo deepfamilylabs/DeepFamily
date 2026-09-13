@@ -666,7 +666,7 @@ export function EntryCards({ t }: { t: T }) {
       title: t("search.unified.detected.tokenId", "Token ID"),
       description: t(
         "search.unified.entry.tokenIdDesc",
-        "Opens that NFT's story chunks and URI history.",
+        "Opens that NFT's story records and URI history.",
       ),
       tone: "info" as const,
     },

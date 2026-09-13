@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import PersonStoryModal from "./PersonStoryModal";
-import { buildStorySnapshot, type StoryChunk, type StoryMetadata } from "../../../shared/model";
+import { buildStorySnapshot, type StoryRecord, type StoryMetadata } from "../../../shared/model";
 
 const mocks = vi.hoisted(() => ({
   t: (key: string, fallback?: string, options?: Record<string, unknown>) =>
@@ -22,38 +22,38 @@ vi.mock("../../../shared/ui", async (importOriginal) => ({
 
 afterEach(cleanup);
 
-const biography: StoryChunk = {
-  chunkIndex: 0,
+const biography: StoryRecord = {
+  recordIndex: 0,
   schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
-  chunkType: 0,
-  chunkHash: `0x${"00".repeat(32)}`,
+  recordType: 0,
+  payloadHash: `0x${"00".repeat(32)}`,
   content: "Original public biography",
   payloadLength: 100,
   timestamp: 1,
-  editor: `0x${"01".repeat(20)}`,
+  author: `0x${"01".repeat(20)}`,
   attachmentCID: "",
 };
 const ordinary = {
   ...biography,
-  chunkIndex: 1,
+  recordIndex: 1,
   schemaId: undefined,
-  chunkType: 1,
+  recordType: 1,
   content: "A later story",
   payloadLength: 50,
 };
 
-function renderStory(chunks: StoryChunk[]) {
+function renderStory(records: StoryRecord[]) {
   const metadata: StoryMetadata = {
-    totalChunks: chunks.length,
-    totalLength: chunks.reduce((length, chunk) => length + (chunk.payloadLength ?? 0), 0),
-    biographyPayloadLength: chunks.some((chunk) => chunk.schemaId === STORY_BIOGRAPHY_SCHEMA_ID)
+    totalRecords: records.length,
+    totalPayloadLength: records.reduce((length, record) => length + (record.payloadLength ?? 0), 0),
+    biographyPayloadLength: records.some((record) => record.schemaId === STORY_BIOGRAPHY_SCHEMA_ID)
       ? 100
       : undefined,
-    fullStoryHash: `0x${"00".repeat(32)}`,
+    recordsHead: `0x${"00".repeat(32)}`,
     lastUpdateTime: 1,
     isSealed: false,
   };
-  const getStoryData = vi.fn().mockResolvedValue(buildStorySnapshot(chunks, metadata));
+  const getStoryData = vi.fn().mockResolvedValue(buildStorySnapshot(records, metadata));
   return render(
     <PersonStoryModal
       person={{
@@ -75,7 +75,7 @@ describe("PersonStoryModal archive presentation", () => {
     renderStory([biography, ordinary]);
     expect(await screen.findByText("Original public biography")).toBeTruthy();
     expect(screen.getAllByText("Original public biography")).toHaveLength(1);
-    expect(screen.getByText("1 chunks · 50 bytes")).toBeTruthy();
+    expect(screen.getByText("1 records · 50 bytes")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
     expect(screen.queryByText("#0")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Full Text" }));
@@ -83,10 +83,10 @@ describe("PersonStoryModal archive presentation", () => {
     expect(screen.queryByText("Original public biographyA later story")).toBeNull();
   });
 
-  it("does not count a biography-only archive as a story chunk", async () => {
+  it("does not count a biography-only archive as a story record", async () => {
     renderStory([biography]);
     expect(await screen.findByText("Original public biography")).toBeTruthy();
-    expect(screen.queryByText(/chunks ·/)).toBeNull();
+    expect(screen.queryByText(/records ·/)).toBeNull();
     expect(screen.queryByText("#0")).toBeNull();
     expect(screen.queryByText("#1")).toBeNull();
   });
@@ -95,7 +95,7 @@ describe("PersonStoryModal archive presentation", () => {
     renderStory([{ ...biography, content: "", unsupportedSchema: true, rawPayload: "0x1234" }]);
     expect(await screen.findByText("0x1234")).toBeTruthy();
     expect(screen.getByText("Basic Story")).toBeTruthy();
-    expect(screen.queryByText(/chunks ·/)).toBeNull();
+    expect(screen.queryByText(/records ·/)).toBeNull();
     expect(screen.queryByText("#0")).toBeNull();
   });
 });

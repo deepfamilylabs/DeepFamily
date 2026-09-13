@@ -344,7 +344,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 }
 
-/* Thin variant utility (used by chunk list) */
+/* Thin variant utility (used by record list) */
 .thin-scrollbar {
   scrollbar-width: thin;
 }

@@ -19,7 +19,7 @@ export function StoryEditorHeader({ editor }: { editor: StoryEditorController })
         className="inline-flex w-fit items-center gap-2 rounded-lg py-1 text-sm font-medium text-ink-muted transition-colors hover:text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
       >
         <ArrowLeft size={15} aria-hidden />
-        {t("storyChunkEditor.backToProfile", "Back to profile")}
+        {t("storyRecordEditor.backToProfile", "Back to profile")}
       </Link>
 
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
@@ -39,20 +39,20 @@ export function StoryEditorHeader({ editor }: { editor: StoryEditorController })
           </div>
 
           <h1 className="truncate text-[2.125rem] font-bold tracking-tight text-ink sm:text-[2.875rem]">
-            {editor.personName || t("storyChunkEditor.titleFallback", "Profile Data")}
+            {editor.personName || t("storyRecordEditor.titleFallback", "Profile Data")}
           </h1>
 
           {meta && (
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-ink-muted">
               <span>
-                {t("storyChunkEditor.chunkCount", "{{total}} chunks", {
-                  total: meta.totalChunks,
+                {t("storyRecordEditor.recordCount", "{{total}} records", {
+                  total: meta.totalRecords,
                 })}
               </span>
               <span aria-hidden className="h-[3px] w-[3px] rounded-full bg-hairline-strong" />
               <span>
-                {t("storyChunkEditor.bytesOnChain", "{{bytes}} bytes on chain", {
-                  bytes: meta.totalLength.toLocaleString(),
+                {t("storyRecordEditor.bytesOnChain", "{{bytes}} bytes on chain", {
+                  bytes: meta.totalPayloadLength.toLocaleString(),
                 })}
               </span>
               {meta.lastUpdateTime ? (
@@ -81,7 +81,7 @@ function StoryStatusPill({ editor }: { editor: StoryEditorController }) {
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-300">
         <Lock size={12} aria-hidden />
-        {t("storyChunkEditor.sealedReadOnly", "Sealed — read only")}
+        {t("storyRecordEditor.sealedReadOnly", "Sealed — read only")}
       </span>
     );
   }
@@ -89,7 +89,7 @@ function StoryStatusPill({ editor }: { editor: StoryEditorController }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300">
       <span aria-hidden className="h-[7px] w-[7px] rounded-full bg-green-500 dark:bg-green-400" />
-      {t("storyChunkEditor.openForWriting", "Open for writing")}
+      {t("storyRecordEditor.openForWriting", "Open for writing")}
     </span>
   );
 }

@@ -294,11 +294,11 @@ describe("tree plaintext IndexedDB scope", () => {
           }),
       ),
       getStoryMetadata: vi.fn(async () => ({
-        totalChunks: 0,
-        totalLength: 0,
+        totalRecords: 0,
+        totalPayloadLength: 0,
         isSealed: false,
         lastUpdateTime: 0,
-        fullStoryHash: `0x${"00".repeat(32)}`,
+        recordsHead: `0x${"00".repeat(32)}`,
       })),
     };
     const contract = {};

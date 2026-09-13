@@ -181,17 +181,17 @@ hre.run = async (taskName, args = {}) => {
       });
     }
 
-    case "add-story-chunk":
+    case "add-story-record":
       return appendDfsStoryRecord({
         archive: archive.connect(signer),
         tokenId: BigInt(args.tokenid),
-        expectedIndex: BigInt(args.chunkindex),
+        expectedIndex: BigInt(args.recordindex),
         content: String(args.content),
-        chunkType: Number(args.type ?? 1),
+        recordType: Number(args.type ?? 1),
         attachmentCID: String(args.attachment ?? ""),
         expectedPayloadHash: args.exphash || undefined,
       });
-    case "list-story-chunks": {
+    case "list-story-records": {
       const [refs, totalRecords, hasMore, nextOffset] = await deepFamilyReader.listStoryRecords(
         BigInt(args.tokenid),
         BigInt(args.offset ?? 0),

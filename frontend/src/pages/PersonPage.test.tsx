@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PersonPage from "./PersonPage";
-import { makeNodeId, type NodeData, type StoryChunk, type StoryMetadata } from "../shared/model";
+import { makeNodeId, type NodeData, type StoryRecord, type StoryMetadata } from "../shared/model";
 
 const zeroHash = `0x${"0".repeat(64)}`;
 
@@ -69,14 +69,14 @@ vi.mock("../shared/ui", async (importOriginal) => {
   };
 });
 
-function makeChunk(overrides: Partial<StoryChunk>): StoryChunk {
+function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
   return {
-    chunkIndex: 0,
-    chunkHash: zeroHash,
+    recordIndex: 0,
+    payloadHash: zeroHash,
     content: "hello",
     timestamp: 1,
-    editor: "0x0000000000000000000000000000000000000000",
-    chunkType: 0,
+    author: "0x0000000000000000000000000000000000000000",
+    recordType: 0,
     attachmentCID: "",
     ...overrides,
   };
@@ -84,11 +84,11 @@ function makeChunk(overrides: Partial<StoryChunk>): StoryChunk {
 
 function makeMetadata(overrides: Partial<StoryMetadata> = {}): StoryMetadata {
   return {
-    totalChunks: 2,
-    fullStoryHash: zeroHash,
+    totalRecords: 2,
+    recordsHead: zeroHash,
     lastUpdateTime: 1,
     isSealed: false,
-    totalLength: 11,
+    totalPayloadLength: 11,
     ...overrides,
   };
 }
@@ -104,9 +104,9 @@ function makePerson(overrides: Partial<NodeData>): NodeData {
     fullName: "Ada Lovelace",
     owner: "0x00000000000000000000000000000000000000aa",
     storyMetadata: makeMetadata(),
-    storyChunks: [
-      makeChunk({ chunkIndex: 0, content: "hello " }),
-      makeChunk({ chunkIndex: 1, content: "world", chunkType: 1 }),
+    storyRecords: [
+      makeRecord({ recordIndex: 0, content: "hello " }),
+      makeRecord({ recordIndex: 1, content: "world", recordType: 1 }),
     ],
     storyFetchedAt: Date.now(),
     ...overrides,
@@ -144,7 +144,7 @@ describe("PersonPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders cached person story data without refetching fresh chunks", async () => {
+  it("renders cached person story data without refetching fresh records", async () => {
     renderPersonPage("/person/42");
 
     await waitFor(() => expect(screen.getAllByText("Ada Lovelace").length).toBeGreaterThan(0));
@@ -162,16 +162,16 @@ describe("PersonPage", () => {
     expect(screen.getByText("Invalid token ID")).toBeTruthy();
   });
 
-  it("shows the archived biography once as the basic story and counts only later chunks", async () => {
+  it("shows the archived biography once as the basic story and counts only later records", async () => {
     const person = makePerson({
-      storyMetadata: makeMetadata({ totalLength: 150, biographyPayloadLength: 100 }),
-      storyChunks: [
-        makeChunk({
+      storyMetadata: makeMetadata({ totalPayloadLength: 150, biographyPayloadLength: 100 }),
+      storyRecords: [
+        makeRecord({
           schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
           content: "Original public biography",
           payloadLength: 100,
         }),
-        makeChunk({ chunkIndex: 1, chunkType: 1, content: "A later story", payloadLength: 50 }),
+        makeRecord({ recordIndex: 1, recordType: 1, content: "A later story", payloadLength: 50 }),
       ],
     });
     mocks.nodesData = { [person.id]: person };
@@ -181,11 +181,11 @@ describe("PersonPage", () => {
     expect(screen.getAllByText("Original public biography")).toHaveLength(1);
     expect(screen.queryByText("#0")).toBeNull();
     expect(screen.getByText("#1")).toBeTruthy();
-    for (const label of screen.getAllByText("Total Chunks")) {
-      expect(label.parentElement?.textContent).toBe("Total Chunks1");
+    for (const label of screen.getAllByText("Total Records")) {
+      expect(label.parentElement?.textContent).toBe("Total Records1");
     }
-    for (const label of screen.getAllByText("Total Length")) {
-      expect(label.parentElement?.textContent).toBe("Total Length50");
+    for (const label of screen.getAllByText("Total payload bytes")) {
+      expect(label.parentElement?.textContent).toBe("Total payload bytes50");
     }
   });
 });

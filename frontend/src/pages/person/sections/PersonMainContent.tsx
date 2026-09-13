@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Edit2, FileText, GitBranch, Layers, List } from "lucide-react";
 import {
-  getChunkTypeColorClass,
-  getChunkTypeI18nKey,
-  getChunkTypeIcon,
-  getChunkTypeOptions,
+  getRecordTypeColorClass,
+  getRecordTypeI18nKey,
+  getRecordTypeIcon,
+  getRecordTypeOptions,
 } from "../../../domains/person";
 import {
   formatUnixSeconds,
@@ -128,7 +128,7 @@ function BasicInfoSection({ person }: { person: PersonPageController }) {
   const data = person.data;
 
   if (!data) return null;
-  const biography = getStoryPresentation(data.storyChunks, data.storyMetadata).biography;
+  const biography = getStoryPresentation(data.storyRecords, data.storyMetadata).biography;
 
   return (
     <>
@@ -232,7 +232,7 @@ function InfoRow({
 
 function ProfileDataSection({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
-  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
+  const recordTypeOptions = useMemo(() => getRecordTypeOptions(t), [t]);
   const data = person.data;
 
   if (!data) return null;
@@ -276,18 +276,18 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
         </div>
       )}
 
-      {person.viewMode === "sections" && person.groupedChunks.length > 0 ? (
+      {person.viewMode === "sections" && person.groupedRecords.length > 0 ? (
         <div
           ref={person.registerSection("profileTop")}
           id="person-profile-top"
           className="space-y-6"
         >
-          {person.groupedChunks.map(({ type, chunks }) => {
-            const ChunkIcon = getChunkTypeIcon(type);
-            const colorClass = getChunkTypeColorClass(type);
+          {person.groupedRecords.map(({ type, records }) => {
+            const RecordIcon = getRecordTypeIcon(type);
+            const colorClass = getRecordTypeColorClass(type);
             const typeLabel = t(
-              getChunkTypeI18nKey(type),
-              chunkTypeOptions.find((option) => option.value === type)?.label || "Unknown",
+              getRecordTypeI18nKey(type),
+              recordTypeOptions.find((option) => option.value === type)?.label || "Unknown",
             );
 
             return (
@@ -299,20 +299,20 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
               >
                 <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-2">
-                    <ChunkIcon size={18} className={colorClass} />
+                    <RecordIcon size={18} className={colorClass} />
                     <h4 className={`text-base font-semibold ${colorClass}`}>{typeLabel}</h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded-full">
-                      {chunks.length}
+                      {records.length}
                     </span>
                   </div>
                 </div>
                 <div className="p-4 space-y-3">
-                  {chunks.map((chunk) => (
+                  {records.map((record) => (
                     <div
-                      key={chunk.chunkIndex}
+                      key={record.recordIndex}
                       className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed"
                     >
-                      <p className="whitespace-pre-wrap">{chunk.content}</p>
+                      <p className="whitespace-pre-wrap">{record.content}</p>
                     </div>
                   ))}
                 </div>
@@ -322,8 +322,8 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
         </div>
       ) : person.viewMode === "paragraph" && person.fullStoryParagraphs.length > 0 ? (
         <div className="space-y-4 text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed">
-          {(person.chunkParagraphs.length > 0
-            ? person.chunkParagraphs
+          {(person.recordParagraphs.length > 0
+            ? person.recordParagraphs
             : person.fullStoryParagraphs
           ).map((content, index) => (
             <p key={index} className="whitespace-pre-wrap">
@@ -430,12 +430,12 @@ function MobileMetadataCard({ person }: { person: PersonPageController }) {
         <div className="grid grid-cols-2 gap-3 text-sm mb-3">
           <MetadataValue label={t("person.tokenId", "Token ID")} value={`#${data.tokenId}`} />
           <MetadataValue
-            label={t("person.totalChunks", "Total Chunks")}
-            value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalChunks}
+            label={t("person.totalRecords", "Total Records")}
+            value={getStoryPresentation(data.storyRecords, data.storyMetadata).totalRecords}
           />
           <MetadataValue
-            label={t("person.totalLength", "Total Length")}
-            value={getStoryPresentation(data.storyChunks, data.storyMetadata).totalLength}
+            label={t("person.totalPayloadLength", "Total payload bytes")}
+            value={getStoryPresentation(data.storyRecords, data.storyMetadata).totalPayloadLength}
           />
         </div>
         <div className="text-sm mb-3 pb-3 border-b border-gray-200 dark:border-gray-800">
@@ -448,9 +448,9 @@ function MobileMetadataCard({ person }: { person: PersonPageController }) {
         </div>
         <div className="space-y-3">
           <MobileCopyValue
-            label={t("person.storyHash", "Story Hash")}
-            value={data.storyMetadata.fullStoryHash}
-            onCopy={() => person.copyText(data.storyMetadata!.fullStoryHash)}
+            label={t("person.recordsHead", "Record-chain head")}
+            value={data.storyMetadata.recordsHead}
+            onCopy={() => person.copyText(data.storyMetadata!.recordsHead)}
           />
           <MobileCopyValue
             label={t("person.owner", "Owner Address")}

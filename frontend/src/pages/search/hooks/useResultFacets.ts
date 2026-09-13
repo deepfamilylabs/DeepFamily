@@ -20,7 +20,7 @@ export type AccountFacetState<T> = {
   error: string | null;
   queried: boolean;
   hasMore: boolean;
-  /** Log scan stopped on its chunk budget; the list may be incomplete. */
+  /** Log scan stopped on its record budget; the list may be incomplete. */
   truncated: boolean;
 };
 

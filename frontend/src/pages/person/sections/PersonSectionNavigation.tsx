@@ -3,18 +3,18 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Layers, User } from "lucide-react";
 import {
-  getChunkTypeColorClass,
-  getChunkTypeI18nKey,
-  getChunkTypeIcon,
-  getChunkTypeOptions,
+  getRecordTypeColorClass,
+  getRecordTypeI18nKey,
+  getRecordTypeIcon,
+  getRecordTypeOptions,
 } from "../../../domains/person";
 import type { PersonPageController } from "../hooks/usePersonPageController";
 
 export function PersonSectionNavigation({ person }: { person: PersonPageController }) {
   const { t } = useTranslation();
-  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
+  const recordTypeOptions = useMemo(() => getRecordTypeOptions(t), [t]);
 
-  if (person.viewMode !== "sections" || person.groupedChunks.length === 0 || !person.data) {
+  if (person.viewMode !== "sections" || person.groupedRecords.length === 0 || !person.data) {
     return null;
   }
 
@@ -38,27 +38,27 @@ export function PersonSectionNavigation({ person }: { person: PersonPageControll
             active={
               typeof person.activeSection === "number" || person.activeSection === "profileTop"
             }
-            count={person.groupedChunks.reduce((count, group) => count + group.chunks.length, 0)}
+            count={person.groupedRecords.reduce((count, group) => count + group.records.length, 0)}
             icon={<Layers size={14} />}
             label={t("person.profileData", "Profile Data")}
             onClick={() => person.scrollToSection("profileTop")}
           />
 
-          {person.groupedChunks.map(({ type, chunks }) => {
-            const ChunkIcon = getChunkTypeIcon(type);
-            const colorClass = getChunkTypeColorClass(type);
+          {person.groupedRecords.map(({ type, records }) => {
+            const RecordIcon = getRecordTypeIcon(type);
+            const colorClass = getRecordTypeColorClass(type);
             const typeLabel = t(
-              getChunkTypeI18nKey(type),
-              chunkTypeOptions.find((option) => option.value === type)?.label || "Unknown",
+              getRecordTypeI18nKey(type),
+              recordTypeOptions.find((option) => option.value === type)?.label || "Unknown",
             );
 
             return (
               <SectionNavButton
                 key={type}
                 active={person.activeSection === type}
-                count={chunks.length}
+                count={records.length}
                 depth="child"
-                icon={<ChunkIcon size={14} />}
+                icon={<RecordIcon size={14} />}
                 iconClassName={colorClass}
                 label={typeLabel}
                 onClick={() => person.scrollToSection(type)}

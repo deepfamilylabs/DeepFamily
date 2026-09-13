@@ -156,7 +156,7 @@ export async function executeMintFlow({
   const payload =
     story === ""
       ? "0x"
-      : hexlify(encodePublicStoryRecord({ content: story, chunkType: 0, attachmentCID: "" }));
+      : hexlify(encodePublicStoryRecord({ content: story, recordType: 0, attachmentCID: "" }));
   const payloadHash = keccak256(payload);
   const frozenCoreInfo = structuredClone(coreInfo);
   const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);

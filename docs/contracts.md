@@ -110,7 +110,6 @@ struct PersonSupplementInfo {
   uint8 deathMonth; // Death month (0-12, 0=unknown)
   uint8 deathDay; // Death day (0-31, 0=unknown)
   string deathPlace; // Death place
-  string story; // Life story summary
 }
 ```
 
@@ -201,7 +200,9 @@ function mintPersonVersionNFT(
     DisclosureBindingPublicSignals calldata publicSignals,
     uint256 versionIndex,
     string calldata _tokenURI,
-    PersonCoreInfo calldata coreInfo
+    PersonCoreInfo calldata coreInfo,
+    bytes calldata storyPayload,
+    bytes32 expectedStoryPayloadHash
 ) external nonReentrant
 ```
 
@@ -217,15 +218,31 @@ function mintPersonVersionNFT(
 8. Linked `AdultAgeGate` age validation must pass
 
 The frontend obtains the target self suite from the archived envelope before proof generation. The
-Mint contract itself does not read or parse the envelope header. Private encrypted `biography` and
-the public NFT `PersonSupplementInfo.story` are independent fields; copying one into the other is
-an explicit product action, not protocol behavior.
+mint contract itself does not read or parse the metadata envelope header. Private encrypted
+`biography` and the public mint biography are independent data. The client encodes the public
+biography as `storyPayload`; the mint initializes its Archive record and verifies
+`expectedStoryPayloadHash` before the ERC721 receiver callback. An empty payload creates no
+biography record. Copying private biography text into a public record requires an explicit product
+action.
 
 #### Atomic Story and Metadata Archive
 
 `DeepFamilyArchive` exposes `storeMetadata`, `metadataRef`, `appendStoryRecord`, `sealStory`, `storyRecordRef` and `storyState`. Metadata keys are write-once and only DeepFamily may store them. Story append/seal requires the current NFT owner and matching expected index/count plus head. Nonempty payloads are segmented into 16 KiB bytecode contracts and paged manifests atomically; the Archive has no business total-length cap. DFM1 format-1 alone retains its 16 KiB envelope limit.
 
 The [Archive contract](../contracts/DeepFamilyArchive.sol) defines the API, events and authorization; the [shared Story codec](../packages/protocol-core/story.js) defines the DFS1 text encoding. Contract and interface names have no version suffix. `archiveKind()` and `apiVersion()` identify the supported protocol, while payload formats and compression codecs carry their own version identifiers.
+
+A **story record** is one logical entry with a schema, author, timestamp and payload reference.
+Each payload may occupy multiple physical **segments**, indexed by manifest **pages**.
+The canonical story JSON uses `schema: "deepfamily/story-record@1.0"`, `content`, `recordType`
+and `attachmentCID`, in that order. Type `0` identifies the mint biography; ordinary records use
+types `1` through `255`. The outer envelope schema is `deepfamily/story-envelope@1.0`, with the
+separate `deepfamily/story-biography-envelope@1.0` schema for the mint biography.
+`payloadHash` commits to the encoded payload, `recordHash` also binds the record's context and
+metadata, and `recordsHead` commits to the ordered record history.
+
+The CLI exposes `add-story-record --tokenid <id> --recordindex <index> --content <text>` and
+`list-story-records --tokenid <id> --offset <offset> --limit <limit>` through Hardhat.
+The append index must equal `totalRecords`, which includes the mint biography when present.
 
 ### DFM1 Contract-Visible Prefix and Format-1 Layout
 
@@ -390,8 +407,8 @@ mapping(uint8 => mapping(uint32 => address)) public verifierRegistry;         //
 address public archive; // One-time protocol binding
 ```
 
-There are deliberately no `storyMetadata`, `storyChunks`, or `storyChunkHeaders` mappings in
-`DeepFamily`; those mappings are private implementation details of `DeepFamilyArchive`.
+Story references and state live in the private `_storyRecords` and `_storyStates` mappings of
+`DeepFamilyArchive`. `DeepFamily` stores only the archive binding.
 
 ### Access Control & Security
 

@@ -475,13 +475,13 @@ export async function mintPerson(
       coreInfo,
       opts.storyPayload ??
         (opts.story
-          ? encodeStoryRecord({ content: opts.story, chunkType: 0, attachmentCID: "" })
+          ? encodeStoryRecord({ content: opts.story, recordType: 0, attachmentCID: "" })
           : "0x"),
       opts.expectedStoryPayloadHash ??
         ethers.keccak256(
           opts.storyPayload ??
             (opts.story
-              ? encodeStoryRecord({ content: opts.story, chunkType: 0, attachmentCID: "" })
+              ? encodeStoryRecord({ content: opts.story, recordType: 0, attachmentCID: "" })
               : "0x"),
         ),
     );

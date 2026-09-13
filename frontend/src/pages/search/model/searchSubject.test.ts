@@ -52,10 +52,10 @@ describe("facet routing", () => {
       "endorsement",
       "children",
       "personNfts",
-      "storyChunks",
+      "storyRecords",
       "uri",
     ]);
-    expect(getFacetsForSubject(token).map((f) => f.key)).toEqual(["storyChunks", "uri"]);
+    expect(getFacetsForSubject(token).map((f) => f.key)).toEqual(["storyRecords", "uri"]);
     expect(getFacetsForSubject(account).map((f) => f.key)).toEqual([
       "accountVersions",
       "accountEndorsements",
@@ -64,7 +64,7 @@ describe("facet routing", () => {
     expect(getFacetsForSubject(null)).toEqual([]);
 
     expect(getDefaultFacet(person)).toBe("versions");
-    expect(getDefaultFacet(token)).toBe("storyChunks");
+    expect(getDefaultFacet(token)).toBe("storyRecords");
     expect(getDefaultFacet(account)).toBe("accountVersions");
   });
 
@@ -83,7 +83,7 @@ describe("facet routing", () => {
   it("gates token facets on a token id and account facets on an address", () => {
     const person = toResolvedSubject(detectSearchSubject(hash))!;
     const account = toResolvedSubject(detectSearchSubject(address))!;
-    const story = getFacetDescriptor("storyChunks");
+    const story = getFacetDescriptor("storyRecords");
     const accountNfts = getFacetDescriptor("accountNfts");
 
     expect(isFacetRunnable(story, person, undefined, undefined)).toBe(false);

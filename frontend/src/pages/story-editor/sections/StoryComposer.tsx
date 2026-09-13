@@ -1,7 +1,7 @@
 import { useId, useMemo } from "react";
 import { Check, ChevronDown, FileText, HelpCircle, Link2, Save } from "lucide-react";
 import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
-import { groupChunkTypeOptions } from "../model/chunkTypeGroups";
+import { groupRecordTypeOptions } from "../model/recordTypeGroups";
 import { getByteMeterRatio, getByteMeterTone } from "../model/storyEditorModel";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
@@ -12,7 +12,7 @@ const METER_TONE_CLASS: Record<string, string> = {
 };
 
 /**
- * The composer sits at the end of the manuscript: writing a chunk is composing
+ * The composer sits at the end of the manuscript: writing a record is composing
  * into the document rather than filling in a form beside it.
  *
  * The 19 tags open as an inline panel instead of a dropdown list — grouped by
@@ -24,38 +24,38 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
   const form = editor.form;
 
-  const chunkTypeLabelId = useId();
-  const chunkTypeValueId = useId();
-  const chunkTypeListboxId = useId();
+  const recordTypeLabelId = useId();
+  const recordTypeValueId = useId();
+  const recordTypeListboxId = useId();
   const contentByteStatusId = useId();
   const attachmentLabelId = useId();
 
-  const selected = editor.chunkTypeOptions.find((option) => option.value === form.data.chunkType);
+  const selected = editor.recordTypeOptions.find((option) => option.value === form.data.recordType);
   const SelectedIcon = selected?.icon || FileText;
-  const selectedChunkTypeIndex = editor.chunkTypeOptions.findIndex(
-    (option) => option.value === form.data.chunkType,
+  const selectedRecordTypeIndex = editor.recordTypeOptions.findIndex(
+    (option) => option.value === form.data.recordType,
   );
 
   const groups = useMemo(
-    () => groupChunkTypeOptions(editor.chunkTypeOptions, t as never),
-    [editor.chunkTypeOptions, t],
+    () => groupRecordTypeOptions(editor.recordTypeOptions, t as never),
+    [editor.recordTypeOptions, t],
   );
 
   const {
-    activeOptionId: activeChunkTypeId,
-    getOptionId: getChunkTypeOptionId,
-    handleButtonKeyDown: handleChunkTypeKeyDown,
-    selectOption: selectChunkTypeOption,
-    setActiveIndex: setActiveChunkTypeIndex,
+    activeOptionId: activeRecordTypeId,
+    getOptionId: getRecordTypeOptionId,
+    handleButtonKeyDown: handleRecordTypeKeyDown,
+    selectOption: selectRecordTypeOption,
+    setActiveIndex: setActiveRecordTypeIndex,
   } = useListboxA11y({
-    open: form.showChunkTypeDropdown,
-    options: editor.chunkTypeOptions,
-    selectedIndex: selectedChunkTypeIndex,
-    listboxId: chunkTypeListboxId,
+    open: form.showRecordTypeDropdown,
+    options: editor.recordTypeOptions,
+    selectedIndex: selectedRecordTypeIndex,
+    listboxId: recordTypeListboxId,
     getOptionKey: (option) => option.value,
-    onOpen: () => form.setShowChunkTypeDropdown(true),
-    onClose: () => form.setShowChunkTypeDropdown(false),
-    onSelect: (option) => form.updateChunkType(option.value),
+    onOpen: () => form.setShowRecordTypeDropdown(true),
+    onClose: () => form.setShowRecordTypeDropdown(false),
+    onSelect: (option) => form.updateRecordType(option.value),
     disabled: editor.submitting,
   });
 
@@ -65,39 +65,39 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   return (
     <section
       ref={editor.refs.formRef}
-      aria-label={t("storyChunkEditor.addChunk", "Add New Chunk")}
+      aria-label={t("storyRecordEditor.addRecord", "Add New Record")}
       className="overflow-hidden rounded-[20px] border border-primary bg-surface shadow-lg shadow-primary/5"
     >
       {/* One ref around the trigger and the panel: the controller closes the
           picker on any mousedown outside it, and mousedown precedes click — so
           a ref that covered only the trigger would unmount an option before its
           click could land. */}
-      <div ref={editor.refs.chunkTypeDropdownRef}>
+      <div ref={editor.refs.recordTypeDropdownRef}>
         <header className="flex flex-wrap items-center gap-3 border-b border-hairline px-4 py-3 sm:px-5">
           <h3 className="ui-heading text-[13.5px] text-ink">
-            {t("storyChunkEditor.newChunk", "New chunk")}
+            {t("storyRecordEditor.newRecord", "New record")}
           </h3>
           <span className="font-mono text-[11px] text-ink-subtle">#{editor.draftDisplayIndex}</span>
           <span className="grow" />
 
           <div className="flex items-center gap-1.5">
-            <span id={chunkTypeLabelId} className="sr-only">
-              {t("storyChunkEditor.chunkTypeLabel", "Chunk Type")}
+            <span id={recordTypeLabelId} className="sr-only">
+              {t("storyRecordEditor.recordTypeLabel", "Record Type")}
             </span>
             <button
               type="button"
               onClick={() =>
-                !editor.submitting && form.setShowChunkTypeDropdown(!form.showChunkTypeDropdown)
+                !editor.submitting && form.setShowRecordTypeDropdown(!form.showRecordTypeDropdown)
               }
-              onKeyDown={handleChunkTypeKeyDown}
+              onKeyDown={handleRecordTypeKeyDown}
               disabled={editor.submitting}
               aria-haspopup="listbox"
-              aria-expanded={form.showChunkTypeDropdown}
-              aria-controls={form.showChunkTypeDropdown ? chunkTypeListboxId : undefined}
-              aria-activedescendant={activeChunkTypeId}
-              aria-labelledby={`${chunkTypeLabelId} ${chunkTypeValueId}`}
+              aria-expanded={form.showRecordTypeDropdown}
+              aria-controls={form.showRecordTypeDropdown ? recordTypeListboxId : undefined}
+              aria-activedescendant={activeRecordTypeId}
+              aria-labelledby={`${recordTypeLabelId} ${recordTypeValueId}`}
               className={`flex min-h-[36px] items-center gap-2 rounded-full border px-3 text-[12.5px] font-medium transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50 ${
-                form.showChunkTypeDropdown
+                form.showRecordTypeDropdown
                   ? "border-primary bg-primary/10 text-ink"
                   : "border-hairline bg-surface text-ink hover:border-hairline-strong"
               }`}
@@ -107,20 +107,20 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
                 className={selected?.color || "text-ink-subtle"}
                 aria-hidden
               />
-              <span id={chunkTypeValueId} className="max-w-[10rem] truncate">
-                {selected?.label || t("chunkTypes.unknown", "Unknown")}
+              <span id={recordTypeValueId} className="max-w-[10rem] truncate">
+                {selected?.label || t("recordTypes.unknown", "Unknown")}
               </span>
               <ChevronDown
                 size={14}
                 aria-hidden
-                className={`shrink-0 text-ink-subtle transition-transform ${form.showChunkTypeDropdown ? "rotate-180" : ""}`}
+                className={`shrink-0 text-ink-subtle transition-transform ${form.showRecordTypeDropdown ? "rotate-180" : ""}`}
               />
             </button>
 
             <button
               type="button"
-              onClick={() => form.setShowChunkTypeHelp(true)}
-              aria-label={t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
+              onClick={() => form.setShowRecordTypeHelp(true)}
+              aria-label={t("storyRecordEditor.recordTypeHelp.title", "Story Record Types Guide")}
               className="flex h-8 w-8 items-center justify-center rounded-full text-ink-subtle transition-colors hover:bg-surface-alt hover:text-ink focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
             >
               <HelpCircle size={15} aria-hidden />
@@ -128,12 +128,12 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           </div>
         </header>
 
-        {form.showChunkTypeDropdown && (
+        {form.showRecordTypeDropdown && (
           <div className="border-b border-hairline bg-surface-alt px-4 py-4 sm:px-5">
             <div
-              id={chunkTypeListboxId}
+              id={recordTypeListboxId}
               role="listbox"
-              aria-labelledby={chunkTypeLabelId}
+              aria-labelledby={recordTypeLabelId}
               className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2"
             >
               {groups.map((group) => (
@@ -149,17 +149,17 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
                   <div className="flex flex-wrap gap-1.5">
                     {group.options.map(({ option, index }) => {
                       const Icon = option.icon;
-                      const isSelected = option.value === form.data.chunkType;
+                      const isSelected = option.value === form.data.recordType;
                       return (
                         <button
                           key={option.value}
-                          id={getChunkTypeOptionId(option, index)}
+                          id={getRecordTypeOptionId(option, index)}
                           type="button"
                           role="option"
                           aria-selected={isSelected}
                           tabIndex={-1}
-                          onMouseEnter={() => setActiveChunkTypeIndex(index)}
-                          onClick={() => selectChunkTypeOption(index)}
+                          onMouseEnter={() => setActiveRecordTypeIndex(index)}
+                          onClick={() => selectRecordTypeOption(index)}
                           className={`flex min-h-[30px] items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors ${
                             isSelected
                               ? "border-primary bg-primary/10 font-semibold text-ink"
@@ -178,7 +178,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
             </div>
             <p className="mt-3.5 border-t border-hairline pt-3 text-[11.5px] leading-relaxed text-ink-muted">
               {t(
-                "storyChunkEditor.tagPickerHint",
+                "storyRecordEditor.tagPickerHint",
                 "Tags describe content, not chapters — repeat a tag as often as you like and use them in any order.",
               )}
             </p>
@@ -192,7 +192,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           value={form.data.content}
           onChange={(event) => form.updateContent(event.target.value)}
           placeholder={t(
-            "storyChunkEditor.contentPlaceholderBytes",
+            "storyRecordEditor.contentPlaceholderBytes",
             "Enter story content; network gas capacity determines the record size",
           )}
           disabled={editor.submitting}
@@ -206,7 +206,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
             id={attachmentLabelId}
             className="text-[10.5px] font-bold uppercase tracking-[0.11em] text-ink-subtle"
           >
-            {t("storyChunkEditor.attachmentLabel", "Attachment CID (optional)")}
+            {t("storyRecordEditor.attachmentLabel", "Attachment CID (optional)")}
           </span>
           <div className="flex min-w-[16rem] grow items-center gap-2 rounded-xl border border-hairline bg-surface-alt px-3 focus-within:border-hairline-strong">
             <Link2 size={14} aria-hidden className="shrink-0 text-ink-subtle" />
@@ -215,7 +215,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
               onChange={(event) => form.updateAttachmentCID(event.target.value)}
               aria-labelledby={attachmentLabelId}
               placeholder={t(
-                "storyChunkEditor.attachmentPlaceholder",
+                "storyRecordEditor.attachmentPlaceholder",
                 "CID (e.g. bafy...) or leave empty",
               )}
               disabled={editor.submitting}
@@ -236,7 +236,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           >
             <span className="font-mono font-semibold">{form.byteLength} bytes</span>
             <span className="ml-1.5 text-ink-muted">
-              {t("storyChunkEditor.segmentBudget", "of {{limit}} per record", {
+              {t("storyRecordEditor.segmentBudget", "of {{limit}} per record", {
                 limit: form.segmentBytes.toLocaleString(),
               })}
             </span>
@@ -258,7 +258,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
             disabled={editor.submitting}
             className="min-h-9 rounded-full border border-hairline bg-surface px-4 text-[13px] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
           >
-            {t("storyChunkEditor.cancel", "Cancel")}
+            {t("storyRecordEditor.cancel", "Cancel")}
           </button>
           <button
             type="button"
@@ -268,8 +268,8 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           >
             <Save size={15} aria-hidden />
             {editor.submitting
-              ? t("storyChunkEditor.saving", "Saving...")
-              : t("storyChunkEditor.reviewAndSign", "Review & sign")}
+              ? t("storyRecordEditor.saving", "Saving...")
+              : t("storyRecordEditor.reviewAndSign", "Review & sign")}
           </button>
         </div>
       </footer>

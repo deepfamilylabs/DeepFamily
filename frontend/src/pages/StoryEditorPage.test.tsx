@@ -3,7 +3,7 @@ import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import StoryEditorPage from "./StoryEditorPage";
-import type { StoryChunk } from "../shared/model";
+import type { StoryRecord } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
   tokenId: "42",
@@ -96,7 +96,7 @@ vi.mock("../shared/cache/queryClient", () => ({
 
 vi.mock("../domains/transactions", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../domains/transactions")>()),
-  useAddStoryChunkFlow: () => ({
+  useAddStoryRecordFlow: () => ({
     runOrThrow: mocks.addStoryRunOrThrow,
   }),
   useSealStoryFlow: () => ({
@@ -106,34 +106,34 @@ vi.mock("../domains/transactions", async (importOriginal) => ({
 
 const bytes32 = (hex: string) => `0x${hex.repeat(32)}`;
 
-const existingChunk: StoryChunk = {
-  chunkIndex: 0,
+const existingRecord: StoryRecord = {
+  recordIndex: 0,
   recordHash: bytes32("a1"),
-  chunkHash: bytes32("11"),
+  payloadHash: bytes32("11"),
   content: "existing story",
   timestamp: 100,
-  editor: "0x00000000000000000000000000000000000000aa",
-  chunkType: 0,
+  author: "0x00000000000000000000000000000000000000aa",
+  recordType: 0,
   attachmentCID: "",
 };
 
 function baseStoryData(isSealed = false) {
   return {
-    chunks: [existingChunk],
-    fullStory: existingChunk.content,
+    records: [existingRecord],
+    fullStory: existingRecord.content,
     integrity: {
       missing: [],
       lengthMatch: true,
       hashMatch: true,
-      computedLength: existingChunk.content.length,
+      computedLength: existingRecord.content.length,
       computedHash: bytes32("22"),
     },
     metadata: {
-      totalChunks: 1,
-      totalLength: existingChunk.content.length,
+      totalRecords: 1,
+      totalPayloadLength: existingRecord.content.length,
       isSealed,
-      lastUpdateTime: existingChunk.timestamp,
-      fullStoryHash: bytes32("33"),
+      lastUpdateTime: existingRecord.timestamp,
+      recordsHead: bytes32("33"),
     },
     loading: false,
     fetchedAt: 1000,
@@ -173,26 +173,26 @@ describe("StoryEditorPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("adds a story chunk through the transaction flow and invalidates scoped story cache", async () => {
-    const addedChunk: StoryChunk = {
-      chunkIndex: 1,
-      chunkHash: bytes32("44"),
+  it("adds a story record through the transaction flow and invalidates scoped story cache", async () => {
+    const addedRecord: StoryRecord = {
+      recordIndex: 1,
+      payloadHash: bytes32("44"),
       content: "new story",
       timestamp: 200,
-      editor: "0x00000000000000000000000000000000000000bb",
-      chunkType: 0,
+      author: "0x00000000000000000000000000000000000000bb",
+      recordType: 0,
       attachmentCID: "",
     };
     mocks.addStoryRunOrThrow.mockResolvedValue({
-      chunkIndex: 1,
-      contentLength: addedChunk.content.length,
-      transactionHash: "0xchunk",
+      recordIndex: 1,
+      payloadLength: addedRecord.content.length,
+      transactionHash: "0xrecord",
       blockNumber: 99,
-      newChunk: addedChunk,
+      newRecord: addedRecord,
       events: {
         StoryRecordAppended: {
-          chunkIndex: 1,
-          contentLength: addedChunk.content.length,
+          recordIndex: 1,
+          payloadLength: addedRecord.content.length,
         },
       },
     });
@@ -217,16 +217,16 @@ describe("StoryEditorPage", () => {
     expect(mocks.addStoryRunOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         tokenId: "42",
-        chunkIndex: 1,
+        recordIndex: 1,
         content: "new story",
-        chunkType: 1,
+        recordType: 1,
         attachmentCID: "",
-        expectedHash: expect.stringMatching(/^0x[0-9a-f]{64}$/),
+        expectedPayloadHash: expect.stringMatching(/^0x[0-9a-f]{64}$/),
       }),
     );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Chunk #2 added successfully (9 bytes)");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Record #2 added successfully (9 bytes)");
     expect(await screen.findByText("new story")).toBeTruthy();
   });
 
@@ -250,13 +250,13 @@ describe("StoryEditorPage", () => {
 
   it("seals the story through the confirmation dialog and updates local sealed state", async () => {
     mocks.sealStoryRunOrThrow.mockResolvedValue({
-      totalChunks: 1,
-      fullStoryHash: bytes32("55"),
+      totalRecords: 1,
+      recordsHead: bytes32("55"),
       transactionHash: "0xseal",
       blockNumber: 100,
       events: {
         StorySealed: {
-          totalChunks: 1,
+          totalRecords: 1,
         },
       },
     });
@@ -281,7 +281,7 @@ describe("StoryEditorPage", () => {
     );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Story sealed successfully (1 chunks)");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Story sealed successfully (1 records)");
     expect(screen.getAllByText("Sealed").length).toBeGreaterThan(0);
   });
 });

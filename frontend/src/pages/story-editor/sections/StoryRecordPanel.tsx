@@ -27,30 +27,30 @@ function PendingWriteCard({ editor }: { editor: StoryEditorController }) {
     <section className="flex flex-col gap-3 rounded-[18px] border border-primary bg-primary/5 px-4 py-[15px]">
       <h2 className="ui-heading flex items-center gap-2 text-[12.5px] text-ink">
         <span aria-hidden className="h-[7px] w-[7px] rounded-full bg-primary" />
-        {t("storyChunkEditor.thisWrite", "This write")}
+        {t("storyRecordEditor.thisWrite", "This write")}
       </h2>
 
       <dl className="flex flex-col gap-2">
         <RecordRow
-          label={t("storyChunkEditor.landsAt", "Lands at")}
+          label={t("storyRecordEditor.landsAt", "Lands at")}
           value={`#${editor.draftDisplayIndex}`}
         />
         <RecordRow
-          label={t("storyChunkEditor.chunkTypeLabel", "Chunk Type")}
-          value={editor.getChunkTypeLabel(form.data.chunkType)}
+          label={t("storyRecordEditor.recordTypeLabel", "Record Type")}
+          value={editor.getRecordTypeLabel(form.data.recordType)}
           mono={false}
         />
         <RecordRow
-          label={t("storyChunkEditor.payload", "Payload")}
+          label={t("storyRecordEditor.payload", "Payload")}
           value={`${form.byteLength.toLocaleString()} B`}
         />
       </dl>
 
-      {form.draftContentHash && (
+      {form.draftPayloadHash && (
         <HashBlock
-          label={t("storyChunkEditor.contentHash", "Content hash")}
-          value={form.draftContentHash}
-          onCopy={() => editor.copyText(form.draftContentHash!)}
+          label={t("storyRecordEditor.payloadHash", "Payload hash")}
+          value={form.draftPayloadHash}
+          onCopy={() => editor.copyText(form.draftPayloadHash!)}
           copyLabel={t("search.copy", "Copy") as string}
         />
       )}
@@ -65,7 +65,7 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
   return (
     <section className="flex flex-col gap-3 rounded-[18px] border border-hairline bg-surface px-4 py-[15px]">
       <h2 className="ui-heading text-[12.5px] text-ink">
-        {t("storyChunkEditor.onChainRecord", "On-chain record")}
+        {t("storyRecordEditor.onChainRecord", "On-chain record")}
       </h2>
 
       <dl className="flex flex-col gap-2">
@@ -79,10 +79,10 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
             value={`${editor.nodeDetails.versionIndex}`}
           />
         )}
-        <RecordRow label={t("person.totalChunks", "Total Chunks")} value={`${meta.totalChunks}`} />
+        <RecordRow label={t("person.totalRecords", "Total Records")} value={`${meta.totalRecords}`} />
         <RecordRow
-          label={t("person.totalLength", "Total Length")}
-          value={`${meta.totalLength.toLocaleString()} B`}
+          label={t("person.totalPayloadLength", "Total payload bytes")}
+          value={`${meta.totalPayloadLength.toLocaleString()} B`}
         />
         <RecordRow
           label={t("person.lastUpdate", "Last Update")}
@@ -106,9 +106,9 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
 
       <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
         <HashBlock
-          label={t("person.storyHash", "Profile Hash")}
-          value={meta.fullStoryHash || "-"}
-          onCopy={meta.fullStoryHash ? () => editor.copyText(meta.fullStoryHash!) : undefined}
+          label={t("person.recordsHead", "Record-chain head")}
+          value={meta.recordsHead || "-"}
+          onCopy={meta.recordsHead ? () => editor.copyText(meta.recordsHead!) : undefined}
           copyLabel={t("search.copy", "Copy") as string}
         />
         {editor.nodeDetails?.personHash && (
@@ -137,7 +137,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
         </h2>
         <p className="text-[11.5px] leading-relaxed text-blue-900/80 dark:text-blue-200/80">
           {t(
-            "storyChunkEditor.sealedNotice",
+            "storyRecordEditor.sealedNotice",
             "This profile is final. It stays readable and verifiable forever, and no further writes are accepted.",
           )}
         </p>
@@ -145,18 +145,18 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
     );
   }
 
-  if (meta.totalChunks === 0) return null;
+  if (meta.totalRecords === 0) return null;
 
   return (
     <section className="flex flex-col gap-2.5 rounded-[18px] border border-orange-200 bg-orange-50/70 px-4 py-[15px] dark:border-orange-900/50 dark:bg-orange-900/15">
       <h2 className="ui-heading flex items-center gap-2 text-[12.5px] text-orange-800 dark:text-orange-300">
         <Lock size={14} aria-hidden />
-        {t("storyChunkEditor.sealCard.title", "Seal this profile")}
+        {t("storyRecordEditor.sealCard.title", "Seal this profile")}
       </h2>
       <p className="text-[11.5px] leading-relaxed text-orange-900/80 dark:text-orange-200/80">
         {t(
-          "storyChunkEditor.sealCard.body",
-          "Writes the final profile hash on chain. After sealing, no chunk can ever be added, edited or removed — by anyone.",
+          "storyRecordEditor.sealCard.body",
+          "Seals the current record-chain head. After sealing, no one can append another record.",
         )}
       </p>
       <button
@@ -165,7 +165,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
         disabled={editor.submitting}
         className="min-h-9 rounded-full border border-orange-300 bg-surface text-[12.5px] font-semibold text-orange-800 transition-colors hover:bg-orange-50 disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-orange-400/40 dark:border-orange-800 dark:text-orange-300 dark:hover:bg-orange-900/30"
       >
-        {t("storyChunkEditor.sealCard.action", "Seal permanently")}
+        {t("storyRecordEditor.sealCard.action", "Seal permanently")}
       </button>
     </section>
   );

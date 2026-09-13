@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 import {
-  ChunkTypeHelpDialog,
+  RecordTypeHelpDialog,
   SealConfirmDialog,
   StoryTransactionPreviewDialog,
 } from "./StoryEditorDialogs";
@@ -29,8 +29,8 @@ function createEditor(
     t,
     submitting: overrides.submitting ?? false,
     form: {
-      showChunkTypeHelp: false,
-      setShowChunkTypeHelp: vi.fn(),
+      showRecordTypeHelp: false,
+      setShowRecordTypeHelp: vi.fn(),
       ...overrides.form,
     },
     seal: {
@@ -94,14 +94,14 @@ describe("StoryEditorDialogs", () => {
     expect(document.activeElement).toBe(beforeDialog);
   });
 
-  it("exposes the chunk type help as a modal dialog and keeps tab focus inside", async () => {
-    const setShowChunkTypeHelp = vi.fn();
-    const renderDialog = (showChunkTypeHelp: boolean) => (
+  it("exposes the record type help as a modal dialog and keeps tab focus inside", async () => {
+    const setShowRecordTypeHelp = vi.fn();
+    const renderDialog = (showRecordTypeHelp: boolean) => (
       <>
         <button type="button">Before dialog</button>
-        <ChunkTypeHelpDialog
+        <RecordTypeHelpDialog
           editor={createEditor({
-            form: { setShowChunkTypeHelp, showChunkTypeHelp },
+            form: { setShowRecordTypeHelp, showRecordTypeHelp },
           })}
         />
       </>
@@ -113,7 +113,7 @@ describe("StoryEditorDialogs", () => {
 
     rerender(renderDialog(true));
 
-    const dialog = screen.getByRole("dialog", { name: "Story Chunk Types Guide" });
+    const dialog = screen.getByRole("dialog", { name: "Story Record Types Guide" });
     const closeButton = screen.getByRole("button", { name: "Close" });
 
     await waitFor(() => expect(document.activeElement).toBe(dialog));
@@ -127,7 +127,7 @@ describe("StoryEditorDialogs", () => {
     expect(document.activeElement).toBe(closeButton);
 
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(setShowChunkTypeHelp).toHaveBeenCalledWith(false);
+    expect(setShowRecordTypeHelp).toHaveBeenCalledWith(false);
 
     rerender(renderDialog(false));
     expect(document.activeElement).toBe(beforeDialog);

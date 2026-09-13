@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { getBytes, hexlify, keccak256 } from "ethers";
 import {
-  STORY_CHUNK_SCHEMA,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_RECORD_SCHEMA,
+  STORY_ENVELOPE_SCHEMA_ID,
   STORY_RECORD_DOMAIN,
   STORY_HEAD_DOMAIN,
   ZERO_BYTES32,
@@ -23,10 +23,10 @@ const vector = JSON.parse(
     "utf8",
   ),
 );
-const input = { content: "  原文😀 e\u0301\n ", chunkType: 3, attachmentCID: "ipfs://abc" };
+const input = { content: "  原文😀 e\u0301\n ", recordType: 3, attachmentCID: "ipfs://abc" };
 
 test("DFS1 shared golden bytes, schema hash and multiple-record semantic head match", () => {
-  assert.equal(STORY_CHUNK_SCHEMA_ID, vector.schemaId);
+  assert.equal(STORY_ENVELOPE_SCHEMA_ID, vector.schemaId);
   assert.equal(STORY_RECORD_DOMAIN, vector.recordDomain);
   assert.equal(STORY_HEAD_DOMAIN, vector.headDomain);
   assert.equal(vector.initialHead, ZERO_BYTES32);
@@ -40,7 +40,7 @@ test("DFS1 shared golden bytes, schema hash and multiple-record semantic head ma
     );
     assert.equal(keccak256(payload), record.commitment.payloadHash);
     assert.equal(payload.length, Number(record.commitment.payloadLength));
-    assert.deepEqual(decodeStoryRecord(payload), { schema: STORY_CHUNK_SCHEMA, ...record.input });
+    assert.deepEqual(decodeStoryRecord(payload), { schema: STORY_RECORD_SCHEMA, ...record.input });
     assert.equal(computeStoryRecordHash(record.commitment), record.recordHash);
     assert.equal(previousHead, record.previousHead);
     previousHead = computeStoryHead({ previousHead, recordHash: record.recordHash });
@@ -77,17 +77,17 @@ test("DFS1 preserves exact content without trimming or Unicode normalization", (
   );
 });
 
-test("DFS1 chunkType and attachment field bounds and whitespace are strict", () => {
-  for (const chunkType of [-1, 256, 3.5, "3", 3n, null, NaN, Infinity, -0]) {
+test("DFS1 recordType and attachment field bounds and whitespace are strict", () => {
+  for (const recordType of [-1, 256, 3.5, "3", 3n, null, NaN, Infinity, -0]) {
     assert.throws(
-      () => encodeStoryRecord({ ...input, chunkType }),
-      (error) => error.code === "INVALID_STORY_CHUNK_TYPE",
+      () => encodeStoryRecord({ ...input, recordType }),
+      (error) => error.code === "INVALID_STORY_RECORD_TYPE",
     );
   }
-  for (const chunkType of [0, 255])
+  for (const recordType of [0, 255])
     assert.equal(
-      decodeStoryRecord(encodeStoryRecord({ ...input, chunkType })).chunkType,
-      chunkType,
+      decodeStoryRecord(encodeStoryRecord({ ...input, recordType })).recordType,
+      recordType,
     );
   for (const attachmentCID of ["", "a".repeat(256), "😀".repeat(64)]) {
     assert.equal(
@@ -113,7 +113,7 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
   for (const record of [
     { ...input, extra: 1 },
     { ...input, schema: "other" },
-    { content: "x", chunkType: 3 },
+    { content: "x", recordType: 3 },
     { ...input, [Symbol("x")]: 1 },
     { ...input, content: "\ud800" },
     { ...input, attachmentCID: "\udfff" },
@@ -123,7 +123,7 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
 
 test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invalid UTF8", () => {
   const canonical = new TextDecoder().decode(
-    encodeCanonicalStoryRecord({ content: "中/\n", chunkType: 3, attachmentCID: "" }),
+    encodeCanonicalStoryRecord({ content: "中/\n", recordType: 3, attachmentCID: "" }),
   );
   for (const text of [
     canonical + "\n",
@@ -132,14 +132,14 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
     canonical.replace("中", "\\u4e2d"),
     canonical.replace("/", "\\/"),
     canonical.replace("\\n", "\\u000a"),
-    canonical.replace('"chunkType":3', '"chunkType":3.0'),
-    canonical.replace('"chunkType":3', '"chunkType":3e0'),
-    canonical.replace('"chunkType":3', '"chunkType":-0'),
-    canonical.replace('"chunkType":3', '"chunkType":3,"chunkType":3'),
+    canonical.replace('"recordType":3', '"recordType":3.0'),
+    canonical.replace('"recordType":3', '"recordType":3e0'),
+    canonical.replace('"recordType":3', '"recordType":-0'),
+    canonical.replace('"recordType":3', '"recordType":3,"recordType":3'),
     canonical.replace('"attachmentCID":""', '"attachmentCID":"","extra":false'),
     canonical.replace('"attachmentCID":""', '"attachmentCID":"\\ud800"'),
-    canonical.replace('{"schema":"deepfamily/story-chunk@1.0",', "{"),
-    '{"content":"中/\\n","schema":"deepfamily/story-chunk@1.0","chunkType":3,"attachmentCID":""}',
+    canonical.replace('{"schema":"deepfamily/story-record@1.0",', "{"),
+    '{"content":"中/\\n","schema":"deepfamily/story-record@1.0","recordType":3,"attachmentCID":""}',
     "\ufeff" + canonical,
   ])
     assert.throws(() => decodeCanonicalStoryRecord(utf8Bytes(text)), text);

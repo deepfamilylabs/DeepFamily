@@ -3,9 +3,9 @@ import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import {
   buildStoryDataResult,
-  mergeStoryChunkRecords,
+  mergeStoryRecords,
   getMissingStoryOffset,
-  type StoryChunk,
+  type StoryRecord,
   type StoryDataResult,
 } from "../../../shared/model";
 import { usePersonGateway } from "./usePersonGateway";
@@ -45,25 +45,25 @@ export function useStoryData(
         const metadata = await gateway.getStoryMetadata(tokenId, { ttlMs: TTL.story });
         if (cancelled) return;
 
-        if (metadata.totalChunks === 0) {
+        if (metadata.totalRecords === 0) {
           setData(buildStoryDataResult([], metadata, Date.now()));
           setLoading(false);
           return;
         }
 
-        let allChunks: StoryChunk[] = [];
+        let allRecords: StoryRecord[] = [];
         let offset = 0;
-        while (offset < metadata.totalChunks) {
+        while (offset < metadata.totalRecords) {
           if (cancelled) return;
-          const batch = await gateway.getStoryChunks(tokenId, offset, STORY_PAGE_SIZE);
-          allChunks = mergeStoryChunkRecords(allChunks, batch, metadata.totalChunks);
+          const batch = await gateway.getStoryRecords(tokenId, offset, STORY_PAGE_SIZE);
+          allRecords = mergeStoryRecords(allRecords, batch, metadata.totalRecords);
           if (batch.length === 0) break;
-          offset = getMissingStoryOffset(allChunks);
-          if (offset >= metadata.totalChunks) break;
+          offset = getMissingStoryOffset(allRecords);
+          if (offset >= metadata.totalRecords) break;
         }
 
         if (!cancelled) {
-          setData(buildStoryDataResult(allChunks, metadata, Date.now()));
+          setData(buildStoryDataResult(allRecords, metadata, Date.now()));
           setLoading(false);
         }
       } catch (err: any) {

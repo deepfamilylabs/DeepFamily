@@ -51,7 +51,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 - Community endorsement validates data quality across versions
 - Endorsed versions can be minted as permanent public NFT records
-- Private encrypted biography and public NFT story data are independent; public story chunks can be
+- Private encrypted biography and public NFT story data are independent; public story records can be
   permanently sealed
 - Personal details remain private until an endorsed contributor mints an NFT
 

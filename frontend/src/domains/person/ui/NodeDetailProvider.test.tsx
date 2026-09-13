@@ -176,14 +176,14 @@ describe("NodeDetailProvider", () => {
       if (!tokenId) return emptyQuery;
       return {
         data: {
-          chunks: [
+          records: [
             {
-              chunkIndex: 0,
-              chunkHash: "0xchunk",
+              recordIndex: 0,
+              payloadHash: "0xrecord",
               content: "story",
               timestamp: 456,
-              editor: "0xeditor",
-              chunkType: 0,
+              author: "0xeditor",
+              recordType: 0,
               attachmentCID: "",
             },
           ],
@@ -196,11 +196,11 @@ describe("NodeDetailProvider", () => {
             computedHash: "0xstory",
           },
           metadata: {
-            totalChunks: 1,
-            totalLength: 5,
+            totalRecords: 1,
+            totalPayloadLength: 5,
             isSealed: true,
             lastUpdateTime: 456,
-            fullStoryHash: "0xstory",
+            recordsHead: "0xstory",
           },
           loading: false,
           fetchedAt: 999,
@@ -246,7 +246,7 @@ describe("NodeDetailProvider", () => {
           parsed: expect.objectContaining({ nftTokenURI: "ipfs://token" }),
         },
         storyData: expect.objectContaining({
-          metadata: expect.objectContaining({ totalChunks: 1 }),
+          metadata: expect.objectContaining({ totalRecords: 1 }),
         }),
       }),
     );

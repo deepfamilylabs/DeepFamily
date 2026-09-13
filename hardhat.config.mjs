@@ -18,8 +18,8 @@ import addPersonZkTask from "./tasks/zk-add-person.mjs";
 import generateDisclosureBindingProofTask from "./tasks/zk-generate-disclosure-binding-proof.mjs";
 import networksCheckTask from "./tasks/networks-check.mjs";
 import networksListTask from "./tasks/networks-list.mjs";
-import addStoryChunkTask from "./tasks/story-add-chunk.mjs";
-import listStoryChunksTask from "./tasks/story-list-chunks.mjs";
+import addStoryRecordTask from "./tasks/story-add-record.mjs";
+import listStoryRecordsTask from "./tasks/story-list-records.mjs";
 import sealStoryTask from "./tasks/story-seal.mjs";
 import governanceScheduleTask from "./tasks/governance-schedule.mjs";
 import governanceExecuteTask from "./tasks/governance-execute.mjs";
@@ -255,8 +255,8 @@ export default {
     generateDisclosureBindingProofTask,
     networksCheckTask,
     networksListTask,
-    addStoryChunkTask,
-    listStoryChunksTask,
+    addStoryRecordTask,
+    listStoryRecordsTask,
     sealStoryTask,
     governanceScheduleTask,
     governanceExecuteTask,

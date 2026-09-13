@@ -28,23 +28,23 @@ function createEditor(
   const form = {
     data: {
       content: "Example story",
-      chunkType: 1,
+      recordType: 1,
       attachmentCID: "",
-      expectedHash: undefined,
+      expectedPayloadHash: undefined,
     },
-    draftContentHash: undefined,
+    draftPayloadHash: undefined,
     byteLength: 13,
     segmentBytes: 16_384,
     warningOrangeBytes: 16_184,
     updateContent: vi.fn(),
-    updateChunkType: vi.fn(),
+    updateRecordType: vi.fn(),
     updateAttachmentCID: vi.fn(),
     cancel: vi.fn(),
     submit: vi.fn(),
-    showChunkTypeDropdown: false,
-    setShowChunkTypeDropdown: vi.fn(),
-    showChunkTypeHelp: false,
-    setShowChunkTypeHelp: vi.fn(),
+    showRecordTypeDropdown: false,
+    setShowRecordTypeDropdown: vi.fn(),
+    showRecordTypeHelp: false,
+    setShowRecordTypeHelp: vi.fn(),
     ...overrides.form,
   };
 
@@ -56,16 +56,16 @@ function createEditor(
       scrollContainerRef: createRef<HTMLDivElement>(),
       formRef: createRef<HTMLDivElement>(),
       textareaRef: createRef<HTMLTextAreaElement>(),
-      chunkTypeDropdownRef: createRef<HTMLDivElement>(),
+      recordTypeDropdownRef: createRef<HTMLDivElement>(),
     },
     form,
-    // value 1 is "Opening", value 2 is "Early Years" in the chunk type taxonomy
-    chunkTypeOptions: [
+    // value 1 is "Opening", value 2 is "Early Years" in the record type taxonomy
+    recordTypeOptions: [
       { value: 1, label: "Summary", icon: TestIcon, color: "text-gray-500" },
       { value: 2, label: "Early Life", icon: TestIcon, color: "text-gray-500" },
     ],
     getByteWarningColor: () => "text-ink-muted",
-    getChunkTypeLabel: (value: number) => (value === 1 ? "Summary" : "Early Life"),
+    getRecordTypeLabel: (value: number) => (value === 1 ? "Summary" : "Early Life"),
     formatHash: (value: string) => value,
     copyText: vi.fn(),
     ...overrides.editor,
@@ -78,29 +78,29 @@ afterEach(() => {
 
 describe("StoryComposer", () => {
   it("keeps listbox semantics and the keyboard model for the inline tag picker", () => {
-    const setShowChunkTypeDropdown = vi.fn();
-    const updateChunkType = vi.fn();
-    const renderComposer = (showChunkTypeDropdown: boolean) => (
+    const setShowRecordTypeDropdown = vi.fn();
+    const updateRecordType = vi.fn();
+    const renderComposer = (showRecordTypeDropdown: boolean) => (
       <StoryComposer
         editor={createEditor({
-          form: { setShowChunkTypeDropdown, showChunkTypeDropdown, updateChunkType },
+          form: { setShowRecordTypeDropdown, showRecordTypeDropdown, updateRecordType },
         })}
       />
     );
 
     const { rerender } = render(renderComposer(false));
-    const trigger = screen.getByRole("button", { name: "Chunk Type Summary" });
+    const trigger = screen.getByRole("button", { name: "Record Type Summary" });
 
     expect(trigger.getAttribute("aria-haspopup")).toBe("listbox");
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
-    expect(setShowChunkTypeDropdown).toHaveBeenCalledWith(true);
+    expect(setShowRecordTypeDropdown).toHaveBeenCalledWith(true);
 
     rerender(renderComposer(true));
 
-    const openTrigger = screen.getByRole("button", { name: "Chunk Type Summary" });
-    const listbox = screen.getByRole("listbox", { name: "Chunk Type" });
+    const openTrigger = screen.getByRole("button", { name: "Record Type Summary" });
+    const listbox = screen.getByRole("listbox", { name: "Record Type" });
     const earlyLifeOption = screen.getByRole("option", { name: "Early Life" });
 
     expect(openTrigger.getAttribute("aria-expanded")).toBe("true");
@@ -113,44 +113,44 @@ describe("StoryComposer", () => {
     expect(openTrigger.getAttribute("aria-activedescendant")).toBe(earlyLifeOption.id);
 
     fireEvent.keyDown(openTrigger, { key: "Enter" });
-    expect(updateChunkType).toHaveBeenCalledWith(2);
+    expect(updateRecordType).toHaveBeenCalledWith(2);
 
     fireEvent.keyDown(openTrigger, { key: "Escape" });
-    expect(setShowChunkTypeDropdown).toHaveBeenCalledWith(false);
+    expect(setShowRecordTypeDropdown).toHaveBeenCalledWith(false);
   });
 
   it("keeps the picker inside the click-outside boundary", () => {
     // The controller closes the picker on any mousedown outside
-    // chunkTypeDropdownRef, and mousedown precedes click — so if the ref covers
+    // recordTypeDropdownRef, and mousedown precedes click — so if the ref covers
     // only the trigger, the panel unmounts before an option's click lands and
     // tags cannot be picked with the mouse at all.
-    const chunkTypeDropdownRef = createRef<HTMLDivElement>();
+    const recordTypeDropdownRef = createRef<HTMLDivElement>();
     render(
       <StoryComposer
         editor={createEditor({
-          form: { showChunkTypeDropdown: true },
+          form: { showRecordTypeDropdown: true },
           editor: {
             refs: {
               scrollContainerRef: createRef<HTMLDivElement>(),
               formRef: createRef<HTMLDivElement>(),
               textareaRef: createRef<HTMLTextAreaElement>(),
-              chunkTypeDropdownRef,
+              recordTypeDropdownRef,
             },
           } as Partial<StoryEditorController>,
         })}
       />,
     );
 
-    const boundary = chunkTypeDropdownRef.current!;
+    const boundary = recordTypeDropdownRef.current!;
     expect(boundary).toBeTruthy();
     expect(boundary.contains(screen.getByRole("listbox"))).toBe(true);
-    expect(boundary.contains(screen.getByRole("button", { name: "Chunk Type Summary" }))).toBe(
+    expect(boundary.contains(screen.getByRole("button", { name: "Record Type Summary" }))).toBe(
       true,
     );
   });
 
   it("groups the tags by taxonomy so the picker explains itself", () => {
-    render(<StoryComposer editor={createEditor({ form: { showChunkTypeDropdown: true } })} />);
+    render(<StoryComposer editor={createEditor({ form: { showRecordTypeDropdown: true } })} />);
 
     expect(screen.getByRole("group", { name: "Opening" })).toBeTruthy();
     expect(screen.getByRole("group", { name: "Early Years" })).toBeTruthy();
@@ -173,7 +173,7 @@ describe("StoryComposer", () => {
     render(
       <StoryComposer
         editor={createEditor({
-          form: { data: { content: "   ", chunkType: 1, attachmentCID: "" } },
+          form: { data: { content: "   ", recordType: 1, attachmentCID: "" } },
         })}
       />,
     );

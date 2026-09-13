@@ -3,31 +3,31 @@ import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import {
   makeNodeId,
   type NodeData,
-  type StoryChunk,
+  type StoryRecord,
   type StoryMetadata,
 } from "../../../shared/model";
 import {
   buildPrefetchedStoryDetailData,
-  getChunkParagraphs,
+  getRecordParagraphs,
   getFreshCachedStoryDetail,
   getFullStoryParagraphs,
-  groupStoryChunks,
+  groupStoryRecords,
   hasStoryIntegrityIssues,
   isValidPersonTokenId,
   mapPersonStoryFetchError,
-  normalizeChunkType,
+  normalizeRecordType,
 } from "./personPageModel";
 
 const zeroHash = `0x${"0".repeat(64)}`;
 
-function makeChunk(overrides: Partial<StoryChunk>): StoryChunk {
+function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
   return {
-    chunkIndex: 0,
-    chunkHash: zeroHash,
+    recordIndex: 0,
+    payloadHash: zeroHash,
     content: "hello",
     timestamp: 1,
-    editor: "0x0000000000000000000000000000000000000000",
-    chunkType: 0,
+    author: "0x0000000000000000000000000000000000000000",
+    recordType: 0,
     attachmentCID: "",
     ...overrides,
   };
@@ -35,11 +35,11 @@ function makeChunk(overrides: Partial<StoryChunk>): StoryChunk {
 
 function makeMetadata(overrides: Partial<StoryMetadata> = {}): StoryMetadata {
   return {
-    totalChunks: 2,
-    fullStoryHash: zeroHash,
+    totalRecords: 2,
+    recordsHead: zeroHash,
     lastUpdateTime: 1,
     isSealed: false,
-    totalLength: 10,
+    totalPayloadLength: 10,
     ...overrides,
   };
 }
@@ -58,39 +58,39 @@ function makeNode(overrides: Partial<NodeData>): NodeData {
 }
 
 describe("personPageModel", () => {
-  it("validates token ids and normalizes chunk types", () => {
+  it("validates token ids and normalizes record types", () => {
     expect(isValidPersonTokenId("42")).toBe(true);
     expect(isValidPersonTokenId("abc")).toBe(false);
-    expect(normalizeChunkType("3")).toBe(3);
-    expect(normalizeChunkType("abc")).toBe(0);
-    expect(normalizeChunkType(undefined)).toBe(0);
+    expect(normalizeRecordType("3")).toBe(3);
+    expect(normalizeRecordType("abc")).toBe(0);
+    expect(normalizeRecordType(undefined)).toBe(0);
   });
 
-  it("hydrates prefetched story data without mutating chunk semantics", () => {
+  it("hydrates prefetched story data without mutating record semantics", () => {
     const data = buildPrefetchedStoryDetailData("42", {
       tokenId: "42",
       fullName: "Ada",
-      storyChunks: [
-        makeChunk({ chunkIndex: 0, content: "hello ", chunkType: "2" as any }),
-        makeChunk({ chunkIndex: 1, content: "world", attachmentCID: undefined as any }),
+      storyRecords: [
+        makeRecord({ recordIndex: 0, content: "hello ", recordType: "2" as any }),
+        makeRecord({ recordIndex: 1, content: "world", attachmentCID: undefined as any }),
       ],
     });
 
     expect(data?.fullStory).toBe("hello world");
-    expect(data?.storyChunks?.map((chunk) => chunk.chunkType)).toEqual([2, 0]);
-    expect(data?.storyChunks?.map((chunk) => chunk.attachmentCID)).toEqual(["", ""]);
+    expect(data?.storyRecords?.map((record) => record.recordType)).toEqual([2, 0]);
+    expect(data?.storyRecords?.map((record) => record.attachmentCID)).toEqual(["", ""]);
     expect(buildPrefetchedStoryDetailData("7", { tokenId: "42" })).toBeNull();
   });
 
-  it("groups chunks by type and builds paragraph views in display order", () => {
-    const chunks = [
-      makeChunk({ chunkIndex: 2, content: "C", chunkType: 3 }),
-      makeChunk({ chunkIndex: 0, content: "A", chunkType: 1 }),
-      makeChunk({ chunkIndex: 1, content: "B", chunkType: 1 }),
+  it("groups records by type and builds paragraph views in display order", () => {
+    const records = [
+      makeRecord({ recordIndex: 2, content: "C", recordType: 3 }),
+      makeRecord({ recordIndex: 0, content: "A", recordType: 1 }),
+      makeRecord({ recordIndex: 1, content: "B", recordType: 1 }),
     ];
 
-    expect(getChunkParagraphs(chunks)).toEqual(["A", "B", "C"]);
-    expect(groupStoryChunks(chunks).map((group) => [group.type, group.chunks.length])).toEqual([
+    expect(getRecordParagraphs(records)).toEqual(["A", "B", "C"]);
+    expect(groupStoryRecords(records).map((group) => [group.type, group.records.length])).toEqual([
       [1, 2],
       [3, 1],
     ]);
@@ -100,33 +100,33 @@ describe("personPageModel", () => {
   });
 
   it("keeps archived biography in the basic story while excluding it from ordinary views", () => {
-    const biography = makeChunk({
+    const biography = makeRecord({
       schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
       content: "Original public biography",
     });
-    const ordinary = makeChunk({ chunkIndex: 1, chunkType: 1, content: "A later story" });
+    const ordinary = makeRecord({ recordIndex: 1, recordType: 1, content: "A later story" });
     const data = buildPrefetchedStoryDetailData("42", {
-      storyChunks: [biography, ordinary],
+      storyRecords: [biography, ordinary],
       fullStory: "Original public biographyA later story",
     });
 
     expect(data?.nftCoreInfo?.story).toBe(biography.content);
     expect(data?.fullStory).toBe(ordinary.content);
-    expect(data?.storyChunks).toEqual([biography, ordinary]);
-    expect(getChunkParagraphs(data?.storyChunks)).toEqual([ordinary.content]);
-    const groups = groupStoryChunks(data?.storyChunks);
+    expect(data?.storyRecords).toEqual([biography, ordinary]);
+    expect(getRecordParagraphs(data?.storyRecords)).toEqual([ordinary.content]);
+    const groups = groupStoryRecords(data?.storyRecords);
     expect(groups.map((group) => group.type)).toEqual([1]);
-    expect(groups[0].chunks[0]).toMatchObject({ chunkIndex: 1, displayIndex: 1 });
+    expect(groups[0].records[0]).toMatchObject({ recordIndex: 1, displayIndex: 1 });
   });
 
   it("uses fresh cached story data only inside the expected ttl", () => {
-    const chunks = [
-      makeChunk({ chunkIndex: 0, content: "hello " }),
-      makeChunk({ chunkIndex: 1, content: "world" }),
+    const records = [
+      makeRecord({ recordIndex: 0, content: "hello " }),
+      makeRecord({ recordIndex: 1, content: "world" }),
     ];
     const node = makeNode({
-      storyMetadata: makeMetadata({ totalLength: 11 }),
-      storyChunks: chunks,
+      storyMetadata: makeMetadata({ totalPayloadLength: 11 }),
+      storyRecords: records,
       storyFetchedAt: 1000,
     });
 
@@ -146,7 +146,7 @@ describe("personPageModel", () => {
     expect(
       hasStoryIntegrityIssues({
         tokenId: "42",
-        storyMetadata: makeMetadata({ totalChunks: 1 }),
+        storyMetadata: makeMetadata({ totalRecords: 1 }),
         integrity: { missing: [0], lengthMatch: true, hashMatch: null, computedLength: 0 },
       }),
     ).toBe(true);

@@ -2,43 +2,43 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
 import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
-import { addStoryChunkService, type AddStoryChunkResult } from "../services/addStoryChunkService";
+import { addStoryRecordService, type AddStoryRecordResult } from "../services/addStoryRecordService";
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
 
 import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
 
-export type AddStoryChunkFlowArgs = {
+export type AddStoryRecordFlowArgs = {
   tokenId: string;
-  chunkIndex: number;
+  recordIndex: number;
   content: string;
-  expectedHash: string;
-  chunkType?: number;
+  expectedPayloadHash: string;
+  recordType?: number;
   attachmentCID?: string;
   confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
 };
 
-export function useAddStoryChunkFlow() {
+export function useAddStoryRecordFlow() {
   const { signer } = useWallet();
   const { contractAddress } = useConfig();
   const { t } = useTranslation();
 
-  const runner: TxFlowRunner<AddStoryChunkResult, [AddStoryChunkFlowArgs]> = useCallback(
+  const runner: TxFlowRunner<AddStoryRecordResult, [AddStoryRecordFlowArgs]> = useCallback(
     async (update, args) => {
       if (!signer || !contractAddress) {
         throw new Error(t("wallet.notConnected", "Please connect your wallet"));
       }
 
-      update("submitting", t("story.addingChunk", "Adding story chunk..."));
+      update("submitting", t("story.addingRecord", "Adding story record..."));
 
-      return await addStoryChunkService(
+      return await addStoryRecordService(
         signer as any,
         contractAddress,
         args.tokenId,
-        args.chunkIndex,
+        args.recordIndex,
         args.content,
-        args.expectedHash,
-        args.chunkType,
+        args.expectedPayloadHash,
+        args.recordType,
         args.attachmentCID,
         args.confirmTransactionPreview,
       );
@@ -46,7 +46,7 @@ export function useAddStoryChunkFlow() {
     [signer, contractAddress, t],
   );
 
-  return useTxFlow<AddStoryChunkResult, [AddStoryChunkFlowArgs], FriendlyError>(runner, {
+  return useTxFlow<AddStoryRecordResult, [AddStoryRecordFlowArgs], FriendlyError>(runner, {
     normalizeError: (error) => normalizeFriendlyError(error, t),
   });
 }

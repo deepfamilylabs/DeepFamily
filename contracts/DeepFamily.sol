@@ -29,7 +29,7 @@ interface IDeepFamilyToken {
  * @dev Architecture:
  *      - Privacy Layer: Groth16 proofs + Poseidon/keccak256 dual-hash for private submissions
  *      - Incentive Layer: DEEP token mining for complete families, endorsement fees route to NFT holders/contributors
- *      - Asset Layer: Endorsed versions mint to NFTs with on-chain bio data + unlimited story sharding
+ *      - Asset Layer: Endorsed versions mint to NFTs with on-chain biography data and append-only public story records
  */
 contract DeepFamily is
   Initializable,

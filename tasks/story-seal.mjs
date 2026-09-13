@@ -10,7 +10,7 @@ const action = async (args, hre) => {
   return sealArchiveStory({ archive: archive.connect(signer), tokenId: BigInt(args.tokenid) });
 };
 
-export default task("seal-story", "Seal the story for an NFT (no further chunk modifications)")
+export default task("seal-story", "Seal the story for an NFT (no further records can be appended)")
   .addOption({
     name: "tokenid",
     description: "NFT tokenId",

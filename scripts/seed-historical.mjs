@@ -1,20 +1,20 @@
 import {
   readStoryRecord,
   STORY_BIOGRAPHY_SCHEMA_ID,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
 } from "@deepfamily/protocol-core";
 import {
-  buildHistoricalStoryChunks,
+  buildHistoricalStoryRecords,
   getHistoricalStoryResume,
-} from "../lib/historicalStoryChunks.js";
+} from "../lib/historicalStoryRecords.js";
 import { appendDfsStoryRecord } from "../lib/archiveOperations.js";
 /**
  * seed-historical.js
  * Generate demo data using real historical person data
  * Features:
  * - Historical persons without copyright issues (public domain)
- * - 19 chunk types corresponding to real biographical content
- * - Each chunk stays within the 16 KiB UTF-8 byte limit
+ * - 19 record types corresponding to real biographical content
+ * - The seed builder splits source text into records of at most 16 KiB of UTF-8
  * - Real family relationships
  * - Data and logic separated (loaded from JSON files)
  * - Multi-language support with batch seeding capability
@@ -467,7 +467,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
   const expectedPersons = members.length;
   const expectedMintable = members.filter((m) => m.mintNFT !== false).length;
   console.log(`Targets — persons: ${expectedPersons}, mintable: ${expectedMintable}`);
-  let expectedChunks = 0; // total JSON chunks for mintable persons
+  let expectedRecords = 0; // total JSON records for mintable persons
 
   const addedPersons = [];
   let existingPersons = 0;
@@ -635,17 +635,17 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
     `Step 2 summary — new versions added: ${newlyAddedPersons}, skipped existing: ${existingPersons}`,
   );
 
-  // Step 3: Mint NFTs and add Story Chunks
-  console.log("Step 3: Minting NFTs and adding story chunks...");
+  // Step 3: Mint NFTs and add Story Records
+  console.log("Step 3: Minting NFTs and adding story records...");
   console.log(
     `Targets — persons to process: ${addedPersons.length}, mintable: ${addedPersons.filter((p) => p.mintNFT !== false).length}`,
   );
 
   let nftCount = 0;
   let skippedCount = 0;
-  let totalChunks = 0;
+  let totalRecords = 0;
   let mintedOnChain = 0; // includes existing + newly minted
-  let onChainChunks = 0; // total chunks observed/assumed on chain (per current signer reads)
+  let onChainRecords = 0; // total records observed/assumed on chain (per current signer reads)
 
   for (let idx = 0; idx < addedPersons.length; idx++) {
     const person = addedPersons[idx];
@@ -749,7 +749,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         if (revertData) {
           console.error(`     Revert data: ${revertData}`);
         }
-        // Skip story chunk processing for this person, continue with next
+        // Skip story record processing for this person, continue with next
         continue;
       }
 
@@ -766,15 +766,15 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
     mintedOnChain += tokenId > 0 ? 1 : 0;
 
     if (tokenId === 0) {
-      console.log("  ⊘ No tokenId available, skip story chunks");
+      console.log("  ⊘ No tokenId available, skip story records");
       continue;
     }
 
     // The mint story and categorized storyData are independent sources.
-    // Archive record 0 may store the biography; only storyData supplies ordinary chunks.
-    const availableChunks = buildHistoricalStoryChunks(person);
-    const targetChunkCount = availableChunks.length;
-    expectedChunks += targetChunkCount;
+    // Archive record 0 may store the biography; only storyData supplies ordinary records.
+    const availableRecords = buildHistoricalStoryRecords(person);
+    const targetRecordCount = availableRecords.length;
+    expectedRecords += targetRecordCount;
     storyState = await archive.storyState(tokenId);
     let biographyRecordCount = 0;
     let initialRef;
@@ -788,15 +788,15 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         recordRef: initialRef,
         getCode: (address, block) => signer.provider.getCode(address, block),
       });
-      if (initial.decoded?.chunkType !== 0 || initial.decoded.content !== person.story) {
+      if (initial.decoded?.recordType !== 0 || initial.decoded.content !== person.story) {
         throw new Error("Mint biography differs from the full source narrative");
       }
-      console.log("  [ok]Public biography verified separately from ordinary story chunks");
+      console.log("  [ok]Public biography verified separately from ordinary story records");
     }
-    const existingChunks = Number(storyState.totalRecords) - biographyRecordCount;
-    console.log(`  >Story chunks prepared from JSON storyData: ${targetChunkCount} chunk(s)`);
+    const existingRecords = Number(storyState.totalRecords) - biographyRecordCount;
+    console.log(`  >Story records prepared from JSON storyData: ${targetRecordCount} record(s)`);
 
-    // Ensure signer owns the NFT before writing chunks (reading metadata is permissionless)
+    // Ensure signer owns the NFT before writing records (reading metadata is permissionless)
     let owner = person.owner;
     if (!owner) {
       try {
@@ -808,82 +808,82 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
 
     if (owner && owner.toLowerCase() !== signer.address.toLowerCase()) {
       console.log(
-        `  ⊘ Current signer not holder (${owner}), skip story chunks (JSON: ${targetChunkCount}, on-chain: ${existingChunks})`,
+        `  ⊘ Current signer not holder (${owner}), skip story records (JSON: ${targetRecordCount}, on-chain: ${existingRecords})`,
       );
-      onChainChunks += existingChunks;
+      onChainRecords += existingRecords;
       continue;
     }
 
     if (storyState?.isSealed) {
       console.log(
-        `  ⊘ Story sealed on-chain, chunks (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
+        `  ⊘ Story sealed on-chain, records (JSON vs on-chain): ${targetRecordCount} vs ${existingRecords}`,
       );
-      onChainChunks += existingChunks;
+      onChainRecords += existingRecords;
       continue;
     }
 
-    if (existingChunks > availableChunks.length) {
+    if (existingRecords > availableRecords.length) {
       console.log(
-        `  Warning: On-chain chunks (${existingChunks}) exceed JSON chunks (${availableChunks.length}), skip writing`,
+        `  Warning: On-chain records (${existingRecords}) exceed JSON records (${availableRecords.length}), skip writing`,
       );
-      onChainChunks += existingChunks;
+      onChainRecords += existingRecords;
       continue;
     }
 
-    const { pendingChunks, nextRecordIndex } = getHistoricalStoryResume({
+    const { pendingRecords, nextRecordIndex } = getHistoricalStoryResume({
       totalRecords: storyState.totalRecords,
       biographyRecordCount,
-      chunks: availableChunks,
+      records: availableRecords,
     });
     // Resume only when the existing ordinary prefix matches this JSON source.
-    for (let index = 0; index < existingChunks; index++) {
+    for (let index = 0; index < existingRecords; index++) {
       const stored = await readStoryRecord({
         recordRef: await archive.storyRecordRef(tokenId, biographyRecordCount + index),
         getCode: (address, block) => signer.provider.getCode(address, block),
       });
-      const expected = availableChunks[index];
+      const expected = availableRecords[index];
       if (
-        stored.schemaId !== STORY_CHUNK_SCHEMA_ID ||
+        stored.schemaId !== STORY_ENVELOPE_SCHEMA_ID ||
         stored.decoded?.content !== expected.content ||
-        stored.decoded?.chunkType !== expected.type ||
+        stored.decoded?.recordType !== expected.type ||
         stored.decoded?.attachmentCID !== ""
       ) {
-        throw new Error(`Existing story chunk ${index + 1} differs from JSON; refusing to resume`);
+        throw new Error(`Existing story record ${index + 1} differs from JSON; refusing to resume`);
       }
     }
-    if (pendingChunks.length === 0) {
+    if (pendingRecords.length === 0) {
       console.log(
-        `  -Story already complete on-chain (JSON vs on-chain): ${targetChunkCount} vs ${existingChunks}`,
+        `  -Story already complete on-chain (JSON vs on-chain): ${targetRecordCount} vs ${existingRecords}`,
       );
-      onChainChunks += existingChunks;
+      onChainRecords += existingRecords;
       continue;
     }
 
     console.log(
-      `  Adding ${pendingChunks.length} story chunk(s) (resume from Archive index ${nextRecordIndex})...`,
+      `  Adding ${pendingRecords.length} story record(s) (resume from Archive index ${nextRecordIndex})...`,
     );
 
-    for (let i = 0; i < pendingChunks.length; i++) {
-      const chunk = pendingChunks[i];
-      const chunkIndex = nextRecordIndex + i;
-      const chunkStart = Date.now();
+    for (let i = 0; i < pendingRecords.length; i++) {
+      const record = pendingRecords[i];
+      const recordIndex = nextRecordIndex + i;
+      const recordStart = Date.now();
       const result = await appendDfsStoryRecord({
         archive,
         tokenId,
-        expectedIndex: chunkIndex,
-        content: chunk.content,
-        chunkType: chunk.type,
+        expectedIndex: recordIndex,
+        content: record.content,
+        recordType: record.type,
         attachmentCID: "",
       });
       console.log(
-        `    [ok]Record ${chunkIndex} added (${Date.now() - chunkStart}ms) — hash: ${result.recordRef.blob.payloadHash}`,
+        `    [ok]Record ${recordIndex} added (${Date.now() - recordStart}ms) — hash: ${result.recordRef.blob.payloadHash}`,
       );
-      totalChunks++;
+      totalRecords++;
     }
 
-    onChainChunks += existingChunks + pendingChunks.length;
+    onChainRecords += existingRecords + pendingRecords.length;
     console.log(
-      `  [ok]Added ${pendingChunks.length} story chunk(s) (JSON target: ${targetChunkCount}, on-chain now: ${existingChunks + pendingChunks.length})`,
+      `  [ok]Added ${pendingRecords.length} story record(s) (JSON target: ${targetRecordCount}, on-chain now: ${existingRecords + pendingRecords.length})`,
     );
   }
 
@@ -891,20 +891,20 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
   console.log("Seed Complete!");
   console.log("=".repeat(60));
   const existingMinted = Math.max(mintedOnChain - nftCount, 0);
-  const existingChunksOnChain = Math.max(onChainChunks - totalChunks, 0);
-  const remainingChunks = expectedChunks - onChainChunks;
+  const existingRecordsOnChain = Math.max(onChainRecords - totalRecords, 0);
+  const remainingRecords = expectedRecords - onChainRecords;
   console.log(`Family: ${familyData.familyName}`);
   console.log(`Persons processed (JSON vs on-chain): ${expectedPersons} vs ${addedPersons.length}`);
   console.log(
     `NFT status — minted this run: ${nftCount}; skipped by config: ${skippedCount}; on-chain total (seen): ${mintedOnChain} (existing: ${existingMinted})`,
   );
   console.log(
-    `Story chunks — target (JSON mintable): ${expectedChunks}; on-chain seen: ${onChainChunks} (existing: ${existingChunksOnChain}); added this run: ${totalChunks}`,
+    `Story records — target (JSON mintable): ${expectedRecords}; on-chain seen: ${onChainRecords} (existing: ${existingRecordsOnChain}); added this run: ${totalRecords}`,
   );
-  if (remainingChunks > 0) {
-    console.log(`Remaining JSON chunks not on-chain (estimate): ${remainingChunks}`);
-  } else if (expectedChunks > 0) {
-    console.log(`All JSON chunks are already on-chain.`);
+  if (remainingRecords > 0) {
+    console.log(`Remaining JSON records not on-chain (estimate): ${remainingRecords}`);
+  } else if (expectedRecords > 0) {
+    console.log(`All JSON records are already on-chain.`);
   }
   console.log(
     `Mintable persons — expected: ${expectedMintable}; on-chain NFTs (seen): ${mintedOnChain}`,
@@ -925,7 +925,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
     personsAdded: addedPersons.length,
     nftsMinted: nftCount,
     nftsSkipped: skippedCount,
-    storyChunks: totalChunks,
+    storyRecords: totalRecords,
     rootHashes,
   };
 }
@@ -994,7 +994,7 @@ async function main() {
 
   let totalPersons = 0;
   let totalNFTs = 0;
-  let totalChunks = 0;
+  let totalRecords = 0;
   let successCount = 0;
 
   for (const result of results) {
@@ -1005,10 +1005,10 @@ async function main() {
       console.log(`    Family: ${result.familyName}`);
       console.log(`    Persons: ${result.personsAdded}`);
       console.log(`    NFTs: ${result.nftsMinted}`);
-      console.log(`    Chunks: ${result.storyChunks}`);
+      console.log(`    Records: ${result.storyRecords}`);
       totalPersons += result.personsAdded;
       totalNFTs += result.nftsMinted;
-      totalChunks += result.storyChunks;
+      totalRecords += result.storyRecords;
       successCount++;
     } else {
       console.log(`    Error: ${result.error}`);
@@ -1019,7 +1019,7 @@ async function main() {
   console.log(`Total Results: ${successCount}/${results.length} files succeeded`);
   console.log(`Total Persons: ${totalPersons}`);
   console.log(`Total NFTs: ${totalNFTs}`);
-  console.log(`Total Story Chunks: ${totalChunks}`);
+  console.log(`Total Story Records: ${totalRecords}`);
   console.log("=".repeat(70));
 
   console.log("\nContract addresses:");

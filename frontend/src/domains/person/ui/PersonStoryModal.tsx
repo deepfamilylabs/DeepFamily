@@ -12,7 +12,7 @@ import {
   getStoryPresentation,
 } from "../../../shared/model";
 import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
-import { getChunkTypeOptions } from "../config/chunkTypes";
+import { getRecordTypeOptions } from "../config/recordTypes";
 import type { EndorseSuccessHandler } from "./EndorseModalProvider";
 import {
   BasicStorySection,
@@ -30,7 +30,7 @@ interface PersonStoryModalProps {
   onClose: () => void;
   getStoryData?: (
     tokenId: string,
-  ) => Promise<Pick<StoryData, "chunks" | "fullStory" | "integrity"> | null>;
+  ) => Promise<Pick<StoryData, "records" | "fullStory" | "integrity"> | null>;
   getOwnerOf?: (tokenId: string) => Promise<string | null | undefined>;
   onEndorseSuccess?: EndorseSuccessHandler;
 }
@@ -52,15 +52,15 @@ export default function PersonStoryModal({
   const [marquee, setMarquee] = useState(false);
 
   const [storyData, setStoryData] = useState<StoryData>({
-    chunks: [],
+    records: [],
     fullStory: "",
     integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
     loading: false,
     integrityChecking: false,
   });
 
-  const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
-  const [viewMode, setViewMode] = useState<"chunks" | "full">("chunks");
+  const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
+  const [viewMode, setViewMode] = useState<"records" | "full">("records");
   const [entered, setEntered] = useState(false);
   const [owner, setOwner] = useState<string | undefined>(person.owner);
   const [showEndorseModal, setShowEndorseModal] = useState(false);
@@ -69,21 +69,21 @@ export default function PersonStoryModal({
 
   const personHasDetailedStory = useMemo(() => hasDetailedStoryFn(person), [person]);
 
-  const chunkTypeOptions = useMemo(() => getChunkTypeOptions(t), [t]);
+  const recordTypeOptions = useMemo(() => getRecordTypeOptions(t), [t]);
 
-  const getChunkTypeLabel = useCallback(
+  const getRecordTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
       if (type === null || type === undefined || type === "") {
-        return chunkTypeOptions[0]?.label || t("chunkTypes.unknown", "Unknown");
+        return recordTypeOptions[0]?.label || t("recordTypes.unknown", "Unknown");
       }
       const numericType = Number(type);
       if (Number.isFinite(numericType)) {
-        const match = chunkTypeOptions.find((opt) => opt.value === numericType);
+        const match = recordTypeOptions.find((opt) => opt.value === numericType);
         if (match) return match.label;
       }
-      return t("chunkTypes.unknown", "Unknown");
+      return t("recordTypes.unknown", "Unknown");
     },
-    [chunkTypeOptions, t],
+    [recordTypeOptions, t],
   );
 
   // Keep local owner state in sync with NodeData updates
@@ -95,19 +95,19 @@ export default function PersonStoryModal({
   }, [person.endorsementCount, person.personHash, person.versionIndex]);
 
   const presentation = useMemo(
-    () => getStoryPresentation(storyData.chunks, person.storyMetadata),
-    [storyData.chunks, person.storyMetadata],
+    () => getStoryPresentation(storyData.records, person.storyMetadata),
+    [storyData.records, person.storyMetadata],
   );
   const presentedStoryData = {
     ...storyData,
-    chunks: presentation.chunks,
+    records: presentation.records,
     fullStory: presentation.fullStory,
   };
   const biography = presentation.biography;
   const basicStory =
     biography && !biography.unsupportedSchema ? biography.content : person.nftPublicStory;
-  const chunksCount = presentation.totalChunks;
-  const lengthBytes = presentation.totalLength;
+  const recordsCount = presentation.totalRecords;
+  const lengthBytes = presentation.totalPayloadLength;
   const integrityOk = useMemo(
     () =>
       !!storyData.integrity &&
@@ -171,12 +171,12 @@ export default function PersonStoryModal({
     }
     if (!getStoryData) {
       setStoryData({
-        chunks: [],
+        records: [],
         fullStory: "",
         integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
         loading: false,
         integrityChecking: false,
-        error: t("storyChunksModal.noStoryData", "No story data available"),
+        error: t("storyRecordsModal.noStoryData", "No story data available"),
       });
       return;
     }
@@ -193,21 +193,21 @@ export default function PersonStoryModal({
       // Handle offline mode with no cached data
       if (!data) {
         setStoryData({
-          chunks: [],
+          records: [],
           fullStory: "",
           integrity: { missing: [], lengthMatch: true, hashMatch: null, computedLength: 0 },
           loading: false,
           integrityChecking: false,
-          error: t("storyChunksModal.noStoryData", "No story data available"),
+          error: t("storyRecordsModal.noStoryData", "No story data available"),
         });
         return;
       }
 
-      // If there are chunks, show integrity checking status first
-      if (data.chunks.length > 0) {
+      // If there are records, show integrity checking status first
+      if (data.records.length > 0) {
         setStoryData((prev) => ({
           ...prev,
-          chunks: data.chunks,
+          records: data.records,
           fullStory: data.fullStory,
           loading: false,
           integrityChecking: true,
@@ -218,19 +218,19 @@ export default function PersonStoryModal({
       }
 
       setStoryData({
-        chunks: data.chunks,
+        records: data.records,
         fullStory: data.fullStory,
         integrity: data.integrity,
         loading: false,
         integrityChecking: false,
       });
     } catch (err: any) {
-      console.error("Failed to fetch story chunks:", err);
+      console.error("Failed to fetch story records:", err);
       setStoryData((prev) => ({
         ...prev,
         loading: false,
         integrityChecking: false,
-        error: err.message || t("storyChunksModal.fetchError", "Failed to load story data"),
+        error: err.message || t("storyRecordsModal.fetchError", "Failed to load story data"),
       }));
     }
   }, [person.tokenId, getStoryData, t]);
@@ -260,9 +260,9 @@ export default function PersonStoryModal({
     };
   }, [isOpen, person.tokenId, getOwnerOf]);
 
-  // Toggle chunk expansion
-  const toggleChunk = (index: number) => {
-    setExpandedChunks((prev) => {
+  // Toggle record expansion
+  const toggleRecord = (index: number) => {
+    setExpandedRecords((prev) => {
       const next = new Set(prev);
       if (next.has(index)) {
         next.delete(index);
@@ -352,7 +352,7 @@ export default function PersonStoryModal({
         {isMinted(person) && (
           <button
             type="button"
-            aria-label={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
+            aria-label={t("storyRecordsModal.peopleEncyclopedia", "People Encyclopedia")}
             onClick={(e) => {
               e.stopPropagation();
               window.open(
@@ -364,7 +364,7 @@ export default function PersonStoryModal({
             onPointerDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             className={action}
-            title={t("storyChunksModal.peopleEncyclopedia", "People Encyclopedia")}
+            title={t("storyRecordsModal.peopleEncyclopedia", "People Encyclopedia")}
           >
             <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
             <span className="hidden sm:inline">
@@ -430,22 +430,22 @@ export default function PersonStoryModal({
               t={t}
               person={person}
               storyData={presentedStoryData}
-              chunksCount={chunksCount}
+              recordsCount={recordsCount}
               lengthBytes={lengthBytes}
               integrityOk={integrityOk}
               viewMode={viewMode}
-              expandedChunks={expandedChunks}
+              expandedRecords={expandedRecords}
               personHasDetailedStory={personHasDetailedStory}
               onViewModeChange={setViewMode}
-              onToggleChunk={toggleChunk}
-              getChunkTypeLabel={getChunkTypeLabel}
+              onToggleRecord={toggleRecord}
+              getRecordTypeLabel={getRecordTypeLabel}
               copyText={copyText}
             />
             {!person.nftPublicStory &&
               !(
                 personHasDetailedStory ||
                 person.storyMetadata ||
-                storyData.chunks.length > 0 ||
+                storyData.records.length > 0 ||
                 !!storyData.fullStory ||
                 storyData.integrity.computedLength > 0 ||
                 storyData.loading

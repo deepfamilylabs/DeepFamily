@@ -25,6 +25,6 @@ export const TTL = {
   /** Edge data (children union/strict). Default: 2 min */
   edges: ttlEnv.edges,
 
-  /** Story metadata + chunks. Default: 5 min */
+  /** Story metadata + records. Default: 5 min */
   story: ttlEnv.story,
 } as const;

@@ -14,12 +14,12 @@ import {
 } from "./archiveTransaction";
 
 export interface SealStoryResult {
-  totalChunks: number;
-  fullStoryHash: string;
+  totalRecords: number;
+  recordsHead: string;
   transactionHash: string;
   blockNumber: number;
   events: {
-    StorySealed: { tokenId: string; totalChunks: number; fullStoryHash: string; sealer: string };
+    StorySealed: { tokenId: string; totalRecords: number; recordsHead: string; sealer: string };
   };
 }
 
@@ -91,8 +91,8 @@ export async function sealStoryService(
     }
     const sealed = {
       tokenId,
-      totalChunks: Number(state.totalRecords),
-      fullStoryHash: state.recordsHead,
+      totalRecords: Number(state.totalRecords),
+      recordsHead: state.recordsHead,
       sealer: author,
     };
     return {

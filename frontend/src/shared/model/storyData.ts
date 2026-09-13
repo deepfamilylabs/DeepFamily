@@ -1,8 +1,8 @@
 import { ethers } from "ethers";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
-import { computeStoryHash } from "./story";
+import { computeStoryRecordsHead } from "./story";
 import { getStoryPresentation } from "./storyPresentation";
-import type { NodeData, StoryChunk, StoryMetadata } from "./graph";
+import type { NodeData, StoryRecord, StoryMetadata } from "./graph";
 
 export interface StoryIntegrity {
   missing: number[];
@@ -13,13 +13,13 @@ export interface StoryIntegrity {
 }
 
 export interface StorySnapshot {
-  chunks: StoryChunk[];
+  records: StoryRecord[];
   fullStory: string;
   integrity: StoryIntegrity;
 }
 
 export interface StoryDataResult {
-  chunks: StoryChunk[];
+  records: StoryRecord[];
   fullStory: string;
   integrity: StoryIntegrity;
   metadata: StoryMetadata;
@@ -28,44 +28,44 @@ export interface StoryDataResult {
 }
 
 export function buildStorySnapshot(
-  chunks: StoryChunk[],
+  records: StoryRecord[],
   metadata?: StoryMetadata | null,
 ): StorySnapshot {
-  const sorted = [...chunks]
-    .filter((chunk) => Number.isFinite(Number(chunk?.chunkIndex)))
-    .sort((a, b) => a.chunkIndex - b.chunkIndex);
+  const sorted = [...records]
+    .filter((record) => Number.isFinite(Number(record?.recordIndex)))
+    .sort((a, b) => a.recordIndex - b.recordIndex);
   const fullStory = getStoryPresentation(sorted, metadata).fullStory;
   const encoder = new TextEncoder();
   const computedLength = sorted.reduce(
-    (acc, chunk) => acc + (chunk.payloadLength ?? encoder.encode(chunk.content).length),
+    (acc, record) => acc + (record.payloadLength ?? encoder.encode(record.content).length),
     0,
   );
 
   const missing: number[] = [];
-  const totalChunks = Number(metadata?.totalChunks ?? 0);
-  for (let i = 0; i < totalChunks; i += 1) {
-    if (!sorted.find((chunk) => chunk.chunkIndex === i)) missing.push(i);
+  const totalRecords = Number(metadata?.totalRecords ?? 0);
+  for (let i = 0; i < totalRecords; i += 1) {
+    if (!sorted.find((record) => record.recordIndex === i)) missing.push(i);
   }
 
   let hashMatch: boolean | null = null;
   let computedHash: string | undefined;
   if (
     missing.length === 0 &&
-    totalChunks > 0 &&
-    sorted.every((chunk) => Boolean(chunk.recordHash)) &&
-    metadata?.fullStoryHash &&
-    metadata.fullStoryHash !== ethers.ZeroHash
+    totalRecords > 0 &&
+    sorted.every((record) => Boolean(record.recordHash)) &&
+    metadata?.recordsHead &&
+    metadata.recordsHead !== ethers.ZeroHash
   ) {
-    computedHash = computeStoryHash(sorted);
-    hashMatch = computedHash === metadata.fullStoryHash;
+    computedHash = computeStoryRecordsHead(sorted);
+    hashMatch = computedHash === metadata.recordsHead;
   }
 
   return {
-    chunks: sorted,
+    records: sorted,
     fullStory,
     integrity: {
       missing,
-      lengthMatch: metadata ? computedLength === metadata.totalLength : true,
+      lengthMatch: metadata ? computedLength === metadata.totalPayloadLength : true,
       hashMatch,
       computedLength,
       computedHash,
@@ -73,34 +73,34 @@ export function buildStorySnapshot(
   };
 }
 
-export function mergeStoryChunkRecords(
-  existingChunks: StoryChunk[],
-  incomingChunks: StoryChunk[],
-  totalChunks?: number,
-): StoryChunk[] {
-  const byIndex = new Map<number, StoryChunk>();
-  for (const chunk of existingChunks) {
-    const idx = Number(chunk?.chunkIndex);
+export function mergeStoryRecords(
+  existingRecords: StoryRecord[],
+  incomingRecords: StoryRecord[],
+  totalRecords?: number,
+): StoryRecord[] {
+  const byIndex = new Map<number, StoryRecord>();
+  for (const record of existingRecords) {
+    const idx = Number(record?.recordIndex);
     if (Number.isFinite(idx) && idx >= 0 && !byIndex.has(idx)) {
-      byIndex.set(idx, chunk);
+      byIndex.set(idx, record);
     }
   }
-  for (const chunk of incomingChunks) {
-    const idx = Number(chunk?.chunkIndex);
+  for (const record of incomingRecords) {
+    const idx = Number(record?.recordIndex);
     if (Number.isFinite(idx) && idx >= 0) {
-      byIndex.set(idx, chunk);
+      byIndex.set(idx, record);
     }
   }
-  const maxChunks = Number(totalChunks ?? 0);
-  return Array.from(byIndex.values()).filter((chunk) =>
-    maxChunks > 0 ? Number(chunk.chunkIndex) < maxChunks : true,
+  const maxRecords = Number(totalRecords ?? 0);
+  return Array.from(byIndex.values()).filter((record) =>
+    maxRecords > 0 ? Number(record.recordIndex) < maxRecords : true,
   );
 }
 
-export function getMissingStoryOffset(chunks: StoryChunk[]): number {
+export function getMissingStoryOffset(records: StoryRecord[]): number {
   const seen = new Set(
-    chunks
-      .map((chunk) => Number(chunk?.chunkIndex))
+    records
+      .map((record) => Number(record?.recordIndex))
       .filter((idx) => Number.isFinite(idx) && idx >= 0),
   );
   let offset = 0;
@@ -109,13 +109,13 @@ export function getMissingStoryOffset(chunks: StoryChunk[]): number {
 }
 
 export function buildStoryDataResult(
-  chunks: StoryChunk[],
+  records: StoryRecord[],
   metadata: StoryMetadata,
   fetchedAt: number,
 ): StoryDataResult {
-  const snapshot = buildStorySnapshot(chunks, metadata);
+  const snapshot = buildStorySnapshot(records, metadata);
   return {
-    chunks: snapshot.chunks,
+    records: snapshot.records,
     fullStory: snapshot.fullStory,
     integrity: snapshot.integrity,
     metadata,
@@ -131,11 +131,11 @@ export function applyStoryDataToNode(
 ): Record<string, NodeData> {
   const current = nodesData[nodeId];
   if (!current) return nodesData;
-  const biography = storyData.chunks.find(
-    (chunk) =>
-      chunk.chunkIndex === 0 &&
-      chunk.schemaId === STORY_BIOGRAPHY_SCHEMA_ID &&
-      !chunk.unsupportedSchema,
+  const biography = storyData.records.find(
+    (record) =>
+      record.recordIndex === 0 &&
+      record.schemaId === STORY_BIOGRAPHY_SCHEMA_ID &&
+      !record.unsupportedSchema,
   );
   return {
     ...nodesData,
@@ -143,7 +143,7 @@ export function applyStoryDataToNode(
       ...current,
       nftPublicStory: biography?.content ?? current.nftPublicStory,
       storyMetadata: storyData.metadata,
-      storyChunks: storyData.chunks,
+      storyRecords: storyData.records,
       storyFetchedAt: storyData.fetchedAt,
     },
   };

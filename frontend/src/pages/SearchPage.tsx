@@ -225,8 +225,8 @@ function facetCount(
           ? search.endorsement.state
           : key === "children"
             ? search.children.state
-            : key === "storyChunks"
-              ? search.storyChunks.state
+            : key === "storyRecords"
+              ? search.storyRecords.state
               : search.uri.state;
   return state.queried && !state.loading ? state.total : undefined;
 }

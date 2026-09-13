@@ -4,11 +4,11 @@ import { findNodeEntryByTokenId, findNodeIdByTokenId } from "./nodeLookup";
 import { buildNftDetailsPatch } from "./nodeEnrichment";
 
 const EMPTY_STORY_METADATA = {
-  totalChunks: 0,
-  totalLength: 0,
+  totalRecords: 0,
+  totalPayloadLength: 0,
   isSealed: false,
   lastUpdateTime: 0,
-  fullStoryHash: "",
+  recordsHead: "",
 };
 
 export function buildNodeFromNftDetails(tokenId: string, nftRet: ParsedNftDetails): NodeData {

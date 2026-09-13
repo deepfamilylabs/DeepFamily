@@ -2,15 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
-import { getEditableChunkTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
-import { useAddStoryChunkFlow, useSealStoryFlow } from "../../../domains/transactions";
+import { getEditableRecordTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
+import { useAddStoryRecordFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
 import {
   getStoryPresentation,
   type NodeData,
-  type StoryChunk,
-  type StoryChunkCreateData,
+  type StoryRecord,
+  type StoryRecordCreateData,
   type StoryMetadata,
 } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
@@ -18,20 +18,20 @@ import { segmentManuscript } from "../model/manuscriptSegments";
 import { buildStoryOutline } from "../model/storyOutline";
 import {
   buildNodeDetailsFromNft,
-  computeContentHash,
+  computeStoryPayloadHash,
   formatStoryHash,
   getByteLength,
   getByteWarningColor,
   getValidTokenId,
-  initialChunkFormData,
-  isChunkFormDirty,
+  initialRecordFormData,
+  isRecordFormDirty,
   mapStorySealError,
   mapStorySubmitError,
-  normalizeStoryChunks,
+  normalizeStoryRecords,
   STORY_MAX_ATTACHMENT_BYTES,
   STORY_SEGMENT_BYTES,
   STORY_WARNING_ORANGE_BYTES,
-  type ChunkFormData,
+  type RecordFormData,
   type PrefetchedStoryState,
 } from "../model/storyEditorModel";
 
@@ -45,9 +45,9 @@ export function useStoryEditorController() {
   const toast = useToast();
 
   const prefetched = (location.state as PrefetchedStoryState | undefined)?.prefetchedStory;
-  const prefetchedChunks = useMemo(
-    () => normalizeStoryChunks(prefetched?.storyChunks),
-    [prefetched?.storyChunks],
+  const prefetchedRecords = useMemo(
+    () => normalizeStoryRecords(prefetched?.storyRecords),
+    [prefetched?.storyRecords],
   );
 
   useEffect(() => {
@@ -60,10 +60,10 @@ export function useStoryEditorController() {
 
   const [optimistic, setOptimistic] = useState<{
     meta?: StoryMetadata;
-    chunks?: StoryChunk[];
+    records?: StoryRecord[];
   } | null>(null);
   const [dirty, setDirty] = useState<boolean>(false);
-  const [formData, setFormData] = useState<ChunkFormData>(initialChunkFormData);
+  const [formData, setFormData] = useState<RecordFormData>(initialRecordFormData);
   const [submitting, setSubmitting] = useState(false);
   const [transactionPreview, setTransactionPreview] = useState<ArchiveTransactionPreview | null>(
     null,
@@ -91,53 +91,53 @@ export function useStoryEditorController() {
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const [showSealConfirm, setShowSealConfirm] = useState(false);
-  const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
+  const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null);
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null);
-  const [showChunkTypeDropdown, setShowChunkTypeDropdown] = useState(false);
+  const [showRecordTypeDropdown, setShowRecordTypeDropdown] = useState(false);
   const [runExpanded, setRunExpanded] = useState(false);
-  const [showChunkTypeHelp, setShowChunkTypeHelp] = useState(false);
+  const [showRecordTypeHelp, setShowRecordTypeHelp] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const chunkTypeDropdownRef = useRef<HTMLDivElement | null>(null);
+  const recordTypeDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const validTokenId = useMemo(() => getValidTokenId(tokenId), [tokenId]);
   const scopedQueryClient = useMemo(
     () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
     [rpcUrl, contractAddress, chainId],
   );
-  const addStoryChunkFlow = useAddStoryChunkFlow();
+  const addStoryRecordFlow = useAddStoryRecordFlow();
   const sealStoryFlow = useSealStoryFlow();
   const nftQuery = useNFTDetails(validTokenId);
   const storyQuery = useStoryData(validTokenId);
-  const chunkTypeOptions = useMemo(() => getEditableChunkTypeOptions(t), [t]);
+  const recordTypeOptions = useMemo(() => getEditableRecordTypeOptions(t), [t]);
 
   useEffect(() => {
     if (storyQuery.data) setOptimistic(null);
   }, [storyQuery.data]);
 
   const meta = optimistic?.meta ?? storyQuery.data?.metadata ?? prefetched?.storyMetadata;
-  const chunks = optimistic?.chunks ?? storyQuery.data?.chunks ?? prefetchedChunks;
-  const presentation = useMemo(() => getStoryPresentation(chunks, meta), [chunks, meta]);
+  const records = optimistic?.records ?? storyQuery.data?.records ?? prefetchedRecords;
+  const presentation = useMemo(() => getStoryPresentation(records, meta), [records, meta]);
   const displayMeta = useMemo(
     () =>
       meta
-        ? { ...meta, totalChunks: presentation.totalChunks, totalLength: presentation.totalLength }
+        ? { ...meta, totalRecords: presentation.totalRecords, totalPayloadLength: presentation.totalPayloadLength }
         : undefined,
-    [meta, presentation.totalChunks, presentation.totalLength],
+    [meta, presentation.totalRecords, presentation.totalPayloadLength],
   );
   const loading = !meta && storyQuery.loading;
   const queryError = meta ? null : storyQuery.error;
 
-  const getChunkTypeLabel = useCallback(
+  const getRecordTypeLabel = useCallback(
     (type: number | string | null | undefined) => {
       const numericType = Number(type ?? 0);
-      const match = chunkTypeOptions.find((option) => option.value === numericType);
-      return match ? match.label : t("chunkTypes.unknown", "Unknown");
+      const match = recordTypeOptions.find((option) => option.value === numericType);
+      return match ? match.label : t("recordTypes.unknown", "Unknown");
     },
-    [chunkTypeOptions, t],
+    [recordTypeOptions, t],
   );
 
   const copyText = useCallback(
@@ -181,23 +181,23 @@ export function useStoryEditorController() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  const isDirty = useMemo(() => isChunkFormDirty(formData), [formData]);
+  const isDirty = useMemo(() => isRecordFormDirty(formData), [formData]);
 
-  // Hash of the chunk as it currently stands. handleSubmit recomputes the value
+  // Hash of the record as it currently stands. handleSubmit recomputes the value
   // it actually submits; this one exists so the record panel can show the
   // caller what they are about to sign.
-  const draftContentHash = useMemo(() => {
+  const draftPayloadHash = useMemo(() => {
     if (!formData.content.trim()) return undefined;
-    const chunkTypeValue = Number(formData.chunkType ?? 1);
-    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 1 || chunkTypeValue > 255) {
+    const recordTypeValue = Number(formData.recordType ?? 1);
+    if (!Number.isInteger(recordTypeValue) || recordTypeValue < 1 || recordTypeValue > 255) {
       return undefined;
     }
     try {
-      return computeContentHash(formData.content, chunkTypeValue, formData.attachmentCID);
+      return computeStoryPayloadHash(formData.content, recordTypeValue, formData.attachmentCID);
     } catch {
       return undefined;
     }
-  }, [formData.content, formData.chunkType, formData.attachmentCID]);
+  }, [formData.content, formData.recordType, formData.attachmentCID]);
 
   useEffect(() => {
     setDirty(isDirty);
@@ -206,17 +206,17 @@ export function useStoryEditorController() {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        chunkTypeDropdownRef.current &&
-        !chunkTypeDropdownRef.current.contains(event.target as Node)
+        recordTypeDropdownRef.current &&
+        !recordTypeDropdownRef.current.contains(event.target as Node)
       ) {
-        setShowChunkTypeDropdown(false);
+        setShowRecordTypeDropdown(false);
       }
     };
-    if (showChunkTypeDropdown) {
+    if (showRecordTypeDropdown) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [showChunkTypeDropdown]);
+  }, [showRecordTypeDropdown]);
 
   useEffect(() => {
     if (prefetched?.fullName) {
@@ -231,27 +231,27 @@ export function useStoryEditorController() {
     setNodeDetails(buildNodeDetailsFromNft(nftQuery.data, validTokenId));
   }, [nftQuery.data, validTokenId]);
 
-  const sortedChunks = presentation.chunks;
+  const sortedRecords = presentation.records;
   const isSealed = meta?.isSealed || false;
 
   // Contents outline for the left column, and the number the composer's draft
   // will take once it is written.
   const outline = useMemo(
-    () => buildStoryOutline(sortedChunks, getChunkTypeLabel, t as never),
-    [sortedChunks, getChunkTypeLabel, t],
+    () => buildStoryOutline(sortedRecords, getRecordTypeLabel, t as never),
+    [sortedRecords, getRecordTypeLabel, t],
   );
-  const draftDisplayIndex = presentation.totalChunks + 1;
+  const draftDisplayIndex = presentation.totalRecords + 1;
 
-  // Long manuscripts fold their middle; Contents still lists every chunk, so a
+  // Long manuscripts fold their middle; Contents still lists every record, so a
   // jump into a folded entry has to open the fold before it can scroll.
-  const segments = useMemo(() => segmentManuscript(sortedChunks), [sortedChunks]);
+  const segments = useMemo(() => segmentManuscript(sortedRecords), [sortedRecords]);
   const collapsedIndexes = useMemo(
-    () => new Set(segments.collapsed.map((chunk) => chunk.chunkIndex)),
+    () => new Set(segments.collapsed.map((record) => record.recordIndex)),
     [segments.collapsed],
   );
-  const revealChunk = useCallback(
-    (chunkIndex: number) => {
-      if (runExpanded || !collapsedIndexes.has(chunkIndex)) return false;
+  const revealRecord = useCallback(
+    (recordIndex: number) => {
+      if (runExpanded || !collapsedIndexes.has(recordIndex)) return false;
       setRunExpanded(true);
       return true;
     },
@@ -260,17 +260,17 @@ export function useStoryEditorController() {
   const toggleRun = useCallback(() => setRunExpanded((prev) => !prev), []);
 
   const handleCancelEdit = useCallback(() => {
-    setFormData(initialChunkFormData);
+    setFormData(initialRecordFormData);
     setLocalError(null);
   }, []);
 
-  const toggleChunkExpansion = useCallback((chunkIndex: number) => {
-    setExpandedChunks((prev) => {
+  const toggleRecordExpansion = useCallback((recordIndex: number) => {
+    setExpandedRecords((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(chunkIndex)) {
-        newSet.delete(chunkIndex);
+      if (newSet.has(recordIndex)) {
+        newSet.delete(recordIndex);
       } else {
-        newSet.add(chunkIndex);
+        newSet.add(recordIndex);
       }
       return newSet;
     });
@@ -280,50 +280,50 @@ export function useStoryEditorController() {
     setFormData((prev) => ({
       ...prev,
       content,
-      expectedHash: undefined,
+      expectedPayloadHash: undefined,
     }));
   }, []);
 
-  const updateChunkType = useCallback((chunkType: number) => {
-    setFormData((prev) => ({ ...prev, chunkType }));
-    setShowChunkTypeDropdown(false);
+  const updateRecordType = useCallback((recordType: number) => {
+    setFormData((prev) => ({ ...prev, recordType }));
+    setShowRecordTypeDropdown(false);
   }, []);
 
   const updateAttachmentCID = useCallback((attachmentCID: string) => {
     setFormData((prev) => ({ ...prev, attachmentCID }));
   }, []);
 
-  const onAddChunk = useCallback(
-    async (data: StoryChunkCreateData) => {
+  const onAddRecord = useCallback(
+    async (data: StoryRecordCreateData) => {
       try {
-        const result = await addStoryChunkFlow.runOrThrow({
+        const result = await addStoryRecordFlow.runOrThrow({
           tokenId: data.tokenId,
-          chunkIndex: data.chunkIndex,
+          recordIndex: data.recordIndex,
           content: data.content,
-          expectedHash: data.expectedHash || "",
-          chunkType:
-            typeof data.chunkType === "number" &&
-            Number.isInteger(data.chunkType) &&
-            data.chunkType >= 1 &&
-            data.chunkType <= 255
-              ? data.chunkType
+          expectedPayloadHash: data.expectedPayloadHash || "",
+          recordType:
+            typeof data.recordType === "number" &&
+            Number.isInteger(data.recordType) &&
+            data.recordType >= 1 &&
+            data.recordType <= 255
+              ? data.recordType
               : 1,
           attachmentCID: data.attachmentCID ?? "",
           confirmTransactionPreview,
         });
 
-        const newChunks = chunks ? [...chunks, result.newChunk] : [result.newChunk];
-        const newFullStoryHash = result.recordsHead;
+        const newRecords = records ? [...records, result.newRecord] : [result.newRecord];
+        const newRecordsHead = result.recordsHead;
         const newMeta: StoryMetadata | undefined = meta
           ? {
               ...meta,
-              totalChunks: (meta.totalChunks || 0) + 1,
-              lastUpdateTime: result.newChunk.timestamp,
-              totalLength: (meta.totalLength || 0) + result.contentLength,
-              fullStoryHash: newFullStoryHash,
+              totalRecords: (meta.totalRecords || 0) + 1,
+              lastUpdateTime: result.newRecord.timestamp,
+              totalPayloadLength: (meta.totalPayloadLength || 0) + result.payloadLength,
+              recordsHead: newRecordsHead,
             }
           : undefined;
-        setOptimistic({ meta: newMeta, chunks: newChunks });
+        setOptimistic({ meta: newMeta, records: newRecords });
 
         if (validTokenId) {
           scopedQueryClient.clear(storyKey(validTokenId));
@@ -334,17 +334,17 @@ export function useStoryEditorController() {
         if (result.events.StoryRecordAppended) {
           toast.success(
             t(
-              "storyChunkEditor.success.chunkAdded",
-              "Chunk #{{index}} added successfully ({{bytes}} bytes)",
+              "storyRecordEditor.success.recordAdded",
+              "Record #{{index}} added successfully ({{bytes}} bytes)",
               {
-                index: getStoryPresentation(newChunks, newMeta).totalChunks,
-                bytes: result.events.StoryRecordAppended.contentLength,
+                index: getStoryPresentation(newRecords, newMeta).totalRecords,
+                bytes: result.events.StoryRecordAppended.payloadLength,
               },
             ),
           );
         } else {
           toast.success(
-            t("storyChunkEditor.success.chunkAddedGeneric", "Story chunk added successfully"),
+            t("storyRecordEditor.success.recordAddedGeneric", "Story record added successfully"),
           );
         }
       } catch (error) {
@@ -354,11 +354,11 @@ export function useStoryEditorController() {
       }
     },
     [
-      addStoryChunkFlow,
+      addStoryRecordFlow,
       confirmTransactionPreview,
       toast,
       t,
-      chunks,
+      records,
       meta,
       validTokenId,
       scopedQueryClient,
@@ -375,13 +375,13 @@ export function useStoryEditorController() {
           ? {
               ...meta,
               isSealed: true,
-              totalChunks: result.totalChunks,
-              fullStoryHash: result.fullStoryHash,
+              totalRecords: result.totalRecords,
+              recordsHead: result.recordsHead,
             }
           : undefined;
         setOptimistic((prev) => ({
           meta: newMeta,
-          chunks: prev?.chunks ?? chunks,
+          records: prev?.records ?? records,
         }));
 
         if (validTokenId) {
@@ -393,16 +393,16 @@ export function useStoryEditorController() {
         if (result.events.StorySealed) {
           toast.success(
             t(
-              "storyChunkEditor.success.storySealed",
-              "Story sealed successfully ({{total}} chunks)",
+              "storyRecordEditor.success.storySealed",
+              "Story sealed successfully ({{total}} records)",
               {
-                total: getStoryPresentation(chunks, newMeta).totalChunks,
+                total: getStoryPresentation(records, newMeta).totalRecords,
               },
             ),
           );
         } else {
           toast.success(
-            t("storyChunkEditor.success.storySealedGeneric", "Story sealed successfully"),
+            t("storyRecordEditor.success.storySealedGeneric", "Story sealed successfully"),
           );
         }
       } catch (error) {
@@ -416,7 +416,7 @@ export function useStoryEditorController() {
       toast,
       t,
       meta,
-      chunks,
+      records,
       validTokenId,
       scopedQueryClient,
       storyQuery.refetch,
@@ -429,7 +429,7 @@ export function useStoryEditorController() {
 
     const trimmedContent = formData.content.trim();
     if (!trimmedContent) {
-      setLocalError(t("storyChunkEditor.contentRequired", "Content cannot be empty"));
+      setLocalError(t("storyRecordEditor.contentRequired", "Content cannot be empty"));
       return;
     }
     const attachment = formData.attachmentCID;
@@ -446,9 +446,9 @@ export function useStoryEditorController() {
       return;
     }
 
-    const chunkTypeValue = Number(formData.chunkType ?? 1);
-    if (!Number.isInteger(chunkTypeValue) || chunkTypeValue < 1 || chunkTypeValue > 255) {
-      setLocalError(t("storyChunkEditor.invalidChunkType", "Invalid chunk type"));
+    const recordTypeValue = Number(formData.recordType ?? 1);
+    if (!Number.isInteger(recordTypeValue) || recordTypeValue < 1 || recordTypeValue > 255) {
+      setLocalError(t("storyRecordEditor.invalidRecordType", "Invalid record type"));
       return;
     }
 
@@ -456,14 +456,14 @@ export function useStoryEditorController() {
     setLocalError(null);
 
     try {
-      const expectedHash = computeContentHash(formData.content, chunkTypeValue, attachment);
-      const nextIndex = meta?.totalChunks || 0;
-      await onAddChunk({
+      const expectedPayloadHash = computeStoryPayloadHash(formData.content, recordTypeValue, attachment);
+      const nextIndex = meta?.totalRecords || 0;
+      await onAddRecord({
         tokenId: validTokenId,
-        chunkIndex: nextIndex,
+        recordIndex: nextIndex,
         content: formData.content,
-        expectedHash,
-        chunkType: chunkTypeValue,
+        expectedPayloadHash,
+        recordType: recordTypeValue,
         attachmentCID: attachment,
       });
 
@@ -473,7 +473,7 @@ export function useStoryEditorController() {
     } finally {
       setSubmitting(false);
     }
-  }, [validTokenId, formData, meta, onAddChunk, handleCancelEdit, t]);
+  }, [validTokenId, formData, meta, onAddRecord, handleCancelEdit, t]);
 
   const handleSeal = useCallback(() => {
     if (!validTokenId) return;
@@ -497,11 +497,11 @@ export function useStoryEditorController() {
   }, [validTokenId, onSealStory, t]);
 
   const titleText = personName
-    ? t("storyChunkEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })
-    : t("storyChunkEditor.titleFallback", { defaultValue: "Biography" });
+    ? t("storyRecordEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })
+    : t("storyRecordEditor.titleFallback", { defaultValue: "Biography" });
   const showEditorForm = !isSealed;
   const showError = Boolean(queryError || localError);
-  const showEmptySealed = !loading && sortedChunks.length === 0 && !showError && isSealed;
+  const showEmptySealed = !loading && sortedRecords.length === 0 && !showError && isSealed;
   const errorMessage = queryError || localError;
   const formByteLength = getByteLength(formData.content);
 
@@ -521,46 +521,46 @@ export function useStoryEditorController() {
     showError,
     errorMessage,
     showEmptySealed,
-    sortedChunks,
+    sortedRecords,
     manuscript: {
       head: segments.head,
       collapsed: segments.collapsed,
       tail: segments.tail,
       isExpanded: runExpanded,
       toggle: toggleRun,
-      reveal: revealChunk,
+      reveal: revealRecord,
     },
     outline,
     draftDisplayIndex,
-    expandedChunks,
-    toggleChunkExpansion,
+    expandedRecords,
+    toggleRecordExpansion,
     copyText,
     formatHash: formatStoryHash,
     getByteLength,
     getByteWarningColor,
-    chunkTypeOptions,
-    getChunkTypeLabel,
+    recordTypeOptions,
+    getRecordTypeLabel,
     refs: {
       scrollContainerRef,
       formRef,
       textareaRef,
-      chunkTypeDropdownRef,
+      recordTypeDropdownRef,
     },
     form: {
       data: formData,
-      draftContentHash,
+      draftPayloadHash,
       byteLength: formByteLength,
       segmentBytes: STORY_SEGMENT_BYTES,
       warningOrangeBytes: STORY_WARNING_ORANGE_BYTES,
       updateContent,
-      updateChunkType,
+      updateRecordType,
       updateAttachmentCID,
       cancel: handleCancelEdit,
       submit: handleSubmit,
-      showChunkTypeDropdown,
-      setShowChunkTypeDropdown,
-      showChunkTypeHelp,
-      setShowChunkTypeHelp,
+      showRecordTypeDropdown,
+      setShowRecordTypeDropdown,
+      showRecordTypeHelp,
+      setShowRecordTypeHelp,
     },
     seal: {
       handleSeal,

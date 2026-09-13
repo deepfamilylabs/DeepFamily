@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { segmentManuscript, summariseCollapsedTypes } from "./manuscriptSegments";
 
-const chunks = (n: number) => Array.from({ length: n }, (_, i) => ({ chunkIndex: i, chunkType: 1 }));
-const ids = (list: { chunkIndex: number }[]) => list.map((c) => c.chunkIndex);
+const records = (n: number) => Array.from({ length: n }, (_, i) => ({ recordIndex: i, recordType: 1 }));
+const ids = (list: { recordIndex: number }[]) => list.map((c) => c.recordIndex);
 
 describe("segmentManuscript", () => {
   it("leaves short manuscripts whole", () => {
     for (const n of [0, 1, 3, 5]) {
-      const s = segmentManuscript(chunks(n));
+      const s = segmentManuscript(records(n));
       expect(s.head).toHaveLength(n);
       expect(s.collapsed).toEqual([]);
       expect(s.tail).toEqual([]);
@@ -15,14 +15,14 @@ describe("segmentManuscript", () => {
   });
 
   it("folds the middle once it hides at least three entries", () => {
-    const s = segmentManuscript(chunks(6));
+    const s = segmentManuscript(records(6));
     expect(ids(s.head)).toEqual([0, 1]);
     expect(ids(s.collapsed)).toEqual([2, 3, 4]);
     expect(ids(s.tail)).toEqual([5]);
   });
 
   it("keeps the opening and the most recent entry in view", () => {
-    const s = segmentManuscript(chunks(10));
+    const s = segmentManuscript(records(10));
     expect(ids(s.head)).toEqual([0, 1]);
     expect(ids(s.collapsed)).toEqual([2, 3, 4, 5, 6, 7, 8]);
     expect(ids(s.tail)).toEqual([9]);
@@ -35,7 +35,7 @@ describe("summariseCollapsedTypes", () => {
 
   it("lists distinct types in document order", () => {
     const r = summariseCollapsedTypes(
-      [{ chunkType: 3 }, { chunkType: 5 }, { chunkType: 3 }, { chunkType: 7 }],
+      [{ recordType: 3 }, { recordType: 5 }, { recordType: 3 }, { recordType: 7 }],
       label,
     );
     expect(r).toEqual({ labels: ["type-3", "type-5", "type-7"], truncated: false });
@@ -43,7 +43,7 @@ describe("summariseCollapsedTypes", () => {
 
   it("caps the list and flags the remainder", () => {
     const r = summariseCollapsedTypes(
-      [1, 2, 3, 4, 5, 6].map((chunkType) => ({ chunkType })),
+      [1, 2, 3, 4, 5, 6].map((recordType) => ({ recordType })),
       label,
     );
     expect(r.labels).toHaveLength(4);

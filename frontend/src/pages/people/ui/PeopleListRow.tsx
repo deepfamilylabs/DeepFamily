@@ -22,7 +22,7 @@ const COL = {
   life: "w-[104px] shrink-0 hidden sm:block",
   places: "w-[200px] shrink-0 hidden lg:block",
   endorsements: "w-[88px] shrink-0 text-right",
-  chunks: "w-[56px] shrink-0 text-right hidden md:block",
+  records: "w-[56px] shrink-0 text-right hidden md:block",
   token: "w-[64px] shrink-0 text-right hidden md:block",
   creator: "w-[124px] shrink-0 hidden xl:block",
   minted: "w-[96px] shrink-0 hidden xl:block",
@@ -39,7 +39,7 @@ export function PeopleListHeader({ t }: { t: PeoplePageT }) {
       <div className={`${COL.endorsements} ${cell}`}>
         {t("people.filterByEndorsement", "Endorsements")}
       </div>
-      <div className={`${COL.chunks} ${cell}`}>{t("people.colChunks", "Chunks")}</div>
+      <div className={`${COL.records} ${cell}`}>{t("people.colRecords", "Records")}</div>
       <div className={`${COL.token} ${cell}`}>{t("people.colToken", "Token ID")}</div>
       <div className={`${COL.creator} ${cell}`}>{t("people.colCreator", "Creator")}</div>
       <div className={`${COL.minted} ${cell}`}>{t("people.colMinted", "Minted")}</div>
@@ -67,7 +67,7 @@ export function PeopleListRow({
 }: PeopleListRowProps) {
   const lifespan = lifeSpanYears(person);
   const places = placesLine(person);
-  const chunks = getStoryPresentation(person.storyChunks, person.storyMetadata).totalChunks;
+  const records = getStoryPresentation(person.storyRecords, person.storyMetadata).totalRecords;
   const dash = <span className="text-ink-subtle">—</span>;
 
   const handleMouseEnter = () => {
@@ -99,7 +99,7 @@ export function PeopleListRow({
             {t("people.generationShort", "Gen {{number}}", { number: generation })}
           </span>
         )}
-        {chunks > 0 && (
+        {records > 0 && (
           <span className="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-full bg-primary/10 text-primary">
             <BookOpen className="w-[11px] h-[11px]" strokeWidth={2.5} />
           </span>
@@ -120,11 +120,11 @@ export function PeopleListRow({
           dash
         )}
       </div>
-      <div className={`${COL.chunks} text-xs text-ink-muted tabular-nums`}>
-        {chunks > 0 ? (
+      <div className={`${COL.records} text-xs text-ink-muted tabular-nums`}>
+        {records > 0 ? (
           <span className="inline-flex items-center gap-1 justify-end">
             <FileText className="w-3 h-3" />
-            {chunks}
+            {records}
           </span>
         ) : (
           dash

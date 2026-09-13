@@ -1,9 +1,9 @@
 /**
- * Story Chunk Types Configuration
+ * Story Record Types Configuration
  *
- * Defines the reserved mint biography and 19 editable chunk types for person biographies
+ * Defines the reserved mint biography and 19 editable record types for person biographies
  *
- * Each chunk type includes:
+ * Each record type includes:
  * - value: Numeric identifier (0-19)
  * - key: Translation key for i18n
  * - icon: Lucide icon component
@@ -12,7 +12,7 @@
  *
  * Design Philosophy:
  * - These are content TYPE TAGS, not mutually exclusive chapters
- * - Multiple chunks can share the same type (e.g., multiple "Life Events")
+ * - Multiple records can share the same type (e.g., multiple "Life Events")
  * - Types can be used in any order, allowing flexible storytelling
  * - Ordered by natural reading flow: Overview → Early Years → Life Narrative → Specialized Topics → Closing
  */
@@ -41,7 +41,7 @@ import {
   Edit3,
 } from "lucide-react";
 
-export interface ChunkTypeConfig {
+export interface RecordTypeConfig {
   value: number;
   key: string;
   label: string;
@@ -50,7 +50,7 @@ export interface ChunkTypeConfig {
   borderColorClass: string;
 }
 
-export interface ChunkTypeOption {
+export interface RecordTypeOption {
   value: number;
   label: string;
   icon: LucideIcon;
@@ -61,7 +61,7 @@ export interface ChunkTypeOption {
  * Type 0 is the immutable mint biography. The 19 editable content tags occupy
  * 1–19, from Summary through Notes. Tags may repeat and appear in any order.
  */
-export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
+export const RECORD_TYPES: readonly RecordTypeConfig[] = [
   {
     value: 0,
     key: "biography",
@@ -238,79 +238,79 @@ export const CHUNK_TYPES: readonly ChunkTypeConfig[] = [
 ] as const;
 
 /**
- * Map of chunk type values to their configurations
+ * Map of record type values to their configurations
  */
-export const CHUNK_TYPE_MAP = new Map<number, ChunkTypeConfig>(
-  CHUNK_TYPES.map((type) => [type.value, type]),
+export const RECORD_TYPE_MAP = new Map<number, RecordTypeConfig>(
+  RECORD_TYPES.map((type) => [type.value, type]),
 );
 
 /**
- * Get chunk type configuration by value
+ * Get record type configuration by value
  */
-export function getChunkTypeConfig(
+export function getRecordTypeConfig(
   value: number | string | null | undefined,
-): ChunkTypeConfig | undefined {
+): RecordTypeConfig | undefined {
   if (value === null || value === undefined) return undefined;
   const numValue = typeof value === "string" ? parseInt(value, 10) : value;
   if (isNaN(numValue)) return undefined;
-  return CHUNK_TYPE_MAP.get(numValue);
+  return RECORD_TYPE_MAP.get(numValue);
 }
 
 /**
- * Get the translation key for a chunk type
+ * Get the translation key for a record type
  */
-export function getChunkTypeI18nKey(value: number | string | null | undefined): string {
-  const config = getChunkTypeConfig(value);
-  return config ? `chunkTypes.${config.key}` : "chunkTypes.unknown";
+export function getRecordTypeI18nKey(value: number | string | null | undefined): string {
+  const config = getRecordTypeConfig(value);
+  return config ? `recordTypes.${config.key}` : "recordTypes.unknown";
 }
 
 /**
- * Get the icon component for a chunk type
+ * Get the icon component for a record type
  */
-export function getChunkTypeIcon(value: number | string | null | undefined): LucideIcon {
-  const config = getChunkTypeConfig(value);
+export function getRecordTypeIcon(value: number | string | null | undefined): LucideIcon {
+  const config = getRecordTypeConfig(value);
   return config?.icon || Edit3;
 }
 
 /**
- * Get the color class for a chunk type
+ * Get the color class for a record type
  */
-export function getChunkTypeColorClass(value: number | string | null | undefined): string {
-  const config = getChunkTypeConfig(value);
+export function getRecordTypeColorClass(value: number | string | null | undefined): string {
+  const config = getRecordTypeConfig(value);
   return config?.colorClass || "text-gray-600 dark:text-gray-400";
 }
 
 /**
- * Get the border color class for a chunk type
+ * Get the border color class for a record type
  */
-export function getChunkTypeBorderColorClass(value: number | string | null | undefined): string {
-  const config = getChunkTypeConfig(value);
+export function getRecordTypeBorderColorClass(value: number | string | null | undefined): string {
+  const config = getRecordTypeConfig(value);
   return config?.borderColorClass || "border-gray-600 dark:border-gray-400";
 }
 
 /**
- * Get chunk type options with translations
+ * Get record type options with translations
  * Use this in React components with useTranslation hook
  *
  * @param t - Translation function from useTranslation
- * @returns Array of chunk type options with translated labels
+ * @returns Array of record type options with translated labels
  *
  * @example
  * ```tsx
  * const { t } = useTranslation()
- * const options = getChunkTypeOptions(t)
+ * const options = getRecordTypeOptions(t)
  * ```
  */
-export function getChunkTypeOptions(t: any): ChunkTypeOption[] {
-  return CHUNK_TYPES.map((type) => ({
+export function getRecordTypeOptions(t: any): RecordTypeOption[] {
+  return RECORD_TYPES.map((type) => ({
     value: type.value,
-    label: t(`chunkTypes.${type.key}`, type.label),
+    label: t(`recordTypes.${type.key}`, type.label),
     icon: type.icon,
     color: type.colorClass,
   }));
 }
 
 /** Type zero is initialized only by NFT minting. */
-export function getEditableChunkTypeOptions(t: any): ChunkTypeOption[] {
-  return getChunkTypeOptions(t).filter((type) => type.value !== 0);
+export function getEditableRecordTypeOptions(t: any): RecordTypeOption[] {
+  return getRecordTypeOptions(t).filter((type) => type.value !== 0);
 }

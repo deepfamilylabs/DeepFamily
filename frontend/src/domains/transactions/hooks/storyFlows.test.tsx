@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useAddStoryChunkFlow } from "./useAddStoryChunkFlow";
+import { useAddStoryRecordFlow } from "./useAddStoryRecordFlow";
 import { useSealStoryFlow } from "./useSealStoryFlow";
 
 const mocks = vi.hoisted(() => ({
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   config: {
     contractAddress: "0x0000000000000000000000000000000000000abc",
   },
-  addStoryChunkService: vi.fn(),
+  addStoryRecordService: vi.fn(),
   sealStoryService: vi.fn(),
 }));
 
@@ -29,8 +29,8 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../services/addStoryChunkService", () => ({
-  addStoryChunkService: mocks.addStoryChunkService,
+vi.mock("../services/addStoryRecordService", () => ({
+  addStoryRecordService: mocks.addStoryRecordService,
 }));
 
 vi.mock("../services/sealStoryService", () => ({
@@ -41,43 +41,43 @@ describe("story transaction flows", () => {
   beforeEach(() => {
     mocks.wallet.signer = { getAddress: vi.fn() };
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000abc";
-    mocks.addStoryChunkService.mockReset();
+    mocks.addStoryRecordService.mockReset();
     mocks.sealStoryService.mockReset();
   });
 
-  it("useAddStoryChunkFlow delegates to addStoryChunkService and stores the result", async () => {
+  it("useAddStoryRecordFlow delegates to addStoryRecordService and stores the result", async () => {
     const serviceResult = {
-      chunkIndex: 2,
-      contentLength: 5,
-      transactionHash: "0xchunk",
+      recordIndex: 2,
+      payloadLength: 5,
+      transactionHash: "0xrecord",
       blockNumber: 10,
-      newChunk: {
-        chunkIndex: 2,
-        chunkHash: "0xhash",
+      newRecord: {
+        recordIndex: 2,
+        payloadHash: "0xhash",
         content: "hello",
         timestamp: 1,
-        editor: "0xeditor",
+        author: "0xeditor",
       },
       events: { StoryRecordAppended: null },
     };
-    mocks.addStoryChunkService.mockResolvedValue(serviceResult);
+    mocks.addStoryRecordService.mockResolvedValue(serviceResult);
 
-    const { result } = renderHook(() => useAddStoryChunkFlow());
+    const { result } = renderHook(() => useAddStoryRecordFlow());
 
     await act(async () => {
       await expect(
         result.current.runOrThrow({
           tokenId: "7",
-          chunkIndex: 2,
+          recordIndex: 2,
           content: "hello",
-          expectedHash: "0xexpected",
-          chunkType: 1,
-          attachmentCID: "ipfs://chunk",
+          expectedPayloadHash: "0xexpected",
+          recordType: 1,
+          attachmentCID: "ipfs://record",
         }),
       ).resolves.toBe(serviceResult);
     });
 
-    expect(mocks.addStoryChunkService).toHaveBeenCalledWith(
+    expect(mocks.addStoryRecordService).toHaveBeenCalledWith(
       mocks.wallet.signer,
       mocks.config.contractAddress,
       "7",
@@ -85,7 +85,7 @@ describe("story transaction flows", () => {
       "hello",
       "0xexpected",
       1,
-      "ipfs://chunk",
+      "ipfs://record",
       undefined,
     );
     expect(result.current.status).toBe("success");
@@ -94,8 +94,8 @@ describe("story transaction flows", () => {
 
   it("useSealStoryFlow delegates to sealStoryService and stores the result", async () => {
     const serviceResult = {
-      totalChunks: 3,
-      fullStoryHash: "0xfull",
+      totalRecords: 3,
+      recordsHead: "0xfull",
       transactionHash: "0xseal",
       blockNumber: 11,
       events: { StorySealed: null },
@@ -121,18 +121,18 @@ describe("story transaction flows", () => {
   it("fails before service execution when wallet or contract config is missing", async () => {
     mocks.wallet.signer = null;
 
-    const addFlow = renderHook(() => useAddStoryChunkFlow());
+    const addFlow = renderHook(() => useAddStoryRecordFlow());
     await act(async () => {
       await expect(
         addFlow.result.current.runOrThrow({
           tokenId: "7",
-          chunkIndex: 0,
+          recordIndex: 0,
           content: "hello",
-          expectedHash: "",
+          expectedPayloadHash: "",
         }),
       ).rejects.toThrow("Please connect your wallet");
     });
-    expect(mocks.addStoryChunkService).not.toHaveBeenCalled();
+    expect(mocks.addStoryRecordService).not.toHaveBeenCalled();
     expect(addFlow.result.current.status).toBe("error");
 
     mocks.wallet.signer = { getAddress: vi.fn() };

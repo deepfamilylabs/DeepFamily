@@ -7,7 +7,7 @@ import {
   type ParsedNftDetails,
   type DetailQueryOptions,
 } from "../model/personDetailParsers";
-import type { StoryChunk, StoryMetadata } from "../model";
+import type { StoryRecord, StoryMetadata } from "../model";
 import { ethers } from "ethers";
 import {
   readStoryRecord,
@@ -25,7 +25,7 @@ export interface PersonReadGateway {
   ) => Promise<ParsedVersionDetails>;
   getNFTDetails: (tokenId: string, options?: DetailQueryOptions) => Promise<ParsedNftDetails>;
   getStoryMetadata: (tokenId: string, options?: DetailQueryOptions) => Promise<StoryMetadata>;
-  getStoryChunks: (tokenId: string, offset: number, limit: number) => Promise<StoryChunk[]>;
+  getStoryRecords: (tokenId: string, offset: number, limit: number) => Promise<StoryRecord[]>;
   listVersionEndorsements: (
     personHash: string,
     offset: number,
@@ -58,13 +58,13 @@ export interface PersonReadGateway {
     hasMore: boolean;
     nextOffset: number;
   }>;
-  listStoryChunksPage: (
+  listStoryRecordsPage: (
     tokenId: string | number,
     offset: number,
     limit: number,
   ) => Promise<{
-    chunks: StoryChunk[];
-    totalChunks: number;
+    records: StoryRecord[];
+    totalRecords: number;
     hasMore: boolean;
     nextOffset: number;
   }>;
@@ -127,7 +127,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
       async () => {
         const ret = await contract.getNFTDetails(tokenId);
         const parsed = parseNftDetailsResult(ret);
-        const initial = (await getStoryChunks(tokenId, 0, 1))[0];
+        const initial = (await getStoryRecords(tokenId, 0, 1))[0];
         parsed.core.nftPublicStory =
           initial?.schemaId === STORY_BIOGRAPHY_SCHEMA_ID && !initial.unsupportedSchema
             ? initial.content
@@ -160,13 +160,13 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
       async () => {
         const ret = await contract.getStoryState(tokenId);
         const metadata: StoryMetadata = {
-          totalChunks: Number(ret.totalRecords),
-          totalLength: Number(ret.totalPayloadLength),
+          totalRecords: Number(ret.totalRecords),
+          totalPayloadLength: Number(ret.totalPayloadLength),
           isSealed: Boolean(ret.isSealed),
           lastUpdateTime: Number(ret.lastUpdateTime),
-          fullStoryHash: String(ret.recordsHead),
+          recordsHead: String(ret.recordsHead),
         };
-        if (metadata.totalChunks > 0) {
+        if (metadata.totalRecords > 0) {
           const initial = await contract.getStoryRecordRef(tokenId, 0);
           if (initial.schemaId === STORY_BIOGRAPHY_SCHEMA_ID) {
             metadata.biographyPayloadLength = Number(initial.blob.payloadLength);
@@ -183,7 +183,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     tokenId: string | number,
     offset: number,
     records: any[],
-  ): Promise<StoryChunk[]> => {
+  ): Promise<StoryRecord[]> => {
     if (records.length === 0) return [];
     const provider = contract.runner?.provider ?? contract.runner;
     const [network, archive] = await Promise.all([provider.getNetwork(), contract.ARCHIVE()]);
@@ -205,13 +205,13 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
         });
         const index = offset + position;
         return {
-          chunkIndex: index,
-          chunkHash: verified.payloadHash,
+          recordIndex: index,
+          payloadHash: verified.payloadHash,
           content: verified.decoded?.content ?? "",
-          chunkType: verified.decoded?.chunkType ?? 0,
+          recordType: verified.decoded?.recordType ?? 0,
           attachmentCID: verified.decoded?.attachmentCID ?? "",
           timestamp: Number(ref.timestamp),
-          editor: ref.author,
+          author: ref.author,
           schemaId: ref.schemaId,
           unsupportedSchema: verified.decoded === null,
           rawPayload: ethers.hexlify(verified.payload),
@@ -233,11 +233,11 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     );
   };
 
-  const getStoryChunks = async (
+  const getStoryRecords = async (
     tokenId: string,
     offset: number,
     limit: number,
-  ): Promise<StoryChunk[]> => {
+  ): Promise<StoryRecord[]> => {
     const result = await contract.listStoryRecords(tokenId, offset, limit);
     return hydrateStoryRecords(tokenId, offset, Array.from(result.records));
   };
@@ -281,11 +281,11 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     };
   };
 
-  const listStoryChunksPage = async (tokenId: string | number, offset: number, limit: number) => {
+  const listStoryRecordsPage = async (tokenId: string | number, offset: number, limit: number) => {
     const out = await contract.listStoryRecords(tokenId, offset, limit);
     return {
-      chunks: await hydrateStoryRecords(tokenId, offset, Array.from(out.records)),
-      totalChunks: Number(out.totalRecords),
+      records: await hydrateStoryRecords(tokenId, offset, Array.from(out.records)),
+      totalRecords: Number(out.totalRecords),
       hasMore: Boolean(out.hasMore),
       nextOffset: Number(out.nextOffset),
     };
@@ -295,10 +295,10 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
     getVersionDetails,
     getNFTDetails,
     getStoryMetadata,
-    getStoryChunks,
+    getStoryRecords,
     listVersionEndorsements,
     listPersonVersionsPage,
     listTokenUriHistory,
-    listStoryChunksPage,
+    listStoryRecordsPage,
   };
 }

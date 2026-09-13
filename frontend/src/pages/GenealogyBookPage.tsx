@@ -273,9 +273,9 @@ export default function GenealogyBookPage() {
     projection.graph.nodes.forEach((node) => {
       const nodeData = projection.nodesData[node.id];
       const tokenId = nodeData?.tokenId;
-      const totalChunks = Number(nodeData?.storyMetadata?.totalChunks || 0);
-      const loadedChunks = Array.isArray(nodeData?.storyChunks) ? nodeData.storyChunks.length : 0;
-      if (!tokenId || totalChunks <= 0 || loadedChunks >= totalChunks) return;
+      const totalRecords = Number(nodeData?.storyMetadata?.totalRecords || 0);
+      const loadedRecords = Array.isArray(nodeData?.storyRecords) ? nodeData.storyRecords.length : 0;
+      if (!tokenId || totalRecords <= 0 || loadedRecords >= totalRecords) return;
       getStoryData(tokenId, { nodeIdHint: node.id }).catch(() => {
         /* Paper view can still render the core story fallback. */
       });

@@ -8,10 +8,10 @@ import { useToast } from "../../../shared/ui";
 import {
   buildPrefetchedStoryDetailData,
   buildStoryDetailData,
-  getChunkParagraphs,
+  getRecordParagraphs,
   getFreshCachedStoryDetail,
   getFullStoryParagraphs,
-  groupStoryChunks,
+  groupStoryRecords,
   isValidPersonTokenId,
   mapPersonStoryFetchError,
   type CachedStoryDetail,
@@ -38,7 +38,7 @@ export function usePersonPageController() {
   const [data, setData] = useState<StoryDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedChunks, setExpandedChunks] = useState<Set<number>>(new Set());
+  const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<PersonStoryViewMode>("sections");
   const [activeSection, setActiveSection] = useState<PersonSectionKey | null>(null);
 
@@ -60,11 +60,11 @@ export function usePersonPageController() {
     () => getFullStoryParagraphs(data?.fullStory, viewMode),
     [data?.fullStory, viewMode],
   );
-  const chunkParagraphs = useMemo(() => getChunkParagraphs(data?.storyChunks), [data?.storyChunks]);
-  const groupedChunks = useMemo(() => groupStoryChunks(data?.storyChunks), [data?.storyChunks]);
+  const recordParagraphs = useMemo(() => getRecordParagraphs(data?.storyRecords), [data?.storyRecords]);
+  const groupedRecords = useMemo(() => groupStoryRecords(data?.storyRecords), [data?.storyRecords]);
 
-  const toggleChunk = useCallback((idx: number) => {
-    setExpandedChunks((prev) => {
+  const toggleRecord = useCallback((idx: number) => {
+    setExpandedRecords((prev) => {
       const next = new Set(prev);
       if (next.has(idx)) {
         next.delete(idx);
@@ -85,15 +85,15 @@ export function usePersonPageController() {
     navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
 
     const state: PrefetchedStoryDetailState = {};
-    if (data?.storyMetadata || data?.storyChunks) {
+    if (data?.storyMetadata || data?.storyRecords) {
       state.prefetchedStory = {
         tokenId,
         storyMetadata: data.storyMetadata,
-        storyChunks: data.storyChunks,
+        storyRecords: data.storyRecords,
       };
     }
     navigate(`/editor/${tokenId}`, { state });
-  }, [data?.storyChunks, data?.storyMetadata, location.pathname, location.search, navigate, tokenId]);
+  }, [data?.storyRecords, data?.storyMetadata, location.pathname, location.search, navigate, tokenId]);
 
   useEffect(() => {
     if (!tokenId) return;
@@ -151,7 +151,7 @@ export function usePersonPageController() {
   }, [fetchStoryData]);
 
   useEffect(() => {
-    if (viewMode !== "sections" || groupedChunks.length === 0) return;
+    if (viewMode !== "sections" || groupedRecords.length === 0) return;
 
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 80;
@@ -214,7 +214,7 @@ export function usePersonPageController() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [groupedChunks, viewMode]);
+  }, [groupedRecords, viewMode]);
 
   const registerSection = useCallback(
     (key: PersonSectionKey) => (element: HTMLElement | null) => {
@@ -293,14 +293,14 @@ export function usePersonPageController() {
     data,
     loading,
     error,
-    expandedChunks,
+    expandedRecords,
     viewMode,
     activeSection,
     fullStoryParagraphs,
-    chunkParagraphs,
-    groupedChunks,
+    recordParagraphs,
+    groupedRecords,
     setViewMode,
-    toggleChunk,
+    toggleRecord,
     retry: fetchStoryData,
     goBack,
     viewFamilyTree,

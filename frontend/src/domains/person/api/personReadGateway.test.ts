@@ -2,7 +2,7 @@ import { ethers } from "ethers";
 import {
   encodeStoryRecord,
   STORY_BIOGRAPHY_SCHEMA_ID,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
 } from "@deepfamily/protocol-core";
 import { describe, expect, it, vi } from "vitest";
 import { QueryCache } from "../../../shared/cache/QueryCache";
@@ -150,7 +150,7 @@ describe("personReadGateway", () => {
   });
 
   it("caches StoryState and verifies canonical records from bytecode", async () => {
-    const bytes = encodeStoryRecord({ content: "hello 🙂", chunkType: 1, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ content: "hello 🙂", recordType: 1, attachmentCID: "" });
     const pointer = "0x0000000000000000000000000000000000000011";
     const archive = "0x0000000000000000000000000000000000000022";
     const author = "0x0000000000000000000000000000000000000033";
@@ -161,7 +161,7 @@ describe("personReadGateway", () => {
         payloadLength: bytes.length,
         segmentCount: 1,
       },
-      schemaId: STORY_CHUNK_SCHEMA_ID,
+      schemaId: STORY_ENVELOPE_SCHEMA_ID,
       author,
       timestamp: 12n,
     };
@@ -188,18 +188,18 @@ describe("personReadGateway", () => {
     const one = await gateway.getStoryMetadata("42", { ttlMs: 60000 });
     const two = await gateway.getStoryMetadata("42", { ttlMs: 60000 });
     expect(one).toEqual(two);
-    expect(one.totalChunks).toBe(1);
-    expect(one.totalLength).toBe(bytes.length);
+    expect(one.totalRecords).toBe(1);
+    expect(one.totalPayloadLength).toBe(bytes.length);
     expect(contract.getStoryState).toHaveBeenCalledTimes(1);
     expect(contract.getStoryRecordRef).toHaveBeenCalledWith("42", 0);
     expect(one.biographyPayloadLength).toBeUndefined();
-    const chunks = await gateway.getStoryChunks("42", 0, 10);
-    expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toMatchObject({
+    const records = await gateway.getStoryRecords("42", 0, 10);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
       content: "hello 🙂",
-      chunkIndex: 0,
-      chunkType: 1,
-      schemaId: STORY_CHUNK_SCHEMA_ID,
+      recordIndex: 0,
+      recordType: 1,
+      schemaId: STORY_ENVELOPE_SCHEMA_ID,
       unsupportedSchema: false,
       rawPayload: ethers.hexlify(bytes),
     });
@@ -223,8 +223,8 @@ describe("personReadGateway", () => {
     const gateway = createPersonReadGateway(contract, new QueryCache());
     const metadata = await gateway.getStoryMetadata("42");
     expect(metadata).toMatchObject({
-      totalChunks: 2,
-      totalLength: 300,
+      totalRecords: 2,
+      totalPayloadLength: 300,
       biographyPayloadLength: 200,
     });
     contract.getStoryState.mockResolvedValue({
@@ -279,13 +279,13 @@ describe("personReadGateway", () => {
       hasMore: true,
       nextOffset: 2,
     });
-    const page = await gateway.listStoryChunksPage("42", 0, 1);
+    const page = await gateway.listStoryRecordsPage("42", 0, 1);
     expect(page).toMatchObject({
-      totalChunks: 3,
+      totalRecords: 3,
       hasMore: true,
       nextOffset: 1,
-      chunks: [
-        { chunkIndex: 0, content: "", rawPayload: payload, schemaId, unsupportedSchema: true },
+      records: [
+        { recordIndex: 0, content: "", rawPayload: payload, schemaId, unsupportedSchema: true },
       ],
     });
   });

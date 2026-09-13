@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoryChunk, StoryMetadata } from "../../../shared/model";
+import type { StoryRecord, StoryMetadata } from "../../../shared/model";
 import { TTL } from "../../../shared/cache/ttl";
 import { useNFTDetails } from "./useNFTDetails";
 import { usePersonDetails } from "./usePersonDetails";
@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
     getVersionDetails: vi.fn(),
     getNFTDetails: vi.fn(),
     getStoryMetadata: vi.fn(),
-    getStoryChunks: vi.fn(),
+    getStoryRecords: vi.fn(),
   },
   gatewayEnabled: true,
 }));
@@ -38,23 +38,23 @@ vi.mock("./usePersonGateway", () => ({
 }));
 
 const storyMetadata = (overrides: Partial<StoryMetadata> = {}): StoryMetadata => ({
-  totalChunks: 0,
-  totalLength: 0,
+  totalRecords: 0,
+  totalPayloadLength: 0,
   isSealed: false,
   lastUpdateTime: 0,
-  fullStoryHash: "",
+  recordsHead: "",
   ...overrides,
 });
 
-const storyChunk = (chunkIndex: number, content: string): StoryChunk => ({
-  chunkIndex,
-  chunkHash: `0x${String(chunkIndex + 1)
+const storyRecord = (recordIndex: number, content: string): StoryRecord => ({
+  recordIndex,
+  payloadHash: `0x${String(recordIndex + 1)
     .repeat(64)
     .slice(0, 64)}`,
   content,
-  timestamp: 100 + chunkIndex,
-  editor: "0x00000000000000000000000000000000000000aa",
-  chunkType: 0,
+  timestamp: 100 + recordIndex,
+  author: "0x00000000000000000000000000000000000000aa",
+  recordType: 0,
   attachmentCID: "",
 });
 
@@ -64,7 +64,7 @@ describe("person query hooks", () => {
     mocks.gateway.getVersionDetails.mockReset();
     mocks.gateway.getNFTDetails.mockReset();
     mocks.gateway.getStoryMetadata.mockReset();
-    mocks.gateway.getStoryChunks.mockReset();
+    mocks.gateway.getStoryRecords.mockReset();
   });
 
   it("usePersonDetails fetches version details with TTL and exposes loading/data", async () => {
@@ -138,19 +138,19 @@ describe("person query hooks", () => {
     expect(failed.result.current.error).toBe("nft unavailable");
   });
 
-  it("useStoryData fetches metadata and chunks into a story result", async () => {
+  it("useStoryData fetches metadata and records into a story result", async () => {
     mocks.gateway.getStoryMetadata.mockResolvedValue(
       storyMetadata({
-        totalChunks: 2,
-        totalLength: 10,
+        totalRecords: 2,
+        totalPayloadLength: 10,
         isSealed: true,
         lastUpdateTime: 123,
-        fullStoryHash: "0xstory",
+        recordsHead: "0xstory",
       }),
     );
-    mocks.gateway.getStoryChunks.mockResolvedValue([
-      storyChunk(0, "hello"),
-      storyChunk(1, "world"),
+    mocks.gateway.getStoryRecords.mockResolvedValue([
+      storyRecord(0, "hello"),
+      storyRecord(1, "world"),
     ]);
 
     const { result } = renderHook(() => useStoryData("42"));
@@ -159,10 +159,10 @@ describe("person query hooks", () => {
     expect(mocks.gateway.getStoryMetadata).toHaveBeenCalledWith("42", {
       ttlMs: TTL.story,
     });
-    expect(mocks.gateway.getStoryChunks).toHaveBeenCalledWith("42", 0, 50);
+    expect(mocks.gateway.getStoryRecords).toHaveBeenCalledWith("42", 0, 50);
     expect(result.current.error).toBeNull();
-    expect(result.current.data?.metadata.totalChunks).toBe(2);
-    expect(result.current.data?.chunks.map((chunk) => chunk.content)).toEqual(["hello", "world"]);
+    expect(result.current.data?.metadata.totalRecords).toBe(2);
+    expect(result.current.data?.records.map((record) => record.content)).toEqual(["hello", "world"]);
     expect(result.current.data?.fullStory).toBe("helloworld");
   });
 
@@ -171,9 +171,9 @@ describe("person query hooks", () => {
     const empty = renderHook(() => useStoryData("7"));
 
     await waitFor(() => expect(empty.result.current.loading).toBe(false));
-    expect(empty.result.current.data?.chunks).toEqual([]);
+    expect(empty.result.current.data?.records).toEqual([]);
     expect(empty.result.current.data?.fullStory).toBe("");
-    expect(mocks.gateway.getStoryChunks).not.toHaveBeenCalled();
+    expect(mocks.gateway.getStoryRecords).not.toHaveBeenCalled();
 
     mocks.gateway.getStoryMetadata.mockReset();
     mocks.gateway.getStoryMetadata.mockRejectedValue(new Error("story unavailable"));

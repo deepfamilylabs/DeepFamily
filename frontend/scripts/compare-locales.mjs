@@ -196,7 +196,7 @@ function extractTCallTranslationCandidates(content) {
   return candidates;
 }
 
-// Convert template literals such as `chunkTypes.${key}` into regexes for locale matching.
+// Convert template literals such as `recordTypes.${key}` into regexes for locale matching.
 function extractDynamicTemplatePatterns(content) {
   const patterns = [];
   const templateRegex = /`([^`\n]*\$\{[^`\n]+\}[^`\n]*)`/g;

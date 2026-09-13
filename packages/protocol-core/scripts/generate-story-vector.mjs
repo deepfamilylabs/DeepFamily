@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import { hexlify, keccak256 } from "ethers";
 import {
-  STORY_CHUNK_SCHEMA,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_RECORD_SCHEMA,
+  STORY_ENVELOPE_SCHEMA_ID,
   STORY_RECORD_DOMAIN,
   STORY_RECORD_DOMAIN_TEXT,
   STORY_HEAD_DOMAIN,
@@ -18,10 +18,10 @@ import {
 const contents = [
   {
     content: '  中😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
-    chunkType: 3,
+    recordType: 3,
     attachmentCID: "ipfs://例子/😀",
   },
-  { content: "Second record\r\nkeeps its final newline.\n", chunkType: 255, attachmentCID: "" },
+  { content: "Second record\r\nkeeps its final newline.\n", recordType: 255, attachmentCID: "" },
 ];
 let previousHead = ZERO_BYTES32;
 const records = contents.map((input, index) => {
@@ -31,7 +31,7 @@ const records = contents.map((input, index) => {
     archive: "0x1111111111111111111111111111111111111111",
     tokenId: "7",
     index: String(index),
-    schemaId: STORY_CHUNK_SCHEMA_ID,
+    schemaId: STORY_ENVELOPE_SCHEMA_ID,
     payloadHash: keccak256(payload),
     payloadLength: String(payload.length),
     author:
@@ -56,8 +56,8 @@ const records = contents.map((input, index) => {
 });
 const vector = {
   schema: STORY_ENVELOPE_SCHEMA,
-  plaintextSchema: STORY_CHUNK_SCHEMA,
-  schemaId: STORY_CHUNK_SCHEMA_ID,
+  plaintextSchema: STORY_RECORD_SCHEMA,
+  schemaId: STORY_ENVELOPE_SCHEMA_ID,
   recordDomainText: STORY_RECORD_DOMAIN_TEXT,
   recordDomain: STORY_RECORD_DOMAIN,
   headDomainText: STORY_HEAD_DOMAIN_TEXT,

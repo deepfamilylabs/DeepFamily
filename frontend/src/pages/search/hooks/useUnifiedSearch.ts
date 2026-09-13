@@ -143,12 +143,12 @@ export function useUnifiedSearch() {
         );
         return;
       }
-      if (key === "storyChunks") {
+      if (key === "storyRecords") {
         const id = ctx.tokenId;
         if (id === undefined || !Number.isFinite(id)) return;
-        search.storyChunks.form.setValue("tokenId", id);
-        search.storyChunks.form.setValue("pageSize", size);
-        await search.storyChunks.actions.query({ tokenId: id, pageSize: size }, 0);
+        search.storyRecords.form.setValue("tokenId", id);
+        search.storyRecords.form.setValue("pageSize", size);
+        await search.storyRecords.actions.query({ tokenId: id, pageSize: size }, 0);
         return;
       }
       if (key === "uri") {
@@ -185,7 +185,7 @@ export function useUnifiedSearch() {
     search.endorsement.actions.reset();
     search.trustedEndorsers.actions.reset();
     search.children.actions.reset();
-    search.storyChunks.actions.reset();
+    search.storyRecords.actions.reset();
     search.uri.actions.reset();
     accountFacets.versions.actions.reset();
     accountFacets.endorsements.actions.reset();
@@ -525,8 +525,8 @@ export function useUnifiedSearch() {
         return search.endorsement.state;
       case "children":
         return search.children.state;
-      case "storyChunks":
-        return search.storyChunks.state;
+      case "storyRecords":
+        return search.storyRecords.state;
       case "uri":
         return search.uri.state;
       case "personNfts":
@@ -546,7 +546,7 @@ export function useUnifiedSearch() {
     personNfts.state,
     search.children.state,
     search.endorsement.state,
-    search.storyChunks.state,
+    search.storyRecords.state,
     search.trustedEndorsers.state,
     search.uri.state,
     search.versions.state,
@@ -562,8 +562,8 @@ export function useUnifiedSearch() {
         return search.endorsement.actions;
       case "children":
         return search.children.actions;
-      case "storyChunks":
-        return search.storyChunks.actions;
+      case "storyRecords":
+        return search.storyRecords.actions;
       case "uri":
         return search.uri.actions;
       case "personNfts":
@@ -583,7 +583,7 @@ export function useUnifiedSearch() {
     personNfts.actions,
     search.children.actions,
     search.endorsement.actions,
-    search.storyChunks.actions,
+    search.storyRecords.actions,
     search.trustedEndorsers.actions,
     search.uri.actions,
     search.versions.actions,

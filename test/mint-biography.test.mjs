@@ -7,7 +7,7 @@ import { mintPerson, setupStubVerifiers } from "./helpers/testHelper.mjs";
 import {
   encodeStoryRecord,
   readStoryRecord,
-  STORY_CHUNK_SCHEMA_ID,
+  STORY_ENVELOPE_SCHEMA_ID,
   STORY_BIOGRAPHY_SCHEMA_ID,
 } from "@deepfamily/protocol-core";
 
@@ -32,7 +32,7 @@ describe("Atomic compressed mint biography", function () {
       getCode: (address, block) => hre.ethers.provider.getCode(address, block),
     });
     expect(restored.decoded.content).to.equal(story);
-    expect(restored.decoded.chunkType).to.equal(0);
+    expect(restored.decoded.recordType).to.equal(0);
     const state = await archive.storyState(1n);
     expect(state.totalRecords).to.equal(1n);
     expect(state.totalPayloadLength).to.equal(ref.blob.payloadLength);
@@ -42,7 +42,7 @@ describe("Atomic compressed mint biography", function () {
         1n,
         state.recordsHead,
         STORY_BIOGRAPHY_SCHEMA_ID,
-        encodeStoryRecord({ content: "replacement", chunkType: 0, attachmentCID: "" }),
+        encodeStoryRecord({ content: "replacement", recordType: 0, attachmentCID: "" }),
         hre.ethers.ZeroHash,
       ),
     ).to.be.revertedWithCustomError(archive, "InvalidSchemaId");
@@ -55,18 +55,18 @@ describe("Atomic compressed mint biography", function () {
     expect((await archive.storyState(1n)).totalRecords).to.equal(0n);
     const payload = encodeStoryRecord({
       content: "First ordinary story",
-      chunkType: 1,
+      recordType: 1,
       attachmentCID: "",
     });
     await archive.appendStoryRecord(
       1n,
       0n,
       hre.ethers.ZeroHash,
-      STORY_CHUNK_SCHEMA_ID,
+      STORY_ENVELOPE_SCHEMA_ID,
       payload,
       hre.ethers.keccak256(payload),
     );
-    expect((await archive.storyRecordRef(1n, 0n)).schemaId).to.equal(STORY_CHUNK_SCHEMA_ID);
+    expect((await archive.storyRecordRef(1n, 0n)).schemaId).to.equal(STORY_ENVELOPE_SCHEMA_ID);
   });
   it("rolls the NFT assignment and Archive initialization back when the payload hash is wrong", async () => {
     const { deepFamily, archive, owner } = await fixture();

@@ -1,6 +1,6 @@
 import { useCallback, useId } from "react";
 import { HelpCircle, Lock, X } from "lucide-react";
-import { getChunkTypeColorClass, getChunkTypeIcon } from "../../../domains/person";
+import { getRecordTypeColorClass, getRecordTypeIcon } from "../../../domains/person";
 import {
   MODAL_ACCENT_TILE,
   MODAL_CLOSE_BUTTON,
@@ -87,11 +87,11 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
             </div>
             <div className="flex-1 min-w-0 space-y-1.5">
               <h3 id={titleId} className="modal-heading font-body text-base font-semibold text-ink">
-                {t("storyChunkEditor.sealDialog.title", "Seal Story")}
+                {t("storyRecordEditor.sealDialog.title", "Seal Story")}
               </h3>
               <p id={descriptionId} className="text-sm text-ink-muted leading-relaxed">
                 {t(
-                  "storyChunkEditor.sealDialog.description",
+                  "storyRecordEditor.sealDialog.description",
                   "Are you sure you want to seal the story? Once sealed, it cannot be modified.",
                 )}
               </p>
@@ -105,7 +105,7 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
               disabled={editor.submitting}
               className="flex-1 h-10 rounded-lg border border-hairline-strong bg-surface text-ink text-sm font-semibold transition-colors hover:bg-surface-alt disabled:opacity-50 focus:outline-hidden focus:ring-2 focus:ring-primary/30"
             >
-              {t("storyChunkEditor.sealDialog.cancel", "Cancel")}
+              {t("storyRecordEditor.sealDialog.cancel", "Cancel")}
             </button>
             <button
               type="button"
@@ -116,12 +116,12 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
               {editor.submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                  <span>{t("storyChunkEditor.saving", "Saving...")}</span>
+                  <span>{t("storyRecordEditor.saving", "Saving...")}</span>
                 </>
               ) : (
                 <>
                   <Lock size={15} aria-hidden />
-                  <span>{t("storyChunkEditor.sealDialog.confirm", "Confirm Seal")}</span>
+                  <span>{t("storyRecordEditor.sealDialog.confirm", "Confirm Seal")}</span>
                 </>
               )}
             </button>
@@ -132,23 +132,23 @@ export function SealConfirmDialog({ editor }: { editor: StoryEditorController })
   );
 }
 
-export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController }) {
+export function RecordTypeHelpDialog({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
   const titleId = useId();
   const descriptionId = useId();
-  const { setShowChunkTypeHelp, showChunkTypeHelp } = editor.form;
-  const closeDialog = useCallback(() => setShowChunkTypeHelp(false), [setShowChunkTypeHelp]);
+  const { setShowRecordTypeHelp, showRecordTypeHelp } = editor.form;
+  const closeDialog = useCallback(() => setShowRecordTypeHelp(false), [setShowRecordTypeHelp]);
 
   return (
     <ModalShell
-      isOpen={showChunkTypeHelp}
+      isOpen={showRecordTypeHelp}
       onClose={closeDialog}
       bare
       zIndex={OVERLAY_Z_INDEX.confirmDialog}
       ariaLabelledBy={titleId}
       ariaDescribedBy={descriptionId}
     >
-      <div className="h-full flex items-center justify-center p-4" data-chunk-help-dialog>
+      <div className="h-full flex items-center justify-center p-4" data-record-help-dialog>
         <div
           className={`w-full max-w-3xl max-h-[75vh] overflow-hidden flex flex-col ${MODAL_PANEL}`}
           onClick={(event) => event.stopPropagation()}
@@ -158,7 +158,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
               <HelpCircle size={18} aria-hidden />
             </div>
             <h2 id={titleId} className={`flex-1 min-w-0 ${MODAL_TITLE}`}>
-              {t("storyChunkEditor.chunkTypeHelp.title", "Story Chunk Types Guide")}
+              {t("storyRecordEditor.recordTypeHelp.title", "Story Record Types Guide")}
             </h2>
             <button
               onClick={closeDialog}
@@ -174,20 +174,20 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             <div className="prose dark:prose-invert max-w-none">
               <p id={descriptionId} className="text-sm text-ink-muted leading-relaxed">
                 {t(
-                  "storyChunkEditor.chunkTypeHelp.intro",
-                  "Story chunks are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple chunks of the same type in any order.",
+                  "storyRecordEditor.recordTypeHelp.intro",
+                  "Story records are content type tags for organizing biographical narratives and life stories. These 19 types allow flexible storytelling - you can use multiple records of the same type in any order.",
                 )}
               </p>
             </div>
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.opening", "Opening")}
+              title={t("storyRecordEditor.recordTypeHelp.opening", "Opening")}
               items={[
                 {
                   value: 1,
-                  label: t("chunkTypes.summary", "Summary"),
+                  label: t("recordTypes.summary", "Summary"),
                   desc: t(
-                    "storyChunkEditor.chunkTypeHelp.summaryDesc",
+                    "storyRecordEditor.recordTypeHelp.summaryDesc",
                     "Brief overview of the person's life and significance",
                   ),
                 },
@@ -195,21 +195,21 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.earlyYears", "Early Years")}
+              title={t("storyRecordEditor.recordTypeHelp.earlyYears", "Early Years")}
               items={[
                 {
                   value: 2,
-                  label: t("chunkTypes.earlyLife", "Early Life"),
+                  label: t("recordTypes.earlyLife", "Early Life"),
                   desc: t(
-                    "storyChunkEditor.chunkTypeHelp.earlyLifeDesc",
+                    "storyRecordEditor.recordTypeHelp.earlyLifeDesc",
                     "Birth, childhood, family background",
                   ),
                 },
                 {
                   value: 3,
-                  label: t("chunkTypes.education", "Education"),
+                  label: t("recordTypes.education", "Education"),
                   desc: t(
-                    "storyChunkEditor.chunkTypeHelp.educationDesc",
+                    "storyRecordEditor.recordTypeHelp.educationDesc",
                     "Schools, degrees, mentors, academic training",
                   ),
                 },
@@ -217,13 +217,13 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.mainNarrative", "Main Narrative")}
+              title={t("storyRecordEditor.recordTypeHelp.mainNarrative", "Main Narrative")}
               items={[
                 {
                   value: 4,
-                  label: t("chunkTypes.lifeEvents", "Life Events"),
+                  label: t("recordTypes.lifeEvents", "Life Events"),
                   desc: t(
-                    "storyChunkEditor.chunkTypeHelp.lifeEventsDesc",
+                    "storyRecordEditor.recordTypeHelp.lifeEventsDesc",
                     "Chronological life story from birth to present/death. Can include career, family, society - a complete timeline.",
                   ),
                 },
@@ -231,9 +231,9 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.specializedTopics", "Specialized Topics")}
+              title={t("storyRecordEditor.recordTypeHelp.specializedTopics", "Specialized Topics")}
               intro={t(
-                "storyChunkEditor.chunkTypeHelp.specializedDesc",
+                "storyRecordEditor.recordTypeHelp.specializedDesc",
                 "Thematic deep dives extracted from life narrative",
               )}
               items={[
@@ -250,7 +250,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.personalLife", "Personal Life")}
+              title={t("storyRecordEditor.recordTypeHelp.personalLife", "Personal Life")}
               items={[
                 { value: 10, key: "family", desc: "Spouse, children, close relatives" },
                 { value: 11, key: "lifestyle", desc: "Hobbies, habits, interests, daily routines" },
@@ -263,7 +263,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.socialEngagement", "Social Engagement")}
+              title={t("storyRecordEditor.recordTypeHelp.socialEngagement", "Social Engagement")}
               items={[
                 {
                   value: 13,
@@ -276,7 +276,7 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
             />
 
             <HelpGroup
-              title={t("storyChunkEditor.chunkTypeHelp.closing", "Closing")}
+              title={t("storyRecordEditor.recordTypeHelp.closing", "Closing")}
               items={[
                 { value: 16, key: "legacy", desc: "Historical impact, influence, commemorations" },
                 {
@@ -295,28 +295,28 @@ export function ChunkTypeHelpDialog({ editor }: { editor: StoryEditorController 
 
             <section className="border-t border-hairline pt-4">
               <h4 className="text-sm font-bold text-ink mb-3 uppercase tracking-wide">
-                {t("storyChunkEditor.chunkTypeHelp.usageNotes", "Usage Notes")}
+                {t("storyRecordEditor.recordTypeHelp.usageNotes", "Usage Notes")}
               </h4>
               <ul className="space-y-2 text-xs text-ink-muted">
                 {[
                   t(
-                    "storyChunkEditor.chunkTypeHelp.note1",
-                    "These are content type tags, not exclusive chapters - you can have multiple chunks of the same type",
+                    "storyRecordEditor.recordTypeHelp.note1",
+                    "These are content type tags, not exclusive chapters - you can have multiple records of the same type",
                   ),
                   t(
-                    "storyChunkEditor.chunkTypeHelp.note2",
+                    "storyRecordEditor.recordTypeHelp.note2",
                     "Types are not mutually exclusive - feel free to use types in any order",
                   ),
                   t(
-                    "storyChunkEditor.chunkTypeHelp.note3",
+                    "storyRecordEditor.recordTypeHelp.note3",
                     "Life Events: For chronological narrative (birth → childhood → adulthood → death)",
                   ),
                   t(
-                    "storyChunkEditor.chunkTypeHelp.note4",
+                    "storyRecordEditor.recordTypeHelp.note4",
                     "Career: For focused professional history (jobs, companies, positions)",
                   ),
                   t(
-                    "storyChunkEditor.chunkTypeHelp.note5",
+                    "storyRecordEditor.recordTypeHelp.note5",
                     "Early Life vs Life Events: Early Life for childhood snippets, Life Events for full timeline",
                   ),
                 ].map((note) => (
@@ -346,8 +346,8 @@ function keyedItem(
 ): HelpItem {
   return {
     value: item.value,
-    label: t(`chunkTypes.${item.key}`, item.key.charAt(0).toUpperCase() + item.key.slice(1)),
-    desc: t(`storyChunkEditor.chunkTypeHelp.${item.key}Desc`, item.desc),
+    label: t(`recordTypes.${item.key}`, item.key.charAt(0).toUpperCase() + item.key.slice(1)),
+    desc: t(`storyRecordEditor.recordTypeHelp.${item.key}Desc`, item.desc),
   };
 }
 
@@ -358,7 +358,7 @@ function HelpGroup({ title, intro, items }: { title: string; intro?: string; ite
       {intro ? <p className="text-xs text-ink-muted mb-2 italic">{intro}</p> : null}
       <div className="space-y-2">
         {items.map((item) => {
-          const Icon = getChunkTypeIcon(item.value);
+          const Icon = getRecordTypeIcon(item.value);
           return (
             <div
               key={item.value}
@@ -367,7 +367,7 @@ function HelpGroup({ title, intro, items }: { title: string; intro?: string; ite
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Icon
                   size={16}
-                  className={getChunkTypeColorClass(item.value) + " shrink-0 mt-0.5"}
+                  className={getRecordTypeColorClass(item.value) + " shrink-0 mt-0.5"}
                 />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-medium text-ink">{item.label}</span>

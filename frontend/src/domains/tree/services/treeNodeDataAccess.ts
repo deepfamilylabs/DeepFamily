@@ -11,7 +11,7 @@ import {
   findNodeIdByTokenId,
   getMissingStoryOffset,
   getOwnerFromTokenNode,
-  mergeStoryChunkRecords,
+  mergeStoryRecords,
   type NodeData,
   type ParsedNftDetails,
   type StoryDataResult,
@@ -28,7 +28,7 @@ interface TreeNodeDataAccessOptions {
   api: {
     getNFTDetails: (tokenId: string, options?: { ttlMs?: number }) => Promise<ParsedNftDetails>;
     getStoryMetadata?: PersonReadGateway["getStoryMetadata"];
-    listStoryChunksPage?: PersonReadGateway["listStoryChunksPage"];
+    listStoryRecordsPage?: PersonReadGateway["listStoryRecordsPage"];
   } | null;
   contract: any;
   nftContract?: any;
@@ -118,29 +118,29 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
       const existingNode = nodeIdToUpdate
         ? options.nodesDataRef.current[nodeIdToUpdate]
         : undefined;
-      const existingChunks = Array.isArray(existingNode?.storyChunks)
-        ? existingNode.storyChunks
+      const existingRecords = Array.isArray(existingNode?.storyRecords)
+        ? existingNode.storyRecords
         : [];
-      let mergedChunks = [...existingChunks];
+      let mergedRecords = [...existingRecords];
 
-      if (!options.api?.getStoryMetadata || !options.api?.listStoryChunksPage) {
+      if (!options.api?.getStoryMetadata || !options.api?.listStoryRecordsPage) {
         throw new Error("Story reference reader is unavailable");
       }
       const storyMetadata = await options.api.getStoryMetadata(effectiveTokenId);
 
-      const total = Number(storyMetadata.totalChunks || 0);
+      const total = Number(storyMetadata.totalRecords || 0);
       if (total > 0) {
-        let offset = getMissingStoryOffset(mergedChunks);
+        let offset = getMissingStoryOffset(mergedRecords);
         if (offset < total) {
           let hasMore = true;
           while (hasMore && offset < total) {
-            const out = await options.api.listStoryChunksPage(
+            const out = await options.api.listStoryRecordsPage(
               effectiveTokenId,
               offset,
               Math.min(options.storyPageLimit, 100),
             );
-            const nextChunks = out.chunks;
-            mergedChunks = mergeStoryChunkRecords(mergedChunks, nextChunks, total);
+            const nextRecords = out.records;
+            mergedRecords = mergeStoryRecords(mergedRecords, nextRecords, total);
             hasMore = Boolean(out.hasMore);
             const nextOffset = Number(out.nextOffset);
             if (!Number.isFinite(nextOffset) || nextOffset <= offset) break;
@@ -149,7 +149,7 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
         }
       }
 
-      const storyData = buildStoryDataResult(mergedChunks, storyMetadata, Date.now());
+      const storyData = buildStoryDataResult(mergedRecords, storyMetadata, Date.now());
       if (nodeIdToUpdate) {
         options.setNodesData((prev) => applyStoryDataToNode(prev, nodeIdToUpdate, storyData));
       }
@@ -169,16 +169,16 @@ export function createTreeNodeDataAccess(options: TreeNodeDataAccessOptions): Tr
 
     if (nodeId) {
       const node = nodeFromLookup || options.nodesDataRef.current[nodeId];
-      if (node?.storyMetadata && Array.isArray(node.storyChunks)) {
+      if (node?.storyMetadata && Array.isArray(node.storyRecords)) {
         const stale = isStale(node.storyFetchedAt, options.storyTtlMs);
-        const storySnapshot = buildStorySnapshot(node.storyChunks, node.storyMetadata);
+        const storySnapshot = buildStorySnapshot(node.storyRecords, node.storyMetadata);
         if (stale) {
           scheduleStoryRevalidate(`story:${String(tokenId)}`, async () => {
             await fetchAndStoreStory(String(tokenId), nodeId);
           });
         }
         return {
-          chunks: storySnapshot.chunks,
+          records: storySnapshot.records,
           fullStory: storySnapshot.fullStory,
           integrity: storySnapshot.integrity,
           metadata: node.storyMetadata,

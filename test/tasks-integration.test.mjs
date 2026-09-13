@@ -131,30 +131,30 @@ describe("Hardhat Tasks Integration", function () {
     expect(tokenId).to.equal(1n);
     expect(await deepFamily.ownerOf(tokenId)).to.equal(signerAddress);
 
-    await hre.tasks.getTask("add-story-chunk").run({
+    await hre.tasks.getTask("add-story-record").run({
       tokenid: tokenId.toString(),
-      chunkindex: "1",
-      content: "Task-generated story chunk",
+      recordindex: "1",
+      content: "Task-generated story record",
       type: "1",
       attachment: "",
       exphash: "",
     });
 
-    const taskResult = await hre.tasks.getTask("list-story-chunks").run({
+    const taskResult = await hre.tasks.getTask("list-story-records").run({
       tokenid: tokenId.toString(),
       offset: "0",
       limit: "10",
     });
 
-    const [chunks, totalChunks, hasMore, nextOffset] = taskResult;
+    const [records, totalRecords, hasMore, nextOffset] = taskResult;
 
-    expect(Number(totalChunks)).to.equal(2);
+    expect(Number(totalRecords)).to.equal(2);
     expect(hasMore).to.equal(false);
     expect(Number(nextOffset)).to.equal(2);
-    expect(chunks).to.have.lengthOf(2);
-    expect(chunks[0].decoded.content).to.equal("Task integration flow");
-    expect(chunks[0].decoded.chunkType).to.equal(0);
-    expect(chunks[1].decoded.content).to.equal("Task-generated story chunk");
+    expect(records).to.have.lengthOf(2);
+    expect(records[0].decoded.content).to.equal("Task integration flow");
+    expect(records[0].decoded.recordType).to.equal(0);
+    expect(records[1].decoded.content).to.equal("Task-generated story record");
 
     await hre.tasks.getTask("seal-story").run({
       tokenid: tokenId.toString(),

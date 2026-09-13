@@ -52,7 +52,7 @@ const ValuePropositions = memo(() => {
       icon: Gem,
     },
     {
-      key: "storyShardingSealing",
+      key: "storyRecordsSealing",
       icon: FileText,
     },
   ];
