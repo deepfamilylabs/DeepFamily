@@ -24,6 +24,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
   const form = editor.form;
 
+  const titleId = useId();
   const recordTypeLabelId = useId();
   const recordTypeValueId = useId();
   const recordTypeListboxId = useId();
@@ -79,6 +80,20 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           </h3>
           <span className="font-mono text-[11px] text-ink-subtle">#{editor.draftDisplayIndex}</span>
           <span className="grow" />
+          <div className="w-full space-y-1.5">
+            <label htmlFor={titleId} className="block text-xs font-medium text-ink-muted">
+              {t("storyRecordEditor.recordTitleLabel", "Title (optional)")}
+            </label>
+            <input
+              id={titleId}
+              type="text"
+              value={form.data.title}
+              onChange={(event) => form.updateTitle(event.target.value)}
+              disabled={editor.submitting}
+              placeholder={t("storyRecordEditor.recordTitlePlaceholder", "Give this record a name")}
+              className="min-h-[42px] w-full rounded-xl border border-hairline bg-surface-alt px-3 text-base text-ink placeholder:text-ink-subtle focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
+            />
+          </div>
 
           <div className="flex items-center gap-1.5">
             <span id={recordTypeLabelId} className="sr-only">

@@ -70,6 +70,7 @@ const flowArgs = {
     suiteCommitment: 4n,
   },
   tokenURI: "ipfs://token",
+  storyTitle: "  Initial biography  ",
   coreInfo: {
     basicInfo: {
       identityCommitment: `0x${"01".padStart(64, "0")}`,
@@ -221,6 +222,7 @@ describe("useMintNftFlow", () => {
         publicSignals: flowArgs.publicSignals,
         tokenURI: flowArgs.tokenURI,
         coreInfo: flowArgs.coreInfo,
+        storyTitle: flowArgs.storyTitle,
         mintPersonVersionNFT: expect.any(Function),
         getVersionDetails: expect.any(Function),
       }),

@@ -13,6 +13,7 @@ import {
 } from "../index.js";
 
 const input = {
+  title: "  传记标题😀 e\u0301\n  ",
   content: '  中文\r\n\n😀 e\u0301 "引号" \\路径\t  ',
   recordType: 1,
   attachmentCID: "ipfs://test",

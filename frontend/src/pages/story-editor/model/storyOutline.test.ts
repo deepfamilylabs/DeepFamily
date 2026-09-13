@@ -62,3 +62,17 @@ describe("buildStoryOutline", () => {
     expect(storyRecordAnchorId(4)).toBe("story-record-4");
   });
 });
+
+it("uses each record title in the directory and falls back only for blank titles", () => {
+  const outline = buildStoryOutline(
+    [
+      { title: "  First journey 😀  ", recordIndex: 4, displayIndex: 1, recordType: 4 },
+      { title: "", recordIndex: 5, displayIndex: 2, recordType: 4 },
+      { title: " \n ", recordIndex: 6, displayIndex: 3, recordType: 4 },
+    ],
+    label,
+    t,
+  ).filter((item) => item.kind === "record");
+  expect(outline.map((item) => item.label)).toEqual(["  First journey 😀  ", "type-4", "type-4"]);
+  expect(outline.map((item) => item.recordIndex)).toEqual([4, 5, 6]);
+});

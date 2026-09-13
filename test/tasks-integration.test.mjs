@@ -124,6 +124,7 @@ describe("Hardhat Tasks Integration", function () {
       deathmonth: "0",
       deathday: "0",
       deathplace: "",
+      storytitle: "Task biography 😀",
       story: "Task integration flow",
     });
 
@@ -134,6 +135,7 @@ describe("Hardhat Tasks Integration", function () {
     await hre.tasks.getTask("add-story-record").run({
       tokenid: tokenId.toString(),
       recordindex: "1",
+      title: "First journey",
       content: "Task-generated story record",
       type: "1",
       attachment: "",
@@ -152,8 +154,10 @@ describe("Hardhat Tasks Integration", function () {
     expect(hasMore).to.equal(false);
     expect(Number(nextOffset)).to.equal(2);
     expect(records).to.have.lengthOf(2);
+    expect(records[0].decoded.title).to.equal("Task biography 😀");
     expect(records[0].decoded.content).to.equal("Task integration flow");
     expect(records[0].decoded.recordType).to.equal(0);
+    expect(records[1].decoded.title).to.equal("First journey");
     expect(records[1].decoded.content).to.equal("Task-generated story record");
 
     await hre.tasks.getTask("seal-story").run({

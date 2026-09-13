@@ -22,7 +22,11 @@ describe("Atomic compressed mint biography", function () {
   it("archives a biography beyond 256 bytes across segments with exact text, author and count", async () => {
     const { deepFamily, archive, owner } = await fixture();
     const story = `  中文\r\n${randomBytes(25_000).toString("base64")}\n😀 e\u0301  `;
-    await mintPerson(hre.ethers, deepFamily, owner, null, "Archive Biography", { story });
+    const storyTitle = "  人物简介 😀 e\u0301  ";
+    await mintPerson(hre.ethers, deepFamily, owner, null, "Archive Biography", {
+      story,
+      storyTitle,
+    });
     const ref = await archive.storyRecordRef(1n, 0n);
     expect(ref.schemaId).to.equal(STORY_BIOGRAPHY_SCHEMA_ID);
     expect(ref.author).to.equal(owner.address);
@@ -31,6 +35,7 @@ describe("Atomic compressed mint biography", function () {
       recordRef: ref,
       getCode: (address, block) => hre.ethers.provider.getCode(address, block),
     });
+    expect(restored.decoded.title).to.equal(storyTitle);
     expect(restored.decoded.content).to.equal(story);
     expect(restored.decoded.recordType).to.equal(0);
     const state = await archive.storyState(1n);
@@ -42,7 +47,7 @@ describe("Atomic compressed mint biography", function () {
         1n,
         state.recordsHead,
         STORY_BIOGRAPHY_SCHEMA_ID,
-        encodeStoryRecord({ content: "replacement", recordType: 0, attachmentCID: "" }),
+        encodeStoryRecord({ title: "", content: "replacement", recordType: 0, attachmentCID: "" }),
         hre.ethers.ZeroHash,
       ),
     ).to.be.revertedWithCustomError(archive, "InvalidSchemaId");
@@ -54,6 +59,7 @@ describe("Atomic compressed mint biography", function () {
     await mintPerson(hre.ethers, deepFamily, owner, null, "Empty Biography");
     expect((await archive.storyState(1n)).totalRecords).to.equal(0n);
     const payload = encodeStoryRecord({
+      title: "",
       content: "First ordinary story",
       recordType: 1,
       attachmentCID: "",

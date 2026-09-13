@@ -178,6 +178,7 @@ describe("NodeDetailProvider", () => {
         data: {
           records: [
             {
+              title: "",
               recordIndex: 0,
               payloadHash: "0xrecord",
               content: "story",

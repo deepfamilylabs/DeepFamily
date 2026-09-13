@@ -124,7 +124,11 @@ export function useStoryEditorController() {
   const displayMeta = useMemo(
     () =>
       meta
-        ? { ...meta, totalRecords: presentation.totalRecords, totalPayloadLength: presentation.totalPayloadLength }
+        ? {
+            ...meta,
+            totalRecords: presentation.totalRecords,
+            totalPayloadLength: presentation.totalPayloadLength,
+          }
         : undefined,
     [meta, presentation.totalRecords, presentation.totalPayloadLength],
   );
@@ -193,11 +197,16 @@ export function useStoryEditorController() {
       return undefined;
     }
     try {
-      return computeStoryPayloadHash(formData.content, recordTypeValue, formData.attachmentCID);
+      return computeStoryPayloadHash(
+        formData.content,
+        recordTypeValue,
+        formData.attachmentCID,
+        formData.title,
+      );
     } catch {
       return undefined;
     }
-  }, [formData.content, formData.recordType, formData.attachmentCID]);
+  }, [formData.title, formData.content, formData.recordType, formData.attachmentCID]);
 
   useEffect(() => {
     setDirty(isDirty);
@@ -276,6 +285,10 @@ export function useStoryEditorController() {
     });
   }, []);
 
+  const updateTitle = useCallback((title: string) => {
+    setFormData((prev) => ({ ...prev, title, expectedPayloadHash: undefined }));
+  }, []);
+
   const updateContent = useCallback((content: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -299,6 +312,7 @@ export function useStoryEditorController() {
         const result = await addStoryRecordFlow.runOrThrow({
           tokenId: data.tokenId,
           recordIndex: data.recordIndex,
+          title: data.title,
           content: data.content,
           expectedPayloadHash: data.expectedPayloadHash || "",
           recordType:
@@ -456,11 +470,17 @@ export function useStoryEditorController() {
     setLocalError(null);
 
     try {
-      const expectedPayloadHash = computeStoryPayloadHash(formData.content, recordTypeValue, attachment);
+      const expectedPayloadHash = computeStoryPayloadHash(
+        formData.content,
+        recordTypeValue,
+        attachment,
+        formData.title,
+      );
       const nextIndex = meta?.totalRecords || 0;
       await onAddRecord({
         tokenId: validTokenId,
         recordIndex: nextIndex,
+        title: formData.title,
         content: formData.content,
         expectedPayloadHash,
         recordType: recordTypeValue,
@@ -503,7 +523,7 @@ export function useStoryEditorController() {
   const showError = Boolean(queryError || localError);
   const showEmptySealed = !loading && sortedRecords.length === 0 && !showError && isSealed;
   const errorMessage = queryError || localError;
-  const formByteLength = getByteLength(formData.content);
+  const formByteLength = getByteLength(formData.title) + getByteLength(formData.content);
 
   return {
     t,
@@ -552,6 +572,7 @@ export function useStoryEditorController() {
       byteLength: formByteLength,
       segmentBytes: STORY_SEGMENT_BYTES,
       warningOrangeBytes: STORY_WARNING_ORANGE_BYTES,
+      updateTitle,
       updateContent,
       updateRecordType,
       updateAttachmentCID,

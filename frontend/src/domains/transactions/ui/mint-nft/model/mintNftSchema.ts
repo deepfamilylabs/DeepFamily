@@ -31,6 +31,7 @@ export const createMintNFTSchema = (t: MintNFTT) =>
         return typeof value === "string" ? (value === "" ? 0 : parseInt(value, 10)) : value;
       }),
       deathPlace: z.string().max(256, t("mintNFT.validation.deathPlaceTooLong")),
+      storyTitle: z.string(),
       story: z.string(),
       tokenURI: z
         .string()
@@ -38,6 +39,13 @@ export const createMintNFTSchema = (t: MintNFTT) =>
         .optional()
         .or(z.literal(""))
         .refine((value) => isValidTokenUri(value ?? ""), t("mintNFT.validation.invalidTokenURI")),
+    })
+    .refine((data) => data.story !== "" || data.storyTitle.trim() === "", {
+      message: t(
+        "mintNFT.validation.storyRequiredForTitle",
+        "Add story content before setting a title",
+      ),
+      path: ["story"],
     })
     .refine(
       (data) => {

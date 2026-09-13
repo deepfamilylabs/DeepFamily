@@ -8,9 +8,11 @@
  * still lines up one-for-one with the manuscript.
  */
 
+import { getStoryRecordTitle } from "../../../shared/model/storyPresentation";
 import { getRecordTypeGroup } from "./recordTypeGroups";
 
 export interface OutlineRecordInput {
+  title?: string;
   recordIndex: number;
   displayIndex: number;
   recordType: number;
@@ -54,7 +56,7 @@ export function buildStoryOutline(
       recordIndex: record.recordIndex,
       displayIndex: record.displayIndex,
       recordType: record.recordType,
-      label: getRecordTypeLabel(record.recordType),
+      label: getStoryRecordTitle(record, getRecordTypeLabel(record.recordType)),
     });
   }
 

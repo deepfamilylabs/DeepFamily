@@ -36,3 +36,17 @@ export function getStoryPresentation(
         ),
   };
 }
+
+/** Choose a display name without rewriting the committed title. */
+export function getStoryRecordTitle(record: { title?: string }, fallback: string): string {
+  return record.title?.trim() ? record.title : fallback;
+}
+
+/** Match both the archived title and body within records already loaded by the caller. */
+export function matchesStoryRecordSearch(
+  record: { title?: string; content: string },
+  query: string,
+): boolean {
+  const term = query.trim().toLocaleLowerCase();
+  return !term || `${record.title ?? ""}\n${record.content}`.toLocaleLowerCase().includes(term);
+}

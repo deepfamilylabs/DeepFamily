@@ -31,6 +31,7 @@ describe("Story Tasks Integration", function () {
     await hre.run("add-story-record", {
       tokenid: "1",
       recordindex: "0",
+      title: "  迁居洛阳 😀 e\u0301  ",
       content: "First record content",
     });
 
@@ -48,6 +49,7 @@ describe("Story Tasks Integration", function () {
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 0),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
+    expect(record0.decoded.title).to.equal("  迁居洛阳 😀 e\u0301  ");
     expect(record0.decoded.content).to.equal("First record content");
     expect(record0.decoded.recordType).to.equal(1);
     expect(record0.decoded.attachmentCID).to.equal("");
@@ -55,6 +57,7 @@ describe("Story Tasks Integration", function () {
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 1),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
     });
+    expect(record1.decoded.title).to.equal("");
     expect(record1.decoded.content).to.equal("Second record content");
     expect(record1.decoded.recordType).to.equal(1);
     expect(record1.decoded.attachmentCID).to.equal("");

@@ -97,6 +97,9 @@ function RecordListItem({ record, person }: { record: StoryRecord; person: Perso
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
         <div className="flex-1 min-w-0">
+          {record.title?.trim() && (
+            <h4 className="mb-1 break-words text-sm font-semibold text-ink">{record.title}</h4>
+          )}
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -115,7 +118,9 @@ function RecordListItem({ record, person }: { record: StoryRecord; person: Perso
                 </span>
               </div>
             </div>
-            <span className="text-xs text-gray-400 dark:text-gray-500">{record.content.length}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {record.content.length}
+            </span>
           </div>
           <div
             className={`text-xs text-gray-600 dark:text-gray-400 ${

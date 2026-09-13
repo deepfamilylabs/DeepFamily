@@ -22,6 +22,7 @@ const zeroHash = `0x${"0".repeat(64)}`;
 
 function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
   return {
+    title: "",
     recordIndex: 0,
     payloadHash: zeroHash,
     content: "hello",
@@ -71,8 +72,13 @@ describe("personPageModel", () => {
       tokenId: "42",
       fullName: "Ada",
       storyRecords: [
-        makeRecord({ recordIndex: 0, content: "hello ", recordType: "2" as any }),
-        makeRecord({ recordIndex: 1, content: "world", attachmentCID: undefined as any }),
+        makeRecord({ title: "", recordIndex: 0, content: "hello ", recordType: "2" as any }),
+        makeRecord({
+          title: "",
+          recordIndex: 1,
+          content: "world",
+          attachmentCID: undefined as any,
+        }),
       ],
     });
 
@@ -84,9 +90,9 @@ describe("personPageModel", () => {
 
   it("groups records by type and builds paragraph views in display order", () => {
     const records = [
-      makeRecord({ recordIndex: 2, content: "C", recordType: 3 }),
-      makeRecord({ recordIndex: 0, content: "A", recordType: 1 }),
-      makeRecord({ recordIndex: 1, content: "B", recordType: 1 }),
+      makeRecord({ title: "", recordIndex: 2, content: "C", recordType: 3 }),
+      makeRecord({ title: "", recordIndex: 0, content: "A", recordType: 1 }),
+      makeRecord({ title: "", recordIndex: 1, content: "B", recordType: 1 }),
     ];
 
     expect(getRecordParagraphs(records)).toEqual(["A", "B", "C"]);
@@ -104,7 +110,12 @@ describe("personPageModel", () => {
       schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
       content: "Original public biography",
     });
-    const ordinary = makeRecord({ recordIndex: 1, recordType: 1, content: "A later story" });
+    const ordinary = makeRecord({
+      title: "",
+      recordIndex: 1,
+      recordType: 1,
+      content: "A later story",
+    });
     const data = buildPrefetchedStoryDetailData("42", {
       storyRecords: [biography, ordinary],
       fullStory: "Original public biographyA later story",
@@ -121,8 +132,8 @@ describe("personPageModel", () => {
 
   it("uses fresh cached story data only inside the expected ttl", () => {
     const records = [
-      makeRecord({ recordIndex: 0, content: "hello " }),
-      makeRecord({ recordIndex: 1, content: "world" }),
+      makeRecord({ title: "", recordIndex: 0, content: "hello " }),
+      makeRecord({ title: "", recordIndex: 1, content: "world" }),
     ];
     const node = makeNode({
       storyMetadata: makeMetadata({ totalPayloadLength: 11 }),

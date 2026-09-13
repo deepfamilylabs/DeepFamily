@@ -787,6 +787,7 @@ describe("GenealogyBookPage", () => {
         },
         storyRecords: [
           {
+            title: "",
             recordIndex: 0,
             payloadHash: "0x1",
             content: "first",

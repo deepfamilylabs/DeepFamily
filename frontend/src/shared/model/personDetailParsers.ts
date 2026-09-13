@@ -40,6 +40,7 @@ export interface CoreInfoFields {
   deathPlace?: string;
   isDeathBC?: boolean;
   nftPublicStory?: string;
+  nftPublicStoryTitle?: string;
 }
 
 export interface ParsedVersionDetails {

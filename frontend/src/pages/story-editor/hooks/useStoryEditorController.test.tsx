@@ -57,6 +57,7 @@ vi.mock("../../../shared/ui", () => ({
 
 function record(index: number, biography = false): StoryRecord {
   return {
+    title: "",
     recordIndex: index,
     recordType: biography ? 0 : 1,
     schemaId: biography ? STORY_BIOGRAPHY_SCHEMA_ID : STORY_ENVELOPE_SCHEMA_ID,
@@ -126,10 +127,19 @@ describe("useStoryEditorController biography presentation", () => {
       });
       const { result } = renderHook(() => useStoryEditorController());
       act(() => result.current.form.updateContent("First ordinary story"));
+      const untitledHash = result.current.form.draftPayloadHash;
+      act(() => result.current.form.updateTitle("  First journey 😀  "));
+      const titledHash = result.current.form.draftPayloadHash;
+      expect(titledHash).not.toBe(untitledHash);
       await act(async () => result.current.form.submit());
 
       expect(mocks.addFlow.runOrThrow).toHaveBeenCalledWith(
-        expect.objectContaining({ recordIndex: records.length, recordType: 1 }),
+        expect.objectContaining({
+          title: "  First journey 😀  ",
+          recordIndex: records.length,
+          recordType: 1,
+          expectedPayloadHash: titledHash,
+        }),
       );
       expect(result.current.sortedRecords).toEqual([{ ...added, displayIndex: 1 }]);
       expect(result.current.meta).toMatchObject({ totalRecords: 1, totalPayloadLength: 100 });
@@ -152,7 +162,11 @@ describe("useStoryEditorController biography presentation", () => {
     await act(async () => result.current.seal.execute());
 
     expect(result.current.isSealed).toBe(true);
-    expect(result.current.meta).toMatchObject({ totalRecords: 2, totalPayloadLength: 200, isSealed: true });
+    expect(result.current.meta).toMatchObject({
+      totalRecords: 2,
+      totalPayloadLength: 200,
+      isSealed: true,
+    });
     expect(result.current.sortedRecords.map((item) => item.displayIndex)).toEqual([1, 2]);
     expect(mocks.toast.success).toHaveBeenCalledWith("Story sealed successfully (2 records)");
   });

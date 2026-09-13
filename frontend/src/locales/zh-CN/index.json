@@ -245,7 +245,9 @@
       "author": "作者",
       "recordType": "记录类型",
       "attachmentCID": "附件CID",
-      "totalRecords": "总记录数"
+      "totalRecords": "总记录数",
+      "filterLabel": "按标题或正文筛选已加载的记录",
+      "noMatches": "已加载的记录中没有匹配结果"
     },
     "childrenQuery": {
       "childHash": "子女哈希",
@@ -930,7 +932,9 @@
     "collapsedRun": "已折叠 {{total}} 个记录",
     "expandRun": "展开",
     "collapseRun": "收起 {{total}} 个记录",
-    "listSeparator": "、"
+    "listSeparator": "、",
+    "recordTitleLabel": "标题（可选）",
+    "recordTitlePlaceholder": "为这条记录起个名字"
   },
   "person": {
     "encyclopedia": "人物百科",
@@ -1044,7 +1048,8 @@
     "peopleEncyclopedia": "人物百科",
     "author": "作者",
     "payloadHash": "载荷哈希",
-    "attachment": "附件"
+    "attachment": "附件",
+    "biographyTitle": "人物简介"
   },
   "actions": {
     "title": "链上操作",
@@ -1200,9 +1205,12 @@
       "storyTooLong": "故事内容过长",
       "tokenURITooLong": "Token URI 过长",
       "invalidTokenURI": "无效的 URL 或 IPFS URI",
-      "yearExceedsCurrent": "公元年份不能超过当前年份"
+      "yearExceedsCurrent": "公元年份不能超过当前年份",
+      "storyRequiredForTitle": "填写简介标题前请先填写正文"
     },
-    "personHashMismatch": "口令或身份套件与目标人物哈希不匹配"
+    "personHashMismatch": "口令或身份套件与目标人物哈希不匹配",
+    "storyTitleLabel": "简介标题（可选）",
+    "storyTitlePlaceholder": "人物简介"
   },
   "endorse": {
     "title": "背书版本",

@@ -277,69 +277,78 @@ describe("PaperGenealogyView", () => {
     expect(childLane?.kind === "person" ? childLane.relationLabel : "unexpected").toBe("");
   });
 
-  it("keeps validated version biography and NFT public story as labelled paper tracks", () => {
-    const generations = buildPaperGenerations({
-      graph: {
-        nodes: [{ id: rootId, depth: 0, personHash: rootHash, versionIndex: 1 }],
-        edges: [],
-        childrenByParent: {},
-      },
-      nodesData: {
-        [rootId]: {
-          id: rootId,
-          personHash: rootHash,
-          versionIndex: 1,
-          tokenId: "1",
-          fullName: "曹操",
-          metadataUnlockValidated: true,
-          biography: "这是解锁并验证后的版本传记，纸本只读这个字段。",
-          nftPublicStory: "这是独立公开的 NFT 传记。",
-          storyMetadata: {
-            totalRecords: 3,
-            recordsHead: "",
-            lastUpdateTime: 1,
-            isSealed: false,
-            totalPayloadLength: 0,
-          },
-          storyRecords: [
-            {
-              recordIndex: 2,
-              payloadHash: "0x3",
-              content: "第三段。",
-              timestamp: 1,
-              author: "0x0000000000000000000000000000000000000000",
-              recordType: 0,
-              attachmentCID: "",
-            },
-            {
-              recordIndex: 0,
-              payloadHash: "0x1",
-              content: "第一段。",
-              timestamp: 1,
-              author: "0x0000000000000000000000000000000000000000",
-              recordType: 0,
-              attachmentCID: "",
-            },
-            {
-              recordIndex: 1,
-              payloadHash: "0x2",
-              content: "第二段。",
-              timestamp: 1,
-              author: "0x0000000000000000000000000000000000000000",
-              recordType: 0,
-              attachmentCID: "",
-            },
-          ],
+  it.each(["  迁居洛阳 😀  ", "", " \t "])(
+    "keeps private/public paper biography labels and includes a nonblank public title (%j)",
+    (storyTitle) => {
+      const generations = buildPaperGenerations({
+        graph: {
+          nodes: [{ id: rootId, depth: 0, personHash: rootHash, versionIndex: 1 }],
+          edges: [],
+          childrenByParent: {},
         },
-      },
-      t: zhTranslate,
-    });
+        nodesData: {
+          [rootId]: {
+            id: rootId,
+            personHash: rootHash,
+            versionIndex: 1,
+            tokenId: "1",
+            fullName: "曹操",
+            metadataUnlockValidated: true,
+            biography: "这是解锁并验证后的版本传记，纸本只读这个字段。",
+            nftPublicStory: "这是独立公开的 NFT 传记。",
+            nftPublicStoryTitle: storyTitle,
+            storyMetadata: {
+              totalRecords: 3,
+              recordsHead: "",
+              lastUpdateTime: 1,
+              isSealed: false,
+              totalPayloadLength: 0,
+            },
+            storyRecords: [
+              {
+                title: "",
+                recordIndex: 2,
+                payloadHash: "0x3",
+                content: "第三段。",
+                timestamp: 1,
+                author: "0x0000000000000000000000000000000000000000",
+                recordType: 0,
+                attachmentCID: "",
+              },
+              {
+                title: "",
+                recordIndex: 0,
+                payloadHash: "0x1",
+                content: "第一段。",
+                timestamp: 1,
+                author: "0x0000000000000000000000000000000000000000",
+                recordType: 0,
+                attachmentCID: "",
+              },
+              {
+                title: "",
+                recordIndex: 1,
+                payloadHash: "0x2",
+                content: "第二段。",
+                timestamp: 1,
+                author: "0x0000000000000000000000000000000000000000",
+                recordType: 0,
+                attachmentCID: "",
+              },
+            ],
+          },
+        },
+        t: zhTranslate,
+      });
 
-    const record = getOuFullRecordText(generations[0].people[0]);
-    expect(record).toContain("附记这是解锁并验证后的版本传记，纸本只读这个字段。");
-    expect(record).toContain("NFT 公开传记: 这是独立公开的 NFT 传记。");
-    expect(record).not.toContain("第一段。第二段。第三段。");
-  });
+      const record = getOuFullRecordText(generations[0].people[0]);
+      expect(record).toContain("附记这是解锁并验证后的版本传记，纸本只读这个字段。");
+      expect(record).toContain(
+        `NFT 公开传记: ${storyTitle.trim() ? `${storyTitle} — ` : ""}这是独立公开的 NFT 传记。`,
+      );
+      expect(record).not.toContain("第一段。第二段。第三段。");
+    },
+  );
 
   it("does not expose a locked biography or use it as an empty NFT-story fallback", () => {
     const generations = buildPaperGenerationsBase({

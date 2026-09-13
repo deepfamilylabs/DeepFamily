@@ -431,6 +431,7 @@ export const STORY_RECORD_DOMAIN: string;
 export const STORY_HEAD_DOMAIN: string;
 export interface StoryRecordInput {
   schema?: "deepfamily/story-record@1.0";
+  title: string;
   content: string;
   recordType: number;
   attachmentCID: string;

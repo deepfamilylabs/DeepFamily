@@ -2,7 +2,10 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
 import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
-import { addStoryRecordService, type AddStoryRecordResult } from "../services/addStoryRecordService";
+import {
+  addStoryRecordService,
+  type AddStoryRecordResult,
+} from "../services/addStoryRecordService";
 import { useWallet } from "../../wallet";
 import { useTxFlow, type TxFlowRunner } from "./useTxFlow";
 
@@ -11,6 +14,7 @@ import type { ArchiveTransactionPreview } from "../services/archiveTransaction";
 export type AddStoryRecordFlowArgs = {
   tokenId: string;
   recordIndex: number;
+  title: string;
   content: string;
   expectedPayloadHash: string;
   recordType?: number;
@@ -36,6 +40,7 @@ export function useAddStoryRecordFlow() {
         contractAddress,
         args.tokenId,
         args.recordIndex,
+        args.title,
         args.content,
         args.expectedPayloadHash,
         args.recordType,

@@ -7,6 +7,7 @@ import { buildStorySnapshot, buildStoryDataResult, applyStoryDataToNode } from "
 import { computeStoryRecordsHead } from "./story";
 
 const record = (index: number, biography = false): StoryRecord => ({
+  title: "",
   recordIndex: index,
   recordType: biography ? 0 : 1,
   content: biography ? "  公开传记\r\n" : `正文${index}`,

@@ -35,6 +35,7 @@ export interface AddStoryRecordResult {
       payloadLength: number;
       payloadHash: string;
       author: string;
+      title: string;
       recordType: number;
       attachmentCID: string;
     };
@@ -46,6 +47,7 @@ export async function addStoryRecordService(
   contractAddress: string,
   tokenId: string,
   recordIndex: number,
+  title: string,
   content: string,
   expectedPayloadHash: string,
   recordType = 1,
@@ -58,8 +60,11 @@ export async function addStoryRecordService(
     // Freeze the exact DFS1 bytes before any RPC/wallet await.
     if (!Number.isInteger(recordType) || recordType < 1 || recordType > 255)
       throw archiveValidationError("Type 0 is reserved for the mint biography");
-    const payload = ethers.hexlify(encodePublicStoryRecord({ content, recordType, attachmentCID }));
-    if (decodeStoryRecord(payload).content !== content)
+    const payload = ethers.hexlify(
+      encodePublicStoryRecord({ title, content, recordType, attachmentCID }),
+    );
+    const decoded = decodeStoryRecord(payload);
+    if (decoded.title !== title || decoded.content !== content)
       throw archiveValidationError("Story compression did not preserve the original text");
     const payloadHash = ethers.keccak256(payload);
     if (expectedPayloadHash && expectedPayloadHash.toLowerCase() !== payloadHash.toLowerCase()) {
@@ -166,6 +171,7 @@ export async function addStoryRecordService(
     const newRecord: StoryRecord = {
       recordIndex,
       payloadHash,
+      title,
       content,
       timestamp: Number(ref.timestamp),
       author: author,
@@ -191,6 +197,7 @@ export async function addStoryRecordService(
           payloadLength: preview.payloadBytes,
           payloadHash,
           author: author,
+          title,
           recordType,
           attachmentCID,
         },

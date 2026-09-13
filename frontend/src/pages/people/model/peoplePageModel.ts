@@ -245,6 +245,10 @@ export function filterPeople(
         matchesText(person.birthPlace, term) ||
         matchesText(person.deathPlace, term) ||
         matchesText(person.nftPublicStory, term) ||
+        matchesText(person.nftPublicStoryTitle, term) ||
+        person.storyRecords?.some(
+          (record) => matchesText(record.title, term) || matchesText(record.content, term),
+        ) ||
         matchesText(person.addedBy, term),
     );
   }

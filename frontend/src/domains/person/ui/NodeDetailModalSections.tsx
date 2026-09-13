@@ -530,13 +530,22 @@ export function NodeDetailTrustedEndorsersSection({
   );
 }
 
-function NodeDetailStorySection({ label, story }: { label: React.ReactNode; story?: string }) {
+function NodeDetailStorySection({
+  label,
+  title,
+  story,
+}: {
+  label: React.ReactNode;
+  title?: string;
+  story?: string;
+}) {
   if (!story?.trim()) return null;
 
   return (
     <div className="flex flex-col gap-1 px-4 py-2.5 sm:flex-row sm:gap-4">
       <div className="w-full shrink-0 break-words text-xs text-ink-muted sm:w-44">{label}</div>
       <div className="min-w-0 flex-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap wrap-break-word text-[13px] leading-relaxed text-ink">
+        {title && <h4 className="mb-1.5 break-words font-semibold">{title}</h4>}
         {story}
       </div>
     </div>
@@ -606,6 +615,11 @@ export function NodeDetailNftSection({
         />
         <NodeDetailStorySection
           label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
+          title={
+            nodeData?.nftPublicStoryTitle?.trim()
+              ? nodeData.nftPublicStoryTitle
+              : t("recordTypes.biography", "Biography")
+          }
           story={nodeData?.nftPublicStory}
         />
         <NodeDetailRow

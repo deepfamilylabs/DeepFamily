@@ -298,6 +298,7 @@ export function buildNftDetailsPatch(options: {
     deathPlace: coreFields.deathPlace,
     isDeathBC: coreFields.isDeathBC,
     nftPublicStory: coreFields.nftPublicStory,
+    nftPublicStoryTitle: coreFields.nftPublicStoryTitle,
     nftTokenURI: options.nftRet.nftTokenURI,
     storyMetadata: options.storyMetadata,
     versionDetailsFetchedAt: Date.now(),

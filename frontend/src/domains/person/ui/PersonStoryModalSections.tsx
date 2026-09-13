@@ -229,10 +229,12 @@ export function StoryIdentitySection({
 export function BasicStorySection({
   t,
   story,
+  title,
   biography,
 }: {
   t: PersonStoryT;
   story?: string;
+  title?: string;
   biography?: StoryRecord;
 }) {
   if (!story && !biography?.unsupportedSchema) return null;
@@ -241,6 +243,11 @@ export function BasicStorySection({
     <div className="space-y-3">
       <SectionTitle>{t("storyRecordsModal.basicStory", "Basic Story")}</SectionTitle>
       <InfoCard>
+        <h4 className="mb-2 break-words text-sm font-semibold text-ink">
+          {(biography?.title ?? title)?.trim()
+            ? (biography?.title ?? title)
+            : t("storyRecordsModal.biographyTitle", "Biography")}
+        </h4>
         {biography?.unsupportedSchema ? (
           <UnsupportedStoryRecord record={biography} />
         ) : (
@@ -417,7 +424,8 @@ function StoryRecordCard({
   onToggle: (index: number) => void;
   copyText: (text: string) => void;
 }) {
-  const preview = record.content.length > 120 ? `${record.content.slice(0, 120)}...` : record.content;
+  const preview =
+    record.content.length > 120 ? `${record.content.slice(0, 120)}...` : record.content;
   const RecordIcon = getRecordTypeIcon(record.recordType);
   const iconColor = getRecordTypeColorClass(record.recordType);
   const copyLabel = t("common.copy", "Copy");
@@ -455,6 +463,9 @@ function StoryRecordCard({
           </div>
 
           <div className="flex-1 min-w-0">
+            {record.title?.trim() && (
+              <h4 className="mb-2 break-words font-semibold text-ink">{record.title}</h4>
+            )}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <span

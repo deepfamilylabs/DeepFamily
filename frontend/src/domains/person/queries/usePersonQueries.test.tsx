@@ -47,6 +47,7 @@ const storyMetadata = (overrides: Partial<StoryMetadata> = {}): StoryMetadata =>
 });
 
 const storyRecord = (recordIndex: number, content: string): StoryRecord => ({
+  title: "",
   recordIndex,
   payloadHash: `0x${String(recordIndex + 1)
     .repeat(64)
@@ -162,7 +163,10 @@ describe("person query hooks", () => {
     expect(mocks.gateway.getStoryRecords).toHaveBeenCalledWith("42", 0, 50);
     expect(result.current.error).toBeNull();
     expect(result.current.data?.metadata.totalRecords).toBe(2);
-    expect(result.current.data?.records.map((record) => record.content)).toEqual(["hello", "world"]);
+    expect(result.current.data?.records.map((record) => record.content)).toEqual([
+      "hello",
+      "world",
+    ]);
     expect(result.current.data?.fullStory).toBe("helloworld");
   });
 

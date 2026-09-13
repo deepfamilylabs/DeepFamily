@@ -1,6 +1,12 @@
 import { useEffect, useId, useState } from "react";
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from "react-hook-form";
-import { MODAL_FIELD, MODAL_FIELD_SM, MODAL_TEXTAREA, ModalSectionHeading, getFieldErrorA11y } from "../../../../../shared/ui";
+import {
+  MODAL_FIELD,
+  MODAL_FIELD_SM,
+  MODAL_TEXTAREA,
+  ModalSectionHeading,
+  getFieldErrorA11y,
+} from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import type { MintNFTFormValues, MintNFTT } from "../model/mintNftTypes";
 
@@ -23,6 +29,7 @@ export function MintSupplementForm({
 }: MintSupplementFormProps) {
   const [biographyCopyConfirmed, setBiographyCopyConfirmed] = useState(false);
   const biographyCopyConfirmationId = useId();
+  const storyTitleId = useId();
   const isDeathBC = Boolean(watch("isDeathBC"));
   const currentYear = new Date().getFullYear();
   const storyErrorId = "mint-nft-story-error";
@@ -47,7 +54,9 @@ export function MintSupplementForm({
   return (
     <>
       <div className="space-y-4 pt-4 border-t border-hairline">
-        <ModalSectionHeading>{t("mintNFT.supplementalInfo", "Supplemental Information")}</ModalSectionHeading>
+        <ModalSectionHeading>
+          {t("mintNFT.supplementalInfo", "Supplemental Information")}
+        </ModalSectionHeading>
 
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -150,6 +159,21 @@ export function MintSupplementForm({
           </div>
 
           <div>
+            <label htmlFor={storyTitleId} className="block text-xs font-semibold text-ink mb-1.5">
+              {t("mintNFT.storyTitleLabel", "Story title (optional)")}
+            </label>
+            <input
+              id={storyTitleId}
+              {...register("storyTitle")}
+              className={MODAL_FIELD}
+              placeholder={t(
+                "mintNFT.storyTitlePlaceholder",
+                "Enter a title for this story record",
+              )}
+            />
+          </div>
+
+          <div>
             <label className="block text-xs font-semibold text-ink mb-1.5">
               {t("mintNFT.story", "Life Story Summary")}
             </label>
@@ -222,10 +246,7 @@ export function MintSupplementForm({
             className={MODAL_FIELD}
             placeholder="https://... or ipfs://..."
           />
-          <p
-            id={tokenUriHintId}
-            className="mt-2 text-xs text-ink-muted font-medium"
-          >
+          <p id={tokenUriHintId} className="mt-2 text-xs text-ink-muted font-medium">
             {t("mintNFT.tokenURIHint", "Optional: URL or IPFS hash for NFT metadata")}
           </p>
           {errors.tokenURI && (

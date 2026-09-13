@@ -2287,10 +2287,12 @@ export const main = async (chainProfile) => {
       "NFT owner mismatch",
     );
 
+    const storyTitle = "Archive acceptance record";
     const storyContent = `${CHAIN_PROFILE.displayName} automated acceptance ${config.runId}`;
     const storyResult = await appendDfsStoryRecord({
       archive: archive.connect(runDeployer),
       tokenId,
+      title: storyTitle,
       content: storyContent,
       recordType: 1,
       attachmentCID: "",
@@ -2298,7 +2300,8 @@ export const main = async (chainProfile) => {
     const storyHash = storyResult.recordRef.blob.payloadHash;
     await recordTx("story-add-record", storyResult.tx);
     assertCondition(
-      storyResult.record.decoded.content === storyContent,
+      storyResult.record.decoded.title === storyTitle &&
+        storyResult.record.decoded.content === storyContent,
       "Reader returned different story content",
     );
     // Network acceptance uses actual complete calls for both sides of the segment boundary.
@@ -2356,6 +2359,7 @@ export const main = async (chainProfile) => {
     const storyState = await deepFamilyReader.getStoryState(tokenId);
     assertCondition(storyState.isSealed, "Story is not sealed");
     const rejectedPayload = encodeStoryRecord({
+      title: "",
       content: "after seal",
       recordType: 1,
       attachmentCID: "",

@@ -25,7 +25,12 @@ describe("Unified Archive and Reader integration", function () {
   }
 
   async function append(archive, tokenId, content, schemaId = STORY_ENVELOPE_SCHEMA_ID) {
-    const payload = encodeStoryRecord({ content, recordType: 3, attachmentCID: "ipfs://source" });
+    const payload = encodeStoryRecord({
+      title: "",
+      content,
+      recordType: 3,
+      attachmentCID: "ipfs://source",
+    });
     const state = await archive.storyState(tokenId);
     await archive.appendStoryRecord(
       tokenId,
@@ -112,6 +117,7 @@ describe("Unified Archive and Reader integration", function () {
     await deepFamily.transferFrom(signer.address, other.address, tokenId);
     const state = await archive.storyState(tokenId);
     const payload = encodeStoryRecord({
+      title: "",
       content: "after transfer",
       recordType: 0,
       attachmentCID: "",

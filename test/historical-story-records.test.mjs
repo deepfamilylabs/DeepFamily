@@ -17,6 +17,7 @@ describe("historical story records", () => {
     expect(records).to.deep.equal(buildHistoricalStoryRecords({ storyData: person.storyData }));
     expect(records[0]).to.deep.equal({
       type: 1,
+      title: "",
       content: person.storyData.summary[0],
       arrayIndex: 0,
       partIndex: 0,
@@ -38,12 +39,36 @@ describe("historical story records", () => {
       },
     });
     expect(records).to.deep.equal([
-      { type: 1, content: "  Summary\r\n", arrayIndex: 1, partIndex: 0 },
-      { type: 1, content: "Second summary\t", arrayIndex: 3, partIndex: 0 },
-      { type: 3, content: " School\n", arrayIndex: 0, partIndex: 0 },
-      { type: 19, content: " Final note\r\n", arrayIndex: 0, partIndex: 0 },
+      { type: 1, title: "", content: "  Summary\r\n", arrayIndex: 1, partIndex: 0 },
+      { type: 1, title: "", content: "Second summary\t", arrayIndex: 3, partIndex: 0 },
+      { type: 3, title: "", content: " School\n", arrayIndex: 0, partIndex: 0 },
+      { type: 19, title: "", content: " Final note\r\n", arrayIndex: 0, partIndex: 0 },
     ]);
     expect(buildHistoricalStoryRecords({ story: "Biography only" })).to.deep.equal([]);
+  });
+
+  it("retains exact optional titles on every part and validates supplied titles", () => {
+    const title = "  第一次远行 😀 e\u0301\n ";
+    const content = "中".repeat(6_000);
+    const records = buildHistoricalStoryRecords({
+      storyData: { lifeEvents: [{ title, content }, { content: "Untitled entry" }] },
+    });
+    expect(records).to.have.length(3);
+    expect(records.slice(0, 2).map((record) => record.title)).to.deep.equal([title, title]);
+    expect(
+      records
+        .slice(0, 2)
+        .map((record) => record.content)
+        .join(""),
+    ).to.equal(content);
+    expect(records[2].title).to.equal("");
+    for (const invalidTitle of [42, {}, "\ud800"]) {
+      expect(() =>
+        buildHistoricalStoryRecords({
+          storyData: { summary: [{ title: invalidTitle, content: "Entry" }] },
+        }),
+      ).to.throw();
+    }
   });
 
   it("splits at Unicode scalar boundaries and preserves the exact original text", () => {

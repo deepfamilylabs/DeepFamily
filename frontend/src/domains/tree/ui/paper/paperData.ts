@@ -203,6 +203,7 @@ function buildClassicalLines(params: {
   const metadataUnlocked = isMetadataUnlockUsable(nodeData);
   const versionBiography = metadataUnlocked ? nodeData?.biography : undefined;
   const nftPublicStory = nodeData?.nftPublicStory;
+  const nftPublicStoryTitle = nodeData?.nftPublicStoryTitle;
   const tag = metadataUnlocked ? ui.tagText || nodeData?.tag : undefined;
 
   return compactUnique([
@@ -217,7 +218,9 @@ function buildClassicalLines(params: {
       ? `${tFallback(t, "genealogyBook.fields.notes", "Notes")}: ${versionBiography}`
       : undefined,
     nftPublicStory
-      ? `${tFallback(t, "genealogyBook.fields.nftPublicStory", "Public NFT Story")}: ${nftPublicStory}`
+      ? `${tFallback(t, "genealogyBook.fields.nftPublicStory", "Public NFT Story")}: ${
+          nftPublicStoryTitle?.trim() ? `${nftPublicStoryTitle} — ` : ""
+        }${nftPublicStory}`
       : undefined,
   ]);
 }

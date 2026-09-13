@@ -266,6 +266,9 @@ function ManuscriptEntry({
         </span>
       </div>
 
+      {record.title?.trim() && (
+        <h4 className="mt-3 break-words text-base font-semibold text-ink">{record.title}</h4>
+      )}
       {record.unsupportedSchema ? (
         <UnsupportedStoryRecord record={record} />
       ) : (

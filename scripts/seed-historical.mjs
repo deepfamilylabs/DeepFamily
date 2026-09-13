@@ -396,6 +396,7 @@ function createSupplementInfo(personInfo) {
     deathDay: personInfo.deathDay ?? 0,
     birthPlace: personInfo.birthPlace || "",
     deathPlace: personInfo.deathPlace || "",
+    storyTitle: personInfo.storyTitle ?? "",
     story: storyPreview,
   };
 }
@@ -788,7 +789,11 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         recordRef: initialRef,
         getCode: (address, block) => signer.provider.getCode(address, block),
       });
-      if (initial.decoded?.recordType !== 0 || initial.decoded.content !== person.story) {
+      if (
+        initial.decoded?.recordType !== 0 ||
+        initial.decoded.title !== (person.storyTitle ?? "") ||
+        initial.decoded.content !== person.story
+      ) {
         throw new Error("Mint biography differs from the full source narrative");
       }
       console.log("  [ok]Public biography verified separately from ordinary story records");
@@ -844,6 +849,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
       const expected = availableRecords[index];
       if (
         stored.schemaId !== STORY_ENVELOPE_SCHEMA_ID ||
+        stored.decoded?.title !== expected.title ||
         stored.decoded?.content !== expected.content ||
         stored.decoded?.recordType !== expected.type ||
         stored.decoded?.attachmentCID !== ""
@@ -871,6 +877,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         archive,
         tokenId,
         expectedIndex: recordIndex,
+        title: record.title,
         content: record.content,
         recordType: record.type,
         attachmentCID: "",

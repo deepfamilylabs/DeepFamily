@@ -207,12 +207,16 @@ describe("person detail modals a11y", () => {
   });
 
   it("shows validated version biography and NFT public story as separate tracks", () => {
-    renderNodeDetail(makeUnlockedMintedPerson("Independent public NFT story"));
+    renderNodeDetail({
+      ...makeUnlockedMintedPerson("Independent public NFT story"),
+      nftPublicStoryTitle: "Early years",
+    });
 
     expect(screen.getByText("Encrypted Version Biography")).toBeTruthy();
     expect(screen.getByText("Validated private version biography")).toBeTruthy();
     expect(screen.getByText("Public NFT Summary")).toBeTruthy();
     expect(screen.getByText("Independent public NFT story")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Early years" })).toBeTruthy();
   });
 
   it("never falls back from an empty NFT public story to the private biography", () => {

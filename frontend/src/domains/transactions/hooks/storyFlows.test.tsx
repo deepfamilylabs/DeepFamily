@@ -52,6 +52,7 @@ describe("story transaction flows", () => {
       transactionHash: "0xrecord",
       blockNumber: 10,
       newRecord: {
+        title: "",
         recordIndex: 2,
         payloadHash: "0xhash",
         content: "hello",
@@ -67,6 +68,7 @@ describe("story transaction flows", () => {
     await act(async () => {
       await expect(
         result.current.runOrThrow({
+          title: "",
           tokenId: "7",
           recordIndex: 2,
           content: "hello",
@@ -82,6 +84,7 @@ describe("story transaction flows", () => {
       mocks.config.contractAddress,
       "7",
       2,
+      "",
       "hello",
       "0xexpected",
       1,
@@ -125,6 +128,7 @@ describe("story transaction flows", () => {
     await act(async () => {
       await expect(
         addFlow.result.current.runOrThrow({
+          title: "",
           tokenId: "7",
           recordIndex: 0,
           content: "hello",

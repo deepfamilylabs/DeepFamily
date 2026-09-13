@@ -212,6 +212,7 @@ export function useMintNftSubmit({
           publicSignals: proof.publicSignals,
           tokenURI: proof.tokenURI,
           coreInfo: proof.coreInfo,
+          storyTitle: data.storyTitle,
           story: data.story,
         });
 

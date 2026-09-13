@@ -176,6 +176,7 @@ hre.run = async (taskName, args = {}) => {
           deathMonth: Number(args.deathmonth ?? 0),
           deathDay: Number(args.deathday ?? 0),
           deathPlace: String(args.deathplace ?? ""),
+          storyTitle: String(args.storytitle ?? ""),
           story: String(args.story ?? ""),
         },
       });
@@ -186,6 +187,7 @@ hre.run = async (taskName, args = {}) => {
         archive: archive.connect(signer),
         tokenId: BigInt(args.tokenid),
         expectedIndex: BigInt(args.recordindex),
+        title: String(args.title ?? ""),
         content: String(args.content),
         recordType: Number(args.type ?? 1),
         attachmentCID: String(args.attachment ?? ""),

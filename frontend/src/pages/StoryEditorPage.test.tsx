@@ -107,6 +107,7 @@ vi.mock("../domains/transactions", async (importOriginal) => ({
 const bytes32 = (hex: string) => `0x${hex.repeat(32)}`;
 
 const existingRecord: StoryRecord = {
+  title: "",
   recordIndex: 0,
   recordHash: bytes32("a1"),
   payloadHash: bytes32("11"),
@@ -175,6 +176,7 @@ describe("StoryEditorPage", () => {
 
   it("adds a story record through the transaction flow and invalidates scoped story cache", async () => {
     const addedRecord: StoryRecord = {
+      title: "",
       recordIndex: 1,
       payloadHash: bytes32("44"),
       content: "new story",
@@ -216,6 +218,7 @@ describe("StoryEditorPage", () => {
     });
     expect(mocks.addStoryRunOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
+        title: "",
         tokenId: "42",
         recordIndex: 1,
         content: "new story",
@@ -263,7 +266,9 @@ describe("StoryEditorPage", () => {
 
     render(<StoryEditorPage />);
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Seal permanently" })).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Seal permanently" })).toBeTruthy(),
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Seal permanently" }));

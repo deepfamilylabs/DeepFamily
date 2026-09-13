@@ -465,6 +465,16 @@ export async function mintPerson(
     },
   };
 
+  const storyPayload =
+    opts.storyPayload ??
+    (opts.story
+      ? encodeStoryRecord({
+          title: opts.storyTitle ?? "",
+          content: opts.story,
+          recordType: 0,
+          attachmentCID: "",
+        })
+      : "0x");
   const tx = await deepFamily
     .connect(signer)
     .mintPersonVersionNFT(
@@ -473,17 +483,8 @@ export async function mintPerson(
       1,
       opts.tokenURI ?? "",
       coreInfo,
-      opts.storyPayload ??
-        (opts.story
-          ? encodeStoryRecord({ content: opts.story, recordType: 0, attachmentCID: "" })
-          : "0x"),
-      opts.expectedStoryPayloadHash ??
-        ethers.keccak256(
-          opts.storyPayload ??
-            (opts.story
-              ? encodeStoryRecord({ content: opts.story, recordType: 0, attachmentCID: "" })
-              : "0x"),
-        ),
+      storyPayload,
+      opts.expectedStoryPayloadHash ?? ethers.keccak256(storyPayload),
     );
   const receipt = await tx.wait();
 

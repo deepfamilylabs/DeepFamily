@@ -91,6 +91,7 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
         publicSignals: args.publicSignals,
         tokenURI: args.tokenURI,
         coreInfo: args.coreInfo,
+        storyTitle: args.storyTitle,
         story: args.story,
         mintPersonVersionNFT,
         getVersionDetails,

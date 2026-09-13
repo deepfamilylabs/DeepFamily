@@ -142,6 +142,7 @@ export function applyStoryDataToNode(
     [nodeId]: {
       ...current,
       nftPublicStory: biography?.content ?? current.nftPublicStory,
+      nftPublicStoryTitle: biography?.title ?? current.nftPublicStoryTitle,
       storyMetadata: storyData.metadata,
       storyRecords: storyData.records,
       storyFetchedAt: storyData.fetchedAt,

@@ -23,6 +23,7 @@ vi.mock("../../../shared/ui", async (importOriginal) => ({
 afterEach(cleanup);
 
 const biography: StoryRecord = {
+  title: "",
   recordIndex: 0,
   schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
   recordType: 0,
@@ -98,4 +99,16 @@ describe("PersonStoryModal archive presentation", () => {
     expect(screen.queryByText(/records ·/)).toBeNull();
     expect(screen.queryByText("#0")).toBeNull();
   });
+});
+
+it("shows custom biography and ordinary record titles with an untitled biography fallback", async () => {
+  const { unmount } = renderStory([
+    { ...biography, title: "My early years" },
+    { ...ordinary, title: "First journey" },
+  ]);
+  expect(await screen.findByRole("heading", { name: "My early years" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "First journey" })).toBeTruthy();
+  unmount();
+  renderStory([{ ...biography, title: " \n " }]);
+  expect(await screen.findByRole("heading", { name: "Biography" })).toBeTruthy();
 });

@@ -158,6 +158,7 @@ describe("Mint NFT Tests", function () {
       deepFamily.interface.encodeFunctionData("endorseVersion", [personHash, 1]),
     );
     const payload = encodeStoryRecord({
+      title: "",
       content: "Original biography before the receiver callback",
       recordType: 0,
       attachmentCID: "",

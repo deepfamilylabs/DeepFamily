@@ -13,7 +13,11 @@ import {
 describe("storyEditorModel", () => {
   it("normalizes record type values and attachment defaults", () => {
     const records = normalizeStoryRecords([
-      { recordIndex: 0, recordType: "3" as any, attachmentCID: undefined } as unknown as StoryRecord,
+      {
+        recordIndex: 0,
+        recordType: "3" as any,
+        attachmentCID: undefined,
+      } as unknown as StoryRecord,
       { recordIndex: 1, recordType: "abc" as any, attachmentCID: "ipfs://cid" } as StoryRecord,
     ]);
 
@@ -35,10 +39,18 @@ describe("storyEditorModel", () => {
   });
 
   it("tracks dirty form state by meaningful story input fields", () => {
-    expect(isRecordFormDirty({ content: " ", recordType: 1, attachmentCID: "" })).toBe(false);
-    expect(isRecordFormDirty({ content: "story", recordType: 1, attachmentCID: "" })).toBe(true);
-    expect(isRecordFormDirty({ content: "", recordType: 2, attachmentCID: "" })).toBe(true);
-    expect(isRecordFormDirty({ content: "", recordType: 1, attachmentCID: "cid" })).toBe(true);
+    expect(isRecordFormDirty({ title: "", content: " ", recordType: 1, attachmentCID: "" })).toBe(
+      false,
+    );
+    expect(
+      isRecordFormDirty({ title: "", content: "story", recordType: 1, attachmentCID: "" }),
+    ).toBe(true);
+    expect(isRecordFormDirty({ title: "", content: "", recordType: 2, attachmentCID: "" })).toBe(
+      true,
+    );
+    expect(isRecordFormDirty({ title: "", content: "", recordType: 1, attachmentCID: "cid" })).toBe(
+      true,
+    );
   });
 
   it("counts bytes and resolves ipfs attachment URLs", () => {

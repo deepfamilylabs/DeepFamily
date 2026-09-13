@@ -14,6 +14,7 @@ export interface PrefetchedStoryState {
 }
 
 export interface RecordFormData {
+  title: string;
   content: string;
   expectedPayloadHash?: string;
   recordType: number;
@@ -26,6 +27,7 @@ export const STORY_WARNING_YELLOW_BYTES = STORY_SEGMENT_BYTES - 400;
 export const STORY_MAX_ATTACHMENT_BYTES = 256;
 
 export const initialRecordFormData: RecordFormData = {
+  title: "",
   content: "",
   recordType: 1,
   attachmentCID: "",
@@ -45,7 +47,9 @@ export function convertRecordTypeToNumber(type: number | string | null | undefin
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function normalizeStoryRecords(records: StoryRecord[] | undefined): StoryRecord[] | undefined {
+export function normalizeStoryRecords(
+  records: StoryRecord[] | undefined,
+): StoryRecord[] | undefined {
   return records?.map((record) => ({
     ...record,
     recordType: convertRecordTypeToNumber(record.recordType),
@@ -53,8 +57,13 @@ export function normalizeStoryRecords(records: StoryRecord[] | undefined): Story
   }));
 }
 
-export function computeStoryPayloadHash(content: string, recordType = 1, attachmentCID = ""): string {
-  return ethers.keccak256(encodePublicStoryRecord({ content, recordType, attachmentCID }));
+export function computeStoryPayloadHash(
+  content: string,
+  recordType = 1,
+  attachmentCID = "",
+  title = "",
+): string {
+  return ethers.keccak256(encodePublicStoryRecord({ title, content, recordType, attachmentCID }));
 }
 
 export function formatStoryHash(hash?: string): string {
@@ -85,7 +94,10 @@ export function getByteWarningColor(byteLen: number): string {
 export function isRecordFormDirty(formData: RecordFormData): boolean {
   const trimmed = (formData.content || "").trim();
   return (
-    trimmed.length > 0 || (formData.attachmentCID || "").length > 0 || formData.recordType !== 1
+    formData.title.length > 0 ||
+    trimmed.length > 0 ||
+    (formData.attachmentCID || "").length > 0 ||
+    formData.recordType !== 1
   );
 }
 
@@ -133,9 +145,14 @@ export function mapStorySealError(
   error: any,
   t: (key: string, fallback: string) => string,
 ): string {
-  return getFriendlyErrorMessage(error, t as any, t("storyRecordEditor.sealFailed", "Seal failed"), {
-    preferDetailsForUnknown: true,
-  });
+  return getFriendlyErrorMessage(
+    error,
+    t as any,
+    t("storyRecordEditor.sealFailed", "Seal failed"),
+    {
+      preferDetailsForUnknown: true,
+    },
+  );
 }
 
 /**

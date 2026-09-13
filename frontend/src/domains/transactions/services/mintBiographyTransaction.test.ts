@@ -34,7 +34,7 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
     story === ""
       ? "0x"
       : ethers.hexlify(
-          encodePublicStoryRecord({ content: story, recordType: 0, attachmentCID: "" }),
+          encodePublicStoryRecord({ title: "", content: story, recordType: 0, attachmentCID: "" }),
         );
   const blob = {
     pointer,
@@ -90,13 +90,11 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
     archive: vi.fn().mockResolvedValue(archiveAddress),
   };
   const archive = {
-    storyState: vi
-      .fn()
-      .mockResolvedValue({
-        totalRecords: story ? 1n : 0n,
-        totalPayloadLength: BigInt(blob.payloadLength),
-        recordsHead: story ? head : ethers.ZeroHash,
-      }),
+    storyState: vi.fn().mockResolvedValue({
+      totalRecords: story ? 1n : 0n,
+      totalPayloadLength: BigInt(blob.payloadLength),
+      recordsHead: story ? head : ethers.ZeroHash,
+    }),
     storyRecordRef: vi.fn().mockResolvedValue(ref),
   };
   mocks.archive.mockReturnValue(archive);

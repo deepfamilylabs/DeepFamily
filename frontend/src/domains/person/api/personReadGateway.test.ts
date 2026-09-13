@@ -150,7 +150,12 @@ describe("personReadGateway", () => {
   });
 
   it("caches StoryState and verifies canonical records from bytecode", async () => {
-    const bytes = encodeStoryRecord({ content: "hello 🙂", recordType: 1, attachmentCID: "" });
+    const bytes = encodeStoryRecord({
+      title: "First journey 😀",
+      content: "hello 🙂",
+      recordType: 1,
+      attachmentCID: "",
+    });
     const pointer = "0x0000000000000000000000000000000000000011";
     const archive = "0x0000000000000000000000000000000000000022";
     const author = "0x0000000000000000000000000000000000000033";
@@ -196,6 +201,7 @@ describe("personReadGateway", () => {
     const records = await gateway.getStoryRecords("42", 0, 10);
     expect(records).toHaveLength(1);
     expect(records[0]).toMatchObject({
+      title: "First journey 😀",
       content: "hello 🙂",
       recordIndex: 0,
       recordType: 1,
@@ -285,7 +291,14 @@ describe("personReadGateway", () => {
       hasMore: true,
       nextOffset: 1,
       records: [
-        { recordIndex: 0, content: "", rawPayload: payload, schemaId, unsupportedSchema: true },
+        {
+          title: "",
+          recordIndex: 0,
+          content: "",
+          rawPayload: payload,
+          schemaId,
+          unsupportedSchema: true,
+        },
       ],
     });
   });

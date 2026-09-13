@@ -39,6 +39,7 @@ export interface StoryDetailData {
     deathDay?: number;
     deathPlace?: string;
     isDeathBC?: boolean;
+    storyTitle?: string;
     story?: string;
   };
   integrity?: PersonStoryIntegrity;
@@ -121,7 +122,11 @@ export function buildPrefetchedStoryDetailData(
     owner: prefetched.owner,
     nftCoreInfo:
       presentation.biography && !presentation.biography.unsupportedSchema
-        ? { ...prefetched.nftCoreInfo, story: presentation.biography.content }
+        ? {
+            ...prefetched.nftCoreInfo,
+            story: presentation.biography.content,
+            storyTitle: presentation.biography.title,
+          }
         : prefetched.nftCoreInfo,
     storyMetadata: prefetched.storyMetadata,
     storyRecords,
@@ -246,6 +251,7 @@ export function buildNftCoreInfo(
     deathPlace: node.deathPlace,
     isDeathBC: node.isDeathBC,
     story: node.nftPublicStory || "",
+    storyTitle: node.nftPublicStoryTitle || "",
   };
 }
 
@@ -265,7 +271,11 @@ export function buildStoryDetailData(options: {
     fullName: node?.fullName,
     nftCoreInfo:
       presentation.biography && !presentation.biography.unsupportedSchema
-        ? { ...coreInfo, story: presentation.biography.content }
+        ? {
+            ...coreInfo,
+            story: presentation.biography.content,
+            storyTitle: presentation.biography.title,
+          }
         : coreInfo,
     storyMetadata: story?.metadata,
     storyRecords: story?.records,

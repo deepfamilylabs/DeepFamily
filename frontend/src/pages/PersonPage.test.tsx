@@ -71,6 +71,7 @@ vi.mock("../shared/ui", async (importOriginal) => {
 
 function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
   return {
+    title: "",
     recordIndex: 0,
     payloadHash: zeroHash,
     content: "hello",
@@ -105,8 +106,8 @@ function makePerson(overrides: Partial<NodeData>): NodeData {
     owner: "0x00000000000000000000000000000000000000aa",
     storyMetadata: makeMetadata(),
     storyRecords: [
-      makeRecord({ recordIndex: 0, content: "hello " }),
-      makeRecord({ recordIndex: 1, content: "world", recordType: 1 }),
+      makeRecord({ title: "", recordIndex: 0, content: "hello " }),
+      makeRecord({ title: "", recordIndex: 1, content: "world", recordType: 1 }),
     ],
     storyFetchedAt: Date.now(),
     ...overrides,
@@ -171,7 +172,13 @@ describe("PersonPage", () => {
           content: "Original public biography",
           payloadLength: 100,
         }),
-        makeRecord({ recordIndex: 1, recordType: 1, content: "A later story", payloadLength: 50 }),
+        makeRecord({
+          title: "",
+          recordIndex: 1,
+          recordType: 1,
+          content: "A later story",
+          payloadLength: 50,
+        }),
       ],
     });
     mocks.nodesData = { [person.id]: person };
