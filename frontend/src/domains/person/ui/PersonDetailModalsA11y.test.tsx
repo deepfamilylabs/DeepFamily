@@ -11,6 +11,7 @@ const personHash = `0x${"ab".repeat(32)}`;
 
 const mocks = vi.hoisted(() => ({
   getOwnerOf: vi.fn(),
+  canEditStory: false,
   openEndorse: vi.fn(),
 }));
 
@@ -31,6 +32,10 @@ vi.mock("react-i18next", () => ({
       return _key;
     },
   }),
+}));
+
+vi.mock("../queries/useNftStoryAccess", () => ({
+  useNftStoryAccess: () => ({ canEdit: mocks.canEditStory }),
 }));
 
 vi.mock("./EndorseModalProvider", () => ({
@@ -158,6 +163,7 @@ function TrustedDetailHarness({
 
 describe("person detail modals a11y", () => {
   beforeEach(() => {
+    mocks.canEditStory = false;
     mocks.getOwnerOf.mockResolvedValue(undefined);
     mocks.openEndorse.mockReset();
     vi.spyOn(window, "requestAnimationFrame").mockImplementation(
@@ -189,6 +195,20 @@ describe("person detail modals a11y", () => {
     expect(
       screen.queryByRole("dialog", { name: "familyTree.personVersionDetail.title" }),
     ).toBeNull();
+  });
+
+  it("keeps the full-story entry public while hiding the editor without ownership access", () => {
+    renderNodeDetail(makePerson({ tokenId: "7" }));
+    expect(screen.getByRole("button", { name: "View Full Story" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
+  });
+
+  it("shows the editor entry for the permitted NFT owner", () => {
+    mocks.canEditStory = true;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    renderNodeDetail(makePerson({ tokenId: "7" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Story" }));
+    expect(open).toHaveBeenCalledWith("/editor/7", "_blank", "noopener,noreferrer");
   });
 
   it("uses the global toast for copy feedback", async () => {

@@ -85,7 +85,7 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
           <Lock size={13} aria-hidden className="shrink-0" />
           {t("storyRecordEditor.closedToNewRecords", "Closed to new records")}
         </p>
-      ) : (
+      ) : editor.showEditorForm ? (
         <div className="border-t border-dashed border-hairline pt-3">
           <div className="flex items-center gap-[9px] rounded-[10px] border border-dashed border-primary bg-primary/8 px-2 py-[7px]">
             <span
@@ -100,7 +100,7 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
             </span>
           </div>
         </div>
-      )}
+      ) : null}
     </nav>
   );
 }

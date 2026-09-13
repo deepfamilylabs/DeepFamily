@@ -79,7 +79,10 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
             value={`${editor.nodeDetails.versionIndex}`}
           />
         )}
-        <RecordRow label={t("person.totalRecords", "Total Records")} value={`${meta.totalRecords}`} />
+        <RecordRow
+          label={t("person.totalRecords", "Total Records")}
+          value={`${meta.totalRecords}`}
+        />
         <RecordRow
           label={t("person.totalPayloadLength", "Total payload bytes")}
           value={`${meta.totalPayloadLength.toLocaleString()} B`}
@@ -99,7 +102,11 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
                 : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
             }`}
           >
-            {meta.isSealed ? t("person.sealed", "Sealed") : t("person.editable", "Editable")}
+            {meta.isSealed
+              ? t("person.sealed", "Sealed")
+              : editor.canEdit
+                ? t("person.editable", "Editable")
+                : t("storyRecordEditor.readOnly", "Read only")}
           </dd>
         </div>
       </dl>
@@ -145,7 +152,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
     );
   }
 
-  if (meta.totalRecords === 0) return null;
+  if (!editor.canEdit || meta.totalRecords === 0) return null;
 
   return (
     <section className="flex flex-col gap-2.5 rounded-[18px] border border-orange-200 bg-orange-50/70 px-4 py-[15px] dark:border-orange-900/50 dark:bg-orange-900/15">

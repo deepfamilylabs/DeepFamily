@@ -256,7 +256,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
             <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
               {t("person.sealed", "Sealed")}
             </span>
-          ) : (
+          ) : person.canEditStory ? (
             <button
               onClick={person.openEditorInNewTab}
               onPointerDown={(event) => event.stopPropagation()}
@@ -270,7 +270,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
                 {t("familyTree.nodeDetail.edit", "Edit")}
               </span>
             </button>
-          )}
+          ) : null}
         </div>
         {data.fullStory && data.fullStory.length > 0 && <ViewModeToggle person={person} />}
       </div>

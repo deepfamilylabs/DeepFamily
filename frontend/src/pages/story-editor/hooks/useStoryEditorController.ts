@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
-import { getEditableRecordTypeOptions, useNFTDetails, useStoryData } from "../../../domains/person";
+import {
+  getEditableRecordTypeOptions,
+  useNFTDetails,
+  useStoryData,
+  useNftStoryAccess,
+} from "../../../domains/person";
 import { useAddStoryRecordFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
@@ -43,6 +48,11 @@ export function useStoryEditorController() {
   const { t } = useTranslation();
   const { contractAddress, rpcUrl, chainId } = useConfig();
   const toast = useToast();
+  const validTokenId = useMemo(() => getValidTokenId(tokenId), [tokenId]);
+  const access = useNftStoryAccess(validTokenId);
+  const accessScope = access.scope;
+  const accessRef = useRef(access);
+  accessRef.current = access;
 
   const prefetched = (location.state as PrefetchedStoryState | undefined)?.prefetchedStory;
   const prefetchedRecords = useMemo(
@@ -68,27 +78,63 @@ export function useStoryEditorController() {
   const [transactionPreview, setTransactionPreview] = useState<ArchiveTransactionPreview | null>(
     null,
   );
+  const mounted = useRef(true);
   const previewDecision = useRef<((approved: boolean) => void) | null>(null);
   const confirmTransactionPreview = useCallback(
     (preview: ArchiveTransactionPreview) =>
       new Promise<boolean>((resolve) => {
+        if (
+          !mounted.current ||
+          accessRef.current.scope !== accessScope ||
+          !accessRef.current.canEdit
+        ) {
+          resolve(false);
+          return;
+        }
         previewDecision.current?.(false);
         previewDecision.current = resolve;
         setTransactionPreview(preview);
       }),
-    [],
+    [accessScope],
   );
-  const resolveTransactionPreview = useCallback((approved: boolean) => {
-    previewDecision.current?.(approved);
+  const resolveTransactionPreview = useCallback(async (approved: boolean) => {
+    const decision = previewDecision.current;
+    const scope = accessRef.current.scope;
+    if (approved) approved = await accessRef.current.recheck();
+    if (
+      !mounted.current ||
+      accessRef.current.scope !== scope ||
+      previewDecision.current !== decision
+    )
+      return;
+    decision?.(approved);
     previewDecision.current = null;
     setTransactionPreview(null);
   }, []);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (!access.connected || !access.correctNetwork || (!access.checking && !access.canEdit)) {
+      void resolveTransactionPreview(false);
+      setShowSealConfirm(false);
+    }
+  }, [
+    access.connected,
+    access.correctNetwork,
+    access.checking,
+    access.canEdit,
+    resolveTransactionPreview,
+  ]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
       previewDecision.current?.(false);
-    },
-    [],
-  );
+      previewDecision.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    void resolveTransactionPreview(false);
+    setShowSealConfirm(false);
+  }, [accessScope, resolveTransactionPreview]);
   const [localError, setLocalError] = useState<string | null>(null);
   const [showSealConfirm, setShowSealConfirm] = useState(false);
   const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
@@ -103,7 +149,6 @@ export function useStoryEditorController() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const recordTypeDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const validTokenId = useMemo(() => getValidTokenId(tokenId), [tokenId]);
   const scopedQueryClient = useMemo(
     () => getScopedQueryClient({ rpcUrl, contractAddress, chainId }),
     [rpcUrl, contractAddress, chainId],
@@ -126,11 +171,12 @@ export function useStoryEditorController() {
       meta
         ? {
             ...meta,
+            isSealed: Boolean(meta.isSealed || access.isSealed),
             totalRecords: presentation.totalRecords,
             totalPayloadLength: presentation.totalPayloadLength,
           }
         : undefined,
-    [meta, presentation.totalRecords, presentation.totalPayloadLength],
+    [meta, access.isSealed, presentation.totalRecords, presentation.totalPayloadLength],
   );
   const loading = !meta && storyQuery.loading;
   const queryError = meta ? null : storyQuery.error;
@@ -241,7 +287,9 @@ export function useStoryEditorController() {
   }, [nftQuery.data, validTokenId]);
 
   const sortedRecords = presentation.records;
-  const isSealed = meta?.isSealed || false;
+  const isSealed = meta?.isSealed || access.isSealed || false;
+  const canEdit =
+    access.canEdit && Boolean(meta) && !isSealed && !storyQuery.loading && !storyQuery.error;
 
   // Contents outline for the left column, and the number the composer's draft
   // will take once it is written.
@@ -326,6 +374,7 @@ export function useStoryEditorController() {
           confirmTransactionPreview,
         });
 
+        if (!mounted.current || accessRef.current.scope !== accessScope) return;
         const newRecords = records ? [...records, result.newRecord] : [result.newRecord];
         const newRecordsHead = result.recordsHead;
         const newMeta: StoryMetadata | undefined = meta
@@ -368,6 +417,7 @@ export function useStoryEditorController() {
       }
     },
     [
+      accessScope,
       addStoryRecordFlow,
       confirmTransactionPreview,
       toast,
@@ -385,6 +435,7 @@ export function useStoryEditorController() {
       try {
         const result = await sealStoryFlow.runOrThrow({ tokenId: tid, confirmTransactionPreview });
 
+        if (!mounted.current || accessRef.current.scope !== accessScope) return;
         const newMeta: StoryMetadata | undefined = meta
           ? {
               ...meta,
@@ -426,6 +477,7 @@ export function useStoryEditorController() {
       }
     },
     [
+      accessScope,
       sealStoryFlow,
       toast,
       t,
@@ -439,7 +491,7 @@ export function useStoryEditorController() {
   );
 
   const handleSubmit = useCallback(async () => {
-    if (!validTokenId) return;
+    if (!validTokenId || !canEdit) return;
 
     const trimmedContent = formData.content.trim();
     if (!trimmedContent) {
@@ -470,6 +522,12 @@ export function useStoryEditorController() {
     setLocalError(null);
 
     try {
+      if (!(await access.recheck())) {
+        setLocalError(
+          t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
+        );
+        return;
+      }
       const expectedPayloadHash = computeStoryPayloadHash(
         formData.content,
         recordTypeValue,
@@ -493,19 +551,25 @@ export function useStoryEditorController() {
     } finally {
       setSubmitting(false);
     }
-  }, [validTokenId, formData, meta, onAddRecord, handleCancelEdit, t]);
+  }, [validTokenId, canEdit, access.recheck, formData, meta, onAddRecord, handleCancelEdit, t]);
 
   const handleSeal = useCallback(() => {
-    if (!validTokenId) return;
+    if (!validTokenId || !canEdit) return;
     setShowSealConfirm(true);
-  }, [validTokenId]);
+  }, [validTokenId, canEdit]);
 
   const executeSeal = useCallback(async () => {
-    if (!validTokenId) return;
+    if (!validTokenId || !canEdit) return;
     setShowSealConfirm(false);
     setSubmitting(true);
     setLocalError(null);
     try {
+      if (!(await access.recheck())) {
+        setLocalError(
+          t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
+        );
+        return;
+      }
       await onSealStory(validTokenId);
       setShowSealConfirm(false);
     } catch (error: any) {
@@ -514,12 +578,33 @@ export function useStoryEditorController() {
     } finally {
       setSubmitting(false);
     }
-  }, [validTokenId, onSealStory, t]);
+  }, [validTokenId, canEdit, access.recheck, onSealStory, t]);
 
   const titleText = personName
     ? t("storyRecordEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })
     : t("storyRecordEditor.titleFallback", { defaultValue: "Biography" });
-  const showEditorForm = !isSealed;
+  const showEditorForm = canEdit;
+  const accessMessage =
+    isSealed || canEdit
+      ? null
+      : !access.connected
+        ? t(
+            "storyRecordEditor.connectOwnerWallet",
+            "Connect the NFT owner's wallet to edit. This story is available to read.",
+          )
+        : !access.correctNetwork
+          ? t(
+              "storyRecordEditor.switchNetworkToEdit",
+              "Switch your wallet to this story's network to edit.",
+            )
+          : access.checking
+            ? t("storyRecordEditor.checkingOwnership", "Checking NFT ownership…")
+            : access.error
+              ? t(
+                  "storyRecordEditor.ownershipUnavailable",
+                  "Unable to verify NFT ownership. Editing is unavailable until verification succeeds.",
+                )
+              : t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story.");
   const showError = Boolean(queryError || localError);
   const showEmptySealed = !loading && sortedRecords.length === 0 && !showError && isSealed;
   const errorMessage = queryError || localError;
@@ -536,6 +621,9 @@ export function useStoryEditorController() {
     titleText,
     loading,
     submitting,
+    canEdit,
+    accessMessage,
+    access,
     isSealed,
     showEditorForm,
     showError,

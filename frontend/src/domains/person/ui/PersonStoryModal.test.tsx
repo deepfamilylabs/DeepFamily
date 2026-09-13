@@ -1,17 +1,21 @@
 // @vitest-environment jsdom
 import React from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import PersonStoryModal from "./PersonStoryModal";
 import { buildStorySnapshot, type StoryRecord, type StoryMetadata } from "../../../shared/model";
 
 const mocks = vi.hoisted(() => ({
+  canEditStory: false,
   t: (key: string, fallback?: string, options?: Record<string, unknown>) =>
     (fallback ?? key).replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(options?.[name] ?? "")),
 }));
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: mocks.t }) }));
+vi.mock("../queries/useNftStoryAccess", () => ({
+  useNftStoryAccess: () => ({ canEdit: mocks.canEditStory }),
+}));
 vi.mock("./EndorseCompactModal", () => ({ default: () => null }));
 vi.mock("../../../shared/ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/ui")>()),
@@ -20,7 +24,13 @@ vi.mock("../../../shared/ui", async (importOriginal) => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
-afterEach(cleanup);
+beforeEach(() => {
+  mocks.canEditStory = false;
+});
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const biography: StoryRecord = {
   title: "",
@@ -111,4 +121,18 @@ it("shows custom biography and ordinary record titles with an untitled biography
   unmount();
   renderStory([{ ...biography, title: " \n " }]);
   expect(await screen.findByRole("heading", { name: "Biography" })).toBeTruthy();
+});
+
+it("shows stories but no editable control without ownership access", async () => {
+  renderStory([biography, ordinary]);
+  expect(await screen.findByText("A later story")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Editable" })).toBeNull();
+});
+
+it("shows an editor entry for the permitted owner", async () => {
+  mocks.canEditStory = true;
+  const open = vi.spyOn(window, "open").mockReturnValue(null);
+  renderStory([biography, ordinary]);
+  fireEvent.click(await screen.findByRole("button", { name: "Editable" }));
+  expect(open).toHaveBeenCalledWith("/editor/42", "_blank", "noopener,noreferrer");
 });

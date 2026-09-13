@@ -89,6 +89,7 @@ git clone https://github.com/deepfamilylabs/DeepFamily.git
 cd DeepFamily
 npm run setup    # Install root + frontend dependencies
 cp .env.example .env
+# Set PRIVATE_KEY and HISTORICAL_DATA_FILES in .env before starting dev:all.
 npm run check    # Frontend checks + contract lint/build/test
 npm run build    # Compile smart contracts
 npm run dev:all  # Start local node + deploy + seed data + frontend
@@ -102,10 +103,17 @@ npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
 npm run dev:deploy      # Deploy contracts
+npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts
 npm run frontend:dev    # Start frontend dev server
 ```
+
+Historical seeding uses the wallet identified by `PRIVATE_KEY` in `.env` for person creation,
+endorsement, NFT minting, and story records. Set `HISTORICAL_DATA_FILES` to the source JSON files
+in `data/persons/`. `dev:all` funds this wallet before seeding; the step-by-step flow requires
+`dev:fund`. Local contract deployment and funding use the Hardhat node's development account.
+Rerunning the seed resumes existing data and does not change an existing NFT's owner.
 
 ### Access Points
 

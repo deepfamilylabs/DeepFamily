@@ -13,6 +13,7 @@ import {
 } from "../../../shared/model";
 import { ResponsiveModalFrame, useResponsiveModalMode, useToast } from "../../../shared/ui";
 import { getRecordTypeOptions } from "../config/recordTypes";
+import { useNftStoryAccess } from "../queries/useNftStoryAccess";
 import type { EndorseSuccessHandler } from "./EndorseModalProvider";
 import {
   BasicStorySection,
@@ -47,6 +48,7 @@ export default function PersonStoryModal({
 }: PersonStoryModalProps) {
   const { t } = useTranslation();
   const toast = useToast();
+  const storyAccess = useNftStoryAccess(isOpen ? person.tokenId : null);
   const nameContainerRef = useRef<HTMLDivElement | null>(null);
   const nameTextRef = useRef<HTMLSpanElement | null>(null);
   const [marquee, setMarquee] = useState(false);
@@ -434,6 +436,7 @@ export default function PersonStoryModal({
             <DetailedStorySection
               t={t}
               person={person}
+              canEditStory={storyAccess.canEdit}
               storyData={presentedStoryData}
               recordsCount={recordsCount}
               lengthBytes={lengthBytes}

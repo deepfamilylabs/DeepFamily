@@ -460,3 +460,9 @@ included in payload hashes and verified on readback. Directories, record lists a
 title when it contains non-whitespace text, otherwise the localized classification label.
 The initial mint biography supports its own `storyTitle` and falls back to the localized biography
 label when untitled. Display fallbacks do not modify the archived title or the record index.
+
+Story edit links and the editor use fresh `ownerOf` and Archive seal-state reads from the configured
+network. Only the connected NFT owner on that network can append or seal. Direct editor URLs stay
+read-only for other visitors, pending lookups and read failures. Access refreshes on NFT transfers,
+sealing and window focus; submissions recheck it before signing. Pending previews are bound to the
+original token, contract, network and wallet, and token/config changes reset the editor's draft.

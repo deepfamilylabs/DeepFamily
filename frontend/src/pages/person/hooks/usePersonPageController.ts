@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../../domains/config";
+import { useNftStoryAccess } from "../../../domains/person";
 import { useTreeGraphData, useTreeNodeAccess } from "../../../domains/tree";
 import { findNodeByTokenId, type NodeData } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
@@ -30,6 +31,7 @@ export function usePersonPageController() {
   const { getStoryData, getNodeByTokenId, getOwnerOf } = useTreeNodeAccess();
   const config = useConfig();
   const toast = useToast();
+  const storyAccess = useNftStoryAccess(tokenId);
 
   const prefetched = (location.state as PrefetchedStoryDetailState | undefined)?.prefetchedStory;
   const dataRef = useRef<StoryDetailData | null>(null);
@@ -60,7 +62,10 @@ export function usePersonPageController() {
     () => getFullStoryParagraphs(data?.fullStory, viewMode),
     [data?.fullStory, viewMode],
   );
-  const recordParagraphs = useMemo(() => getRecordParagraphs(data?.storyRecords), [data?.storyRecords]);
+  const recordParagraphs = useMemo(
+    () => getRecordParagraphs(data?.storyRecords),
+    [data?.storyRecords],
+  );
   const groupedRecords = useMemo(() => groupStoryRecords(data?.storyRecords), [data?.storyRecords]);
 
   const toggleRecord = useCallback((idx: number) => {
@@ -78,11 +83,13 @@ export function usePersonPageController() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const wantEdit = params.get("edit") === "1";
-    if (!wantEdit || !tokenId) return;
+    if (!wantEdit || !tokenId || storyAccess.checking) return;
 
     params.delete("edit");
     const nextSearch = params.toString();
     navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+
+    if (!storyAccess.canEdit) return;
 
     const state: PrefetchedStoryDetailState = {};
     if (data?.storyMetadata || data?.storyRecords) {
@@ -93,7 +100,16 @@ export function usePersonPageController() {
       };
     }
     navigate(`/editor/${tokenId}`, { state });
-  }, [data?.storyRecords, data?.storyMetadata, location.pathname, location.search, navigate, tokenId]);
+  }, [
+    data?.storyRecords,
+    data?.storyMetadata,
+    location.pathname,
+    location.search,
+    navigate,
+    tokenId,
+    storyAccess.canEdit,
+    storyAccess.checking,
+  ]);
 
   useEffect(() => {
     if (!tokenId) return;
@@ -284,12 +300,13 @@ export function usePersonPageController() {
   }, [config, data?.personHash, data?.versionIndex, navigate]);
 
   const openEditorInNewTab = useCallback(() => {
-    if (!tokenId) return;
+    if (!tokenId || !storyAccess.canEdit) return;
     window.open(`/editor/${tokenId}`, "_blank", "noopener,noreferrer");
-  }, [tokenId]);
+  }, [tokenId, storyAccess.canEdit]);
 
   return {
     tokenId,
+    canEditStory: storyAccess.canEdit,
     data,
     loading,
     error,

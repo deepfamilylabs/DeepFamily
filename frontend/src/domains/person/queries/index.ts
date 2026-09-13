@@ -5,3 +5,5 @@ export { useNFTDetails } from "./useNFTDetails";
 export type { UseNFTDetailsResult } from "./useNFTDetails";
 export { useStoryData } from "./useStoryData";
 export type { UseStoryDataResult } from "./useStoryData";
+
+export { useNftStoryAccess } from "./useNftStoryAccess";

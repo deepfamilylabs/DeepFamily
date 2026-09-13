@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getStoryData: vi.fn(),
   getNodeByTokenId: vi.fn(),
   getOwnerOf: vi.fn(),
+  storyAccess: { canEdit: false, checking: false },
   configUpdate: vi.fn(),
   toastShow: vi.fn(),
   toastSuccess: vi.fn(),
@@ -44,6 +45,11 @@ vi.mock("../domains/config", () => ({
   useConfig: () => ({
     update: mocks.configUpdate,
   }),
+}));
+
+vi.mock("../domains/person", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../domains/person")>()),
+  useNftStoryAccess: () => mocks.storyAccess,
 }));
 
 vi.mock("../domains/tree", () => ({
@@ -119,6 +125,7 @@ function renderPersonPage(initialEntry: string) {
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/person/:tokenId" element={<PersonPage />} />
+        <Route path="/editor/:tokenId" element={<div>Editor route</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -130,6 +137,7 @@ describe("PersonPage", () => {
     mocks.nodesData = {
       [person.id]: person,
     };
+    mocks.storyAccess = { canEdit: false, checking: false };
     mocks.getStoryData.mockReset();
     mocks.getNodeByTokenId.mockReset();
     mocks.getOwnerOf.mockReset();
@@ -154,6 +162,32 @@ describe("PersonPage", () => {
     expect(screen.getAllByText(/world/).length).toBeGreaterThan(0);
     expect(mocks.getStoryData).not.toHaveBeenCalled();
     expect(mocks.getNodeByTokenId).not.toHaveBeenCalled();
+  });
+
+  it("keeps stories readable and hides the edit entry without ownership access", async () => {
+    renderPersonPage("/person/42");
+    expect(await screen.findByText("#1")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
+  });
+
+  it("opens the editor only when ownership access permits editing", async () => {
+    mocks.storyAccess.canEdit = true;
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    renderPersonPage("/person/42");
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Story" }));
+    expect(open).toHaveBeenCalledWith("/editor/42", "_blank", "noopener,noreferrer");
+  });
+
+  it("does not follow the edit query parameter without ownership access", async () => {
+    renderPersonPage("/person/42?edit=1");
+    expect(await screen.findByText("#1")).toBeTruthy();
+    expect(screen.queryByText("Editor route")).toBeNull();
+  });
+
+  it("follows the edit query parameter after ownership is verified", async () => {
+    mocks.storyAccess.canEdit = true;
+    renderPersonPage("/person/42?edit=1");
+    expect(await screen.findByText("Editor route")).toBeTruthy();
   });
 
   it("shows an inline validation error for invalid token ids", async () => {

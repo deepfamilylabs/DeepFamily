@@ -256,6 +256,12 @@ Historical imports accept `person.storyTitle` for the mint biography and `{ "tit
 source entry is split into records, each part retains the exact same title; resume validation
 checks titles alongside content, classification and attachment.
 
+`dev:seed` and `seed:net` require `PRIVATE_KEY` and sign all person creation, endorsement, NFT
+minting and story append transactions with that wallet, including on localhost. A missing or
+invalid key, or a wallet with no native balance, stops the script before seeding. Run `dev:fund`
+first on localhost (already included in `dev:all`). Resuming a seed preserves existing NFT
+ownership; changing `PRIVATE_KEY` does not transfer previously minted NFTs or change their creator.
+
 ### DFM1 Contract-Visible Prefix and Format-1 Layout
 
 All envelopes accepted by the current `addPersonVersion` ABI share a permanent 20-byte prefix:
