@@ -245,7 +245,9 @@
       "author": "Author",
       "recordType": "Record Type",
       "attachmentCID": "Attachment CID",
-      "totalRecords": "Total Records"
+      "totalRecords": "Total Records",
+      "filterLabel": "Filter loaded records by title or content",
+      "noMatches": "No matching loaded records"
     },
     "childrenQuery": {
       "childHash": "Child Hash",
@@ -930,7 +932,9 @@
     "collapsedRun": "{{total}} records collapsed",
     "expandRun": "Expand",
     "collapseRun": "Collapse {{total}} records",
-    "listSeparator": ", "
+    "listSeparator": ", ",
+    "recordTitleLabel": "Title (optional)",
+    "recordTitlePlaceholder": "Give this record a name"
   },
   "person": {
     "encyclopedia": "Encyclopedia",
@@ -1044,7 +1048,8 @@
     "peopleEncyclopedia": "Encyclopedia",
     "author": "Author",
     "payloadHash": "Payload Hash",
-    "attachment": "Attachment"
+    "attachment": "Attachment",
+    "biographyTitle": "Biography"
   },
   "actions": {
     "title": "Blockchain Actions",
@@ -1200,9 +1205,12 @@
       "storyTooLong": "Story content is too long",
       "tokenURITooLong": "Token URI is too long",
       "invalidTokenURI": "Invalid URL or IPFS URI",
-      "yearExceedsCurrent": "AD year cannot exceed current year"
+      "yearExceedsCurrent": "AD year cannot exceed current year",
+      "storyRequiredForTitle": "Add story content before setting a title"
     },
-    "personHashMismatch": "The passphrase or identity suite does not match the target person hash"
+    "personHashMismatch": "The passphrase or identity suite does not match the target person hash",
+    "storyTitleLabel": "Story title (optional)",
+    "storyTitlePlaceholder": "Biography"
   },
   "endorse": {
     "title": "Endorse Version",

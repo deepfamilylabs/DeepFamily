@@ -425,7 +425,12 @@ export default function PersonStoryModal({
 
           {/* Story Content */}
           <div className="space-y-6">
-            <BasicStorySection t={t} story={basicStory} biography={biography} />
+            <BasicStorySection
+              t={t}
+              story={basicStory}
+              title={person.nftPublicStoryTitle}
+              biography={biography}
+            />
             <DetailedStorySection
               t={t}
               person={person}

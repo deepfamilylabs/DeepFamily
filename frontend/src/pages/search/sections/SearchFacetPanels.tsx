@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -8,7 +9,12 @@ import {
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatUnixSeconds, formatYMD, genderText } from "../../../shared/model";
+import {
+  formatUnixSeconds,
+  formatYMD,
+  genderText,
+  matchesStoryRecordSearch,
+} from "../../../shared/model";
 import { CopyIconButton } from "../../../shared/ui";
 import type { UnifiedSearch } from "../hooks/useUnifiedSearch";
 import type { SearchFacetKey } from "../model/searchSubject";
@@ -434,6 +440,9 @@ function ChildrenPanel({ unified }: { unified: UnifiedSearch }) {
 function StoryRecordsPanel({ unified }: { unified: UnifiedSearch }) {
   const { t, search } = unified;
   const records = search.storyRecords.state.data ?? [];
+  const [query, setQuery] = useState("");
+  const filterId = useId();
+  const filteredRecords = records.filter((record) => matchesStoryRecordSearch(record, query));
 
   if (records.length === 0) {
     return <NoRows unified={unified} icon={<FileText size={22} aria-hidden="true" />} />;
@@ -441,8 +450,28 @@ function StoryRecordsPanel({ unified }: { unified: UnifiedSearch }) {
 
   return (
     <div className="divide-y divide-hairline">
-      {records.map((record: any, index: number) => (
-        <div key={index} className={ROW}>
+      <div className="space-y-1.5 p-4">
+        <label htmlFor={filterId} className="block text-xs font-medium text-ink-muted">
+          {t("search.storyRecordsQuery.filterLabel", "Filter loaded records by title or content")}
+        </label>
+        <input
+          id={filterId}
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:ring-1 focus:ring-primary"
+        />
+      </div>
+      {filteredRecords.length === 0 && (
+        <p role="status" className="p-4 text-sm text-ink-muted">
+          {t("search.storyRecordsQuery.noMatches", "No matching loaded records")}
+        </p>
+      )}
+      {filteredRecords.map((record: any, index: number) => (
+        <div key={record.recordIndex ?? index} className={ROW}>
+          {record.title?.trim() && (
+            <h3 className="mb-3 break-words font-semibold text-ink">{record.title}</h3>
+          )}
           <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-xs font-semibold text-ink-muted">
               #{Number(record.displayIndex ?? Number(record.recordIndex) + 1)}
@@ -658,9 +687,14 @@ function PersonNftsPanel({ unified }: { unified: UnifiedSearch }) {
             ) : null}
 
             {core?.nftPublicStory?.trim() ? (
-              <p className="line-clamp-2 rounded-lg bg-surface-alt px-3 py-2 text-xs leading-relaxed text-ink-muted">
-                {core.nftPublicStory}
-              </p>
+              <div className="rounded-lg bg-surface-alt px-3 py-2 text-xs leading-relaxed text-ink-muted">
+                <h4 className="mb-1.5 break-words font-semibold text-ink">
+                  {core.nftPublicStoryTitle?.trim()
+                    ? core.nftPublicStoryTitle
+                    : t("storyRecordsModal.biographyTitle", "Biography")}
+                </h4>
+                <p className="line-clamp-2">{core.nftPublicStory}</p>
+              </div>
             ) : null}
           </div>
         );

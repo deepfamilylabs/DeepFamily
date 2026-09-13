@@ -192,7 +192,15 @@ function BasicInfoSection({ person }: { person: PersonPageController }) {
 
         {(biography?.unsupportedSchema ||
           (data.nftCoreInfo?.story && data.nftCoreInfo.story.trim() !== "")) && (
-          <InfoRow align="start" label={t("familyTree.nodeDetail.story", "Story")} padded>
+          <InfoRow
+            align="start"
+            label={
+              data.nftCoreInfo?.storyTitle?.trim()
+                ? data.nftCoreInfo.storyTitle
+                : t("storyRecordsModal.biographyTitle", "Biography")
+            }
+            padded
+          >
             <div className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap flex-1 min-w-0">
               {biography?.unsupportedSchema ? (
                 <UnsupportedStoryRecord record={biography} />
@@ -312,6 +320,9 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
                       key={record.recordIndex}
                       className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed"
                     >
+                      {record.title?.trim() && (
+                        <h5 className="mb-1 break-words font-semibold">{record.title}</h5>
+                      )}
                       <p className="whitespace-pre-wrap">{record.content}</p>
                     </div>
                   ))}

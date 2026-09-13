@@ -237,10 +237,10 @@ test("segment RPC uses default concurrency 8, preserves order and propagates blo
 test("DFS1 emoji and JSON escapes split at segment boundaries decode only after reassembly", async () => {
   for (const suffix of ["😀", "\n", "\\", '"']) {
     const prefix = new TextEncoder().encode(
-      '{"schema":"deepfamily/story-record@1.0","content":"',
+      '{"schema":"deepfamily/story-record@1.0","title":"","content":"',
     ).length;
     const content = "a".repeat(ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH - prefix - 1) + suffix + "  ";
-    const bytes = encodeStoryRecord({ content, recordType: 3, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ title: "", content, recordType: 3, attachmentCID: "" });
     const fixture = archiveFixture(bytes);
     const result = await readStoryRecord({
       getCode: fixture.getCode,
@@ -275,6 +275,7 @@ test("unknown Story schema preserves verified non-UTF8 raw bytes", async () => {
 
 test("Story reader accepts ethers Result refs using their named tuple fields", async () => {
   const payload = encodeStoryRecord({
+    title: "Chain record title",
     content: "Exact chain result",
     recordType: 3,
     attachmentCID: "",
@@ -299,6 +300,7 @@ test("Story reader accepts ethers Result refs using their named tuple fields", a
   );
   assert.equal(Object.hasOwn({ ...recordRef.blob }, "pointer"), false);
   const result = await readStoryRecord({ getCode: fixture.getCode, recordRef });
+  assert.equal(result.decoded.title, "Chain record title");
   assert.equal(result.decoded.content, "Exact chain result");
   assert.equal(result.timestamp, 123n);
   assert.deepEqual(result.payload, payload);

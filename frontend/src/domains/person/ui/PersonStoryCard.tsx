@@ -1,13 +1,6 @@
 import { memo, useMemo, useCallback, MouseEvent, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  User,
-  BookOpen,
-  Star,
-  ChevronRight,
-  MapPin,
-  Rows3,
-} from "lucide-react";
+import { User, BookOpen, Star, ChevronRight, MapPin, Rows3 } from "lucide-react";
 import {
   NodeData,
   hasDetailedStory as hasDetailedStoryFn,
@@ -131,6 +124,11 @@ function PersonStoryCard({
         </div>
       )}
 
+      {storyPreview && person.nftPublicStoryTitle?.trim() && (
+        <h4 className="mt-2 break-words text-sm font-semibold text-ink">
+          {person.nftPublicStoryTitle}
+        </h4>
+      )}
       {storyPreview && (
         <p className="mt-2.5 pl-2.5 border-l-2 border-primary/35 text-xs leading-[1.55] text-ink-muted italic line-clamp-2">
           {storyPreview}

@@ -18,6 +18,7 @@ const t = ((
 
 function record(index: number, recordType: number) {
   return {
+    title: "",
     recordIndex: index,
     displayIndex: index + 1,
     recordType,
@@ -76,7 +77,14 @@ describe("StoryManuscript fold", () => {
   });
 
   it("folds the middle and summarises what it hides", () => {
-    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    const records = [
+      record(0, 1),
+      record(1, 2),
+      record(2, 3),
+      record(3, 5),
+      record(4, 7),
+      record(5, 16),
+    ];
     const editor = createEditor(records);
     render(<StoryManuscript editor={editor} />);
 
@@ -97,7 +105,14 @@ describe("StoryManuscript fold", () => {
   });
 
   it("drops the stand-in summary once the entries are actually on the page", () => {
-    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    const records = [
+      record(0, 1),
+      record(1, 2),
+      record(2, 3),
+      record(3, 5),
+      record(4, 7),
+      record(5, 16),
+    ];
     const editor = createEditor(records);
     editor.manuscript.isExpanded = true;
     render(<StoryManuscript editor={editor} />);
@@ -118,7 +133,14 @@ describe("StoryManuscript fold", () => {
   });
 
   it("keeps a single control while the run is folded", () => {
-    const records = [record(0, 1), record(1, 2), record(2, 3), record(3, 5), record(4, 7), record(5, 16)];
+    const records = [
+      record(0, 1),
+      record(1, 2),
+      record(2, 3),
+      record(3, 5),
+      record(4, 7),
+      record(5, 16),
+    ];
     render(<StoryManuscript editor={createEditor(records)} />);
 
     expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(1);

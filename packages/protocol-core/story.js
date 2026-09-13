@@ -39,7 +39,7 @@ const DFS1_TRIM_ONLY =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*$/u;
 const DFS1_TRIM_EDGE =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]|[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$/u;
-const INPUT_KEYS = ["content", "recordType", "attachmentCID"];
+const INPUT_KEYS = ["title", "content", "recordType", "attachmentCID"];
 const CANONICAL_KEYS = ["schema", ...INPUT_KEYS];
 
 function validateStoryRecord(input) {
@@ -65,6 +65,7 @@ function validateStoryRecord(input) {
     "UNSUPPORTED_STORY_SCHEMA",
     `DFS1 schema must be ${STORY_RECORD_SCHEMA}`,
   );
+  assertUnicodeScalarString(input.title, "title");
   assertUnicodeScalarString(input.content, "content");
   protocolAssert(
     !DFS1_TRIM_ONLY.test(input.content),
@@ -93,6 +94,7 @@ function validateStoryRecord(input) {
   );
   return {
     schema: STORY_RECORD_SCHEMA,
+    title: input.title,
     content: input.content,
     recordType: input.recordType,
     attachmentCID: input.attachmentCID,
@@ -109,6 +111,7 @@ export function encodeCanonicalStoryRecord(input) {
   const record = validateStoryRecord(input);
   const bytes = utf8Bytes(
     `{"schema":${escapeCanonicalJsonString(record.schema)}` +
+      `,"title":${escapeCanonicalJsonString(record.title)}` +
       `,"content":${escapeCanonicalJsonString(record.content)}` +
       `,"recordType":${record.recordType}` +
       `,"attachmentCID":${escapeCanonicalJsonString(record.attachmentCID)}}`,

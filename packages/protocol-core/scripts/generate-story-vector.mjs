@@ -17,11 +17,17 @@ import {
 
 const contents = [
   {
+    title: '  标题😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
     content: '  中😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
     recordType: 3,
     attachmentCID: "ipfs://例子/😀",
   },
-  { content: "Second record\r\nkeeps its final newline.\n", recordType: 255, attachmentCID: "" },
+  {
+    title: "",
+    content: "Second record\r\nkeeps its final newline.\n",
+    recordType: 255,
+    attachmentCID: "",
+  },
 ];
 let previousHead = ZERO_BYTES32;
 const records = contents.map((input, index) => {

@@ -233,16 +233,28 @@ The [Archive contract](../contracts/DeepFamilyArchive.sol) defines the API, even
 
 A **story record** is one logical entry with a schema, author, timestamp and payload reference.
 Each payload may occupy multiple physical **segments**, indexed by manifest **pages**.
-The canonical story JSON uses `schema: "deepfamily/story-record@1.0"`, `content`, `recordType`
-and `attachmentCID`, in that order. Type `0` identifies the mint biography; ordinary records use
+The canonical story JSON uses `schema: "deepfamily/story-record@1.0"`, `title`, `content`,
+`recordType` and `attachmentCID`, in that order. `title` is a required string in the payload and
+may be empty. Titles preserve exact Unicode, whitespace and normalization; a blank title displays
+the record classification in the UI. Title bytes participate in the payload hash and ordered
+record history, so an archived title is immutable. Type `0` identifies the mint biography; ordinary records use
 types `1` through `255`. The outer envelope schema is `deepfamily/story-envelope@1.0`, with the
 separate `deepfamily/story-biography-envelope@1.0` schema for the mint biography.
 `payloadHash` commits to the encoded payload, `recordHash` also binds the record's context and
 metadata, and `recordsHead` commits to the ordered record history.
 
-The CLI exposes `add-story-record --tokenid <id> --recordindex <index> --content <text>` and
+The CLI exposes `add-story-record --tokenid <id> --recordindex <index> --title <title> --content <text>` and
 `list-story-records --tokenid <id> --offset <offset> --limit <limit>` through Hardhat.
 The append index must equal `totalRecords`, which includes the mint biography when present.
+`--title` is optional and defaults to an empty string. `mint-nft` accepts an optional
+`--storytitle <title>` alongside `--story <text>`; a nonblank biography title requires biography
+content. Both titles are encoded in the archived payload without changing the Solidity ABI or
+contract storage layout.
+
+Historical imports accept `person.storyTitle` for the mint biography and `{ "title": "...",
+"content": "..." }` entries within `storyData`. String entries use an empty title. If a long
+source entry is split into records, each part retains the exact same title; resume validation
+checks titles alongside content, classification and attachment.
 
 ### DFM1 Contract-Visible Prefix and Format-1 Layout
 

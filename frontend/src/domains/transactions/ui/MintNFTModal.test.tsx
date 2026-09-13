@@ -300,71 +300,101 @@ describe("MintNFTModal", () => {
     vi.restoreAllMocks();
   });
 
-  it("mints through the transaction flow and patches tree state on success", async () => {
-    mocks.mintRunOrThrow.mockResolvedValue({
-      tokenId: 77,
-      transactionHash: "0xmint",
-      blockNumber: 123,
-      event: {
-        personHash,
+  it.each(["", "  初始传记 😀 e\u0301  "])(
+    "mints with the exact optional story title (%s) and patches tree state on success",
+    async (storyTitle) => {
+      mocks.mintRunOrThrow.mockResolvedValue({
         tokenId: 77,
-        owner: ownerAddress,
-        versionIndex: 2,
-        tokenURI: "ipfs://token",
-        timestamp: 456,
-      },
-      receipt: { hash: "0xmint" },
-    });
-
-    renderMintModal();
-
-    await waitForMintableTarget();
-    await checkAllConsents();
-
-    await act(async () => {
-      fireEvent.change(screen.getByPlaceholderText("Enter birth place"), {
-        target: { value: "London" },
+        transactionHash: "0xmint",
+        blockNumber: 123,
+        event: {
+          personHash,
+          tokenId: 77,
+          owner: ownerAddress,
+          versionIndex: 2,
+          tokenURI: "ipfs://token",
+          timestamp: 456,
+        },
+        receipt: { hash: "0xmint" },
       });
-      fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
-        target: { value: "ipfs://token" },
+
+      renderMintModal();
+
+      await waitForMintableTarget();
+      await checkAllConsents();
+      expect((screen.getByLabelText("Story title (optional)") as HTMLInputElement).value).toBe("");
+
+      await act(async () => {
+        fireEvent.change(screen.getByPlaceholderText("Enter birth place"), {
+          target: { value: "London" },
+        });
+        fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
+          target: { value: "ipfs://token" },
+        });
+        fireEvent.change(screen.getByLabelText("Story title (optional)"), {
+          target: { value: storyTitle },
+        });
+        fireEvent.change(screen.getByPlaceholderText("Enter a brief life story summary..."), {
+          target: { value: "  A public life story  " },
+        });
       });
-    });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
+      });
 
-    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
-    expect(mocks.mintRunOrThrow).toHaveBeenCalledWith(
-      expect.objectContaining({
-        personHash,
-        versionIndex: 2,
-        selfSuiteId: 1,
-        tokenURI: "ipfs://token",
-        coreInfo: expect.objectContaining({
-          supplementInfo: expect.objectContaining({
-            fullName: "Ada Lovelace",
-            birthPlace: "London",
+      await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+      expect(mocks.mintRunOrThrow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personHash,
+          versionIndex: 2,
+          selfSuiteId: 1,
+          tokenURI: "ipfs://token",
+          storyTitle,
+          story: "  A public life story  ",
+          coreInfo: expect.objectContaining({
+            supplementInfo: expect.objectContaining({
+              fullName: "Ada Lovelace",
+              birthPlace: "London",
+            }),
           }),
         }),
-      }),
-    );
-    expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
-    expect(mocks.markVersionMinted).toHaveBeenCalledWith({
-      personHash,
-      versionIndex: 2,
-      tokenId: "77",
-      tokenURI: "ipfs://token",
-      receipt: { hash: "0xmint" },
+      );
+      expect(mocks.mintRunOrThrow.mock.calls[0][0].coreInfo.supplementInfo).not.toHaveProperty(
+        "storyTitle",
+      );
+      expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
+      expect(mocks.markVersionMinted).toHaveBeenCalledWith({
+        personHash,
+        versionIndex: 2,
+        tokenId: "77",
+        tokenURI: "ipfs://token",
+        receipt: { hash: "0xmint" },
+      });
+      expect(mocks.onSuccess).toHaveBeenCalledWith(77);
+      // The passphrase must be gone before the wallet wait, not merely by the end.
+      expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(1);
+      expect(mocks.clearSecretInputs.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.mintRunOrThrow.mock.invocationCallOrder[0],
+      );
+      expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
+      expect(formSectionsHidden()).toBe(true);
+    },
+  );
+
+  it("shows a story-content error and does not generate a proof when only a title is entered", async () => {
+    renderMintModal();
+    await waitForMintableTarget();
+    await checkAllConsents();
+    fireEvent.change(screen.getByLabelText("Story title (optional)"), {
+      target: { value: "  A title without a story  " },
     });
-    expect(mocks.onSuccess).toHaveBeenCalledWith(77);
-    // The passphrase must be gone before the wallet wait, not merely by the end.
-    expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(1);
-    expect(mocks.clearSecretInputs.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.mintRunOrThrow.mock.invocationCallOrder[0],
-    );
-    expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
-    expect(formSectionsHidden()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
+    expect(await screen.findByText("Add story content before setting a title")).toBeTruthy();
+    const story = screen.getByPlaceholderText("Enter a brief life story summary...");
+    expect(story.getAttribute("aria-invalid")).toBe("true");
+    expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
+    expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
   });
 
   it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
@@ -550,7 +580,11 @@ describe("MintNFTModal", () => {
       // A spinner here would claim the flow is working when it is the user's
       // turn, which reads as a step already under way.
       const marks = Array.from(document.querySelectorAll("ol li")).map(
-        (li) => li.querySelector("svg")?.getAttribute("class")?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
+        (li) =>
+          li
+            .querySelector("svg")
+            ?.getAttribute("class")
+            ?.match(/lucide-([a-z-]+)/)?.[1] ?? "dot",
       );
       const confirmIndex = marks.length - 2;
       expect(marks[confirmIndex]).toBe("arrow-right");

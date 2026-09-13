@@ -110,6 +110,7 @@ describe("useDisclosureProof", () => {
           deathMonth: "",
           deathDay: "",
           deathPlace: "",
+          storyTitle: "  Mathematical legacy  ",
           story: "Math",
           tokenURI: "ipfs://token",
         },
@@ -151,6 +152,7 @@ describe("useDisclosureProof", () => {
         }),
       }),
     );
+    expect(proofResult!.coreInfo.supplementInfo).not.toHaveProperty("storyTitle");
     expect(mocks.formatGroth16ProofForContract).toHaveBeenCalledWith(expect.anything(), {
       circuitId: 1,
       proofEncodingId: 1,

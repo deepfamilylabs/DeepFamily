@@ -128,8 +128,8 @@ function setup() {
   mocks.main.mockReturnValue({ archive: vi.fn(async () => ADDRESS) });
   mocks.archive.mockReturnValue(archive);
   const confirm = vi.fn(async () => true);
-  const submit = (content = "  原文\n🙂  ") =>
-    addStoryRecordService(signer as any, ADDRESS, "1", 0, content, "", 2, "", confirm);
+  const submit = (content = "  原文\n🙂  ", title = "") =>
+    addStoryRecordService(signer as any, ADDRESS, "1", 0, title, content, "", 2, "", confirm);
   return { archive, signer, confirm, submit };
 }
 describe("Archive story writes", () => {
@@ -141,7 +141,7 @@ describe("Archive story writes", () => {
     const f = setup();
     const result = await f.submit();
     const bytes = ethers.hexlify(
-      encodeStoryRecord({ content: "  原文\n🙂  ", recordType: 2, attachmentCID: "" }),
+      encodeStoryRecord({ title: "", content: "  原文\n🙂  ", recordType: 2, attachmentCID: "" }),
     );
     expect(f.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ canonicalPayload: bytes, gasLimit: 1202n, segmentCount: 1 }),
@@ -168,7 +168,7 @@ describe("Archive story writes", () => {
   it("compresses a long original and previews the actual stored byte length", async () => {
     const f = setup();
     const content = "长传记 😀\n".repeat(4000);
-    const bytes = encodeStoryRecord({ content, recordType: 2, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ title: "", content, recordType: 2, attachmentCID: "" });
     const result = await f.submit(content);
     expect(result.payloadLength).toBe(bytes.length);
     expect(bytes.length).toBeLessThan(16384);
@@ -260,5 +260,22 @@ describe("Archive story writes", () => {
       /account changed/i,
     );
     expect(f.archive.sealStory).not.toHaveBeenCalled();
+  });
+});
+
+it("includes the exact title in the preview, transaction and returned record", async () => {
+  const f = setup();
+  const title = "  第一次远行 😀 e\u0301  ";
+  const content = "Body with no repeated heading";
+  const result = await f.submit(content, title);
+  const payload = ethers.hexlify(
+    encodeStoryRecord({ title, content, recordType: 2, attachmentCID: "" }),
+  );
+  expect(f.confirm).toHaveBeenCalledWith(expect.objectContaining({ canonicalPayload: payload }));
+  expect(f.archive.appendStoryRecord.mock.calls[0][4]).toBe(payload);
+  expect(result.newRecord).toMatchObject({
+    title,
+    content,
+    payloadHash: ethers.keccak256(payload),
   });
 });

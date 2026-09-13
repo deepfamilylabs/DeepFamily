@@ -69,6 +69,7 @@ const action = async (args, hre) => {
     deathDay,
     deathPlace: args.deathplace,
     story: args.story,
+    storyTitle: args.storytitle ?? "",
   };
 
   const result = await mintPersonVersionNFT({
@@ -184,8 +185,14 @@ export default task("mint-nft", "Mint NFT for a person version (requires prior e
     defaultValue: "",
   })
   .addOption({
+    name: "storytitle",
+    description: "Public biography title (optional; requires biography content)",
+    type: ArgumentType.STRING,
+    defaultValue: "",
+  })
+  .addOption({
     name: "story",
-    description: "Short life story (<=256 chars)",
+    description: "Public biography text (capacity depends on network gas)",
     type: ArgumentType.STRING,
     defaultValue: "",
   })

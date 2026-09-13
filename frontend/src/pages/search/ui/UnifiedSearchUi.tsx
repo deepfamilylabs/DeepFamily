@@ -200,8 +200,7 @@ function DetectionChip({ t, subject }: { t: T; subject: SearchSubject }) {
 }
 
 function Chip({ tone, children }: { tone: "success" | "danger"; children: ReactNode }) {
-  const toneClass =
-    tone === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger";
+  const toneClass = tone === "success" ? "bg-success/10 text-success" : "bg-danger/10 text-danger";
   return (
     <span
       className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold sm:inline-flex ${toneClass}`}
@@ -269,6 +268,7 @@ export function NftIdentityCard({
     isDeathBC?: boolean;
     deathPlace?: string;
     nftPublicStory?: string;
+    nftPublicStoryTitle?: string;
   };
   personHash?: string;
   versionIndex?: number;
@@ -348,12 +348,16 @@ export function NftIdentityCard({
           <div className="mb-1.5 text-xs font-medium text-ink-subtle">
             {t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
           </div>
+          <h4 className="mb-1.5 break-words text-sm font-semibold text-ink">
+            {core.nftPublicStoryTitle?.trim()
+              ? core.nftPublicStoryTitle
+              : t("storyRecordsModal.biographyTitle", "Biography")}
+          </h4>
           <p className="max-h-44 overflow-y-auto text-sm leading-relaxed whitespace-pre-line text-ink-muted">
             {core.nftPublicStory}
           </p>
         </div>
       ) : null}
-
     </div>
   );
 }
@@ -471,13 +475,7 @@ export function ScopeBar({
 }
 
 /** Read-only: which NFT the selected version resolves to. */
-export function ResolvedNftBadge({
-  t,
-  tokenId,
-}: {
-  t: T;
-  tokenId: number | undefined;
-}) {
+export function ResolvedNftBadge({ t, tokenId }: { t: T; tokenId: number | undefined }) {
   if (tokenId === undefined) {
     return (
       <span className="text-xs text-ink-subtle">

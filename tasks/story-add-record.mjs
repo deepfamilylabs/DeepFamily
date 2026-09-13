@@ -11,6 +11,7 @@ const action = async (args, hre) => {
     archive: archive.connect(signer),
     tokenId: BigInt(args.tokenid),
     expectedIndex: BigInt(args.recordindex),
+    title: args.title ?? "",
     content: args.content,
     recordType: Number(args.type ?? 1),
     attachmentCID: args.attachment ?? "",
@@ -30,6 +31,12 @@ export default task("add-story-record", "Append a story record to an NFT archive
     description: "Record index to add (must equal current totalRecords, starts at 0)",
     type: ArgumentType.STRING_WITHOUT_DEFAULT,
     defaultValue: undefined,
+  })
+  .addOption({
+    name: "title",
+    description: "Exact story title (optional)",
+    type: ArgumentType.STRING,
+    defaultValue: "",
   })
   .addOption({
     name: "content",

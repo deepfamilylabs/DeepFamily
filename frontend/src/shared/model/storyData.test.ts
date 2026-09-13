@@ -13,6 +13,7 @@ describe("storyData buildStorySnapshot", () => {
   it("computes full story and integrity for complete record sets", () => {
     const records = [
       {
+        title: "",
         recordIndex: 1,
         recordHash: ethers.id("verified record"),
         payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
@@ -23,6 +24,7 @@ describe("storyData buildStorySnapshot", () => {
         attachmentCID: "",
       },
       {
+        title: "",
         recordIndex: 0,
         recordHash: ethers.id("verified record"),
         payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000001",
@@ -51,6 +53,7 @@ describe("storyData buildStorySnapshot", () => {
     const snapshot = buildStorySnapshot(
       [
         {
+          title: "",
           recordIndex: 1,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x0000000000000000000000000000000000000000000000000000000000000002",
@@ -79,6 +82,7 @@ describe("storyData buildStorySnapshot", () => {
     const merged = mergeStoryRecords(
       [
         {
+          title: "",
           recordIndex: 0,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x1",
@@ -91,6 +95,7 @@ describe("storyData buildStorySnapshot", () => {
       ],
       [
         {
+          title: "",
           recordIndex: 2,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x3",
@@ -101,6 +106,7 @@ describe("storyData buildStorySnapshot", () => {
           attachmentCID: "",
         },
         {
+          title: "",
           recordIndex: 1,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x2",
@@ -122,6 +128,7 @@ describe("storyData buildStorySnapshot", () => {
     const storyData = buildStoryDataResult(
       [
         {
+          title: "",
           recordIndex: 0,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x1",
@@ -164,6 +171,7 @@ describe("storyData buildStorySnapshot", () => {
     const storyData = buildStoryDataResult(
       [
         {
+          title: "",
           recordIndex: 1,
           recordHash: ethers.id("verified record"),
           payloadHash: "0x1",

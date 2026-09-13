@@ -10,6 +10,7 @@ export function encodePublicStoryRecord(input: StoryRecordInput): Uint8Array {
   const payload = encodeStoryRecord(input, { compressionSuite: PUBLIC_STORY_COMPRESSION_SUITE });
   const restored = decodeStoryRecord(payload);
   if (
+    restored.title !== input.title ||
     restored.content !== input.content ||
     restored.recordType !== input.recordType ||
     restored.attachmentCID !== input.attachmentCID

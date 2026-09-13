@@ -235,67 +235,75 @@ describe("SearchPage", () => {
     expect(screen.getByText("9")).toBeTruthy();
   });
 
-  it("offers an NFT tab for a person and lists the minted tokens by name", async () => {
-    mocks.treeGateway.listPersonVersionsPage.mockResolvedValue(versionsPage1);
-    mocks.personGateway.listVersionEndorsements.mockResolvedValue({
-      versionIndices: [2, 3],
-      endorsementCounts: [9, 1],
-      tokenIds: [128, 0],
-      totalVersions: 2,
-      hasMore: false,
-      nextOffset: 2,
-    });
-    mocks.personGateway.getNFTDetails.mockResolvedValue({
-      personHash: personHashA,
-      versionIndex: 2,
-      version: {},
-      metadata: {},
-      core: {
-        fullName: "Ada Lovelace",
-        gender: 2,
-        birthYear: 1815,
-        birthPlace: "London",
-        nftPublicStory: "Wrote the first algorithm intended for a machine.",
-      },
-    });
+  it.each(["  Mathematical legacy 😀  ", "", " \t "])(
+    "offers a person's NFT tab with a named biography or its fallback (%j)",
+    async (storyTitle) => {
+      mocks.treeGateway.listPersonVersionsPage.mockResolvedValue(versionsPage1);
+      mocks.personGateway.listVersionEndorsements.mockResolvedValue({
+        versionIndices: [2, 3],
+        endorsementCounts: [9, 1],
+        tokenIds: [128, 0],
+        totalVersions: 2,
+        hasMore: false,
+        nextOffset: 2,
+      });
+      mocks.personGateway.getNFTDetails.mockResolvedValue({
+        personHash: personHashA,
+        versionIndex: 2,
+        version: {},
+        metadata: {},
+        core: {
+          fullName: "Ada Lovelace",
+          gender: 2,
+          birthYear: 1815,
+          birthPlace: "London",
+          nftPublicStory: "Wrote the first algorithm intended for a machine.",
+          nftPublicStoryTitle: storyTitle,
+        },
+      });
 
-    renderPage();
-    submitQuery(personHashA);
-    await waitFor(() => expect(mocks.treeGateway.listPersonVersionsPage).toHaveBeenCalled());
+      renderPage();
+      submitQuery(personHashA);
+      await waitFor(() => expect(mocks.treeGateway.listPersonVersionsPage).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByRole("tab", { name: /NFTs/ }));
+      fireEvent.click(screen.getByRole("tab", { name: /NFTs/ }));
 
-    expect(await screen.findByText("Ada Lovelace")).toBeTruthy();
-    // The details call already returns the whole identity — surface it, don't drop it.
-    expect(screen.getByText("Female")).toBeTruthy();
-    expect(screen.getByText(/London/)).toBeTruthy();
-    expect(screen.getByText(/1815/)).toBeTruthy();
-    expect(screen.getByText("Wrote the first algorithm intended for a machine.")).toBeTruthy();
-    // The endorsement count came from the stats call, not a second lookup.
-    expect(screen.getByText("9")).toBeTruthy();
-    // A minted row links to the token's canonical page.
-    const wiki = screen.getByRole("link", { name: /Encyclopedia/ });
-    expect(wiki.getAttribute("href")).toBe("/person/128");
-    // A new tab keeps the search behind it; same-tab navigation would drop it.
-    expect(wiki.getAttribute("target")).toBe("_blank");
-    expect(wiki.getAttribute("rel")).toContain("noopener");
-    // v3 was never minted (token id 0), so it must not appear as an NFT row.
-    expect(screen.queryByText("#0")).toBeNull();
+      expect(await screen.findByText("Ada Lovelace")).toBeTruthy();
+      // The details call already returns the whole identity — surface it, don't drop it.
+      expect(screen.getByText("Female")).toBeTruthy();
+      expect(screen.getByText(/London/)).toBeTruthy();
+      expect(screen.getByText(/1815/)).toBeTruthy();
+      expect(screen.getByText("Wrote the first algorithm intended for a machine.")).toBeTruthy();
+      const titleHeading = screen.getByRole("heading", {
+        name: storyTitle.trim() || "Biography",
+      });
+      expect(titleHeading.textContent).toBe(storyTitle.trim() ? storyTitle : "Biography");
+      // The endorsement count came from the stats call, not a second lookup.
+      expect(screen.getByText("9")).toBeTruthy();
+      // A minted row links to the token's canonical page.
+      const wiki = screen.getByRole("link", { name: /Encyclopedia/ });
+      expect(wiki.getAttribute("href")).toBe("/person/128");
+      // A new tab keeps the search behind it; same-tab navigation would drop it.
+      expect(wiki.getAttribute("target")).toBe("_blank");
+      expect(wiki.getAttribute("rel")).toContain("noopener");
+      // v3 was never minted (token id 0), so it must not appear as an NFT row.
+      expect(screen.queryByText("#0")).toBeNull();
 
-    // Clicking the token id resolves it as a subject in its own right.
-    mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
-      records: [],
-      totalRecords: 0,
-      hasMore: false,
-      nextOffset: 0,
-    });
-    fireEvent.click(screen.getByRole("button", { name: "#128" }));
+      // Clicking the token id resolves it as a subject in its own right.
+      mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
+        records: [],
+        totalRecords: 0,
+        hasMore: false,
+        nextOffset: 0,
+      });
+      fireEvent.click(screen.getByRole("button", { name: "#128" }));
 
-    await waitFor(() =>
-      expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
-    );
-    expect(await screen.findByText(/familyTree.nodeDetail.tokenId/)).toBeTruthy();
-  });
+      await waitFor(() =>
+        expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
+      );
+      expect(await screen.findByText(/familyTree.nodeDetail.tokenId/)).toBeTruthy();
+    },
+  );
 
   it("follows a creator address straight from a version row", async () => {
     mocks.treeGateway.listPersonVersionsPage.mockResolvedValue(versionsPage1);
@@ -456,6 +464,7 @@ describe("SearchPage", () => {
     mocks.personGateway.listStoryRecordsPage.mockResolvedValue({
       records: [
         {
+          title: "Journey to Luoyang",
           recordIndex: 0,
           recordType: 1,
           payloadHash: "0xrecord-1",
@@ -491,6 +500,18 @@ describe("SearchPage", () => {
       expect(mocks.personGateway.listStoryRecordsPage).toHaveBeenCalledWith(128, 0, 100),
     );
     expect(await screen.findByText("First record")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Journey to Luoyang" })).toBeTruthy();
+    const filter = screen.getByRole("searchbox", {
+      name: "Filter loaded records by title or content",
+    });
+    fireEvent.change(filter, { target: { value: "LUOYANG" } });
+    expect(screen.getByText("First record")).toBeTruthy();
+    fireEvent.change(filter, { target: { value: "not in this record" } });
+    expect(screen.queryByText("First record")).toBeNull();
+    expect(screen.getByText("No matching loaded records")).toBeTruthy();
+    fireEvent.change(filter, { target: { value: "First record" } });
+    expect(screen.getByRole("heading", { name: "Journey to Luoyang" })).toBeTruthy();
+    fireEvent.change(filter, { target: { value: "" } });
     expect(screen.getByText("#1")).toBeTruthy();
     expect(mocks.treeGateway.listPersonVersionsPage).not.toHaveBeenCalled();
 
@@ -523,6 +544,7 @@ describe("SearchPage", () => {
 
   it("pages ordinary stories after the biography and returns from a short last page without skipping", async () => {
     const biography = {
+      title: "",
       recordIndex: 0,
       recordType: 0,
       schemaId: STORY_BIOGRAPHY_SCHEMA_ID,
@@ -532,6 +554,7 @@ describe("SearchPage", () => {
     const records = [
       biography,
       ...Array.from({ length: 101 }, (_, index) => ({
+        title: "",
         recordIndex: index + 1,
         recordType: 1,
         schemaId: STORY_ENVELOPE_SCHEMA_ID,

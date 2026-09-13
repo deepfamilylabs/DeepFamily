@@ -8,6 +8,7 @@ export interface StoryRecord {
   /** One-based ordinary story number, assigned only for presentation. */
   displayIndex?: number;
   payloadHash: string;
+  title: string;
   content: string;
   timestamp: number;
   author: string;
@@ -35,6 +36,7 @@ export interface StoryMetadata {
 export interface StoryRecordCreateData {
   tokenId: string;
   recordIndex: number;
+  title: string;
   content: string;
   expectedPayloadHash?: string;
   recordType?: number;
@@ -100,6 +102,7 @@ export interface NodeData {
   deathPlace?: string;
   isDeathBC?: boolean;
   nftPublicStory?: string;
+  nftPublicStoryTitle?: string;
   nftTokenURI?: string;
   storyMetadata?: StoryMetadata;
   storyRecords?: StoryRecord[];

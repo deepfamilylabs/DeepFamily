@@ -17,6 +17,7 @@ export interface MintNFTFormValues {
   deathMonth: number | string;
   deathDay: number | string;
   deathPlace: string;
+  storyTitle: string;
   story: string;
   tokenURI?: string;
 }
@@ -44,6 +45,7 @@ export interface MintNftFlowArgs {
   publicSignals: MintDisclosurePublicSignals;
   tokenURI: string;
   coreInfo: MintCoreInfo;
+  storyTitle?: string;
   story?: string;
 }
 

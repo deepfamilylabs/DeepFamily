@@ -127,6 +127,7 @@ describe("nodeDetailSync", () => {
     const storyData: StoryDataResult = {
       records: [
         {
+          title: "",
           recordIndex: 0,
           payloadHash: "0x1",
           content: "hello",

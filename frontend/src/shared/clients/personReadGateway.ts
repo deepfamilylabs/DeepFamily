@@ -132,6 +132,10 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
           initial?.schemaId === STORY_BIOGRAPHY_SCHEMA_ID && !initial.unsupportedSchema
             ? initial.content
             : undefined;
+        parsed.core.nftPublicStoryTitle =
+          initial?.schemaId === STORY_BIOGRAPHY_SCHEMA_ID && !initial.unsupportedSchema
+            ? initial.title
+            : undefined;
         options?.onFetched?.();
         return parsed;
       },
@@ -207,6 +211,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
         return {
           recordIndex: index,
           payloadHash: verified.payloadHash,
+          title: verified.decoded?.title ?? "",
           content: verified.decoded?.content ?? "",
           recordType: verified.decoded?.recordType ?? 0,
           attachmentCID: verified.decoded?.attachmentCID ?? "",

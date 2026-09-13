@@ -1,12 +1,93 @@
 import { describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
-import { computeSuiteCommitment } from "@deepfamily/protocol-core";
+import { computeSuiteCommitment, decodeStoryRecord } from "@deepfamily/protocol-core";
+import { encodePublicStoryRecord } from "../../../shared/config/storyEncoding";
 import { createDeepFamilyInterface } from "../../../shared/clients/contractFactory";
-import { executeMintFlow, readMintTargetEnvelopeHeader } from "./mintNftService";
+import {
+  executeMintFlow,
+  readMintTargetEnvelopeHeader,
+  type ExecuteMintFlowParams,
+  type MintPersonVersionNFTFn,
+} from "./mintNftService";
 
 describe("mintService executeMintFlow", () => {
   const identityCommitmentHex = `0x${"01".padStart(64, "0")}`;
   const suiteCommitment = computeSuiteCommitment(1);
+  const initialBiographyInput = (story: string): ExecuteMintFlowParams => ({
+    contract: {
+      endorsedVersionIndex: vi.fn(async () => 2),
+      getAddress: vi.fn(async () => "0x0000000000000000000000000000000000000abc"),
+    },
+    address: "0x00000000000000000000000000000000000000aa",
+    personHash: `0x${"bb".repeat(32)}`,
+    versionIndex: 2,
+    selfSuiteId: 1,
+    proofEnvelope: {},
+    publicSignals: {
+      identityCommitment: 1n,
+      disclosureBinding: 2n,
+      minter: 3n,
+      suiteCommitment,
+    },
+    tokenURI: "",
+    coreInfo: {
+      basicInfo: {
+        identityCommitment: identityCommitmentHex,
+        isBirthBC: false,
+        birthYear: 2000,
+        birthMonth: 1,
+        birthDay: 1,
+        gender: 1,
+      },
+      supplementInfo: {
+        fullName: "Test",
+        birthPlace: "",
+        isDeathBC: false,
+        deathYear: 0,
+        deathMonth: 0,
+        deathDay: 0,
+        deathPlace: "",
+      },
+    },
+    story,
+    mintPersonVersionNFT: vi.fn<MintPersonVersionNFTFn>().mockResolvedValue({ logs: [] }),
+  });
+
+  it.each([undefined, "  家族纪事 😀 e\u0301  "])(
+    "archives the initial title exactly, defaulting an omitted title to empty (%s)",
+    async (storyTitle) => {
+      const story = "  Life story\r\n生平 😀  ";
+      const input = { ...initialBiographyInput(story), storyTitle };
+      await executeMintFlow(input);
+      const args = vi.mocked(input.mintPersonVersionNFT).mock.calls[0];
+      const payload = args[5];
+      expect(decodeStoryRecord(payload)).toMatchObject({
+        title: storyTitle ?? "",
+        content: story,
+        recordType: 0,
+      });
+      expect(args[6]).toBe(ethers.keccak256(payload));
+      expect(args[4].supplementInfo).not.toHaveProperty("storyTitle");
+      if (storyTitle) {
+        const untitled = encodePublicStoryRecord({
+          title: "",
+          content: story,
+          recordType: 0,
+          attachmentCID: "",
+        });
+        expect(args[6]).not.toBe(ethers.keccak256(untitled));
+      }
+    },
+  );
+
+  it("rejects a title without story content before requesting any mint", async () => {
+    const input = { ...initialBiographyInput(""), storyTitle: "  A title  " };
+    await expect(executeMintFlow(input)).rejects.toThrow(
+      "Add story content before setting a title",
+    );
+    expect(input.mintPersonVersionNFT).not.toHaveBeenCalled();
+    expect(input.contract.endorsedVersionIndex).not.toHaveBeenCalled();
+  });
 
   it("reads selfSuiteId only from the hash/length-authenticated target envelope header", async () => {
     const envelope = `0x44464d3101${"00".repeat(11)}00000001`;

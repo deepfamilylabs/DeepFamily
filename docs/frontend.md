@@ -453,3 +453,10 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 ## Archive V1 reads and writes
 
 The frontend reads named BlobRef and StoryRecordRef fields and verifies complete segmented bytecode via `protocol-core` before decoding. Story content uses exact canonical DFS1 bytes; unknown schemas remain verified raw records. Metadata and Story submissions require successful full-call gas estimation and a 20% integer-ceiling buffer within network limits. The confirmation preview exposes bytes, segment count, gas and fees. See the [protocol release manifest](../protocol-release-manifest.json) for the frozen protocol rules.
+
+Story records carry an optional user-entered title, encoded as a string in every DFS1 payload.
+The composer presents title, classification, content and attachment in that order. Titles are
+included in payload hashes and verified on readback. Directories, record lists and search use the
+title when it contains non-whitespace text, otherwise the localized classification label.
+The initial mint biography supports its own `storyTitle` and falls back to the localized biography
+label when untitled. Display fallbacks do not modify the archived title or the record index.

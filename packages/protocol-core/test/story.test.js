@@ -23,7 +23,12 @@ const vector = JSON.parse(
     "utf8",
   ),
 );
-const input = { content: "  原文😀 e\u0301\n ", recordType: 3, attachmentCID: "ipfs://abc" };
+const input = {
+  title: "  标题😀 e\u0301\n ",
+  content: "  原文😀 e\u0301\n ",
+  recordType: 3,
+  attachmentCID: "ipfs://abc",
+};
 
 test("DFS1 shared golden bytes, schema hash and multiple-record semantic head match", () => {
   assert.equal(STORY_ENVELOPE_SCHEMA_ID, vector.schemaId);
@@ -47,6 +52,77 @@ test("DFS1 shared golden bytes, schema hash and multiple-record semantic head ma
     assert.equal(previousHead, record.newHead);
   }
   assert.equal(previousHead, vector.finalHead);
+});
+
+test("DFS1 preserves empty, nonempty and Unicode titles without trimming or normalization", () => {
+  for (const title of [
+    "",
+    "A family story",
+    " \r\n\t",
+    '  标题😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
+    "长".repeat(16_385),
+  ]) {
+    const record = { ...input, title };
+    const expected = { schema: STORY_RECORD_SCHEMA, ...record };
+    assert.deepEqual(decodeCanonicalStoryRecord(encodeCanonicalStoryRecord(record)), expected);
+    assert.deepEqual(decodeStoryRecord(encodeStoryRecord(record)), expected);
+  }
+  const originalHash = keccak256(encodeStoryRecord(input));
+  for (const title of [input.title.trim(), input.title.normalize("NFC")]) {
+    assert.notEqual(keccak256(encodeStoryRecord({ ...input, title })), originalHash);
+  }
+});
+
+test("DFS1 requires a title and rejects non-string titles and isolated surrogates", () => {
+  const { title: _title, ...missingTitle } = input;
+  assert.throws(
+    () => encodeStoryRecord(missingTitle),
+    (error) => error.code === "INVALID_STORY_KEYS",
+  );
+  assert.throws(
+    () =>
+      decodeCanonicalStoryRecord(
+        utf8Bytes(JSON.stringify({ schema: STORY_RECORD_SCHEMA, ...missingTitle })),
+      ),
+    (error) => error.code === "INVALID_STORY_KEYS",
+  );
+  for (const title of [undefined, null, false, 3, 3n, {}, [], new String("title")]) {
+    assert.throws(
+      () => encodeStoryRecord({ ...input, title }),
+      (error) => error.code === "INVALID_STRING",
+    );
+  }
+  for (const title of [null, false, 3, {}, [], "\ud800", "\udfff", "before\ud800after"]) {
+    const record = { schema: STORY_RECORD_SCHEMA, ...input, title };
+    const errorCode = typeof title === "string" ? "ISOLATED_SURROGATE" : "INVALID_STRING";
+    assert.throws(
+      () => encodeStoryRecord(record),
+      (error) => error.code === errorCode,
+    );
+    assert.throws(
+      () => decodeCanonicalStoryRecord(utf8Bytes(JSON.stringify(record))),
+      (error) => error.code === errorCode,
+    );
+  }
+});
+
+test("a title-only change updates the payload commitment, record hash and historical head", () => {
+  const record = vector.records[0];
+  const payload = encodeStoryRecord({ ...record.input, title: `${record.input.title}Changed` });
+  const payloadHash = keccak256(payload);
+  assert.notEqual(payloadHash, record.commitment.payloadHash);
+  const recordHash = computeStoryRecordHash({
+    ...record.commitment,
+    payloadHash,
+    payloadLength: payload.length,
+  });
+  assert.notEqual(recordHash, record.recordHash);
+  const firstHead = computeStoryHead({ previousHead: record.previousHead, recordHash });
+  assert.notEqual(firstHead, record.newHead);
+  assert.notEqual(
+    computeStoryHead({ previousHead: firstHead, recordHash: vector.records[1].recordHash }),
+    vector.finalHead,
+  );
 });
 
 test("DFS1 preserves exact content without trimming or Unicode normalization", () => {
@@ -113,7 +189,7 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
   for (const record of [
     { ...input, extra: 1 },
     { ...input, schema: "other" },
-    { content: "x", recordType: 3 },
+    { title: "", content: "x", recordType: 3 },
     { ...input, [Symbol("x")]: 1 },
     { ...input, content: "\ud800" },
     { ...input, attachmentCID: "\udfff" },
@@ -123,7 +199,16 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
 
 test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invalid UTF8", () => {
   const canonical = new TextDecoder().decode(
-    encodeCanonicalStoryRecord({ content: "中/\n", recordType: 3, attachmentCID: "" }),
+    encodeCanonicalStoryRecord({
+      title: "标题",
+      content: "中/\n",
+      recordType: 3,
+      attachmentCID: "",
+    }),
+  );
+  assert.equal(
+    canonical,
+    '{"schema":"deepfamily/story-record@1.0","title":"标题","content":"中/\\n","recordType":3,"attachmentCID":""}',
   );
   for (const text of [
     canonical + "\n",
@@ -132,6 +217,8 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
     canonical.replace("中", "\\u4e2d"),
     canonical.replace("/", "\\/"),
     canonical.replace("\\n", "\\u000a"),
+    canonical.replace('"title":"标题"', '"title":"标题","title":"标题"'),
+    canonical.replace('"title":"标题",', ""),
     canonical.replace('"recordType":3', '"recordType":3.0'),
     canonical.replace('"recordType":3', '"recordType":3e0'),
     canonical.replace('"recordType":3', '"recordType":-0'),
@@ -139,7 +226,7 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
     canonical.replace('"attachmentCID":""', '"attachmentCID":"","extra":false'),
     canonical.replace('"attachmentCID":""', '"attachmentCID":"\\ud800"'),
     canonical.replace('{"schema":"deepfamily/story-record@1.0",', "{"),
-    '{"content":"中/\\n","schema":"deepfamily/story-record@1.0","recordType":3,"attachmentCID":""}',
+    '{"schema":"deepfamily/story-record@1.0","content":"中/\\n","title":"标题","recordType":3,"attachmentCID":""}',
     "\ufeff" + canonical,
   ])
     assert.throws(() => decodeCanonicalStoryRecord(utf8Bytes(text)), text);

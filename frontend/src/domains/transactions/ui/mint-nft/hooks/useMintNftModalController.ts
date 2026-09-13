@@ -165,6 +165,7 @@ export function useMintNftModalController({
       deathMonth: "",
       deathDay: "",
       deathPlace: "",
+      storyTitle: "",
       story: "",
       tokenURI: "",
     },
@@ -215,7 +216,14 @@ export function useMintNftModalController({
     resetTargetStatus();
     previousTargetRef.current = { hash: "", index: 0 };
     didPatchCacheRef.current = false;
-  }, [reset, resetDisclosureProof, resetMintNftFlow, resetTargetStatus, seedTarget, decideTransactionPreview]);
+  }, [
+    reset,
+    resetDisclosureProof,
+    resetMintNftFlow,
+    resetTargetStatus,
+    seedTarget,
+    decideTransactionPreview,
+  ]);
 
   useEffect(() => {
     if (isOpen) {
@@ -376,7 +384,8 @@ export function useMintNftModalController({
             id: "proof",
             label: t("transaction.stepProof", "Generate zero-knowledge proof"),
             // Says what the label cannot: how long, and what it needs from you.
-            detail: proofStep === "verifying"
+            detail:
+              proofStep === "verifying"
                 ? t("mintNFT.verifyingProof", "Verifying zero-knowledge proof...")
                 : t(
                     "transaction.proofDuration",

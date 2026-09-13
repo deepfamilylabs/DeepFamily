@@ -27,6 +27,7 @@ function createEditor(
 ) {
   const form = {
     data: {
+      title: "",
       content: "Example story",
       recordType: 1,
       attachmentCID: "",
@@ -36,6 +37,7 @@ function createEditor(
     byteLength: 13,
     segmentBytes: 16_384,
     warningOrangeBytes: 16_184,
+    updateTitle: vi.fn(),
     updateContent: vi.fn(),
     updateRecordType: vi.fn(),
     updateAttachmentCID: vi.fn(),
@@ -173,7 +175,7 @@ describe("StoryComposer", () => {
     render(
       <StoryComposer
         editor={createEditor({
-          form: { data: { content: "   ", recordType: 1, attachmentCID: "" } },
+          form: { data: { title: "", content: "   ", recordType: 1, attachmentCID: "" } },
         })}
       />,
     );
@@ -181,4 +183,20 @@ describe("StoryComposer", () => {
     const submit = screen.getByRole("button", { name: /Review & sign/ });
     expect((submit as HTMLButtonElement).disabled).toBe(true);
   });
+});
+
+it("accepts an exact optional title before the classification and content fields", () => {
+  const updateTitle = vi.fn();
+  const { rerender } = render(<StoryComposer editor={createEditor({ form: { updateTitle } })} />);
+  const input = screen.getByRole("textbox", { name: "Title (optional)" });
+  const type = screen.getByRole("button", { name: "Record Type Summary" });
+  const content = screen.getByPlaceholderText(/Enter story content/);
+  expect(input.compareDocumentPosition(type) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(type.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.change(input, { target: { value: "  第一次远行 😀  " } });
+  expect(updateTitle).toHaveBeenCalledWith("  第一次远行 😀  ");
+  rerender(<StoryComposer editor={createEditor({ editor: { submitting: true } })} />);
+  expect(
+    (screen.getByRole("textbox", { name: "Title (optional)" }) as HTMLInputElement).disabled,
+  ).toBe(true);
 });
