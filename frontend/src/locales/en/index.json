@@ -907,7 +907,6 @@
     "orderLabel": "Record order",
     "orderReading": "Reading order",
     "orderWritten": "Order written",
-    "sealedReadOnly": "Sealed — read only",
     "closedToNewRecords": "Closed to new records",
     "newRecord": "New record",
     "readFullRecord": "Read the full record",

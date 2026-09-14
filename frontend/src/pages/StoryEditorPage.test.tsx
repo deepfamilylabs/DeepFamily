@@ -194,6 +194,27 @@ describe("StoryEditorPage", () => {
     vi.restoreAllMocks();
   });
 
+  it("puts the record order switch in the page header, where it orders Contents too", async () => {
+    const second: StoryRecord = {
+      ...existingRecord,
+      recordIndex: 1,
+      recordHash: bytes32("a2"),
+      payloadHash: bytes32("12"),
+      content: "second story",
+    };
+    const data = baseStoryData();
+    mocks.storyData = {
+      ...data,
+      records: [existingRecord, second],
+      metadata: { ...data.metadata, totalRecords: 2 },
+    };
+
+    render(<StoryEditorPage />);
+
+    const toggle = await screen.findByRole("group", { name: "Record order" });
+    expect(toggle.closest("header")?.querySelector("h1")).toBeTruthy();
+  });
+
   it("adds a story record through the transaction flow and invalidates scoped story cache", async () => {
     const addedRecord: StoryRecord = {
       title: "",

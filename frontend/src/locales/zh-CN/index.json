@@ -907,7 +907,6 @@
     "orderLabel": "排列方式",
     "orderReading": "阅读顺序",
     "orderWritten": "写入顺序",
-    "sealedReadOnly": "已封存 · 只读",
     "closedToNewRecords": "不再接受新记录",
     "newRecord": "新建记录",
     "readFullRecord": "展开全文",
