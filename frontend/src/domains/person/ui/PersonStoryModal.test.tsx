@@ -26,6 +26,7 @@ vi.mock("../../../shared/ui", async (importOriginal) => ({
 
 beforeEach(() => {
   mocks.canEditStory = false;
+  localStorage.removeItem("df-story-editor-record-order");
 });
 afterEach(() => {
   cleanup();
@@ -53,7 +54,7 @@ const ordinary = {
   payloadLength: 50,
 };
 
-function renderStory(records: StoryRecord[]) {
+function renderStory(records: StoryRecord[], metadataOverrides: Partial<StoryMetadata> = {}) {
   const metadata: StoryMetadata = {
     totalRecords: records.length,
     totalPayloadLength: records.reduce((length, record) => length + (record.payloadLength ?? 0), 0),
@@ -63,6 +64,7 @@ function renderStory(records: StoryRecord[]) {
     recordsHead: `0x${"00".repeat(32)}`,
     lastUpdateTime: 1,
     isSealed: false,
+    ...metadataOverrides,
   };
   const getStoryData = vi.fn().mockResolvedValue(buildStorySnapshot(records, metadata));
   return render(
@@ -126,13 +128,57 @@ it("shows custom biography and ordinary record titles with an untitled biography
 it("shows stories but no editable control without ownership access", async () => {
   renderStory([biography, ordinary]);
   expect(await screen.findByText("A later story")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Editable" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
 });
 
 it("shows an editor entry for the permitted owner", async () => {
   mocks.canEditStory = true;
   const open = vi.spyOn(window, "open").mockReturnValue(null);
   renderStory([biography, ordinary]);
-  fireEvent.click(await screen.findByRole("button", { name: "Editable" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Edit Story" }));
   expect(open).toHaveBeenCalledWith("/editor/42", "_blank", "noopener,noreferrer");
+});
+
+it("lists records in reading order by default and follows a switch to the order written", async () => {
+  const closing = {
+    ...ordinary,
+    recordIndex: 1,
+    recordType: 16,
+    content: "Written first, read last",
+  };
+  const summary = {
+    ...ordinary,
+    recordIndex: 2,
+    recordType: 1,
+    content: "Written second, read first",
+  };
+  renderStory([biography, closing, summary]);
+
+  await screen.findByText("Written second, read first");
+  const bodies = () => [...document.querySelectorAll("article p")].map((node) => node.textContent);
+
+  // A Summary is read first however late it was written, as on the published profile.
+  expect(bodies()).toEqual(["Written second, read first", "Written first, read last"]);
+
+  fireEvent.click(screen.getByRole("button", { name: "Order written" }));
+
+  expect(bodies()).toEqual(["Written first, read last", "Written second, read first"]);
+  // Remembered under the key the story editor reads, so one choice serves both.
+  expect(localStorage.getItem("df-story-editor-record-order")).toBe("written");
+});
+
+it("says nothing about integrity when the archive checks out", async () => {
+  renderStory([biography, ordinary]);
+
+  expect(await screen.findByText("A later story")).toBeTruthy();
+  // Records are verified as they are read; a standing badge added nothing.
+  expect(screen.queryByText("Integrity verified")).toBeNull();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+it("warns, the way the person page does, when the chain holds records the list lacks", async () => {
+  renderStory([biography, ordinary], { totalRecords: 3 });
+
+  const warning = await screen.findByRole("alert");
+  expect(warning.textContent).toContain("Missing indices: 2");
 });

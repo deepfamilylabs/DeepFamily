@@ -1,26 +1,11 @@
 import { UnsupportedStoryRecord } from "../../../shared/ui/UnsupportedStoryRecord";
 import type React from "react";
 import type { TFunction } from "i18next";
-import { useEffect, useRef, useState } from "react";
-import {
-  Book,
-  FileText,
-  ChevronDown,
-  ChevronRight,
-  Layers,
-  AlertCircle,
-  Edit2,
-  Check,
-} from "lucide-react";
-import {
-  NodeData,
-  StoryRecord,
-  isMinted,
-  isMetadataUnlockUsable,
-  formatUnixSeconds,
-} from "../../../shared/model";
+import { Book, FileText, Layers, AlertCircle, Edit2, Check } from "lucide-react";
+import { NodeData, StoryRecord, isMinted, isMetadataUnlockUsable } from "../../../shared/model";
 import { CopyIconButton, MODAL_CARD, MODAL_CHIP, ModalSectionHeading } from "../../../shared/ui";
-import { getRecordTypeIcon, getRecordTypeColorClass } from "../config/recordTypes";
+import type { StoryRecordOrder } from "../config/recordTypeGroups";
+import { StoryRecordOrderToggle, StoryRecordTimeline } from "./StoryRecordTimeline";
 
 export interface StoryData {
   records: StoryRecord[];
@@ -301,68 +286,93 @@ function StoryViewToggle({
   );
 }
 
+/**
+ * Edit or seal status, and integrity only when it fails.
+ *
+ * Every record shown was already verified byte-for-byte as it was read, so a
+ * standing "verified" badge said nothing on the ordinary day. What is worth
+ * saying is the other case — the list itself is incomplete, the sizes do not add
+ * up, or the recomputed record-chain head disagrees with the chain — and that is
+ * said the way the person page says it.
+ */
 function StoryIntegritySection({
   t,
   person,
   canEditStory,
-  recordsCount,
   storyData,
-  integrityOk,
 }: {
   t: PersonStoryT;
   person: NodeData;
   canEditStory: boolean;
-  recordsCount: number;
   storyData: StoryData;
-  integrityOk: boolean;
 }) {
+  const sealed = Boolean(person.storyMetadata?.isSealed);
+  const editable = !sealed && canEditStory && Boolean(person.tokenId);
+  const integrity = storyData.integrity;
+  const hasIssues =
+    !storyData.loading &&
+    !storyData.integrityChecking &&
+    Number(person.storyMetadata?.totalRecords ?? 0) > 0 &&
+    Boolean(integrity) &&
+    (integrity.missing.length > 0 || !integrity.lengthMatch || integrity.hashMatch === false);
+
+  if (!sealed && !editable && !hasIssues) return null;
+
   return (
-    <div className="flex items-center justify-between gap-2 flex-wrap min-h-[32px]">
-      <div>
-        {person.storyMetadata?.isSealed ? (
+    <>
+      {sealed ? (
+        <div>
           <span className={`${MODAL_CHIP} border-info/25 bg-info/10 text-info`}>
             <Check size={12} strokeWidth={3} />
             {t("person.sealed", "Sealed")}
           </span>
-        ) : (
-          canEditStory &&
-          person.tokenId && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!person.tokenId || !canEditStory) return;
-                window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer");
-              }}
-              className={`group ${MODAL_CHIP} border-success/25 bg-success/10 text-success transition-colors hover:bg-success/15`}
-            >
-              <Edit2 size={12} className="group-hover:scale-110 transition-transform" />
-              {t("person.editable", "Editable")}
-            </button>
-          )
-        )}
-      </div>
-      {recordsCount > 0 &&
-        !storyData.loading &&
-        (storyData.integrityChecking ? (
-          <span className={`${MODAL_CHIP} border-hairline bg-surface-alt text-ink-muted`}>
-            <div className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
-            {t("storyRecordsModal.integrityChecking", "Checking...")}
-          </span>
-        ) : (
-          storyData.integrity &&
-          (integrityOk ? (
-            <span className={`${MODAL_CHIP} border-success/25 bg-success/10 text-success`}>
-              <Check size={12} strokeWidth={3} />
-              {t("storyRecordsModal.integrityVerified", "Integrity verified")}
+        </div>
+      ) : editable ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!person.tokenId || !canEditStory) return;
+              window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer");
+            }}
+            className={`group ${MODAL_CHIP} border-hairline-strong bg-surface text-ink transition-colors hover:border-primary hover:text-primary`}
+          >
+            <Edit2 size={12} className="group-hover:scale-110 transition-transform" />
+            {t("familyTree.nodeDetail.editStory", "Edit Story")}
+          </button>
+        </div>
+      ) : null}
+
+      {hasIssues && (
+        <div
+          role="alert"
+          className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning"
+        >
+          {integrity.missing.length > 0 && (
+            <span className="inline-flex items-start gap-1.5">
+              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+              {t("person.integrityMissing", "Missing indices: {{indices}}", {
+                indices: integrity.missing.join(","),
+              })}
             </span>
-          ) : (
-            <span className={`${MODAL_CHIP} border-warning/25 bg-warning/10 text-warning`}>
-              <AlertCircle size={12} />
-              {t("storyRecordsModal.integrityWarning", "Integrity failed")}
+          )}
+          {!integrity.lengthMatch && (
+            <span className="inline-flex items-start gap-1.5">
+              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+              {t("person.integrityLenDiff", "Length mismatch local={{local}} bytes", {
+                local: integrity.computedLength,
+              })}
             </span>
-          ))
-        ))}
-    </div>
+          )}
+          {integrity.hashMatch === false && (
+            <span className="inline-flex items-start gap-1.5">
+              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+              {t("person.integrityLocalHashMismatch", "Local hash mismatch")}
+            </span>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -412,177 +422,6 @@ function StoryFullTextPanel({ fullStory }: { fullStory: string }) {
   );
 }
 
-function StoryRecordCard({
-  t,
-  record,
-  isExpanded,
-  getRecordTypeLabel,
-  onToggle,
-  copyText,
-}: {
-  t: PersonStoryT;
-  record: StoryRecord;
-  isExpanded: boolean;
-  getRecordTypeLabel: (type: number | string | null | undefined) => string;
-  onToggle: (index: number) => void;
-  copyText: (text: string) => void;
-}) {
-  const preview =
-    record.content.length > 120 ? `${record.content.slice(0, 120)}...` : record.content;
-  const RecordIcon = getRecordTypeIcon(record.recordType);
-  const iconColor = getRecordTypeColorClass(record.recordType);
-  const copyLabel = t("common.copy", "Copy");
-
-  return (
-    <div
-      className={`group relative rounded-xl border bg-surface transition-colors ${
-        isExpanded ? "border-primary/40" : "border-hairline hover:border-hairline-strong"
-      }`}
-    >
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={isExpanded}
-        onClick={() => onToggle(record.recordIndex)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onToggle(record.recordIndex);
-          }
-        }}
-        className="w-full text-left p-4 cursor-pointer rounded-xl focus:outline-hidden focus:ring-3 focus:ring-primary/15"
-      >
-        <div className="flex items-start gap-4">
-          <div
-            className={`mt-0.5 p-1.5 rounded-full transition-colors ${
-              isExpanded ? "bg-primary/12 text-primary" : "bg-surface-muted text-ink-subtle"
-            }`}
-          >
-            {isExpanded ? (
-              <ChevronDown size={16} strokeWidth={2.5} />
-            ) : (
-              <ChevronRight size={16} strokeWidth={2.5} />
-            )}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            {record.title?.trim() && (
-              <h4 className="mb-2 break-words font-semibold text-ink">{record.title}</h4>
-            )}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-ink"}`}
-                >
-                  {t("person.recordOrdinal", "No. {{index}}", {
-                    index: record.displayIndex ?? record.recordIndex + 1,
-                  })}
-                </span>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-hairline shadow-xs">
-                  <RecordIcon size={12} className={iconColor} />
-                  <span
-                    className={`text-[10px] uppercase font-bold tracking-wider ${iconColor.replace("text-", "text-opacity-80 text-")}`}
-                  >
-                    {getRecordTypeLabel(record.recordType)}
-                  </span>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-ink-subtle bg-surface-muted px-2 py-0.5 rounded-full uppercase tracking-wider">
-                {record.content.length} {t("storyRecordsModal.characters", "chars")}
-              </span>
-            </div>
-
-            <div
-              className={`text-sm leading-relaxed ${isExpanded ? "text-ink whitespace-pre-wrap" : "text-ink-muted line-clamp-2"}`}
-            >
-              {record.unsupportedSchema ? (
-                <UnsupportedStoryRecord record={record} />
-              ) : isExpanded ? (
-                record.content
-              ) : (
-                preview
-              )}
-            </div>
-
-            {isExpanded && (
-              <div
-                className="mt-4 border-t border-hairline divide-y divide-hairline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <RecordRow
-                  inset={false}
-                  label={t("storyRecordsModal.author", "Author")}
-                  value={record.author || "-"}
-                  copy={record.author || undefined}
-                  copyLabel={copyLabel}
-                  onCopy={copyText}
-                />
-                <RecordRow
-                  inset={false}
-                  label={t("familyTree.nodeDetail.timestamp", "Timestamp")}
-                  value={formatUnixSeconds(record.timestamp)}
-                  copyLabel={copyLabel}
-                  onCopy={copyText}
-                />
-                {record.attachmentCID && record.attachmentCID.trim().length > 0 && (
-                  <RecordRow
-                    inset={false}
-                    label={t("storyRecordsModal.attachment", "Attachment")}
-                    value={record.attachmentCID}
-                    copy={record.attachmentCID}
-                    copyLabel={copyLabel}
-                    onCopy={copyText}
-                  />
-                )}
-                <RecordRow
-                  inset={false}
-                  label={t("storyRecordsModal.payloadHash", "Record Hash")}
-                  value={record.payloadHash}
-                  copy={record.payloadHash}
-                  copyLabel={copyLabel}
-                  onCopy={copyText}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StoryRecordList({
-  t,
-  records,
-  expandedRecords,
-  getRecordTypeLabel,
-  onToggleRecord,
-  copyText,
-}: {
-  t: PersonStoryT;
-  records: StoryRecord[];
-  expandedRecords: Set<number>;
-  getRecordTypeLabel: (type: number | string | null | undefined) => string;
-  onToggleRecord: (index: number) => void;
-  copyText: (text: string) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      {records.map((record) => (
-        <StoryRecordCard
-          key={record.recordIndex}
-          t={t}
-          record={record}
-          isExpanded={expandedRecords.has(record.recordIndex)}
-          getRecordTypeLabel={getRecordTypeLabel}
-          onToggle={onToggleRecord}
-          copyText={copyText}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function DetailedStorySection({
   t,
   person,
@@ -590,11 +429,12 @@ export function DetailedStorySection({
   storyData,
   recordsCount,
   lengthBytes,
-  integrityOk,
   viewMode,
+  recordOrder,
   expandedRecords,
   personHasDetailedStory,
   onViewModeChange,
+  onRecordOrderChange,
   onToggleRecord,
   getRecordTypeLabel,
   copyText,
@@ -605,11 +445,12 @@ export function DetailedStorySection({
   storyData: StoryData;
   recordsCount: number;
   lengthBytes: number;
-  integrityOk: boolean;
   viewMode: "records" | "full";
+  recordOrder: StoryRecordOrder;
   expandedRecords: Set<number>;
   personHasDetailedStory: boolean;
   onViewModeChange: (mode: "records" | "full") => void;
+  onRecordOrderChange: (next: StoryRecordOrder) => void;
   onToggleRecord: (index: number) => void;
   getRecordTypeLabel: (type: number | string | null | undefined) => string;
   copyText: (text: string) => void;
@@ -646,17 +487,20 @@ export function DetailedStorySection({
         t={t}
         person={person}
         canEditStory={canEditStory}
-        recordsCount={recordsCount}
         storyData={storyData}
-        integrityOk={integrityOk}
       />
+
+      {/* Applies to both views: the full text is the records joined in this order. */}
+      {!storyData.loading && !storyData.error && storyData.records.length > 1 && (
+        <StoryRecordOrderToggle t={t} value={recordOrder} onChange={onRecordOrderChange} />
+      )}
 
       {storyData.loading ? (
         <StoryLoadingState t={t} />
       ) : storyData.error ? (
         <StoryErrorState error={storyData.error} />
       ) : viewMode === "records" && storyData.records.length > 0 ? (
-        <StoryRecordList
+        <StoryRecordTimeline
           t={t}
           records={storyData.records}
           expandedRecords={expandedRecords}

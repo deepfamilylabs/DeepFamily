@@ -1,4 +1,5 @@
 export * from "./config/recordTypes";
+export * from "./config/recordTypeGroups";
 export { createPersonReadGateway } from "./api/personReadGateway";
 export type {
   DetailQueryOptions,
@@ -44,6 +45,14 @@ export {
 } from "./ui/PersonHashCalculator";
 export { default as EndorseCompactModal } from "./ui/EndorseCompactModal";
 export { default as PersonStoryCard } from "./ui/PersonStoryCard";
+export {
+  STORY_SPINE_MARKER,
+  StoryRecordOrderToggle,
+  StoryRecordTimeline,
+  StoryTimelineEntry,
+  type StoryTimelineEntryProps,
+} from "./ui/StoryRecordTimeline";
+export { useStoryRecordOrder } from "./ui/useStoryRecordOrder";
 export { default as SecureKeyDerivation } from "./ui/SecureKeyDerivation";
 export { default as PersonStoryModal } from "./ui/PersonStoryModal";
 

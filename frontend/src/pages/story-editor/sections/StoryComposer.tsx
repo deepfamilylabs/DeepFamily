@@ -1,7 +1,7 @@
 import { useId, useMemo } from "react";
 import { Check, ChevronDown, FileText, HelpCircle, Link2, Save } from "lucide-react";
 import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
-import { groupRecordTypeOptions } from "../model/recordTypeGroups";
+import { groupRecordTypeOptions } from "../../../domains/person";
 import {
   STORY_MAX_ATTACHMENT_BYTES,
   getByteLength,
@@ -223,7 +223,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           onChange={(event) => form.updateTitle(event.target.value)}
           disabled={editor.submitting}
           placeholder={t("storyRecordEditor.recordTitlePlaceholder", "Title (optional)")}
-          className="w-full border-x-0 border-t-0 border-b border-hairline bg-transparent px-0 pb-2.5 text-base font-semibold text-ink placeholder:text-ink-subtle focus:border-primary focus:ring-0 disabled:opacity-60"
+          className="w-full border-x-0 border-t-0 border-b border-hairline bg-transparent px-0 pb-2.5 text-lg font-bold text-ink placeholder:text-ink-subtle focus:border-primary focus:ring-0 disabled:opacity-60"
         />
 
         <textarea

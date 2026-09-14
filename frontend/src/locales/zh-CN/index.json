@@ -826,7 +826,7 @@
     "language": "语言"
   },
   "storyEditor": {
-    "title": "传记编辑器"
+    "title": "档案编辑器"
   },
   "storyRecordEditor": {
     "titleWithName": "{{name}}的人物资料",
@@ -954,7 +954,6 @@
     "totalRecords": "总记录数",
     "totalPayloadLength": "总载荷字节数",
     "lastUpdate": "最后更新",
-    "editable": "可编辑",
     "recordsHead": "记录链头",
     "owner": "所有者地址",
     "basicInfo": "基础信息",
@@ -1042,18 +1041,11 @@
     "detailedStory": "详细资料",
     "records": "资料记录",
     "fullText": "全文",
-    "integrityChecking": "正在检查完整性...",
-    "integrityVerified": "传记完整性已验证",
-    "integrityWarning": "检测到传记完整性问题",
     "loading": "加载传记记录中...",
-    "characters": "个字符",
     "noStoryData": "暂无资料数据",
     "basicStory": "简介",
     "noStory": "暂无资料内容",
     "peopleEncyclopedia": "人物百科",
-    "author": "作者",
-    "payloadHash": "载荷哈希",
-    "attachment": "附件",
     "biographyTitle": "人物简介"
   },
   "actions": {

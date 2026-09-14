@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { User, BookOpen, Star } from "lucide-react";
 import EndorseCompactModal from "./EndorseCompactModal";
+import { useStoryRecordOrder } from "./useStoryRecordOrder";
+import { sortRecordsForReading } from "../config/recordTypeGroups";
 import {
   NodeData,
   hasDetailedStory as hasDetailedStoryFn,
@@ -63,6 +65,7 @@ export default function PersonStoryModal({
 
   const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<"records" | "full">("records");
+  const [recordOrder, setRecordOrder] = useStoryRecordOrder();
   const [entered, setEntered] = useState(false);
   const [owner, setOwner] = useState<string | undefined>(person.owner);
   const [showEndorseModal, setShowEndorseModal] = useState(false);
@@ -100,24 +103,25 @@ export default function PersonStoryModal({
     () => getStoryPresentation(storyData.records, person.storyMetadata),
     [storyData.records, person.storyMetadata],
   );
+  // Records and full text follow the viewer's order — the same choice, and the
+  // same remembered preference, as the story editor.
+  const orderedRecords = useMemo(
+    () =>
+      recordOrder === "reading"
+        ? sortRecordsForReading(presentation.records)
+        : presentation.records,
+    [presentation.records, recordOrder],
+  );
   const presentedStoryData = {
     ...storyData,
-    records: presentation.records,
-    fullStory: presentation.fullStory,
+    records: orderedRecords,
+    fullStory: orderedRecords.map((record) => record.content).join(""),
   };
   const biography = presentation.biography;
   const basicStory =
     biography && !biography.unsupportedSchema ? biography.content : person.nftPublicStory;
   const recordsCount = presentation.totalRecords;
   const lengthBytes = presentation.totalPayloadLength;
-  const integrityOk = useMemo(
-    () =>
-      !!storyData.integrity &&
-      storyData.integrity.missing.length === 0 &&
-      storyData.integrity.lengthMatch &&
-      storyData.integrity.hashMatch === true,
-    [storyData.integrity],
-  );
 
   // Format dates
   const formatDate = useMemo(
@@ -440,8 +444,9 @@ export default function PersonStoryModal({
               storyData={presentedStoryData}
               recordsCount={recordsCount}
               lengthBytes={lengthBytes}
-              integrityOk={integrityOk}
               viewMode={viewMode}
+              recordOrder={recordOrder}
+              onRecordOrderChange={setRecordOrder}
               expandedRecords={expandedRecords}
               personHasDetailedStory={personHasDetailedStory}
               onViewModeChange={setViewMode}

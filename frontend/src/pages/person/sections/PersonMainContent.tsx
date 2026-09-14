@@ -321,7 +321,9 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
                       className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed"
                     >
                       {record.title?.trim() && (
-                        <h5 className="mb-1 break-words font-semibold">{record.title}</h5>
+                        <h5 className="mb-1 break-words text-base font-bold leading-snug text-gray-900 sm:text-lg dark:text-gray-100">
+                          {record.title}
+                        </h5>
                       )}
                       <p className="whitespace-pre-wrap">{record.content}</p>
                     </div>
