@@ -7,6 +7,7 @@ import {
   useNFTDetails,
   useStoryData,
   useNftStoryAccess,
+  useStoryRecordOrder,
 } from "../../../domains/person";
 import { useAddStoryRecordFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
@@ -20,11 +21,7 @@ import {
 } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import { segmentManuscript } from "../model/manuscriptSegments";
-import {
-  buildStoryOutline,
-  sortRecordsForReading,
-  type StoryRecordOrder,
-} from "../model/storyOutline";
+import { buildStoryOutline, sortRecordsForReading } from "../model/storyOutline";
 import {
   buildNodeDetailsFromNft,
   computeStoryPayloadHash,
@@ -46,17 +43,6 @@ import {
 } from "../model/storyEditorModel";
 
 import type { ArchiveTransactionPreview } from "../../../domains/transactions";
-
-const RECORD_ORDER_STORAGE_KEY = "df-story-editor-record-order";
-
-/** A per-viewer preference; storage can be missing or refuse, so never trust it. */
-function readStoredRecordOrder(): StoryRecordOrder {
-  try {
-    return localStorage.getItem(RECORD_ORDER_STORAGE_KEY) === "written" ? "written" : "reading";
-  } catch {
-    return "reading";
-  }
-}
 
 export function useStoryEditorController() {
   const { tokenId } = useParams<{ tokenId: string }>();
@@ -163,15 +149,8 @@ export function useStoryEditorController() {
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null);
   const [showRecordTypeDropdown, setShowRecordTypeDropdown] = useState(false);
   const [runExpanded, setRunExpanded] = useState(false);
-  const [recordOrder, setRecordOrderState] = useState<StoryRecordOrder>(readStoredRecordOrder);
-  const setRecordOrder = useCallback((next: StoryRecordOrder) => {
-    setRecordOrderState(next);
-    try {
-      localStorage.setItem(RECORD_ORDER_STORAGE_KEY, next);
-    } catch {
-      // Remembering the choice is a convenience; the switch itself still works.
-    }
-  }, []);
+  // Shared with the person story modal: one remembered choice for both.
+  const [recordOrder, setRecordOrder] = useStoryRecordOrder();
   const [showRecordTypeHelp, setShowRecordTypeHelp] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);

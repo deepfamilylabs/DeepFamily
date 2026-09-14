@@ -47,6 +47,8 @@ vi.mock("../domains/tree", () => ({
     rootId: mocks.graphNodeIds[0] ?? null,
     rootExists: mocks.graphNodeIds.length > 0,
     nodesData: mocks.nodesData,
+    reachableNodeIds: mocks.graphNodeIds,
+    endorsementsReady: (mocks as { endorsementsReady?: boolean }).endorsementsReady ?? true,
   }),
   useTreeStatus: () => ({
     loading: mocks.loading,
@@ -178,6 +180,7 @@ describe("PeoplePage", () => {
     mocks.graphNodeDepths = {};
     mocks.loading = false;
     (mocks as { settled?: boolean }).settled = true;
+    (mocks as { endorsementsReady?: boolean }).endorsementsReady = true;
     mocks.treeErrors = [];
     mocks.contractMessage = "";
     mocks.treeRefresh.mockReset();
@@ -245,6 +248,36 @@ describe("PeoplePage", () => {
   it("shows 'No stories found' once the settled tree really has no people", async () => {
     mocks.nodesData = {};
     mocks.graphNodeIds = [];
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByText("No stories found")).toBeTruthy());
+  });
+
+  it("keeps the skeleton while enrichment runs and no one is known to be minted yet", () => {
+    // The build is done but tokenIds have not arrived: that is not "no people".
+    const pending = makePerson({ personHash: "0xpending", tokenId: "0", fullName: undefined });
+    mocks.nodesData = { [pending.id]: pending };
+    mocks.graphNodeIds = [pending.id];
+    (mocks as { endorsementsReady?: boolean }).endorsementsReady = false;
+
+    renderPeoplePage();
+
+    expect(screen.queryByText("No stories found")).toBeNull();
+  });
+
+  it("shows the list as soon as the first minted people arrive, before enrichment finishes", async () => {
+    (mocks as { endorsementsReady?: boolean }).endorsementsReady = false;
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByTestId("person-card-7")).toBeTruthy());
+  });
+
+  it("shows 'No stories found' once enrichment finishes and still no one is minted", async () => {
+    const pending = makePerson({ personHash: "0xpending", tokenId: "0", fullName: undefined });
+    mocks.nodesData = { [pending.id]: pending };
+    mocks.graphNodeIds = [pending.id];
 
     renderPeoplePage();
 

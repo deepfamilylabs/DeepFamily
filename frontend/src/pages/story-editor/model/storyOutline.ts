@@ -13,10 +13,14 @@
  * the end, where the chain will append it, when following the order written.
  */
 
+import {
+  compareRecordsForReading,
+  getRecordTypeGroup,
+  type StoryRecordOrder,
+} from "../../../domains/person";
 import { getStoryRecordTitle } from "../../../shared/model/storyPresentation";
-import { RECORD_TYPE_GROUPS, getRecordTypeGroup } from "./recordTypeGroups";
 
-export type StoryRecordOrder = "reading" | "written";
+export { sortRecordsForReading, type StoryRecordOrder } from "../../../domains/person";
 
 export interface OutlineRecordInput {
   title?: string;
@@ -55,32 +59,6 @@ export type StoryOutlineItem =
       label: string;
     };
 
-/** Position of a type's group in reading order; types outside the taxonomy read last. */
-function groupRank(recordType: number): number {
-  const group = getRecordTypeGroup(recordType);
-  return group ? RECORD_TYPE_GROUPS.indexOf(group) : RECORD_TYPE_GROUPS.length;
-}
-
-function compareForReading(
-  a: { recordType: number },
-  aOrder: number,
-  b: { recordType: number },
-  bOrder: number,
-): number {
-  return (
-    groupRank(a.recordType) - groupRank(b.recordType) ||
-    a.recordType - b.recordType ||
-    aOrder - bOrder
-  );
-}
-
-/** Records in the order the published profile reads them. */
-export function sortRecordsForReading<T extends { recordType: number; recordIndex: number }>(
-  records: readonly T[],
-): T[] {
-  return [...records].sort((a, b) => compareForReading(a, a.recordIndex, b, b.recordIndex));
-}
-
 export function buildStoryOutline(
   records: readonly OutlineRecordInput[],
   getRecordTypeLabel: (value: number) => string,
@@ -101,7 +79,7 @@ export function buildStoryOutline(
   if (draft) entries.push({ draft: true, record: draft, order: Number.POSITIVE_INFINITY });
 
   if (order === "reading") {
-    entries.sort((a, b) => compareForReading(a.record, a.order, b.record, b.order));
+    entries.sort((a, b) => compareRecordsForReading(a.record, a.order, b.record, b.order));
   }
 
   const items: StoryOutlineItem[] = [];

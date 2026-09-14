@@ -32,12 +32,11 @@ import {
 } from "../model/peoplePageModel";
 
 export function usePeoplePageController() {
-  const { nodesData } = useTreeGraphData();
+  const { nodesData, reachableNodeIds, endorsementsReady } = useTreeGraphData();
   const { loading: building, settled, contractMessage, refresh } = useTreeStatus();
   // Not done until the tree has a result. `building` is false before the first build
-  // starts and right after caches are cleared; reading that as final showed "no
-  // people" between the skeleton and the list.
-  const loading = building || !settled;
+  // starts; reading that as final showed "no people" between the skeleton and the list.
+  const treeLoading = building || !settled;
   const [projectionEnabled, setProjectionEnabled] = useState(false);
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();
@@ -108,6 +107,13 @@ export function usePeoplePageController() {
     () => selectProjectedMintedPeople(graph.nodes, nodesData),
     [graph.nodes, nodesData],
   );
+
+  // The build lays the tree out before anyone is known to be minted: tokenIds come
+  // with the enrichment batches that follow it. Until the first minted person lands,
+  // an empty list means "still reading", not "no people". Once one has, the list
+  // shows and the remaining batches append to it.
+  const enriching = reachableNodeIds.length > 0 && !endorsementsReady;
+  const loading = treeLoading || (enriching && people.length === 0);
 
   const projectedLookup = useMemo(() => createProjectedPeopleLookup(people), [people]);
 

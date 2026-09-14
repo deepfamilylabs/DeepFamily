@@ -98,7 +98,7 @@ function RecordListItem({ record, person }: { record: StoryRecord; person: Perso
         </span>
         <div className="flex-1 min-w-0">
           {record.title?.trim() && (
-            <h4 className="mb-1 break-words text-sm font-semibold text-ink">{record.title}</h4>
+            <h4 className="mb-1 break-words text-sm font-bold text-ink">{record.title}</h4>
           )}
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">

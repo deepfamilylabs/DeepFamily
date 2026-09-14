@@ -4,10 +4,11 @@
  * The 19 editable record types fall into seven reading-order groups. The help
  * dialog has always described them; the Contents outline and the composer's tag
  * picker now show them directly, so the grouping lives here rather than being
- * spelled out again in each surface.
+ * spelled out again in each surface. Reading order is derived from it too, so the
+ * editor and the person story modal list records the same way.
  */
 
-import type { RecordTypeOption } from "../../../domains/person";
+import type { RecordTypeOption } from "./recordTypes";
 
 export interface RecordTypeGroup {
   id: string;
@@ -122,4 +123,38 @@ export function groupRecordTypeOptions(
   }
 
   return grouped;
+}
+
+/** Which order a profile's records are listed in. */
+export type StoryRecordOrder = "reading" | "written";
+
+/** Position of a type's group in reading order; types outside the taxonomy read last. */
+function readingGroupRank(recordType: number): number {
+  const group = getRecordTypeGroup(recordType);
+  return group ? RECORD_TYPE_GROUPS.indexOf(group) : RECORD_TYPE_GROUPS.length;
+}
+
+/**
+ * Reading order: how the published profile presents records — by taxonomy group,
+ * then by type, then by the order the chain holds them (`aOrder` / `bOrder`,
+ * normally the record index).
+ */
+export function compareRecordsForReading(
+  a: { recordType: number },
+  aOrder: number,
+  b: { recordType: number },
+  bOrder: number,
+): number {
+  return (
+    readingGroupRank(a.recordType) - readingGroupRank(b.recordType) ||
+    a.recordType - b.recordType ||
+    aOrder - bOrder
+  );
+}
+
+/** A copy of the records in reading order; the input keeps its chain order. */
+export function sortRecordsForReading<T extends { recordType: number; recordIndex: number }>(
+  records: readonly T[],
+): T[] {
+  return [...records].sort((a, b) => compareRecordsForReading(a, a.recordIndex, b, b.recordIndex));
 }

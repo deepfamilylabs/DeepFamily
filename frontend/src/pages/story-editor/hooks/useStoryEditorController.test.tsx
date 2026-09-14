@@ -46,7 +46,10 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: mocks.t }) }));
 vi.mock("../../../domains/config", () => ({
   useConfig: () => ({ rpcUrl: "http://localhost:8545", chainId: 31337, contractAddress: "0xabc" }),
 }));
-vi.mock("../../../domains/person", () => ({
+vi.mock("../../../domains/person", async (importOriginal) => ({
+  // The real module for everything else — record grouping, reading order and the
+  // shared order preference are part of what these tests exercise.
+  ...(await importOriginal<typeof import("../../../domains/person")>()),
   useNftStoryAccess: () => mocks.access,
   useNFTDetails: () => ({ data: undefined }),
   useStoryData: () => mocks.storyQuery,
