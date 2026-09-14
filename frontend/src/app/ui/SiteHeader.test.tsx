@@ -138,7 +138,10 @@ describe("SiteHeader", () => {
     // Below md the rail is off-canvas, so the brand belongs to the header again.
     const brand = screen.getByTestId("logo").closest("div");
     expect(brand?.className).toContain("md:hidden");
+    expect(brand?.className).toContain("shrink-0");
     expect(screen.getByText("Deepfamily")).toBeTruthy();
+    // The narrowest phones keep the mark and let the wordmark go.
+    expect(screen.getByText("Deepfamily").parentElement?.className).toContain("max-[359px]:hidden");
 
     const trigger = screen.getByLabelText("Open menu");
     expect(trigger.getAttribute("aria-controls")).toBe("global-sidebar");

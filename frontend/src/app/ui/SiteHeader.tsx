@@ -18,7 +18,11 @@ import { useActivePath, useSidebar } from "../context";
  * and the wallet. Full-bleed like the status bar — chrome hugs the viewport,
  * only page content is centred — which keeps the search box beside the rail.
  * Below `md` the rail is off-canvas, so the brand and the drawer trigger come
- * back here, and search shrinks to an icon that opens /search.
+ * back here, and search shrinks to an icon that opens /search. On a phone the
+ * wallet control is an icon whether connected or not, so the header's width
+ * does not depend on the wallet; only the narrowest phones (below 360px) let
+ * the wordmark step aside for the mark alone, and the wallet slot is the one
+ * that gives way, so the header never runs off the edge.
  */
 
 /** The environment badge (TESTNET, DEMO, …) stays visible at every breakpoint. */
@@ -71,7 +75,7 @@ const SiteHeader = memo(() => {
     >
       <div className="h-16 flex items-center justify-between gap-4 px-4 sm:px-6">
         {/* Mobile: the drawer trigger and the brand, which the rail owns on desktop */}
-        <div className="flex items-center md:hidden">
+        <div className="flex shrink-0 items-center md:hidden">
           <button
             type="button"
             onClick={toggleMobileSidebar}
@@ -88,7 +92,7 @@ const SiteHeader = memo(() => {
             onClick={() => handleNavClick("/")}
           >
             <Logo className="w-7 h-7 shrink-0 text-orange-500 transition-transform duration-300 group-hover:-rotate-90" />
-            <div className="inline-flex items-baseline gap-1">
+            <div className="inline-flex items-baseline gap-1 max-[359px]:hidden">
               <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
                 Deepfamily
               </span>
@@ -116,7 +120,7 @@ const SiteHeader = memo(() => {
         </form>
 
         {/* Right Side Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center justify-end gap-2">
           {/* Mobile: no room for the search box, so the page takes the query */}
           <Link
             to="/search"
