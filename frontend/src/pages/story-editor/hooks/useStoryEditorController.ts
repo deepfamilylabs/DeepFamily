@@ -20,7 +20,11 @@ import {
 } from "../../../shared/model";
 import { useToast } from "../../../shared/ui";
 import { segmentManuscript } from "../model/manuscriptSegments";
-import { buildStoryOutline } from "../model/storyOutline";
+import {
+  buildStoryOutline,
+  sortRecordsForReading,
+  type StoryRecordOrder,
+} from "../model/storyOutline";
 import {
   buildNodeDetailsFromNft,
   computeStoryPayloadHash,
@@ -30,6 +34,7 @@ import {
   getValidTokenId,
   initialRecordFormData,
   isRecordFormDirty,
+  isStaleStoryError,
   mapStorySealError,
   mapStorySubmitError,
   normalizeStoryRecords,
@@ -41,6 +46,17 @@ import {
 } from "../model/storyEditorModel";
 
 import type { ArchiveTransactionPreview } from "../../../domains/transactions";
+
+const RECORD_ORDER_STORAGE_KEY = "df-story-editor-record-order";
+
+/** A per-viewer preference; storage can be missing or refuse, so never trust it. */
+function readStoredRecordOrder(): StoryRecordOrder {
+  try {
+    return localStorage.getItem(RECORD_ORDER_STORAGE_KEY) === "written" ? "written" : "reading";
+  } catch {
+    return "reading";
+  }
+}
 
 export function useStoryEditorController() {
   const { tokenId } = useParams<{ tokenId: string }>();
@@ -135,13 +151,27 @@ export function useStoryEditorController() {
     void resolveTransactionPreview(false);
     setShowSealConfirm(false);
   }, [accessScope, resolveTransactionPreview]);
-  const [localError, setLocalError] = useState<string | null>(null);
+  // A failure is reported beside the control that caused it: appending at the
+  // composer's button, sealing on the seal card. The page-level banner is left
+  // to what is genuinely page-level — the story failing to load at all — because
+  // it sits at the top of a long manuscript, out of sight of both buttons.
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [sealError, setSealError] = useState<string | null>(null);
   const [showSealConfirm, setShowSealConfirm] = useState(false);
   const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
   const [personName, setPersonName] = useState<string | null>(prefetched?.fullName || null);
   const [nodeDetails, setNodeDetails] = useState<NodeData | null>(null);
   const [showRecordTypeDropdown, setShowRecordTypeDropdown] = useState(false);
   const [runExpanded, setRunExpanded] = useState(false);
+  const [recordOrder, setRecordOrderState] = useState<StoryRecordOrder>(readStoredRecordOrder);
+  const setRecordOrder = useCallback((next: StoryRecordOrder) => {
+    setRecordOrderState(next);
+    try {
+      localStorage.setItem(RECORD_ORDER_STORAGE_KEY, next);
+    } catch {
+      // Remembering the choice is a convenience; the switch itself still works.
+    }
+  }, []);
   const [showRecordTypeHelp, setShowRecordTypeHelp] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -287,21 +317,46 @@ export function useStoryEditorController() {
   }, [nftQuery.data, validTokenId]);
 
   const sortedRecords = presentation.records;
+  // The manuscript and Contents list records in the order the writer picked;
+  // sortedRecords stays in chain order for everything that counts or indexes.
+  const orderedRecords = useMemo(
+    () => (recordOrder === "reading" ? sortRecordsForReading(sortedRecords) : sortedRecords),
+    [recordOrder, sortedRecords],
+  );
   const isSealed = meta?.isSealed || access.isSealed || false;
   const canEdit =
     access.canEdit && Boolean(meta) && !isSealed && !storyQuery.loading && !storyQuery.error;
 
-  // Contents outline for the left column, and the number the composer's draft
-  // will take once it is written.
-  const outline = useMemo(
-    () => buildStoryOutline(sortedRecords, getRecordTypeLabel, t as never),
-    [sortedRecords, getRecordTypeLabel, t],
-  );
+  // The number the composer's draft will take once it is written, and the
+  // Contents outline — in reading order, with the draft placed in its group.
   const draftDisplayIndex = presentation.totalRecords + 1;
+  const outline = useMemo(
+    () =>
+      buildStoryOutline(sortedRecords, getRecordTypeLabel, t as never, {
+        order: recordOrder,
+        draft: canEdit
+          ? {
+              title: formData.title,
+              recordType: formData.recordType,
+              displayIndex: draftDisplayIndex,
+            }
+          : null,
+      }),
+    [
+      sortedRecords,
+      getRecordTypeLabel,
+      t,
+      recordOrder,
+      canEdit,
+      formData.title,
+      formData.recordType,
+      draftDisplayIndex,
+    ],
+  );
 
   // Long manuscripts fold their middle; Contents still lists every record, so a
   // jump into a folded entry has to open the fold before it can scroll.
-  const segments = useMemo(() => segmentManuscript(sortedRecords), [sortedRecords]);
+  const segments = useMemo(() => segmentManuscript(orderedRecords), [orderedRecords]);
   const collapsedIndexes = useMemo(
     () => new Set(segments.collapsed.map((record) => record.recordIndex)),
     [segments.collapsed],
@@ -318,7 +373,7 @@ export function useStoryEditorController() {
 
   const handleCancelEdit = useCallback(() => {
     setFormData(initialRecordFormData);
-    setLocalError(null);
+    setSubmitError(null);
   }, []);
 
   const toggleRecordExpansion = useCallback((recordIndex: number) => {
@@ -350,8 +405,11 @@ export function useStoryEditorController() {
     setShowRecordTypeDropdown(false);
   }, []);
 
+  // A CID never contains whitespace, and the archive rejects a padded one — so
+  // a pasted trailing newline is trimmed here rather than left to fail at the
+  // signing step, which is the only place it would otherwise surface.
   const updateAttachmentCID = useCallback((attachmentCID: string) => {
-    setFormData((prev) => ({ ...prev, attachmentCID }));
+    setFormData((prev) => ({ ...prev, attachmentCID: attachmentCID.trim() }));
   }, []);
 
   const onAddRecord = useCallback(
@@ -398,7 +456,7 @@ export function useStoryEditorController() {
           toast.success(
             t(
               "storyRecordEditor.success.recordAdded",
-              "Record #{{index}} added successfully ({{bytes}} bytes)",
+              "Record No. {{index}} added successfully ({{bytes}} bytes)",
               {
                 index: getStoryPresentation(newRecords, newMeta).totalRecords,
                 bytes: result.events.StoryRecordAppended.payloadLength,
@@ -411,8 +469,8 @@ export function useStoryEditorController() {
           );
         }
       } catch (error) {
-        const message = mapStorySubmitError(error, t);
-        toast.error(message);
+        // Reported by the caller, at the composer. A toast here as well meant two
+        // tellings of one failure, in two wordings, from two sides of the screen.
         throw error;
       }
     },
@@ -471,8 +529,7 @@ export function useStoryEditorController() {
           );
         }
       } catch (error) {
-        const message = mapStorySealError(error, t);
-        toast.error(message);
+        // Reported by the caller, on the seal card. See onAddRecord.
         throw error;
       }
     },
@@ -495,7 +552,7 @@ export function useStoryEditorController() {
 
     const trimmedContent = formData.content.trim();
     if (!trimmedContent) {
-      setLocalError(t("storyRecordEditor.contentRequired", "Content cannot be empty"));
+      setSubmitError(t("storyRecordEditor.contentRequired", "Content cannot be empty"));
       return;
     }
     const attachment = formData.attachmentCID;
@@ -503,7 +560,7 @@ export function useStoryEditorController() {
       attachment !== attachment.trim() ||
       getByteLength(attachment) > STORY_MAX_ATTACHMENT_BYTES
     ) {
-      setLocalError(
+      setSubmitError(
         t(
           "archive.attachmentInvalid",
           "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
@@ -514,16 +571,16 @@ export function useStoryEditorController() {
 
     const recordTypeValue = Number(formData.recordType ?? 1);
     if (!Number.isInteger(recordTypeValue) || recordTypeValue < 1 || recordTypeValue > 255) {
-      setLocalError(t("storyRecordEditor.invalidRecordType", "Invalid record type"));
+      setSubmitError(t("storyRecordEditor.invalidRecordType", "Invalid record type"));
       return;
     }
 
     setSubmitting(true);
-    setLocalError(null);
+    setSubmitError(null);
 
     try {
       if (!(await access.recheck())) {
-        setLocalError(
+        setSubmitError(
           t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
         );
         return;
@@ -547,11 +604,43 @@ export function useStoryEditorController() {
 
       handleCancelEdit();
     } catch (error: any) {
-      setLocalError(mapStorySubmitError(error, t));
+      // The record index is read from a snapshot that can be minutes old — the
+      // story cache is served from IndexedDB for five minutes — so "the story
+      // changed" is usually just this page being behind, not a lost draft. Drop
+      // the snapshot and reload it so the next attempt lands on the real head,
+      // and say that, rather than asking for a refresh the writer already made.
+      if (isStaleStoryError(error)) {
+        if (validTokenId) {
+          scopedQueryClient.clear(storyKey(validTokenId));
+          scopedQueryClient.clear(`${storyKey(validTokenId)}:meta`);
+        }
+        // Revalidate in place: dropping the records to a spinner mid-write reads
+        // as the page reloading itself for no reason the writer can see.
+        storyQuery.refetch({ keepData: true });
+        setSubmitError(
+          t(
+            "storyRecordEditor.storyMovedOn",
+            "This profile gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
+          ),
+        );
+      } else {
+        setSubmitError(mapStorySubmitError(error, t));
+      }
     } finally {
       setSubmitting(false);
     }
-  }, [validTokenId, canEdit, access.recheck, formData, meta, onAddRecord, handleCancelEdit, t]);
+  }, [
+    validTokenId,
+    canEdit,
+    access.recheck,
+    formData,
+    meta,
+    onAddRecord,
+    handleCancelEdit,
+    scopedQueryClient,
+    storyQuery.refetch,
+    t,
+  ]);
 
   const handleSeal = useCallback(() => {
     if (!validTokenId || !canEdit) return;
@@ -562,10 +651,10 @@ export function useStoryEditorController() {
     if (!validTokenId || !canEdit) return;
     setShowSealConfirm(false);
     setSubmitting(true);
-    setLocalError(null);
+    setSealError(null);
     try {
       if (!(await access.recheck())) {
-        setLocalError(
+        setSealError(
           t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story."),
         );
         return;
@@ -573,7 +662,7 @@ export function useStoryEditorController() {
       await onSealStory(validTokenId);
       setShowSealConfirm(false);
     } catch (error: any) {
-      setLocalError(mapStorySealError(error, t));
+      setSealError(mapStorySealError(error, t));
       setShowSealConfirm(false);
     } finally {
       setSubmitting(false);
@@ -605,9 +694,9 @@ export function useStoryEditorController() {
                   "Unable to verify NFT ownership. Editing is unavailable until verification succeeds.",
                 )
               : t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story.");
-  const showError = Boolean(queryError || localError);
+  const showError = Boolean(queryError);
   const showEmptySealed = !loading && sortedRecords.length === 0 && !showError && isSealed;
-  const errorMessage = queryError || localError;
+  const errorMessage = queryError;
   const formByteLength = getByteLength(formData.title) + getByteLength(formData.content);
 
   return {
@@ -630,6 +719,7 @@ export function useStoryEditorController() {
     errorMessage,
     showEmptySealed,
     sortedRecords,
+    order: { value: recordOrder, set: setRecordOrder },
     manuscript: {
       head: segments.head,
       collapsed: segments.collapsed,
@@ -666,6 +756,7 @@ export function useStoryEditorController() {
       updateAttachmentCID,
       cancel: handleCancelEdit,
       submit: handleSubmit,
+      error: submitError,
       showRecordTypeDropdown,
       setShowRecordTypeDropdown,
       showRecordTypeHelp,
@@ -676,6 +767,7 @@ export function useStoryEditorController() {
       showConfirm: showSealConfirm,
       setShowConfirm: setShowSealConfirm,
       execute: executeSeal,
+      error: sealError,
     },
   };
 }

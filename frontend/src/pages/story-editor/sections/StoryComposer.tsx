@@ -2,7 +2,12 @@ import { useId, useMemo } from "react";
 import { Check, ChevronDown, FileText, HelpCircle, Link2, Save } from "lucide-react";
 import { useListboxA11y } from "../../../shared/ui/useListboxA11y";
 import { groupRecordTypeOptions } from "../model/recordTypeGroups";
-import { getByteMeterRatio, getByteMeterTone } from "../model/storyEditorModel";
+import {
+  STORY_MAX_ATTACHMENT_BYTES,
+  getByteLength,
+  getByteMeterRatio,
+  getByteMeterTone,
+} from "../model/storyEditorModel";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 const METER_TONE_CLASS: Record<string, string> = {
@@ -14,6 +19,12 @@ const METER_TONE_CLASS: Record<string, string> = {
 /**
  * The composer sits at the end of the manuscript: writing a record is composing
  * into the document rather than filling in a form beside it.
+ *
+ * So it is laid out as the record it will become. The meta line carries what a
+ * published entry carries — the index and the type tag — and title, body and
+ * attachment are typed straight onto the page below it in the type they will be
+ * read in, separated by rules that light up on focus rather than by three boxes
+ * of three different weights competing with the body text.
  *
  * The 19 tags open as an inline panel instead of a dropdown list — grouped by
  * the same taxonomy the help dialog describes, all visible at once, and never
@@ -30,6 +41,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   const recordTypeListboxId = useId();
   const contentByteStatusId = useId();
   const attachmentLabelId = useId();
+  const attachmentStatusId = useId();
 
   const selected = editor.recordTypeOptions.find((option) => option.value === form.data.recordType);
   const SelectedIcon = selected?.icon || FileText;
@@ -63,6 +75,11 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   const byteRatio = getByteMeterRatio(form.byteLength);
   const meterTone = getByteMeterTone(form.byteLength);
 
+  // The 256-byte ceiling is out of reach for a real CID, so it is worth no
+  // permanent counter — but when a draft does cross it, saying so at the field
+  // beats letting the signing step reject it.
+  const attachmentOverLimit = getByteLength(form.data.attachmentCID) > STORY_MAX_ATTACHMENT_BYTES;
+
   return (
     <section
       ref={editor.refs.formRef}
@@ -74,27 +91,17 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           a ref that covered only the trigger would unmount an option before its
           click could land. */}
       <div ref={editor.refs.recordTypeDropdownRef}>
-        <header className="flex flex-wrap items-center gap-3 border-b border-hairline px-4 py-3 sm:px-5">
+        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline px-4 py-3 sm:px-5">
           <h3 className="ui-heading text-[13.5px] text-ink">
             {t("storyRecordEditor.newRecord", "New record")}
           </h3>
-          <span className="font-mono text-[11px] text-ink-subtle">#{editor.draftDisplayIndex}</span>
+          <span className="text-[11px] text-ink-subtle">
+            {t("person.recordOrdinal", "No. {{index}}", { index: editor.draftDisplayIndex })}
+          </span>
           <span className="grow" />
-          <div className="w-full space-y-1.5">
-            <label htmlFor={titleId} className="block text-xs font-medium text-ink-muted">
-              {t("storyRecordEditor.recordTitleLabel", "Title (optional)")}
-            </label>
-            <input
-              id={titleId}
-              type="text"
-              value={form.data.title}
-              onChange={(event) => form.updateTitle(event.target.value)}
-              disabled={editor.submitting}
-              placeholder={t("storyRecordEditor.recordTitlePlaceholder", "Give this record a name")}
-              className="min-h-[42px] w-full rounded-xl border border-hairline bg-surface-alt px-3 text-base text-ink placeholder:text-ink-subtle focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-60"
-            />
-          </div>
 
+          {/* The tag sits where the published record wears it — on the meta line
+              beside the index, not below the title as a second form row. */}
           <div className="flex items-center gap-1.5">
             <span id={recordTypeLabelId} className="sr-only">
               {t("storyRecordEditor.recordTypeLabel", "Record Type")}
@@ -201,7 +208,24 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
         )}
       </div>
 
-      <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 sm:py-5">
+      {/* Title, body and attachment are the record itself, so they are typed
+          onto the page rather than into three boxes of three different weights:
+          one rule under the title, one over the attachment, each lighting up on
+          focus. Their type matches how the record will read once archived. */}
+      <div className="flex flex-col px-4 py-4 sm:px-5 sm:py-5">
+        <label htmlFor={titleId} className="sr-only">
+          {t("storyRecordEditor.recordTitleLabel", "Title (optional)")}
+        </label>
+        <input
+          id={titleId}
+          type="text"
+          value={form.data.title}
+          onChange={(event) => form.updateTitle(event.target.value)}
+          disabled={editor.submitting}
+          placeholder={t("storyRecordEditor.recordTitlePlaceholder", "Title (optional)")}
+          className="w-full border-x-0 border-t-0 border-b border-hairline bg-transparent px-0 pb-2.5 text-base font-semibold text-ink placeholder:text-ink-subtle focus:border-primary focus:ring-0 disabled:opacity-60"
+        />
+
         <textarea
           ref={editor.refs.textareaRef}
           value={form.data.content}
@@ -213,32 +237,62 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           disabled={editor.submitting}
           aria-invalid={false}
           aria-describedby={contentByteStatusId}
-          className="min-h-[132px] w-full resize-y rounded-2xl border-0 bg-transparent p-0 text-base leading-[1.85] text-ink placeholder:text-ink-subtle focus:ring-0 disabled:opacity-60"
+          className="mt-3.5 min-h-[152px] w-full resize-y border-0 bg-transparent p-0 text-[15.5px] leading-[1.8] text-ink placeholder:text-ink-subtle focus:ring-0 disabled:opacity-60"
         />
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span
-            id={attachmentLabelId}
-            className="text-[10.5px] font-bold uppercase tracking-[0.11em] text-ink-subtle"
-          >
+        <div
+          className={`mt-3 flex items-center gap-2 border-t pt-2.5 ${
+            attachmentOverLimit
+              ? "border-red-400 dark:border-red-500/70"
+              : "border-hairline focus-within:border-primary"
+          }`}
+        >
+          <Link2
+            size={13}
+            aria-hidden
+            className={`shrink-0 ${attachmentOverLimit ? "text-red-500 dark:text-red-400" : "text-ink-subtle"}`}
+          />
+          <span id={attachmentLabelId} className="sr-only">
             {t("storyRecordEditor.attachmentLabel", "Attachment CID (optional)")}
           </span>
-          <div className="flex min-w-[16rem] grow items-center gap-2 rounded-xl border border-hairline bg-surface-alt px-3 focus-within:border-hairline-strong">
-            <Link2 size={14} aria-hidden className="shrink-0 text-ink-subtle" />
-            <input
-              value={form.data.attachmentCID}
-              onChange={(event) => form.updateAttachmentCID(event.target.value)}
-              aria-labelledby={attachmentLabelId}
-              placeholder={t(
-                "storyRecordEditor.attachmentPlaceholder",
-                "CID (e.g. bafy...) or leave empty",
-              )}
-              disabled={editor.submitting}
-              className="min-h-[38px] w-full min-w-0 border-0 bg-transparent p-0 font-mono text-xs text-ink placeholder:text-ink-subtle focus:ring-0 disabled:opacity-60"
-            />
-          </div>
+          <input
+            value={form.data.attachmentCID}
+            onChange={(event) => form.updateAttachmentCID(event.target.value)}
+            aria-labelledby={attachmentLabelId}
+            aria-invalid={attachmentOverLimit}
+            aria-describedby={attachmentOverLimit ? attachmentStatusId : undefined}
+            placeholder={t(
+              "storyRecordEditor.attachmentPlaceholder",
+              "Attachment CID (optional), e.g. bafy...",
+            )}
+            disabled={editor.submitting}
+            className="min-h-[26px] w-full min-w-0 border-0 bg-transparent p-0 font-mono text-[11.5px] text-ink placeholder:text-ink-subtle focus:ring-0 disabled:opacity-60"
+          />
         </div>
+        {attachmentOverLimit && (
+          <p
+            id={attachmentStatusId}
+            role="alert"
+            className="mt-1.5 text-[11.5px] text-red-600 dark:text-red-400"
+          >
+            {t(
+              "storyRecordEditor.attachmentTooLong",
+              "Attachment CID cannot exceed 256 UTF-8 bytes",
+            )}
+          </p>
+        )}
       </div>
+
+      {/* The write fails here, at the button, not at the top of a manuscript the
+          writer would have to scroll back up to read. */}
+      {form.error && (
+        <p
+          role="alert"
+          className="border-t border-red-200 bg-red-50 px-4 py-2.5 text-[12.5px] leading-relaxed text-red-700 sm:px-5 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+        >
+          {form.error}
+        </p>
+      )}
 
       <footer className="flex flex-col gap-3 border-t border-hairline bg-surface-alt px-4 py-3 sm:flex-row sm:items-center sm:px-5">
         <div className="flex w-full max-w-[14rem] flex-col gap-1.5">
@@ -278,7 +332,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           <button
             type="button"
             onClick={form.submit}
-            disabled={editor.submitting || !form.data.content.trim()}
+            disabled={editor.submitting || !form.data.content.trim() || attachmentOverLimit}
             className="flex min-h-9 items-center gap-2 rounded-full bg-primary px-[18px] text-[13px] font-semibold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
           >
             <Save size={15} aria-hidden />

@@ -87,8 +87,8 @@ describe("PersonStoryModal archive presentation", () => {
     expect(await screen.findByText("Original public biography")).toBeTruthy();
     expect(screen.getAllByText("Original public biography")).toHaveLength(1);
     expect(screen.getByText("1 records · 50 bytes")).toBeTruthy();
-    expect(screen.getByText("#1")).toBeTruthy();
-    expect(screen.queryByText("#0")).toBeNull();
+    expect(screen.getByText("No. 1")).toBeTruthy();
+    expect(screen.queryByText("No. 0")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Full Text" }));
     expect(screen.getByText("A later story")).toBeTruthy();
     expect(screen.queryByText("Original public biographyA later story")).toBeNull();
@@ -98,8 +98,8 @@ describe("PersonStoryModal archive presentation", () => {
     renderStory([biography]);
     expect(await screen.findByText("Original public biography")).toBeTruthy();
     expect(screen.queryByText(/records ·/)).toBeNull();
-    expect(screen.queryByText("#0")).toBeNull();
-    expect(screen.queryByText("#1")).toBeNull();
+    expect(screen.queryByText("No. 0")).toBeNull();
+    expect(screen.queryByText("No. 1")).toBeNull();
   });
 
   it("keeps unsupported biography bytes in the basic story area", async () => {
@@ -107,7 +107,7 @@ describe("PersonStoryModal archive presentation", () => {
     expect(await screen.findByText("0x1234")).toBeTruthy();
     expect(screen.getByText("Basic Story")).toBeTruthy();
     expect(screen.queryByText(/records ·/)).toBeNull();
-    expect(screen.queryByText("#0")).toBeNull();
+    expect(screen.queryByText("No. 0")).toBeNull();
   });
 });
 

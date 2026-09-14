@@ -5,8 +5,12 @@ import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 /**
  * Record column — what this write costs the chain and what the chain already
- * holds. Sealing lives at the bottom of it, stated with its consequence, rather
- * than as a button in the page header next to everything else.
+ * holds, and the only place those numbers are stated: the page header carries
+ * the name alone so that token id, totals and last update are read once, here.
+ *
+ * Sealing lives at the bottom of it, stated with its consequence, rather than as
+ * a button in the page header next to everything else. A "status" row above
+ * would be a third telling of what the seal card says in full, so there is none.
  */
 export function StoryRecordPanel({ editor }: { editor: StoryEditorController }) {
   return (
@@ -33,7 +37,8 @@ function PendingWriteCard({ editor }: { editor: StoryEditorController }) {
       <dl className="flex flex-col gap-2">
         <RecordRow
           label={t("storyRecordEditor.landsAt", "Lands at")}
-          value={`#${editor.draftDisplayIndex}`}
+          value={t("person.recordOrdinal", "No. {{index}}", { index: editor.draftDisplayIndex })}
+          mono={false}
         />
         <RecordRow
           label={t("storyRecordEditor.recordTypeLabel", "Record Type")}
@@ -93,22 +98,6 @@ function OnChainRecordCard({ editor }: { editor: StoryEditorController }) {
             meta.lastUpdateTime ? formatUnixSeconds(meta.lastUpdateTime) : t("common.na", "N/A")
           }
         />
-        <div className="flex items-center justify-between gap-2">
-          <dt className="text-[11.5px] text-ink-muted">{t("person.status", "Status")}</dt>
-          <dd
-            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-              meta.isSealed
-                ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-            }`}
-          >
-            {meta.isSealed
-              ? t("person.sealed", "Sealed")
-              : editor.canEdit
-                ? t("person.editable", "Editable")
-                : t("storyRecordEditor.readOnly", "Read only")}
-          </dd>
-        </div>
       </dl>
 
       <div className="flex flex-col gap-2.5 border-t border-hairline pt-3">
@@ -166,6 +155,15 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
           "Seals the current record-chain head. After sealing, no one can append another record.",
         )}
       </p>
+      {/* Beside the button, not in the page banner three columns away. */}
+      {editor.seal.error && (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-[11.5px] leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+        >
+          {editor.seal.error}
+        </p>
+      )}
       <button
         type="button"
         onClick={editor.seal.handleSeal}

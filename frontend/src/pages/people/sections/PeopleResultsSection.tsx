@@ -71,6 +71,7 @@ export function PeopleResultsSection({
                   isFirst={index === 0}
                   onOpen={modal.openPerson}
                   preloadStoryData={preloadStoryData}
+                  onEndorseSuccess={onEndorseSuccess}
                 />
               ))}
             </div>

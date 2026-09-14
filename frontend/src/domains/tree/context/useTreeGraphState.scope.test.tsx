@@ -80,6 +80,52 @@ describe("tree plaintext IndexedDB scope", () => {
     cleanup();
   });
 
+  it("is not settled until a build has a result, and settles when there is no root to build", async () => {
+    const storageNS = "settled-scope";
+    const queryCacheRef = { current: new QueryCache() };
+    // Stable, as they are in the app: the build effect depends on both, and fresh
+    // functions every render re-run it every render.
+    const t = (key: string) => key;
+    const push = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ refreshTick }: { refreshTick: number }) =>
+        useTreeGraphState({
+          rootId: null,
+          rootHash: null,
+          rootVersionIndex: null,
+          provider: null,
+          contract: null,
+          api: null,
+          queryCacheRef,
+          storageNS,
+          edgesUnionKey: `${storageNS}::edges.union.v1`,
+          edgesStrictKey: `${storageNS}::edges.strict.v1`,
+          refreshTick,
+          traversal: "dfs",
+          childrenMode: "strict",
+          strictIncludeUnversionedChildren: false,
+          trustedSourceFilterEnabled: false,
+          edgeTtlMs: 60_000,
+          totalVersionsTtlMs: 60_000,
+          versionDetailsTtlMs: 60_000,
+          nftDetailsTtlMs: 60_000,
+          childrenPageLimit: 200,
+          t,
+          push,
+        }),
+      { initialProps: { refreshTick: 0 } },
+    );
+
+    // Nothing has been asked of the tree yet: not loading, and no result either.
+    await waitFor(() => expect(result.current.idbHydrated).toBe(true));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.settled).toBe(false);
+
+    // With no root configured there is definitely nothing to build — that is a result.
+    rerender({ refreshTick: 1 });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+  });
+
   it("hydrates only an exact protocol-generation + chain + proxy namespace", async () => {
     const sourceScope = buildTreeStorageNamespace({
       protocolGeneration: "df-onchain-biography-v1",

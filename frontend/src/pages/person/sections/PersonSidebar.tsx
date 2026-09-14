@@ -103,7 +103,9 @@ function RecordListItem({ record, person }: { record: StoryRecord; person: Perso
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                #{record.displayIndex ?? record.recordIndex + 1}
+                {t("person.recordOrdinal", "No. {{index}}", {
+                  index: record.displayIndex ?? record.recordIndex + 1,
+                })}
               </span>
               <div className="flex items-center gap-1.5">
                 <RecordIcon size={14} className={iconColor} />

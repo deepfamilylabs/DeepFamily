@@ -42,6 +42,7 @@ export {
   type SecretHashInputs,
   type PersonHashCalculatorHandle,
 } from "./ui/PersonHashCalculator";
+export { default as EndorseCompactModal } from "./ui/EndorseCompactModal";
 export { default as PersonStoryCard } from "./ui/PersonStoryCard";
 export { default as SecureKeyDerivation } from "./ui/SecureKeyDerivation";
 export { default as PersonStoryModal } from "./ui/PersonStoryModal";

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import {
@@ -16,22 +16,28 @@ export interface UseStoryDataResult {
   data: StoryDataResult | null;
   loading: boolean;
   error: string | null;
-  refetch: () => void;
+  /**
+   * Refetch from the chain. By default the current data is dropped first, so
+   * consumers fall back to their loading state; `keepData` revalidates in place
+   * instead, for refreshes the reader did not ask for and should not have to
+   * watch.
+   */
+  refetch: (options?: { keepData?: boolean }) => void;
 }
 
-export function useStoryData(
-  tokenId: string | null | undefined,
-): UseStoryDataResult {
+export function useStoryData(tokenId: string | null | undefined): UseStoryDataResult {
   const gateway = usePersonGateway();
   const [data, setData] = useState<StoryDataResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const triggerRef = useRef(0);
+  // State, not a ref: the effect re-runs on the value changing, and a `keepData`
+  // refetch may change nothing else to re-render on.
+  const [trigger, setTrigger] = useState(0);
 
-  const refetch = useCallback(() => {
-    triggerRef.current += 1;
-    setData(null);
+  const refetch = useCallback((options?: { keepData?: boolean }) => {
+    if (!options?.keepData) setData(null);
     setError(null);
+    setTrigger((value) => value + 1);
   }, []);
 
   useEffect(() => {
@@ -84,7 +90,7 @@ export function useStoryData(
     return () => {
       cancelled = true;
     };
-  }, [gateway, tokenId, triggerRef.current]);
+  }, [gateway, tokenId, trigger]);
 
   return { data, loading, error, refetch };
 }

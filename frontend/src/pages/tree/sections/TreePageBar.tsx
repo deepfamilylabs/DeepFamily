@@ -101,7 +101,7 @@ export function TreePageBar({
         </ToolbarButton>
 
         <ToolbarButton
-          label={t("familyTree.actions.clearCaches", "Clear caches and reload")}
+          label={t("familyTree.actions.clearCaches", "Clear caches")}
           onClick={onClearCaches}
           tone="danger"
         >

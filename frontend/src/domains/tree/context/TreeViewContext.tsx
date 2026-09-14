@@ -50,6 +50,8 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     setReachableNodeIds,
     reachableNodeIdsRef,
     loading,
+    settled,
+    setSettled,
     rootExists,
     progress,
     setProgress,
@@ -137,6 +139,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
     setEdgesStrict,
     setReachableNodeIds,
     setProgress,
+    setSettled,
     refresh: runtime.refresh,
     storageNS: runtime.storageNS,
     edgesUnionKey: runtime.edgesUnionKey,
@@ -160,6 +163,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
 
   const statusValue: TreeStatusValue = {
     loading,
+    settled,
     progress,
     contractMessage,
     refresh: runtime.refresh,

@@ -4,13 +4,13 @@ import { storyRecordAnchorId } from "../model/storyOutline";
 import type { StoryEditorController } from "../hooks/useStoryEditorController";
 
 /**
- * Contents column — a map of the manuscript in document order. Rows jump to the
- * matching entry; the trailing dashed row is the record being composed, so the
- * draft has a place in the outline before it has a place on chain.
+ * Contents column — the profile in the order it will be read, grouped the way
+ * the published page groups it. Rows jump to the matching manuscript entry; the
+ * dashed row is the record being composed, shown inside the group where readers
+ * will find it once it is written.
  */
 export function StoryContentsOutline({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
-  const hasRecords = editor.sortedRecords.length > 0;
 
   const jumpTo = (recordIndex: number) => {
     const scroll = () =>
@@ -40,17 +40,40 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
         </span>
       </div>
 
-      {hasRecords ? (
+      {editor.outline.length > 0 ? (
         <ul className="flex flex-col gap-0.5">
-          {editor.outline.map((item) =>
-            item.kind === "group" ? (
-              <li
-                key={item.key}
-                className="px-1.5 pb-[3px] pt-2.5 text-[9.5px] font-bold uppercase tracking-[0.13em] text-ink-subtle first:pt-1.5"
-              >
-                {item.label}
-              </li>
-            ) : (
+          {editor.outline.map((item) => {
+            if (item.kind === "group") {
+              return (
+                <li
+                  key={item.key}
+                  className="px-1.5 pb-[3px] pt-2.5 text-[9.5px] font-bold uppercase tracking-[0.13em] text-ink-subtle first:pt-1.5"
+                >
+                  {item.label}
+                </li>
+              );
+            }
+
+            if (item.kind === "draft") {
+              return (
+                <li key={item.key}>
+                  <div className="flex items-center gap-[9px] rounded-[10px] border border-dashed border-primary bg-primary/8 px-2 py-[7px]">
+                    <span
+                      aria-hidden
+                      className={`h-[7px] w-[7px] shrink-0 rounded-full bg-current ${getRecordTypeColorClass(item.recordType)}`}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">
+                      {item.label}
+                    </span>
+                    <span className="font-mono text-[10.5px] text-primary">
+                      {item.displayIndex}
+                    </span>
+                  </div>
+                </li>
+              );
+            }
+
+            return (
               <li key={item.key}>
                 <button
                   type="button"
@@ -67,12 +90,12 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
                     {item.label}
                   </span>
                   <span className="font-mono text-[10.5px] text-ink-subtle">
-                    #{item.displayIndex}
+                    {item.displayIndex}
                   </span>
                 </button>
               </li>
-            ),
-          )}
+            );
+          })}
         </ul>
       ) : (
         <p className="px-1.5 pb-1 text-[12.5px] text-ink-subtle">
@@ -80,27 +103,12 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
         </p>
       )}
 
-      {editor.isSealed ? (
+      {editor.isSealed && (
         <p className="flex items-center gap-2 border-t border-hairline px-1.5 pt-3 text-[11.5px] text-ink-muted">
           <Lock size={13} aria-hidden className="shrink-0" />
           {t("storyRecordEditor.closedToNewRecords", "Closed to new records")}
         </p>
-      ) : editor.showEditorForm ? (
-        <div className="border-t border-dashed border-hairline pt-3">
-          <div className="flex items-center gap-[9px] rounded-[10px] border border-dashed border-primary bg-primary/8 px-2 py-[7px]">
-            <span
-              aria-hidden
-              className={`h-[7px] w-[7px] shrink-0 rounded-full bg-current ${getRecordTypeColorClass(editor.form.data.recordType)}`}
-            />
-            <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">
-              {editor.getRecordTypeLabel(editor.form.data.recordType)}
-            </span>
-            <span className="font-mono text-[10.5px] text-primary">
-              #{editor.draftDisplayIndex}
-            </span>
-          </div>
-        </div>
-      ) : null}
+      )}
     </nav>
   );
 }

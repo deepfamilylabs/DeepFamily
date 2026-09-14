@@ -68,6 +68,8 @@ interface UseTreeCacheActionsOptions {
   setEdgesStrict: React.Dispatch<React.SetStateAction<EdgeStoreStrict>>;
   setReachableNodeIds: React.Dispatch<React.SetStateAction<NodeId[]>>;
   setProgress: React.Dispatch<React.SetStateAction<TreeProgress | undefined>>;
+  /** Marks the tree as having no result yet for its current inputs. */
+  setSettled: React.Dispatch<React.SetStateAction<boolean>>;
   refresh: () => void;
   storageNS: string;
   edgesUnionKey: string;
@@ -173,6 +175,9 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.nodesDataRef.current = {};
     options.setReachableNodeIds([]);
     options.setProgress(undefined);
+    // Emptied in this same render; until the rebuild lands there is no result,
+    // and nothing may read the empty store as one.
+    options.setSettled(false);
     if (options.useIndexedDbCache && isIndexedDBSupported()) {
       deleteTreeNodesSnapshot(nodesStorageKey).catch(() => {});
       deleteBlob(options.edgesUnionKey).catch(() => {});
@@ -190,6 +195,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.nodesDataRef,
     options.setProgress,
     options.setReachableNodeIds,
+    options.setSettled,
     nodesStorageKey,
     options.useIndexedDbCache,
   ]);

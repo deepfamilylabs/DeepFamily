@@ -129,6 +129,18 @@ export function getValidTokenId(tokenId: string | undefined): string | undefined
   return tokenId && /^\d+$/.test(tokenId) ? tokenId : undefined;
 }
 
+/**
+ * Whether a failed append is only this page being behind the chain.
+ *
+ * Both tellings carry the same reason: the client-side guard in
+ * addStoryRecordService raises it before signing, and the archive reverts with
+ * it when a record slipped in between the estimate and the send.
+ */
+export function isStaleStoryError(error: any): boolean {
+  const reason = error?.reason;
+  return reason === "StoryIndexMismatch" || reason === "StoryHeadMismatch";
+}
+
 export function mapStorySubmitError(
   error: any,
   t: (key: string, fallback: string) => string,

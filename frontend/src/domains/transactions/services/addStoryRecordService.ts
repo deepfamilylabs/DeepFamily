@@ -53,6 +53,15 @@ export async function addStoryRecordService(
   recordType = 1,
   attachmentCID = "",
   confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>,
+  /**
+   * The provider the page read the story through. The record index the caller
+   * passes came from it, so the pre-write state it is checked against must come
+   * from it too; the wallet's provider is a different endpoint, with its own
+   * caching, and comparing a count from one against a count from the other
+   * refused writes the chain would have taken. Signing still goes through the
+   * wallet.
+   */
+  readProvider?: ethers.Provider,
 ): Promise<AddStoryRecordResult> {
   const deepFamily = createDeepFamilyContract(contractAddress, signer);
   let errorContract = deepFamily;
@@ -73,13 +82,19 @@ export async function addStoryRecordService(
     const archiveAddress = await deepFamily.archive();
     const contract = createArchiveContract(archiveAddress, signer);
     errorContract = contract;
+    const stateReader = readProvider
+      ? createArchiveContract(archiveAddress, readProvider)
+      : contract;
     const [state, author, network] = await Promise.all([
-      contract.storyState(tokenId),
+      stateReader.storyState(tokenId),
       signer.getAddress(),
       signer.provider.getNetwork(),
     ]);
+    // Same reason the archive itself would revert with, so the caller can tell
+    // this apart from every other validation failure and reload instead of
+    // leaving the writer staring at a dead end.
     if (BigInt(state.totalRecords) !== BigInt(recordIndex))
-      throw archiveValidationError("Story changed; refresh before appending");
+      throw archiveValidationError("Story changed; refresh before appending", "StoryIndexMismatch");
     const args = Object.freeze([
       tokenId,
       recordIndex,

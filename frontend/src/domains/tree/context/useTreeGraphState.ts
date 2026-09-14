@@ -84,6 +84,8 @@ export interface TreeGraphStateResult {
   reachableNodeIdsRef: React.MutableRefObject<NodeId[]>;
   loading: boolean;
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  settled: boolean;
+  setSettled: React.Dispatch<React.SetStateAction<boolean>>;
   rootExists: boolean;
   setRootExists: React.Dispatch<React.SetStateAction<boolean>>;
   progress: TreeProgress | undefined;
@@ -133,6 +135,11 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
   }, [reachableNodeIds]);
 
   const [loading, setLoading] = useState(false);
+  // Whether the tree has a result for its current inputs: a finished build, or a
+  // definite reason there is none. `loading` cannot say this on its own — it is
+  // false before the first build starts and between a reset and the next build —
+  // so a consumer reading `!loading` as final flashes an empty state.
+  const [settled, setSettled] = useState(false);
   const [rootExists, setRootExists] = useState(false);
   const [progress, setProgress] = useState<TreeProgress | undefined>(undefined);
   const [contractMessage, setContractMessage] = useState("");
@@ -176,6 +183,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
   );
 
   useEffect(() => {
+    setSettled(false);
     setNodesData({});
     setEdgesUnion({});
     setEdgesStrict({});
@@ -266,6 +274,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
 
   useEffect(() => {
     setRootExists(false);
+    setSettled(false);
   }, [options.rootId]);
 
   useEffect(() => {
@@ -274,6 +283,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
       setReachableNodeIds([]);
       setRootExists(false);
       setProgress(undefined);
+      setSettled(true);
       if (typeof options.rootHash === "string" && options.rootHash) {
         setContractMessage(options.t("familyTree.status.rootNotFound"));
       }
@@ -346,6 +356,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
 
     (async () => {
       setLoading(true);
+      setSettled(false);
       setContractMessage("");
       setProgress(undefined);
 
@@ -376,6 +387,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           setTrustedFilterActive(false);
         }
         setLoading(false);
+        if (!cancelled) setSettled(true);
         return;
       }
 
@@ -423,6 +435,7 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
           fetchRunKeyRef.current = runKey;
         }
         setLoading(false);
+        if (!cancelled) setSettled(true);
         return;
       }
 
@@ -486,11 +499,15 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
         fetchRunKeyRef.current = runKey;
       }
       setLoading(false);
+      if (!cancelled) setSettled(true);
     })().catch((error: any) => {
       if (!cancelled && error?.name !== "AbortError") {
         options.push(error, { stage: "build_session" });
       }
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        setSettled(true);
+      }
     });
 
     return () => {
@@ -772,6 +789,8 @@ export function useTreeGraphState(options: UseTreeGraphStateOptions): TreeGraphS
     reachableNodeIdsRef,
     loading,
     setLoading,
+    settled,
+    setSettled,
     rootExists,
     setRootExists,
     progress,

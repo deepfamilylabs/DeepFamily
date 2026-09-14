@@ -158,6 +158,64 @@ describe("Archive story writes", () => {
     expect(result.newRecord.content).toBe("  原文\n🙂  ");
     expect(result.newRecord.recordHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
+  it("checks the page's record index against the story as read through the page's own provider", async () => {
+    // The editor's snapshot is read through the app's readonly RPC; the wallet's
+    // endpoint is another client with its own view of "latest". Checking one
+    // against the other refused a write the chain would have accepted.
+    const f = setup();
+    // The wallet's "latest" disagrees; reads pinned to a block still see the chain.
+    const walletRead = f.archive.storyState.getMockImplementation()!;
+    (f.archive.storyState as any).mockImplementation(
+      async (_tokenId: string, overrides?: { blockTag?: number }) =>
+        overrides?.blockTag === undefined
+          ? {
+              recordsHead: ethers.ZeroHash,
+              totalRecords: 5n,
+              totalPayloadLength: 0n,
+              lastUpdateTime: 0n,
+              isSealed: false,
+            }
+          : walletRead(),
+    );
+    const readProvider = { endpoint: "page-rpc" } as unknown as ethers.Provider;
+    const pageArchive = {
+      storyState: vi.fn(async () => ({
+        recordsHead: ethers.ZeroHash,
+        totalRecords: 0n,
+        totalPayloadLength: 0n,
+        lastUpdateTime: 0n,
+        isSealed: false,
+      })),
+    };
+    mocks.archive.mockImplementation((_address: string, runner: unknown) =>
+      runner === readProvider ? pageArchive : f.archive,
+    );
+
+    // Read through the wallet, the page's index 0 disagrees with the wallet's 5.
+    await expect(
+      addStoryRecordService(f.signer as any, ADDRESS, "1", 0, "", "A story", "", 2, "", f.confirm),
+    ).rejects.toThrow(/Story changed/);
+    expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
+
+    // Read through the page's provider, the same index is the chain's end.
+    const result = await addStoryRecordService(
+      f.signer as any,
+      ADDRESS,
+      "1",
+      0,
+      "",
+      "A story",
+      "",
+      2,
+      "",
+      f.confirm,
+      readProvider,
+    );
+    expect(pageArchive.storyState).toHaveBeenCalledWith("1");
+    expect(f.archive.appendStoryRecord).toHaveBeenCalledTimes(1);
+    expect(result.recordIndex).toBe(0);
+  });
+
   it("rejects estimate failure even when staticCall succeeds and never requests signature", async () => {
     const f = setup();
     f.archive.appendStoryRecord.estimateGas.mockRejectedValue(new Error("RPC unavailable"));

@@ -6,6 +6,7 @@ export {
   type EndorseSuccessHandler,
   type EndorseTarget,
 } from "./EndorseModalProvider";
+export { default as EndorseCompactModal } from "./EndorseCompactModal";
 export { default as PersonStoryCard } from "./PersonStoryCard";
 export { default as PersonStoryModal } from "./PersonStoryModal";
 export {

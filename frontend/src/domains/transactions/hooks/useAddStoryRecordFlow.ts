@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useConfig } from "../../config";
+import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { normalizeFriendlyError, type FriendlyError } from "../../../shared/lib/errors";
 import {
   addStoryRecordService,
@@ -24,7 +25,7 @@ export type AddStoryRecordFlowArgs = {
 
 export function useAddStoryRecordFlow() {
   const { signer } = useWallet();
-  const { contractAddress } = useConfig();
+  const { contractAddress, rpcUrl, chainId } = useConfig();
   const { t } = useTranslation();
 
   const runner: TxFlowRunner<AddStoryRecordResult, [AddStoryRecordFlowArgs]> = useCallback(
@@ -46,9 +47,11 @@ export function useAddStoryRecordFlow() {
         args.recordType,
         args.attachmentCID,
         args.confirmTransactionPreview,
+        // The same endpoint the editor's snapshot was read from; see readProvider.
+        rpcUrl ? getReadonlyProvider(rpcUrl, chainId) : undefined,
       );
     },
-    [signer, contractAddress, t],
+    [signer, contractAddress, rpcUrl, chainId, t],
   );
 
   return useTxFlow<AddStoryRecordResult, [AddStoryRecordFlowArgs], FriendlyError>(runner, {

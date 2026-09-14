@@ -27,6 +27,12 @@ export interface TreeGraphDataValue {
 
 export interface TreeStatusValue {
   loading: boolean;
+  /**
+   * True once the tree has a result for its current inputs — a finished build or a
+   * definite reason there is none. `loading` is also false before the first build
+   * and right after caches are cleared, so "empty" is only final when settled.
+   */
+  settled: boolean;
   progress?: TreeProgress;
   contractMessage: string;
   refresh: () => void;

@@ -136,7 +136,7 @@ describe("useStoryEditorController biography presentation", () => {
   });
 
   it.each([false, true])(
-    "appends the first ordinary story at the raw index while displaying #1 (biography: %s)",
+    "appends the first ordinary story at the raw index while displaying No. 1 (biography: %s)",
     async (hasBiography) => {
       const records = hasBiography ? [record(0, true)] : [];
       mocks.storyQuery.data = { records: records, metadata: metadata(records) };
@@ -165,12 +165,64 @@ describe("useStoryEditorController biography presentation", () => {
       );
       expect(result.current.sortedRecords).toEqual([{ ...added, displayIndex: 1 }]);
       expect(result.current.meta).toMatchObject({ totalRecords: 1, totalPayloadLength: 100 });
-      expect(mocks.toast.success).toHaveBeenCalledWith("Record #1 added successfully (100 bytes)");
+      expect(mocks.toast.success).toHaveBeenCalledWith(
+        "Record No. 1 added successfully (100 bytes)",
+      );
       render(<StoryManuscript editor={result.current} />);
-      expect(screen.getByText("#1")).toBeTruthy();
-      expect(screen.queryByText("#0")).toBeNull();
+      expect(screen.getByText("No. 1")).toBeTruthy();
+      expect(screen.queryByText("No. 0")).toBeNull();
     },
   );
+
+  it("trims a pasted attachment CID instead of failing the write on a stray newline", async () => {
+    // The archive rejects a padded CID, and the submit-time check is the only
+    // other place that would catch it — long after the paste.
+    mocks.storyQuery.data = { records: [], metadata: metadata([]) };
+    const added = record(0);
+    mocks.addFlow.runOrThrow.mockResolvedValue({
+      newRecord: added,
+      payloadLength: added.payloadLength,
+      recordsHead: `0x${"4".repeat(64)}`,
+      events: { StoryRecordAppended: { recordIndex: 0, payloadLength: 100 } },
+    });
+    const cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+
+    const { result } = renderHook(() => useStoryEditorController());
+    act(() => result.current.form.updateContent("An ordinary story"));
+    act(() => result.current.form.updateAttachmentCID(`  ${cid}\n`));
+
+    expect(result.current.form.data.attachmentCID).toBe(cid);
+
+    await act(async () => result.current.form.submit());
+
+    expect(mocks.addFlow.runOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({ attachmentCID: cid }),
+    );
+  });
+
+  it("reloads the snapshot and keeps the draft when the story moved on mid-write", async () => {
+    // The index is computed from a snapshot the story cache can serve for five
+    // minutes, so this failure is usually staleness, not a lost draft.
+    mocks.storyQuery.data = { records: [], metadata: metadata([]) };
+    mocks.addFlow.runOrThrow.mockRejectedValue(
+      Object.assign(new Error("Story changed; refresh before appending"), {
+        reason: "StoryIndexMismatch",
+      }),
+    );
+
+    const { result } = renderHook(() => useStoryEditorController());
+    act(() => result.current.form.updateContent("An ordinary story"));
+    await act(async () => result.current.form.submit());
+
+    expect(mocks.queryClient.clear).toHaveBeenCalledWith("story:7");
+    expect(mocks.queryClient.clear).toHaveBeenCalledWith("story:7:meta");
+    expect(mocks.storyQuery.refetch).toHaveBeenCalled();
+    expect(result.current.form.error).toContain("latest state is loaded");
+    // Reported at the composer's button, not by the page banner that carries
+    // load and seal failures above the fold.
+    expect(result.current.showError).toBe(false);
+    expect(result.current.form.data.content).toBe("An ordinary story");
+  });
 
   it("keeps Archive seal state but reports only ordinary records after sealing", async () => {
     const records = [record(0, true), record(1), record(2)];
@@ -204,6 +256,39 @@ describe("useStoryEditorController biography presentation", () => {
     const { result } = renderHook(() => useStoryEditorController());
     expect(result.current.meta).toMatchObject({ totalRecords: 0, totalPayloadLength: 0 });
     expect(result.current.sortedRecords).toEqual([]);
+  });
+});
+
+describe("record order", () => {
+  it("lists the manuscript and Contents in reading order by default and remembers written order", () => {
+    localStorage.removeItem("df-story-editor-record-order");
+    const records = [
+      { ...record(0), recordType: 16 }, // Closing, written first
+      { ...record(1), recordType: 1 }, // Summary, written second
+    ];
+    mocks.storyQuery.data = { records, metadata: metadata(records) };
+    const { result } = renderHook(() => useStoryEditorController());
+    const manuscript = () =>
+      [
+        ...result.current.manuscript.head,
+        ...result.current.manuscript.collapsed,
+        ...result.current.manuscript.tail,
+      ].map((item) => item.recordIndex);
+    const contents = () =>
+      result.current.outline.flatMap((item) => (item.kind === "record" ? [item.recordIndex] : []));
+
+    expect(result.current.order.value).toBe("reading");
+    expect(manuscript()).toEqual([1, 0]);
+    expect(contents()).toEqual([1, 0]);
+
+    act(() => result.current.order.set("written"));
+
+    expect(manuscript()).toEqual([0, 1]);
+    expect(contents()).toEqual([0, 1]);
+    // Counting and indexing still go by the chain.
+    expect(result.current.sortedRecords.map((item) => item.recordIndex)).toEqual([0, 1]);
+    expect(localStorage.getItem("df-story-editor-record-order")).toBe("written");
+    localStorage.removeItem("df-story-editor-record-order");
   });
 });
 
@@ -242,7 +327,11 @@ describe("story editor write authorization", () => {
     expect(mocks.access.recheck).toHaveBeenCalledTimes(2);
     expect(mocks.addFlow.runOrThrow).not.toHaveBeenCalled();
     expect(mocks.sealFlow.runOrThrow).not.toHaveBeenCalled();
-    expect(result.current.errorMessage).toContain("Only the current NFT owner");
+    // Each refusal is reported beside the control it refused — the composer's
+    // button and the seal card's — not by the page banner above the fold.
+    expect(result.current.form.error).toContain("Only the current NFT owner");
+    expect(result.current.seal.error).toContain("Only the current NFT owner");
+    expect(result.current.errorMessage).toBeNull();
   });
 
   it("closes an open seal confirmation when the wallet loses ownership", () => {

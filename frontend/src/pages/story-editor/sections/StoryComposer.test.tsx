@@ -171,6 +171,44 @@ describe("StoryComposer", () => {
     expect(byteStatus.textContent).toContain("of 16,384 per record");
   });
 
+  it("flags an over-long attachment CID at the field rather than at signing time", () => {
+    const withinLimit = createEditor({
+      form: { data: { title: "", content: "Example story", recordType: 1, attachmentCID: "bafy" } },
+    });
+    const { rerender } = render(<StoryComposer editor={withinLimit} />);
+
+    // 256 bytes is out of reach for a real CID, so nothing is said until a draft
+    // actually crosses it — no permanent counter on an optional field.
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: /Review & sign/ }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    rerender(
+      <StoryComposer
+        editor={createEditor({
+          form: {
+            data: {
+              title: "",
+              content: "Example story",
+              recordType: 1,
+              attachmentCID: "b".repeat(257),
+            },
+          },
+        })}
+      />,
+    );
+
+    const alert = screen.getByRole("alert");
+    const cid = screen.getByPlaceholderText(/Attachment CID \(optional\)/);
+    expect(alert.textContent).toContain("256");
+    expect(cid.getAttribute("aria-invalid")).toBe("true");
+    expect(cid.getAttribute("aria-describedby")).toBe(alert.id);
+    expect(
+      (screen.getByRole("button", { name: /Review & sign/ }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("blocks the write while the draft is empty", () => {
     render(
       <StoryComposer
@@ -185,14 +223,17 @@ describe("StoryComposer", () => {
   });
 });
 
-it("accepts an exact optional title before the classification and content fields", () => {
+// The draft is ordered the way the record reads once archived: the type tag on
+// the meta line, then the title, then the body — so reading order, tab order and
+// the published entry all agree.
+it("accepts an exact optional title between the classification and content fields", () => {
   const updateTitle = vi.fn();
   const { rerender } = render(<StoryComposer editor={createEditor({ form: { updateTitle } })} />);
   const input = screen.getByRole("textbox", { name: "Title (optional)" });
   const type = screen.getByRole("button", { name: "Record Type Summary" });
   const content = screen.getByPlaceholderText(/Enter story content/);
-  expect(input.compareDocumentPosition(type) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(type.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(type.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(input.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   fireEvent.change(input, { target: { value: "  第一次远行 😀  " } });
   expect(updateTitle).toHaveBeenCalledWith("  第一次远行 😀  ");
   rerender(<StoryComposer editor={createEditor({ editor: { submitting: true } })} />);
