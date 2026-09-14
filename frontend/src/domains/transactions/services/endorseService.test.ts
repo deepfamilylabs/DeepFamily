@@ -46,7 +46,6 @@ describe("endorseService executeEndorseFlow", () => {
       balanceOf: vi.fn(async () => 100n),
       allowance: vi.fn(async () => 0n),
       approve: vi.fn(async () => ({ hash: "0xapprove", wait: vi.fn(async () => ({})) })),
-      increaseAllowance: vi.fn(),
       decimals: vi.fn(async () => 18),
       symbol: vi.fn(async () => "DEEP"),
     };
@@ -129,7 +128,6 @@ describe("endorseService executeEndorseFlow", () => {
       balanceOf: vi.fn(async () => 100n),
       allowance: vi.fn(async () => 50n),
       approve: vi.fn(),
-      increaseAllowance: vi.fn(),
       decimals: vi.fn(async () => 18),
       symbol: vi.fn(async () => "DEEP"),
     };
@@ -163,7 +161,49 @@ describe("endorseService executeEndorseFlow", () => {
       symbol: "DEEP",
     });
     expect(result.alreadyEndorsed).toBe(false);
+    expect(tokenContract.approve).not.toHaveBeenCalled();
     expect(endorseVersion).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["wallet rejection", "ACTION_REJECTED"],
+    ["approval failure", "CALL_EXCEPTION"],
+  ])("preserves the %s error and stops before endorsement", async (_reason, code) => {
+    const approvalError = Object.assign(new Error("Approval unsuccessful"), { code });
+    const tokenContract = {
+      recentReward: vi.fn(async () => 10n),
+      balanceOf: vi.fn(async () => 100n),
+      allowance: vi.fn(async () => 5n),
+      approve: vi.fn().mockRejectedValue(approvalError),
+      decimals: vi.fn(async () => 18),
+      symbol: vi.fn(async () => "DEEP"),
+    };
+    createDeepTokenContractMock.mockReturnValue(tokenContract);
+
+    const contractAddress = "0x0000000000000000000000000000000000000abc";
+    const estimateGas = vi.fn();
+    const contract = {
+      endorsedVersionIndex: vi.fn(async () => 0),
+      DEEP_FAMILY_TOKEN_CONTRACT: vi.fn(async () => "0x0000000000000000000000000000000000000def"),
+      getAddress: vi.fn(async () => contractAddress),
+      endorseVersion: Object.assign(vi.fn(), { estimateGas }),
+    } as any;
+    const endorseVersion = vi.fn();
+
+    await expect(
+      executeEndorseFlow({
+        contract,
+        signer: {} as any,
+        address: "0x00000000000000000000000000000000000000bb",
+        personHash: "0x00000000000000000000000000000000000000000000000000000000000000aa",
+        versionIndex: 2,
+        endorseVersion,
+      }),
+    ).rejects.toBe(approvalError);
+
+    expect(tokenContract.approve).toHaveBeenCalledExactlyOnceWith(contractAddress, 10n);
+    expect(estimateGas).not.toHaveBeenCalled();
+    expect(endorseVersion).not.toHaveBeenCalled();
   });
 
   it("aborts without spending when the fee drifted from the quote", async () => {
@@ -172,7 +212,6 @@ describe("endorseService executeEndorseFlow", () => {
       balanceOf: vi.fn(async () => 100n),
       allowance: vi.fn(async () => 0n),
       approve: vi.fn(),
-      increaseAllowance: vi.fn(),
       decimals: vi.fn(async () => 18),
       symbol: vi.fn(async () => "DEEP"),
     };

@@ -205,7 +205,7 @@ describe("DeepFamilyToken", function () {
     expect(await token.totalSupply()).to.equal(maxSupply);
   });
 
-  it("supports allowance adjustments and holder or approved burns", async () => {
+  it("supports standard approvals and holder or approved burns", async () => {
     const [holder, spender] = await hre.ethers.getSigners();
     const { token, minter } = await deployBoundToken();
     const holderAddress = await holder.getAddress();
@@ -214,14 +214,8 @@ describe("DeepFamilyToken", function () {
     await minter.mint(holderAddress);
     const supplyBefore = await token.totalSupply();
 
-    await token.increaseAllowance(spenderAddress, 20n);
-    expect(await token.allowance(holderAddress, spenderAddress)).to.equal(20n);
-    await token.decreaseAllowance(spenderAddress, 5n);
+    await token.approve(spenderAddress, 15n);
     expect(await token.allowance(holderAddress, spenderAddress)).to.equal(15n);
-    await expect(token.decreaseAllowance(spenderAddress, 16n)).to.be.revertedWithCustomError(
-      token,
-      "AllowanceBelowZero",
-    );
 
     await token.connect(spender).burnFrom(holderAddress, 10n);
     await token.burn(7n);
