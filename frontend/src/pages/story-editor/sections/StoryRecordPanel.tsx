@@ -134,7 +134,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
         <p className="text-[11.5px] leading-relaxed text-blue-900/80 dark:text-blue-200/80">
           {t(
             "storyRecordEditor.sealedNotice",
-            "This profile is final. It stays readable and verifiable forever, and no further writes are accepted.",
+            "This story is final. It stays readable and verifiable forever, and no further writes are accepted.",
           )}
         </p>
       </section>
@@ -147,7 +147,7 @@ function SealCard({ editor }: { editor: StoryEditorController }) {
     <section className="flex flex-col gap-2.5 rounded-[18px] border border-orange-200 bg-orange-50/70 px-4 py-[15px] dark:border-orange-900/50 dark:bg-orange-900/15">
       <h2 className="ui-heading flex items-center gap-2 text-[12.5px] text-orange-800 dark:text-orange-300">
         <Lock size={14} aria-hidden />
-        {t("storyRecordEditor.sealCard.title", "Seal this profile")}
+        {t("storyRecordEditor.sealCard.title", "Seal this story")}
       </h2>
       <p className="text-[11.5px] leading-relaxed text-orange-900/80 dark:text-orange-200/80">
         {t(

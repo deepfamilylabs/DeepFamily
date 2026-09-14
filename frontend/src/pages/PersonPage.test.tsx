@@ -157,7 +157,7 @@ describe("PersonPage", () => {
     renderPersonPage("/person/42");
 
     await waitFor(() => expect(screen.getAllByText("Ada Lovelace").length).toBeGreaterThan(0));
-    expect(screen.getAllByText("Profile Data").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Life Story").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/hello/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/world/).length).toBeGreaterThan(0);
     expect(mocks.getStoryData).not.toHaveBeenCalled();

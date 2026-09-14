@@ -43,7 +43,7 @@ export const createMintNFTSchema = (t: MintNFTT) =>
     .refine((data) => data.story !== "" || data.storyTitle.trim() === "", {
       message: t(
         "mintNFT.validation.storyRequiredForTitle",
-        "Add story content before setting a title",
+        "Add biography content before setting a title",
       ),
       path: ["story"],
     })

@@ -83,7 +83,7 @@ describe("mintService executeMintFlow", () => {
   it("rejects a title without story content before requesting any mint", async () => {
     const input = { ...initialBiographyInput(""), storyTitle: "  A title  " };
     await expect(executeMintFlow(input)).rejects.toThrow(
-      "Add story content before setting a title",
+      "Add biography content before setting a title",
     );
     expect(input.mintPersonVersionNFT).not.toHaveBeenCalled();
     expect(input.contract.endorsedVersionIndex).not.toHaveBeenCalled();

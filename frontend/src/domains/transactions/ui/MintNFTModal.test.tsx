@@ -322,7 +322,9 @@ describe("MintNFTModal", () => {
 
       await waitForMintableTarget();
       await checkAllConsents();
-      expect((screen.getByLabelText("Story title (optional)") as HTMLInputElement).value).toBe("");
+      expect((screen.getByLabelText("Biography title (optional)") as HTMLInputElement).value).toBe(
+        "",
+      );
 
       await act(async () => {
         fireEvent.change(screen.getByPlaceholderText("Enter birth place"), {
@@ -331,7 +333,7 @@ describe("MintNFTModal", () => {
         fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
           target: { value: "ipfs://token" },
         });
-        fireEvent.change(screen.getByLabelText("Story title (optional)"), {
+        fireEvent.change(screen.getByLabelText("Biography title (optional)"), {
           target: { value: storyTitle },
         });
         fireEvent.change(screen.getByPlaceholderText("Enter a brief life story summary..."), {
@@ -386,11 +388,11 @@ describe("MintNFTModal", () => {
     renderMintModal();
     await waitForMintableTarget();
     await checkAllConsents();
-    fireEvent.change(screen.getByLabelText("Story title (optional)"), {
+    fireEvent.change(screen.getByLabelText("Biography title (optional)"), {
       target: { value: "  A title without a story  " },
     });
     fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
-    expect(await screen.findByText("Add story content before setting a title")).toBeTruthy();
+    expect(await screen.findByText("Add biography content before setting a title")).toBeTruthy();
     const story = screen.getByPlaceholderText("Enter a brief life story summary...");
     expect(story.getAttribute("aria-invalid")).toBe("true");
     expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
@@ -449,7 +451,7 @@ describe("MintNFTModal", () => {
     renderMintModal();
 
     const copyButton = await screen.findByRole("button", {
-      name: "Copy biography into public story",
+      name: "Copy into public biography",
     });
     expect((copyButton as HTMLButtonElement).disabled).toBe(true);
 
@@ -478,7 +480,7 @@ describe("MintNFTModal", () => {
     renderMintModal();
     await waitForMintableTarget();
 
-    expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy into public biography" })).toBeNull();
   });
 
   it("never offers marker-only cached biography missing format and suite evidence", async () => {
@@ -495,7 +497,7 @@ describe("MintNFTModal", () => {
     renderMintModal();
     await waitForMintableTarget();
 
-    expect(screen.queryByRole("button", { name: "Copy biography into public story" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Copy into public biography" })).toBeNull();
   });
 
   it("shows a friendly error when the mint flow fails", async () => {

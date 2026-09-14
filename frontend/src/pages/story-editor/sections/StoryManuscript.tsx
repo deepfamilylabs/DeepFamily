@@ -65,7 +65,7 @@ export function StoryManuscript({ editor }: { editor: StoryEditorController }) {
         <section className="py-12 text-center text-ink-muted">
           <Lock size={44} aria-hidden className="mx-auto mb-4 opacity-50" />
           <p className="text-sm font-medium">
-            {t("storyRecordEditor.noRecordsSealed", "This profile is sealed with no records.")}
+            {t("storyRecordEditor.noRecordsSealed", "This story is sealed with no records.")}
           </p>
         </section>
       )}
@@ -95,7 +95,7 @@ export function StoryManuscript({ editor }: { editor: StoryEditorController }) {
 
           {editor.sortedRecords.length === 0 && !editor.loading && (
             <p className="text-sm text-ink-subtle">
-              {t("storyRecordEditor.noRecords", "No profile records yet.")}
+              {t("storyRecordEditor.noRecords", "No story records yet.")}
             </p>
           )}
 

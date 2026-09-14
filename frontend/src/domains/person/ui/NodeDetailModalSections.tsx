@@ -618,7 +618,7 @@ export function NodeDetailNftSection({
           onCopy={onCopy}
         />
         <NodeDetailStorySection
-          label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
+          label={t("familyTree.nodeDetail.nftPublicStory", "Public NFT Biography")}
           title={
             nodeData?.nftPublicStoryTitle?.trim()
               ? nodeData.nftPublicStoryTitle

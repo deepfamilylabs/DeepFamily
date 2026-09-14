@@ -135,7 +135,7 @@ describe("useStoryEditorController biography presentation", () => {
     );
     expect(screen.queryByRole("button", { name: "Seal permanently" })).toBeNull();
     expect(screen.queryByText(records[0].content)).toBeNull();
-    expect(screen.getByText("No profile records yet.")).toBeTruthy();
+    expect(screen.getByText("No story records yet.")).toBeTruthy();
   });
 
   it.each([false, true])(

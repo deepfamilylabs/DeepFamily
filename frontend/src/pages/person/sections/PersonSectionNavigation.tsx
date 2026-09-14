@@ -40,7 +40,7 @@ export function PersonSectionNavigation({ person }: { person: PersonPageControll
             }
             count={person.groupedRecords.reduce((count, group) => count + group.records.length, 0)}
             icon={<Layers size={14} />}
-            label={t("person.profileData", "Profile Data")}
+            label={t("person.profileData", "Life Story")}
             onClick={() => person.scrollToSection("profileTop")}
           />
 
