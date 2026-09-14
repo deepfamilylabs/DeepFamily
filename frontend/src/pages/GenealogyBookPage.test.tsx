@@ -381,8 +381,8 @@ describe("GenealogyBookPage", () => {
   it("applies the default appearance and forwards it to the view", () => {
     render(<GenealogyBookPage />);
 
-    // The settings drawer opens with the page so its controls are in reach right away.
-    expect(screen.getByTestId("paper-settings-drawer")).toBeTruthy();
+    // The settings drawer stays closed until requested.
+    expect(screen.queryByTestId("paper-settings-drawer")).toBeNull();
 
     openSettings("book");
     expect(screen.getByTestId("paper-settings-drawer")).toBeTruthy();

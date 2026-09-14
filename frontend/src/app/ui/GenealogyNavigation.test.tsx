@@ -3,7 +3,6 @@ import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import BottomNav from "./BottomNav";
 import GlobalSidebar from "./GlobalSidebar";
 
 const mocks = vi.hoisted(() => ({
@@ -55,12 +54,11 @@ vi.mock("./Logo", () => ({
   default: (props: any) => <svg data-testid="logo" {...props} />,
 }));
 
-/** The two surfaces that carry section entries: the rail and the bottom nav. */
+/** The rail is the one surface that carries section entries. */
 function renderNavigation() {
   return render(
     <MemoryRouter>
       <GlobalSidebar />
-      <BottomNav />
     </MemoryRouter>,
   );
 }
@@ -96,14 +94,10 @@ describe("genealogy volume navigation", () => {
         .getAllByRole("link")
         .filter((link) => link.getAttribute("href") === "/familyTree");
 
-      // Both surfaces light up for the whole section.
-      expect(familyEntries).toHaveLength(2);
-      for (const entry of familyEntries) {
-        expect(entry.className).toContain("text-orange-600");
-      }
-      expect(
-        familyEntries.some((entry) => entry.getAttribute("aria-current") === "page"),
-      ).toBe(true);
+      // The entry lights up for the whole section.
+      expect(familyEntries).toHaveLength(1);
+      expect(familyEntries[0].className).toContain("text-orange-600");
+      expect(familyEntries[0].getAttribute("aria-current")).toBe("page");
 
       cleanup();
     }

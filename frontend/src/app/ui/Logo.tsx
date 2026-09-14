@@ -7,9 +7,11 @@ import { useId } from "react";
 interface LogoProps {
   className?: string;
   size?: number;
+  /** Stroke in currentColor instead of the brand gradient, to sit among other icons. */
+  monochrome?: boolean;
 }
 
-export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
+export default function Logo({ className = "w-10 h-10", size, monochrome = false }: LogoProps) {
   const width = size ?? undefined;
   const height = size ?? undefined;
   // Every instance needs its own gradient id: `url(#id)` resolves to the first
@@ -41,7 +43,7 @@ export default function Logo({ className = "w-10 h-10", size }: LogoProps) {
       </defs>
       <g
         fill="none"
-        stroke={`url(#${gradientId})`}
+        stroke={monochrome ? "currentColor" : `url(#${gradientId})`}
         strokeWidth="14"
         strokeLinecap="round"
         strokeLinejoin="round"

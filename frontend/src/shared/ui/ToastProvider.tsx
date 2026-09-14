@@ -116,7 +116,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {/* portal-like container */}
       <div
-        className={`fixed inset-x-0 bottom-4 ${OVERLAY_Z_INDEX.toast} flex justify-center pointer-events-none`}
+        className={`fixed inset-x-0 bottom-[calc(var(--app-statusbar-h)+1rem)] ${OVERLAY_Z_INDEX.toast} flex justify-center pointer-events-none`}
       >
         <div className="space-y-2">
           {toasts.map((toast) => {

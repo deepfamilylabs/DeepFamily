@@ -165,7 +165,7 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
       )}
 
       <div
-        className={`fixed right-6 md:right-10 z-10000 bottom-24 md:bottom-10 ${className}`}
+        className={`fixed right-6 md:right-10 z-10000 bottom-[calc(var(--app-statusbar-h)+1rem)] md:bottom-[calc(var(--app-statusbar-h)+0.5rem)] ${className}`}
         onKeyDown={handleKeyDown}
       >
         <div

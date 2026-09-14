@@ -300,9 +300,10 @@ export function MetadataUnlockControl({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          // Stacked above the global floating action button (bottom-24 / md:bottom-10, h-14 / md:h-16)
-          // instead of underneath it, where the two used to overlap.
-          className="fixed bottom-[164px] right-6 z-30 inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-3.5 py-2 text-[13px] font-semibold text-ink shadow-sm backdrop-blur-sm transition-colors hover:border-hairline-strong md:bottom-[116px] md:right-10"
+          // Stacked above the global floating action button instead of underneath it, where the two
+          // used to overlap. The button sits statusbar + 1rem / md: + 0.5rem up and is h-14 / md:h-16,
+          // so its top edge is 4.5rem above the bar either way; 0.75rem of gap on top of that.
+          className="fixed bottom-[calc(var(--app-statusbar-h)+5.25rem)] right-6 z-30 inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface/95 px-3.5 py-2 text-[13px] font-semibold text-ink shadow-sm backdrop-blur-sm transition-colors hover:border-hairline-strong md:right-10"
         >
           <KeyRound className="h-4 w-4 text-ink-muted" />
           {t("metadataUnlock.openButton", "Unlock versions")}

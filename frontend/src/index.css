@@ -175,17 +175,12 @@ h3 {
  * Chrome metrics. The header and the desktop status bar are both fixed, so any
  * surface that sizes itself to the viewport has to subtract them rather than
  * repeat the magic numbers (see TreePage, GenealogyBookPage, FamilySettingsDrawer).
- * The status bar is desktop-only — below md the bottom nav owns that edge.
+ * The status bar runs at every breakpoint and grows by the home-indicator inset
+ * on phones, so its height here already includes that inset.
  */
 :root {
   --app-header-h: 4rem;
-  --app-statusbar-h: 0rem;
-}
-
-@media (min-width: 768px) {
-  :root {
-    --app-statusbar-h: 2rem;
-  }
+  --app-statusbar-h: calc(2rem + env(safe-area-inset-bottom, 0px));
 }
 
 /*
@@ -583,35 +578,13 @@ html {
   background-size: 50px 50px;
 }
 
-/* Safe area padding for devices with notches */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .app-bottom-nav {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
-
-/* Fix bottom navigation stability on mobile */
+/* Mobile viewport stability */
 @media (max-width: 767px) {
   body {
     overflow-x: hidden;
     /* Ensure consistent viewport height */
     min-height: 100vh;
     min-height: -webkit-fill-available;
-  }
-
-  /* Prevent bottom navigation from disappearing during scroll */
-  .app-bottom-nav {
-    position: fixed !important;
-    bottom: 0 !important;
-    z-index: 9999 !important;
-    /* Ensure it stays above familyTree content */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    /* Force hardware acceleration for better performance */
-    will-change: transform;
-    /* Prevent iOS Safari from hiding the navigation */
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
   }
 }
 
