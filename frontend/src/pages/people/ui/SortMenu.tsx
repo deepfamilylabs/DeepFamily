@@ -1,10 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type {
-  PeopleFilterType,
-  PeoplePageT,
-  PeopleSortOrder,
-} from "../model/peoplePageModel";
+import type { PeopleFilterType, PeoplePageT, PeopleSortOrder } from "../model/peoplePageModel";
 
 export interface SortMenuOption {
   type: PeopleFilterType;
@@ -65,7 +61,7 @@ export default function SortMenu({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium text-ink-muted border border-hairline bg-surface hover:text-ink hover:border-hairline-strong transition-colors"
+        className="inline-flex shrink-0 items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-full text-xs font-medium whitespace-nowrap text-ink-muted border border-hairline bg-surface hover:text-ink hover:border-hairline-strong transition-colors"
       >
         <ArrowUpDown className="w-3.5 h-3.5" />
         <span>{t("people.sortByLabel", "Sort: {{rule}}", { rule: activeLabel })}</span>
