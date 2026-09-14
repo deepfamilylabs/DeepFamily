@@ -22,6 +22,13 @@ describe("segmentManuscript", () => {
     expect(ids(s.tail)).toEqual([5]);
   });
 
+  it("never folds a read-only manuscript", () => {
+    const s = segmentManuscript(records(10), false);
+    expect(s.head).toHaveLength(10);
+    expect(s.collapsed).toEqual([]);
+    expect(s.tail).toEqual([]);
+  });
+
   it("keeps the opening and the most recent entry in view", () => {
     const s = segmentManuscript(records(10));
     expect(ids(s.head)).toEqual([0, 1]);

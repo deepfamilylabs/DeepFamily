@@ -333,7 +333,6 @@ describe("StoryEditorPage", () => {
   it.each([
     { connected: false, isOwner: false, checking: false, correctNetwork: true, error: false },
     { connected: true, isOwner: false, checking: false, correctNetwork: true, error: false },
-    { connected: true, isOwner: false, checking: true, correctNetwork: true, error: false },
     { connected: true, isOwner: true, checking: false, correctNetwork: false, error: false },
     { connected: true, isOwner: false, checking: false, correctNetwork: true, error: true },
   ])("keeps a direct editor URL read-only when access is unavailable (%j)", async (access) => {
@@ -344,10 +343,27 @@ describe("StoryEditorPage", () => {
     expect(screen.queryByRole("button", { name: /Review & sign/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Seal permanently" })).toBeNull();
     // Being locked out is stated once, by the access banner, in a sentence that
-    // says which of these five reasons it is — not by a "Read only" pill in the
+    // says which of these four reasons it is — not by a "Read only" pill in the
     // header and a second one in the record card saying it without the reason.
     expect(screen.getByRole("status").textContent).toBeTruthy();
     expect(mocks.addStoryRunOrThrow).not.toHaveBeenCalled();
+  });
+  it.each([
+    [
+      "ownership is still being checked",
+      () => Object.assign(mocks.access, { checking: true, isOwner: false, canEdit: false }),
+    ],
+    [
+      "the owner's story is still loading",
+      () => Object.assign(mocks, { storyData: null, storyLoading: true }),
+    ],
+  ])("says nothing about access while %s", (_label, arrange) => {
+    arrange();
+    render(<StoryEditorPage />);
+    expect(screen.queryByPlaceholderText(/Enter story content/)).toBeNull();
+    // Both settle on their own; until then the owner must not be told that only
+    // the owner can edit.
+    expect(screen.queryByText(/NFT owner/)).toBeNull();
   });
   it("clears the previous token's draft and story on a direct route change", async () => {
     const view = render(<StoryEditorPage />);

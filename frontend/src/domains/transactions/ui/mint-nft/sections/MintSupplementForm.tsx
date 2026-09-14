@@ -160,7 +160,7 @@ export function MintSupplementForm({
 
           <div>
             <label htmlFor={storyTitleId} className="block text-xs font-semibold text-ink mb-1.5">
-              {t("mintNFT.storyTitleLabel", "Story title (optional)")}
+              {t("mintNFT.storyTitleLabel", "Biography title (optional)")}
             </label>
             <input
               id={storyTitleId}
@@ -182,7 +182,7 @@ export function MintSupplementForm({
                 <p className="text-xs font-medium leading-relaxed text-red-700 dark:text-red-300">
                   {t(
                     "mintNFT.copyBiographyWarning",
-                    "An unlocked private biography is available for this exact version. Copying it into the NFT story makes that text permanently public on-chain.",
+                    "An unlocked private biography is available for this exact version. Copying it into the NFT biography makes that text permanently public on-chain.",
                   )}
                 </p>
                 <label
@@ -215,7 +215,7 @@ export function MintSupplementForm({
                   }
                   className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {t("mintNFT.copyBiographyToStory", "Copy biography into public story")}
+                  {t("mintNFT.copyBiographyToStory", "Copy into public biography")}
                 </button>
               </div>
             )}

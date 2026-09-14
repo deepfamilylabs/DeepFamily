@@ -99,7 +99,7 @@ export function StoryContentsOutline({ editor }: { editor: StoryEditorController
         </ul>
       ) : (
         <p className="px-1.5 pb-1 text-[12.5px] text-ink-subtle">
-          {t("storyRecordEditor.noRecords", "No profile records yet.")}
+          {t("storyRecordEditor.noRecords", "No story records yet.")}
         </p>
       )}
 

@@ -53,10 +53,10 @@ const WorkflowSection: React.FC = memo(() => {
     {
       number: 4,
       icon: PenTool,
-      title: t("home.valueSystem.advantages.step4", "Write Biographical Details"),
+      title: t("home.valueSystem.advantages.step4", "Write Story Records"),
       description: t(
         "home.valueSystem.advantages.step4Desc",
-        "Record holders write and append biographical content",
+        "Holders write and append story records",
       ),
       color: "text-rose-600 dark:text-rose-400",
       bg: "bg-rose-500/10",
@@ -127,9 +127,7 @@ const WorkflowSection: React.FC = memo(() => {
                   <step.icon className={`w-8 h-8 ${step.color}`} />
                 </div>
 
-                <h3 className="text-lg font-bold text-ink mb-3 leading-tight">
-                  {step.title}
-                </h3>
+                <h3 className="text-lg font-bold text-ink mb-3 leading-tight">{step.title}</h3>
 
                 <p className="text-ink-muted text-sm leading-relaxed">{step.description}</p>
               </div>

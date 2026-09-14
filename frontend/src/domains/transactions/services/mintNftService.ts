@@ -158,7 +158,7 @@ export async function executeMintFlow({
 
   assertUnicodeScalarString(storyTitle, "Mint biography title");
   if (story === "" && storyTitle.trim()) {
-    throw new Error("Add story content before setting a title");
+    throw new Error("Add biography content before setting a title");
   }
   const payload =
     story === ""

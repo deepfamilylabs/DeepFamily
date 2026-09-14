@@ -15,7 +15,7 @@ import { StoryRecordPanel } from "./story-editor/sections/StoryRecordPanel";
 type EditorPane = "story" | "contents" | "record";
 
 const PANES: { id: EditorPane; key: string; fallback: string }[] = [
-  { id: "story", key: "storyRecordEditor.paneStory", fallback: "Profile" },
+  { id: "story", key: "storyRecordEditor.paneStory", fallback: "Story" },
   { id: "contents", key: "storyRecordEditor.contents", fallback: "Contents" },
   { id: "record", key: "storyRecordEditor.paneRecord", fallback: "Record" },
 ];

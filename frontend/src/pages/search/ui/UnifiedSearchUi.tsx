@@ -346,7 +346,7 @@ export function NftIdentityCard({
       {core?.nftPublicStory?.trim() ? (
         <div className="mt-4 border-t border-hairline pt-4">
           <div className="mb-1.5 text-xs font-medium text-ink-subtle">
-            {t("familyTree.nodeDetail.nftPublicStory", "Public NFT Summary")}
+            {t("familyTree.nodeDetail.nftPublicStory", "Public NFT Biography")}
           </div>
           <h4 className="mb-1.5 break-words text-sm font-semibold text-ink">
             {core.nftPublicStoryTitle?.trim()

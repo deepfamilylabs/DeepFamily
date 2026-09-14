@@ -12,6 +12,7 @@ import {
 import { useAddStoryRecordFlow, useSealStoryFlow } from "../../../domains/transactions";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
 import { storyKey } from "../../../shared/cache/queryKeys";
+import { getNetworkName } from "../../../shared/config";
 import {
   getStoryPresentation,
   type NodeData,
@@ -333,9 +334,13 @@ export function useStoryEditorController() {
     ],
   );
 
-  // Long manuscripts fold their middle; Contents still lists every record, so a
-  // jump into a folded entry has to open the fold before it can scroll.
-  const segments = useMemo(() => segmentManuscript(orderedRecords), [orderedRecords]);
+  // Long manuscripts fold their middle only while editable; read-only ones are
+  // shown whole. Contents still lists every record, so a jump into a folded
+  // entry has to open the fold before it can scroll.
+  const segments = useMemo(
+    () => segmentManuscript(orderedRecords, canEdit),
+    [orderedRecords, canEdit],
+  );
   const collapsedIndexes = useMemo(
     () => new Set(segments.collapsed.map((record) => record.recordIndex)),
     [segments.collapsed],
@@ -599,7 +604,7 @@ export function useStoryEditorController() {
         setSubmitError(
           t(
             "storyRecordEditor.storyMovedOn",
-            "This profile gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
+            "This story gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
           ),
         );
       } else {
@@ -649,30 +654,36 @@ export function useStoryEditorController() {
   }, [validTokenId, canEdit, access.recheck, onSealStory, t]);
 
   const titleText = personName
-    ? t("storyRecordEditor.titleWithName", { name: personName, defaultValue: "{{name}} Biography" })
-    : t("storyRecordEditor.titleFallback", { defaultValue: "Biography" });
+    ? t("storyRecordEditor.titleWithName", {
+        name: personName,
+        defaultValue: "{{name}}'s Life Story",
+      })
+    : t("storyRecordEditor.titleFallback", { defaultValue: "Life Story" });
   const showEditorForm = canEdit;
+  // Only what the reader can act on. A pending ownership check or a story still
+  // loading says nothing: both settle on their own, and the owner would otherwise
+  // be told that only the owner can edit.
   const accessMessage =
     isSealed || canEdit
       ? null
       : !access.connected
-        ? t(
-            "storyRecordEditor.connectOwnerWallet",
-            "Connect the NFT owner's wallet to edit. This story is available to read.",
-          )
+        ? t("storyRecordEditor.connectOwnerWallet", "Connect the NFT owner's wallet to edit.")
         : !access.correctNetwork
           ? t(
               "storyRecordEditor.switchNetworkToEdit",
-              "Switch your wallet to this story's network to edit.",
+              "Switch your wallet to {{network}} to edit.",
+              {
+                network: getNetworkName(chainId),
+              },
             )
-          : access.checking
-            ? t("storyRecordEditor.checkingOwnership", "Checking NFT ownership…")
-            : access.error
-              ? t(
-                  "storyRecordEditor.ownershipUnavailable",
-                  "Unable to verify NFT ownership. Editing is unavailable until verification succeeds.",
-                )
-              : t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story.");
+          : access.error
+            ? t(
+                "storyRecordEditor.ownershipUnavailable",
+                "Couldn't verify NFT ownership. Please try again.",
+              )
+            : !access.checking && !access.isOwner
+              ? t("storyRecordEditor.ownerOnly", "Only the current NFT owner can edit this story.")
+              : null;
   const showError = Boolean(queryError);
   const showEmptySealed = !loading && sortedRecords.length === 0 && !showError && isSealed;
   const errorMessage = queryError;

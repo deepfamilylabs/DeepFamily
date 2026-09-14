@@ -17,13 +17,13 @@ import type { StoryEditorController } from "../hooks/useStoryEditorController";
  */
 export function StoryEditorHeader({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
-  const name = editor.personName || t("storyRecordEditor.titleFallback", "Profile Data");
+  const name = editor.personName || t("storyRecordEditor.titleFallback", "Life Story");
 
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="flex min-w-0 flex-col gap-2">
         <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-ink-subtle">
-          {t("person.profileData", "Profile Data")}
+          {t("person.profileData", "Life Story")}
         </span>
 
         {/* The name wraps rather than truncating: an ellipsis on a person's name

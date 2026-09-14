@@ -3,7 +3,9 @@
  *
  * A long profile reads better with its opening and its most recent entry in
  * view and the middle folded away — everything stays reachable from Contents,
- * which lists every record regardless. Short profiles are never folded.
+ * which lists every record regardless. Short profiles are never folded, and
+ * neither are read-only ones: the fold exists to keep the latest entry beside
+ * the composer, so without a composer it would only hide text.
  */
 
 /** Entries kept visible at the start of the manuscript. */
@@ -19,9 +21,9 @@ export interface ManuscriptSegments<T> {
   tail: T[];
 }
 
-export function segmentManuscript<T>(records: readonly T[]): ManuscriptSegments<T> {
+export function segmentManuscript<T>(records: readonly T[], fold = true): ManuscriptSegments<T> {
   const middle = records.length - MANUSCRIPT_HEAD_COUNT - MANUSCRIPT_TAIL_COUNT;
-  if (middle < MANUSCRIPT_MIN_COLLAPSED) {
+  if (!fold || middle < MANUSCRIPT_MIN_COLLAPSED) {
     return { head: [...records], collapsed: [], tail: [] };
   }
   return {

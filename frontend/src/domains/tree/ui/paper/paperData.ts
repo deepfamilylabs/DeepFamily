@@ -218,7 +218,7 @@ function buildClassicalLines(params: {
       ? `${tFallback(t, "genealogyBook.fields.notes", "Notes")}: ${versionBiography}`
       : undefined,
     nftPublicStory
-      ? `${tFallback(t, "genealogyBook.fields.nftPublicStory", "Public NFT Story")}: ${
+      ? `${tFallback(t, "genealogyBook.fields.nftPublicStory", "Public NFT Biography")}: ${
           nftPublicStoryTitle?.trim() ? `${nftPublicStoryTitle} — ` : ""
         }${nftPublicStory}`
       : undefined,

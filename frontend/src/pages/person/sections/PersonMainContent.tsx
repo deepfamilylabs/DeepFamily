@@ -250,7 +250,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
-            {t("person.profileData", "Profile Data")}
+            {t("person.profileData", "Life Story")}
           </h3>
           {data.storyMetadata?.isSealed ? (
             <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-xs font-medium border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20">
@@ -357,7 +357,7 @@ function ProfileDataSection({ person }: { person: PersonPageController }) {
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 dark:text-gray-500 text-sm">
-            {t("person.noProfileData", "No profile data")}
+            {t("person.noProfileData", "No life story yet")}
           </p>
         </div>
       )}

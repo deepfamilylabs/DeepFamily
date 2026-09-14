@@ -65,8 +65,8 @@
         "description": "Endorsed versions can be minted as NFT biographies with full biographical data, recognizing quality contributions"
       },
       "storyRecordsSealing": {
-        "title": "Biographical Records & Sealing",
-        "description": "Append immutable biographical records with hash verification; sealing closes the archive to further records"
+        "title": "Story Records & Sealing",
+        "description": "Append immutable story records with hash verification; sealing closes the story to further records"
       }
     },
     "valueSystem": {
@@ -81,10 +81,10 @@
       },
       "layer2": {
         "title": "Value & Public Records",
-        "description": "Endorsed versions can be minted as NFT biographies. Community consensus surfaces the most trusted data while biographical storage keeps histories verifiable.",
+        "description": "Endorsed versions can be minted as NFT biographies. Community consensus surfaces the most trusted data while on-chain stories keep histories verifiable.",
         "feature1": "Minting publishes NFT biographies on-chain",
         "feature2": "Community endorsements validate data quality",
-        "feature3": "Biographical details extend records with on-chain verification"
+        "feature3": "Story records are appended with on-chain verification"
       },
       "advantages": {
         "title": "Workflow",
@@ -95,8 +95,8 @@
         "step2Desc": "Endorse trusted versions to signal data quality",
         "step3": "Mint Version NFT",
         "step3Desc": "Endorsers can mint NFTs for corresponding versions",
-        "step4": "Write Biographical Details",
-        "step4Desc": "Record holders write and append biographical content",
+        "step4": "Write Story Records",
+        "step4Desc": "Holders write and append story records",
         "step5": "Story Sealing",
         "step5Desc": "Seal stories to form immutable on-chain historical records"
       },
@@ -135,8 +135,8 @@
         "description": "Endorsed versions mint into NFT biographies that disclose core biographical info; holders can extend them with detailed narratives."
       },
       "storyRecords": {
-        "title": "Biographical Records & Sealing",
-        "description": "Append life stories as verifiable, immutable on-chain records, then seal the archive to prevent further records."
+        "title": "Story Records & Sealing",
+        "description": "Append life stories as verifiable, immutable on-chain records, then seal the story to prevent further records."
       },
       "versionNotarization": {
         "title": "Collaboration & Private Modes",
@@ -542,7 +542,7 @@
       "origin": "Origin",
       "deathPlace": "Death place",
       "notes": "Notes",
-      "nftPublicStory": "Public NFT Story",
+      "nftPublicStory": "Public NFT Biography",
       "endorsements": "Endorsements",
       "children": "Children",
       "descendants": "Children",
@@ -680,7 +680,7 @@
       "gender": "Gender",
       "birth": "Birth",
       "death": "Death",
-      "story": "Introduction",
+      "story": "Biography",
       "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
       "edit": "Edit",
@@ -696,7 +696,7 @@
       "unlockedOnDevice": "Unlocked on this device",
       "locked": "Locked",
       "versionBiography": "Encrypted Version Biography",
-      "nftPublicStory": "Public NFT Summary",
+      "nftPublicStory": "Public NFT Biography",
       "trustedEndorsers": "Recommended Sources",
       "trustedAccount": "Recommended Account",
       "trustedLoading": "Loading recommended sources...",
@@ -829,16 +829,16 @@
     "title": "Story Editor"
   },
   "storyRecordEditor": {
-    "titleWithName": "{{name}} Profile Data",
-    "titleFallback": "Profile Data",
+    "titleWithName": "{{name}}'s Life Story",
+    "titleFallback": "Life Story",
     "totalPayloadLength": "Total payload bytes",
     "addRecord": "Add New Record",
     "saving": "Saving...",
     "cancel": "Cancel",
     "loading": "Loading...",
     "contentRequired": "Content cannot be empty",
-    "noRecords": "No profile records yet.",
-    "noRecordsSealed": "This profile is sealed with no records.",
+    "noRecords": "No story records yet.",
+    "noRecordsSealed": "This story is sealed with no records.",
     "recordTypeLabel": "Record Type",
     "attachmentLabel": "Attachment CID (optional)",
     "attachmentPlaceholder": "Attachment CID (optional), e.g. bafy...",
@@ -846,10 +846,10 @@
     "invalidRecordType": "Invalid record type",
     "operationFailed": "Operation failed",
     "sealFailed": "Seal failed",
-    "storyMovedOn": "This profile gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
+    "storyMovedOn": "This story gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
     "sealDialog": {
-      "title": "Seal Biography",
-      "description": "Are you sure you want to seal the biography? Once sealed, it can no longer be modified.",
+      "title": "Seal Story",
+      "description": "Are you sure you want to seal the story? Once sealed, it can no longer be modified.",
       "cancel": "Cancel",
       "confirm": "Confirm Seal"
     },
@@ -919,13 +919,13 @@
     "payload": "Payload",
     "payloadHash": "Payload hash",
     "onChainRecord": "On-chain record",
-    "sealedNotice": "This profile is final. It stays readable and verifiable forever, and no further writes are accepted.",
+    "sealedNotice": "This story is final. It stays readable and verifiable forever, and no further writes are accepted.",
     "sealCard": {
-      "title": "Seal this profile",
+      "title": "Seal this story",
       "body": "Seals the current record-chain head on chain. After sealing, no further records can be appended.",
       "action": "Seal permanently"
     },
-    "paneStory": "Profile",
+    "paneStory": "Story",
     "paneRecord": "Record",
     "paneSwitcher": "Editor section",
     "collapsedRun": "{{total}} records collapsed",
@@ -934,10 +934,9 @@
     "listSeparator": ", ",
     "recordTitleLabel": "Title (optional)",
     "recordTitlePlaceholder": "Title (optional)",
-    "connectOwnerWallet": "Connect the NFT owner's wallet to edit. This story is available to read.",
-    "switchNetworkToEdit": "Switch your wallet to this story's network to edit.",
-    "checkingOwnership": "Checking NFT ownership…",
-    "ownershipUnavailable": "Unable to verify NFT ownership. Editing is unavailable until verification succeeds.",
+    "connectOwnerWallet": "Connect the NFT owner's wallet to edit.",
+    "switchNetworkToEdit": "Switch your wallet to {{network}} to edit.",
+    "ownershipUnavailable": "Couldn't verify NFT ownership. Please try again.",
     "ownerOnly": "Only the current NFT owner can edit this story."
   },
   "person": {
@@ -945,10 +944,10 @@
     "encyclopedia": "Encyclopedia",
     "pageTitle": "{{name}} Encyclopedia",
     "sealed": "Sealed",
-    "profileData": "Profile Data",
-    "noProfileData": "No profile data",
-    "recordList": "Profile Records",
-    "noRecords": "No profile records",
+    "profileData": "Life Story",
+    "noProfileData": "No life story yet",
+    "recordList": "Story Records",
+    "noRecords": "No story records",
     "metadata": "Metadata",
     "totalRecords": "Total Records",
     "totalPayloadLength": "Total payload bytes",
@@ -1037,13 +1036,13 @@
     "recordsAndSize": "{{count}} records · {{size}} bytes",
     "tag": "Tag",
     "personHash": "Person Hash",
-    "detailedStory": "Detailed Profile",
-    "records": "Profile Records",
+    "detailedStory": "Life Story",
+    "records": "Story Records",
     "fullText": "Full Text",
     "loading": "Loading story records...",
-    "noStoryData": "No profile data available",
-    "basicStory": "Introduction",
-    "noStory": "No profile content",
+    "noStoryData": "No story data available",
+    "basicStory": "Biography",
+    "noStory": "No story content",
     "peopleEncyclopedia": "Encyclopedia",
     "biographyTitle": "Biography"
   },
@@ -1170,9 +1169,9 @@
     "deathYear": "Death Year",
     "story": "Public biography",
     "storyPlaceholder": "Enter the full public biography, or import the unlocked private biography.",
-    "copyBiographyWarning": "An unlocked private biography is available for this exact version. Copying it into the NFT story makes that text permanently public on-chain.",
+    "copyBiographyWarning": "An unlocked private biography is available for this exact version. Copying it into the NFT biography makes that text permanently public on-chain.",
     "copyBiographyConfirm": "I understand this copies decrypted private biography text into a public, immutable NFT field.",
-    "copyBiographyToStory": "Copy biography into public story",
+    "copyBiographyToStory": "Copy into public biography",
     "tokenURI": "Token URI",
     "tokenURIHint": "Optional: URL or IPFS hash for NFT metadata",
     "nftAlreadyMinted": "NFT Already Minted",
@@ -1198,14 +1197,14 @@
     "validation": {
       "birthPlaceTooLong": "Birth place is too long",
       "deathPlaceTooLong": "Death place is too long",
-      "storyTooLong": "Story content is too long",
+      "storyTooLong": "Biography is too long",
       "tokenURITooLong": "Token URI is too long",
       "invalidTokenURI": "Invalid URL or IPFS URI",
       "yearExceedsCurrent": "AD year cannot exceed current year",
-      "storyRequiredForTitle": "Add story content before setting a title"
+      "storyRequiredForTitle": "Add biography content before setting a title"
     },
     "personHashMismatch": "The passphrase or identity suite does not match the target person hash",
-    "storyTitleLabel": "Story title (optional)",
+    "storyTitleLabel": "Biography title (optional)",
     "storyTitlePlaceholder": "Biography"
   },
   "endorse": {

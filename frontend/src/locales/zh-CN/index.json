@@ -34,8 +34,8 @@
     "closeMenu": "关闭菜单"
   },
   "story": {
-    "addingRecord": "正在添加故事记录...",
-    "sealing": "正在封存故事..."
+    "addingRecord": "正在添加档案记录...",
+    "sealing": "正在封存档案..."
   },
   "home": {
     "title": "去中心化数字族谱",
@@ -65,8 +65,8 @@
         "description": "经背书的版本可铸造为NFT人物百科，公开完整传记信息，认可高质量贡献"
       },
       "storyRecordsSealing": {
-        "title": "传记记录与封存",
-        "description": "追加不可篡改的传记记录并通过哈希校验，封存后档案不再接受新记录"
+        "title": "档案记录与封存",
+        "description": "追加不可篡改的档案记录并通过哈希校验，封存后档案不再接受新记录"
       }
     },
     "valueSystem": {
@@ -81,10 +81,10 @@
       },
       "layer2": {
         "title": "价值与公开记录",
-        "description": "经背书的版本可铸造为NFT人物百科。社区共识筛选最可信的数据，传记存储保持历史可验证。",
+        "description": "经背书的版本可铸造为NFT人物百科。社区共识筛选最可信的数据，链上档案保持历史可验证。",
         "feature1": "铸造即公开NFT人物百科",
         "feature2": "社区背书验证数据质量",
-        "feature3": "传记内容持续追加并链上确认"
+        "feature3": "档案记录持续追加并链上确认"
       },
       "advantages": {
         "title": "工作流程",
@@ -95,10 +95,10 @@
         "step2Desc": "背书可信版本，表达数据质量信号",
         "step3": "铸造版本 NFT",
         "step3Desc": "背书者可铸造对应版本的 NFT",
-        "step4": "撰写传记内容",
-        "step4Desc": "记录持有人撰写和追加传记内容",
-        "step5": "故事封存",
-        "step5Desc": "故事封存，形成不可更改的链上历史影像"
+        "step4": "撰写档案记录",
+        "step4Desc": "持有人撰写并追加档案记录",
+        "step5": "档案封存",
+        "step5Desc": "封存档案，形成不可更改的链上历史影像"
       },
       "privacyLayer": {
         "title": "隐私保护层",
@@ -135,7 +135,7 @@
         "description": "经背书版本可铸造为NFT人物百科，公开核心传记信息，持有人可继续追加详细叙事。"
       },
       "storyRecords": {
-        "title": "传记记录与封存",
+        "title": "档案记录与封存",
         "description": "将生平写入可验证、不可篡改的链上记录，封存档案后不再接受新记录。"
       },
       "versionNotarization": {
@@ -329,7 +329,7 @@
       "inputLabel": "查询链上记录",
       "clear": "清除",
       "recent": "最近",
-      "subtitle": "输入人物哈希、Token ID 或钱包地址，查询对应的版本、背书、NFT、故事与家庭关系。",
+      "subtitle": "输入人物哈希、Token ID 或钱包地址，查询对应的版本、背书、NFT、档案与家庭关系。",
       "retry": "重试",
       "searchThis": "查询该项",
       "hexLength": "当前 {{count}} 位",
@@ -353,7 +353,7 @@
         "trustedEndorsers": "推荐来源",
         "endorsement": "背书统计",
         "children": "子女",
-        "storyRecords": "故事记录",
+        "storyRecords": "档案记录",
         "uri": "URI 历史",
         "accountVersions": "创建的版本",
         "accountEndorsements": "作出的背书",
@@ -361,8 +361,8 @@
         "personNfts": "NFT"
       },
       "entry": {
-        "personHashDesc": "展开人物版本、推荐来源、背书统计、子女、NFT、故事记录与 URI 历史。",
-        "tokenIdDesc": "展开该 NFT 的故事记录与 URI 历史。",
+        "personHashDesc": "展开人物版本、推荐来源、背书统计、子女、NFT、档案记录与 URI 历史。",
+        "tokenIdDesc": "展开该 NFT 的档案记录与 URI 历史。",
         "addressDesc": "展开该账户创建的版本、作出的背书与持有的 NFT。"
       },
       "empty": {
@@ -680,7 +680,7 @@
       "gender": "性别",
       "birth": "出生",
       "death": "逝世",
-      "story": "简介",
+      "story": "传记",
       "encyclopedia": "人物百科",
       "editStory": "编辑档案",
       "edit": "编辑",
@@ -696,7 +696,7 @@
       "unlockedOnDevice": "已在此设备解锁",
       "locked": "已锁定",
       "versionBiography": "加密版本传记",
-      "nftPublicStory": "NFT 公开简介",
+      "nftPublicStory": "NFT 公开传记",
       "trustedEndorsers": "推荐来源",
       "trustedAccount": "推荐账户",
       "trustedLoading": "推荐来源加载中…",
@@ -829,16 +829,16 @@
     "title": "档案编辑器"
   },
   "storyRecordEditor": {
-    "titleWithName": "{{name}}的人物资料",
-    "titleFallback": "人物资料",
+    "titleWithName": "{{name}}的人物档案",
+    "titleFallback": "人物档案",
     "totalPayloadLength": "总载荷字节数",
     "addRecord": "添加新记录",
     "saving": "保存中...",
     "cancel": "取消",
     "loading": "加载中...",
     "contentRequired": "内容不能为空",
-    "noRecords": "暂无资料记录",
-    "noRecordsSealed": "此资料已封存且无记录内容",
+    "noRecords": "暂无档案记录",
+    "noRecordsSealed": "此档案已封存且无记录内容",
     "recordTypeLabel": "记录类型",
     "attachmentLabel": "附件CID（可选）",
     "attachmentPlaceholder": "附件 CID（可选），例如 bafy...",
@@ -846,16 +846,16 @@
     "invalidRecordType": "无效的记录类型",
     "operationFailed": "操作失败",
     "sealFailed": "封存失败",
-    "storyMovedOn": "在你书写期间，这份资料新增了记录。最新状态已载入，请重新确认并签名，新记录会追加在它们之后。",
+    "storyMovedOn": "在你书写期间，这份档案新增了记录。最新状态已载入，请重新确认并签名，新记录会追加在它们之后。",
     "sealDialog": {
-      "title": "封存传记",
-      "description": "确定要封存传记吗？封存后将无法再修改。",
+      "title": "封存档案",
+      "description": "确定要封存档案吗？封存后将无法再修改。",
       "cancel": "取消",
       "confirm": "确认封存"
     },
     "recordTypeHelp": {
-      "title": "传记记录类型指南",
-      "intro": "传记记录是用于组织人物传记叙事和生平故事的内容类型标签。这19种类型支持灵活叙事——您可以按任意顺序使用同一类型的多个记录。",
+      "title": "档案记录类型指南",
+      "intro": "记录类型是用于组织人物生平叙事的内容标签。这19种类型支持灵活叙事——您可以按任意顺序使用同一类型的多个记录。",
       "opening": "开篇",
       "summaryDesc": "人物生平和重要性的简要概述",
       "earlyYears": "早年经历",
@@ -890,12 +890,12 @@
       "note4": "职业经历：用于聚焦职业历史（工作、公司、职位）",
       "note5": "早年生活 vs 生平事件：早年生活用于童年片段，生平事件用于完整时间轴"
     },
-    "contentPlaceholderBytes": "请输入故事内容；可保存的记录大小取决于当前网络的交易容量",
+    "contentPlaceholderBytes": "请输入记录内容；可保存的记录大小取决于当前网络的交易容量",
     "success": {
       "recordAdded": "第 {{index}} 条记录添加成功（{{bytes}} 字节）",
       "recordAddedGeneric": "记录添加成功",
-      "storySealed": "传记封存成功（共 {{total}} 个记录）",
-      "storySealedGeneric": "传记封存成功"
+      "storySealed": "档案封存成功（共 {{total}} 个记录）",
+      "storySealedGeneric": "档案封存成功"
     },
     "errors": {
       "userRejected": "用户拒绝了交易",
@@ -919,13 +919,13 @@
     "payload": "数据量",
     "payloadHash": "载荷哈希",
     "onChainRecord": "链上记录",
-    "sealedNotice": "该资料已定稿，可永久读取与校验，不再接受任何写入。",
+    "sealedNotice": "该档案已定稿，可永久读取与校验，不再接受任何写入。",
     "sealCard": {
-      "title": "封存该资料",
+      "title": "封存该档案",
       "body": "在链上封存当前记录链头。封存之后，无法再追加记录。",
       "action": "永久封存"
     },
-    "paneStory": "资料",
+    "paneStory": "档案",
     "paneRecord": "链上记录",
     "paneSwitcher": "编辑区域",
     "collapsedRun": "已折叠 {{total}} 个记录",
@@ -934,21 +934,20 @@
     "listSeparator": "、",
     "recordTitleLabel": "标题（可选）",
     "recordTitlePlaceholder": "标题（可选）",
-    "connectOwnerWallet": "连接 NFT 所有者的钱包后方可编辑，故事仍可公开阅读。",
-    "switchNetworkToEdit": "请将钱包切换到此故事所在的网络后再编辑。",
-    "checkingOwnership": "正在核实 NFT 所有者…",
-    "ownershipUnavailable": "暂时无法核实 NFT 所有者，验证成功前不可编辑。",
-    "ownerOnly": "只有当前 NFT 所有者可以编辑此故事。"
+    "connectOwnerWallet": "连接 NFT 所有者的钱包后即可编辑。",
+    "switchNetworkToEdit": "请将钱包切换到 {{network}} 后再编辑。",
+    "ownershipUnavailable": "暂时无法核实 NFT 所有者，请重试。",
+    "ownerOnly": "只有当前 NFT 所有者可以编辑此档案。"
   },
   "person": {
     "recordOrdinal": "第 {{index}} 条",
     "encyclopedia": "人物百科",
     "pageTitle": "{{name}} 人物百科",
     "sealed": "已封存",
-    "profileData": "人物资料",
-    "noProfileData": "暂无人物资料",
-    "recordList": "资料记录",
-    "noRecords": "暂无资料记录",
+    "profileData": "人物档案",
+    "noProfileData": "暂无人物档案",
+    "recordList": "档案记录",
+    "noRecords": "暂无档案记录",
     "metadata": "元数据",
     "totalRecords": "总记录数",
     "totalPayloadLength": "总载荷字节数",
@@ -1029,7 +1028,7 @@
     }
   },
   "storyRecordsModal": {
-    "fetchError": "加载传记数据失败",
+    "fetchError": "加载档案失败",
     "lifeEvents": "重要事件",
     "blockchainIdentity": "链上身份",
     "born": "出生",
@@ -1037,15 +1036,15 @@
     "recordsAndSize": "{{count}} 个记录 · {{size}} 字节",
     "tag": "标签",
     "personHash": "人物哈希",
-    "detailedStory": "详细资料",
-    "records": "资料记录",
+    "detailedStory": "人物档案",
+    "records": "档案记录",
     "fullText": "全文",
-    "loading": "加载传记记录中...",
-    "noStoryData": "暂无资料数据",
-    "basicStory": "简介",
-    "noStory": "暂无资料内容",
+    "loading": "正在加载档案记录...",
+    "noStoryData": "暂无档案数据",
+    "basicStory": "传记",
+    "noStory": "暂无档案内容",
     "peopleEncyclopedia": "人物百科",
-    "biographyTitle": "人物简介"
+    "biographyTitle": "人物传记"
   },
   "actions": {
     "title": "链上操作",
@@ -1198,15 +1197,15 @@
     "validation": {
       "birthPlaceTooLong": "出生地过长",
       "deathPlaceTooLong": "死亡地过长",
-      "storyTooLong": "故事内容过长",
+      "storyTooLong": "传记内容过长",
       "tokenURITooLong": "Token URI 过长",
       "invalidTokenURI": "无效的 URL 或 IPFS URI",
       "yearExceedsCurrent": "公元年份不能超过当前年份",
-      "storyRequiredForTitle": "填写简介标题前请先填写正文"
+      "storyRequiredForTitle": "填写传记标题前请先填写正文"
     },
     "personHashMismatch": "口令或身份套件与目标人物哈希不匹配",
-    "storyTitleLabel": "简介标题（可选）",
-    "storyTitlePlaceholder": "人物简介"
+    "storyTitleLabel": "传记标题（可选）",
+    "storyTitlePlaceholder": "人物传记"
   },
   "endorse": {
     "title": "背书版本",
@@ -1392,7 +1391,7 @@
       "InvalidBirthMonth": "出生月份无效。",
       "InvalidBirthDay": "出生日期无效。",
       "InvalidBirthYear": "出生年份无效。",
-      "InvalidStory": "故事内容无效。",
+      "InvalidStory": "档案内容无效。",
       "InvalidTokenURI": "Token URI 无效。",
       "InvalidZKProof": "零知识证明验证失败。",
       "InvalidVerifierAddress": "验证合约地址无效。",
@@ -1455,10 +1454,10 @@
       "NotEndorsed": "该版本尚未被背书。",
       "PageSizeExceedsLimit": "分页大小超出限制。",
       "DirectNativeCurrencyNotAccepted": "不接受直接转入目标网络的原生代币。",
-      "StoryAlreadySealed": "故事已封存。",
-      "RecordIndexOutOfRange": "故事记录索引超出范围。",
-      "PayloadHashMismatch": "故事载荷哈希不匹配。",
-      "StoryNotFound": "未找到故事。",
+      "StoryAlreadySealed": "档案已封存。",
+      "RecordIndexOutOfRange": "档案记录索引超出范围。",
+      "PayloadHashMismatch": "记录载荷哈希不匹配。",
+      "StoryNotFound": "未找到档案。",
       "MustBeNFTHolder": "需要 NFT 持有者权限。",
       "OnlyDeepFamilyContract": "只有 DeepFamily 合约可以调用该代币函数。",
       "ZeroAddress": "地址不能为零地址。",
@@ -1546,10 +1545,10 @@
     "segmentCost": "这条记录需要创建多个存储分段。每增加一段都会增加交易成本。",
     "feeChanges": "钱包提交交易前，网络费用可能发生变化。",
     "exactBytes": "查看完整载荷字节及哈希",
-    "unknownSchema": "此记录使用了当前应用尚不支持的故事格式或压缩方式。已验证其存储字节完整。",
+    "unknownSchema": "此记录使用了当前应用尚不支持的格式或压缩方式。已验证其存储字节完整。",
     "rawRecord": "查看已验证的原始记录",
     "largeStory": "原文较长，请在签名前查看压缩后的存储大小与费用估算",
-    "reviewStory": "确认故事交易",
+    "reviewStory": "确认档案交易",
     "confirm": "前往钱包确认",
     "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节"
   }
