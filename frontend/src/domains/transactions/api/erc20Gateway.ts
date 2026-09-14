@@ -1,8 +1,7 @@
 export type EnsureAllowanceOptions = {
   tokenContract: {
     allowance: (owner: string, spender: string) => Promise<bigint>;
-    approve: (spender: string, amount: bigint) => Promise<{ wait: () => Promise<any>; hash?: string }>;
-    increaseAllowance?: (
+    approve: (
       spender: string,
       amount: bigint,
     ) => Promise<{ wait: () => Promise<any>; hash?: string }>;
@@ -34,17 +33,7 @@ export async function ensureAllowance({
     };
   }
 
-  let tx;
-  try {
-    tx = await tokenContract.approve(spender, required);
-  } catch (approveError) {
-    const delta = required - currentAllowance;
-    if (delta <= 0n || typeof tokenContract.increaseAllowance !== "function") {
-      throw approveError;
-    }
-    tx = await tokenContract.increaseAllowance(spender, delta);
-  }
-
+  const tx = await tokenContract.approve(spender, required);
   await tx.wait();
 
   return {

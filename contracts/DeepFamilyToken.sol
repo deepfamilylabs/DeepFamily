@@ -71,7 +71,6 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
   error InvalidDeepFamilyContract();
   error InvalidTokenBinding();
   error InvalidRecordCount();
-  error AllowanceBelowZero();
 
   // ========== Modifiers ==========
 
@@ -186,39 +185,5 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
     }
 
     return INITIAL_REWARD >> cycleIndex;
-  }
-
-  // ========== ERC20 Allowance Extension Functions ==========
-
-  /**
-   * @dev Safely increase allowance amount
-   * @param spender Address being authorized
-   * @param addedValue Amount of allowance to add
-   * @return Whether operation succeeded
-   *
-   * Note: This function avoids race condition issues of standard approve function
-   */
-  function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
-    address owner = _msgSender();
-    _approve(owner, spender, allowance(owner, spender) + addedValue);
-    return true;
-  }
-
-  /**
-   * @dev Safely decrease allowance amount
-   * @param spender Address being authorized
-   * @param subtractedValue Amount of allowance to subtract
-   * @return Whether operation succeeded
-   *
-   * Note: Transaction will revert if resulting allowance would be below 0
-   */
-  function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-    address owner = _msgSender();
-    uint256 currentAllowance = allowance(owner, spender);
-    if (currentAllowance < subtractedValue) revert AllowanceBelowZero();
-    unchecked {
-      _approve(owner, spender, currentAllowance - subtractedValue);
-    }
-    return true;
   }
 }

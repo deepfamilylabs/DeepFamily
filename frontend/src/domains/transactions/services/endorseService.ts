@@ -75,10 +75,6 @@ type TokenAllowanceContract = {
     spender: string,
     amount: bigint,
   ) => Promise<{ wait: () => Promise<any>; hash?: string }>;
-  increaseAllowance?: (
-    spender: string,
-    amount: bigint,
-  ) => Promise<{ wait: () => Promise<any>; hash?: string }>;
   recentReward: () => Promise<bigint>;
   balanceOf: (owner: string) => Promise<bigint>;
   decimals: () => Promise<bigint | number>;
