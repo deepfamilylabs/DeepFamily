@@ -97,8 +97,10 @@ export default function GenerationFilter({
     0,
   );
 
-  const dragLow = dragAnchor !== null && dragHover !== null ? Math.min(dragAnchor, dragHover) : null;
-  const dragHigh = dragAnchor !== null && dragHover !== null ? Math.max(dragAnchor, dragHover) : null;
+  const dragLow =
+    dragAnchor !== null && dragHover !== null ? Math.min(dragAnchor, dragHover) : null;
+  const dragHigh =
+    dragAnchor !== null && dragHover !== null ? Math.max(dragAnchor, dragHover) : null;
   const isPreviewed = (generation: number) =>
     dragLow !== null && dragHigh !== null && generation >= dragLow && generation <= dragHigh;
 
@@ -120,13 +122,14 @@ export default function GenerationFilter({
     selectedCount > 0 && isRun ? rangeLabel : t("people.generations", "Generations");
 
   return (
-    <div ref={anchorRef} className="relative">
+    // Not `relative` below sm: the panel spans the sticky toolbar there (see PeopleToolbar).
+    <div ref={anchorRef} className="sm:relative">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-colors ${
+        className={`inline-flex shrink-0 items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
           selectedCount > 0
             ? "bg-primary/10 text-primary border border-primary/25"
             : "text-ink-muted border border-dashed border-hairline-strong hover:text-ink hover:border-ink-subtle"
@@ -146,7 +149,7 @@ export default function GenerationFilter({
         <div
           role="dialog"
           aria-label={t("people.generations", "Generations")}
-          className="absolute right-0 top-full mt-2 z-50 w-85 rounded-2xl border border-hairline bg-surface p-3.5 shadow-xl shadow-ink/10"
+          className="absolute inset-x-4 top-full mt-2 z-50 rounded-2xl border border-hairline bg-surface p-3.5 shadow-xl shadow-ink/10 sm:inset-x-auto sm:left-0 sm:w-85"
         >
           <div className="flex items-baseline justify-between mb-2.5">
             <span className="text-[11px] font-semibold tracking-wide text-ink-subtle">
@@ -204,7 +207,9 @@ export default function GenerationFilter({
                           )}px`,
                         }}
                         className={`block w-full rounded-t transition-colors ${
-                          isActive ? "bg-primary" : "bg-surface-muted group-hover:bg-hairline-strong"
+                          isActive
+                            ? "bg-primary"
+                            : "bg-surface-muted group-hover:bg-hairline-strong"
                         }`}
                       />
                     </span>
@@ -225,7 +230,10 @@ export default function GenerationFilter({
           </div>
 
           <div className="mt-3 pt-2.5 border-t border-hairline text-[11px] leading-relaxed text-ink-subtle">
-            {t("people.generationHint", "Click a generation, or drag across the row to take a range.")}
+            {t(
+              "people.generationHint",
+              "Click a generation, or drag across the row to take a range.",
+            )}
           </div>
         </div>
       )}

@@ -28,6 +28,15 @@ const sortOptions: Array<{ type: PeopleFilterType; key: string; label: string }>
  * live on a single row; the chip row only appears once a filter is actually
  * applied, and the creator-address input moved into a popover behind the
  * filter button.
+ *
+ * The row is two groups: what shapes the list (sort, generations, filter
+ * rules) and what the list is (the count, the view mode). On a phone each
+ * group takes its own line — the shaping controls wrap as a group, the count
+ * and view sit at the two ends of theirs — and no control ever shrinks below
+ * its label, which used to break "Generations" into a column of characters.
+ * Their popovers span the toolbar there instead of hanging off a button that
+ * may sit anywhere on the line (the wrappers drop `relative` below `sm`, so the
+ * sticky toolbar is what they position against).
  */
 export function PeopleToolbar({ t, filters, view, loading, filteredCount }: PeopleToolbarProps) {
   const [addressOpen, setAddressOpen] = useState(false);
@@ -78,19 +87,92 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
             />
           </div>
 
-          <SortMenu
-            t={t}
-            options={visibleSortOptions.map((option) => ({
-              type: option.type,
-              label: t(option.key, option.label),
-            }))}
-            activeType={filters.filterType}
-            sortOrder={filters.sortOrder}
-            onSelect={filters.setFilterType}
-            onSortOrderChange={filters.setSortOrder}
-          />
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            <SortMenu
+              t={t}
+              options={visibleSortOptions.map((option) => ({
+                type: option.type,
+                label: t(option.key, option.label),
+              }))}
+              activeType={filters.filterType}
+              sortOrder={filters.sortOrder}
+              onSelect={filters.setFilterType}
+              onSortOrderChange={filters.setSortOrder}
+            />
 
-          <div className="flex items-center gap-2 ml-auto">
+            {/* Both narrow the list, so they wrap as a pair rather than splitting across lines. */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <GenerationFilter
+                t={t}
+                options={filters.generationOptions}
+                selected={filters.selectedGenerations}
+                onToggle={filters.toggleGeneration}
+                onSelectRange={filters.selectGenerationRange}
+                onClear={filters.clearGenerations}
+              />
+
+              <div ref={anchorRef} className="sm:relative">
+                <button
+                  type="button"
+                  onClick={() => setAddressOpen((open) => !open)}
+                  aria-expanded={addressOpen}
+                  aria-haspopup="dialog"
+                  className={`inline-flex shrink-0 items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                    addressCount > 0
+                      ? "bg-primary/10 text-primary border border-primary/25"
+                      : "text-ink-muted border border-dashed border-hairline-strong hover:text-ink hover:border-ink-subtle"
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  <span>{t("people.filterRules", "Filter Rules")}</span>
+                  {addressCount > 0 && <span className="tabular-nums">{addressCount}</span>}
+                </button>
+
+                {addressOpen && (
+                  <div
+                    role="dialog"
+                    aria-label={t("people.filterByAddress", "Add creator address...")}
+                    className="absolute inset-x-4 top-full mt-2 z-50 rounded-2xl border border-hairline bg-surface p-3.5 shadow-xl shadow-ink/10 sm:inset-x-auto sm:left-0 sm:w-80"
+                  >
+                    <div className="mb-2 text-[11px] font-semibold tracking-wide text-ink-subtle">
+                      {t("people.filterRules", "Filter Rules")}
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1 group">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle group-focus-within:text-primary transition-colors" />
+                        <input
+                          ref={inputRef}
+                          type="text"
+                          value={filters.addressInput}
+                          onChange={(event) => filters.setAddressInput(event.target.value)}
+                          onKeyDown={filters.handleAddressKeyDown}
+                          placeholder={t("people.filterByAddress", "Add creator address...")}
+                          className="w-full h-10 pl-9 pr-3 text-sm rounded-xl border border-hairline bg-surface-alt text-ink placeholder-ink-subtle focus:outline-hidden focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={filters.addAddress}
+                        disabled={!filters.addressInput.trim()}
+                        aria-label={t("people.filterByAddress", "Add creator address...")}
+                        className="w-10 h-10 shrink-0 rounded-xl bg-ink text-surface hover:bg-primary-hover hover:text-white disabled:opacity-50 disabled:hover:bg-ink disabled:hover:text-surface transition-all flex items-center justify-center active:scale-95"
+                      >
+                        <Plus className="w-5 h-5" strokeWidth={2.5} />
+                      </button>
+                    </div>
+                    <div className="mt-2 text-[11px] text-ink-subtle">
+                      {t(
+                        "people.filterByAddressHint",
+                        "Press Enter or comma to add several addresses",
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end">
             <span className="flex items-center gap-2 text-xs font-medium text-ink-muted whitespace-nowrap">
               {loading && (
                 <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
@@ -102,72 +184,7 @@ export function PeopleToolbar({ t, filters, view, loading, filteredCount }: Peop
                 : t("people.allResults", "{{count}} total results", { count: filteredCount })}
             </span>
 
-            <GenerationFilter
-              t={t}
-              options={filters.generationOptions}
-              selected={filters.selectedGenerations}
-              onToggle={filters.toggleGeneration}
-              onSelectRange={filters.selectGenerationRange}
-              onClear={filters.clearGenerations}
-            />
-
-            <div ref={anchorRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setAddressOpen((open) => !open)}
-                aria-expanded={addressOpen}
-                aria-haspopup="dialog"
-                className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-medium transition-colors ${
-                  addressCount > 0
-                    ? "bg-primary/10 text-primary border border-primary/25"
-                    : "text-ink-muted border border-dashed border-hairline-strong hover:text-ink hover:border-ink-subtle"
-                }`}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{t("people.filterRules", "Filter Rules")}</span>
-                {addressCount > 0 && <span className="tabular-nums">{addressCount}</span>}
-              </button>
-
-              {addressOpen && (
-                <div
-                  role="dialog"
-                  aria-label={t("people.filterByAddress", "Add creator address...")}
-                  className="absolute right-0 top-full mt-2 z-50 w-80 rounded-2xl border border-hairline bg-surface p-3.5 shadow-xl shadow-ink/10"
-                >
-                  <div className="mb-2 text-[11px] font-semibold tracking-wide text-ink-subtle">
-                    {t("people.filterRules", "Filter Rules")}
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1 group">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-subtle group-focus-within:text-primary transition-colors" />
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={filters.addressInput}
-                        onChange={(event) => filters.setAddressInput(event.target.value)}
-                        onKeyDown={filters.handleAddressKeyDown}
-                        placeholder={t("people.filterByAddress", "Add creator address...")}
-                        className="w-full h-10 pl-9 pr-3 text-sm rounded-xl border border-hairline bg-surface-alt text-ink placeholder-ink-subtle focus:outline-hidden focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={filters.addAddress}
-                      disabled={!filters.addressInput.trim()}
-                      aria-label={t("people.filterByAddress", "Add creator address...")}
-                      className="w-10 h-10 shrink-0 rounded-xl bg-ink text-surface hover:bg-primary-hover hover:text-white disabled:opacity-50 disabled:hover:bg-ink disabled:hover:text-surface transition-all flex items-center justify-center active:scale-95"
-                    >
-                      <Plus className="w-5 h-5" strokeWidth={2.5} />
-                    </button>
-                  </div>
-                  <div className="mt-2 text-[11px] text-ink-subtle">
-                    {t("people.filterByAddressHint", "Press Enter or comma to add several addresses")}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-0.5 p-0.5 rounded-[10px] bg-surface-muted">
+            <div className="flex shrink-0 items-center gap-0.5 p-0.5 rounded-[10px] bg-surface-muted">
               <ViewButton
                 label={t("people.viewGrid", "Grid view")}
                 isActive={view.mode === "grid"}

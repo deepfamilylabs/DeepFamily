@@ -2,8 +2,9 @@
  * Overlay stacking order.
  *
  * Everything here must sit ABOVE the app chrome, which is itself fixed and
- * layered: StatusBar z-10001 (its menus must clear the button), FloatingActionButton
- * z-10000, the GlobalSidebar
+ * layered: the family settings drawer on a phone z-10003 (its backdrop z-10002 —
+ * it must clear the button and the bar), StatusBar z-10001 (its menus must clear
+ * the button), FloatingActionButton z-10000, the GlobalSidebar
  * mobile drawer z-10005 (its desktop rail sits below the header at z-90),
  * SiteHeader z-100. A dialog below that band ends up painted over by the
  * chrome, which is what the low z-1200/z-1300 layers used to do.
