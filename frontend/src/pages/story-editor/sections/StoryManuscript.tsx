@@ -1,7 +1,6 @@
 import { ChevronUp, Lock } from "lucide-react";
 import {
   STORY_SPINE_MARKER,
-  StoryRecordOrderToggle,
   StoryTimelineEntry,
   getRecordTypeColorClass,
 } from "../../../domains/person";
@@ -33,10 +32,6 @@ export function StoryManuscript({ editor }: { editor: StoryEditorController }) {
 
   return (
     <div ref={editor.refs.scrollContainerRef} className="flex flex-col gap-6">
-      {editor.sortedRecords.length > 1 && (
-        <StoryRecordOrderToggle t={t} value={editor.order.value} onChange={editor.order.set} />
-      )}
-
       {editor.showError && (
         <section
           role="alert"
