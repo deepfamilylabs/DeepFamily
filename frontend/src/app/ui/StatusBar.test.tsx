@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
     isChecking: false,
   },
   networkName: "Localhost",
+  isDark: false,
+  toggleTheme: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -31,6 +33,14 @@ vi.mock("react-i18next", () => ({
       return vars ? text.replace(/\{\{(\w+)\}\}/g, (_, name) => String(vars[name] ?? "")) : text;
     },
   }),
+}));
+
+vi.mock("../context", () => ({
+  useTheme: () => ({ isDark: mocks.isDark, toggleTheme: mocks.toggleTheme }),
+}));
+
+vi.mock("./LanguageMenu", () => ({
+  default: () => <div data-testid="language-menu" />,
 }));
 
 vi.mock("./useChainStatus", () => ({
@@ -169,9 +179,58 @@ describe("StatusBar", () => {
     expect(hrefs.some((href) => href?.includes("github.com"))).toBe(true);
   });
 
-  it("stays out of the way below md, where the bottom nav owns that edge", () => {
+  it("keeps the language switch with the links, desktop-only like them", () => {
+    renderBar();
+
+    const group = screen.getByTestId("language-menu").parentElement;
+    expect(group?.className).toContain("hidden md:flex");
+    expect(group?.contains(screen.getByLabelText("GitHub"))).toBe(true);
+  });
+
+  it("flips the theme from the bar, beside the language switch", () => {
+    mocks.isDark = false;
+    mocks.toggleTheme.mockReset();
+    renderBar();
+
+    const toggle = screen.getByRole("switch", { name: "Theme" });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(toggle.previousElementSibling).toBe(screen.getByTestId("language-menu"));
+
+    fireEvent.click(toggle);
+    expect(mocks.toggleTheme).toHaveBeenCalledTimes(1);
+  });
+
+  it("links the logo page as the mark, first among the icon links", () => {
+    renderBar();
+
+    const logo = screen.getByRole("link", { name: "Logo" });
+    expect(logo.getAttribute("href")).toBe("/logo.html");
+    expect(logo.getAttribute("target")).toBe("_blank");
+    expect(logo.getAttribute("title")).toBe("Logo");
+    // An icon like its neighbours: no visible word, painted in the bar's text colour.
+    expect(logo.textContent).toBe("");
+    expect(logo.querySelector("g")?.getAttribute("stroke")).toBe("currentColor");
+    expect(logo.nextElementSibling).toBe(screen.getByRole("link", { name: "X" }));
+  });
+
+  it("stays on screen below md, leaving only the links to the drawer", () => {
     const { container } = renderBar();
 
-    expect(container.firstElementChild?.className).toContain("hidden md:flex");
+    const bar = container.firstElementChild;
+    expect(bar?.className).not.toContain("hidden");
+    expect(bar?.className).toContain("pb-[env(safe-area-inset-bottom)]");
+    expect(screen.getByLabelText("GitHub").closest("div")?.className).toContain("hidden md:flex");
+  });
+
+  it("spans the bar with the network menu on phones instead of running off the edge", () => {
+    renderBar();
+
+    fireEvent.click(screen.getByRole("button", { name: /RPC status/ }));
+    const menu = screen.getByRole("dialog", { name: "RPC network" });
+    expect(menu.className).toContain("inset-x-4");
+    expect(menu.className).toContain("md:w-80");
+    // Without `relative` below md, the fixed bar is what the menu positions against.
+    expect(menu.parentElement?.className).toContain("md:relative");
+    expect(menu.parentElement?.className).not.toMatch(/(^| )relative( |$)/);
   });
 });

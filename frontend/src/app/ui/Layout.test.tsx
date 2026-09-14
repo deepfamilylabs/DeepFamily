@@ -21,10 +21,6 @@ vi.mock("./GlobalSidebar", () => ({
   default: () => <div data-testid="global-sidebar">global-sidebar</div>,
 }));
 
-vi.mock("./BottomNav", () => ({
-  default: () => <div data-testid="bottom-nav">bottom-nav</div>,
-}));
-
 vi.mock("./FloatingActionButton", () => ({
   default: () => <div data-testid="floating-action-button">floating-action-button</div>,
 }));
@@ -66,7 +62,6 @@ describe("Layout", () => {
     expect(screen.getByTestId("global-sidebar")).toBeTruthy();
     expect(screen.getByTestId("page-content").textContent).toBe("home-content");
     expect(screen.queryByTestId("page-container")).toBeNull();
-    expect(screen.getByTestId("bottom-nav")).toBeTruthy();
     expect(screen.getByTestId("floating-action-button")).toBeTruthy();
     expect(screen.getByTestId("status-bar")).toBeTruthy();
   });

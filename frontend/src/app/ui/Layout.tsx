@@ -8,7 +8,6 @@
  */
 
 import { Outlet, useLocation } from "react-router-dom";
-import BottomNav from "./BottomNav";
 import { PageContainer } from "../../shared/ui";
 import SiteHeader from "./SiteHeader";
 import FloatingActionButton from "./FloatingActionButton";
@@ -43,15 +42,12 @@ export default function Layout() {
         {isFullWidthPage ? (
           <Outlet />
         ) : (
-          <PageContainer className="pt-10 pb-16 md:pb-12">
+          <PageContainer className="pt-10 pb-12">
             <Outlet />
           </PageContainer>
         )}
       </main>
       <StatusBar />
-      <div className="md:hidden">
-        <BottomNav />
-      </div>
       <FloatingActionButton />
     </div>
   );

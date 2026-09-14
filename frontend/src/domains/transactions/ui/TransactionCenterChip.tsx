@@ -21,6 +21,46 @@ function shortHash(hash: string) {
   return `${hash.slice(0, 10)}…${hash.slice(-8)}`;
 }
 
+/** The transaction centre's records with their clear control — the chip's menu body. */
+function TransactionCenterList() {
+  const { t } = useTranslation();
+  const centre = useTransactionCenter();
+
+  if (!centre || centre.records.length === 0) return null;
+
+  const title = t("transaction.center", "Transactions");
+
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-3 px-1.5 pb-2">
+        <span className="text-xs font-semibold text-ink">{title}</span>
+        <button
+          type="button"
+          onClick={() => centre.clearSettled()}
+          className={`text-[11px] ${LINK_CLASSES}`}
+        >
+          {t("transaction.clearSettled", "Clear finished")}
+        </button>
+      </div>
+
+      {centre.pendingCount > 0 && (
+        <p className="px-1.5 pb-2 text-[11px] leading-relaxed text-ink-muted">
+          {t(
+            "transaction.pendingDetails",
+            "Transaction has been submitted or waiting for wallet confirmation. You can continue using the app, we'll update after confirmation.",
+          )}
+        </p>
+      )}
+
+      <ul className="space-y-1">
+        {centre.records.map((record) => (
+          <TransactionRow key={record.id} record={record} />
+        ))}
+      </ul>
+    </>
+  );
+}
+
 /**
  * The transaction centre's entry point, in the status bar beside the RPC chip.
  *
@@ -54,7 +94,8 @@ export default function TransactionCenterChip() {
   const title = t("transaction.center", "Transactions");
 
   return (
-    <div className="relative" ref={menuRef}>
+    // Not `relative` below md: the menu spans the status bar there (see StatusBar).
+    <div className="flex md:relative" ref={menuRef}>
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
@@ -74,33 +115,9 @@ export default function TransactionCenterChip() {
         <div
           role="dialog"
           aria-label={title}
-          className="absolute bottom-full left-0 mb-2 max-h-[70vh] w-96 overflow-y-auto rounded-xl border border-hairline bg-surface p-2 shadow-[0_16px_40px_-16px_rgba(15,23,42,0.35)] dark:shadow-[0_16px_40px_-16px_rgba(0,0,0,0.75)]"
+          className="absolute bottom-full inset-x-4 mb-2 max-h-[70vh] overflow-y-auto md:inset-x-auto md:left-0 md:w-96 rounded-xl border border-hairline bg-surface p-2 shadow-[0_16px_40px_-16px_rgba(15,23,42,0.35)] dark:shadow-[0_16px_40px_-16px_rgba(0,0,0,0.75)]"
         >
-          <div className="flex items-baseline justify-between gap-3 px-1.5 pb-2">
-            <span className="text-xs font-semibold text-ink">{title}</span>
-            <button
-              type="button"
-              onClick={() => centre.clearSettled()}
-              className={`text-[11px] ${LINK_CLASSES}`}
-            >
-              {t("transaction.clearSettled", "Clear finished")}
-            </button>
-          </div>
-
-          {centre.pendingCount > 0 && (
-            <p className="px-1.5 pb-2 text-[11px] leading-relaxed text-ink-muted">
-              {t(
-                "transaction.pendingDetails",
-                "Transaction has been submitted or waiting for wallet confirmation. You can continue using the app, we'll update after confirmation.",
-              )}
-            </p>
-          )}
-
-          <ul className="space-y-1">
-            {centre.records.map((record) => (
-              <TransactionRow key={record.id} record={record} />
-            ))}
-          </ul>
+          <TransactionCenterList />
         </div>
       ) : null}
     </div>

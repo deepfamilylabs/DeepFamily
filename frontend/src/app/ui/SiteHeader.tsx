@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import type { FormEvent } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Search, Menu } from "lucide-react";
 import HeaderControls from "./HeaderControls";
@@ -16,8 +16,9 @@ import { useActivePath, useSidebar } from "../context";
  * The rail owns the brand and the section entries (see GlobalSidebar), so what
  * is left here is the pair that belongs at the top of a page: the search box
  * and the wallet. Full-bleed like the status bar — chrome hugs the viewport,
- * only page content is centred — which keeps the search box beside the rail. Below `md` the rail is off-canvas, so the brand and the
- * drawer trigger come back here and search stays in the bottom nav.
+ * only page content is centred — which keeps the search box beside the rail.
+ * Below `md` the rail is off-canvas, so the brand and the drawer trigger come
+ * back here, and search shrinks to an icon that opens /search.
  */
 
 /** The environment badge (TESTNET, DEMO, …) stays visible at every breakpoint. */
@@ -116,6 +117,15 @@ const SiteHeader = memo(() => {
 
         {/* Right Side Controls */}
         <div className="flex items-center gap-2">
+          {/* Mobile: no room for the search box, so the page takes the query */}
+          <Link
+            to="/search"
+            onClick={() => handleNavClick("/search")}
+            aria-label={t("navigation.search")}
+            className="md:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <Search className="w-5 h-5" aria-hidden="true" />
+          </Link>
           <HeaderControls variant="normal" />
         </div>
       </div>

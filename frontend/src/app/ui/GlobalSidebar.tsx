@@ -2,96 +2,110 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
-import {
-  Globe,
-  ChevronRight,
-  X,
-  Moon,
-  Sun,
-  Image,
-  Home,
-  TreePine,
-  Zap,
-  Server,
-} from "lucide-react";
+import { Globe, ChevronRight, X, Moon, Sun, Home, TreePine, Zap } from "lucide-react";
 import { useActivePath, useSidebar, useTheme } from "../context";
 import { resolveNavSection, type NavSection } from "../config/navSections";
 import { useResponsiveModalMode } from "../../shared/ui";
 import { languages } from "../config/languages";
-import { RpcNetworkList } from "../../domains/config";
 import Logo from "./Logo";
+import SidebarFooter from "./SidebarFooter";
 
 /**
  * GlobalSidebar
  *
  * Desktop: a 4rem icon rail spanning the full viewport height, stacked above
  * the header — so it owns the brand mark and the header starts after it (both
- * take a matching 4rem offset, see Layout). Hover (or keyboard focus) widens
- * the rail to show labels, clicking an item opens its panel and pins the rail
- * open until it is dismissed. Both widths are *overlays* — the main content
- * keeps a constant 4rem padding, so nothing in the page reflows when the rail
- * opens. Click-outside and Escape close the panel.
+ * take a matching 4rem offset, see Layout). It carries the routes and nothing
+ * else: language, theme and the logo page are site-level, so they live in the
+ * status bar with the legal links. Hover (or keyboard focus) widens the rail to
+ * show labels. Picking anything in it with the pointer finishes the errand, so
+ * the rail folds straight back even though the pointer is still over it, and
+ * stays folded until the pointer leaves. Both widths are *overlays* — the main
+ * content keeps a constant 4rem padding, so nothing in the page reflows when
+ * the rail opens.
  *
  * Mobile: a full-screen drawer with modal semantics — focus trap, Escape,
- * body scroll lock, and focus restored to whatever opened it. It drops the
- * entries the bottom nav already shows, so the drawer only offers what is not
- * already on screen.
+ * body scroll lock, and focus restored to whatever opened it. It carries the
+ * same routes as the rail — there is no bottom nav, so it is the only way to
+ * them below md. The status bar keeps the network and transactions at the foot
+ * of the screen but has no room for the rest, so the drawer adds a settings
+ * group (language, theme) behind a divider and closes with the social, legal
+ * and logo links as its footer. Its rows are larger than the rail's, icons in a
+ * round tile, with the current value of a setting shown beside its label.
  *
- * Two groups: routes at the top, settings pinned to the bottom on desktop.
- * They highlight for different reasons — a route row lights up for the section
- * the current URL belongs to, a settings row for the panel it has open — so
- * they must not share one notion of "active".
+ * Route rows and setting rows highlight for different reasons — a route row
+ * lights up for the section the current URL belongs to, a setting row for the
+ * panel it has open — so they must not share one notion of "active".
  */
 
 type IconType = ComponentType<{ className?: string }>;
 
-type SidebarRouteItem = {
+type RowVariant = "rail" | "drawer";
+
+type SidebarItemBase = {
   id: string;
   icon: IconType;
   label: string;
+  /** The setting's current value, shown beside the label in the drawer. */
+  detail?: ReactNode;
+};
+
+type SidebarRouteItem = SidebarItemBase & {
   kind: "route";
   to: string;
   section: NavSection;
-  /** The bottom nav already carries it, so the mobile drawer skips it. */
-  inBottomNav?: boolean;
 };
 
+/** Setting rows only ever appear in the drawer; the rail is routes alone. */
 type SidebarItem =
   | SidebarRouteItem
-  | { id: string; icon: IconType; label: string; kind: "panel"; content: ReactNode }
-  | {
-      id: string;
-      icon: IconType;
-      label: string;
-      kind: "switch";
-      checked: boolean;
-      onToggle: () => void;
-    }
-  | { id: string; icon: IconType; label: string; kind: "action"; onClick: () => void };
+  | (SidebarItemBase & { kind: "panel"; content: ReactNode })
+  | (SidebarItemBase & { kind: "switch"; checked: boolean; onToggle: () => void });
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const DESKTOP_QUERY = "(min-width: 768px)";
 
-const ROW_BASE =
-  "relative w-full h-14 flex items-center gap-3 pl-5 pr-4 text-left transition-colors motion-reduce:transition-none";
+const TRANSITION = "transition-colors motion-reduce:transition-none";
 
-function rowClasses(isActive: boolean) {
-  return `${ROW_BASE} ${
+const ROW_BASE: Record<RowVariant, string> = {
+  rail: `relative w-full h-14 flex items-center gap-3 pl-5 pr-4 text-left ${TRANSITION}`,
+  drawer: `relative w-full min-h-[72px] flex items-center gap-4 px-4 py-3 text-left ${TRANSITION}`,
+};
+
+function rowClasses(variant: RowVariant, isActive: boolean) {
+  if (variant === "drawer") {
+    return `${ROW_BASE.drawer} ${
+      isActive
+        ? "text-orange-600 dark:text-orange-400"
+        : "text-slate-800 dark:text-slate-100 active:bg-slate-50 dark:active:bg-slate-800/60"
+    }`;
+  }
+  return `${ROW_BASE.rail} ${
     isActive
       ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/10"
       : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
   }`;
 }
 
+function iconTileClasses(isActive: boolean) {
+  return `flex h-12 w-12 shrink-0 items-center justify-center rounded-full border ${TRANSITION} ${
+    isActive
+      ? "border-orange-300 bg-orange-50 dark:border-orange-500/40 dark:bg-orange-500/10"
+      : "border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300"
+  }`;
+}
+
 function SidebarRow({
   item,
+  variant,
   showLabel,
   isActive,
   onSelect,
 }: {
   item: SidebarItem;
+  variant: RowVariant;
   showLabel: boolean;
   isActive: boolean;
   onSelect: (event: MouseEvent<HTMLElement>) => void;
@@ -99,49 +113,61 @@ function SidebarRow({
   const Icon = item.icon;
   const panelId = `sidebar-panel-${item.id}`;
 
-  const body = (
-    <>
-      <span
-        aria-hidden="true"
-        className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-orange-500 transition-opacity duration-200 motion-reduce:transition-none ${
-          isActive ? "opacity-100" : "opacity-0"
-        }`}
+  const control =
+    item.kind === "panel" ? (
+      <ChevronRight
+        className={`w-4 h-4 transition-transform motion-reduce:transition-none ${isActive ? "rotate-90" : ""}`}
       />
-      <Icon className="w-6 h-6 shrink-0" />
+    ) : item.kind === "switch" ? (
       <span
-        className={`flex-1 min-w-0 font-medium whitespace-nowrap overflow-hidden transition-opacity duration-200 motion-reduce:transition-none ${
-          showLabel ? "opacity-100" : "opacity-0"
+        className={`inline-flex w-10 h-6 items-center rounded-full p-1 ${TRANSITION} ${
+          item.checked ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"
         }`}
       >
-        {item.label}
+        <span
+          className={`block w-4 h-4 rounded-full bg-white shadow-xs transition-transform motion-reduce:transition-none ${
+            item.checked ? "translate-x-4" : ""
+          }`}
+        />
       </span>
-      <span
-        aria-hidden="true"
-        className={`shrink-0 transition-opacity duration-200 motion-reduce:transition-none ${
-          showLabel ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        {item.kind === "panel" && (
-          <ChevronRight
-            className={`w-4 h-4 transition-transform motion-reduce:transition-none ${isActive ? "rotate-90" : ""}`}
-          />
-        )}
-        {item.kind === "switch" && (
-          <span
-            className={`inline-flex w-10 h-6 items-center rounded-full p-1 transition-colors motion-reduce:transition-none ${
-              item.checked ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"
-            }`}
-          >
-            <span
-              className={`block w-4 h-4 rounded-full bg-white shadow-xs transition-transform motion-reduce:transition-none ${
-                item.checked ? "translate-x-4" : ""
-              }`}
-            />
+    ) : null;
+
+  const body =
+    variant === "drawer" ? (
+      <>
+        <span aria-hidden="true" className={iconTileClasses(isActive)}>
+          <Icon className="w-5 h-5" />
+        </span>
+        <span className="flex-1 min-w-0 truncate text-base font-semibold">{item.label}</span>
+        {item.detail ? (
+          <span className="flex min-w-0 max-w-[50%] justify-end text-sm text-slate-500 dark:text-slate-400">
+            {item.detail}
           </span>
-        )}
-      </span>
-    </>
-  );
+        ) : null}
+        {control ? (
+          <span aria-hidden="true" className="shrink-0 text-slate-400 dark:text-slate-500">
+            {control}
+          </span>
+        ) : null}
+      </>
+    ) : (
+      <>
+        <span
+          aria-hidden="true"
+          className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-orange-500 transition-opacity duration-200 motion-reduce:transition-none ${
+            isActive ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <Icon className="w-6 h-6 shrink-0" />
+        <span
+          className={`flex-1 min-w-0 font-medium whitespace-nowrap overflow-hidden transition-opacity duration-200 motion-reduce:transition-none ${
+            showLabel ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {item.label}
+        </span>
+      </>
+    );
 
   // A route is a real link: middle-click and open-in-new-tab have to work.
   // Plain Link, not NavLink — the row is current for the whole *section* it
@@ -155,7 +181,7 @@ function SidebarRow({
         aria-label={item.label}
         aria-current={isActive ? "page" : undefined}
         title={showLabel ? undefined : item.label}
-        className={rowClasses(isActive)}
+        className={rowClasses(variant, isActive)}
       >
         {body}
       </Link>
@@ -165,9 +191,7 @@ function SidebarRow({
   const ariaProps =
     item.kind === "panel"
       ? { "aria-expanded": isActive, "aria-controls": panelId }
-      : item.kind === "switch"
-        ? { role: "switch", "aria-checked": item.checked }
-        : {};
+      : { role: "switch", "aria-checked": item.checked };
 
   return (
     <button
@@ -177,7 +201,7 @@ function SidebarRow({
       aria-label={item.label}
       title={showLabel ? undefined : item.label}
       {...ariaProps}
-      className={rowClasses(isActive)}
+      className={rowClasses(variant, isActive)}
     >
       {body}
     </button>
@@ -194,14 +218,15 @@ export default function GlobalSidebar() {
 
   const [isHovered, setIsHovered] = useState(false);
   const [isFocusWithin, setIsFocusWithin] = useState(false);
+  // Set by a pointer pick; cleared when the pointer leaves the rail.
+  const [isDismissed, setIsDismissed] = useState(false);
   const containerRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const isPanelOpen = activePanel !== null;
-  // Detail routes stay under the section they belong to — the same table the
-  // bottom nav reads.
+  const variant: RowVariant = isDesktop ? "rail" : "drawer";
+  // Detail routes stay under the section they belong to (see navSections).
   const activeNavSection = resolveNavSection(activePath);
-  const isRailOpen = isHovered || isFocusWithin || isPanelOpen;
+  const isRailOpen = !isDismissed && (isHovered || isFocusWithin);
   const showLabels = isMobileOpen || (isDesktop && isRailOpen);
   // Off-canvas on mobile: keep it out of the tab order and the a11y tree.
   const isOffCanvas = !isDesktop && !isMobileOpen;
@@ -261,30 +286,20 @@ export default function GlobalSidebar() {
     };
   }, [isMobileOpen, closeMobileSidebar]);
 
-  // Desktop panel: dismiss on outside click or Escape.
-  useEffect(() => {
-    if (!isPanelOpen || isMobileOpen) return;
+  /**
+   * Fold the desktop rail after a pointer pick, although the pointer is still
+   * over it. The click also left focus on the row, and focus-within would hold
+   * the rail open just the same, so that goes too. Keyboard activation
+   * (detail 0) keeps both — focus is the only way back to the rail.
+   */
+  const dismissRail = useCallback((event: MouseEvent<HTMLElement>) => {
+    if (event.detail === 0) return;
+    setIsDismissed(true);
+    setIsFocusWithin(false);
+    event.currentTarget.blur();
+  }, []);
 
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) closePanel();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      closePanel();
-      // Focus may sit inside the panel we just collapsed — put it back on the trigger.
-      document.getElementById(`sidebar-item-${activePanel}`)?.focus();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isPanelOpen, isMobileOpen, activePanel, closePanel]);
-
-  // Picking a language finishes the errand, so the panel (and with it the
-  // pinned-open rail) closes behind it.
+  // Picking a language finishes the errand, so its panel closes behind it.
   const changeLanguage = useCallback(
     (code: string) => {
       void i18n.changeLanguage(code);
@@ -302,7 +317,6 @@ export default function GlobalSidebar() {
         label: t("navigation.home"),
         to: "/",
         section: "home",
-        inBottomNav: true,
       },
       {
         id: "familyTree",
@@ -311,11 +325,8 @@ export default function GlobalSidebar() {
         label: t("navigation.familyTree"),
         to: "/familyTree",
         section: "familyTree",
-        inBottomNav: true,
       },
       {
-        // The bottom nav has no room for it, so on mobile the drawer is the
-        // only way in besides the floating action button.
         id: "actions",
         kind: "route",
         icon: Zap,
@@ -327,30 +338,19 @@ export default function GlobalSidebar() {
     [t],
   );
 
-  const settingItems = useMemo<SidebarItem[]>(
-    () => [
-      // Which chain the app reads from lives in the desktop status bar, which
-      // does not exist below md — so on mobile the drawer is the only way to it.
-      ...(isDesktop
-        ? []
-        : [
-            {
-              id: "network",
-              kind: "panel",
-              icon: Server,
-              label: t("statusBar.rpcNetwork", "RPC network"),
-              content: (
-                <div className="p-4">
-                  <RpcNetworkList onPicked={closePanel} />
-                </div>
-              ),
-            } as SidebarItem,
-          ]),
+  // Drawer-only: on desktop these live in the status bar (LanguageMenu, theme button).
+  const settingItems = useMemo<SidebarItem[]>(() => {
+    if (isDesktop) return [];
+
+    const currentLanguage = languages.find((lang) => lang.code === i18n.language);
+
+    return [
       {
         id: "language",
         kind: "panel",
         icon: Globe,
         label: t("settings.language", "Language"),
+        detail: currentLanguage?.nativeName,
         content: (
           <div
             className="p-4 space-y-2"
@@ -366,7 +366,7 @@ export default function GlobalSidebar() {
                   role="radio"
                   aria-checked={selected}
                   onClick={() => changeLanguage(lang.code)}
-                  className={`w-full text-left px-4 py-3 rounded-lg transition-colors motion-reduce:transition-none flex items-center justify-between ${
+                  className={`w-full text-left px-4 py-3 rounded-lg ${TRANSITION} flex items-center justify-between ${
                     selected
                       ? "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 font-medium"
                       : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
@@ -390,54 +390,35 @@ export default function GlobalSidebar() {
         checked: isDark,
         onToggle: toggleTheme,
       },
-      {
-        id: "logo",
-        kind: "action",
-        icon: Image,
-        label: t("logo.label", "Logo"),
-        onClick: () => window.open("/logo.html", "_blank", "noopener,noreferrer"),
-      },
-    ],
-    [t, i18n.language, changeLanguage, isDark, toggleTheme, isDesktop, closePanel],
-  );
-
-  // Below md, Home and Family are already one tap away in the bottom nav.
-  const visibleNavItems = isDesktop ? navItems : navItems.filter((item) => !item.inBottomNav);
+    ];
+  }, [t, i18n.language, changeLanguage, isDark, toggleTheme, isDesktop]);
 
   const isRowActive = (item: SidebarItem) =>
     item.kind === "route" ? activeNavSection === item.section : activePanel === item.id;
 
   const handleSelect = (item: SidebarItem, event: MouseEvent<HTMLElement>) => {
     if (item.kind === "route") {
-      // Light the row up on click, the way the bottom nav does, and get the
-      // drawer out of the way even when the route does not change.
+      // Light the row up on click, and get the drawer out of the way even when
+      // the route does not change.
       setActivePath(item.to);
       closeMobileSidebar();
       closePanel();
-      // A pointer click leaves focus on the link, and focus-within holds the
-      // rail open long after the pointer has gone. Keyboard activation
-      // (detail 0) keeps its focus — it is the only way back to the rail.
-      if (event.detail > 0) {
-        setIsFocusWithin(false);
-        event.currentTarget.blur();
-      }
+      dismissRail(event);
       return;
     }
+    // Settings are drawer-only, where there is no rail to fold.
     if (item.kind === "switch") {
       item.onToggle();
-      return;
-    }
-    if (item.kind === "action") {
-      item.onClick();
       return;
     }
     togglePanel(item.id);
   };
 
   const renderItem = (item: SidebarItem) => (
-    <div key={item.id} className="border-b border-gray-50 dark:border-slate-800/50 md:border-none">
+    <div key={item.id}>
       <SidebarRow
         item={item}
+        variant={variant}
         showLabel={showLabels}
         isActive={isRowActive(item)}
         onSelect={(event) => handleSelect(item, event)}
@@ -460,7 +441,7 @@ export default function GlobalSidebar() {
     </div>
   );
 
-  const railWidth = isPanelOpen ? "md:w-72" : isRailOpen ? "md:w-56" : "md:w-16";
+  const railWidth = isRailOpen ? "md:w-56" : "md:w-16";
 
   return (
     <nav
@@ -471,7 +452,10 @@ export default function GlobalSidebar() {
       role={!isDesktop && isMobileOpen ? "dialog" : undefined}
       aria-modal={!isDesktop && isMobileOpen ? true : undefined}
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsDismissed(false);
+      }}
       onFocus={() => setIsFocusWithin(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -479,13 +463,14 @@ export default function GlobalSidebar() {
         }
       }}
       className={`
-        /* Full height, minus the status bar so the last row never straddles it */
+        /* Full height. The rail stops short of the status bar so the last row
+           never straddles it; the mobile drawer covers the bar instead. */
         fixed inset-y-0 left-0 flex flex-col
         bg-white dark:bg-slate-900 shadow-xl
         transition-[width,translate] duration-300 ease-in-out motion-reduce:transition-none
         will-change-[translate]
         z-10005 md:z-110
-        pb-[calc(env(safe-area-inset-bottom)+var(--app-statusbar-h))]
+        pb-[env(safe-area-inset-bottom)] md:pb-[var(--app-statusbar-h)]
 
         /* Mobile: full-screen drawer */
         w-full ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
@@ -498,9 +483,10 @@ export default function GlobalSidebar() {
       {/* Brand: the drawer header on mobile, the rail's own head on desktop. The
           logo sits on the same axis as the item icons; the wordmark follows the
           labels in and out. */}
-      <div className="h-16 shrink-0 flex items-center gap-2 pl-5 pr-4">
+      <div className="h-16 shrink-0 flex items-center gap-2 pl-5 pr-4 border-b border-slate-100 dark:border-slate-800 md:border-none">
         <Link
           to="/"
+          onClick={dismissRail}
           className="flex flex-1 min-w-0 items-center gap-3 group focus:outline-hidden"
           title={showLabels ? undefined : "Deepfamily"}
         >
@@ -528,12 +514,17 @@ export default function GlobalSidebar() {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll">
         <div className="flex min-h-full flex-col">
-          <div>{visibleNavItems.map(renderItem)}</div>
-          {/* Settings follow the routes, and drop to the foot of the rail on
-              desktop where there is height to spare. */}
-          <div className="md:mt-auto" role="group" aria-label={t("settings.title", "Settings")}>
-            {settingItems.map(renderItem)}
-          </div>
+          <div className="py-2 md:py-0">{navItems.map(renderItem)}</div>
+          {settingItems.length > 0 && (
+            <div
+              className="border-t border-slate-100 dark:border-slate-800 py-2"
+              role="group"
+              aria-label={t("settings.title", "Settings")}
+            >
+              {settingItems.map(renderItem)}
+            </div>
+          )}
+          {!isDesktop && <SidebarFooter />}
         </div>
       </div>
     </nav>

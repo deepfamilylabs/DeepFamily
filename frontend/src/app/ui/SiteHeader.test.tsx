@@ -117,8 +117,19 @@ describe("SiteHeader", () => {
 
     expect(container.querySelector("nav")).toBeNull();
     const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
-    // Only the mobile brand mark links out of the header.
-    expect(hrefs).toEqual(["/"]);
+    // Only the mobile brand mark and the mobile search icon link out of the header.
+    expect(hrefs).toEqual(["/", "/search"]);
+  });
+
+  it("gives phones a search entry, since the search box is desktop-only", () => {
+    renderHeader();
+
+    const searchLink = screen.getByLabelText("Search", { selector: "a" });
+    expect(searchLink.className).toContain("md:hidden");
+
+    fireEvent.click(searchLink);
+    expect(screen.getByTestId("location").textContent).toBe("/search");
+    expect(mocks.setActivePath).toHaveBeenCalledWith("/search");
   });
 
   it("keeps the brand and the drawer trigger for the breakpoints with no rail", () => {
