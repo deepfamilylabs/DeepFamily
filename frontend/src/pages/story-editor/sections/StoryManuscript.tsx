@@ -17,11 +17,27 @@ import type { StoryEditorController } from "../hooks/useStoryEditorController";
  * The manuscript: every record on one spine, in order, read as a document. The
  * composer is the last stop on that spine rather than a separate form.
  */
+
+/**
+ * Where a marker hangs off the spine.
+ *
+ * The line runs at x = 6.5px inside the column, 7.5px from sm where the column
+ * gains a pixel of padding, so a dot of width w sits at axis − w/2. Derived once
+ * here per size: working it out at each call site is how three dot sizes ended
+ * up on three different axes, the 7px fold marker three pixels off the line.
+ */
+const SPINE_MARKER = {
+  fold: "-left-[29px] sm:-left-[32px]",
+  record: "-left-8 sm:-left-[35px]",
+  draft: "-left-[33px] sm:-left-9",
+} as const;
 export function StoryManuscript({ editor }: { editor: StoryEditorController }) {
   const { t } = editor;
 
   return (
     <div ref={editor.refs.scrollContainerRef} className="flex flex-col gap-6">
+      {editor.sortedRecords.length > 1 && <RecordOrderToggle editor={editor} />}
+
       {editor.showError && (
         <section
           role="alert"
@@ -99,13 +115,56 @@ export function StoryManuscript({ editor }: { editor: StoryEditorController }) {
             <div className="relative">
               <span
                 aria-hidden
-                className="absolute -left-8 top-4 box-border h-[15px] w-[15px] rounded-full border-[3px] border-primary bg-primary/10 sm:-left-9"
+                className={`absolute ${SPINE_MARKER.draft} top-4 box-border h-[15px] w-[15px] rounded-full border-[3px] border-primary bg-primary/10`}
               />
               <StoryComposer editor={editor} />
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+const RECORD_ORDERS = [
+  { id: "reading", key: "storyRecordEditor.orderReading", fallback: "Reading order" },
+  { id: "written", key: "storyRecordEditor.orderWritten", fallback: "Order written" },
+] as const;
+
+/**
+ * Reading order is how the published profile presents the records — by group,
+ * then type. Order written is the chain's own sequence. Contents follows the
+ * same choice, so the outline and the manuscript always line up.
+ */
+function RecordOrderToggle({ editor }: { editor: StoryEditorController }) {
+  const { t } = editor;
+
+  return (
+    <div className="flex justify-end">
+      <div
+        role="group"
+        aria-label={t("storyRecordEditor.orderLabel", "Record order")}
+        className="inline-flex gap-1 rounded-full bg-surface-muted p-1"
+      >
+        {RECORD_ORDERS.map((item) => {
+          const active = editor.order.value === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => editor.order.set(item.id)}
+              className={`min-h-[30px] rounded-full px-3 text-[12px] transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30 ${
+                active
+                  ? "bg-surface font-semibold text-ink shadow-sm"
+                  : "font-medium text-ink-muted hover:text-ink"
+              }`}
+            >
+              {t(item.key, item.fallback)}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -192,7 +251,7 @@ function FoldSpineMarker() {
   return (
     <span
       aria-hidden
-      className="absolute -left-[31px] top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-hairline-strong sm:-left-[35px]"
+      className={`absolute ${SPINE_MARKER.fold} top-1/2 h-[7px] w-[7px] -translate-y-1/2 rounded-full bg-hairline-strong`}
     />
   );
 }
@@ -235,11 +294,13 @@ function ManuscriptEntry({
     >
       <span
         aria-hidden
-        className={`absolute -left-8 top-1 box-border h-[13px] w-[13px] rounded-full border-[3px] bg-surface-body sm:-left-9 ${borderColor}`}
+        className={`absolute ${SPINE_MARKER.record} top-1 box-border h-[13px] w-[13px] rounded-full border-[3px] bg-surface-body ${borderColor}`}
       />
 
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <span className="font-mono text-[11px] text-ink-subtle">#{record.displayIndex}</span>
+        <span className="text-[11px] text-ink-subtle">
+          {t("person.recordOrdinal", "No. {{index}}", { index: record.displayIndex })}
+        </span>
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border bg-surface py-[3px] pl-2 pr-2.5 text-[10.5px] font-semibold uppercase tracking-[0.05em] ${iconColor} ${borderColor}`}
         >

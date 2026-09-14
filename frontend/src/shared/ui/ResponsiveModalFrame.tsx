@@ -121,8 +121,13 @@ export function ResponsiveModalFrame({
               </button>
             </div>
 
+            {/* shrink-0: overflow-x-auto makes this a scroll container on both axes,
+                and a scroll container gives up the flex item's content-height
+                minimum — so a tall body squeezed the row, clipping its buttons
+                behind a vertical scrollbar. The row keeps its height; only
+                horizontal overflow scrolls. */}
             {toolbar ? (
-              <div className="flex items-center gap-2 px-5 py-3.5 border-b border-hairline bg-surface overflow-x-auto">
+              <div className="flex shrink-0 items-center gap-2 px-5 py-3.5 border-b border-hairline bg-surface overflow-x-auto overflow-y-hidden">
                 {toolbar}
               </div>
             ) : null}

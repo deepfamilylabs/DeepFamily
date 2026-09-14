@@ -474,7 +474,9 @@ function StoryRecordCard({
                 <span
                   className={`text-sm font-bold tracking-tight ${isExpanded ? "text-orange-700 dark:text-orange-400" : "text-ink"}`}
                 >
-                  #{record.displayIndex ?? record.recordIndex + 1}
+                  {t("person.recordOrdinal", "No. {{index}}", {
+                    index: record.displayIndex ?? record.recordIndex + 1,
+                  })}
                 </span>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-hairline shadow-xs">
                   <RecordIcon size={12} className={iconColor} />

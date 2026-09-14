@@ -44,6 +44,7 @@ function createEditor(
     showEmptySealed: false,
     showEditorForm: false,
     sortedRecords: records,
+    order: { value: "written", set: vi.fn() },
     manuscript: {
       head: segments.head,
       collapsed: segments.collapsed,

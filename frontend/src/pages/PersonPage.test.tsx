@@ -166,7 +166,7 @@ describe("PersonPage", () => {
 
   it("keeps stories readable and hides the edit entry without ownership access", async () => {
     renderPersonPage("/person/42");
-    expect(await screen.findByText("#1")).toBeTruthy();
+    expect(await screen.findByText("No. 1")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
   });
 
@@ -180,7 +180,7 @@ describe("PersonPage", () => {
 
   it("does not follow the edit query parameter without ownership access", async () => {
     renderPersonPage("/person/42?edit=1");
-    expect(await screen.findByText("#1")).toBeTruthy();
+    expect(await screen.findByText("No. 1")).toBeTruthy();
     expect(screen.queryByText("Editor route")).toBeNull();
   });
 
@@ -220,8 +220,8 @@ describe("PersonPage", () => {
 
     expect(await screen.findByText("Original public biography")).toBeTruthy();
     expect(screen.getAllByText("Original public biography")).toHaveLength(1);
-    expect(screen.queryByText("#0")).toBeNull();
-    expect(screen.getByText("#1")).toBeTruthy();
+    expect(screen.queryByText("No. 0")).toBeNull();
+    expect(screen.getByText("No. 1")).toBeTruthy();
     for (const label of screen.getAllByText("Total Records")) {
       expect(label.parentElement?.textContent).toBe("Total Records1");
     }

@@ -33,7 +33,11 @@ import {
 
 export function usePeoplePageController() {
   const { nodesData } = useTreeGraphData();
-  const { loading, contractMessage, refresh } = useTreeStatus();
+  const { loading: building, settled, contractMessage, refresh } = useTreeStatus();
+  // Not done until the tree has a result. `building` is false before the first build
+  // starts and right after caches are cleared; reading that as final showed "no
+  // people" between the skeleton and the list.
+  const loading = building || !settled;
   const [projectionEnabled, setProjectionEnabled] = useState(false);
   const { graph } = useFamilyTreeProjection({ enabled: projectionEnabled });
   const location = useLocation();

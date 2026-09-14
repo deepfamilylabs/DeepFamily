@@ -1,8 +1,11 @@
 import { ethers } from "ethers";
 import { ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH } from "@deepfamily/protocol-core";
 
-export const archiveValidationError = (message: string) =>
-  Object.assign(new Error(message), { code: "ARCHIVE_VALIDATION_FAILED" });
+export const archiveValidationError = (message: string, reason?: string) =>
+  Object.assign(new Error(message), {
+    code: "ARCHIVE_VALIDATION_FAILED",
+    ...(reason ? { reason } : {}),
+  });
 
 export interface ArchiveTransactionPreview {
   canonicalPayload: string;

@@ -147,6 +147,17 @@ h3 {
 }
 
 /*
+ * Page titles carry a person's name, so they get the same escape hatch for the
+ * same reason as .modal-title above: at 100% a 36px title gives a 36px line box,
+ * the CJK glyphs a name is often made of overflow it, and anything that clips —
+ * a `truncate`, a `line-clamp` — shears the tops off 李慕白. The extra fifth of
+ * an em also keeps a name that wraps from setting its two lines solid.
+ */
+.page-title {
+  line-height: 1.2;
+}
+
+/*
  * Card and panel labels that are headings structurally but UI text visually —
  * a 13px "Contents" is a label, not a display title. Same escape hatch as
  * .modal-title above: the h1–h6 rules are unlayered, so they outrank a

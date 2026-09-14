@@ -662,7 +662,7 @@
       "remove": "移除",
       "clearAll": "清空历史",
       "openConfig": "家族设置",
-      "clearCaches": "清空缓存并重载"
+      "clearCaches": "清空缓存"
     },
     "nodeDetail": {
       "hash": "哈希",
@@ -841,11 +841,12 @@
     "noRecordsSealed": "此资料已封存且无记录内容",
     "recordTypeLabel": "记录类型",
     "attachmentLabel": "附件CID（可选）",
-    "attachmentPlaceholder": "CID（例如 bafy...）或留空",
+    "attachmentPlaceholder": "附件 CID（可选），例如 bafy...",
     "attachmentTooLong": "附件 CID 不能超过 256 个 UTF-8 字节",
     "invalidRecordType": "无效的记录类型",
     "operationFailed": "操作失败",
     "sealFailed": "封存失败",
+    "storyMovedOn": "在你书写期间，这份资料新增了记录。最新状态已载入，请重新确认并签名，新记录会追加在它们之后。",
     "sealDialog": {
       "title": "封存传记",
       "description": "确定要封存传记吗？封存后将无法再修改。",
@@ -891,7 +892,7 @@
     },
     "contentPlaceholderBytes": "请输入故事内容；可保存的记录大小取决于当前网络的交易容量",
     "success": {
-      "recordAdded": "记录 #{{index}} 添加成功（{{bytes}} 字节）",
+      "recordAdded": "第 {{index}} 条记录添加成功（{{bytes}} 字节）",
       "recordAddedGeneric": "记录添加成功",
       "storySealed": "传记封存成功（共 {{total}} 个记录）",
       "storySealedGeneric": "传记封存成功"
@@ -902,11 +903,10 @@
       "walletPending": "钱包中存在待处理请求，请打开钱包确认或取消后再试。",
       "noWallet": "未连接钱包。请先连接您的钱包。"
     },
-    "backToProfile": "返回人物页",
     "contents": "目录",
-    "recordCount": "{{total}} 个记录",
-    "bytesOnChain": "链上 {{bytes}} 字节",
-    "openForWriting": "可继续写入",
+    "orderLabel": "排列方式",
+    "orderReading": "阅读顺序",
+    "orderWritten": "写入顺序",
     "sealedReadOnly": "已封存 · 只读",
     "closedToNewRecords": "不再接受新记录",
     "newRecord": "新建记录",
@@ -934,8 +934,7 @@
     "collapseRun": "收起 {{total}} 个记录",
     "listSeparator": "、",
     "recordTitleLabel": "标题（可选）",
-    "recordTitlePlaceholder": "为这条记录起个名字",
-    "readOnly": "只读",
+    "recordTitlePlaceholder": "标题（可选）",
     "connectOwnerWallet": "连接 NFT 所有者的钱包后方可编辑，故事仍可公开阅读。",
     "switchNetworkToEdit": "请将钱包切换到此故事所在的网络后再编辑。",
     "checkingOwnership": "正在核实 NFT 所有者…",
@@ -943,6 +942,7 @@
     "ownerOnly": "只有当前 NFT 所有者可以编辑此故事。"
   },
   "person": {
+    "recordOrdinal": "第 {{index}} 条",
     "encyclopedia": "人物百科",
     "pageTitle": "{{name}} 人物百科",
     "sealed": "已封存",
@@ -954,7 +954,6 @@
     "totalRecords": "总记录数",
     "totalPayloadLength": "总载荷字节数",
     "lastUpdate": "最后更新",
-    "status": "状态",
     "editable": "可编辑",
     "recordsHead": "记录链头",
     "owner": "所有者地址",

@@ -249,7 +249,7 @@ describe("StoryEditorPage", () => {
     );
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42");
     expect(mocks.queryClear).toHaveBeenCalledWith("story:42:meta");
-    expect(mocks.toastSuccess).toHaveBeenCalledWith("Record #2 added successfully (9 bytes)");
+    expect(mocks.toastSuccess).toHaveBeenCalledWith("Record No. 2 added successfully (9 bytes)");
     expect(await screen.findByText("new story")).toBeTruthy();
   });
 
@@ -322,8 +322,10 @@ describe("StoryEditorPage", () => {
     expect(screen.queryByPlaceholderText(/Enter story content/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Review & sign/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Seal permanently" })).toBeNull();
-    expect(screen.queryByText("Open for writing")).toBeNull();
-    expect(screen.getAllByText("Read only").length).toBeGreaterThan(0);
+    // Being locked out is stated once, by the access banner, in a sentence that
+    // says which of these five reasons it is — not by a "Read only" pill in the
+    // header and a second one in the record card saying it without the reason.
+    expect(screen.getByRole("status").textContent).toBeTruthy();
     expect(mocks.addStoryRunOrThrow).not.toHaveBeenCalled();
   });
   it("clears the previous token's draft and story on a direct route change", async () => {

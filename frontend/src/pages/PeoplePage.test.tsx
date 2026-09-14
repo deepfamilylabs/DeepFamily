@@ -50,6 +50,7 @@ vi.mock("../domains/tree", () => ({
   }),
   useTreeStatus: () => ({
     loading: mocks.loading,
+    settled: (mocks as { settled?: boolean }).settled ?? true,
     contractMessage: mocks.contractMessage,
     errors: mocks.treeErrors,
     refresh: mocks.treeRefresh,
@@ -79,6 +80,7 @@ vi.mock("../domains/config", () => ({
 }));
 
 vi.mock("../domains/person", () => ({
+  EndorseCompactModal: () => null,
   PersonStoryCard: ({ person, onOpen }: any) => (
     <button data-testid={`person-card-${person.tokenId}`} onClick={() => onOpen(person)}>
       {person.fullName}
@@ -175,6 +177,7 @@ describe("PeoplePage", () => {
     mocks.graphNodeIds = [ada.id, grace.id];
     mocks.graphNodeDepths = {};
     mocks.loading = false;
+    (mocks as { settled?: boolean }).settled = true;
     mocks.treeErrors = [];
     mocks.contractMessage = "";
     mocks.treeRefresh.mockReset();
@@ -226,6 +229,28 @@ describe("PeoplePage", () => {
     await waitFor(() => expect(screen.getByTestId("location-search").textContent).toBe(""));
     expect(screen.queryByText("This person isn’t in the current lineage projection")).toBeNull();
   });
+  it("keeps the skeleton instead of 'No stories found' until the tree has a result", () => {
+    // Before the first build starts, and right after caches are cleared, the tree
+    // is not loading yet holds no nodes. That is not an empty result.
+    mocks.nodesData = {};
+    mocks.graphNodeIds = [];
+    (mocks as { settled?: boolean }).settled = false;
+
+    renderPeoplePage();
+
+    expect(screen.queryByText("No stories found")).toBeNull();
+    expect(screen.queryByText("Ada Lovelace")).toBeNull();
+  });
+
+  it("shows 'No stories found' once the settled tree really has no people", async () => {
+    mocks.nodesData = {};
+    mocks.graphNodeIds = [];
+
+    renderPeoplePage();
+
+    await waitFor(() => expect(screen.getByText("No stories found")).toBeTruthy());
+  });
+
   it("filters the list down to a picked generation and shows it as a chip", async () => {
     const [adaId, graceId] = mocks.graphNodeIds;
     mocks.graphNodeDepths = { [adaId]: 0, [graceId]: 1 };

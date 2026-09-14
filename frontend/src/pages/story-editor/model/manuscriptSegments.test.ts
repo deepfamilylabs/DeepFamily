@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { segmentManuscript, summariseCollapsedTypes } from "./manuscriptSegments";
 
-const records = (n: number) => Array.from({ length: n }, (_, i) => ({ recordIndex: i, recordType: 1 }));
+const records = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({ recordIndex: i, recordType: 1 }));
 const ids = (list: { recordIndex: number }[]) => list.map((c) => c.recordIndex);
 
 describe("segmentManuscript", () => {

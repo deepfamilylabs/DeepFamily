@@ -90,6 +90,8 @@ describe("story transaction flows", () => {
       1,
       "ipfs://record",
       undefined,
+      // no rpcUrl in this config, so no readonly provider to read the story through
+      undefined,
     );
     expect(result.current.status).toBe("success");
     expect(result.current.result).toBe(serviceResult);

@@ -209,7 +209,7 @@ describe("TreePage", () => {
 
     fireEvent.click(screen.getByTitle("Refresh"));
 
-    fireEvent.click(screen.getByTitle("Clear caches and reload"));
+    fireEvent.click(screen.getByTitle("Clear caches"));
 
     expect(mocks.treeStatus.refresh).toHaveBeenCalledTimes(1);
     expect(mocks.treeStatus.clearAllCaches).toHaveBeenCalledTimes(1);

@@ -662,7 +662,7 @@
       "remove": "Remove",
       "clearAll": "Clear all",
       "openConfig": "Family settings",
-      "clearCaches": "Clear caches and reload"
+      "clearCaches": "Clear caches"
     },
     "nodeDetail": {
       "hash": "Hash",
@@ -841,11 +841,12 @@
     "noRecordsSealed": "This profile is sealed with no records.",
     "recordTypeLabel": "Record Type",
     "attachmentLabel": "Attachment CID (optional)",
-    "attachmentPlaceholder": "CID (e.g. bafy...) or leave empty",
+    "attachmentPlaceholder": "Attachment CID (optional), e.g. bafy...",
     "attachmentTooLong": "Attachment CID cannot exceed 256 UTF-8 bytes",
     "invalidRecordType": "Invalid record type",
     "operationFailed": "Operation failed",
     "sealFailed": "Seal failed",
+    "storyMovedOn": "This profile gained new records while you were writing. The latest state is loaded — review and sign again to append after them.",
     "sealDialog": {
       "title": "Seal Biography",
       "description": "Are you sure you want to seal the biography? Once sealed, it can no longer be modified.",
@@ -891,7 +892,7 @@
     },
     "contentPlaceholderBytes": "Enter story content; network gas capacity determines the record size",
     "success": {
-      "recordAdded": "Record #{{index}} added successfully ({{bytes}} bytes)",
+      "recordAdded": "Record No. {{index}} added successfully ({{bytes}} bytes)",
       "recordAddedGeneric": "Story record added successfully",
       "storySealed": "Story sealed successfully ({{total}} records)",
       "storySealedGeneric": "Story sealed successfully"
@@ -902,11 +903,10 @@
       "walletPending": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
       "noWallet": "No wallet connected. Please connect your wallet first."
     },
-    "backToProfile": "Back to profile",
     "contents": "Contents",
-    "recordCount": "{{total}} records",
-    "bytesOnChain": "{{bytes}} bytes on chain",
-    "openForWriting": "Open for writing",
+    "orderLabel": "Record order",
+    "orderReading": "Reading order",
+    "orderWritten": "Order written",
     "sealedReadOnly": "Sealed — read only",
     "closedToNewRecords": "Closed to new records",
     "newRecord": "New record",
@@ -934,8 +934,7 @@
     "collapseRun": "Collapse {{total}} records",
     "listSeparator": ", ",
     "recordTitleLabel": "Title (optional)",
-    "recordTitlePlaceholder": "Give this record a name",
-    "readOnly": "Read only",
+    "recordTitlePlaceholder": "Title (optional)",
     "connectOwnerWallet": "Connect the NFT owner's wallet to edit. This story is available to read.",
     "switchNetworkToEdit": "Switch your wallet to this story's network to edit.",
     "checkingOwnership": "Checking NFT ownership…",
@@ -943,6 +942,7 @@
     "ownerOnly": "Only the current NFT owner can edit this story."
   },
   "person": {
+    "recordOrdinal": "No. {{index}}",
     "encyclopedia": "Encyclopedia",
     "pageTitle": "{{name}} Encyclopedia",
     "sealed": "Sealed",
@@ -954,7 +954,6 @@
     "totalRecords": "Total Records",
     "totalPayloadLength": "Total payload bytes",
     "lastUpdate": "Last Update",
-    "status": "Status",
     "editable": "Editable",
     "recordsHead": "Record-chain head",
     "owner": "Owner Address",

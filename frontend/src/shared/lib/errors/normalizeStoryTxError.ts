@@ -29,8 +29,11 @@ const makeTypedError = (message: string, type: string, code?: string): Error => 
  * detection pipeline so story flows do not maintain a separate parser.
  */
 export function normalizeStoryTxError(error: any, contract: any): Error {
-  if (error?.code === "ARCHIVE_VALIDATION_FAILED")
-    return makeTypedError(error.message, "VALIDATION_ERROR", error.code);
+  if (error?.code === "ARCHIVE_VALIDATION_FAILED") {
+    const typed = makeTypedError(error.message, "VALIDATION_ERROR", error.code);
+    if (typeof error.reason === "string") (typed as any).reason = error.reason;
+    return typed;
+  }
   const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {
     contract,
     fallbackMessage: error?.message || "An unknown error occurred",
