@@ -82,7 +82,7 @@ function StoryEditorScreen() {
           ))}
         </div>
 
-        <div className="grid items-start gap-7 xl:grid-cols-[248px_minmax(0,1fr)_256px]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-7 xl:grid-cols-[248px_minmax(0,1fr)_256px]">
           <div className={`${paneClass("contents")} xl:sticky xl:top-20`}>
             <StoryContentsOutline editor={editor} />
           </div>
