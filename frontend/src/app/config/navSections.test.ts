@@ -4,7 +4,7 @@ import { resolveNavSection } from "./navSections";
 describe("resolveNavSection", () => {
   it("maps every family volume and detail route to the family entry", () => {
     for (const path of [
-      "/familyTree",
+      "/family",
       "/people",
       "/genealogyBook",
       "/person/12",
@@ -17,7 +17,7 @@ describe("resolveNavSection", () => {
   it("matches home exactly rather than as a prefix", () => {
     expect(resolveNavSection("/")).toBe("home");
     expect(resolveNavSection("/search")).toBe("search");
-    expect(resolveNavSection("/actions")).toBe("actions");
+    expect(resolveNavSection("/create")).toBe("create");
   });
 
   it("returns null for routes no nav entry owns", () => {

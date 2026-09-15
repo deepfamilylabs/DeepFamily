@@ -108,8 +108,8 @@ export default function FloatingActionButton({ className = "" }: FloatingActionB
 
   const handleActionClick = (tab: string) => {
     closeMenu();
-    setActivePath("/actions");
-    navigate(`/actions?tab=${tab}&open=1`);
+    setActivePath("/create");
+    navigate(`/create?tab=${tab}&open=1`);
   };
 
   const toggleMenu = () => {

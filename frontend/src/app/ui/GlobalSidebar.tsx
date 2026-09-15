@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, MouseEvent, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
-import { Globe, ChevronRight, X, Moon, Sun, Home, TreePine, Zap } from "lucide-react";
+import { Globe, ChevronRight, X, Moon, Sun } from "lucide-react";
 import { useActivePath, useSidebar, useTheme } from "../context";
 import { resolveNavSection, type NavSection } from "../config/navSections";
 import { useResponsiveModalMode } from "../../shared/ui";
 import { languages } from "../config/languages";
 import Logo from "./Logo";
+import { CreateNavIcon, FamilyTreeNavIcon, HomeNavIcon, type NavIconProps } from "./NavIcons";
 import SidebarFooter from "./SidebarFooter";
 
 /**
@@ -23,6 +24,14 @@ import SidebarFooter from "./SidebarFooter";
  * stays folded until the pointer leaves. Both widths are *overlays* — the main
  * content keeps a constant 4rem padding, so nothing in the page reflows when
  * the rail opens.
+ *
+ * The current section's row sits on a muted pill, its icon solid in the
+ * accent colour, while the other rows rest as muted outlines on the bare rail
+ * — a change of shape as well as colour (see NavIcons); there is no indicator
+ * bar. The row under the pointer takes the same pill and brightens its icon,
+ * since colour alone was too faint to read against the rail. Folded, the rail
+ * is chrome and sits flat beside the page; open, it overlays the page and
+ * lifts off it.
  *
  * Mobile: a full-screen drawer with modal semantics — focus trap, Escape,
  * body scroll lock, and focus restored to whatever opened it. It carries the
@@ -40,11 +49,13 @@ import SidebarFooter from "./SidebarFooter";
 
 type IconType = ComponentType<{ className?: string }>;
 
+/** Route icons come in two forms: an outline at rest, solid for the current section. */
+type RouteIconType = ComponentType<NavIconProps>;
+
 type RowVariant = "rail" | "drawer";
 
 type SidebarItemBase = {
   id: string;
-  icon: IconType;
   label: string;
   /** The setting's current value, shown beside the label in the drawer. */
   detail?: ReactNode;
@@ -52,6 +63,7 @@ type SidebarItemBase = {
 
 type SidebarRouteItem = SidebarItemBase & {
   kind: "route";
+  icon: RouteIconType;
   to: string;
   section: NavSection;
 };
@@ -59,8 +71,13 @@ type SidebarRouteItem = SidebarItemBase & {
 /** Setting rows only ever appear in the drawer; the rail is routes alone. */
 type SidebarItem =
   | SidebarRouteItem
-  | (SidebarItemBase & { kind: "panel"; content: ReactNode })
-  | (SidebarItemBase & { kind: "switch"; checked: boolean; onToggle: () => void });
+  | (SidebarItemBase & { kind: "panel"; icon: IconType; content: ReactNode })
+  | (SidebarItemBase & {
+      kind: "switch";
+      icon: IconType;
+      checked: boolean;
+      onToggle: () => void;
+    });
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -69,8 +86,16 @@ const DESKTOP_QUERY = "(min-width: 768px)";
 
 const TRANSITION = "transition-colors motion-reduce:transition-none";
 
+/** The rail draws its glyphs a touch lighter than lucide's weight, which the drawer keeps. */
+const RAIL_ICON_STROKE = 1.75;
+
+// A rail row is an inset pill: 0.5rem in from the left plus 0.75rem of padding
+// puts the icon on the 4rem rail's centre line, the axis the logo sits on. The
+// rail's 1px right edge takes a pixel from the right margin, so the pill sits
+// square on that line too. It fills for the current section and under the
+// pointer, and rings under keyboard focus.
 const ROW_BASE: Record<RowVariant, string> = {
-  rail: `relative w-full h-14 flex items-center gap-3 pl-5 pr-4 text-left ${TRANSITION}`,
+  rail: `ml-2 mr-[7px] h-12 flex items-center gap-3 rounded-xl px-3 text-left outline-hidden hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-500/60 ${TRANSITION}`,
   drawer: `relative w-full min-h-[72px] flex items-center gap-4 px-4 py-3 text-left ${TRANSITION}`,
 };
 
@@ -84,8 +109,8 @@ function rowClasses(variant: RowVariant, isActive: boolean) {
   }
   return `${ROW_BASE.rail} ${
     isActive
-      ? "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/10"
-      : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+      ? "bg-surface-muted text-orange-600 dark:text-orange-400"
+      : "text-ink-muted hover:text-ink"
   }`;
 }
 
@@ -110,23 +135,34 @@ function SidebarRow({
   isActive: boolean;
   onSelect: (event: MouseEvent<HTMLElement>) => void;
 }) {
-  const Icon = item.icon;
   const panelId = `sidebar-panel-${item.id}`;
+  const iconClassName = "w-6 h-6 shrink-0";
+
+  const icon =
+    item.kind === "route" ? (
+      <item.icon
+        className={iconClassName}
+        solid={isActive}
+        strokeWidth={variant === "rail" ? RAIL_ICON_STROKE : undefined}
+      />
+    ) : (
+      <item.icon className={iconClassName} />
+    );
 
   const control =
     item.kind === "panel" ? (
       <ChevronRight
-        className={`w-4 h-4 transition-transform motion-reduce:transition-none ${isActive ? "rotate-90" : ""}`}
+        className={`w-5 h-5 transition-transform motion-reduce:transition-none ${isActive ? "rotate-90" : ""}`}
       />
     ) : item.kind === "switch" ? (
       <span
-        className={`inline-flex w-10 h-6 items-center rounded-full p-1 ${TRANSITION} ${
+        className={`inline-flex w-12 h-7 items-center rounded-full p-1 ${TRANSITION} ${
           item.checked ? "bg-orange-500" : "bg-slate-300 dark:bg-slate-600"
         }`}
       >
         <span
-          className={`block w-4 h-4 rounded-full bg-white shadow-xs transition-transform motion-reduce:transition-none ${
-            item.checked ? "translate-x-4" : ""
+          className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform motion-reduce:transition-none ${
+            item.checked ? "translate-x-5" : ""
           }`}
         />
       </span>
@@ -136,11 +172,11 @@ function SidebarRow({
     variant === "drawer" ? (
       <>
         <span aria-hidden="true" className={iconTileClasses(isActive)}>
-          <Icon className="w-5 h-5" />
+          {icon}
         </span>
-        <span className="flex-1 min-w-0 truncate text-base font-semibold">{item.label}</span>
+        <span className="flex-1 min-w-0 truncate text-lg font-semibold">{item.label}</span>
         {item.detail ? (
-          <span className="flex min-w-0 max-w-[50%] justify-end text-sm text-slate-500 dark:text-slate-400">
+          <span className="flex min-w-0 max-w-[50%] justify-end text-base text-slate-500 dark:text-slate-400">
             {item.detail}
           </span>
         ) : null}
@@ -152,13 +188,7 @@ function SidebarRow({
       </>
     ) : (
       <>
-        <span
-          aria-hidden="true"
-          className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-orange-500 transition-opacity duration-200 motion-reduce:transition-none ${
-            isActive ? "opacity-100" : "opacity-0"
-          }`}
-        />
-        <Icon className="w-6 h-6 shrink-0" />
+        {icon}
         <span
           className={`flex-1 min-w-0 font-medium whitespace-nowrap overflow-hidden transition-opacity duration-200 motion-reduce:transition-none ${
             showLabel ? "opacity-100" : "opacity-0"
@@ -313,7 +343,7 @@ export default function GlobalSidebar() {
       {
         id: "home",
         kind: "route",
-        icon: Home,
+        icon: HomeNavIcon,
         label: t("navigation.home"),
         to: "/",
         section: "home",
@@ -321,18 +351,18 @@ export default function GlobalSidebar() {
       {
         id: "familyTree",
         kind: "route",
-        icon: TreePine,
+        icon: FamilyTreeNavIcon,
         label: t("navigation.familyTree"),
-        to: "/familyTree",
+        to: "/family",
         section: "familyTree",
       },
       {
-        id: "actions",
+        id: "create",
         kind: "route",
-        icon: Zap,
-        label: t("navigation.actions", "Actions"),
-        to: "/actions",
-        section: "actions",
+        icon: CreateNavIcon,
+        label: t("navigation.create", "Create"),
+        to: "/create",
+        section: "create",
       },
     ],
     [t],
@@ -441,7 +471,11 @@ export default function GlobalSidebar() {
     </div>
   );
 
-  const railWidth = isRailOpen ? "md:w-56" : "md:w-16";
+  // Folded, the rail sits flat beside the page; open, it overlays the page. Its
+  // right edge takes the header divider's colours, since the two lines meet.
+  // The notes inside the class string below land in the class attribute, so
+  // they must never use a utility's name as a plain word.
+  const railState = isRailOpen ? "md:w-56" : "md:w-16 md:shadow-none";
 
   return (
     <nav
@@ -466,8 +500,8 @@ export default function GlobalSidebar() {
         /* Full height. The rail stops short of the status bar so the last row
            never straddles it; the mobile drawer covers the bar instead. */
         fixed inset-y-0 left-0 flex flex-col
-        bg-white dark:bg-slate-900 shadow-xl
-        transition-[width,translate] duration-300 ease-in-out motion-reduce:transition-none
+        bg-surface shadow-xl
+        transition-[width,translate,box-shadow] duration-300 ease-in-out motion-reduce:transition-none
         will-change-[translate]
         z-10005 md:z-110
         pb-[env(safe-area-inset-bottom)] md:pb-[var(--app-statusbar-h)]
@@ -476,8 +510,8 @@ export default function GlobalSidebar() {
         w-full ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
 
         /* Desktop: full-height rail beside the header; open widths overlay the content */
-        md:translate-x-0 md:border-r md:border-gray-100 md:dark:border-slate-800
-        ${railWidth}
+        md:translate-x-0 md:border-r md:border-slate-200 md:dark:border-gray-800
+        ${railState}
       `}
     >
       {/* Brand: the drawer header on mobile, the rail's own head on desktop. The
@@ -514,7 +548,7 @@ export default function GlobalSidebar() {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden sidebar-scroll">
         <div className="flex min-h-full flex-col">
-          <div className="py-2 md:py-0">{navItems.map(renderItem)}</div>
+          <div className="py-2 md:flex md:flex-col md:gap-1">{navItems.map(renderItem)}</div>
           {settingItems.length > 0 && (
             <div
               className="border-t border-slate-100 dark:border-slate-800 py-2"

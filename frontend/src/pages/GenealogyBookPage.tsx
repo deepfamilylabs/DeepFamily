@@ -120,7 +120,7 @@ function isDefaultPaperAppearance(appearance: PaperAppearance): boolean {
 /**
  * /genealogyBook — the paper volume.
  *
- * The page is a reading surface first: the family bar at the top is shared with /familyTree and
+ * The page is a reading surface first: the family bar at the top is shared with /family and
  * /people and stays as it is, and everything below it belongs to this volume. The book gets the
  * whole stage, the settings that shape it slide over on demand rather than holding a column, and
  * how the sheet is viewed (fit, zoom, which leaf) lives on a bar floating over the desk.

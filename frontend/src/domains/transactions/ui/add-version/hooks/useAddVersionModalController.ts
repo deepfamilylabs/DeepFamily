@@ -544,6 +544,8 @@ export function useAddVersionModalController({
     metadataSection: {
       register,
       isSubmitting,
+      tagValue: watchedValues.tag,
+      tagInvalid: Boolean(errors.tag),
     },
     consentSection: {
       consents,

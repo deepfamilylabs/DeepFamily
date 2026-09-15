@@ -383,7 +383,7 @@ export function usePersonPageController() {
       rootHash: data.personHash,
       rootVersionIndex: data.versionIndex,
     });
-    navigate(`/familyTree?root=${data.personHash}&v=${data.versionIndex}`);
+    navigate(`/family?root=${data.personHash}&v=${data.versionIndex}`);
   }, [config, data?.personHash, data?.versionIndex, navigate]);
 
   const openEditorInNewTab = useCallback(() => {

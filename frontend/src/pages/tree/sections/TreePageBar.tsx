@@ -28,7 +28,7 @@ export interface TreePageBarProps {
 }
 
 /**
- * One row of page chrome for /familyTree.
+ * One row of page chrome for /family.
  *
  * The three destinations — lineage chart, genealogy, encyclopedia — are the volumes of a single
  * genealogy, so they read as page-level tabs. The renderers (tree / DAG / list) are three

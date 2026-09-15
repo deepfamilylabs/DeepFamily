@@ -35,9 +35,9 @@ function renderLayout(initialEntry: string) {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<div data-testid="page-content">home-content</div>} />
-          <Route path="/actions" element={<div data-testid="page-content">actions-content</div>} />
+          <Route path="/create" element={<div data-testid="page-content">create-content</div>} />
           <Route
-            path="/familyTree"
+            path="/family"
             element={<div data-testid="page-content">tree-content</div>}
           />
           <Route
@@ -62,22 +62,23 @@ describe("Layout", () => {
     expect(screen.getByTestId("global-sidebar")).toBeTruthy();
     expect(screen.getByTestId("page-content").textContent).toBe("home-content");
     expect(screen.queryByTestId("page-container")).toBeNull();
-    expect(screen.getByTestId("floating-action-button")).toBeTruthy();
+    // The sidebar's Create entry leads to /create; nothing floats over the page.
+    expect(screen.queryByTestId("floating-action-button")).toBeNull();
     expect(screen.getByTestId("status-bar")).toBeTruthy();
   });
 
   it("wraps non-full-width pages in PageContainer and keeps the rail offset", () => {
-    const { container } = renderLayout("/actions");
+    const { container } = renderLayout("/create");
 
     expect(screen.getByTestId("page-container")).toBeTruthy();
-    expect(screen.getByTestId("page-content").textContent).toBe("actions-content");
+    expect(screen.getByTestId("page-content").textContent).toBe("create-content");
 
     const main = container.querySelector("main");
     expect(main?.className).toContain("md:pl-16");
   });
 
   it("keeps tree route full-width behind the same rail offset", () => {
-    const { container } = renderLayout("/familyTree");
+    const { container } = renderLayout("/family");
 
     expect(screen.getByTestId("page-content").textContent).toBe("tree-content");
     expect(screen.queryByTestId("page-container")).toBeNull();
@@ -94,7 +95,7 @@ describe("Layout", () => {
   });
 
   it("keeps the status bar on every route — it replaced the landing-page footer", () => {
-    renderLayout("/actions");
+    renderLayout("/create");
 
     expect(screen.getByTestId("status-bar")).toBeTruthy();
   });

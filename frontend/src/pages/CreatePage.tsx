@@ -9,7 +9,7 @@ import type { ActionCardTone } from "../shared/ui";
 
 type ActionTab = "add-version" | "mint-nft" | "endorse";
 
-export default function ActionsPage() {
+export default function CreatePage() {
   const { t } = useTranslation();
   const { address } = useWallet();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,7 +47,7 @@ export default function ActionsPage() {
 
   // `?tab=endorse|mint-nft` plus a target opens that modal on the version the
   // URL names. This is where the person detail dialog's mint button lands — it
-  // opens /actions in a new tab carrying hash + version.
+  // opens /create in a new tab carrying hash + version.
   //
   // Opening is one-shot per target: `address` is a dependency, so without this
   // guard switching wallet accounts re-ran the effect and popped the modal back
@@ -188,10 +188,10 @@ export default function ActionsPage() {
   return (
     <PageContainer className="py-10">
       <PageHead
-        title={t("actions.title", "Blockchain Actions")}
+        title={t("actions.title", "Create")}
         subtitle={t(
           "actions.subtitle",
-          "Interact with the DeepFamily protocol using your connected wallet",
+          "Add person versions, endorse quality data, or mint NFTs with your connected wallet",
         )}
       />
 

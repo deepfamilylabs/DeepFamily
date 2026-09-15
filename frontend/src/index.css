@@ -13,6 +13,9 @@
  */
 @source inline("{,dark:}{text,fill,stroke}-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{50,100,200,300,400,500,600,700,800,900}");
 @source inline("dark:fill-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{800,900}/{20,60}");
+/* The list view draws the same badges as HTML spans, so it needs their background and border twins. */
+@source inline("{bg,border}-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{100,300}");
+@source inline("dark:{bg,border}-{slate,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose,stone,gray}-{700,800}/{40,60}");
 
 /* Static tokens (fonts + the one used custom animation) → Tailwind theme. */
 @theme {
@@ -340,13 +343,20 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.55);
 }
 
-/* Sidebar list: keep scrollbar width stable to avoid hover collapse jitter */
-.sidebar-scroll {
-  scrollbar-gutter: stable;
-}
-@supports not (scrollbar-gutter: stable) {
+/*
+ * Sidebar list: below md the drawer's language panel can push it into overflow,
+ * so the gutter stays reserved and the rows do not shift as the scrollbar comes
+ * and goes. The desktop rail is three rows that never scroll in practice, and a
+ * reserved gutter there would pull its icons off the rail's centre line.
+ */
+@media (max-width: 767px) {
   .sidebar-scroll {
-    overflow-y: scroll;
+    scrollbar-gutter: stable;
+  }
+  @supports not (scrollbar-gutter: stable) {
+    .sidebar-scroll {
+      overflow-y: scroll;
+    }
   }
 }
 

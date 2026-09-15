@@ -13,6 +13,12 @@ export type FamilyTreeNodeTheme = {
 
   tagBadgeBgClass: string;
   tagBadgeText: FamilyTreeThemeText;
+  /**
+   * Badge fill and edge for views that draw badges as HTML (the list) rather
+   * than SVG: a fill class does nothing on a span, so they need `bg-*` twins.
+   */
+  tagBadgeBgHtmlClass: string;
+  badgeBorderHtmlClass: string;
 
   endorseBadgeBgClass: string;
   endorseStarClass: string;
@@ -26,6 +32,8 @@ type ThemeColors = {
   body: string;
   meta: string;
   badgeBg: string;
+  badgeBgHtml: string;
+  badgeBorderHtml: string;
   badgeText: string;
   star: string;
 };
@@ -57,6 +65,8 @@ const createTheme = (color: string): ThemeColors => {
     meta: `text-${color}-${metaShade} dark:text-${color}-${metaDarkShade}`,
 
     badgeBg: `fill-${color}-100 dark:fill-${color}-800/60`,
+    badgeBgHtml: `bg-${color}-100 dark:bg-${color}-800/60`,
+    badgeBorderHtml: `border-${color}-300 dark:border-${color}-700/40`,
     badgeText: `text-${color}-${titleShade} dark:text-${color}-${titleDarkShade}`,
     star: `fill-${color}-500`,
   };
@@ -124,6 +134,10 @@ export function getFamilyTreeNodeTheme(opts: {
       : { html: "text-slate-600 dark:text-slate-400", svg: "fill-slate-600 dark:fill-slate-400" };
 
   const tagBadgeBgClass = minted ? theme.badgeBg : "fill-slate-100 dark:fill-slate-800/60";
+  const tagBadgeBgHtmlClass = minted ? theme.badgeBgHtml : "bg-slate-100 dark:bg-slate-800/60";
+  const badgeBorderHtmlClass = minted
+    ? theme.badgeBorderHtml
+    : "border-slate-300 dark:border-slate-700/40";
 
   const tagBadgeText: FamilyTreeThemeText = minted
     ? {
@@ -152,6 +166,8 @@ export function getFamilyTreeNodeTheme(opts: {
     infoText,
     tagBadgeBgClass,
     tagBadgeText,
+    tagBadgeBgHtmlClass,
+    badgeBorderHtmlClass,
     endorseBadgeBgClass,
     endorseStarClass,
     endorseCountText,

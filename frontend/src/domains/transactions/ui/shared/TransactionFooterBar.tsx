@@ -28,6 +28,12 @@ export type TransactionFooterSlots = {
  * One container and one phase switch: the bar itself had drifted apart between
  * flows, and the switch over which actions belong to which phase is the same
  * question the status view answers, so it gets the same `never` treatment.
+ *
+ * Slots hand over their buttons bare and the strip lays them out. From sm up it
+ * is a row, where a slot's `flex-1` / `flex-[1.5]` shares out the width. On a
+ * phone it is a 2fr/3fr grid: a pair still sits side by side, and a lone or
+ * third action takes a row of its own. Not a column — there those same flex
+ * values would share out the height instead, folding each button to its text.
  */
 export function TransactionFooterBar({
   phase,
@@ -40,7 +46,7 @@ export function TransactionFooterBar({
   const backgroundLabel = t("transaction.runInBackground", "Continue in background");
 
   return (
-    <div className="flex flex-col-reverse sm:flex-row gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
+    <div className="grid grid-cols-[2fr_3fr] *:last:odd:col-span-2 sm:flex gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
       {/* Keyed by phase so no <button> is reused across phases. A click's default
           action runs after React re-renders, so "Back to edit" reused in place as
           the form's submit button would submit the form it just reopened. */}

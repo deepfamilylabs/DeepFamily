@@ -19,7 +19,7 @@ vi.mock("react-i18next", () => ({
         "navigation.familyTree": "Family",
         "navigation.people": "People",
         "navigation.search": "Search",
-        "navigation.actions": "Actions",
+        "navigation.create": "Create",
       };
       return labels[key] || fallback || key;
     },
