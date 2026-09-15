@@ -5,6 +5,18 @@ import hre from "hardhat";
 describe("DeepFamilyToken", function () {
   this.timeout(120_000);
 
+  const expectedCycleLengths = [
+    1n,
+    10n,
+    100n,
+    1_000n,
+    10_000n,
+    100_000n,
+    1_000_000n,
+    10_000_000n,
+    100_000_000n,
+  ];
+
   async function deployToken(contractName = "DeepFamilyToken") {
     const Token = await hre.ethers.getContractFactory(contractName);
     const token = await Token.deploy();
@@ -120,55 +132,40 @@ describe("DeepFamilyToken", function () {
     expect(await token.recentReward()).to.equal(initialReward);
   });
 
-  it("returns the expected rewards at every important cycle boundary", async () => {
+  it("returns the expected rewards at every cycle boundary through reward exhaustion", async () => {
     const token = await deployToken();
-    const initialReward = await token.INITIAL_REWARD();
 
     await expect(token.getReward(0)).to.be.revertedWithCustomError(token, "InvalidRecordCount");
 
-    const cases = [
-      [1n, initialReward],
-      [2n, initialReward >> 1n],
-      [11n, initialReward >> 1n],
-      [12n, initialReward >> 2n],
-      [111n, initialReward >> 2n],
-      [112n, initialReward >> 3n],
-      [111_111_111n, initialReward >> 8n],
-      [111_111_112n, initialReward >> 9n],
-      [211_111_111n, initialReward >> 9n],
-      [211_111_112n, initialReward >> 10n],
-      [6_911_111_111n, 1n],
-      [6_911_111_112n, 0n],
-    ];
-
-    for (const [recordCount, expectedReward] of cases) {
-      expect(await token.getReward(recordCount), `recordCount=${recordCount}`).to.equal(
-        expectedReward,
-      );
+    let firstRecord = 1n;
+    let expectedReward = 113_777n * 10n ** 18n;
+    for (let cycleIndex = 0; ; cycleIndex++) {
+      const length = expectedCycleLengths[cycleIndex] ?? 100_000_000n;
+      const lastRecord = firstRecord + length - 1n;
+      for (const recordCount of [firstRecord, lastRecord]) {
+        expect(await token.getReward(recordCount), `recordCount=${recordCount}`).to.equal(
+          expectedReward,
+        );
+      }
+      if (expectedReward === 0n) break;
+      firstRecord = lastRecord + 1n;
+      expectedReward /= 2n;
     }
+
+    expect(await token.getReward(hre.ethers.MaxUint256)).to.equal(0n);
   });
 
   it("has an exact theoretical issuance below the hard cap when rewards round to zero", async () => {
     const token = await deployToken();
     const initialReward = await token.INITIAL_REWARD();
     const maxSupply = await token.MAX_SUPPLY();
-    const cycleLengths = [
-      1n,
-      10n,
-      100n,
-      1_000n,
-      10_000n,
-      100_000n,
-      1_000_000n,
-      10_000_000n,
-      100_000_000n,
-    ];
 
     let theoreticalIssuance = 0n;
-    for (let cycleIndex = 0; cycleIndex < cycleLengths.length; cycleIndex++) {
-      theoreticalIssuance += cycleLengths[cycleIndex] * (initialReward >> BigInt(cycleIndex));
+    for (let cycleIndex = 0; cycleIndex < expectedCycleLengths.length; cycleIndex++) {
+      theoreticalIssuance +=
+        expectedCycleLengths[cycleIndex] * (initialReward >> BigInt(cycleIndex));
     }
-    for (let cycleIndex = cycleLengths.length; ; cycleIndex++) {
+    for (let cycleIndex = expectedCycleLengths.length; ; cycleIndex++) {
       const reward = initialReward >> BigInt(cycleIndex);
       if (reward === 0n) break;
       theoreticalIssuance += 100_000_000n * reward;
@@ -176,6 +173,42 @@ describe("DeepFamilyToken", function () {
 
     expect(theoreticalIssuance).to.equal(99_999_287_961_999_999_997_100_000_000n);
     expect(maxSupply - theoreticalIssuance).to.equal(712_038_000_000_002_900_000_000n);
+  });
+
+  it("mints the last scheduled reward and cannot restart exhausted rewards after a burn", async () => {
+    const [, miner] = await hre.ethers.getSigners();
+    const { token, minter } = await deployBoundToken("DeepFamilyTokenHarness");
+    const minerAddress = await miner.getAddress();
+    const lastRewardedRecord = 6_911_111_111n;
+
+    await token.setTotalAdditionsForTest(lastRewardedRecord - 1n);
+
+    expect(await minter.mint.staticCall(minerAddress)).to.equal(1n);
+    await expect(minter.mint(minerAddress))
+      .to.emit(token, "MiningReward")
+      .withArgs(minerAddress, 1n, lastRewardedRecord)
+      .and.to.emit(token, "Transfer")
+      .withArgs(hre.ethers.ZeroAddress, minerAddress, 1n);
+    expect(await token.totalAdditions()).to.equal(lastRewardedRecord);
+    expect(await token.totalSupply()).to.equal(1n);
+    expect(await token.balanceOf(minerAddress)).to.equal(1n);
+    expect(await token.recentReward()).to.equal(1n);
+
+    async function expectExhaustedMint(expectedSupply) {
+      expect(await minter.mint.staticCall(minerAddress)).to.equal(0n);
+      const transaction = await minter.mint(minerAddress);
+      await expect(transaction).to.not.emit(token, "MiningReward");
+      await expect(transaction).to.not.emit(token, "Transfer");
+      expect(await token.totalAdditions()).to.equal(lastRewardedRecord);
+      expect(await token.totalSupply()).to.equal(expectedSupply);
+      expect(await token.balanceOf(minerAddress)).to.equal(expectedSupply);
+      expect(await token.recentReward()).to.equal(0n);
+    }
+
+    await expectExhaustedMint(1n);
+    await expectExhaustedMint(1n);
+    await token.connect(miner).burn(1n);
+    await expectExhaustedMint(0n);
   });
 
   it("truncates the final reward at the live supply cap and stops until supply is burned", async () => {

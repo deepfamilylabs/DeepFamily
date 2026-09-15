@@ -8,6 +8,11 @@ contract DeepFamilyTokenHarness is DeepFamilyToken {
     _mint(account, amount);
   }
 
+  /// @dev Test-only hook for reaching the end of the reward schedule without billions of mints.
+  function setTotalAdditionsForTest(uint256 additions) external {
+    totalAdditions = additions;
+  }
+
   /// @dev Test-only hook for exercising monitoring against a legacy/non-retired token owner.
   function forceBootstrapOwnerForTest(address account) external {
     _transferOwnership(account);
