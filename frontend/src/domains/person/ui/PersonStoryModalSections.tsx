@@ -3,7 +3,7 @@ import type React from "react";
 import type { TFunction } from "i18next";
 import { Book, FileText, Layers, AlertCircle, Edit2, Check } from "lucide-react";
 import { NodeData, StoryRecord, isMinted, isMetadataUnlockUsable } from "../../../shared/model";
-import { CopyIconButton, MODAL_CARD, MODAL_CHIP, ModalSectionHeading } from "../../../shared/ui";
+import { CopyIconButton, MODAL_CARD, ModalSectionHeading } from "../../../shared/ui";
 import type { StoryRecordOrder } from "../config/recordTypeGroups";
 import { StoryRecordOrderToggle, StoryRecordTimeline } from "./StoryRecordTimeline";
 
@@ -245,6 +245,7 @@ export function BasicStorySection({
   );
 }
 
+/** Same segmented pill as the record order switch, so the two read as one control bar. */
 function StoryViewToggle({
   t,
   viewMode,
@@ -254,40 +255,76 @@ function StoryViewToggle({
   viewMode: "records" | "full";
   onChange: (mode: "records" | "full") => void;
 }) {
-  const buttonClass = (active: boolean) =>
-    `inline-flex h-[34px] items-center gap-2 px-3.5 rounded-lg border text-[13px] font-semibold transition-colors focus:outline-hidden focus:ring-3 focus:ring-primary/15 ${
-      active
-        ? "bg-primary border-primary text-white dark:text-orange-950"
-        : "bg-surface border-hairline-strong text-ink hover:bg-surface-alt hover:border-primary"
-    }`;
-  const iconClass = (active: boolean) => (active ? "" : "text-ink-muted");
+  const views = [
+    { id: "records", icon: Layers, label: t("storyRecordsModal.records", "Records") },
+    { id: "full", icon: FileText, label: t("storyRecordsModal.fullText", "Full Text") },
+  ] as const;
 
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        aria-pressed={viewMode === "records"}
-        onClick={() => onChange("records")}
-        className={buttonClass(viewMode === "records")}
-      >
-        <Layers size={14} className={iconClass(viewMode === "records")} />
-        <span>{t("storyRecordsModal.records", "Records")}</span>
-      </button>
-      <button
-        type="button"
-        aria-pressed={viewMode === "full"}
-        onClick={() => onChange("full")}
-        className={buttonClass(viewMode === "full")}
-      >
-        <FileText size={14} className={iconClass(viewMode === "full")} />
-        <span>{t("storyRecordsModal.fullText", "Full Text")}</span>
-      </button>
+    <div
+      role="group"
+      aria-label={t("storyRecordsModal.viewLabel", "View")}
+      className="inline-flex gap-1 rounded-full bg-surface-muted p-1"
+    >
+      {views.map(({ id, icon: Icon, label }) => {
+        const active = viewMode === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(id)}
+            className={`inline-flex min-h-[30px] items-center gap-1.5 rounded-full px-3 text-[12px] transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30 ${
+              active
+                ? "bg-surface font-semibold text-ink shadow-sm"
+                : "font-medium text-ink-muted hover:text-ink"
+            }`}
+          >
+            <Icon size={13} aria-hidden />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
 /**
- * Edit or seal status, and integrity only when it fails.
+ * Sealed, or the editor entry for a permitted owner — at most one, and it sits
+ * with the record count on the heading line rather than on a row of its own.
+ */
+function StoryArchiveStatus({
+  t,
+  person,
+  canEditStory,
+}: {
+  t: PersonStoryT;
+  person: NodeData;
+  canEditStory: boolean;
+}) {
+  if (person.storyMetadata?.isSealed) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-info">
+        <Check size={12} strokeWidth={3} aria-hidden />
+        {t("person.sealed", "Sealed")}
+      </span>
+    );
+  }
+  if (!canEditStory || !person.tokenId) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer")}
+      className="inline-flex items-center gap-1 rounded py-1 text-[12px] font-semibold text-primary transition-colors hover:text-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30"
+    >
+      <Edit2 size={12} aria-hidden />
+      {t("familyTree.nodeDetail.editStory", "Edit Story")}
+    </button>
+  );
+}
+
+/**
+ * Integrity, only when it fails.
  *
  * Every record shown was already verified byte-for-byte as it was read, so a
  * standing "verified" badge said nothing on the ordinary day. What is worth
@@ -295,19 +332,15 @@ function StoryViewToggle({
  * up, or the recomputed record-chain head disagrees with the chain — and that is
  * said the way the person page says it.
  */
-function StoryIntegritySection({
+function StoryIntegrityAlert({
   t,
   person,
-  canEditStory,
   storyData,
 }: {
   t: PersonStoryT;
   person: NodeData;
-  canEditStory: boolean;
   storyData: StoryData;
 }) {
-  const sealed = Boolean(person.storyMetadata?.isSealed);
-  const editable = !sealed && canEditStory && Boolean(person.tokenId);
   const integrity = storyData.integrity;
   const hasIssues =
     !storyData.loading &&
@@ -316,63 +349,36 @@ function StoryIntegritySection({
     Boolean(integrity) &&
     (integrity.missing.length > 0 || !integrity.lengthMatch || integrity.hashMatch === false);
 
-  if (!sealed && !editable && !hasIssues) return null;
+  if (!hasIssues) return null;
 
   return (
-    <>
-      {sealed ? (
-        <div>
-          <span className={`${MODAL_CHIP} border-info/25 bg-info/10 text-info`}>
-            <Check size={12} strokeWidth={3} />
-            {t("person.sealed", "Sealed")}
-          </span>
-        </div>
-      ) : editable ? (
-        <div>
-          <button
-            type="button"
-            onClick={() => {
-              if (!person.tokenId || !canEditStory) return;
-              window.open(`/editor/${person.tokenId}`, "_blank", "noopener,noreferrer");
-            }}
-            className={`group ${MODAL_CHIP} border-hairline-strong bg-surface text-ink transition-colors hover:border-primary hover:text-primary`}
-          >
-            <Edit2 size={12} className="group-hover:scale-110 transition-transform" />
-            {t("familyTree.nodeDetail.editStory", "Edit Story")}
-          </button>
-        </div>
-      ) : null}
-
-      {hasIssues && (
-        <div
-          role="alert"
-          className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning"
-        >
-          {integrity.missing.length > 0 && (
-            <span className="inline-flex items-start gap-1.5">
-              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
-              {t("person.integrityMissing", "Missing indices: {{indices}}", {
-                indices: integrity.missing.join(","),
-              })}
-            </span>
-          )}
-          {!integrity.lengthMatch && (
-            <span className="inline-flex items-start gap-1.5">
-              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
-              {t("person.integrityLenDiff", "Length mismatch local={{local}} bytes", {
-                local: integrity.computedLength,
-              })}
-            </span>
-          )}
-          {integrity.hashMatch === false && (
-            <span className="inline-flex items-start gap-1.5">
-              <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
-              {t("person.integrityLocalHashMismatch", "Local hash mismatch")}
-            </span>
-          )}
-        </div>
+    <div
+      role="alert"
+      className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning"
+    >
+      {integrity.missing.length > 0 && (
+        <span className="inline-flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+          {t("person.integrityMissing", "Missing indices: {{indices}}", {
+            indices: integrity.missing.join(","),
+          })}
+        </span>
       )}
-    </>
+      {!integrity.lengthMatch && (
+        <span className="inline-flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+          {t("person.integrityLenDiff", "Length mismatch local={{local}} bytes", {
+            local: integrity.computedLength,
+          })}
+        </span>
+      )}
+      {integrity.hashMatch === false && (
+        <span className="inline-flex items-start gap-1.5">
+          <AlertCircle size={13} className="mt-px shrink-0" aria-hidden />
+          {t("person.integrityLocalHashMismatch", "Local hash mismatch")}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -466,34 +472,38 @@ export function DetailedStorySection({
 
   if (!shouldRender) return null;
 
+  const showRecordOrder =
+    !storyData.loading && !storyData.error && storyData.records.length > 1;
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <SectionTitle>{t("storyRecordsModal.detailedStory", "Detailed Story")}</SectionTitle>
-          {recordsCount > 0 && (
-            <span className="text-xs font-bold text-ink-muted px-2.5 py-1 bg-surface-muted rounded-full">
-              {t("storyRecordsModal.recordsAndSize", "{{count}} records · {{size}} bytes", {
-                count: recordsCount,
-                size: lengthBytes,
-              })}
-            </span>
-          )}
-        </div>
+    <div className="space-y-3">
+      <ModalSectionHeading
+        aside={
+          <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            {recordsCount > 0 && (
+              <span>
+                {t("storyRecordsModal.recordsAndSize", "{{count}} records · {{size}} bytes", {
+                  count: recordsCount,
+                  size: lengthBytes.toLocaleString(),
+                })}
+              </span>
+            )}
+            <StoryArchiveStatus t={t} person={person} canEditStory={canEditStory} />
+          </span>
+        }
+      >
+        {t("storyRecordsModal.detailedStory", "Detailed Story")}
+      </ModalSectionHeading>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <StoryViewToggle t={t} viewMode={viewMode} onChange={onViewModeChange} />
+        {/* Applies to both views: the full text is the records joined in this order. */}
+        {showRecordOrder && (
+          <StoryRecordOrderToggle t={t} value={recordOrder} onChange={onRecordOrderChange} />
+        )}
       </div>
 
-      <StoryIntegritySection
-        t={t}
-        person={person}
-        canEditStory={canEditStory}
-        storyData={storyData}
-      />
-
-      {/* Applies to both views: the full text is the records joined in this order. */}
-      {!storyData.loading && !storyData.error && storyData.records.length > 1 && (
-        <StoryRecordOrderToggle t={t} value={recordOrder} onChange={onRecordOrderChange} />
-      )}
+      <StoryIntegrityAlert t={t} person={person} storyData={storyData} />
 
       {storyData.loading ? (
         <StoryLoadingState t={t} />

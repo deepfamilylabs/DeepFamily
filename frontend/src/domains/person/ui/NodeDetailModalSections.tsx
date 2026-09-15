@@ -1,6 +1,15 @@
 import React from "react";
 import type { TFunction } from "i18next";
-import { BookOpen, Edit2, Image, KeyRound, Plus, Star, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Edit2,
+  Image,
+  KeyRound,
+  Plus,
+  Star,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import { ethers } from "ethers";
 import {
   CopyIconButton,
@@ -83,6 +92,66 @@ function NodeDetailRow({
   );
 }
 
+const TOOLBAR_BUTTON_BASE =
+  "inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-colors focus:outline-hidden focus:ring-3";
+const TOOLBAR_BUTTON_VARIANT = {
+  primary:
+    "bg-primary text-white dark:text-orange-950 hover:bg-primary-hover focus:ring-primary/25",
+  secondary:
+    "border border-hairline-strong bg-surface text-ink hover:bg-surface-alt hover:border-primary focus:ring-primary/15",
+} as const;
+
+/**
+ * One entry in a person detail modal toolbar (node detail and story modals).
+ * Labels stay visible at every width — bare book/pencil/image glyphs were
+ * ambiguous on touch, where `title` never shows.
+ */
+export function DetailToolbarButton({
+  variant,
+  icon: Icon,
+  label,
+  accessibleLabel,
+  onClick,
+  children,
+}: {
+  variant: keyof typeof TOOLBAR_BUTTON_VARIANT;
+  icon: LucideIcon;
+  label: string;
+  accessibleLabel: string;
+  onClick: () => void;
+  children?: React.ReactNode;
+}) {
+  const isPrimary = variant === "primary";
+  return (
+    <button
+      type="button"
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      className={`${TOOLBAR_BUTTON_BASE} ${TOOLBAR_BUTTON_VARIANT[variant]}`}
+    >
+      <Icon
+        className={`w-[15px] h-[15px] ${isPrimary ? "" : "text-ink-muted"}`}
+        strokeWidth={isPrimary ? 1.9 : 1.75}
+        aria-hidden
+      />
+      <span>{label}</span>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Actions only — minted status lives in the modal description, not here.
+ * Unminted: endorsing is the main path (and gates minting), so it leads.
+ * Minted: reading the encyclopedia is what most viewers came for, so it leads
+ * and the paid endorsement drops to a secondary action.
+ */
 export function NodeDetailHeaderActions({
   t,
   nodeData,
@@ -104,89 +173,56 @@ export function NodeDetailHeaderActions({
   onOpenPerson: () => void;
   onOpenEditor: () => void;
 }) {
-  const action =
-    "inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg border border-hairline-strong bg-surface text-ink text-[13px] font-semibold transition-colors hover:bg-surface-alt hover:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/15";
+  const hasVersion = Boolean(nodeData?.personHash) && nodeData?.versionIndex !== undefined;
+  const showEncyclopedia = hasNFT && Boolean(nodeData?.tokenId);
 
-  const stop = {
-    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
-    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
-  };
+  const endorseButton = hasVersion ? (
+    <DetailToolbarButton
+      variant={showEncyclopedia ? "secondary" : "primary"}
+      icon={Star}
+      label={t("endorse.endorse", "Endorse")}
+      accessibleLabel={t("people.clickToEndorse", "Click to endorse this version")}
+      onClick={onOpenEndorse}
+    >
+      <span className="font-mono opacity-80">{endorsementCount}</span>
+    </DetailToolbarButton>
+  ) : null;
+
+  if (showEncyclopedia) {
+    return (
+      <>
+        <DetailToolbarButton
+          variant="primary"
+          icon={BookOpen}
+          label={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+          accessibleLabel={t("people.viewEncyclopedia", "View Encyclopedia")}
+          onClick={onOpenPerson}
+        />
+        {canEditStory && (
+          <DetailToolbarButton
+            variant="secondary"
+            icon={Edit2}
+            label={t("familyTree.nodeDetail.editStory", "Edit Story")}
+            accessibleLabel={t("familyTree.nodeDetail.editStory", "Edit Story")}
+              onClick={onOpenEditor}
+          />
+        )}
+        {endorseButton}
+      </>
+    );
+  }
 
   return (
     <>
-      {nodeData?.personHash && nodeData?.versionIndex !== undefined && (
-        <button
-          type="button"
-          aria-label={t("people.clickToEndorse", "Click to endorse this version")}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenEndorse();
-          }}
-          {...stop}
-          className="inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg bg-primary text-white dark:text-orange-950 text-[13px] font-semibold transition-colors hover:bg-primary-hover focus:outline-hidden focus:ring-3 focus:ring-primary/25"
-          title={t("people.clickToEndorse", "Click to endorse this version")}
-        >
-          <Star className="w-[15px] h-[15px]" strokeWidth={1.9} aria-hidden />
-          <span>{t("endorse.endorse", "Endorse")}</span>
-          <span className="font-mono opacity-80">{endorsementCount}</span>
-        </button>
-      )}
-      {!hasNFT && nodeData?.personHash && nodeData?.versionIndex !== undefined && (
-        <button
-          type="button"
-          aria-label={t("familyTree.nodeDetail.mintNFTTooltip", "Mint this person as an NFT")}
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenMint();
-          }}
-          {...stop}
-          className={action}
-          title={t("familyTree.nodeDetail.mintNFTTooltip", "Mint this person as an NFT")}
-        >
-          <Image className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
-          <span className="hidden sm:inline">{t("actions.mintNFT", "Mint NFT")}</span>
-        </button>
-      )}
-      {hasNFT && nodeData?.tokenId && (
-        <>
-          <button
-            type="button"
-            aria-label={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenPerson();
-            }}
-            {...stop}
-            className={action}
-            title={t("familyTree.nodeDetail.viewFullStory", "View Full Story")}
-          >
-            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
-            <span className="hidden sm:inline">
-              {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
-            </span>
-          </button>
-          {canEditStory && (
-            <button
-              type="button"
-              aria-label={t("familyTree.nodeDetail.editStory", "Edit Story")}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenEditor();
-              }}
-              {...stop}
-              className={action}
-              title={t("familyTree.nodeDetail.editStory", "Edit Story")}
-            >
-              <Edit2 className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
-              <span className="hidden sm:inline">{t("familyTree.nodeDetail.edit", "Edit")}</span>
-            </button>
-          )}
-          <span className="flex-1" />
-          <span className="inline-flex shrink-0 items-center gap-1.5 h-7 px-2.5 rounded-full border border-purple-600/25 bg-purple-600/10 text-xs font-semibold text-purple-700 dark:border-purple-400/30 dark:bg-purple-400/15 dark:text-purple-300">
-            <Image className="w-3.5 h-3.5" strokeWidth={1.9} aria-hidden />
-            {t("familyTree.nodeDetail.minted", "Minted")} · #{nodeData.tokenId}
-          </span>
-        </>
+      {endorseButton}
+      {hasVersion && !hasNFT && (
+        <DetailToolbarButton
+          variant="secondary"
+          icon={Image}
+          label={t("actions.mintNFT", "Mint NFT")}
+          accessibleLabel={t("familyTree.nodeDetail.mintNFTTooltip", "Mint this person as an NFT")}
+          onClick={onOpenMint}
+        />
       )}
     </>
   );

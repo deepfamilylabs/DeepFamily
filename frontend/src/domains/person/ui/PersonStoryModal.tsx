@@ -25,6 +25,7 @@ import {
   StoryLifeEventsSection,
   type StoryData,
 } from "./PersonStoryModalSections";
+import { DetailToolbarButton } from "./NodeDetailModalSections";
 // owner/address resolution is delegated to the tree node access layer.
 
 interface PersonStoryModalProps {
@@ -331,52 +332,39 @@ export default function PersonStoryModal({
     </div>
   );
 
-  const action =
-    "inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg border border-hairline-strong bg-surface text-ink text-[13px] font-semibold whitespace-nowrap transition-colors hover:bg-surface-alt hover:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/15";
+  const personMinted = isMinted(person);
+  const showEndorse = endorsementCount > 0;
 
+  // Same entries and priority as the node detail toolbar: once minted, reading the
+  // encyclopedia leads and the paid endorsement becomes secondary.
   const modalToolbar =
-    endorsementCount > 0 || isMinted(person) ? (
+    showEndorse || personMinted ? (
       <>
-        {endorsementCount > 0 && (
-          <button
-            type="button"
-            aria-label={t("people.clickToEndorse", "Click to endorse this version")}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowEndorseModal(true);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="inline-flex h-[34px] shrink-0 items-center gap-1.5 px-3 rounded-lg bg-primary text-white dark:text-orange-950 text-[13px] font-semibold whitespace-nowrap transition-colors hover:bg-primary-hover focus:outline-hidden focus:ring-3 focus:ring-primary/25"
-          >
-            <Star className="w-[15px] h-[15px]" strokeWidth={1.9} aria-hidden />
-            <span>{t("endorse.endorse", "Endorse")}</span>
-            <span className="font-mono opacity-80">{endorsementCount}</span>
-          </button>
-        )}
-
-        {isMinted(person) && (
-          <button
-            type="button"
-            aria-label={t("storyRecordsModal.peopleEncyclopedia", "People Encyclopedia")}
-            onClick={(e) => {
-              e.stopPropagation();
+        {personMinted && (
+          <DetailToolbarButton
+            variant="primary"
+            icon={BookOpen}
+            label={t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
+            accessibleLabel={t("people.viewEncyclopedia", "View Encyclopedia")}
+            onClick={() =>
               window.open(
                 `/person/${person.tokenId || person.id}`,
                 "_blank",
                 "noopener,noreferrer",
-              );
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className={action}
-            title={t("storyRecordsModal.peopleEncyclopedia", "People Encyclopedia")}
+              )
+            }
+          />
+        )}
+        {showEndorse && (
+          <DetailToolbarButton
+            variant={personMinted ? "secondary" : "primary"}
+            icon={Star}
+            label={t("endorse.endorse", "Endorse")}
+            accessibleLabel={t("people.clickToEndorse", "Click to endorse this version")}
+            onClick={() => setShowEndorseModal(true)}
           >
-            <BookOpen className="w-[15px] h-[15px] text-ink-muted" strokeWidth={1.75} aria-hidden />
-            <span className="hidden sm:inline">
-              {t("familyTree.nodeDetail.encyclopedia", "Encyclopedia")}
-            </span>
-          </button>
+            <span className="font-mono opacity-80">{endorsementCount}</span>
+          </DetailToolbarButton>
         )}
       </>
     ) : null;

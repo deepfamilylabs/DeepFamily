@@ -180,11 +180,18 @@ export default function NodeDetailModal({
     window.open(`/editor/${nodeData.tokenId}`, "_blank", "noopener,noreferrer");
   };
 
-  const personSummary = nodeData?.fullName
-    ? nodeData.versionIndex !== undefined
-      ? `${nodeData.fullName} · ${t("familyTree.nodeDetail.versionLabel", "Version")} ${nodeData.versionIndex}`
-      : nodeData.fullName
-    : undefined;
+  // Minted status is metadata about the record, so it sits with the name and
+  // version rather than among the toolbar actions.
+  const summaryParts = [
+    nodeData?.fullName,
+    nodeData?.versionIndex !== undefined
+      ? `${t("familyTree.nodeDetail.versionLabel", "Version")} ${nodeData.versionIndex}`
+      : undefined,
+    hasNFT && nodeData?.tokenId
+      ? `${t("familyTree.nodeDetail.minted", "Minted")} #${nodeData.tokenId}`
+      : undefined,
+  ].filter(Boolean);
+  const personSummary = summaryParts.length ? summaryParts.join(" · ") : undefined;
 
   const headerActions = (
     <NodeDetailHeaderActions

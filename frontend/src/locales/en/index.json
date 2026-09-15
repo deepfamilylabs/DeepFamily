@@ -683,8 +683,6 @@
       "story": "Biography",
       "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
-      "edit": "Edit",
-      "viewFullStory": "View Full Story",
       "mintNFTTooltip": "Mint this person as an NFT",
       "uri": "URI",
       "loading": "Loading NFT info…",
@@ -1041,11 +1039,11 @@
     "detailedStory": "Life Story",
     "records": "Story Records",
     "fullText": "Full Text",
+    "viewLabel": "View",
     "loading": "Loading story records...",
     "noStoryData": "No story data available",
     "basicStory": "Biography",
     "noStory": "No story content",
-    "peopleEncyclopedia": "Encyclopedia",
     "biographyTitle": "Biography"
   },
   "actions": {
