@@ -17,6 +17,7 @@ export interface EndorseFooterProps {
   isPersonHashFormatValid: boolean;
   onRunInBackground?: () => void;
   onClose: () => void;
+  onBackToEdit: () => void;
   onContinueEndorsing: () => void;
   onEndorse: () => void;
   onMintNFT?: (personHash: string, versionIndex: number) => void;
@@ -35,6 +36,7 @@ export function EndorseFooter({
   isPersonHashFormatValid,
   onRunInBackground,
   onClose,
+  onBackToEdit,
   onContinueEndorsing,
   onEndorse,
   onMintNFT,
@@ -44,6 +46,7 @@ export function EndorseFooter({
       phase={phase}
       slots={{
         onRunInBackground,
+        failed: { onClose, onBackToEdit },
         // The phase is derived from this result, so it is always present here.
         done: successResult ? (
         <div className="flex flex-col sm:flex-row gap-3 w-full">

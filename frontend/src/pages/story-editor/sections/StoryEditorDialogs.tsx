@@ -163,7 +163,7 @@ export function RecordTypeHelpDialog({ editor }: { editor: StoryEditorController
             <button
               onClick={closeDialog}
               className={MODAL_CLOSE_BUTTON}
-              aria-label="Close"
+              aria-label={t("common.close", "Close")}
               type="button"
             >
               <X size={17} />

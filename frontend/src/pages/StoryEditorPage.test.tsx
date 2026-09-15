@@ -330,6 +330,28 @@ describe("StoryEditorPage", () => {
     expect(mocks.toastSuccess).toHaveBeenCalledWith("Story sealed successfully (1 records)");
     expect(screen.getAllByText("Sealed").length).toBeGreaterThan(0);
   });
+
+  it("reports nothing when the seal fee preview is closed without signing", async () => {
+    mocks.sealStoryRunOrThrow.mockRejectedValue(
+      Object.assign(new Error("Story seal cancelled before wallet request"), {
+        code: "ARCHIVE_PREVIEW_REJECTED",
+      }),
+    );
+    render(<StoryEditorPage />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Seal permanently" })).toBeTruthy(),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Seal permanently" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText("Confirm Seal"));
+    });
+    await waitFor(() => expect(mocks.sealStoryRunOrThrow).toHaveBeenCalled());
+    expect(screen.queryByText(/cancelled/)).toBeNull();
+    expect(screen.queryByText("Seal failed")).toBeNull();
+    expect(screen.getByRole("button", { name: "Seal permanently" })).toBeTruthy();
+  });
   it.each([
     { connected: false, isOwner: false, checking: false, correctNetwork: true, error: false },
     { connected: true, isOwner: false, checking: false, correctNetwork: true, error: false },

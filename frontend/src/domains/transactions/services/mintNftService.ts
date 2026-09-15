@@ -119,6 +119,12 @@ export type ExecuteMintFlowParams = {
   story?: string;
   mintPersonVersionNFT: MintPersonVersionNFTFn;
   getVersionDetails?: (personHash: string, versionIndex: number) => Promise<any>;
+  /**
+   * Reads the caller's endorsement; defaults to `contract`. Callers pass a
+   * reader on the app's own RPC, since a wallet provider can answer from a
+   * cached block right after the endorsement confirmed.
+   */
+  endorsementReader?: any;
 };
 
 export type ExecuteMintFlowResult =
@@ -148,6 +154,7 @@ export async function executeMintFlow({
   story = "",
   mintPersonVersionNFT,
   getVersionDetails,
+  endorsementReader = contract,
 }: ExecuteMintFlowParams): Promise<ExecuteMintFlowResult> {
   if (!Number.isInteger(selfSuiteId) || selfSuiteId <= 0 || selfSuiteId > 0xffff_ffff) {
     throw new Error("Target identity suite must be a nonzero uint32");
@@ -173,7 +180,7 @@ export async function executeMintFlow({
         );
   const payloadHash = keccak256(payload);
   const frozenCoreInfo = structuredClone(coreInfo);
-  const endorsedIdx = await contract.endorsedVersionIndex(personHash, address);
+  const endorsedIdx = await endorsementReader.endorsedVersionIndex(personHash, address);
   if (Number(endorsedIdx) !== Number(versionIndex)) {
     return { requiresEndorsement: true };
   }

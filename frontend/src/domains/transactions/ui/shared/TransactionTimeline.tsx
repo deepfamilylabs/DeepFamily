@@ -69,16 +69,30 @@ export function buildTimeline(input: {
 export function useTimelineProgress(
   stepIds: readonly string[],
   currentId: string | null,
+  /**
+   * A failed run has no current signal left, but its timeline still has to
+   * show the step it stopped on. Held until the next run starts.
+   */
+  options: { holdLastStep?: boolean } = {},
 ): string | null {
-  const [furthest, setFurthest] = useState(-1);
+  const [progress, setProgress] = useState({ furthest: -1, running: false });
 
   useEffect(() => {
     const index = currentId ? stepIds.indexOf(currentId) : -1;
-    // No current step means the run is over or has not started: begin again.
-    setFurthest((previous) => (index === -1 ? -1 : Math.max(previous, index)));
+    setProgress((previous) => {
+      // No current step means the run is over or has not started.
+      if (index === -1) return previous.running ? { ...previous, running: false } : previous;
+      // A run that starts after the last one ended begins again.
+      const furthest = previous.running ? Math.max(previous.furthest, index) : index;
+      return furthest === previous.furthest && previous.running
+        ? previous
+        : { furthest, running: true };
+    });
   }, [currentId, stepIds]);
 
-  return furthest === -1 ? null : (stepIds[furthest] ?? null);
+  if (progress.furthest === -1) return null;
+  if (!progress.running && !options.holdLastStep) return null;
+  return stepIds[progress.furthest] ?? null;
 }
 
 function StepMarker({ state }: { state: TimelineStepState }) {

@@ -87,7 +87,7 @@ export function TransactionSuccessSummary({
  * Self-contained on purpose: a summary that needed a toast provider could not
  * be rendered anywhere the provider was not, which is most of its tests.
  */
-function CopyValueButton({ label, value }: { label: string; value: string }) {
+export function CopyValueButton({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {

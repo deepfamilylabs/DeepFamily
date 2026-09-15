@@ -704,6 +704,11 @@ describe("AddVersionModal", () => {
     ]);
     expect(firstArgs.publicSignals.versionCommitment).toBe(99n);
 
+    const backToEdit = await screen.findByRole("button", { name: /Back to edit/i });
+    await act(async () => {
+      fireEvent.click(backToEdit);
+    });
+
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /Add Version/i }));
     });
@@ -751,6 +756,10 @@ describe("AddVersionModal", () => {
     });
     await waitFor(() => expect(mocks.addVersionRunOrThrow).toHaveBeenCalledTimes(1));
     const firstArgs = mocks.addVersionRunOrThrow.mock.calls[0][0];
+    const backToEdit = await screen.findByRole("button", { name: /Back to edit/i });
+    await act(async () => {
+      fireEvent.click(backToEdit);
+    });
 
     fireEvent.change(screen.getByLabelText("person identity passphrase test input"), {
       target: { value: "replacement-passphrase" },
@@ -901,11 +910,21 @@ describe("AddVersionModal", () => {
     expect(await screen.findByText("Transaction Failed")).toBeTruthy();
     expect(screen.getAllByText("add version reverted").length).toBeGreaterThan(0);
 
-    // The form stays up to be corrected, so the alert has to come to the user.
     const alert = screen.getByRole("alert");
-    expect(formSectionsHidden()).toBe(false);
+    // A failure is a result like success: it owns the view, and the alert takes focus.
+    expect(formSectionsHidden()).toBe(true);
     expect(document.activeElement).toBe(alert);
-    expect(precedesFormSections(alert)).toBe(true);
+
+    // "Back to edit" brings the form back, without the error — and must not
+    // resubmit it. In a browser the click's default action runs after React has
+    // re-rendered, so a <button> reused in place as the submit button submits.
+    const backToEdit = await screen.findByRole("button", { name: /Back to edit/i });
+    await act(async () => {
+      fireEvent.click(backToEdit);
+    });
+    expect(backToEdit.isConnected).toBe(false);
+    expect(formSectionsHidden()).toBe(false);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("stops before Groth16, encryption, or transaction submission when gzip cannot fit", async () => {

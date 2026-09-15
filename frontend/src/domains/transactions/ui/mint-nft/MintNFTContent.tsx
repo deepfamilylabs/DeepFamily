@@ -55,7 +55,9 @@ export default function MintNFTModal(props: MintNFTModalProps) {
           >
             <MintTargetSection t={t} {...mint.targetSection} />
 
-            {standing === "all" && (
+            {/* Hidden with the wrapper rather than unmounted, so "Back to edit"
+                after a failure finds the form as it was left. */}
+            {standing !== "target" && (
               <>
                 <MintPersonProofSection t={t} {...mint.personProofSection} />
                 <MintSupplementForm t={t} {...mint.supplementForm} />
@@ -75,19 +77,19 @@ export default function MintNFTModal(props: MintNFTModalProps) {
 
 /**
  * Which editable sections a phase leaves standing. A blocked target keeps the
- * picker — changing the target is the only way forward — while a failure keeps
- * everything, because correcting the form is how it gets retried.
+ * picker — changing the target is the only way forward. A failure is a result
+ * like success and hides the form; "Back to edit" brings it back.
  */
 function standingSections(phase: TransactionPhase): "all" | "target" | "none" {
   switch (phase) {
     case "form":
-    case "failed":
       return "all";
     case "blocked":
       return "target";
     case "busy":
     case "review":
     case "done":
+    case "failed":
       return "none";
     default:
       return assertPhaseHandled(phase);

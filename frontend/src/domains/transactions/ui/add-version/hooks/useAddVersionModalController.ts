@@ -221,6 +221,8 @@ export function useAddVersionModalController({
       hasPreview: Boolean(transactionPreview),
       status: addVersionStatus,
     }),
+    // A failure keeps the step it stopped on, for the timeline above the error.
+    { holdLastStep: Boolean(errorResult) },
   );
   const phase = resolveTransactionPhase({
     successResult,
@@ -609,6 +611,7 @@ export function useAddVersionModalController({
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,
+      onBackToEdit: () => setErrorResult(null),
       onContinueAdding: handleContinueAdding,
       onEndorse,
     },

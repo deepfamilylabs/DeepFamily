@@ -22,6 +22,7 @@ interface AddVersionFooterProps {
   onTransactionPreviewDecision: (approved: boolean) => void;
   onRunInBackground?: () => void;
   onClose: () => void;
+  onBackToEdit: () => void;
   onContinueAdding: () => void;
   onEndorse?: (personHash: string, versionIndex: number) => void;
 }
@@ -38,6 +39,7 @@ export function AddVersionFooter({
   onTransactionPreviewDecision,
   onRunInBackground,
   onClose,
+  onBackToEdit,
   onContinueAdding,
   onEndorse,
 }: AddVersionFooterProps) {
@@ -46,6 +48,7 @@ export function AddVersionFooter({
       phase={phase}
       slots={{
         onRunInBackground,
+        failed: { onClose, onBackToEdit },
         done: successResult ? (
         <>
           <TransactionButton onClick={onClose} className="flex-1">

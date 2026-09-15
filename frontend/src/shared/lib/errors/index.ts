@@ -1,4 +1,6 @@
 export {
+  ARCHIVE_PREVIEW_REJECTED,
+  ARCHIVE_VALIDATION_FAILED,
   ERROR_SELECTOR_MAP,
   REASON_FRIENDLY_MAP,
   deriveReadableError,
@@ -6,6 +8,7 @@ export {
   formatErrorSummaryForDev,
   getFriendlyErrorMessage,
   getFriendlyError,
+  isArchivePreviewRejected,
   normalizeErrorToError,
   normalizeFriendlyError,
   defaultErrorTranslator,

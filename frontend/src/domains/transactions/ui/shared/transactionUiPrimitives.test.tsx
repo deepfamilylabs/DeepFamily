@@ -10,6 +10,7 @@ import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
 import { TransactionTimeline, buildTimeline, useTimelineProgress } from "./TransactionTimeline";
 import { TransactionSuccessSummary } from "./TransactionSuccessSummary";
 import { TransactionProgress } from "./TransactionProgress";
+import { TransactionStatusView } from "./TransactionStatusView";
 
 afterEach(() => {
   cleanup();
@@ -127,6 +128,63 @@ describe("transaction UI primitives", () => {
     expect(result.current).toBe("a");
   });
 
+  it("holds the step a failed run stopped on until the next run starts", () => {
+    const steps = ["a", "b", "c"] as const;
+    const { result, rerender } = renderHook(
+      ({ current, hold }: { current: string | null; hold: boolean }) =>
+        useTimelineProgress(steps, current, { holdLastStep: hold }),
+      { initialProps: { current: "b" as string | null, hold: false } },
+    );
+    expect(result.current).toBe("b");
+
+    rerender({ current: null, hold: true });
+    expect(result.current).toBe("b");
+
+    // Back to the form: nothing left to hold.
+    rerender({ current: null, hold: false });
+    expect(result.current).toBeNull();
+
+    // The next run starts from its own first step, not from the old failure.
+    rerender({ current: "a", hold: false });
+    expect(result.current).toBe("a");
+  });
+
+  it("shows a failure where a result goes: the steps it got through, then the error", () => {
+    const t = (_key: string, fallback: string) => fallback;
+    const error = { type: "BAD_DATA", message: "Submission failed", details: "could not decode" };
+    const steps = [
+      { id: "proof", label: "Proof" },
+      { id: "confirm", label: "Confirm" },
+    ];
+    const { rerender } = render(
+      <TransactionStatusView
+        t={t}
+        phase="failed"
+        slots={{
+          timeline: buildTimeline({ steps, currentId: "confirm", failed: true }),
+          failed: { title: "Failed", error },
+        }}
+      />,
+    );
+    const step = screen.getByText("Confirm");
+    const alert = screen.getByRole("alert");
+    expect(step.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // Failing before the first step leaves no step to mark, so no timeline.
+    rerender(
+      <TransactionStatusView
+        t={t}
+        phase="failed"
+        slots={{
+          timeline: buildTimeline({ steps, currentId: null, failed: true }),
+          failed: { title: "Failed", error },
+        }}
+      />,
+    );
+    expect(screen.queryByText("Confirm")).toBeNull();
+    expect(screen.getByRole("alert")).toBeTruthy();
+  });
+
   it("drops a detail that only restates its own step label", () => {
     const steps = buildTimeline({
       steps: [
@@ -165,9 +223,12 @@ describe("transaction UI primitives", () => {
 
   it("announces transaction errors assertively and keeps retry actionable", () => {
     const retry = vi.fn();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
 
     render(
       <TransactionErrorResult
+        t={(_key, fallback) => fallback}
         title="Transaction failed"
         error={{
           type: "CALL_EXCEPTION",
@@ -175,7 +236,6 @@ describe("transaction UI primitives", () => {
           details: "Execution reverted by contract",
         }}
         typeLabel="Type"
-        messageLabel="Message"
         detailsLabel="Details"
         retry={{ label: "Try again", onClick: retry }}
       />,
@@ -184,12 +244,42 @@ describe("transaction UI primitives", () => {
     const alert = screen.getByRole("alert");
 
     expect(alert.getAttribute("aria-live")).toBe("assertive");
+    expect(alert.getAttribute("aria-labelledby")).toBe(
+      screen.getByText("Transaction failed").id,
+    );
     expect(screen.getByText("Execution reverted")).toBeTruthy();
     expect(screen.getByText("Execution reverted by contract")).toBeTruthy();
+    expect(screen.getByText("CALL_EXCEPTION")).toBeTruthy();
+
+    // The copy button yields the whole report: the code and the concrete cause.
+    fireEvent.click(screen.getByRole("button", { name: "Copy Details" }));
+    expect(writeText).toHaveBeenCalledWith("CALL_EXCEPTION: Execution reverted by contract");
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("leads with the message and leaves out what adds nothing to it", () => {
+    render(
+      <TransactionErrorResult
+        t={(_key, fallback) => fallback}
+        title="Transaction failed"
+        error={{
+          type: "UNKNOWN_ERROR",
+          message: "Submission failed. Please retry or check your input.",
+          details: "Submission failed. Please retry or check your input.",
+        }}
+        typeLabel="Type"
+        detailsLabel="Details"
+      />,
+    );
+
+    expect(screen.getByText("Submission failed. Please retry or check your input.")).toBeTruthy();
+    // A generic code and details that only repeat the message are noise.
+    expect(screen.queryByText("UNKNOWN_ERROR")).toBeNull();
+    expect(screen.queryByText("Details")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("supports keyboard selection in themed selects", () => {

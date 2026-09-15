@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { ethers } from "ethers";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import DeepFamily from "../../../../abi/DeepFamily.json";
 import {
   ERROR_SELECTOR_MAP,
   extractRevertReason,
   getFriendlyError,
   getFriendlyErrorMessage,
+  isArchivePreviewRejected,
   normalizeErrorToError,
   normalizeFriendlyError,
   resolveErrorReason,
@@ -294,5 +296,67 @@ describe("Archive validation guidance", () => {
       message,
       retryable: false,
     });
+  });
+
+  it("tells a closed fee preview apart from a failure", () => {
+    const error = Object.assign(new Error("Story seal cancelled before wallet request"), {
+      code: "ARCHIVE_PREVIEW_REJECTED",
+    });
+    expect(isArchivePreviewRejected(error)).toBe(true);
+    expect(isArchivePreviewRejected(normalizeErrorToError(error, passthroughT as any))).toBe(true);
+    expect(
+      isArchivePreviewRejected(
+        Object.assign(new Error("x"), { code: "ARCHIVE_VALIDATION_FAILED" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("shows the locale string an archive error names, guidance included", () => {
+    const zh: Record<string, string> = {
+      "archive.errors.gasLimitExceeded": "含缓冲的 Gas 超出网络单笔交易上限。{{guidance}}",
+      "archive.errors.guidance.story": "请把文本拆分为另一条故事记录。",
+    };
+    const t = (key: string, fallback?: string, options?: Record<string, string>) =>
+      (zh[key] ?? fallback ?? key).replace(/{{(\w+)}}/g, (_m, name) => options?.[name] ?? "");
+    const error = Object.assign(new Error("Buffered archive gas exceeds the network limit."), {
+      code: "ARCHIVE_VALIDATION_FAILED",
+      i18n: {
+        key: "archive.errors.gasLimitExceeded",
+        guidanceKey: "archive.errors.guidance.story",
+      },
+    });
+    const expected = "含缓冲的 Gas 超出网络单笔交易上限。请把文本拆分为另一条故事记录。";
+    expect(getFriendlyError(error, t as any).message).toBe(expected);
+    // Normalizing with the English translator must not lose the key for the UI.
+    const normalized = normalizeErrorToError(error, passthroughT as any);
+    expect(getFriendlyErrorMessage(normalized, t as any, "Operation failed")).toBe(expected);
+  });
+
+  it("has every archive error key the services name in both locales", () => {
+    const src = path.resolve(fileURLToPath(import.meta.url), "../../../../..");
+    const services = [
+      "archiveTransaction",
+      "sealStoryService",
+      "addStoryRecordService",
+      "mintBiographyTransaction",
+    ]
+      .map((name) =>
+        fs.readFileSync(path.join(src, `domains/transactions/services/${name}.ts`), "utf8"),
+      )
+      .join("\n");
+    const keys = new Set([...services.matchAll(/"(archive\.errors\.[\w.]+)"/g)].map((m) => m[1]));
+    for (const kind of ["story", "mint", "metadata", "seal"])
+      keys.add(`archive.errors.guidance.${kind}`);
+    expect(keys.size).toBeGreaterThan(8);
+    for (const locale of ["en", "zh-CN"]) {
+      const messages = JSON.parse(
+        fs.readFileSync(path.join(src, `locales/${locale}/index.json`), "utf8"),
+      );
+      const missing = [...keys].filter(
+        (key) =>
+          typeof key.split(".").reduce((node: any, part) => node?.[part], messages) !== "string",
+      );
+      expect(missing, locale).toEqual([]);
+    }
   });
 });

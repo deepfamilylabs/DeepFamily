@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { assertPhaseHandled, type TransactionPhase } from "./transactionPhase";
@@ -10,7 +11,9 @@ export type TransactionFooterSlots = {
   review?: React.ReactNode;
   /** This target cannot proceed; only leaving or re-targeting is useful. */
   blocked?: React.ReactNode;
-  /** Still working the form — including while busy and after a failure. */
+  /** Failed: the error owns the view; leave, or go back to the form to fix it. */
+  failed: { onClose: () => void; onBackToEdit: () => void };
+  /** Still working the form — including while busy. */
   active: React.ReactNode;
   /**
    * Closes the modal without abandoning the flow. Offered only once the
@@ -38,7 +41,10 @@ export function TransactionFooterBar({
 
   return (
     <div className="flex flex-col-reverse sm:flex-row gap-2.5 px-5 py-3.5 bg-surface border-t border-hairline pb-[calc(0.875rem+env(safe-area-inset-bottom))]">
-      {actions()}
+      {/* Keyed by phase so no <button> is reused across phases. A click's default
+          action runs after React re-renders, so "Back to edit" reused in place as
+          the form's submit button would submit the form it just reopened. */}
+      <Fragment key={phase}>{actions()}</Fragment>
     </div>
   );
 
@@ -60,8 +66,22 @@ export function TransactionFooterBar({
         ) : (
           slots.active
         );
-      case "form":
       case "failed":
+        return (
+          <>
+            <TransactionButton onClick={slots.failed.onClose} className="flex-1">
+              {t("common.close", "Close")}
+            </TransactionButton>
+            <TransactionButton
+              variant="primary"
+              onClick={slots.failed.onBackToEdit}
+              className="flex-[1.5]"
+            >
+              {t("transaction.backToEdit", "Back to edit")}
+            </TransactionButton>
+          </>
+        );
+      case "form":
         return slots.active;
       default:
         return assertPhaseHandled(phase);

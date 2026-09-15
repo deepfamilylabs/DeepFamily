@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getMetadataCode: vi.fn(),
   endorsedVersionIndex: vi.fn(),
   contract: {} as any,
+  readDeepFamilyContract: null as any,
   personGateway: {
     listVersionEndorsements: vi.fn(async () => ({
       versionIndices: [] as number[],
@@ -70,6 +71,7 @@ vi.mock("../hooks/useContractClient", () => ({
     getVersionDetails: mocks.getVersionDetails,
     getMetadataCode: mocks.getMetadataCode,
     contract: mocks.contract,
+    readDeepFamilyContract: mocks.readDeepFamilyContract,
   }),
 }));
 
@@ -119,6 +121,7 @@ vi.mock("../../../shared/lib/errors", () => ({
     message: error?.message || "Operation failed",
     details: error?.details || error?.message || "Operation failed",
   }),
+  isArchivePreviewRejected: (error: any) => error?.code === "ARCHIVE_PREVIEW_REJECTED",
   sanitizeErrorForLogging: (error: any) => error,
 }));
 
@@ -218,6 +221,7 @@ describe("MintNFTModal", () => {
     mocks.contract = {
       endorsedVersionIndex: mocks.endorsedVersionIndex,
     };
+    mocks.readDeepFamilyContract = null;
     mocks.mintRunOrThrow.mockReset();
     mocks.mintReset.mockReset();
     mocks.mintFlow = { status: "idle" };
@@ -500,6 +504,20 @@ describe("MintNFTModal", () => {
     expect(screen.queryByRole("button", { name: "Copy into public biography" })).toBeNull();
   });
 
+  it("reads the endorsement from the app's RPC rather than the wallet's cached state", async () => {
+    // Straight after endorsing, the wallet provider can still answer from the
+    // block before it; the dedicated RPC reader already sees the endorsement.
+    mocks.endorsedVersionIndex.mockResolvedValue(0);
+    const readEndorsed = vi.fn().mockResolvedValue(2);
+    mocks.readDeepFamilyContract = { endorsedVersionIndex: readEndorsed };
+
+    renderMintModal();
+
+    await waitForMintableTarget();
+    expect(readEndorsed).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /Go Endorse/i })).toBeNull();
+  });
+
   it("shows a friendly error when the mint flow fails", async () => {
     mocks.mintRunOrThrow.mockRejectedValue(new Error("mint reverted"));
 
@@ -517,10 +535,20 @@ describe("MintNFTModal", () => {
     expect(mocks.markVersionMinted).not.toHaveBeenCalled();
     const alert = await screen.findByRole("alert");
     expect(screen.getAllByText("mint reverted").length).toBeGreaterThan(0);
-    // The form stays up to be corrected, so the alert has to come to the user.
-    expect(formSectionsHidden()).toBe(false);
+    // A failure is a result like success: it owns the view, and the alert takes focus.
+    expect(formSectionsHidden()).toBe(true);
     expect(document.activeElement).toBe(alert);
-    expect(precedesFormSections(alert)).toBe(true);
+
+    // "Back to edit" brings the form back, without the error — and must not
+    // resubmit it. In a browser the click's default action runs after React has
+    // re-rendered, so a <button> reused in place as the submit button submits.
+    const backToEdit = await screen.findByRole("button", { name: /Back to edit/i });
+    await act(async () => {
+      fireEvent.click(backToEdit);
+    });
+    expect(backToEdit.isConnected).toBe(false);
+    expect(formSectionsHidden()).toBe(false);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("drops the chosen version when the hash is cleared", async () => {

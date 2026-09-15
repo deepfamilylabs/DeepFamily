@@ -8,6 +8,7 @@ import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway"
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
 
 import {
+  archivePreviewRejectedError,
   archiveValidationError,
   estimateArchiveTransaction,
   type ArchiveTransactionPreview,
@@ -50,7 +51,7 @@ export async function sealStoryService(
       kind: "Seal",
     });
     if (!confirmTransactionPreview || !(await confirmTransactionPreview(preview))) {
-      throw archiveValidationError("Story seal cancelled before wallet request");
+      throw archivePreviewRejectedError("Story seal cancelled before wallet request");
     }
     const [currentNetwork, currentAuthor] = await Promise.all([
       signer.provider.getNetwork(),
@@ -60,7 +61,9 @@ export async function sealStoryService(
       currentNetwork.chainId !== network.chainId ||
       currentAuthor.toLowerCase() !== author.toLowerCase()
     ) {
-      throw archiveValidationError("Wallet network or account changed; preview the seal again");
+      throw archiveValidationError("Wallet network or account changed; preview the seal again", {
+        key: "archive.errors.walletScopeChanged",
+      });
     }
     const tx = await contract.sealStory(...args, { gasLimit: preview.gasLimit });
     const receipt = await waitForTransactionReceipt(tx);
@@ -77,7 +80,9 @@ export async function sealStoryService(
       event.args.sealer.toLowerCase() !== author.toLowerCase() ||
       String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tx.hash.toLowerCase()
     ) {
-      throw archiveValidationError("Story seal receipt does not match the expected state");
+      throw archiveValidationError("Story seal receipt does not match the expected state", {
+        key: "archive.errors.confirmationMismatch",
+      });
     }
     const finalState = await contract.storyState(tokenId, { blockTag: receipt.blockNumber });
     if (
@@ -87,7 +92,9 @@ export async function sealStoryService(
       BigInt(finalState.totalPayloadLength) !== BigInt(state.totalPayloadLength) ||
       BigInt(finalState.lastUpdateTime) !== BigInt(event.args.timestamp)
     ) {
-      throw archiveValidationError("Stored story seal differs from the confirmed event");
+      throw archiveValidationError("Stored story seal differs from the confirmed event", {
+        key: "archive.errors.confirmationMismatch",
+      });
     }
     const sealed = {
       tokenId,

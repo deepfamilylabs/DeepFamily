@@ -79,15 +79,18 @@ export default function AddVersionModal(props: AddVersionModalProps) {
   );
 }
 
-/** Waiting, deciding and done each own the whole view; a failure keeps the form to fix. */
+/**
+ * Waiting, deciding, done and failed each own the whole view. A failure is a
+ * result like success; "Back to edit" brings the form back to fix it.
+ */
 function addVersionFormHidden(phase: TransactionPhase): boolean {
   switch (phase) {
     case "busy":
     case "review":
     case "done":
+    case "failed":
       return true;
     case "form":
-    case "failed":
     case "blocked":
       return false;
     default:

@@ -1,5 +1,7 @@
+import { useId } from "react";
 import { AlertTriangle } from "lucide-react";
-import type React from "react";
+import { TransactionButton } from "./TransactionButton";
+import { CopyValueButton } from "./TransactionSuccessSummary";
 import { useFocusOnMount } from "./useFocusOnMount";
 
 type ErrorResult = {
@@ -8,88 +10,102 @@ type ErrorResult = {
   details: string;
 };
 
-type TransactionErrorResultProps = {
+/** Codes that name no cause of their own; showing them only adds noise. */
+const UNINFORMATIVE_TYPES = new Set(["UNKNOWN_ERROR", "VALIDATION_ERROR"]);
+
+/**
+ * What a failed transaction leaves the user with, shaped like the success summary.
+ *
+ * The earlier panel gave the error code, the message and the raw details three
+ * equal red boxes, code first — so a generic "UNKNOWN_ERROR" was the loudest
+ * thing on screen and the one concrete cause came last. The message leads now,
+ * the concrete cause follows with a copy button for reporting it, and a code is
+ * shown only when it says something the message does not.
+ */
+export function TransactionErrorResult({
+  t,
+  title,
+  error,
+  typeLabel,
+  detailsLabel,
+  retry,
+}: {
+  t: (key: string, fallback: string) => string;
   title: string;
   error: ErrorResult;
   typeLabel: string;
-  messageLabel: string;
   detailsLabel: string;
   retry?: {
     label: string;
     onClick: () => void;
   };
-};
-
-export function TransactionErrorResult({
-  title,
-  error,
-  typeLabel,
-  messageLabel,
-  detailsLabel,
-  retry,
-}: TransactionErrorResultProps) {
-  // The form stays on screen after a failure so it can be corrected, which
-  // leaves this below the fold; focus is what makes it findable.
+}) {
   const panelRef = useFocusOnMount<HTMLDivElement>();
+  const titleId = useId();
+  const details = error.details && error.details !== error.message ? error.details : "";
+  const code = error.type && !UNINFORMATIVE_TYPES.has(error.type) ? error.type : "";
+  const report = [code, details || error.message].filter(Boolean).join(": ");
 
   return (
     <div
       ref={panelRef}
       role="alert"
       aria-live="assertive"
+      aria-labelledby={titleId}
       tabIndex={-1}
-      className="p-5 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-800 animate-fade-in outline-hidden"
+      className="rounded-xl border border-danger/25 bg-danger/10 outline-hidden animate-fade-in"
     >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-800 flex items-center justify-center shrink-0">
-          <AlertTriangle className="w-5 h-5 text-danger dark:text-red-300" />
-        </div>
+      <div className="flex items-start gap-3 p-4">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger">
+          <AlertTriangle className="h-4 w-4 text-white" aria-hidden />
+        </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-2">{title}</p>
-          <div className="space-y-3">
-            <ErrorField label={typeLabel}>
-              <code className="block bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl font-mono text-xs break-all">
-                {error.type}
-              </code>
-            </ErrorField>
-            <ErrorField label={messageLabel}>
-              <p className="bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl text-xs leading-relaxed">
-                {error.message}
-              </p>
-            </ErrorField>
-            {error.details !== error.message ? (
-              <ErrorField label={detailsLabel}>
-                <p className="bg-surface-alt border border-danger/25 text-red-700 dark:text-red-300 px-3 py-2 rounded-xl text-xs leading-relaxed">
-                  {error.details}
-                </p>
-              </ErrorField>
-            ) : null}
-          </div>
-
-          {retry ? (
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={retry.onClick}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-all shadow-md shadow-red-500/20 active:scale-95"
-              >
-                {retry.label}
-              </button>
-            </div>
-          ) : null}
+          <h3 id={titleId} className="text-sm font-semibold leading-8 text-ink">
+            {title}
+          </h3>
+          <p className="text-[13px] leading-relaxed text-ink">{error.message}</p>
         </div>
       </div>
-    </div>
-  );
-}
 
-function ErrorField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-300 opacity-80">
-        {label}
-      </span>
-      {children}
+      {details || code ? (
+        <dl className="space-y-2 border-t border-danger/20 px-4 py-3">
+          {details ? (
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-3">
+              <dt className="shrink-0 text-xs leading-5 text-ink-muted sm:w-20">{detailsLabel}</dt>
+              <dd className="flex min-w-0 flex-1 items-start gap-1.5">
+                <span className="min-w-0 flex-1 font-mono text-xs leading-5 text-ink [overflow-wrap:anywhere]">
+                  {details}
+                </span>
+                <CopyValueButton
+                  label={`${t("common.copy", "Copy")} ${detailsLabel}`}
+                  value={report}
+                />
+              </dd>
+            </div>
+          ) : null}
+          {code ? (
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-start sm:gap-3">
+              <dt className="shrink-0 text-xs leading-5 text-ink-muted sm:w-20">{typeLabel}</dt>
+              <dd className="min-w-0 flex-1 font-mono text-xs leading-5 text-ink-muted [overflow-wrap:anywhere]">
+                {code}
+              </dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      {/* Secondary: the footer already carries the view's primary action. */}
+      {retry ? (
+        <div className="border-t border-danger/20 px-4 py-3">
+          <TransactionButton
+            variant="secondary"
+            onClick={retry.onClick}
+            className="w-full sm:w-auto"
+          >
+            {retry.label}
+          </TransactionButton>
+        </div>
+      ) : null}
     </div>
   );
 }
