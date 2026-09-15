@@ -21,6 +21,20 @@ import {
   type PrefetchedStoryDetailState,
   type StoryDetailData,
 } from "../model/personPageModel";
+import { isRecordFolded, sortSectionsForReading } from "../model/personStoryLayout";
+
+/** The biography's key among the page's scroll anchors; type sections use their type number. */
+export const BIOGRAPHY_SECTION: PersonSectionKey = "biography";
+
+/**
+ * How far below the viewport top a section counts as the one being read. The
+ * header is sticky everywhere; below xl the section chips stick under it too.
+ */
+function readingLine(): number {
+  const wide =
+    typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1280px)").matches;
+  return wide ? 96 : 152;
+}
 
 export function usePersonPageController() {
   const { tokenId } = useParams<{ tokenId: string }>();
@@ -36,13 +50,18 @@ export function usePersonPageController() {
   const prefetched = (location.state as PrefetchedStoryDetailState | undefined)?.prefetchedStory;
   const dataRef = useRef<StoryDetailData | null>(null);
   const sectionRefs = useRef<Map<PersonSectionKey, HTMLElement>>(new Map());
+  const recordRefs = useRef<Map<number, HTMLElement>>(new Map());
+  /** Set while a Contents jump is scrolling the page; calling it hands the reading position back. */
+  const navLockRef = useRef<(() => void) | null>(null);
 
   const [data, setData] = useState<StoryDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRecords, setExpandedRecords] = useState<Set<number>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<PersonStoryViewMode>("sections");
   const [activeSection, setActiveSection] = useState<PersonSectionKey | null>(null);
+  const [activeRecord, setActiveRecord] = useState<number | null>(null);
 
   useEffect(() => {
     try {
@@ -66,7 +85,11 @@ export function usePersonPageController() {
     () => getRecordParagraphs(data?.storyRecords),
     [data?.storyRecords],
   );
-  const groupedRecords = useMemo(() => groupStoryRecords(data?.storyRecords), [data?.storyRecords]);
+  /** Type sections in reading order — the order Contents lists them and the page shows them. */
+  const groupedRecords = useMemo(
+    () => sortSectionsForReading(groupStoryRecords(data?.storyRecords)),
+    [data?.storyRecords],
+  );
 
   const toggleRecord = useCallback((idx: number) => {
     setExpandedRecords((prev) => {
@@ -75,6 +98,18 @@ export function usePersonPageController() {
         next.delete(idx);
       } else {
         next.add(idx);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSection = useCallback((type: number) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
       }
       return next;
     });
@@ -166,71 +201,58 @@ export function usePersonPageController() {
     fetchStoryData();
   }, [fetchStoryData]);
 
+  /**
+   * Which section and which record are being read: the last of each whose top
+   * has passed the reading line. At the very bottom of the page the last
+   * section wins, since a short final section may never reach the line.
+   */
   useEffect(() => {
-    if (viewMode !== "sections" || groupedRecords.length === 0) return;
+    if (viewMode !== "sections" || !data) return;
 
-    const handleScroll = () => {
-      const scrollPosition = window.scrollY + 80;
-      const entries: Array<{ key: PersonSectionKey; top: number }> = [];
-      sectionRefs.current.forEach((el, key) => {
-        entries.push({ key, top: el.offsetTop });
-      });
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      // A Contents jump owns the reading position until the reader scrolls on their own.
+      if (navLockRef.current) return;
+      const line = readingLine();
+      const sectionOrder: PersonSectionKey[] = [
+        BIOGRAPHY_SECTION,
+        ...groupedRecords.map((group) => group.type),
+      ].filter((key) => sectionRefs.current.has(key));
+      if (sectionOrder.length === 0) return;
 
-      let nextActive: PersonSectionKey | null = null;
-      const numericEntries = entries
-        .filter((entry): entry is { key: number; top: number } => typeof entry.key === "number")
-        .sort((a, b) => a.top - b.top);
+      let nextSection = sectionOrder[0];
+      for (const key of sectionOrder) {
+        const element = sectionRefs.current.get(key);
+        if (element && element.getBoundingClientRect().top <= line) nextSection = key;
+      }
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (atBottom && window.scrollY > 0) nextSection = sectionOrder[sectionOrder.length - 1];
 
-      for (let i = 0; i < numericEntries.length; i++) {
-        const curr = numericEntries[i];
-        const nextTop =
-          i < numericEntries.length - 1 ? numericEntries[i + 1].top : Number.POSITIVE_INFINITY;
-        if (scrollPosition >= curr.top && scrollPosition < nextTop) {
-          nextActive = curr.key;
-          break;
-        }
+      let nextRecord: number | null = null;
+      const section = groupedRecords.find((group) => group.type === nextSection);
+      for (const record of section?.records ?? []) {
+        const element = recordRefs.current.get(record.recordIndex);
+        if (element && element.getBoundingClientRect().top <= line) nextRecord = record.recordIndex;
       }
 
-      if (nextActive === null && numericEntries.length) {
-        const nearBottom =
-          window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
-        if (nearBottom) {
-          nextActive = numericEntries[numericEntries.length - 1].key;
-        }
-      }
-
-      if (nextActive === null) {
-        const basic = entries.find((entry) => entry.key === "basicInfo");
-        if (basic && scrollPosition >= basic.top) {
-          const anchorTops = entries
-            .filter((entry) => typeof entry.key === "number" || entry.key === "profileTop")
-            .map((entry) => entry.top);
-          const firstAnchorTop = anchorTops.length
-            ? Math.min(...anchorTops)
-            : Number.POSITIVE_INFINITY;
-          if (scrollPosition < firstAnchorTop) nextActive = "basicInfo";
-        }
-      }
-
-      if (nextActive === null) {
-        const profileTop = entries.find((entry) => entry.key === "profileTop");
-        if (profileTop && scrollPosition >= profileTop.top) {
-          const firstGroupTop = numericEntries.length
-            ? numericEntries[0].top
-            : Number.POSITIVE_INFINITY;
-          if (scrollPosition < firstGroupTop) nextActive = "profileTop";
-        }
-      }
-
-      if (nextActive !== null) {
-        setActiveSection((current) => (current === nextActive ? current : nextActive));
-      }
+      setActiveSection((current) => (current === nextSection ? current : nextSection));
+      setActiveRecord((current) => (current === nextRecord ? current : nextRecord));
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [groupedRecords, viewMode]);
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [data, expandedSections, groupedRecords, viewMode]);
 
   const registerSection = useCallback(
     (key: PersonSectionKey) => (element: HTMLElement | null) => {
@@ -243,13 +265,78 @@ export function usePersonPageController() {
     [],
   );
 
-  const scrollToSection = useCallback((key: PersonSectionKey) => {
-    const element = sectionRefs.current.get(key);
-    if (!element) return;
-    setActiveSection(key);
-    const top = element.offsetTop - 80;
-    window.scrollTo({ top, behavior: "smooth" });
+  const registerRecord = useCallback(
+    (recordIndex: number) => (element: HTMLElement | null) => {
+      if (element) {
+        recordRefs.current.set(recordIndex, element);
+      } else {
+        recordRefs.current.delete(recordIndex);
+      }
+    },
+    [],
+  );
+
+  /**
+   * Holds the reading position on a Contents target while the page scrolls to
+   * it. Left to the scroll position it walks through every section the smooth
+   * scroll passes, and Contents opens and closes each one on the way. The
+   * reader's own next gesture — wheel, touch, key or pointer — hands it back,
+   * which also keeps a target too close to the end to reach the line current.
+   */
+  const lockReadingPosition = useCallback(() => {
+    navLockRef.current?.();
+    const gestures = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    const release = () => {
+      gestures.forEach((name) => window.removeEventListener(name, release, true));
+      if (navLockRef.current === release) navLockRef.current = null;
+    };
+    gestures.forEach((name) =>
+      window.addEventListener(name, release, { capture: true, passive: true }),
+    );
+    navLockRef.current = release;
   }, []);
+
+  useEffect(() => () => navLockRef.current?.(), []);
+
+  const scrollToElement = useCallback((element: HTMLElement) => {
+    const top = element.getBoundingClientRect().top + window.scrollY - (readingLine() - 8);
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, []);
+
+  const scrollToSection = useCallback(
+    (key: PersonSectionKey) => {
+      const element = sectionRefs.current.get(key);
+      if (!element) return;
+      lockReadingPosition();
+      setActiveSection(key);
+      setActiveRecord(null);
+      scrollToElement(element);
+    },
+    [lockReadingPosition, scrollToElement],
+  );
+
+  /** Jumps to one record, opening its section's fold first when the record is behind it. */
+  const scrollToRecord = useCallback(
+    (type: number, recordIndex: number) => {
+      const section = groupedRecords.find((group) => group.type === type);
+      const mustUnfold =
+        !!section && !expandedSections.has(type) && isRecordFolded(section.records, recordIndex);
+      lockReadingPosition();
+      setActiveSection(type);
+      setActiveRecord(recordIndex);
+      const jump = () => {
+        const element = recordRefs.current.get(recordIndex);
+        if (element) scrollToElement(element);
+      };
+      if (!mustUnfold) {
+        jump();
+        return;
+      }
+      setExpandedSections((prev) => new Set(prev).add(type));
+      window.requestAnimationFrame(() => window.requestAnimationFrame(jump));
+    },
+    [expandedSections, groupedRecords, lockReadingPosition, scrollToElement],
+  );
 
   const copyText = useCallback(
     async (text: string) => {
@@ -311,20 +398,25 @@ export function usePersonPageController() {
     loading,
     error,
     expandedRecords,
+    expandedSections,
     viewMode,
     activeSection,
+    activeRecord,
     fullStoryParagraphs,
     recordParagraphs,
     groupedRecords,
     setViewMode,
     toggleRecord,
+    toggleSection,
     retry: fetchStoryData,
     goBack,
     viewFamilyTree,
     openEditorInNewTab,
     copyText,
     scrollToSection,
+    scrollToRecord,
     registerSection,
+    registerRecord,
   };
 }
 

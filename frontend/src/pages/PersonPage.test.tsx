@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STORY_BIOGRAPHY_SCHEMA_ID } from "@deepfamily/protocol-core";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -166,7 +166,7 @@ describe("PersonPage", () => {
 
   it("keeps stories readable and hides the edit entry without ownership access", async () => {
     renderPersonPage("/person/42");
-    expect(await screen.findByText("No. 1")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "No. 1" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
   });
 
@@ -174,13 +174,13 @@ describe("PersonPage", () => {
     mocks.storyAccess.canEdit = true;
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     renderPersonPage("/person/42");
-    fireEvent.click(await screen.findByRole("button", { name: "Edit Story" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "Edit Story" }))[0]);
     expect(open).toHaveBeenCalledWith("/editor/42", "_blank", "noopener,noreferrer");
   });
 
   it("does not follow the edit query parameter without ownership access", async () => {
     renderPersonPage("/person/42?edit=1");
-    expect(await screen.findByText("No. 1")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "No. 1" })).toBeTruthy();
     expect(screen.queryByText("Editor route")).toBeNull();
   });
 
@@ -220,13 +220,76 @@ describe("PersonPage", () => {
 
     expect(await screen.findByText("Original public biography")).toBeTruthy();
     expect(screen.getAllByText("Original public biography")).toHaveLength(1);
-    expect(screen.queryByText("No. 0")).toBeNull();
-    expect(screen.getByText("No. 1")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "No. 0" })).toBeNull();
+    expect(screen.getByRole("button", { name: "No. 1" })).toBeTruthy();
     for (const label of screen.getAllByText("Total Records")) {
       expect(label.parentElement?.textContent).toBe("Total Records1");
     }
     for (const label of screen.getAllByText("Total payload bytes")) {
-      expect(label.parentElement?.textContent).toBe("Total payload bytes50");
+      expect(label.parentElement?.textContent).toBe("Total payload bytes50 B");
     }
+  });
+  it("folds a long section behind a row that names the hidden titles", async () => {
+    const records = Array.from({ length: 6 }, (_, index) =>
+      makeRecord({
+        recordIndex: index,
+        recordType: 4,
+        title: index >= 3 ? `Event ${index + 1}` : "",
+        content: `Entry ${index + 1}`,
+      }),
+    );
+    const person = makePerson({
+      storyMetadata: makeMetadata({ totalRecords: 6 }),
+      storyRecords: records,
+    });
+    mocks.nodesData = { [person.id]: person };
+    renderPersonPage("/person/42");
+
+    const fold = await screen.findByRole("button", { name: /3 records collapsed/ });
+    expect(fold.textContent).toContain("Event 4, Event 5, Event 6");
+    expect(screen.queryByText("Entry 4")).toBeNull();
+
+    fireEvent.click(fold);
+    expect(screen.getByText("Entry 6")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse 3 records" }));
+    expect(screen.queryByText("Entry 6")).toBeNull();
+  });
+
+  it("keeps a Contents target current while the page scrolls to it", async () => {
+    const records = [1, 2, 3].map((type, index) =>
+      makeRecord({ recordIndex: index, recordType: type, content: `Story ${type}` }),
+    );
+    const person = makePerson({
+      storyMetadata: makeMetadata({ totalRecords: 3 }),
+      storyRecords: records,
+    });
+    mocks.nodesData = { [person.id]: person };
+    renderPersonPage("/person/42");
+
+    const contents = await screen.findByRole("navigation", { name: "Contents" });
+    const summary = within(contents).getByRole("button", { name: /^Summary/ });
+    fireEvent.click(summary);
+    expect(summary.getAttribute("aria-current")).toBe("location");
+
+    // The smooth scroll passes other sections; the reading position must not follow it.
+    await act(async () => {
+      fireEvent.scroll(window);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(summary.getAttribute("aria-current")).toBe("location");
+  });
+
+  it("opens a record's provenance from its number", async () => {
+    renderPersonPage("/person/42");
+    const shortHash = `${zeroHash.slice(0, 10)}…${zeroHash.slice(-8)}`;
+
+    const handle = await screen.findByRole("button", { name: "No. 1" });
+    expect(handle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText(shortHash)).toBeNull();
+
+    fireEvent.click(handle);
+    expect(handle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText(shortHash)).toBeTruthy();
   });
 });
