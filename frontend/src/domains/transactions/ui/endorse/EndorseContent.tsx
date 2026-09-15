@@ -60,15 +60,18 @@ export default function EndorseModal(props: EndorseModalProps) {
   );
 }
 
-/** Waiting and done each own the whole view; a failure keeps the form to fix. */
+/**
+ * Waiting, done and failed each own the whole view. A failure is a result like
+ * success; "Back to edit" brings the form back to fix it.
+ */
 function endorseFormHidden(phase: TransactionPhase): boolean {
   switch (phase) {
     case "busy":
     case "done":
+    case "failed":
       return true;
     case "form":
     case "review":
-    case "failed":
     case "blocked":
       return false;
     default:

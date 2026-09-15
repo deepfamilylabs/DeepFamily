@@ -1,5 +1,9 @@
 import { useCallback, type MutableRefObject } from "react";
-import { getFriendlyError, sanitizeErrorForLogging } from "../../../../../shared/lib/errors";
+import {
+  getFriendlyError,
+  isArchivePreviewRejected,
+  sanitizeErrorForLogging,
+} from "../../../../../shared/lib/errors";
 import {
   classifyProtocolPassphraseRisk,
   type ProtocolPassphraseRisk,
@@ -265,6 +269,9 @@ export function useMintNftSubmit({
           onSuccess?.(tokenId);
         }
       } catch (error) {
+        // Closing the fee preview sent nothing: no failure to show or record,
+        // the same as add-version.
+        if (isArchivePreviewRejected(error)) return;
         console.error("Mint NFT failed:", sanitizeErrorForLogging(error));
         const friendly = getFriendlyError(error, t);
         settleTransaction({ phase: "failed", error: friendly });

@@ -60,7 +60,12 @@ export function useMintNftModalController({
 }: UseMintNftModalControllerArgs) {
   const { t } = useTranslation();
   const { address } = useWallet();
-  const { getVersionDetails, getMetadataCode, contract } = useContractClient();
+  const { getVersionDetails, getMetadataCode, contract, readDeepFamilyContract } =
+    useContractClient();
+  // Endorsement is read from the app's RPC. Right after endorsing, the wallet
+  // provider can still answer from the block before it, and this modal reads
+  // the target's status once — so a stale "not endorsed" would never go away.
+  const endorsementReader = readDeepFamilyContract ?? contract;
   const { markVersionMinted } = useTreeMutations();
   const { nodesData } = useTreeGraphData();
   const mintNFTSchema = useMemo(() => createMintNFTSchema(t), [t]);
@@ -102,7 +107,7 @@ export function useMintNftModalController({
   const endorsedVersionIndex = useEndorsedVersionIndex(
     isOpen && isPersonHashFormatValid ? targetPersonHash : null,
     address,
-    contract,
+    endorsementReader,
   );
   const allConsentsChecked = consents.public && consents.age && consents.legal;
   const hasPersonInfo = Boolean(personInfo?.fullName?.trim());
@@ -133,7 +138,7 @@ export function useMintNftModalController({
   const targetStatus = useMintTargetStatus({
     isOpen,
     address,
-    contract,
+    contract: endorsementReader,
     getVersionDetails: getVersionDetails ?? undefined,
     getMetadataCode: getMetadataCode ?? undefined,
     targetPersonHash,
@@ -184,6 +189,8 @@ export function useMintNftModalController({
       hasPreview: Boolean(transactionPreview),
       status: mintNftStatus,
     }),
+    // A failure keeps the step it stopped on, for the timeline above the error.
+    { holdLastStep: Boolean(errorResult) },
   );
   const phase = resolveTransactionPhase({
     successResult,
@@ -438,6 +445,7 @@ export function useMintNftModalController({
       transactionPreview,
       onTransactionPreviewDecision: decideTransactionPreview,
       onClose: handleClose,
+      onBackToEdit: () => setErrorResult(null),
       onContinueMinting: handleContinueMinting,
       onShowEndorseConfirm: () => setShowEndorseConfirm(true),
     },

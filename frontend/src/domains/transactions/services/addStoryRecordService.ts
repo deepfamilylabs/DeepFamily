@@ -15,6 +15,7 @@ import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway"
 import { normalizeStoryTxError } from "../../../shared/lib/errors";
 import type { StoryRecord } from "../../../shared/model";
 import {
+  archivePreviewRejectedError,
   archiveValidationError,
   assertBlobRefMatches,
   estimateArchiveTransaction,
@@ -68,16 +69,22 @@ export async function addStoryRecordService(
   try {
     // Freeze the exact DFS1 bytes before any RPC/wallet await.
     if (!Number.isInteger(recordType) || recordType < 1 || recordType > 255)
-      throw archiveValidationError("Type 0 is reserved for the mint biography");
+      throw archiveValidationError("Type 0 is reserved for the mint biography", {
+        key: "archive.errors.recordTypeReserved",
+      });
     const payload = ethers.hexlify(
       encodePublicStoryRecord({ title, content, recordType, attachmentCID }),
     );
     const decoded = decodeStoryRecord(payload);
     if (decoded.title !== title || decoded.content !== content)
-      throw archiveValidationError("Story compression did not preserve the original text");
+      throw archiveValidationError("Story compression did not preserve the original text", {
+        key: "archive.errors.encodingMismatch",
+      });
     const payloadHash = ethers.keccak256(payload);
     if (expectedPayloadHash && expectedPayloadHash.toLowerCase() !== payloadHash.toLowerCase()) {
-      throw archiveValidationError("Expected hash does not match canonical story bytes");
+      throw archiveValidationError("Expected hash does not match canonical story bytes", {
+        key: "archive.errors.encodingMismatch",
+      });
     }
     const archiveAddress = await deepFamily.archive();
     const contract = createArchiveContract(archiveAddress, signer);
@@ -94,7 +101,11 @@ export async function addStoryRecordService(
     // this apart from every other validation failure and reload instead of
     // leaving the writer staring at a dead end.
     if (BigInt(state.totalRecords) !== BigInt(recordIndex))
-      throw archiveValidationError("Story changed; refresh before appending", "StoryIndexMismatch");
+      throw archiveValidationError(
+        "Story changed; refresh before appending",
+        { key: "archive.errors.storyChanged" },
+        "StoryIndexMismatch",
+      );
     const args = Object.freeze([
       tokenId,
       recordIndex,
@@ -112,7 +123,7 @@ export async function addStoryRecordService(
       kind: "Story",
     });
     if (!confirmTransactionPreview || !(await confirmTransactionPreview(preview))) {
-      throw archiveValidationError("Story submission cancelled before wallet request");
+      throw archivePreviewRejectedError("Story submission cancelled before wallet request");
     }
     const [currentNetwork, currentAuthor] = await Promise.all([
       signer.provider.getNetwork(),
@@ -122,7 +133,9 @@ export async function addStoryRecordService(
       currentNetwork.chainId !== network.chainId ||
       currentAuthor.toLowerCase() !== author.toLowerCase()
     ) {
-      throw archiveValidationError("Wallet network or account changed; preview the story again");
+      throw archiveValidationError("Wallet network or account changed; preview the story again", {
+        key: "archive.errors.walletScopeChanged",
+      });
     }
     const tx = await contract.appendStoryRecord(...args, { gasLimit: preview.gasLimit });
     const receipt = await waitForTransactionReceipt(tx);
@@ -138,7 +151,9 @@ export async function addStoryRecordService(
       String(event.args.author).toLowerCase() !== author.toLowerCase() ||
       String(receipt.hash ?? receipt.transactionHash).toLowerCase() !== tx.hash.toLowerCase()
     ) {
-      throw archiveValidationError("Story receipt does not match the frozen record");
+      throw archiveValidationError("Story receipt does not match the frozen record", {
+        key: "archive.errors.confirmationMismatch",
+      });
     }
     const expectedBlob = {
       payloadHash,
@@ -163,7 +178,9 @@ export async function addStoryRecordService(
           BigInt(finalState.totalPayloadLength) !==
             BigInt(state.totalPayloadLength) + BigInt(preview.payloadBytes)))
     ) {
-      throw archiveValidationError("Stored story reference differs from the confirmed event");
+      throw archiveValidationError("Stored story reference differs from the confirmed event", {
+        key: "archive.errors.confirmationMismatch",
+      });
     }
     const computedRecordHash = computeStoryRecordHash({
       chainId: network.chainId,
@@ -181,7 +198,9 @@ export async function addStoryRecordService(
       computeStoryHead({ previousHead: state.recordsHead, recordHash: computedRecordHash }) !==
         event.args.newHead
     ) {
-      throw archiveValidationError("Story event commitment differs from the frozen record");
+      throw archiveValidationError("Story event commitment differs from the frozen record", {
+        key: "archive.errors.confirmationMismatch",
+      });
     }
     const newRecord: StoryRecord = {
       recordIndex,

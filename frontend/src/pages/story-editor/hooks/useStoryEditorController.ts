@@ -42,6 +42,7 @@ import {
   type RecordFormData,
   type PrefetchedStoryState,
 } from "../model/storyEditorModel";
+import { isArchivePreviewRejected } from "../../../shared/lib/errors";
 
 import type { ArchiveTransactionPreview } from "../../../domains/transactions";
 
@@ -588,6 +589,9 @@ export function useStoryEditorController() {
 
       handleCancelEdit();
     } catch (error: any) {
+      // Closing the fee preview is the writer changing their mind, not a failure;
+      // the draft stays as it was.
+      if (isArchivePreviewRejected(error)) return;
       // The record index is read from a snapshot that can be minutes old — the
       // story cache is served from IndexedDB for five minutes — so "the story
       // changed" is usually just this page being behind, not a lost draft. Drop
@@ -646,6 +650,7 @@ export function useStoryEditorController() {
       await onSealStory(validTokenId);
       setShowSealConfirm(false);
     } catch (error: any) {
+      if (isArchivePreviewRejected(error)) return;
       setSealError(mapStorySealError(error, t));
       setShowSealConfirm(false);
     } finally {

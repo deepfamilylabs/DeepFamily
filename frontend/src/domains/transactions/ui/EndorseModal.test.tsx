@@ -517,11 +517,18 @@ describe("EndorseModal", () => {
     expect(mocks.onSuccess).not.toHaveBeenCalled();
     expect(screen.getAllByText("endorse reverted").length).toBeGreaterThan(0);
 
-    // The form stays up to be corrected, so the alert has to come to the user.
     const alert = screen.getByRole("alert");
-    expect(formSectionsHidden()).toBe(false);
+    // A failure is a result like success: it owns the view, and the alert takes focus.
+    expect(formSectionsHidden()).toBe(true);
     expect(document.activeElement).toBe(alert);
-    expect(precedesFormSections(alert)).toBe(true);
+
+    // "Back to edit" brings the form back, without the error.
+    const backToEdit = await screen.findByRole("button", { name: /Back to edit/i });
+    await act(async () => {
+      fireEvent.click(backToEdit);
+    });
+    expect(formSectionsHidden()).toBe(false);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("does not reuse a previous success result when reopened for another version", async () => {

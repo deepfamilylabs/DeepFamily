@@ -17,7 +17,7 @@ export type TransactionPhase =
   | "review"
   /** Finished; the result is the subject. */
   | "done"
-  /** Failed; the form stays up to be corrected. */
+  /** Failed; like done, the result is the subject. "Back to edit" returns to the form. */
   | "failed"
   /** This target cannot proceed at all; only the target picker is useful. */
   | "blocked";

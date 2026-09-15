@@ -1,4 +1,9 @@
-import { defaultErrorTranslator, normalizeErrorToError } from "./core";
+import {
+  ARCHIVE_PREVIEW_REJECTED,
+  ARCHIVE_VALIDATION_FAILED,
+  defaultErrorTranslator,
+  normalizeErrorToError,
+} from "./core";
 
 const STORY_ERROR_MESSAGES: Record<string, string> = {
   MustBeNFTHolder: "You must own this NFT to edit its story",
@@ -29,9 +34,10 @@ const makeTypedError = (message: string, type: string, code?: string): Error => 
  * detection pipeline so story flows do not maintain a separate parser.
  */
 export function normalizeStoryTxError(error: any, contract: any): Error {
-  if (error?.code === "ARCHIVE_VALIDATION_FAILED") {
+  if (error?.code === ARCHIVE_VALIDATION_FAILED || error?.code === ARCHIVE_PREVIEW_REJECTED) {
     const typed = makeTypedError(error.message, "VALIDATION_ERROR", error.code);
     if (typeof error.reason === "string") (typed as any).reason = error.reason;
+    if (error.i18n) (typed as any).i18n = error.i18n;
     return typed;
   }
   const normalized = normalizeErrorToError(error, defaultErrorTranslator as any, {

@@ -67,16 +67,24 @@ export function TransactionStatusView({
       );
     case "failed": {
       const failed = slots.failed;
-      return failed?.error ? (
-        <TransactionErrorResult
-          title={failed.title}
-          error={failed.error}
-          typeLabel={t("transaction.errorType", "Error Type")}
-          messageLabel={t("transaction.errorMessage", "Message")}
-          detailsLabel={t("transaction.errorDetails", "Details")}
-          retry={failed.retry}
-        />
-      ) : null;
+      // Same shape as done: the steps, with the one it stopped on marked, then
+      // what went wrong. A failure before the first step has nothing to mark.
+      const stoppedOnStep = slots.timeline?.some((step) => step.state === "failed");
+      return (
+        <div className="space-y-4">
+          {stoppedOnStep ? timeline() : null}
+          {failed?.error ? (
+            <TransactionErrorResult
+              t={t}
+              title={failed.title}
+              error={failed.error}
+              typeLabel={t("transaction.errorType", "Error Type")}
+              detailsLabel={t("transaction.errorDetails", "Details")}
+              retry={failed.retry}
+            />
+          ) : null}
+        </div>
+      );
     }
     case "blocked":
       return <>{slots.blocked ?? null}</>;

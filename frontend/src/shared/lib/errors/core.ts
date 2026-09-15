@@ -686,20 +686,53 @@ export const deriveReadableError = (err: any): string | null => {
   return null;
 };
 
+export const ARCHIVE_VALIDATION_FAILED = "ARCHIVE_VALIDATION_FAILED";
+/** The writer closed an archive fee preview; nothing reached the wallet. */
+export const ARCHIVE_PREVIEW_REJECTED = "ARCHIVE_PREVIEW_REJECTED";
+
+export const isArchivePreviewRejected = (error: any): boolean =>
+  error?.code === ARCHIVE_PREVIEW_REJECTED;
+
+/**
+ * Archive services throw English messages, for logs and tests, and name the
+ * locale string the writer should read instead in `error.i18n`. An error
+ * without one is shown as it was thrown.
+ */
+const translateArchiveError = (error: any, fallback: string, t: TFunction): string => {
+  const i18n = error?.i18n;
+  if (!i18n || typeof i18n.key !== "string") return fallback;
+  const translate = t as unknown as (
+    key: string,
+    defaultValue: string,
+    options?: object,
+  ) => unknown;
+  const guidance =
+    typeof i18n.guidanceKey === "string" ? translate(i18n.guidanceKey, "") : undefined;
+  const translated = translate(i18n.key, fallback, {
+    ...i18n.params,
+    ...(typeof guidance === "string" && guidance ? { guidance } : {}),
+  });
+  return typeof translated === "string" && translated ? translated : fallback;
+};
+
 export const getFriendlyError = (error: any, t: TFunction): FriendlyError => {
   // Capacity guidance is already a user-facing validation result. Words such
   // as "network" or "gas" must not replace it with a generic RPC error.
-  if (error?.code === "ARCHIVE_VALIDATION_FAILED") {
+  if (error?.code === ARCHIVE_VALIDATION_FAILED || error?.code === ARCHIVE_PREVIEW_REJECTED) {
     const message = truncate(
-      error.message || deriveReadableError(error) || "Archive validation failed",
+      translateArchiveError(
+        error,
+        error.message || deriveReadableError(error) || "Archive validation failed",
+        t,
+      ),
       MAX_ERROR_DETAILS_LENGTH,
     );
     return {
       type: "VALIDATION_ERROR",
       message,
       details: message,
-      reason: "ARCHIVE_VALIDATION_FAILED",
-      code: "ARCHIVE_VALIDATION_FAILED",
+      reason: error.code,
+      code: error.code,
       retryable: false,
     };
   }
@@ -870,6 +903,7 @@ export const normalizeErrorToError = (
   (normalized as any).details = friendly.details;
   (normalized as any).code = friendly.reason || friendly.type || friendly.code;
   (normalized as any).retryable = friendly.retryable;
+  if (error?.i18n) (normalized as any).i18n = error.i18n;
   (normalized as any).friendly = friendly;
   return normalized;
 };

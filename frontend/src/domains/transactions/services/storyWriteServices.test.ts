@@ -246,7 +246,10 @@ describe("Archive story writes", () => {
   it("does not send after preview cancellation", async () => {
     const f = setup();
     f.confirm.mockResolvedValue(false);
-    await expect(f.submit()).rejects.toThrow(/cancel/i);
+    await expect(f.submit()).rejects.toMatchObject({
+      code: "ARCHIVE_PREVIEW_REJECTED",
+      message: expect.stringMatching(/cancel/i),
+    });
     expect(f.archive.appendStoryRecord).not.toHaveBeenCalled();
   });
   it("does not locally timeout while awaiting wallet confirmation", async () => {
@@ -302,9 +305,10 @@ describe("Archive story writes", () => {
     const f = setup();
     await f.submit();
     f.confirm.mockResolvedValue(false);
-    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toThrow(
-      /cancel/i,
-    );
+    await expect(sealStoryService(f.signer as any, ADDRESS, "1", f.confirm)).rejects.toMatchObject({
+      code: "ARCHIVE_PREVIEW_REJECTED",
+      message: expect.stringMatching(/cancel/i),
+    });
     expect(f.archive.sealStory).not.toHaveBeenCalled();
   });
   it("stops sealing if the wallet changes account during the preview", async () => {

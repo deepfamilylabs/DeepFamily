@@ -11,6 +11,7 @@ import { useTxFlow, type TxFlowRunner } from "../../../hooks/useTxFlow";
 import { mintBiographyTransaction } from "../../../services/mintBiographyTransaction";
 import type { ArchiveTransactionPreview } from "../../../services/archiveTransaction";
 import { executeMintFlow } from "../../../services/mintNftService";
+import { getReadonlyProvider } from "../../../../../shared/clients/providerRegistry";
 import type { ExecuteMintFlowResult, MintNftFlowArgs } from "../model/mintNftTypes";
 
 export type { ExecuteMintFlowResult, MintNftFlowArgs };
@@ -21,7 +22,7 @@ interface UseMintNftFlowOptions {
 
 export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
   const { signer, address } = useWallet();
-  const { contractAddress, readerAddress } = useConfig();
+  const { contractAddress, readerAddress, rpcUrl, chainId } = useConfig();
   const { t } = useTranslation();
   const { confirmTransactionPreview } = options;
 
@@ -83,6 +84,11 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
 
       return await executeMintFlow({
         contract,
+        // See useMintNftModalController: the wallet provider can answer from a
+        // cached block right after the endorsement, so read it from the app's RPC.
+        endorsementReader: rpcUrl
+          ? createDeepFamilyContract(contractAddress, getReadonlyProvider(rpcUrl, chainId))
+          : undefined,
         address,
         personHash: args.personHash,
         versionIndex: args.versionIndex,
@@ -97,7 +103,16 @@ export function useMintNftFlow(options: UseMintNftFlowOptions = {}) {
         getVersionDetails,
       });
     },
-    [address, confirmTransactionPreview, contractAddress, readerAddress, signer, t],
+    [
+      address,
+      chainId,
+      confirmTransactionPreview,
+      contractAddress,
+      readerAddress,
+      rpcUrl,
+      signer,
+      t,
+    ],
   );
 
   return useTxFlow<ExecuteMintFlowResult, [MintNftFlowArgs], FriendlyError>(runner, {

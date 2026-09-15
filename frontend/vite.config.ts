@@ -308,9 +308,11 @@ export default defineConfig(({ command, mode }) => {
       // Increase chunk size warning limit to 1MB since some third-party libraries are indeed large
       chunkSizeWarningLimit: 1000
     },
-    // Optimize dependency pre-bundling
+    // Optimize dependency pre-bundling. The dep scanner does not follow Worker
+    // entries, so snarkjs (zk.worker) is listed to avoid a mid-proof full reload
+    // when Vite discovers it at runtime.
     optimizeDeps: {
-      include: ['ethers', 'react', 'react-dom', 'react-router-dom']
+      include: ['ethers', 'react', 'react-dom', 'react-router-dom', 'snarkjs']
     }
   }
 })

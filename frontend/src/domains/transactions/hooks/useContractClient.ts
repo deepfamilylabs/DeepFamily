@@ -36,6 +36,16 @@ export function useContractClient() {
     return createDeepFamilyReaderContract(readerAddress, readonlyProvider);
   }, [readerAddress, readonlyProvider]);
 
+  /**
+   * DeepFamily on the dedicated provider, for state that must be current right
+   * after a wallet transaction: the wallet provider can keep answering calls
+   * from a cached block for a while after the transaction confirmed.
+   */
+  const readDeepFamilyContract = useMemo(() => {
+    if (!contractAddress || !readonlyProvider) return null;
+    return createDeepFamilyContract(contractAddress, readonlyProvider);
+  }, [contractAddress, readonlyProvider]);
+
   const isContractReady = !!contract && !!signer;
 
   const getVersionDetails = useMemo(() => {
@@ -62,6 +72,7 @@ export function useContractClient() {
   return {
     contract,
     readContract,
+    readDeepFamilyContract,
     isContractReady,
     getVersionDetails,
     getNFTDetails,

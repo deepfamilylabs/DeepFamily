@@ -12,6 +12,7 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { parseReceiptEvents, waitForTransactionReceipt } from "../api/txGateway";
 import {
+  archivePreviewRejectedError,
   archiveValidationError,
   assertBlobRefMatches,
   estimateArchiveTransaction,
@@ -32,7 +33,9 @@ export async function mintBiographyTransaction(input: {
   const args = structuredClone(input.args);
   const payload = String(args[5]);
   if (ethers.keccak256(payload) !== args[6])
-    throw archiveValidationError("Mint biography hash mismatch");
+    throw archiveValidationError("Mint biography hash mismatch", {
+      key: "archive.errors.encodingMismatch",
+    });
   const [author, network, archiveAddress, contractAddress] = await Promise.all([
     signer.getAddress(),
     signer.provider.getNetwork(),
@@ -48,7 +51,7 @@ export async function mintBiographyTransaction(input: {
     kind: "Mint",
   });
   if (!(await input.confirm(preview)))
-    throw archiveValidationError("Mint cancelled before wallet request");
+    throw archivePreviewRejectedError("Mint cancelled before wallet request");
   const [currentAuthor, currentNetwork] = await Promise.all([
     signer.getAddress(),
     signer.provider.getNetwork(),
@@ -57,7 +60,9 @@ export async function mintBiographyTransaction(input: {
     author.toLowerCase() !== currentAuthor.toLowerCase() ||
     network.chainId !== currentNetwork.chainId
   )
-    throw archiveValidationError("Wallet network or account changed; preview the mint again");
+    throw archiveValidationError("Wallet network or account changed; preview the mint again", {
+      key: "archive.errors.walletScopeChanged",
+    });
   const tx = await contract.mintPersonVersionNFT(...args, { gasLimit: preview.gasLimit });
   input.onSubmitted?.();
   const receipt = await waitForTransactionReceipt(tx);
@@ -74,7 +79,9 @@ export async function mintBiographyTransaction(input: {
     String(mint.owner).toLowerCase() !== author.toLowerCase() ||
     BigInt(mint.versionIndex) !== BigInt(args[2] as number)
   )
-    throw archiveValidationError("Mint receipt does not match the frozen submission");
+    throw archiveValidationError("Mint receipt does not match the frozen submission", {
+      key: "archive.errors.confirmationMismatch",
+    });
   const archive = createArchiveContract(archiveAddress, signer);
   const blockTag = receipt.blockNumber;
   const state = await archive.storyState(mint.tokenId, { blockTag });
@@ -86,7 +93,9 @@ export async function mintBiographyTransaction(input: {
   );
   if (preview.payloadBytes === 0) {
     if (events.some((event) => event.args.schemaId === STORY_BIOGRAPHY_SCHEMA_ID))
-      throw archiveValidationError("An empty biography unexpectedly produced a record");
+      throw archiveValidationError("An empty biography unexpectedly produced a record", {
+        key: "archive.errors.confirmationMismatch",
+      });
     return receipt;
   }
   const event = events[0]?.args;
@@ -95,7 +104,9 @@ export async function mintBiographyTransaction(input: {
     event.schemaId !== STORY_BIOGRAPHY_SCHEMA_ID ||
     String(event.author).toLowerCase() !== author.toLowerCase()
   )
-    throw archiveValidationError("Mint biography event is missing or mismatched");
+    throw archiveValidationError("Mint biography event is missing or mismatched", {
+      key: "archive.errors.confirmationMismatch",
+    });
   const expected = {
     payloadHash: preview.payloadHash,
     payloadLength: preview.payloadBytes,
@@ -109,14 +120,18 @@ export async function mintBiographyTransaction(input: {
     String(ref.author).toLowerCase() !== author.toLowerCase() ||
     BigInt(ref.timestamp) !== BigInt(event.timestamp)
   )
-    throw archiveValidationError("Mint biography reference does not match its event");
+    throw archiveValidationError("Mint biography reference does not match its event", {
+      key: "archive.errors.confirmationMismatch",
+    });
   const restored = await readStoryRecord({
     recordRef: ref,
     blockTag,
     getCode: (address, block) => signer.provider.getCode(address, block),
   });
   if (ethers.hexlify(restored.payload) !== payload || restored.decoded?.recordType !== 0)
-    throw archiveValidationError("Mint biography readback does not match the submitted bytes");
+    throw archiveValidationError("Mint biography readback does not match the submitted bytes", {
+      key: "archive.errors.confirmationMismatch",
+    });
   const recordHash = computeStoryRecordHash({
     chainId: network.chainId,
     archive: archiveAddress,
@@ -138,6 +153,8 @@ export async function mintBiographyTransaction(input: {
       (state.recordsHead !== head ||
         BigInt(state.totalPayloadLength) !== BigInt(preview.payloadBytes)))
   )
-    throw archiveValidationError("Mint biography commitment does not match the final story state");
+    throw archiveValidationError("Mint biography commitment does not match the final story state", {
+      key: "archive.errors.confirmationMismatch",
+    });
   return receipt;
 }

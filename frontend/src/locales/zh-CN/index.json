@@ -1288,7 +1288,6 @@
     "success": "交易成功",
     "reviewTitle": "打开钱包前请确认",
     "errorType": "错误类型",
-    "errorMessage": "错误信息",
     "errorDetails": "详细信息",
     "center": "交易",
     "clearSettled": "清除已完成",
@@ -1308,7 +1307,8 @@
     "rowFee": "费用",
     "rowFather": "父亲",
     "rowMother": "母亲",
-    "rowVersionSuffix": "版本 {{index}}"
+    "rowVersionSuffix": "版本 {{index}}",
+    "backToEdit": "返回修改"
   },
   "contract": {
     "endorseSuccess": "背书提交成功",
@@ -1497,7 +1497,10 @@
       "WALLET_REQUEST_PENDING": "钱包中已有待处理请求，请先在钱包中确认或取消后再重试。",
       "CALL_EXCEPTION": "合约校验未通过，请检查输入数据。",
       "StoryAlreadyInitialized": "铸造传记已初始化，不能再次写入。",
-      "InvalidStoryAuthor": "铸造传记的作者地址无效。"
+      "InvalidStoryAuthor": "铸造传记的作者地址无效。",
+      "InvalidCIDLength": "附件 CID 过长。",
+      "InvalidDeepFamilyAddress": "DeepFamily 合约地址无效。",
+      "InvalidStoryContent": "存档的故事内容未通过完整性校验。"
     },
     "unknown": "提交失败，请稍后重试或核对输入。"
   },
@@ -1551,6 +1554,26 @@
     "largeStory": "原文较长，请在签名前查看压缩后的存储大小与费用估算",
     "reviewStory": "确认档案交易",
     "confirm": "前往钱包确认",
-    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节"
+    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节",
+    "errors": {
+      "previewRejected": "已取消，未向钱包发起请求。",
+      "walletScopeChanged": "钱包网络或账户已切换，请重新预览交易。",
+      "gasEstimationFailed": "档案交易 Gas 估算失败。{{guidance}}",
+      "gasLimitExceeded": "含缓冲的 Gas 超出网络单笔交易上限。{{guidance}}",
+      "networkNotConfigured": "当前网络未配置档案交易限额。",
+      "blockGasLimitUnavailable": "无法获取当前区块的 Gas 上限。",
+      "gasBelowCalldataFloor": "RPC 返回的 Gas 估算低于网络 calldata 最低消耗。",
+      "feeUnavailable": "无法获取网络费用估算。",
+      "recordTypeReserved": "类型 0 为铸造时的传记保留。",
+      "encodingMismatch": "故事内容编码校验未通过，交易未发送，请重试。",
+      "storyChanged": "故事已有更新，请刷新后再追加。",
+      "confirmationMismatch": "交易已确认，但链上结果与提交内容不一致，请刷新页面核对最新状态。",
+      "guidance": {
+        "story": "请把文本拆分为另一条故事记录。",
+        "mint": "请先精简公开传记再铸造；NFT 与传记必须在同一笔交易内完成。",
+        "metadata": "当前网络无法在单笔交易内存储这份元数据。",
+        "seal": "请刷新故事后重试。"
+      }
+    }
   }
 }

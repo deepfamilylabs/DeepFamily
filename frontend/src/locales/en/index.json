@@ -1288,7 +1288,6 @@
     "success": "Transaction successful",
     "reviewTitle": "Review before opening your wallet",
     "errorType": "Error Type",
-    "errorMessage": "Message",
     "errorDetails": "Details",
     "center": "Transactions",
     "clearSettled": "Clear finished",
@@ -1308,7 +1307,8 @@
     "rowFee": "Fee",
     "rowFather": "Father",
     "rowMother": "Mother",
-    "rowVersionSuffix": "version {{index}}"
+    "rowVersionSuffix": "version {{index}}",
+    "backToEdit": "Back to edit"
   },
   "contract": {
     "endorseSuccess": "endorse success",
@@ -1497,7 +1497,10 @@
       "WALLET_REQUEST_PENDING": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
       "CALL_EXCEPTION": "Contract validation failed. Please check input data.",
       "StoryAlreadyInitialized": "The mint biography has already been initialized.",
-      "InvalidStoryAuthor": "The mint biography author is invalid."
+      "InvalidStoryAuthor": "The mint biography author is invalid.",
+      "InvalidCIDLength": "Attachment CID is too long.",
+      "InvalidDeepFamilyAddress": "DeepFamily contract address is invalid.",
+      "InvalidStoryContent": "Archived story content failed integrity validation."
     },
     "unknown": "Submission failed. Please retry later or verify your inputs."
   },
@@ -1551,6 +1554,26 @@
     "largeStory": "Long text; review the compressed storage size and estimated fee before signing",
     "reviewStory": "Review story transaction",
     "confirm": "Continue to wallet",
-    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes"
+    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
+    "errors": {
+      "previewRejected": "Cancelled before the wallet request; nothing was sent.",
+      "walletScopeChanged": "Wallet network or account changed; review the transaction again.",
+      "gasEstimationFailed": "Archive gas estimation failed. {{guidance}}",
+      "gasLimitExceeded": "Buffered archive gas exceeds the network transaction limit. {{guidance}}",
+      "networkNotConfigured": "Archive transaction limits are not configured for this network.",
+      "blockGasLimitUnavailable": "Current block gas limit is unavailable.",
+      "gasBelowCalldataFloor": "RPC gas estimate is below the network calldata gas floor.",
+      "feeUnavailable": "Network fee estimate is unavailable.",
+      "recordTypeReserved": "Type 0 is reserved for the mint biography.",
+      "encodingMismatch": "The story could not be encoded consistently, so nothing was sent. Please try again.",
+      "storyChanged": "Story changed; refresh before appending.",
+      "confirmationMismatch": "The transaction was confirmed, but the on-chain result does not match what was submitted. Refresh to check the latest state.",
+      "guidance": {
+        "story": "Split the text into another logical story record.",
+        "mint": "Reduce the public biography before minting; the NFT and biography must fit in one transaction.",
+        "metadata": "The current network cannot atomically store this metadata.",
+        "seal": "Refresh the story and try again."
+      }
+    }
   }
 }

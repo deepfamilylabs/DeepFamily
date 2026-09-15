@@ -21,6 +21,7 @@ export interface MintNftFooterProps {
   onTransactionPreviewDecision: (approved: boolean) => void;
   onRunInBackground?: () => void;
   onClose: () => void;
+  onBackToEdit: () => void;
   onContinueMinting: () => void;
   onShowEndorseConfirm: () => void;
 }
@@ -41,6 +42,7 @@ export function MintNftFooter({
   onTransactionPreviewDecision,
   onRunInBackground,
   onClose,
+  onBackToEdit,
   onContinueMinting,
   onShowEndorseConfirm,
 }: MintNftFooterProps) {
@@ -49,6 +51,7 @@ export function MintNftFooter({
       phase={phase}
       slots={{
         onRunInBackground,
+        failed: { onClose, onBackToEdit },
         done: successResult ? (
           <>
           <TransactionButton onClick={onClose} className="flex-1">

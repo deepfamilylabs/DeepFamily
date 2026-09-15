@@ -105,6 +105,8 @@ export function useEndorseModalController({
   const timelineStep = useTimelineProgress(
     ENDORSE_TIMELINE_STEPS,
     endorseTimelineStep(endorseFlow.status),
+    // A failure keeps the step it stopped on, for the timeline above the error.
+    { holdLastStep: Boolean(errorResult) },
   );
   const phase = resolveTransactionPhase({
     successResult,
@@ -372,6 +374,7 @@ export function useEndorseModalController({
       onRunInBackground: endorseFlow.status === "confirming" ? handleClose : undefined,
       isPersonHashFormatValid,
       onClose: handleClose,
+      onBackToEdit: () => setErrorResult(null),
       onContinueEndorsing: handleContinueEndorsing,
       onEndorse: handleEndorse,
       onMintNFT,
