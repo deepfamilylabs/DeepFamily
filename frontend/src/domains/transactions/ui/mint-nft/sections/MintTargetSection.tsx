@@ -1,6 +1,12 @@
+import { useId } from "react";
 import { AlertCircle, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ModalSectionHeading, getFieldErrorA11y, modalField } from "../../../../../shared/ui";
+import {
+  MODAL_LABEL,
+  ModalSectionHeading,
+  getFieldErrorA11y,
+  modalField,
+} from "../../../../../shared/ui";
 import { ThemedSelect } from "../../shared/ThemedSelect";
 import type { PersonVersionLookup } from "../../../hooks/usePersonVersionOptions";
 import { describeVersionOrigin } from "../../../model/personVersionMeta";
@@ -31,6 +37,7 @@ export function MintTargetSection({
   onPersonHashChange,
   onVersionIndexChange,
 }: MintTargetSectionProps) {
+  const personHashId = useId();
   const personHashA11y = getFieldErrorA11y({
     invalid: hashInputInvalid,
     errorId: "mint-nft-person-hash-error",
@@ -96,11 +103,12 @@ export function MintTargetSection({
           width to stay readable, and the version list grows downwards. */}
       <div className="p-4 bg-surface border border-hairline rounded-xl">
         <div className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-ink">
+          <div className="space-y-1">
+            <label htmlFor={personHashId} className={MODAL_LABEL}>
               {t("mintNFT.personHash", "Person Hash")} <span className="text-danger">*</span>
             </label>
             <input
+              id={personHashId}
               type="text"
               value={personHash}
               onChange={(event) => onPersonHashChange(event.target.value)}
@@ -110,8 +118,8 @@ export function MintTargetSection({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-ink">
+          <div className="space-y-1">
+            <label className={MODAL_LABEL}>
               {t("mintNFT.versionIndex", "Version Index")} <span className="text-danger">*</span>
             </label>
             <ThemedSelect
@@ -177,7 +185,7 @@ export function MintTargetSection({
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {t(
                   "mintNFT.targetEnvelopeHeaderInvalid",
-                  "The target metadata envelope header could not be verified. Minting is disabled.",
+                  "Couldn't verify the target version's metadata header, so it can't be minted.",
                 )}
               </div>
             )}

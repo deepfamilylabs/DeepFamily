@@ -148,7 +148,7 @@ export default function TreeListRowRenderer(
           {mintedFlag && (
             <>
               <span
-                className={`text-[10px] px-1 rounded-sm ${theme.tagBadgeBgClass.replace("fill-", "bg-")} ${theme.tagBadgeText.html} border border-emerald-300 dark:border-emerald-700/40`}
+                className={`text-[10px] px-1 rounded-sm ${theme.tagBadgeBgHtmlClass} ${theme.tagBadgeText.html} border ${theme.badgeBorderHtmlClass}`}
               >
                 NFT
               </span>
@@ -167,7 +167,7 @@ export default function TreeListRowRenderer(
           )}
           {ui.tagText && (
             <span
-              className={`text-xs ${theme.tagBadgeText.html} ${theme.tagBadgeBgClass.replace("fill-", "bg-")} border border-blue-200 dark:border-blue-700/40 px-1 rounded-sm`}
+              className={`text-xs ${theme.tagBadgeText.html} ${theme.tagBadgeBgHtmlClass} border border-blue-200 dark:border-blue-700/40 px-1 rounded-sm`}
               title={ui.tagText}
             >
               {ui.tagText}

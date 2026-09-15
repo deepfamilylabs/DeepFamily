@@ -3,9 +3,11 @@ import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConsentCheckbox } from "./ConsentCheckbox";
+import { ConsentSection } from "./ConsentSection";
 import { ThemedSelect } from "./ThemedSelect";
 import { TransactionButton } from "./TransactionButton";
 import { TransactionErrorResult } from "./TransactionErrorResult";
+import { TransactionFooterBar } from "./TransactionFooterBar";
 import { TransactionPreviewPanel } from "./TransactionPreviewPanel";
 import { TransactionTimeline, buildTimeline, useTimelineProgress } from "./TransactionTimeline";
 import { TransactionSuccessSummary } from "./TransactionSuccessSummary";
@@ -386,6 +388,31 @@ describe("transaction UI primitives", () => {
     expect(checkbox.checked).toBe(true);
   });
 
+  it("counts confirmed consents and toggles one from anywhere on its row", () => {
+    const onToggle = vi.fn();
+
+    render(
+      <ConsentSection
+        title="Informed consent"
+        items={[
+          { key: "public", label: "It goes on-chain for good" },
+          { key: "age", label: "The person is an adult" },
+          { key: "legal", label: "The data is lawful" },
+        ]}
+        consents={{ public: true, age: true, legal: false }}
+        error={null}
+        onToggle={onToggle}
+      />,
+    );
+
+    expect(screen.getByText("2/3")).toBeTruthy();
+    // The sentence is the target, not only the box beside it.
+    fireEvent.click(screen.getByText("The data is lawful"));
+    expect(onToggle).toHaveBeenCalledWith("legal");
+    // Each item is agreed to on its own: there is no agree-to-all box.
+    expect(screen.getAllByRole("checkbox")).toHaveLength(3);
+  });
+
   it("keeps transaction buttons accessible and actionable", () => {
     const onClick = vi.fn();
 
@@ -398,5 +425,44 @@ describe("transaction UI primitives", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit transaction" }));
 
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("greys out a filled action that is not ready yet rather than fading it", () => {
+    render(
+      <TransactionButton variant="primary" disabled>
+        Submit transaction
+      </TransactionButton>,
+    );
+
+    const button = screen.getByRole("button", { name: "Submit transaction" });
+    expect(button.className).toContain("disabled:bg-surface-muted");
+    // Half an orange over the dark surface read as brown.
+    expect(button.className).not.toContain("disabled:opacity-50");
+  });
+
+  it("lays footer actions on a grid on a phone, never a column their flex would fold", () => {
+    render(
+      <TransactionFooterBar
+        phase="form"
+        slots={{
+          done: null,
+          failed: { onClose: vi.fn(), onBackToEdit: vi.fn() },
+          active: (
+            <>
+              <TransactionButton className="flex-1">Cancel</TransactionButton>
+              <TransactionButton variant="primary" className="flex-[1.5]">
+                Add Version
+              </TransactionButton>
+            </>
+          ),
+        }}
+      />,
+    );
+
+    const bar = screen.getByRole("button", { name: "Cancel" }).parentElement!;
+    expect(bar.className).toMatch(/(^|\s)grid(\s|$)/);
+    expect(bar.className).toContain("sm:flex");
+    // A column would turn each button's flex-1 into a share of the height.
+    expect(bar.className).not.toContain("flex-col");
   });
 });

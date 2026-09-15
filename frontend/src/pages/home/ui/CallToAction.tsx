@@ -31,7 +31,7 @@ const CallToAction = memo(() => {
           <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-20">
             {/* Primary Button: Vibrant Gradient (Orange/Red like screenshot) */}
             <NavLink
-              to="/actions"
+              to="/create"
               className="group relative inline-flex items-center gap-2 bg-linear-to-r from-orange-400 to-red-500 text-white px-10 py-4 rounded-full font-bold hover:shadow-lg hover:shadow-orange-500/25 transition-all duration-300 hover:scale-105"
             >
               <span className="relative z-10">{t("home.cta.startButton")}</span>
@@ -40,7 +40,7 @@ const CallToAction = memo(() => {
 
             {/* Secondary Button: Minimalist Outline */}
             <NavLink
-              to="/familyTree"
+              to="/family"
               className="group inline-flex items-center gap-2 border border-hairline bg-surface text-ink-muted px-10 py-4 rounded-full font-bold hover:bg-surface-alt hover:border-hairline-strong transition-all duration-300"
             >
               {t("home.cta.exploreButton")}

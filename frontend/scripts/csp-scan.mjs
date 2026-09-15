@@ -14,10 +14,10 @@ const reportFile = process.env.DEEP_CSP_REPORT_FILE || path.join(process.cwd(), 
 
 const routes = [
   '/',
-  '/familyTree',
+  '/family',
   '/search',
   '/people',
-  '/actions',
+  '/create',
   '/keygen',
   '/decrypt',
   '/person/1',

@@ -70,7 +70,7 @@ describe("transaction form accessibility", () => {
     expect(alert.textContent).toContain("Person hash must be");
   });
 
-  it("links mint supplement field errors and hints to their fields", () => {
+  it("links mint supplement field errors to their fields", () => {
     render(
       <MintSupplementForm
         t={t as any}
@@ -92,9 +92,7 @@ describe("transaction form accessibility", () => {
     expect(screen.getByText("Story is too long").getAttribute("role")).toBe("alert");
 
     expect(tokenUri.getAttribute("aria-invalid")).toBe("true");
-    expect(tokenUri.getAttribute("aria-describedby")).toBe(
-      "mint-nft-token-uri-hint mint-nft-token-uri-error",
-    );
+    expect(tokenUri.getAttribute("aria-describedby")).toBe("mint-nft-token-uri-error");
     expect(screen.getByText("Invalid token URI").getAttribute("role")).toBe("alert");
   });
 
@@ -131,14 +129,28 @@ describe("transaction form accessibility", () => {
   it("renders only private tag/biography fields, with no legacy metadata password or CID", () => {
     render(<MetadataEncryptionSection t={t as any} register={register} isSubmitting={false} />);
 
-    expect(screen.getByPlaceholderText("Optional private revision label")).toBeTruthy();
-    expect(
-      screen.getByPlaceholderText(
-        "This immutable biography is encrypted on this device before it is stored on-chain.",
-      ),
-    ).toBeTruthy();
+    // The labels name the fields.
+    expect(screen.getByRole("textbox", { name: "Tag" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Biography" })).toBeTruthy();
     expect(screen.queryByPlaceholderText("Password (min 8 chars)")).toBeNull();
     expect(screen.queryByPlaceholderText("Confirm password")).toBeNull();
     expect(screen.queryByText("Metadata CID")).toBeNull();
+  });
+
+  it("counts tag bytes as typed and flags a tag over the limit", () => {
+    // 86 CJK characters are 258 UTF-8 bytes, two past the cap.
+    render(
+      <MetadataEncryptionSection
+        t={t as any}
+        register={register}
+        isSubmitting={false}
+        tagValue={"族".repeat(86)}
+      />,
+    );
+
+    const tag = screen.getByRole("textbox", { name: "Tag" });
+    expect(screen.getByText("258/256")).toBeTruthy();
+    expect(tag.getAttribute("aria-invalid")).toBe("true");
+    expect(tag.getAttribute("aria-describedby")).toBe(screen.getByText("258/256").id);
   });
 });

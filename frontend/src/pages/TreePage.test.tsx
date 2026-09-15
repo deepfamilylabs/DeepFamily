@@ -219,7 +219,7 @@ describe("TreePage", () => {
     renderTreePage();
 
     // The paper genealogy volume is Chinese-only; the mocked language is "en".
-    expect(screen.getByRole("link", { name: "Lineage" }).getAttribute("href")).toBe("/familyTree");
+    expect(screen.getByRole("link", { name: "Lineage" }).getAttribute("href")).toBe("/family");
     expect(screen.getByRole("link", { name: "People" }).getAttribute("href")).toBe("/people");
     expect(screen.queryByRole("link", { name: "Genealogy" })).toBeNull();
 

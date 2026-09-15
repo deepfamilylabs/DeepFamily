@@ -3,7 +3,7 @@ import React from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import ActionsPage from "./ActionsPage";
+import CreatePage from "./CreatePage";
 
 const mocks = vi.hoisted(() => ({
   address: null as string | null,
@@ -86,17 +86,17 @@ function actionsTree(initialEntry: string) {
   return (
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
-        <Route path="/actions" element={<ActionsPage />} />
+        <Route path="/create" element={<CreatePage />} />
       </Routes>
     </MemoryRouter>
   );
 }
 
-function renderActionsPage(initialEntry = "/actions") {
+function renderCreatePage(initialEntry = "/create") {
   return render(actionsTree(initialEntry));
 }
 
-describe("ActionsPage", () => {
+describe("CreatePage", () => {
   beforeEach(() => {
     mocks.address = null;
   });
@@ -106,7 +106,7 @@ describe("ActionsPage", () => {
   });
 
   it("renders the wallet-required view when no wallet is connected", () => {
-    renderActionsPage();
+    renderCreatePage();
 
     expect(screen.getByText("Wallet Connection Required")).toBeTruthy();
     expect(screen.getByTestId("wallet-connect-button")).toBeTruthy();
@@ -121,7 +121,7 @@ describe("ActionsPage", () => {
       ["Open Endorsement", "endorse-modal"],
       ["Open NFT Minting", "mint-nft-modal"],
     ] as const) {
-      renderActionsPage();
+      renderCreatePage();
       // All three are on screen at once; none is hidden behind a tab.
       expect(screen.getByText("Start Adding Version")).toBeTruthy();
       expect(screen.getByText("Open Endorsement")).toBeTruthy();
@@ -136,7 +136,7 @@ describe("ActionsPage", () => {
   it("opens the add-version modal and hands off to endorse within the page shell", async () => {
     mocks.address = "0x00000000000000000000000000000000000000aa";
 
-    renderActionsPage();
+    renderCreatePage();
 
     fireEvent.click(screen.getByText("Start Adding Version"));
 
@@ -153,7 +153,7 @@ describe("ActionsPage", () => {
   it("auto-opens endorse from URL params and hands off to mint", async () => {
     mocks.address = "0x00000000000000000000000000000000000000aa";
 
-    renderActionsPage("/actions?tab=endorse&open=true&hash=0xfeed&versionIndex=2");
+    renderCreatePage("/create?tab=endorse&open=true&hash=0xfeed&versionIndex=2");
 
     await waitFor(() => expect(screen.getByTestId("endorse-modal")).toBeTruthy());
     expect(screen.getByTestId("endorse-hash").textContent).toBe("0xfeed");
@@ -169,9 +169,9 @@ describe("ActionsPage", () => {
 
   it("keeps a URL-targeted modal closed when the wallet account changes", async () => {
     mocks.address = "0x00000000000000000000000000000000000000aa";
-    const target = "/actions?tab=mint-nft&hash=0xfeed&vi=2";
+    const target = "/create?tab=mint-nft&hash=0xfeed&vi=2";
 
-    const view = renderActionsPage(target);
+    const view = renderCreatePage(target);
     await waitFor(() => expect(screen.getByTestId("mint-nft-modal")).toBeTruthy());
 
     fireEvent.click(screen.getByText("close-mint"));

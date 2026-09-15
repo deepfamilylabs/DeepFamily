@@ -304,9 +304,9 @@ describe("MintNFTModal", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(["", "  初始传记 😀 e\u0301  "])(
-    "mints with the exact optional story title (%s) and patches tree state on success",
-    async (storyTitle) => {
+  it(
+    "mints without a biography title and patches tree state on success",
+    async () => {
       mocks.mintRunOrThrow.mockResolvedValue({
         tokenId: 77,
         transactionHash: "0xmint",
@@ -326,19 +326,14 @@ describe("MintNFTModal", () => {
 
       await waitForMintableTarget();
       await checkAllConsents();
-      expect((screen.getByLabelText("Biography title (optional)") as HTMLInputElement).value).toBe(
-        "",
-      );
+      expect(screen.queryByLabelText("Biography title (optional)")).toBeNull();
 
       await act(async () => {
-        fireEvent.change(screen.getByPlaceholderText("Enter birth place"), {
+        fireEvent.change(screen.getByPlaceholderText("e.g. Shaoxing, Zhejiang"), {
           target: { value: "London" },
         });
         fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
           target: { value: "ipfs://token" },
-        });
-        fireEvent.change(screen.getByLabelText("Biography title (optional)"), {
-          target: { value: storyTitle },
         });
         fireEvent.change(screen.getByPlaceholderText("Enter a brief life story summary..."), {
           target: { value: "  A public life story  " },
@@ -356,7 +351,8 @@ describe("MintNFTModal", () => {
           versionIndex: 2,
           selfSuiteId: 1,
           tokenURI: "ipfs://token",
-          storyTitle,
+          // The modal no longer offers a title, so the record's title stays empty.
+          storyTitle: "",
           story: "  A public life story  ",
           coreInfo: expect.objectContaining({
             supplementInfo: expect.objectContaining({
@@ -387,21 +383,6 @@ describe("MintNFTModal", () => {
       expect(formSectionsHidden()).toBe(true);
     },
   );
-
-  it("shows a story-content error and does not generate a proof when only a title is entered", async () => {
-    renderMintModal();
-    await waitForMintableTarget();
-    await checkAllConsents();
-    fireEvent.change(screen.getByLabelText("Biography title (optional)"), {
-      target: { value: "  A title without a story  " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Mint NFT" }));
-    expect(await screen.findByText("Add biography content before setting a title")).toBeTruthy();
-    const story = screen.getByPlaceholderText("Enter a brief life story summary...");
-    expect(story.getAttribute("aria-invalid")).toBe("true");
-    expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
-    expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
-  });
 
   it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
     renderMintModal();

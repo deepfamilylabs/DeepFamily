@@ -167,7 +167,7 @@ export default function NodeDetailModal({
     const params = new URLSearchParams();
     if (nodeData?.personHash) params.set("hash", nodeData.personHash);
     if (nodeData?.versionIndex) params.set("vi", nodeData.versionIndex.toString());
-    window.open(`/actions?tab=mint-nft&${params.toString()}`, "_blank", "noopener,noreferrer");
+    window.open(`/create?tab=mint-nft&${params.toString()}`, "_blank", "noopener,noreferrer");
   };
 
   const openPerson = () => {

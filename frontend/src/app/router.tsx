@@ -12,7 +12,7 @@ const SearchPage = lazy(() => import("../pages/SearchPage"));
 const PersonPage = lazy(() => import("../pages/PersonPage"));
 const PeoplePage = lazy(() => import("../pages/PeoplePage"));
 const StoryEditorPage = lazy(() => import("../pages/StoryEditorPage"));
-const ActionsPage = lazy(() => import("../pages/ActionsPage"));
+const CreatePage = lazy(() => import("../pages/CreatePage"));
 const KeyDerivationPage = lazy(() => import("../pages/KeyDerivationPage"));
 const GenealogyBookPage = lazy(() => import("../pages/GenealogyBookPage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
@@ -36,7 +36,7 @@ function TitleUpdater() {
       switch (location.pathname) {
         case "/":
           return `${baseName} - ${t("home.title")}`;
-        case "/familyTree":
+        case "/family":
           return `${baseName} - ${t("navigation.familyTree")}`;
         case "/genealogyBook":
           return `${baseName} - ${t("navigation.genealogyBook", "Genealogy")}`;
@@ -44,8 +44,8 @@ function TitleUpdater() {
           return `${baseName} - ${t("navigation.search")}`;
         case "/people":
           return `${baseName} - ${t("navigation.people")}`;
-        case "/actions":
-          return `${baseName} - ${t("navigation.actions", "Actions")}`;
+        case "/create":
+          return `${baseName} - ${t("navigation.create", "Create")}`;
         case "/keygen":
           return `${baseName} - Secure Key Derivation`;
         case "/terms":
@@ -78,11 +78,11 @@ export function AppRouter() {
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />
-              <Route path="familyTree" element={<DomainErrorBoundary domain="tree"><TreePage /></DomainErrorBoundary>} />
+              <Route path="family" element={<DomainErrorBoundary domain="tree"><TreePage /></DomainErrorBoundary>} />
               <Route path="genealogyBook" element={<DomainErrorBoundary domain="genealogy"><GenealogyBookPage /></DomainErrorBoundary>} />
               <Route path="search" element={<DomainErrorBoundary domain="search"><SearchPage /></DomainErrorBoundary>} />
               <Route path="people" element={<DomainErrorBoundary domain="people"><PeoplePage /></DomainErrorBoundary>} />
-              <Route path="actions" element={<ActionsPage />} />
+              <Route path="create" element={<CreatePage />} />
               <Route path="keygen" element={<KeyDerivationPage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="privacy" element={<PrivacyPage />} />

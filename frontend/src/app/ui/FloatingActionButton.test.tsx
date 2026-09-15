@@ -25,7 +25,7 @@ function renderFab(initialEntry = "/") {
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/" element={<FloatingActionButton />} />
-        <Route path="/actions" element={<FloatingActionButton />} />
+        <Route path="/create" element={<FloatingActionButton />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -74,21 +74,21 @@ describe("FloatingActionButton", () => {
     expect(openButton.getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("collapses back to its trigger after routing to the actions page", () => {
+  it("collapses back to its trigger after routing to the create page", () => {
     renderFab();
 
     fireEvent.click(screen.getByRole("button", { name: "Open actions menu" }));
     fireEvent.click(screen.getByRole("button", { name: "Add Version" }));
 
     // The menu collapses but the button stays mounted, so the shortcut is still
-    // available once the actions page has rendered.
+    // available once the create page has rendered.
     const trigger = screen.getByRole("button", { name: "Open actions menu" });
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(mocks.setActivePath).toHaveBeenCalledWith("/actions");
+    expect(mocks.setActivePath).toHaveBeenCalledWith("/create");
   });
 
-  it("still offers the shortcut on the actions page itself", () => {
-    renderFab("/actions");
+  it("still offers the shortcut on the create page itself", () => {
+    renderFab("/create");
 
     expect(screen.getByRole("button", { name: "Open actions menu" })).toBeTruthy();
   });

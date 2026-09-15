@@ -39,7 +39,12 @@ export const MODAL_FOOTER =
 /** Content block inside MODAL_BODY. One step of depth — never a nested shadow. */
 export const MODAL_CARD = "bg-surface border border-hairline rounded-xl";
 
-export const MODAL_LABEL = "block text-xs font-semibold text-ink";
+/**
+ * Field label: the small uppercase caption the identity fields
+ * (PersonHashCalculator) set, so every label in a form reads the same.
+ */
+export const MODAL_LABEL =
+  "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
 
 export const MODAL_HINT = "text-xs text-ink-muted";
 
@@ -61,7 +66,11 @@ export const MODAL_FIELD_SM = `${FIELD_BASE} ${FIELD_REST} h-10 px-3 text-xs`;
 /** Swap for MODAL_FIELD_SM when the value fails validation. */
 export const MODAL_FIELD_SM_INVALID = `${FIELD_BASE} ${FIELD_ERROR} h-10 px-3 text-xs`;
 
-export const MODAL_TEXTAREA = `${FIELD_BASE} ${FIELD_REST} px-3.5 py-3 text-sm leading-relaxed resize-y`;
+/**
+ * `block`: a textarea is inline-block by default and sits on a text line, which
+ * leaves a descender's worth of space under it — the next field drifted 6px away.
+ */
+export const MODAL_TEXTAREA = `${FIELD_BASE} ${FIELD_REST} block px-3.5 py-3 text-sm leading-relaxed resize-y`;
 
 /** Pick the field class for a validated input. */
 export function modalField(invalid?: boolean) {

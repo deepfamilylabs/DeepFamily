@@ -8,7 +8,7 @@ import GlobalSidebar from "./GlobalSidebar";
 const mocks = vi.hoisted(() => ({
   isMobileOpen: false,
   isDesktop: true,
-  activePath: "/familyTree",
+  activePath: "/family",
   closeMobileSidebar: vi.fn(),
   setActivePath: vi.fn(),
   togglePanel: vi.fn(),
@@ -63,7 +63,7 @@ describe("GlobalSidebar", () => {
   beforeEach(() => {
     mocks.isMobileOpen = false;
     mocks.isDesktop = true;
-    mocks.activePath = "/familyTree";
+    mocks.activePath = "/family";
     mocks.closeMobileSidebar.mockReset();
     mocks.setActivePath.mockReset();
     mocks.closePanel.mockReset();
@@ -100,7 +100,7 @@ describe("GlobalSidebar", () => {
       row.getAttribute("aria-label"),
     );
 
-    expect(labels).toEqual(["Home", "Family", "Actions"]);
+    expect(labels).toEqual(["Home", "Family", "Create"]);
   });
 
   it("keeps the desktop rail to routes — settings and the logo page live in the status bar", () => {
@@ -123,10 +123,38 @@ describe("GlobalSidebar", () => {
     expect(screen.getByLabelText("Home").getAttribute("aria-current")).toBeNull();
   });
 
+  it("marks the current section by shape, not colour alone — solid glyph, outlines elsewhere", () => {
+    renderSidebar();
+
+    const glyph = (label: string) => screen.getByLabelText(label).querySelector("svg");
+    expect(glyph("Family")?.getAttribute("fill")).toBe("currentColor");
+    expect(glyph("Home")?.getAttribute("fill")).toBe("none");
+    expect(glyph("Create")?.getAttribute("fill")).toBe("none");
+  });
+
+  it("keeps the current section on a fill, and gives other rows one only under the pointer", () => {
+    renderSidebar();
+
+    expect(screen.getByLabelText("Family").className).toMatch(/(^|\s)bg-surface-muted(\s|$)/);
+
+    const home = screen.getByLabelText("Home");
+    expect(home.className).toContain("hover:bg-surface-muted");
+    expect(home.className).not.toMatch(/(^|\s)bg-/);
+  });
+
+  it("sits flat beside the page when folded and lifts off it when open", () => {
+    const { container } = renderSidebar();
+    const rail = container.querySelector("#global-sidebar")!;
+
+    expect(rail.className).toContain("md:shadow-none");
+    fireEvent.mouseEnter(rail);
+    expect(rail.className).not.toContain("md:shadow-none");
+  });
+
   it("routes are links, so they open in a new tab like any other", () => {
     renderSidebar();
 
-    expect(screen.getByLabelText("Actions").getAttribute("href")).toBe("/actions");
+    expect(screen.getByLabelText("Create").getAttribute("href")).toBe("/create");
   });
 
   it("carries every route in the mobile drawer, the same as the rail", () => {
@@ -136,8 +164,8 @@ describe("GlobalSidebar", () => {
 
     // There is no bottom nav, so the drawer is the only way to them below md.
     expect(screen.getByLabelText("Home").getAttribute("href")).toBe("/");
-    expect(screen.getByLabelText("Family").getAttribute("href")).toBe("/familyTree");
-    expect(screen.getByLabelText("Actions").getAttribute("href")).toBe("/actions");
+    expect(screen.getByLabelText("Family").getAttribute("href")).toBe("/family");
+    expect(screen.getByLabelText("Create").getAttribute("href")).toBe("/create");
   });
 
   it("orders the drawer like the rail, then the language and theme rows", () => {
@@ -149,7 +177,7 @@ describe("GlobalSidebar", () => {
       row.getAttribute("aria-label"),
     );
 
-    expect(labels).toEqual(["Home", "Family", "Actions", "Language", "Theme"]);
+    expect(labels).toEqual(["Home", "Family", "Create", "Language", "Theme"]);
   });
 
   it("shows the current language beside its drawer row", () => {
@@ -204,8 +232,8 @@ describe("GlobalSidebar", () => {
     mocks.isMobileOpen = true;
     renderSidebar();
 
-    fireEvent.click(screen.getByLabelText("Actions"));
-    expect(mocks.setActivePath).toHaveBeenCalledWith("/actions");
+    fireEvent.click(screen.getByLabelText("Create"));
+    expect(mocks.setActivePath).toHaveBeenCalledWith("/create");
     expect(mocks.closeMobileSidebar).toHaveBeenCalled();
   });
 
@@ -216,7 +244,7 @@ describe("GlobalSidebar", () => {
     fireEvent.mouseEnter(rail);
     expect(rail.className).toContain("md:w-56");
 
-    const actions = screen.getByLabelText("Actions");
+    const actions = screen.getByLabelText("Create");
     actions.focus();
     fireEvent.click(actions, { detail: 1 });
 
@@ -268,7 +296,7 @@ describe("GlobalSidebar", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("#global-sidebar")!;
 
-    const actions = screen.getByLabelText("Actions");
+    const actions = screen.getByLabelText("Create");
     actions.focus();
     fireEvent.click(actions, { detail: 0 });
 

@@ -28,7 +28,7 @@
     "genealogyBook": "Genealogy",
     "search": "Search",
     "people": "People",
-    "actions": "Actions",
+    "create": "Create",
     "title": "Main navigation",
     "openMenu": "Open menu",
     "closeMenu": "Close menu"
@@ -75,7 +75,7 @@
       "layer1": {
         "title": "Family Relationship Network",
         "description": "Build a global family tree graph through parent-child hash connections. Zero-knowledge proofs keep the entire submission process private.",
-        "feature1": "Store salted hash commitments only, no plaintext on-chain",
+        "feature1": "No plaintext on-chain",
         "feature2": "Salted passphrases block identity inference and pollution",
         "feature3": "Shared passphrases enable private collaboration; strong solo passphrases fully isolate trees"
       },
@@ -1047,8 +1047,8 @@
     "biographyTitle": "Biography"
   },
   "actions": {
-    "title": "Blockchain Actions",
-    "subtitle": "Interact with the DeepFamily protocol using your connected wallet",
+    "title": "Create",
+    "subtitle": "Add person versions, endorse quality data, or mint NFTs with your connected wallet",
     "walletRequired": "Wallet Connection Required",
     "walletRequiredDesc": "Connect your wallet to access blockchain features like adding versions, endorsing data, and minting NFTs.",
     "whatYouCanDo": "What you can do after connecting:",
@@ -1085,9 +1085,9 @@
     "motherInfo": "Mother Information",
     "versionIndex": "Version Index",
     "tag": "Tag",
-    "tagPlaceholder": "Optional tag",
-    "biography": "Private version biography",
-    "biographyPlaceholder": "This immutable biography is encrypted on this device before it is stored on-chain.",
+    "tagPlaceholder": "e.g. From the family register",
+    "biography": "Biography",
+    "biographyPlaceholder": "Life story, deeds, family memories…",
     "validating": "Validating version...",
     "changedAfterPreparation": "The version content changed after preparation. Re-enter the identity passphrases and submit again to build a new proof and envelope.",
     "verifyingProof": "Verifying proof...",
@@ -1116,7 +1116,7 @@
     "consentPassphrase": "I understand anyone can guess the passphrase offline, without limit or deadline; the weaker it is the easier the content is to unlock, and an empty one is the same as no encryption at all.",
     "consentMissing": "Please confirm all required checkboxes before submitting.",
     "personInfo": "Person Information",
-    "personInfoHint": "Plain text stays off-chain; used only for local ZK proof",
+    "personInfoHint": "Plain text stays off-chain",
     "proofVerificationFailed": "Generated proof verification failed",
     "parents": "Parents",
     "parentsMiningHint": "Both required to mine DEEP",
@@ -1128,7 +1128,7 @@
   },
   "mintNFT": {
     "title": "Mint NFT",
-    "headerOnChainHint": "Minting is public: plain text is permanently on-chain and undeletable",
+    "headerOnChainHint": "Minting is public",
     "personHash": "Person Hash",
     "versionIndex": "Version Index",
     "versionOption": "Version {{index}} · {{endorsements}} endorsements",
@@ -1150,7 +1150,7 @@
     "targetVersion": "Target Version",
     "targetRequired": "Please provide a valid person hash and version index.",
     "targetEnvelopeHeaderRequired": "The target metadata envelope header must be verified before minting.",
-    "targetEnvelopeHeaderInvalid": "The target metadata envelope header could not be verified. Minting is disabled.",
+    "targetEnvelopeHeaderInvalid": "Couldn't verify the target version's metadata header, so it can't be minted.",
     "invalidPersonHashFormat": "Person hash must be 0x-prefixed 32-byte hex (64 hex chars).",
     "basicInfo": "Basic Information",
     "basicInfoMustMatch": "Must match the target version's data exactly; the contract verifies this on chain before minting.",
@@ -1162,10 +1162,9 @@
     "consentMissing": "Please confirm all required checkboxes before minting.",
     "supplementalInfo": "Supplemental Information",
     "birthPlace": "Birth Place",
-    "birthPlacePlaceholder": "Enter birth place",
+    "birthPlacePlaceholder": "e.g. Shaoxing, Zhejiang",
     "deathPlace": "Death Place",
-    "deathPlacePlaceholder": "Enter death place (if applicable)",
-    "deathDate": "Death Date (if applicable)",
+    "deathPlacePlaceholder": "e.g. Beijing",
     "deathYear": "Death Year",
     "story": "Public biography",
     "storyPlaceholder": "Enter the full public biography, or import the unlocked private biography.",
@@ -1173,7 +1172,6 @@
     "copyBiographyConfirm": "I understand this copies decrypted private biography text into a public, immutable NFT field.",
     "copyBiographyToStory": "Copy into public biography",
     "tokenURI": "Token URI",
-    "tokenURIHint": "Optional: URL or IPFS hash for NFT metadata",
     "nftAlreadyMinted": "NFT Already Minted",
     "nftAlreadyMintedDesc": "This version has already been minted as an NFT. Each version can only be minted once.",
     "mint": "Mint NFT",
@@ -1203,9 +1201,7 @@
       "yearExceedsCurrent": "AD year cannot exceed current year",
       "storyRequiredForTitle": "Add biography content before setting a title"
     },
-    "personHashMismatch": "The passphrase or identity suite does not match the target person hash",
-    "storyTitleLabel": "Biography title (optional)",
-    "storyTitlePlaceholder": "Biography"
+    "personHashMismatch": "The passphrase or identity suite does not match the target person hash"
   },
   "endorse": {
     "title": "Endorse Version",

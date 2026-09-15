@@ -10,7 +10,6 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { PageContainer } from "../../shared/ui";
 import SiteHeader from "./SiteHeader";
-import FloatingActionButton from "./FloatingActionButton";
 import GlobalSidebar from "./GlobalSidebar";
 import StatusBar from "./StatusBar";
 
@@ -18,7 +17,7 @@ export default function Layout() {
   const location = useLocation();
   const isHomePage = location.pathname === "/";
   const isPeoplePage = location.pathname === "/people";
-  const isTreePage = location.pathname === "/familyTree";
+  const isTreePage = location.pathname === "/family";
   const isGenealogyBookPage = location.pathname === "/genealogyBook";
   const isFullWidthPage = isHomePage || isPeoplePage || isTreePage || isGenealogyBookPage;
 
@@ -34,6 +33,8 @@ export default function Layout() {
   // The desktop rail is 4rem wide and runs the full viewport height, so the
   // header, the page and the status bar all clear it by the same constant 4rem.
   // Its open states overlay the page, so opening the sidebar never reflows it.
+  // The sidebar's Create entry is the way to /create, so no floating action
+  // button is mounted over the page.
   return (
     <div className={`${bgClass} min-h-screen transition-colors duration-300`}>
       <SiteHeader />
@@ -48,7 +49,6 @@ export default function Layout() {
         )}
       </main>
       <StatusBar />
-      <FloatingActionButton />
     </div>
   );
 }

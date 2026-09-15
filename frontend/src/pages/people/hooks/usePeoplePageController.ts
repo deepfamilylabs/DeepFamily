@@ -142,8 +142,8 @@ export function usePeoplePageController() {
   }, [location.pathname, location.search, navigate]);
 
   const openTree = useCallback(() => {
-    setActivePath("/familyTree");
-    navigate("/familyTree");
+    setActivePath("/family");
+    navigate("/family");
   }, [navigate, setActivePath]);
 
   // The build session's own status, not the tree's error log. That log is an

@@ -46,7 +46,7 @@ export function FamilyVolumeNav({
         className="flex min-w-0 items-stretch gap-4 md:gap-5"
         aria-label={t("familyTree.title", "Family")}
       >
-        <VolumeTab to="/familyTree" label={t("familyTree.volumes.chart", "Lineage")} end>
+        <VolumeTab to="/family" label={t("familyTree.volumes.chart", "Lineage")} end>
           <Network className="h-[15px] w-[15px] shrink-0" />
         </VolumeTab>
         <VolumeTab to="/people" label={t("familyTree.volumes.people", "People")}>

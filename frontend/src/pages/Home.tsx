@@ -55,8 +55,8 @@ const CTAButtons = memo(() => {
   return (
     <div className={CTA_BUTTON_STYLES.container}>
       <NavLink
-        to="/familyTree"
-        onClick={() => setActivePath("/familyTree")}
+        to="/family"
+        onClick={() => setActivePath("/family")}
         className="relative inline-flex h-14 overflow-hidden rounded-full p-[2px] focus:outline-hidden focus:ring-2 focus:ring-hairline-strong focus:ring-offset-2 focus:ring-offset-slate-50 hover:scale-105 transition-transform duration-300"
       >
         <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#ffffff_0%,#ff9e64_50%,#ffffff_100%)]" />

@@ -23,7 +23,7 @@ vi.mock("react-i18next", () => ({
         "navigation.people": "People",
         "navigation.genealogyBook": "Genealogy",
         "navigation.search": "Search",
-        "navigation.actions": "Actions",
+        "navigation.create": "Create",
       };
       return labels[key] || fallback || key;
     },
@@ -85,14 +85,14 @@ describe("genealogy volume navigation", () => {
   });
 
   it("keeps the family entry selected on the other volumes and on detail routes", () => {
-    for (const path of ["/familyTree", "/people", "/genealogyBook", "/person/7", "/editor/7"]) {
+    for (const path of ["/family", "/people", "/genealogyBook", "/person/7", "/editor/7"]) {
       mocks.activePath = path;
 
       renderNavigation();
 
       const familyEntries = screen
         .getAllByRole("link")
-        .filter((link) => link.getAttribute("href") === "/familyTree");
+        .filter((link) => link.getAttribute("href") === "/family");
 
       // The entry lights up for the whole section.
       expect(familyEntries).toHaveLength(1);

@@ -49,7 +49,7 @@ export function EndorseFooter({
         failed: { onClose, onBackToEdit },
         // The phase is derived from this result, so it is always present here.
         done: successResult ? (
-        <div className="flex flex-col sm:flex-row gap-3 w-full">
+        <>
           <TransactionButton
             onClick={onClose}
             className="flex-1"
@@ -76,12 +76,12 @@ export function EndorseFooter({
             <Image className="w-4 h-4 fill-current/20" />
             {t("endorse.goToMintNFT", "Go to Mint NFT")}
           </TransactionButton>
-        </div>
+        </>
         ) : null,
         // Nothing else about endorsing changes the actions: the button's own
         // disabled state already covers waiting, and a failure is retried here.
         active: (
-        <div className="flex gap-3 w-full">
+        <>
           <TransactionButton
             onClick={onClose}
             className="flex-1"
@@ -124,7 +124,7 @@ export function EndorseFooter({
               </div>
             )}
           </TransactionButton>
-        </div>
+        </>
         ),
       }}
     />

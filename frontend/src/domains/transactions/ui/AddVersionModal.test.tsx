@@ -280,12 +280,12 @@ async function checkConsentBoxes() {
 
 async function fillRequiredFields() {
   await act(async () => {
-    fireEvent.change(screen.getByPlaceholderText("Optional private revision label"), {
+    fireEvent.change(screen.getByPlaceholderText("e.g. From the family register"), {
       target: { value: "verified" },
     });
     fireEvent.change(
       screen.getByPlaceholderText(
-        "This immutable biography is encrypted on this device before it is stored on-chain.",
+        "Life story, deeds, family memories…",
       ),
       {
         target: { value: "private biography" },

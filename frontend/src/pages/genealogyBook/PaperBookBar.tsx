@@ -17,7 +17,7 @@ export interface PaperBookBarProps {
 /**
  * The /genealogyBook volume's own bar.
  *
- * The family bar above it (TreePageBar) is shared with /familyTree and /people, so nothing that
+ * The family bar above it (TreePageBar) is shared with /family and /people, so nothing that
  * belongs to this volume alone may live there. This row is what the page owns, and it replaces the
  * old 62px section header whose title block ("族谱纸本视图 / 以传统族谱风格实时预览") only repeated
  * the 族谱 tab directly above it. Dropping the title leaves the row to carry the one document-level
