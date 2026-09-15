@@ -683,8 +683,6 @@
       "story": "传记",
       "encyclopedia": "人物百科",
       "editStory": "编辑档案",
-      "edit": "编辑",
-      "viewFullStory": "查看完整档案",
       "mintNFTTooltip": "将此人物铸造成 NFT",
       "uri": "URI",
       "loading": "NFT 信息加载中…",
@@ -1041,11 +1039,11 @@
     "detailedStory": "人物档案",
     "records": "档案记录",
     "fullText": "全文",
+    "viewLabel": "查看方式",
     "loading": "正在加载档案记录...",
     "noStoryData": "暂无档案数据",
     "basicStory": "传记",
     "noStory": "暂无档案内容",
-    "peopleEncyclopedia": "人物百科",
     "biographyTitle": "人物传记"
   },
   "actions": {

@@ -139,6 +139,13 @@ it("shows an editor entry for the permitted owner", async () => {
   expect(open).toHaveBeenCalledWith("/editor/42", "_blank", "noopener,noreferrer");
 });
 
+it("shows a sealed archive as sealed instead of offering the editor, even to the owner", async () => {
+  mocks.canEditStory = true;
+  renderStory([biography, ordinary], { isSealed: true });
+  expect(await screen.findByText("Sealed")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
+});
+
 it("lists records in reading order by default and follows a switch to the order written", async () => {
   const closing = {
     ...ordinary,

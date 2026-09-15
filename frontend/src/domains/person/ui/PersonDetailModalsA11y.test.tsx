@@ -197,10 +197,23 @@ describe("person detail modals a11y", () => {
     ).toBeNull();
   });
 
-  it("keeps the full-story entry public while hiding the editor without ownership access", () => {
+  it("keeps the encyclopedia entry public while hiding the editor without ownership access", () => {
     renderNodeDetail(makePerson({ tokenId: "7" }));
-    expect(screen.getByRole("button", { name: "View Full Story" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "View Encyclopedia" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit Story" })).toBeNull();
+  });
+
+  it("shows minted status in the description instead of the action toolbar", () => {
+    renderNodeDetail(makePerson({ tokenId: "7" }));
+    expect(screen.getByText("Ada Lovelace · Version 1 · Minted #7")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mint this person as an NFT" })).toBeNull();
+  });
+
+  it("offers endorsement and minting for an unminted version", () => {
+    renderNodeDetail(makePerson());
+    expect(screen.getByRole("button", { name: "Click to endorse this version" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mint this person as an NFT" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "View Encyclopedia" })).toBeNull();
   });
 
   it("shows the editor entry for the permitted NFT owner", () => {
