@@ -186,7 +186,7 @@ function endorseVersion(
 **Endorsement Mechanics**:
 
 - Endorsers pay `recentReward` amount in DEEP utility points (ERC20)
-- `recentReward` is `0` before the first successful mining reward, tracks the most recently minted reward during mining, and returns to `0` when mining rewards end
+- `recentReward` is `0` before the first successful mining reward and tracks the most recently minted reward during mining; a subsequent `mint()` call that returns zero clears it to `0`
 - **Fee Distribution**: Majority flows to NFT holder (if minted) or original contributor, with a small protocol share (default 5%, max 20%) for sustainability
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
@@ -1011,10 +1011,10 @@ Ethereum deployment is unlimited.
 ```solidity
 uint256 public constant MAX_SUPPLY = 100_000_000_000e18;  // 100 billion cap
 uint256 public constant INITIAL_REWARD = 113_777e18;      // Initial reward
-uint256 public constant FIXED_LENGTH = 100_000_000;      // Fixed cycle length after 9th cycle
-
-uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000];
+uint256 public constant FIXED_LENGTH = 100_000_000;      // Fixed cycle length from the 9th cycle onward
 ```
+
+`getReward()` computes cycle lengths without reading a storage array.
 
 ### Progressive Halving Mechanics
 
@@ -1026,34 +1026,26 @@ uint256[] public cycleLengths = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000, 
 - `MAX_SUPPLY` is a hard live-supply ceiling, not a guaranteed final issuance target
 - Maximum supply is capped at `100 billion DEEP`; actual scheduled mining issuance may be slightly lower because halvings use integer arithmetic
 - Because the cap checks `totalSupply()`, burns create an equal amount of live-supply headroom; the remaining reward schedule and `totalAdditions` still limit subsequent minting
+- Once the next integer reward is zero, `totalAdditions` stops advancing and burns cannot restart the exhausted reward schedule
 
 **Reward Calculation**:
 
 ```solidity
-function getReward(uint256 recordCount) public view returns (uint256) {
+function getReward(uint256 recordCount) public pure returns (uint256) {
   if (recordCount == 0) revert InvalidRecordCount();
 
-  uint256 cycleIndex;
   uint256 countLeft = recordCount;
+  uint256 len = 1;
 
-  // Determine cycle index based on record count
-  for (uint256 i = 0; i < cycleLengths.length; i++) {
-    uint256 len = cycleLengths[i];
-    if (countLeft <= len) {
-      cycleIndex = i;
-      break;
-    }
+  // The first eight cycles grow by a factor of ten.
+  for (uint256 i = 0; i < 8; i++) {
+    if (countLeft <= len) return INITIAL_REWARD >> i;
     countLeft -= len;
-
-    // Handle post-9th cycle fixed lengths
-    if (i == cycleLengths.length - 1) {
-      uint256 extraCycles = (countLeft - 1) / FIXED_LENGTH + 1;
-      cycleIndex = i + extraCycles;
-      break;
-    }
+    len *= 10;
   }
 
-  return INITIAL_REWARD >> cycleIndex;
+  // The ninth cycle and every later cycle have the same length.
+  return INITIAL_REWARD >> (8 + (countLeft - 1) / FIXED_LENGTH);
 }
 ```
 
@@ -1082,14 +1074,15 @@ function mint(address miner) external onlyDeepFamilyContract returns (uint256 re
 - **Callable only by DeepFamily contract**
 - Checks reward calculation for next addition index
 - Enforces MAX_SUPPLY cap with partial reward if needed
-- Updates `totalAdditions` counter and `recentReward` for endorsement pricing
-- Returns 0 when `MAX_SUPPLY` is reached or the next integer reward is zero
+- Successful rewards advance `totalAdditions` and set `recentReward` for endorsement pricing
+- Returns 0 when `MAX_SUPPLY` is reached or the next integer reward is zero; that call clears `recentReward`, leaves `totalAdditions` unchanged, and emits no `MiningReward` event
+- The final positive reward remains in `recentReward` until a later `mint()` call returns zero; reward exhaustion does not clear it automatically
 
-#### View Functions
+#### Query Functions
 
 ```solidity
-function recentReward() external view returns (uint256)  // Latest minted amount
-function getReward(uint256 recordCount) public view returns (uint256)  // Reward for specific index
+function recentReward() external view returns (uint256)  // Latest mint result, including zero
+function getReward(uint256 recordCount) public pure returns (uint256)  // Reward for specific index
 ```
 
 ### State Variables
@@ -1099,7 +1092,7 @@ function getReward(uint256 recordCount) public view returns (uint256)  // Reward
 | `deepFamilyContract` | address | Authorized minting contract                      |
 | `initialized`        | bool    | Prevents re-initialization                       |
 | `totalAdditions`     | uint256 | Count of successful reward-generating additions  |
-| `recentReward`       | uint256 | Latest minted amount (used for endorsement fees) |
+| `recentReward`       | uint256 | Latest mint result, including zero; fee basis    |
 
 ### Events
 

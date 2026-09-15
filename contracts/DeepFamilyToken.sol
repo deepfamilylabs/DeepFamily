@@ -29,19 +29,7 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
   uint256 public constant MAX_SUPPLY = 100_000_000_000e18; // 100 billion cap
   uint256 public constant INITIAL_REWARD = 113_777e18; // Initial reward (integer, no over-issuance)
 
-  // Preset halving cycle lengths (fixed at 100_000_000 after 9th cycle)
-  uint256[] public cycleLengths = [
-    1,
-    10,
-    100,
-    1_000,
-    10_000,
-    100_000,
-    1_000_000,
-    10_000_000,
-    100_000_000
-  ];
-  // Fixed cycle length after 9th cycle
+  // Fixed cycle length from the 9th cycle onward
   uint256 public constant FIXED_LENGTH = 100_000_000;
 
   /// @dev Authorized DeepFamily contract address
@@ -144,11 +132,6 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
       reward = remaining;
     }
 
-    if (reward == 0) {
-      recentReward = 0;
-      return 0;
-    }
-
     totalAdditions = nextIndex;
     _mint(miner, reward);
     recentReward = reward;
@@ -163,27 +146,20 @@ contract DeepFamilyToken is ERC20Burnable, Ownable {
    * @param recordCount Total number of addition records
    * @return reward Corresponding reward amount
    */
-  function getReward(uint256 recordCount) public view returns (uint256) {
+  function getReward(uint256 recordCount) public pure returns (uint256) {
     if (recordCount == 0) revert InvalidRecordCount();
 
-    uint256 cycleIndex;
     uint256 countLeft = recordCount;
+    uint256 len = 1;
 
-    for (uint256 i = 0; i < cycleLengths.length; i++) {
-      uint256 len = cycleLengths[i];
-      if (countLeft <= len) {
-        cycleIndex = i;
-        break;
-      }
+    // The first eight cycles grow tenfold, from 1 to 10_000_000 records.
+    for (uint256 i = 0; i < 8; i++) {
+      if (countLeft <= len) return INITIAL_REWARD >> i;
       countLeft -= len;
-
-      if (i == cycleLengths.length - 1) {
-        uint256 extraCycles = (countLeft - 1) / FIXED_LENGTH + 1;
-        cycleIndex = i + extraCycles;
-        break;
-      }
+      len *= 10;
     }
 
-    return INITIAL_REWARD >> cycleIndex;
+    // All subsequent cycles contain FIXED_LENGTH records; countLeft is still one-based.
+    return INITIAL_REWARD >> (8 + (countLeft - 1) / FIXED_LENGTH);
   }
 }
