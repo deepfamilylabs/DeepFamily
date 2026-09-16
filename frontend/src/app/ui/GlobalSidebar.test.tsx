@@ -73,14 +73,15 @@ describe("GlobalSidebar", () => {
     cleanup();
   });
 
-  it("runs the full viewport height and stacks above the header", () => {
+  it("runs the full viewport height and stacks above the header and status bar", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("#global-sidebar");
 
     expect(rail?.className).toContain("inset-y-0");
     expect(rail?.className).not.toContain("md:top-16");
-    // The header is z-100: the rail has to win the top-left corner it now owns.
-    expect(rail?.className).toContain("md:z-110");
+    // The header is z-100 and the status bar z-10001: the open rail overlays both.
+    expect(rail?.className).toContain("md:z-10004");
+    expect(rail?.className).not.toContain("md:pb-[var(--app-statusbar-h)]");
   });
 
   it("holds the brand, collapsed to the mark until the labels come in", () => {
