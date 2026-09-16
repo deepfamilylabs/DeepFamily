@@ -12,6 +12,8 @@ import type { TreeTxInvalidationInput } from "../services/treeInvalidation";
 import type { TreeDebugStats, TreeProgress } from "./types";
 
 export interface TreeGraphDataValue {
+  /** Background metadata reads wait until persisted nodes have been hydrated. */
+  idbHydrated?: boolean;
   rootId: NodeId | null;
   rootExists: boolean;
   reachableNodeIds: NodeId[];

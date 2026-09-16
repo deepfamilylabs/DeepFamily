@@ -154,9 +154,22 @@ type CryptoWorkerResponse =
   | { id: number; ok: false; error: { message: string; name?: string; code?: string } };
 
 interface PendingCryptoWorkerCall {
+  request: CryptoWorkerRequest;
+  priority: CryptoWorkerPriority;
+  timeoutMs: number;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   timeoutId?: ReturnType<typeof setTimeout>;
+  signal?: AbortSignal;
+  onAbort?: () => void;
+}
+
+export type CryptoWorkerPriority = "foreground" | "background";
+
+export interface CryptoWorkerCallOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  priority?: CryptoWorkerPriority;
 }
 
 export class CryptoWorkerTerminatedError extends Error {
@@ -166,23 +179,39 @@ export class CryptoWorkerTerminatedError extends Error {
   }
 }
 
+export class CryptoWorkerPreemptedError extends CryptoWorkerTerminatedError {
+  constructor() {
+    super("Background crypto work interrupted by a foreground request");
+    this.name = "CryptoWorkerPreemptedError";
+  }
+}
+
 let workerSingleton: Worker | null = null;
 let nextId = 1;
+let activeId: number | null = null;
 const pending = new Map<number, PendingCryptoWorkerCall>();
 
-const rejectPending = (error: Error): void => {
-  for (const [, entry] of pending) {
-    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
-    entry.reject(error);
-  }
-  pending.clear();
+const removePending = (id: number): PendingCryptoWorkerCall | undefined => {
+  const entry = pending.get(id);
+  if (!entry) return undefined;
+  pending.delete(id);
+  if (activeId === id) activeId = null;
+  if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
+  if (entry.signal && entry.onAbort) entry.signal.removeEventListener("abort", entry.onAbort);
+  // Queued calls may still contain a passphrase when cancelled.
+  entry.request.params = undefined;
+  return entry;
 };
 
-export function terminateCryptoWorker(reason: Error = new CryptoWorkerTerminatedError()): void {
+const stopWorker = (): void => {
   const worker = workerSingleton;
   workerSingleton = null;
   if (worker) worker.terminate();
-  rejectPending(reason);
+};
+
+export function terminateCryptoWorker(reason: Error = new CryptoWorkerTerminatedError()): void {
+  stopWorker();
+  for (const id of pending.keys()) removePending(id)?.reject(reason);
 }
 
 export function terminateCryptoWorkerIfIdle(): boolean {
@@ -201,62 +230,104 @@ const ensureWorker = (): Worker => {
   });
   workerSingleton = worker;
   worker.addEventListener("message", (event: MessageEvent<CryptoWorkerResponse>) => {
+    if (workerSingleton !== worker) return;
     const message = event.data;
-    const entry = pending.get(message.id);
+    if (message.id !== activeId) return;
+    const entry = removePending(message.id);
     if (!entry) return;
-    pending.delete(message.id);
-    if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
     if (message.ok) {
       entry.resolve(message.result);
-      return;
+    } else {
+      const error = Object.assign(new Error(message.error?.message || "Crypto worker error"), {
+        name: message.error?.name,
+        code: message.error?.code,
+      });
+      entry.reject(error);
     }
-    const error = Object.assign(new Error(message.error?.message || "Crypto worker error"), {
-      name: message.error?.name,
-      code: message.error?.code,
-    });
-    entry.reject(error);
+    // Give a foreground operation's continuation a chance to enqueue its next
+    // step before starting another background KDF.
+    queueMicrotask(dispatchNext);
   });
   worker.addEventListener("error", () => {
     if (workerSingleton !== worker) return;
-    terminateCryptoWorker(new Error("Crypto worker crashed"));
+    rejectActive(new Error("Crypto worker crashed"));
+    dispatchNext();
   });
   return worker;
 };
 
+const rejectActive = (reason: Error): void => {
+  stopWorker();
+  if (activeId !== null) removePending(activeId)?.reject(reason);
+};
+
+const dispatchNext = (): void => {
+  // postMessage starts an asynchronous worker handler. Serializing here also
+  // protects callers outside metadata unlock from concurrent Argon2 memory use.
+  while (activeId === null && pending.size > 0) {
+    const entries = [...pending.values()];
+    const entry = entries.find((candidate) => candidate.priority === "foreground") ?? entries[0];
+    const { request } = entry;
+    try {
+      const worker = ensureWorker();
+      activeId = request.id;
+      if (entry.timeoutMs > 0) {
+        entry.timeoutId = setTimeout(() => {
+          if (activeId !== request.id) return;
+          rejectActive(new Error(`Crypto worker timeout (${String(request.method)})`));
+          dispatchNext();
+        }, entry.timeoutMs);
+      }
+      worker.postMessage(request);
+    } catch (error) {
+      removePending(request.id)?.reject(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      // postMessage performs a synchronous structured clone. Do not retain
+      // secrets in caller-realm request objects after dispatch.
+      request.params = undefined;
+    }
+  }
+};
+
+const abortError = (): Error =>
+  Object.assign(new Error("Crypto worker request cancelled"), {
+    name: "AbortError",
+  });
+
 export function cryptoWorkerCall<M extends keyof CryptoWorkerCallMap>(
   method: M,
   params: CryptoWorkerCallMap[M]["params"],
-  opts?: { timeoutMs?: number },
+  opts?: CryptoWorkerCallOptions,
 ): Promise<CryptoWorkerCallMap[M]["result"]> {
-  const worker = ensureWorker();
+  if (opts?.signal?.aborted) return Promise.reject(abortError());
   const id = nextId++;
-  const timeoutMs = opts?.timeoutMs ?? 120_000;
 
   return new Promise<CryptoWorkerCallMap[M]["result"]>((resolve, reject) => {
     const entry: PendingCryptoWorkerCall = {
+      request: { id, method, params },
+      priority: opts?.priority ?? "foreground",
+      timeoutMs: opts?.timeoutMs ?? 120_000,
+      signal: opts?.signal,
       resolve: (value) => resolve(value as CryptoWorkerCallMap[M]["result"]),
       reject,
     };
-    if (timeoutMs > 0) {
-      entry.timeoutId = setTimeout(() => {
-        if (!pending.has(id)) return;
-        terminateCryptoWorker(new Error(`Crypto worker timeout (${String(method)})`));
-      }, timeoutMs);
-    }
     pending.set(id, entry);
-    const request: CryptoWorkerRequest = { id, method, params };
-    try {
-      worker.postMessage(request);
-    } catch (error) {
-      pending.delete(id);
-      if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
-      reject(error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      // postMessage performs a synchronous structured clone. Drop the caller-
-      // realm reference immediately so a long-lived Worker wrapper, test
-      // harness, or accidental message recorder cannot retain passphrases or
-      // transient KDF material after dispatch.
-      request.params = undefined;
+    if (entry.signal) {
+      entry.onAbort = () => {
+        if (!pending.has(id)) return;
+        if (activeId === id) stopWorker();
+        removePending(id)?.reject(abortError());
+        dispatchNext();
+      };
+      entry.signal.addEventListener("abort", entry.onAbort, { once: true });
     }
+    if (
+      entry.priority === "foreground" &&
+      activeId !== null &&
+      pending.get(activeId)?.priority === "background"
+    ) {
+      rejectActive(new CryptoWorkerPreemptedError());
+    }
+    dispatchNext();
   });
 }

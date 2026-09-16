@@ -5,6 +5,7 @@ export const DagView = React.lazy(() => import("./DagView"));
 export const TreeLayoutView = React.lazy(() => import("./TreeLayoutView"));
 export { default as TreeDebugPanel } from "./TreeDebugPanel";
 export { MetadataUnlockControl } from "./MetadataUnlockControl";
+export { useMetadataUnlockScope, type MetadataUnlockViewScope } from "./useMetadataUnlockScope";
 export { default as TreeListView } from "./TreeListView";
 export {
   TreeInteractionProvider,

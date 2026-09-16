@@ -21,7 +21,14 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, Eye, EyeOff, Info } from "lucide-react";
-import { CopyIconButton, MODAL_FIELD_SM, ModalShell, OVERLAY_Z_INDEX, useListboxA11y, useToast } from "../../../shared/ui";
+import {
+  CopyIconButton,
+  MODAL_FIELD_SM,
+  ModalShell,
+  OVERLAY_Z_INDEX,
+  useListboxA11y,
+  useToast,
+} from "../../../shared/ui";
 import {
   validatePassphraseStrength,
   normalizePassphraseForHash,
@@ -483,6 +490,7 @@ export const PersonHashCalculator = forwardRef<
       }
 
       let cancelled = false;
+      const controller = new AbortController();
       const timer = window.setTimeout(
         () => {
           setIsComputingHash(true);
@@ -491,7 +499,7 @@ export const PersonHashCalculator = forwardRef<
             {
               input: { ...transformedData, identitySuiteId },
             },
-            { timeoutMs: 180_000 },
+            { timeoutMs: 180_000, signal: controller.signal },
           )
             .then(({ identityHash }) => {
               if (!cancelled) {
@@ -515,6 +523,7 @@ export const PersonHashCalculator = forwardRef<
       return () => {
         cancelled = true;
         window.clearTimeout(timer);
+        controller.abort();
       };
     }, [
       fullName,
@@ -662,10 +671,7 @@ export const PersonHashCalculator = forwardRef<
                   >
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div
-                          id={passphraseHelpTitleId}
-                          className="font-semibold text-ink"
-                        >
+                        <div id={passphraseHelpTitleId} className="font-semibold text-ink">
                           {t(
                             "search.hashCalculator.passphraseHelp.title",
                             "Passphrase Information",
@@ -996,9 +1002,7 @@ export const PersonHashCalculator = forwardRef<
         >
           {showTitle && (
             <div className="bg-orange-50 dark:bg-gray-800/60 px-4 py-2 border-b border-hairline/60">
-              <h3 className="text-sm font-semibold text-ink">
-                {t("search.hashCalculator.title")}
-              </h3>
+              <h3 className="text-sm font-semibold text-ink">{t("search.hashCalculator.title")}</h3>
             </div>
           )}
           <div className="py-6 px-3">{content}</div>
@@ -1015,9 +1019,7 @@ export const PersonHashCalculator = forwardRef<
           onClick={handleToggle}
         >
           {showTitle && (
-            <h3 className="text-sm font-semibold text-ink">
-              {t("search.hashCalculator.title")}
-            </h3>
+            <h3 className="text-sm font-semibold text-ink">{t("search.hashCalculator.title")}</h3>
           )}
           <button
             type="button"

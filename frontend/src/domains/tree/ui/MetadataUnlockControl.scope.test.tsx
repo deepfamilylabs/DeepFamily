@@ -3,24 +3,42 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MetadataUnlockControl } from "./MetadataUnlockControl";
 
-const PERSON_HASH = `0x${"11".repeat(32)}`;
-const PAYLOAD_HASH = `0x${"22".repeat(32)}`;
-const POINTER = "0x00000000000000000000000000000000000000aa";
+const PERSON_A = `0x${"11".repeat(32)}`;
+const PERSON_B = `0x${"22".repeat(32)}`;
 const PROXY_A = "0x00000000000000000000000000000000000000a1";
 const PROXY_B = "0x00000000000000000000000000000000000000b1";
-
-const lockedNode = {
-  id: `${PERSON_HASH}:1`,
-  personHash: PERSON_HASH,
-  versionIndex: 1,
+const makeNode = (personHash: string, versionIndex: number, fullName: string) => ({
+  id: `${personHash}-${versionIndex}`,
+  personHash,
+  versionIndex,
+  fullName,
   versionCommitment: "123",
-  metadataPointer: POINTER,
-  metadataPayloadHash: PAYLOAD_HASH,
+  metadataPointer: "0x00000000000000000000000000000000000000aa",
+  metadataPayloadHash: `0x${"33".repeat(32)}`,
   metadataSegmentCount: 1,
   metadataPayloadLength: 128,
-};
+});
+const nodeA1 = makeNode(PERSON_A, 1, "Ada");
+const nodeA2 = makeNode(PERSON_A, 2, "Ada");
+const nodeB1 = makeNode(PERSON_B, 1, "Bo");
+const target = { personHash: PERSON_A, versionIndex: 1 };
+const report = (overrides: Record<string, unknown> = {}) => ({
+  status: "completed",
+  total: 1,
+  processed: 1,
+  attempted: 1,
+  succeeded: 1,
+  failed: 0,
+  skipped: 0,
+  persistenceFailed: 0,
+  failures: [],
+  persistenceFailures: [],
+  ...overrides,
+});
 
 const mocks = vi.hoisted(() => ({
+  viewRoot: "root-a",
+  visibleIds: null as string[] | null,
   config: {
     rpcUrl: "https://rpc-a.example",
     chainId: 71,
@@ -37,10 +55,21 @@ const mocks = vi.hoisted(() => ({
   persistValidatedPersonVersion: vi.fn(),
   captureMetadataCacheRevision: vi.fn(),
   clearMetadataUnlockCache: vi.fn(),
+  automatic: vi.fn(),
 }));
 
-// Mirrors i18next's t(key, defaultValue, options) closely enough to keep the
-// interpolated progress and summary lines assertable.
+vi.mock("./useMetadataUnlockScope", () => ({
+  useMetadataUnlockScope: () => {
+    const ids = mocks.visibleIds ?? Object.keys(mocks.nodesData);
+    return {
+      rootId: mocks.viewRoot,
+      key: JSON.stringify([mocks.viewRoot, [...ids].sort()]),
+      nodeIds: new Set(ids),
+      unlockedCount: ids.filter((id) => mocks.nodesData[id]?.metadataUnlockValidated).length,
+    };
+  },
+}));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallbackOrOptions?: unknown, maybeOptions?: unknown) => {
@@ -54,11 +83,7 @@ vi.mock("react-i18next", () => ({
     },
   }),
 }));
-
-vi.mock("../../config", () => ({
-  useConfig: () => mocks.config,
-}));
-
+vi.mock("../../config", () => ({ useConfig: () => mocks.config }));
 vi.mock("../context", () => ({
   useTreeGraphData: () => ({ nodesData: mocks.nodesData }),
   useTreeMutations: () => ({
@@ -68,15 +93,26 @@ vi.mock("../context", () => ({
     clearMetadataUnlockCache: mocks.clearMetadataUnlockCache,
   }),
 }));
-
 vi.mock("../../../shared/clients/providerRegistry", () => ({
   getReadonlyProvider: (...args: any[]) => mocks.getReadonlyProvider(...args),
 }));
-
 vi.mock("../../../shared/model", () => ({
-  isMetadataUnlockUsable: () => false,
+  isMetadataUnlockUsable: (node: any) => Boolean(node?.metadataUnlockValidated),
+  makeNodeId: (hash: string, version: number) => `${hash.toLowerCase()}-${version}`,
 }));
-
+vi.mock("./useAutomaticMetadataUnlock", () => ({
+  useAutomaticMetadataUnlock: (...args: any[]) => mocks.automatic(...args),
+  automaticMetadataUnlockKey: (node: any) => node.id,
+}));
+vi.mock("./useMetadataUnlockPreferences", async () => {
+  const { useState } = await import("react");
+  return {
+    useMetadataUnlockPreferences: () => {
+      const [remember, setRemember] = useState(true);
+      return { remember, setRemember };
+    },
+  };
+});
 vi.mock("../../../shared/metadata", () => ({
   readPersonVersionEnvelope: (...args: any[]) => mocks.readPersonVersionEnvelope(...args),
   MetadataUnlockCoordinator: class {
@@ -84,7 +120,6 @@ vi.mock("../../../shared/metadata", () => ({
       mocks.coordinatorCancel();
       return true;
     }
-
     run(options: any) {
       mocks.lastBatchOptions = options;
       return mocks.coordinatorRun(options);
@@ -94,182 +129,367 @@ vi.mock("../../../shared/metadata", () => ({
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+  const promise = new Promise<T>((resolvePromise) => {
     resolve = resolvePromise;
-    reject = rejectPromise;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
+}
+async function enterPassphrase(value = "Ada passphrase") {
+  const input = await screen.findByLabelText("Identity passphrase");
+  fireEvent.change(input, { target: { value } });
+  return input as HTMLInputElement;
+}
+function clickUnlock() {
+  fireEvent.click(screen.getByRole("button", { name: "Unlock selected versions" }));
+}
+function version(person: string, number: number) {
+  return screen.getByRole("checkbox", {
+    name: `Select ${person}, version ${number}`,
+  }) as HTMLInputElement;
 }
 
-function openUnlockControl() {
-  fireEvent.click(screen.getByRole("button", { name: /Unlock versions/i }));
-}
-
-function switchScope(rerender: (ui: React.ReactNode) => void) {
-  mocks.config.chainId = 1;
-  mocks.config.contractAddress = PROXY_B;
-  mocks.config.rpcUrl = "https://rpc-b.example";
-  rerender(<MetadataUnlockControl />);
-}
-
-describe("MetadataUnlockControl cache scope", () => {
+describe("MetadataUnlockControl selection and scope", () => {
   beforeEach(() => {
+    mocks.viewRoot = "root-a";
+    mocks.visibleIds = null;
     mocks.config.rpcUrl = "https://rpc-a.example";
     mocks.config.chainId = 71;
     mocks.config.contractAddress = PROXY_A;
-    mocks.nodesData = { [lockedNode.id]: { ...lockedNode } };
+    mocks.nodesData = {
+      [nodeA1.id]: { ...nodeA1 },
+      [nodeA2.id]: { ...nodeA2 },
+      [nodeB1.id]: { ...nodeB1 },
+    };
     mocks.provider.getCode.mockReset();
-    mocks.getReadonlyProvider.mockReset();
-    mocks.getReadonlyProvider.mockReturnValue(mocks.provider);
-    mocks.readPersonVersionEnvelope.mockReset();
-    mocks.coordinatorRun.mockReset();
+    mocks.getReadonlyProvider.mockReset().mockReturnValue(mocks.provider);
+    mocks.readPersonVersionEnvelope.mockReset().mockResolvedValue({});
+    mocks.coordinatorRun.mockReset().mockResolvedValue(report());
     mocks.coordinatorCancel.mockReset();
     mocks.lastBatchOptions = null;
     mocks.cacheValidatedPersonVersion.mockReset();
-    mocks.persistValidatedPersonVersion.mockReset();
-    mocks.persistValidatedPersonVersion.mockResolvedValue(undefined);
-    mocks.captureMetadataCacheRevision.mockReset();
-    mocks.captureMetadataCacheRevision.mockReturnValue(7);
+    mocks.persistValidatedPersonVersion.mockReset().mockResolvedValue(undefined);
+    mocks.captureMetadataCacheRevision.mockReset().mockReturnValue(7);
     mocks.clearMetadataUnlockCache.mockReset();
+    mocks.automatic.mockReset().mockReturnValue({ paused: false, issues: [] });
   });
+  afterEach(cleanup);
 
-  afterEach(() => {
-    cleanup();
-  });
-
-  it("opens through ModalShell, so it portals out and closes on Escape", async () => {
+  it("keeps background work running in the open dialog until versions are selected", async () => {
     const { container } = render(<MetadataUnlockControl />);
-
-    openUnlockControl();
-
+    expect(mocks.automatic).toHaveBeenLastCalledWith({
+      suspended: false,
+      priorityNodeId: undefined,
+      viewScope: expect.objectContaining({
+        rootId: "root-a",
+        nodeIds: new Set([nodeA1.id, nodeA2.id, nodeB1.id]),
+      }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Unlock versions/i }));
     const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
-    // Labelled by the visible heading rather than a duplicated aria-label.
-    const titleId = dialog.getAttribute("aria-labelledby");
-    expect(titleId).toBeTruthy();
-    expect(document.getElementById(titleId as string)?.textContent).toContain(
+    expect(document.getElementById(dialog.getAttribute("aria-labelledby")!)?.textContent).toContain(
       "Unlock encrypted version metadata",
     );
-    // Portalled to the body, so tree-view stacking contexts cannot clip it.
     expect(container.contains(dialog)).toBe(false);
-    expect(document.body.contains(dialog)).toBe(true);
-    // The shell owns the scrim; the dialog no longer paints one of its own.
-    expect(document.body.querySelectorAll("[aria-hidden][data-modal-scrim]")).toHaveLength(1);
-
+    expect(mocks.automatic).toHaveBeenLastCalledWith({
+      suspended: false,
+      priorityNodeId: undefined,
+      viewScope: expect.objectContaining({
+        rootId: "root-a",
+        nodeIds: new Set([nodeA1.id, nodeA2.id, nodeB1.id]),
+      }),
+    });
+    fireEvent.click(version("Ada", 1));
+    await screen.findByLabelText("Identity passphrase");
+    expect(mocks.automatic).toHaveBeenLastCalledWith(expect.objectContaining({ suspended: true }));
+    expect(screen.getByText(/Automatic attempts are paused while you unlock/)).toBeTruthy();
+    fireEvent.click(version("Ada", 1));
+    expect(mocks.automatic).toHaveBeenLastCalledWith(expect.objectContaining({ suspended: false }));
+    expect(screen.queryByText(/Automatic attempts are paused while you unlock/)).toBeNull();
     fireEvent.keyDown(window, { key: "Escape" });
-
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("invalidates an in-flight Archive preflight when chain or proxy scope changes", async () => {
-    const preflight = deferred<Record<string, never>>();
+  it("preselects only the detail version and adds the same person's other versions explicitly", async () => {
+    render(<MetadataUnlockControl open target={target} />);
+    await screen.findByLabelText("Identity passphrase");
+    expect(version("Ada", 1).checked).toBe(true);
+    expect(version("Ada", 2).checked).toBe(false);
+    expect(version("Bo", 1).checked).toBe(false);
+    expect(mocks.automatic).toHaveBeenLastCalledWith(expect.objectContaining({ suspended: true }));
+    expect(mocks.readPersonVersionEnvelope.mock.calls.map(([input]) => input.node.id)).toEqual([
+      nodeA1.id,
+    ]);
+    fireEvent.click(screen.getByLabelText("Also unlock this person's other versions in this view"));
+    await enterPassphrase();
+    clickUnlock();
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
+    expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([
+      nodeA1.id,
+      nodeA2.id,
+    ]);
+  });
+
+  it("limits the default list and counts to exact versions in the current family view", () => {
+    mocks.visibleIds = [nodeA1.id];
+    mocks.nodesData[nodeB1.id].metadataUnlockValidated = true;
+    render(<MetadataUnlockControl open target={target} />);
+    expect(version("Ada", 1)).toBeTruthy();
+    expect(screen.queryByLabelText("Select Ada, version 2")).toBeNull();
+    expect(screen.queryByLabelText("Select Bo, version 1")).toBeNull();
+    expect(screen.queryByLabelText(/Also unlock this person's other/)).toBeNull();
+    expect(screen.getByText(/1 locked candidate\(s\); 0 already unlocked/)).toBeTruthy();
+  });
+
+  it("drops a late manual result when the selected version leaves the family view", async () => {
+    const batch = deferred<any>();
+    mocks.coordinatorRun.mockImplementation((options) => {
+      options.onProgress({ ...report(), status: "running", currentNodeId: nodeA1.id });
+      return batch.promise;
+    });
+    const { rerender } = render(<MetadataUnlockControl open target={target} />);
+    await enterPassphrase();
+    clickUnlock();
+    const oldOptions = mocks.lastBatchOptions;
+    expect(screen.getByText("Unlocking…")).toBeTruthy();
+    mocks.visibleIds = [nodeB1.id];
+    rerender(<MetadataUnlockControl open target={target} />);
+    expect(() => oldOptions.cacheValidatedPersonVersion(nodeA1)).toThrow();
+    await act(async () => {
+      batch.resolve(report());
+      await batch.promise;
+    });
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.persistValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Cancel unlock" })).toBeNull();
+    mocks.visibleIds = [nodeA1.id, nodeB1.id];
+    rerender(<MetadataUnlockControl open target={target} />);
+    expect(version("Ada", 1).checked).toBe(false);
+    expect(screen.queryByText("Unlocking…")).toBeNull();
+    expect(screen.queryByText("Checking…")).toBeNull();
+    fireEvent.click(version("Bo", 1));
+    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+  });
+
+  it("cancels preflight on root change even if both roots share the selected descendant", async () => {
+    const preflight = deferred<any>();
     mocks.readPersonVersionEnvelope.mockReturnValueOnce(preflight.promise);
-    const { rerender } = render(<MetadataUnlockControl />);
-
-    openUnlockControl();
-    fireEvent.click(screen.getByRole("button", { name: /Preflight loaded versions/i }));
-    expect(await screen.findByText(/Checking Archive bytes/i)).toBeTruthy();
-
-    switchScope(rerender);
-
-    await waitFor(() => expect(mocks.coordinatorCancel).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: /Preflight loaded versions/i })).toBeTruthy();
-    expect(screen.queryByLabelText(/Identity passphrase/i)).toBeNull();
-
+    const { rerender } = render(<MetadataUnlockControl open target={target} />);
+    expect(await screen.findByText("Checking encrypted data…")).toBeTruthy();
+    mocks.viewRoot = "root-b";
+    rerender(<MetadataUnlockControl open target={target} />);
+    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
     await act(async () => {
       preflight.resolve({});
       await preflight.promise;
     });
-
-    expect(screen.queryByLabelText(/Identity passphrase/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /Preflight loaded versions/i })).toBeTruthy();
+    expect(mocks.readPersonVersionEnvelope).toHaveBeenCalledTimes(2);
   });
 
-  it("terminates a running batch and rejects stale memory or IndexedDB commits after a scope change", async () => {
-    mocks.readPersonVersionEnvelope.mockResolvedValue({});
-    const batch = deferred<any>();
-    mocks.coordinatorRun.mockImplementationOnce((options) => {
-      options.onProgress({
-        status: "running",
-        total: 1,
-        processed: 0,
-        attempted: 1,
-        succeeded: 0,
-        failed: 0,
-        skipped: 0,
-        persistenceFailed: 0,
+  it("does not preflight global versions until selected, and supports several people sharing a passphrase", async () => {
+    render(<MetadataUnlockControl open />);
+    expect(mocks.readPersonVersionEnvelope).not.toHaveBeenCalled();
+    fireEvent.click(version("Ada", 1));
+    fireEvent.click(version("Bo", 1));
+    await enterPassphrase("shared passphrase");
+    clickUnlock();
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
+    expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([
+      nodeA1.id,
+      nodeB1.id,
+    ]);
+  });
+
+  it.each([false, true])(
+    "remembers device results by default and keeps opted-out results in memory (remember=%s)",
+    async (remember) => {
+      mocks.coordinatorRun.mockImplementation(async (options) => {
+        options.cacheValidatedPersonVersion(nodeA1);
+        await options.persistUnlocked?.(nodeA1);
+        return report();
       });
+      render(<MetadataUnlockControl open target={target} />);
+      expect(
+        (screen.getByLabelText(/Remember unlocked results on this device/) as HTMLInputElement)
+          .checked,
+      ).toBe(true);
+      if (!remember)
+        fireEvent.click(screen.getByLabelText(/Remember unlocked results on this device/));
+      const input = await enterPassphrase();
+      clickUnlock();
+      await waitFor(() => expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledTimes(1));
+      const marked = { ...nodeA1, metadataUnlockPersistence: remember ? "device" : "session" };
+      expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledWith(marked, 7);
+      if (remember) expect(mocks.persistValidatedPersonVersion).toHaveBeenCalledWith(marked, 7);
+      else {
+        expect(mocks.persistValidatedPersonVersion).not.toHaveBeenCalled();
+        expect(mocks.lastBatchOptions.persistUnlocked).toBeUndefined();
+      }
+      expect(input.value).toBe("");
+    },
+  );
+
+  it("retains each failure and success while continuing with a different person's passphrase", async () => {
+    mocks.coordinatorRun
+      .mockImplementationOnce(async (options) => {
+        options.cacheValidatedPersonVersion(nodeA1);
+        return report({
+          total: 2,
+          processed: 2,
+          failed: 1,
+          failures: [{ nodeId: nodeB1.id, name: "Error", message: "wrong passphrase" }],
+        });
+      })
+      .mockImplementationOnce(async (options) => {
+        options.cacheValidatedPersonVersion(nodeB1);
+        return report();
+      });
+    render(<MetadataUnlockControl open />);
+    fireEvent.click(version("Ada", 1));
+    fireEvent.click(version("Bo", 1));
+    await enterPassphrase();
+    clickUnlock();
+    expect(await screen.findByText("Decryption or verification failed")).toBeTruthy();
+    expect(screen.getByText("Unlocked")).toBeTruthy();
+    await enterPassphrase("Bo passphrase");
+    clickUnlock();
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(2));
+    expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([nodeB1.id]);
+    expect(mocks.lastBatchOptions.rawPassphrase).toBe("Bo passphrase");
+    await waitFor(() => expect(screen.getAllByText("Unlocked")).toHaveLength(2));
+  });
+
+  it("shows a per-version read error and supports retry without resetting successful results", async () => {
+    mocks.readPersonVersionEnvelope.mockRejectedValueOnce(new Error("invalid Archive hash"));
+    render(<MetadataUnlockControl open target={target} />);
+    expect(await screen.findByText("Read or data check failed")).toBeTruthy();
+    expect(screen.queryByLabelText("Identity passphrase")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry reading selected versions" }));
+    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+  });
+
+  it.each([
+    ["ordinary", "Ada passphrase"],
+    ["empty", ""],
+    ["whitespace-only", "  "],
+    ["surrounding whitespace", "  Ada passphrase  "],
+  ])("submits a %s passphrase unchanged without confirmation", async (_kind, rawPassphrase) => {
+    render(<MetadataUnlockControl open target={target} />);
+    await enterPassphrase(rawPassphrase);
+    expect(screen.queryByText(/permanent on-chain ciphertext permits/i)).toBeNull();
+    expect(screen.queryByText(/I explicitly (choose|confirm)/)).toBeNull();
+    const button = screen.getByRole("button", {
+      name: "Unlock selected versions",
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    clickUnlock();
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
+    expect(mocks.lastBatchOptions.rawPassphrase).toBe(rawPassphrase);
+  });
+
+  it("shows background read and verification issues without treating locked versions as failures", () => {
+    mocks.automatic.mockReturnValue({
+      paused: false,
+      issues: [
+        { key: nodeA1.id, kind: "read" },
+        { key: nodeB1.id, kind: "validation" },
+      ],
+    });
+    render(<MetadataUnlockControl open />);
+    expect(screen.getByText("Read or data check failed")).toBeTruthy();
+    expect(screen.getByText("Encrypted data verification failed")).toBeTruthy();
+    expect(screen.getByText("Locked")).toBeTruthy();
+  });
+
+  it("retains background persistence failures on already unlocked versions", () => {
+    mocks.nodesData[nodeA1.id].metadataUnlockValidated = true;
+    mocks.automatic.mockReturnValue({
+      paused: false,
+      issues: [{ key: nodeA1.id, kind: "persistence" }],
+    });
+    render(<MetadataUnlockControl open />);
+    expect(screen.getByText("Unlocked; could not remember on this device")).toBeTruthy();
+    expect(version("Ada", 1).disabled).toBe(true);
+  });
+
+  it("discards old preflight results after a chain or proxy change", async () => {
+    const preflight = deferred<Record<string, never>>();
+    mocks.readPersonVersionEnvelope.mockReturnValueOnce(preflight.promise);
+    const { rerender } = render(<MetadataUnlockControl open target={target} />);
+    expect(await screen.findByText("Checking encrypted data…")).toBeTruthy();
+    mocks.config.chainId = 1;
+    mocks.config.contractAddress = PROXY_B;
+    mocks.config.rpcUrl = "https://rpc-b.example";
+    mocks.readPersonVersionEnvelope.mockRejectedValue(new Error("new scope data unavailable"));
+    rerender(<MetadataUnlockControl open target={target} />);
+    await screen.findByText("Read or data check failed");
+    await act(async () => {
+      preflight.resolve({});
+      await preflight.promise;
+    });
+    expect(screen.queryByLabelText("Identity passphrase")).toBeNull();
+  });
+
+  it("discards late batch results after an external cache clear and leaves selection usable", async () => {
+    const batch = deferred<any>();
+    mocks.coordinatorRun.mockImplementation((options) => {
+      options.onProgress(report({ status: "running", processed: 0, succeeded: 0 }));
       return batch.promise;
     });
-    const { rerender } = render(<MetadataUnlockControl />);
-
-    openUnlockControl();
-    fireEvent.click(screen.getByRole("button", { name: /Preflight loaded versions/i }));
-    const passphrase = await screen.findByLabelText(/Identity passphrase/i);
-    fireEvent.change(passphrase, { target: { value: "strong passphrase" } });
-    fireEvent.click(screen.getByText(/permanent on-chain ciphertext permits/i));
-    fireEvent.click(screen.getByRole("button", { name: /Unlock sequentially/i }));
-
-    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
-    expect(mocks.lastBatchOptions).toBeTruthy();
-    mocks.lastBatchOptions.cacheValidatedPersonVersion(lockedNode);
-    await mocks.lastBatchOptions.persistUnlocked(lockedNode);
-    expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledWith(lockedNode, 7);
-    expect(mocks.persistValidatedPersonVersion).toHaveBeenCalledWith(lockedNode, 7);
-    mocks.cacheValidatedPersonVersion.mockClear();
-    mocks.persistValidatedPersonVersion.mockClear();
-    expect(screen.getByRole("button", { name: /Cancel active Worker/i })).toBeTruthy();
-    expect(screen.getByText(/running: 0\/1/i)).toBeTruthy();
-    switchScope(rerender);
-
-    await waitFor(() => expect(mocks.coordinatorCancel).toHaveBeenCalledTimes(1));
-    expect((passphrase as HTMLInputElement).value).toBe("");
-    expect(screen.queryByText(/running: 0\/1/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /Preflight loaded versions/i })).toBeTruthy();
-
-    expect(() => mocks.lastBatchOptions.getCurrentNode(lockedNode.id)).toThrow(
-      "Metadata unlock scope changed",
-    );
-    expect(() => mocks.lastBatchOptions.cacheValidatedPersonVersion(lockedNode)).toThrow(
-      "Metadata unlock scope changed",
-    );
-    await expect(mocks.lastBatchOptions.persistUnlocked(lockedNode)).rejects.toThrow(
-      "Metadata unlock scope changed",
-    );
-    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
-    expect(mocks.persistValidatedPersonVersion).not.toHaveBeenCalled();
-
-    // Late progress/completion from the old run must not repopulate cleared UI.
-    act(() => {
-      mocks.lastBatchOptions.onProgress({
-        status: "running",
-        total: 1,
-        processed: 1,
-        attempted: 1,
-        succeeded: 1,
-        failed: 0,
-        skipped: 0,
-        persistenceFailed: 0,
-      });
-      batch.resolve({
-        status: "cancelled",
-        total: 1,
-        processed: 0,
-        attempted: 1,
-        succeeded: 0,
-        failed: 0,
-        skipped: 0,
-        persistenceFailed: 0,
-        failures: [],
-        persistenceFailures: [],
-      });
-    });
+    render(<MetadataUnlockControl open target={target} />);
+    await enterPassphrase();
+    clickUnlock();
+    const options = mocks.lastBatchOptions;
+    expect(screen.getByRole("button", { name: "Cancel unlock" })).toBeTruthy();
+    mocks.captureMetadataCacheRevision.mockReturnValue(8);
     await act(async () => {
+      expect(() => options.cacheValidatedPersonVersion(nodeA1)).toThrow(
+        "Metadata unlock scope changed",
+      );
+      await expect(options.persistUnlocked(nodeA1)).rejects.toThrow(
+        "Metadata unlock scope changed",
+      );
+      options.onProgress(report());
+      batch.resolve(report());
       await batch.promise;
     });
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.persistValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(screen.queryByText("Unlocked")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel unlock" })).toBeNull();
+    expect(version("Bo", 1).disabled).toBe(false);
+    fireEvent.click(version("Bo", 1));
+    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+  });
 
-    expect(screen.queryByText(/running: 1\/1/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /Preflight loaded versions/i })).toBeTruthy();
+  it("rejects stale cache commits and progress after changing scope while a batch runs", async () => {
+    const batch = deferred<any>();
+    mocks.coordinatorRun.mockImplementation((options) => {
+      options.onProgress(report({ status: "running", processed: 0, succeeded: 0 }));
+      return batch.promise;
+    });
+    const { rerender } = render(<MetadataUnlockControl open target={target} />);
+    await enterPassphrase();
+    clickUnlock();
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
+    const options = mocks.lastBatchOptions;
+    expect(screen.getByRole("button", { name: "Cancel unlock" })).toBeTruthy();
+    mocks.config.chainId = 1;
+    mocks.config.contractAddress = PROXY_B;
+    rerender(<MetadataUnlockControl open target={target} />);
+    expect(() => options.getCurrentNode(nodeA1.id)).toThrow("Metadata unlock scope changed");
+    expect(() => options.cacheValidatedPersonVersion(nodeA1)).toThrow(
+      "Metadata unlock scope changed",
+    );
+    await expect(options.persistUnlocked(nodeA1)).rejects.toThrow("Metadata unlock scope changed");
+    expect(mocks.cacheValidatedPersonVersion).not.toHaveBeenCalled();
+    expect(mocks.persistValidatedPersonVersion).not.toHaveBeenCalled();
+    await act(async () => {
+      options.onProgress(report({ status: "running" }));
+      batch.resolve(report({ status: "cancelled" }));
+      await batch.promise;
+    });
+    expect(screen.queryByRole("button", { name: "Cancel unlock" })).toBeNull();
+    expect(screen.queryByText(/running: 1\/1/)).toBeNull();
   });
 });

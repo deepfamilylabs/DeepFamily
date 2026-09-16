@@ -11,6 +11,7 @@ import {
   PAPER_GENEALOGY_STYLE,
   PaperGenealogyView,
   MetadataUnlockControl,
+  useMetadataUnlockScope,
   savePaperAppearance,
   savePaperSpineTitleOverride,
   usePaperReadingView,
@@ -30,7 +31,7 @@ import {
   useTreeStatus,
 } from "../domains/tree";
 import { useConfig } from "../domains/config";
-import { isMetadataUnlockUsable, type NodeId } from "../shared/model";
+import type { NodeId } from "../shared/model";
 import { FamilySettingsDrawer } from "./family/FamilySettingsDrawer";
 import { TreePageBar } from "./tree/sections/TreePageBar";
 import { PaperBookBar } from "./genealogyBook/PaperBookBar";
@@ -218,10 +219,7 @@ export default function GenealogyBookPage() {
     const hash = (rootHash || "").trim();
     return hash.length > 12 ? `${hash.slice(0, 6)}…${hash.slice(-4)}` : hash;
   }, [nodesData, rootHash, rootId]);
-  const unlockedCount = useMemo(
-    () => Object.values(nodesData).filter(isMetadataUnlockUsable).length,
-    [nodesData],
-  );
+  const { unlockedCount } = useMetadataUnlockScope({ includeSpouses: true });
   const defaultHallName = t("genealogyBook.ouHallName", "DeepFamily");
   const hallNameInputValue = appearance.hallName ?? defaultHallName;
 
@@ -274,7 +272,9 @@ export default function GenealogyBookPage() {
       const nodeData = projection.nodesData[node.id];
       const tokenId = nodeData?.tokenId;
       const totalRecords = Number(nodeData?.storyMetadata?.totalRecords || 0);
-      const loadedRecords = Array.isArray(nodeData?.storyRecords) ? nodeData.storyRecords.length : 0;
+      const loadedRecords = Array.isArray(nodeData?.storyRecords)
+        ? nodeData.storyRecords.length
+        : 0;
       if (!tokenId || totalRecords <= 0 || loadedRecords >= totalRecords) return;
       getStoryData(tokenId, { nodeIdHint: node.id }).catch(() => {
         /* Paper view can still render the core story fallback. */
@@ -418,7 +418,9 @@ export default function GenealogyBookPage() {
         </div>
       </div>
       <MetadataUnlockControl
+        includeSpouses
         open={metadataUnlockOpen}
+        target={null}
         onOpenChange={setMetadataUnlockOpen}
         showTrigger={false}
       />

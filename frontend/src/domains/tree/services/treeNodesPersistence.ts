@@ -2,6 +2,7 @@ import { deleteBlob, readBlob, writeBlob } from "../../../shared/cache/persisten
 import {
   clearAllMetadataUnlocks,
   sanitizeHydratedMetadataUnlocks,
+  stripSessionMetadataUnlocks,
   type NodeData,
 } from "../../../shared/model";
 
@@ -98,7 +99,7 @@ export function writeTreeNodesSnapshot(
 ): Promise<void> {
   return enqueue(storageKey, async () => {
     if (expectedRevision !== currentRevision(storageKey)) return;
-    await writeBlob(storageKey, snapshot);
+    await writeBlob(storageKey, stripSessionMetadataUnlocks(snapshot));
     if (expectedRevision === currentRevision(storageKey)) failClosedReads.delete(storageKey);
   });
 }
@@ -116,7 +117,7 @@ export function updateTreeNodesSnapshot(
     const persisted = applyReadPolicy(storageKey, persistedRaw) ?? {};
     const next = update(persisted);
     if (expectedRevision !== currentRevision(storageKey)) return;
-    await writeBlob(storageKey, next);
+    await writeBlob(storageKey, stripSessionMetadataUnlocks(next));
     if (expectedRevision === currentRevision(storageKey)) failClosedReads.delete(storageKey);
   });
 }

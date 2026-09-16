@@ -1,7 +1,10 @@
 import { normalizePassphrase, type BigNumberish } from "@deepfamily/protocol-core";
 import type { NodeData } from "../model/graph";
 import { isMetadataUnlockUsable, rebaseValidatedMetadataUnlock } from "../model/metadataUnlock";
-import { CryptoWorkerTerminatedError, terminateCryptoWorker } from "../workers/cryptoWorkerClient";
+import {
+  CryptoWorkerTerminatedError,
+  type CryptoWorkerPriority,
+} from "../workers/cryptoWorkerClient";
 import {
   MetadataUnlockCancelledError,
   unlockPersonVersionNode,
@@ -43,6 +46,7 @@ export interface MetadataUnlockBatchItemInput {
   getCode: MetadataCodeReader;
   rawPassphrase: string;
   signal?: AbortSignal;
+  priority?: CryptoWorkerPriority;
 }
 
 export type MetadataNodeUnlocker = (input: MetadataUnlockBatchItemInput) => Promise<NodeData>;
@@ -53,6 +57,7 @@ export interface MetadataUnlockBatchOptions {
   deepFamilyProxy: string;
   getCode: MetadataCodeReader;
   rawPassphrase: string;
+  priority?: CryptoWorkerPriority;
   cacheValidatedPersonVersion: (node: NodeData) => void;
   getCurrentNode?: (nodeId: string) => NodeData | undefined;
   persistUnlocked?: (node: NodeData) => Promise<void> | void;
@@ -104,9 +109,9 @@ const isCancellation = (error: unknown): boolean =>
   error instanceof MetadataUnlockCancelledError || error instanceof CryptoWorkerTerminatedError;
 
 /**
- * Owns one user-initiated batch at a time. The loop deliberately awaits each
- * version before starting the next, so only one heavy KDF job can exist at the
- * application layer. It never stores the passphrase on the coordinator.
+ * Owns one foreground or background batch at a time. Each batch awaits its
+ * versions in order; the shared worker scheduler also serializes other callers.
+ * It never stores the passphrase on the coordinator.
  */
 export class MetadataUnlockCoordinator {
   private activeRun: ActiveRun | null = null;
@@ -120,9 +125,8 @@ export class MetadataUnlockCoordinator {
     if (!active || active.controller.signal.aborted) return false;
     active.controller.abort();
     active.notifyCancelling?.();
-    // AbortSignal stops reads/commits; termination is what actually stops an
-    // Argon2 invocation already executing inside the Worker realm.
-    terminateCryptoWorker(new CryptoWorkerTerminatedError("Metadata unlock cancelled"));
+    // The worker scheduler stops only this signal's job, preserving work owned
+    // by other coordinators and foreground operations.
     return true;
   }
 
@@ -174,6 +178,7 @@ export class MetadataUnlockCoordinator {
             getCode: options.getCode,
             rawPassphrase: options.rawPassphrase,
             signal: active.controller.signal,
+            priority: options.priority,
           });
           if (active.controller.signal.aborted) break;
 
@@ -199,7 +204,10 @@ export class MetadataUnlockCoordinator {
           }
           emit();
         } catch (error) {
-          if (active.controller.signal.aborted || isCancellation(error)) break;
+          if (active.controller.signal.aborted || isCancellation(error)) {
+            active.controller.abort();
+            break;
+          }
           failures.push(safeFailure(node.id, error, options.rawPassphrase));
           progress.failed += 1;
           progress.processed += 1;

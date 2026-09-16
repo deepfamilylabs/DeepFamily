@@ -3,13 +3,13 @@ import { useTranslation } from "react-i18next";
 import { PersonStoryModal, type EndorseSuccessHandler } from "../domains/person";
 import {
   MetadataUnlockControl,
+  useMetadataUnlockScope,
   useTreeGraphData,
   useTreeMutations,
   useTreeNodeAccess,
   useTreeStatus,
 } from "../domains/tree";
 import { useConfig } from "../domains/config";
-import { isMetadataUnlockUsable } from "../shared/model";
 import { usePeoplePageController } from "./people/hooks/usePeoplePageController";
 import { PeoplePageHead } from "./people/sections/PeoplePageHead";
 import { PeopleResultsSection } from "./people/sections/PeopleResultsSection";
@@ -45,10 +45,7 @@ export default function PeoplePage() {
     const hash = (rootHash || "").trim();
     return hash.length > 12 ? `${hash.slice(0, 6)}…${hash.slice(-4)}` : hash;
   }, [nodesData, rootHash, rootId]);
-  const unlockedCount = useMemo(
-    () => Object.values(nodesData).filter(isMetadataUnlockUsable).length,
-    [nodesData],
-  );
+  const { unlockedCount } = useMetadataUnlockScope();
 
   return (
     <div className="min-h-screen bg-surface-body pb-[var(--app-statusbar-h)] text-ink selection:bg-primary/30">
@@ -113,6 +110,7 @@ export default function PeoplePage() {
       </div>
       <MetadataUnlockControl
         open={metadataUnlockOpen}
+        target={null}
         onOpenChange={setMetadataUnlockOpen}
         showTrigger={false}
       />

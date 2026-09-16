@@ -227,8 +227,9 @@ Heavy and sensitive computation runs off the main thread:
   `packages/protocol-core/`
 
 Identity/file Argon2id, DFM1 encryption/decryption, and proof generation execute through these
-boundaries. Metadata batch unlock runs KDF jobs strictly one at a time; cancellation terminates the
-active Worker. Do not add a password-fingerprint cache or retain passphrases, salts, derived
+boundaries. The crypto client serializes all jobs, including calls from transaction flows. Foreground
+jobs take priority over, and may preempt, an automatic empty-passphrase job. A request's cancellation
+only stops that request; unrelated queued calls remain available. Do not add a password-fingerprint cache or retain passphrases, salts, derived
 secrets, keys, content digests, or witnesses in Worker state.
 
 The most common worker crash is accidentally pulling React or DOM code into the worker bundle via a
@@ -383,14 +384,40 @@ references, `versionCommitment`, self identity suite, and the format selectors. 
 envelope to a different context therefore fails authentication for a holder of the correct key;
 this does not create a contract-level global replay check.
 
-The Tree page batch-unlock control preflights loaded locked versions first and runs KDF work
-sequentially. Each successful item is cached immediately, a failed item is not written, and cancel
-terminates the current crypto Worker. The page never automatically tries an empty passphrase.
+The unlock dialog opened from a person detail selects that version, with an option to include the
+person's other versions in the current family view. Page-level entry points allow explicit selection
+by person or version within the same view.
+Selection starts public Archive/header preflight automatically; one supplied passphrase is then tried
+sequentially against that selection. Per-version results remain visible while the user selects the
+next person. Each successful item is cached immediately; a failed item is not written.
+Unlocking existing metadata requires no passphrase-risk confirmation. Empty and whitespace-only
+inputs may be submitted directly, with whitespace preserved for protocol decoding.
 
-After validation, the product intentionally persists the entire `NodeData` as plaintext in
-IndexedDB, including decrypted display fields, `tag`, and `biography`. Cache scope includes chain
-ID, DeepFamily proxy, and protocol/cache generation. Refreshing the same scope can display that
-plaintext without another KDF. Users can clear local unlocked metadata, but this is best-effort and
+Both manual candidates and background attempts use the current root hash/version's projected family
+graph, honoring strict/union child rules, version deduplication, and trusted-source filters. The book
+also includes its displayed spouse versions. Other cached families and filtered-out versions are
+excluded; scrolling or collapsing a branch does not change this scope. Counts use the same scope.
+Switching roots cancels the old work, and removing a version from the view cancels its pending work
+and discards late results. Newly loaded descendants join the queue without restarting eligible work.
+
+After local cache hydration, locked versions in this view are also tried once with an empty passphrase
+in the background, with the inspected version and root first. The attempt key includes the scope and
+public envelope/context anchors. Authentication failure quietly leaves a version locked; read and
+validation errors remain distinguishable. Opening the unlock dialog without a selection keeps
+background attempts running. Selecting versions in the open dialog pauses background work for
+manual unlock; hidden tabs also pause it, and foreground crypto calls take priority. Clearing either
+metadata or all tree caches cancels and pauses automatic attempts for that scope for the remainder of this page session, including
+navigation/remounts. Cancellation/preemption may retry an incomplete attempt.
+
+"Remember unlocked data on this device" is selected by default. With this scope-specific preference
+enabled, subsequent unlocks persist as plaintext in IndexedDB (`metadataUnlockPersistence: "device"`),
+including decrypted display fields, `tag`, and `biography`. An explicit opt-out is remembered and
+keeps subsequent results in memory for the session (`"session"`). All snapshot write paths strip
+session-only private fields, including when another
+node is saved. Newly created confirmed versions use the same preference when no explicit mode is
+provided. Older device caches remain readable. Cache scope includes chain ID, DeepFamily proxy,
+and protocol/cache generation. Refreshing the same scope can display remembered plaintext without
+another KDF. Users can clear local unlocked metadata, but this is best-effort and
 does not protect browser-profile backups or defend against same-origin XSS. Passphrases, identity
 salts, derived secrets, KEK/DEK, witnesses, and `contentDigest` are never part of `NodeData` or the
 cache.
@@ -404,8 +431,8 @@ external person-metadata/decryption flow is retired.
 
 - Passphrases and cryptographic working material must not be placed in React state/props or
   persistent storage. Pass them directly to a Worker/service and clear them as soon as possible.
-- Validated unlocked `NodeData` is intentionally cached as plaintext. Treat that as a separate,
-  explicit product boundary rather than as secret persistence.
+- Validated unlocked `NodeData` is plaintext in memory. Persist new unlocks only while remembering
+  them on this device is enabled (the default); filter session-only nodes at every durable write.
 - CSP is strict in preview/production. Iterate with Report-Only and `csp:scan`, then enforce.
 - Security commands (from repo root):
 

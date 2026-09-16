@@ -4,6 +4,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../shared/ui";
 import { PersonHashCalculator } from "./PersonHashCalculator";
 
+const workerCall = vi.hoisted(() =>
+  vi.fn<
+    (
+      method: string,
+      params: unknown,
+      options?: { signal?: AbortSignal },
+    ) => Promise<{ identityHash: string }>
+  >(() => new Promise(() => {})),
+);
+
+vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({ cryptoWorkerCall: workerCall }));
+
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, fallbackOrOptions?: string | Record<string, unknown>, options?: any) => {
@@ -21,9 +33,32 @@ vi.mock("react-i18next", () => ({
 
 afterEach(() => {
   cleanup();
+  workerCall.mockClear();
 });
 
 describe("PersonHashCalculator accessibility", () => {
+  it("cancels outdated identity jobs on input changes and unmount", async () => {
+    const { unmount } = render(
+      <ToastProvider>
+        <PersonHashCalculator showTitle={false} initialValues={{ fullName: "Alice" }} />
+      </ToastProvider>,
+    );
+    await waitFor(() => expect(workerCall).toHaveBeenCalledTimes(1));
+    const firstSignal = workerCall.mock.calls[0][2]?.signal;
+    expect(firstSignal?.aborted).toBe(false);
+
+    fireEvent.change(screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder"), {
+      target: { value: "Bob" },
+    });
+    expect(firstSignal?.aborted).toBe(true);
+    await waitFor(() => expect(workerCall).toHaveBeenCalledTimes(2));
+    const nextSignal = workerCall.mock.calls[1][2]?.signal;
+    expect(nextSignal?.aborted).toBe(false);
+
+    unmount();
+    expect(nextSignal?.aborted).toBe(true);
+  });
+
   it("exposes local themed selects as keyboard listboxes", () => {
     render(
       <ToastProvider>

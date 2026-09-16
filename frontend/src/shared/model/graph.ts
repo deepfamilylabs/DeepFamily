@@ -80,6 +80,8 @@ export interface NodeData {
   metadataPayloadLength?: number;
   metadataSegmentCount?: number;
   metadataUnlockValidated?: boolean;
+  /** Missing on older caches means device persistence; session plaintext must never be persisted. */
+  metadataUnlockPersistence?: "session" | "device";
   metadataProtocolGeneration?: string;
   metadataFormatVersion?: number;
   identitySuiteId?: number;
