@@ -16,6 +16,8 @@ import {
 } from "../model/metadataUnlock";
 import {
   cryptoWorkerCall,
+  type CryptoWorkerCallOptions,
+  type CryptoWorkerPriority,
   type ValidatedPersonVersionV1Result,
 } from "../workers/cryptoWorkerClient";
 
@@ -44,11 +46,13 @@ export interface DecryptPersonVersionEnvelopeV1Params {
 
 export type PersonVersionEnvelopeDecryptor = (
   params: DecryptPersonVersionEnvelopeV1Params,
+  options?: Pick<CryptoWorkerCallOptions, "signal" | "priority">,
 ) => Promise<ValidatedPersonVersionV1Result>;
 
 export interface UnlockPersonVersionNodeInput extends ReadPersonVersionEnvelopeInput {
   rawPassphrase: string;
   signal?: AbortSignal;
+  priority?: CryptoWorkerPriority;
   decryptEnvelope?: PersonVersionEnvelopeDecryptor;
 }
 
@@ -160,8 +164,8 @@ export async function readPersonVersionEnvelope(
   };
 }
 
-const defaultDecryptEnvelope: PersonVersionEnvelopeDecryptor = (params) =>
-  cryptoWorkerCall("decryptPersonVersionEnvelopeV1", params);
+const defaultDecryptEnvelope: PersonVersionEnvelopeDecryptor = (params, options) =>
+  cryptoWorkerCall("decryptPersonVersionEnvelopeV1", params, options);
 
 const equalHex = (left: string, right: string): boolean =>
   left.toLowerCase() === right.toLowerCase();
@@ -192,11 +196,14 @@ export async function unlockPersonVersionNode(
   assertNotCancelled(input.signal);
 
   const decryptEnvelope = input.decryptEnvelope ?? defaultDecryptEnvelope;
-  const validated = await decryptEnvelope({
-    envelopeHex: read.envelopeHex,
-    rawPassphrase: input.rawPassphrase,
-    context: read.context,
-  });
+  const validated = await decryptEnvelope(
+    {
+      envelopeHex: read.envelopeHex,
+      rawPassphrase: input.rawPassphrase,
+      context: read.context,
+    },
+    { signal: input.signal, priority: input.priority },
+  );
   assertNotCancelled(input.signal);
 
   if (

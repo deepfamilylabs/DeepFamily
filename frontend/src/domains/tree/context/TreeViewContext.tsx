@@ -38,6 +38,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
   const { errors, push } = useErrorMonitor();
   const runtime = useTreeRuntime();
   const {
+    idbHydrated,
     nodesData,
     setNodesData,
     nodesDataRef,
@@ -148,6 +149,7 @@ export function TreeViewProvider({ children }: { children: React.ReactNode }) {
   });
 
   const graphValue: TreeGraphDataValue = {
+    idbHydrated,
     rootId: runtime.rootId,
     rootExists,
     reachableNodeIds,

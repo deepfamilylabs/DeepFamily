@@ -8,6 +8,7 @@ import {
   mergeValidatedMetadataUnlock,
   METADATA_CACHE_PROTOCOL_GENERATION,
   sanitizeHydratedMetadataUnlocks,
+  stripSessionMetadataUnlocks,
   rebaseValidatedMetadataUnlock,
   type MetadataUnlockAnchors,
 } from "./metadataUnlock";
@@ -153,5 +154,73 @@ describe("validated NodeData metadata cache", () => {
     };
 
     expect(() => rebaseValidatedMetadataUnlock(node, incomplete)).toThrow(/fully validated/);
+  });
+
+  it.each(["session", "device", undefined] as const)(
+    "keeps the incoming unlock lifetime %s when rebasing over another choice",
+    (persistence) => {
+      const incoming = {
+        ...mergeValidatedMetadataUnlock(node, anchors, unlocked),
+        ...(persistence ? { metadataUnlockPersistence: persistence } : {}),
+      };
+      const current: NodeData = {
+        ...node,
+        metadataUnlockPersistence: persistence === "device" ? "session" : "device",
+      };
+
+      const rebased = rebaseValidatedMetadataUnlock(current, incoming);
+
+      expect(rebased.metadataUnlockPersistence).toBe(persistence);
+      expect(isMetadataUnlockUsable(rebased)).toBe(true);
+      if (persistence === undefined)
+        expect(rebased).not.toHaveProperty("metadataUnlockPersistence");
+    },
+  );
+
+  it("strips session plaintext for storage without mutating the live unlock", () => {
+    const session: NodeData = {
+      ...mergeValidatedMetadataUnlock(node, anchors, unlocked),
+      metadataUnlockPersistence: "session",
+    };
+    const device: NodeData = { ...session, metadataUnlockPersistence: "device" };
+    const legacy = mergeValidatedMetadataUnlock(node, anchors, unlocked);
+
+    const durable = stripSessionMetadataUnlocks({ session, device, legacy });
+
+    expect(durable.session).toEqual(clearMetadataUnlock(session));
+    expect(durable.session).not.toHaveProperty("fullName");
+    expect(durable.session).not.toHaveProperty("metadataUnlockPersistence");
+    expect(durable.device).toBe(device);
+    expect(durable.legacy).toBe(legacy);
+    expect(session.metadataUnlockPersistence).toBe("session");
+    expect(isMetadataUnlockUsable(session)).toBe(true);
+  });
+
+  it("rejects an accidentally persisted session unlock during hydration", () => {
+    const session: NodeData = {
+      ...mergeValidatedMetadataUnlock(node, anchors, unlocked),
+      metadataUnlockPersistence: "session",
+    };
+
+    expect(sanitizeHydratedMetadataUnlocks({ session }).session).toEqual(
+      clearMetadataUnlock(session),
+    );
+  });
+
+  it("keeps public NFT identity and biography when stripping session metadata", () => {
+    const minted: NodeData = {
+      ...mergeValidatedMetadataUnlock(node, anchors, unlocked),
+      tokenId: "42",
+      nftPublicStory: "Published NFT biography",
+      metadataUnlockPersistence: "session",
+    };
+
+    const durable = stripSessionMetadataUnlocks({ minted }).minted;
+
+    expect(durable.fullName).toBe("Alice");
+    expect(durable.birthYear).toBe(1980);
+    expect(durable.nftPublicStory).toBe("Published NFT biography");
+    expect(durable).not.toHaveProperty("biography");
+    expect(durable).not.toHaveProperty("metadataPerson");
   });
 });

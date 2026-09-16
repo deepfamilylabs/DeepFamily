@@ -28,6 +28,9 @@ vi.mock("./NodeDetailModal", () => ({
       <div data-testid="node-token">{props.nodeData?.tokenId ?? ""}</div>
       <div data-testid="loading">{props.loading ? "true" : "false"}</div>
       <div data-testid="error">{props.error ?? ""}</div>
+      <button type="button" onClick={props.onRequestMetadataUnlock}>
+        unlock metadata
+      </button>
       <button type="button" onClick={props.onClose}>
         close
       </button>
@@ -111,6 +114,26 @@ describe("NodeDetailProvider", () => {
     expect(screen.getByTestId("node-detail-modal").getAttribute("data-open")).toBe("false");
     expect(screen.getByTestId("fallback-hash").textContent).toBe("");
     expect(screen.getByTestId("context-open").textContent).toBe("false");
+  });
+
+  it("passes the selected person and version to the metadata unlock entry", async () => {
+    const requestUnlock = vi.fn();
+    render(
+      <NodeDetailProvider
+        nodesData={mocks.nodesData}
+        mergeNodeDetail={mocks.mergeNodeDetail}
+        onRequestMetadataUnlock={requestUnlock}
+      >
+        <Harness />
+      </NodeDetailProvider>,
+    );
+    await act(async () => {
+      screen.getByText("open").click();
+    });
+    await act(async () => {
+      screen.getByText("unlock metadata").click();
+    });
+    expect(requestUnlock).toHaveBeenCalledWith({ personHash: "0xperson", versionIndex: 2 });
   });
 
   it("passes selected keys to queries, aggregates state, and writes fetched details back to tree data", async () => {

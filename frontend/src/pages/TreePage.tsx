@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   ColorThemeProvider,
   MetadataUnlockControl,
   TreeDebugPanel,
   TreeInteractionProvider,
+  useMetadataUnlockScope,
   useTreeGraphData,
   useTreeMutations,
   useTreeNodeAccess,
@@ -29,7 +37,7 @@ import {
   createDeepFamilyReaderContract,
 } from "../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../shared/clients/providerRegistry";
-import { isMetadataUnlockUsable } from "../shared/model";
+import { makeNodeId, type NodeKeyMinimal } from "../shared/model";
 
 /**
  * TreePage is intentionally a thin UI shell. The actual "data -> UI" pipeline is:
@@ -87,6 +95,16 @@ function TreeInteractionBridge({ children }: { children: ReactNode }) {
   return <TreeInteractionProvider value={interaction}>{children}</TreeInteractionProvider>;
 }
 
+function TreeMetadataUnlockControl(props: ComponentProps<typeof MetadataUnlockControl>) {
+  const { selected } = useNodeDetail();
+  return (
+    <MetadataUnlockControl
+      {...props}
+      priorityNodeId={selected ? makeNodeId(selected.personHash, selected.versionIndex) : undefined}
+    />
+  );
+}
+
 export default function TreePage() {
   const { viewMode, setViewMode } = usePersistedViewMode();
 
@@ -113,14 +131,12 @@ export default function TreePage() {
     update,
   } = useConfig();
   const [metadataUnlockOpen, setMetadataUnlockOpen] = useState(false);
+  const [metadataUnlockTarget, setMetadataUnlockTarget] = useState<NodeKeyMinimal | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
   const showDebugPanel = useMemo(() => isTreeDebugEnabled(), []);
   const hasRoot = Boolean(rootId && rootExists);
   // Mirrors the dialog's own tally so the bar button can carry it as a badge.
-  const unlockedCount = useMemo(
-    () => Object.values(nodesData).filter(isMetadataUnlockUsable).length,
-    [nodesData],
-  );
+  const { unlockedCount } = useMetadataUnlockScope();
   // The bar names the genealogy you are looking at. Until the root's metadata is readable that name
   // is still a hash — the same thing the node cards fall back to.
   const rootLabel = useMemo(() => {
@@ -180,7 +196,6 @@ export default function TreePage() {
     };
   }, [address, clearAllCaches, contractAddress, refresh, signer, trustedReader]);
 
-
   return (
     <ColorThemeProvider>
       <EndorseModalProvider
@@ -196,7 +211,10 @@ export default function TreePage() {
           nodesData={nodesData}
           getOwnerOf={getOwnerOf}
           trustedEndorserAccess={trustedEndorserAccess}
-          onRequestMetadataUnlock={() => setMetadataUnlockOpen(true)}
+          onRequestMetadataUnlock={(selected) => {
+            setMetadataUnlockTarget(selected);
+            setMetadataUnlockOpen(true);
+          }}
           mergeNodeDetail={mergeNodeDetail}
         >
           <TreeInteractionBridge>
@@ -210,7 +228,10 @@ export default function TreePage() {
                 generationCount={progress?.depth || 0}
                 loading={loadingContract}
                 unlockedCount={unlockedCount}
-                onOpenUnlock={() => setMetadataUnlockOpen(true)}
+                onOpenUnlock={() => {
+                  setMetadataUnlockTarget(null);
+                  setMetadataUnlockOpen(true);
+                }}
                 onRefresh={refresh}
                 onClearCaches={clearAllCaches}
                 configOpen={configOpen}
@@ -242,8 +263,9 @@ export default function TreePage() {
                       />
                     }
                   />
-                  <MetadataUnlockControl
+                  <TreeMetadataUnlockControl
                     open={metadataUnlockOpen}
+                    target={metadataUnlockTarget}
                     onOpenChange={setMetadataUnlockOpen}
                     showTrigger={false}
                   />

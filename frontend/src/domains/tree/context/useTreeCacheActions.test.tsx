@@ -11,6 +11,11 @@ import {
 import { makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { readTreeNodesSnapshot } from "../services/treeNodesPersistence";
+import {
+  claimAutomaticMetadataUnlock,
+  isAutomaticMetadataUnlockPaused,
+  setMetadataUnlockPreference,
+} from "../../../shared/metadata/metadataUnlockSession";
 import { useTreeCacheActions } from "./useTreeCacheActions";
 
 const persistenceMocks = vi.hoisted(() => ({
@@ -110,6 +115,27 @@ describe("useTreeCacheActions", () => {
     sessionStorage.clear();
   });
 
+  it.each(["clearMetadataUnlockCache", "clearAllCaches"] as const)(
+    "%s aborts and pauses automatic unlocks only in its current storage scope",
+    async (action) => {
+      const storageNS = `automatic-clear-${action}`;
+      const harness = createTreeCacheActionsHarness({}, { storageNS });
+      const pending = claimAutomaticMetadataUnlock(storageNS, "current-envelope")!;
+      const otherScope = `${storageNS}-other`;
+      const unaffected = claimAutomaticMetadataUnlock(otherScope, "current-envelope")!;
+
+      await act(async () => {
+        await harness.hook.result.current[action]();
+      });
+
+      expect(pending.signal.aborted).toBe(true);
+      expect(isAutomaticMetadataUnlockPaused(storageNS)).toBe(true);
+      expect(claimAutomaticMetadataUnlock(storageNS, "new-envelope")).toBeNull();
+      expect(unaffected.signal.aborted).toBe(false);
+      expect(isAutomaticMetadataUnlockPaused(otherScope)).toBe(false);
+    },
+  );
+
   it("markVersionMinted upserts a minted node when tree data has not loaded it yet", () => {
     const personHash = `0x${"ab".repeat(32)}`;
     const harness = createTreeCacheActionsHarness();
@@ -205,6 +231,7 @@ describe("useTreeCacheActions", () => {
       metadataParents: { father: null, mother: null },
       tag: "new-confirmed-tag",
       biography: "new-confirmed-biography",
+      metadataUnlockPersistence: "device",
     };
     const storageNS = "clear-all-same-tick";
     persistenceMocks.blobs.set(`${storageNS}::nodesData`, { [oldId]: oldNode });
@@ -634,71 +661,92 @@ describe("useTreeCacheActions", () => {
     });
   });
 
-  it("uses a dedicated confirmed-version path to insert and persist a missing node", async () => {
-    const personHash = `0x${"8a".repeat(32)}`;
-    const id = makeNodeId(personHash, 2);
-    const confirmed = {
-      id,
-      personHash,
-      versionIndex: 2,
-      versionCommitment: "987654321",
-      metadataPointer: `0x${"8b".repeat(20)}`,
-      metadataPayloadHash: `0x${"8c".repeat(32)}`,
-      metadataSegmentCount: 1,
-      metadataPayloadLength: 512,
-      fatherHash: `0x${"8d".repeat(32)}`,
-      fatherVersionIndex: 1,
-      addedBy: `0x${"8e".repeat(20)}`,
-      timestamp: 1234,
-      tokenId: "0",
-      metadataUnlockValidated: true,
-      metadataProtocolGeneration: "df-onchain-biography-v1",
-      metadataFormatVersion: 1,
-      identitySuiteId: 1,
-      metadataPerson: {
-        fullName: "Confirmed Alice",
-        gender: 2,
-        birthYear: 1980,
-        birthMonth: 1,
-        birthDay: 2,
-        isBirthBC: false,
+  it.each([
+    { remember: false, mode: undefined, expected: "session" },
+    { remember: true, mode: undefined, expected: "device" },
+    { remember: true, mode: "session", expected: "session" },
+    { remember: false, mode: "device", expected: "device" },
+  ] as const)(
+    "uses $expected for a new confirmed version with remember=$remember and explicit mode=$mode",
+    async ({ remember, mode, expected }) => {
+      const personHash = `0x${"8a".repeat(32)}`;
+      const id = makeNodeId(personHash, 2);
+      const confirmed = {
+        id,
         personHash,
-      },
-      metadataParents: { father: null, mother: null },
-      tag: "confirmed-private-tag",
-      biography: "confirmed-private-biography",
-      rawPassphrase: "must-never-persist",
-    } as NodeData;
-    const harness = createTreeCacheActionsHarness(
-      {},
-      { useIndexedDbCache: true, storageNS: "confirmed-insert" },
-    );
+        versionIndex: 2,
+        versionCommitment: "987654321",
+        metadataPointer: `0x${"8b".repeat(20)}`,
+        metadataPayloadHash: `0x${"8c".repeat(32)}`,
+        metadataSegmentCount: 1,
+        metadataPayloadLength: 512,
+        fatherHash: `0x${"8d".repeat(32)}`,
+        fatherVersionIndex: 1,
+        addedBy: `0x${"8e".repeat(20)}`,
+        timestamp: 1234,
+        tokenId: "0",
+        metadataUnlockValidated: true,
+        metadataProtocolGeneration: "df-onchain-biography-v1",
+        metadataFormatVersion: 1,
+        identitySuiteId: 1,
+        metadataPerson: {
+          fullName: "Confirmed Alice",
+          gender: 2,
+          birthYear: 1980,
+          birthMonth: 1,
+          birthDay: 2,
+          isBirthBC: false,
+          personHash,
+        },
+        metadataParents: { father: null, mother: null },
+        tag: "confirmed-private-tag",
+        biography: "confirmed-private-biography",
+        rawPassphrase: "must-never-persist",
+        ...(mode ? { metadataUnlockPersistence: mode } : {}),
+      } as NodeData;
+      const storageNS = `confirmed-insert-${remember}-${mode ?? "default"}`;
+      setMetadataUnlockPreference(storageNS, remember);
+      const harness = createTreeCacheActionsHarness({}, { useIndexedDbCache: true, storageNS });
 
-    const persistence = harness.hook.result.current.cacheConfirmedPersonVersion(
-      confirmed,
-      harness.hook.result.current.captureMetadataCacheRevision(),
-    );
-    expect(harness.nodesData[id]).toMatchObject({
-      personHash,
-      versionIndex: 2,
-      versionCommitment: "987654321",
-      tag: "confirmed-private-tag",
-      metadataUnlockValidated: true,
-    });
-    await persistence;
+      const persistence = harness.hook.result.current.cacheConfirmedPersonVersion(
+        confirmed,
+        harness.hook.result.current.captureMetadataCacheRevision(),
+      );
+      expect(harness.nodesData[id]).toMatchObject({
+        personHash,
+        versionIndex: 2,
+        versionCommitment: "987654321",
+        tag: "confirmed-private-tag",
+        metadataUnlockValidated: true,
+        metadataUnlockPersistence: expected,
+      });
+      await persistence;
 
-    const durable = persistenceMocks.blobs.get("confirmed-insert::nodesData") as Record<
-      string,
-      NodeData
-    >;
-    expect(durable[id]).toMatchObject({
-      personHash,
-      versionIndex: 2,
-      metadataUnlockValidated: true,
-      biography: "confirmed-private-biography",
-    });
-    expect(JSON.stringify(durable)).not.toContain("must-never-persist");
-  });
+      const durable = persistenceMocks.blobs.get(`${storageNS}::nodesData`) as Record<
+        string,
+        NodeData
+      >;
+      expect(durable[id]).toMatchObject({
+        personHash,
+        versionIndex: 2,
+        versionCommitment: confirmed.versionCommitment,
+        metadataPayloadHash: confirmed.metadataPayloadHash,
+      });
+      if (expected === "device") {
+        expect(durable[id]).toMatchObject({
+          metadataUnlockValidated: true,
+          metadataUnlockPersistence: "device",
+          biography: "confirmed-private-biography",
+        });
+      } else {
+        expect(durable[id].metadataUnlockValidated).toBe(false);
+        expect(durable[id]).not.toHaveProperty("metadataUnlockPersistence");
+        expect(JSON.stringify(durable)).not.toContain("confirmed-private");
+        expect(JSON.stringify(durable)).not.toContain("Confirmed Alice");
+      }
+      expect(JSON.stringify(durable)).not.toContain("must-never-persist");
+    },
+  );
 
   it("keeps ordinary unlock cache and persistence closed to missing nodes", async () => {
     const personHash = `0x${"8f".repeat(32)}`;

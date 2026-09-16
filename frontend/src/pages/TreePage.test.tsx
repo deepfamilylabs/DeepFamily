@@ -4,8 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TreePage from "./TreePage";
+import { makeNodeId } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
+  unlockedCount: 0,
+  selectedDetail: null as { personHash: string; versionIndex: number } | null,
   treeGraphData: {
     rootId: "root-1",
     rootExists: true,
@@ -66,6 +69,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("../domains/tree", () => ({
+  useMetadataUnlockScope: () => ({ unlockedCount: mocks.unlockedCount }),
   useTreeGraphData: () => mocks.treeGraphData,
   useTreeMutations: () => ({
     bumpEndorsementCount: vi.fn(),
@@ -91,16 +95,28 @@ vi.mock("../domains/tree", () => ({
     </div>
   ),
   TreeDebugPanel: () => <div data-testid="tree-debug-panel">debug</div>,
-  MetadataUnlockControl: () => <div data-testid="metadata-unlock-control">unlock</div>,
+  MetadataUnlockControl: ({ open, target, priorityNodeId }: any) => (
+    <div data-testid="metadata-unlock-control">
+      {JSON.stringify({ open, target, priorityNodeId })}
+    </div>
+  ),
 }));
 
 vi.mock("../domains/person", () => ({
   EndorseModalProvider: ({ children }: any) => <div data-testid="endorse-provider">{children}</div>,
-  NodeDetailProvider: ({ children }: any) => (
-    <div data-testid="node-detail-provider">{children}</div>
+  NodeDetailProvider: ({ children, onRequestMetadataUnlock }: any) => (
+    <div data-testid="node-detail-provider">
+      {children}
+      <button
+        type="button"
+        onClick={() => onRequestMetadataUnlock({ personHash: "0xperson", versionIndex: 2 })}
+      >
+        Unlock person
+      </button>
+    </div>
   ),
   useEndorseModal: () => ({ openEndorse: vi.fn() }),
-  useNodeDetail: () => ({ openNode: vi.fn(), selected: null }),
+  useNodeDetail: () => ({ openNode: vi.fn(), selected: mocks.selectedDetail }),
 }));
 
 vi.mock("../domains/config", () => ({
@@ -136,6 +152,8 @@ function renderTreePage() {
 
 describe("TreePage", () => {
   beforeEach(() => {
+    mocks.unlockedCount = 0;
+    mocks.selectedDetail = null;
     localStorage.clear();
     mocks.treeGraphData.rootId = "root-1";
     mocks.treeGraphData.rootExists = true;
@@ -186,6 +204,12 @@ describe("TreePage", () => {
     vi.unstubAllEnvs();
   });
 
+  it("uses the current projection's unlocked count in the family bar", () => {
+    mocks.unlockedCount = 2;
+    renderTreePage();
+    expect(screen.getByTitle("Unlock versions").textContent).toBe("2");
+  });
+
   it("renders the page bar stats, wires refresh/clear actions, and persists the selected view mode", async () => {
     localStorage.setItem("df:viewMode", "tree");
 
@@ -215,6 +239,28 @@ describe("TreePage", () => {
     expect(mocks.treeStatus.clearAllCaches).toHaveBeenCalledTimes(1);
   });
 
+  it("prioritizes the viewed detail before its manual unlock dialog is opened", () => {
+    mocks.selectedDetail = { personHash: "0xperson", versionIndex: 2 };
+    renderTreePage();
+    const control = JSON.parse(screen.getByTestId("metadata-unlock-control").textContent!);
+    expect(control).toMatchObject({
+      open: false,
+      target: null,
+      priorityNodeId: makeNodeId("0xperson", 2),
+    });
+  });
+
+  it("opens a targeted unlock from details and clears the target for the global entry", () => {
+    renderTreePage();
+    fireEvent.click(screen.getByRole("button", { name: "Unlock person" }));
+    expect(screen.getByTestId("metadata-unlock-control").textContent).toContain(
+      '"target":{"personHash":"0xperson","versionIndex":2}',
+    );
+    fireEvent.click(screen.getByTitle("Unlock versions"));
+    expect(screen.getByTestId("metadata-unlock-control").textContent).toContain('"target":null');
+    expect(screen.getByTestId("metadata-unlock-control").textContent).toContain('"open":true');
+  });
+
   it("links the three genealogy volumes and opens the config panel from the overflow menu", () => {
     renderTreePage();
 
@@ -234,5 +280,4 @@ describe("TreePage", () => {
     fireEvent.click(screen.getByTitle("Family settings"));
     expect(screen.getByRole("dialog", { hidden: true }).getAttribute("aria-hidden")).toBe("true");
   });
-
 });

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import GenealogyBookPage from "./GenealogyBookPage";
 
 const mocks = vi.hoisted(() => ({
+  unlockedCount: 0,
+  metadataUnlockScopeOptions: vi.fn(),
   rootExists: true,
   projection: {
     rootId: "0xroot-v-1",
@@ -63,6 +65,10 @@ vi.mock("../domains/config", () => ({
 }));
 
 vi.mock("../domains/tree", () => ({
+  useMetadataUnlockScope: (options: { includeSpouses?: boolean }) => {
+    mocks.metadataUnlockScopeOptions(options);
+    return { unlockedCount: mocks.unlockedCount };
+  },
   PAPER_GENEALOGY_STYLE: {
     OU: "ou",
     SU: "su",
@@ -212,11 +218,15 @@ vi.mock("../domains/tree", () => ({
     canGoNext: true,
     ...mocks.readingView,
   }),
-  MetadataUnlockControl: () => <div data-testid="metadata-unlock-control" />,
+  MetadataUnlockControl: ({ includeSpouses }: { includeSpouses?: boolean }) => (
+    <div data-testid="metadata-unlock-control" data-include-spouses={String(includeSpouses)} />
+  ),
 }));
 
 describe("GenealogyBookPage", () => {
   beforeEach(() => {
+    mocks.unlockedCount = 0;
+    mocks.metadataUnlockScopeOptions.mockClear();
     localStorage.clear();
     mocks.rootExists = true;
     mocks.status.loading = false;
@@ -235,6 +245,16 @@ describe("GenealogyBookPage", () => {
       edges: [],
       childrenByParent: {},
     };
+  });
+
+  it("uses the book scope including displayed spouses for its badge and unlock control", () => {
+    mocks.unlockedCount = 3;
+    render(<GenealogyBookPage />);
+    expect(screen.getByTitle("Unlock versions").textContent).toBe("3");
+    expect(mocks.metadataUnlockScopeOptions).toHaveBeenCalledWith({ includeSpouses: true });
+    expect(screen.getByTestId("metadata-unlock-control").getAttribute("data-include-spouses")).toBe(
+      "true",
+    );
   });
 
   afterEach(() => {

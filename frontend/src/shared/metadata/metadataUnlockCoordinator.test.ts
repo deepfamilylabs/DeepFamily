@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { normalizePassphrase } from "@deepfamily/protocol-core";
 import type { NodeData } from "../model/graph";
+import {
+  CryptoWorkerPreemptedError,
+  cryptoWorkerCall,
+  terminateCryptoWorker,
+} from "../workers/cryptoWorkerClient";
 import { MetadataUnlockCancelledError } from "./metadataArchiveService";
 import {
   MetadataUnlockCoordinator,
@@ -41,6 +46,91 @@ const validated = (current: NodeData): NodeData => ({
 });
 
 describe("MetadataUnlockCoordinator", () => {
+  it("passes background priority through and reports preemption as cancellation without a failed unlock", async () => {
+    const unlockNode = vi.fn<MetadataNodeUnlocker>(async () => {
+      throw new CryptoWorkerPreemptedError();
+    });
+    const cacheValidatedPersonVersion = vi.fn();
+    const report = await new MetadataUnlockCoordinator().run({
+      nodes: [node(1), node(2)],
+      chainId: 71,
+      deepFamilyProxy: `0x${"11".repeat(20)}`,
+      getCode: async () => "0x",
+      rawPassphrase: "",
+      priority: "background",
+      unlockNode,
+      cacheValidatedPersonVersion,
+    });
+
+    expect(report).toMatchObject({ status: "cancelled", attempted: 1, processed: 0, failed: 0 });
+    expect(report.failures).toEqual([]);
+    expect(unlockNode).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        priority: "background",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(cacheValidatedPersonVersion).not.toHaveBeenCalled();
+  });
+
+  it("cancels a queued background batch without terminating the foreground batch's worker", async () => {
+    const messages: Array<{ id: number }> = [];
+    const terminate = vi.fn();
+    let onMessage!: (event: { data: unknown }) => void;
+    class FakeWorker {
+      terminate = terminate;
+      addEventListener(type: string, listener: (event: { data: unknown }) => void) {
+        if (type === "message") onMessage = listener;
+      }
+      postMessage(message: { id: number }) {
+        messages.push(message);
+      }
+    }
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("Worker", FakeWorker);
+    const unlockNode: MetadataNodeUnlocker = async ({ node: current, signal, priority }) => {
+      await cryptoWorkerCall(
+        "computeIdentityHash",
+        {
+          input: {
+            fullName: "Alice",
+            gender: 0,
+            birthYear: 1980,
+            birthMonth: 1,
+            birthDay: 1,
+            isBirthBC: false,
+            passphrase: "",
+          },
+        },
+        { signal, priority, timeoutMs: 0 },
+      );
+      return validated(current);
+    };
+    const options = {
+      nodes: [node(1)],
+      chainId: 71,
+      deepFamilyProxy: `0x${"11".repeat(20)}`,
+      getCode: async () => "0x",
+      rawPassphrase: "",
+      unlockNode,
+      cacheValidatedPersonVersion: vi.fn(),
+    };
+    try {
+      const foreground = new MetadataUnlockCoordinator().run(options);
+      const backgroundCoordinator = new MetadataUnlockCoordinator();
+      const background = backgroundCoordinator.run({ ...options, priority: "background" });
+      expect(messages).toHaveLength(1);
+      backgroundCoordinator.cancel();
+      expect(await background).toMatchObject({ status: "cancelled", failed: 0 });
+      expect(terminate).not.toHaveBeenCalled();
+      onMessage({ data: { id: messages[0].id, ok: true, result: { identityHash: "1" } } });
+      expect(await foreground).toMatchObject({ status: "completed", succeeded: 1 });
+    } finally {
+      terminateCryptoWorker();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("runs strictly serially, skips cached nodes, persists each success, and isolates failures", async () => {
     const nodes = [node(1), node(2), node(3), node(4)];
     let inFlight = 0;

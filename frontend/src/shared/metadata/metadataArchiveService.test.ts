@@ -4,8 +4,9 @@ import {
   concatBytes,
 } from "@deepfamily/protocol-core";
 import { keccak256 } from "ethers";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NodeData } from "../model/graph";
+import * as cryptoWorkerClient from "../workers/cryptoWorkerClient";
 import {
   readPersonVersionEnvelope,
   unlockPersonVersionNode,
@@ -41,6 +42,57 @@ const nodeForEnvelope = (envelope: Uint8Array): NodeData => ({
 });
 
 describe("metadata Archive read/decrypt service", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("forwards request cancellation and background priority to the production worker", async () => {
+    const envelope = format1Envelope();
+    const controller = new AbortController();
+    const workerCall = vi
+      .spyOn(cryptoWorkerClient, "cryptoWorkerCall")
+      .mockRejectedValue(new cryptoWorkerClient.CryptoWorkerPreemptedError());
+
+    await expect(
+      unlockPersonVersionNode({
+        node: nodeForEnvelope(envelope),
+        chainId: 71,
+        deepFamilyProxy: PROXY,
+        getCode: async () => concatBytes(Uint8Array.of(0), envelope),
+        rawPassphrase: "",
+        signal: controller.signal,
+        priority: "background",
+      }),
+    ).rejects.toBeInstanceOf(cryptoWorkerClient.CryptoWorkerPreemptedError);
+
+    expect(workerCall).toHaveBeenCalledWith(
+      "decryptPersonVersionEnvelopeV1",
+      expect.objectContaining({ rawPassphrase: "" }),
+      { signal: controller.signal, priority: "background" },
+    );
+  });
+
+  it("does not start a worker job when cancellation arrives during the archive read", async () => {
+    const envelope = format1Envelope();
+    const controller = new AbortController();
+    const decryptEnvelope = vi.fn<PersonVersionEnvelopeDecryptor>();
+
+    await expect(
+      unlockPersonVersionNode({
+        node: nodeForEnvelope(envelope),
+        chainId: 71,
+        deepFamilyProxy: PROXY,
+        getCode: async () => {
+          controller.abort();
+          return concatBytes(Uint8Array.of(0), envelope);
+        },
+        rawPassphrase: "",
+        signal: controller.signal,
+        decryptEnvelope,
+      }),
+    ).rejects.toMatchObject({ name: "MetadataUnlockCancelledError" });
+
+    expect(decryptEnvelope).not.toHaveBeenCalled();
+  });
+
   it("validates STOP/length/hash/header before returning an envelope", async () => {
     const envelope = format1Envelope();
     const getCode = vi.fn(async () => concatBytes(Uint8Array.of(0), envelope));

@@ -3,9 +3,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CryptoWorkerTerminatedError,
+  CryptoWorkerPreemptedError,
   cryptoWorkerCall,
   terminateCryptoWorker,
   terminateCryptoWorkerIfIdle,
+  type CryptoWorkerCallOptions,
 } from "./cryptoWorkerClient";
 
 class FakeWorker {
@@ -40,6 +42,28 @@ class FakeWorker {
   }
 }
 
+const compute = (label: string, options?: CryptoWorkerCallOptions) =>
+  cryptoWorkerCall(
+    "computeIdentityHash",
+    {
+      input: {
+        fullName: label,
+        gender: 0,
+        birthYear: 1980,
+        birthMonth: 1,
+        birthDay: 1,
+        isBirthBC: false,
+        passphrase: "",
+      },
+    },
+    { timeoutMs: 0, ...options },
+  );
+
+const complete = (worker: FakeWorker, index = worker.messages.length - 1) => {
+  const id = worker.messages[index].id;
+  worker.emit("message", { id, ok: true, result: { identityHash: String(id) } });
+};
+
 describe("crypto worker lifecycle", () => {
   beforeEach(() => {
     terminateCryptoWorker();
@@ -49,7 +73,141 @@ describe("crypto worker lifecycle", () => {
 
   afterEach(() => {
     terminateCryptoWorker();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("serializes all callers and preserves foreground FIFO order", async () => {
+    const first = compute("first");
+    const second = compute("second");
+    const third = compute("third");
+    const worker = FakeWorker.instances[0];
+
+    expect(worker.messages).toHaveLength(1);
+    complete(worker);
+    await first;
+    expect(worker.deliveredMessages.map((message) => message.params.input.fullName)).toEqual([
+      "first",
+      "second",
+    ]);
+    complete(worker);
+    await second;
+    expect(worker.deliveredMessages.map((message) => message.params.input.fullName)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+    complete(worker);
+    await third;
+    expect(FakeWorker.instances).toHaveLength(1);
+  });
+
+  it("preempts an active background job and dispatches foreground before queued background", async () => {
+    const background = compute("background", { priority: "background" });
+    const interrupted = expect(background).rejects.toBeInstanceOf(CryptoWorkerPreemptedError);
+    const queued = compute("queued background", { priority: "background" });
+    const oldWorker = FakeWorker.instances[0];
+    const foreground = compute("foreground");
+
+    await interrupted;
+    const worker = FakeWorker.instances[1];
+    expect(oldWorker.terminate).toHaveBeenCalledOnce();
+    expect(worker.deliveredMessages[0].params.input.fullName).toBe("foreground");
+    expect(worker.messages).toHaveLength(1);
+    // A late event from the terminated worker cannot complete a different job.
+    oldWorker.emit("message", { id: worker.messages[0].id, ok: true, result: "stale" });
+    oldWorker.emit("error", undefined);
+    expect(worker.terminate).not.toHaveBeenCalled();
+
+    complete(worker);
+    await foreground;
+    expect(worker.deliveredMessages[1].params.input.fullName).toBe("queued background");
+    complete(worker);
+    await queued;
+  });
+
+  it("cancels a queued request without interrupting another caller's active work", async () => {
+    const first = compute("active");
+    const controller = new AbortController();
+    const queued = compute("cancelled", { signal: controller.signal });
+    const cancelled = expect(queued).rejects.toMatchObject({ name: "AbortError" });
+    const last = compute("last");
+    const worker = FakeWorker.instances[0];
+
+    controller.abort();
+    await cancelled;
+    expect(worker.terminate).not.toHaveBeenCalled();
+    expect(worker.messages).toHaveLength(1);
+    complete(worker);
+    await first;
+    expect(worker.deliveredMessages[1].params.input.fullName).toBe("last");
+    complete(worker);
+    await last;
+  });
+
+  it("stops an aborted active job while preserving queued jobs and removing settled abort listeners", async () => {
+    const controller = new AbortController();
+    const first = compute("cancelled", { signal: controller.signal });
+    const cancelled = expect(first).rejects.toMatchObject({ name: "AbortError" });
+    const nextController = new AbortController();
+    const second = compute("second", { signal: nextController.signal });
+    const third = compute("third");
+    const oldWorker = FakeWorker.instances[0];
+
+    controller.abort();
+    await cancelled;
+    expect(oldWorker.terminate).toHaveBeenCalledOnce();
+    const worker = FakeWorker.instances[1];
+    expect(worker.deliveredMessages[0].params.input.fullName).toBe("second");
+    complete(worker);
+    await second;
+    nextController.abort();
+    expect(worker.terminate).not.toHaveBeenCalled();
+    expect(worker.deliveredMessages[1].params.input.fullName).toBe("third");
+    complete(worker);
+    await third;
+  });
+
+  it("starts timeouts on dispatch and isolates a timeout from queued requests", async () => {
+    vi.useFakeTimers();
+    const first = compute("first");
+    const second = compute("timeout", { timeoutMs: 50 });
+    const timedOut = expect(second).rejects.toThrow("Crypto worker timeout");
+    const last = compute("last");
+    const firstWorker = FakeWorker.instances[0];
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(firstWorker.messages).toHaveLength(1);
+    expect(firstWorker.terminate).not.toHaveBeenCalled();
+    complete(firstWorker);
+    await first;
+    expect(firstWorker.deliveredMessages[1].params.input.fullName).toBe("timeout");
+    await vi.advanceTimersByTimeAsync(50);
+    await timedOut;
+    expect(firstWorker.terminate).toHaveBeenCalledOnce();
+    const nextWorker = FakeWorker.instances[1];
+    expect(nextWorker.deliveredMessages[0].params.input.fullName).toBe("last");
+    complete(nextWorker);
+    await last;
+  });
+
+  it("skips already-aborted calls and globally terminates both active and queued calls", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(compute("aborted", { signal: controller.signal })).rejects.toMatchObject({
+      name: "AbortError",
+    });
+    expect(FakeWorker.instances).toHaveLength(0);
+    const first = compute("first");
+    const queued = compute("queued", { priority: "background" });
+    const rejected = Promise.all([
+      expect(first).rejects.toBeInstanceOf(CryptoWorkerTerminatedError),
+      expect(queued).rejects.toBeInstanceOf(CryptoWorkerTerminatedError),
+    ]);
+    terminateCryptoWorker();
+    await rejected;
+    expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
+    expect(terminateCryptoWorkerIfIdle()).toBe(true);
   });
 
   it("termination rejects the active KDF request and the next call creates a new Worker", async () => {

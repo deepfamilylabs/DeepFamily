@@ -7,6 +7,7 @@ import PeoplePage from "./PeoplePage";
 import { makeNodeId, type NodeData } from "../shared/model";
 
 const mocks = vi.hoisted(() => ({
+  unlockedCount: 0,
   nodesData: {} as Record<string, NodeData>,
   graphNodeIds: [] as string[],
   graphNodeDepths: {} as Record<string, number>,
@@ -43,6 +44,7 @@ vi.mock("../app/context", () => ({
 }));
 
 vi.mock("../domains/tree", () => ({
+  useMetadataUnlockScope: () => ({ unlockedCount: mocks.unlockedCount }),
   useTreeGraphData: () => ({
     rootId: mocks.graphNodeIds[0] ?? null,
     rootExists: mocks.graphNodeIds.length > 0,
@@ -154,6 +156,7 @@ function renderPeoplePage(initialEntry = "/people") {
 
 describe("PeoplePage", () => {
   beforeEach(() => {
+    mocks.unlockedCount = 0;
     const ada = makePerson({
       personHash: "0xada",
       tokenId: "7",
@@ -199,6 +202,12 @@ describe("PeoplePage", () => {
         unobserve: vi.fn(),
       })),
     });
+  });
+
+  it("uses the current projection's unlocked count in the family bar", () => {
+    mocks.unlockedCount = 2;
+    renderPeoplePage();
+    expect(screen.getByTitle("Unlock versions").textContent).toBe("2");
   });
 
   afterEach(() => {

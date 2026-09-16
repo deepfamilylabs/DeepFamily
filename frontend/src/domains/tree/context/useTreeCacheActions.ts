@@ -1,4 +1,8 @@
 import { useCallback } from "react";
+import {
+  getMetadataUnlockPreference,
+  pauseAutomaticMetadataUnlock,
+} from "../../../shared/metadata/metadataUnlockSession";
 import type React from "react";
 import { deleteBlob, isIndexedDBSupported } from "../../../shared/cache/persistence";
 import type { QueryCache } from "../../../shared/cache/QueryCache";
@@ -161,6 +165,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
   );
 
   const clearAllCaches = useCallback(() => {
+    pauseAutomaticMetadataUnlock(options.storageNS);
     options.setNodesData({});
     options.setEdgesUnion({});
     options.setEdgesStrict({});
@@ -193,10 +198,12 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
     options.setProgress,
     options.setReachableNodeIds,
     nodesStorageKey,
+    options.storageNS,
     options.useIndexedDbCache,
   ]);
 
   const clearMetadataUnlockCache = useCallback(() => {
+    pauseAutomaticMetadataUnlock(options.storageNS);
     const lockedSnapshot = clearAllMetadataUnlocks(options.nodesDataRef.current);
     // Keep the imperative ref in lockstep immediately: callers may unmount or
     // start another cache operation before React runs the normal ref effect.
@@ -211,7 +218,13 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       return Promise.resolve();
     }
     return clearTreeMetadataUnlocks(nodesStorageKey, lockedSnapshot);
-  }, [nodesStorageKey, options.nodesDataRef, options.setNodesData, options.useIndexedDbCache]);
+  }, [
+    nodesStorageKey,
+    options.storageNS,
+    options.nodesDataRef,
+    options.setNodesData,
+    options.useIndexedDbCache,
+  ]);
 
   const invalidateTreeRootCache = useCallback(() => {
     options.setReachableNodeIds([]);
@@ -429,7 +442,19 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       // This is the only missing-node path. Its caller must have already checked
       // the post-confirmation Reader/Archive anchors; the explicit projection
       // prevents Worker diagnostics or secret intermediates from being retained.
-      const committed = projectConfirmedPersonVersion(node);
+      // A newly confirmed version is new plaintext, not a legacy hydrated
+      // cache. Apply the current scope's preference unless its producer already
+      // chose a lifetime explicitly.
+      const committed = projectConfirmedPersonVersion(
+        node.metadataUnlockPersistence === undefined
+          ? {
+              ...node,
+              metadataUnlockPersistence: getMetadataUnlockPreference(options.storageNS)
+                ? "device"
+                : "session",
+            }
+          : node,
+      );
       if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) {
         return Promise.resolve();
       }
@@ -456,7 +481,13 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         expectedRevision,
       );
     },
-    [nodesStorageKey, options.nodesDataRef, options.setNodesData, options.useIndexedDbCache],
+    [
+      nodesStorageKey,
+      options.storageNS,
+      options.nodesDataRef,
+      options.setNodesData,
+      options.useIndexedDbCache,
+    ],
   );
 
   const persistValidatedPersonVersion = useCallback(

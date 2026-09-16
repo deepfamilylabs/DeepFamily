@@ -76,6 +76,9 @@ export function metadataAnchorsMatch(
 export function isMetadataUnlockUsable(node: NodeData | undefined): boolean {
   return Boolean(
     node?.metadataUnlockValidated === true &&
+    (node.metadataUnlockPersistence === undefined ||
+      node.metadataUnlockPersistence === "session" ||
+      node.metadataUnlockPersistence === "device") &&
     node.metadataProtocolGeneration === METADATA_CACHE_PROTOCOL_GENERATION &&
     Number.isSafeInteger(node.versionIndex) &&
     node.versionIndex > 0 &&
@@ -108,6 +111,7 @@ export function hasMetadataUnlockFootprint(node: NodeData | undefined): boolean 
   return Boolean(
     node &&
     (node.metadataUnlockValidated !== undefined ||
+      node.metadataUnlockPersistence !== undefined ||
       node.metadataProtocolGeneration !== undefined ||
       node.metadataFormatVersion !== undefined ||
       node.identitySuiteId !== undefined ||
@@ -163,7 +167,7 @@ export function rebaseValidatedMetadataUnlock(current: NodeData, unlocked: NodeD
     throw new Error("Only a fully validated metadata unlock may be committed");
   }
 
-  return mergeValidatedMetadataUnlock(
+  const rebased = mergeValidatedMetadataUnlock(
     current,
     {
       personHash: unlocked.personHash,
@@ -183,6 +187,14 @@ export function rebaseValidatedMetadataUnlock(current: NodeData, unlocked: NodeD
       identitySuiteId: unlocked.identitySuiteId!,
     },
   );
+  // The producer of this plaintext determines its lifetime. Never inherit a
+  // previous device choice when rebasing a new session-only unlock.
+  if (unlocked.metadataUnlockPersistence === undefined) {
+    delete rebased.metadataUnlockPersistence;
+  } else {
+    rebased.metadataUnlockPersistence = unlocked.metadataUnlockPersistence;
+  }
+  return rebased;
 }
 
 export function clearMetadataUnlock(node: NodeData): NodeData {
@@ -194,6 +206,7 @@ export function clearMetadataUnlock(node: NodeData): NodeData {
   delete next.metadataFormatVersion;
   delete next.identitySuiteId;
   delete next.metadataProtocolGeneration;
+  delete next.metadataUnlockPersistence;
   // For an unminted version these display fields came only from decrypted
   // metadata. Minted versions have an independently public NFT core and keep it.
   if (!next.tokenId || String(next.tokenId) === "0") {
@@ -223,9 +236,22 @@ export function sanitizeHydratedMetadataUnlocks(
   return Object.fromEntries(
     Object.entries(nodes).map(([id, node]) => [
       id,
-      !hasMetadataUnlockFootprint(node) || isMetadataUnlockUsable(node)
+      node.metadataUnlockPersistence !== "session" &&
+      (!hasMetadataUnlockFootprint(node) || isMetadataUnlockUsable(node))
         ? node
         : clearMetadataUnlock(node),
+    ]),
+  );
+}
+
+/** Projects session-only unlocks back to their public fields at the durable boundary. */
+export function stripSessionMetadataUnlocks(
+  nodes: Record<string, NodeData>,
+): Record<string, NodeData> {
+  return Object.fromEntries(
+    Object.entries(nodes).map(([id, node]) => [
+      id,
+      node.metadataUnlockPersistence === "session" ? clearMetadataUnlock(node) : node,
     ]),
   );
 }
