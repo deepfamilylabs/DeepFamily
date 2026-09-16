@@ -497,14 +497,14 @@ export default function GlobalSidebar() {
         }
       }}
       className={`
-        /* Full height. The rail stops short of the status bar so the last row
-           never straddles it; the mobile drawer covers the bar instead. */
+        /* Full height, above the status bar at every breakpoint: the bar clears
+           the collapsed rail, and the open rail overlays the bar like the page. */
         fixed inset-y-0 left-0 flex flex-col
         bg-surface shadow-xl
         transition-[width,translate,box-shadow] duration-300 ease-in-out motion-reduce:transition-none
         will-change-[translate]
-        z-10005 md:z-110
-        pb-[env(safe-area-inset-bottom)] md:pb-[var(--app-statusbar-h)]
+        z-10005 md:z-10004
+        pb-[env(safe-area-inset-bottom)]
 
         /* Mobile: full-screen drawer */
         w-full ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
