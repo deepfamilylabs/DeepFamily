@@ -13,7 +13,7 @@ export interface StoryRecord {
   timestamp: number;
   author: string;
   recordType: number;
-  attachmentCID: string;
+  attachmentURI: string;
   schemaId?: string;
   rawPayload?: string;
   payloadLength?: number;
@@ -40,7 +40,7 @@ export interface StoryRecordCreateData {
   content: string;
   expectedPayloadHash?: string;
   recordType?: number;
-  attachmentCID?: string;
+  attachmentURI?: string;
 }
 
 export interface MetadataPersonDisplay {

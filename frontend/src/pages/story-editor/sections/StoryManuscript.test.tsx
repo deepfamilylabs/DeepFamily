@@ -26,7 +26,7 @@ function record(index: number, recordType: number) {
     payloadHash: `0x${String(index).repeat(4)}`,
     timestamp: 1_700_000_000,
     author: "0x0000000000000000000000000000000000000001",
-    attachmentCID: "",
+    attachmentURI: "",
     payloadLength: 40,
   };
 }

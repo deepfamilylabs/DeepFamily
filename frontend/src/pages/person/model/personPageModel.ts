@@ -89,7 +89,7 @@ export function normalizeStoryRecord(record: StoryRecord): StoryRecord {
   return {
     ...record,
     recordType: normalizeRecordType(record.recordType),
-    attachmentCID: record.attachmentCID ?? "",
+    attachmentURI: record.attachmentURI ?? "",
   };
 }
 

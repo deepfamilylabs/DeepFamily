@@ -27,7 +27,7 @@ const input = {
   title: "  标题😀 e\u0301\n ",
   content: "  原文😀 e\u0301\n ",
   recordType: 3,
-  attachmentCID: "ipfs://abc",
+  attachmentURI: "ipfs://abc",
 };
 
 test("DFS1 shared golden bytes, schema hash and multiple-record semantic head match", () => {
@@ -165,21 +165,26 @@ test("DFS1 recordType and attachment field bounds and whitespace are strict", ()
       decodeStoryRecord(encodeStoryRecord({ ...input, recordType })).recordType,
       recordType,
     );
-  for (const attachmentCID of ["", "a".repeat(256), "😀".repeat(64)]) {
+  for (const attachmentURI of [
+    "",
+    "https://example.com/attachment",
+    "a".repeat(256),
+    "😀".repeat(64),
+  ]) {
     assert.equal(
-      decodeStoryRecord(encodeStoryRecord({ ...input, attachmentCID })).attachmentCID,
-      attachmentCID,
+      decodeStoryRecord(encodeStoryRecord({ ...input, attachmentURI })).attachmentURI,
+      attachmentURI,
     );
   }
-  for (const attachmentCID of ["a".repeat(257), "😀".repeat(65)]) {
+  for (const attachmentURI of ["a".repeat(257), "😀".repeat(65)]) {
     assert.throws(
-      () => encodeStoryRecord({ ...input, attachmentCID }),
+      () => encodeStoryRecord({ ...input, attachmentURI }),
       (error) => error.code === "STORY_ATTACHMENT_TOO_LARGE",
     );
   }
-  for (const attachmentCID of [" x", "x\n", "\ufeffx", "x\u3000"]) {
+  for (const attachmentURI of [" x", "x\n", "\ufeffx", "x\u3000"]) {
     assert.throws(
-      () => encodeStoryRecord({ ...input, attachmentCID }),
+      () => encodeStoryRecord({ ...input, attachmentURI }),
       (error) => error.code === "STORY_ATTACHMENT_WHITESPACE",
     );
   }
@@ -192,7 +197,7 @@ test("DFS1 rejects extra/missing fields, unsupported schema and non-scalar strin
     { title: "", content: "x", recordType: 3 },
     { ...input, [Symbol("x")]: 1 },
     { ...input, content: "\ud800" },
-    { ...input, attachmentCID: "\udfff" },
+    { ...input, attachmentURI: "\udfff" },
   ])
     assert.throws(() => encodeStoryRecord(record));
 });
@@ -203,12 +208,12 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
       title: "标题",
       content: "中/\n",
       recordType: 3,
-      attachmentCID: "",
+      attachmentURI: "",
     }),
   );
   assert.equal(
     canonical,
-    '{"schema":"deepfamily/story-record@1.0","title":"标题","content":"中/\\n","recordType":3,"attachmentCID":""}',
+    '{"schema":"deepfamily/story-record@1.0","title":"标题","content":"中/\\n","recordType":3,"attachmentURI":""}',
   );
   for (const text of [
     canonical + "\n",
@@ -223,10 +228,10 @@ test("DFS1 rejects every alternate JSON spelling, duplicate keys, BOM and invali
     canonical.replace('"recordType":3', '"recordType":3e0'),
     canonical.replace('"recordType":3', '"recordType":-0'),
     canonical.replace('"recordType":3', '"recordType":3,"recordType":3'),
-    canonical.replace('"attachmentCID":""', '"attachmentCID":"","extra":false'),
-    canonical.replace('"attachmentCID":""', '"attachmentCID":"\\ud800"'),
+    canonical.replace('"attachmentURI":""', '"attachmentURI":"","extra":false'),
+    canonical.replace('"attachmentURI":""', '"attachmentURI":"\\ud800"'),
     canonical.replace('{"schema":"deepfamily/story-record@1.0",', "{"),
-    '{"schema":"deepfamily/story-record@1.0","content":"中/\\n","title":"标题","recordType":3,"attachmentCID":""}',
+    '{"schema":"deepfamily/story-record@1.0","content":"中/\\n","title":"标题","recordType":3,"attachmentURI":""}',
     "\ufeff" + canonical,
   ])
     assert.throws(() => decodeCanonicalStoryRecord(utf8Bytes(text)), text);

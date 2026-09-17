@@ -29,7 +29,7 @@ function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
     timestamp: 1,
     author: "0x0000000000000000000000000000000000000000",
     recordType: 0,
-    attachmentCID: "",
+    attachmentURI: "",
     ...overrides,
   };
 }
@@ -77,14 +77,14 @@ describe("personPageModel", () => {
           title: "",
           recordIndex: 1,
           content: "world",
-          attachmentCID: undefined as any,
+          attachmentURI: undefined as any,
         }),
       ],
     });
 
     expect(data?.fullStory).toBe("hello world");
     expect(data?.storyRecords?.map((record) => record.recordType)).toEqual([2, 0]);
-    expect(data?.storyRecords?.map((record) => record.attachmentCID)).toEqual(["", ""]);
+    expect(data?.storyRecords?.map((record) => record.attachmentURI)).toEqual(["", ""]);
     expect(buildPrefetchedStoryDetailData("7", { tokenId: "42" })).toBeNull();
   });
 

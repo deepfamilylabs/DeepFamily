@@ -220,13 +220,13 @@ export function StoryTimelineEntry({
             <Clock size={12} aria-hidden className="shrink-0" />
             <span>{formatUnixSeconds(record.timestamp)}</span>
           </div>
-          {record.attachmentCID && record.attachmentCID.trim().length > 0 && (
+          {record.attachmentURI && record.attachmentURI.trim().length > 0 && (
             <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted">
               <Link2 size={12} aria-hidden className="shrink-0" />
-              <span className="truncate font-mono">{record.attachmentCID}</span>
+              <span className="truncate font-mono">{record.attachmentURI}</span>
               <CopyIconButton
                 label={copyLabel}
-                onClick={() => copyText(record.attachmentCID)}
+                onClick={() => copyText(record.attachmentURI)}
                 size="xs"
                 stopPropagation
               />

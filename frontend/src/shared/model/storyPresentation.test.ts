@@ -17,7 +17,7 @@ const record = (index: number, biography = false): StoryRecord => ({
   payloadLength: biography ? 100 : 30,
   timestamp: 1,
   author: ethers.ZeroAddress,
-  attachmentCID: "",
+  attachmentURI: "",
 });
 const metadata = (records: StoryRecord[]): StoryMetadata => ({
   totalRecords: records.length,

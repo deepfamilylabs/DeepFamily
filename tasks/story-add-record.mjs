@@ -14,7 +14,7 @@ const action = async (args, hre) => {
     title: args.title ?? "",
     content: args.content,
     recordType: Number(args.type ?? 1),
-    attachmentCID: args.attachment ?? "",
+    attachmentURI: args.attachment ?? "",
     expectedPayloadHash: args.exphash || undefined,
   });
 };
@@ -52,7 +52,7 @@ export default task("add-story-record", "Append a story record to an NFT archive
   })
   .addOption({
     name: "attachment",
-    description: "Attachment CID (optional)",
+    description: "Attachment URI (optional)",
     type: ArgumentType.STRING,
     defaultValue: "",
   })

@@ -81,7 +81,7 @@ function record(index: number, biography = false): StoryRecord {
     recordHash: `0x${"2".repeat(64)}`,
     timestamp: 1_700_000_000,
     author: "0x0000000000000000000000000000000000000001",
-    attachmentCID: "",
+    attachmentURI: "",
     payloadLength: biography ? 180 : 100,
   };
 }
@@ -177,9 +177,8 @@ describe("useStoryEditorController biography presentation", () => {
     },
   );
 
-  it("trims a pasted attachment CID instead of failing the write on a stray newline", async () => {
-    // The archive rejects a padded CID, and the submit-time check is the only
-    // other place that would catch it — long after the paste.
+  it("trims a pasted attachment URI instead of failing the write on a stray newline", async () => {
+    // The archive rejects a padded URI, so trim the paste before submission.
     mocks.storyQuery.data = { records: [], metadata: metadata([]) };
     const added = record(0);
     mocks.addFlow.runOrThrow.mockResolvedValue({
@@ -188,18 +187,18 @@ describe("useStoryEditorController biography presentation", () => {
       recordsHead: `0x${"4".repeat(64)}`,
       events: { StoryRecordAppended: { recordIndex: 0, payloadLength: 100 } },
     });
-    const cid = "bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
+    const uri = "ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi";
 
     const { result } = renderHook(() => useStoryEditorController());
     act(() => result.current.form.updateContent("An ordinary story"));
-    act(() => result.current.form.updateAttachmentCID(`  ${cid}\n`));
+    act(() => result.current.form.updateAttachmentURI(`  ${uri}\n`));
 
-    expect(result.current.form.data.attachmentCID).toBe(cid);
+    expect(result.current.form.data.attachmentURI).toBe(uri);
 
     await act(async () => result.current.form.submit());
 
     expect(mocks.addFlow.runOrThrow).toHaveBeenCalledWith(
-      expect.objectContaining({ attachmentCID: cid }),
+      expect.objectContaining({ attachmentURI: uri }),
     );
   });
 

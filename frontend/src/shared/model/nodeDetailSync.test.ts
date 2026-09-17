@@ -134,7 +134,7 @@ describe("nodeDetailSync", () => {
           timestamp: 1,
           author: "0x00000000000000000000000000000000000000aa",
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       fullStory: "hello",

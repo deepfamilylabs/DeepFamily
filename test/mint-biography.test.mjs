@@ -47,7 +47,7 @@ describe("Atomic compressed mint biography", function () {
         1n,
         state.recordsHead,
         STORY_BIOGRAPHY_SCHEMA_ID,
-        encodeStoryRecord({ title: "", content: "replacement", recordType: 0, attachmentCID: "" }),
+        encodeStoryRecord({ title: "", content: "replacement", recordType: 0, attachmentURI: "" }),
         hre.ethers.ZeroHash,
       ),
     ).to.be.revertedWithCustomError(archive, "InvalidSchemaId");
@@ -62,7 +62,7 @@ describe("Atomic compressed mint biography", function () {
       title: "",
       content: "First ordinary story",
       recordType: 1,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     await archive.appendStoryRecord(
       1n,

@@ -43,7 +43,7 @@ const biography: StoryRecord = {
   payloadLength: 100,
   timestamp: 1,
   author: `0x${"01".repeat(20)}`,
-  attachmentCID: "",
+  attachmentURI: "",
 };
 const ordinary = {
   ...biography,

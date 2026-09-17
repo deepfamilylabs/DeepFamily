@@ -30,7 +30,7 @@ function createEditor(
       title: "",
       content: "Example story",
       recordType: 1,
-      attachmentCID: "",
+      attachmentURI: "",
       expectedPayloadHash: undefined,
     },
     draftPayloadHash: undefined,
@@ -40,7 +40,7 @@ function createEditor(
     updateTitle: vi.fn(),
     updateContent: vi.fn(),
     updateRecordType: vi.fn(),
-    updateAttachmentCID: vi.fn(),
+    updateAttachmentURI: vi.fn(),
     cancel: vi.fn(),
     submit: vi.fn(),
     showRecordTypeDropdown: false,
@@ -171,14 +171,13 @@ describe("StoryComposer", () => {
     expect(byteStatus.textContent).toContain("of 16,384 per record");
   });
 
-  it("flags an over-long attachment CID at the field rather than at signing time", () => {
+  it("flags an over-long attachment URI at the field rather than at signing time", () => {
     const withinLimit = createEditor({
-      form: { data: { title: "", content: "Example story", recordType: 1, attachmentCID: "bafy" } },
+      form: { data: { title: "", content: "Example story", recordType: 1, attachmentURI: "ipfs://bafy" } },
     });
     const { rerender } = render(<StoryComposer editor={withinLimit} />);
 
-    // 256 bytes is out of reach for a real CID, so nothing is said until a draft
-    // actually crosses it — no permanent counter on an optional field.
+    // The optional field only shows its limit after a draft exceeds 256 bytes.
     expect(screen.queryByRole("alert")).toBeNull();
     expect(
       (screen.getByRole("button", { name: /Review & sign/ }) as HTMLButtonElement).disabled,
@@ -192,7 +191,7 @@ describe("StoryComposer", () => {
               title: "",
               content: "Example story",
               recordType: 1,
-              attachmentCID: "b".repeat(257),
+              attachmentURI: `https://example.com/${"b".repeat(257)}`,
             },
           },
         })}
@@ -200,10 +199,10 @@ describe("StoryComposer", () => {
     );
 
     const alert = screen.getByRole("alert");
-    const cid = screen.getByPlaceholderText(/Attachment CID \(optional\)/);
+    const uri = screen.getByPlaceholderText(/Attachment URI \(optional\)/);
     expect(alert.textContent).toContain("256");
-    expect(cid.getAttribute("aria-invalid")).toBe("true");
-    expect(cid.getAttribute("aria-describedby")).toBe(alert.id);
+    expect(uri.getAttribute("aria-invalid")).toBe("true");
+    expect(uri.getAttribute("aria-describedby")).toBe(alert.id);
     expect(
       (screen.getByRole("button", { name: /Review & sign/ }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -213,7 +212,7 @@ describe("StoryComposer", () => {
     render(
       <StoryComposer
         editor={createEditor({
-          form: { data: { title: "", content: "   ", recordType: 1, attachmentCID: "" } },
+          form: { data: { title: "", content: "   ", recordType: 1, attachmentURI: "" } },
         })}
       />,
     );

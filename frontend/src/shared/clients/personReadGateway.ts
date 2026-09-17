@@ -214,7 +214,7 @@ export function createPersonReadGateway(contract: any, queryCache: QueryCache): 
           title: verified.decoded?.title ?? "",
           content: verified.decoded?.content ?? "",
           recordType: verified.decoded?.recordType ?? 0,
-          attachmentCID: verified.decoded?.attachmentCID ?? "",
+          attachmentURI: verified.decoded?.attachmentURI ?? "",
           timestamp: Number(ref.timestamp),
           author: ref.author,
           schemaId: ref.schemaId,

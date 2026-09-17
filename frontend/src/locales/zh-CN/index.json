@@ -244,7 +244,7 @@
       "payloadHash": "载荷哈希",
       "author": "作者",
       "recordType": "记录类型",
-      "attachmentCID": "附件CID",
+      "attachmentURI": "附件 URI",
       "totalRecords": "总记录数",
       "filterLabel": "按标题或正文筛选已加载的记录",
       "noMatches": "已加载的记录中没有匹配结果"
@@ -880,9 +880,9 @@
     "noRecords": "暂无档案记录",
     "noRecordsSealed": "此档案已封存且无记录内容",
     "recordTypeLabel": "记录类型",
-    "attachmentLabel": "附件CID（可选）",
-    "attachmentPlaceholder": "附件 CID（可选），例如 bafy...",
-    "attachmentTooLong": "附件 CID 不能超过 256 个 UTF-8 字节",
+    "attachmentLabel": "附件 URI（可选）",
+    "attachmentPlaceholder": "附件 URI（可选），例如 ipfs://bafy... 或 https://...",
+    "attachmentTooLong": "附件 URI 不能超过 256 个 UTF-8 字节",
     "invalidRecordType": "无效的记录类型",
     "operationFailed": "操作失败",
     "sealFailed": "封存失败",
@@ -1530,7 +1530,6 @@
       "CALL_EXCEPTION": "合约校验未通过，请检查输入数据。",
       "StoryAlreadyInitialized": "铸造传记已初始化，不能再次写入。",
       "InvalidStoryAuthor": "铸造传记的作者地址无效。",
-      "InvalidCIDLength": "附件 CID 过长。",
       "InvalidDeepFamilyAddress": "DeepFamily 合约地址无效。",
       "InvalidStoryContent": "存档的故事内容未通过完整性校验。"
     },
@@ -1586,7 +1585,7 @@
     "largeStory": "原文较长，请在签名前查看压缩后的存储大小与费用估算",
     "reviewStory": "确认档案交易",
     "confirm": "前往钱包确认",
-    "attachmentInvalid": "附件 CID 首尾不能有空白，且不能超过 256 个 UTF-8 字节",
+    "attachmentInvalid": "附件 URI 首尾不能有空白，且不能超过 256 个 UTF-8 字节",
     "errors": {
       "previewRejected": "已取消，未向钱包发起请求。",
       "walletScopeChanged": "钱包网络或账户已切换，请重新预览交易。",

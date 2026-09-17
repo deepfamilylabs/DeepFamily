@@ -126,7 +126,7 @@ const existingRecord: StoryRecord = {
   timestamp: 100,
   author: "0x00000000000000000000000000000000000000aa",
   recordType: 0,
-  attachmentCID: "",
+  attachmentURI: "",
 };
 
 function baseStoryData(isSealed = false) {
@@ -224,7 +224,7 @@ describe("StoryEditorPage", () => {
       timestamp: 200,
       author: "0x00000000000000000000000000000000000000bb",
       recordType: 0,
-      attachmentCID: "",
+      attachmentURI: "",
     };
     mocks.addStoryRunOrThrow.mockResolvedValue({
       recordIndex: 1,
@@ -264,7 +264,7 @@ describe("StoryEditorPage", () => {
         recordIndex: 1,
         content: "new story",
         recordType: 1,
-        attachmentCID: "",
+        attachmentURI: "",
         expectedPayloadHash: expect.stringMatching(/^0x[0-9a-f]{64}$/),
       }),
     );

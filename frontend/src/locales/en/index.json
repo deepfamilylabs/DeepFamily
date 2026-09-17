@@ -244,7 +244,7 @@
       "payloadHash": "Payload Hash",
       "author": "Author",
       "recordType": "Record Type",
-      "attachmentCID": "Attachment CID",
+      "attachmentURI": "Attachment URI",
       "totalRecords": "Total Records",
       "filterLabel": "Filter loaded records by title or content",
       "noMatches": "No matching loaded records"
@@ -880,9 +880,9 @@
     "noRecords": "No story records yet.",
     "noRecordsSealed": "This story is sealed with no records.",
     "recordTypeLabel": "Record Type",
-    "attachmentLabel": "Attachment CID (optional)",
-    "attachmentPlaceholder": "Attachment CID (optional), e.g. bafy...",
-    "attachmentTooLong": "Attachment CID cannot exceed 256 UTF-8 bytes",
+    "attachmentLabel": "Attachment URI (optional)",
+    "attachmentPlaceholder": "Attachment URI (optional), e.g. ipfs://bafy... or https://...",
+    "attachmentTooLong": "Attachment URI cannot exceed 256 UTF-8 bytes",
     "invalidRecordType": "Invalid record type",
     "operationFailed": "Operation failed",
     "sealFailed": "Seal failed",
@@ -1530,7 +1530,6 @@
       "CALL_EXCEPTION": "Contract validation failed. Please check input data.",
       "StoryAlreadyInitialized": "The mint biography has already been initialized.",
       "InvalidStoryAuthor": "The mint biography author is invalid.",
-      "InvalidCIDLength": "Attachment CID is too long.",
       "InvalidDeepFamilyAddress": "DeepFamily contract address is invalid.",
       "InvalidStoryContent": "Archived story content failed integrity validation."
     },
@@ -1586,7 +1585,7 @@
     "largeStory": "Long text; review the compressed storage size and estimated fee before signing",
     "reviewStory": "Review story transaction",
     "confirm": "Continue to wallet",
-    "attachmentInvalid": "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
+    "attachmentInvalid": "Attachment URI must have no surrounding whitespace and fit in 256 UTF-8 bytes",
     "errors": {
       "previewRejected": "Cancelled before the wallet request; nothing was sent.",
       "walletScopeChanged": "Wallet network or account changed; review the transaction again.",

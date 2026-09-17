@@ -313,7 +313,7 @@ describe("PaperGenealogyView", () => {
                 timestamp: 1,
                 author: "0x0000000000000000000000000000000000000000",
                 recordType: 0,
-                attachmentCID: "",
+                attachmentURI: "",
               },
               {
                 title: "",
@@ -323,7 +323,7 @@ describe("PaperGenealogyView", () => {
                 timestamp: 1,
                 author: "0x0000000000000000000000000000000000000000",
                 recordType: 0,
-                attachmentCID: "",
+                attachmentURI: "",
               },
               {
                 title: "",
@@ -333,7 +333,7 @@ describe("PaperGenealogyView", () => {
                 timestamp: 1,
                 author: "0x0000000000000000000000000000000000000000",
                 recordType: 0,
-                attachmentCID: "",
+                attachmentURI: "",
               },
             ],
           },

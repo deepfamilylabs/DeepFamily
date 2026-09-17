@@ -73,7 +73,7 @@ describe("mintService executeMintFlow", () => {
           title: "",
           content: story,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         });
         expect(args[6]).not.toBe(ethers.keccak256(untitled));
       }

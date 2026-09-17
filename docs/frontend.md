@@ -261,7 +261,7 @@ VITE_ROOT_VERSION_INDEX=...
 | Variable                                                         | Purpose                                                                    |
 | ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
-| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for NFT/attachment CIDs; must match CSP allowlist        |
+| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for IPFS NFT/attachment URIs; must match CSP allowlist   |
 | `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs                             |
 | `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                                         |
 | `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                                           |
@@ -425,7 +425,7 @@ cache.
 
 Private `biography` is distinct from the NFT supplement `story` and public on-chain DFS1 Story
 data. Any UI action that copies private text into an NFT story must require explicit confirmation
-that the destination is public. Attachment CIDs and NFT token URIs remain supported; the legacy
+that the destination is public. Attachment URIs and NFT token URIs remain supported; the legacy
 external person-metadata/decryption flow is retired.
 
 ## Security

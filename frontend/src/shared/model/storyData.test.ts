@@ -21,7 +21,7 @@ describe("storyData buildStorySnapshot", () => {
         timestamp: 2,
         author: ethers.ZeroAddress,
         recordType: 0,
-        attachmentCID: "",
+        attachmentURI: "",
       },
       {
         title: "",
@@ -32,7 +32,7 @@ describe("storyData buildStorySnapshot", () => {
         timestamp: 1,
         author: ethers.ZeroAddress,
         recordType: 0,
-        attachmentCID: "",
+        attachmentURI: "",
       },
     ];
     const snapshot = buildStorySnapshot(records, {
@@ -61,7 +61,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 2,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       {
@@ -90,7 +90,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 1,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       [
@@ -103,7 +103,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 3,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
         {
           title: "",
@@ -114,7 +114,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 2,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       3,
@@ -136,7 +136,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 1,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       {
@@ -179,7 +179,7 @@ describe("storyData buildStorySnapshot", () => {
           timestamp: 1,
           author: ethers.ZeroAddress,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         },
       ],
       {
