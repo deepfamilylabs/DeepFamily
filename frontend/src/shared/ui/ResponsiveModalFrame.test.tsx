@@ -63,6 +63,33 @@ describe("ResponsiveModalFrame", () => {
     );
   });
 
+  it("names and describes the dialog from its header when given ids, and narrows on request", () => {
+    render(
+      <ResponsiveModalFrame
+        isOpen
+        onClose={vi.fn()}
+        isDesktop
+        ariaLabel="Fallback label"
+        titleId="frame-title"
+        descriptionId="frame-description"
+        maxWidth="max-w-[600px]"
+        icon={<User aria-hidden="true" />}
+        title="Visible title"
+        description="Visible description"
+        entered
+      >
+        <p>Body</p>
+      </ResponsiveModalFrame>,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Visible title" });
+    expect(dialog.getAttribute("aria-label")).toBeNull();
+    expect(document.getElementById(dialog.getAttribute("aria-describedby")!)?.textContent).toBe(
+      "Visible description",
+    );
+    expect(screen.getByText("Body").closest(".max-w-\\[600px\\]")).not.toBeNull();
+  });
+
   it("does not close when clicking inside the panel", () => {
     const { onClose } = renderFrame();
 
