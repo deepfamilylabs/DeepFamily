@@ -34,7 +34,7 @@ function setup(story = "  私密传记导入\r\n😀 e\u0301  ".repeat(100)) {
     story === ""
       ? "0x"
       : ethers.hexlify(
-          encodePublicStoryRecord({ title: "", content: story, recordType: 0, attachmentCID: "" }),
+          encodePublicStoryRecord({ title: "", content: story, recordType: 0, attachmentURI: "" }),
         );
   const blob = {
     pointer,

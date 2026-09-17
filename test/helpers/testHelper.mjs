@@ -472,7 +472,7 @@ export async function mintPerson(
           title: opts.storyTitle ?? "",
           content: opts.story,
           recordType: 0,
-          attachmentCID: "",
+          attachmentURI: "",
         })
       : "0x");
   const tx = await deepFamily

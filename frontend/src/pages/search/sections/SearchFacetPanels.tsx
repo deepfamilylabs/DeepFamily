@@ -509,16 +509,16 @@ function StoryRecordsPanel({ unified }: { unified: UnifiedSearch }) {
                   searchable
                 />
               ) : null}
-              {record.attachmentCID && record.attachmentCID.length > 0 ? (
+              {record.attachmentURI && record.attachmentURI.length > 0 ? (
                 <div className="grid grid-cols-[80px_1fr] items-center gap-2">
-                  <span className={LABEL}>{t("search.storyRecordsQuery.attachmentCID")}</span>
+                  <span className={LABEL}>{t("search.storyRecordsQuery.attachmentURI")}</span>
                   <div className={CHIP}>
                     <HashInline
-                      value={String(record.attachmentCID)}
+                      value={String(record.attachmentURI)}
                       className="min-w-0 flex-1 font-mono"
                     />
                     <CopyIconButton
-                      onClick={() => unified.onCopy(String(record.attachmentCID))}
+                      onClick={() => unified.onCopy(String(record.attachmentURI))}
                       label={t("search.copy", "Copy") as string}
                       size="xs"
                     />

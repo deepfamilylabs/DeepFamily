@@ -161,7 +161,7 @@ describe("Mint NFT Tests", function () {
       title: "",
       content: "Original biography before the receiver callback",
       recordType: 0,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     const data = deepFamily.interface.encodeFunctionData("mintPersonVersionNFT", [
       makeStubProof(),

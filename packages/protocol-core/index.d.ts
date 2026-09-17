@@ -424,7 +424,7 @@ export const STORY_ENVELOPE_HEADER_BYTES: 48;
 export const STORY_ENVELOPE_OFFSETS: Readonly<Record<string, number>>;
 export const STORY_DEFAULT_COMPRESSION_SUITE: 1;
 export const STORY_MAX_CANONICAL_JSON_BYTES: 16777216;
-export const STORY_MAX_ATTACHMENT_CID_BYTES: 256;
+export const STORY_MAX_ATTACHMENT_URI_BYTES: 256;
 export const STORY_RECORD_DOMAIN_TEXT: "deepfamily.archive.story-record.v1";
 export const STORY_HEAD_DOMAIN_TEXT: "deepfamily.archive.story-head.v1";
 export const STORY_RECORD_DOMAIN: string;
@@ -434,7 +434,7 @@ export interface StoryRecordInput {
   title: string;
   content: string;
   recordType: number;
-  attachmentCID: string;
+  attachmentURI: string;
 }
 export interface DecodedStoryRecord extends StoryRecordInput {
   schema: "deepfamily/story-record@1.0";

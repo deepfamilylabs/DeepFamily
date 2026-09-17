@@ -19,7 +19,7 @@ export type AddStoryRecordFlowArgs = {
   content: string;
   expectedPayloadHash: string;
   recordType?: number;
-  attachmentCID?: string;
+  attachmentURI?: string;
   confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>;
 };
 
@@ -45,7 +45,7 @@ export function useAddStoryRecordFlow() {
         args.content,
         args.expectedPayloadHash,
         args.recordType,
-        args.attachmentCID,
+        args.attachmentURI,
         args.confirmTransactionPreview,
         // The same endpoint the editor's snapshot was read from; see readProvider.
         rpcUrl ? getReadonlyProvider(rpcUrl, chainId) : undefined,

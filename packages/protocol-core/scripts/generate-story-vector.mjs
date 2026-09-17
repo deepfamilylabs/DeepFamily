@@ -20,13 +20,13 @@ const contents = [
     title: '  标题😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
     content: '  中😀 e\u0301\n"quote" \\ /\t\u0000\u001f\u2028\u2029  ',
     recordType: 3,
-    attachmentCID: "ipfs://例子/😀",
+    attachmentURI: "ipfs://例子/😀",
   },
   {
     title: "",
     content: "Second record\r\nkeeps its final newline.\n",
     recordType: 255,
-    attachmentCID: "",
+    attachmentURI: "",
   },
 ];
 let previousHead = ZERO_BYTES32;

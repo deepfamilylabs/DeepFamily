@@ -169,15 +169,15 @@ function RecordProvenance({
         </span>
         <span>{byteLength} B</span>
       </div>
-      {record.attachmentCID?.trim() && (
+      {record.attachmentURI?.trim() && (
         <div className={row}>
           <Link2 size={12} aria-hidden className="shrink-0" />
-          <span className="truncate font-mono" title={record.attachmentCID}>
-            {record.attachmentCID}
+          <span className="truncate font-mono" title={record.attachmentURI}>
+            {record.attachmentURI}
           </span>
           <CopyIconButton
             label={copyLabel}
-            onClick={() => copyText(record.attachmentCID)}
+            onClick={() => copyText(record.attachmentURI)}
             size="xs"
           />
         </div>

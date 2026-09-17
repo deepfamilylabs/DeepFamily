@@ -29,7 +29,7 @@ describe("Unified Archive and Reader integration", function () {
       title: "",
       content,
       recordType: 3,
-      attachmentCID: "ipfs://source",
+      attachmentURI: "ipfs://source",
     });
     const state = await archive.storyState(tokenId);
     await archive.appendStoryRecord(
@@ -74,7 +74,7 @@ describe("Unified Archive and Reader integration", function () {
     expect(hre.ethers.hexlify(hydrated.payload)).to.equal(hre.ethers.hexlify(payload));
     expect(hydrated.decoded.content).to.equal(content);
     expect(hydrated.decoded.recordType).to.equal(3);
-    expect(hydrated.decoded.attachmentCID).to.equal("ipfs://source");
+    expect(hydrated.decoded.attachmentURI).to.equal("ipfs://source");
     expect(await reader.getStoryState(tokenId)).to.deep.equal(await archive.storyState(tokenId));
   });
 
@@ -120,7 +120,7 @@ describe("Unified Archive and Reader integration", function () {
       title: "",
       content: "after transfer",
       recordType: 0,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     const args = [
       tokenId,

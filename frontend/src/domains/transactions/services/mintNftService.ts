@@ -175,7 +175,7 @@ export async function executeMintFlow({
             title: storyTitle,
             content: story,
             recordType: 0,
-            attachmentCID: "",
+            attachmentURI: "",
           }),
         );
   const payloadHash = keccak256(payload);

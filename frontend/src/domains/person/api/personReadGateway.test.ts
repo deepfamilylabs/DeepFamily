@@ -154,7 +154,7 @@ describe("personReadGateway", () => {
       title: "First journey 😀",
       content: "hello 🙂",
       recordType: 1,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     const pointer = "0x0000000000000000000000000000000000000011";
     const archive = "0x0000000000000000000000000000000000000022";

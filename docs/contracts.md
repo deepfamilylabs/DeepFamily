@@ -234,7 +234,9 @@ The [Archive contract](../contracts/DeepFamilyArchive.sol) defines the API, even
 A **story record** is one logical entry with a schema, author, timestamp and payload reference.
 Each payload may occupy multiple physical **segments**, indexed by manifest **pages**.
 The canonical story JSON uses `schema: "deepfamily/story-record@1.0"`, `title`, `content`,
-`recordType` and `attachmentCID`, in that order. `title` is a required string in the payload and
+`recordType` and `attachmentURI`, in that order. `attachmentURI` is an optional string for an
+external attachment location, such as `ipfs://...` or `https://...`; the attachment bytes are not
+stored in this field. `title` is a required string in the payload and
 may be empty. Titles preserve exact Unicode, whitespace and normalization; a blank title displays
 the record classification in the UI. Title bytes participate in the payload hash and ordered
 record history, so an archived title is immutable. Type `0` identifies the mint biography; ordinary records use

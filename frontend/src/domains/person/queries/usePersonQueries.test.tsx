@@ -56,7 +56,7 @@ const storyRecord = (recordIndex: number, content: string): StoryRecord => ({
   timestamp: 100 + recordIndex,
   author: "0x00000000000000000000000000000000000000aa",
   recordType: 0,
-  attachmentCID: "",
+  attachmentURI: "",
 });
 
 describe("person query hooks", () => {

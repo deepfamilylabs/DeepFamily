@@ -39,6 +39,7 @@ describe("Story Tasks Integration", function () {
       tokenid: "1",
       recordindex: "1",
       content: "Second record content",
+      attachment: "https://example.com/photo.jpg",
     });
 
     const meta = await deepFamilyReader.getStoryState(1n);
@@ -52,7 +53,7 @@ describe("Story Tasks Integration", function () {
     expect(record0.decoded.title).to.equal("  迁居洛阳 😀 e\u0301  ");
     expect(record0.decoded.content).to.equal("First record content");
     expect(record0.decoded.recordType).to.equal(1);
-    expect(record0.decoded.attachmentCID).to.equal("");
+    expect(record0.decoded.attachmentURI).to.equal("");
     const record1 = await readStoryRecord({
       recordRef: await deepFamilyReader.getStoryRecordRef(1n, 1),
       getCode: (a, b) => hre.ethers.provider.getCode(a, b),
@@ -60,7 +61,7 @@ describe("Story Tasks Integration", function () {
     expect(record1.decoded.title).to.equal("");
     expect(record1.decoded.content).to.equal("Second record content");
     expect(record1.decoded.recordType).to.equal(1);
-    expect(record1.decoded.attachmentCID).to.equal("");
+    expect(record1.decoded.attachmentURI).to.equal("https://example.com/photo.jpg");
 
     await hre.run("list-story-records", { tokenid: "1", offset: "0", limit: "10" });
 

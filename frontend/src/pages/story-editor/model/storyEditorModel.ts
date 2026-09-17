@@ -18,7 +18,7 @@ export interface RecordFormData {
   content: string;
   expectedPayloadHash?: string;
   recordType: number;
-  attachmentCID: string;
+  attachmentURI: string;
 }
 
 export const STORY_SEGMENT_BYTES = 16_384;
@@ -30,7 +30,7 @@ export const initialRecordFormData: RecordFormData = {
   title: "",
   content: "",
   recordType: 1,
-  attachmentCID: "",
+  attachmentURI: "",
   expectedPayloadHash: undefined,
 };
 
@@ -53,17 +53,17 @@ export function normalizeStoryRecords(
   return records?.map((record) => ({
     ...record,
     recordType: convertRecordTypeToNumber(record.recordType),
-    attachmentCID: record.attachmentCID ?? "",
+    attachmentURI: record.attachmentURI ?? "",
   }));
 }
 
 export function computeStoryPayloadHash(
   content: string,
   recordType = 1,
-  attachmentCID = "",
+  attachmentURI = "",
   title = "",
 ): string {
-  return ethers.keccak256(encodePublicStoryRecord({ title, content, recordType, attachmentCID }));
+  return ethers.keccak256(encodePublicStoryRecord({ title, content, recordType, attachmentURI }));
 }
 
 export function formatStoryHash(hash?: string): string {
@@ -74,12 +74,12 @@ export function getByteLength(value: string): number {
   return new TextEncoder().encode(value).length;
 }
 
-export function resolveAttachmentUrl(cid: string): string {
-  if (!cid) return "";
-  if (cid.startsWith("ipfs://")) {
-    return `https://ipfs.io/ipfs/${cid.slice(7)}`;
+export function resolveAttachmentUrl(uri: string): string {
+  if (!uri) return "";
+  if (uri.startsWith("ipfs://")) {
+    return `https://ipfs.io/ipfs/${uri.slice(7)}`;
   }
-  return cid;
+  return uri;
 }
 
 export function getByteWarningColor(byteLen: number): string {
@@ -96,7 +96,7 @@ export function isRecordFormDirty(formData: RecordFormData): boolean {
   return (
     formData.title.length > 0 ||
     trimmed.length > 0 ||
-    (formData.attachmentCID || "").length > 0 ||
+    (formData.attachmentURI || "").length > 0 ||
     formData.recordType !== 1
   );
 }

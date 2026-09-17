@@ -74,7 +74,7 @@ describe("story transaction flows", () => {
           content: "hello",
           expectedPayloadHash: "0xexpected",
           recordType: 1,
-          attachmentCID: "ipfs://record",
+          attachmentURI: "ipfs://record",
         }),
       ).resolves.toBe(serviceResult);
     });

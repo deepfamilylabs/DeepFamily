@@ -23,7 +23,7 @@ function makeRecord(overrides: Partial<StoryRecord>): StoryRecord {
     timestamp: 1,
     author: "0x0000000000000000000000000000000000000000",
     recordType: 1,
-    attachmentCID: "",
+    attachmentURI: "",
     ...overrides,
   };
 }

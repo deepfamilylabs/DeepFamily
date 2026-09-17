@@ -240,7 +240,7 @@ test("DFS1 emoji and JSON escapes split at segment boundaries decode only after 
       '{"schema":"deepfamily/story-record@1.0","title":"","content":"',
     ).length;
     const content = "a".repeat(ARCHIVE_MAX_SEGMENT_PAYLOAD_LENGTH - prefix - 1) + suffix + "  ";
-    const bytes = encodeStoryRecord({ title: "", content, recordType: 3, attachmentCID: "" });
+    const bytes = encodeStoryRecord({ title: "", content, recordType: 3, attachmentURI: "" });
     const fixture = archiveFixture(bytes);
     const result = await readStoryRecord({
       getCode: fixture.getCode,
@@ -278,7 +278,7 @@ test("Story reader accepts ethers Result refs using their named tuple fields", a
     title: "Chain record title",
     content: "Exact chain result",
     recordType: 3,
-    attachmentCID: "",
+    attachmentURI: "",
   });
   const fixture = archiveFixture(payload);
   const abi = AbiCoder.defaultAbiCoder();

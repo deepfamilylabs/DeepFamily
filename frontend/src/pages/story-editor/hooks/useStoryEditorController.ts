@@ -257,13 +257,13 @@ export function useStoryEditorController() {
       return computeStoryPayloadHash(
         formData.content,
         recordTypeValue,
-        formData.attachmentCID,
+        formData.attachmentURI,
         formData.title,
       );
     } catch {
       return undefined;
     }
-  }, [formData.title, formData.content, formData.recordType, formData.attachmentCID]);
+  }, [formData.title, formData.content, formData.recordType, formData.attachmentURI]);
 
   useEffect(() => {
     setDirty(isDirty);
@@ -390,11 +390,9 @@ export function useStoryEditorController() {
     setShowRecordTypeDropdown(false);
   }, []);
 
-  // A CID never contains whitespace, and the archive rejects a padded one — so
-  // a pasted trailing newline is trimmed here rather than left to fail at the
-  // signing step, which is the only place it would otherwise surface.
-  const updateAttachmentCID = useCallback((attachmentCID: string) => {
-    setFormData((prev) => ({ ...prev, attachmentCID: attachmentCID.trim() }));
+  // Trim pasted whitespace before the draft reaches the signing step.
+  const updateAttachmentURI = useCallback((attachmentURI: string) => {
+    setFormData((prev) => ({ ...prev, attachmentURI: attachmentURI.trim() }));
   }, []);
 
   const onAddRecord = useCallback(
@@ -413,7 +411,7 @@ export function useStoryEditorController() {
             data.recordType <= 255
               ? data.recordType
               : 1,
-          attachmentCID: data.attachmentCID ?? "",
+          attachmentURI: data.attachmentURI ?? "",
           confirmTransactionPreview,
         });
 
@@ -540,7 +538,7 @@ export function useStoryEditorController() {
       setSubmitError(t("storyRecordEditor.contentRequired", "Content cannot be empty"));
       return;
     }
-    const attachment = formData.attachmentCID;
+    const attachment = formData.attachmentURI;
     if (
       attachment !== attachment.trim() ||
       getByteLength(attachment) > STORY_MAX_ATTACHMENT_BYTES
@@ -548,7 +546,7 @@ export function useStoryEditorController() {
       setSubmitError(
         t(
           "archive.attachmentInvalid",
-          "Attachment CID must have no surrounding whitespace and fit in 256 UTF-8 bytes",
+          "Attachment URI must have no surrounding whitespace and fit in 256 UTF-8 bytes",
         ),
       );
       return;
@@ -584,7 +582,7 @@ export function useStoryEditorController() {
         content: formData.content,
         expectedPayloadHash,
         recordType: recordTypeValue,
-        attachmentCID: attachment,
+        attachmentURI: attachment,
       });
 
       handleCancelEdit();
@@ -748,7 +746,7 @@ export function useStoryEditorController() {
       updateTitle,
       updateContent,
       updateRecordType,
-      updateAttachmentCID,
+      updateAttachmentURI,
       cancel: handleCancelEdit,
       submit: handleSubmit,
       error: submitError,

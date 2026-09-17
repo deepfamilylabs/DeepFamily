@@ -12,7 +12,7 @@ import {
   STORY_ENVELOPE_MAGIC_BYTES,
   STORY_HEAD_DOMAIN,
   STORY_MAX_CANONICAL_JSON_BYTES,
-  STORY_MAX_ATTACHMENT_CID_BYTES,
+  STORY_MAX_ATTACHMENT_URI_BYTES,
   STORY_RECORD_DOMAIN,
   ZERO_BYTES32,
 } from "./constants.js";
@@ -39,7 +39,7 @@ const DFS1_TRIM_ONLY =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]*$/u;
 const DFS1_TRIM_EDGE =
   /^[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]|[\u0009-\u000d\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]$/u;
-const INPUT_KEYS = ["title", "content", "recordType", "attachmentCID"];
+const INPUT_KEYS = ["title", "content", "recordType", "attachmentURI"];
 const CANONICAL_KEYS = ["schema", ...INPUT_KEYS];
 
 function validateStoryRecord(input) {
@@ -81,23 +81,23 @@ function validateStoryRecord(input) {
     "INVALID_STORY_RECORD_TYPE",
     "recordType must be an integer from 0 through 255",
   );
-  assertUnicodeScalarString(input.attachmentCID, "attachmentCID");
+  assertUnicodeScalarString(input.attachmentURI, "attachmentURI");
   protocolAssert(
-    !DFS1_TRIM_EDGE.test(input.attachmentCID),
+    !DFS1_TRIM_EDGE.test(input.attachmentURI),
     "STORY_ATTACHMENT_WHITESPACE",
-    "attachmentCID must not have leading or trailing whitespace",
+    "attachmentURI must not have leading or trailing whitespace",
   );
   protocolAssert(
-    utf8Bytes(input.attachmentCID).length <= STORY_MAX_ATTACHMENT_CID_BYTES,
+    utf8Bytes(input.attachmentURI).length <= STORY_MAX_ATTACHMENT_URI_BYTES,
     "STORY_ATTACHMENT_TOO_LARGE",
-    "attachmentCID must not exceed 256 UTF-8 bytes",
+    "attachmentURI must not exceed 256 UTF-8 bytes",
   );
   return {
     schema: STORY_RECORD_SCHEMA,
     title: input.title,
     content: input.content,
     recordType: input.recordType,
-    attachmentCID: input.attachmentCID,
+    attachmentURI: input.attachmentURI,
   };
 }
 
@@ -114,7 +114,7 @@ export function encodeCanonicalStoryRecord(input) {
       `,"title":${escapeCanonicalJsonString(record.title)}` +
       `,"content":${escapeCanonicalJsonString(record.content)}` +
       `,"recordType":${record.recordType}` +
-      `,"attachmentCID":${escapeCanonicalJsonString(record.attachmentCID)}}`,
+      `,"attachmentURI":${escapeCanonicalJsonString(record.attachmentURI)}}`,
   );
   protocolAssert(
     bytes.length <= STORY_MAX_CANONICAL_JSON_BYTES,

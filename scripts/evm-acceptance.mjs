@@ -2295,7 +2295,7 @@ export const main = async (chainProfile) => {
       title: storyTitle,
       content: storyContent,
       recordType: 1,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     const storyHash = storyResult.recordRef.blob.payloadHash;
     await recordTx("story-add-record", storyResult.tx);
@@ -2362,7 +2362,7 @@ export const main = async (chainProfile) => {
       title: "",
       content: "after seal",
       recordType: 1,
-      attachmentCID: "",
+      attachmentURI: "",
     });
     await expectRevert(
       () =>

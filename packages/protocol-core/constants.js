@@ -102,7 +102,7 @@ export const STORY_DEFAULT_COMPRESSION_SUITE = COMPRESSION_SUITE_GZIP_V1;
 // Public records have their own decompression resource bound. This does not
 // change the private person-version JSON/envelope limits above.
 export const STORY_MAX_CANONICAL_JSON_BYTES = 16_777_216;
-export const STORY_MAX_ATTACHMENT_CID_BYTES = 256;
+export const STORY_MAX_ATTACHMENT_URI_BYTES = 256;
 export const STORY_RECORD_DOMAIN_TEXT = "deepfamily.archive.story-record.v1";
 export const STORY_HEAD_DOMAIN_TEXT = "deepfamily.archive.story-head.v1";
 export const STORY_RECORD_DOMAIN = keccak256(toUtf8Bytes(STORY_RECORD_DOMAIN_TEXT));

@@ -75,10 +75,8 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
   const byteRatio = getByteMeterRatio(form.byteLength);
   const meterTone = getByteMeterTone(form.byteLength);
 
-  // The 256-byte ceiling is out of reach for a real CID, so it is worth no
-  // permanent counter — but when a draft does cross it, saying so at the field
-  // beats letting the signing step reject it.
-  const attachmentOverLimit = getByteLength(form.data.attachmentCID) > STORY_MAX_ATTACHMENT_BYTES;
+  // Show the 256-byte limit at the field when a URI exceeds it, before signing.
+  const attachmentOverLimit = getByteLength(form.data.attachmentURI) > STORY_MAX_ATTACHMENT_BYTES;
 
   return (
     <section
@@ -253,17 +251,17 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
             className={`shrink-0 ${attachmentOverLimit ? "text-red-500 dark:text-red-400" : "text-ink-subtle"}`}
           />
           <span id={attachmentLabelId} className="sr-only">
-            {t("storyRecordEditor.attachmentLabel", "Attachment CID (optional)")}
+            {t("storyRecordEditor.attachmentLabel", "Attachment URI (optional)")}
           </span>
           <input
-            value={form.data.attachmentCID}
-            onChange={(event) => form.updateAttachmentCID(event.target.value)}
+            value={form.data.attachmentURI}
+            onChange={(event) => form.updateAttachmentURI(event.target.value)}
             aria-labelledby={attachmentLabelId}
             aria-invalid={attachmentOverLimit}
             aria-describedby={attachmentOverLimit ? attachmentStatusId : undefined}
             placeholder={t(
               "storyRecordEditor.attachmentPlaceholder",
-              "Attachment CID (optional), e.g. bafy...",
+              "Attachment URI (optional), e.g. ipfs://bafy... or https://...",
             )}
             disabled={editor.submitting}
             className="min-h-[26px] w-full min-w-0 border-0 bg-transparent p-0 font-mono text-[11.5px] text-ink placeholder:text-ink-subtle focus:ring-0 disabled:opacity-60"
@@ -277,7 +275,7 @@ export function StoryComposer({ editor }: { editor: StoryEditorController }) {
           >
             {t(
               "storyRecordEditor.attachmentTooLong",
-              "Attachment CID cannot exceed 256 UTF-8 bytes",
+              "Attachment URI cannot exceed 256 UTF-8 bytes",
             )}
           </p>
         )}

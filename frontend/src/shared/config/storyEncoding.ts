@@ -13,7 +13,7 @@ export function encodePublicStoryRecord(input: StoryRecordInput): Uint8Array {
     restored.title !== input.title ||
     restored.content !== input.content ||
     restored.recordType !== input.recordType ||
-    restored.attachmentCID !== input.attachmentCID
+    restored.attachmentURI !== input.attachmentURI
   )
     throw new Error("Public story compression failed exact-content verification");
   return payload;

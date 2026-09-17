@@ -190,7 +190,7 @@ hre.run = async (taskName, args = {}) => {
         title: String(args.title ?? ""),
         content: String(args.content),
         recordType: Number(args.type ?? 1),
-        attachmentCID: String(args.attachment ?? ""),
+        attachmentURI: String(args.attachment ?? ""),
         expectedPayloadHash: args.exphash || undefined,
       });
     case "list-story-records": {

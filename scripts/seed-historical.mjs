@@ -853,7 +853,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         stored.decoded?.title !== expected.title ||
         stored.decoded?.content !== expected.content ||
         stored.decoded?.recordType !== expected.type ||
-        stored.decoded?.attachmentCID !== ""
+        stored.decoded?.attachmentURI !== ""
       ) {
         throw new Error(`Existing story record ${index + 1} differs from JSON; refusing to resume`);
       }
@@ -881,7 +881,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
         title: record.title,
         content: record.content,
         recordType: record.type,
-        attachmentCID: "",
+        attachmentURI: "",
       });
       console.log(
         `    [ok]Record ${recordIndex} added (${Date.now() - recordStart}ms) — hash: ${result.recordRef.blob.payloadHash}`,

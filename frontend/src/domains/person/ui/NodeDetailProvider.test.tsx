@@ -208,7 +208,7 @@ describe("NodeDetailProvider", () => {
               timestamp: 456,
               author: "0xeditor",
               recordType: 0,
-              attachmentCID: "",
+              attachmentURI: "",
             },
           ],
           fullStory: "story",

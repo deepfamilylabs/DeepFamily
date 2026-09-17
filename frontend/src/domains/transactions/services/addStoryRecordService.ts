@@ -38,7 +38,7 @@ export interface AddStoryRecordResult {
       author: string;
       title: string;
       recordType: number;
-      attachmentCID: string;
+      attachmentURI: string;
     };
   };
 }
@@ -52,7 +52,7 @@ export async function addStoryRecordService(
   content: string,
   expectedPayloadHash: string,
   recordType = 1,
-  attachmentCID = "",
+  attachmentURI = "",
   confirmTransactionPreview?: (preview: ArchiveTransactionPreview) => boolean | Promise<boolean>,
   /**
    * The provider the page read the story through. The record index the caller
@@ -73,7 +73,7 @@ export async function addStoryRecordService(
         key: "archive.errors.recordTypeReserved",
       });
     const payload = ethers.hexlify(
-      encodePublicStoryRecord({ title, content, recordType, attachmentCID }),
+      encodePublicStoryRecord({ title, content, recordType, attachmentURI }),
     );
     const decoded = decodeStoryRecord(payload);
     if (decoded.title !== title || decoded.content !== content)
@@ -210,7 +210,7 @@ export async function addStoryRecordService(
       timestamp: Number(ref.timestamp),
       author: author,
       recordType,
-      attachmentCID,
+      attachmentURI,
       schemaId: STORY_ENVELOPE_SCHEMA_ID,
       rawPayload: payload,
       payloadLength: preview.payloadBytes,
@@ -233,7 +233,7 @@ export async function addStoryRecordService(
           author: author,
           title,
           recordType,
-          attachmentCID,
+          attachmentURI,
         },
       },
     };
