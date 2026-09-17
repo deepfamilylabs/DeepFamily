@@ -732,21 +732,37 @@
   "metadataUnlock": {
     "openButton": "解锁版本",
     "title": "解锁加密的版本元数据",
-    "description": "请选择使用同一身份口令的版本。解锁后可直接选择其他人物，输入对应口令继续。",
+    "scopeSummary": "当前家族视图 · {{count}} 个版本待解锁",
+    "scopeSummaryEmpty": "当前家族视图 · 没有待解锁的版本",
     "close": "关闭",
-    "summary": "当前家族视图：{{candidates}} 个锁定候选版本；{{unlocked}} 个已在本地解锁。",
+    "lockedSection": "锁定的版本",
+    "selectedCount": "已选 {{count}} 个版本",
     "checking": "正在读取并校验加密资料…",
     "passphraseLabel": "身份口令",
-    "progress": "{{status}}：{{processed}}/{{total}}；成功 {{succeeded}} 个，失败 {{failed}} 个，命中缓存 {{skipped}} 个。",
-    "status": {
-      "running": "进行中",
-      "cancelling": "正在取消",
-      "cancelled": "已取消",
-      "completed": "已完成"
+    "sharedPassphraseHint": "所选版本需使用同一口令",
+    "passphrasePlaceholder": "输入身份口令",
+    "passphrasePlaceholderIdle": "请先选择要解锁的版本",
+    "passphraseVisibility": {
+      "show": "显示身份口令",
+      "hide": "隐藏身份口令"
     },
+    "passphraseNote": "身份口令仅在本机用于解密，不会保存。",
+    "progressTitle": {
+      "running": "正在解锁",
+      "cancelling": "正在取消"
+    },
+    "progressCounts": "成功 {{succeeded}} · 失败 {{failed}} · 命中缓存 {{skipped}}",
+    "result": {
+      "completed": "已完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
+      "cancelled": "已取消：成功 {{succeeded}} 个，失败 {{failed}} 个。",
+      "skipped": "命中缓存 {{count}} 个。",
+      "retryHint": "失败的版本仍保持选中，可换一个口令重试。"
+    },
+    "readFailures": "{{count}} 个版本读取失败。",
     "cancel": "取消解锁",
     "unlock": "解锁所选版本",
-    "clearCache": "清除本地已解锁的明文缓存",
+    "unlockCount": "解锁所选 {{count}} 个版本",
+    "clearCache": "清除明文缓存",
     "errors": {
       "config": "请先配置有效的 RPC 端点、链 ID 和 DeepFamily 代理地址。",
       "noCandidates": "当前家族视图中的锁定版本均不包含完整 Archive 引用。",
@@ -754,18 +770,23 @@
       "failed": "元数据解锁失败"
     },
     "automaticHint": "系统仅为当前家族视图中的版本在后台尝试一次空口令。其余版本可在这里输入对应口令解锁。",
+    "automaticHintEmpty": "系统仅为当前家族视图中的版本在后台尝试一次空口令。",
     "automaticPaused": "已清除明文缓存，本次会话已暂停后台空口令解锁。",
     "automaticSelectionPaused": "已选择版本准备手动解锁，后台自动尝试已暂停。取消全部选择后会继续自动尝试。",
-    "includePersonVersions": "同时解锁此人物在当前视图中的其他版本",
     "selectPerson": "选择 {{person}} 在当前视图中的所有版本",
     "selectVersion": "选择 {{person}} 的版本 {{version}}",
     "version": "版本 {{version}}",
-    "noLockedVersions": "当前家族视图中没有需要解锁的版本。",
+    "versionCount": "{{count}} 个版本",
+    "nameAfterUnlock": "解锁后显示姓名",
+    "viewing": "正在查看",
+    "noLockedVersions": "当前家族视图中没有需要解锁的版本",
     "selectHint": "选择人物或具体版本后，将自动读取并校验资料。",
     "retryRead": "重新读取所选版本",
+    "localSection": "本机保存",
     "remember": "在本机记住解锁结果",
-    "rememberDeviceHint": "之后解锁的明文将保存在此浏览器中，身份口令不会保存。",
+    "rememberDeviceHint": "之后解锁的明文将保存在此浏览器中。",
     "rememberSessionHint": "之后的解锁结果仅用于本次查看。",
+    "unlockedSummary": "当前视图中 {{count}} 个版本已在本机解锁",
     "versionStatus": {
       "locked": "未解锁",
       "checking": "正在校验…",

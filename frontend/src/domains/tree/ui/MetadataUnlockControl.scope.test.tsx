@@ -139,8 +139,18 @@ async function enterPassphrase(value = "Ada passphrase") {
   fireEvent.change(input, { target: { value } });
   return input as HTMLInputElement;
 }
-function clickUnlock() {
-  fireEvent.click(screen.getByRole("button", { name: "Unlock selected versions" }));
+function unlockButton() {
+  return screen.getByRole("button", {
+    name: /^Unlock (\d+ )?selected version/,
+  }) as HTMLButtonElement;
+}
+/** The passphrase bar is always there; the button only arms once the selection is checked. */
+async function waitForUnlockReady() {
+  await waitFor(() => expect(unlockButton().disabled).toBe(false));
+}
+async function clickUnlock() {
+  await waitForUnlockReady();
+  fireEvent.click(unlockButton());
 }
 function version(person: string, number: number) {
   return screen.getByRole("checkbox", {
@@ -220,14 +230,29 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(mocks.readPersonVersionEnvelope.mock.calls.map(([input]) => input.node.id)).toEqual([
       nodeA1.id,
     ]);
-    fireEvent.click(screen.getByLabelText("Also unlock this person's other versions in this view"));
+    const person = screen.getByRole("checkbox", {
+      name: "Select all versions for Ada in this view",
+    }) as HTMLInputElement;
+    expect(person.checked).toBe(false);
+    expect(person.indeterminate).toBe(true);
+    fireEvent.click(person);
+    expect(person.checked).toBe(true);
+    expect(person.indeterminate).toBe(false);
     await enterPassphrase();
-    clickUnlock();
+    await clickUnlock();
     await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
     expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([
       nodeA1.id,
       nodeA2.id,
     ]);
+  });
+
+  it("lists the inspected person first and marks them as being viewed", () => {
+    render(<MetadataUnlockControl open target={{ personHash: PERSON_B, versionIndex: 1 }} />);
+    const [first] = screen.getAllByRole("checkbox", { name: /^Select / });
+    expect(first.getAttribute("aria-label")).toBe("Select Bo, version 1");
+    expect(screen.getAllByText("Viewing")).toHaveLength(1);
+    expect(version("Bo", 1).closest("label")?.textContent).toContain("Viewing");
   });
 
   it("limits the default list and counts to exact versions in the current family view", () => {
@@ -237,8 +262,58 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(version("Ada", 1)).toBeTruthy();
     expect(screen.queryByLabelText("Select Ada, version 2")).toBeNull();
     expect(screen.queryByLabelText("Select Bo, version 1")).toBeNull();
-    expect(screen.queryByLabelText(/Also unlock this person's other/)).toBeNull();
-    expect(screen.getByText(/1 locked candidate\(s\); 0 already unlocked/)).toBeTruthy();
+    // A person with one version in view is a single row, without a separate select-all.
+    expect(screen.queryByLabelText("Select all versions for Ada in this view")).toBeNull();
+    expect(screen.getByText("Current family view · 1 version(s) to unlock")).toBeTruthy();
+    expect(screen.getByText("0 version(s) in this view already unlocked locally")).toBeTruthy();
+  });
+
+  it("keeps the passphrase field disabled until something is selected", async () => {
+    render(<MetadataUnlockControl open />);
+    const input = screen.getByLabelText("Identity passphrase") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(unlockButton().disabled).toBe(true);
+    fireEvent.click(version("Bo", 1));
+    expect(input.disabled).toBe(false);
+    await waitForUnlockReady();
+    expect(unlockButton().textContent).toBe("Unlock 1 selected version(s)");
+  });
+
+  it("swaps in a separate cancel button, so a second click cannot stop the batch it started", async () => {
+    mocks.coordinatorRun.mockImplementation((options) => {
+      options.onProgress(report({ status: "running", processed: 0, succeeded: 0 }));
+      return deferred<any>().promise;
+    });
+    render(<MetadataUnlockControl open target={target} />);
+    await enterPassphrase();
+    await waitForUnlockReady();
+    const unlock = unlockButton();
+    fireEvent.click(unlock);
+    const cancel = screen.getByRole("button", { name: "Cancel unlock" });
+    expect(cancel).not.toBe(unlock);
+    expect(unlock.isConnected).toBe(false);
+  });
+
+  it("unlocks on Enter once the selection is checked, but not while an IME is composing", async () => {
+    render(<MetadataUnlockControl open target={target} />);
+    const input = await enterPassphrase();
+    await waitForUnlockReady();
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(mocks.coordinatorRun).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
+    expect(mocks.lastBatchOptions.rawPassphrase).toBe("Ada passphrase");
+  });
+
+  it("shows no passphrase bar when nothing in the view needs unlocking", () => {
+    for (const node of Object.values(mocks.nodesData)) node.metadataUnlockValidated = true;
+    render(<MetadataUnlockControl open />);
+    expect(screen.getByText("No versions in the current family view need unlocking")).toBeTruthy();
+    expect(screen.getByText("Current family view · nothing to unlock")).toBeTruthy();
+    expect(screen.queryByLabelText("Identity passphrase")).toBeNull();
+    expect(
+      (screen.getByRole("button", { name: "Clear plaintext cache" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it("drops a late manual result when the selected version leaves the family view", async () => {
@@ -249,9 +324,10 @@ describe("MetadataUnlockControl selection and scope", () => {
     });
     const { rerender } = render(<MetadataUnlockControl open target={target} />);
     await enterPassphrase();
-    clickUnlock();
+    await clickUnlock();
     const oldOptions = mocks.lastBatchOptions;
     expect(screen.getByText("Unlocking…")).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("1");
     mocks.visibleIds = [nodeB1.id];
     rerender(<MetadataUnlockControl open target={target} />);
     expect(() => oldOptions.cacheValidatedPersonVersion(nodeA1)).toThrow();
@@ -268,7 +344,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(screen.queryByText("Unlocking…")).toBeNull();
     expect(screen.queryByText("Checking…")).toBeNull();
     fireEvent.click(version("Bo", 1));
-    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+    await waitForUnlockReady();
   });
 
   it("cancels preflight on root change even if both roots share the selected descendant", async () => {
@@ -278,7 +354,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(await screen.findByText("Checking encrypted data…")).toBeTruthy();
     mocks.viewRoot = "root-b";
     rerender(<MetadataUnlockControl open target={target} />);
-    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+    await waitForUnlockReady();
     await act(async () => {
       preflight.resolve({});
       await preflight.promise;
@@ -292,7 +368,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     fireEvent.click(version("Ada", 1));
     fireEvent.click(version("Bo", 1));
     await enterPassphrase("shared passphrase");
-    clickUnlock();
+    await clickUnlock();
     await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
     expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([
       nodeA1.id,
@@ -316,7 +392,7 @@ describe("MetadataUnlockControl selection and scope", () => {
       if (!remember)
         fireEvent.click(screen.getByLabelText(/Remember unlocked results on this device/));
       const input = await enterPassphrase();
-      clickUnlock();
+      await clickUnlock();
       await waitFor(() => expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledTimes(1));
       const marked = { ...nodeA1, metadataUnlockPersistence: remember ? "device" : "session" };
       expect(mocks.cacheValidatedPersonVersion).toHaveBeenCalledWith(marked, 7);
@@ -348,11 +424,15 @@ describe("MetadataUnlockControl selection and scope", () => {
     fireEvent.click(version("Ada", 1));
     fireEvent.click(version("Bo", 1));
     await enterPassphrase();
-    clickUnlock();
+    await clickUnlock();
     expect(await screen.findByText("Decryption or verification failed")).toBeTruthy();
     expect(screen.getByText("Unlocked")).toBeTruthy();
+    expect(screen.getByText("Completed: 1 unlocked, 1 failed.")).toBeTruthy();
+    expect(
+      screen.getByText("Failed versions stay selected, so you can try another passphrase."),
+    ).toBeTruthy();
     await enterPassphrase("Bo passphrase");
-    clickUnlock();
+    await clickUnlock();
     await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(2));
     expect(mocks.lastBatchOptions.nodes.map((node: any) => node.id)).toEqual([nodeB1.id]);
     expect(mocks.lastBatchOptions.rawPassphrase).toBe("Bo passphrase");
@@ -363,9 +443,11 @@ describe("MetadataUnlockControl selection and scope", () => {
     mocks.readPersonVersionEnvelope.mockRejectedValueOnce(new Error("invalid Archive hash"));
     render(<MetadataUnlockControl open target={target} />);
     expect(await screen.findByText("Read or data check failed")).toBeTruthy();
-    expect(screen.queryByLabelText("Identity passphrase")).toBeNull();
+    expect(screen.getByText("1 version(s) could not be read.")).toBeTruthy();
+    expect(unlockButton().disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Retry reading selected versions" }));
-    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+    await waitForUnlockReady();
+    expect(screen.queryByRole("button", { name: "Retry reading selected versions" })).toBeNull();
   });
 
   it.each([
@@ -378,11 +460,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     await enterPassphrase(rawPassphrase);
     expect(screen.queryByText(/permanent on-chain ciphertext permits/i)).toBeNull();
     expect(screen.queryByText(/I explicitly (choose|confirm)/)).toBeNull();
-    const button = screen.getByRole("button", {
-      name: "Unlock selected versions",
-    }) as HTMLButtonElement;
-    expect(button.disabled).toBe(false);
-    clickUnlock();
+    await clickUnlock();
     await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
     expect(mocks.lastBatchOptions.rawPassphrase).toBe(rawPassphrase);
   });
@@ -427,7 +505,7 @@ describe("MetadataUnlockControl selection and scope", () => {
       preflight.resolve({});
       await preflight.promise;
     });
-    expect(screen.queryByLabelText("Identity passphrase")).toBeNull();
+    expect(unlockButton().disabled).toBe(true);
   });
 
   it("discards late batch results after an external cache clear and leaves selection usable", async () => {
@@ -438,7 +516,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     });
     render(<MetadataUnlockControl open target={target} />);
     await enterPassphrase();
-    clickUnlock();
+    await clickUnlock();
     const options = mocks.lastBatchOptions;
     expect(screen.getByRole("button", { name: "Cancel unlock" })).toBeTruthy();
     mocks.captureMetadataCacheRevision.mockReturnValue(8);
@@ -459,7 +537,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(screen.queryByRole("button", { name: "Cancel unlock" })).toBeNull();
     expect(version("Bo", 1).disabled).toBe(false);
     fireEvent.click(version("Bo", 1));
-    expect(await screen.findByLabelText("Identity passphrase")).toBeTruthy();
+    await waitForUnlockReady();
   });
 
   it("rejects stale cache commits and progress after changing scope while a batch runs", async () => {
@@ -470,7 +548,7 @@ describe("MetadataUnlockControl selection and scope", () => {
     });
     const { rerender } = render(<MetadataUnlockControl open target={target} />);
     await enterPassphrase();
-    clickUnlock();
+    await clickUnlock();
     await waitFor(() => expect(mocks.coordinatorRun).toHaveBeenCalledTimes(1));
     const options = mocks.lastBatchOptions;
     expect(screen.getByRole("button", { name: "Cancel unlock" })).toBeTruthy();
@@ -490,6 +568,6 @@ describe("MetadataUnlockControl selection and scope", () => {
       await batch.promise;
     });
     expect(screen.queryByRole("button", { name: "Cancel unlock" })).toBeNull();
-    expect(screen.queryByText(/running: 1\/1/)).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 });

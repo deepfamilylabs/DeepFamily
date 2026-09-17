@@ -384,9 +384,10 @@ references, `versionCommitment`, self identity suite, and the format selectors. 
 envelope to a different context therefore fails authentication for a holder of the correct key;
 this does not create a contract-level global replay check.
 
-The unlock dialog opened from a person detail selects that version, with an option to include the
-person's other versions in the current family view. Page-level entry points allow explicit selection
-by person or version within the same view.
+The unlock dialog opened from a person detail selects that version and lists that person first;
+selecting the whole person adds their other versions in the current family view. Page-level entry
+points allow explicit selection by person or version within the same view. The passphrase field
+stays in the dialog footer and unlocks only once the selection has passed preflight.
 Selection starts public Archive/header preflight automatically; one supplied passphrase is then tried
 sequentially against that selection. Per-version results remain visible while the user selects the
 next person. Each successful item is cached immediately; a failed item is not written.

@@ -732,21 +732,37 @@
   "metadataUnlock": {
     "openButton": "Unlock versions",
     "title": "Unlock encrypted version metadata",
-    "description": "Select versions that share an identity passphrase. After unlocking, select another person and enter their passphrase to continue.",
+    "scopeSummary": "Current family view · {{count}} version(s) to unlock",
+    "scopeSummaryEmpty": "Current family view · nothing to unlock",
     "close": "Close",
-    "summary": "Current family view: {{candidates}} locked candidate(s); {{unlocked}} already unlocked locally.",
+    "lockedSection": "Locked versions",
+    "selectedCount": "{{count}} selected",
     "checking": "Checking encrypted data…",
     "passphraseLabel": "Identity passphrase",
-    "progress": "{{status}}: {{processed}}/{{total}}; {{succeeded}} successful, {{failed}} failed, {{skipped}} cached.",
-    "status": {
-      "running": "running",
-      "cancelling": "cancelling",
-      "cancelled": "cancelled",
-      "completed": "completed"
+    "sharedPassphraseHint": "Selected versions must share one passphrase",
+    "passphrasePlaceholder": "Enter identity passphrase",
+    "passphrasePlaceholderIdle": "Select versions above first",
+    "passphraseVisibility": {
+      "show": "Show identity passphrase",
+      "hide": "Hide identity passphrase"
     },
+    "passphraseNote": "Your passphrase is used only for local decryption and is never saved.",
+    "progressTitle": {
+      "running": "Unlocking",
+      "cancelling": "Cancelling"
+    },
+    "progressCounts": "{{succeeded}} unlocked · {{failed}} failed · {{skipped}} cached",
+    "result": {
+      "completed": "Completed: {{succeeded}} unlocked, {{failed}} failed.",
+      "cancelled": "Cancelled: {{succeeded}} unlocked, {{failed}} failed.",
+      "skipped": "{{count}} cached.",
+      "retryHint": "Failed versions stay selected, so you can try another passphrase."
+    },
+    "readFailures": "{{count}} version(s) could not be read.",
     "cancel": "Cancel unlock",
     "unlock": "Unlock selected versions",
-    "clearCache": "Clear local unlocked plaintext cache",
+    "unlockCount": "Unlock {{count}} selected version(s)",
+    "clearCache": "Clear plaintext cache",
     "errors": {
       "config": "Configure a valid RPC endpoint, chain ID, and DeepFamily proxy first.",
       "noCandidates": "No locked version in the current family view has a complete Archive reference.",
@@ -754,18 +770,23 @@
       "failed": "Metadata unlock failed"
     },
     "automaticHint": "Only versions in the current family view are tried once with an empty passphrase in the background. You can unlock the remaining versions here.",
+    "automaticHintEmpty": "Only versions in the current family view are tried once with an empty passphrase in the background.",
     "automaticPaused": "Automatic empty-passphrase unlock is paused after clearing cached plaintext for this session.",
     "automaticSelectionPaused": "Automatic attempts are paused while you unlock the selected versions. Clear the selection to resume them.",
-    "includePersonVersions": "Also unlock this person's other versions in this view",
     "selectPerson": "Select all versions for {{person}} in this view",
     "selectVersion": "Select {{person}}, version {{version}}",
     "version": "Version {{version}}",
-    "noLockedVersions": "No versions in the current family view need unlocking.",
+    "versionCount": "{{count}} version(s)",
+    "nameAfterUnlock": "Name shown after unlock",
+    "viewing": "Viewing",
+    "noLockedVersions": "No versions in the current family view need unlocking",
     "selectHint": "Select a person or individual versions to check them automatically.",
     "retryRead": "Retry reading selected versions",
+    "localSection": "On this device",
     "remember": "Remember unlocked results on this device",
-    "rememberDeviceHint": "Future unlocks will save plaintext in this browser. Your passphrase is never saved.",
+    "rememberDeviceHint": "Future unlocks will save plaintext in this browser.",
     "rememberSessionHint": "Future unlocks are shown for this session only.",
+    "unlockedSummary": "{{count}} version(s) in this view already unlocked locally",
     "versionStatus": {
       "locked": "Locked",
       "checking": "Checking…",

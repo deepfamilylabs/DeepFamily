@@ -33,6 +33,11 @@ export type ResponsiveModalFrameProps = {
   toolbar?: React.ReactNode;
   zIndex?: string;
   closeLabel?: string;
+  /** Desktop width cap for the dialog; the mobile sheet always spans the screen. */
+  maxWidth?: string;
+  /** Ids for the header title and description, so the dialog is named and described by them. */
+  titleId?: string;
+  descriptionId?: string;
   children: React.ReactNode;
 };
 
@@ -55,6 +60,9 @@ export function ResponsiveModalFrame({
   toolbar,
   zIndex = OVERLAY_Z_INDEX.appModal,
   closeLabel = "Close",
+  maxWidth = "max-w-[720px]",
+  titleId,
+  descriptionId,
   children,
 }: ResponsiveModalFrameProps) {
   const { dragging, dragOffset, startDrag, updateDrag, finishDrag, cancelDrag } =
@@ -67,12 +75,14 @@ export function ResponsiveModalFrame({
       bare
       zIndex={zIndex}
       ariaLabel={ariaLabel}
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={description ? descriptionId : undefined}
       disableBackdropClose={isDesktop}
     >
       <div className="overflow-x-hidden touch-pan-y h-dvh max-h-dvh md:h-full md:max-h-none">
         <div className="flex items-end md:items-center justify-center h-full w-full px-2 pt-6 pb-[env(safe-area-inset-bottom)] md:p-4">
           <div
-            className={`relative flex flex-col w-full max-w-[720px] h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[92vh] bg-surface-body rounded-t-2xl md:rounded-2xl border border-hairline shadow-[0_24px_48px_-24px_rgba(15,23,42,0.28),0_2px_6px_-2px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.7)] overflow-hidden transform transition-[transform,opacity] duration-300 ease-out ${entered ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-full opacity-0 md:translate-y-0 md:scale-95"} will-change-transform`}
+            className={`relative flex flex-col w-full ${maxWidth} h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] max-h-[calc(100dvh-1.5rem-env(safe-area-inset-bottom))] md:h-auto md:max-h-[92vh] bg-surface-body rounded-t-2xl md:rounded-2xl border border-hairline shadow-[0_24px_48px_-24px_rgba(15,23,42,0.28),0_2px_6px_-2px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_48px_-24px_rgba(0,0,0,0.7)] overflow-hidden transform transition-[transform,opacity] duration-300 ease-out ${entered ? "translate-y-0 opacity-100 md:scale-100" : "translate-y-full opacity-0 md:translate-y-0 md:scale-95"} will-change-transform`}
             onClick={(e) => e.stopPropagation()}
             style={{
               transform: dragging ? `translateY(${dragOffset}px)` : undefined,
@@ -97,9 +107,13 @@ export function ResponsiveModalFrame({
               <div className={`${MODAL_TILE_BASE} ${MODAL_ACCENT_TILE[accent]}`}>{icon}</div>
 
               <div className="flex-1 min-w-0">
-                <h2 className={MODAL_TITLE}>{title}</h2>
+                <h2 id={titleId} className={MODAL_TITLE}>
+                  {title}
+                </h2>
                 {description ? (
-                  <div className="text-xs text-ink-muted">{description}</div>
+                  <div id={descriptionId} className="text-xs text-ink-muted">
+                    {description}
+                  </div>
                 ) : null}
               </div>
 
