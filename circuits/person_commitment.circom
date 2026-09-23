@@ -29,6 +29,8 @@ template IdentityCommitmentCore() {
     bcBit.in <== isBirthBC;
     component birthYearCheck = Num2Bits(16);
     birthYearCheck.in <== birthYear;
+    component birthMonthBits = Num2Bits(4);
+    birthMonthBits.in <== birthMonth;
     component birthMonthCheck = LessEqThan(4);
     birthMonthCheck.in[0] <== birthMonth;
     birthMonthCheck.in[1] <== 12;

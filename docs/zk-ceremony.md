@@ -1,8 +1,8 @@
 # DeepFamily Production ZK Setup
 
 This runbook describes how to replace the checked-in development Groth16 keys with production
-artifacts. The normal DeepFamily path is intentionally a single command for the current
-single-developer project:
+artifacts. The production Phase 1 file is committed, so the normal single-developer setup runs
+with one command:
 
 ```bash
 npm run zk:production:setup
@@ -48,7 +48,7 @@ Both DeepFamily circuits reuse the same published BN254 Phase 1 file:
 File:
 powersOfTau28_hez_final_13.ptau
 
-Source:
+Published provenance recorded in the manifest:
 https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_13.ptau
 
 Capacity:
@@ -64,41 +64,45 @@ BLAKE2b-512:
 58efc8bf2834d04768a3d7ffcd8e1e23d461561729beaac4e3e7a47829a1c9066d5320241e124a1a8e8aa6c75be0ba66f65bc8239a0542ed38e11276f6fdb4d9
 ```
 
-The setup command downloads this file only when the verified cache is absent. It stores the file at:
+The exact file is committed at:
 
 ```text
-tmp/zk-production/powersOfTau28_hez_final_13.ptau
+circuits/ptau/powersOfTau28_hez_final_13.ptau
 ```
 
-The downloader rejects redirects, symbolic links, an unexpected byte length, or either hash
-mismatch. An existing cache is rehashed before use. A suspicious existing file is not silently
-replaced.
+Both published download locations, the URL above and the earlier
+`https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_13.ptau`, now return HTTP 403.
+The committed copy was retrieved from the Internet Archive capture of the original S3 object:
 
-To populate or validate the cache without generating keys:
-
-```bash
-npm run zk:ptau:fetch
+```text
+https://web.archive.org/web/20210918182747id_/https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_13.ptau
 ```
 
-`ZK_PTAU_PATH` is optional for later verification and release commands. When it is empty,
-`zk:ceremony:verify` and `release:preflight` use the pinned cache above. An explicit override must
-still be an ordinary file whose byte length, SHA-256, and BLAKE2b-512 all match the production
-manifest:
+Its BLAKE2b-512 matches the digest published in the snarkjs README, and
+`snarkjs powersoftau verify` reports 54 named contributions followed by the final beacon. The
+retrieval location needs no trust; the pinned digests decide whether the bytes are accepted.
+
+The setup and verification commands never download or replace the file. They reject symbolic
+links, an unexpected byte length, or either hash mismatch; the file is rehashed before use. The
+published URL above identifies the reviewed source bytes in ceremony evidence and is not accessed
+by these commands.
+
+`ZK_PTAU_PATH` selects a different copy, for example one obtained independently, for setup,
+verification, and release commands. When it is empty, they use the committed file above. An
+override must still be an ordinary file whose byte length, SHA-256, and BLAKE2b-512 match the
+production manifest:
 
 ```bash
-ZK_PTAU_PATH=/absolute/path/to/the-same-reviewed-file \
+ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-Development and production intentionally reuse this exact fixed-digest public Phase 1 file. The
-development refresh obtains or validates the same cache, so the repository no longer needs a
-separate locally generated development pTau.
-
-This shared Phase 1 does **not** make development zkeys production-safe. `npm run zk:dev:refresh`
-uses a single-operator Phase 2 flow with hard-coded public entropy and records a `development`
-manifest. That supplies no independent secret contribution, and the operator may retain the
-circuit-specific toxic waste. `npm run zk:production:setup` instead creates fresh OS-CSPRNG Phase 2
-inputs and records the explicit production trust model described above.
+`npm run zk:development:setup` uses the same committed Phase 1 file. Its Phase 2 contribution
+passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
+secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
+records no ceremony evidence, so it does not establish a production trust model. The resulting
+manifest records `development` status. `npm run zk:production:setup` instead runs once from a
+clean commit with a pinned toolchain and records the transcript described above.
 
 ## Circom host and release compiler
 
@@ -187,7 +191,7 @@ git rev-parse HEAD
 - CI execution;
 - a symbolic-link repository or artifact path;
 - a missing or unexpected pinned toolchain;
-- concurrent pTau download or setup execution;
+- concurrent production pTau verification or setup execution;
 - overwriting an existing production manifest unless the explicit, hash-bound rotation mode below
   is used.
 
@@ -249,7 +253,7 @@ Internally the command:
 
 1. validates the clean release commit and development manifest, or the explicitly hash-bound
    production baseline in rotation mode;
-2. downloads or reuses the pinned public power-13 pTau and checks both pinned digests;
+2. reads the pinned public power-13 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles both circuits there
    with explicit `--O2 --sanity_check 2`;
@@ -362,16 +366,15 @@ git add \
 git commit -m "chore: install production zk artifacts"
 ```
 
-The ignored `zk-artifacts/circuits/` build outputs and pinned pTau cache must also be copied into
-the controlled release archive. A clean Git status alone does not archive ignored files.
+The ignored `zk-artifacts/circuits/` build outputs must also be copied into the controlled release
+archive. A clean Git status alone does not archive ignored files.
 
-From a clean checkout of the new commit, restore the exact dependencies and pTau cache, rebuild, and
-run the complete gate:
+From a clean checkout of the new commit, restore the exact dependencies, then rebuild and run the
+complete gate:
 
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm run zk:fetch
-npm run zk:ptau:fetch
 npm run release:preflight
 ```
 

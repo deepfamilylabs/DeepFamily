@@ -184,10 +184,10 @@ describe("MetadataUnlockCoordinator", () => {
     expect(progress[progress.length - 1]?.status).toBe("completed");
   });
 
-  it("redacts Unicode 17 protocol-normalized passphrases from failure reports", async () => {
-    const rawPassphrase = "\ua7f1-unlock-secret";
+  it("redacts protocol-normalized passphrases from failure reports", async () => {
+    const rawPassphrase = "a\u030a-unlock-secret";
     const normalizedPassphrase = normalizePassphrase(rawPassphrase);
-    expect(normalizedPassphrase).toBe("S-unlock-secret");
+    expect(normalizedPassphrase).toBe("\u00e5-unlock-secret");
     const coordinator = new MetadataUnlockCoordinator();
 
     const report = await coordinator.run({

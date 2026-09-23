@@ -132,16 +132,15 @@ npm run check         # Run frontend checks + contract lint/build/test
 
 The supported ZK command surface is intentionally limited to these eight entries:
 
-| Command                       | Purpose                                                            |
-| ----------------------------- | ------------------------------------------------------------------ |
-| `npm run zk:fetch`            | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:ptau:fetch`       | Download or verify the pinned public Phase 1 pTau cache            |
-| `npm run zk:build`            | Compile both circuits                                              |
-| `npm run zk:dev:refresh`      | Rebuild every development artifact from a self-contained workflow  |
-| `npm run zk:production:setup` | Generate and verify the production Phase 2 artifacts               |
-| `npm run zk:check`            | Generate and verify real proofs for both circuits                  |
-| `npm run zk:artifacts:check`  | Rebuild and validate the complete artifact set                     |
-| `npm run zk:ceremony:verify`  | Verify the production pTau, zkeys, transcript, and trust metadata  |
+| Command                        | Purpose                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
+| `npm run zk:build`             | Compile both circuits                                              |
+| `npm run zk:development:setup` | Rebuild every development artifact from a self-contained workflow  |
+| `npm run zk:production:setup`  | Generate and verify the production Phase 2 artifacts               |
+| `npm run zk:check`             | Generate and verify real proofs for both circuits                  |
+| `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact set                     |
+| `npm run zk:ceremony:verify`   | Verify the production pTau, zkeys, transcript, and trust metadata  |
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -201,13 +200,15 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates both Phase 2 artifact sets from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-Development and production reuse the same fixed-digest public Phase 1 pTau at
-`tmp/zk-production/powersOfTau28_hez_final_13.ptau`. This removes the old locally generated
-development pTau, but it does **not** make development keys safe for production:
-`zk:dev:refresh` deliberately uses a single-operator Phase 2 flow with hard-coded public entropy
-and records a `development` manifest. It downloads or validates the shared pTau when needed,
-compiles both circuits, generates both development zkeys and verification keys, exports the
-Solidity verifiers, copies the required frontend assets, and updates the development manifest.
+`zk:development:setup` verifies the committed Phase 1 pTau, then compiles both circuits,
+generates development zkeys and verification keys, exports the Solidity verifiers, copies the
+required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
+any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
+production.
+
+Production setup uses the pinned public Phase 1 pTau committed at
+`circuits/ptau/powersOfTau28_hez_final_13.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
+command that reads it checks its byte length and both pinned hashes first; none downloads it.
 
 Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
 verification key is missing. It never silently generates a missing artifact during the copy step.

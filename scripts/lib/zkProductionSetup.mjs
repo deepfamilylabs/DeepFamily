@@ -1450,8 +1450,18 @@ export const runSingleOperatorProductionSetup = async ({
   const reviewedSnarkjsRuntimeSha256 = rotate
     ? expectedSnarkjsRuntimeSha256
     : initialManifest.toolchain.snarkjsRuntimeSha256;
-  const ptau = await ptauInstaller({ root: resolvedRoot });
-  const setupDirectory = path.dirname(ptau.path);
+  const ptau = await ptauInstaller({ root: resolvedRoot, env: baseEnvironment, platform });
+  // Keep the lock in this checkout so a reviewed pTau can live on read-only media.
+  const localTemporaryDirectory = path.join(resolvedRoot, "tmp");
+  await fsp.mkdir(localTemporaryDirectory, { recursive: true, mode: 0o700 });
+  if ((await fsp.realpath(localTemporaryDirectory)) !== localTemporaryDirectory) {
+    throw new Error("Production ZK setup temporary path must not traverse a symlink");
+  }
+  const setupDirectory = path.join(localTemporaryDirectory, "zk-production");
+  await fsp.mkdir(setupDirectory, { recursive: true, mode: 0o700 });
+  if ((await fsp.realpath(setupDirectory)) !== setupDirectory) {
+    throw new Error("Production ZK setup lock path must not traverse a symlink");
+  }
   const lockPath = path.join(setupDirectory, ".setup.lock");
   let lock;
   try {

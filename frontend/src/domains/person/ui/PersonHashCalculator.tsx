@@ -270,6 +270,8 @@ export const PersonHashCalculator = forwardRef<
     const confirmPassphraseInputRef = useRef<HTMLInputElement | null>(null);
     const passphraseHelpTitleId = useId();
     const passphraseHelpDescriptionId = useId();
+    const passphraseInputId = useId();
+    const passphraseErrorId = useId();
 
     // Use external state if provided, otherwise use internal state
     const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true;
@@ -380,6 +382,11 @@ export const PersonHashCalculator = forwardRef<
       () => normalizePassphraseForHash(passphraseInputRef.current?.value ?? ""),
       [passphraseRevision],
     );
+    const passphraseRisk = useMemo(
+      () => classifyProtocolPassphraseRisk(passphraseInputRef.current?.value ?? ""),
+      [passphraseRevision],
+    );
+    const isPassphraseDisallowed = passphraseRisk === "disallowed";
     const passphraseGraphemeLength = useMemo(
       () => getGraphemeLength(normalizedPassphrase),
       [normalizedPassphrase],
@@ -445,10 +452,20 @@ export const PersonHashCalculator = forwardRef<
         }),
         hasPassphrase: () =>
           normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
-        passphrasesMatch: () =>
-          !requirePassphraseConfirmation ||
-          normalizePassphraseForHash(passphraseInputRef.current?.value ?? "") ===
-            normalizePassphraseForHash(confirmPassphraseInputRef.current?.value ?? ""),
+        passphrasesMatch: () => {
+          if (!requirePassphraseConfirmation) return true;
+          const first = passphraseInputRef.current?.value ?? "";
+          const second = confirmPassphraseInputRef.current?.value ?? "";
+          // Input the protocol refuses normalizes to "", so comparing only the
+          // normalized forms would call two different refused inputs a match.
+          if (
+            classifyProtocolPassphraseRisk(first) === "disallowed" ||
+            classifyProtocolPassphraseRisk(second) === "disallowed"
+          ) {
+            return first === second;
+          }
+          return normalizePassphraseForHash(first) === normalizePassphraseForHash(second);
+        },
         clearSecretInputs: () => {
           if (passphraseInputRef.current) passphraseInputRef.current.value = "";
           if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
@@ -483,8 +500,9 @@ export const PersonHashCalculator = forwardRef<
         birthDay,
         gender: Number(gender || 0),
       });
-      if (!transformedData.fullName.length) {
-        setComputedHash("");
+      // Any edited field invalidates the previously computed hash immediately.
+      setComputedHash("");
+      if (!transformedData.fullName.length || isPassphraseDisallowed) {
         setIsComputingHash(false);
         return;
       }
@@ -533,6 +551,7 @@ export const PersonHashCalculator = forwardRef<
       birthDay,
       gender,
       passphraseRevision,
+      isPassphraseDisallowed,
       identitySuiteId,
     ]);
 
@@ -641,7 +660,7 @@ export const PersonHashCalculator = forwardRef<
           </div>
           <div className="w-full mt-2">
             <div className="flex items-center gap-2 mb-1">
-              <label className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-ink-muted whitespace-normal sm:whitespace-nowrap leading-tight">
+              <label htmlFor={passphraseInputId} className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-ink-muted whitespace-normal sm:whitespace-nowrap leading-tight">
                 {t("search.hashCalculator.passphrase", "Identity passphrase")}
               </label>
               <div className="relative">
@@ -752,6 +771,7 @@ export const PersonHashCalculator = forwardRef<
             </div>
             <div className="relative">
               <input
+                id={passphraseInputId}
                 type={showPassphrase ? "text" : "password"}
                 className={`${MODAL_FIELD_SM} pr-10`}
                 placeholder={t(
@@ -765,7 +785,11 @@ export const PersonHashCalculator = forwardRef<
                 spellCheck={false}
                 lang={i18n.language}
                 ref={passphraseInputRef}
+                aria-invalid={isPassphraseDisallowed || undefined}
+                aria-describedby={isPassphraseDisallowed ? passphraseErrorId : undefined}
                 onChange={() => {
+                  setComputedHash("");
+                  setIsComputingHash(false);
                   setPassphraseRevision((r) => r + 1);
                   onPassphraseChange?.(
                     classifyProtocolPassphraseRisk(passphraseInputRef.current?.value ?? ""),
@@ -791,6 +815,14 @@ export const PersonHashCalculator = forwardRef<
                 {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {isPassphraseDisallowed && (
+              <p id={passphraseErrorId} role="alert" className="mt-1 text-xs text-danger">
+                {t(
+                  "search.hashCalculator.passphraseDisallowed",
+                  "This passphrase contains a character the protocol does not accept, such as a control or invisible character. Remove it to calculate the identity hash.",
+                )}
+              </p>
+            )}
 
             {requirePassphraseConfirmation ? (
               <div className="relative mt-2">

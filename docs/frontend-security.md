@@ -36,7 +36,7 @@ different salts; "one passphrase" does not mean reusing the same KDF output as b
 
 Treat all of the following as sensitive working material:
 
-- raw and NFKD-normalized passphrases for the current person and non-null parents;
+- raw and OpaqueString-normalized passphrases for the current person and non-null parents;
 - domain-separated identity/file password bytes;
 - deterministic identity salts and random file salts;
 - Argon2id outputs, `derivedSecretField`, KEK, DEK, and proof witnesses;
@@ -57,7 +57,8 @@ Rules:
   package. It must not rerun the KDF, prover, or encryption with already-cleared secrets.
 
 The identity and file KDF paths both normalize the raw passphrase with the protocol's checked-in
-Unicode 17.0.0 NFKD implementation and do not trim it; browser/Node host ICU tables are not used.
+Unicode 17.0.0 RFC 8265 OpaqueString implementation and do not trim it; browser/Node host ICU
+tables are not used.
 They prepend different nonempty domains before Argon2id, so even an empty raw passphrase executes
 the full KDF. Identity suite 1 derives a deterministic salt from the suite ID and canonical
 identity fields; format 1 uses a fresh random `fileSalt` for every envelope.

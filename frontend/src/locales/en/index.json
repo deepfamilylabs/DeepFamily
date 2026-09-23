@@ -271,6 +271,7 @@
       "birthDayLabel": "Day",
       "passphrase": "Identity passphrase",
       "passphrasePlaceholder": "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+      "passphraseDisallowed": "This passphrase contains a character the protocol does not accept, such as a control or invisible character. Remove it to calculate the identity hash.",
       "confirmPassphrasePlaceholder": "Repeat the identity passphrase (empty is allowed)",
       "deterministicIdentityNotice": "Identity suite 1 always derives its salt deterministically from the canonical identity fields. No recovery salt is stored or accepted.",
       "passphraseHelp": {
@@ -300,7 +301,7 @@
         "weak": "Tip: Use at least 15+ mixed characters or 20+ letters for better security"
       },
       "entropyDisplay": "Raw entropy: {{raw}} bits · Adjusted strength score: {{adjusted}}",
-      "passphraseCharCount": "Characters after NFKD (not trimmed): {{count}}",
+      "passphraseCharCount": "Characters after normalization (not trimmed): {{count}}",
       "nameInputPlaceholder": "e.g., John Smith",
       "bcOptions": {
         "ad": "AD",
@@ -1394,7 +1395,8 @@
       "improvePassphrase": "Improve Passphrase",
       "recommendations": {
         "empty": "Empty passphrase: zero passphrase entropy. Anyone who knows the identity fields can reproduce this key derivation input; the KDF cannot restore missing entropy.",
-        "unicodeWhitespace": "This passphrase contains only Unicode White_Space after NFKD. It is not trimmed, but it is highly guessable and must be treated as a high-risk choice.",
+        "unicodeWhitespace": "This passphrase contains only Unicode White_Space after normalization. It is not trimmed, but it is highly guessable and must be treated as a high-risk choice.",
+        "disallowedCodePoint": "This passphrase contains a code point the protocol does not accept, such as a control or invisible character. It cannot be used until that character is removed, because an invisible character cannot be retyped and the passphrase is not recoverable.",
         "weak": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
         "medium": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols",
         "strong": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",

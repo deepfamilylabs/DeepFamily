@@ -271,6 +271,7 @@
       "birthDayLabel": "日",
       "passphrase": "身份口令",
       "passphrasePlaceholder": "可输入任意字符的家训或暗号，推荐 15+ 字符并混合不同符号",
+      "passphraseDisallowed": "此口令包含协议不接受的字符，例如控制字符或不可见字符。请移除该字符后再计算身份哈希。",
       "confirmPassphrasePlaceholder": "再次输入身份口令（允许留空）",
       "deterministicIdentityNotice": "身份套件 1 始终从规范化身份字段确定性派生盐值，不保存也不接受恢复盐。",
       "passphraseHelp": {
@@ -300,7 +301,7 @@
         "weak": "建议：至少使用 15+ 混合字符或 20+ 字母以获得更好的安全性"
       },
       "entropyDisplay": "真实熵值：{{raw}} bits · 评估强度评分：{{adjusted}}",
-      "passphraseCharCount": "NFKD 规范化后的字符数（不裁剪）：{{count}}",
+      "passphraseCharCount": "规范化后的字符数（不裁剪）：{{count}}",
       "nameInputPlaceholder": "例如：张三",
       "bcOptions": {
         "ad": "公元",
@@ -1394,7 +1395,8 @@
       "improvePassphrase": "改进口令短语",
       "recommendations": {
         "empty": "空口令的口令熵为零。任何知道身份字段的人都能复现此密钥派生输入，KDF 无法弥补缺失的熵。",
-        "unicodeWhitespace": "此口令经 NFKD 规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中，必须视为高风险选择。",
+        "unicodeWhitespace": "此口令经规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中，必须视为高风险选择。",
+        "disallowedCodePoint": "此口令包含协议不接受的码点，例如控制字符或不可见字符。必须先移除该字符才能使用，因为不可见字符无法重新键入，而口令不可找回。",
         "weak": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性不足。建议：15+ 混合字符或 20+ 纯字母",
         "medium": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号",
         "strong": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性良好",

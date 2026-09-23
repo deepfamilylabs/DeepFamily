@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readZkeyMpcMetadata } from "../scripts/lib/zkeyMpcMetadata.mjs";
-import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-dev-refresh.mjs";
+import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-development-setup.mjs";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

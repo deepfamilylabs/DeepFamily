@@ -136,7 +136,8 @@ Copy `.env.example` to the ignored `.env` file and fill the production values. D
 # Approved factory/release deployer only; never a Safe owner key.
 PRIVATE_KEY=0x...
 CONFLUX_RPC_URL=https://your-reviewed-espace-mainnet-rpc
-# Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
+# Optional path override for the production pTau file.
+# Blank uses the committed circuits/ptau/powersOfTau28_hez_final_13.ptau.
 ZK_PTAU_PATH=
 
 # Deployed production Safe Proxy address. Keep blank through Safe plan/deploy/owner acceptance.

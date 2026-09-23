@@ -43,7 +43,7 @@ export const CANDIDATE_ARGON2ID_PROFILE = Object.freeze({
 export const IDENTITY_PASSWORD_DOMAIN = "DeepFamily:IdentityKDF:v1";
 export const FILE_PASSWORD_DOMAIN = "DeepFamily:FileKDF:v1";
 export const IDENTITY_SALT_DOMAIN = "deepfamily:identity-kdf-salt:v1";
-export const NAME_PREHASH_DOMAIN = "deepfamily:name-prehash:v2";
+export const NAME_PREHASH_DOMAIN = "deepfamily:name-prehash:v1";
 
 export const DOMAIN_SUITE = 1000n;
 export const DOMAIN_NAME_SECRET = 1001n;

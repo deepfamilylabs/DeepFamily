@@ -858,7 +858,7 @@ describe("production release preflight", function () {
     expect(error?.message).to.match(/person_commitment zkey SHA-256 mismatch/u);
   });
 
-  it("falls back to the pinned cache and fails closed when it is unavailable", async function () {
+  it("uses the default local pTau path and fails closed when it is unavailable", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
     const previousPtauPath = process.env.ZK_PTAU_PATH;
@@ -876,7 +876,7 @@ describe("production release preflight", function () {
         }),
       );
       expect(error?.message).to.match(
-        /Published Powers of Tau is unavailable:.*tmp[\\/]zk-production/u,
+        /Published Powers of Tau is unavailable:.*circuits[\\/]ptau/u,
       );
     } finally {
       if (previousPtauPath === undefined) delete process.env.ZK_PTAU_PATH;

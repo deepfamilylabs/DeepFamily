@@ -1,10 +1,11 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 export const PRODUCTION_PTAU_FILE_NAME = "powersOfTau28_hez_final_13.ptau";
-export const PRODUCTION_PTAU_RELATIVE_PATH = `tmp/zk-production/${PRODUCTION_PTAU_FILE_NAME}`;
+export const PRODUCTION_PTAU_RELATIVE_PATH = `circuits/ptau/${PRODUCTION_PTAU_FILE_NAME}`;
+// Ceremony provenance only. The production workflow never downloads from this URL.
 export const PRODUCTION_PTAU_URL =
   "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_13.ptau";
 export const PRODUCTION_PTAU_BYTES = 9_520_280;
@@ -19,20 +20,6 @@ export const PRODUCTION_PTAU_EVIDENCE = Object.freeze({
   sha256: PRODUCTION_PTAU_SHA256,
   blake2b512: PRODUCTION_PTAU_BLAKE2B512,
 });
-
-const requireSecureDirectory = async (directory) => {
-  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  const state = await fs.lstat(directory);
-  if (!state.isDirectory() || state.isSymbolicLink()) {
-    throw new Error(`Production Powers of Tau cache must be a non-symlink directory: ${directory}`);
-  }
-  if ((await fs.realpath(directory)) !== path.resolve(directory)) {
-    throw new Error(
-      `Production Powers of Tau cache path must not traverse a symlink: ${directory}`,
-    );
-  }
-  await fs.chmod(directory, 0o700);
-};
 
 export const inspectPtauFile = async (filePath) => {
   const state = await fs.lstat(filePath);
@@ -58,81 +45,15 @@ export const inspectPtauFile = async (filePath) => {
   });
 };
 
-const assertPinnedEvidence = (actual, label, expected) => {
+const assertPinnedEvidence = (actual, expected) => {
   for (const field of ["bytes", "sha256", "blake2b512"]) {
     if (actual[field] !== expected[field]) {
       throw new Error(
-        `${label} ${field} mismatch; expected ${expected[field]}, got ${actual[field]}`,
+        `Local Powers of Tau ${field} mismatch; expected ${expected[field]}, got ${actual[field]}`,
       );
     }
   }
   return actual;
-};
-
-const destinationState = async (destination) => {
-  try {
-    return await fs.lstat(destination);
-  } catch (error) {
-    if (error?.code === "ENOENT") return null;
-    throw error;
-  }
-};
-
-const downloadPinnedPtau = async ({ destination, fetchImpl, source, expected }) => {
-  const response = await fetchImpl(source, { redirect: "error" });
-  if (!response?.ok) {
-    throw new Error(`Powers of Tau download failed with HTTP ${response?.status ?? "unknown"}`);
-  }
-  const contentLength = response.headers?.get?.("content-length");
-  if (contentLength !== null && contentLength !== undefined) {
-    const parsedLength = Number(contentLength);
-    if (parsedLength !== expected.bytes) {
-      throw new Error(
-        `Powers of Tau Content-Length mismatch; expected ${expected.bytes}, ` +
-          `got ${contentLength}`,
-      );
-    }
-  }
-  if (!response.body) throw new Error("Powers of Tau download returned an empty body");
-
-  const temporaryPath = path.join(
-    path.dirname(destination),
-    `.${PRODUCTION_PTAU_FILE_NAME}.${process.pid}.${randomBytes(8).toString("hex")}.partial`,
-  );
-  let handle;
-  try {
-    handle = await fs.open(temporaryPath, "wx", 0o600);
-    let bytes = 0;
-    const sha256 = createHash("sha256");
-    const blake2b512 = createHash("blake2b512");
-    for await (const value of response.body) {
-      const chunk = Buffer.from(value);
-      bytes += chunk.length;
-      if (bytes > expected.bytes) {
-        throw new Error(`Powers of Tau download exceeds the pinned ${expected.bytes}-byte size`);
-      }
-      sha256.update(chunk);
-      blake2b512.update(chunk);
-      await handle.writeFile(chunk);
-    }
-    await handle.sync();
-    await handle.close();
-    handle = null;
-    assertPinnedEvidence(
-      {
-        bytes,
-        sha256: sha256.digest("hex"),
-        blake2b512: blake2b512.digest("hex"),
-      },
-      "Downloaded Powers of Tau",
-      expected,
-    );
-    await fs.rename(temporaryPath, destination);
-    await fs.chmod(destination, 0o600);
-  } finally {
-    await handle?.close();
-    await fs.rm(temporaryPath, { force: true });
-  }
 };
 
 export const productionPtauPath = (root = process.cwd()) =>
@@ -158,11 +79,10 @@ export const resolveProductionPtauPath = ({
 
 export const ensureProductionPtau = async ({
   root = process.cwd(),
-  fetchImpl = globalThis.fetch,
-  source = PRODUCTION_PTAU_URL,
+  env = process.env,
+  platform = process.platform,
   expected = PRODUCTION_PTAU_EVIDENCE,
 } = {}) => {
-  if (typeof fetchImpl !== "function") throw new Error("fetchImpl must be a function");
   if (
     !expected ||
     !Number.isSafeInteger(expected.bytes) ||
@@ -176,55 +96,23 @@ export const ensureProductionPtau = async ({
   if ((await fs.realpath(resolvedRoot)) !== resolvedRoot) {
     throw new Error("Production Powers of Tau root must not traverse a symlink");
   }
-  const destination = productionPtauPath(resolvedRoot);
-  const cacheDirectory = path.dirname(destination);
-  await requireSecureDirectory(cacheDirectory);
-  const lockPath = path.join(cacheDirectory, ".download.lock");
-  let lock;
+  const filePath = resolveProductionPtauPath({ root: resolvedRoot, env, platform });
+  let evidence;
   try {
-    lock = await fs.open(lockPath, "wx", 0o600);
+    evidence = await inspectPtauFile(filePath);
   } catch (error) {
-    if (error?.code === "EEXIST") {
-      throw new Error("Another production Powers of Tau download or validation is in progress");
+    if (error?.code === "ENOENT") {
+      throw new Error(
+        `Local production Powers of Tau is missing: ${filePath}. Place the reviewed file there or set ZK_PTAU_PATH.`,
+        { cause: error },
+      );
     }
     throw error;
   }
-
-  try {
-    const state = await destinationState(destination);
-    let status = "already-cached";
-    if (state) {
-      if (!state.isFile() || state.isSymbolicLink()) {
-        throw new Error("Existing production Powers of Tau cache is not a regular file");
-      }
-      try {
-        assertPinnedEvidence(await inspectPtauFile(destination), "Cached Powers of Tau", expected);
-      } catch (error) {
-        throw new Error(
-          "Existing production Powers of Tau cache is unexpected; remove it only after review",
-          { cause: error },
-        );
-      }
-      await fs.chmod(destination, 0o600);
-    } else {
-      await downloadPinnedPtau({ destination, fetchImpl, source, expected });
-      status = "downloaded";
-    }
-    const evidence = assertPinnedEvidence(
-      await inspectPtauFile(destination),
-      "Installed Powers of Tau",
-      expected,
-    );
-    return Object.freeze({
-      status,
-      ...evidence,
-      source,
-    });
-  } finally {
-    try {
-      await lock.close();
-    } finally {
-      await fs.rm(lockPath, { force: true });
-    }
-  }
+  assertPinnedEvidence(evidence, expected);
+  return Object.freeze({
+    status: "verified-local",
+    ...evidence,
+    source: PRODUCTION_PTAU_URL,
+  });
 };

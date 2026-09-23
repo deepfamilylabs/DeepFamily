@@ -125,6 +125,12 @@ export const SecureKeyDerivation: React.FC<SecureKeyDerivationProps> = ({ classN
     // Check passphrase strength (without lifting passphrase into component state)
     const strength = validatePassphraseStrength(formData.passphrase || "");
     const passphraseRisk = classifyProtocolPassphraseRisk(formData.passphrase || "");
+    if (passphraseRisk === "disallowed") {
+      // Unlike a weak passphrase this is not a risk the user can accept: the
+      // protocol refuses the input, so offering to continue could only fail later.
+      toast.error(t("keyDerivation.component.recommendations.disallowedCodePoint"));
+      return;
+    }
     if (passphraseRisk !== "ordinary" || (strength && !strength.isStrong)) {
       const rawBits = Math.round(strength.rawEntropy ?? 0);
       const adjustedBits = Math.round(strength.entropy ?? 0);

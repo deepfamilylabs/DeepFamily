@@ -13,21 +13,21 @@ import { resolveSnarkjsCliPath } from "../scripts/lib/snarkjsToolchain.mjs";
 import {
   DEVELOPMENT_CIRCUITS,
   DEVELOPMENT_CONTRIBUTOR_NAME,
-  DEVELOPMENT_PUBLIC_ENTROPY,
+  DEVELOPMENT_ENTROPY_LABEL,
   buildDevelopmentSetupCommands,
-  runZkDevelopmentRefresh,
-} from "../scripts/zk-dev-refresh.mjs";
+  runZkDevelopmentSetup,
+} from "../scripts/zk-development-setup.mjs";
 
 const fakePtau = (root) => ({
-  status: "already-cached",
-  path: path.join(root, "tmp/zk-production/powersOfTau28_hez_final_13.ptau"),
+  status: "verified-local",
+  path: path.join(root, "circuits/ptau/powersOfTau28_hez_final_13.ptau"),
   bytes: 9_520_280,
   sha256: "95".repeat(32),
   blake2b512: "58".repeat(64),
-  source: "https://example.invalid/pinned.ptau",
+  source: ZK_PRODUCTION_PHASE1.source,
 });
 
-describe("development ZK refresh", function () {
+describe("development ZK setup", function () {
   it("rejects a valid production manifest without changing the fixture tree", async function () {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-zk-production-guard-"));
     const manifestPath = path.join(root, ZK_ARTIFACT_MANIFEST_PATH);
@@ -86,7 +86,7 @@ describe("development ZK refresh", function () {
     try {
       let caught;
       try {
-        await runZkDevelopmentRefresh({
+        await runZkDevelopmentSetup({
           root,
           ptauInstaller: async () => {
             mutationCalls += 1;
@@ -127,7 +127,7 @@ describe("development ZK refresh", function () {
 
     let caught;
     try {
-      await runZkDevelopmentRefresh({
+      await runZkDevelopmentSetup({
         root: "/tmp/deepfamily-production-guard-fixture",
         manifestGuard: () => {
           calls.push("guard");
@@ -157,25 +157,6 @@ describe("development ZK refresh", function () {
     expect(calls).to.deep.equal(["guard"]);
   });
 
-  it("uses the explicit fresh-v1 initializer instead of the normal development guard", async function () {
-    const root = path.resolve("/tmp/deepfamily-fresh-v1-transition-fixture");
-    const calls = [];
-    await runZkDevelopmentRefresh({
-      root,
-      freshV1: true,
-      freshV1Initializer: ({ root: initializedRoot }) => calls.push(["fresh-v1", initializedRoot]),
-      manifestGuard: () => calls.push(["unexpected-guard"]),
-      ptauInstaller: async () => fakePtau(root),
-      temporaryDirectoryFactory: () => path.join(root, "temporary"),
-      temporaryDirectoryRemover: () => {},
-      commandRunner: async () => {},
-      assetSynchronizer: async () => ({ exitCode: 0, failedFiles: [] }),
-      manifestUpdater: () => ({ manifestSha256: "ab".repeat(32) }),
-      output: { log: () => {}, warn: () => {}, error: () => {} },
-    });
-    expect(calls).to.deep.equal([["fresh-v1", root]]);
-  });
-
   it("uses the pinned pTau before rebuilding keys, then syncs, updates and proves", async function () {
     const root = path.resolve("/tmp/deepfamily-development-refresh-fixture");
     const temporaryDirectory = path.join(root, "temporary");
@@ -188,7 +169,7 @@ describe("development ZK refresh", function () {
     };
     const manifestEvidence = { manifestSha256: "ab".repeat(32) };
 
-    const result = await runZkDevelopmentRefresh({
+    const result = await runZkDevelopmentSetup({
       root,
       output,
       manifestGuard: ({ root: guardedRoot }) => calls.push(["guard", guardedRoot]),
@@ -216,6 +197,7 @@ describe("development ZK refresh", function () {
     expect(calls[0]).to.deep.equal(["guard", root]);
     expect(calls[1]).to.deep.equal(["ptau", root]);
     expect(calls[2][0]).to.equal("log");
+    expect(calls[2][1]).to.include("Pinned Phase 1 Powers of Tau");
     expect(calls[3]).to.deep.equal(["temporary-directory", temporaryDirectory]);
 
     const commandCalls = calls.filter(([kind]) => kind === "command");
@@ -241,7 +223,7 @@ describe("development ZK refresh", function () {
     expect(cleanupIndex).to.be.greaterThan(proofIndex);
   });
 
-  it("builds one fixed-entropy development Phase 2 sequence per circuit", function () {
+  it("builds one development Phase 2 sequence per circuit", function () {
     const root = path.resolve("/tmp/deepfamily-development-commands");
     const temporaryDirectory = path.join(root, "temporary");
     const ptauPath = path.join(root, "pinned.ptau");
@@ -273,7 +255,7 @@ describe("development ZK refresh", function () {
         path.join(temporaryDirectory, `${circuit.name}_0000.zkey`),
       ]);
       expect(contribute.args).to.include(`--name=${DEVELOPMENT_CONTRIBUTOR_NAME}`);
-      expect(contribute.args).to.include(`-e=${DEVELOPMENT_PUBLIC_ENTROPY}`);
+      expect(contribute.args).to.include(`-e=${DEVELOPMENT_ENTROPY_LABEL}`);
       expect(exportVkey.args.slice(1, 4)).to.deep.equal(["zkey", "export", "verificationkey"]);
       expect(exportVerifier.args.slice(1, 4)).to.deep.equal(["zkey", "export", "solidityverifier"]);
       expect(renameVerifier.executable).to.equal(process.execPath);
@@ -286,7 +268,7 @@ describe("development ZK refresh", function () {
     const calls = [];
     let caught;
     try {
-      await runZkDevelopmentRefresh({
+      await runZkDevelopmentSetup({
         root,
         output: { log: () => {}, warn: () => {}, error: () => {} },
         manifestGuard: () => {},

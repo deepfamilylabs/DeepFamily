@@ -106,7 +106,8 @@ Copy `.env.example` to the ignored `.env` and protect it. Never commit `.env`.
 PRIVATE_KEY=0x...
 ETHEREUM_MAINNET_RPC_URL=https://your-reviewed-ethereum-mainnet-rpc
 EXPLORER_API_KEY=your-real-etherscan-api-key
-# Optional: blank uses tmp/zk-production/powersOfTau28_hez_final_13.ptau.
+# Optional path override for the production pTau file.
+# Blank uses the committed circuits/ptau/powersOfTau28_hez_final_13.ptau.
 ZK_PTAU_PATH=
 
 # Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.

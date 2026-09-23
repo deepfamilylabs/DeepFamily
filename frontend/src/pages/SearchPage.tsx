@@ -31,6 +31,7 @@ export default function SearchPage() {
   const query = searchParams.get("q")?.trim() ?? "";
   const { searchFor } = unified;
   const appliedQueryRef = useRef<string | null>(null);
+  const lastCalculatorHashRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!query || appliedQueryRef.current === query) return;
@@ -69,7 +70,18 @@ export default function SearchPage() {
             className="border-0 bg-transparent p-0 shadow-none"
             onPublicFormChange={search.hash.onPublicFormChange}
             onComputedHashChange={(hash) => {
-              if (hash) unified.setQueryInput(hash);
+              if (hash) {
+                lastCalculatorHashRef.current = hash;
+                unified.setQueryInput(hash);
+                return;
+              }
+              const lastCalculatorHash = lastCalculatorHashRef.current;
+              lastCalculatorHashRef.current = null;
+              if (lastCalculatorHash) {
+                unified.setQueryInput((current) =>
+                  current === lastCalculatorHash ? "" : current,
+                );
+              }
             }}
           />
           {search.hash.hasPassphrase && (
@@ -230,4 +242,3 @@ function facetCount(
               : search.uri.state;
   return state.queried && !state.loading ? state.total : undefined;
 }
-

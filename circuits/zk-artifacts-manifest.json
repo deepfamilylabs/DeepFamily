@@ -10,7 +10,7 @@
   "trustedSetup": {
     "status": "development",
     "trustModel": "single-operator",
-    "warning": "Fresh-v1 development keys use one public fixed-entropy contributor; production ceremony required.",
+    "warning": "Fresh-v1 development keys come from an unattested local contribution with no ceremony evidence; production ceremony required.",
     "minimumContributors": 1,
     "contributorCount": 1,
     "beaconApplied": false,
@@ -18,12 +18,12 @@
   },
   "circuits": {
     "person_commitment": {
-      "sourceSha256": "51247f81f18bb4a44334158549dfdbb93b081db64b5fe994ecd58577095279aa",
-      "r1csSha256": "d7890330905380ec3d491a7e0b6ca9a1c01f7ed6feb0bb884bceb32463ee873d",
-      "wasmSha256": "99a961ed1febeeb8aebec12bd5ab0c4e09b47adf34030596adc9effa68775c4e",
-      "zkeySha256": "6e631784fedc8c9983a8867907bb2b662f319fd9ef4e51b1d63c8d0795218956",
-      "verificationKeySha256": "fdbdca40d0aff9b37b061b8657dafef5bbc2e35d48b42811055a197d04e622f5",
-      "solidityVerifierSha256": "2e93041f1330b46c889362a578a77a94e74a3970929d1ee6c9b98def0f6c1286"
+      "sourceSha256": "a188ef1b37c37f49a5780731d4b03004ab45da991de0ba9538de371e055e9c82",
+      "r1csSha256": "32ebc923b60c7d136fd0c5fbbe63a77ec818eadda2b0bb830c1d17d913e05f48",
+      "wasmSha256": "a475fd49119d170384ae47518544d289792754626d5a8a888a2948d0b9159c1a",
+      "zkeySha256": "04114e44fdaa37a8e125086f90ad4da13c2c58f6b00517a6bb1767833c1eee97",
+      "verificationKeySha256": "0f55cf59e74d21dd72f9a82bdeb6b565bb5a7d1a27695152262fa57003b8c9f2",
+      "solidityVerifierSha256": "bc1e438326c2bcc764a69d0fb55dc3f79b3f4ae3692f9150b71d3a045c2fcbec"
     },
     "disclosure_binding": {
       "sourceSha256": "ce0308ca6af430da7dc09720659465b5d750153e755508f8d654c90ba898ccdb",

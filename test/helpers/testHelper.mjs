@@ -63,7 +63,7 @@ export function computeSuiteCommitment(identitySuiteId = 1) {
 
 export function computeNameField(ethers, fullName) {
   const canonicalFullName = canonicalizeFullName(fullName);
-  const domainBytes = ethers.toUtf8Bytes("deepfamily:name-prehash:v2");
+  const domainBytes = ethers.toUtf8Bytes("deepfamily:name-prehash:v1");
   const nameBytes = ethers.toUtf8Bytes(canonicalFullName);
   return BigInt(ethers.keccak256(ethers.concat([domainBytes, nameBytes]))) % SNARK_FIELD;
 }

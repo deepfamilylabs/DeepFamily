@@ -137,9 +137,11 @@ describe("production crypto worker handlers", () => {
     expect(decrypted).not.toHaveProperty("contentDigest");
   });
 
-  it("uses NFKD without trimming on both real identity and file KDF paths", async () => {
+  it("uses OpaqueString without trimming on both real identity and file KDF paths", async () => {
     const rawPassphrase = "  caf\u00e9  ";
-    const normalizedPassphrase = rawPassphrase.normalize("NFKD");
+    // These fixtures contain no non-ASCII Zs, so the OpaqueString additional
+    // mapping rule is a no-op and host NFC reproduces the protocol form exactly.
+    const normalizedPassphrase = rawPassphrase.normalize("NFC");
     const material = await cryptoWorkerHandlers.deriveIdentityMaterialV1({
       identity,
       rawPassphrase,
@@ -225,7 +227,7 @@ describe("production crypto worker handlers", () => {
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
     expect(
       serializeCryptoWorkerError(
-        Object.assign(new Error(`failed for ${rawPassphrase.normalize("NFKD")}`), {
+        Object.assign(new Error(`failed for ${rawPassphrase.normalize("NFC")}`), {
           code: "KDF_FAILED",
         }),
         rawPassphrase,
@@ -236,7 +238,7 @@ describe("production crypto worker handlers", () => {
   it("redacts nested shared-identity passphrases from Worker errors", async () => {
     const rawPassphrase = "nested-worker-passphrase-\u00e9-sentinel";
     const deriveKey = vi.spyOn(cryptoWorkerHandlers, "deriveKey").mockRejectedValueOnce(
-      Object.assign(new Error(`derive failed for ${rawPassphrase.normalize("NFKD")}`), {
+      Object.assign(new Error(`derive failed for ${rawPassphrase.normalize("NFC")}`), {
         code: "KDF_FAILED",
       }),
     );
@@ -260,14 +262,14 @@ describe("production crypto worker handlers", () => {
       error: { message: "derive failed for [REDACTED]", code: "KDF_FAILED" },
     });
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
-    expect(JSON.stringify(responses)).not.toContain(rawPassphrase.normalize("NFKD"));
+    expect(JSON.stringify(responses)).not.toContain(rawPassphrase.normalize("NFC"));
     deriveKey.mockRestore();
   });
 
-  it("redacts Unicode 17 protocol-normalized secrets even when host ICU differs", async () => {
-    const rawPassphrase = "\ua7f1-worker-secret";
+  it("redacts the protocol-normalized secret, not only the raw input", async () => {
+    const rawPassphrase = "a\u030a-worker-secret";
     const normalizedPassphrase = normalizePassphrase(rawPassphrase);
-    expect(normalizedPassphrase).toBe("S-worker-secret");
+    expect(normalizedPassphrase).toBe("\u00e5-worker-secret");
     const deriveKey = vi
       .spyOn(cryptoWorkerHandlers, "deriveKey")
       .mockRejectedValueOnce(new Error(`derive failed for ${normalizedPassphrase}`));

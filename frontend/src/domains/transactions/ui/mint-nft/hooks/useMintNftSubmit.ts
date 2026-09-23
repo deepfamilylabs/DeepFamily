@@ -122,6 +122,21 @@ export function useMintNftSubmit({
         return;
       }
 
+      if (
+        classifyProtocolPassphraseRisk(calculator.getSecretInputs().passphrase) === "disallowed"
+      ) {
+        setErrorResult(
+          toMintNFTErrorResult(
+            "PASSPHRASE_DISALLOWED",
+            t(
+              "keyDerivation.component.recommendations.disallowedCodePoint",
+              "This passphrase contains a code point the protocol does not accept, such as a control or invisible character.",
+            ),
+          ),
+        );
+        return;
+      }
+
       if (!hasTargetInputs) {
         setErrorResult(
           toMintNFTErrorResult(

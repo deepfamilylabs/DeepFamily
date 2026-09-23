@@ -120,13 +120,32 @@
       "maximumBytes": 16384
     }
   },
+  "identity": {
+    "fullName": {
+      "normalization": "NFKC",
+      "unicodeVersion": "17.0.0",
+      "normalizationImplementation": "deepfamily-ucd-normalization-v1",
+      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      "whiteSpaceProperty": "Unicode White_Space",
+      "whiteSpaceUnicodeVersion": "17.0.0",
+      "collapse": "runs to U+0020",
+      "trim": true,
+      "maximumUtf8Bytes": 256
+    },
+    "nameField": {
+      "domain": "deepfamily:name-prehash:v1",
+      "derivation": "keccak256(UTF8(domain) || UTF8(canonicalFullName)) mod BN254"
+    }
+  },
   "identitySuites": {
     "1": {
       "status": "candidate-awaiting-device-benchmark",
-      "normalization": "NFKD",
+      "normalization": "RFC8265-OpaqueString",
       "unicodeVersion": "17.0.0",
       "normalizationImplementation": "deepfamily-ucd-normalization-v1",
-      "normalizationDataSha256": "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
+      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      "codePointRestriction": "PRECIS FreeformClass (RFC 8264)",
+      "precisDataSha256": "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
       "trim": false,
       "passwordDomain": "DeepFamily:IdentityKDF:v1",
       "passwordDomainSeparatorHex": "00",
@@ -149,10 +168,12 @@
   "fileKdfSuites": {
     "1": {
       "status": "candidate-awaiting-device-benchmark",
-      "normalization": "NFKD",
+      "normalization": "RFC8265-OpaqueString",
       "unicodeVersion": "17.0.0",
       "normalizationImplementation": "deepfamily-ucd-normalization-v1",
-      "normalizationDataSha256": "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
+      "normalizationDataSha256": "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      "codePointRestriction": "PRECIS FreeformClass (RFC 8264)",
+      "precisDataSha256": "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
       "trim": false,
       "passwordDomain": "DeepFamily:FileKDF:v1",
       "passwordDomainSeparatorHex": "00",
@@ -1549,7 +1570,7 @@
   "goldenVectors": {
     "status": "candidate-not-production-frozen",
     "path": "protocol-vectors/onchain-biography-v1.json",
-    "sha256": "e654308e4bac1f1847f51ceaf6b79f8f28f5595c2df2c7968a9a7ad37294f68a"
+    "sha256": "661a7a429035a0aefb01fa299140d9b031ab7e6a6121e24d8a704200a36df205"
   },
   "releaseEvidence": {
     "kdfDeviceMatrix": {
