@@ -29,8 +29,8 @@ const usage = () => {
 
 The command is read-only. It requires a production ceremony manifest, verifies every checked-in
 artifact hash, verifies the Powers of Tau transcript, and cryptographically binds each final zkey
-to the frozen R1CS and the supplied Powers of Tau file. With no --ptau option it uses the pinned
-cache populated by npm run zk:ptau:fetch or npm run zk:production:setup.`);
+to the frozen R1CS and the supplied Powers of Tau file. With no --ptau option it uses the file
+selected by ZK_PTAU_PATH, or the committed circuits/ptau file.`);
 };
 
 const parseArguments = (argv) => {

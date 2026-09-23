@@ -84,7 +84,19 @@ vi.mock("../domains/person", async (importOriginal) => {
         props.onPublicFormChange?.();
       }, [props]);
 
-      return <div data-testid="person-hash-calculator" />;
+      return (
+        <div data-testid="person-hash-calculator">
+          <button type="button" onClick={() => props.onComputedHashChange?.(personHashA)}>
+            Emit calculator hash A
+          </button>
+          <button type="button" onClick={() => props.onComputedHashChange?.(personHashB)}>
+            Emit calculator hash B
+          </button>
+          <button type="button" onClick={() => props.onComputedHashChange?.("")}>
+            Invalidate calculator hash
+          </button>
+        </div>
+      );
     }),
   };
 });
@@ -166,6 +178,22 @@ describe("SearchPage", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("clears an invalidated calculator hash but preserves a manually entered query", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "search.hashCalculator.title" }));
+    fireEvent.click(screen.getByRole("button", { name: "Emit calculator hash A" }));
+    expect((queryBox() as HTMLInputElement).value).toBe(personHashA);
+
+    fireEvent.click(screen.getByRole("button", { name: "Invalidate calculator hash" }));
+    expect((queryBox() as HTMLInputElement).value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Emit calculator hash B" }));
+    expect((queryBox() as HTMLInputElement).value).toBe(personHashB);
+    fireEvent.change(queryBox(), { target: { value: walletAddress } });
+    fireEvent.click(screen.getByRole("button", { name: "Invalidate calculator hash" }));
+    expect((queryBox() as HTMLInputElement).value).toBe(walletAddress);
   });
 
   it("resolves a person hash from the single query box and paginates its versions", async () => {

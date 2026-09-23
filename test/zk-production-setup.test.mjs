@@ -583,7 +583,7 @@ describe("single-operator production ZK setup safety", function () {
         rotate: true,
         expectedCurrentManifestSha256: sha256Text(manifestRaw),
         expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
-        env: {},
+        env: { ZK_PTAU_PATH: ptauPath },
         platform: "darwin",
         arch: "arm64",
         captureRunner: createFixtureGitCaptureRunner(),
@@ -623,7 +623,9 @@ describe("single-operator production ZK setup safety", function () {
           entropyRequested = true;
           return Buffer.alloc(length);
         },
-        ptauInstaller: async () => {
+        ptauInstaller: async ({ env: ptauEnv, platform: ptauPlatform }) => {
+          expect(ptauEnv.ZK_PTAU_PATH).to.equal(ptauPath);
+          expect(ptauPlatform).to.equal("darwin");
           await fs.mkdir(setupDirectory, { recursive: true });
           await fs.writeFile(ptauPath, ptauContents);
           return {
@@ -633,6 +635,13 @@ describe("single-operator production ZK setup safety", function () {
             sha256: sha256Text(ptauContents),
             blake2b512: createHash("blake2b512").update(ptauContents).digest("hex"),
           };
+        },
+        privateDirectoryFactory: async () => {
+          expect(await fs.readdir(setupDirectory)).to.deep.equal(["fixture.ptau"]);
+          expect(await fs.readdir(path.join(root, "tmp", "zk-production"))).to.deep.equal([
+            ".setup.lock",
+          ]);
+          return stage;
         },
         runner: async (command) => {
           if (!command.args[0]?.endsWith(".circom")) {

@@ -31,9 +31,27 @@ normalization tables, independent of the host browser or Node ICU version:
 - leading and trailing whitespace removed;
 - the result must be nonempty and at most 256 UTF-8 bytes.
 
-Passphrases follow a different rule: Unicode 17.0.0 NFKD, no trim. Empty is valid and still
-executes Argon2id. Both suite definitions bind the exact generated normalization-data SHA-256 in
-the protocol release manifest. `npm run protocol:unicode:check` downloads hash-pinned official UCD
+Passphrases follow a different rule: RFC 8265 OpaqueString over Unicode 17.0.0, no trim.
+
+Preparation (Section 4.2.1) rejects any code point outside the PRECIS FreeformClass (RFC 8264
+Section 4.3), derived from pinned UCD bytes by `scripts/generate-precis-data.mjs`. Controls such as
+U+0009 and U+0000, Default_Ignorable code points such as U+00AD and U+FEFF, noncharacters,
+unassigned code points and Old Hangul Jamo are all refused, because a code point that is invisible
+or untypeable cannot be reproduced and the passphrase is not recoverable. CONTEXTJ and CONTEXTO
+code points are admitted only when their RFC 5892 Appendix A rule confirms the surrounding context.
+
+Enforcement (Section 4.2.2) then maps every General_Category Zs other than U+0020 to U+0020 and
+applies NFC; there is no width or case mapping, so fullwidth forms and compatibility decompositions
+survive. The Zs rule is narrower than the White_Space property used for names, so U+0085, U+2028
+and U+2029 are not folded to a space — they are rejected outright during preparation.
+The normalized result must satisfy the FreeformClass and contextual rules again (RFC 8264
+Section 7): NFC can introduce a contextual code point or change its surrounding script. For
+example, U+0387 becomes U+00B7 and is accepted only between two lowercase `l` characters.
+
+The profile's nonempty-password rule is the one deliberate divergence: an empty passphrase is valid
+and still executes Argon2id. Both suite definitions bind the exact SHA-256 of the generated
+normalization tables and FreeformClass repertoire in the protocol release manifest.
+`npm run protocol:unicode:check` downloads hash-pinned official UCD
 sources and runs the complete Unicode normalization conformance suite; it is an explicit
 reproducibility check rather than a network dependency of the ordinary offline test command.
 Identity suite 1 derives its 16-byte deterministic salt from the suite ID, canonical name, and
@@ -43,8 +61,8 @@ password-input domain and a random 16-byte `fileSalt`.
 The candidate suite-1 byte rules are:
 
 ```text
-identityPassword = UTF8("DeepFamily:IdentityKDF:v1") || 0x00 || UTF8(NFKD(rawPassphrase))
-filePassword     = UTF8("DeepFamily:FileKDF:v1")     || 0x00 || UTF8(NFKD(rawPassphrase))
+identityPassword = UTF8("DeepFamily:IdentityKDF:v1") || 0x00 || UTF8(OpaqueString(rawPassphrase))
+filePassword     = UTF8("DeepFamily:FileKDF:v1")     || 0x00 || UTF8(OpaqueString(rawPassphrase))
 
 identitySalt = first16(keccak256(solidityPacked(
   "deepfamily:identity-kdf-salt:v1", // string
@@ -69,7 +87,7 @@ DOMAIN_DISCLOSURE         = 1003
 DOMAIN_VERSION_COMMITMENT = 1004
 
 namePrehash = keccak256(
-  UTF8("deepfamily:name-prehash:v2") || UTF8(canonicalFullName)
+  UTF8("deepfamily:name-prehash:v1") || UTF8(canonicalFullName)
 )
 nameField = uint256(namePrehash) mod BN254_SCALAR_FIELD
 
@@ -330,16 +348,15 @@ operation freezes its non-sensitive submission package.
 
 Supported top-level commands:
 
-| Command                       | Purpose                                                    |
-| ----------------------------- | ---------------------------------------------------------- |
-| `npm run zk:fetch`            | Install the pinned Circom toolchain                        |
-| `npm run zk:ptau:fetch`       | Fetch/verify the pinned public Phase-1 pTau                |
-| `npm run zk:build`            | Compile both circuits                                      |
-| `npm run zk:dev:refresh`      | Rebuild all development proving/verifier/browser artifacts |
-| `npm run zk:production:setup` | Produce and verify fresh production Phase-2 artifacts      |
-| `npm run zk:check`            | Generate and verify real proofs for both circuits          |
-| `npm run zk:artifacts:check`  | Rebuild and cross-check published artifacts                |
-| `npm run zk:ceremony:verify`  | Verify production setup evidence                           |
+| Command                        | Purpose                                                    |
+| ------------------------------ | ---------------------------------------------------------- |
+| `npm run zk:fetch`             | Install the pinned Circom toolchain                        |
+| `npm run zk:build`             | Compile both circuits                                      |
+| `npm run zk:development:setup` | Rebuild all development proving/verifier/browser artifacts |
+| `npm run zk:production:setup`  | Produce and verify fresh production Phase-2 artifacts      |
+| `npm run zk:check`             | Generate and verify real proofs for both circuits          |
+| `npm run zk:artifacts:check`   | Rebuild and cross-check published artifacts                |
+| `npm run zk:ceremony:verify`   | Verify production setup evidence                           |
 
 The checked-in keys and current protocol release manifest are development-only. The manifest marks
 identity/file KDF suite 1 as `candidate-awaiting-device-benchmark`, trusted setup as requiring a
@@ -347,12 +364,15 @@ fresh v1 ceremony, and deployments as absent. Do not describe the protocol as pr
 until device benchmarks, attacker-cost analysis, a fresh reviewed setup, artifact hashes, golden
 vectors, and deployment/runtime evidence have all been recorded and the release gates pass.
 
-`zk:dev:refresh` uses development entropy and is never a substitute for a production ceremony.
+`zk:development:setup` records no ceremony evidence and is never a substitute for a production
+ceremony. Both it and production setup use the pinned public Phase-1 pTau committed at
+`circuits/ptau/powersOfTau28_hez_final_13.ptau` or the file selected by `ZK_PTAU_PATH`; both check
+its pinned hashes before use, and no command downloads it.
+
 Once the circuits and KDF profiles are frozen, run `npm run zk:production:setup`, review and commit
 the transcript, manifest, verifier contracts, and browser artifacts together, then run:
 
 ```bash
-npm run zk:ptau:fetch
 npm run zk:ceremony:verify
 npm run release:preflight
 ```

@@ -198,7 +198,7 @@ contract DeepFamily is
   uint256 public constant PROTOCOL_FEE_BPS_MAX = 2000;
   uint256 public constant FEE_BPS_DENOMINATOR = 10_000;
   uint256 private constant DOMAIN_DISCLOSURE = 1003;
-  string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v2";
+  string private constant DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v1";
   bytes32 internal constant VERSION_HASH_DOMAIN = keccak256("DeepFamily:VersionHash:v1");
 
   address public DEEP_FAMILY_TOKEN_CONTRACT;

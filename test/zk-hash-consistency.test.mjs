@@ -87,7 +87,7 @@ describe("Hash Consistency Tests", function () {
 
     it("uses domain-separated keccak256 mod SNARK_FIELD", () => {
       const fullName = "Alice Smith";
-      const domainBytes = hre.ethers.toUtf8Bytes("deepfamily:name-prehash:v2");
+      const domainBytes = hre.ethers.toUtf8Bytes("deepfamily:name-prehash:v1");
       const nameBytes = hre.ethers.toUtf8Bytes(fullName);
       const prehash = hre.ethers.keccak256(hre.ethers.concat([domainBytes, nameBytes]));
       const expected = BigInt(prehash) % SNARK_FIELD;

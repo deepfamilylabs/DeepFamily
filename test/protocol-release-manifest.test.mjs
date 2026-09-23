@@ -14,6 +14,7 @@ import {
   protocolManifestSha256,
   PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS,
   PROTOCOL_RELEASE_MANIFEST_PATH,
+  PROTOCOL_PRECIS_DATA_PATH,
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 
@@ -73,6 +74,11 @@ const createDevelopmentManifestFixture = () => {
   fs.copyFileSync(
     path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
     path.join(root, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
+  );
+  fs.mkdirSync(path.join(root, path.dirname(PROTOCOL_PRECIS_DATA_PATH)), { recursive: true });
+  fs.copyFileSync(
+    path.join(ROOT, PROTOCOL_PRECIS_DATA_PATH),
+    path.join(root, PROTOCOL_PRECIS_DATA_PATH),
   );
   return {
     root,
@@ -399,6 +405,9 @@ const createProductionFixture = () => {
     path.join(ROOT, PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH),
     unicodeNormalizationDataPath,
   );
+  const precisDataPath = path.join(temporaryRoot, PROTOCOL_PRECIS_DATA_PATH);
+  fs.mkdirSync(path.dirname(precisDataPath), { recursive: true });
+  fs.copyFileSync(path.join(ROOT, PROTOCOL_PRECIS_DATA_PATH), precisDataPath);
   writeCanonicalJson(path.join(temporaryRoot, PROTOCOL_RELEASE_MANIFEST_PATH), manifest);
 
   const zkEvidence = {
@@ -592,7 +601,7 @@ describe("protocol release manifest", function () {
     assert.equal(evidence.manifest.proofRoutes[1].publicSignals.length, 4);
     assert.equal(
       evidence.manifest.goldenVectors.sha256,
-      "e654308e4bac1f1847f51ceaf6b79f8f28f5595c2df2c7968a9a7ad37294f68a",
+      "661a7a429035a0aefb01fa299140d9b031ab7e6a6121e24d8a704200a36df205",
     );
   });
 
@@ -841,9 +850,37 @@ describe("production protocol release manifest evidence", function () {
     [
       "identity normalization",
       (manifest) => {
-        manifest.identitySuites["1"].normalization = "NFC";
+        manifest.identitySuites["1"].normalization = "NFKD";
       },
       /identity suite 1 definition does not match/,
+    ],
+    [
+      "full-name normalization",
+      (manifest) => {
+        manifest.identity.fullName.normalization = "NFC";
+      },
+      /canonical identity definition does not match/,
+    ],
+    [
+      "full-name trim flag",
+      (manifest) => {
+        manifest.identity.fullName.trim = false;
+      },
+      /canonical identity definition does not match/,
+    ],
+    [
+      "name prehash domain",
+      (manifest) => {
+        manifest.identity.nameField.domain = "deepfamily:name-prehash:v2";
+      },
+      /canonical identity definition does not match/,
+    ],
+    [
+      "name canonicalization Unicode data hash",
+      (manifest) => {
+        manifest.identity.fullName.normalizationDataSha256 = hash("0");
+      },
+      /canonical identity definition does not match/,
     ],
     [
       "identity Unicode normalization-data hash",
@@ -1018,6 +1055,7 @@ describe("production protocol release manifest evidence", function () {
     ["manifest", PROTOCOL_RELEASE_MANIFEST_PATH],
     ["golden vectors", "protocol-vectors/onchain-biography-v1.json"],
     ["Unicode normalization data", PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH],
+    ["PRECIS repertoire data", PROTOCOL_PRECIS_DATA_PATH],
     ["device matrix", "release-evidence/kdf-device-matrix.json"],
     ["attacker study", "release-evidence/kdf-attacker-study.json"],
   ]) {

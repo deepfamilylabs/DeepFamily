@@ -27,7 +27,8 @@ import {
 } from "./bytes.js";
 import { canonicalizeFullName } from "./canonical.js";
 import { ProtocolError, UnsupportedProtocolError, protocolAssert } from "./errors.js";
-import { normalizeUnicodeNfkd } from "./unicode-normalization.js";
+import { mapNonAsciiSpacesToAscii, normalizeUnicodeNfc } from "./unicode-normalization.js";
+import { assertFreeformClass } from "./precis.js";
 
 function assertSmallUnsigned(value, maximum, label) {
   return Number(bigintFrom(value, label, BigInt(maximum)));
@@ -97,8 +98,21 @@ export function normalizePassphrase(rawPassphrase) {
     "INVALID_PASSPHRASE",
     "Passphrase must be a string",
   );
-  assertUnicodeScalarString(rawPassphrase, "passphrase");
-  return normalizeUnicodeNfkd(rawPassphrase, "passphrase");
+  // RFC 8265 Section 4.2.1 preparation: the code point repertoire must satisfy
+  // the PRECIS FreeformClass before anything is mapped or normalized.
+  assertFreeformClass(rawPassphrase, "passphrase");
+  // Section 4.2.2 enforcement, in profile order: no width mapping, the
+  // additional mapping rule (non-ASCII Zs to U+0020), no case mapping, then NFC.
+  // The profile's nonempty-password rule is the one deliberate divergence: an
+  // empty passphrase is a supported public-tree mode and still runs Argon2id.
+  const normalized = normalizeUnicodeNfc(
+    mapNonAsciiSpacesToAscii(rawPassphrase, "passphrase"),
+    "passphrase",
+  );
+  // RFC 8264 Section 7: normalization can introduce a contextual code point
+  // or change its surrounding script, so validate the final string as well.
+  assertFreeformClass(normalized, "passphrase");
+  return normalized;
 }
 
 export function buildDomainSeparatedPasswordBytes(domain, rawPassphrase) {

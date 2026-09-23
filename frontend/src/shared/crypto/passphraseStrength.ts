@@ -9,9 +9,10 @@ import {
   canonicalizeFullName,
   isUnicodeWhiteSpaceOnly,
   normalizePassphrase,
+  normalizeUnicodeNfkc,
 } from "@deepfamily/protocol-core";
 
-export type ProtocolPassphraseRisk = "empty" | "unicode-whitespace" | "ordinary";
+export type ProtocolPassphraseRisk = "empty" | "unicode-whitespace" | "disallowed" | "ordinary";
 
 /**
  * Normalize full name for identity flows.
@@ -30,7 +31,7 @@ export const normalizeNameForHash = (value: string): string => {
 
 /**
  * Normalize passphrase for hashing
- * Uses NFKD (BIP39-style); no trimming or other mutation
+ * Uses RFC 8265 OpaqueString; no trimming or other mutation
  */
 export const normalizePassphraseForHash = (value: string): string => {
   try {
@@ -45,7 +46,8 @@ export const normalizePassphraseForHash = (value: string): string => {
 /**
  * Classify the exact v1 passphrase bytes for high-risk UX decisions.
  *
- * The protocol applies NFKD and deliberately does not trim. Keep UI event
+ * The protocol applies RFC 8265 OpaqueString and deliberately does not trim.
+ * Keep UI event
  * handling total for malformed programmatic input; the authoritative worker
  * path still rejects invalid Unicode before doing proof or transaction work.
  */
@@ -54,7 +56,10 @@ export const classifyProtocolPassphraseRisk = (value: string): ProtocolPassphras
   try {
     normalized = normalizePassphrase(value);
   } catch {
-    return "ordinary";
+    // The protocol refused this input, most often a control or invisible code
+    // point the PRECIS FreeformClass disallows. Reporting "ordinary" here used
+    // to hide the problem until the wallet call failed.
+    return "disallowed";
   }
   if (normalized.length === 0) return "empty";
   return isUnicodeWhiteSpaceOnly(normalized) ? "unicode-whitespace" : "ordinary";
@@ -159,6 +164,15 @@ const isRepeatedSequence = (value: string): boolean => {
   return false;
 };
 
+const foldCompatibilityFormsForAnalysis = (value: string): string => {
+  try {
+    return normalizeUnicodeNfkc(value);
+  } catch {
+    // Keep the meter total: the authoritative path rejects invalid input.
+    return value;
+  }
+};
+
 /**
  * Calculate passphrase strength score.
  *
@@ -181,7 +195,28 @@ export function validatePassphraseStrength(
   passphrase: string,
   includeRecommendation: boolean = false,
 ): PassphraseStrength {
-  const normalized = normalizePassphraseForHash(passphrase);
+  // Input the protocol refuses is not the same as an empty passphrase, and
+  // saying "empty" about a passphrase the user can see would be misleading.
+  let protocolNormalized: string;
+  try {
+    protocolNormalized = normalizePassphrase(passphrase);
+  } catch {
+    return {
+      isStrong: false,
+      entropy: 0,
+      rawEntropy: 0,
+      level: "weak",
+      recommendation: includeRecommendation
+        ? "Passphrase contains a character the protocol does not accept, such as a control or invisible code point. Remove it and use a visible, reproducible passphrase"
+        : undefined,
+    };
+  }
+
+  // Strength analysis folds compatibility forms that the protocol deliberately
+  // preserves. A fullwidth "１２３４５６" is exactly as guessable as "123456":
+  // width is one bit of IME state, not per-character entropy. Without this the
+  // sequence, dictionary and charset checks below all miss fullwidth input.
+  const normalized = foldCompatibilityFormsForAnalysis(protocolNormalized);
 
   if (!normalized) {
     return {

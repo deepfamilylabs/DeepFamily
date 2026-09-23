@@ -304,85 +304,82 @@ describe("MintNFTModal", () => {
     vi.restoreAllMocks();
   });
 
-  it(
-    "mints without a biography title and patches tree state on success",
-    async () => {
-      mocks.mintRunOrThrow.mockResolvedValue({
+  it("mints without a biography title and patches tree state on success", async () => {
+    mocks.mintRunOrThrow.mockResolvedValue({
+      tokenId: 77,
+      transactionHash: "0xmint",
+      blockNumber: 123,
+      event: {
+        personHash,
         tokenId: 77,
-        transactionHash: "0xmint",
-        blockNumber: 123,
-        event: {
-          personHash,
-          tokenId: 77,
-          owner: ownerAddress,
-          versionIndex: 2,
-          tokenURI: "ipfs://token",
-          timestamp: 456,
-        },
-        receipt: { hash: "0xmint" },
+        owner: ownerAddress,
+        versionIndex: 2,
+        tokenURI: "ipfs://token",
+        timestamp: 456,
+      },
+      receipt: { hash: "0xmint" },
+    });
+
+    renderMintModal();
+
+    await waitForMintableTarget();
+    await checkAllConsents();
+    expect(screen.queryByLabelText("Biography title (optional)")).toBeNull();
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText("e.g. Shaoxing, Zhejiang"), {
+        target: { value: "London" },
       });
-
-      renderMintModal();
-
-      await waitForMintableTarget();
-      await checkAllConsents();
-      expect(screen.queryByLabelText("Biography title (optional)")).toBeNull();
-
-      await act(async () => {
-        fireEvent.change(screen.getByPlaceholderText("e.g. Shaoxing, Zhejiang"), {
-          target: { value: "London" },
-        });
-        fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
-          target: { value: "ipfs://token" },
-        });
-        fireEvent.change(screen.getByPlaceholderText("Enter a brief life story summary..."), {
-          target: { value: "  A public life story  " },
-        });
+      fireEvent.change(screen.getByPlaceholderText("https://... or ipfs://..."), {
+        target: { value: "ipfs://token" },
       });
-
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
+      fireEvent.change(screen.getByPlaceholderText("Enter a brief life story summary..."), {
+        target: { value: "  A public life story  " },
       });
+    });
 
-      await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
-      expect(mocks.mintRunOrThrow).toHaveBeenCalledWith(
-        expect.objectContaining({
-          personHash,
-          versionIndex: 2,
-          selfSuiteId: 1,
-          tokenURI: "ipfs://token",
-          // The modal no longer offers a title, so the record's title stays empty.
-          storyTitle: "",
-          story: "  A public life story  ",
-          coreInfo: expect.objectContaining({
-            supplementInfo: expect.objectContaining({
-              fullName: "Ada Lovelace",
-              birthPlace: "London",
-            }),
-          }),
-        }),
-      );
-      expect(mocks.mintRunOrThrow.mock.calls[0][0].coreInfo.supplementInfo).not.toHaveProperty(
-        "storyTitle",
-      );
-      expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
-      expect(mocks.markVersionMinted).toHaveBeenCalledWith({
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
+    });
+
+    await waitFor(() => expect(mocks.mintRunOrThrow).toHaveBeenCalledTimes(1));
+    expect(mocks.mintRunOrThrow).toHaveBeenCalledWith(
+      expect.objectContaining({
         personHash,
         versionIndex: 2,
-        tokenId: "77",
+        selfSuiteId: 1,
         tokenURI: "ipfs://token",
-        receipt: { hash: "0xmint" },
-      });
-      expect(mocks.onSuccess).toHaveBeenCalledWith(77);
-      // The passphrase must be gone before the wallet wait, not merely by the end.
-      expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(1);
-      expect(mocks.clearSecretInputs.mock.invocationCallOrder[0]).toBeLessThan(
-        mocks.mintRunOrThrow.mock.invocationCallOrder[0],
-      );
-      expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
-      expect(formSectionsHidden()).toBe(true);
-    },
-  );
+        // The modal no longer offers a title, so the record's title stays empty.
+        storyTitle: "",
+        story: "  A public life story  ",
+        coreInfo: expect.objectContaining({
+          supplementInfo: expect.objectContaining({
+            fullName: "Ada Lovelace",
+            birthPlace: "London",
+          }),
+        }),
+      }),
+    );
+    expect(mocks.mintRunOrThrow.mock.calls[0][0].coreInfo.supplementInfo).not.toHaveProperty(
+      "storyTitle",
+    );
+    expect(mocks.markVersionMinted).toHaveBeenCalledTimes(1);
+    expect(mocks.markVersionMinted).toHaveBeenCalledWith({
+      personHash,
+      versionIndex: 2,
+      tokenId: "77",
+      tokenURI: "ipfs://token",
+      receipt: { hash: "0xmint" },
+    });
+    expect(mocks.onSuccess).toHaveBeenCalledWith(77);
+    // The passphrase must be gone before the wallet wait, not merely by the end.
+    expect(mocks.clearSecretInputs).toHaveBeenCalledTimes(1);
+    expect(mocks.clearSecretInputs.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.mintRunOrThrow.mock.invocationCallOrder[0],
+    );
+    expect(await screen.findByText("NFT Minted Successfully")).toBeTruthy();
+    expect(formSectionsHidden()).toBe(true);
+  });
 
   it("keeps minting disabled until every consent is checked, whatever the passphrase", async () => {
     renderMintModal();
@@ -497,6 +494,26 @@ describe("MintNFTModal", () => {
     await waitForMintableTarget();
     expect(readEndorsed).toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /Go Endorse/i })).toBeNull();
+  });
+
+  it("refuses a passphrase the protocol disallows before running the mint flow", async () => {
+    // The FreeformClass rejects controls and invisible code points. Catching it
+    // here gives a specific error instead of a generic worker failure later.
+    mocks.personPassphrase = `family${String.fromCharCode(9)}motto`;
+
+    renderMintModal();
+
+    await waitForMintableTarget();
+    await checkAllConsents();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Mint NFT/i }));
+    });
+
+    await screen.findByRole("alert");
+    expect(screen.getAllByText(/does not accept/).length).toBeGreaterThan(0);
+    expect(mocks.mintRunOrThrow).not.toHaveBeenCalled();
+    expect(mocks.onSuccess).not.toHaveBeenCalled();
   });
 
   it("shows a friendly error when the mint flow fails", async () => {

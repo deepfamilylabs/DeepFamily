@@ -30,6 +30,7 @@ import {
   IDENTITY_SALT_DOMAIN,
   IDENTITY_SUITE_CANDIDATE_1,
   MAX_CANONICAL_JSON_BYTES,
+  MAX_FULL_NAME_UTF8_BYTES,
   MAX_TAG_UTF8_BYTES,
   METADATA_CONTENT_AAD_DOMAIN,
   METADATA_CONTENT_AAD_DOMAIN_TEXT,
@@ -37,6 +38,7 @@ import {
   METADATA_CONTEXT_AAD_DOMAIN_TEXT,
   METADATA_WRAP_AAD_DOMAIN,
   METADATA_WRAP_AAD_DOMAIN_TEXT,
+  NAME_PREHASH_DOMAIN,
   PERSON_VERSION_SCHEMA,
   PLAINTEXT_CODEC_CANONICAL_JSON_V1,
   PROTOCOL_GENERATION as PROTOCOL_CORE_GENERATION,
@@ -44,6 +46,8 @@ import {
   VERSION_HASH_DOMAIN,
   VERSION_HASH_DOMAIN_TEXT,
 } from "../../packages/protocol-core/constants.js";
+import { UNICODE_WHITE_SPACE_VERSION } from "../../packages/protocol-core/canonical.js";
+import { UNICODE_NORMALIZATION_VERSION } from "../../packages/protocol-core/unicode-normalization.js";
 import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
@@ -57,6 +61,7 @@ import {
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
 
 export const PROTOCOL_RELEASE_MANIFEST_PATH = "protocol-release-manifest.json";
+export const PROTOCOL_PRECIS_DATA_PATH = "packages/protocol-core/precis-data.js";
 export const PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH =
   "packages/protocol-core/unicode-normalization-data.js";
 export const PROTOCOL_DEPLOYMENT_EVIDENCE_SCHEMA_VERSION = 1;
@@ -328,10 +333,12 @@ const validateFrozenV1Constants = ({
   assertExactJson(
     identityDefinition,
     {
-      normalization: "NFKD",
+      normalization: "RFC8265-OpaqueString",
       unicodeVersion: "17.0.0",
       normalizationImplementation: "deepfamily-ucd-normalization-v1",
-      normalizationDataSha256: "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
+      normalizationDataSha256: "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      codePointRestriction: "PRECIS FreeformClass (RFC 8264)",
+      precisDataSha256: "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
       trim: false,
       passwordDomain: IDENTITY_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
@@ -351,10 +358,12 @@ const validateFrozenV1Constants = ({
   assertExactJson(
     fileDefinition,
     {
-      normalization: "NFKD",
+      normalization: "RFC8265-OpaqueString",
       unicodeVersion: "17.0.0",
       normalizationImplementation: "deepfamily-ucd-normalization-v1",
-      normalizationDataSha256: "b9b14130d46b36690fc825ad6f35214e6254755aaa0830a66f178f24f3055138",
+      normalizationDataSha256: "f4f31f42e0e3b87e821bea40f4b4396a0da16095cc6fad69b9c898d3b592b2a4",
+      codePointRestriction: "PRECIS FreeformClass (RFC 8264)",
+      precisDataSha256: "396dec075f54f1242e5268274db1fae0ca31ed38f5b2270ccc76ae9123bb91c3",
       trim: false,
       passwordDomain: FILE_PASSWORD_DOMAIN,
       passwordDomainSeparatorHex: "00",
@@ -362,6 +371,29 @@ const validateFrozenV1Constants = ({
       kdf: expectedArgon2idProfile(),
     },
     "file KDF suite 1 definition",
+  );
+
+  assertExactJson(
+    manifest.identity,
+    {
+      fullName: {
+        normalization: "NFKC",
+        unicodeVersion: UNICODE_NORMALIZATION_VERSION,
+        normalizationImplementation: "deepfamily-ucd-normalization-v1",
+        normalizationDataSha256: identitySuite.normalizationDataSha256,
+        whiteSpaceProperty: "Unicode White_Space",
+        whiteSpaceUnicodeVersion: UNICODE_WHITE_SPACE_VERSION,
+        collapse: "runs to U+0020",
+        // Names are trimmed; passphrases deliberately are not.
+        trim: true,
+        maximumUtf8Bytes: MAX_FULL_NAME_UTF8_BYTES,
+      },
+      nameField: {
+        domain: NAME_PREHASH_DOMAIN,
+        derivation: "keccak256(UTF8(domain) || UTF8(canonicalFullName)) mod BN254",
+      },
+    },
+    "canonical identity definition",
   );
 
   assertExactJson(
@@ -1067,6 +1099,7 @@ export const inspectProtocolReleaseManifest = ({
       "protocolGeneration",
       "envelope",
       "formats",
+      "identity",
       "identitySuites",
       "fileKdfSuites",
       "commitments",
@@ -1234,6 +1267,33 @@ export const inspectProtocolReleaseManifest = ({
   assert(
     protocolManifestSha256(unicodeNormalizationData) === identitySuite.normalizationDataSha256,
     "Unicode normalization data hash does not match the suite definitions",
+  );
+  assert(
+    identitySuite.precisDataSha256 === fileSuite.precisDataSha256,
+    "identity and file suites must bind the same PRECIS repertoire data",
+  );
+  const precisDataPath = path.join(resolvedRoot, PROTOCOL_PRECIS_DATA_PATH);
+  let precisData;
+  try {
+    const state = fs.lstatSync(precisDataPath);
+    assert(
+      state.isFile() && !state.isSymbolicLink() && fs.realpathSync(precisDataPath) === precisDataPath,
+      "PRECIS repertoire data must be a regular non-symlink file",
+    );
+    precisData = fs.readFileSync(precisDataPath);
+  } catch (error) {
+    if (String(error?.message ?? "").startsWith("Protocol release manifest:")) throw error;
+    throw new Error("Protocol release manifest: PRECIS repertoire data is unavailable", {
+      cause: error,
+    });
+  }
+  assert(
+    protocolManifestSha256(precisData) === identitySuite.precisDataSha256,
+    "PRECIS repertoire data hash does not match the suite definitions",
+  );
+  assert(
+    manifest.identity.fullName.normalizationDataSha256 === identitySuite.normalizationDataSha256,
+    "name canonicalization must bind the same Unicode normalization data as the suites",
   );
 
   const goldenVectors = manifest.goldenVectors;
@@ -1443,6 +1503,7 @@ export const inspectProtocolReleaseManifest = ({
       [PROTOCOL_RELEASE_MANIFEST_PATH, "protocol release manifest"],
       [goldenVectors.path, "golden vector"],
       [PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH, "Unicode normalization data"],
+      [PROTOCOL_PRECIS_DATA_PATH, "PRECIS repertoire data"],
     ]) {
       assert(
         trackedPathInspector({ root: resolvedRoot, relativePath }) === true,

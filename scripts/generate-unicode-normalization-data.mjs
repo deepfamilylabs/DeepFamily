@@ -73,21 +73,30 @@ function parseFullCompositionExclusions(source) {
 function parseUnicodeData(source, fullCompositionExclusions) {
   const combiningClasses = [];
   const decompositions = [];
+  const canonicalDecompositions = [];
   const compositions = [];
+  const nonAsciiSpaces = [];
 
   for (const line of source.split(/\r?\n/u)) {
     if (!line) continue;
     const fields = line.split(";");
     const codePoint = Number.parseInt(fields[0], 16);
+    const generalCategory = fields[2];
     const combiningClass = Number.parseInt(fields[3], 10);
     const decompositionText = fields[5];
     if (combiningClass !== 0) combiningClasses.push([codePoint, combiningClass]);
+    // RFC 8265 OpaqueString maps General_Category Zs (other than U+0020) to
+    // U+0020. This is narrower than the White_Space property used for names.
+    if (generalCategory === "Zs" && codePoint !== 0x20) nonAsciiSpaces.push(codePoint);
     if (!decompositionText) continue;
 
     const compatibility = decompositionText.startsWith("<");
     const mappingText = decompositionText.replace(/^<[^>]+>\s*/u, "");
     const mapping = mappingText.split(/\s+/u).map((value) => Number.parseInt(value, 16));
     decompositions.push([codePoint, mapping]);
+    // Canonical mappings are a subset of the compatibility table with identical
+    // targets, so only the code points are emitted and the mapping is shared.
+    if (!compatibility) canonicalDecompositions.push(codePoint);
 
     if (
       !compatibility &&
@@ -99,7 +108,7 @@ function parseUnicodeData(source, fullCompositionExclusions) {
     }
   }
 
-  return { combiningClasses, decompositions, compositions };
+  return { combiningClasses, decompositions, canonicalDecompositions, compositions, nonAsciiSpaces };
 }
 
 const serializeRows = (rows) => rows.map((row) => `  ${JSON.stringify(row)},`).join("\n");
@@ -111,7 +120,14 @@ const formatUnicodeLicenseComment = (licenseText) =>
     .map((line) => (line === "" ? " *" : ` * ${line}`))
     .join("\n")}\n */\n`;
 
-function generateModule({ combiningClasses, decompositions, compositions, unicodeLicense }) {
+function generateModule({
+  combiningClasses,
+  decompositions,
+  canonicalDecompositions,
+  compositions,
+  nonAsciiSpaces,
+  unicodeLicense,
+}) {
   const sourceSummary = SOURCES.map(
     (source) => `// - ${source.url} (SHA-256 ${source.sha256})`,
   ).join("\n");
@@ -126,7 +142,11 @@ function generateModule({ combiningClasses, decompositions, compositions, unicod
     `// prettier-ignore\n` +
     `export const UNICODE_COMPATIBILITY_DECOMPOSITION_ENTRIES = [\n${serializeRows(decompositions)}\n];\n\n` +
     `// prettier-ignore\n` +
-    `export const UNICODE_CANONICAL_COMPOSITION_ENTRIES = [\n${serializeRows(compositions)}\n];\n`
+    `export const UNICODE_CANONICAL_DECOMPOSITION_CODE_POINTS = [\n${serializeRows(canonicalDecompositions)}\n];\n\n` +
+    `// prettier-ignore\n` +
+    `export const UNICODE_CANONICAL_COMPOSITION_ENTRIES = [\n${serializeRows(compositions)}\n];\n\n` +
+    `// prettier-ignore\n` +
+    `export const UNICODE_NON_ASCII_ZS_CODE_POINTS = [\n${serializeRows(nonAsciiSpaces)}\n];\n`
   );
 }
 
@@ -141,7 +161,7 @@ const parseCodePointSequence = (value) =>
       );
 
 async function verifyNormalizationConformance(source) {
-  const { normalizeUnicodeNfkc, normalizeUnicodeNfkd } =
+  const { normalizeUnicodeNfc, normalizeUnicodeNfd, normalizeUnicodeNfkc, normalizeUnicodeNfkd } =
     await import("../packages/protocol-core/unicode-normalization.js");
   const part1CodePoints = new Set();
   let currentPart = null;
@@ -173,6 +193,22 @@ async function verifyNormalizationConformance(source) {
       }
       assertions += 2;
     }
+    // Unlike the compatibility forms, the canonical forms of the compatibility
+    // columns fold to c4/c5 rather than to c2/c3.
+    for (const [inputs, expectedNfc, expectedNfd] of [
+      [[c1, c2, c3], c2, c3],
+      [[c4, c5], c4, c5],
+    ]) {
+      for (const input of inputs) {
+        if (normalizeUnicodeNfc(input) !== expectedNfc) {
+          throw new Error(`Unicode ${UNICODE_VERSION} NFC conformance failed at record ${records}`);
+        }
+        if (normalizeUnicodeNfd(input) !== expectedNfd) {
+          throw new Error(`Unicode ${UNICODE_VERSION} NFD conformance failed at record ${records}`);
+        }
+        assertions += 2;
+      }
+    }
     records += 1;
   }
 
@@ -183,7 +219,12 @@ async function verifyNormalizationConformance(source) {
     if (codePoint >= 0xd800 && codePoint <= 0xdfff) continue;
     if (part1CodePoints.has(codePoint)) continue;
     const value = String.fromCodePoint(codePoint);
-    if (normalizeUnicodeNfkc(value) !== value || normalizeUnicodeNfkd(value) !== value) {
+    if (
+      normalizeUnicodeNfkc(value) !== value ||
+      normalizeUnicodeNfkd(value) !== value ||
+      normalizeUnicodeNfc(value) !== value ||
+      normalizeUnicodeNfd(value) !== value
+    ) {
       throw new Error(
         `Unicode ${UNICODE_VERSION} unlisted-scalar conformance failed at U+${codePoint
           .toString(16)
@@ -191,7 +232,7 @@ async function verifyNormalizationConformance(source) {
           .padStart(4, "0")}`,
       );
     }
-    assertions += 2;
+    assertions += 4;
     unlistedScalars += 1;
   }
   return { records, unlistedScalars, assertions };

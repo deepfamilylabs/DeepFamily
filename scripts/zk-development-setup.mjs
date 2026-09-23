@@ -11,12 +11,12 @@ import { ensureProductionPtau } from "./lib/productionPtau.mjs";
 import { buildSnarkjsCommand } from "./lib/snarkjsToolchain.mjs";
 import {
   assertDevelopmentManifest,
-  initializeFreshV1DevelopmentManifest,
   updateDevelopmentManifest,
 } from "./update-zk-development-manifest.mjs";
 
 export const DEVELOPMENT_CONTRIBUTOR_NAME = "development-only";
-export const DEVELOPMENT_PUBLIC_ENTROPY = "development-only-public-entropy";
+// snarkjs mixes 64 bytes of system randomness into this label; it is not a reproducible seed.
+export const DEVELOPMENT_ENTROPY_LABEL = "development-only-entropy-label";
 
 export const DEVELOPMENT_CIRCUITS = Object.freeze(
   [
@@ -65,7 +65,7 @@ export const buildDevelopmentSetupCommands = ({ root, ptauPath, temporaryDirecto
           finalZkey,
           `--name=${DEVELOPMENT_CONTRIBUTOR_NAME}`,
           "-v",
-          `-e=${DEVELOPMENT_PUBLIC_ENTROPY}`,
+          `-e=${DEVELOPMENT_ENTROPY_LABEL}`,
         ],
       }),
       buildSnarkjsCommand({
@@ -90,12 +90,10 @@ export const runCommand = ({ executable, args, cwd }) =>
     stdio: "inherit",
   });
 
-export const runZkDevelopmentRefresh = async ({
+export const runZkDevelopmentSetup = async ({
   root = process.cwd(),
   output = console,
   manifestGuard = assertDevelopmentManifest,
-  freshV1 = false,
-  freshV1Initializer = initializeFreshV1DevelopmentManifest,
   ptauInstaller = ensureProductionPtau,
   commandRunner = runCommand,
   assetSynchronizer = syncZkAssets,
@@ -107,14 +105,10 @@ export const runZkDevelopmentRefresh = async ({
   const resolvedRoot = path.resolve(root);
 
   // This must remain the first operation: every later dependency can write files.
-  if (freshV1) {
-    await freshV1Initializer({ root: resolvedRoot });
-  } else {
-    await manifestGuard({ root: resolvedRoot });
-  }
+  await manifestGuard({ root: resolvedRoot });
 
   const ptau = await ptauInstaller({ root: resolvedRoot });
-  output.log(`Pinned Powers of Tau ${ptau.status}: ${ptau.path} (SHA-256 ${ptau.sha256})`);
+  output.log(`Pinned Phase 1 Powers of Tau ${ptau.status}: ${ptau.path} (SHA-256 ${ptau.sha256})`);
 
   let temporaryDirectory;
   try {
@@ -152,7 +146,7 @@ export const runZkDevelopmentRefresh = async ({
     });
 
     output.warn(
-      "Development ZK artifacts refreshed with public entropy; they remain blocked from production.",
+      "Development ZK artifacts refreshed without ceremony evidence; they remain blocked from production.",
     );
     return Object.freeze({
       status: "passed",
@@ -165,10 +159,10 @@ export const runZkDevelopmentRefresh = async ({
 };
 
 export const main = async (argv = process.argv.slice(2)) => {
-  if (argv.length > 1 || (argv.length === 1 && argv[0] !== "--fresh-v1")) {
-    throw new Error("Usage: node scripts/zk-dev-refresh.mjs [--fresh-v1]");
+  if (argv.length > 0) {
+    throw new Error("Usage: node scripts/zk-development-setup.mjs");
   }
-  return runZkDevelopmentRefresh({ freshV1: argv[0] === "--fresh-v1" });
+  return runZkDevelopmentSetup();
 };
 
 const isMain =
@@ -176,7 +170,7 @@ const isMain =
 
 if (isMain) {
   main().catch((error) => {
-    console.error(`[zk-dev-refresh] ${error.message}`);
+    console.error(`[zk-development-setup] ${error.message}`);
     process.exitCode = 1;
   });
 }

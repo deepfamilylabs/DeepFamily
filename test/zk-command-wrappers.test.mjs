@@ -29,17 +29,15 @@ const inspectFixtureCompiler = async ({ root, platform }) => ({
 });
 
 describe("public ZK command surface", function () {
-  it("exposes only the nine supported top-level npm commands", function () {
+  it("exposes only the seven supported top-level npm commands", function () {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     );
     expect(Object.keys(packageJson.scripts).filter((name) => name.startsWith("zk:"))).to.deep.equal(
       [
         "zk:fetch",
-        "zk:ptau:fetch",
         "zk:build",
-        "zk:dev:refresh",
-        "zk:dev:fresh-v1",
+        "zk:development:setup",
         "zk:production:setup",
         "zk:check",
         "zk:artifacts:check",

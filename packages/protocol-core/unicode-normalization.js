@@ -1,8 +1,10 @@
 import { assertUnicodeScalarString } from "./bytes.js";
 import {
   UNICODE_CANONICAL_COMPOSITION_ENTRIES,
+  UNICODE_CANONICAL_DECOMPOSITION_CODE_POINTS,
   UNICODE_COMBINING_CLASS_ENTRIES,
   UNICODE_COMPATIBILITY_DECOMPOSITION_ENTRIES,
+  UNICODE_NON_ASCII_ZS_CODE_POINTS,
   UNICODE_NORMALIZATION_VERSION,
 } from "./unicode-normalization-data.js";
 
@@ -10,7 +12,16 @@ export { UNICODE_NORMALIZATION_VERSION };
 
 const combiningClasses = new Map(UNICODE_COMBINING_CLASS_ENTRIES);
 const compatibilityDecompositions = new Map(UNICODE_COMPATIBILITY_DECOMPOSITION_ENTRIES);
+// Canonical mappings share the compatibility table's targets, so the data file
+// ships only the canonical code points.
+const canonicalDecompositions = new Map(
+  UNICODE_CANONICAL_DECOMPOSITION_CODE_POINTS.map((codePoint) => [
+    codePoint,
+    compatibilityDecompositions.get(codePoint),
+  ]),
+);
 const compositionKey = (starter, codePoint) => starter * 0x11_0000 + codePoint;
+const nonAsciiSpaces = new Set(UNICODE_NON_ASCII_ZS_CODE_POINTS);
 const canonicalCompositions = new Map(
   UNICODE_CANONICAL_COMPOSITION_ENTRIES.map(([starter, codePoint, composite]) => [
     compositionKey(starter, codePoint),
@@ -28,7 +39,8 @@ const HANGUL_T_COUNT = 28;
 const HANGUL_N_COUNT = HANGUL_V_COUNT * HANGUL_T_COUNT;
 const HANGUL_S_COUNT = HANGUL_L_COUNT * HANGUL_N_COUNT;
 
-function compatibilityDecompose(codePoint, output) {
+// Hangul syllable decomposition is canonical, so it applies to both mapping tables.
+function decompose(mappings, codePoint, output) {
   const hangulIndex = codePoint - HANGUL_S_BASE;
   if (hangulIndex >= 0 && hangulIndex < HANGUL_S_COUNT) {
     output.push(HANGUL_L_BASE + Math.floor(hangulIndex / HANGUL_N_COUNT));
@@ -38,12 +50,12 @@ function compatibilityDecompose(codePoint, output) {
     return;
   }
 
-  const mapping = compatibilityDecompositions.get(codePoint);
+  const mapping = mappings.get(codePoint);
   if (!mapping) {
     output.push(codePoint);
     return;
   }
-  for (const mappedCodePoint of mapping) compatibilityDecompose(mappedCodePoint, output);
+  for (const mappedCodePoint of mapping) decompose(mappings, mappedCodePoint, output);
 }
 
 function canonicalOrder(codePoints) {
@@ -130,19 +142,52 @@ function codePointsToString(codePoints) {
   return output;
 }
 
-function compatibilityDecomposeAndOrder(value, label) {
+function decomposeAndOrder(mappings, value, label) {
   assertUnicodeScalarString(value, label);
   const decomposed = [];
-  for (const symbol of value) compatibilityDecompose(symbol.codePointAt(0), decomposed);
+  for (const symbol of value) decompose(mappings, symbol.codePointAt(0), decomposed);
   return canonicalOrder(decomposed);
+}
+
+/** Canonical_Combining_Class from the frozen table; Virama is class 9. */
+export function canonicalCombiningClass(codePoint) {
+  return combiningClasses.get(codePoint) ?? 0;
 }
 
 /** Unicode 17.0.0 NFKD independent of the host JavaScript/ICU version. */
 export function normalizeUnicodeNfkd(value, label = "string") {
-  return codePointsToString(compatibilityDecomposeAndOrder(value, label));
+  return codePointsToString(decomposeAndOrder(compatibilityDecompositions, value, label));
 }
 
 /** Unicode 17.0.0 NFKC independent of the host JavaScript/ICU version. */
 export function normalizeUnicodeNfkc(value, label = "string") {
-  return codePointsToString(canonicalCompose(compatibilityDecomposeAndOrder(value, label)));
+  return codePointsToString(
+    canonicalCompose(decomposeAndOrder(compatibilityDecompositions, value, label)),
+  );
+}
+
+/** Unicode 17.0.0 NFD independent of the host JavaScript/ICU version. */
+export function normalizeUnicodeNfd(value, label = "string") {
+  return codePointsToString(decomposeAndOrder(canonicalDecompositions, value, label));
+}
+
+/** Unicode 17.0.0 NFC independent of the host JavaScript/ICU version. */
+export function normalizeUnicodeNfc(value, label = "string") {
+  return codePointsToString(
+    canonicalCompose(decomposeAndOrder(canonicalDecompositions, value, label)),
+  );
+}
+
+/**
+ * RFC 8265 additional mapping rule: General_Category Zs other than U+0020 maps
+ * to U+0020. This is strictly narrower than the White_Space property, so tabs,
+ * newlines, U+0085, U+2028 and U+2029 are left untouched.
+ */
+export function mapNonAsciiSpacesToAscii(value, label = "string") {
+  assertUnicodeScalarString(value, label);
+  let output = "";
+  for (const symbol of value) {
+    output += nonAsciiSpaces.has(symbol.codePointAt(0)) ? " " : symbol;
+  }
+  return output;
 }

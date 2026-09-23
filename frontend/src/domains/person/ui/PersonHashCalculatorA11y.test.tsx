@@ -2,7 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../shared/ui";
-import { PersonHashCalculator } from "./PersonHashCalculator";
+import { createRef } from "react";
+import { PersonHashCalculator, type PersonHashCalculatorHandle } from "./PersonHashCalculator";
 
 const workerCall = vi.hoisted(() =>
   vi.fn<
@@ -23,7 +24,7 @@ vi.mock("react-i18next", () => ({
       const values =
         fallbackOrOptions && typeof fallbackOrOptions === "object" ? fallbackOrOptions : options;
       if (key === "search.hashCalculator.passphraseCharCount") {
-        return `Characters after NFKD (not trimmed): ${String(values?.count ?? "")}`;
+        return `Characters after normalization (not trimmed): ${String(values?.count ?? "")}`;
       }
       return template.replace(/{{\s*(\w+)\s*}}/g, (_match, name) => String(values?.[name] ?? ""));
     },
@@ -152,9 +153,59 @@ describe("PersonHashCalculator accessibility", () => {
       screen.getByPlaceholderText(
         "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
       ),
-      { target: { value: "\u0085\u3000" } },
+      { target: { value: "\u00a0\u3000" } },
     );
 
-    expect(screen.getByText("Characters after NFKD (not trimmed): 2")).toBeTruthy();
+    expect(screen.getByText("Characters after normalization (not trimmed): 2")).toBeTruthy();
+  });
+
+  it("shows a refused passphrase error and removes a previously computed hash", async () => {
+    const hash = `0x${"12".repeat(32)}`;
+    const onComputedHashChange = vi.fn();
+    workerCall.mockImplementationOnce(async () => ({ identityHash: hash }));
+    render(
+      <ToastProvider>
+        <PersonHashCalculator
+          showTitle={false}
+          initialValues={{ fullName: "Alice" }}
+          onComputedHashChange={onComputedHashChange}
+        />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => expect(onComputedHashChange).toHaveBeenLastCalledWith(hash));
+    const passphraseInput = screen.getByLabelText("Identity passphrase");
+    fireEvent.change(passphraseInput, { target: { value: `family${String.fromCharCode(9)}motto` } });
+
+    const error = screen.getByRole("alert");
+    expect(error.textContent).toContain("character the protocol does not accept");
+    expect(passphraseInput.getAttribute("aria-invalid")).toBe("true");
+    expect(passphraseInput.getAttribute("aria-describedby")).toBe(error.id);
+    expect(screen.queryByText(hash)).toBeNull();
+    await waitFor(() => expect(onComputedHashChange).toHaveBeenLastCalledWith(""));
+    expect(workerCall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat two different refused passphrases as matching", () => {
+    // Refused input normalizes to "", so comparing only normalized forms would
+    // call any two refused passphrases a match and hide a real typo.
+    const tab = String.fromCharCode(9);
+    const ref = createRef<PersonHashCalculatorHandle>();
+    render(
+      <ToastProvider>
+        <PersonHashCalculator ref={ref} showTitle={false} requirePassphraseConfirmation />
+      </ToastProvider>,
+    );
+    const first = screen.getByPlaceholderText(
+      "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+    );
+    const second = screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)");
+
+    fireEvent.change(first, { target: { value: `family${tab}motto` } });
+    fireEvent.change(second, { target: { value: `other${tab}words` } });
+    expect(ref.current?.passphrasesMatch()).toBe(false);
+
+    fireEvent.change(second, { target: { value: `family${tab}motto` } });
+    expect(ref.current?.passphrasesMatch()).toBe(true);
   });
 });

@@ -6,6 +6,7 @@ import {
   canonicalizeFullName,
   type PersonVersionMetadataInput,
 } from "@deepfamily/protocol-core";
+import { classifyProtocolPassphraseRisk } from "../../../../../shared/crypto/passphraseStrength";
 import { cryptoWorkerCall } from "../../../../../shared/workers/cryptoWorkerClient";
 import type { PersonHashCalculatorHandle } from "../../../../person";
 import type {
@@ -51,9 +52,12 @@ export function useAddVersionIdentityMaterials() {
       const identity = getPublicIdentity(calc);
       if (!calc || !identity) return null;
       if (!calc.passphrasesMatch()) {
-        throw new Error("Identity passphrase confirmation does not match after NFKD normalization");
+        throw new Error("Identity passphrase confirmation does not match after normalization");
       }
       const rawPassphrase = calc.getSecretInputs().passphrase;
+      if (classifyProtocolPassphraseRisk(rawPassphrase) === "disallowed") {
+        throw new Error("Identity passphrase contains a code point the protocol does not accept");
+      }
       const derived = await cryptoWorkerCall(
         "deriveIdentityMaterialV1",
         {
@@ -88,12 +92,8 @@ export function useAddVersionIdentityMaterials() {
     }): PersonVersionMetadataInput => {
       const { processedData } = input;
       const person = identityFields(input.personIdentity.personData);
-      const father = input.fatherIdentity
-        ? identityFields(input.fatherIdentity.personData)
-        : null;
-      const mother = input.motherIdentity
-        ? identityFields(input.motherIdentity.personData)
-        : null;
+      const father = input.fatherIdentity ? identityFields(input.fatherIdentity.personData) : null;
+      const mother = input.motherIdentity ? identityFields(input.motherIdentity.personData) : null;
 
       return {
         schema: PERSON_VERSION_SCHEMA,

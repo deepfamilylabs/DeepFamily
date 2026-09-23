@@ -62,6 +62,47 @@ describe("SecureKeyDerivation passphrase policy", () => {
     vi.restoreAllMocks();
   });
 
+  it("refuses a passphrase the protocol disallows instead of offering to proceed", async () => {
+    // A disallowed code point is not a risk the user can accept: continuing
+    // could only fail inside the KDF, so no "proceed anyway" path may exist.
+    const passphrase = `family${String.fromCharCode(9)}motto`;
+    render(
+      <ToastProvider>
+        <SecureKeyDerivation />
+      </ToastProvider>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder"), {
+      target: { value: "Ada Lovelace" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+      ),
+      { target: { value: passphrase } },
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)"),
+      { target: { value: passphrase } },
+    );
+
+    const deriveButton = screen.getByRole("button", {
+      name: "keyDerivation.component.deriveButton",
+    });
+    await waitFor(() => expect((deriveButton as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(deriveButton);
+
+    expect(await screen.findByText(/recommendations\.disallowedCodePoint/)).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "keyDerivation.component.proceedAnyway" }),
+    ).toBeNull();
+    expect(mocks.cryptoWorkerCall).not.toHaveBeenCalledWith(
+      "deriveKey",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it("requires an explicit warning for protocol Unicode-whitespace-only input", async () => {
     render(
       <ToastProvider>
@@ -76,11 +117,11 @@ describe("SecureKeyDerivation passphrase policy", () => {
       screen.getByPlaceholderText(
         "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
       ),
-      { target: { value: "\u0085\u3000" } },
+      { target: { value: "\u00a0\u3000" } },
     );
     fireEvent.change(
       screen.getByPlaceholderText("Repeat the identity passphrase (empty is allowed)"),
-      { target: { value: "\u0085\u3000" } },
+      { target: { value: "\u00a0\u3000" } },
     );
 
     const deriveButton = screen.getByRole("button", {
@@ -101,7 +142,7 @@ describe("SecureKeyDerivation passphrase policy", () => {
       expect(mocks.cryptoWorkerCall).toHaveBeenCalledWith(
         "deriveKey",
         expect.objectContaining({
-          input: expect.objectContaining({ passphrase: "\u0085\u3000" }),
+          input: expect.objectContaining({ passphrase: "\u00a0\u3000" }),
         }),
         expect.anything(),
       ),

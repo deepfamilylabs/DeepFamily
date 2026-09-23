@@ -24,6 +24,27 @@ async function expectRejected(label, operation) {
 const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const MAX_UINT160 = (1n << 160n) - 1n;
+const SNARK_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+
+const withPresentParent = (input, role) => {
+  const result = {
+    ...input,
+    [`has${role[0].toUpperCase()}${role.slice(1)}`]: 1,
+    [`${role}SuiteId`]: input.selfSuiteId,
+  };
+  for (const field of [
+    "nameField",
+    "derivedSecretField",
+    "isBirthBC",
+    "birthYear",
+    "birthMonth",
+    "birthDay",
+    "gender",
+  ]) {
+    result[`${role}${field[0].toUpperCase()}${field.slice(1)}`] = input[field];
+  }
+  return result;
+};
 
 async function runPersonConstraintTests() {
   const personInput = readFixture("person_commitment_input.json");
@@ -49,9 +70,31 @@ async function runPersonConstraintTests() {
   }
   console.log("PASS: PersonRelation accepts exact uint160/uint32/uint128 maxima");
 
-  await expectRejected("PersonRelation rejects birthMonth > 12", () =>
-    calculateWitnessIsolated({ ...personInput, birthMonth: 13 }),
-  );
+  // All three roles instantiate IdentityCommitmentCore. Present parents ensure
+  // rejection comes from its month constraint, not the canonical null mask.
+  for (const [role, input, monthField] of [
+    ["self", personInput, "birthMonth"],
+    ["father", withPresentParent(personInput, "father"), "fatherBirthMonth"],
+    ["mother", withPresentParent(personInput, "mother"), "motherBirthMonth"],
+  ]) {
+    for (const birthMonth of [0, 12]) {
+      await calculateWitnessIsolated({ ...input, [monthField]: birthMonth });
+      console.log(`PASS: PersonRelation accepts ${role} birthMonth == ${birthMonth}`);
+    }
+    await expectRejected(`PersonRelation rejects ${role} birthMonth > 12`, () =>
+      calculateWitnessIsolated({ ...input, [monthField]: 13 }),
+    );
+    // The old comparator accepted these negative field representatives because
+    // its input was not independently constrained to the advertised bit width.
+    for (const offset of [3n, 2n, 1n]) {
+      await expectRejected(`PersonRelation rejects ${role} birthMonth == p-${offset}`, () =>
+        calculateWitnessIsolated({
+          ...input,
+          [monthField]: (SNARK_FIELD - offset).toString(),
+        }),
+      );
+    }
+  }
   await expectRejected("PersonRelation rejects birthDay > 31", () =>
     calculateWitnessIsolated({ ...personInput, birthDay: 32 }),
   );

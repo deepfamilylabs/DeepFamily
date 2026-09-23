@@ -4,12 +4,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import {
-  PRODUCTION_PTAU_FILE_NAME,
+  PRODUCTION_PTAU_URL,
   ensureProductionPtau,
   productionPtauPath,
   resolveProductionPtauPath,
 } from "../scripts/lib/productionPtau.mjs";
-import { expectRegularFileWithPosixMode } from "./helpers/fileMode.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const fixtureBytes = Buffer.from("hermetic public phase-1 fixture");
@@ -18,15 +17,8 @@ const expected = Object.freeze({
   sha256: createHash("sha256").update(fixtureBytes).digest("hex"),
   blake2b512: createHash("blake2b512").update(fixtureBytes).digest("hex"),
 });
-const source = "https://fixtures.invalid/public-phase-1.ptau";
 
-const responseFor = (bytes, status = 200) =>
-  new Response(bytes, {
-    status,
-    headers: { "content-length": String(bytes.length) },
-  });
-
-describe("pinned production Powers of Tau cache", function () {
+describe("pinned local production Powers of Tau", function () {
   let root;
 
   beforeEach(async function () {
@@ -57,144 +49,112 @@ describe("pinned production Powers of Tau cache", function () {
     ).to.throw("duplicate ZK_PTAU_PATH entries");
   });
 
-  it("downloads atomically and validates size, SHA-256 and BLAKE2b-512", async function () {
-    let requested;
-    let options;
-    const result = await ensureProductionPtau({
-      root,
-      source,
-      expected,
-      fetchImpl: async (url, init) => {
-        requested = url;
-        options = init;
-        return responseFor(fixtureBytes);
-      },
-    });
-    const destination = productionPtauPath(root);
-    expect(requested).to.equal(source);
-    expect(options).to.deep.equal({ redirect: "error" });
-    expect(result).to.include({
-      status: "downloaded",
-      path: destination,
-      source,
-      ...expected,
-    });
-    expect(await fs.readFile(destination)).to.deep.equal(fixtureBytes);
-    expectRegularFileWithPosixMode(await fs.lstat(destination), 0o600);
-    const cacheFiles = await fs.readdir(path.dirname(destination));
-    expect(cacheFiles).to.deep.equal([PRODUCTION_PTAU_FILE_NAME]);
-  });
-
-  it("reuses only an exact cached file without making a request", async function () {
-    await ensureProductionPtau({
-      root,
-      source,
-      expected,
-      fetchImpl: async () => responseFor(fixtureBytes),
-    });
-    const result = await ensureProductionPtau({
-      root,
-      source,
-      expected,
-      fetchImpl: async () => {
-        throw new Error("network must not be used for an exact cache hit");
-      },
-    });
-    expect(result.status).to.equal("already-cached");
-  });
-
-  it("rejects HTTP failures and removes partial files", async function () {
-    let error;
-    try {
-      await ensureProductionPtau({
-        root,
-        source,
-        expected,
-        fetchImpl: async () => responseFor(Buffer.from("missing"), 404),
-      });
-    } catch (caught) {
-      error = caught;
-    }
-    expect(error?.message).to.include("HTTP 404");
-    const directory = path.dirname(productionPtauPath(root));
-    expect(await fs.readdir(directory)).to.deep.equal([]);
-  });
-
-  it("rejects truncated or altered bytes without creating a usable cache", async function () {
-    const altered = Buffer.from(fixtureBytes);
-    altered[0] ^= 0xff;
-    let error;
-    try {
-      await ensureProductionPtau({
-        root,
-        source,
-        expected,
-        fetchImpl: async () => responseFor(altered),
-      });
-    } catch (caught) {
-      error = caught;
-    }
-    expect(error?.message).to.include("sha256 mismatch");
-    await expectMissing(productionPtauPath(root));
-    const directory = path.dirname(productionPtauPath(root));
-    expect((await fs.readdir(directory)).some((name) => name.endsWith(".partial"))).to.equal(false);
-  });
-
-  it("refuses unexpected existing bytes instead of silently overwriting them", async function () {
+  it("verifies an existing file at the default local path without modifying it", async function () {
     const destination = productionPtauPath(root);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, "unexpected");
+    await fs.writeFile(destination, fixtureBytes);
+    const result = await ensureProductionPtau({
+      root,
+      env: {},
+      expected,
+    });
+    expect(result).to.deep.equal({
+      status: "verified-local",
+      path: destination,
+      source: PRODUCTION_PTAU_URL,
+      ...expected,
+    });
+    expect(await fs.readdir(path.dirname(destination))).to.deep.equal([path.basename(destination)]);
+  });
+
+  it("verifies a file selected by ZK_PTAU_PATH", async function () {
+    const selected = path.join(root, "reviewed", "phase1.ptau");
+    await fs.mkdir(path.dirname(selected), { recursive: true });
+    await fs.writeFile(selected, fixtureBytes);
+    const result = await ensureProductionPtau({
+      root,
+      env: { ZK_PTAU_PATH: "reviewed/phase1.ptau" },
+      expected,
+    });
+    expect(result.path).to.equal(selected);
+    expect(result.status).to.equal("verified-local");
+  });
+
+  it("fails clearly when the local file is missing and never creates one", async function () {
+    const destination = productionPtauPath(root);
     let error;
     try {
       await ensureProductionPtau({
         root,
-        source,
+        env: {},
         expected,
-        fetchImpl: async () => responseFor(fixtureBytes),
       });
     } catch (caught) {
       error = caught;
     }
-    expect(error?.message).to.include("remove it only after review");
-    expect(await fs.readFile(destination, "utf8")).to.equal("unexpected");
+    expect(error?.message).to.include("Local production Powers of Tau is missing");
+    expect(error?.message).to.include("ZK_PTAU_PATH");
+    await expectMissing(destination);
+    await expectMissing(path.dirname(destination));
   });
 
-  it("refuses a symlink cache and a concurrent lock", async function () {
+  it("rejects truncated and altered bytes without modifying the local file", async function () {
     const destination = productionPtauPath(root);
-    const directory = path.dirname(destination);
-    await fs.mkdir(directory, { recursive: true });
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, fixtureBytes.subarray(1));
+    let error = await captureError(() => ensureProductionPtau({ root, env: {}, expected }));
+    expect(error?.message).to.include("bytes mismatch");
+
+    const altered = Buffer.from(fixtureBytes);
+    altered[0] ^= 0xff;
+    await fs.writeFile(destination, altered);
+    error = await captureError(() => ensureProductionPtau({ root, env: {}, expected }));
+    expect(error?.message).to.include("sha256 mismatch");
+    expect(await fs.readFile(destination)).to.deep.equal(altered);
+
+    await fs.writeFile(destination, fixtureBytes);
+    error = await captureError(() =>
+      ensureProductionPtau({
+        root,
+        env: {},
+        expected: { ...expected, blake2b512: "11".repeat(64) },
+      }),
+    );
+    expect(error?.message).to.include("blake2b512 mismatch");
+  });
+
+  it("rejects a symlink file and a path traversing a symlink", async function () {
+    const destination = productionPtauPath(root);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
     const target = path.join(root, "target.ptau");
     await fs.writeFile(target, fixtureBytes);
     await fs.symlink(target, destination);
-    let symlinkError;
-    try {
-      await ensureProductionPtau({
-        root,
-        source,
-        expected,
-        fetchImpl: async () => responseFor(fixtureBytes),
-      });
-    } catch (caught) {
-      symlinkError = caught;
-    }
-    expect(symlinkError?.message).to.include("not a regular file");
-    await fs.rm(destination);
-    await fs.writeFile(path.join(directory, ".download.lock"), "busy");
+    let error = await captureError(() => ensureProductionPtau({ root, env: {}, expected }));
+    expect(error?.message).to.include("regular non-symlink file");
 
-    let lockError;
-    try {
-      await ensureProductionPtau({
+    const linkedDirectory = path.join(root, "linked");
+    await fs.symlink(path.dirname(destination), linkedDirectory);
+    await fs.rm(destination);
+    await fs.writeFile(destination, fixtureBytes);
+    error = await captureError(() =>
+      ensureProductionPtau({
         root,
-        source,
+        env: { ZK_PTAU_PATH: "linked/powersOfTau28_hez_final_13.ptau" },
         expected,
-        fetchImpl: async () => responseFor(fixtureBytes),
-      });
-    } catch (caught) {
-      lockError = caught;
-    }
-    expect(lockError?.message).to.include("in progress");
+      }),
+    );
+    expect(error?.message).to.include("must not traverse a symlink");
   });
 });
+
+const captureError = async (callback) => {
+  try {
+    await callback();
+    return null;
+  } catch (error) {
+    return error;
+  }
+};
 
 const expectMissing = async (filePath) => {
   try {
