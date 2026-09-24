@@ -1156,7 +1156,8 @@
       "confirm": "存入并设立",
       "cancel": "返回修改",
       "success": "传承 #{{id}} 已设立。",
-      "successHint": "如有家族成员想追加存入，把编号告诉他们即可。",
+      "successHint": "如有家族成员想追加存入，把编号 {{id}} 告诉他们即可。",
+      "credential": "传承凭证",
       "createAnother": "再设立一个"
     },
     "deposit": {
@@ -1185,6 +1186,7 @@
       "search": "查找传承",
       "searchAgain": "重新查找",
       "foundVia": "你的版本 {{version}} 已获推荐来源 {{endorser}} 背书。",
+      "credential": "传承凭证",
       "noneTitle": "暂无传承",
       "noneDescription": "还没有人为这个根版本设立传承。",
       "perPeriod": "每位子女每 30 天",

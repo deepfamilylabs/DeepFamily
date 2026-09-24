@@ -7,6 +7,7 @@ import {
   ErrorNotice,
   FactList,
   FieldBlock,
+  HashList,
   PanelButton,
   PanelShell,
   StatusLine,
@@ -22,7 +23,11 @@ export interface InheritanceDepositPanelProps {
   onReset: () => void;
 }
 
-const ID_PATTERN = /^\d+$/;
+// Notices show the id as "#3", so it may be pasted that way.
+function parseId(text: string): bigint | null {
+  const match = /^#?(\d+)$/.exec(text.trim());
+  return match ? BigInt(match[1]) : null;
+}
 
 export function InheritanceDepositPanel({
   state,
@@ -37,7 +42,8 @@ export function InheritanceDepositPanel({
   const [amountText, setAmountText] = useState("");
   const [attempted, setAttempted] = useState(false);
 
-  const idValid = ID_PATTERN.test(idText.trim());
+  const id = parseId(idText);
+  const idInvalid = idText !== "" && id === null;
   const amount = parseDeepAmount(amountText);
   const info = "info" in state ? state.info : undefined;
   const busy =
@@ -45,7 +51,7 @@ export function InheritanceDepositPanel({
 
   const lookup = () => {
     setAttempted(false);
-    if (idValid) onLookup(BigInt(idText.trim()));
+    if (id !== null) onLookup(id);
   };
 
   const deposit = () => {
@@ -67,9 +73,10 @@ export function InheritanceDepositPanel({
             <input
               id={`${ids}-id`}
               inputMode="numeric"
-              className={modalField(idText !== "" && !idValid)}
+              className={modalField(idInvalid)}
               value={idText}
               disabled={busy}
+              aria-invalid={idInvalid || undefined}
               onChange={(event) => {
                 setIdText(event.target.value);
                 if (state.step !== "idle") onReset();
@@ -78,7 +85,7 @@ export function InheritanceDepositPanel({
           </FieldBlock>
         </div>
         <PanelButton
-          disabled={disabled || busy || !idValid}
+          disabled={disabled || busy || id === null}
           busy={state.step === "loading"}
           onClick={lookup}
         >
@@ -151,7 +158,9 @@ export function InheritanceDepositPanel({
               id: state.info.id.toString(),
             })}
           </p>
-          <p className="break-all font-mono text-xs text-ink-muted">{state.transactionHash}</p>
+          <HashList
+            items={[{ label: t("transaction.rowTransaction"), value: state.transactionHash }]}
+          />
         </SuccessNotice>
       ) : null}
       {state.step === "success" ? (

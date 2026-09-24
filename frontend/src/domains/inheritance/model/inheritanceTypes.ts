@@ -82,6 +82,8 @@ export interface ClaimLookup {
   heirPersonHash: string;
   rootPersonHash: string;
   rootVersionIndex: number;
+  /** The root version's credential; `rows` are every inheritance opened under it. */
+  credential: bigint;
   /** The heir's version and endorser that open the earliest period. */
   versionIndex: number;
   endorser: string;
