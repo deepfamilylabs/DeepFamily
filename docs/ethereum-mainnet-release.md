@@ -107,7 +107,7 @@ PRIVATE_KEY=0x...
 ETHEREUM_MAINNET_RPC_URL=https://your-reviewed-ethereum-mainnet-rpc
 EXPLORER_API_KEY=your-real-etherscan-api-key
 # Optional path override for the production pTau file.
-# Blank uses the committed circuits/ptau/powersOfTau28_hez_final_13.ptau.
+# Blank uses the committed circuits/ptau/powersOfTau28_hez_final_15.ptau.
 ZK_PTAU_PATH=
 
 # Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.

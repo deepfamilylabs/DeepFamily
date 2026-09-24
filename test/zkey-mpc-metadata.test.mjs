@@ -3,13 +3,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { ZK_CEREMONY_CIRCUIT_FIELDS } from "../scripts/lib/zkArtifactTrust.mjs";
 import { readZkeyMpcMetadata } from "../scripts/lib/zkeyMpcMetadata.mjs";
 import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-development-setup.mjs";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("zkey MPC metadata reader", function () {
-  for (const name of ["person_commitment", "disclosure_binding"]) {
+  for (const name of ["person_commitment", "disclosure_binding", "family_inheritance_claim"]) {
     it(`reads the real committed ${name} Groth16 MPC section`, async function () {
       const manifest = JSON.parse(
         await fs.readFile(
@@ -38,9 +39,7 @@ describe("zkey MPC metadata reader", function () {
           await fs.readFile(path.join(PROJECT_ROOT, manifest.trustedSetup.transcript.path), "utf8"),
         );
         const contributionHashField =
-          name === "person_commitment"
-            ? "personCommitmentContributionHash"
-            : "disclosureBindingContributionHash";
+          ZK_CEREMONY_CIRCUIT_FIELDS[name].contributionHash;
         const expectedContributions = [
           ...transcript.contributions.map((contribution, index) => ({
             sequence: index + 1,

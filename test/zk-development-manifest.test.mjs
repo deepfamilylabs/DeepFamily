@@ -64,6 +64,7 @@ const productionSetup = () => {
       source: "public-randomness-round-12345",
       personCommitmentContributionHash: "aa".repeat(64),
       disclosureBindingContributionHash: "bb".repeat(64),
+      familyInheritanceClaimContributionHash: "cc".repeat(64),
     },
   };
 };

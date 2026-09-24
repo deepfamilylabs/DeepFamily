@@ -18,6 +18,7 @@ describe("resolveNavSection", () => {
     expect(resolveNavSection("/")).toBe("home");
     expect(resolveNavSection("/search")).toBe("search");
     expect(resolveNavSection("/create")).toBe("create");
+    expect(resolveNavSection("/inheritance")).toBe("inheritance");
   });
 
   it("returns null for routes no nav entry owns", () => {

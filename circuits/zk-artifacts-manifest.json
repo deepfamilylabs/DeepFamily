@@ -18,20 +18,28 @@
   },
   "circuits": {
     "person_commitment": {
-      "sourceSha256": "a188ef1b37c37f49a5780731d4b03004ab45da991de0ba9538de371e055e9c82",
+      "sourceSha256": "6e241b83d9c3b43d4985ba40984d39e0e56929ee25a6ea555fb7959cf80c8032",
       "r1csSha256": "32ebc923b60c7d136fd0c5fbbe63a77ec818eadda2b0bb830c1d17d913e05f48",
-      "wasmSha256": "a475fd49119d170384ae47518544d289792754626d5a8a888a2948d0b9159c1a",
-      "zkeySha256": "04114e44fdaa37a8e125086f90ad4da13c2c58f6b00517a6bb1767833c1eee97",
-      "verificationKeySha256": "0f55cf59e74d21dd72f9a82bdeb6b565bb5a7d1a27695152262fa57003b8c9f2",
-      "solidityVerifierSha256": "bc1e438326c2bcc764a69d0fb55dc3f79b3f4ae3692f9150b71d3a045c2fcbec"
+      "wasmSha256": "4a22604f06f048f8f7cc6bc4cb014430784ee63501af11f453a462ba04daf6da",
+      "zkeySha256": "a98e5154d8af19c0e6e0de77cd84b07512ac4059402b6c15432bda52ece09f0b",
+      "verificationKeySha256": "b4765402c084aff9505f7040b8814ac1b210f2e8e482fec2f52241e0dff10115",
+      "solidityVerifierSha256": "b7f0c63d4294162a0c25fa9642c8a8dc7b448f82407c53eef012327f8398d979"
     },
     "disclosure_binding": {
       "sourceSha256": "ce0308ca6af430da7dc09720659465b5d750153e755508f8d654c90ba898ccdb",
       "r1csSha256": "b7e51378ad88bc98239e404d848c893cc286ed489fc54f995fa54e3daa8eea99",
       "wasmSha256": "550466e9c9f1f5dfe71b8d2e0fd04a092f3736504463c4844c4f038ac153ee12",
-      "zkeySha256": "cdf5e3ccbec372cc5acc272b96965664e3474d6ec53640521adb40d16160af61",
-      "verificationKeySha256": "bce5ddd5ea48ec52997f584c66802094f944bd5be360523753146920e70d0697",
-      "solidityVerifierSha256": "f1f0cd4d966aeb6fd43f08341910b625cf8d270a118e041968f93c9e911b16e6"
+      "zkeySha256": "349eef06ef1ebc93c0a60b9380aeba8429840f326378ba9477d4ca7446107212",
+      "verificationKeySha256": "0f22a0cb907c46682cc4198ee77ae5237742f7f5af0ce96ba7c1cf1f9bd99110",
+      "solidityVerifierSha256": "78b447c67ec01bb6e19834c89a0027429ea11098b943fc1fa90c842539ad97a8"
+    },
+    "family_inheritance_claim": {
+      "sourceSha256": "781588c55adb30735e3b5a6a162969c21ac4dd9b1aa5ac91fe7fa916ec1badf0",
+      "r1csSha256": "9c2776158d5e4290838b4b752b90a994534400cdac3f6f0c8aebb3b276a41b4c",
+      "wasmSha256": "47664cf39989077b9fee88c75c0c92eaf9dbb5d5447c021b795129a41384d869",
+      "zkeySha256": "300b83590e711be378184c4c34fe7131432b4d8a982c6039da2f026e99c9fcff",
+      "verificationKeySha256": "8d3bb2e0375281e62f43f0eb10aded3f1967cc2bc2bad3b5e4c43efa0c570eeb",
+      "solidityVerifierSha256": "5bbb3161146b0c443728d78501d698d2e1fe06fa1c24493499f1375a0557ad3b"
     }
   }
 }

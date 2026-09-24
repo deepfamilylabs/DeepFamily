@@ -40,6 +40,16 @@ const circuits = [
     verifier: "contracts/DisclosureBindingVerifier.sol",
     verifierContractName: "DisclosureBindingVerifier",
   },
+  {
+    name: "family_inheritance_claim",
+    builtR1cs: "zk-artifacts/circuits/family_inheritance_claim.r1cs",
+    builtWasm: "zk-artifacts/circuits/family_inheritance_claim_js/family_inheritance_claim.wasm",
+    committedWasm: "frontend/public/zk/family_inheritance_claim.wasm",
+    committedZkey: "frontend/public/zk/family_inheritance_claim_final.zkey",
+    committedVkey: "frontend/public/zk/family_inheritance_claim.vkey.json",
+    verifier: "contracts/FamilyInheritanceClaimVerifier.sol",
+    verifierContractName: "FamilyInheritanceClaimVerifier",
+  },
 ];
 
 function absolute(relativePath) {

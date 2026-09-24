@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "poseidon-solidity/PoseidonT5.sol";
 import {IDeepFamilyArchive} from "./interfaces/IDeepFamilyArchive.sol";
+import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
 import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {AdultAgeGate} from "./libraries/AdultAgeGate.sol";
@@ -74,6 +75,9 @@ contract DeepFamily is
   error InvalidArchive();
   error ArchiveAlreadySet();
   error ArchiveNotSet();
+  error InvalidLineageIndex();
+  error LineageIndexAlreadySet();
+  error LineageIndexNotSet();
   error InvalidMetadataEnvelope();
   error InvalidEnvelopePrefix();
   error InvalidIdentitySuite();
@@ -208,6 +212,7 @@ contract DeepFamily is
   mapping(bytes32 => mapping(uint256 => address[])) private trustedEndorsers;
   mapping(bytes32 => mapping(uint256 => mapping(address => uint256))) private trustedEndorserIndex;
   mapping(bytes32 => bool) public rewardClaimedByPerson;
+  address public lineageIndex;
 
   // NOTE: No storage gap. This is the most-derived (leaf) upgradeable contract and every
   // inherited base uses ERC-7201 namespaced storage, so a new implementation adds state simply
@@ -280,6 +285,7 @@ contract DeepFamily is
     address indexed adapter
   );
   event ArchiveSet(address indexed archive);
+  event LineageIndexSet(address indexed lineageIndex);
 
   event TrustedEndorserAdded(
     bytes32 indexed personHash,
@@ -551,6 +557,39 @@ contract DeepFamily is
     emit ArchiveSet(candidate);
   }
 
+  /** @notice Permanently bind the immutable lineage index that mirrors legitimacy state. */
+  function setLineageIndex(address candidate) external onlyProxy onlyOwner {
+    if (lineageIndex != address(0)) revert LineageIndexAlreadySet();
+    if (candidate == address(0) || candidate.code.length == 0) revert InvalidLineageIndex();
+    if (!ERC165Checker.supportsInterface(candidate, type(IDeepFamilyLineageIndex).interfaceId)) {
+      revert InvalidLineageIndex();
+    }
+    IDeepFamilyLineageIndex target = IDeepFamilyLineageIndex(candidate);
+    try target.DEEP_FAMILY() returns (address bound) {
+      if (bound != address(this)) revert InvalidLineageIndex();
+    } catch {
+      revert InvalidLineageIndex();
+    }
+    try target.indexKind() returns (bytes32 kind) {
+      if (kind != keccak256("deepfamily.lineage-index.v1")) revert InvalidLineageIndex();
+    } catch {
+      revert InvalidLineageIndex();
+    }
+    try target.apiVersion() returns (uint256 version) {
+      if (version != 1) revert InvalidLineageIndex();
+    } catch {
+      revert InvalidLineageIndex();
+    }
+    lineageIndex = candidate;
+    emit LineageIndexSet(candidate);
+  }
+
+  function _lineage() internal view returns (IDeepFamilyLineageIndex) {
+    address index = lineageIndex;
+    if (index == address(0)) revert LineageIndexNotSet();
+    return IDeepFamilyLineageIndex(index);
+  }
+
   function _requireTrustedEndorserManager(bytes32 personHash, uint256 versionIndex) internal view {
     uint256 tokenId = versionToTokenId[personHash][versionIndex];
     if (tokenId == 0) {
@@ -580,6 +619,7 @@ contract DeepFamily is
       trustedEndorsers[personHash][versionIndex].length +
       1;
     trustedEndorsers[personHash][versionIndex].push(account);
+    _lineage().onTrustedEndorserSet(personHash, versionIndex, account, true);
 
     emit TrustedEndorserAdded(personHash, versionIndex, account);
   }
@@ -605,6 +645,7 @@ contract DeepFamily is
     trustedEndorsers[personHash][versionIndex].pop();
     delete trustedEndorserIndex[personHash][versionIndex][account];
     delete trustedEndorserOf[personHash][versionIndex][account];
+    _lineage().onTrustedEndorserSet(personHash, versionIndex, account, false);
 
     emit TrustedEndorserRemoved(personHash, versionIndex, account);
   }
@@ -643,9 +684,10 @@ contract DeepFamily is
     bytes32 motherHash,
     uint256 fatherVersionIndex,
     uint256 motherVersionIndex,
-    uint256 versionCommitment,
+    PersonProofPublicSignals calldata publicSignals,
     bytes calldata metadataEnvelope
   ) internal {
+    uint256 versionCommitment = publicSignals.versionCommitment;
     if (personHash == bytes32(0)) revert InvalidPersonHash();
     if (fatherHash == personHash || motherHash == personHash) revert InvalidParentHash();
     if (fatherHash != bytes32(0) && fatherHash == motherHash) revert InvalidParentHash();
@@ -683,6 +725,13 @@ contract DeepFamily is
     );
 
     IDeepFamilyArchive(archive).storeMetadata(personHash, versionIndex, metadataEnvelope);
+    _lineage().onVersionAdded(
+      personHash,
+      versionIndex,
+      publicSignals.identityCommitment,
+      publicSignals.fatherIdentityCommitment,
+      publicSignals.motherIdentityCommitment
+    );
 
     _addTrustedEndorserInternal(personHash, versionIndex, msg.sender);
     if (fatherHash != bytes32(0)) {
@@ -735,6 +784,7 @@ contract DeepFamily is
     bytes calldata metadataEnvelope
   ) external nonReentrant {
     if (archive == address(0)) revert ArchiveNotSet();
+    if (lineageIndex == address(0)) revert LineageIndexNotSet();
     _validateMetadataEnvelope(metadataEnvelope, publicSignals.submitterAndSelfSuiteId);
 
     address adapter = _getVerifier(proof.circuitId, ProofPurpose.PersonRelation);
@@ -780,7 +830,7 @@ contract DeepFamily is
       motherHash_,
       fatherVersionIndex,
       motherVersionIndex,
-      publicSignals.versionCommitment,
+      publicSignals,
       metadataEnvelope
     );
   }
@@ -811,6 +861,7 @@ contract DeepFamily is
 
     versionEndorsementCount[personHash][arrayIndex] += 1;
     endorsedVersionIndex[personHash][msg.sender] = versionIndex;
+    _lineage().onEndorsementSet(personHash, msg.sender, versionIndex);
 
     if (fee > 0) {
       IDeepFamilyToken tokenContract = IDeepFamilyToken(DEEP_FAMILY_TOKEN_CONTRACT);
@@ -892,6 +943,7 @@ contract DeepFamily is
     }
 
     delete endorsedVersionIndex[personHash][msg.sender];
+    _lineage().onEndorsementCleared(personHash, msg.sender);
 
     emit EndorsementCancelled(personHash, msg.sender, versionIndex, block.timestamp);
   }

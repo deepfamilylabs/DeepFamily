@@ -134,6 +134,19 @@ export function getChainEntryReaderAddress(chainId: number): string {
   return getStringEnv(`VITE_READER_ADDRESS_${chainId}`);
 }
 
+/**
+ * The FamilyInheritance module. It is not bound to DeepFamily, so unlike the
+ * token and lineage index it cannot be derived from the reader; the per-chain
+ * `VITE_INHERITANCE_ADDRESS_<chainId>` wins over the unsuffixed default.
+ */
+export function getInheritanceAddress(chainId: number): string {
+  const perChain =
+    Number.isSafeInteger(chainId) && chainId > 0
+      ? getStringEnv(`VITE_INHERITANCE_ADDRESS_${chainId}`)
+      : "";
+  return perChain.trim() || getStringEnv("VITE_INHERITANCE_ADDRESS").trim();
+}
+
 export function getDefaultRootHash(): string {
   return getStringEnv("VITE_ROOT_PERSON_HASH");
 }

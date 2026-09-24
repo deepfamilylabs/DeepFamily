@@ -22,6 +22,7 @@ vi.mock("react-i18next", () => ({
       const labels: Record<string, string> = {
         "navigation.home": "Home",
         "navigation.familyTree": "Family",
+        "navigation.inheritance": "Inheritance",
       };
       return labels[key] ?? fallback ?? key;
     },
@@ -101,7 +102,7 @@ describe("GlobalSidebar", () => {
       row.getAttribute("aria-label"),
     );
 
-    expect(labels).toEqual(["Home", "Family", "Create"]);
+    expect(labels).toEqual(["Home", "Family", "Create", "Inheritance"]);
   });
 
   it("keeps the desktop rail to routes — settings and the logo page live in the status bar", () => {
@@ -122,6 +123,16 @@ describe("GlobalSidebar", () => {
     expect(family.getAttribute("aria-current")).toBe("page");
     expect(family.className).toContain("text-orange-600");
     expect(screen.getByLabelText("Home").getAttribute("aria-current")).toBeNull();
+  });
+
+  it("lights the inheritance row on its own route", () => {
+    mocks.activePath = "/inheritance";
+    renderSidebar();
+
+    const inheritance = screen.getByLabelText("Inheritance");
+    expect(inheritance.getAttribute("href")).toBe("/inheritance");
+    expect(inheritance.getAttribute("aria-current")).toBe("page");
+    expect(inheritance.querySelector("svg")?.getAttribute("fill")).toBe("currentColor");
   });
 
   it("marks the current section by shape, not colour alone — solid glyph, outlines elsewhere", () => {
@@ -178,7 +189,7 @@ describe("GlobalSidebar", () => {
       row.getAttribute("aria-label"),
     );
 
-    expect(labels).toEqual(["Home", "Family", "Create", "Language", "Theme"]);
+    expect(labels).toEqual(["Home", "Family", "Create", "Inheritance", "Language", "Theme"]);
   });
 
   it("shows the current language beside its drawer row", () => {

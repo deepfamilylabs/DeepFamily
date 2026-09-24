@@ -8,7 +8,13 @@ import { resolveNavSection, type NavSection } from "../config/navSections";
 import { useResponsiveModalMode } from "../../shared/ui";
 import { languages } from "../config/languages";
 import Logo from "./Logo";
-import { CreateNavIcon, FamilyTreeNavIcon, HomeNavIcon, type NavIconProps } from "./NavIcons";
+import {
+  CreateNavIcon,
+  FamilyTreeNavIcon,
+  HomeNavIcon,
+  InheritanceNavIcon,
+  type NavIconProps,
+} from "./NavIcons";
 import SidebarFooter from "./SidebarFooter";
 
 /**
@@ -363,6 +369,14 @@ export default function GlobalSidebar() {
         label: t("navigation.create", "Create"),
         to: "/create",
         section: "create",
+      },
+      {
+        id: "inheritance",
+        kind: "route",
+        icon: InheritanceNavIcon,
+        label: t("navigation.inheritance"),
+        to: "/inheritance",
+        section: "inheritance",
       },
     ],
     [t],

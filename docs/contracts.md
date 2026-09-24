@@ -150,7 +150,7 @@ function addPersonVersion(
 
 **Verification Process**:
 
-1. Requires the one-time `archive` binding to be configured.
+1. Requires the one-time `archive` and `lineageIndex` bindings to be configured.
 2. Reads only the 20-byte envelope common prefix: magic `DFM1`, nonzero `formatVersion`, and the
    nonzero big-endian self suite at bytes `0x10..0x13`.
 3. Requires `submitterAndSelfSuiteId` to equal the caller in the low 160 bits plus that header suite
@@ -162,6 +162,8 @@ function addPersonVersion(
 6. Rejects a duplicate `versionHash` scoped to the person, parent references, and
    `versionCommitment`.
 7. Creates the version and calls the fixed Archive with the exact envelope in the same transaction.
+8. Reports the version's own, father, and mother identity commitments to the lineage index
+   (`onVersionAdded`), which stores the parents digest the endorsement tree needs.
 
 DeepFamily does not parse format-1 selectors, salts, IVs, ciphertext, GCM tags, gzip, or JSON. It
 also does not calculate `versionCommitment` from `contentCiphertext`; the contract has neither the
@@ -191,6 +193,9 @@ function endorseVersion(
 - Protocol share goes to contract owner or burned if ownership renounced
 - Each account can endorse only one version per person
 - Switching endorsements rebalances vote counts
+- Every endorsement, switch, and cancellation, and every trusted-endorser (recommended source)
+  addition or removal, is mirrored into `DeepFamilyLineageIndex` in the same transaction. Each such
+  write recomputes one Merkle path there, one Poseidon hash and one storage write per tree level
 
 #### NFT Minting with Disclosure Proof
 
@@ -407,6 +412,8 @@ event EndorsementFeeUpdated(uint256 previousBps, uint256 newBps);
 event CircuitVerifierSet(uint8 indexed purpose, uint32 indexed circuitId, address indexed adapter);
 
 event ArchiveSet(address indexed archive);
+
+event LineageIndexSet(address indexed lineageIndex);
 ```
 
 `DeepFamilyArchive` emits `MetadataStored`, `StoryRecordAppended` and `StorySealed`. All events carry complete reference or final-state commitments; see the [Archive interface](../contracts/interfaces/IDeepFamilyArchive.sol).
@@ -425,6 +432,7 @@ mapping(uint256 => PersonCoreInfo) public nftCoreInfo;                        //
 mapping(bytes32 => mapping(uint256 => uint256)) public versionToTokenId;      // Version => NFT mapping
 mapping(uint8 => mapping(uint32 => address)) public verifierRegistry;         // purpose => circuitId => adapter
 address public archive; // One-time protocol binding
+address public lineageIndex; // One-time lineage index binding, appended after rewardClaimedByPerson
 ```
 
 Story references and state live in the private `_storyRecords` and `_storyStates` mappings of
@@ -517,6 +525,9 @@ Token
 → proxy.setArchive(archive) exactly once
 → DeepFamilyReader(proxy), after Archive binding
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
+→ PoseidonT3/T4/T6 libraries, then DeepFamilyLineageIndex(proxy) linked to T3–T6
+→ proxy.setLineageIndex(index) exactly once
+→ FamilyInheritanceClaimVerifier, then FamilyInheritance(token, index, claimVerifier)
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
 → verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
   parameterized runtimes, and release-manifest hashes
@@ -1118,6 +1129,126 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 - Custom error types for precise debugging
 - OpenZeppelin's secure ERC20 base implementation
 
+## DeepFamilyLineageIndex.sol - Lineage Merkle Index
+
+**Location**: `contracts/DeepFamilyLineageIndex.sol`
+**Description**: Immutable companion of the DeepFamily proxy. It mirrors endorsements and trusted
+endorsers (recommended sources) into two Poseidon LeanIMTs so that an inheritance claim can prove
+membership without naming the record. Both trees mirror public DeepFamily state in full, so being
+indexed reveals nothing DeepFamily does not already publish.
+**Upgradeability**: None. It binds the proxy in its constructor (`DEEP_FAMILY`), and the proxy binds
+it once through `setLineageIndex`, which checks ERC-165 support, the reverse binding,
+`indexKind() == keccak256("deepfamily.lineage-index.v1")`, and `apiVersion() == 1`.
+
+| Tree | Id | One leaf per                        | Leaf                                                                            |
+| ---- | -- | ----------------------------------- | ------------------------------------------------------------------------------- |
+| Endorsement | 0 | (person, endorser)         | `Poseidon(1007, identityCommitment, parentsDigest, versionIndex, writtenAt << 160 \| endorser)` |
+| Trusted     | 1 | (person, version, account) | `Poseidon(1008, identityCommitment, versionIndex, account)`                      |
+
+`parentsDigest = Poseidon(1009, fatherIdentityCommitment, motherIdentityCommitment)` is stored per
+version by `onVersionAdded`, which also checks `keccak256(bytes32(identityCommitment)) ==
+personHash` and emits `VersionIndexed` with all three commitments, because DeepFamily itself keeps
+only their Keccak wraps. Changing an endorsement rewrites its leaf with a new `writtenAt`;
+cancelling it or removing a trusted endorser writes zero into the leaf. Leaves are never removed.
+
+The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
+without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its
+path without caller-supplied siblings and concurrent writes never invalidate each other.
+
+```solidity
+function root(uint8 treeId) external view returns (uint256);
+function size(uint8 treeId) external view returns (uint256);
+function depth(uint8 treeId) external view returns (uint256);
+function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
+function identityCommitmentOf(bytes32 personHash) external view returns (uint256);
+function parentsDigestOf(bytes32 personHash, uint256 versionIndex) external view returns (uint256);
+function endorsementLeafIndex(bytes32 personHash, address endorser)
+    external view returns (bool exists, uint256 leafIndex);
+function trustedLeafIndex(bytes32 personHash, uint256 versionIndex, address account)
+    external view returns (bool exists, uint256 leafIndex);
+
+event LeafWritten(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
+event VersionIndexed(
+    bytes32 indexed personHash,
+    uint256 indexed versionIndex,
+    uint256 identityCommitment,
+    uint256 fatherIdentityCommitment,
+    uint256 motherIdentityCommitment
+);
+```
+
+`isKnownRoot` accepts the current root, or a root replaced at most `ROOT_HISTORY_WINDOW` (1 hour)
+ago, so a proof built just before another write still verifies. Only the proxy may call the
+`on*` hooks. Clients rebuild both trees by replaying every `LeafWritten` event in order and check
+the result against `root(treeId)` at the scanned block.
+
+The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
+`viaIR` (see `hardhat.config.mjs`); with it, PoseidonT6 exceeds the contract size limit.
+
+## FamilyInheritance.sol - Family Inheritance
+
+**Location**: `contracts/FamilyInheritance.sol`
+**Description**: Holds DEEP set aside for the direct children of a root person. A deposit names
+only an opaque credential derived from the root's passphrase; every 30 days a legit child can claim
+a fixed amount with a zero-knowledge proof, without revealing which child they are. There is no
+owner or administrator, and nothing here has legal effect.
+**Upgradeability**: None. `TOKEN`, `LINEAGE_INDEX`, and `CLAIM_VERIFIER` are immutable.
+
+```solidity
+struct Inheritance {
+  uint256 credential;
+  uint64 startTime;
+  uint192 amountPerPeriod;
+  uint256 balance;
+}
+
+struct ClaimSignals {
+  uint256 endorsementRoot;
+  uint256 trustedRoot;
+  uint256 claimTag;
+  uint256 eligibleFrom;
+  address recipient;
+}
+
+function createInheritance(uint256 credential, uint256 amountPerPeriod, uint256 amount)
+    external returns (uint256 id);
+function deposit(uint256 id, uint256 amount) external;
+function claim(uint256 id, ClaimSignals calldata signals, bytes calldata proof)
+    external returns (uint256 amount);
+function inheritanceOf(uint256 id) external view returns (Inheritance memory);
+function claimed(uint256 id, uint256 claimTag) external view returns (uint256);
+
+event InheritanceCreated(uint256 indexed id, uint256 indexed credential, address indexed creator,
+    uint256 startTime, uint256 amountPerPeriod, uint256 amount);
+event InheritanceDeposited(uint256 indexed id, address indexed depositor, uint256 amount);
+event InheritanceClaimed(uint256 indexed id, uint256 indexed claimTag, address indexed recipient,
+    uint256 amount);
+```
+
+**Rules**:
+
+- `credential = Poseidon(1005, rootIdentityCommitment, rootVersionIndex, rootDerivedSecret)`. It
+  fixes the root version, so a new root version with different trusted endorsers cannot take over
+  an existing inheritance. Ids are sequential; copying a credential from the mempool only opens a
+  separate inheritance funded by the copier.
+- The per-period amount is fixed at creation. The frontend pre-fills
+  `1000 × recentReward × k` for a user-chosen k; the contract never reads mining rewards.
+- Anyone can `deposit` to an existing id. Nobody can withdraw; DEEP leaves only through claims.
+- A legit child is one whose version names the root as father or mother and is endorsed by a
+  trusted endorser of the root version. The proof statement is in
+  [zk-proofs.md](zk-proofs.md#familyinheritanceclaim-circuit).
+- `claim` requires known lineage roots, and an `eligibleFrom` on the 30-day grid from `startTime`
+  that is not later than the current block. It pays
+  `amountPerPeriod × ((now − eligibleFrom) / 30 days + 1) − claimed[id][claimTag]`, capped at the
+  balance. Unclaimed periods accumulate; a shortfall stays owed until a later deposit, and claims are
+  first come, first served.
+- The claim tag is the heir's pseudonym within one credential; the proof binds `recipient`, so a
+  copied proof cannot redirect the payout. The sender pays the gas and is public.
+
+**Errors**: `InvalidConstructorAddress`, `InvalidCredential`, `InvalidAmount`,
+`InheritanceNotFound`, `InvalidRecipient`, `UnknownLineageRoot`, `InvalidEligibility`,
+`MalformedProofData`, `InvalidZKProof`, `NothingToClaim`.
+
 ## ZK Verifier Contracts
 
 ### PersonCommitmentVerifier.sol
@@ -1134,8 +1265,17 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 `suiteCommitment`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-Both verifiers are auto-generated from circom circuits. DeepFamily does not call them directly;
-the permanent `(purpose,circuitId)` route selects an `IProofVerifierAdapter`. Encoding ID `1`
+### FamilyInheritanceClaimVerifier.sol
+
+**Purpose**: Validates inheritance claims for `FamilyInheritance.claim()`
+**Public Signals**: 6 values (`endorsementRoot`, `trustedRoot`, `inheritanceCredential`,
+`claimTag`, `eligibleFrom`, `recipient`)
+**Verification**: Groth16 proof with circuit `family_inheritance_claim.circom`, called directly by
+`FamilyInheritance` with a 256-byte ABI encoding of `a/b/c`; it has no adapter or route
+
+All three verifiers are generated from their circom circuits by snarkjs. DeepFamily does not call
+the person and disclosure verifiers directly; the permanent `(purpose,circuitId)` route selects an
+`IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:
 
 ```solidity
@@ -1153,6 +1293,14 @@ function verifyProof(
   uint256[2][2] calldata b,
   uint256[2] calldata c,
   uint256[4] calldata publicSignals
+) external view returns (bool);
+
+// FamilyInheritanceClaimVerifier (6 public signals), called by FamilyInheritance
+function verifyProof(
+  uint256[2] calldata a,
+  uint256[2][2] calldata b,
+  uint256[2] calldata c,
+  uint256[6] calldata publicSignals
 ) external view returns (bool);
 ```
 
@@ -1189,7 +1337,8 @@ error TokenContractNotSet();
 - **Input Validation**: Comprehensive parameter checking with custom constraints
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification
-- **Domain Separation**: domain constants (1000–1004) in Poseidon inputs + Keccak wrapping for
+- **Domain Separation**: domain constants in Poseidon inputs (1000–1004 for identity and relation
+  proofs, 1005–1009 for the lineage index and inheritance claims) + Keccak wrapping for
   `personHash` and a distinct Keccak domain for `versionHash`
 
 ### Gas Optimization Features

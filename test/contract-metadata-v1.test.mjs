@@ -19,6 +19,7 @@ import {
   wipeBytes,
   wipePreparedPersonVersionContent,
 } from "../packages/protocol-core/index.js";
+import { deployLineageIndex } from "./helpers/testHelper.mjs";
 
 const PERSON_RELATION = 0;
 const DISCLOSURE_BINDING = 1;
@@ -163,7 +164,12 @@ async function deployAdapter({ personShouldVerify = true, disclosureShouldVerify
   return { adapter, personVerifier, disclosureVerifier };
 }
 
-async function deployCore({ configureArchive = true, registerRoutes = true, archiveFactory } = {}) {
+async function deployCore({
+  configureArchive = true,
+  configureLineageIndex = true,
+  registerRoutes = true,
+  archiveFactory,
+} = {}) {
   const [owner] = await hre.ethers.getSigners();
   const Token = await hre.ethers.getContractFactory("DeepFamilyToken");
   const token = await Token.deploy();
@@ -205,6 +211,16 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
     await deepFamily.setArchive(await archive.getAddress());
   }
 
+  let lineageIndex;
+  if (configureLineageIndex) {
+    lineageIndex = await deployLineageIndex(
+      hre.ethers,
+      await proxy.getAddress(),
+      await poseidon.getAddress(),
+    );
+    await deepFamily.setLineageIndex(await lineageIndex.getAddress());
+  }
+
   let adapter;
   if (registerRoutes) {
     ({ adapter } = await deployAdapter());
@@ -229,6 +245,7 @@ async function deployCore({ configureArchive = true, registerRoutes = true, arch
     proxy,
     deepFamily,
     archive,
+    lineageIndex,
     adapter,
   };
 }

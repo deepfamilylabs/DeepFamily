@@ -182,6 +182,7 @@ export const assertImplementationMatchesArtifact = async ({
     libraries.AdultAgeGate =
       explicitLibraries?.AdultAgeGate ?? (await readDeploymentAddress(connection, "AdultAgeGate"));
   }
+  if (spec?.libraries) Object.assign(libraries, spec.libraries);
   let expected = linkDeployedBytecode(artifact, libraries);
   if (spec?.librarySelfAddress) {
     expected = linkLibrarySelfAddress(expected, implementation);

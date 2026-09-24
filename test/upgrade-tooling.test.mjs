@@ -65,8 +65,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(14);
-      expect(observed.size).to.equal(14);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(21);
+      expect(observed.size).to.equal(21);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,8 +84,17 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(9);
-        expect(files).to.include.members(["DeepFamilyArchive.json", "DeepFamilyReader.json"]);
+        expect(files).to.have.length(15);
+        expect(files).to.include.members([
+          "DeepFamilyArchive.json",
+          "DeepFamilyReader.json",
+          "DeepFamilyLineageIndex.json",
+          "FamilyInheritance.json",
+          "FamilyInheritanceClaimVerifier.json",
+          "PoseidonT3.json",
+          "PoseidonT4.json",
+          "PoseidonT6.json",
+        ]);
         const deepFamilyMetadata = JSON.parse(
           await fs.readFile(path.join(deploymentDirectory, "DeepFamily.json"), "utf8"),
         );

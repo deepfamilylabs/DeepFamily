@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_RELEASE_ARTIFACTS,
   ZK_PRODUCTION_PHASE1,
   inspectZkReleaseArtifacts,
@@ -50,9 +51,9 @@ const defaultRunner = ({ executable, args, cwd, env }) =>
   });
 
 const contributionHashField = (circuitName) => {
-  if (circuitName === "person_commitment") return "personCommitmentContributionHash";
-  if (circuitName === "disclosure_binding") return "disclosureBindingContributionHash";
-  throw new Error(`Unsupported ceremony circuit: ${circuitName}`);
+  const fields = ZK_CEREMONY_CIRCUIT_FIELDS[circuitName];
+  if (!fields) throw new Error(`Unsupported ceremony circuit: ${circuitName}`);
+  return fields.contributionHash;
 };
 
 const assertMpcMetadataMatchesTranscript = ({ circuitName, metadata, evidence }) => {

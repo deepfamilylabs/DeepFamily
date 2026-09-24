@@ -55,6 +55,15 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
   permanently sealed
 - Personal details remain private until an endorsed contributor mints an NFT
 
+### Family Inheritance
+
+- Anyone can set aside DEEP for the direct children of a root person; the deposit names only a
+  credential derived from the root's passphrase, not the root's person hash
+- A child claims a fixed amount per 30-day period with a zero-knowledge proof that their version is
+  endorsed by a recommended source of the root version, without revealing which child they are
+- Deposits cannot be withdrawn, anyone can top one up, and a shortfall stays owed until the next
+  top-up. The feature distributes DEEP utility points and has no legal effect
+
 ## Technology Stack
 
 - **Smart Contracts**: Solidity ^0.8.20, OpenZeppelin v5, Poseidon hashing
@@ -73,6 +82,9 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **GovernanceTimelock.sol**        | Production owner and DEEP protocol treasury; enforces a delay on multisig-approved administration and spending      |
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                        |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
+| **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy          |
+| **FamilyInheritance.sol**         | Ownerless DEEP inheritance: credential-only deposits, anonymous per-period claims by the root's children           |
+| **FamilyInheritanceClaimVerifier.sol** | ZK verifier for inheritance claims, called directly by FamilyInheritance                                       |
 
 ## Quick Start
 
@@ -135,10 +147,10 @@ The supported ZK command surface is intentionally limited to these eight entries
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:build`             | Compile both circuits                                              |
+| `npm run zk:build`             | Compile all three circuits                                         |
 | `npm run zk:development:setup` | Rebuild every development artifact from a self-contained workflow  |
 | `npm run zk:production:setup`  | Generate and verify the production Phase 2 artifacts               |
-| `npm run zk:check`             | Generate and verify real proofs for both circuits                  |
+| `npm run zk:check`             | Generate and verify real proofs for every circuit                  |
 | `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact set                     |
 | `npm run zk:ceremony:verify`   | Verify the production pTau, zkeys, transcript, and trust metadata  |
 
@@ -174,8 +186,8 @@ external ancestor Cargo configuration, discards inherited Git, Cargo, Rust, Node
 npm, and native-build overrides, resolves Git/Cargo/Rustc to protected absolute executables, and
 uses a controlled PATH plus private home, Cargo, XDG, and temporary directories. It also disables
 ambient Git system/global configuration and hooks. Production setup copies the compiler and pTau
-into its private OS temporary stage, compiles both circuits, and validates both staged R1CS/WASM pairs
-against the reviewed canonical hashes before starting either Groth16 Setup or Phase 2
+into its private OS temporary stage, compiles every circuit, and validates every staged R1CS/WASM pair
+against the reviewed canonical hashes before starting any Groth16 Setup or Phase 2
 contribution. It repeats those integrity checks immediately before each setup and before
 installation. `release:preflight` performs the same fresh source-build isolation and artifact
 comparisons. Both commands therefore run on Linux x64 with glibc, macOS arm64, and Windows x64 while
@@ -197,17 +209,17 @@ Schema-v2 manifests remain readable only for legacy compatibility inspection and
 If a reviewed dependency update changes the runtime graph after production artifacts already
 exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
 the reviewed old-manifest and new-runtime digests, validates the complete old production bundle,
-and regenerates both Phase 2 artifact sets from scratch; see the
+and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-`zk:development:setup` verifies the committed Phase 1 pTau, then compiles both circuits,
+`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all three circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
 production.
 
 Production setup uses the pinned public Phase 1 pTau committed at
-`circuits/ptau/powersOfTau28_hez_final_13.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
+`circuits/ptau/powersOfTau28_hez_final_15.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
 command that reads it checks its byte length and both pinned hashes first; none downloads it.
 
 Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or

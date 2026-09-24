@@ -14,15 +14,15 @@ const usage = () => {
     --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \\
     [--ceremony-id <new-stable-audit-id>]
 
-Creates both production Groth16 proving keys with:
+Creates every production Groth16 proving key with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
-  - canonical R1CS/WASM hashes checked before either Groth16 setup starts;
+  - canonical R1CS/WASM hashes checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;
   - one local Phase 2 operator using OS CSPRNG entropy per circuit;
-  - one finalization beacon generated only after both contributions;
+  - one finalization beacon generated only after every contribution;
   - a schema-validated single-operator transcript and production manifest.
 
-The Phase 1 file is read from circuits/ptau/powersOfTau28_hez_final_13.ptau, or from
+The Phase 1 file is read from circuits/ptau/powersOfTau28_hez_final_15.ptau, or from
 ZK_PTAU_PATH when set. Neither form downloads it.
 
 The default command requires a development manifest and refuses to overwrite production artifacts.
@@ -30,7 +30,7 @@ The explicit --rotate form accepts only a valid existing schema-v3 single-operat
 manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
 runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
 and restore the previous artifact set if final validation fails. They intentionally record that
-production security trusts the operator to destroy both Phase 2 secrets.`);
+production security trusts the operator to destroy every Phase 2 secret.`);
 };
 
 const USAGE_ERROR =

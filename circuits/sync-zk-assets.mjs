@@ -38,6 +38,18 @@ export const FILES_TO_COPY = Object.freeze(
       source: "person_commitment_js/person_commitment.wasm",
       destination: "person_commitment.wasm",
     },
+    {
+      source: "family_inheritance_claim_final.zkey",
+      destination: "family_inheritance_claim_final.zkey",
+    },
+    {
+      source: "family_inheritance_claim.vkey.json",
+      destination: "family_inheritance_claim.vkey.json",
+    },
+    {
+      source: "family_inheritance_claim_js/family_inheritance_claim.wasm",
+      destination: "family_inheritance_claim.wasm",
+    },
   ].map((entry) => Object.freeze(entry)),
 );
 

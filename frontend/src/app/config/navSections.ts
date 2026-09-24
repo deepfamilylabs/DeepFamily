@@ -7,12 +7,13 @@
  * pages are its detail routes. All of them keep the Family entry selected —
  * without this, opening a person from the tree left the whole nav unlit.
  */
-export type NavSection = "home" | "familyTree" | "search" | "create";
+export type NavSection = "home" | "familyTree" | "search" | "create" | "inheritance";
 
 const SECTION_ROUTES: ReadonlyArray<readonly [NavSection, readonly string[]]> = [
   ["familyTree", ["/family", "/people", "/genealogyBook", "/person", "/editor"]],
   ["search", ["/search"]],
   ["create", ["/create"]],
+  ["inheritance", ["/inheritance"]],
 ];
 
 export function resolveNavSection(pathname: string): NavSection | null {

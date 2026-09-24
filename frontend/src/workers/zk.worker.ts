@@ -1,6 +1,7 @@
 import type { Groth16Proof } from "../shared/zk/zk";
 import type {
   DisclosureBindingProofParameters,
+  InheritanceClaimWitness,
   PersonRelationProofParameters,
 } from "../shared/zk/zkSnark";
 import { getProofDescriptorByPurpose } from "../shared/zk/proofDescriptors";
@@ -9,6 +10,7 @@ import {
   verifyPersonRelationProof,
   generateDisclosureBindingProof,
   verifyDisclosureBindingProof,
+  generateInheritanceClaimProof,
 } from "../shared/zk/zkSnark";
 
 type ZkWorkerMethods = {
@@ -27,6 +29,10 @@ type ZkWorkerMethods = {
   verifyDisclosureBindingProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
+  };
+  generateInheritanceClaimProof: {
+    params: { witness: InheritanceClaimWitness };
+    result: { proof: Groth16Proof; publicSignals: string[] };
   };
 };
 
@@ -47,7 +53,9 @@ const getErrorShape = (err: unknown): { message: string; name?: string } => {
   return { message: String(err) };
 };
 
-function assertDescriptorPurpose(purpose: "PersonRelation" | "DisclosureBinding") {
+function assertDescriptorPurpose(
+  purpose: "PersonRelation" | "DisclosureBinding" | "InheritanceClaim",
+) {
   return getProofDescriptorByPurpose(purpose);
 }
 
@@ -71,6 +79,10 @@ const handlers: {
   verifyDisclosureBindingProof: async ({ proof, publicSignals }) => {
     assertDescriptorPurpose("DisclosureBinding");
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
+  },
+  generateInheritanceClaimProof: async ({ witness }) => {
+    assertDescriptorPurpose("InheritanceClaim");
+    return await generateInheritanceClaimProof(witness);
   },
 };
 

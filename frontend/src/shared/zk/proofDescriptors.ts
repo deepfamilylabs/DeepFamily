@@ -1,5 +1,6 @@
 import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
+  INHERITANCE_CLAIM_PROOF_DEFINITION,
   PERSON_RELATION_PROOF_DEFINITION,
   type ProofDefinition,
 } from "@deepfamily/proof-core";
@@ -46,14 +47,25 @@ export const DISCLOSURE_BINDING_PROOF_DESCRIPTOR = defineBrowserDescriptor(
   },
 );
 
+export const INHERITANCE_CLAIM_PROOF_DESCRIPTOR = defineBrowserDescriptor(
+  INHERITANCE_CLAIM_PROOF_DEFINITION,
+  {
+    wasm: "/zk/family_inheritance_claim.wasm",
+    zkey: "/zk/family_inheritance_claim_final.zkey",
+    vkey: "/zk/family_inheritance_claim.vkey.json",
+  },
+);
+
 export const PROOF_DESCRIPTORS = Object.freeze({
   [PERSON_RELATION_PROOF_DESCRIPTOR.key]: PERSON_RELATION_PROOF_DESCRIPTOR,
   [DISCLOSURE_BINDING_PROOF_DESCRIPTOR.key]: DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  [INHERITANCE_CLAIM_PROOF_DESCRIPTOR.key]: INHERITANCE_CLAIM_PROOF_DESCRIPTOR,
 });
 
 export const PROOF_DESCRIPTORS_BY_PURPOSE = Object.freeze({
   [PERSON_RELATION_PROOF_DESCRIPTOR.purpose]: PERSON_RELATION_PROOF_DESCRIPTOR,
   [DISCLOSURE_BINDING_PROOF_DESCRIPTOR.purpose]: DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  [INHERITANCE_CLAIM_PROOF_DESCRIPTOR.purpose]: INHERITANCE_CLAIM_PROOF_DESCRIPTOR,
 });
 
 export function getProofDescriptor(key: string): ProofDescriptor {

@@ -12,7 +12,19 @@ const ARTIFACTS = [
   ["ArchiveData", "artifacts/contracts/DeepFamilyArchive.sol/ArchiveData.json"],
   ["DeepFamilyReader", "artifacts/contracts/DeepFamilyReader.sol/DeepFamilyReader.json"],
   ["AdultAgeGate", "artifacts/contracts/libraries/AdultAgeGate.sol/AdultAgeGate.json"],
+  ["PoseidonT3", "artifacts/poseidon-solidity/PoseidonT3.sol/PoseidonT3.json"],
+  ["PoseidonT4", "artifacts/poseidon-solidity/PoseidonT4.sol/PoseidonT4.json"],
   ["PoseidonT5", "artifacts/poseidon-solidity/PoseidonT5.sol/PoseidonT5.json"],
+  ["PoseidonT6", "artifacts/poseidon-solidity/PoseidonT6.sol/PoseidonT6.json"],
+  [
+    "DeepFamilyLineageIndex",
+    "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
+  ],
+  ["FamilyInheritance", "artifacts/contracts/FamilyInheritance.sol/FamilyInheritance.json"],
+  [
+    "FamilyInheritanceClaimVerifier",
+    "artifacts/contracts/FamilyInheritanceClaimVerifier.sol/FamilyInheritanceClaimVerifier.json",
+  ],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
   [
     "GovernanceTimelock",

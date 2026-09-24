@@ -139,7 +139,7 @@ describe("pinned local production Powers of Tau", function () {
     error = await captureError(() =>
       ensureProductionPtau({
         root,
-        env: { ZK_PTAU_PATH: "linked/powersOfTau28_hez_final_13.ptau" },
+        env: { ZK_PTAU_PATH: "linked/powersOfTau28_hez_final_15.ptau" },
         expected,
       }),
     );

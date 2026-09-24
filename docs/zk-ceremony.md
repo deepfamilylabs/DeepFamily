@@ -8,7 +8,7 @@ with one command:
 npm run zk:production:setup
 ```
 
-That command creates production artifacts for both circuits, writes an auditable transcript and
+That command creates production artifacts for all three circuits, writes an auditable transcript and
 manifest, and verifies the complete result before returning. It does **not** commit files, deploy a
 contract, submit a transaction, or authorize a Mainnet release.
 
@@ -25,7 +25,7 @@ contributorCount = 1
 ```
 
 For this model, production security trusts the operator who runs the setup command to use a
-controlled machine and destroy both circuit-specific Phase 2 secrets after the command exits. This
+controlled machine and destroy every circuit-specific Phase 2 secret after the command exits. This
 is a deliberate and visible trust assumption, not a claim that the proving keys are trustless.
 
 One contribution is sufficient for Groth16. Three contributors are **not** a cryptographic
@@ -42,45 +42,49 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-Both DeepFamily circuits reuse the same published BN254 Phase 1 file:
+All three DeepFamily circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
-powersOfTau28_hez_final_13.ptau
+powersOfTau28_hez_final_15.ptau
 
 Published provenance recorded in the manifest:
-https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_13.ptau
+https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_15.ptau
 
 Capacity:
-2^13 constraints
+2^15 constraints
 
 Bytes:
-9,520,280
+37,831,832
 
 SHA-256:
-95751b5207f20aa822f01109902315c01c15250303feacea2b8aa7dc9fdfeefd
+3ef2ecc5b75d687048cf2d59195119b42fb07c5af639c5f283d84bfa69829e7f
 
 BLAKE2b-512:
-58efc8bf2834d04768a3d7ffcd8e1e23d461561729beaac4e3e7a47829a1c9066d5320241e124a1a8e8aa6c75be0ba66f65bc8239a0542ed38e11276f6fdb4d9
+982372c867d229c236091f767e703253249a9b432c1710b4f326306bfa2428a17b06240359606cfe4d580b10a5a1f63fbed499527069c18ae17060472969ae6e
 ```
+
+The family inheritance claim circuit has 18,499 constraints, so the power-13 file used before it
+(8,192 constraints) is too small.
 
 The exact file is committed at:
 
 ```text
-circuits/ptau/powersOfTau28_hez_final_13.ptau
+circuits/ptau/powersOfTau28_hez_final_15.ptau
 ```
 
 Both published download locations, the URL above and the earlier
-`https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_13.ptau`, now return HTTP 403.
+`https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau`, now return HTTP 403.
 The committed copy was retrieved from the Internet Archive capture of the original S3 object:
 
 ```text
-https://web.archive.org/web/20210918182747id_/https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_13.ptau
+https://web.archive.org/web/20220331132554id_/https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau
 ```
 
 Its BLAKE2b-512 matches the digest published in the snarkjs README, and
-`snarkjs powersoftau verify` reports 54 named contributions followed by the final beacon. The
-retrieval location needs no trust; the pinned digests decide whether the bytes are accepted.
+`snarkjs powersoftau verify` reports 54 named contributions followed by the final
+beacon. The retrieval location needs no trust; the pinned digests decide whether the bytes are
+accepted.
 
 The setup and verification commands never download or replace the file. They reject symbolic
 links, an unexpected byte length, or either hash mismatch; the file is rehashed before use. The
@@ -142,8 +146,8 @@ removes inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker,
 package-discovery overrides. It resolves Git/Cargo/Rustc to protected absolute executables and uses
 a controlled PATH, private home/Cargo/XDG/temporary directories, empty Git system/global
 configuration files, and an empty hooks directory. The resulting compiler is copied into the
-private release stage. Before any Groth16 Setup or Phase 2 contribution, production setup compiles both
-circuits and verifies every staged R1CS/WASM hash against the reviewed manifest. The canonical
+private release stage. Before any Groth16 Setup or Phase 2 contribution, production setup compiles every
+circuit and verifies every staged R1CS/WASM hash against the reviewed manifest. The canonical
 Linux amd64 glibc binary remains a fixed-digest reference; other runtimes hash it but never execute
 it. The schema-v3 ceremony transcript records which native compiler and Linux libc evidence
 actually produced the staged circuits.
@@ -239,12 +243,12 @@ accepts an existing schema-v3 `production` manifest using the one-contributor `s
 trust model. It rejects a development or multi-party baseline, a reused ceremony ID, and a runtime
 digest equal to the current manifest. Before generating entropy it verifies the old canonical
 manifest digest, transcript, source, WASM, zkeys, verification keys, Solidity verifiers, compiler,
-snarkjs version/CLI, and pinned pTau identity. It then recompiles both circuits and requires the
+snarkjs version/CLI, and pinned pTau identity. It then recompiles every circuit and requires the
 source/R1CS/WASM hashes to remain unchanged, snapshots the explicitly reviewed new runtime, and
-runs both Phase 2 setups, contributions, and finalization from scratch. The staged and rollback
+runs every Phase 2 setup, contribution, and finalization from scratch. The staged and rollback
 rules are identical to the initial setup.
 
-Fresh Phase 2 randomness changes both zkeys, verification keys, and generated verifier contracts.
+Fresh Phase 2 randomness changes every zkey, verification key, and generated verifier contract.
 Treat the result as a new cryptographic release: review and commit the complete bundle together,
 then redeploy the verifiers and update any governed references through the normal release process.
 The circuit WASM and R1CS are expected to stay unchanged for this runtime-only rotation.
@@ -253,26 +257,26 @@ Internally the command:
 
 1. validates the clean release commit and development manifest, or the explicitly hash-bound
    production baseline in rotation mode;
-2. reads the pinned public power-13 pTau and checks both pinned digests;
+2. reads the pinned public power-15 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
-   pTau into the current user's private OS temporary directory and compiles both circuits there
+   pTau into the current user's private OS temporary directory and compiles every circuit there
    with explicit `--O2 --sanity_check 2`;
 4. verifies all staged R1CS/WASM hashes against the reviewed manifest, then—and only then—creates
-   either initial Groth16 zkey; each circuit and the pTau are checked again immediately before its
+   any initial Groth16 zkey; each circuit and the pTau are checked again immediately before its
    setup;
 5. hashes the logical installed snarkjs production dependency graph—each package's content,
    identity, version, and logical dependency path—and compares it with the schema-v3 manifest or
    the explicit reviewed rotation digest; it copies only that verified runtime into private
    staging, makes package files read-only on POSIX, and executes snarkjs from the snapshot;
-6. before reading either secret, re-hashes that private runtime snapshot, strips inherited release
+6. before reading any secret, re-hashes that private runtime snapshot, strips inherited release
    injection variables from the helper environment, and supplies a separate 64-byte OS CSPRNG input
    for each circuit through a private stdin pipe, never through command arguments, environment
    variables, or files;
 7. embeds one `deepfamily-single-operator` contribution in each zkey;
-8. only after both contributions, generates a separate 32-byte local CSPRNG finalization value and
-   applies it to both zkeys;
-9. exports both verification keys and Solidity verifiers and stages the browser WASM/zkey assets;
-10. reads the real contribution metadata embedded in both final zkeys;
+8. only after every contribution, generates a separate 32-byte local CSPRNG finalization value and
+   applies it to every zkey;
+9. exports every verification key and Solidity verifier and stages the browser WASM/zkey assets;
+10. reads the real contribution metadata embedded in every final zkey;
 11. creates `circuits/zk-ceremony-transcript.json` and updates
     `circuits/zk-artifacts-manifest.json`;
 12. rechecks the reviewed R1CS/WASM and pTau bytes, then validates the staged schema, pTau
@@ -286,7 +290,7 @@ Internally the command:
 The local finalization value is accurately recorded as:
 
 ```text
-node:crypto.randomBytes(32), generated after both Phase 2 contributions
+node:crypto.randomBytes(32), generated after every Phase 2 contribution
 ```
 
 It closes and identifies the final transcript. It is **not** described as an independent public
@@ -307,7 +311,7 @@ The production manifest records:
 - the fixed pTau source, byte length, SHA-256, BLAKE2b-512, and verification status;
 - schema v3, the canonical Circom reference, the exact snarkjs CLI hash, and the deterministic
   logical dependency-graph hash of the installed snarkjs production runtime;
-- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for both circuits;
+- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for every circuit;
 - the transcript and local finalization hashes.
 
 The schema-v3 transcript records:
@@ -318,9 +322,9 @@ The schema-v3 transcript records:
   Linux libc detection evidence (or `null` on macOS/Windows);
 - for source targets, the pinned repository/commit and the Cargo/Rust versions from the fresh
   private build;
-- both source and R1CS hashes;
+- every source and R1CS hash;
 - the one operator contribution name;
-- the two embedded BLAKE2b-512 contribution hashes;
+- one embedded BLAKE2b-512 contribution hash per circuit;
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 `platform` and `architecture` describe the Node/compiler execution runtime, not a hardware
@@ -344,7 +348,8 @@ git diff -- \
   circuits/zk-artifacts-manifest.json \
   circuits/zk-ceremony-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
-  contracts/DisclosureBindingVerifier.sol
+  contracts/DisclosureBindingVerifier.sol \
+  contracts/FamilyInheritanceClaimVerifier.sol
 
 npm run zk:ceremony:verify
 npm run zk:artifacts:check
@@ -361,6 +366,7 @@ git add \
   circuits/zk-ceremony-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
+  contracts/FamilyInheritanceClaimVerifier.sol \
   frontend/public/zk
 
 git commit -m "chore: install production zk artifacts"
@@ -383,7 +389,7 @@ schema-v3 manifest. It validates the official native compiler identity or perfor
 environment-isolated private build for a source target, validates the canonical reference digest,
 checks the clean commit before and after the build, verifies that the R1CS and WASM produced with
 explicit `--O2 --sanity_check 2` match the reviewed artifact hashes, runs the ceremony's snarkjs
-verification from a private runtime snapshot, verifies both real proofs and all published hashes,
+verification from a private runtime snapshot, verifies every real proof and all published hashes,
 validates the single-operator transcript against the real zkey metadata, and runs the complete
 contract, frontend, localization, XSS, storage, and dependency checks.
 
@@ -426,15 +432,15 @@ multi-party Phase 2 ceremony instead of the default command:
 
 ```text
 initial zkeys
-  -> participant A contributes independently to both circuits
-  -> participant B contributes independently to both circuits
+  -> participant A contributes independently to every circuit
+  -> participant B contributes independently to every circuit
   -> optional further participants
   -> pre-announced public finalization beacon
   -> final production zkeys
 ```
 
 Each participant should verify the incoming R1CS, pTau, zkeys, and transcript; use separate fresh
-entropy for the two circuits; return both outputs together; sign the exact public contribution
+entropy for each circuit; return all outputs together; sign the exact public contribution
 record; and destroy their secret environment. The existing signed multi-party transcript format
 remains supported.
 
@@ -446,7 +452,7 @@ and do not claim completion merely by generating several keys on one operator's 
 
 Generate a new production setup before release when:
 
-- either circuit source or R1CS changes;
+- any circuit source or R1CS changes;
 - public-signal or packing semantics change;
 - the selected pTau or its hash is uncertain;
 - the operator believes Phase 2 secrets may have been retained or exposed;

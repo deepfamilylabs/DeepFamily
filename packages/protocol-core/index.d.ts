@@ -188,6 +188,15 @@ export const DOMAIN_NAME_SECRET: 1001n;
 export const DOMAIN_IDENTITY: 1002n;
 export const DOMAIN_DISCLOSURE: 1003n;
 export const DOMAIN_VERSION_COMMITMENT: 1004n;
+export const DOMAIN_INHERITANCE_CREDENTIAL: 1005n;
+export const DOMAIN_INHERITANCE_CLAIM_TAG: 1006n;
+export const DOMAIN_LINEAGE_ENDORSEMENT_LEAF: 1007n;
+export const DOMAIN_LINEAGE_TRUSTED_LEAF: 1008n;
+export const DOMAIN_LINEAGE_PARENTS: 1009n;
+export const LINEAGE_ENDORSEMENT_TREE_ID: 0;
+export const LINEAGE_TRUSTED_TREE_ID: 1;
+export const LINEAGE_TREE_MAX_DEPTH: 32;
+export const INHERITANCE_PERIOD_SECONDS: bigint;
 export const SNARK_SCALAR_FIELD: bigint;
 export const MAX_UINT8: bigint;
 export const MAX_UINT16: bigint;
@@ -544,3 +553,100 @@ export function computePreparedVersionHash(input: {
   context: MetadataContextInput;
   versionCommitment: BigNumberish;
 }): string;
+
+export interface LineageTree {
+  readonly root: bigint;
+  readonly depth: number;
+  readonly size: number;
+  readonly leaves: bigint[];
+  insert(leaf: bigint): void;
+  update(index: number, leaf: bigint): void;
+  indexOf(leaf: bigint): number;
+}
+export interface LineageMerkleProof {
+  root: bigint;
+  leaf: bigint;
+  depth: number;
+  index: bigint;
+  siblings: bigint[];
+}
+export function wrapIdentityCommitmentAsPersonHash(identityCommitment: BigNumberish): string;
+export function computeLineageParentsDigest(input: {
+  fatherIdentityCommitment: BigNumberish;
+  motherIdentityCommitment: BigNumberish;
+}): bigint;
+export function packLineageEndorserAndTime(input: {
+  endorser: string;
+  writtenAt: BigNumberish;
+}): bigint;
+export function computeLineageEndorsementLeaf(input: {
+  identityCommitment: BigNumberish;
+  parentsDigest: BigNumberish;
+  versionIndex: BigNumberish;
+  endorser: string;
+  writtenAt: BigNumberish;
+}): bigint;
+export function computeLineageTrustedLeaf(input: {
+  rootIdentityCommitment: BigNumberish;
+  rootVersionIndex: BigNumberish;
+  account: string;
+}): bigint;
+export function computeInheritanceCredential(input: {
+  rootIdentityCommitment: BigNumberish;
+  rootVersionIndex: BigNumberish;
+  rootDerivedSecretField: BigNumberish;
+}): bigint;
+export function computeInheritanceClaimTag(input: {
+  derivedSecretField: BigNumberish;
+  inheritanceCredential: BigNumberish;
+}): bigint;
+export function hashLineageNodes(left: bigint, right: bigint): bigint;
+export function createLineageTree(leaves?: BigNumberish[]): LineageTree;
+export function replayLineageTree(
+  writes: ReadonlyArray<{ leafIndex: BigNumberish; leaf: BigNumberish }>,
+): LineageTree;
+export function buildLineageMerkleProof(tree: LineageTree, leafIndex: number): LineageMerkleProof;
+export function computeInheritanceEligibleFrom(input: {
+  startTime: BigNumberish;
+  writtenAt: BigNumberish;
+}): bigint;
+export function computeInheritanceEntitlement(input: {
+  amountPerPeriod: BigNumberish;
+  eligibleFrom: BigNumberish;
+  now: BigNumberish;
+}): bigint;
+export interface InheritanceClaimPublicSignals {
+  endorsementRoot: bigint;
+  trustedRoot: bigint;
+  inheritanceCredential: bigint;
+  claimTag: bigint;
+  eligibleFrom: bigint;
+  recipient: bigint;
+}
+export function buildInheritanceClaimWitness(input: {
+  heir: {
+    identity: IdentityFields;
+    identitySuiteId: BigNumberish;
+    derivedSecretField: BigNumberish;
+  };
+  versionIndex: BigNumberish;
+  fatherIdentityCommitment: BigNumberish;
+  motherIdentityCommitment: BigNumberish;
+  rootIsMother: boolean;
+  endorser: string;
+  writtenAt: BigNumberish;
+  endorsementTree: LineageTree;
+  endorsementLeafIndex: number;
+  root: {
+    identityCommitment: BigNumberish;
+    versionIndex: BigNumberish;
+    derivedSecretField: BigNumberish;
+  };
+  trustedTree: LineageTree;
+  trustedLeafIndex: number;
+  eligibleFrom: BigNumberish;
+  recipient: string;
+}): {
+  witness: Record<string, string | string[]>;
+  publicSignals: InheritanceClaimPublicSignals;
+};

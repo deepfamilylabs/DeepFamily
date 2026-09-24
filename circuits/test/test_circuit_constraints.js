@@ -158,17 +158,66 @@ async function runDisclosureConstraintTests() {
   );
 }
 
+async function runInheritanceConstraintTests() {
+  const { buildFamilyInheritanceFixture } = await import("./generate_family_inheritance_input.mjs");
+  const { witness } = buildFamilyInheritanceFixture();
+  const committed = readFixture("family_inheritance_claim_input.json");
+  if (JSON.stringify(committed) !== JSON.stringify(witness)) {
+    throw new Error("family_inheritance_claim_input.json is stale; rerun its generator");
+  }
+  const circuitName = "family_inheritance_claim";
+  const result = await calculateCircuitProofIsolated(witness, circuitName);
+  if (result.publicSignals.length !== 6) {
+    throw new Error(
+      `FamilyInheritanceClaim must expose exactly 6 signals, got ${result.publicSignals.length}`,
+    );
+  }
+  console.log("PASS: FamilyInheritanceClaim valid six-signal proof");
+
+  const period = 2592000n;
+  const rejected = [
+    [
+      "an endorsement younger than one period",
+      { eligibleFrom: (BigInt(witness.writtenAt) + period - 1n).toString() },
+    ],
+    ["a root that is not the selected parent", { rootIsMother: "1" }],
+    ["a non-binary parent selector", { rootIsMother: "2" }],
+    ["a different heir secret", { derivedSecretField: "333334" }],
+    ["a wrong root secret", { rootDerivedSecretField: "111112" }],
+    ["an endorser missing from the trusted tree", { endorser: "1" }],
+    ["a 161-bit endorser", { endorser: (1n << 160n).toString() }],
+    ["a 65-bit write time", { writtenAt: (1n << 64n).toString() }],
+    ["a stale endorsement root", { endorsementRoot: "1" }],
+    ["a stale trusted root", { trustedRoot: "1" }],
+    ["a mismatched claim tag", { claimTag: "1" }],
+    ["a proof depth beyond the maximum", { endorsementDepth: "33" }],
+    [
+      "a zero root",
+      {
+        fatherIdentityCommitment: "0",
+        rootIsMother: "0",
+      },
+    ],
+  ];
+  for (const [label, override] of rejected) {
+    await expectRejected(`FamilyInheritanceClaim rejects ${label}`, () =>
+      calculateCircuitProofIsolated({ ...witness, ...override }, circuitName),
+    );
+  }
+}
+
 async function runCircuitConstraintTests(argv = process.argv.slice(2)) {
   const parsed = parseCircuitArguments(argv);
   if (parsed.help) {
     console.log(
-      "Usage: node circuits/test/test_circuit_constraints.js --circuit <all|person|disclosure>",
+      "Usage: node circuits/test/test_circuit_constraints.js --circuit <all|person|disclosure|inheritance>",
     );
     return;
   }
   for (const circuit of selectCircuitNames(parsed.circuit)) {
     if (circuit === "person") await runPersonConstraintTests();
     if (circuit === "disclosure") await runDisclosureConstraintTests();
+    if (circuit === "inheritance") await runInheritanceConstraintTests();
   }
 }
 

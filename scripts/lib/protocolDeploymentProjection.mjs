@@ -17,6 +17,12 @@ export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   deepFamily: 8,
   deepFamilyArchive: 10,
   deepFamilyReader: 12,
+  poseidonT3: 15,
+  poseidonT4: 16,
+  poseidonT6: 17,
+  deepFamilyLineageIndex: 18,
+  familyInheritanceClaimVerifier: 20,
+  familyInheritance: 21,
 });
 
 const normalizeChainId = (value) => {
