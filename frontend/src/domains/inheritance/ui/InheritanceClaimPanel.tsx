@@ -9,12 +9,14 @@ import {
   ErrorNotice,
   FactList,
   FieldBlock,
+  HashList,
   IdentityBlock,
   PanelButton,
   PanelShell,
   StatusLine,
   SuccessNotice,
   formatBlockDate,
+  formatCredential,
   shortHex,
 } from "./inheritanceControls";
 
@@ -210,7 +212,9 @@ export function InheritanceClaimPanel({
               id: state.id.toString(),
             })}
           </p>
-          <p className="break-all font-mono text-xs text-ink-muted">{state.transactionHash}</p>
+          <HashList
+            items={[{ label: t("transaction.rowTransaction"), value: state.transactionHash }]}
+          />
         </SuccessNotice>
       ) : null}
 
@@ -222,6 +226,14 @@ export function InheritanceClaimPanel({
               endorser: shortHex(lookup.endorser, 6, 4),
             })}
           </p>
+          <HashList
+            items={[
+              {
+                label: t("inheritance.claim.credential"),
+                value: formatCredential(lookup.credential),
+              },
+            ]}
+          />
           {lookup.rows.length === 0 ? (
             <EmptyState
               icon={<Inbox className="h-5 w-5" strokeWidth={1.75} />}

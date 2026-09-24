@@ -15,12 +15,14 @@ import {
   ErrorNotice,
   FactList,
   FieldBlock,
+  HashList,
   IdentityBlock,
   PanelButton,
   PanelShell,
   StatusLine,
   SuccessNotice,
   WarningNotice,
+  formatCredential,
   shortHex,
 } from "./inheritanceControls";
 
@@ -244,8 +246,18 @@ export function InheritanceCreatePanel({
           <p className="font-semibold">
             {t("inheritance.create.success", { id: state.id.toString() })}
           </p>
-          <p className="text-ink-muted">{t("inheritance.create.successHint")}</p>
-          <p className="break-all font-mono text-xs text-ink-muted">{state.transactionHash}</p>
+          <p className="text-ink-muted">
+            {t("inheritance.create.successHint", { id: state.id.toString() })}
+          </p>
+          <HashList
+            items={[
+              {
+                label: t("inheritance.create.credential"),
+                value: formatCredential(state.review.credential),
+              },
+              { label: t("transaction.rowTransaction"), value: state.transactionHash },
+            ]}
+          />
         </SuccessNotice>
       ) : null}
 

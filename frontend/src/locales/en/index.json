@@ -1156,7 +1156,8 @@
       "confirm": "Deposit and set up",
       "cancel": "Edit",
       "success": "Inheritance #{{id}} is set up.",
-      "successHint": "Share the id with family members who want to top it up.",
+      "successHint": "Share the id {{id}} with family members who want to top it up.",
+      "credential": "Credential",
       "createAnother": "Set up another"
     },
     "deposit": {
@@ -1185,6 +1186,7 @@
       "search": "Find inheritances",
       "searchAgain": "Search again",
       "foundVia": "Your version {{version}} is endorsed by recommended source {{endorser}}.",
+      "credential": "Credential",
       "noneTitle": "No inheritance yet",
       "noneDescription": "Nobody has set up an inheritance for this root version.",
       "perPeriod": "Per child, every 30 days",

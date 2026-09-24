@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { ethers } from "ethers";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { MODAL_HINT, MODAL_LABEL } from "../../../shared/ui";
 import type { FriendlyError } from "../../../shared/lib/errors";
@@ -137,6 +138,20 @@ export function WarningNotice({ children }: { children: ReactNode }) {
   );
 }
 
+/** Hashes a result leaves behind, each labelled so none is taken for the inheritance id. */
+export function HashList({ items }: { items: Array<{ label: string; value: string }> }) {
+  return (
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 text-xs text-ink-muted">
+      {items.map((item) => (
+        <div key={item.label} className="contents">
+          <dt>{item.label}</dt>
+          <dd className="min-w-0 break-all font-mono">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Label/value rows for a summary; values may be long hashes, so they wrap. */
 export function FactList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
@@ -149,6 +164,11 @@ export function FactList({ items }: { items: Array<{ label: string; value: React
       ))}
     </dl>
   );
+}
+
+/** The 32-byte word InheritanceCreated indexes; set-up and claim must print it alike. */
+export function formatCredential(credential: bigint): string {
+  return ethers.toBeHex(credential, 32);
 }
 
 export function shortHex(value: string, head = 10, tail = 8): string {

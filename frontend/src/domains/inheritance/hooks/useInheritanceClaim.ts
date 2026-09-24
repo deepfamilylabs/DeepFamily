@@ -135,6 +135,7 @@ export function useInheritanceClaim(
             heirPersonHash: resolved.heir.personHash,
             rootPersonHash: resolved.root.personHash,
             rootVersionIndex,
+            credential: resolved.credential,
             versionIndex: resolved.legitimacy.versionIndex,
             endorser: resolved.legitimacy.endorser,
             rows: views,

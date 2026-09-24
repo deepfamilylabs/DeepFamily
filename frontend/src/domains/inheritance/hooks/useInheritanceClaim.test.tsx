@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ethers } from "ethers";
 import { INHERITANCE_PERIOD_SECONDS } from "@deepfamily/protocol-core";
 import type { IdentityFormHandle } from "../model/inheritanceTypes";
+import { listInheritancesForCredential } from "../services/inheritanceChain";
 import { useInheritanceClaim } from "./useInheritanceClaim";
 
 const PERIOD = INHERITANCE_PERIOD_SECONDS;
@@ -130,6 +131,10 @@ describe("useInheritanceClaim", () => {
     const lookup = (result.current.state as any).lookup;
     // Two periods have started since START; the balance caps the payout at 15.
     expect(lookup.rows[0]).toMatchObject({ id: 3n, ready: true, owed: 20n, claimable: 15n });
+    // The heir is shown the credential the rows were matched by.
+    const [, scanned] = vi.mocked(listInheritancesForCredential).mock.calls[0];
+    expect(typeof scanned).toBe("bigint");
+    expect(lookup.credential).toBe(scanned);
   });
 
   it("proves, submits, and books the payout against the row", async () => {
