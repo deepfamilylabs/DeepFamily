@@ -7,6 +7,7 @@ import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomT
 import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
+  ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
@@ -103,6 +104,7 @@ const createProductionFixture = async () => {
     participantId: `participant-${index + 1}`,
     personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
     disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+    familyInheritanceClaimContributionHash: `${String(index + 21).padStart(2, "0")}`.repeat(64),
   }));
   const beacon = {
     name: "deepfamily-public-beacon",
@@ -111,6 +113,7 @@ const createProductionFixture = async () => {
     source: "public-randomness-round-12345",
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
+    familyInheritanceClaimContributionHash: "cc".repeat(64),
   };
   const compilerTarget = resolveLocalCircomTarget({
     platform: "linux",
@@ -171,9 +174,7 @@ const createProductionFixture = async () => {
   const metadataByCircuit = Object.fromEntries(
     Object.keys(ZK_RELEASE_ARTIFACTS).map((circuitName) => {
       const hashField =
-        circuitName === "person_commitment"
-          ? "personCommitmentContributionHash"
-          : "disclosureBindingContributionHash";
+        ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
       return [
         circuitName,
         {
@@ -244,7 +245,8 @@ describe("production ZK ceremony verifier", function () {
       },
     });
 
-    expect(calls).to.have.length(3);
+    // One Powers of Tau verification, then one zkey verification per circuit.
+    expect(calls).to.have.length(1 + Object.keys(ZK_RELEASE_ARTIFACTS).length);
     const snapshotSnarkjsCli = calls[0].args[0];
     expect(
       calls.every(
@@ -308,7 +310,8 @@ describe("production ZK ceremony verifier", function () {
         fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")],
     });
 
-    expect(calls).to.have.length(3);
+    // One Powers of Tau verification, then one zkey verification per circuit.
+    expect(calls).to.have.length(1 + Object.keys(ZK_RELEASE_ARTIFACTS).length);
     for (const invocation of calls) {
       expect(invocation.env).to.deep.equal({
         PATH: "/trusted/bin",

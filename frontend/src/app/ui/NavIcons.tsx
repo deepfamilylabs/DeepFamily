@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
  * and a solid silhouette for the section you are in, so the current section is
  * marked by a change of shape and not by colour alone.
  *
- * The outlines trace lucide's House, TreePine and CirclePlus (ISC), so the rail
+ * The outlines trace lucide's House, TreePine, CirclePlus and Sprout (ISC), so the rail
  * keeps the app's icon language; lucide draws no solid forms, so those live
  * here. A solid glyph keeps the outline's stroke, which rounds its corners the
  * same way and keeps it from growing or shrinking when it changes state.
@@ -95,6 +95,30 @@ export function CreateNavIcon(props: NavIconProps) {
           <circle cx="12" cy="12" r="10" />
           <path d="M8 12h8" />
           <path d="M12 8v8" />
+        </>
+      )}
+    </Glyph>
+  );
+}
+
+/** The inheritance entry (/inheritance): a sprout, the next generation growing from the family. */
+export function InheritanceNavIcon(props: NavIconProps) {
+  return (
+    <Glyph {...props}>
+      {props.solid ? (
+        // Lucide draws the right leaf and the stem as one open path, which a fill would close
+        // into a wedge; the solid form splits them so only the leaves fill.
+        <>
+          <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-2 .536z" />
+          <path d="M16 9a4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" fill="none" />
+          <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+          <path d="M5 21h14" />
+        </>
+      ) : (
+        <>
+          <path d="M14 9.536V7a4 4 0 0 1 4-4h1.5a.5.5 0 0 1 .5.5V5a4 4 0 0 1-4 4 4 4 0 0 0-4 4c0 2 1 3 1 5a5 5 0 0 1-1 3" />
+          <path d="M4 9a5 5 0 0 1 8 4 5 5 0 0 1-8-4" />
+          <path d="M5 21h14" />
         </>
       )}
     </Glyph>

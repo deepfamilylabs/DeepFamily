@@ -20,8 +20,8 @@ import {
 
 const fakePtau = (root) => ({
   status: "verified-local",
-  path: path.join(root, "circuits/ptau/powersOfTau28_hez_final_13.ptau"),
-  bytes: 9_520_280,
+  path: path.join(root, "circuits/ptau/powersOfTau28_hez_final_15.ptau"),
+  bytes: 37_831_832,
   sha256: "95".repeat(32),
   blake2b512: "58".repeat(64),
   source: ZK_PRODUCTION_PHASE1.source,
@@ -73,6 +73,7 @@ describe("development ZK setup", function () {
           source: "fixture-public-randomness",
           personCommitmentContributionHash: "e".repeat(128),
           disclosureBindingContributionHash: "f".repeat(128),
+          familyInheritanceClaimContributionHash: "a".repeat(128),
         },
       },
       circuits: artifactHashes,

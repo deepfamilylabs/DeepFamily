@@ -341,7 +341,11 @@ describe("single-operator production ZK setup safety", function () {
 
     const circuits = {};
     const reviewedCircuits = {};
-    for (const circuitName of ["person_commitment", "disclosure_binding"]) {
+    for (const circuitName of [
+      "person_commitment",
+      "disclosure_binding",
+      "family_inheritance_claim",
+    ]) {
       const circuitDirectory = path.join(stage, circuitName);
       await fs.mkdir(circuitDirectory, { recursive: true });
       await fs.writeFile(
@@ -540,6 +544,10 @@ describe("single-operator production ZK setup safety", function () {
         r1cs: "disclosure-r1cs\n",
         wasm: "tampered-disclosure-wasm\n",
       },
+      family_inheritance_claim: {
+        r1cs: "inheritance-r1cs\n",
+        wasm: "inheritance-wasm\n",
+      },
     };
     const manifest = {
       schemaVersion: 3,
@@ -561,6 +569,10 @@ describe("single-operator production ZK setup safety", function () {
         disclosure_binding: {
           r1csSha256: sha256Text(compiledBytes.disclosure_binding.r1cs),
           wasmSha256: sha256Text("expected-disclosure-wasm\n"),
+        },
+        family_inheritance_claim: {
+          r1csSha256: sha256Text(compiledBytes.family_inheritance_claim.r1cs),
+          wasmSha256: sha256Text(compiledBytes.family_inheritance_claim.wasm),
         },
       },
     };
@@ -668,6 +680,7 @@ describe("single-operator production ZK setup safety", function () {
     expect(runnerEvents.map(([kind, name]) => [kind, name])).to.deep.equal([
       ["compile", "person_commitment"],
       ["compile", "disclosure_binding"],
+      ["compile", "family_inheritance_claim"],
     ]);
   });
 
@@ -679,6 +692,7 @@ describe("single-operator production ZK setup safety", function () {
     const compiledBytes = {
       person_commitment: { r1cs: "person-r1cs\n", wasm: "person-wasm\n" },
       disclosure_binding: { r1cs: "disclosure-r1cs\n", wasm: "disclosure-wasm\n" },
+      family_inheritance_claim: { r1cs: "inheritance-r1cs\n", wasm: "inheritance-wasm\n" },
     };
     const manifest = {
       schemaVersion: 3,
@@ -1115,12 +1129,18 @@ describe("single-operator production ZK setup safety", function () {
         finalZkey: "/stage/disclosure.zkey",
         verificationKey: "/stage/disclosure.vkey.json",
       },
+      family_inheritance_claim: {
+        wasm: "/stage/inheritance.wasm",
+        finalZkey: "/stage/inheritance.zkey",
+        verificationKey: "/stage/inheritance.vkey.json",
+      },
     };
     const commands = buildStagedProofValidationCommands({ root, circuits });
-    expect(commands).to.have.length(2);
+    expect(commands).to.have.length(3);
     for (const [command, circuit] of [
       [commands[0], circuits.person_commitment],
       [commands[1], circuits.disclosure_binding],
+      [commands[2], circuits.family_inheritance_claim],
     ]) {
       expect(command.executable).to.equal(process.execPath);
       expect(command.args[command.args.indexOf("--wasm") + 1]).to.equal(circuit.wasm);

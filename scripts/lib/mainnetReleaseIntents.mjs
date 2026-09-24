@@ -76,7 +76,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the exact sixteen-transaction EVM mainnet release intent without a signer or RPC.
+ * Rebuilds the exact twenty-three-transaction EVM mainnet release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -112,6 +112,12 @@ export const buildMainnetReleaseIntents = async ({
     "UUPSProxy",
     "DeepFamilyArchive",
     "DeepFamilyReader",
+    "PoseidonT3",
+    "PoseidonT4",
+    "PoseidonT6",
+    "DeepFamilyLineageIndex",
+    "FamilyInheritanceClaimVerifier",
+    "FamilyInheritance",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
   const artifact = Object.fromEntries(names.map((name, index) => [name, artifactList[index]]));
@@ -132,6 +138,14 @@ export const buildMainnetReleaseIntents = async ({
     deepFamilyArchive: addressAt(10),
     // nonce 11 is the one-time setArchive call.
     deepFamilyReader: addressAt(12),
+    // nonces 13 and 14 register the two verifier routes.
+    poseidonT3: addressAt(15),
+    poseidonT4: addressAt(16),
+    poseidonT6: addressAt(17),
+    deepFamilyLineageIndex: addressAt(18),
+    // nonce 19 is the one-time setLineageIndex call.
+    familyInheritanceClaimVerifier: addressAt(20),
+    familyInheritance: addressAt(21),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -145,6 +159,16 @@ export const buildMainnetReleaseIntents = async ({
     libraries: {
       PoseidonT5: addresses.poseidonT5,
       AdultAgeGate: addresses.adultAgeGate,
+    },
+  });
+  const lineageIndexBytecode = linkBytecode({
+    ethers,
+    artifact: artifact.DeepFamilyLineageIndex,
+    libraries: {
+      PoseidonT3: addresses.poseidonT3,
+      PoseidonT4: addresses.poseidonT4,
+      PoseidonT5: addresses.poseidonT5,
+      PoseidonT6: addresses.poseidonT6,
     },
   });
   const deepFamilyInterface = new ethers.Interface(artifact.DeepFamily.abi);
@@ -238,6 +262,26 @@ export const buildMainnetReleaseIntents = async ({
       addresses.groth16VerifierAdapter,
     ]),
   );
+  await pushDeployment("poseidonT3", "PoseidonT3");
+  await pushDeployment("poseidonT4", "PoseidonT4");
+  await pushDeployment("poseidonT6", "PoseidonT6");
+  await pushDeployment(
+    "deepFamilyLineageIndex",
+    "DeepFamilyLineageIndex",
+    [addresses.deepFamilyProxy],
+    lineageIndexBytecode,
+  );
+  pushCall(
+    "setLineageIndex",
+    addresses.deepFamilyProxy,
+    deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
+  );
+  await pushDeployment("familyInheritanceClaimVerifier", "FamilyInheritanceClaimVerifier");
+  await pushDeployment("familyInheritance", "FamilyInheritance", [
+    addresses.deepFamilyToken,
+    addresses.deepFamilyLineageIndex,
+    addresses.familyInheritanceClaimVerifier,
+  ]);
   pushCall(
     "transferDeepFamilyOwnership",
     addresses.deepFamilyProxy,

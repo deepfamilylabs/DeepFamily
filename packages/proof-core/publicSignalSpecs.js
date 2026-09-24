@@ -38,14 +38,39 @@ export const DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC = Object.freeze({
   length: 4,
 });
 
+export const INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC = Object.freeze({
+  name: "inheritance-claim-v1",
+  version: 1,
+  purpose: "InheritanceClaim",
+  fieldOrder: Object.freeze([
+    "endorsementRoot",
+    "trustedRoot",
+    "inheritanceCredential",
+    "claimTag",
+    "eligibleFrom",
+    "recipient",
+  ]),
+  fieldBitWidths: Object.freeze({
+    endorsementRoot: 254,
+    trustedRoot: 254,
+    inheritanceCredential: 254,
+    claimTag: 254,
+    eligibleFrom: 64,
+    recipient: 160,
+  }),
+  length: 6,
+});
+
 export const PUBLIC_SIGNAL_SPECS = Object.freeze({
   [PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.name]: PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
   [DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.name]: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  [INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.name]: INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 export const PUBLIC_SIGNAL_SPECS_BY_PURPOSE = Object.freeze({
   [PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC.purpose]: PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
   [DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.purpose]: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  [INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.purpose]: INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC,
 });
 
 function resolveSpecLabel(spec, label) {

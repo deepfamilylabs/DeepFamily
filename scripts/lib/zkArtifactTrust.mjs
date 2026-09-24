@@ -57,7 +57,37 @@ export const ZK_RELEASE_ARTIFACTS = Object.freeze({
     verificationKey: "frontend/public/zk/disclosure_binding.vkey.json",
     solidityVerifier: "contracts/DisclosureBindingVerifier.sol",
   }),
+  family_inheritance_claim: Object.freeze({
+    source: "circuits/family_inheritance_claim.circom",
+    builtR1cs: "zk-artifacts/circuits/family_inheritance_claim.r1cs",
+    wasm: "frontend/public/zk/family_inheritance_claim.wasm",
+    zkey: "frontend/public/zk/family_inheritance_claim_final.zkey",
+    verificationKey: "frontend/public/zk/family_inheritance_claim.vkey.json",
+    solidityVerifier: "contracts/FamilyInheritanceClaimVerifier.sol",
+  }),
 });
+
+// Ceremony evidence names each circuit's contribution hash and (multi-party) zkey digest.
+export const ZK_CEREMONY_CIRCUIT_FIELDS = Object.freeze({
+  person_commitment: Object.freeze({
+    contributionHash: "personCommitmentContributionHash",
+    zkeySha256: "personCommitmentZkeySha256",
+  }),
+  disclosure_binding: Object.freeze({
+    contributionHash: "disclosureBindingContributionHash",
+    zkeySha256: "disclosureBindingZkeySha256",
+  }),
+  family_inheritance_claim: Object.freeze({
+    contributionHash: "familyInheritanceClaimContributionHash",
+    zkeySha256: "familyInheritanceClaimZkeySha256",
+  }),
+});
+const CONTRIBUTION_HASH_FIELDS = Object.freeze(
+  Object.values(ZK_CEREMONY_CIRCUIT_FIELDS).map(({ contributionHash }) => contributionHash),
+);
+const ZKEY_SHA256_FIELDS = Object.freeze(
+  Object.values(ZK_CEREMONY_CIRCUIT_FIELDS).map(({ zkeySha256 }) => zkeySha256),
+);
 
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const BLAKE2B_512_PATTERN = /^[0-9a-f]{128}$/;
@@ -325,8 +355,7 @@ const validateProductionSetup = (setup, expectedPhase1) => {
       "hash",
       "numIterationsExp",
       "source",
-      "personCommitmentContributionHash",
-      "disclosureBindingContributionHash",
+      ...CONTRIBUTION_HASH_FIELDS,
     ],
     "trustedSetup.beacon",
   );
@@ -345,14 +374,9 @@ const validateProductionSetup = (setup, expectedPhase1) => {
   if (typeof beacon.source !== "string" || beacon.source.trim().length < 8) {
     throw new Error("trustedSetup.beacon.source must identify the randomness source");
   }
-  assertBlake2b512(
-    beacon.personCommitmentContributionHash,
-    "trustedSetup.beacon.personCommitmentContributionHash",
-  );
-  assertBlake2b512(
-    beacon.disclosureBindingContributionHash,
-    "trustedSetup.beacon.disclosureBindingContributionHash",
-  );
+  for (const field of CONTRIBUTION_HASH_FIELDS) {
+    assertBlake2b512(beacon[field], `trustedSetup.beacon.${field}`);
+  }
 };
 
 export const buildZkContributionApprovalMessage = ({
@@ -569,16 +593,10 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
   const contributions = transcript.contributions.map((entry, index) => {
     const label = `ZK ceremony transcript contributions[${index}]`;
     const contribution = assertPlainObject(entry, label);
-    const embeddedContributionKeys = [
-      "sequence",
-      "participantId",
-      "personCommitmentContributionHash",
-      "disclosureBindingContributionHash",
-    ];
+    const embeddedContributionKeys = ["sequence", "participantId", ...CONTRIBUTION_HASH_FIELDS];
     const signedMultiPartyKeys = [
       ...embeddedContributionKeys,
-      "personCommitmentZkeySha256",
-      "disclosureBindingZkeySha256",
+      ...ZKEY_SHA256_FIELDS,
       "signerAddress",
       "signature",
     ];
@@ -601,20 +619,13 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
     }
     participantIds.add(contribution.participantId);
 
-    assertBlake2b512(
-      contribution.personCommitmentContributionHash,
-      `${label}.personCommitmentContributionHash`,
-    );
-    assertBlake2b512(
-      contribution.disclosureBindingContributionHash,
-      `${label}.disclosureBindingContributionHash`,
-    );
+    for (const field of CONTRIBUTION_HASH_FIELDS) {
+      assertBlake2b512(contribution[field], `${label}.${field}`);
+    }
     if (!singleOperatorTranscript) {
-      assertSha256(contribution.personCommitmentZkeySha256, `${label}.personCommitmentZkeySha256`);
-      assertSha256(
-        contribution.disclosureBindingZkeySha256,
-        `${label}.disclosureBindingZkeySha256`,
-      );
+      for (const field of ZKEY_SHA256_FIELDS) {
+        assertSha256(contribution[field], `${label}.${field}`);
+      }
     }
     const signedContribution = Object.fromEntries(
       Object.entries(contribution).filter(([key]) => key !== "signature"),
@@ -672,8 +683,7 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
       "hash",
       "numIterationsExp",
       "source",
-      "personCommitmentContributionHash",
-      "disclosureBindingContributionHash",
+      ...CONTRIBUTION_HASH_FIELDS,
     ],
     "ZK ceremony transcript beacon",
   );
@@ -682,9 +692,9 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
     hash: manifest.trustedSetup.beacon.hash,
     numIterationsExp: manifest.trustedSetup.beacon.numIterationsExp,
     source: manifest.trustedSetup.beacon.source,
-    personCommitmentContributionHash: manifest.trustedSetup.beacon.personCommitmentContributionHash,
-    disclosureBindingContributionHash:
-      manifest.trustedSetup.beacon.disclosureBindingContributionHash,
+    ...Object.fromEntries(
+      CONTRIBUTION_HASH_FIELDS.map((field) => [field, manifest.trustedSetup.beacon[field]]),
+    ),
   };
   if (canonicalJson(transcriptBeacon) !== canonicalJson(manifestBeacon)) {
     throw new Error("ZK ceremony transcript beacon does not match the manifest");

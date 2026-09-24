@@ -17,6 +17,7 @@ import { CIRCOM_OVERRIDE_ENV } from "../scripts/lib/circomCompilerOverride.mjs";
 import {
   MINIMUM_PRODUCTION_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
+  ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
@@ -129,6 +130,7 @@ const createProductionFixture = async () => {
     participantId: `participant-${index + 1}`,
     personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
     disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+    familyInheritanceClaimContributionHash: `${String(index + 21).padStart(2, "0")}`.repeat(64),
   }));
   const beacon = {
     name: "deepfamily-public-beacon",
@@ -137,6 +139,7 @@ const createProductionFixture = async () => {
     source: "public-randomness-round-12345",
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
+    familyInheritanceClaimContributionHash: "cc".repeat(64),
   };
   const transcript = {
     schemaVersion: 2,
@@ -181,9 +184,7 @@ const createProductionFixture = async () => {
   const metadataByCircuit = Object.fromEntries(
     Object.keys(ZK_RELEASE_ARTIFACTS).map((circuitName) => {
       const hashField =
-        circuitName === "person_commitment"
-          ? "personCommitmentContributionHash"
-          : "disclosureBindingContributionHash";
+        ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
       return [
         circuitName,
         {
@@ -734,7 +735,7 @@ describe("production release preflight", function () {
           args[1] === "zkey" &&
           args[2] === "verify",
       ),
-    ).to.have.lengthOf(2);
+    ).to.have.lengthOf(Object.keys(ZK_RELEASE_ARTIFACTS).length);
     expect(result).to.deep.equal({
       status: "passed",
       releaseCommit: COMMIT,

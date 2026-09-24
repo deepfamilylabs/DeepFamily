@@ -1,5 +1,6 @@
 // Fresh-v1 PersonRelation / DisclosureBinding proof generation and verification.
 
+import { INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC } from "@deepfamily/proof-core";
 import { canonicalizeFullName } from "@deepfamily/protocol-core";
 import type { Groth16Proof, PersonData } from "./zk";
 import type { ProofDescriptor } from "./proofDescriptors";
@@ -16,6 +17,7 @@ import {
 } from "./publicSignalSpecs";
 import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
+  INHERITANCE_CLAIM_PROOF_DESCRIPTOR,
   PERSON_RELATION_PROOF_DESCRIPTOR,
 } from "./proofDescriptors";
 // @ts-ignore snarkjs does not publish complete browser typings.
@@ -106,7 +108,7 @@ function assertSupportedProverDriver(descriptor: ProofDescriptor) {
 
 async function fullProveWithDescriptor(
   descriptor: ProofDescriptor,
-  input: Record<string, string | number>,
+  input: Record<string, string | number | string[]>,
 ): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
   assertSupportedProverDriver(descriptor);
   const { wasm, zkey } = await loadArtifactsForDescriptor(descriptor);
@@ -336,4 +338,20 @@ export async function verifyDisclosureBindingProof(
   publicSignals: string[],
 ): Promise<boolean> {
   return await verifyWithDescriptor(DISCLOSURE_BINDING_PROOF_DESCRIPTOR, proof, publicSignals);
+}
+
+/** Decimal-string witness produced by protocol-core `buildInheritanceClaimWitness`. */
+export type InheritanceClaimWitness = Record<string, string | string[]>;
+
+export async function generateInheritanceClaimProof(
+  witness: InheritanceClaimWitness,
+): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
+  const result = await fullProveWithDescriptor(INHERITANCE_CLAIM_PROOF_DESCRIPTOR, witness);
+  // The claim circuit has no outputs, so its public signals are its public inputs in spec order.
+  INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.fieldOrder.forEach((fieldName, index) => {
+    if (String(witness[fieldName]) !== String(result.publicSignals[index])) {
+      throw new Error(`InheritanceClaim public signal mismatch: ${fieldName}`);
+    }
+  });
+  return result;
 }

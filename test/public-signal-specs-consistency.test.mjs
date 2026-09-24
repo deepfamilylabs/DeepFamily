@@ -7,6 +7,7 @@ import {
   PROOF_ENCODING_ID_ABI_GROTH16_ABC,
   DISCLOSURE_BINDING_CIRCUIT_ID_V1,
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC,
   PERSON_RELATION_CIRCUIT_ID_V1,
   PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 } from "@deepfamily/proof-core";
@@ -56,7 +57,15 @@ describe("ProofConstants consistency tests", () => {
       proofConstantsSource,
       "DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN",
     ),
+    inheritanceSignalsLength: extractUintConstant(
+      proofConstantsSource,
+      "INHERITANCE_CLAIM_PUBLIC_SIGNALS_LEN",
+    ),
   };
+  const inheritanceCircuitSource = readFileSync(
+    path.resolve(__dirname, "../circuits/family_inheritance_claim.circom"),
+    "utf8",
+  );
 
   const proofPurposeMembers = deepFamilySource
     .match(/enum\s+ProofPurpose\s*{([^}]*)}/s)[1]
@@ -108,5 +117,25 @@ describe("ProofConstants consistency tests", () => {
     expect(DISCLOSURE_BINDING_PROOF_DESCRIPTOR.publicSignalSpec).to.equal(
       DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC.name,
     );
+
+    expect(INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.length).to.equal(
+      solidityConstants.inheritanceSignalsLength,
+    );
+    expect(INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.fieldOrder).to.have.length(
+      solidityConstants.inheritanceSignalsLength,
+    );
+  });
+
+  it("keeps the inheritance circuit's public inputs in the spec's order", () => {
+    const publicList = inheritanceCircuitSource
+      .match(/public\s*\[([^\]]*)\]/s)[1]
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean);
+    expect(publicList).to.deep.equal([...INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC.fieldOrder]);
+    const declarationOrder = [
+      ...inheritanceCircuitSource.matchAll(/signal input (\w+);/g),
+    ].map((match) => match[1]);
+    expect(declarationOrder.slice(0, publicList.length)).to.deep.equal(publicList);
   });
 });

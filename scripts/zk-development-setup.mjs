@@ -30,6 +30,11 @@ export const DEVELOPMENT_CIRCUITS = Object.freeze(
       verifierPath: "contracts/DisclosureBindingVerifier.sol",
       verifierContractName: "DisclosureBindingVerifier",
     },
+    {
+      name: "family_inheritance_claim",
+      verifierPath: "contracts/FamilyInheritanceClaimVerifier.sol",
+      verifierContractName: "FamilyInheritanceClaimVerifier",
+    },
   ].map((circuit) => Object.freeze(circuit)),
 );
 

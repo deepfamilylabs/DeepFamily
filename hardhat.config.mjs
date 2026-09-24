@@ -51,6 +51,13 @@ const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 const CONFLUX_RPC_URLS = resolveConfluxRpcUrls();
 const ETHEREUM_RPC_URLS = resolveEthereumRpcUrls();
 
+const POSEIDON_LIBRARY_SOURCES = [
+  "poseidon-solidity/PoseidonT3.sol",
+  "poseidon-solidity/PoseidonT4.sol",
+  "poseidon-solidity/PoseidonT5.sol",
+  "poseidon-solidity/PoseidonT6.sol",
+];
+
 const solidityProfile = () => ({
   // Keep deployment and verification compiler inputs identical across Hardhat build profiles.
   isolated: false,
@@ -80,19 +87,23 @@ const solidityProfile = () => ({
       },
     },
   ],
-  overrides: {
-    "poseidon-solidity/PoseidonT5.sol": {
-      version: "0.8.28",
-      settings: {
-        optimizer: {
-          enabled: true,
-          runs: 1,
+  // The Poseidon libraries are hand-written assembly; viaIR bloats them past the size limit.
+  overrides: Object.fromEntries(
+    POSEIDON_LIBRARY_SOURCES.map((source) => [
+      source,
+      {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+          viaIR: false,
+          evmVersion: SOLIDITY_EVM_VERSION,
         },
-        viaIR: false,
-        evmVersion: SOLIDITY_EVM_VERSION,
       },
-    },
-  },
+    ]),
+  ),
 });
 
 /** @type {import('hardhat/config').HardhatUserConfig} */
@@ -106,7 +117,7 @@ export default {
     hardhatVerify,
   ],
   solidity: {
-    npmFilesToBuild: ["poseidon-solidity/PoseidonT5.sol"],
+    npmFilesToBuild: POSEIDON_LIBRARY_SOURCES,
     profiles: {
       default: solidityProfile(),
       production: solidityProfile(),

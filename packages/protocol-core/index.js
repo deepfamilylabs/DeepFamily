@@ -8,6 +8,7 @@ export * from "./envelope.js";
 export * from "./errors.js";
 export * from "./gzip.js";
 export * from "./identity.js";
+export * from "./inheritance.js";
 export * from "./metadata.js";
 export * from "./unicode-normalization.js";
 export * from "./precis.js";

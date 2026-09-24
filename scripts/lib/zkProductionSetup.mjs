@@ -23,6 +23,7 @@ import {
 } from "./circomCompilerOverride.mjs";
 import {
   ZK_ARTIFACT_MANIFEST_PATH,
+  ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
@@ -47,9 +48,9 @@ import { readZkeyMpcMetadata } from "./zkeyMpcMetadata.mjs";
 export const SINGLE_OPERATOR_PARTICIPANT_ID = "deepfamily-single-operator";
 export const SINGLE_OPERATOR_BEACON_NAME = "deepfamily-single-operator-finalization";
 export const SINGLE_OPERATOR_BEACON_SOURCE =
-  "node:crypto.randomBytes(32), generated after both Phase 2 contributions";
+  "node:crypto.randomBytes(32), generated after every Phase 2 contribution";
 export const SINGLE_OPERATOR_TRUST_WARNING =
-  "Production security trusts one operator to destroy both circuit-specific Phase 2 secrets.";
+  "Production security trusts one operator to destroy every circuit-specific Phase 2 secret.";
 export const SINGLE_OPERATOR_BEACON_ITERATIONS_EXP = 10;
 
 const SETUP_CIRCUITS = Object.freeze({
@@ -61,7 +62,20 @@ const SETUP_CIRCUITS = Object.freeze({
     ...ZK_RELEASE_ARTIFACTS.disclosure_binding,
     contractName: "DisclosureBindingVerifier",
   }),
+  family_inheritance_claim: Object.freeze({
+    ...ZK_RELEASE_ARTIFACTS.family_inheritance_claim,
+    contractName: "FamilyInheritanceClaimVerifier",
+  }),
 });
+
+// Collects one per-circuit metadata value under each circuit's ceremony field name.
+const ceremonyFieldsFrom = (circuits, metadataKey) =>
+  Object.fromEntries(
+    Object.entries(ZK_CEREMONY_CIRCUIT_FIELDS).map(([circuitName, fields]) => [
+      fields.contributionHash,
+      circuits[circuitName].metadata[metadataKey],
+    ]),
+  );
 
 const defaultCaptureRunner = ({ executable, args, cwd, env = process.env, encoding = "utf8" }) =>
   execFileSync(executable, args, {
@@ -1050,8 +1064,7 @@ export const buildTranscriptAndManifest = async ({
     hash: beaconHash,
     numIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
     source: SINGLE_OPERATOR_BEACON_SOURCE,
-    personCommitmentContributionHash: circuits.person_commitment.metadata.beaconContributionHash,
-    disclosureBindingContributionHash: circuits.disclosure_binding.metadata.beaconContributionHash,
+    ...ceremonyFieldsFrom(circuits, "beaconContributionHash"),
   };
   const transcript = {
     schemaVersion: 3,
@@ -1064,10 +1077,7 @@ export const buildTranscriptAndManifest = async ({
       {
         sequence: 1,
         participantId: SINGLE_OPERATOR_PARTICIPANT_ID,
-        personCommitmentContributionHash:
-          circuits.person_commitment.metadata.operatorContributionHash,
-        disclosureBindingContributionHash:
-          circuits.disclosure_binding.metadata.operatorContributionHash,
+        ...ceremonyFieldsFrom(circuits, "operatorContributionHash"),
       },
     ],
     beacon,
@@ -1172,6 +1182,21 @@ export const buildStagedProofValidationCommands = ({ root, circuits }) =>
         circuits.disclosure_binding.verificationKey,
         "--input",
         path.join(root, "circuits", "test", "proof", "disclosure_binding_input.json"),
+      ]),
+    }),
+    Object.freeze({
+      executable: process.execPath,
+      args: Object.freeze([
+        path.join(root, "tasks", "zk-inheritance-claim-check.mjs"),
+        "--prove",
+        "--wasm",
+        circuits.family_inheritance_claim.wasm,
+        "--zkey",
+        circuits.family_inheritance_claim.finalZkey,
+        "--vkey",
+        circuits.family_inheritance_claim.verificationKey,
+        "--input",
+        path.join(root, "circuits", "test", "proof", "family_inheritance_claim_input.json"),
       ]),
     }),
   ]);
@@ -1551,7 +1576,7 @@ export const runSingleOperatorProductionSetup = async ({
       });
     }
 
-    // The finalization beacon is generated only after both independent Phase 2 contributions.
+    // The finalization beacon is generated only after every independent Phase 2 contribution.
     const beaconBytes = requireRandomBytes(randomBytesFn, 32, "Finalization beacon");
     const beaconHash = beaconBytes.toString("hex");
     beaconBytes.fill(0);

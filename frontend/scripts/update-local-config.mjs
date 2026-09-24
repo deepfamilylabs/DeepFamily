@@ -135,6 +135,12 @@ async function updateLocalConfig() {
     const readerDeployment = JSON.parse(fs.readFileSync(readerPath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
+    // FamilyInheritance is not reachable from DeepFamily, so its address is configured beside
+    // the reader. A deployment from before the inheritance module simply leaves it unset.
+    const inheritancePath = path.join(DEPLOYMENTS_DIR, "FamilyInheritance.json");
+    const inheritanceAddress = fs.existsSync(inheritancePath)
+      ? JSON.parse(fs.readFileSync(inheritancePath, "utf8")).address
+      : "";
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
     console.log(`Found DeepFamilyReader contract at: ${readerAddress}`);
@@ -214,6 +220,10 @@ async function updateLocalConfig() {
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };
+    if (inheritanceAddress) {
+      updates.VITE_INHERITANCE_ADDRESS = inheritanceAddress;
+      updates[`VITE_INHERITANCE_ADDRESS_${LOCAL_CHAIN_ID}`] = inheritanceAddress;
+    }
 
     for (const entry of rootEntries) {
       const suffix = entry.lang.toUpperCase();
@@ -267,6 +277,9 @@ async function updateLocalConfig() {
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Reader (VITE_READER_ADDRESS): ${readerAddress}`);
     console.log(`   DeepFamily behind it: ${contractAddress}`);
+    if (inheritanceAddress) {
+      console.log(`   Inheritance (VITE_INHERITANCE_ADDRESS): ${inheritanceAddress}`);
+    }
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
 
     console.log("\nYou can now start the frontend with: npm run dev");

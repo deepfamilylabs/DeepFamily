@@ -1,11 +1,14 @@
 import { PROOF_ENCODING_ID_ABI_GROTH16_ABC } from "./proofEnvelopeCodec.js";
 import {
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC,
   PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
 } from "./publicSignalSpecs.js";
 
 export const PERSON_RELATION_CIRCUIT_ID_V1 = 1;
 export const DISCLOSURE_BINDING_CIRCUIT_ID_V1 = 1;
+// FamilyInheritance verifies this circuit directly; the id only labels the definition.
+export const INHERITANCE_CLAIM_CIRCUIT_ID_V1 = 1;
 
 function defineProofDefinition({ key, purpose, circuitId, publicSignalSpec }) {
   return Object.freeze({
@@ -34,14 +37,23 @@ export const DISCLOSURE_BINDING_PROOF_DEFINITION = defineProofDefinition({
   publicSignalSpec: DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
 });
 
+export const INHERITANCE_CLAIM_PROOF_DEFINITION = defineProofDefinition({
+  key: "inheritance-claim-groth16-bn254-v1",
+  purpose: "InheritanceClaim",
+  circuitId: INHERITANCE_CLAIM_CIRCUIT_ID_V1,
+  publicSignalSpec: INHERITANCE_CLAIM_V1_PUBLIC_SIGNAL_SPEC,
+});
+
 export const PROOF_DEFINITIONS = Object.freeze({
   [PERSON_RELATION_PROOF_DEFINITION.key]: PERSON_RELATION_PROOF_DEFINITION,
   [DISCLOSURE_BINDING_PROOF_DEFINITION.key]: DISCLOSURE_BINDING_PROOF_DEFINITION,
+  [INHERITANCE_CLAIM_PROOF_DEFINITION.key]: INHERITANCE_CLAIM_PROOF_DEFINITION,
 });
 
 export const PROOF_DEFINITIONS_BY_PURPOSE = Object.freeze({
   [PERSON_RELATION_PROOF_DEFINITION.purpose]: PERSON_RELATION_PROOF_DEFINITION,
   [DISCLOSURE_BINDING_PROOF_DEFINITION.purpose]: DISCLOSURE_BINDING_PROOF_DEFINITION,
+  [INHERITANCE_CLAIM_PROOF_DEFINITION.purpose]: INHERITANCE_CLAIM_PROOF_DEFINITION,
 });
 
 export function getProofDefinition(key) {

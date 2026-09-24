@@ -29,7 +29,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(14);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(21);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -91,6 +91,23 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     const Proxy = await ethers.getContractFactory("UUPSProxy", deployer);
     const Archive = await ethers.getContractFactory("DeepFamilyArchive", deployer);
     const Reader = await ethers.getContractFactory("DeepFamilyReader", deployer);
+    const PoseidonT3 = await ethers.getContractFactory("PoseidonT3", deployer);
+    const PoseidonT4 = await ethers.getContractFactory("PoseidonT4", deployer);
+    const PoseidonT6 = await ethers.getContractFactory("PoseidonT6", deployer);
+    const LineageIndex = await ethers.getContractFactory("DeepFamilyLineageIndex", {
+      signer: deployer,
+      libraries: {
+        PoseidonT3: address("poseidonT3"),
+        PoseidonT4: address("poseidonT4"),
+        PoseidonT5: address("poseidonT5"),
+        PoseidonT6: address("poseidonT6"),
+      },
+    });
+    const ClaimVerifier = await ethers.getContractFactory(
+      "FamilyInheritanceClaimVerifier",
+      deployer,
+    );
+    const Inheritance = await ethers.getContractFactory("FamilyInheritance", deployer);
     const initializeData = DeepFamily.interface.encodeFunctionData("initialize", [
       address("deepFamilyToken"),
       deployerAddress,
@@ -139,6 +156,22 @@ describe("eSpace Mainnet resumable deployment integration", function () {
           address("groth16VerifierAdapter"),
         ]),
       },
+      poseidonT3: await PoseidonT3.getDeployTransaction(),
+      poseidonT4: await PoseidonT4.getDeployTransaction(),
+      poseidonT6: await PoseidonT6.getDeployTransaction(),
+      deepFamilyLineageIndex: await LineageIndex.getDeployTransaction(address("deepFamilyProxy")),
+      setLineageIndex: {
+        to: address("deepFamilyProxy"),
+        data: DeepFamily.interface.encodeFunctionData("setLineageIndex", [
+          address("deepFamilyLineageIndex"),
+        ]),
+      },
+      familyInheritanceClaimVerifier: await ClaimVerifier.getDeployTransaction(),
+      familyInheritance: await Inheritance.getDeployTransaction(
+        address("deepFamilyToken"),
+        address("deepFamilyLineageIndex"),
+        address("familyInheritanceClaimVerifier"),
+      ),
       transferDeepFamilyOwnership: {
         to: address("deepFamilyProxy"),
         data: DeepFamily.interface.encodeFunctionData("transferOwnership", [

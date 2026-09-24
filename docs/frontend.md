@@ -24,6 +24,7 @@ frontend/src/
 ├── pages/       # Route-level composition; imports from domains + shared only
 ├── domains/     # Feature code grouped by bounded context
 │   ├── config/        # Network/contract config context and UI
+│   ├── inheritance/   # Family inheritance: set up, top up, claim with a ZK proof
 │   ├── wallet/        # Wallet + network selection
 │   ├── person/        # Person model, queries, UI coordination
 │   ├── tree/          # Family-tree context/queries/selectors/services and view UI
@@ -63,7 +64,11 @@ Use the directory tree for ownership boundaries, and these files as first-read e
   `frontend/src/shared/metadata/metadataUnlockCoordinator.ts`,
   `packages/protocol-core/identity.js`, `frontend/src/shared/crypto/identityHash.ts`, and
   `frontend/src/shared/zk/proofDescriptors.ts`
-- Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`
+- Family inheritance: `frontend/src/pages/InheritancePage.tsx`,
+  `frontend/src/domains/inheritance/services/inheritanceChain.ts` (tree replay and legitimacy
+  lookup), `frontend/src/domains/inheritance/services/inheritanceFlows.ts` (funding, claim math,
+  submission), and `packages/protocol-core/inheritance.js` (witness builder)
+- Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`, `frontend/src/pages/InheritancePage.test.tsx`
 
 Update this section when adding or moving stable entry points, route groups, domain gateways, app providers, shared config/client/cache layers, worker boundaries, or boundary-level tests. Do not list ordinary leaf components, local renderers, or one-off helpers here; keep them discoverable through their owning directory.
 
@@ -217,6 +222,40 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
   - Toggle hidden via env (`VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE=0`) → filtering is forced on and cannot be turned off in the UI.
 - **Where it lives**: the allowlist fetch and per-node predicate live in `domains/tree/context/useTreeGraphState.ts`; pruning runs during traversal (`domains/tree/services/treeTraversalOrchestrator.ts`) and is enforced again at projection time (`domains/tree/selectors/buildViewGraph.ts`), so hidden versions never leak into the view even from shared edge caches.
 
+### Family inheritance
+
+`/inheritance` (`pages/InheritancePage.tsx`) composes the `inheritance` domain with the person
+domain's identity form. It has three tabs:
+
+- **Set up**: derives the root person's identity from the form, confirms from the replayed
+  `VersionIndexed` events that the root version exists (a wrong passphrase gives an identity that
+  has none), shows the number of recommended sources, and only then approves DEEP and calls
+  `createInheritance` with the credential. The per-period amount is pre-filled as
+  `1000 × recentReward × k`.
+- **Top up**: looks up an inheritance by id and deposits into it.
+- **Claim**: derives both the heir's and the root's identity, rebuilds both lineage trees from
+  `LeafWritten` events, verifies the rebuilt roots against the chain at the scanned block, finds the
+  oldest endorsement of the heir by a recommended source of the root version, lists every
+  inheritance under the credential, and for the chosen one builds the witness, proves in the ZK
+  worker, and submits from the connected wallet.
+
+The page follows the sensitive-input rule above: identity forms stay uncontrolled, and each action
+reads the passphrases at click time and derives again, so search and claim each derive once and no
+secret survives the click. Search results in React state hold only public data (ids, amounts, dates,
+the found version and endorser). Before any transaction, the page checks that the configured
+`FamilyInheritance` reads the same lineage index DeepFamily writes to and holds the same token, and
+that the wallet is on the configured chain.
+
+Lookups never name a person to the RPC node. `inheritanceChain.ts` fetches logs filtered only by
+contract and event type — lineage `LeafWritten`/`VersionIndexed`, DeepFamily
+`PersonVersionEndorsed`/`TrustedEndorserAdded`/`TrustedEndorserRemoved`, and `InheritanceCreated` —
+and matches the heir and root locally: it recomputes each candidate endorsement and trusted leaf
+and finds it in the replayed trees, so cancelled endorsements and removed recommended sources
+(zeroed leaves) drop out. These scans start at `VITE_DF_EVENT_FROM_BLOCK` and have no chunk budget,
+because a skipped write would rebuild a root the contract never had. The node still sees which
+inheritance ids the page reads and the transactions it sends; the claim itself reveals only the
+proof's public signals and the sending wallet.
+
 ### Workers (crypto + ZK)
 
 Heavy and sensitive computation runs off the main thread:
@@ -267,6 +306,7 @@ VITE_ROOT_VERSION_INDEX=...
 | `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                                           |
 | `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                                   |
 | `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                         | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
+| `VITE_INHERITANCE_ADDRESS`, `VITE_INHERITANCE_ADDRESS_<chainId>` | FamilyInheritance address for `/inheritance`; the page is disabled without it |
 | `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                                     |
 
 ### Local auto-config

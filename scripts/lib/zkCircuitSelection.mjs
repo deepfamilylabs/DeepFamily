@@ -1,4 +1,4 @@
-const CIRCUIT_CHOICES = Object.freeze(["all", "person", "disclosure"]);
+const CIRCUIT_CHOICES = Object.freeze(["all", "person", "disclosure", "inheritance"]);
 
 export const parseCircuitArguments = (argv) => {
   if (!Array.isArray(argv)) {
@@ -19,7 +19,7 @@ export const parseCircuitArguments = (argv) => {
     circuit = argv[0].slice("--circuit=".length);
   } else {
     throw new Error(
-      "Usage: --circuit <all|person|disclosure> (the option may be omitted to select all)",
+      "Usage: --circuit <all|person|disclosure|inheritance> (the option may be omitted to select all)",
     );
   }
 
@@ -37,5 +37,7 @@ export const selectCircuitNames = (circuit) => {
       `Invalid circuit ${JSON.stringify(circuit)}; expected one of: ${CIRCUIT_CHOICES.join(", ")}`,
     );
   }
-  return circuit === "all" ? Object.freeze(["person", "disclosure"]) : Object.freeze([circuit]);
+  return circuit === "all"
+    ? Object.freeze(["person", "disclosure", "inheritance"])
+    : Object.freeze([circuit]);
 };

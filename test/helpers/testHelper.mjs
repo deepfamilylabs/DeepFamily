@@ -213,6 +213,20 @@ export function makeMetadataEnvelope(ethers, identitySuiteId = 1, opts = {}) {
   return ethers.hexlify(bytes);
 }
 
+/** Deploys a real lineage index for `deepFamily`, linking its own Poseidon T3/T4/T6 copies. */
+export async function deployLineageIndex(ethers, deepFamilyAddress, poseidonT5Address) {
+  const libraries = { PoseidonT5: poseidonT5Address };
+  for (const name of ["PoseidonT3", "PoseidonT4", "PoseidonT6"]) {
+    const library = await (await ethers.getContractFactory(name)).deploy();
+    await library.waitForDeployment();
+    libraries[name] = await library.getAddress();
+  }
+  const LineageIndex = await ethers.getContractFactory("DeepFamilyLineageIndex", { libraries });
+  const lineageIndex = await LineageIndex.deploy(deepFamilyAddress);
+  await lineageIndex.waitForDeployment();
+  return lineageIndex;
+}
+
 export async function setupStubVerifiers(ethers, deepFamily) {
   const relationRoute = await deepFamily.verifierRegistry(
     PROOF_PURPOSE_PERSON_RELATION,

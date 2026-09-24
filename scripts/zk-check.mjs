@@ -55,6 +55,28 @@ const CHECKS = Object.freeze({
       args: Object.freeze(["--circuit", "disclosure"]),
     }),
   ]),
+  inheritance: Object.freeze([
+    Object.freeze({
+      check: "proof",
+      task: path.join("tasks", "zk-inheritance-claim-check.mjs"),
+      args: Object.freeze([
+        "--prove",
+        "--wasm",
+        "./frontend/public/zk/family_inheritance_claim.wasm",
+        "--zkey",
+        "./frontend/public/zk/family_inheritance_claim_final.zkey",
+        "--vkey",
+        "./frontend/public/zk/family_inheritance_claim.vkey.json",
+        "--input",
+        "./circuits/test/proof/family_inheritance_claim_input.json",
+      ]),
+    }),
+    Object.freeze({
+      check: "constraints",
+      task: path.join("circuits", "test", "test_circuit_constraints.js"),
+      args: Object.freeze(["--circuit", "inheritance"]),
+    }),
+  ]),
 });
 
 const defaultRunner = ({ executable, args, cwd }) =>
@@ -100,7 +122,7 @@ export const runZkCheck = ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-check.mjs [--circuit <all|person|disclosure>]
+  node scripts/zk-check.mjs [--circuit <all|person|disclosure|inheritance>]
 
 Generates and independently verifies real proofs plus range/parent constraint regressions for the
 selected circuit using the repository's committed frontend ZK artifacts. The default is

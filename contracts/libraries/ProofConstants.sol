@@ -45,4 +45,5 @@ library ProofConstants {
 
   uint256 internal constant PERSON_RELATION_PUBLIC_SIGNALS_LEN = 5;
   uint256 internal constant DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN = 4;
+  uint256 internal constant INHERITANCE_CLAIM_PUBLIC_SIGNALS_LEN = 6;
 }

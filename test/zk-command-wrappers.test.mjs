@@ -141,14 +141,22 @@ describe("parameterized ZK command wrappers", function () {
         runner: (command) => events.push(["run", command.circuit]),
       });
 
-      expect(commands.map(({ circuit }) => circuit)).to.deep.equal(["person", "disclosure"]);
+      expect(commands.map(({ circuit }) => circuit)).to.deep.equal([
+        "person",
+        "disclosure",
+        "inheritance",
+      ]);
       expect(events).to.deep.equal([
         ["inspect", fixtureRoot, "linux", "x64"],
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "circuits")],
         ["run", "person"],
         ["run", "disclosure"],
+        ["run", "inheritance"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
+      expect(commands[2].args[0]).to.equal(
+        path.join("circuits", "family_inheritance_claim.circom"),
+      );
     });
 
     it("propagates a compiler execution error and does not run the next circuit", async function () {
@@ -214,7 +222,7 @@ describe("parameterized ZK command wrappers", function () {
   });
 
   describe("zk-check", function () {
-    it("builds fixed proof and constraint commands in person/disclosure order", function () {
+    it("builds fixed proof and constraint commands in person/disclosure/inheritance order", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot });
       expect(commands).to.deep.equal([
         {
@@ -277,6 +285,35 @@ describe("parameterized ZK command wrappers", function () {
             path.join(fixtureRoot, "circuits", "test", "test_circuit_constraints.js"),
             "--circuit",
             "disclosure",
+          ],
+          cwd: fixtureRoot,
+        },
+        {
+          circuit: "inheritance",
+          check: "proof",
+          executable: process.execPath,
+          args: [
+            path.join(fixtureRoot, "tasks", "zk-inheritance-claim-check.mjs"),
+            "--prove",
+            "--wasm",
+            "./frontend/public/zk/family_inheritance_claim.wasm",
+            "--zkey",
+            "./frontend/public/zk/family_inheritance_claim_final.zkey",
+            "--vkey",
+            "./frontend/public/zk/family_inheritance_claim.vkey.json",
+            "--input",
+            "./circuits/test/proof/family_inheritance_claim_input.json",
+          ],
+          cwd: fixtureRoot,
+        },
+        {
+          circuit: "inheritance",
+          check: "constraints",
+          executable: process.execPath,
+          args: [
+            path.join(fixtureRoot, "circuits", "test", "test_circuit_constraints.js"),
+            "--circuit",
+            "inheritance",
           ],
           cwd: fixtureRoot,
         },

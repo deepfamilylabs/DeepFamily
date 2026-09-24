@@ -119,6 +119,7 @@
     "@types/chai": "^5.2.3",
     "@types/mocha": ">=9.1.0",
     "@types/node": ">=18.0.0",
+    "@zk-kit/binary-merkle-root.circom": "2.0.0",
     "chai": "^5.1.2",
     "circomlib": "^2.0.5",
     "concurrently": "^9.2.4",
