@@ -1662,6 +1662,8 @@
       "LineageIndexAlreadySet": "Lineage index is already configured and cannot be replaced.",
       "LineageIndexNotSet": "Lineage index is not configured.",
       "InvalidTreeId": "Lineage tree identifier is invalid.",
+      "TreeCapacityExceeded": "Lineage tree has reached its maximum leaf capacity.",
+      "InvalidLeafIndex": "Lineage leaf index is invalid.",
       "IdentityCommitmentMismatch": "Identity commitment does not match the person hash.",
       "UnknownPerson": "The lineage index has no record of this person.",
       "UnknownVersion": "The lineage index has no record of this version.",

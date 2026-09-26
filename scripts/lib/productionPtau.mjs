@@ -3,17 +3,17 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export const PRODUCTION_PTAU_FILE_NAME = "powersOfTau28_hez_final_15.ptau";
+export const PRODUCTION_PTAU_FILE_NAME = "ppot_0080_16.ptau";
 export const PRODUCTION_PTAU_RELATIVE_PATH = `circuits/ptau/${PRODUCTION_PTAU_FILE_NAME}`;
 // Ceremony provenance only. The production workflow never downloads from this URL.
 export const PRODUCTION_PTAU_URL =
-  "https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_15.ptau";
-export const PRODUCTION_PTAU_BYTES = 37_831_832;
+  "https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_16.ptau";
+export const PRODUCTION_PTAU_BYTES = 75_590_802;
 export const PRODUCTION_PTAU_SHA256 =
-  "3ef2ecc5b75d687048cf2d59195119b42fb07c5af639c5f283d84bfa69829e7f";
+  "ed3622a7c79b0b49aadd134ebbc5b77df8c8c59bccebdfd0d9bf2c1a51561cf9";
 export const PRODUCTION_PTAU_BLAKE2B512 =
-  "982372c867d229c236091f767e703253249a9b432c1710b4f326306bfa2428a1" +
-  "7b06240359606cfe4d580b10a5a1f63fbed499527069c18ae17060472969ae6e";
+  "9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0" +
+  "d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3";
 
 export const PRODUCTION_PTAU_EVIDENCE = Object.freeze({
   bytes: PRODUCTION_PTAU_BYTES,

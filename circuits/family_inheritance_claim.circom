@@ -104,15 +104,15 @@ template FamilyInheritanceClaim(MAX_DEPTH) {
     trustedLeaf.inputs[3] <== endorser;
 
     // BinaryMerkleRoot yields 0 for a depth above MAX_DEPTH, so bound both depths explicitly.
-    component endorsementDepthBits = Num2Bits(6);
+    component endorsementDepthBits = Num2Bits(7);
     endorsementDepthBits.in <== endorsementDepth;
-    component trustedDepthBits = Num2Bits(6);
+    component trustedDepthBits = Num2Bits(7);
     trustedDepthBits.in <== trustedDepth;
-    component endorsementDepthOk = LessEqThan(6);
+    component endorsementDepthOk = LessEqThan(7);
     endorsementDepthOk.in[0] <== endorsementDepth;
     endorsementDepthOk.in[1] <== MAX_DEPTH;
     endorsementDepthOk.out === 1;
-    component trustedDepthOk = LessEqThan(6);
+    component trustedDepthOk = LessEqThan(7);
     trustedDepthOk.in[0] <== trustedDepth;
     trustedDepthOk.in[1] <== MAX_DEPTH;
     trustedDepthOk.out === 1;
@@ -158,4 +158,4 @@ template FamilyInheritanceClaim(MAX_DEPTH) {
 
 component main {
     public [endorsementRoot, trustedRoot, inheritanceCredential, claimTag, eligibleFrom, recipient]
-} = FamilyInheritanceClaim(32);
+} = FamilyInheritanceClaim(64);

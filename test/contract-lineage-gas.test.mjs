@@ -6,6 +6,7 @@ import hre from "hardhat";
 import * as snarkjs from "snarkjs";
 import {
   buildInheritanceClaimWitness,
+  buildLineageMerkleProofFromPath,
   computeIdentityFromDerivedSecret,
   computeInheritanceCredential,
   computeInheritanceEligibleFrom,
@@ -416,9 +417,9 @@ describe("DeepFamily lineage gas benchmark", function () {
     reportGas(measurements);
   });
 
-  it("measures synthetic full-sibling paths at depths 16, 24 and 32", async () => {
+  it("measures synthetic full-sibling paths through depth 64", async () => {
     const measurements = [];
-    for (const depth of [16, 24, 32]) {
+    for (const depth of [16, 24, 32, 48, 64]) {
       const context = await hre.networkHelpers.loadFixture(setupSinglePerson);
       const { deepFamily, lineageIndex, manager, personHash } = context;
       const { root, deletedRoot } = await seedSyntheticPath(context, depth);
@@ -443,9 +444,9 @@ describe("DeepFamily lineage gas benchmark", function () {
     reportGas(measurements);
   });
 
-  it("measures synthetic full-sibling appends at depths 16, 24 and 32", async () => {
+  it("measures synthetic full-sibling appends through depth 64", async () => {
     const measurements = [];
-    for (const depth of [16, 24, 32]) {
+    for (const depth of [16, 24, 32, 48, 64]) {
       const context = await hre.networkHelpers.loadFixture(setupSinglePerson);
       const { deepFamily, lineageIndex, manager, personHash } = context;
       const { oldSize, siblings, identityCommitment } = await seedSyntheticAppendPath(
@@ -473,23 +474,64 @@ describe("DeepFamily lineage gas benchmark", function () {
       expect(await lineageIndex.root(TRUSTED_TREE)).to.equal(
         siblings.reduce((node, sibling) => hashLineageNodes(sibling, node), leaf),
       );
+      if (depth === 64) {
+        const proof = await lineageIndex.getMerkleProof(TRUSTED_TREE, leafIndex);
+        expect(proof.proofDepth).to.equal(64n);
+        expect(proof.proofIndex).to.equal((1n << 64n) - 1n);
+        expect(proof.siblings).to.deep.equal(siblings);
+        const circuitProof = buildLineageMerkleProofFromPath({
+          root: proof.proofRoot,
+          leaf: proof.leaf,
+          index: proof.proofIndex,
+          siblings: proof.siblings,
+        });
+        expect(circuitProof.root).to.equal(await lineageIndex.root(TRUSTED_TREE));
+        expect(circuitProof.depth).to.equal(64);
+        expect(circuitProof.index).to.equal((1n << 64n) - 1n);
+      }
       measurements.push(measurement);
     }
     reportGas(measurements);
   });
 
-  it("rejects an append beyond the circuit's depth-32 limit", async () => {
+  it("accepts an append beyond 2^32 leaves and returns its compact proof", async () => {
     const context = await hre.networkHelpers.loadFixture(setupSinglePerson);
     const { deepFamily, lineageIndex, manager, personHash } = context;
-    const { root } = await seedSyntheticPath(context, 32);
+    const { root: oldRoot } = await seedSyntheticPath(context, 32);
     const account = syntheticAccount(99);
+    await (await deepFamily.connect(manager).addTrustedEndorser(personHash, 1, account)).wait();
+    expect(await lineageIndex.size(TRUSTED_TREE)).to.equal((1n << 32n) + 1n);
+    expect(await lineageIndex.depth(TRUSTED_TREE)).to.equal(33n);
+    const [exists, leafIndex] = await lineageIndex.trustedLeafIndex(personHash, 1, account);
+    expect(exists).to.equal(true);
+    expect(leafIndex).to.equal(1n << 32n);
+    const proof = await lineageIndex.getMerkleProof(TRUSTED_TREE, leafIndex);
+    expect(proof.proofDepth).to.equal(1n);
+    expect(proof.siblings).to.deep.equal([oldRoot]);
+    expect(proof.proofIndex).to.equal(1n);
+    expect(proof.proofRoot).to.equal(await lineageIndex.root(TRUSTED_TREE));
+  });
+
+  it("rejects an append beyond the depth-64 limit", async () => {
+    const context = await hre.networkHelpers.loadFixture(setupSinglePerson);
+    const { deepFamily, lineageIndex, manager, personHash } = context;
+    const { root } = await seedSyntheticPath(context, 64);
+    const proof = await lineageIndex.getMerkleProof(TRUSTED_TREE, 0);
+    expect(proof.proofDepth).to.equal(64n);
+    expect(proof.siblings).to.have.length(64);
+    expect(proof.proofIndex).to.equal(0n);
+    expect(proof.proofRoot).to.equal(root);
+    expect(
+      proof.siblings.reduce((node, sibling) => hashLineageNodes(node, sibling), proof.leaf),
+    ).to.equal(root);
+    const overflowAccount = syntheticAccount(199);
     await expect(
-      deepFamily.connect(manager).addTrustedEndorser(personHash, 1, account),
+      deepFamily.connect(manager).addTrustedEndorser(personHash, 1, overflowAccount),
     ).to.be.revertedWithCustomError(lineageIndex, "TreeCapacityExceeded");
-    expect(await lineageIndex.size(TRUSTED_TREE)).to.equal(1n << 32n);
-    expect(await lineageIndex.depth(TRUSTED_TREE)).to.equal(32n);
+    expect(await lineageIndex.size(TRUSTED_TREE)).to.equal(1n << 64n);
+    expect(await lineageIndex.depth(TRUSTED_TREE)).to.equal(64n);
     expect(await lineageIndex.root(TRUSTED_TREE)).to.equal(root);
-    expect(await deepFamily.trustedEndorserOf(personHash, 1, account)).to.equal(false);
+    expect(await deepFamily.trustedEndorserOf(personHash, 1, overflowAccount)).to.equal(false);
   });
 
   it("keeps one inheritance create, deposit and proven claim bounded as IDs grow", async () => {

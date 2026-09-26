@@ -46,45 +46,36 @@ All three DeepFamily circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
-powersOfTau28_hez_final_15.ptau
+ppot_0080_16.ptau
 
 Published provenance recorded in the manifest:
-https://storage.googleapis.com/zkevm/ptau/powersOfTau28_hez_final_15.ptau
+https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_16.ptau
 
 Capacity:
-2^15 constraints
+2^16 constraints
 
 Bytes:
-37,831,832
+75,590,802
 
 SHA-256:
-3ef2ecc5b75d687048cf2d59195119b42fb07c5af639c5f283d84bfa69829e7f
+ed3622a7c79b0b49aadd134ebbc5b77df8c8c59bccebdfd0d9bf2c1a51561cf9
 
 BLAKE2b-512:
-982372c867d229c236091f767e703253249a9b432c1710b4f326306bfa2428a17b06240359606cfe4d580b10a5a1f63fbed499527069c18ae17060472969ae6e
+9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3
 ```
 
-The family inheritance claim circuit has 18,499 constraints, so the power-13 file used before it
-(8,192 constraints) is too small.
+The 64-level family inheritance claim circuit has 34,247 constraints, so the previous power-15
+file (32,768 constraints) is too small.
 
 The exact file is committed at:
 
 ```text
-circuits/ptau/powersOfTau28_hez_final_15.ptau
+circuits/ptau/ppot_0080_16.ptau
 ```
 
-Both published download locations, the URL above and the earlier
-`https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau`, now return HTTP 403.
-The committed copy was retrieved from the Internet Archive capture of the original S3 object:
-
-```text
-https://web.archive.org/web/20220331132554id_/https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau
-```
-
-Its BLAKE2b-512 matches the digest published in the snarkjs README, and
-`snarkjs powersoftau verify` reports 54 named contributions followed by the final
-beacon. The retrieval location needs no trust; the pinned digests decide whether the bytes are
-accepted.
+The [PSE Perpetual Powers of Tau repository](https://github.com/privacy-ethereum/perpetualpowersoftau)
+links the published object above. The retrieval location needs no trust; the pinned digests decide
+whether the bytes are accepted.
 
 The setup and verification commands never download or replace the file. They reject symbolic
 links, an unexpected byte length, or either hash mismatch; the file is rehashed before use. The
@@ -257,7 +248,7 @@ Internally the command:
 
 1. validates the clean release commit and development manifest, or the explicitly hash-bound
    production baseline in rotation mode;
-2. reads the pinned public power-15 pTau and checks both pinned digests;
+2. reads the pinned public power-16 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles every circuit there
    with explicit `--O2 --sanity_check 2`;

@@ -39,7 +39,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   uint256 internal constant DOMAIN_ENDORSEMENT_LEAF = 1007;
   uint256 internal constant DOMAIN_TRUSTED_LEAF = 1008;
   uint256 internal constant DOMAIN_PARENTS = 1009;
-  uint256 internal constant MAX_LEAF_COUNT = uint256(1) << 32;
+  uint256 internal constant MAX_LEAF_COUNT = uint256(1) << 64;
 
   address public immutable override DEEP_FAMILY;
 

@@ -65,7 +65,7 @@ export function buildFamilyInheritanceFixture() {
     }),
     707n,
   ]);
-  return buildInheritanceClaimWitness({
+  const claimInput = {
     heir: {
       identity: heirIdentity,
       identitySuiteId: 1,
@@ -77,21 +77,33 @@ export function buildFamilyInheritanceFixture() {
     rootIsMother: false,
     endorser: endorsement.endorser,
     writtenAt: endorsement.writtenAt,
-    endorsementTree,
-    endorsementLeafIndex: 1,
     root: {
       identityCommitment: vector.root.identityCommitment,
       versionIndex: vector.root.versionIndex,
       derivedSecretField: vector.root.derivedSecretField,
     },
-    trustedTree,
-    trustedLeafIndex: 1,
     eligibleFrom: computeInheritanceEligibleFrom({
       startTime: vector.eligibility.startTime,
       writtenAt: endorsement.writtenAt,
     }),
     recipient: FIXTURE_RECIPIENT,
+  };
+  const fromTrees = buildInheritanceClaimWitness({
+    ...claimInput,
+    endorsementTree,
+    endorsementLeafIndex: 1,
+    trustedTree,
+    trustedLeafIndex: 1,
   });
+  const fromCompactPaths = buildInheritanceClaimWitness({
+    ...claimInput,
+    endorsementProof: endorsementTree.generateProof(1),
+    trustedProof: trustedTree.generateProof(1),
+  });
+  if (JSON.stringify(fromTrees.witness) !== JSON.stringify(fromCompactPaths.witness)) {
+    throw new Error("Tree and compact lineage proofs produced different claim witnesses");
+  }
+  return fromTrees;
 }
 
 export const serializeFamilyInheritanceInput = (witness) => `${JSON.stringify(witness, null, 2)}\n`;

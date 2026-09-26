@@ -20,8 +20,8 @@ import {
 
 const fakePtau = (root) => ({
   status: "verified-local",
-  path: path.join(root, "circuits/ptau/powersOfTau28_hez_final_15.ptau"),
-  bytes: 37_831_832,
+  path: path.join(root, "circuits/ptau/ppot_0080_16.ptau"),
+  bytes: 75_590_802,
   sha256: "95".repeat(32),
   blake2b512: "58".repeat(64),
   source: ZK_PRODUCTION_PHASE1.source,

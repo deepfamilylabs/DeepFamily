@@ -311,7 +311,7 @@ mother and be endorsed by a trusted endorser (recommended source) of the root ve
 
 `DeepFamilyLineageIndex` mirrors public DeepFamily state in two Poseidon LeanIMTs. They follow zk-kit
 semantics: a node hash is `Poseidon2(left, right)`, a node without a right sibling rises unchanged,
-and the maximum depth is 32. The index rejects appends beyond `2^32` cumulative leaf slots per tree;
+and the maximum depth is 64. The index rejects appends beyond `2^64` cumulative leaf slots per tree;
 clearing a leaf retains its slot.
 
 ```text
@@ -375,9 +375,9 @@ An endorsement written or rewritten less than one period ago therefore cannot be
 re-endorsed after a passphrase leak starts a new waiting period under the new identity.
 
 The circuit range-checks the endorser to 160 bits, `writtenAt` and `eligibleFrom` to 64 bits, and
-the identity fields as in PersonRelation. Both tree depths must be at most 32, because the zk-kit
+the identity fields as in PersonRelation. Both tree depths must be at most 64, because the zk-kit
 root template returns zero for a larger depth. `recipient` is bound by a square constraint, so a
-copied proof cannot pay a different address. The circuit has 18,499 constraints.
+copied proof cannot pay a different address. The circuit has 34,247 constraints.
 
 ### Public signals
 
@@ -491,7 +491,7 @@ vectors, and deployment/runtime evidence have all been recorded and the release 
 
 `zk:development:setup` records no ceremony evidence and is never a substitute for a production
 ceremony. Both it and production setup use the pinned public Phase-1 pTau committed at
-`circuits/ptau/powersOfTau28_hez_final_15.ptau` or the file selected by `ZK_PTAU_PATH`; both check
+`circuits/ptau/ppot_0080_16.ptau` or the file selected by `ZK_PTAU_PATH`; both check
 its pinned hashes before use, and no command downloads it.
 
 Once the circuits and KDF profiles are frozen, run `npm run zk:production:setup`, review and commit
