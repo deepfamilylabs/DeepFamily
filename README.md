@@ -136,9 +136,15 @@ Rerunning the seed resumes existing data and does not change an existing NFT's o
 
 ```bash
 npm test              # Run all contract tests
+npm run test:gas      # Benchmark lineage writes and inheritance transactions
 npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check         # Run frontend checks + contract lint/build/test
 ```
+
+`test:gas` uses Hardhat's in-process chain. The person-version case uses a proof-verifier stub;
+the inheritance claim comparison uses real Groth16 proofs. Simulated deep-tree cases measure
+update gas without creating billions of leaves; they do not validate the whole Merkle tree,
+proof generation at that depth, or a live network's transaction limit.
 
 ### ZK Artifact Workflow
 

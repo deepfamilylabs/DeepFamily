@@ -47,7 +47,6 @@ const EXPLORER_API_KEY = explorerApiKeyForNetwork(
   HARDHAT_NETWORK_NAME,
   process.env.EXPLORER_API_KEY,
 );
-const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "";
 const CONFLUX_RPC_URLS = resolveConfluxRpcUrls();
 const ETHEREUM_RPC_URLS = resolveEthereumRpcUrls();
 
@@ -294,25 +293,6 @@ export default {
     sourcify: {
       enabled: false,
     },
-  },
-
-  // Gas reporter configuration
-  gasReporter: {
-    enabled: false, // Temporarily disabled due to provider issues
-    currency: "USD",
-    coinmarketcap: COINMARKETCAP_API_KEY,
-    gasPrice: 20,
-    showTimeSpent: true,
-    showMethodSig: true,
-    maxMethodDiff: 10,
-  },
-
-  // Contract size checker - temporarily disabled due to JSON parsing issue
-  contractSizer: {
-    alphaSort: true,
-    disambiguatePaths: false,
-    runOnCompile: false, // Disabled to avoid JSON parsing errors
-    strict: process.env.CONTRACT_SIZER_STRICT === "true",
   },
 
   // Path configuration

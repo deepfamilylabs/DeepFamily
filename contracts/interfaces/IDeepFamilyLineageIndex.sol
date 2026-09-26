@@ -57,4 +57,20 @@ interface IDeepFamilyLineageIndex is IERC165 {
     uint256 versionIndex,
     address account
   ) external view returns (bool exists, uint256 leafIndex);
+
+  /// @notice The current LeanIMT proof for an allocated leaf slot.
+  /// @dev Missing right siblings are omitted; proofIndex packs directions for returned siblings.
+  function getMerkleProof(
+    uint8 treeId,
+    uint256 leafIndex
+  )
+    external
+    view
+    returns (
+      uint256 leaf,
+      uint256 proofRoot,
+      uint256 proofIndex,
+      uint256 proofDepth,
+      uint256[] memory siblings
+    );
 }

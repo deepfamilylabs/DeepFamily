@@ -28,6 +28,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   error UnknownPerson();
   error UnknownVersion();
   error EndorsementNotIndexed();
+  error TreeCapacityExceeded();
+  error InvalidLeafIndex();
 
   uint8 public constant ENDORSEMENT_TREE = 0;
   uint8 public constant TRUSTED_TREE = 1;
@@ -37,6 +39,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
   uint256 internal constant DOMAIN_ENDORSEMENT_LEAF = 1007;
   uint256 internal constant DOMAIN_TRUSTED_LEAF = 1008;
   uint256 internal constant DOMAIN_PARENTS = 1009;
+  uint256 internal constant MAX_LEAF_COUNT = uint256(1) << 32;
 
   address public immutable override DEEP_FAMILY;
 
@@ -208,6 +211,55 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     return slot == 0 ? (false, 0) : (true, slot - 1);
   }
 
+  function getMerkleProof(
+    uint8 treeId,
+    uint256 leafIndex
+  )
+    external
+    view
+    override
+    returns (
+      uint256 leaf,
+      uint256 proofRoot,
+      uint256 proofIndex,
+      uint256 proofDepth,
+      uint256[] memory siblings
+    )
+  {
+    Tree storage tree = _tree(treeId);
+    uint256 levelSize = tree.size;
+    if (leafIndex >= levelSize) revert InvalidLeafIndex();
+
+    leaf = tree.nodes[0][leafIndex];
+    proofRoot = tree.root;
+    uint256 index = leafIndex;
+    uint256 treeDepth = tree.depth;
+
+    // Count only existing siblings so the returned path has zk-kit LeanIMT's compact shape.
+    for (uint256 level = 0; level < treeDepth; ++level) {
+      if ((index & 1) == 1 || index + 1 < levelSize) ++proofDepth;
+      index >>= 1;
+      levelSize = (levelSize + 1) >> 1;
+    }
+
+    siblings = new uint256[](proofDepth);
+    index = leafIndex;
+    levelSize = tree.size;
+    uint256 siblingIndex;
+    for (uint256 level = 0; level < treeDepth; ++level) {
+      if ((index & 1) == 1) {
+        siblings[siblingIndex] = tree.nodes[level][index - 1];
+        proofIndex |= uint256(1) << siblingIndex;
+        ++siblingIndex;
+      } else if (index + 1 < levelSize) {
+        siblings[siblingIndex] = tree.nodes[level][index + 1];
+        ++siblingIndex;
+      }
+      index >>= 1;
+      levelSize = (levelSize + 1) >> 1;
+    }
+  }
+
   // ========== Tree internals ==========
 
   function _tree(uint8 treeId) private view returns (Tree storage) {
@@ -224,6 +276,7 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     Tree storage tree = _trees[treeId];
     leafIndex = tree.size;
     uint256 newSize = leafIndex + 1;
+    if (newSize > MAX_LEAF_COUNT) revert TreeCapacityExceeded();
     uint256 treeDepth = tree.depth;
     // The depth is ceil(log2(size)); one more leaf raises it by at most one level.
     if ((uint256(1) << treeDepth) < newSize) {

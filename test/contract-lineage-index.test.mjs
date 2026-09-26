@@ -41,6 +41,24 @@ async function expectTreesMirrored(lineageIndex) {
     expect(await lineageIndex.root(treeId), `tree ${treeId} root`).to.equal(expectedRoot);
     expect(await lineageIndex.size(treeId), `tree ${treeId} size`).to.equal(BigInt(tree.size));
     expect(await lineageIndex.depth(treeId), `tree ${treeId} depth`).to.equal(BigInt(tree.depth));
+
+    // zk-kit skips absent right siblings and compacts the proof index accordingly. Compare
+    // every on-chain proof, including cleared (zero-valued) leaves, with its reference proof.
+    for (let leafIndex = 0; leafIndex < tree.size; leafIndex += 1) {
+      const expected = tree.generateProof(leafIndex);
+      const actual = await lineageIndex.getMerkleProof(treeId, leafIndex);
+      expect(actual.leaf, `tree ${treeId} leaf ${leafIndex}`).to.equal(expected.leaf);
+      expect(actual.proofRoot, `tree ${treeId} proof root ${leafIndex}`).to.equal(expected.root);
+      expect(actual.proofIndex, `tree ${treeId} proof index ${leafIndex}`).to.equal(
+        BigInt(expected.index),
+      );
+      expect(actual.proofDepth, `tree ${treeId} proof depth ${leafIndex}`).to.equal(
+        BigInt(expected.siblings.length),
+      );
+      expect([...actual.siblings], `tree ${treeId} siblings ${leafIndex}`).to.deep.equal(
+        expected.siblings,
+      );
+    }
   }
 }
 
@@ -174,11 +192,18 @@ describe("DeepFamily lineage index", function () {
     expect(switchedIndex).to.equal(endorsementIndex);
 
     await (await deepFamily.connect(third).endorseVersion(family.rootHash, 1)).wait();
+    await (await deepFamily.connect(manager).endorseVersion(family.childHash, 1)).wait();
+    await expectTreesMirrored(lineageIndex);
+    const rightmostEndorsement = await lineageIndex.getMerkleProof(ENDORSEMENT_TREE, 2);
+    expect(rightmostEndorsement.proofDepth).to.equal(1n);
+    expect(rightmostEndorsement.proofIndex).to.equal(1n);
     await (await deepFamily.connect(second).cancelEndorsement(family.childHash)).wait();
     await expectTreesMirrored(lineageIndex);
     expect(
       (await replayedTree(lineageIndex, ENDORSEMENT_TREE)).leaves[Number(endorsementIndex)],
     ).to.equal(0n);
+    const endorsementWithZeroSibling = await lineageIndex.getMerkleProof(ENDORSEMENT_TREE, 1);
+    expect(endorsementWithZeroSibling.siblings[0]).to.equal(0n);
     // Endorsing again after a cancellation reuses the cleared slot.
     await (await deepFamily.connect(second).endorseVersion(family.childHash, 1)).wait();
     const [, reusedIndex] = await lineageIndex.endorsementLeafIndex(
@@ -213,6 +238,70 @@ describe("DeepFamily lineage index", function () {
     );
     expect(readdedIndex).to.equal(secondTrustedIndex);
     await expectTreesMirrored(lineageIndex);
+  });
+
+  it("distinguishes absent right siblings from present zero-valued siblings", async () => {
+    const { deepFamily, lineageIndex, signers } = await setup();
+    const [manager, second, third] = signers;
+    const personHash = await addPerson(hre.ethers, deepFamily, manager, undefined, {
+      person: makeTestPerson("Proof Edge Cases", { derivedSecretField: 3001n }),
+      tag: "proof-edge-cases",
+    });
+    await (
+      await deepFamily.connect(manager).addTrustedEndorser(personHash, 1, second.address)
+    ).wait();
+    await (
+      await deepFamily.connect(manager).addTrustedEndorser(personHash, 1, third.address)
+    ).wait();
+    await expectTreesMirrored(lineageIndex);
+
+    const rightmost = await lineageIndex.getMerkleProof(TRUSTED_TREE, 2);
+    expect(await lineageIndex.depth(TRUSTED_TREE)).to.equal(2n);
+    expect(rightmost.proofDepth).to.equal(1n);
+    expect(rightmost.proofIndex).to.equal(1n);
+    expect(rightmost.siblings).to.have.length(1);
+
+    await (
+      await deepFamily.connect(manager).removeTrustedEndorser(personHash, 1, manager.address)
+    ).wait();
+    await expectTreesMirrored(lineageIndex);
+    const zeroSibling = await lineageIndex.getMerkleProof(TRUSTED_TREE, 1);
+    expect(zeroSibling.leaf).to.not.equal(0n);
+    expect(zeroSibling.proofDepth).to.equal(2n);
+    expect(zeroSibling.siblings[0]).to.equal(0n);
+    expect(zeroSibling.siblings).to.have.length(2);
+
+    await (
+      await deepFamily.connect(manager).addTrustedEndorser(personHash, 1, manager.address)
+    ).wait();
+    expect(await lineageIndex.size(TRUSTED_TREE)).to.equal(3n);
+    await expectTreesMirrored(lineageIndex);
+  });
+
+  it("rejects invalid tree IDs and leaf indices", async () => {
+    const { deepFamily, lineageIndex, signers } = await setup();
+    await expect(lineageIndex.getMerkleProof(2, 0)).to.be.revertedWithCustomError(
+      lineageIndex,
+      "InvalidTreeId",
+    );
+    await expect(lineageIndex.getMerkleProof(ENDORSEMENT_TREE, 0)).to.be.revertedWithCustomError(
+      lineageIndex,
+      "InvalidLeafIndex",
+    );
+    await expect(lineageIndex.getMerkleProof(TRUSTED_TREE, 0)).to.be.revertedWithCustomError(
+      lineageIndex,
+      "InvalidLeafIndex",
+    );
+
+    await addPerson(hre.ethers, deepFamily, signers[0], undefined, {
+      person: makeTestPerson("One Proof Leaf", { derivedSecretField: 3002n }),
+      tag: "one-proof-leaf",
+    });
+    expect(await lineageIndex.size(TRUSTED_TREE)).to.equal(1n);
+    await expect(lineageIndex.getMerkleProof(TRUSTED_TREE, 1)).to.be.revertedWithCustomError(
+      lineageIndex,
+      "InvalidLeafIndex",
+    );
   });
 
   it("keeps a replaced root verifiable for one hour only", async () => {

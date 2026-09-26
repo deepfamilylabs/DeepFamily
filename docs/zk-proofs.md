@@ -311,7 +311,8 @@ mother and be endorsed by a trusted endorser (recommended source) of the root ve
 
 `DeepFamilyLineageIndex` mirrors public DeepFamily state in two Poseidon LeanIMTs. They follow zk-kit
 semantics: a node hash is `Poseidon2(left, right)`, a node without a right sibling rises unchanged,
-and the maximum depth is 32.
+and the maximum depth is 32. The index rejects appends beyond `2^32` cumulative leaf slots per tree;
+clearing a leaf retains its slot.
 
 ```text
 DOMAIN_INHERITANCE_CREDENTIAL   = 1005
