@@ -1153,7 +1153,9 @@ cancelling it or removing a trusted endorser writes zero into the leaf. Leaves a
 
 The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
 without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its
-path without caller-supplied siblings and concurrent writes never invalidate each other.
+path without caller-supplied siblings and concurrent writes never invalidate each other. Each tree
+accepts at most `2^32` leaf slots, matching the claim circuit's maximum proof depth; clearing a
+leaf does not free its slot.
 
 ```solidity
 function root(uint8 treeId) external view returns (uint256);
@@ -1166,6 +1168,13 @@ function endorsementLeafIndex(bytes32 personHash, address endorser)
     external view returns (bool exists, uint256 leafIndex);
 function trustedLeafIndex(bytes32 personHash, uint256 versionIndex, address account)
     external view returns (bool exists, uint256 leafIndex);
+function getMerkleProof(uint8 treeId, uint256 leafIndex) external view returns (
+    uint256 leaf,
+    uint256 proofRoot,
+    uint256 proofIndex,
+    uint256 proofDepth,
+    uint256[] memory siblings
+);
 
 event LeafWritten(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
 event VersionIndexed(
@@ -1176,6 +1185,18 @@ event VersionIndexed(
     uint256 motherIdentityCommitment
 );
 ```
+
+`getMerkleProof` reads the current tree state for an allocated `leafIndex` and returns its leaf
+value, current root, compact path index, sibling count, and sibling hashes in leaf-to-root order.
+It rejects an invalid tree id or an index outside `size(treeId)`. Like zk-kit LeanIMT, it omits
+levels without a right sibling: that node rises unchanged, and neither a sibling nor a direction
+bit is added. Thus `proofDepth == siblings.length`, and `proofIndex` packs directions only for the
+returned siblings: bit `k` is one when the running node is the right child of `siblings[k]`.
+`proofIndex` can differ from `leafIndex`. An allocated leaf cleared to zero still occupies its slot
+and can be a sibling in another proof. The read visits at most 32 tree levels and does not write
+storage. A targeted RPC call reveals `treeId` and `leafIndex` to the RPC provider, which can
+correlate the index with public `LeafWritten` events. The current client instead rebuilds both
+trees from full event scans.
 
 `isKnownRoot` accepts the current root, or a root replaced at most `ROOT_HISTORY_WINDOW` (1 hour)
 ago, so a proof built just before another write still verifies. Only the proxy may call the
