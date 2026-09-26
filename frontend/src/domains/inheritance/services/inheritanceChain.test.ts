@@ -235,15 +235,15 @@ describe("findHeirLegitimacy", () => {
     expect(found[0]).toMatchObject({
       versionIndex: 1,
       rootIsMother: false,
-      endorsementLeafIndex: 1,
-      trustedLeafIndex: 1,
+      endorsementLeafIndex: 1n,
+      trustedLeafIndex: 1n,
       writtenAt: 200n,
     });
     expect(found[1]).toMatchObject({
       versionIndex: 2,
       rootIsMother: true,
-      endorsementLeafIndex: 0,
-      trustedLeafIndex: 0,
+      endorsementLeafIndex: 0n,
+      trustedLeafIndex: 0n,
       writtenAt: 300n,
     });
   });

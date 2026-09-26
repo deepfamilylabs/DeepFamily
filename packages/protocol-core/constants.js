@@ -59,7 +59,7 @@ export const DOMAIN_LINEAGE_PARENTS = 1009n;
 // Lineage index trees mirror DeepFamily's endorsement and trusted-endorser state as LeanIMTs.
 export const LINEAGE_ENDORSEMENT_TREE_ID = 0;
 export const LINEAGE_TRUSTED_TREE_ID = 1;
-export const LINEAGE_TREE_MAX_DEPTH = 32;
+export const LINEAGE_TREE_MAX_DEPTH = 64;
 export const INHERITANCE_PERIOD_SECONDS = 2_592_000n;
 
 export const SNARK_SCALAR_FIELD = BigInt(

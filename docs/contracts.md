@@ -1154,7 +1154,7 @@ cancelling it or removing a trusted endorser writes zero into the leaf. Leaves a
 The trees follow zk-kit LeanIMT semantics: a node hash is `PoseidonT3(left, right)` and a node
 without a right sibling rises unchanged. Every node stays in storage, so a write recomputes its
 path without caller-supplied siblings and concurrent writes never invalidate each other. Each tree
-accepts at most `2^32` leaf slots, matching the claim circuit's maximum proof depth; clearing a
+accepts at most `2^64` leaf slots, matching the claim circuit's maximum proof depth; clearing a
 leaf does not free its slot.
 
 ```solidity
@@ -1193,7 +1193,7 @@ levels without a right sibling: that node rises unchanged, and neither a sibling
 bit is added. Thus `proofDepth == siblings.length`, and `proofIndex` packs directions only for the
 returned siblings: bit `k` is one when the running node is the right child of `siblings[k]`.
 `proofIndex` can differ from `leafIndex`. An allocated leaf cleared to zero still occupies its slot
-and can be a sibling in another proof. The read visits at most 32 tree levels and does not write
+and can be a sibling in another proof. The read visits at most 64 tree levels and does not write
 storage. A targeted RPC call reveals `treeId` and `leafIndex` to the RPC provider, which can
 correlate the index with public `LeafWritten` events. The current client instead rebuilds both
 trees from full event scans.

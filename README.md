@@ -225,7 +225,7 @@ any developer or CI machine and records no ceremony evidence; these keys are uns
 production.
 
 Production setup uses the pinned public Phase 1 pTau committed at
-`circuits/ptau/powersOfTau28_hez_final_15.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
+`circuits/ptau/ppot_0080_16.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
 command that reads it checks its byte length and both pinned hashes first; none downloads it.
 
 Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
@@ -274,7 +274,7 @@ Production release is blocked until the development Groth16 keys have been repla
 `npm run zk:production:setup`, the generated artifacts have been reviewed and committed together,
 `npm run release:preflight` passes from that clean commit, and the exact release commit produces an
 eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default setup reuses the
-pinned public power-13 pTau and records one local Phase 2 contributor under the explicit
+pinned public power-16 pTau and records one local Phase 2 contributor under the explicit
 `single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
 a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
 A successful, self-validated rehearsal automatically publishes the exact schema-v5 evidence to the

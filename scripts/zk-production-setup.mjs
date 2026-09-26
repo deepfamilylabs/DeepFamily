@@ -22,7 +22,7 @@ Creates every production Groth16 proving key with:
   - one finalization beacon generated only after every contribution;
   - a schema-validated single-operator transcript and production manifest.
 
-The Phase 1 file is read from circuits/ptau/powersOfTau28_hez_final_15.ptau, or from
+The Phase 1 file is read from circuits/ptau/ppot_0080_16.ptau, or from
 ZK_PTAU_PATH when set. Neither form downloads it.
 
 The default command requires a development manifest and refuses to overwrite production artifacts.

@@ -8,7 +8,7 @@
     "parents": "1009"
   },
   "periodSeconds": "2592000",
-  "treeMaxDepth": 32,
+  "treeMaxDepth": 64,
   "root": {
     "fullName": "Root Ancestor",
     "derivedSecretField": "111111",

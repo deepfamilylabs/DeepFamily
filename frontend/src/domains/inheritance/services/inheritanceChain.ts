@@ -195,7 +195,7 @@ export async function loadLineageSnapshot(
     [TRUSTED_TREE, trustedTree],
   ] as const) {
     const onChain = BigInt(await lineageIndex.root(treeId, { blockTag: blockNumber }));
-    const rebuilt = tree.size === 0 ? 0n : tree.root;
+    const rebuilt = tree.sizeBigInt === 0n ? 0n : tree.root;
     if (onChain !== rebuilt) {
       throw new InheritanceError(
         "snapshotMismatch",
@@ -265,8 +265,8 @@ export type HeirLegitimacy = {
   motherIdentityCommitment: bigint;
   rootIsMother: boolean;
   endorser: string;
-  endorsementLeafIndex: number;
-  trustedLeafIndex: number;
+  endorsementLeafIndex: bigint;
+  trustedLeafIndex: bigint;
   writtenAt: bigint;
 };
 
@@ -331,8 +331,8 @@ export function findHeirLegitimacy({
       motherIdentityCommitment: version.motherIdentityCommitment,
       rootIsMother: !fatherIsRoot,
       endorser,
-      endorsementLeafIndex,
-      trustedLeafIndex,
+      endorsementLeafIndex: BigInt(endorsementLeafIndex),
+      trustedLeafIndex: BigInt(trustedLeafIndex),
       writtenAt: endorsement.timestamp,
     });
   }
