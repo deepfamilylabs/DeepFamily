@@ -1,4 +1,9 @@
 import type { Groth16Proof } from "../shared/zk/zk";
+import {
+  generateShieldedProof,
+  type ShieldedCircuitName,
+  type ShieldedWitness,
+} from "../shared/zk/shieldedZk";
 import type {
   DisclosureBindingProofParameters,
   InheritanceClaimWitness,
@@ -32,6 +37,14 @@ type ZkWorkerMethods = {
   };
   generateInheritanceClaimProof: {
     params: { witness: InheritanceClaimWitness };
+    result: { proof: Groth16Proof; publicSignals: string[] };
+  };
+  generateShieldedProof: {
+    params: {
+      circuit: ShieldedCircuitName;
+      witness: ShieldedWitness;
+      expectedPublicSignals: string[];
+    };
     result: { proof: Groth16Proof; publicSignals: string[] };
   };
 };
@@ -84,6 +97,7 @@ const handlers: {
     assertDescriptorPurpose("InheritanceClaim");
     return await generateInheritanceClaimProof(witness);
   },
+  generateShieldedProof: async (parameters) => await generateShieldedProof(parameters),
 };
 
 self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) => {
