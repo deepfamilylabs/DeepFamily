@@ -1,0 +1,409 @@
+import {
+  SHIELDED_POOL_ACTION,
+  buildLineageMerkleProof,
+  buildShieldedPoolPublicSignals,
+  computeIdentityFromDerivedSecret,
+  computeShieldedBudgetNoteCommitment,
+  computeShieldedCiphertextHashField,
+  computeShieldedClaimBatch,
+  computeShieldedDummyInputNullifier,
+  computeShieldedDummyPeriodNullifier,
+  computeShieldedEnrollmentCommitment,
+  computeShieldedPeriodNullifier,
+  computeShieldedPolicyCommitment,
+  computeShieldedSpendNullifier,
+  computeShieldedValueNoteCommitment,
+  decryptShieldedNote,
+  deriveShieldedHeirKeyMaterial,
+  deriveShieldedViewPublicKey,
+  encodeShieldedBudgetNotePayload,
+  encodeShieldedValueNotePayload,
+  encryptShieldedNote,
+  generateShieldedRandomField,
+  verifyShieldedNotePayload,
+  type ShieldedBudgetNotePayload,
+  type ShieldedValueNotePayload,
+} from "@deepfamily/protocol-core";
+import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
+import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
+import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
+import {
+  findHeirLegitimacy,
+  type HeirLegitimacy,
+  type LineageSnapshot,
+} from "./inheritanceChain";
+import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
+import {
+  getRecoveredShieldedNoteProof,
+  type LocalShieldedWalletSnapshot,
+} from "./shieldedWalletRecovery";
+
+const MAX_UINT64 = (1n << 64n) - 1n;
+const ZERO_PERIODS = Array<bigint>(12).fill(0n);
+
+type ClaimOutput<T> = {
+  /** Plaintext stays on this device; only commitment and ciphertext are submitted. */
+  note: T;
+  commitment: bigint;
+  ciphertext: Uint8Array;
+  ciphertextHashField: bigint;
+};
+
+export type PrepareShieldedClaimInput = {
+  chainId: BigNumberish;
+  poolAddress: string;
+  identity: IdentityMaterialV1Result;
+  wallet: LocalShieldedWalletSnapshot;
+  /** Reconstructed from unfiltered public events; refresh roots before submission. */
+  lineage: LineageSnapshot;
+  budgetCommitment: BigNumberish;
+  /** Current chain timestamp used as public asOf; the pool enforces its recency. */
+  asOf: BigNumberish;
+  /** Strictly increasing, due period indices, with 1–12 entries. */
+  periodIndices: readonly BigNumberish[];
+  /** Optional choice when several current direct-child endorsements are valid. */
+  source?: { endorser: string; versionIndex: number };
+};
+
+export type PreparedShieldedClaim = {
+  amount: bigint;
+  policyCommitment: bigint;
+  data: ShieldedPoolActionData;
+  witness: ShieldedWitness;
+  outputs: readonly [
+    ClaimOutput<ShieldedBudgetNotePayload>,
+    ClaimOutput<ShieldedValueNotePayload>,
+  ];
+};
+
+function checkedUint64(value: BigNumberish, label: string): bigint {
+  const parsed = getBigInt(value);
+  if (parsed < 0n || parsed > MAX_UINT64) throw new Error(`${label} must fit in uint64`);
+  return parsed;
+}
+
+function sameWallet(
+  wallet: LocalShieldedWalletSnapshot,
+  chainId: bigint,
+  poolAddress: string,
+  ownerCommitment: bigint,
+  identityCommitment: bigint,
+): void {
+  if (
+    wallet.invalidated ||
+    wallet.chainId !== chainId ||
+    wallet.poolAddress.toLowerCase() !== poolAddress.toLowerCase() ||
+    wallet.walletOwnerCommitment !== ownerCommitment ||
+    (wallet.walletIdentityCommitment !== undefined &&
+      wallet.walletIdentityCommitment !== identityCommitment)
+  ) {
+    throw new Error("Shielded wallet does not match this identity, chain, or pool");
+  }
+}
+
+function currentSource(
+  lineage: LineageSnapshot,
+  heir: { personHash: string; identityCommitment: bigint },
+  note: { rootIdentityCommitment: bigint; rootVersionIndex: bigint },
+  selected?: PrepareShieldedClaimInput["source"],
+): HeirLegitimacy {
+  if (note.rootVersionIndex > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error("Root version index is outside the local lineage index range");
+  }
+  const candidates = findHeirLegitimacy({
+    snapshot: lineage,
+    heir,
+    root: { identityCommitment: note.rootIdentityCommitment },
+    rootVersionIndex: Number(note.rootVersionIndex),
+  });
+  const source = selected
+    ? candidates.find((candidate) =>
+        candidate.versionIndex === selected.versionIndex &&
+        candidate.endorser.toLowerCase() === selected.endorser.toLowerCase(),
+      )
+    : candidates[0];
+  if (!source) {
+    throw new Error("No current direct-child endorsement and trusted source match this budget");
+  }
+  return source;
+}
+
+async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedValueNotePayload>(
+  note: T,
+  encode: (value: T) => Uint8Array,
+  commitment: (ciphertextHashField: bigint) => bigint,
+  viewingKey: Uint8Array,
+  hpkeIkm: string,
+  chainId: bigint,
+  poolAddress: string,
+): Promise<ClaimOutput<T>> {
+  const payload = encode(note);
+  let opened: Uint8Array | undefined;
+  try {
+    const ciphertext = await encryptShieldedNote({
+      recipientPublicKey: viewingKey,
+      payload,
+      chainId,
+      poolAddress,
+    });
+    const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
+    const noteCommitment = commitment(ciphertextHashField);
+    opened = await decryptShieldedNote({
+      hpkeIkm: getBytes(hpkeIkm),
+      ciphertext,
+      chainId,
+      poolAddress,
+    });
+    const recovered = verifyShieldedNotePayload({
+      payload: opened,
+      ciphertext,
+      noteCommitment,
+    });
+    if (recovered.noteCommitment !== noteCommitment) {
+      throw new Error("Locally encrypted claim output does not match its commitment");
+    }
+    return { note, commitment: noteCommitment, ciphertext, ciphertextHashField };
+  } finally {
+    payload.fill(0);
+    opened?.fill(0);
+  }
+}
+
+/**
+ * Build a claim entirely from local plaintext and locally replayed public trees.
+ * Load a fresh lineage snapshot and chain timestamp before proving. A lineage
+ * write after that snapshot changes the current roots and requires preparing
+ * again. The witness and private notes must never be sent to a server or RPC.
+ */
+export async function prepareShieldedClaim(
+  input: PrepareShieldedClaimInput,
+): Promise<PreparedShieldedClaim> {
+  const chainId = checkedUint64(input.chainId, "chainId");
+  const poolAddress = getAddress(input.poolAddress);
+  const asOf = checkedUint64(input.asOf, "asOf");
+  const material = computeIdentityFromDerivedSecret({
+    identity: input.identity.identity,
+    identitySuiteId: input.identity.identitySuiteId,
+    derivedSecretField: input.identity.derivedSecretField,
+  });
+  if (
+    material.identityCommitment !== BigInt(input.identity.identityCommitment) ||
+    material.nameField !== BigInt(input.identity.nameField) ||
+    material.packedBirthGenderField !== BigInt(input.identity.packedBirthGenderField) ||
+    material.suiteCommitment !== BigInt(input.identity.suiteCommitment) ||
+    material.personHash.toLowerCase() !== input.identity.personHash.toLowerCase()
+  ) {
+    throw new Error("Identity material does not match the passphrase-derived secret");
+  }
+  const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
+  sameWallet(
+    input.wallet,
+    chainId,
+    poolAddress,
+    keys.ownerCommitment,
+    material.identityCommitment,
+  );
+  const budgetCommitment = getBigInt(input.budgetCommitment);
+  const owned = input.wallet.ownedNotes.get(budgetCommitment);
+  if (!owned || owned.note.kind !== "budget") {
+    throw new Error("Input must be a locally recovered budget note");
+  }
+  const budget = owned.note;
+  if (
+    budget.heirIdentityCommitment !== material.identityCommitment ||
+    budget.heirOwnerCommitment !== keys.ownerCommitment
+  ) {
+    throw new Error("Budget note belongs to another heir");
+  }
+  const budgetCiphertextHash = computeShieldedCiphertextHashField(owned.ciphertext);
+  const policyCommitment = computeShieldedPolicyCommitment(budget);
+  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
+    policyCommitment,
+    heirIdentityCommitment: budget.heirIdentityCommitment,
+    eligibleFrom: budget.eligibleFrom,
+    enrollmentSalt: budget.enrollmentSalt,
+  });
+  if (
+    budgetCiphertextHash !== owned.ciphertextHashField ||
+    computeShieldedBudgetNoteCommitment({
+      policyCommitment,
+      enrollmentCommitment,
+      heirOwnerCommitment: budget.heirOwnerCommitment,
+      amountPerPeriod: budget.amountPerPeriod,
+      remaining: budget.remaining,
+      nonce: budget.nonce,
+      ciphertextHashField: budgetCiphertextHash,
+    }) !== budgetCommitment
+  ) {
+    throw new Error("Budget note does not match its public ciphertext and commitment");
+  }
+  const spend = computeShieldedSpendNullifier({
+    ownerSecret: keys.ownerSecret,
+    noteCommitment: budgetCommitment,
+  });
+  const dummySpend = computeShieldedDummyInputNullifier({
+    ownerSecret: keys.ownerSecret,
+    noteCommitment: budgetCommitment,
+  });
+  if (input.wallet.spentNullifiers.has(spend) || input.wallet.spentNullifiers.has(dummySpend)) {
+    throw new Error("Budget note has already been spent");
+  }
+  const batch = computeShieldedClaimBatch({
+    amountPerPeriod: budget.amountPerPeriod,
+    remaining: budget.remaining,
+    eligibleFrom: budget.eligibleFrom,
+    now: asOf,
+    periodIndices: [...input.periodIndices],
+  });
+  const periodNullifiers = ZERO_PERIODS.map((_, slot) =>
+    slot < batch.periodIndices.length
+      ? computeShieldedPeriodNullifier({
+          derivedSecretField: material.derivedSecretField,
+          policyCommitment,
+          periodIndex: batch.periodIndices[slot],
+        })
+      : computeShieldedDummyPeriodNullifier({
+          ownerSecret: keys.ownerSecret,
+          budgetNoteCommitment: budgetCommitment,
+          slotIndex: slot,
+        }),
+  );
+  if (periodNullifiers.some((tag) => input.wallet.spentNullifiers.has(tag))) {
+    throw new Error("A requested claim period has already been used");
+  }
+  const source = currentSource(
+    input.lineage,
+    { personHash: material.personHash, identityCommitment: material.identityCommitment },
+    budget,
+    input.source,
+  );
+  if (source.writtenAt > asOf) {
+    throw new Error("Current endorsement was written after the selected claim time");
+  }
+  const endorsement = buildLineageMerkleProof(
+    input.lineage.endorsementTree,
+    source.endorsementLeafIndex,
+  );
+  const trusted = buildLineageMerkleProof(
+    input.lineage.trustedTree,
+    source.trustedLeafIndex,
+  );
+  if (endorsement.root === 0n || trusted.root === 0n) {
+    throw new Error("Both current lineage roots must be nonzero");
+  }
+  const path = getRecoveredShieldedNoteProof(input.wallet, budgetCommitment);
+  const budgetOutput: ShieldedBudgetNotePayload = {
+    rootIdentityCommitment: budget.rootIdentityCommitment,
+    rootVersionIndex: budget.rootVersionIndex,
+    policySalt: budget.policySalt,
+    allocationKeyCommitment: budget.allocationKeyCommitment,
+    heirIdentityCommitment: budget.heirIdentityCommitment,
+    eligibleFrom: budget.eligibleFrom,
+    enrollmentSalt: budget.enrollmentSalt,
+    heirOwnerCommitment: budget.heirOwnerCommitment,
+    amountPerPeriod: budget.amountPerPeriod,
+    remaining: batch.remaining,
+    nonce: generateShieldedRandomField(),
+  };
+  const payoutOutput: ShieldedValueNotePayload = {
+    ownerCommitment: keys.ownerCommitment,
+    amount: batch.amount,
+    nonce: generateShieldedRandomField(),
+  };
+  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+  const outputs = await Promise.all([
+    encryptOwnOutput(
+      budgetOutput,
+      encodeShieldedBudgetNotePayload,
+      (ciphertextHashField) => computeShieldedBudgetNoteCommitment({
+        policyCommitment,
+        enrollmentCommitment,
+        heirOwnerCommitment: keys.ownerCommitment,
+        amountPerPeriod: budget.amountPerPeriod,
+        remaining: batch.remaining,
+        nonce: budgetOutput.nonce,
+        ciphertextHashField,
+      }),
+      viewingKey,
+      keys.hpkeIkm,
+      chainId,
+      poolAddress,
+    ),
+    encryptOwnOutput(
+      payoutOutput,
+      encodeShieldedValueNotePayload,
+      (ciphertextHashField) => computeShieldedValueNoteCommitment({
+        ...payoutOutput,
+        ciphertextHashField,
+      }),
+      viewingKey,
+      keys.hpkeIkm,
+      chainId,
+      poolAddress,
+    ),
+  ]) as [ClaimOutput<ShieldedBudgetNotePayload>, ClaimOutput<ShieldedValueNotePayload>];
+  const data = {
+    inputShardIds: [path.shardId, path.shardId],
+    inputRoots: [path.root, path.root],
+    inputNullifiers: [spend, dummySpend],
+    periodNullifiers,
+    outputCommitments: [outputs[0].commitment, outputs[1].commitment],
+    outputCiphertexts: [outputs[0].ciphertext, outputs[1].ciphertext],
+    relation0: endorsement.root,
+    relation1: trusted.root,
+    asOf,
+    registryRoot: 0n,
+    registryShardId: 0n,
+  } satisfies ShieldedPoolActionData;
+  const publicSignals = buildShieldedPoolPublicSignals({
+    action: SHIELDED_POOL_ACTION.Claim,
+    chainId,
+    poolAddress,
+    ...data,
+  });
+  const decimal = (values: readonly bigint[]) => values.map(String);
+  const witness: ShieldedWitness = {
+    publicSignals: decimal(publicSignals),
+    nameField: String(material.nameField),
+    derivedSecretField: String(material.derivedSecretField),
+    isBirthBC: Number(material.identity.isBirthBC),
+    birthYear: material.identity.birthYear,
+    birthMonth: material.identity.birthMonth,
+    birthDay: material.identity.birthDay,
+    gender: material.identity.gender,
+    suiteId: material.identitySuiteId,
+    versionIndex: String(source.versionIndex),
+    fatherIdentityCommitment: String(source.fatherIdentityCommitment),
+    motherIdentityCommitment: String(source.motherIdentityCommitment),
+    rootIsMother: Number(source.rootIsMother),
+    endorser: String(BigInt(source.endorser)),
+    writtenAt: String(source.writtenAt),
+    endorsementDepth: endorsement.depth,
+    endorsementIndex: String(endorsement.index),
+    endorsementSiblings: decimal(endorsement.siblings),
+    rootVersionIndex: String(budget.rootVersionIndex),
+    trustedDepth: trusted.depth,
+    trustedIndex: String(trusted.index),
+    trustedSiblings: decimal(trusted.siblings),
+    policySalt: String(budget.policySalt),
+    allocationKeyCommitment: String(budget.allocationKeyCommitment),
+    enrollmentSalt: String(budget.enrollmentSalt),
+    eligibleFrom: String(budget.eligibleFrom),
+    rate: String(budget.amountPerPeriod),
+    remaining: String(budget.remaining),
+    remainingPeriods: String(budget.remaining / budget.amountPerPeriod),
+    budgetNonce: String(budget.nonce),
+    budgetCiphertextHash: String(budgetCiphertextHash),
+    noteDepth: path.proofDepth,
+    noteIndex: String(path.proofIndex),
+    noteSiblings: decimal(path.siblings),
+    claimCount: String(batch.periodIndices.length),
+    periodIndices: decimal([
+      ...batch.periodIndices,
+      ...Array<bigint>(12 - batch.periodIndices.length).fill(0n),
+    ]),
+    newBudgetNonce: String(budgetOutput.nonce),
+    payoutNonce: String(payoutOutput.nonce),
+  };
+  return { amount: batch.amount, policyCommitment, data, witness, outputs };
+}

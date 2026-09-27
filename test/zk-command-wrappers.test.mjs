@@ -29,7 +29,7 @@ const inspectFixtureCompiler = async ({ root, platform }) => ({
 });
 
 describe("public ZK command surface", function () {
-  it("exposes only the seven supported top-level npm commands", function () {
+  it("exposes the reviewed legacy and shielded top-level npm commands", function () {
     const packageJson = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     );
@@ -37,6 +37,12 @@ describe("public ZK command surface", function () {
       [
         "zk:fetch",
         "zk:build",
+        "zk:shielded:build",
+        "zk:shielded:development:setup",
+        "zk:shielded:development:proof-smoke",
+        "zk:shielded:testnet:rehearsal",
+        "zk:shielded:testnet:receipts",
+        "zk:shielded:release:check",
         "zk:development:setup",
         "zk:production:setup",
         "zk:check",
