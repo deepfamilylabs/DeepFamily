@@ -24,7 +24,7 @@ frontend/src/
 ├── pages/       # Route-level composition; imports from domains + shared only
 ├── domains/     # Feature code grouped by bounded context
 │   ├── config/        # Network/contract config context and UI
-│   ├── inheritance/   # Family inheritance: set up, top up, claim with a ZK proof
+│   ├── inheritance/   # Shared private DEEP pool: deposits, allocations, claims, exits
 │   ├── wallet/        # Wallet + network selection
 │   ├── person/        # Person model, queries, UI coordination
 │   ├── tree/          # Family-tree context/queries/selectors/services and view UI
@@ -222,39 +222,13 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
   - Toggle hidden via env (`VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE=0`) → filtering is forced on and cannot be turned off in the UI.
 - **Where it lives**: the allowlist fetch and per-node predicate live in `domains/tree/context/useTreeGraphState.ts`; pruning runs during traversal (`domains/tree/services/treeTraversalOrchestrator.ts`) and is enforced again at projection time (`domains/tree/selectors/buildViewGraph.ts`), so hidden versions never leak into the view even from shared edge caches.
 
-### Family inheritance
+### Shielded family inheritance
 
-`/inheritance` (`pages/InheritancePage.tsx`) composes the `inheritance` domain with the person
-domain's identity form. It has three tabs:
+`/inheritance` uses `ShieldedDeepPool` and `ShieldedHeirKeyRegistry`. The page derives shielded spend and viewing keys from the existing identity passphrase on the device, reads public note and lineage events, opens matching ciphertexts locally, and creates proofs in the ZK worker. It presents key registration, a public `shield` deposit, private policy creation and child allocation, private top-ups and claims, private transfers, and a separate public exit.
 
-- **Set up**: derives the root person's identity from the form, confirms from the replayed
-  `VersionIndexed` events that the root version exists (a wrong passphrase gives an identity that
-  has none), shows the number of recommended sources, and only then approves DEEP and calls
-  `createInheritance` with the credential. The per-period amount is pre-filled as
-  `1000 × recentReward × k`.
-- **Top up**: looks up an inheritance by id and deposits into it.
-- **Claim**: derives both the heir's and the root's identity, rebuilds both lineage trees from
-  `LeafWritten` events, verifies the rebuilt roots against the chain at the scanned block, finds the
-  oldest endorsement of the heir by a recommended source of the root version, lists every
-  inheritance under the credential, and for the chosen one builds the witness, proves in the ZK
-  worker, and submits from the connected wallet.
+The pool address and registry address are chain-specific configuration values. The page checks pool/token/lineage/registry wiring and the connected wallet’s chain. The sender pays native gas; the page warns about reusing public wallets, funding a private action wallet directly from a known wallet, immediate exits, and unusual amounts. Public deposits and exits expose amounts and senders or recipients. A local cache can be cleared and reconstructed from all public events, without a private-note or child-specific RPC filter.
 
-The page follows the sensitive-input rule above: identity forms stay uncontrolled, and each action
-reads the passphrases at click time and derives again, so search and claim each derive once and no
-secret survives the click. Search results in React state hold only public data (ids, amounts, dates,
-the found version and endorser). Before any transaction, the page checks that the configured
-`FamilyInheritance` reads the same lineage index DeepFamily writes to and holds the same token, and
-that the wallet is on the configured chain.
-
-Lookups never name a person to the RPC node. `inheritanceChain.ts` fetches logs filtered only by
-contract and event type — lineage `LeafWritten`/`VersionIndexed`, DeepFamily
-`PersonVersionEndorsed`/`TrustedEndorserAdded`/`TrustedEndorserRemoved`, and `InheritanceCreated` —
-and matches the heir and root locally: it recomputes each candidate endorsement and trusted leaf
-and finds it in the replayed trees, so cancelled endorsements and removed recommended sources
-(zeroed leaves) drop out. These scans start at `VITE_DF_EVENT_FROM_BLOCK` and have no chunk budget,
-because a skipped write would rebuild a root the contract never had. The node still sees which
-inheritance ids the page reads and the transactions it sends; the claim itself reveals only the
-proof's public signals and the sending wallet.
+`shieldedWalletRecovery.ts` and the snapshot readers verify roots against the chain while rebuilding the public trees. Funding and claiming check current lineage and registry snapshots before preparing witnesses. They use a 32-level note shard proof and, where needed, 64-level lineage proofs. A reorg or concurrent write can require a fresh scan and proof.
 
 ### Workers (crypto + ZK)
 
@@ -306,7 +280,8 @@ VITE_ROOT_VERSION_INDEX=...
 | `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                                           |
 | `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                                   |
 | `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                         | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
-| `VITE_INHERITANCE_ADDRESS`, `VITE_INHERITANCE_ADDRESS_<chainId>` | FamilyInheritance address for `/inheritance`; the page is disabled without it |
+| `VITE_SHIELDED_POOL_ADDRESS`, `VITE_SHIELDED_POOL_ADDRESS_<chainId>` | Shared shielded DEEP pool address for `/inheritance` |
+| `VITE_SHIELDED_KEY_REGISTRY_ADDRESS`, `VITE_SHIELDED_KEY_REGISTRY_ADDRESS_<chainId>` | Heir viewing-key registry address |
 | `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                                     |
 
 ### Local auto-config
@@ -338,7 +313,7 @@ npm run frontend:check      # lint + legacy-entrypoints + typecheck + build + vi
 npm run dev:all
 ```
 
-This starts a Hardhat node, deploys the integrated system, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:seed`, `frontend:config`, `dev:frontend` individually.
+This starts a Hardhat node, deploys the integrated system and shielded pool with local development proof keys, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:shielded:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 

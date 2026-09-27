@@ -1,192 +1,186 @@
-import { useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useSearchParams } from "react-router-dom";
 import { Wallet } from "lucide-react";
 import { useConfig } from "../domains/config";
-import {
-  InheritanceClaimPanel,
-  InheritanceCreatePanel,
-  InheritanceDepositPanel,
-  InheritanceGate,
-  InheritanceNotice,
-  useInheritanceClaim,
-  useInheritanceCreate,
-  useInheritanceDeposit,
-  useInheritanceModules,
-  type InheritanceBlocker,
-  type InheritanceSession,
-} from "../domains/inheritance";
-import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../domains/person";
+import { ShieldedInheritancePanel, type ShieldedPageModules } from "../domains/inheritance";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
+import {
+  createDeepFamilyContract,
+  createDeepTokenContract,
+  createLineageIndexContract,
+  createShieldedKeyRegistryContract,
+  createShieldedPoolContract,
+} from "../shared/clients/contractFactory";
+import { getReadonlyProvider } from "../shared/clients/providerRegistry";
+import { getShieldedKeyRegistryAddress, getShieldedPoolAddress } from "../shared/config/env";
 import { EmptyState, PageContainer, PageHead } from "../shared/ui";
 
-type InheritanceTab = "create" | "deposit" | "claim";
+type ModulesState =
+  | { status: "loading" }
+  | { status: "unavailable"; message: string }
+  | { status: "ready"; modules: ShieldedPageModules };
 
-const TABS: readonly InheritanceTab[] = ["create", "deposit", "claim"];
-
-function isTab(value: string | null): value is InheritanceTab {
-  return TABS.includes(value as InheritanceTab);
-}
-
-function IdentityForm({
-  formRef,
-  onChange,
-}: {
-  formRef: RefObject<PersonHashCalculatorHandle>;
-  onChange: () => void;
-}) {
-  return (
-    <PersonHashCalculator
-      ref={formRef}
-      showTitle={false}
-      collapsible={false}
-      className="border-0 bg-transparent p-0 shadow-none"
-      onPublicFormChange={onChange}
-      onPassphraseChange={onChange}
-    />
-  );
+function sameAddress(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
 }
 
 export default function InheritancePage() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get("tab");
-  const tab: InheritanceTab = isTab(requestedTab) ? requestedTab : "create";
+  const poolAddress = getShieldedPoolAddress(config.chainId);
+  const registryAddress = getShieldedKeyRegistryAddress(config.chainId);
+  const configurationMissing = t("shielded.configurationMissing");
+  const configurationMismatch = t("shielded.configurationMismatch");
+  const invalidDecimals = t("shielded.invalidDecimals");
+  const unreachable = t("shielded.unreachable");
+  const [state, setState] = useState<ModulesState>({ status: "loading" });
+  // Kept across wallet switches during this page visit so a public deposit or
+  // identity registration wallet cannot be reused immediately for private actions.
+  const publicActivityAddresses = useRef(new Set<string>());
 
-  const modulesState = useInheritanceModules({
-    rpcUrl: config.rpcUrl,
-    chainId: config.chainId,
-    contractAddress: config.contractAddress,
-    tokenAddress: config.tokenAddress,
-  });
-  // Compare against the chain the contracts are read on; a custom RPC has no configured id.
-  const readChainId = modulesState.status === "ready" ? modulesState.modules.chainId : null;
-  const wrongNetwork = Boolean(
-    wallet.address && wallet.chainId && readChainId && wallet.chainId !== readChainId,
-  );
-  const blocker: InheritanceBlocker | null =
-    modulesState.status === "blocked"
-      ? modulesState.blocker
-      : wrongNetwork
-        ? "wrong-network"
-        : null;
+  useEffect(() => {
+    if (
+      !config.rpcUrl ||
+      !config.contractAddress ||
+      !config.tokenAddress ||
+      !poolAddress ||
+      !registryAddress
+    ) {
+      setState({ status: "unavailable", message: configurationMissing });
+      return;
+    }
+    let cancelled = false;
+    setState({ status: "loading" });
+    const load = async () => {
+      const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
+      const deepFamily = createDeepFamilyContract(config.contractAddress, provider);
+      const token = createDeepTokenContract(config.tokenAddress, provider);
+      const pool = createShieldedPoolContract(poolAddress, provider);
+      const registry = createShieldedKeyRegistryContract(registryAddress, provider);
+      const [network, familyIndex, poolIndex, registryIndex, poolToken, poolRegistry, decimals] =
+        await Promise.all([
+          provider.getNetwork(),
+          deepFamily.lineageIndex() as Promise<string>,
+          pool.LINEAGE_INDEX() as Promise<string>,
+          registry.LINEAGE_INDEX() as Promise<string>,
+          pool.TOKEN() as Promise<string>,
+          pool.KEY_REGISTRY() as Promise<string>,
+          token.decimals() as Promise<bigint>,
+        ]);
+      if (
+        !sameAddress(familyIndex, poolIndex) ||
+        !sameAddress(familyIndex, registryIndex) ||
+        !sameAddress(poolToken, config.tokenAddress) ||
+        !sameAddress(poolRegistry, registryAddress)
+      ) {
+        throw new Error(configurationMismatch);
+      }
+      const tokenDecimals = Number(decimals);
+      if (!Number.isSafeInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 36) {
+        throw new Error(invalidDecimals);
+      }
+      if (!cancelled) {
+        setState({
+          status: "ready",
+          modules: {
+            chainId: network.chainId,
+            provider,
+            deepFamily,
+            lineageIndex: createLineageIndexContract(familyIndex, provider),
+            token,
+            pool,
+            registry,
+            poolAddress,
+            tokenDecimals,
+          },
+        });
+      }
+    };
+    void load().catch((error: unknown) => {
+      if (!cancelled) {
+        setState({
+          status: "unavailable",
+          message: error instanceof Error ? error.message : unreachable,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    config.rpcUrl,
+    config.chainId,
+    config.contractAddress,
+    config.tokenAddress,
+    poolAddress,
+    registryAddress,
+    configurationMissing,
+    configurationMismatch,
+    invalidDecimals,
+    unreachable,
+  ]);
 
-  const session = useMemo<InheritanceSession | null>(
+  const wrongNetwork = useMemo(
     () =>
-      modulesState.status === "ready" && wallet.signer && wallet.address && !wrongNetwork
-        ? { modules: modulesState.modules, signer: wallet.signer, account: wallet.address }
-        : null,
-    [modulesState, wallet.signer, wallet.address, wrongNetwork],
+      state.status === "ready" &&
+      wallet.chainId !== null &&
+      BigInt(wallet.chainId) !== state.modules.chainId,
+    [state, wallet.chainId],
   );
-
-  const createRootRef = useRef<PersonHashCalculatorHandle>(null);
-  const claimHeirRef = useRef<PersonHashCalculatorHandle>(null);
-  const claimRootRef = useRef<PersonHashCalculatorHandle>(null);
-  const create = useInheritanceCreate(session, createRootRef);
-  const deposit = useInheritanceDeposit(session);
-  const claim = useInheritanceClaim(session, claimHeirRef, claimRootRef);
-
-  // Leaving a tab unmounts its identity forms, so whatever they fed is stale.
-  const selectTab = (next: InheritanceTab) => {
-    if (next === tab) return;
-    create.reset();
-    claim.reset();
-    const params = new URLSearchParams(searchParams);
-    params.set("tab", next);
-    setSearchParams(params, { replace: true });
-  };
-
-  const head = <PageHead title={t("inheritance.title")} subtitle={t("inheritance.subtitle")} />;
+  const head = <PageHead title={t("shielded.title")} subtitle={t("shielded.subtitle")} />;
 
   if (!wallet.address) {
     return (
       <PageContainer size="narrow" className="space-y-6 py-10">
         {head}
-        <InheritanceNotice />
         <EmptyState
           size="page"
           icon={<Wallet className="h-7 w-7" strokeWidth={1.5} />}
           title={t("inheritance.gate.walletTitle")}
-          description={t("inheritance.gate.walletDescription")}
+          description={t("shielded.connectWallet")}
           action={<WalletConnectButton className="mx-auto" alwaysShowLabel />}
         />
       </PageContainer>
     );
   }
 
-  const disabled = session === null;
-  const recentReward = modulesState.status === "ready" ? modulesState.modules.recentReward : 0n;
-
   return (
     <PageContainer size="narrow" className="space-y-6 py-10">
       {head}
-      <InheritanceNotice />
-      {blocker ? (
-        <InheritanceGate
-          blocker={blocker}
-          onSwitchNetwork={() => {
-            if (readChainId) void wallet.switchOrAddChain(readChainId);
-          }}
+      {state.status === "loading" ? <p role="status">{t("shielded.loading")}</p> : null}
+      {state.status === "unavailable" ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
+        >
+          {state.message}
+        </p>
+      ) : null}
+      {wrongNetwork && state.status === "ready" ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
+        >
+          <p>{t("shielded.wrongNetwork", { chainId: String(state.modules.chainId) })}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-lg border border-hairline px-4 py-2"
+            onClick={() => void wallet.switchOrAddChain(Number(state.modules.chainId))}
+          >
+            {t("inheritance.gate.switchNetwork")}
+          </button>
+        </div>
+      ) : null}
+      {state.status === "ready" && !wrongNetwork && wallet.signer ? (
+        <ShieldedInheritancePanel
+          key={`${state.modules.chainId}:${state.modules.poolAddress}:${wallet.address}`}
+          modules={state.modules}
+          signer={wallet.signer}
+          account={wallet.address}
+          publicActivityAddresses={publicActivityAddresses.current}
         />
       ) : null}
-
-      <div
-        role="tablist"
-        aria-label={t("inheritance.title")}
-        className="inline-flex rounded-xl border border-hairline bg-surface-muted p-1"
-      >
-        {TABS.map((id) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            id={`inheritance-tab-${id}`}
-            aria-selected={tab === id}
-            aria-controls="inheritance-tabpanel"
-            onClick={() => selectTab(id)}
-            className={`h-9 rounded-lg px-4 text-sm font-semibold transition-colors ${
-              tab === id ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-            }`}
-          >
-            {t(`inheritance.tabs.${id}`)}
-          </button>
-        ))}
-      </div>
-
-      <div role="tabpanel" id="inheritance-tabpanel" aria-labelledby={`inheritance-tab-${tab}`}>
-        {tab === "create" ? (
-          <InheritanceCreatePanel
-            rootIdentityForm={<IdentityForm formRef={createRootRef} onChange={create.reset} />}
-            state={create.state}
-            recentReward={recentReward}
-            disabled={disabled}
-            onReview={(input) => void create.review(input)}
-            onConfirm={() => void create.confirm()}
-            onReset={create.reset}
-          />
-        ) : tab === "deposit" ? (
-          <InheritanceDepositPanel
-            state={deposit.state}
-            disabled={disabled}
-            onLookup={(id) => void deposit.lookup(id)}
-            onDeposit={(amount) => void deposit.deposit(amount)}
-            onReset={deposit.reset}
-          />
-        ) : (
-          <InheritanceClaimPanel
-            heirIdentityForm={<IdentityForm formRef={claimHeirRef} onChange={claim.reset} />}
-            rootIdentityForm={<IdentityForm formRef={claimRootRef} onChange={claim.reset} />}
-            state={claim.state}
-            account={wallet.address}
-            disabled={disabled}
-            onSearch={(rootVersionIndex) => void claim.search(rootVersionIndex)}
-            onClaim={(id, recipient) => void claim.claim(id, recipient)}
-            onReset={claim.reset}
-          />
-        )}
-      </div>
     </PageContainer>
   );
 }

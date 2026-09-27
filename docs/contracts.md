@@ -527,7 +527,7 @@ Token
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
 → PoseidonT3/T4/T6 libraries, then DeepFamilyLineageIndex(proxy) linked to T3–T6
 → proxy.setLineageIndex(index) exactly once
-→ FamilyInheritanceClaimVerifier, then FamilyInheritance(token, index, claimVerifier)
+→ ShieldedHeirKeyRegistry and ShieldedDeepPool with action-specific verifier adapters
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
 → verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
   parameterized runtimes, and release-manifest hashes
@@ -1133,7 +1133,7 @@ event MiningReward(address indexed miner, uint256 reward, uint256 totalAdditions
 
 **Location**: `contracts/DeepFamilyLineageIndex.sol`
 **Description**: Immutable companion of the DeepFamily proxy. It mirrors endorsements and trusted
-endorsers (recommended sources) into two Poseidon LeanIMTs so that an inheritance claim can prove
+endorsers (recommended sources) into two Poseidon LeanIMTs so that a shielded claim can prove
 membership without naming the record. Both trees mirror public DeepFamily state in full, so being
 indexed reveals nothing DeepFamily does not already publish.
 **Upgradeability**: None. It binds the proxy in its constructor (`DEEP_FAMILY`), and the proxy binds
@@ -1206,69 +1206,15 @@ the result against `root(treeId)` at the scanned block.
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
 `viaIR` (see `hardhat.config.mjs`); with it, PoseidonT6 exceeds the contract size limit.
 
-## FamilyInheritance.sol - Family Inheritance
+## Shielded inheritance contracts
 
-**Location**: `contracts/FamilyInheritance.sol`
-**Description**: Holds DEEP set aside for the direct children of a root person. A deposit names
-only an opaque credential derived from the root's passphrase; every 30 days a legit child can claim
-a fixed amount with a zero-knowledge proof, without revealing which child they are. There is no
-owner or administrator, and nothing here has legal effect.
-**Upgradeability**: None. `TOKEN`, `LINEAGE_INDEX`, and `CLAIM_VERIFIER` are immutable.
+`ShieldedHeirKeyRegistry` records a person’s viewing key after a zero-knowledge identity proof. Its public registry tree is split into 32-level shards. Registration reveals the person and key, so the registration wallet should not also submit private pool actions.
 
-```solidity
-struct Inheritance {
-  uint256 credential;
-  uint64 startTime;
-  uint192 amountPerPeriod;
-  uint256 balance;
-}
+`ShieldedDeepPool` holds pooled DEEP and a global sequence of encrypted note commitments in 32-level shards. Each action consumes one-time nullifiers and appends two ciphertext commitments. The pool exposes `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Only `shield` and `unshield` reveal a public amount; `unshield` also reveals the recipient. Policy, child, budget, and claim details are proved privately. The two lineage trees remain 64 levels deep.
 
-struct ClaimSignals {
-  uint256 endorsementRoot;
-  uint256 trustedRoot;
-  uint256 claimTag;
-  uint256 eligibleFrom;
-  address recipient;
-}
+Each pool action has its own circuit and `ShieldedGroth16ActionAdapter`; key registration has a separate verifier. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
 
-function createInheritance(uint256 credential, uint256 amountPerPeriod, uint256 amount)
-    external returns (uint256 id);
-function deposit(uint256 id, uint256 amount) external;
-function claim(uint256 id, ClaimSignals calldata signals, bytes calldata proof)
-    external returns (uint256 amount);
-function inheritanceOf(uint256 id) external view returns (Inheritance memory);
-function claimed(uint256 id, uint256 claimTag) external view returns (uint256);
-
-event InheritanceCreated(uint256 indexed id, uint256 indexed credential, address indexed creator,
-    uint256 startTime, uint256 amountPerPeriod, uint256 amount);
-event InheritanceDeposited(uint256 indexed id, address indexed depositor, uint256 amount);
-event InheritanceClaimed(uint256 indexed id, uint256 indexed claimTag, address indexed recipient,
-    uint256 amount);
-```
-
-**Rules**:
-
-- `credential = Poseidon(1005, rootIdentityCommitment, rootVersionIndex, rootDerivedSecret)`. It
-  fixes the root version, so a new root version with different trusted endorsers cannot take over
-  an existing inheritance. Ids are sequential; copying a credential from the mempool only opens a
-  separate inheritance funded by the copier.
-- The per-period amount is fixed at creation. The frontend pre-fills
-  `1000 × recentReward × k` for a user-chosen k; the contract never reads mining rewards.
-- Anyone can `deposit` to an existing id. Nobody can withdraw; DEEP leaves only through claims.
-- A legit child is one whose version names the root as father or mother and is endorsed by a
-  trusted endorser of the root version. The proof statement is in
-  [zk-proofs.md](zk-proofs.md#familyinheritanceclaim-circuit).
-- `claim` requires known lineage roots, and an `eligibleFrom` on the 30-day grid from `startTime`
-  that is not later than the current block. It pays
-  `amountPerPeriod × ((now − eligibleFrom) / 30 days + 1) − claimed[id][claimTag]`, capped at the
-  balance. Unclaimed periods accumulate; a shortfall stays owed until a later deposit, and claims are
-  first come, first served.
-- The claim tag is the heir's pseudonym within one credential; the proof binds `recipient`, so a
-  copied proof cannot redirect the payout. The sender pays the gas and is public.
-
-**Errors**: `InvalidConstructorAddress`, `InvalidCredential`, `InvalidAmount`,
-`InheritanceNotFound`, `InvalidRecipient`, `UnknownLineageRoot`, `InvalidEligibility`,
-`MalformedProofData`, `InvalidZKProof`, `NothingToClaim`.
+The localhost stack deploys these contracts with development verifiers. The guarded mainnet release planner currently lacks the corresponding production verifier, registry, and pool transactions and refuses to broadcast until that plan is complete. Development use does not require an audit; production release remains gated by the shielded release evidence and an independent audit.
 
 ## ZK Verifier Contracts
 
@@ -1286,17 +1232,11 @@ event InheritanceClaimed(uint256 indexed id, uint256 indexed claimTag, address i
 `suiteCommitment`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-### FamilyInheritanceClaimVerifier.sol
+### Shielded action and key registration verifiers
 
-**Purpose**: Validates inheritance claims for `FamilyInheritance.claim()`
-**Public Signals**: 6 values (`endorsementRoot`, `trustedRoot`, `inheritanceCredential`,
-`claimTag`, `eligibleFrom`, `recipient`)
-**Verification**: Groth16 proof with circuit `family_inheritance_claim.circom`, called directly by
-`FamilyInheritance` with a 256-byte ABI encoding of `a/b/c`; it has no adapter or route
+The pool uses eight action-specific verifiers, each with 32 public signals and a `ShieldedGroth16ActionAdapter`. Key registration uses seven public signals. Development verifiers are generated into ignored `zk-artifacts/shielded/`; production verifiers require their own setup and review.
 
-All three verifiers are generated from their circom circuits by snarkjs. DeepFamily does not call
-the person and disclosure verifiers directly; the permanent `(purpose,circuitId)` route selects an
-`IProofVerifierAdapter`. Encoding ID `1`
+The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:
 
 ```solidity
@@ -1316,13 +1256,6 @@ function verifyProof(
   uint256[4] calldata publicSignals
 ) external view returns (bool);
 
-// FamilyInheritanceClaimVerifier (6 public signals), called by FamilyInheritance
-function verifyProof(
-  uint256[2] calldata a,
-  uint256[2][2] calldata b,
-  uint256[2] calldata c,
-  uint256[6] calldata publicSignals
-) external view returns (bool);
 ```
 
 ## Contract Security Summary
@@ -1359,7 +1292,7 @@ error TokenContractNotSet();
 - **Access Control**: Role-based permissions with explicit error types
 - **Immutability Controls**: Sealed stories and initialized contracts prevent further modification
 - **Domain Separation**: domain constants in Poseidon inputs (1000–1004 for identity and relation
-  proofs, 1005–1009 for the lineage index and inheritance claims) + Keccak wrapping for
+  proofs, 1007–1009 for the lineage index) + Keccak wrapping for
   `personHash` and a distinct Keccak domain for `versionHash`
 
 ### Gas Optimization Features

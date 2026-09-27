@@ -6,7 +6,6 @@ import {
   selectCircuitNames,
 } from "../../scripts/lib/zkCircuitSelection.mjs";
 import { calculateCircuitProofIsolated, calculateWitnessIsolated } from "./witness_helper.js";
-import { LINEAGE_TREE_MAX_DEPTH, hashLineageNodes } from "@deepfamily/protocol-core";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const readFixture = (name) =>
@@ -159,100 +158,17 @@ async function runDisclosureConstraintTests() {
   );
 }
 
-async function runInheritanceConstraintTests() {
-  const { buildFamilyInheritanceFixture } = await import("./generate_family_inheritance_input.mjs");
-  const { witness } = buildFamilyInheritanceFixture();
-  const committed = readFixture("family_inheritance_claim_input.json");
-  if (JSON.stringify(committed) !== JSON.stringify(witness)) {
-    throw new Error("family_inheritance_claim_input.json is stale; rerun its generator");
-  }
-  const circuitName = "family_inheritance_claim";
-  const result = await calculateCircuitProofIsolated(witness, circuitName);
-  if (result.publicSignals.length !== 6) {
-    throw new Error(
-      `FamilyInheritanceClaim must expose exactly 6 signals, got ${result.publicSignals.length}`,
-    );
-  }
-  console.log("PASS: FamilyInheritanceClaim valid six-signal proof");
-
-  // Exercise the highest path bit and an exact 64-sibling path, which a small fixture cannot reach.
-  const fullDepthSiblings = [...witness.endorsementSiblings];
-  let fullDepthRoot = BigInt(witness.endorsementRoot);
-  for (let level = Number(witness.endorsementDepth); level < LINEAGE_TREE_MAX_DEPTH; level += 1) {
-    const sibling = BigInt(level + 1);
-    fullDepthSiblings[level] = sibling.toString();
-    fullDepthRoot =
-      level === LINEAGE_TREE_MAX_DEPTH - 1
-        ? hashLineageNodes(sibling, fullDepthRoot)
-        : hashLineageNodes(fullDepthRoot, sibling);
-  }
-  const fullDepthResult = await calculateCircuitProofIsolated(
-    {
-      ...witness,
-      endorsementRoot: fullDepthRoot.toString(),
-      endorsementDepth: String(LINEAGE_TREE_MAX_DEPTH),
-      endorsementIndex: (BigInt(witness.endorsementIndex) | (1n << 63n)).toString(),
-      endorsementSiblings: fullDepthSiblings,
-    },
-    circuitName,
-  );
-  if (fullDepthResult.publicSignals[0] !== fullDepthRoot.toString()) {
-    throw new Error("FamilyInheritanceClaim exact-depth-64 root changed");
-  }
-  console.log("PASS: FamilyInheritanceClaim accepts an exact-depth-64 proof");
-
-  const period = 2592000n;
-  const rejected = [
-    [
-      "an endorsement younger than one period",
-      { eligibleFrom: (BigInt(witness.writtenAt) + period - 1n).toString() },
-    ],
-    ["a root that is not the selected parent", { rootIsMother: "1" }],
-    ["a non-binary parent selector", { rootIsMother: "2" }],
-    ["a different heir secret", { derivedSecretField: "333334" }],
-    ["a wrong root secret", { rootDerivedSecretField: "111112" }],
-    ["an endorser missing from the trusted tree", { endorser: "1" }],
-    ["a 161-bit endorser", { endorser: (1n << 160n).toString() }],
-    ["a 65-bit write time", { writtenAt: (1n << 64n).toString() }],
-    ["a stale endorsement root", { endorsementRoot: "1" }],
-    ["a stale trusted root", { trustedRoot: "1" }],
-    ["a mismatched claim tag", { claimTag: "1" }],
-    ["a 65-bit proof index", { endorsementIndex: (1n << 64n).toString() }],
-    [
-      "an endorsement proof depth beyond the maximum",
-      { endorsementDepth: String(LINEAGE_TREE_MAX_DEPTH + 1) },
-    ],
-    [
-      "a trusted proof depth beyond the maximum",
-      { trustedDepth: String(LINEAGE_TREE_MAX_DEPTH + 1) },
-    ],
-    [
-      "a zero root",
-      {
-        fatherIdentityCommitment: "0",
-        rootIsMother: "0",
-      },
-    ],
-  ];
-  for (const [label, override] of rejected) {
-    await expectRejected(`FamilyInheritanceClaim rejects ${label}`, () =>
-      calculateCircuitProofIsolated({ ...witness, ...override }, circuitName),
-    );
-  }
-}
-
 async function runCircuitConstraintTests(argv = process.argv.slice(2)) {
   const parsed = parseCircuitArguments(argv);
   if (parsed.help) {
     console.log(
-      "Usage: node circuits/test/test_circuit_constraints.js --circuit <all|person|disclosure|inheritance>",
+      "Usage: node circuits/test/test_circuit_constraints.js --circuit <all|person|disclosure>",
     );
     return;
   }
   for (const circuit of selectCircuitNames(parsed.circuit)) {
     if (circuit === "person") await runPersonConstraintTests();
     if (circuit === "disclosure") await runDisclosureConstraintTests();
-    if (circuit === "inheritance") await runInheritanceConstraintTests();
   }
 }
 

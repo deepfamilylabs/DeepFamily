@@ -152,6 +152,7 @@ describe("local private transfer and unshield preparation", () => {
     expect(signals.slice(25)).toEqual(Array(7).fill("0"));
     expect(prepared.data.inputNullifiers[0]).not.toBe(prepared.data.inputNullifiers[1]);
     expect(prepared.witness.inputAmounts).toEqual(["70", "30"]);
+    expect(prepared.witness.hasSecondInput).toBe("1");
     expect(prepared.witness.outputAmounts).toEqual(["60", "40"]);
     expect(prepared.outputs[0].note.ownerCommitment).toBe(
       deriveShieldedHeirKeyMaterial(recipientSecret).ownerCommitment,
@@ -169,6 +170,54 @@ describe("local private transfer and unshield preparation", () => {
       .rejects.toThrow();
     expect(JSON.stringify(prepared.data, (_, value) => typeof value === "bigint" ? value.toString() : value))
       .not.toContain(recipientHash);
+  });
+
+  it("transfers from the only recovered value note with a bound dummy second input", async () => {
+    const { input0 } = await walletFixture();
+    const commitment = BigInt(input0.commitment);
+    input0.wallet.ownedNotes = new Map([[commitment, input0.wallet.ownedNotes.get(commitment)!]]);
+    const keyRegistry = await registryFixture();
+    const recipientHash = wrapIdentityCommitmentAsPersonHash(12345n);
+    const prepared = await prepareShieldedPrivateTransfer({
+      chainId,
+      poolAddress,
+      inputs: [input0],
+      destinations: [
+        { kind: "registered", personHash: recipientHash, amount: 60n },
+        { kind: "inputOwner", inputIndex: 0, amount: 10n },
+      ],
+      keyRegistry,
+    });
+    const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
+    expect(prepared.witness.hasSecondInput).toBe("0");
+    expect(prepared.witness.inputAmounts).toEqual(["70", "0"]);
+    expect(prepared.witness.inputOwnerSecrets).toEqual([String(ownerSecret), "0"]);
+    expect((prepared.witness.inputNonces as string[])[1]).toBe("0");
+    expect((prepared.witness.inputDepths as string[])[1]).toBe("0");
+    expect((prepared.witness.inputSiblings as string[][])[1]).toEqual(Array(32).fill("0"));
+    expect(prepared.data.inputShardIds[1]).toBe(prepared.data.inputShardIds[0]);
+    expect(prepared.data.inputRoots[1]).toBe(prepared.data.inputRoots[0]);
+    expect(prepared.data.inputNullifiers).toEqual([
+      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: commitment }),
+      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: commitment }),
+    ]);
+    expect(await openedValue(prepared.outputs[0].ciphertext, recipientSecret, prepared.outputs[0].commitment))
+      .toMatchObject({ kind: "value", amount: 60n });
+    await expect(prepareShieldedPrivateTransfer({
+      chainId, poolAddress, inputs: [input0],
+      destinations: [
+        { kind: "inputOwner", inputIndex: 1, amount: 60n },
+        { kind: "inputOwner", inputIndex: 0, amount: 10n },
+      ],
+    })).rejects.toThrow("Invalid private transfer input owner index");
+    input0.wallet.spentNullifiers.add(BigInt(prepared.data.inputNullifiers[1]));
+    await expect(prepareShieldedPrivateTransfer({
+      chainId, poolAddress, inputs: [input0],
+      destinations: [
+        { kind: "inputOwner", inputIndex: 0, amount: 60n },
+        { kind: "inputOwner", inputIndex: 0, amount: 10n },
+      ],
+    })).rejects.toThrow("already been spent");
   });
 
   it("accepts two inputs owned by different identities at the same snapshot", async () => {

@@ -2,6 +2,15 @@
 
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
+For local shielded inheritance development, run `npm run dev:all` from the repository root.
+The first run generates the nine development proving keys if they are missing or stale; later
+runs reuse them. Key generation can take several minutes. To regenerate them manually, run
+`npm run zk:shielded:development:setup`.
+The local deploy command binds the shielded pool and key registry to the same DeepFamily token
+and lineage index and writes their addresses and deployment blocks to `.env.local`. The Vite
+development server serves manifest-checked keys from the ignored `zk-artifacts/shielded` directory;
+it never copies them into `public/` or a production build. These keys are for localhost only.
+
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 
 ## Quick Start

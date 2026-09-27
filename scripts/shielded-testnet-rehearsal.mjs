@@ -262,7 +262,7 @@ export function verifyCandidateDerivation(candidate, { root = DEFAULT_ROOT } = {
   }
 }
 
-async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT } = {}) {
+export async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT } = {}) {
   const hardhatCompiler = path.join(
     root,
     "node_modules/hardhat/dist/src/internal/builtin-plugins/solidity/build-system/compiler/index.js",

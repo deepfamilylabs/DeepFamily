@@ -62,10 +62,6 @@ const SETUP_CIRCUITS = Object.freeze({
     ...ZK_RELEASE_ARTIFACTS.disclosure_binding,
     contractName: "DisclosureBindingVerifier",
   }),
-  family_inheritance_claim: Object.freeze({
-    ...ZK_RELEASE_ARTIFACTS.family_inheritance_claim,
-    contractName: "FamilyInheritanceClaimVerifier",
-  }),
 });
 
 // Collects one per-circuit metadata value under each circuit's ceremony field name.
@@ -1182,21 +1178,6 @@ export const buildStagedProofValidationCommands = ({ root, circuits }) =>
         circuits.disclosure_binding.verificationKey,
         "--input",
         path.join(root, "circuits", "test", "proof", "disclosure_binding_input.json"),
-      ]),
-    }),
-    Object.freeze({
-      executable: process.execPath,
-      args: Object.freeze([
-        path.join(root, "tasks", "zk-inheritance-claim-check.mjs"),
-        "--prove",
-        "--wasm",
-        circuits.family_inheritance_claim.wasm,
-        "--zkey",
-        circuits.family_inheritance_claim.finalZkey,
-        "--vkey",
-        circuits.family_inheritance_claim.verificationKey,
-        "--input",
-        path.join(root, "circuits", "test", "proof", "family_inheritance_claim_input.json"),
       ]),
     }),
   ]);

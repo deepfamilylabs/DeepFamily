@@ -10,7 +10,7 @@ import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-development-setup.mj
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("zkey MPC metadata reader", function () {
-  for (const name of ["person_commitment", "disclosure_binding", "family_inheritance_claim"]) {
+  for (const name of ["person_commitment", "disclosure_binding"]) {
     it(`reads the real committed ${name} Groth16 MPC section`, async function () {
       const manifest = JSON.parse(
         await fs.readFile(

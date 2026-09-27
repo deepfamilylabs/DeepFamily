@@ -20,7 +20,6 @@ const ARTIFACTS = [
     "DeepFamilyLineageIndex",
     "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
   ],
-  ["FamilyInheritance", "artifacts/contracts/FamilyInheritance.sol/FamilyInheritance.json"],
   ["ShieldedDeepPool", "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json"],
   [
     "ShieldedHeirKeyRegistry",
@@ -29,10 +28,6 @@ const ARTIFACTS = [
   [
     "ShieldedGroth16ActionAdapter",
     "artifacts/contracts/adapters/ShieldedGroth16ActionAdapter.sol/ShieldedGroth16ActionAdapter.json",
-  ],
-  [
-    "FamilyInheritanceClaimVerifier",
-    "artifacts/contracts/FamilyInheritanceClaimVerifier.sol/FamilyInheritanceClaimVerifier.json",
   ],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
   [

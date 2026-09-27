@@ -36,9 +36,6 @@ const artifactPaths = {
   PoseidonT6: "artifacts/poseidon-solidity/PoseidonT6.sol/PoseidonT6.json",
   DeepFamilyLineageIndex:
     "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
-  FamilyInheritanceClaimVerifier:
-    "artifacts/contracts/FamilyInheritanceClaimVerifier.sol/FamilyInheritanceClaimVerifier.json",
-  FamilyInheritance: "artifacts/contracts/FamilyInheritance.sol/FamilyInheritance.json",
 };
 
 const artifacts = {
@@ -61,11 +58,11 @@ const constructorData = (intent, artifact) =>
   `0x${intent.data.slice(String(artifact.bytecode).length)}`;
 
 describe("eSpace Mainnet release transaction intents", function () {
-  it("reconstructs the exact seventeen deployments and six calls in nonce order", async function () {
+  it("reconstructs the exact fifteen deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(23);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(17);
+    expect(intents).to.have.length(21);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(15);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -199,14 +196,6 @@ describe("eSpace Mainnet release transaction intents", function () {
     expect(setLineageIndex[0]).to.equal(byLabel.deepFamilyLineageIndex.predictedAddress);
     expect(byLabel.setLineageIndex.nonce).to.be.lessThan(byLabel.transferDeepFamilyOwnership.nonce);
 
-    const inheritanceArgs = decodeConstructor("familyInheritance", "FamilyInheritance", [
-      "address",
-      "address",
-      "address",
-    ]);
-    expect(inheritanceArgs[0]).to.equal(byLabel.deepFamilyToken.predictedAddress);
-    expect(inheritanceArgs[1]).to.equal(byLabel.deepFamilyLineageIndex.predictedAddress);
-    expect(inheritanceArgs[2]).to.equal(byLabel.familyInheritanceClaimVerifier.predictedAddress);
   });
 
   it("changes the plan digest when any core intent field changes", async function () {

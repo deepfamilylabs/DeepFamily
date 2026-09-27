@@ -1,7 +1,7 @@
 // Isolated fixture for shielded_claim.circom. It deliberately does not modify
 // the reviewed production ZK artifact manifest or verifier assets.
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
-import { buildFamilyInheritanceFixture } from "./generate_family_inheritance_input.mjs";
+import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
 
 const PERIOD = 2_592_000n;
 const decimal = (value) => BigInt(value).toString();
@@ -10,7 +10,7 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
   if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 12) {
     throw new RangeError("claimCount fixture must be 1..12");
   }
-  const lineage = buildFamilyInheritanceFixture().witness;
+  const lineage = buildLineageFixture().witness;
   const derivedSecret = BigInt(lineage.derivedSecretField);
   const ownerSecret = poseidon2([1012n, derivedSecret]);
   const ownerCommitment = poseidon2([1013n, ownerSecret]);

@@ -45,6 +45,9 @@ export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "frontend:locales:check"]]),
   Object.freeze(["npm", ["run", "zk:artifacts:check"]]),
   Object.freeze(["npm", ["run", "zk:check"]]),
+  // The inheritance route now uses the shared shielded pool. Development keys
+  // are accepted by localhost only; release evidence is checked separately.
+  Object.freeze(["npm", ["run", "zk:shielded:release:check"]]),
   Object.freeze(["npm", ["run", "security:xss-scan"]]),
   // The release toolchain itself (Hardhat, Safe SDK, ethers and snarkjs) is in devDependencies.
   Object.freeze(["npm", ["run", "security:audit:all"]]),

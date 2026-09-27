@@ -125,6 +125,7 @@ function privateTransferFixture() {
   }
   return {
     publicSignals: strs(signals),
+    hasSecondInput: "1",
     inputOwnerSecrets: strs(inputOwnerSecrets),
     inputAmounts: strs(inputAmounts),
     inputNonces: strs(inputNonces),
@@ -136,6 +137,37 @@ function privateTransferFixture() {
     outputAmounts: strs(outputAmounts),
     outputNonces: strs(outputNonces),
   };
+}
+
+function singleInputPrivateTransferFixture() {
+  const witness = privateTransferFixture();
+  const signals = witness.publicSignals.map(BigInt);
+  const ownerSecret = BigInt(witness.inputOwnerSecrets[0]);
+  const firstCommitment = signals[4];
+  signals[5] = signals[3];
+  signals[6] = signals[4];
+  signals[8] = computeShieldedDummyInputNullifier({
+    ownerSecret,
+    noteCommitment: firstCommitment,
+  });
+  const secondOutputAmount = 10n;
+  signals[22] = valueNote(
+    BigInt(witness.outputOwnerCommitments[1]),
+    secondOutputAmount,
+    BigInt(witness.outputNonces[1]),
+    signals[24],
+  );
+  witness.publicSignals = strs(signals);
+  witness.hasSecondInput = "0";
+  witness.inputOwnerSecrets[1] = "0";
+  witness.inputAmounts[1] = "0";
+  witness.inputNonces[1] = "0";
+  witness.inputCiphertextHashes[1] = "0";
+  witness.inputDepths[1] = "0";
+  witness.inputIndices[1] = "0";
+  witness.inputSiblings[1] = Array(32).fill("0");
+  witness.outputAmounts[1] = String(secondOutputAmount);
+  return witness;
 }
 
 function mergeBudgetFixture({
@@ -272,6 +304,7 @@ test("policy creation and private transfer circuits", async (t) => {
     const merge = await compile(directory, "shielded_merge_budget");
     const validPolicy = createPolicyFixture();
     const validTransfer = privateTransferFixture();
+    const validSingleTransfer = singleInputPrivateTransferFixture();
     const validMerge = mergeBudgetFixture();
     await t.test("policy creation preserves all DEEP and satisfies R1CS", async () => {
       await policy.valid(validPolicy);
@@ -318,6 +351,10 @@ test("policy creation and private transfer circuits", async (t) => {
       await transfer.valid(validTransfer);
       transfer.checkR1cs(validTransfer);
     });
+    await t.test("single-note private transfer conserves DEEP with a bound dummy input", async () => {
+      await transfer.valid(validSingleTransfer);
+      transfer.checkR1cs(validSingleTransfer);
+    });
     await t.test("private transfer rejects inflation and foreign-note spending", async () => {
       await transfer.invalid(
         mutate(validTransfer, (w) => {
@@ -349,6 +386,15 @@ test("policy creation and private transfer circuits", async (t) => {
           w.publicSignals[26] = "1";
         }),
       );
+    });
+    await t.test("single-note transfer rejects forged amount, root, nullifier, and mode", async () => {
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputAmounts[1] = "1"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[5] = "1"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[6] = "123"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[8] = "123"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputOwnerSecrets[1] = "1"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.hasSecondInput = "2"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.outputAmounts[1] = "11"; }));
     });
     await t.test("budget merge preserves whole-period value and satisfies R1CS", async () => {
       await merge.valid(validMerge);

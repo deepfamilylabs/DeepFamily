@@ -8,7 +8,6 @@ import {
 import type { ethers } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { InheritanceError, type InheritanceErrorCode } from "../model/inheritanceErrors";
-import type { InheritanceInfo } from "../model/inheritanceTypes";
 
 export const ENDORSEMENT_TREE = 0;
 export const TRUSTED_TREE = 1;
@@ -337,56 +336,6 @@ export function findHeirLegitimacy({
     });
   }
   return found.sort((left, right) => Number(left.writtenAt - right.writtenAt));
-}
-
-export type InheritanceRow = InheritanceInfo & {
-  /** Already paid to this heir's claim tag. */
-  claimed: bigint;
-};
-
-export async function readInheritance(
-  inheritance: ethers.Contract,
-  id: bigint,
-): Promise<InheritanceInfo> {
-  const state = await inheritance.inheritanceOf(id);
-  return {
-    id,
-    startTime: BigInt(state.startTime),
-    amountPerPeriod: BigInt(state.amountPerPeriod),
-    balance: BigInt(state.balance),
-  };
-}
-
-export async function readInheritanceRow(
-  inheritance: ethers.Contract,
-  id: bigint,
-  claimTag: bigint,
-): Promise<InheritanceRow> {
-  const [info, claimed] = await Promise.all([
-    readInheritance(inheritance, id),
-    inheritance.claimed(id, claimTag),
-  ]);
-  return { ...info, claimed: BigInt(claimed) };
-}
-
-/**
- * Every inheritance opened under `credential`, with this heir's claimed total in each. The scan
- * reads all creations and matches the credential locally.
- */
-export async function listInheritancesForCredential(
-  inheritance: ethers.Contract,
-  credential: bigint,
-  claimTag: bigint,
-  options: ScanOptions = {},
-): Promise<InheritanceRow[]> {
-  const toBlock = await providerOf(inheritance).getBlockNumber();
-  const created = await scanEvents(inheritance, ["InheritanceCreated"], toBlock, options);
-  const rows: InheritanceRow[] = [];
-  for (const event of created) {
-    if (BigInt(event.args.credential) !== credential) continue;
-    rows.push(await readInheritanceRow(inheritance, BigInt(event.args.id), claimTag));
-  }
-  return rows;
 }
 
 /** Time of the latest block; accrual is measured against it, not the local clock. */

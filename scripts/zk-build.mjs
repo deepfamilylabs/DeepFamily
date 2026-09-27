@@ -20,7 +20,6 @@ const INCLUDE_ARGUMENTS = Object.freeze([
 const CIRCUIT_SOURCES = Object.freeze({
   person: path.join("circuits", "person_commitment.circom"),
   disclosure: path.join("circuits", "disclosure_binding.circom"),
-  inheritance: path.join("circuits", "family_inheritance_claim.circom"),
 });
 
 const defaultRunner = ({ executable, args, cwd }) =>
@@ -114,7 +113,7 @@ export const runZkBuild = async ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-build.mjs [--circuit <all|person|disclosure|inheritance>]
+  node scripts/zk-build.mjs [--circuit <all|person|disclosure>]
 
 Compiles the selected Circom circuit with the repository's fixed R1CS, WASM, symbol,
 include-path and output settings. The default is --circuit all.`);

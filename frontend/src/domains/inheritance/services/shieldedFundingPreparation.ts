@@ -125,8 +125,8 @@ async function currentContext(input: CommonFundingInput) {
     provider.getBlock(input.wallet.toBlock),
     provider.getBlock(input.keyRegistry.toBlock),
   ]);
-  if (!latestBlock || latestBlock.number !== input.wallet.toBlock) {
-    throw new Error("Wallet snapshot is stale; replay all public pool events before funding");
+  if (!latestBlock || input.wallet.toBlock > latestBlock.number) {
+    throw new Error("Wallet snapshot is ahead of the chain");
   }
   if (input.keyRegistry.toBlock > latestBlock.number) {
     throw new Error("Key registry snapshot is ahead of the chain");

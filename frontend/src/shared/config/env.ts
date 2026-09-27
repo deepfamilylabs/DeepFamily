@@ -113,9 +113,8 @@ export function getDefaultRpcUrl(): string {
 /**
  * The entry reader for the chain `VITE_RPC_URL` points at.
  *
- * The one address a build has to be given: the app asks this reader for the
- * DeepFamily contract, and asks DeepFamily for the token, so everything else
- * is derived rather than configured.
+ * The entry reader for person and tree data. The shielded pool and heir key
+ * registry have separate addresses because they are not modules of DeepFamily.
  */
 export function getDefaultReaderAddress(): string {
   return getStringEnv("VITE_READER_ADDRESS");
@@ -134,17 +133,37 @@ export function getChainEntryReaderAddress(chainId: number): string {
   return getStringEnv(`VITE_READER_ADDRESS_${chainId}`);
 }
 
-/**
- * The FamilyInheritance module. It is not bound to DeepFamily, so unlike the
- * token and lineage index it cannot be derived from the reader; the per-chain
- * `VITE_INHERITANCE_ADDRESS_<chainId>` wins over the unsuffixed default.
- */
-export function getInheritanceAddress(chainId: number): string {
+function getModuleAddress(key: string, chainId: number): string {
   const perChain =
+    Number.isSafeInteger(chainId) && chainId > 0 ? getStringEnv(`${key}_${chainId}`) : "";
+  return perChain.trim() || getStringEnv(key).trim();
+}
+
+/** Address of the shared shielded DEEP pool for the selected chain. */
+export function getShieldedPoolAddress(chainId: number): string {
+  return getModuleAddress("VITE_SHIELDED_POOL_ADDRESS", chainId);
+}
+
+/** Address of the heir viewing-key registry for the selected chain. */
+export function getShieldedKeyRegistryAddress(chainId: number): string {
+  return getModuleAddress("VITE_SHIELDED_KEY_REGISTRY_ADDRESS", chainId);
+}
+
+function getShieldedDeploymentBlock(key: string, chainId: number): number {
+  const value =
     Number.isSafeInteger(chainId) && chainId > 0
-      ? getStringEnv(`VITE_INHERITANCE_ADDRESS_${chainId}`)
-      : "";
-  return perChain.trim() || getStringEnv("VITE_INHERITANCE_ADDRESS").trim();
+      ? getStringEnv(`${key}_${chainId}`) || getStringEnv(key)
+      : getStringEnv(key);
+  const block = Number(value);
+  return Number.isSafeInteger(block) && block >= 0 ? block : 0;
+}
+
+export function getShieldedPoolDeploymentBlock(chainId: number): number {
+  return getShieldedDeploymentBlock("VITE_SHIELDED_POOL_FROM_BLOCK", chainId);
+}
+
+export function getShieldedKeyRegistryDeploymentBlock(chainId: number): number {
+  return getShieldedDeploymentBlock("VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK", chainId);
 }
 
 export function getDefaultRootHash(): string {

@@ -130,7 +130,6 @@ const createProductionFixture = async () => {
     participantId: `participant-${index + 1}`,
     personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
     disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-    familyInheritanceClaimContributionHash: `${String(index + 21).padStart(2, "0")}`.repeat(64),
   }));
   const beacon = {
     name: "deepfamily-public-beacon",
@@ -139,7 +138,6 @@ const createProductionFixture = async () => {
     source: "public-randomness-round-12345",
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
-    familyInheritanceClaimContributionHash: "cc".repeat(64),
   };
   const transcript = {
     schemaVersion: 2,

@@ -2,7 +2,6 @@ import type { Groth16Proof } from "../zk/zk";
 import type { ShieldedCircuitName, ShieldedWitness } from "../zk/shieldedZk";
 import type {
   DisclosureBindingProofParameters,
-  InheritanceClaimWitness,
   PersonRelationProofParameters,
 } from "../zk/zkSnark";
 
@@ -22,10 +21,6 @@ type ZkWorkerCallMap = {
   verifyDisclosureBindingProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
-  };
-  generateInheritanceClaimProof: {
-    params: { witness: InheritanceClaimWitness };
-    result: { proof: Groth16Proof; publicSignals: string[] };
   };
   generateShieldedProof: {
     params: {

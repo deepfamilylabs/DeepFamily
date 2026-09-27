@@ -32,14 +32,6 @@
       "zkeySha256": "29fe74e04d12364f535d5943cd071156bfef2227ec4e94ee42f4b3bb0134b6d8",
       "verificationKeySha256": "488ed51f26c78dbb7343dfb2ae77ca221659af2344b6fdce9dfe5ce7a7f08705",
       "solidityVerifierSha256": "755dd6a9555b047c19275f96ad49103c4343406b59b9313c45dca7505b6d5bcf"
-    },
-    "family_inheritance_claim": {
-      "sourceSha256": "c4f863e59f734c648ae9d9f64d07d91b1a4824b84151e961c2501f5986176b89",
-      "r1csSha256": "1fc2c0c4ef46213866fd7667e0b518dc5597977f021f4785c86350a9d7a89fa4",
-      "wasmSha256": "40ad9d48d839ed05257ec834f42a6f9edf14a2523d06ad8e07979f4922e5c51d",
-      "zkeySha256": "dcd6cc99817069baf6d376fb4a57fa0ff30a15a68a2b6ef42e3d03c51b9f9927",
-      "verificationKeySha256": "ef99f7c9cc27e0fe0358c07448ce00dd0a22865e837c7f4f93c8178a237458b1",
-      "solidityVerifierSha256": "9bb5f2b8b7331f2d98469919401fd5cc6df2ad543cbb2723b19ed030fb6a2058"
     }
   }
 }

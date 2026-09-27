@@ -76,7 +76,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the exact twenty-three-transaction EVM mainnet release intent without a signer or RPC.
+ * Rebuilds the exact twenty-one-transaction EVM mainnet core release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -116,8 +116,6 @@ export const buildMainnetReleaseIntents = async ({
     "PoseidonT4",
     "PoseidonT6",
     "DeepFamilyLineageIndex",
-    "FamilyInheritanceClaimVerifier",
-    "FamilyInheritance",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
   const artifact = Object.fromEntries(names.map((name, index) => [name, artifactList[index]]));
@@ -144,8 +142,6 @@ export const buildMainnetReleaseIntents = async ({
     poseidonT6: addressAt(17),
     deepFamilyLineageIndex: addressAt(18),
     // nonce 19 is the one-time setLineageIndex call.
-    familyInheritanceClaimVerifier: addressAt(20),
-    familyInheritance: addressAt(21),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -276,12 +272,6 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
-  await pushDeployment("familyInheritanceClaimVerifier", "FamilyInheritanceClaimVerifier");
-  await pushDeployment("familyInheritance", "FamilyInheritance", [
-    addresses.deepFamilyToken,
-    addresses.deepFamilyLineageIndex,
-    addresses.familyInheritanceClaimVerifier,
-  ]);
   pushCall(
     "transferDeepFamilyOwnership",
     addresses.deepFamilyProxy,

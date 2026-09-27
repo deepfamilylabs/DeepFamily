@@ -57,12 +57,9 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Family Inheritance
 
-- Anyone can set aside DEEP for the direct children of a root person; the deposit names only a
-  credential derived from the root's passphrase, not the root's person hash
-- A child claims a fixed amount per 30-day period with a zero-knowledge proof that their version is
-  endorsed by a recommended source of the root version, without revealing which child they are
-- Deposits cannot be withdrawn, anyone can top one up, and a shortfall stays owed until the next
-  top-up. The feature distributes DEEP utility points and has no legal effect
+- A public `shield` deposit places DEEP in a shared pool. The depositor later creates a private policy and independently allocates whole-period budgets to eligible direct children.
+- A child proves current lineage eligibility and claims 1–12 complete 30-day periods into a private note. Private transfers and a later public exit are separate transactions. Insufficient budgets do not consume a period.
+- Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. This feature distributes DEEP utility points and has no legal effect.
 
 ## Technology Stack
 
@@ -83,8 +80,8 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                        |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
 | **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy          |
-| **FamilyInheritance.sol**         | Ownerless DEEP inheritance: credential-only deposits, anonymous per-period claims by the root's children           |
-| **FamilyInheritanceClaimVerifier.sol** | ZK verifier for inheritance claims, called directly by FamilyInheritance                                       |
+| **ShieldedDeepPool.sol** | Shared DEEP pool with encrypted note commitments, private allocations, claims, transfers, and public exits |
+| **ShieldedHeirKeyRegistry.sol** | Identity-proved viewing-key registry for private allocations |
 
 ## Quick Start
 
@@ -115,6 +112,7 @@ npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
 npm run dev:deploy      # Deploy contracts
+npm run dev:shielded:deploy # Build local proof keys and deploy the private pool
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts
@@ -136,29 +134,32 @@ Rerunning the seed resumes existing data and does not change an existing NFT's o
 
 ```bash
 npm test              # Run all contract tests
-npm run test:gas      # Benchmark lineage writes and inheritance transactions
+npm run test:gas      # Benchmark lineage writes at real and synthetic tree depths
 npm run frontend:check # Run frontend lint + typecheck + tests
 npm run check         # Run frontend checks + contract lint/build/test
 ```
 
 `test:gas` uses Hardhat's in-process chain. The person-version case uses a proof-verifier stub;
-the inheritance claim comparison uses real Groth16 proofs. Simulated deep-tree cases measure
-update gas without creating billions of leaves; they do not validate the whole Merkle tree,
-proof generation at that depth, or a live network's transaction limit.
+simulated deep-tree cases measure update gas without creating billions of leaves; they do not
+validate the whole Merkle tree, proof generation at that depth, or a live network's transaction limit.
+Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` for local pool benchmarks.
 
 ### ZK Artifact Workflow
 
-The supported ZK command surface is intentionally limited to these eight entries:
+The identity/disclosure and shielded circuits have separate build and setup commands:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:build`             | Compile all three circuits                                         |
+| `npm run zk:build`             | Compile identity and disclosure circuits                         |
 | `npm run zk:development:setup` | Rebuild every development artifact from a self-contained workflow  |
 | `npm run zk:production:setup`  | Generate and verify the production Phase 2 artifacts               |
-| `npm run zk:check`             | Generate and verify real proofs for every circuit                  |
+| `npm run zk:check`             | Generate and verify identity/disclosure proofs                    |
 | `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact set                     |
-| `npm run zk:ceremony:verify`   | Verify the production pTau, zkeys, transcript, and trust metadata  |
+| `npm run zk:ceremony:verify`   | Verify identity/disclosure production setup evidence             |
+| `npm run zk:shielded:development:setup` | Generate shielded development proof assets and verifiers |
+| `npm run zk:shielded:development:proof-smoke` | Verify shielded development proofs |
+| `npm run zk:shielded:release:check` | Check shielded release evidence |
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -218,7 +219,7 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all three circuits,
+`zk:development:setup` verifies the committed Phase 1 pTau, then compiles the identity and disclosure circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for

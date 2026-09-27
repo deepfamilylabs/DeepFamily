@@ -273,29 +273,36 @@ function signals(
 }
 
 /**
- * Spend two locally recovered value notes into two encrypted value notes.
+ * Spend one or two locally recovered value notes into two encrypted value notes.
  * Recipient identity is absent from the public proof and event. A registered
  * recipient's key is read from the unfiltered local key-registry snapshot.
  */
 export async function prepareShieldedPrivateTransfer(input: {
   chainId: BigNumberish;
   poolAddress: string;
-  inputs: readonly [ShieldedValueInput, ShieldedValueInput];
+  inputs: readonly [ShieldedValueInput] | readonly [ShieldedValueInput, ShieldedValueInput];
   destinations: readonly [ShieldedValueDestination, ShieldedValueDestination];
   keyRegistry?: KeyRegistrySnapshot;
 }): Promise<PreparedShieldedPrivateTransfer> {
   const ctx = context(input.chainId, input.poolAddress);
-  const opened = await Promise.all(input.inputs.map((note) => openValueInput(note, ctx))) as
-    [OpenedValueInput, OpenedValueInput];
-  if (getBigInt(input.inputs[0].commitment) === getBigInt(input.inputs[1].commitment)) {
+  if (input.inputs.length !== 1 && input.inputs.length !== 2) {
+    throw new Error("Private transfer needs one or two input notes");
+  }
+  if (input.inputs.length === 2 &&
+      getBigInt(input.inputs[0].commitment) === getBigInt(input.inputs[1].commitment)) {
     throw new Error("Private transfer needs two distinct input notes");
   }
+  const opened = await Promise.all(input.inputs.map((note) => openValueInput(note, ctx)));
+  const first = opened[0];
+  const second = opened[1];
+  const secondInput = input.inputs[1];
+  if (!first) throw new Error("Private transfer needs a value note");
   // Different wallet scans must be anchored to the same public chain state.
-  if (
-    input.inputs[0].wallet.toBlock !== input.inputs[1].wallet.toBlock ||
-    input.inputs[0].wallet.blockHash !== input.inputs[1].wallet.blockHash
-  ) throw new Error("Private transfer input wallets must share one public snapshot block");
-  const total = opened[0].note.amount + opened[1].note.amount;
+  if (secondInput && (
+    input.inputs[0].wallet.toBlock !== secondInput.wallet.toBlock ||
+    input.inputs[0].wallet.blockHash !== secondInput.wallet.blockHash
+  )) throw new Error("Private transfer input wallets must share one public snapshot block");
+  const total = first.note.amount + (second?.note.amount ?? 0n);
   if (total === 0n) throw new Error("Private transfer requires positive input value");
   const outputAmounts = input.destinations.map((destination, index) =>
     uint128(destination.amount, `destinations[${index}].amount`)) as [bigint, bigint];
@@ -326,16 +333,29 @@ export async function prepareShieldedPrivateTransfer(input: {
     };
     return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
   })) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
-  const data = actionData(opened, [opened[0].nullifier, opened[1].nullifier], outputs);
+  const secondNullifier = second?.nullifier ?? computeShieldedDummyInputNullifier({
+    ownerSecret: first.ownerSecret,
+    noteCommitment: getBigInt(input.inputs[0].commitment),
+  });
+  if (!second && input.inputs[0].wallet.spentNullifiers.has(secondNullifier)) {
+    throw new Error("Input value note has already been spent");
+  }
+  const data = actionData(
+    [first, second ?? first],
+    [first.nullifier, secondNullifier],
+    outputs,
+  );
+  const zeroSiblings = Array<bigint>(32).fill(0n);
   const witness: ShieldedWitness = {
     publicSignals: signals(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
-    inputOwnerSecrets: decimal(opened.map((note) => note.ownerSecret)),
-    inputAmounts: decimal(opened.map((note) => note.note.amount)),
-    inputNonces: decimal(opened.map((note) => note.note.nonce)),
-    inputCiphertextHashes: decimal(opened.map((note) => note.ciphertextHashField)),
-    inputDepths: opened.map((note) => String(note.path.proofDepth)),
-    inputIndices: decimal(opened.map((note) => note.path.proofIndex)),
-    inputSiblings: opened.map((note) => decimal(note.path.siblings)),
+    hasSecondInput: second ? "1" : "0",
+    inputOwnerSecrets: decimal([first.ownerSecret, second?.ownerSecret ?? 0n]),
+    inputAmounts: decimal([first.note.amount, second?.note.amount ?? 0n]),
+    inputNonces: decimal([first.note.nonce, second?.note.nonce ?? 0n]),
+    inputCiphertextHashes: decimal([first.ciphertextHashField, second?.ciphertextHashField ?? 0n]),
+    inputDepths: [String(first.path.proofDepth), String(second?.path.proofDepth ?? 0)],
+    inputIndices: decimal([first.path.proofIndex, second?.path.proofIndex ?? 0n]),
+    inputSiblings: [decimal(first.path.siblings), decimal(second?.path.siblings ?? zeroSiblings)],
     outputOwnerCommitments: decimal(destinationKeys.map((destination) => destination.ownerCommitment)),
     outputAmounts: decimal(outputAmounts),
     outputNonces: decimal(outputs.map((output) => output.note.nonce)),
