@@ -138,14 +138,12 @@ const createProductionFixture = async ({
       participantId: `participant-${index + 1}`,
       personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
       disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-      familyInheritanceClaimContributionHash: `${String(index + 21).padStart(2, "0")}`.repeat(64),
     };
     if (trustModel === ZK_TRUST_MODEL_MULTI_PARTY) {
       const signedContribution = {
         ...contribution,
         personCommitmentZkeySha256: sha256Text(`person-contribution-${index + 1}`),
         disclosureBindingZkeySha256: sha256Text(`disclosure-contribution-${index + 1}`),
-        familyInheritanceClaimZkeySha256: sha256Text(`inheritance-contribution-${index + 1}`),
         signerAddress: wallet.address,
       };
       contributions.push({
@@ -170,7 +168,6 @@ const createProductionFixture = async ({
     source: "public-randomness-round-12345",
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
-    familyInheritanceClaimContributionHash: "cc".repeat(64),
   };
   const compilerTarget = resolveCircomTargetPolicy({
     version: CIRCOM_VERSION,
@@ -333,7 +330,6 @@ describe("ZK artifact trust", function () {
         "participantId",
         "personCommitmentContributionHash",
         "disclosureBindingContributionHash",
-        "familyInheritanceClaimContributionHash",
       ]);
       expect(fixture.transcript.schemaVersion).to.equal(3);
       expect(fixture.transcript.compiler).to.deep.equal(fixture.compiler);
@@ -618,7 +614,6 @@ describe("ZK artifact trust", function () {
         expect(contribution.signature).to.match(/^0x[0-9a-f]{130}$/u);
         expect(contribution.personCommitmentZkeySha256).to.match(/^[0-9a-f]{64}$/u);
         expect(contribution.disclosureBindingZkeySha256).to.match(/^[0-9a-f]{64}$/u);
-        expect(contribution.familyInheritanceClaimZkeySha256).to.match(/^[0-9a-f]{64}$/u);
         expect(result.contributions[index].approvalMessageHash).to.match(/^0x[0-9a-f]{64}$/u);
       }
     });

@@ -64,7 +64,8 @@ export async function main() {
     "DeepFamilyArchive",
     "DeepFamilyReader",
     "DeepFamilyLineageIndex",
-    "FamilyInheritance",
+    "ShieldedDeepPool",
+    "ShieldedHeirKeyRegistry",
   ]) {
     await syncAbi(contractName);
   }

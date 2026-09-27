@@ -1487,6 +1487,7 @@ describe("Shielded pool real Groth16 development integration", function () {
       "privateTransfer",
       {
         publicSignals: transferSignals.map(String),
+        hasSecondInput: "1",
         inputOwnerSecrets: sourceOwners.map(String),
         inputAmounts: sourceAmounts.map(String),
         inputNonces: sourceNonces.map(String),
@@ -1542,6 +1543,97 @@ describe("Shielded pool real Groth16 development integration", function () {
       pool,
       "NullifierAlreadySpent",
     );
-    console.log(`development-only Hardhat gas: privateTransfer=${receipt.gasUsed}`);
+
+    // The first recipient owns only this payout note. It can immediately make
+    // a private transfer without waiting for another claim or a zero-value note.
+    const singleSource = recipients[0];
+    const singleRoot = (await pool.noteShard(0)).root;
+    const singlePath = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    const singleDestinations = await Promise.all([
+      { ownerSecret: 5505n, amount: 25n, nonce: 41n, hpkeIkm: "0x5555" },
+      { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
+    ].map(async (destination) => {
+      const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
+      const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
+      const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+      const note = await encryptValueNote({
+        ownerCommitment,
+        viewingKey,
+        chainId,
+        poolAddress,
+        amount: destination.amount,
+        nonce: destination.nonce,
+      });
+      return { ...destination, hpkeIkm, ownerCommitment, note };
+    }));
+    const singleNullifiers = [
+      computeShieldedSpendNullifier({
+        ownerSecret: singleSource.ownerSecret,
+        noteCommitment: singleSource.note.commitment,
+      }),
+      computeShieldedDummyInputNullifier({
+        ownerSecret: singleSource.ownerSecret,
+        noteCommitment: singleSource.note.commitment,
+      }),
+    ];
+    const singleData = {
+      ...zeroData(),
+      inputRoots: [singleRoot, singleRoot],
+      inputNullifiers: singleNullifiers,
+      outputCommitments: singleDestinations.map(({ note }) => note.commitment),
+      outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
+    };
+    const singleSignals = buildShieldedPoolPublicSignals({
+      action: 6,
+      chainId,
+      poolAddress,
+      ...singleData,
+    });
+    const singleProof = await prove(
+      "privateTransfer",
+      {
+        publicSignals: singleSignals.map(String),
+        hasSecondInput: "0",
+        inputOwnerSecrets: [String(singleSource.ownerSecret), "0"],
+        inputAmounts: [String(singleSource.amount), "0"],
+        inputNonces: [String(singleSource.nonce), "0"],
+        inputCiphertextHashes: [String(singleSource.note.ciphertextHashField), "0"],
+        inputDepths: [singlePath.depth, "0"],
+        inputIndices: [singlePath.index, "0"],
+        inputSiblings: [singlePath.siblings, Array(32).fill("0")],
+        outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) => String(ownerCommitment)),
+        outputAmounts: singleDestinations.map(({ amount }) => String(amount)),
+        outputNonces: singleDestinations.map(({ nonce }) => String(nonce)),
+      },
+      singleSignals,
+    );
+    expect(await transferAdapter.verifyProof(singleProof, singleSignals)).to.equal(true);
+    await expect(pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof))
+      .to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    const singleReceipt = await (await pool.privateTransfer(singleData, singleProof)).wait();
+    for (const nullifier of singleNullifiers) {
+      expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+    }
+    for (const destination of singleDestinations) {
+      const payload = await decryptShieldedNote({
+        ciphertext: destination.note.ciphertext,
+        hpkeIkm: destination.hpkeIkm,
+        chainId,
+        poolAddress,
+      });
+      const recovered = verifyShieldedNotePayload({
+        payload,
+        ciphertext: destination.note.ciphertext,
+        noteCommitment: destination.note.commitment,
+      });
+      expect(recovered.note.amount).to.equal(destination.amount);
+    }
+    expect(await pool.totalShielded()).to.equal(100n);
+    expect(await token.balanceOf(poolAddress)).to.equal(100n);
+    await expect(pool.privateTransfer(singleData, singleProof)).to.be.revertedWithCustomError(
+      pool,
+      "NullifierAlreadySpent",
+    );
+    console.log(`development-only Hardhat gas: privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`);
   });
 });

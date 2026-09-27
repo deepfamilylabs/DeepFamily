@@ -434,34 +434,20 @@ const assertExistingIntegratedWiring = async ({
   }
 };
 
-const assertExistingInheritanceWiring = async ({
-  deepFamily,
-  token,
-  lineageIndex,
-  familyInheritance,
-  expectedClaimVerifier,
-}) => {
+const assertExistingLineageWiring = async ({ deepFamily, lineageIndex }) => {
   const deepFamilyAddress = await deepFamily.getAddress();
   const lineageIndexAddress = await lineageIndex.getAddress();
-  const [configuredIndex, indexMain, inheritanceIndex, inheritanceToken, claimVerifier] =
-    await Promise.all([
-      deepFamily.lineageIndex(),
-      lineageIndex.DEEP_FAMILY(),
-      familyInheritance.LINEAGE_INDEX(),
-      familyInheritance.TOKEN(),
-      familyInheritance.CLAIM_VERIFIER(),
-    ]);
+  const [configuredIndex, indexMain] = await Promise.all([
+    deepFamily.lineageIndex(),
+    lineageIndex.DEEP_FAMILY(),
+  ]);
   if (
     !sameAddress(configuredIndex, lineageIndexAddress) ||
-    !sameAddress(indexMain, deepFamilyAddress) ||
-    !sameAddress(inheritanceIndex, lineageIndexAddress) ||
-    !sameAddress(inheritanceToken, await token.getAddress()) ||
-    !sameAddress(claimVerifier, expectedClaimVerifier?.address)
+    !sameAddress(indexMain, deepFamilyAddress)
   ) {
     throw new Error(
       `Deployment wiring mismatch: DeepFamily lineageIndex=${configuredIndex}, ` +
-        `index.DEEP_FAMILY=${indexMain}, inheritance index/token/verifier=` +
-        `${inheritanceIndex}/${inheritanceToken}/${claimVerifier}`,
+        `index.DEEP_FAMILY=${indexMain}`,
     );
   }
 };
@@ -776,17 +762,6 @@ export const deployIntegratedSystem = async (
     );
   }
 
-  const familyInheritanceClaimVerifier = await deployContract(
-    "familyInheritanceClaimVerifier",
-    await ethers.getContractFactory("FamilyInheritanceClaimVerifier", deployer),
-  );
-  const familyInheritanceClaimVerifierAddress = await familyInheritanceClaimVerifier.getAddress();
-  const familyInheritance = await deployContract(
-    "familyInheritance",
-    await ethers.getContractFactory("FamilyInheritance", deployer),
-    [tokenAddress, lineageIndexAddress, familyInheritanceClaimVerifierAddress],
-  );
-
   // Hand DeepFamily upgrade/configuration ownership to governance (intended: timelock + multisig).
   // DeepFamilyToken already retired its bootstrap owner during initialize(), so it intentionally
   // remains ownerless. Must run after verifier registration, which requires the deployer to still
@@ -908,8 +883,6 @@ export const deployIntegratedSystem = async (
       ["PoseidonT3", lineageLibraries.PoseidonT3],
       ["PoseidonT4", lineageLibraries.PoseidonT4],
       ["PoseidonT6", lineageLibraries.PoseidonT6],
-      ["FamilyInheritanceClaimVerifier", familyInheritanceClaimVerifierAddress],
-      ["FamilyInheritance", await familyInheritance.getAddress()],
     ]) {
       await writeDeployment(
         connection,
@@ -945,8 +918,6 @@ export const deployIntegratedSystem = async (
     poseidonT4,
     poseidonT6,
     lineageIndex,
-    familyInheritanceClaimVerifier,
-    familyInheritance,
     deepFamilyImplementationAddress,
     transactionReceipts,
   };
@@ -989,11 +960,6 @@ export const ensureIntegratedSystem = async (
     "DisclosureBindingVerifier",
   );
   const existingLineageIndex = await safeReadDeployment(connection, "DeepFamilyLineageIndex");
-  const existingInheritance = await safeReadDeployment(connection, "FamilyInheritance");
-  const existingClaimVerifier = await safeReadDeployment(
-    connection,
-    "FamilyInheritanceClaimVerifier",
-  );
   const existingPoseidonT3 = await safeReadDeployment(connection, "PoseidonT3");
   const existingPoseidonT4 = await safeReadDeployment(connection, "PoseidonT4");
   const existingPoseidonT6 = await safeReadDeployment(connection, "PoseidonT6");
@@ -1008,8 +974,6 @@ export const ensureIntegratedSystem = async (
     ["PersonCommitmentVerifier", existingPersonVerifier],
     ["DisclosureBindingVerifier", existingDisclosureVerifier],
     ["DeepFamilyLineageIndex", existingLineageIndex],
-    ["FamilyInheritance", existingInheritance],
-    ["FamilyInheritanceClaimVerifier", existingClaimVerifier],
     ["PoseidonT3", existingPoseidonT3],
     ["PoseidonT4", existingPoseidonT4],
     ["PoseidonT6", existingPoseidonT6],
@@ -1022,8 +986,7 @@ export const ensureIntegratedSystem = async (
     existingToken?.address &&
     existingArchive?.address &&
     existingReader?.address &&
-    existingLineageIndex?.address &&
-    existingInheritance?.address;
+    existingLineageIndex?.address;
 
   if (recordedNames.length === 0 && !isLocalDevNetwork(connection)) {
     if (!allowNewDeployment) {
@@ -1055,7 +1018,6 @@ export const ensureIntegratedSystem = async (
         ["DeepFamilyArchive", existingArchive],
         ["DeepFamilyReader", existingReader],
         ["DeepFamilyLineageIndex", existingLineageIndex],
-        ["FamilyInheritance", existingInheritance],
       ]);
 
       // DeepFamily must be a UUPS proxy; a legacy direct deployment would
@@ -1073,7 +1035,6 @@ export const ensureIntegratedSystem = async (
           ["PoseidonT3", existingPoseidonT3],
           ["PoseidonT4", existingPoseidonT4],
           ["PoseidonT6", existingPoseidonT6],
-          ["FamilyInheritanceClaimVerifier", existingClaimVerifier],
         ];
         const missing = artifactBoundDeployments
           .filter(([, deployment]) => !deployment?.address)
@@ -1114,7 +1075,6 @@ export const ensureIntegratedSystem = async (
           deployments: [
             { contractName: "DeepFamilyToken", deployment: existingToken },
             { contractName: "DeepFamilyReader", deployment: existingReader },
-            { contractName: "FamilyInheritance", deployment: existingInheritance },
             {
               contractName: "DeepFamilyLineageIndex",
               deployment: existingLineageIndex,
@@ -1160,11 +1120,6 @@ export const ensureIntegratedSystem = async (
         existingLineageIndex.address,
         defaultSigner,
       );
-      const familyInheritance = await ethers.getContractAt(
-        "FamilyInheritance",
-        existingInheritance.address,
-        defaultSigner,
-      );
       await assertExistingIntegratedWiring({
         ethers,
         deepFamily,
@@ -1173,13 +1128,7 @@ export const ensureIntegratedSystem = async (
         deepFamilyReader,
         expectedGroth16Adapter: existingGroth16Adapter,
       });
-      await assertExistingInheritanceWiring({
-        deepFamily,
-        token,
-        lineageIndex,
-        familyInheritance,
-        expectedClaimVerifier: existingClaimVerifier,
-      });
+      await assertExistingLineageWiring({ deepFamily, lineageIndex });
       await assertExistingGovernanceOwner(connection, ethers, currentArtifacts, [
         { contractName: "DeepFamily", contract: deepFamily },
       ]);
@@ -1204,7 +1153,6 @@ export const ensureIntegratedSystem = async (
             contract: lineageIndex,
             extra: { deepFamilyAddress: await deepFamily.getAddress() },
           },
-          { contractName: "FamilyInheritance", contract: familyInheritance },
         ];
         if (existingGroth16Adapter?.address) {
           const groth16Adapter = await ethers.getContractAt(
@@ -1227,7 +1175,6 @@ export const ensureIntegratedSystem = async (
         archive,
         deepFamilyReader,
         lineageIndex,
-        familyInheritance,
       };
       return connection.__deepfamilyIntegrated;
     } catch (error) {
@@ -1254,7 +1201,6 @@ export const ensureIntegratedSystem = async (
     archive: deployed.archive,
     deepFamilyReader: deployed.deepFamilyReader,
     lineageIndex: deployed.lineageIndex,
-    familyInheritance: deployed.familyInheritance,
   };
   return connection.__deepfamilyIntegrated;
 };

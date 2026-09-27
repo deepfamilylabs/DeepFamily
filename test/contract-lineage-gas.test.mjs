@@ -1,20 +1,11 @@
 import "../hardhat-test-setup.mjs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { expect } from "chai";
 import hre from "hardhat";
-import * as snarkjs from "snarkjs";
 import {
-  buildInheritanceClaimWitness,
   buildLineageMerkleProofFromPath,
-  computeIdentityFromDerivedSecret,
-  computeInheritanceCredential,
-  computeInheritanceEligibleFrom,
   computeLineageTrustedLeaf,
   hashLineageNodes,
-  replayLineageTree,
 } from "@deepfamily/protocol-core";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { loadStorageLayoutFromArtifactObject } from "../scripts/lib/storageLayout.mjs";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import {
@@ -29,18 +20,11 @@ import {
 
 const TRUSTED_TREE = 1;
 const ENDORSEMENT_TREE = 0;
-const DEEP = 10n ** 18n;
 const REAL_SIZES_TO_REPORT = new Set([2, 4, 8, 9, 15, 16, 17, 31, 32, 33]);
 // Match the repository's 15M eSpace single-transaction test budget with 20% headroom.
 // This local EDR regression gate is not a guarantee about a live network's gas policy.
 const SINGLE_TX_TEST_BUDGET = 15_000_000n;
 const coder = hre.ethers.AbiCoder.defaultAbiCoder();
-const ZK_DIRECTORY = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../frontend/public/zk",
-);
-const CLAIM_WASM = path.join(ZK_DIRECTORY, "family_inheritance_claim.wasm");
-const CLAIM_ZKEY = path.join(ZK_DIRECTORY, "family_inheritance_claim_final.zkey");
 
 function reportGas(measurements) {
   if (process.env.LINEAGE_GAS_REPORT === "1") console.table(measurements);
@@ -67,103 +51,6 @@ function row(label, tree, size, depth, estimate, receipt) {
     depth: String(depth),
     estimate: String(estimate),
     gasUsed: String(receipt.gasUsed),
-  };
-}
-
-async function measureInheritance(method, args, label, id) {
-  const estimate = await method.estimateGas(...args);
-  const receipt = await (await method(...args)).wait();
-  assertGasBudget(`${label} id ${id}`, estimate, receipt);
-  return {
-    display: {
-      operation: label,
-      id: String(id),
-      estimate: String(estimate),
-      gasUsed: String(receipt.gasUsed),
-    },
-    gasUsed: receipt.gasUsed,
-  };
-}
-
-async function replayedTree(lineageIndex, treeId) {
-  const events = await lineageIndex.queryFilter(lineageIndex.filters.LeafWritten(treeId));
-  events.sort((left, right) => left.blockNumber - right.blockNumber || left.index - right.index);
-  return replayLineageTree(
-    events.map(({ args }) => ({ leafIndex: args.leafIndex, leaf: args.leaf })),
-  );
-}
-
-async function inheritanceClaimProof(context, id, recipient) {
-  const {
-    familyInheritance,
-    lineageIndex,
-    root,
-    rootHash,
-    heir,
-    heirHash,
-    spouse,
-    rootIdentity,
-    manager,
-    writtenAt,
-  } = context;
-  const inheritance = await familyInheritance.inheritanceOf(id);
-  const eligibleFrom = computeInheritanceEligibleFrom({
-    startTime: inheritance.startTime,
-    writtenAt,
-  });
-  const [hasEndorsement, endorsementLeafIndex] = await lineageIndex.endorsementLeafIndex(
-    heirHash,
-    manager.address,
-  );
-  const [isTrusted, trustedLeafIndex] = await lineageIndex.trustedLeafIndex(
-    rootHash,
-    1,
-    manager.address,
-  );
-  expect(hasEndorsement).to.equal(true);
-  expect(isTrusted).to.equal(true);
-  const spouseIdentity = computeIdentityFromDerivedSecret({
-    identity: spouse,
-    identitySuiteId: 1,
-    derivedSecretField: spouse.derivedSecretField,
-  });
-  const { witness, publicSignals } = buildInheritanceClaimWitness({
-    heir: { identity: heir, identitySuiteId: 1, derivedSecretField: heir.derivedSecretField },
-    versionIndex: 1,
-    fatherIdentityCommitment: rootIdentity.identityCommitment,
-    motherIdentityCommitment: spouseIdentity.identityCommitment,
-    rootIsMother: false,
-    endorser: manager.address,
-    writtenAt,
-    endorsementTree: await replayedTree(lineageIndex, ENDORSEMENT_TREE),
-    endorsementLeafIndex: Number(endorsementLeafIndex),
-    root: {
-      identityCommitment: rootIdentity.identityCommitment,
-      versionIndex: 1,
-      derivedSecretField: root.derivedSecretField,
-    },
-    trustedTree: await replayedTree(lineageIndex, TRUSTED_TREE),
-    trustedLeafIndex: Number(trustedLeafIndex),
-    eligibleFrom,
-    recipient,
-  });
-  const { proof } = await snarkjs.groth16.fullProve(
-    witness,
-    CLAIM_WASM,
-    CLAIM_ZKEY,
-    undefined,
-    undefined,
-    { singleThread: true },
-  );
-  return {
-    proofData: encodeGroth16AbcProofData(normalizeGroth16Proof(proof)),
-    signals: {
-      endorsementRoot: publicSignals.endorsementRoot,
-      trustedRoot: publicSignals.trustedRoot,
-      claimTag: publicSignals.claimTag,
-      eligibleFrom: publicSignals.eligibleFrom,
-      recipient,
-    },
   };
 }
 
@@ -534,121 +421,4 @@ describe("DeepFamily lineage gas benchmark", function () {
     expect(await deepFamily.trustedEndorserOf(personHash, 1, overflowAccount)).to.equal(false);
   });
 
-  it("keeps one inheritance create, deposit and proven claim bounded as IDs grow", async () => {
-    const {
-      deepFamily,
-      familyInheritance,
-      lineageIndex,
-      token,
-      manager,
-      person: root,
-      personHash: rootHash,
-    } = await hre.networkHelpers.loadFixture(setupSinglePerson);
-    const [, depositor, earlyRecipient, lateRecipient] = await hre.ethers.getSigners();
-    // One complete-parent version funds the depositor, as in the inheritance contract tests.
-    const heir = makeTestPerson("Inheritance gas child", { derivedSecretField: 78635n });
-    const spouse = makeTestPerson("Inheritance gas spouse", {
-      derivedSecretField: 78636n,
-      gender: 2,
-    });
-    const heirHash = await addPerson(hre.ethers, deepFamily, manager, undefined, {
-      person: heir,
-      fatherPerson: root,
-      motherPerson: spouse,
-      tag: "inheritance-gas-funding",
-    });
-    await (
-      await token.connect(manager).approve(await deepFamily.getAddress(), hre.ethers.MaxUint256)
-    ).wait();
-    const endorsement = await (
-      await deepFamily.connect(manager).endorseVersion(heirHash, 1)
-    ).wait();
-    const writtenAt = BigInt((await endorsement.getBlock()).timestamp);
-    await (await token.connect(manager).transfer(depositor.address, 200n * DEEP)).wait();
-    await (
-      await token
-        .connect(depositor)
-        .approve(await familyInheritance.getAddress(), hre.ethers.MaxUint256)
-    ).wait();
-    const rootIdentity = computeIdentityFromDerivedSecret({
-      identity: root,
-      identitySuiteId: 1,
-      derivedSecretField: root.derivedSecretField,
-    });
-    const credential = computeInheritanceCredential({
-      rootIdentityCommitment: rootIdentity.identityCommitment,
-      rootVersionIndex: 1,
-      rootDerivedSecretField: root.derivedSecretField,
-    });
-
-    const create = familyInheritance.connect(depositor).createInheritance;
-    const createArgs = [credential, DEEP, 2n * DEEP];
-    const measurements = [];
-    const createGas = new Map();
-    for (let id = 1; id <= 65; id += 1) {
-      if (id === 2 || id === 65) {
-        const measured = await measureInheritance(create, createArgs, "create inheritance", id);
-        measurements.push(measured.display);
-        createGas.set(id, measured.gasUsed);
-      } else {
-        await (await create(...createArgs)).wait();
-      }
-    }
-    expect(await familyInheritance.inheritanceCount()).to.equal(65n);
-
-    const deposit = familyInheritance.connect(depositor).deposit;
-    const depositGas = new Map();
-    for (const id of [2, 65]) {
-      const measured = await measureInheritance(deposit, [id, DEEP], "deposit", id);
-      measurements.push(measured.display);
-      depositGas.set(id, measured.gasUsed);
-      expect((await familyInheritance.inheritanceOf(id)).balance).to.equal(3n * DEEP);
-    }
-    // A 30k allowance covers ordinary storage/account warmness differences while catching
-    // a material scan through the 63 additional inheritances in either transaction path.
-    expect(createGas.get(65)).to.be.at.most(createGas.get(2) + 30_000n);
-    expect(depositGas.get(65)).to.be.at.most(depositGas.get(2) + 30_000n);
-
-    // Each inheritance has a different startTime, so its proof binds a different eligibility grid.
-    const proofContext = {
-      familyInheritance,
-      lineageIndex,
-      root,
-      rootHash,
-      heir,
-      heirHash,
-      spouse,
-      rootIdentity,
-      manager,
-      writtenAt,
-    };
-    const earlyProof = await inheritanceClaimProof(proofContext, 2n, earlyRecipient.address);
-    const lateProof = await inheritanceClaimProof(proofContext, 65n, lateRecipient.address);
-    const readyAt =
-      earlyProof.signals.eligibleFrom > lateProof.signals.eligibleFrom
-        ? earlyProof.signals.eligibleFrom
-        : lateProof.signals.eligibleFrom;
-    await hre.networkHelpers.time.increaseTo(readyAt);
-    const claim = familyInheritance.claim;
-    const earlyClaim = await measureInheritance(
-      claim,
-      [2n, earlyProof.signals, earlyProof.proofData],
-      "claim with real Groth16 proof",
-      2,
-    );
-    const lateClaim = await measureInheritance(
-      claim,
-      [65n, lateProof.signals, lateProof.proofData],
-      "claim with real Groth16 proof",
-      65,
-    );
-    measurements.push(earlyClaim.display, lateClaim.display);
-    expect(await token.balanceOf(earlyRecipient.address)).to.equal(DEEP);
-    expect(await token.balanceOf(lateRecipient.address)).to.equal(DEEP);
-    expect((await familyInheritance.inheritanceOf(2)).balance).to.equal(2n * DEEP);
-    expect((await familyInheritance.inheritanceOf(65)).balance).to.equal(2n * DEEP);
-    // Both recipients start with zero DEEP; allow precompile and storage cost variation.
-    expect(lateClaim.gasUsed).to.be.at.most(earlyClaim.gasUsed + 50_000n);
-    reportGas(measurements);
-  });
 });

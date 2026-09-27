@@ -5,11 +5,14 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Action 6. Two independently owned VALUE_NOTE inputs may come from different
-// shards. Two encrypted VALUE_NOTE outputs may name independent recipient
-// owner commitments. No public amount, recipient, policy, or heir is exposed.
+// Action 6. One or two independently owned VALUE_NOTE inputs fund two
+// encrypted VALUE_NOTE outputs. An absent second input uses a domain-separated
+// dummy nullifier bound to the first note, with no value contribution. The
+// input count is a private witness, though different public roots reveal two
+// inputs. Amounts, recipients, policy, and heir are not public inputs.
 template ShieldedPrivateTransfer() {
     signal input publicSignals[32];
+    signal input hasSecondInput;
     signal input inputOwnerSecrets[2];
     signal input inputAmounts[2];
     signal input inputNonces[2];
@@ -32,6 +35,9 @@ template ShieldedPrivateTransfer() {
     for (var i = 25; i <= 31; i++) {
         publicSignals[i] === 0;
     }
+    hasSecondInput * (hasSecondInput - 1) === 0;
+    (1 - hasSecondInput) * (publicSignals[5] - publicSignals[3]) === 0;
+    (1 - hasSecondInput) * (publicSignals[6] - publicSignals[4]) === 0;
 
     component ownerNotZero[2];
     component owner[2];
@@ -49,7 +55,20 @@ template ShieldedPrivateTransfer() {
     for (var i = 0; i < 2; i++) {
         ownerNotZero[i] = IsZero();
         ownerNotZero[i].in <== inputOwnerSecrets[i];
-        ownerNotZero[i].out === 0;
+        if (i == 0) {
+            ownerNotZero[i].out === 0;
+        } else {
+            hasSecondInput * ownerNotZero[i].out === 0;
+            (1 - hasSecondInput) * inputOwnerSecrets[i] === 0;
+            (1 - hasSecondInput) * inputAmounts[i] === 0;
+            (1 - hasSecondInput) * inputNonces[i] === 0;
+            (1 - hasSecondInput) * inputCiphertextHashes[i] === 0;
+            (1 - hasSecondInput) * inputDepths[i] === 0;
+            (1 - hasSecondInput) * inputIndices[i] === 0;
+            for (var level = 0; level < 32; level++) {
+                (1 - hasSecondInput) * inputSiblings[i][level] === 0;
+            }
+        }
         owner[i] = Poseidon(2);
         owner[i].inputs[0] <== 1013;
         owner[i].inputs[1] <== inputOwnerSecrets[i];
@@ -57,7 +76,11 @@ template ShieldedPrivateTransfer() {
         inputAmountBits[i].in <== inputAmounts[i];
         inputNonceNotZero[i] = IsZero();
         inputNonceNotZero[i].in <== inputNonces[i];
-        inputNonceNotZero[i].out === 0;
+        if (i == 0) {
+            inputNonceNotZero[i].out === 0;
+        } else {
+            hasSecondInput * inputNonceNotZero[i].out === 0;
+        }
         inputNote[i] = Poseidon(5);
         inputNote[i].inputs[0] <== 1014;
         inputNote[i].inputs[1] <== owner[i].out;
@@ -77,12 +100,18 @@ template ShieldedPrivateTransfer() {
         for (var level = 0; level < 32; level++) {
             membership[i].siblings[level] <== inputSiblings[i][level];
         }
-        membership[i].out === publicSignals[4 + i * 2];
+        if (i == 0) {
+            membership[i].out === publicSignals[4];
+        } else {
+            hasSecondInput * (membership[i].out - publicSignals[6]) === 0;
+        }
         spend[i] = Poseidon(3);
         spend[i].inputs[0] <== 1016;
         spend[i].inputs[1] <== inputOwnerSecrets[i];
         spend[i].inputs[2] <== inputNote[i].out;
-        spend[i].out === publicSignals[7 + i];
+        if (i == 0) {
+            spend[i].out === publicSignals[7];
+        }
 
         outputOwnerNotZero[i] = IsZero();
         outputOwnerNotZero[i].in <== outputOwnerCommitments[i];
@@ -100,6 +129,11 @@ template ShieldedPrivateTransfer() {
         outputNote[i].inputs[4] <== publicSignals[23 + i];
         outputNote[i].out === publicSignals[21 + i];
     }
+    component dummySpend = Poseidon(3);
+    dummySpend.inputs[0] <== 1021;
+    dummySpend.inputs[1] <== inputOwnerSecrets[0];
+    dummySpend.inputs[2] <== inputNote[0].out;
+    publicSignals[8] === dummySpend.out + hasSecondInput * (spend[1].out - dummySpend.out);
     inputAmounts[0] + inputAmounts[1] === outputAmounts[0] + outputAmounts[1];
 }
 

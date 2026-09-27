@@ -61,6 +61,7 @@ import {
 } from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
+import { checkShieldedRelease } from "./zk-shielded-release-check.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const ERC1967_IMPLEMENTATION_SLOT =
@@ -834,6 +835,13 @@ export const main = async (chainProfile) => {
   if (authorization.mode !== wrapperMode) {
     throw new Error("Mainnet release command mode does not match its approval input");
   }
+
+  // The inheritance page now targets ShieldedDeepPool. Release planning must
+  // include its verifiers, registry, and pool before any core transaction is sent.
+  if (!MAINNET_TRANSACTION_LABELS.includes("shieldedDeepPool")) {
+    throw new Error("Mainnet release plan does not yet deploy the shielded inheritance pool");
+  }
+  await checkShieldedRelease({ root: process.cwd() });
 
   const connection = await hre.network.connect();
   const { ethers } = connection;

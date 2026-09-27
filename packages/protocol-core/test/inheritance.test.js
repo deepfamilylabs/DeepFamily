@@ -1,26 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import { poseidon2 } from "poseidon-lite";
 import {
-  INHERITANCE_PERIOD_SECONDS,
   LINEAGE_TREE_MAX_DEPTH,
   buildLineageMerkleProof,
   buildLineageMerkleProofFromPath,
-  computeInheritanceClaimTag,
-  computeInheritanceCredential,
-  computeInheritanceEligibleFrom,
-  computeInheritanceEntitlement,
   createLineageTree,
   packLineageEndorserAndTime,
   replayLineageTree,
   wrapIdentityCommitmentAsPersonHash,
 } from "../index.js";
-import {
-  INHERITANCE_VECTOR_URL,
-  buildInheritanceVector,
-  serializeInheritanceVector,
-} from "../scripts/generate-inheritance-vector.mjs";
 
 // Independent LeanIMT reference: a lone left node rises unchanged, a pair is hashed.
 const referenceRoot = (leaves) => {
@@ -68,11 +57,6 @@ const rootFromProof = (proof) => {
   }
   return node;
 };
-
-test("the committed inheritance vector matches the generator", () => {
-  const committed = fs.readFileSync(INHERITANCE_VECTOR_URL, "utf8");
-  assert.equal(committed, serializeInheritanceVector(buildInheritanceVector()));
-});
 
 test("replayed lineage trees match an independent LeanIMT for appends, updates and clears", () => {
   let seed = 7n;
@@ -190,60 +174,11 @@ test("the endorser and write time pack into disjoint bit ranges", () => {
   assert.equal(packed, (3n << 160n) | ((1n << 160n) - 1n));
 });
 
-test("eligibility starts on the first period boundary at least one period after the write", () => {
-  const period = INHERITANCE_PERIOD_SECONDS;
-  const startTime = 10n * period + 1_000n;
-  assert.equal(computeInheritanceEligibleFrom({ startTime, writtenAt: 0n }), startTime);
-  assert.equal(
-    computeInheritanceEligibleFrom({ startTime: 1_000n, writtenAt: 0n }),
-    1_000n + period,
-  );
-  assert.equal(
-    computeInheritanceEligibleFrom({ startTime, writtenAt: startTime - period }),
-    startTime,
-  );
-  assert.equal(
-    computeInheritanceEligibleFrom({ startTime, writtenAt: startTime - period + 1n }),
-    startTime + period,
-  );
-  assert.equal(
-    computeInheritanceEligibleFrom({ startTime, writtenAt: startTime + period }),
-    startTime + 2n * period,
-  );
-});
-
-test("entitlement accrues one amount per started period", () => {
-  const period = INHERITANCE_PERIOD_SECONDS;
-  const input = { amountPerPeriod: 5n, eligibleFrom: 100n };
-  assert.equal(computeInheritanceEntitlement({ ...input, now: 99n }), 0n);
-  assert.equal(computeInheritanceEntitlement({ ...input, now: 100n }), 5n);
-  assert.equal(computeInheritanceEntitlement({ ...input, now: 100n + period - 1n }), 5n);
-  assert.equal(computeInheritanceEntitlement({ ...input, now: 100n + 3n * period }), 20n);
-});
-
-test("credentials and claim tags bind every input", () => {
-  const base = { rootIdentityCommitment: 9n, rootVersionIndex: 1n, rootDerivedSecretField: 7n };
-  const credential = computeInheritanceCredential(base);
-  assert.notEqual(computeInheritanceCredential({ ...base, rootVersionIndex: 2n }), credential);
-  assert.notEqual(
-    computeInheritanceCredential({ ...base, rootDerivedSecretField: 8n }),
-    credential,
-  );
-  assert.throws(() => computeInheritanceCredential({ ...base, rootIdentityCommitment: 0n }));
-  const tag = computeInheritanceClaimTag({
-    derivedSecretField: 3n,
-    inheritanceCredential: credential,
-  });
-  assert.notEqual(
-    computeInheritanceClaimTag({ derivedSecretField: 3n, inheritanceCredential: credential + 1n }),
-    tag,
-  );
-});
-
 test("person hashes wrap identity commitments exactly like DeepFamily", () => {
-  const vector = buildInheritanceVector();
   assert.equal(
-    wrapIdentityCommitmentAsPersonHash(vector.heir.identityCommitment),
-    vector.heir.personHash,
+    wrapIdentityCommitmentAsPersonHash(
+      8000408651253274776522029745440183964027976999181226727404389597872309383089n,
+    ),
+    "0x1d09d06090b14dc8e3d0d886eeadbab1aa4653e7c62ef565cc48160074db5718",
   );
 });

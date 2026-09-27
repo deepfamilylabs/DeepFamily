@@ -29,7 +29,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(21);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(19);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -103,11 +103,6 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         PoseidonT6: address("poseidonT6"),
       },
     });
-    const ClaimVerifier = await ethers.getContractFactory(
-      "FamilyInheritanceClaimVerifier",
-      deployer,
-    );
-    const Inheritance = await ethers.getContractFactory("FamilyInheritance", deployer);
     const initializeData = DeepFamily.interface.encodeFunctionData("initialize", [
       address("deepFamilyToken"),
       deployerAddress,
@@ -166,12 +161,6 @@ describe("eSpace Mainnet resumable deployment integration", function () {
           address("deepFamilyLineageIndex"),
         ]),
       },
-      familyInheritanceClaimVerifier: await ClaimVerifier.getDeployTransaction(),
-      familyInheritance: await Inheritance.getDeployTransaction(
-        address("deepFamilyToken"),
-        address("deepFamilyLineageIndex"),
-        address("familyInheritanceClaimVerifier"),
-      ),
       transferDeepFamilyOwnership: {
         to: address("deepFamilyProxy"),
         data: DeepFamily.interface.encodeFunctionData("transferOwnership", [

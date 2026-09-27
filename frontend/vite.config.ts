@@ -5,6 +5,7 @@ import { NETWORK_PRESETS } from './src/shared/config/networks'
 import { IPFS_GATEWAY_BASE_URLS } from './src/shared/ipfs/config'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { assertNoShieldedPublicArtifacts, shieldedDevelopmentArtifactPlugin } from './scripts/shielded-dev-artifacts.mjs'
 
 const CSP_REPORT_PATH = '/__csp-report'
 const CSP_HEADER = 'Content-Security-Policy'
@@ -209,6 +210,7 @@ const buildCsp = (opts: {
 }
 
 export default defineConfig(({ command, mode }) => {
+  assertNoShieldedPublicArtifacts(fileURLToPath(new URL('.', import.meta.url)))
   const env = loadEnv(mode, process.cwd(), '')
   const getEnv = (key: string): string | undefined => env[key] ?? process.env[key]
   const flag = (key: string, defaultValue: boolean): boolean => {
@@ -275,7 +277,11 @@ export default defineConfig(({ command, mode }) => {
   const inquireShimPath = fileURLToPath(new URL('./src/shims/protobufjs-inquire.ts', import.meta.url))
 
   return {
-    plugins: [react(), cspReportPlugin({ reportFile })],
+    plugins: [
+      react(),
+      cspReportPlugin({ reportFile }),
+      ...(command === 'serve' && mode === 'development' ? [shieldedDevelopmentArtifactPlugin()] : []),
+    ],
     resolve: {
       alias: {
         '@protobufjs/inquire': inquireShimPath,

@@ -277,6 +277,34 @@ describe("local private allocation and top-up preparation", () => {
     expect(await open(topUp.outputs[1].ciphertext, donorSecret)).toMatchObject({ kind: "value", amount: 70n });
   });
 
+  it("accepts canonical wallet and key snapshots when unrelated blocks arrive before funding", async () => {
+    const fixture = await setup();
+    const provider = fixture.pool.runner!.provider as unknown as {
+      getBlock: (block: number | string) => Promise<{ number: number; timestamp: number; hash: string } | null>;
+    };
+    const getBlock = provider.getBlock.bind(provider);
+    provider.getBlock = async (block) => block === "latest"
+      ? { number: 11, timestamp: timestamp + 2, hash: `0x${"cd".repeat(32)}` }
+      : getBlock(block);
+
+    const allocated = await prepareShieldedAllocate({
+      ...fixture.common,
+      policy: { ...fixture.policy.outputs[0], shardId: 0n },
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+      budgetPeriods: 1n,
+    });
+    expect(allocated.data.asOf).toBe(BigInt(timestamp + 2));
+    fixture.noteTree.insert(allocated.outputs[0].commitment);
+    fixture.noteTree.insert(allocated.outputs[1].commitment);
+    const topUp = await prepareShieldedTopUp({
+      ...fixture.common,
+      budget: { ...allocated.outputs[0], shardId: 0n },
+      topUpPeriods: 1n,
+    });
+    expect(topUp.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
+  });
+
   it("rejects insufficient funds, stale lineage, a one-key root, and a substituted template", async () => {
     const fixture = await setup();
     const input = {

@@ -122,6 +122,8 @@ async function updateLocalConfig() {
 
     const deepFamilyPath = path.join(DEPLOYMENTS_DIR, "DeepFamily.json");
     const readerPath = path.join(DEPLOYMENTS_DIR, "DeepFamilyReader.json");
+    const poolPath = path.join(DEPLOYMENTS_DIR, "ShieldedDeepPool.json");
+    const registryPath = path.join(DEPLOYMENTS_DIR, "ShieldedHeirKeyRegistry.json");
     if (!fs.existsSync(deepFamilyPath)) {
       console.log("DeepFamily contract not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
@@ -130,20 +132,32 @@ async function updateLocalConfig() {
       console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
+    if (!fs.existsSync(poolPath) || !fs.existsSync(registryPath)) {
+      console.log("Shielded pool not deployed. Run `npm run dev:shielded:deploy` first.");
+      process.exit(1);
+    }
 
     const deepFamilyDeployment = JSON.parse(fs.readFileSync(deepFamilyPath, "utf8"));
     const readerDeployment = JSON.parse(fs.readFileSync(readerPath, "utf8"));
+    const poolDeployment = JSON.parse(fs.readFileSync(poolPath, "utf8"));
+    const registryDeployment = JSON.parse(fs.readFileSync(registryPath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
-    // FamilyInheritance is not reachable from DeepFamily, so its address is configured beside
-    // the reader. A deployment from before the inheritance module simply leaves it unset.
-    const inheritancePath = path.join(DEPLOYMENTS_DIR, "FamilyInheritance.json");
-    const inheritanceAddress = fs.existsSync(inheritancePath)
-      ? JSON.parse(fs.readFileSync(inheritancePath, "utf8")).address
-      : "";
+    const poolAddress = ethers.getAddress(poolDeployment.address);
+    const registryAddress = ethers.getAddress(registryDeployment.address);
+    if (
+      poolDeployment.developmentOnly !== true ||
+      registryDeployment.developmentOnly !== true ||
+      !Number.isSafeInteger(poolDeployment.deploymentBlock) ||
+      !Number.isSafeInteger(registryDeployment.deploymentBlock)
+    ) {
+      throw new Error("Local shielded deployment metadata is incomplete or not development-only");
+    }
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
     console.log(`Found DeepFamilyReader contract at: ${readerAddress}`);
+    console.log(`Found local shielded pool at: ${poolAddress}`);
+    console.log(`Found local heir key registry at: ${registryAddress}`);
 
     const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
 
@@ -157,6 +171,34 @@ async function updateLocalConfig() {
     }
 
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
+
+    const [localChain, poolCode, registryCode] = await Promise.all([
+      provider.getNetwork(),
+      provider.getCode(poolAddress),
+      provider.getCode(registryAddress),
+    ]);
+    if (localChain.chainId !== BigInt(LOCAL_CHAIN_ID) || poolCode === "0x" || registryCode === "0x") {
+      throw new Error("Local shielded deployment is missing or belongs to another chain");
+    }
+    const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
+    const registry = new ethers.Contract(registryAddress, registryDeployment.abi, provider);
+    const [familyToken, familyLineage, poolToken, poolLineage, poolRegistry, registryLineage] =
+      await Promise.all([
+        deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
+        deepFamily.lineageIndex(),
+        pool.TOKEN(),
+        pool.LINEAGE_INDEX(),
+        pool.KEY_REGISTRY(),
+        registry.LINEAGE_INDEX(),
+      ]);
+    if (
+      ethers.getAddress(familyToken) !== ethers.getAddress(poolToken) ||
+      ethers.getAddress(familyLineage) !== ethers.getAddress(poolLineage) ||
+      ethers.getAddress(familyLineage) !== ethers.getAddress(registryLineage) ||
+      ethers.getAddress(poolRegistry) !== registryAddress
+    ) {
+      throw new Error("Local shielded pool and key registry are not bound to this DeepFamily");
+    }
 
     try {
       const tokenCounter = await deepFamily.tokenCounter();
@@ -211,19 +253,24 @@ async function updateLocalConfig() {
 
     const updates = {
       VITE_RPC_URL: "http://127.0.0.1:8545",
-      // The one address the app is given; it derives the rest by asking this
-      // reader. The retired `VITE_CONTRACT_ADDRESS` spelling is swept up below.
+      // Person/tree modules are resolved through this reader. The shielded
+      // pool and key registry are separate immutable contracts.
       VITE_READER_ADDRESS: readerAddress,
       // Keyed by chain, so switching networks in the app can find its way back
       // here without the reader having to be retyped.
       [`VITE_READER_ADDRESS_${LOCAL_CHAIN_ID}`]: readerAddress,
+      VITE_SHIELDED_POOL_ADDRESS: poolAddress,
+      [`VITE_SHIELDED_POOL_ADDRESS_${LOCAL_CHAIN_ID}`]: poolAddress,
+      VITE_SHIELDED_POOL_FROM_BLOCK: poolDeployment.deploymentBlock,
+      [`VITE_SHIELDED_POOL_FROM_BLOCK_${LOCAL_CHAIN_ID}`]: poolDeployment.deploymentBlock,
+      VITE_SHIELDED_KEY_REGISTRY_ADDRESS: registryAddress,
+      [`VITE_SHIELDED_KEY_REGISTRY_ADDRESS_${LOCAL_CHAIN_ID}`]: registryAddress,
+      VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK: registryDeployment.deploymentBlock,
+      [`VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK_${LOCAL_CHAIN_ID}`]:
+        registryDeployment.deploymentBlock,
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };
-    if (inheritanceAddress) {
-      updates.VITE_INHERITANCE_ADDRESS = inheritanceAddress;
-      updates[`VITE_INHERITANCE_ADDRESS_${LOCAL_CHAIN_ID}`] = inheritanceAddress;
-    }
 
     for (const entry of rootEntries) {
       const suffix = entry.lang.toUpperCase();
@@ -252,13 +299,16 @@ async function updateLocalConfig() {
     // older run does nothing at all — which is exactly why it is swept up:
     // editing an inert variable and seeing no effect is worse than not having
     // it. Removing it here keeps a long-lived .env.local honest.
-    for (const legacyKey of ["VITE_CONTRACT_ADDRESS", `VITE_CONTRACT_ADDRESS_${LOCAL_CHAIN_ID}`]) {
+    for (const legacyKey of [
+      "VITE_CONTRACT_ADDRESS",
+      `VITE_CONTRACT_ADDRESS_${LOCAL_CHAIN_ID}`,
+      "VITE_INHERITANCE_ADDRESS",
+      `VITE_INHERITANCE_ADDRESS_${LOCAL_CHAIN_ID}`,
+    ]) {
       const legacyLine = new RegExp(`^${legacyKey}=.*\\n?`, "m");
       if (legacyLine.test(updatedContent)) {
         updatedContent = updatedContent.replace(legacyLine, "");
-        console.log(
-          `Removed retired ${legacyKey} (no longer read; use ${legacyKey.replace("CONTRACT", "READER")})`,
-        );
+        console.log(`Removed retired ${legacyKey} from local config`);
       }
     }
 
@@ -277,9 +327,10 @@ async function updateLocalConfig() {
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Reader (VITE_READER_ADDRESS): ${readerAddress}`);
     console.log(`   DeepFamily behind it: ${contractAddress}`);
-    if (inheritanceAddress) {
-      console.log(`   Inheritance (VITE_INHERITANCE_ADDRESS): ${inheritanceAddress}`);
-    }
+    console.log(`   Shielded pool: ${poolAddress} (from block ${poolDeployment.deploymentBlock})`);
+    console.log(
+      `   Heir key registry: ${registryAddress} (from block ${registryDeployment.deploymentBlock})`,
+    );
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
 
     console.log("\nYou can now start the frontend with: npm run dev");

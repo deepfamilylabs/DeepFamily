@@ -188,8 +188,6 @@ export const DOMAIN_NAME_SECRET: 1001n;
 export const DOMAIN_IDENTITY: 1002n;
 export const DOMAIN_DISCLOSURE: 1003n;
 export const DOMAIN_VERSION_COMMITMENT: 1004n;
-export const DOMAIN_INHERITANCE_CREDENTIAL: 1005n;
-export const DOMAIN_INHERITANCE_CLAIM_TAG: 1006n;
 export const DOMAIN_LINEAGE_ENDORSEMENT_LEAF: 1007n;
 export const DOMAIN_LINEAGE_TRUSTED_LEAF: 1008n;
 export const DOMAIN_LINEAGE_PARENTS: 1009n;
@@ -604,15 +602,6 @@ export function computeLineageTrustedLeaf(input: {
   rootVersionIndex: BigNumberish;
   account: string;
 }): bigint;
-export function computeInheritanceCredential(input: {
-  rootIdentityCommitment: BigNumberish;
-  rootVersionIndex: BigNumberish;
-  rootDerivedSecretField: BigNumberish;
-}): bigint;
-export function computeInheritanceClaimTag(input: {
-  derivedSecretField: BigNumberish;
-  inheritanceCredential: BigNumberish;
-}): bigint;
 export function hashLineageNodes(left: bigint, right: bigint): bigint;
 export function createLineageTree(leaves?: BigNumberish[]): LineageTree;
 export function replayLineageTree(
@@ -623,72 +612,6 @@ export function buildLineageMerkleProof(
   leafIndex: BigNumberish,
 ): LineageMerkleProof;
 export function buildLineageMerkleProofFromPath(input: LineageMerklePathInput): LineageMerkleProof;
-export function computeInheritanceEligibleFrom(input: {
-  startTime: BigNumberish;
-  writtenAt: BigNumberish;
-}): bigint;
-export function computeInheritanceEntitlement(input: {
-  amountPerPeriod: BigNumberish;
-  eligibleFrom: BigNumberish;
-  now: BigNumberish;
-}): bigint;
-export interface InheritanceClaimPublicSignals {
-  endorsementRoot: bigint;
-  trustedRoot: bigint;
-  inheritanceCredential: bigint;
-  claimTag: bigint;
-  eligibleFrom: bigint;
-  recipient: bigint;
-}
-export type InheritanceClaimEndorsementSource =
-  | {
-      endorsementTree: LineageTree;
-      endorsementLeafIndex: BigNumberish;
-      endorsementProof?: never;
-    }
-  | {
-      endorsementProof: LineageMerklePathInput;
-      endorsementTree?: never;
-      endorsementLeafIndex?: never;
-    };
-export type InheritanceClaimTrustedSource =
-  | {
-      trustedTree: LineageTree;
-      trustedLeafIndex: BigNumberish;
-      trustedProof?: never;
-    }
-  | {
-      trustedProof: LineageMerklePathInput;
-      trustedTree?: never;
-      trustedLeafIndex?: never;
-    };
-export function buildInheritanceClaimWitness(
-  input: {
-    heir: {
-      identity: IdentityFields;
-      identitySuiteId: BigNumberish;
-      derivedSecretField: BigNumberish;
-    };
-    versionIndex: BigNumberish;
-    fatherIdentityCommitment: BigNumberish;
-    motherIdentityCommitment: BigNumberish;
-    rootIsMother: boolean;
-    endorser: string;
-    writtenAt: BigNumberish;
-    root: {
-      identityCommitment: BigNumberish;
-      versionIndex: BigNumberish;
-      derivedSecretField: BigNumberish;
-    };
-    eligibleFrom: BigNumberish;
-    recipient: string;
-  } & InheritanceClaimEndorsementSource &
-    InheritanceClaimTrustedSource,
-): {
-  witness: Record<string, string | string[]>;
-  publicSignals: InheritanceClaimPublicSignals;
-};
-
 /** Shielded inheritance v1 Poseidon domains. */
 export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   policy: bigint;

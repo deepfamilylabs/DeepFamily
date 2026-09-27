@@ -11,7 +11,6 @@ export const deployIntegratedFixture = async (connection) => {
     archive: deployed.archive,
     deepFamilyReader: deployed.deepFamilyReader,
     lineageIndex: deployed.lineageIndex,
-    familyInheritance: deployed.familyInheritance,
   };
   return deployed;
 };

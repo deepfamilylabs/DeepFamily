@@ -9,10 +9,8 @@ import {
 } from "@deepfamily/protocol-core";
 import DeepFamily from "../../../abi/DeepFamily.json";
 import DeepFamilyLineageIndex from "../../../abi/DeepFamilyLineageIndex.json";
-import FamilyInheritance from "../../../abi/FamilyInheritance.json";
 import {
   findHeirLegitimacy,
-  listInheritancesForCredential,
   loadLineageSnapshot,
   loadRootRegistry,
   countTrustedEndorsers,
@@ -20,10 +18,8 @@ import {
 
 const INDEX = "0x00000000000000000000000000000000000000d1";
 const FAMILY = "0x00000000000000000000000000000000000000d2";
-const INHERITANCE = "0x00000000000000000000000000000000000000d3";
 const indexIface = new ethers.Interface(DeepFamilyLineageIndex.abi);
 const familyIface = new ethers.Interface(DeepFamily.abi);
-const inheritanceIface = new ethers.Interface(FamilyInheritance.abi);
 
 type TestLog = {
   address: string;
@@ -173,7 +169,6 @@ describe("loadLineageSnapshot", () => {
     ).rejects.toMatchObject({ code: "snapshotMismatch" });
   });
 });
-
 describe("findHeirLegitimacy", () => {
   // Version 1 names the root as father, version 2 as mother. A endorsed version 1, then
   // switched to version 2; B endorsed version 1; C's endorsement was cancelled (its leaf zeroed);
@@ -256,39 +251,5 @@ describe("findHeirLegitimacy", () => {
       rootVersionIndex: 2,
     });
     expect(found).toEqual([]);
-  });
-});
-
-describe("listInheritancesForCredential", () => {
-  it("scans every creation and matches the credential locally", async () => {
-    const creator = "0x00000000000000000000000000000000000000e1";
-    const chain = chainStub([
-      log(inheritanceIface, INHERITANCE, "InheritanceCreated", [1n, 11n, creator, 5n, 1n, 1n], 2),
-      log(inheritanceIface, INHERITANCE, "InheritanceCreated", [2n, 22n, creator, 6n, 2n, 2n], 3),
-      log(inheritanceIface, INHERITANCE, "InheritanceCreated", [3n, 11n, creator, 7n, 3n, 3n], 4),
-    ]);
-    const inheritance = chain.contract(INHERITANCE, inheritanceIface, {
-      inheritanceOf: vi.fn(async (id: bigint) => ({
-        startTime: id * 10n,
-        amountPerPeriod: id,
-        balance: id * 100n,
-      })),
-      claimed: vi.fn(async () => 4n),
-    });
-
-    const rows = await listInheritancesForCredential(inheritance as any, 11n, 99n);
-
-    expect(rows.map((row) => row.id)).toEqual([1n, 3n]);
-    expect(rows[1]).toEqual({
-      id: 3n,
-      startTime: 30n,
-      amountPerPeriod: 3n,
-      balance: 300n,
-      claimed: 4n,
-    });
-    expect(inheritance.claimed).toHaveBeenCalledWith(3n, 99n);
-    expect(chain.provider.getLogs.mock.calls[0][0].topics).toEqual([
-      [inheritanceIface.getEvent("InheritanceCreated")!.topicHash],
-    ]);
   });
 });

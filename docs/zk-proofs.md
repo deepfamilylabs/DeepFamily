@@ -19,10 +19,7 @@ commitment; `personHash` carries no route-recency marker.
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
 
-A third circuit, `FamilyInheritanceClaim` (`circuits/family_inheritance_claim.circom`), is not a
-DeepFamily purpose. `FamilyInheritance.claim` calls its generated verifier directly, with no
-`ProofEnvelope` and no `verifierRegistry` route; see
-[FamilyInheritanceClaim Circuit](#familyinheritanceclaim-circuit).
+The shielded inheritance pool uses a separate set of action circuits and a key-registration circuit. Their proofs do not use the DeepFamily `ProofEnvelope` route.
 
 ## Identity and Commitment Architecture
 
@@ -300,115 +297,15 @@ Private encrypted `biography` is not a mint public signal and is not automatical
 NFT. The mint biography record, token URI, and appended DFS1 story records are separate
 intentionally public NFT data.
 
-## FamilyInheritanceClaim Circuit
+## Shielded inheritance circuits
 
-The claim circuit lets a direct child of a root person withdraw from a family inheritance
-(`FamilyInheritance`, see [contracts.md](contracts.md#familyinheritancesol---family-inheritance)) without revealing which
-child they are. Legitimacy stays on chain: the child's version must name the root as father or
-mother and be endorsed by a trusted endorser (recommended source) of the root version.
+`circuits/shielded_key_registration.circom` proves that the registrant knows the existing identity secret and binds a viewing key to that person. Eight pool action circuits prove ownership and value conservation for `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Their public inputs have a fixed 32-signal shape.
 
-### Lineage trees
+`ShieldedDeepPool` stores encrypted notes and one-time spend and period nullifiers. The pool note and key-registry trees are 32-level rotating shards; the two lineage trees remain 64 levels deep. A claim proves an eligible direct child, current endorsement and recommended source, complete due periods, and sufficient budget. It creates a private child-controlled note. An exit later exposes its public recipient and amount.
 
-`DeepFamilyLineageIndex` mirrors public DeepFamily state in two Poseidon LeanIMTs. They follow zk-kit
-semantics: a node hash is `Poseidon2(left, right)`, a node without a right sibling rises unchanged,
-and the maximum depth is 64. The index rejects appends beyond `2^64` cumulative leaf slots per tree;
-clearing a leaf retains its slot.
+`privateTransfer` can spend one or two value notes, so a child can transfer the first claimed note immediately. The second public slot uses a secret-bound dummy nullifier for a single-note transfer. Different public input roots reveal that two real notes were spent; equal roots do not establish how many real notes were used.
 
-```text
-DOMAIN_INHERITANCE_CREDENTIAL   = 1005
-DOMAIN_INHERITANCE_CLAIM_TAG    = 1006
-DOMAIN_LINEAGE_ENDORSEMENT_LEAF = 1007
-DOMAIN_LINEAGE_TRUSTED_LEAF     = 1008
-DOMAIN_LINEAGE_PARENTS          = 1009
-
-parentsDigest = Poseidon3(1009, fatherIdentityCommitment, motherIdentityCommitment)
-
-endorsementLeaf = Poseidon5(
-  1007,
-  identityCommitment,         // the endorsed person
-  parentsDigest,              // of the endorsed version
-  versionIndex,
-  writtenAt * 2^160 + endorser
-)
-
-trustedLeaf = Poseidon4(1008, rootIdentityCommitment, rootVersionIndex, account)
-```
-
-A missing parent contributes a zero identity commitment. `writtenAt` is the block time of the
-endorsement write and occupies bits 160..223; the endorser occupies bits 0..159.
-
-- Tree 0 holds one leaf per (person, endorser). Changing the endorsement rewrites that leaf with a
-  new `writtenAt`; cancelling it sets the leaf to zero.
-- Tree 1 holds one leaf per (person, version, trusted account). Removing the account sets the leaf
-  to zero.
-
-### Credential and claim tag
-
-```text
-inheritanceCredential = Poseidon4(1005, rootIdentityCommitment, rootVersionIndex, rootDerivedSecretField)
-claimTag              = Poseidon3(1006, heirDerivedSecretField, inheritanceCredential)
-```
-
-A deposit names only the credential. Without the root's derived secret it cannot be linked to the
-root's identity commitment or person hash. It also fixes the root version, so a new root version
-with different trusted endorsers cannot take over an existing inheritance. The claim tag is the
-heir's pseudonym under one credential: the contract counts claimed amounts per tag, so every child
-has one running total. Tags under different credentials cannot be linked to each other or to the
-heir.
-
-### Statement
-
-The proof shows that the prover:
-
-1. knows an identity witness (name field, derived secret, birth/gender fields, suite ID) for the
-   heir's identity commitment;
-2. knows an endorsement leaf in tree 0 for that identity whose parents digest opens to a father and
-   mother commitment, one of which (selected by the private `rootIsMother` bit) is a nonzero root
-   commitment;
-3. knows a trusted leaf in tree 1 for that root commitment, a root version, and the same endorser;
-4. opens `inheritanceCredential` with that root commitment, root version, and a root derived
-   secret;
-5. derived `claimTag` from the heir's own derived secret and the credential;
-6. satisfies `writtenAt + 30 days <= eligibleFrom`.
-
-An endorsement written or rewritten less than one period ago therefore cannot be used; a child
-re-endorsed after a passphrase leak starts a new waiting period under the new identity.
-
-The circuit range-checks the endorser to 160 bits, `writtenAt` and `eligibleFrom` to 64 bits, and
-the identity fields as in PersonRelation. Both tree depths must be at most 64, because the zk-kit
-root template returns zero for a larger depth. `recipient` is bound by a square constraint, so a
-copied proof cannot pay a different address. The circuit has 34,247 constraints.
-
-### Public signals
-
-```text
-[
-  endorsementRoot,
-  trustedRoot,
-  inheritanceCredential,
-  claimTag,
-  eligibleFrom,
-  recipient
-]
-```
-
-### Contract checks
-
-`FamilyInheritance.claim(id, signals, proof)`:
-
-- takes `inheritanceCredential` from the stored inheritance, never from calldata;
-- requires each root to be the index's current root or one replaced within the last hour
-  (`ROOT_HISTORY_WINDOW`), so a proof built just before another write still lands;
-- requires `eligibleFrom` to lie on the inheritance's 30-day grid from `startTime`, not before
-  `startTime`, and not after the current block;
-- pays `amountPerPeriod × ((now − eligibleFrom) / 30 days + 1)` minus what the tag has already
-  received, capped at the balance. A shortfall stays owed and becomes claimable after a deposit.
-
-The proof hides which child claims and the root's identity. The recipient, amounts, timing, and the
-wallet that sends the transaction and pays its gas are public. To build the witness, the frontend
-replays every `LeafWritten` and `VersionIndexed` event and every DeepFamily endorsement and
-trusted-endorser event, rebuilds each candidate leaf locally, and looks it up in the replayed
-trees; no RPC request names the heir or the root.
+Development builds use `npm run zk:shielded:development:setup`. Generated development keys and verifiers stay under ignored `zk-artifacts/shielded/`. Production release needs independent setup and verification of all shielded circuits.
 
 ## Proof Transport and Permanent Routing
 
@@ -438,17 +335,17 @@ Current generated verifiers are:
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
 - `contracts/adapters/Groth16VerifierAdapter.sol` for the transport boundary;
-- `contracts/FamilyInheritanceClaimVerifier.sol` for 6 inheritance-claim public signals, called
-  directly by `FamilyInheritance`.
+- `ShieldedGroth16ActionAdapter` and eight shielded action verifiers for pool actions;
+- a separate seven-signal verifier for `ShieldedHeirKeyRegistry`.
 
 ## Frontend and Shared Definitions
 
 Cross-runtime definitions are owned by `packages/proof-core/`:
 
 - `proofDefinitions.js` maps purpose to circuit ID, encoding, and artifact descriptor, plus the
-  standalone `inheritance-claim-groth16-bn254-v1` definition;
+  person and disclosure proof definitions;
 - `publicSignalSpecs.js` freezes field names, order, bit widths, and lengths, including
-  `inheritance-claim-v1`;
+  their corresponding public-signal layouts;
 - `proofEnvelopeCodec.js` normalizes snarkjs points and builds `ProofEnvelope`.
 
 Browser artifact descriptors live in `frontend/src/shared/zk/proofDescriptors.ts`; Node descriptors
@@ -458,12 +355,10 @@ are published under `frontend/public/zk/`:
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;
 - `disclosure_binding.wasm`, `disclosure_binding_final.zkey`,
   `disclosure_binding.vkey.json`;
-- `family_inheritance_claim.wasm`, `family_inheritance_claim_final.zkey`,
-  `family_inheritance_claim.vkey.json`.
+- shielded development artifacts are served from ignored `zk-artifacts/shielded/` only by the local Vite development server.
 
-The inheritance claim witness is assembled by `buildInheritanceClaimWitness` in
-`packages/protocol-core/inheritance.js`, which recomputes every leaf and root and rejects a mismatch
-before proving.
+Shielded witnesses are assembled locally by the `shielded*Preparation` services, using
+`packages/protocol-core/shielded-inheritance.js` and replayed public note and lineage events.
 
 Proof generation and KDF work execute in dedicated Workers. Worker messages and long-lived caches
 must never retain raw passphrases, salts, derived secrets, content digests, or witnesses after the
@@ -476,12 +371,14 @@ Supported top-level commands:
 | Command                        | Purpose                                                    |
 | ------------------------------ | ---------------------------------------------------------- |
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                        |
-| `npm run zk:build`             | Compile all three circuits                                 |
-| `npm run zk:development:setup` | Rebuild all development proving/verifier/browser artifacts |
+| `npm run zk:build`             | Compile the person and disclosure circuits                 |
+| `npm run zk:development:setup` | Rebuild person and disclosure development artifacts        |
 | `npm run zk:production:setup`  | Produce and verify fresh production Phase-2 artifacts      |
-| `npm run zk:check`             | Generate and verify real proofs for every circuit          |
+| `npm run zk:check`             | Generate and verify identity/disclosure proofs             |
 | `npm run zk:artifacts:check`   | Rebuild and cross-check published artifacts                |
-| `npm run zk:ceremony:verify`   | Verify production setup evidence                           |
+| `npm run zk:ceremony:verify`   | Verify identity/disclosure production setup evidence       |
+| `npm run zk:shielded:development:setup` | Build shielded development keys and verifiers |
+| `npm run zk:shielded:development:proof-smoke` | Verify shielded development proofs |
 
 The checked-in keys and current protocol release manifest are development-only. The manifest marks
 identity/file KDF suite 1 as `candidate-awaiting-device-benchmark`, trusted setup as requiring a

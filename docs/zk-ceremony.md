@@ -8,7 +8,7 @@ with one command:
 npm run zk:production:setup
 ```
 
-That command creates production artifacts for all three circuits, writes an auditable transcript and
+That command creates production artifacts for the two identity/disclosure circuits, writes an auditable transcript and
 manifest, and verifies the complete result before returning. It does **not** commit files, deploy a
 contract, submit a transaction, or authorize a Mainnet release.
 
@@ -42,7 +42,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All three DeepFamily circuits reuse the same published BN254 Phase 1 file:
+Both DeepFamily circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -64,8 +64,7 @@ BLAKE2b-512:
 9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3
 ```
 
-The 64-level family inheritance claim circuit has 34,247 constraints, so the previous power-15
-file (32,768 constraints) is too small.
+The shielded circuits use a separate development setup and require their own production Phase 2 before release.
 
 The exact file is committed at:
 
@@ -340,7 +339,6 @@ git diff -- \
   circuits/zk-ceremony-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
-  contracts/FamilyInheritanceClaimVerifier.sol
 
 npm run zk:ceremony:verify
 npm run zk:artifacts:check
@@ -357,7 +355,6 @@ git add \
   circuits/zk-ceremony-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
-  contracts/FamilyInheritanceClaimVerifier.sol \
   frontend/public/zk
 
 git commit -m "chore: install production zk artifacts"

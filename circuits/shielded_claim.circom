@@ -20,7 +20,7 @@ include "lib/identity.circom";
 template ShieldedClaim() {
     signal input publicSignals[32];
 
-    // Identity witness, following family_inheritance_claim.circom.
+    // Identity witness follows the active person commitment circuit.
     signal input nameField;
     signal input derivedSecretField;
     signal input isBirthBC;

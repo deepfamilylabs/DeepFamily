@@ -73,7 +73,6 @@ describe("development ZK setup", function () {
           source: "fixture-public-randomness",
           personCommitmentContributionHash: "e".repeat(128),
           disclosureBindingContributionHash: "f".repeat(128),
-          familyInheritanceClaimContributionHash: "a".repeat(128),
         },
       },
       circuits: artifactHashes,

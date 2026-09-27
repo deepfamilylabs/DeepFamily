@@ -57,14 +57,6 @@ export const ZK_RELEASE_ARTIFACTS = Object.freeze({
     verificationKey: "frontend/public/zk/disclosure_binding.vkey.json",
     solidityVerifier: "contracts/DisclosureBindingVerifier.sol",
   }),
-  family_inheritance_claim: Object.freeze({
-    source: "circuits/family_inheritance_claim.circom",
-    builtR1cs: "zk-artifacts/circuits/family_inheritance_claim.r1cs",
-    wasm: "frontend/public/zk/family_inheritance_claim.wasm",
-    zkey: "frontend/public/zk/family_inheritance_claim_final.zkey",
-    verificationKey: "frontend/public/zk/family_inheritance_claim.vkey.json",
-    solidityVerifier: "contracts/FamilyInheritanceClaimVerifier.sol",
-  }),
 });
 
 // Ceremony evidence names each circuit's contribution hash and (multi-party) zkey digest.
@@ -76,10 +68,6 @@ export const ZK_CEREMONY_CIRCUIT_FIELDS = Object.freeze({
   disclosure_binding: Object.freeze({
     contributionHash: "disclosureBindingContributionHash",
     zkeySha256: "disclosureBindingZkeySha256",
-  }),
-  family_inheritance_claim: Object.freeze({
-    contributionHash: "familyInheritanceClaimContributionHash",
-    zkeySha256: "familyInheritanceClaimZkeySha256",
   }),
 });
 const CONTRIBUTION_HASH_FIELDS = Object.freeze(

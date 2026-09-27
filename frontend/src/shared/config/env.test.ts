@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getChainEntryReaderAddress,
   getDefaultReaderAddress,
+  getShieldedKeyRegistryAddress,
+  getShieldedKeyRegistryDeploymentBlock,
+  getShieldedPoolAddress,
+  getShieldedPoolDeploymentBlock,
   readBooleanEnv,
   readListEnv,
   readNumberEnv,
@@ -11,6 +15,25 @@ import {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+});
+
+describe("shielded module addresses", () => {
+  it("uses the selected chain's addresses and falls back to the default", () => {
+    const pool = "0x" + "2".repeat(40);
+    const registry = "0x" + "3".repeat(40);
+    vi.stubEnv("VITE_SHIELDED_POOL_ADDRESS", READER);
+    vi.stubEnv("VITE_SHIELDED_POOL_ADDRESS_31337", pool);
+    vi.stubEnv("VITE_SHIELDED_KEY_REGISTRY_ADDRESS", registry);
+    vi.stubEnv("VITE_SHIELDED_KEY_REGISTRY_ADDRESS_31337", "");
+    vi.stubEnv("VITE_SHIELDED_POOL_FROM_BLOCK_31337", "42");
+    vi.stubEnv("VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK", "40");
+    vi.stubEnv("VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK_31337", "");
+    expect(getShieldedPoolAddress(31337)).toBe(pool);
+    expect(getShieldedPoolAddress(71)).toBe(READER);
+    expect(getShieldedKeyRegistryAddress(31337)).toBe(registry);
+    expect(getShieldedPoolDeploymentBlock(31337)).toBe(42);
+    expect(getShieldedKeyRegistryDeploymentBlock(31337)).toBe(40);
+  });
 });
 
 describe("readBooleanEnv", () => {
