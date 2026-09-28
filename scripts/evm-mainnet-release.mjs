@@ -16,7 +16,6 @@ import hre from "hardhat";
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
@@ -69,6 +68,7 @@ import {
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
 import { checkShieldedRelease } from "./zk-shielded-release-check.mjs";
+import { assertShieldedDeploymentBindings } from "./lib/shieldedDeploymentEvidence.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
 const ERC1967_IMPLEMENTATION_SLOT =
@@ -302,6 +302,9 @@ const buildFingerprint = ({
       groth16VerifierAdapter: [
         plannedAddresses.personCommitmentVerifier,
         plannedAddresses.disclosureBindingVerifier,
+        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(
+          (spec) => plannedAddresses[spec.verifierLabel],
+        ),
       ],
       deepFamilyImplementationLibraries: {
         PoseidonT5: plannedAddresses.poseidonT5,
@@ -314,6 +317,16 @@ const buildFingerprint = ({
       deepFamilyArchive: [plannedAddresses.deepFamily],
       deepFamilyArchiveBinding: plannedAddresses.deepFamilyArchive,
       deepFamilyReader: [plannedAddresses.deepFamily],
+      shieldedHeirKeyRegistry: [
+        plannedAddresses.deepFamilyLineageIndex,
+        plannedAddresses.groth16VerifierAdapter,
+      ],
+      shieldedDeepPool: [
+        plannedAddresses.token,
+        plannedAddresses.deepFamilyLineageIndex,
+        plannedAddresses.shieldedHeirKeyRegistry,
+        plannedAddresses.groth16VerifierAdapter,
+      ],
     },
   },
   governanceSafe: {
@@ -550,11 +563,6 @@ const assertProtocolTerminalState = async ({
       addresses[spec.verifierLabel],
       { needsLibraries: false },
     ]),
-    ...SHIELDED_ACTIONS.map((action) => [
-      "ShieldedGroth16ActionAdapter",
-      addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
-      { needsLibraries: false },
-    ]),
     [
       "ShieldedHeirKeyRegistry",
       addresses.shieldedHeirKeyRegistry,
@@ -655,6 +663,18 @@ const assertProtocolTerminalState = async ({
   );
   if (!sameAddress(await lineageIndex.DEEP_FAMILY(), addresses.deepFamily))
     throw new Error("Lineage index DeepFamily binding mismatch");
+  await assertShieldedDeploymentBindings({
+    deployed: {
+      ...deployed,
+      lineageIndex,
+      shieldedHeirKeyRegistry: await ethers.getContractAt(
+        "ShieldedHeirKeyRegistry",
+        addresses.shieldedHeirKeyRegistry,
+      ),
+      shieldedDeepPool: await ethers.getContractAt("ShieldedDeepPool", addresses.shieldedDeepPool),
+    },
+    addresses,
+  });
   const deploymentEvidence = assertPlannedProtocolDeploymentMatchesManifest({
     root: process.cwd(),
     chainId: config.chainId,
@@ -1451,7 +1471,11 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "Groth16VerifierAdapter",
         addresses.groth16VerifierAdapter,
-        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+        [
+          addresses.personCommitmentVerifier,
+          addresses.disclosureBindingVerifier,
+          Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
+        ],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
         PoseidonT5: addresses.poseidonT5,
@@ -1493,25 +1517,11 @@ export const main = async (chainProfile) => {
           ),
         ),
       )),
-      ...(await Promise.all(
-        SHIELDED_ACTIONS.map(async (action) => {
-          const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-          return {
-            ...(await verificationEntry(
-              hre.artifacts,
-              spec.adapterContractName,
-              addresses[spec.adapterLabel],
-              [addresses[spec.verifierLabel], spec.actionId],
-            )),
-            label: spec.adapterDeploymentName,
-          };
-        }),
-      )),
       await verificationEntry(
         hre.artifacts,
         "ShieldedHeirKeyRegistry",
         addresses.shieldedHeirKeyRegistry,
-        [addresses.deepFamilyLineageIndex, addresses.shieldedKeyRegistrationVerifier],
+        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
         { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
       ),
       await verificationEntry(
@@ -1522,9 +1532,7 @@ export const main = async (chainProfile) => {
           addresses.token,
           addresses.deepFamilyLineageIndex,
           addresses.shieldedHeirKeyRegistry,
-          SHIELDED_ACTIONS.map(
-            (action) => addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
-          ),
+          addresses.groth16VerifierAdapter,
         ],
         { PoseidonT3: addresses.poseidonT3 },
       ),

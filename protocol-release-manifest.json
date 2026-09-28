@@ -1541,6 +1541,15 @@
       "address": null,
       "personVerifierImmutable": null,
       "disclosureBindingVerifierImmutable": null,
+      "keyRegistrationVerifierImmutable": null,
+      "shieldVerifierImmutable": null,
+      "createPolicyVerifierImmutable": null,
+      "allocateVerifierImmutable": null,
+      "topUpVerifierImmutable": null,
+      "mergeBudgetVerifierImmutable": null,
+      "claimVerifierImmutable": null,
+      "privateTransferVerifierImmutable": null,
+      "unshieldVerifierImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null
     },
@@ -1608,88 +1617,21 @@
         "runtimeSha256": null
       }
     },
-    "shieldedAdapters": {
-      "shield": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "createPolicy": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "allocate": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "topUp": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "mergeBudget": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "claim": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "privateTransfer": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "unshield": {
-        "address": null,
-        "verifierImmutable": null,
-        "actionId": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      }
-    },
     "shieldedHeirKeyRegistry": {
       "address": null,
       "lineageIndexImmutable": null,
-      "keyRegistrationVerifierImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null
+      "runtimeSha256": null,
+      "verifierAdapterImmutable": null
     },
     "shieldedDeepPool": {
       "address": null,
       "tokenImmutable": null,
       "lineageIndexImmutable": null,
       "keyRegistryImmutable": null,
-      "adapterImmutables": {
-        "shield": null,
-        "createPolicy": null,
-        "allocate": null,
-        "topUp": null,
-        "mergeBudget": null,
-        "claim": null,
-        "privateTransfer": null,
-        "unshield": null
-      },
       "artifactSha256": null,
-      "runtimeSha256": null
+      "runtimeSha256": null,
+      "verifierAdapterImmutable": null
     }
   },
   "goldenVectors": {

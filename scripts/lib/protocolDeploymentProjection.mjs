@@ -4,40 +4,38 @@ import {
   protocolDeploymentEvidenceFromManifest,
   protocolDeploymentEvidenceSha256,
   shieldedDeploymentBindingsFromAddresses,
+  groth16VerifierAdapterBindingsFromAddresses,
 } from "./protocolReleaseManifest.mjs";
-import { SHIELDED_ACTIONS, SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "./zkDeploymentCatalog.mjs";
+import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 
-export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
-  timelock: 0,
-  token: 1,
-  poseidonT5: 2,
-  adultAgeGate: 3,
-  personCommitmentVerifier: 4,
-  disclosureBindingVerifier: 5,
-  groth16VerifierAdapter: 6,
-  deepFamilyImplementation: 7,
-  deepFamily: 8,
-  deepFamilyArchive: 10,
-  deepFamilyReader: 12,
-  poseidonT3: 15,
-  poseidonT4: 16,
-  poseidonT6: 17,
-  deepFamilyLineageIndex: 18,
+const MAINNET_DEPLOYMENT_ADDRESS_LABELS = Object.freeze({
+  timelock: "governanceTimelock",
+  deepFamilyImplementation: "deepFamilyImplementation",
   ...Object.fromEntries(
-    Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec, index) => [
-      spec.verifierLabel,
-      20 + index,
+    INTEGRATED_DEPLOYMENT_RECORDS.map((record) => [
+      record.transactionLabel === "deepFamilyToken"
+        ? "token"
+        : record.transactionLabel === "deepFamilyProxy"
+          ? "deepFamily"
+          : record.transactionLabel,
+      record.transactionLabel,
     ]),
   ),
-  ...Object.fromEntries(
-    SHIELDED_ACTIONS.map((action, index) => [
-      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
-      29 + index,
-    ]),
-  ),
-  shieldedHeirKeyRegistry: 37,
-  shieldedDeepPool: 38,
 });
+
+export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(MAINNET_DEPLOYMENT_ADDRESS_LABELS).map(([address, label]) => {
+      const offset = MAINNET_TRANSACTION_LABELS.indexOf(label);
+      if (offset < 0) throw new Error(`Mainnet deployment ${label} has no transaction label`);
+      return [address, offset];
+    }),
+  ),
+);
 
 const normalizeChainId = (value) => {
   const normalized = typeof value === "bigint" ? Number(value) : Number(value);
@@ -82,10 +80,7 @@ export const buildPlannedProtocolDeploymentEvidence = ({
   }
   const deploymentBindings = {
     ...shieldedDeploymentBindingsFromAddresses(plannedAddresses),
-    groth16VerifierAdapter: {
-      personVerifierImmutable: plannedAddresses?.personCommitmentVerifier,
-      disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
-    },
+    groth16VerifierAdapter: groth16VerifierAdapterBindingsFromAddresses(plannedAddresses),
     deepFamilyArchive: { deepFamilyImmutable: plannedAddresses?.deepFamily },
     deepFamilyReader: {
       deepFamilyImmutable: plannedAddresses?.deepFamily,
@@ -115,17 +110,6 @@ export const buildPlannedProtocolDeploymentEvidence = ({
         ]),
       ),
     ),
-    shieldedAdapters: Object.freeze(
-      Object.fromEntries(
-        SHIELDED_ACTIONS.map((action) => [
-          action,
-          withHashes(
-            deploymentBindings.shieldedAdapters[action],
-            artifacts?.shieldedAdapters?.[action],
-          ),
-        ]),
-      ),
-    ),
     shieldedHeirKeyRegistry: withHashes(
       deploymentBindings.shieldedHeirKeyRegistry,
       artifacts?.shieldedHeirKeyRegistry,
@@ -136,9 +120,7 @@ export const buildPlannedProtocolDeploymentEvidence = ({
     deepFamilyProxy: plannedAddresses?.deepFamily,
     deepFamilyImplementation: plannedAddresses?.deepFamilyImplementation,
     groth16VerifierAdapter: Object.freeze({
-      address: plannedAddresses?.groth16VerifierAdapter,
-      personVerifierImmutable: plannedAddresses?.personCommitmentVerifier,
-      disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
+      ...deploymentBindings.groth16VerifierAdapter,
       artifactSha256: artifacts?.groth16VerifierAdapter?.artifactSha256,
       runtimeSha256: artifacts?.groth16VerifierAdapter?.runtimeSha256,
     }),
@@ -211,14 +193,6 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
     ]),
-    ...SHIELDED_ACTIONS.map((action) => {
-      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-      return [
-        spec.adapterDeploymentName,
-        plannedAddresses?.[spec.adapterLabel],
-        deploymentArtifacts?.shieldedAdapters?.[action],
-      ];
-    }),
     [
       "ShieldedHeirKeyRegistry",
       plannedAddresses?.shieldedHeirKeyRegistry,

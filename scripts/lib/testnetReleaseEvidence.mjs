@@ -19,9 +19,10 @@ import {
   protocolDeploymentEvidenceFromAcceptanceReport,
   protocolDeploymentEvidenceSha256,
   protocolShieldedDeploymentEvidenceFromRecords,
+  GROTH16_ADAPTER_VERIFIER_BINDINGS,
+  GROTH16_ADAPTER_IMMUTABLE_FIELDS,
 } from "./protocolReleaseManifest.mjs";
 import {
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   INTEGRATED_DEPLOYMENT_RECORDS,
 } from "./zkDeploymentCatalog.mjs";
@@ -681,7 +682,6 @@ const requireTerminalGovernanceEvidence = ({
       "poseidonT6",
       "deepFamilyLineageIndex",
       "shieldedVerifiers",
-      "shieldedAdapters",
       "shieldedHeirKeyRegistry",
       "shieldedDeepPool",
     ],
@@ -814,7 +814,7 @@ const requireTerminalGovernanceEvidence = ({
   const verifierAdapter = requireExactRecordKeys(
     terminal.verifierAdapter,
     "terminalGovernanceState.verifierAdapter",
-    ["address", "artifactSha256", "disclosureBindingVerifier", "personVerifier", "runtimeSha256"],
+    ["address", "artifactSha256", "runtimeSha256", ...GROTH16_ADAPTER_IMMUTABLE_FIELDS],
   );
   requireSameAddress(
     verifierAdapter.address,
@@ -831,6 +831,13 @@ const requireTerminalGovernanceEvidence = ({
     disclosureBindingVerifierAddress,
     "terminalGovernanceState.verifierAdapter.disclosureBindingVerifier",
   );
+  for (const [getter, label] of Object.entries(GROTH16_ADAPTER_VERIFIER_BINDINGS)) {
+    requireSameAddress(
+      verifierAdapter[getter],
+      addresses[label],
+      `terminalGovernanceState.verifierAdapter.${getter}`,
+    );
+  }
 
   const archive = requireExactRecordKeys(terminal.archive, "terminalGovernanceState.archive", [
     "address",
@@ -926,6 +933,7 @@ const requireTerminalGovernanceEvidence = ({
   const shieldedRecords = protocolShieldedDeploymentEvidenceFromRecords({
     ...terminal,
     token: addresses.token,
+    groth16VerifierAdapter: verifierAdapter,
   });
   const expectedBindings = shieldedDeploymentBindings(addresses);
   for (const [label, record, expected] of shieldedArtifactEntries(
@@ -953,10 +961,12 @@ const requireTerminalGovernanceEvidence = ({
     root: repositoryRoot,
     deployments: {
       ...shieldedRecords,
-      groth16VerifierAdapter: {
-        personVerifierImmutable: verifierAdapter.personVerifier,
-        disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
-      },
+      groth16VerifierAdapter: Object.fromEntries(
+        GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
+          `${getter}Immutable`,
+          verifierAdapter[getter],
+        ]),
+      ),
       deepFamilyArchive: { deepFamilyImmutable: archive.deepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: reader.deepFamily,

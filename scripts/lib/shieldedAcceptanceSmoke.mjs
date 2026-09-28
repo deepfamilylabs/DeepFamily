@@ -40,6 +40,7 @@ import {
 import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { addPersonVersion } from "../../lib/seedHelpers.js";
 import { loadCandidateArtifacts } from "./shieldedArtifacts.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const PERIOD = 2_592_000n;
@@ -166,6 +167,16 @@ export async function runShieldedAcceptanceSmoke({
       await verifier.verifyProof.staticCall(a, b, c, publicSignals),
       true,
       `${action} deployed verifier rejected its proof`,
+    );
+    assert.equal(
+      await deployed.groth16VerifierAdapter.verifyProof.staticCall(
+        SHIELDED_DEPLOYMENT_CIRCUITS[action].proofPurpose,
+        1,
+        encodeGroth16AbcProofData(generated.normalized),
+        publicSignals,
+      ),
+      true,
+      `${action} shared Groth16 adapter rejected its proof`,
     );
     const item = candidate.manifest.circuits[action];
     const metadata = {
@@ -447,7 +458,6 @@ export async function runShieldedAcceptanceSmoke({
       };
       const label = index === 0 ? "shielded-action-keyRegistration" : "shielded-register-root-key";
       const generated = await prove("keyRegistration", witness, signals, { label });
-      const { a, b, c } = generated.normalized;
       const receipt = await record(
         label,
         await registry.register(
@@ -455,9 +465,7 @@ export async function runShieldedAcceptanceSmoke({
           keys.ownerCommitment,
           hexlify(keys.viewingKey),
           signals[6],
-          a,
-          b,
-          c,
+          encodeGroth16AbcProofData(generated.normalized),
         ),
       );
       const appended = receipt.logs

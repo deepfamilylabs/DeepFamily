@@ -7,11 +7,11 @@ import { buildMainnetReleaseIntents } from "../scripts/lib/mainnetReleaseIntents
 import { createCheckpointedTransactionExecutor } from "../scripts/lib/mainnetReleaseState.mjs";
 import { assertOnChainProtocolDeploymentRuntimes } from "../scripts/lib/protocolDeploymentProjection.mjs";
 import {
+  groth16VerifierAdapterBindingsFromAddresses,
   inspectProtocolDeploymentArtifacts,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 import {
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   integratedDeploymentAddresses,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
@@ -39,7 +39,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(38);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(30);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -66,10 +66,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       root: process.cwd(),
       deployments: {
         ...shieldedDeploymentBindingsFromAddresses(addresses),
-        groth16VerifierAdapter: {
-          personVerifierImmutable: addresses.personCommitmentVerifier,
-          disclosureBindingVerifierImmutable: addresses.disclosureBindingVerifier,
-        },
+        groth16VerifierAdapter: groth16VerifierAdapterBindingsFromAddresses(addresses),
         deepFamilyArchive: { deepFamilyImmutable: addresses.deepFamily },
         deepFamilyReader: {
           deepFamilyImmutable: addresses.deepFamily,
@@ -149,6 +146,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       groth16VerifierAdapter: await Adapter.getDeployTransaction(
         address("personCommitmentVerifier"),
         address("disclosureBindingVerifier"),
+        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => address(spec.verifierLabel)),
       ),
       deepFamilyImplementation: await DeepFamily.getDeployTransaction(),
       deepFamilyProxy: await Proxy.getDeployTransaction(
@@ -203,24 +201,13 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         await ethers.getContractFactory(spec.verifierContractName, deployer)
       ).getDeployTransaction();
     }
-    const actionAdapterFactory = await ethers.getContractFactory(
-      "ShieldedGroth16ActionAdapter",
-      deployer,
-    );
-    for (const action of SHIELDED_ACTIONS) {
-      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-      requests[spec.adapterLabel] = await actionAdapterFactory.getDeployTransaction(
-        address(spec.verifierLabel),
-        spec.actionId,
-      );
-    }
     const registryFactory = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
       signer: deployer,
       libraries: { PoseidonT3: address("poseidonT3"), PoseidonT6: address("poseidonT6") },
     });
     requests.shieldedHeirKeyRegistry = await registryFactory.getDeployTransaction(
       address("deepFamilyLineageIndex"),
-      address("shieldedKeyRegistrationVerifier"),
+      address("groth16VerifierAdapter"),
     );
     const poolFactory = await ethers.getContractFactory("ShieldedDeepPool", {
       signer: deployer,
@@ -230,9 +217,9 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       address("deepFamilyToken"),
       address("deepFamilyLineageIndex"),
       address("shieldedHeirKeyRegistry"),
-      SHIELDED_ACTIONS.map((action) => address(SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel)),
+      address("groth16VerifierAdapter"),
     );
-    expect(Object.keys(requests)).to.have.length(40);
+    expect(Object.keys(requests)).to.have.length(32);
 
     for (const intent of intents) {
       const request = requests[intent.label];

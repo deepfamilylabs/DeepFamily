@@ -1457,6 +1457,7 @@
       "UnsupportedProofEncoding": "不支持该证明编码。",
       "MalformedProofData": "证明数据格式错误。",
       "UnsupportedPurpose": "验证器不支持该证明用途。",
+      "VerifierNotConfigured": "未配置当前操作的证明验证器。",
       "DuplicateVersion": "该人物版本已存在。",
       "DuplicateVersionCommitment": "该加密版本承诺已存在于链上。",
       "CallerOrIdentitySuiteMismatch": "调用者地址或身份套件与提交的证明不匹配。",

@@ -1,21 +1,26 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
+import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 import { computeShieldedRegistrationLeaf, createLineageTree } from "@deepfamily/protocol-core";
 
-const EMPTY_PROOF = [
-  [0n, 0n],
+const EMPTY_PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
+  ["uint256[2]", "uint256[2][2]", "uint256[2]"],
   [
     [0n, 0n],
+    [
+      [0n, 0n],
+      [0n, 0n],
+    ],
     [0n, 0n],
   ],
-  [0n, 0n],
-];
+);
 
 describe("Shielded heir key registry transport", function () {
   async function setup() {
     const lineage = await hre.ethers.deployContract("ShieldedKeyRegistryLineageMock");
     const verifier = await hre.ethers.deployContract("ShieldedKeyRegistryVerifierMock");
+    const adapter = await deployUnifiedVerifierAdapter(hre, { keyRegistration: verifier });
     const poseidonT3 = await hre.ethers.deployContract("PoseidonT3");
     const poseidonT6 = await hre.ethers.deployContract("PoseidonT6");
     const Registry = await hre.ethers.getContractFactory("ShieldedHeirKeyRegistry", {
@@ -24,7 +29,7 @@ describe("Shielded heir key registry transport", function () {
         PoseidonT6: await poseidonT6.getAddress(),
       },
     });
-    const registry = await Registry.deploy(await lineage.getAddress(), await verifier.getAddress());
+    const registry = await Registry.deploy(await lineage.getAddress(), await adapter.getAddress());
     const network = await hre.ethers.provider.getNetwork();
     const identityCommitment = 123456n;
     const personHash = hre.ethers.keccak256(
@@ -73,7 +78,7 @@ describe("Shielded heir key registry transport", function () {
         ownerCommitment,
         viewingKey,
         registrationTag,
-        ...EMPTY_PROOF,
+        EMPTY_PROOF,
       ),
     )
       .to.emit(registry, "ViewingKeyRegistered")
@@ -117,7 +122,7 @@ describe("Shielded heir key registry transport", function () {
       ownerCommitment,
       viewingKey,
       registrationTag,
-      ...EMPTY_PROOF,
+      EMPTY_PROOF,
     );
     expect(await registry.knownRootSize(0, tree.root)).to.equal(1n);
     expect(await registry.knownRootSize(0, (await registry.keyShard(0)).root)).to.equal(2n);
@@ -127,7 +132,7 @@ describe("Shielded heir key registry transport", function () {
         ownerCommitment,
         viewingKey,
         registrationTag,
-        ...EMPTY_PROOF,
+        EMPTY_PROOF,
       ),
     ).to.be.revertedWithCustomError(registry, "AlreadyRegistered");
   });
@@ -141,7 +146,7 @@ describe("Shielded heir key registry transport", function () {
         ownerCommitment,
         viewingKey,
         registrationTag,
-        ...EMPTY_PROOF,
+        EMPTY_PROOF,
       ),
     ).to.be.revertedWithCustomError(registry, "UnknownIdentity");
     await expect(
@@ -150,7 +155,7 @@ describe("Shielded heir key registry transport", function () {
         ownerCommitment,
         `0x${"43".repeat(32)}`,
         registrationTag,
-        ...EMPTY_PROOF,
+        EMPTY_PROOF,
       ),
     ).to.be.revertedWithCustomError(registry, "InvalidRegistrationProof");
     await expect(
@@ -159,7 +164,7 @@ describe("Shielded heir key registry transport", function () {
         ownerCommitment,
         `0x${"42".repeat(32)}`,
         registrationTag,
-        ...EMPTY_PROOF,
+        EMPTY_PROOF,
       ),
     ).to.be.revertedWithCustomError(registry, "InvalidRegistrationProof");
   });

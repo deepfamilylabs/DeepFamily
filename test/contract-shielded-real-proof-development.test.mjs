@@ -8,6 +8,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { expect } from "chai";
 import hre from "hardhat";
+import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 import { poseidon2, poseidon8 } from "poseidon-lite";
 import {
   buildShieldedPoolPublicSignals,
@@ -384,36 +385,24 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
 
     const [depositor, recipient] = await hre.ethers.getSigners();
     const generated = await deployCurrentGeneratedVerifiers(["shield", "unshield"], depositor);
-    const shieldAdapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
-      await generated.shield.getAddress(),
-      0,
-    ]);
-    const unshieldAdapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
-      await generated.unshield.getAddress(),
-      7,
-    ]);
-    const mockAdapter = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
+    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
     const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [shieldAdapter, unshieldAdapter, mockAdapter, token, lineage, keyRegistry, poseidon].map(
-        (contract) => contract.waitForDeployment(),
+      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
+        contract.waitForDeployment(),
       ),
     );
     const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
     });
-    const mockAddress = await mockAdapter.getAddress();
-    const verifierAddresses = Array(8).fill(mockAddress);
-    verifierAddresses[0] = await shieldAdapter.getAddress();
-    verifierAddresses[7] = await unshieldAdapter.getAddress();
     const pool = await Pool.deploy(
       await token.getAddress(),
       await lineage.getAddress(),
       await keyRegistry.getAddress(),
-      verifierAddresses,
+      await adapter.getAddress(),
     );
     await pool.waitForDeployment();
     const poolAddress = await pool.getAddress();
@@ -449,7 +438,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       shieldSignals,
     );
-    expect(await shieldAdapter.verifyProof(shieldProof, shieldSignals)).to.equal(true);
+    expect(await adapter.verifyProof(3, 1, shieldProof, shieldSignals)).to.equal(true);
+    // Equal public-signal lengths do not allow a proof from one circuit to verify in another.
+    expect(await adapter.verifyProof(10, 1, shieldProof, shieldSignals)).to.equal(false);
     await token.mint(depositor.address, 100n);
     await token.approve(poolAddress, 100n);
     await expect(pool.shield(101n, shieldData, shieldProof)).to.be.revertedWithCustomError(
@@ -536,7 +527,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       unshieldSignals,
     );
-    expect(await unshieldAdapter.verifyProof(unshieldProof, unshieldSignals)).to.equal(true);
+    expect(await adapter.verifyProof(10, 1, unshieldProof, unshieldSignals)).to.equal(true);
     await expect(
       pool.unshield(depositor.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
@@ -568,28 +559,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
 
     const [depositor] = await hre.ethers.getSigners();
     const generated = await deployCurrentGeneratedVerifiers(actions, depositor);
-    const mockAdapter = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
-    const verifierAddresses = Array(8).fill(await mockAdapter.getAddress());
-    for (const [action, actionIndex] of [
-      ["shield", 0],
-      ["createPolicy", 1],
-      ["allocate", 2],
-      ["topUp", 3],
-      ["claim", 5],
-    ]) {
-      const adapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
-        await generated[action].getAddress(),
-        actionIndex,
-      ]);
-      await adapter.waitForDeployment();
-      verifierAddresses[actionIndex] = await adapter.getAddress();
-    }
+    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
     const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [mockAdapter, token, lineage, keyRegistry, poseidon].map((contract) =>
+      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
         contract.waitForDeployment(),
       ),
     );
@@ -600,7 +576,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       await token.getAddress(),
       await lineage.getAddress(),
       await keyRegistry.getAddress(),
-      verifierAddresses,
+      await adapter.getAddress(),
     );
     await pool.waitForDeployment();
     const poolAddress = await pool.getAddress();
@@ -1380,35 +1356,24 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ["shield", "privateTransfer"],
       depositor,
     );
-    const shieldAdapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
-      await generated.shield.getAddress(),
-      0,
-    ]);
-    const transferAdapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
-      await generated.privateTransfer.getAddress(),
-      6,
-    ]);
-    const mockAdapter = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
+    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
     const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [shieldAdapter, transferAdapter, mockAdapter, token, lineage, keyRegistry, poseidon].map(
-        (contract) => contract.waitForDeployment(),
+      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
+        contract.waitForDeployment(),
       ),
     );
     const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
     });
-    const verifierAddresses = Array(8).fill(await mockAdapter.getAddress());
-    verifierAddresses[0] = await shieldAdapter.getAddress();
-    verifierAddresses[6] = await transferAdapter.getAddress();
     const pool = await Pool.deploy(
       await token.getAddress(),
       await lineage.getAddress(),
       await keyRegistry.getAddress(),
-      verifierAddresses,
+      await adapter.getAddress(),
     );
     await pool.waitForDeployment();
     const poolAddress = await pool.getAddress();
@@ -1525,7 +1490,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       transferSignals,
     );
-    expect(await transferAdapter.verifyProof(transferProof, transferSignals)).to.equal(true);
+    expect(await adapter.verifyProof(9, 1, transferProof, transferSignals)).to.equal(true);
     const tampered = {
       ...transferData,
       outputCiphertexts: [
@@ -1635,7 +1600,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       singleSignals,
     );
-    expect(await transferAdapter.verifyProof(singleProof, singleSignals)).to.equal(true);
+    expect(await adapter.verifyProof(9, 1, singleProof, singleSignals)).to.equal(true);
     await expect(
       pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");

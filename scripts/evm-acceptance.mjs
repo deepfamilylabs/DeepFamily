@@ -76,6 +76,7 @@ import {
   protocolDeploymentEvidenceFromAcceptanceReport,
   protocolDeploymentEvidenceSha256,
   protocolRuntimeBytecodeSha256,
+  GROTH16_ADAPTER_IMMUTABLE_FIELDS,
 } from "./lib/protocolReleaseManifest.mjs";
 import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
 import {
@@ -87,7 +88,6 @@ import { publishTestnetReleaseEvidence } from "./lib/releaseEvidencePublisher.mj
 import { loadCandidateArtifacts } from "./lib/shieldedArtifacts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
@@ -246,6 +246,14 @@ const readTerminalProtocolDeploymentEvidence = async ({
       sameAddress(ethers, adapterDisclosureBindingVerifier, addresses.disclosureBindingVerifier),
     "Terminal Groth16 adapter immutables do not match the deployed verifiers",
   );
+  const adapterVerifierBindings = Object.fromEntries(
+    await Promise.all(
+      GROTH16_ADAPTER_IMMUTABLE_FIELDS.map(async (getter) => [
+        getter,
+        await terminalRead(`terminal adapter ${getter}`, () => groth16VerifierAdapter[getter]()),
+      ]),
+    ),
+  );
 
   const shieldedBindings = await assertShieldedDeploymentBindings({
     deployed,
@@ -256,10 +264,12 @@ const readTerminalProtocolDeploymentEvidence = async ({
     root: process.cwd(),
     deployments: {
       ...shieldedBindings,
-      groth16VerifierAdapter: {
-        personVerifierImmutable: adapterPersonVerifier,
-        disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
-      },
+      groth16VerifierAdapter: Object.fromEntries(
+        GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
+          `${getter}Immutable`,
+          adapterVerifierBindings[getter],
+        ]),
+      ),
       deepFamilyArchive: { deepFamilyImmutable: archiveDeepFamily },
       deepFamilyReader: {
         deepFamilyImmutable: readerDeepFamily,
@@ -298,8 +308,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
     deepFamilyArchive,
     verifierAdapter: {
       address: addresses.groth16VerifierAdapter,
-      personVerifier: adapterPersonVerifier,
-      disclosureBindingVerifier: adapterDisclosureBindingVerifier,
+      ...adapterVerifierBindings,
       artifactSha256: deploymentArtifacts.groth16VerifierAdapter.artifactSha256,
       runtimeSha256: deploymentArtifacts.groth16VerifierAdapter.runtimeSha256,
     },
@@ -365,11 +374,6 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       spec.verifierContractName,
       terminalProjection.contracts.shieldedVerifiers[action],
       manifest.deployments.shieldedVerifiers[action],
-    ]),
-    ...SHIELDED_ACTIONS.map((action) => [
-      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName,
-      terminalProjection.contracts.shieldedAdapters[action],
-      manifest.deployments.shieldedAdapters[action],
     ]),
     [
       "ShieldedHeirKeyRegistry",
@@ -1847,6 +1851,7 @@ export const main = async (chainProfile) => {
       const governedVerifierCandidate = await deploy("Groth16VerifierAdapter", runDeployer, [
         addresses.personCommitmentVerifier,
         addresses.disclosureBindingVerifier,
+        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
       ]);
       addresses.governedVerifierCandidate = await governedVerifierCandidate.getAddress();
       assertCondition(
@@ -1891,7 +1896,11 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "Groth16VerifierAdapter",
         addresses.groth16VerifierAdapter,
-        [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+        [
+          addresses.personCommitmentVerifier,
+          addresses.disclosureBindingVerifier,
+          Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
+        ],
       ),
       await verificationEntry(hre.artifacts, "DeepFamily", addresses.deepFamilyImplementation, [], {
         PoseidonT5: addresses.poseidonT5,
@@ -1936,23 +1945,13 @@ export const main = async (chainProfile) => {
           addresses[spec.verifierLabel],
         ),
       );
-      if (spec.actionId !== null)
-        initialVerificationEntries.push({
-          ...(await verificationEntry(
-            hre.artifacts,
-            spec.adapterContractName,
-            addresses[spec.adapterLabel],
-            [addresses[spec.verifierLabel], spec.actionId],
-          )),
-          label: spec.adapterDeploymentName,
-        });
     }
     initialVerificationEntries.push(
       await verificationEntry(
         hre.artifacts,
         "ShieldedHeirKeyRegistry",
         addresses.shieldedHeirKeyRegistry,
-        [addresses.deepFamilyLineageIndex, addresses.shieldedKeyRegistrationVerifier],
+        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
         { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
       ),
     );
@@ -1965,9 +1964,7 @@ export const main = async (chainProfile) => {
           addresses.token,
           addresses.deepFamilyLineageIndex,
           addresses.shieldedHeirKeyRegistry,
-          SHIELDED_ACTIONS.map(
-            (action) => addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
-          ),
+          addresses.groth16VerifierAdapter,
         ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
@@ -1978,7 +1975,13 @@ export const main = async (chainProfile) => {
           hre.artifacts,
           "Groth16VerifierAdapter",
           addresses.governedVerifierCandidate,
-          [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+          [
+            addresses.personCommitmentVerifier,
+            addresses.disclosureBindingVerifier,
+            Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(
+              (spec) => addresses[spec.verifierLabel],
+            ),
+          ],
         )),
         label: "GovernedVerifierCandidate",
       });
@@ -3618,7 +3621,6 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedAdapters: terminalProtocolDeployment.shieldedAdapters,
         shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
         shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
@@ -3742,7 +3744,6 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedAdapters: terminalProtocolDeployment.shieldedAdapters,
         shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
         shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
       };

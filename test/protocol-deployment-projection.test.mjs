@@ -3,10 +3,7 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
-import {
-  SHIELDED_ACTIONS,
-  SHIELDED_DEPLOYMENT_CIRCUITS,
-} from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import {
   MAINNET_DEPLOYMENT_NONCE_OFFSETS,
   assertOnChainProtocolDeploymentRuntimes,
@@ -18,7 +15,10 @@ import {
   buildProtocolDeploymentProjectionPlan,
   parseProtocolDeploymentProjectionArguments,
 } from "../scripts/protocol-deployment-projection.mjs";
-import { inspectProtocolDeploymentArtifact } from "../scripts/lib/protocolReleaseManifest.mjs";
+import {
+  GROTH16_ADAPTER_IMMUTABLE_FIELDS,
+  inspectProtocolDeploymentArtifact,
+} from "../scripts/lib/protocolReleaseManifest.mjs";
 
 const DEPLOYER = "0x1000000000000000000000000000000000000001";
 const STARTING_NONCE = 41;
@@ -56,22 +56,12 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
         artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierContractName, record),
       ]),
     ),
-    shieldedAdapters: Object.fromEntries(
-      Object.entries(deployments.shieldedAdapters).map(([action, record]) => [
-        action,
-        artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName, record),
-      ]),
-    ),
     shieldedHeirKeyRegistry: artifact(
       "ShieldedHeirKeyRegistry",
       deployments.shieldedHeirKeyRegistry,
     ),
     shieldedDeepPool: artifact("ShieldedDeepPool", deployments.shieldedDeepPool),
-    groth16VerifierAdapter: artifact("Groth16VerifierAdapter", {
-      personVerifier: deployments.groth16VerifierAdapter.personVerifierImmutable,
-      disclosureBindingVerifier:
-        deployments.groth16VerifierAdapter.disclosureBindingVerifierImmutable,
-    }),
+    groth16VerifierAdapter: artifact("Groth16VerifierAdapter", deployments.groth16VerifierAdapter),
     deepFamilyArchive: artifact("DeepFamilyArchive", {
       deepFamily: deployments.deepFamilyArchive.deepFamilyImmutable,
     }),
@@ -107,7 +97,7 @@ const fixtureFor = (chainProfile) => {
   };
 };
 
-const expectProjectionMismatch = (operation, message = /do not match/iu) => {
+const expectProjectionMismatch = (operation, message = /do not match|must bind/iu) => {
   expect(operation).to.throw(message);
 };
 
@@ -134,25 +124,28 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes all nine verifiers and eight adapters in the exact target projection", function () {
+  it("includes all nine shielded verifiers behind the common eleven-route adapter", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
       Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
     );
-    expect(Object.keys(contracts.shieldedAdapters)).to.deep.equal(SHIELDED_ACTIONS);
+    expect(contracts).not.to.have.property("shieldedAdapters");
     expect(contracts.shieldedDeepPool.tokenImmutable).to.equal(contracts.token);
-    for (const action of SHIELDED_ACTIONS) {
-      expect(contracts.shieldedDeepPool.adapterImmutables[action]).to.equal(
-        contracts.shieldedAdapters[action].address,
-      );
-      expect(contracts.shieldedAdapters[action].actionId).to.equal(
-        SHIELDED_DEPLOYMENT_CIRCUITS[action].actionId,
+    expect(contracts.shieldedDeepPool.verifierAdapterImmutable).to.equal(
+      contracts.groth16VerifierAdapter.address,
+    );
+    expect(contracts.shieldedHeirKeyRegistry.verifierAdapterImmutable).to.equal(
+      contracts.groth16VerifierAdapter.address,
+    );
+    for (const action of Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+      expect(contracts.groth16VerifierAdapter[`${action}VerifierImmutable`]).to.equal(
+        contracts.shieldedVerifiers[action].address,
       );
     }
   });
 
-  it("reconstructs real linked pool and registry runtimes and encodes each adapter action", function () {
+  it("reconstructs linked pool and registry runtimes and pins every adapter verifier", function () {
     const plannedAddresses = deriveMainnetPlannedAddresses({
       ethers,
       deployer: DEPLOYER,
@@ -164,19 +157,27 @@ describe("planned production protocol deployment projection", function () {
       manifest: baseManifest(),
     });
     expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(9);
-    expect(Object.keys(inspected.artifacts.shieldedAdapters)).to.have.length(8);
+    expect(inspected.artifacts).not.to.have.property("shieldedAdapters");
     expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
     expect(inspected.artifacts.shieldedHeirKeyRegistry.runtimeBytecode).to.include(
       plannedAddresses.poseidonT6.slice(2).toLowerCase(),
     );
-    const actual = inspected.artifacts.shieldedAdapters.allocate;
-    const wrongAction = inspectProtocolDeploymentArtifact({
-      artifactName: SHIELDED_DEPLOYMENT_CIRCUITS.allocate.adapterLabel,
-      immutableValues: { VERIFIER: plannedAddresses.shieldedAllocateVerifier, ACTION: 5 },
+    const immutableValues = Object.fromEntries(
+      GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
+        getter,
+        inspected.deployments.groth16VerifierAdapter[`${getter}Immutable`],
+      ]),
+    );
+    immutableValues.allocateVerifier = plannedAddresses.shieldedClaimVerifier;
+    const wrongRoute = inspectProtocolDeploymentArtifact({
+      artifactName: "groth16VerifierAdapter",
+      immutableValues,
     });
-    expect(wrongAction.runtimeSha256).not.to.equal(actual.runtimeSha256);
+    expect(wrongRoute.runtimeSha256).not.to.equal(
+      inspected.artifacts.groth16VerifierAdapter.runtimeSha256,
+    );
   });
 
   for (const [profile, oppositeProfile] of [
@@ -222,6 +223,13 @@ describe("planned production protocol deployment projection", function () {
         (manifest) =>
           (manifest.deployments.groth16VerifierAdapter.disclosureBindingVerifierImmutable =
             DEPLOYER),
+        ...Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map(
+          (action) => (manifest) =>
+            (manifest.deployments.groth16VerifierAdapter[`${action}VerifierImmutable`] = DEPLOYER),
+        ),
+        (manifest) => (manifest.deployments.shieldedDeepPool.verifierAdapterImmutable = DEPLOYER),
+        (manifest) =>
+          (manifest.deployments.shieldedHeirKeyRegistry.verifierAdapterImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.address = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.address = DEPLOYER),
@@ -255,10 +263,6 @@ describe("planned production protocol deployment projection", function () {
       ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
         fixture.plannedAddresses[spec.verifierLabel].toLowerCase(),
         fixture.planned.artifacts.shieldedVerifiers[action].runtimeBytecode,
-      ]),
-      ...SHIELDED_ACTIONS.map((action) => [
-        fixture.plannedAddresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel].toLowerCase(),
-        fixture.planned.artifacts.shieldedAdapters[action].runtimeBytecode,
       ]),
       [
         fixture.plannedAddresses.shieldedHeirKeyRegistry.toLowerCase(),

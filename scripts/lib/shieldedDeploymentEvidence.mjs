@@ -1,6 +1,6 @@
 import { getAddress } from "ethers";
-import { SHIELDED_ACTIONS, SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
-import { SHIELDED_POOL_VERIFIER_IMMUTABLES } from "./protocolReleaseManifest.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+import { GROTH16_ADAPTER_VERIFIER_BINDINGS } from "./protocolReleaseManifest.mjs";
 
 export function shieldedDeploymentBindings(addresses) {
   const address = (name) => getAddress(addresses[name]);
@@ -15,35 +15,17 @@ export function shieldedDeploymentBindings(addresses) {
         { address: address(spec.verifierLabel) },
       ]),
     ),
-    shieldedAdapters: Object.fromEntries(
-      SHIELDED_ACTIONS.map((action) => {
-        const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-        return [
-          action,
-          {
-            address: address(spec.adapterLabel),
-            verifierImmutable: address(spec.verifierLabel),
-            actionId: spec.actionId,
-          },
-        ];
-      }),
-    ),
     shieldedHeirKeyRegistry: {
       address: address("shieldedHeirKeyRegistry"),
       lineageIndexImmutable: address("deepFamilyLineageIndex"),
-      keyRegistrationVerifierImmutable: address("shieldedKeyRegistrationVerifier"),
+      verifierAdapterImmutable: address("groth16VerifierAdapter"),
     },
     shieldedDeepPool: {
       address: address("shieldedDeepPool"),
       tokenImmutable: address("token"),
       lineageIndexImmutable: address("deepFamilyLineageIndex"),
       keyRegistryImmutable: address("shieldedHeirKeyRegistry"),
-      adapterImmutables: Object.fromEntries(
-        SHIELDED_ACTIONS.map((action) => [
-          action,
-          address(SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel),
-        ]),
-      ),
+      verifierAdapterImmutable: address("groth16VerifierAdapter"),
     },
   };
 }
@@ -59,19 +41,16 @@ export async function assertShieldedDeploymentBindings({
     if (getAddress(actual) !== getAddress(expected))
       throw new Error(`${label} differs from the integrated deployment`);
   };
-  for (const action of SHIELDED_ACTIONS) {
-    const adapter = deployed.shieldedAdapters[action];
-    const [verifier, actionId] = await Promise.all([
-      read(`${action} adapter verifier`, () => adapter.VERIFIER()),
-      read(`${action} adapter action`, () => adapter.ACTION()),
+  const adapter = deployed.groth16VerifierAdapter;
+  for (const [purpose, [getter, label]] of Object.entries(
+    GROTH16_ADAPTER_VERIFIER_BINDINGS,
+  ).entries()) {
+    const [verifier, routedVerifier] = await Promise.all([
+      read(`adapter ${getter}`, () => adapter[getter]()),
+      read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose)),
     ]);
-    same(
-      verifier,
-      bindings.shieldedAdapters[action].verifierImmutable,
-      `${action} adapter verifier`,
-    );
-    if (BigInt(actionId) !== BigInt(bindings.shieldedAdapters[action].actionId))
-      throw new Error(`${action} adapter has the wrong action ID`);
+    same(verifier, addresses[label], `adapter ${getter}`);
+    same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
   }
   const registry = deployed.shieldedHeirKeyRegistry;
   same(
@@ -81,7 +60,7 @@ export async function assertShieldedDeploymentBindings({
   );
   same(
     await read("registry verifier", () => registry.VERIFIER()),
-    bindings.shieldedHeirKeyRegistry.keyRegistrationVerifierImmutable,
+    bindings.shieldedHeirKeyRegistry.verifierAdapterImmutable,
     "registry verifier",
   );
   const pool = deployed.shieldedDeepPool;
@@ -89,10 +68,7 @@ export async function assertShieldedDeploymentBindings({
     ["TOKEN", bindings.token],
     ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
     ["KEY_REGISTRY", bindings.shieldedHeirKeyRegistry.address],
-    ...SHIELDED_ACTIONS.map((action) => [
-      SHIELDED_POOL_VERIFIER_IMMUTABLES[action],
-      bindings.shieldedDeepPool.adapterImmutables[action],
-    ]),
+    ["VERIFIER", bindings.shieldedDeepPool.verifierAdapterImmutable],
   ])
     same(await read(`pool ${method}`, () => pool[method]()), expected, `pool ${method}`);
   same(
@@ -115,11 +91,6 @@ export function shieldedArtifactEntries(bindings, artifacts) {
       bindings.shieldedVerifiers[action],
       artifacts.shieldedVerifiers[action],
     ]),
-    ...SHIELDED_ACTIONS.map((action) => [
-      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName,
-      bindings.shieldedAdapters[action],
-      artifacts.shieldedAdapters[action],
-    ]),
     [
       "ShieldedHeirKeyRegistry",
       bindings.shieldedHeirKeyRegistry,
@@ -137,8 +108,6 @@ export function shieldedDeploymentEvidence(bindings, artifacts) {
   });
   for (const action of Object.keys(evidence.shieldedVerifiers))
     Object.assign(evidence.shieldedVerifiers[action], hashes(artifacts.shieldedVerifiers[action]));
-  for (const action of SHIELDED_ACTIONS)
-    Object.assign(evidence.shieldedAdapters[action], hashes(artifacts.shieldedAdapters[action]));
   Object.assign(evidence.shieldedHeirKeyRegistry, hashes(artifacts.shieldedHeirKeyRegistry));
   Object.assign(evidence.shieldedDeepPool, hashes(artifacts.shieldedDeepPool));
   delete evidence.token;

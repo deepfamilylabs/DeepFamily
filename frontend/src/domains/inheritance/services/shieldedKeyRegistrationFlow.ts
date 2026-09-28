@@ -1,4 +1,4 @@
-import { normalizeGroth16Proof } from "@deepfamily/proof-core";
+import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import {
   buildShieldedKeyRegistrationPublicSignals,
   computeIdentityFromDerivedSecret,
@@ -60,7 +60,9 @@ function assertExpectedSignals(actual: readonly string[], expected: readonly str
   }
   for (let index = 0; index < 7; index += 1) {
     if (BigInt(actual[index]) !== BigInt(expected[index])) {
-      throw new Error(`Shielded key registration public signal ${index} does not match transaction`);
+      throw new Error(
+        `Shielded key registration public signal ${index} does not match transaction`,
+      );
     }
   }
 }
@@ -133,7 +135,7 @@ export async function registerShieldedHeirKey(
     { timeoutMs: input.proofTimeoutMs ?? 1_200_000 },
   );
   assertExpectedSignals(generated.publicSignals, expectedSignals);
-  const proof = normalizeGroth16Proof(generated.proof);
+  const proofData = encodeGroth16AbcProofData(normalizeGroth16Proof(generated.proof));
 
   await assertSignerNetwork(signer, expectedChainId);
   const connected = registry.connect(signer) as unknown as { register: RegisterMethod };
@@ -146,9 +148,7 @@ export async function registerShieldedHeirKey(
     keys.ownerCommitment,
     viewingKey,
     signals[6],
-    proof.a,
-    proof.b,
-    proof.c,
+    proofData,
   ];
   onStage?.("checkingGas");
   const gasEstimate = await register.estimateGas(...args);

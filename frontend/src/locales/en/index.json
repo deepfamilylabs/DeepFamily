@@ -1457,6 +1457,7 @@
       "UnsupportedProofEncoding": "Proof encoding is not supported.",
       "MalformedProofData": "Proof data is malformed.",
       "UnsupportedPurpose": "Proof purpose is not supported by the verifier.",
+      "VerifierNotConfigured": "Proof verification is not configured for this operation.",
       "DuplicateVersion": "This person version already exists.",
       "DuplicateVersionCommitment": "This encrypted version commitment already exists on-chain.",
       "CallerOrIdentitySuiteMismatch": "Caller address or identity suite does not match the submitted proof.",

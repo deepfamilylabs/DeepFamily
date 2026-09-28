@@ -100,6 +100,7 @@ async function deployStubAdapter() {
   const adapter = await Adapter.deploy(
     await personVerifier.getAddress(),
     await disclosureVerifier.getAddress(),
+    Array(9).fill(hre.ethers.ZeroAddress),
   );
   await adapter.waitForDeployment();
   return adapter;
