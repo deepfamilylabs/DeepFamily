@@ -3,13 +3,19 @@
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
 For local shielded inheritance development, run `npm run dev:all` from the repository root.
-The first run generates the nine development proving keys if they are missing or stale; later
-runs reuse them. Key generation can take several minutes. To regenerate them manually, run
-`npm run zk:shielded:development:setup`.
+The first run builds missing circuit outputs and reuses the checked-in public keys. It generates
+development proving keys only if they are missing or stale. Key generation can take several minutes.
+To regenerate them manually, run
+`npm run zk:development:setup`.
 The local deploy command binds the shielded pool and key registry to the same DeepFamily token
-and lineage index and writes their addresses and deployment blocks to `.env.local`. The Vite
-development server serves manifest-checked keys from the ignored `zk-artifacts/shielded` directory;
-it never copies them into `public/` or a production build. These keys are for localhost only.
+and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
+`.env.local` from the integrated deployment records.
+Both setup commands synchronize browser WASM/zkey/vkey files to `public/zk/shielded/` and generated
+verifiers to `contracts/`, following the identity/disclosure flow. Vite serves the files directly
+at `/zk/shielded/`, including built previews. `zk:artifacts:check` validates all 11 artifact sets;
+`zk:check` and `zk:ceremony:verify` perform the cryptographic checks.
+The checked-in keys are development-only. `release:preflight` requires production keys and release
+evidence before publication.
 
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 
@@ -43,6 +49,9 @@ Configure the Pages project as a monorepo build:
 
 `pages:build` performs a clean filtered workspace install for only `deepfamily-frontend` and
 `@deepfamily/proof-core`, so Cloudflare does not install the Hardhat toolchain.
+Cloudflare Pages currently limits each site asset to [25 MiB](https://developers.cloudflare.com/pages/platform/limits/#file-size).
+The production shielded zkeys have not been generated or measured yet. If any exceed this limit,
+the current Pages deployment path cannot serve them and needs a separate asset hosting plan.
 
 ## Configuration
 

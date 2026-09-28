@@ -157,6 +157,32 @@ describe("development ZK setup", function () {
     expect(calls).to.deep.equal(["guard"]);
   });
 
+  it("rejects shielded production artifacts before installing or rebuilding anything", async function () {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-shielded-production-guard-"));
+    const manifest = path.join(root, "circuits", "shielded-production-manifest.json");
+    await fs.mkdir(path.dirname(manifest), { recursive: true });
+    await fs.writeFile(manifest, "{}\n");
+    const calls = [];
+    try {
+      let caught;
+      try {
+        await runZkDevelopmentSetup({
+          root,
+          manifestGuard: () => calls.push("legacy-guard"),
+          ptauInstaller: () => calls.push("ptau"),
+          commandRunner: () => calls.push("command"),
+        });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught?.message).to.include("Refusing to overwrite shielded production artifacts");
+      expect(calls).to.deep.equal(["legacy-guard"]);
+      expect(await fs.readFile(manifest, "utf8")).to.equal("{}\n");
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("uses the pinned pTau before rebuilding keys, then syncs, updates and proves", async function () {
     const root = path.resolve("/tmp/deepfamily-development-refresh-fixture");
     const temporaryDirectory = path.join(root, "temporary");
@@ -201,15 +227,25 @@ describe("development ZK setup", function () {
     expect(calls[3]).to.deep.equal(["temporary-directory", temporaryDirectory]);
 
     const commandCalls = calls.filter(([kind]) => kind === "command");
-    expect(commandCalls).to.have.length(2 + DEVELOPMENT_CIRCUITS.length * 5);
+    expect(commandCalls).to.have.length(4 + DEVELOPMENT_CIRCUITS.length * 5);
     expect(commandCalls[0][1]).to.deep.equal({
       executable: process.execPath,
-      args: [path.join(root, "scripts/zk-build.mjs")],
+      args: [path.join(root, "scripts/zk-build.mjs"), "--circuit", "legacy"],
+      cwd: root,
+    });
+    expect(commandCalls.at(-3)[1]).to.deep.equal({
+      executable: process.execPath,
+      args: [path.join(root, "scripts/zk-check.mjs"), "--circuit", "legacy"],
+      cwd: root,
+    });
+    expect(commandCalls.at(-2)[1]).to.deep.equal({
+      executable: process.execPath,
+      args: [path.join(root, "scripts/zk-shielded-development-setup.mjs")],
       cwd: root,
     });
     expect(commandCalls.at(-1)[1]).to.deep.equal({
       executable: process.execPath,
-      args: [path.join(root, "scripts/zk-check.mjs")],
+      args: [path.join(root, "scripts/zk-shielded-development-proof-smoke.mjs")],
       cwd: root,
     });
 
@@ -217,7 +253,7 @@ describe("development ZK setup", function () {
     const manifestIndex = calls.findIndex(([kind]) => kind === "manifest-update");
     const proofIndex = calls.lastIndexOf(commandCalls.at(-1));
     const cleanupIndex = calls.findIndex(([kind]) => kind === "remove");
-    expect(syncIndex).to.be.greaterThan(calls.indexOf(commandCalls.at(-2)));
+    expect(syncIndex).to.be.greaterThan(calls.indexOf(commandCalls.at(-4)));
     expect(manifestIndex).to.be.greaterThan(syncIndex);
     expect(proofIndex).to.be.greaterThan(manifestIndex);
     expect(cleanupIndex).to.be.greaterThan(proofIndex);

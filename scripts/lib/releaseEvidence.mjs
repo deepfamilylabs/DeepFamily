@@ -10,6 +10,7 @@ export const RELEASE_INPUT_DIRECTORY_NAMES = Object.freeze([
   "artifacts",
   "contracts",
   "circuits",
+  "frontend/public/zk",
   "hardhat",
   "lib",
   "packages",

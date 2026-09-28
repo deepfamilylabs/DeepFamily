@@ -90,10 +90,18 @@ export const runCommand = ({ executable, args, cwd }) =>
     stdio: "inherit",
   });
 
+export const assertNoShieldedProductionSetup = ({ root }) => {
+  const productionManifest = absolute(root, "circuits/shielded-production-manifest.json");
+  if (fs.existsSync(productionManifest)) {
+    throw new Error("Refusing to overwrite shielded production artifacts with development keys");
+  }
+};
+
 export const runZkDevelopmentSetup = async ({
   root = process.cwd(),
   output = console,
   manifestGuard = assertDevelopmentManifest,
+  shieldedManifestGuard = assertNoShieldedProductionSetup,
   ptauInstaller = ensureProductionPtau,
   commandRunner = runCommand,
   assetSynchronizer = syncZkAssets,
@@ -106,6 +114,7 @@ export const runZkDevelopmentSetup = async ({
 
   // This must remain the first operation: every later dependency can write files.
   await manifestGuard({ root: resolvedRoot });
+  await shieldedManifestGuard({ root: resolvedRoot });
 
   const ptau = await ptauInstaller({ root: resolvedRoot });
   output.log(`Pinned Phase 1 Powers of Tau ${ptau.status}: ${ptau.path} (SHA-256 ${ptau.sha256})`);
@@ -116,7 +125,7 @@ export const runZkDevelopmentSetup = async ({
 
     await commandRunner({
       executable: process.execPath,
-      args: [absolute(resolvedRoot, "scripts/zk-build.mjs")],
+      args: [absolute(resolvedRoot, "scripts/zk-build.mjs"), "--circuit", "legacy"],
       cwd: resolvedRoot,
     });
 
@@ -141,7 +150,18 @@ export const runZkDevelopmentSetup = async ({
 
     await commandRunner({
       executable: process.execPath,
-      args: [absolute(resolvedRoot, "scripts/zk-check.mjs")],
+      args: [absolute(resolvedRoot, "scripts/zk-check.mjs"), "--circuit", "legacy"],
+      cwd: resolvedRoot,
+    });
+
+    await commandRunner({
+      executable: process.execPath,
+      args: [absolute(resolvedRoot, "scripts/zk-shielded-development-setup.mjs")],
+      cwd: resolvedRoot,
+    });
+    await commandRunner({
+      executable: process.execPath,
+      args: [absolute(resolvedRoot, "scripts/zk-shielded-development-proof-smoke.mjs")],
       cwd: resolvedRoot,
     });
 

@@ -235,17 +235,17 @@ describe("local shielded budget merge preparation", () => {
     await expect(prepareShieldedMergeBudget(periodOverflow)).rejects.toThrow("period limit");
   });
 
-  // Test-only opt-in. Development zkeys are ignored and must never ship in the app.
+  // Test-only opt-in for real proofs using the same public artifacts as the app.
   // eslint-disable-next-line no-restricted-syntax
-  it.skipIf(process.env.SHIELDED_MERGE_DEV_PROOF !== "1")(
-    "verifies a real Groth16 merge proof with development artifacts",
+  it.skipIf(process.env.SHIELDED_MERGE_PROOF !== "1")(
+    "verifies a real Groth16 merge proof with current public artifacts",
     async () => {
       const prepared = await prepareShieldedMergeBudget(await fixture());
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-merge-prep-"));
       try {
         const source = "shielded_merge_budget";
         const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
-        const artifacts = path.join(repoRoot, "zk-artifacts/shielded");
+        const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
@@ -255,8 +255,8 @@ describe("local shielded budget merge preparation", () => {
           cli,
           "groth16", "fullprove",
           inputPath,
-          path.join(artifacts, `${source}_js`, `${source}.wasm`),
-          path.join(artifacts, `${source}_dev_final.zkey`),
+          path.join(artifacts, `${source}.wasm`),
+          path.join(artifacts, `${source}_final.zkey`),
           proofPath,
           publicPath,
         ], { timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });

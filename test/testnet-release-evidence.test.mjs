@@ -16,9 +16,20 @@ import {
   protocolDeploymentEvidenceSha256,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 import {
+  shieldedDeploymentBindings,
+  shieldedDeploymentEvidence,
+} from "../scripts/lib/shieldedDeploymentEvidence.mjs";
+import { ALLOCATE_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
+import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   ZK_PRODUCTION_PHASE1,
+  ZK_RELEASE_ARTIFACTS,
   ZK_TRUST_MODEL_MULTI_PARTY,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
 } from "../scripts/lib/zkArtifactTrust.mjs";
@@ -58,18 +69,106 @@ const COMPONENT_HASH = `0x${"ab".repeat(32)}`;
 const ROLE_HASH = `0x${"bc".repeat(32)}`;
 const ZERO_ADDRESS = `0x${"00".repeat(20)}`;
 const ZERO_HASH = `0x${"00".repeat(32)}`;
+const SHIELDED_MANIFEST_SHA256 = "41".repeat(32);
+const SHIELDED_ARTIFACT_SHA256 = "42".repeat(32);
+const SHIELDED_RUNTIME_SHA256 = "43".repeat(32);
+const SHIELDED_SOURCE_SHA256 = "44".repeat(32);
+const SHIELDED_WASM_SHA256 = "45".repeat(32);
+const SHIELDED_ZKEY_SHA256 = "46".repeat(32);
+const SHIELDED_VERIFICATION_KEY_SHA256 = "47".repeat(32);
+const SHIELDED_PROOF_SHA256 = "48".repeat(32);
+const SHIELDED_ACTION_TRANSACTION_LABELS = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)
+  .filter((action) => action !== "claim")
+  .map((action) => `shielded-action-${action}`);
+const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
+  SHIELDED_ACTION_TRANSACTION_LABELS.map((label, index) => [
+    label,
+    {
+      hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
+      blockNumber: 100,
+      blockHash: FINALIZED_BLOCK_HASH,
+      status: 1,
+    },
+  ]),
+);
+const REPORT_TRANSACTIONS = {
+  "critical-transaction": {
+    hash: FINALIZED_TRANSACTION_HASH,
+    blockNumber: 100,
+    blockHash: FINALIZED_BLOCK_HASH,
+    status: 1,
+  },
+  ...SHIELDED_TRANSACTION_RECEIPTS,
+};
+const SHIELDED_ADDRESSES = Object.fromEntries(
+  INTEGRATED_DEPLOYMENT_RECORDS.filter(
+    (record) =>
+      record.transactionLabel.startsWith("shielded") ||
+      ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
+  ).map((record, index) => [record.transactionLabel, address(200 + index)]),
+);
+const SHIELDED_BINDINGS = shieldedDeploymentBindings({
+  token: TOKEN,
+  ...SHIELDED_ADDRESSES,
+});
+const SHIELDED_DEPLOYMENT_ARTIFACTS = {
+  shieldedVerifiers: Object.fromEntries(
+    Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
+      action,
+      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
+    ]),
+  ),
+  shieldedAdapters: Object.fromEntries(
+    SHIELDED_ACTIONS.map((action) => [
+      action,
+      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
+    ]),
+  ),
+  shieldedHeirKeyRegistry: {
+    artifactSha256: SHIELDED_ARTIFACT_SHA256,
+    runtimeSha256: SHIELDED_RUNTIME_SHA256,
+  },
+  shieldedDeepPool: {
+    artifactSha256: SHIELDED_ARTIFACT_SHA256,
+    runtimeSha256: SHIELDED_RUNTIME_SHA256,
+  },
+};
+const SHIELDED_DEPLOYMENT_EVIDENCE = shieldedDeploymentEvidence(
+  SHIELDED_BINDINGS,
+  SHIELDED_DEPLOYMENT_ARTIFACTS,
+);
+const SHIELDED_MANIFEST_CIRCUITS = Object.fromEntries(
+  Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+    action,
+    {
+      source: spec.source,
+      sourceSha256: SHIELDED_SOURCE_SHA256,
+      wasmSha256: SHIELDED_WASM_SHA256,
+      zkeySha256: SHIELDED_ZKEY_SHA256,
+      verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
+    },
+  ]),
+);
+const shieldedArtifactInspector = () => ({
+  manifestSha256: SHIELDED_MANIFEST_SHA256,
+  manifest: {
+    circuits: structuredClone(SHIELDED_MANIFEST_CIRCUITS),
+    releaseCriteria: {
+      allocationMaxGas: 300_000,
+      claim12MaxGas: 300_000,
+      browserAllocationMaxMs: 60_000,
+      browserClaim12MaxMs: 60_000,
+      recoveryMaxMs: 60_000,
+      recoveryMinEvents: 1,
+    },
+  },
+});
 const VERIFIED_CONTRACTS = [
-  ["initial-deployment", "GovernanceTimelock"],
-  ["initial-deployment", "DeepFamilyToken"],
-  ["initial-deployment", "PoseidonT5"],
-  ["initial-deployment", "AdultAgeGate"],
-  ["initial-deployment", "PersonCommitmentVerifier"],
-  ["initial-deployment", "DisclosureBindingVerifier"],
-  ["initial-deployment", "Groth16VerifierAdapter"],
-  ["initial-deployment", "DeepFamilyArchive"],
-  ["initial-deployment", "DeepFamily"],
-  ["initial-deployment", "UUPSProxy"],
-  ["initial-deployment", "DeepFamilyReader"],
+  ...[
+    "GovernanceTimelock",
+    "UUPSProxy",
+    ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => record.deploymentName),
+  ].map((name) => ["initial-deployment", name]),
 ];
 const EXPECTED_INITIAL_RELEASE_STEPS = [
   "acceptance-source-inputs-unchanged",
@@ -83,6 +182,7 @@ const EXPECTED_INITIAL_RELEASE_STEPS = [
   "production-build-manifest-preflight",
   "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
+  "real-zk-shielded-business",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
   "terminal-governance-state-verified",
@@ -152,13 +252,21 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         groth16VerifierAdapter: { artifactSha256: ADAPTER_ARTIFACT_SHA256 },
         deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
+        shieldedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedVerifiers,
+        shieldedAdapters: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedAdapters,
+        shieldedHeirKeyRegistry: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedHeirKeyRegistry,
+        shieldedDeepPool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedDeepPool,
       },
     },
   };
 };
 
 const protocolDeploymentArtifactInspector = ({ deployments }) => {
-  expect(deployments).to.deep.equal({
+  expect({
+    groth16VerifierAdapter: deployments.groth16VerifierAdapter,
+    deepFamilyArchive: deployments.deepFamilyArchive,
+    deepFamilyReader: deployments.deepFamilyReader,
+  }).to.deep.equal({
     groth16VerifierAdapter: {
       personVerifierImmutable: PERSON_VERIFIER,
       disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
@@ -170,6 +278,7 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
     },
   });
   return {
+    ...SHIELDED_DEPLOYMENT_ARTIFACTS,
     groth16VerifierAdapter: {
       artifactSha256: ADAPTER_ARTIFACT_SHA256,
       runtimeSha256: ADAPTER_RUNTIME_SHA256,
@@ -191,6 +300,41 @@ const bindDeploymentEvidence = (report) => {
   );
   return report;
 };
+
+const shieldedProofs = (chainId) =>
+  Object.fromEntries(
+    Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
+      const signals = Array(action === "keyRegistration" ? 7 : 32).fill("0");
+      if (action === "keyRegistration") {
+        signals[4] = String(chainId);
+        signals[5] = BigInt(SHIELDED_ADDRESSES.shieldedHeirKeyRegistry).toString();
+      } else {
+        signals[0] = String(spec.actionId);
+        signals[1] = String(chainId);
+        signals[2] = BigInt(SHIELDED_ADDRESSES.shieldedDeepPool).toString();
+        if (action === "allocate") signals[29] = "1000";
+        if (action === "claim") signals[29] = String(8200 + 12 * 2_592_000);
+      }
+      return [
+        action,
+        {
+          source: spec.source,
+          verified: true,
+          verifierAddress: SHIELDED_ADDRESSES[spec.verifierLabel],
+          wasmSha256: SHIELDED_WASM_SHA256,
+          zkeySha256: SHIELDED_ZKEY_SHA256,
+          verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
+          proofSha256: SHIELDED_PROOF_SHA256,
+          publicSignals: signals,
+          publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
+          execution: action === "claim" ? "verifier-call" : "transaction",
+          ...(action === "claim"
+            ? { claimCount: 12 }
+            : { transactionLabel: `shielded-action-${action}` }),
+        },
+      ];
+    }),
+  );
 
 const validReportTemplate = () => ({
   schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
@@ -231,26 +375,14 @@ const validReportTemplate = () => ({
       lastCriticalBlock: 100,
       finalizedBlockNumber: 105,
       finalizedBlockHash: FINALIZED_BLOCK_HASH,
-      revalidatedTransactionCount: 1,
-      revalidatedTransactions: [
-        {
-          label: "critical-transaction",
-          hash: FINALIZED_TRANSACTION_HASH,
-          blockNumber: 100,
-          blockHash: FINALIZED_BLOCK_HASH,
-          status: 1,
-        },
-      ],
+      revalidatedTransactionCount: Object.keys(REPORT_TRANSACTIONS).length,
+      revalidatedTransactions: Object.entries(REPORT_TRANSACTIONS).map(([label, receipt]) => ({
+        label,
+        ...receipt,
+      })),
     },
   },
-  transactions: {
-    "critical-transaction": {
-      hash: FINALIZED_TRANSACTION_HASH,
-      blockNumber: 100,
-      blockHash: FINALIZED_BLOCK_HASH,
-      status: 1,
-    },
-  },
+  transactions: structuredClone(REPORT_TRANSACTIONS),
   addresses: {
     governanceSafe: GOVERNANCE_SAFE,
     safeOwners: SAFE_OWNERS,
@@ -263,6 +395,7 @@ const validReportTemplate = () => ({
     groth16VerifierAdapter: VERIFIER_ADAPTER,
     archive: ARCHIVE,
     deepFamilyReader: READER,
+    ...SHIELDED_ADDRESSES,
   },
   timelockDeployment: { minDelaySeconds: MIN_DELAY },
   buildState: {
@@ -309,6 +442,57 @@ const validReportTemplate = () => ({
       bytes: ZK_PRODUCTION_PHASE1.bytes,
       sha256: ZK_PRODUCTION_PHASE1.sha256,
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
+    },
+    circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
+    circuitCount: 11,
+    shielded: {
+      status: "passed",
+      circuitCount: 9,
+      manifestSha256: SHIELDED_MANIFEST_SHA256,
+      ptau: {
+        bytes: ZK_PRODUCTION_PHASE1.bytes,
+        sha256: ZK_PRODUCTION_PHASE1.sha256,
+        blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
+      },
+    },
+  },
+  shieldedArtifacts: {
+    status: "passed",
+    productionReady: true,
+    manifestSha256: SHIELDED_MANIFEST_SHA256,
+    circuits: structuredClone(SHIELDED_MANIFEST_CIRCUITS),
+  },
+  shielded: {
+    status: "passed",
+    manifestSha256: SHIELDED_MANIFEST_SHA256,
+    proofs: shieldedProofs(CHAIN_ID),
+    scenario: {
+      allocationLabel: "shielded-action-allocate",
+      claimExecution: "verifier-call",
+      claimCount: 12,
+      registeredKeys: 2,
+      recoveryEventCount: 2,
+      recoveredNotes: 1,
+      lineageDepth: 1,
+      noteDepth: 1,
+      eligibleFrom: "8200",
+      claimAsOf: String(8200 + 12 * 2_592_000),
+    },
+    receipts: {
+      rpcChecks: "passed",
+      chainId: CHAIN_ID,
+      poolAddress: SHIELDED_ADDRESSES.shieldedDeepPool,
+      transactions: {
+        allocation: {
+          txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-allocate"].hash,
+          blockNumber: 100,
+          blockHash: FINALIZED_BLOCK_HASH,
+          selector: ALLOCATE_SELECTOR,
+          gasUsed: "200000",
+          transactionGasLimit: "300000",
+          blockGasLimit: "30000000",
+        },
+      },
     },
   },
   productionParity: {
@@ -383,6 +567,7 @@ const validReportTemplate = () => ({
       artifactSha256: ARCHIVE_ARTIFACT_SHA256,
       runtimeSha256: ARCHIVE_RUNTIME_SHA256,
     },
+    ...structuredClone(SHIELDED_DEPLOYMENT_EVIDENCE),
     proofRoutes: [
       {
         purpose: "PersonRelation",
@@ -423,7 +608,7 @@ const expectRejected = async (operation, pattern) => {
   expect(error.message).to.match(pattern);
 };
 
-describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
+describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
   let repositoryRoot;
   let reportPath;
   let destinationPath;
@@ -438,6 +623,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       currentCommit: COMMIT,
       protocolManifestInspector,
       protocolDeploymentArtifactInspector,
+      shieldedArtifactInspector,
       ...overrides,
     });
 
@@ -460,6 +646,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       expectedAcceptanceInputDigest: INPUT_DIGEST,
       protocolManifestInspector,
       protocolDeploymentArtifactInspector,
+      shieldedArtifactInspector,
       ...overrides,
     });
 
@@ -486,6 +673,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
   });
 
   it("pins the exact initial-release evidence identity and required step policy", function () {
+    expect(TESTNET_RELEASE_REPORT_SCHEMA_VERSION).to.equal(1);
     expect(TESTNET_RELEASE_EVIDENCE_TYPE).to.equal("initial-mainnet-release");
     expect(TESTNET_RELEASE_REQUIRED_STEPS).to.deep.equal(EXPECTED_INITIAL_RELEASE_STEPS);
   });
@@ -503,7 +691,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       sha256: result.reportSha256,
     });
     expect(result.publicSummary).to.deep.include({
-      schemaVersion: 5,
+      schemaVersion: 1,
       evidenceType: TESTNET_RELEASE_EVIDENCE_TYPE,
       governanceLifecycleIncluded: false,
       acceptanceMode: "release-rehearsal",
@@ -535,7 +723,16 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(1);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(9);
+    expect(result.publicSummary.shielded).to.deep.include({
+      manifestSha256: SHIELDED_MANIFEST_SHA256,
+      proofCount: 9,
+      claimCount: 12,
+      lineageDepth: 1,
+      noteDepth: 1,
+    });
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
+    expect(result.publicSummary.shielded.transactionActions).to.have.length(8);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -664,6 +861,13 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
     report.network.name = "sepolia";
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
+    report.shielded.receipts.chainId = sepoliaChainId;
+    for (const [action, proof] of Object.entries(report.shielded.proofs)) {
+      proof.publicSignals[action === "keyRegistration" ? 4 : 1] = String(sepoliaChainId);
+      proof.publicSignalsSha256 = createHash("sha256")
+        .update(JSON.stringify(proof.publicSignals))
+        .digest("hex");
+    }
     bindDeploymentEvidence(report);
     await writeReport(report);
 
@@ -770,7 +974,8 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
 
   it("strictly requires the release report identity and exact target chain", async function () {
     const mutations = [
-      ["schemaVersion", 4, /schemaVersion must be 5/iu],
+      ["schemaVersion", 5, /schemaVersion must be 1/iu],
+      ["schemaVersion", 6, /schemaVersion must be 1/iu],
       ["evidenceType", "governance-lifecycle", /evidenceType must be "initial-mainnet-release"/iu],
       ["governanceLifecycleIncluded", true, /governanceLifecycleIncluded must be false/iu],
       ["mode", "recovery", /mode must be "acceptance"/iu],
@@ -830,7 +1035,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
             attempts: 1,
             status: "passed",
           }),
-        /exactly the schema v5 initial-release contract set/iu,
+        /exactly the schema v1 initial-release contract set/iu,
       ]),
       ...[
         "delayed-deep-treasury-transfer",
@@ -839,7 +1044,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
         "storage-safe-timelocked-uups-upgrade",
       ].map((name) => [
         (report) => report.steps.push({ name, status: "passed" }),
-        /exactly the schema v5 initial-release step set/iu,
+        /exactly the schema v1 initial-release step set/iu,
       ]),
       ...[
         "fee-update-schedule",
@@ -853,7 +1058,8 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       ].map((label) => [
         (report) => {
           const receipt = report.transactions["critical-transaction"];
-          report.transactions = { [label]: receipt };
+          delete report.transactions["critical-transaction"];
+          report.transactions[label] = receipt;
           report.network.finality.revalidatedTransactions[0].label = label;
         },
         /forbidden governance lifecycle content/iu,
@@ -926,7 +1132,7 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
     );
   });
 
-  it("requires the exact schema v5 readiness gate set and every gate to be true", async function () {
+  it("requires the exact schema v1 readiness gate set and every gate to be true", async function () {
     const failedGate = validReport();
     failedGate.releaseReadinessGates.refundCompleted = false;
     await writeReport(failedGate);
@@ -935,12 +1141,12 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
     const missingGate = validReport();
     delete missingGate.releaseReadinessGates.cleanReleaseCommit;
     await writeReport(missingGate);
-    await expectRejected(() => validate(), /exactly the schema v5 initial-release gate set/iu);
+    await expectRejected(() => validate(), /exactly the schema v1 initial-release gate set/iu);
 
     const extraGate = validReport();
     extraGate.releaseReadinessGates.unrecognizedGate = true;
     await writeReport(extraGate);
-    await expectRejected(() => validate(), /exactly the schema v5 initial-release gate set/iu);
+    await expectRejected(() => validate(), /exactly the schema v1 initial-release gate set/iu);
   });
 
   it("requires production Trusted Setup evidence behind the production configuration gate", async function () {
@@ -1161,14 +1367,14 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => report.verification.contracts.pop(),
-        /exactly the schema v5 initial-release contract set/iu,
+        /exactly the schema v1 initial-release contract set/iu,
       ],
       [
         (report) =>
           (report.steps = report.steps.filter(
             (step) => step.name !== "terminal-governance-state-verified",
           )),
-        /exactly the schema v5 initial-release step set/iu,
+        /exactly the schema v1 initial-release step set/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.safe.threshold = 1),
@@ -1236,6 +1442,112 @@ describe("schema v5 initial-mainnet-release rehearsal evidence", function () {
       [
         (report) => (report.terminalGovernanceState.deploymentEvidenceSha256 = "93".repeat(32)),
         /terminalGovernanceState\.deploymentEvidenceSha256/iu,
+      ],
+    ];
+    for (const [mutate, pattern] of cases) {
+      const report = validReport();
+      mutate(report);
+      await writeReport(report);
+      await expectRejected(() => validate(), pattern);
+    }
+  });
+
+  it("binds all nine public proof assets and the claim verifier call to the selected chain", async function () {
+    const cases = [
+      [
+        (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),
+        /shieldedArtifacts\.manifestSha256/iu,
+      ],
+      [
+        (report) => delete report.shieldedArtifacts.circuits.privateTransfer,
+        /shieldedArtifacts\.circuits must contain exactly/iu,
+      ],
+      [
+        (report) => (report.shieldedArtifacts.circuits.topUp.zkeySha256 = "ff".repeat(32)),
+        /shieldedArtifacts\.topUp\.zkeySha256/iu,
+      ],
+      [
+        (report) => delete report.shielded.proofs.unshield,
+        /shielded\.proofs must contain exactly/iu,
+      ],
+      [
+        (report) => (report.shielded.proofs.allocate.verified = false),
+        /shielded\.proofs\.allocate\.verified/iu,
+      ],
+      [
+        (report) => (report.shielded.proofs.keyRegistration.verifierAddress = address(999)),
+        /shielded\.proofs\.keyRegistration\.verifierAddress/iu,
+      ],
+      [
+        (report) => (report.shielded.proofs.shield.publicSignals[1] = "11155111"),
+        /shielded\.proofs\.shield\.publicSignalsSha256/iu,
+      ],
+      [
+        (report) => (report.shielded.proofs.claim.execution = "transaction"),
+        /shielded\.proofs\.claim\.execution/iu,
+      ],
+      [
+        (report) => (report.shielded.proofs.claim.transactionLabel = "shielded-action-claim"),
+        /Future-maturity claim proof must not claim an executed pool transaction/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.circuits = ["person_commitment"]),
+        /zkCeremonyVerification\.circuits must cover both original circuits/iu,
+      ],
+      [
+        (report) => (report.zkCeremonyVerification.shielded.ptau.sha256 = "ff".repeat(32)),
+        /zkCeremonyVerification\.shielded\.ptau\.sha256/iu,
+      ],
+      [(report) => (report.shielded.scenario.claimCount = 11), /shielded\.scenario\.claimCount/iu],
+      [
+        (report) => (report.shielded.scenario.eligibleFrom = "8201"),
+        /shielded\.scenario\.eligibleFrom/iu,
+      ],
+    ];
+    for (const [mutate, pattern] of cases) {
+      const report = validReport();
+      mutate(report);
+      await writeReport(report);
+      await expectRejected(() => validate(), pattern);
+    }
+  });
+
+  it("rejects shielded receipt and immutable binding tampering", async function () {
+    const cases = [
+      [(report) => (report.shielded.receipts.chainId = 11155111), /shielded\.receipts\.chainId/iu],
+      [
+        (report) =>
+          (report.shielded.receipts.transactions.allocation.txHash = `0x${"ef".repeat(32)}`),
+        /shielded allocation transaction hash/iu,
+      ],
+      [
+        (report) => (report.shielded.receipts.transactions.allocation.selector = "0x12345678"),
+        /shielded allocation selector/iu,
+      ],
+      [
+        (report) => (report.shielded.receipts.transactions.allocation.gasUsed = "300001"),
+        /shielded allocation exceeds the committed production gas threshold/iu,
+      ],
+      [
+        (report) =>
+          (report.terminalGovernanceState.shieldedAdapters.allocate.verifierImmutable =
+            address(999)),
+        /allocate shielded adapter must bind its exact verifier and action/iu,
+      ],
+      [
+        (report) => (report.terminalGovernanceState.shieldedDeepPool.tokenImmutable = address(999)),
+        /ShieldedDeepPool must bind the declared token, lineage and key registry/iu,
+      ],
+      [
+        (report) =>
+          (report.terminalGovernanceState.shieldedHeirKeyRegistry.keyRegistrationVerifierImmutable =
+            address(999)),
+        /ShieldedHeirKeyRegistry must bind the declared lineage and key registration verifier/iu,
+      ],
+      [
+        (report) =>
+          (report.terminalGovernanceState.shieldedDeepPool.runtimeSha256 = "ff".repeat(32)),
+        /ShieldedDeepPool runtimeSha256/iu,
       ],
     ];
     for (const [mutate, pattern] of cases) {

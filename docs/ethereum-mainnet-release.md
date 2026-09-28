@@ -140,7 +140,7 @@ Proxy becomes the sole holder of the Timelock's proposer, canceller, and executo
 Timelock becomes `DeepFamily.owner()` and the DEEP protocol treasury.
 
 The protocol release command automatically reads the Ethereum profile's fixed
-`tmp/release-evidence/ethereum-release-rehearsal.json` file. It requires a schema-v5 fresh-release
+`tmp/release-evidence/ethereum-release-rehearsal.json` file. It requires a schema-v1 fresh-release
 report with release-ready status, `evidenceType=initial-mainnet-release`,
 `governanceLifecycleIncluded=false`, the same clean commit, artifact-input digest and deployed
 `MIN_DELAY`, production ZK evidence, source verification, finality, initial governance state and
@@ -149,7 +149,7 @@ diagnostic, failed, or recovery run is rejected before any Mainnet transaction. 
 Mock, upgrade, migration, or Timelock-wait evidence are rejected as well.
 
 The acceptance runner retains its run-specific report beneath the ignored run directory and, only
-after a successful release rehearsal passes schema-v5 self-validation, publishes the exact bytes to
+after a successful release rehearsal passes schema-v1 self-validation, publishes the exact bytes to
 the fixed evidence path above. No environment setting or manual in-checkout copy selects release
 evidence. Compare the published file's SHA-256 against the immutable off-machine archive before
 planning; that archive is a review and recovery record, not an alternate input path. A later
@@ -273,7 +273,8 @@ npm run --silent ethereum:mainnet:release:projection -- \
 ```
 
 Review chain ID `1`, deployer, starting nonce, every derived address and constructor immutable, all
-three artifact hashes and immutable-linked runtime hashes, and `stableProjectionSha256`. Copy the
+compiled artifact hashes and immutable-linked runtime hashes for the complete system, and
+`stableProjectionSha256`. Copy the
 output's exact `deployments` object into `protocol-release-manifest.json`, finish freezing the other
 production evidence, and commit the chain-specific release state. The projection command never
 reads a private key, contacts RPC, changes the manifest, or broadcasts.
@@ -285,7 +286,7 @@ npm run release:preflight
 EVM_E2E_MODE=release-rehearsal npm run ethereum:acceptance
 ```
 
-Accept and archive only the exact published schema-v5
+Accept and archive only the exact published schema-v1
 `tmp/release-evidence/ethereum-release-rehearsal.json` with `status=passed`,
 `releaseReady=true`, matching commit/shared release-input digest and production ZK/ceremony
 evidence. Sepolia addresses and immutable-linked runtimes are verified internally against Sepolia;

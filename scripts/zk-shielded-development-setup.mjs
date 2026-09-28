@@ -5,25 +5,45 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildShieldedCircuits, SHIELDED_CIRCUITS } from "./zk-shielded-build.mjs";
+import { ensureProductionPtau } from "./lib/productionPtau.mjs";
+import { syncShieldedDevelopmentAssets } from "./lib/shieldedDevelopmentAssets.mjs";
+import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { runZkBuild } from "./zk-build.mjs";
 
-const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const artifactDirectory = path.join(root, "zk-artifacts", "shielded");
-const snarkjs = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
-const ptau = path.join(root, "circuits", "ptau", "ppot_0080_16.ptau");
+const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
-function run(args) {
-  execFileSync(process.execPath, [snarkjs, ...args], { cwd: root, stdio: "inherit" });
-}
-
 /**
- * Local proof tooling only. The generated zkeys/verifiers live under ignored
- * zk-artifacts and have no independent phase-2 ceremony or audit evidence.
+ * Development setup and public synchronization, shared by the top-level eleven-circuit command.
  */
-export async function setupShieldedDevelopmentKeys(argv = []) {
-  const built = await buildShieldedCircuits(argv);
-  if (!fs.existsSync(ptau)) throw new Error("Pinned Phase 1 Powers of Tau file is missing");
+export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
+  root = path.resolve(root);
+  const artifactDirectory = path.join(root, "zk-artifacts", "shielded");
+  const snarkjs = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
+  const run = (args) =>
+    execFileSync(process.execPath, [snarkjs, ...args], { cwd: root, stdio: "inherit" });
+  if (fs.existsSync(path.join(root, "circuits", "shielded-production-manifest.json"))) {
+    throw new Error("Refusing to overwrite shielded production artifacts with development keys");
+  }
+  const existingManifest = path.join(artifactDirectory, "development-manifest.json");
+  if (fs.existsSync(existingManifest)) {
+    let current;
+    try {
+      current = JSON.parse(fs.readFileSync(existingManifest, "utf8"));
+    } catch {
+      // A partially written development manifest can be regenerated.
+    }
+    if (
+      current &&
+      (current.schema !== "deepfamily/shielded-development-keys@1" ||
+        current.developmentOnly !== true ||
+        current.productionReady !== false)
+    ) {
+      throw new Error("Refusing to replace a non-development shielded proof manifest");
+    }
+  }
+  const { path: ptau } = await ensureProductionPtau({ root });
+  await runZkBuild({ root, circuit: "shielded" });
   const verifierDirectory = path.join(artifactDirectory, "verifiers");
   fs.mkdirSync(verifierDirectory, { recursive: true });
   const manifest = {
@@ -33,7 +53,7 @@ export async function setupShieldedDevelopmentKeys(argv = []) {
     ptauSha256: sha256(ptau),
     circuits: {},
   };
-  for (const { action, sourceName } of built) {
+  for (const [action, sourceName] of Object.entries(SHIELDED_CIRCUITS)) {
     const r1cs = path.join(artifactDirectory, `${sourceName}.r1cs`);
     const wasm = path.join(artifactDirectory, `${sourceName}_js`, `${sourceName}.wasm`);
     const initial = path.join(artifactDirectory, `${sourceName}_0000.zkey`);
@@ -65,15 +85,11 @@ export async function setupShieldedDevelopmentKeys(argv = []) {
     path.join(artifactDirectory, "development-manifest.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
   );
-  return manifest;
+  return syncShieldedDevelopmentAssets({ root, manifest });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (
-    process.argv.length === 4 &&
-    (process.argv[2] !== "--circuit" || !Object.hasOwn(SHIELDED_CIRCUITS, process.argv[3]))
-  ) {
-    throw new Error("Unknown shielded circuit");
-  }
-  await setupShieldedDevelopmentKeys(process.argv.slice(2));
+  if (process.argv.length !== 2)
+    throw new Error("Usage: node scripts/zk-shielded-development-setup.mjs");
+  await setupShieldedDevelopmentKeys();
 }

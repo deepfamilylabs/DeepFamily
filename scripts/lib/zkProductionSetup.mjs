@@ -44,6 +44,17 @@ import { createPrivateTemporaryDirectory } from "./privateTemporaryDirectory.mjs
 import { ensureProductionPtau, inspectPtauFile } from "./productionPtau.mjs";
 import { buildSnarkjsCommand, snapshotSnarkjsRuntime } from "./snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./zkeyMpcMetadata.mjs";
+import {
+  SHIELDED_PRODUCTION_MANIFEST_PATH,
+  SHIELDED_SETUP_CIRCUITS,
+  assertShieldedCompilationUnchanged,
+  buildShieldedProductionRecords,
+  inspectShieldedProductionArtifacts,
+  readShieldedReleaseCriteria,
+  shieldedProductionInstallEntries,
+  snapshotShieldedCompilation,
+} from "./shieldedProductionSetup.mjs";
+import { sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 
 export const SINGLE_OPERATOR_PARTICIPANT_ID = "deepfamily-single-operator";
 export const SINGLE_OPERATOR_BEACON_NAME = "deepfamily-single-operator-finalization";
@@ -63,6 +74,18 @@ const SETUP_CIRCUITS = Object.freeze({
     contractName: "DisclosureBindingVerifier",
   }),
 });
+
+const SHIELDED_CIRCUITS_BY_SOURCE = Object.freeze(
+  Object.fromEntries(
+    Object.values(SHIELDED_SETUP_CIRCUITS).map((spec) => [
+      spec.source,
+      Object.freeze({
+        source: `circuits/${spec.source}.circom`,
+        contractName: spec.verifierContractName,
+      }),
+    ]),
+  ),
+);
 
 // Collects one per-circuit metadata value under each circuit's ceremony field name.
 const ceremonyFieldsFrom = (circuits, metadataKey) =>
@@ -789,7 +812,7 @@ export const buildProductionCircuitCompileCommand = ({
   circuitName,
   compilerPath,
 }) => {
-  const circuit = SETUP_CIRCUITS[circuitName];
+  const circuit = SETUP_CIRCUITS[circuitName] ?? SHIELDED_CIRCUITS_BY_SOURCE[circuitName];
   if (circuit === undefined) {
     throw new Error(`Unsupported production ZK circuit: ${circuitName}`);
   }
@@ -988,7 +1011,9 @@ const finalizeCircuitKeys = async ({
   });
   renameZkVerifierFile({
     targetPath: circuit.solidityVerifier,
-    contractName: SETUP_CIRCUITS[circuit.circuitName].contractName,
+    contractName: (
+      SETUP_CIRCUITS[circuit.circuitName] ?? SHIELDED_CIRCUITS_BY_SOURCE[circuit.circuitName]
+    ).contractName,
     root: "/",
   });
   const finalMetadata = await metadataReader(circuit.finalZkey);
@@ -1257,7 +1282,10 @@ export const runSingleOperatorProductionSetup = async ({
   ceremonyId = createCeremonyId(),
   rotate = false,
   expectedCurrentManifestSha256,
+  expectedCurrentShieldedManifestSha256,
   expectedSnarkjsRuntimeSha256,
+  includeShielded = true,
+  shieldedReleaseCriteriaPath,
   env = process.env,
   platform = process.platform,
   arch = process.arch,
@@ -1281,6 +1309,15 @@ export const runSingleOperatorProductionSetup = async ({
     expectedCurrentManifestSha256 !== undefined || expectedSnarkjsRuntimeSha256 !== undefined;
   if (typeof rotate !== "boolean") {
     throw new Error("Production ZK setup rotate option must be a boolean");
+  }
+  if (typeof includeShielded !== "boolean") {
+    throw new Error("Production ZK setup includeShielded option must be a boolean");
+  }
+  if (!includeShielded && (shieldedReleaseCriteriaPath || expectedCurrentShieldedManifestSha256)) {
+    throw new Error("Shielded production options require the eleven-circuit setup");
+  }
+  if (!rotate && expectedCurrentShieldedManifestSha256 !== undefined) {
+    throw new Error("Shielded rotation manifest hash requires the explicit rotate option");
   }
   if (!rotate && rotationEvidenceProvided) {
     throw new Error("Production ZK rotation hashes require the explicit rotate option");
@@ -1332,6 +1369,38 @@ export const runSingleOperatorProductionSetup = async ({
     gitExecutable,
     captureRunner,
   });
+  let shieldedReleaseCriteria;
+  let shieldedSourceDigest;
+  let shieldedBaselineManifest;
+  if (includeShielded) {
+    if (shieldedReleaseCriteriaPath !== undefined) {
+      shieldedReleaseCriteria = readShieldedReleaseCriteria({
+        root: resolvedRoot,
+        criteriaPath: shieldedReleaseCriteriaPath,
+      });
+    }
+    const shieldedManifestPath = path.join(resolvedRoot, SHIELDED_PRODUCTION_MANIFEST_PATH);
+    if (rotate) {
+      if (!/^[0-9a-f]{64}$/u.test(expectedCurrentShieldedManifestSha256 ?? "")) {
+        throw new Error("Shielded production rotation requires the current manifest SHA-256");
+      }
+      if (
+        !fs.existsSync(shieldedManifestPath) ||
+        sha256File(shieldedManifestPath) !== expectedCurrentShieldedManifestSha256
+      ) {
+        throw new Error("Shielded production rotation current manifest SHA-256 mismatch");
+      }
+      shieldedBaselineManifest = inspectShieldedProductionArtifacts({
+        root: resolvedRoot,
+        expectedSnarkjsRuntimeSha256,
+        env: baseEnvironment,
+        platform,
+      }).manifest;
+    } else if (fs.existsSync(shieldedManifestPath)) {
+      throw new Error("Refusing to overwrite an existing shielded production trusted setup");
+    }
+    shieldedSourceDigest = sourceBundleSha256(resolvedRoot);
+  }
   const initialManifestPath = path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH);
   let initialManifestDocument = null;
   if (rotate) {
@@ -1538,6 +1607,36 @@ export const runSingleOperatorProductionSetup = async ({
       stageBuild,
       initialManifest,
     });
+    let shieldedCompiled;
+    let shieldedInitialManifest;
+    if (includeShielded) {
+      if (sourceBundleSha256(resolvedRoot) !== shieldedSourceDigest) {
+        throw new Error("Shielded release sources changed before production Phase 2");
+      }
+      for (const spec of Object.values(SHIELDED_SETUP_CIRCUITS)) {
+        await compileCircuit({
+          root: resolvedRoot,
+          stageBuild,
+          circuitName: spec.source,
+          compilerPath: privateCompiler.path,
+          runner,
+          env: baseEnvironment,
+        });
+      }
+      shieldedCompiled = snapshotShieldedCompilation({
+        root: resolvedRoot,
+        stageBuild,
+        expectedManifest: shieldedBaselineManifest,
+      });
+      shieldedInitialManifest = {
+        circuits: Object.fromEntries(
+          Object.values(shieldedCompiled).map((entry) => [
+            entry.source,
+            { r1csSha256: entry.r1csSha256, wasmSha256: entry.wasmSha256 },
+          ]),
+        ),
+      };
+    }
 
     const generated = {};
     for (const circuitName of Object.keys(SETUP_CIRCUITS)) {
@@ -1556,6 +1655,29 @@ export const runSingleOperatorProductionSetup = async ({
         snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
       });
     }
+    const shieldedGenerated = {};
+    if (includeShielded) {
+      for (const [action, entry] of Object.entries(shieldedCompiled)) {
+        shieldedGenerated[action] = await generateCircuitKeys({
+          root: resolvedRoot,
+          stageRoot,
+          compiledCircuit: {
+            circuitName: entry.source,
+            r1cs: entry.r1cs,
+            wasm: entry.wasm,
+          },
+          initialManifest: shieldedInitialManifest,
+          ptau: stagedPtau,
+          runner,
+          randomBytesFn,
+          metadataReader,
+          contributionEnvironment: baseEnvironment,
+          contributionHelperSnapshot: contributionHelper,
+          runtimeRoot: snarkjsRuntime.root,
+          snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+        });
+      }
+    }
 
     // The finalization beacon is generated only after every independent Phase 2 contribution.
     const beaconBytes = requireRandomBytes(randomBytesFn, 32, "Finalization beacon");
@@ -1572,6 +1694,24 @@ export const runSingleOperatorProductionSetup = async ({
         metadataReader,
         commandEnvironment: baseEnvironment,
       });
+    }
+    const shieldedFinalized = {};
+    if (includeShielded) {
+      for (const [action, circuit] of Object.entries(shieldedGenerated)) {
+        shieldedFinalized[action] = await finalizeCircuitKeys({
+          root: resolvedRoot,
+          runtimeRoot: snarkjsRuntime.root,
+          circuit,
+          beaconHash,
+          runner,
+          metadataReader,
+          commandEnvironment: baseEnvironment,
+        });
+      }
+      assertShieldedCompilationUnchanged(shieldedCompiled);
+      if (sourceBundleSha256(resolvedRoot) !== shieldedSourceDigest) {
+        throw new Error("Shielded release sources changed during production Phase 2");
+      }
     }
 
     assertStagedCircuitCompilationMatchesManifest({ stageBuild, initialManifest });
@@ -1590,10 +1730,42 @@ export const runSingleOperatorProductionSetup = async ({
       beaconHash,
       snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
     });
-    const entries = buildInstallEntries({
+    let shieldedRecords;
+    if (includeShielded) {
+      shieldedRecords = await buildShieldedProductionRecords({
+        root: resolvedRoot,
+        stageRoot,
+        compiled: shieldedCompiled,
+        finalized: shieldedFinalized,
+        ptau,
+        compilerSha256: privateCompiler.sha256,
+        snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+        ceremonyId: resolvedCeremonyId,
+        releaseCriteria: shieldedReleaseCriteria,
+        operatorParticipantId: SINGLE_OPERATOR_PARTICIPANT_ID,
+        beaconName: SINGLE_OPERATOR_BEACON_NAME,
+        beaconHash,
+        beaconIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
+        sourceDigest: shieldedSourceDigest,
+      });
+    }
+    const legacyEntries = buildInstallEntries({
       circuits: finalized,
       records,
     });
+    // The old manifest remains the final installation marker. The shielded manifest is installed
+    // immediately before it, after all eleven circuit artifacts and the shielded transcript.
+    const entries = includeShielded
+      ? [
+          ...legacyEntries.slice(0, -1),
+          ...shieldedProductionInstallEntries({
+            compiled: shieldedCompiled,
+            finalized: shieldedFinalized,
+            records: shieldedRecords,
+          }),
+          legacyEntries.at(-1),
+        ]
+      : legacyEntries;
     await validateStagedProductionArtifacts({
       root: resolvedRoot,
       ptauPath: stagedPtau.path,
@@ -1604,6 +1776,23 @@ export const runSingleOperatorProductionSetup = async ({
       runtimeRoot: snarkjsRuntime.root,
       commandEnvironment: baseEnvironment,
     });
+    if (includeShielded) {
+      for (const [action, circuit] of Object.entries(shieldedFinalized)) {
+        await runner({
+          ...buildProductionSnarkjsCommand({
+            root: resolvedRoot,
+            runtimeRoot: snarkjsRuntime.root,
+            args: ["zkey", "verify", circuit.r1cs, stagedPtau.path, circuit.finalZkey],
+          }),
+          env: baseEnvironment,
+        });
+        const vkey = JSON.parse(fs.readFileSync(circuit.verificationKey, "utf8"));
+        if (vkey.nPublic !== SHIELDED_SETUP_CIRCUITS[action].publicSignals) {
+          throw new Error(`${action} shielded production verification key signal count mismatch`);
+        }
+      }
+      assertShieldedCompilationUnchanged(shieldedCompiled);
+    }
     assertStagedCircuitCompilationMatchesManifest({ stageBuild, initialManifest });
     await assertPtauSnapshotMatchesEvidence({
       ptauPath: stagedPtau.path,
@@ -1619,7 +1808,7 @@ export const runSingleOperatorProductionSetup = async ({
             root: resolvedRoot,
             ptauPath: stagedPtau.path,
             runner,
-            commandEnvironment: baseEnvironment,
+            commandEnvironment: compilerEnvironment,
           });
         },
         validateAfterCommit: async () => {
@@ -1629,6 +1818,17 @@ export const runSingleOperatorProductionSetup = async ({
             runner,
             compilerEnvironment,
           });
+          if (includeShielded) {
+            const installed = inspectShieldedProductionArtifacts({
+              root: resolvedRoot,
+              ptauPath: stagedPtau.path,
+              env: compilerEnvironment,
+              platform,
+            });
+            if (installed.manifestSha256 !== sha256File(shieldedRecords.manifestPath)) {
+              throw new Error("Installed shielded production manifest changed after staging");
+            }
+          }
         },
       });
     } catch (error) {
@@ -1657,6 +1857,9 @@ export const runSingleOperatorProductionSetup = async ({
       manifestSha256:
         validation?.artifacts?.manifestSha256 ??
         sha256File(path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH)),
+      ...(includeShielded
+        ? { shieldedManifestSha256: sha256File(shieldedRecords.manifestPath), circuitCount: 11 }
+        : { circuitCount: 2 }),
       transcriptSha256:
         validation?.artifacts?.transcriptSha256 ?? records.manifest.trustedSetup.transcript.sha256,
     });

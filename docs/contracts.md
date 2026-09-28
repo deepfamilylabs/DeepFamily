@@ -607,7 +607,7 @@ Before this command can plan a release, the development proving keys must have b
 `npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
 that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
-exact schema-v5 `releaseReady=true` evidence to the chain-specific, Git-ignored
+exact schema-v1 `releaseReady=true` evidence to the chain-specific, Git-ignored
 `tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
 automatically and rejects a missing file or evidence from an older commit, a different artifact
 input, or a different production `MIN_DELAY >= 86400`. Diagnostic, failed, and recovery acceptance
@@ -620,7 +620,7 @@ Acceptance modes deliberately prove different things:
 - `diagnostic` uses the built-in 30-second Testnet delay and runs all four real governance windows.
   It is fast lifecycle coverage and never release evidence.
 - `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 86400`, but schedules
-  no Timelock operation and waits zero Timelock windows. Its schema-v5 report contains no Mock,
+  no Timelock operation and waits zero Timelock windows. Its schema-v1 report contains no Mock,
   upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
   `governanceLifecycleIncluded=false`.
 - a fresh Mainnet release follows the same zero-wait shape. Its 48-hour Timelock delay constrains
@@ -674,7 +674,7 @@ The Ethereum production flow requires
 `GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3`, a canonical Safe v1.3.0 L1 singleton,
 exactly three ordered EOA owners with threshold `2`, ETH-denominated values in the shared
 `EVM_MAINNET_SAFE_MAX_NATIVE` and `EVM_MAINNET_MAX_NATIVE` budget settings, a real Etherscan API key,
-reviewed production ZK setup artifacts, and an exact Sepolia schema-v5 fresh-release rehearsal
+reviewed production ZK setup artifacts, and an exact Sepolia schema-v1 fresh-release rehearsal
 report automatically published at the chain-specific, Git-ignored
 `tmp/release-evidence/ethereum-release-rehearsal.json`. The Ethereum Mainnet release reads that fixed
 file automatically and rejects it when missing or tied to an older commit; diagnostic, failed, and
@@ -1214,7 +1214,7 @@ The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They 
 
 Each pool action has its own circuit and `ShieldedGroth16ActionAdapter`; key registration has a separate verifier. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
 
-The localhost stack deploys these contracts with development verifiers. The guarded mainnet release planner currently lacks the corresponding production verifier, registry, and pool transactions and refuses to broadcast until that plan is complete. Development use does not require an audit; production release remains gated by the shielded release evidence and an independent audit.
+The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They bind the nine shielded verifiers, eight action adapters, key registry, and pool to the same token and lineage index as the identity and disclosure contracts. Development use does not require an audit; production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
 
 ## ZK Verifier Contracts
 
@@ -1234,7 +1234,7 @@ The localhost stack deploys these contracts with development verifiers. The guar
 
 ### Shielded action and key registration verifiers
 
-The pool uses eight action-specific verifiers, each with 32 public signals and a `ShieldedGroth16ActionAdapter`. Key registration uses seven public signals. Development verifiers are generated into ignored `zk-artifacts/shielded/`; production verifiers require their own setup and review.
+The pool uses eight action-specific verifiers, each with 32 public signals and a `ShieldedGroth16ActionAdapter`. Key registration uses seven public signals. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` and synchronize the matching browser assets to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

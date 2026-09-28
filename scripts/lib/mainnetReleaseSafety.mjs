@@ -5,6 +5,11 @@ import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
 import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "./zkDeploymentCatalog.mjs";
 
 export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
 export const ESPACE_MAINNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
@@ -33,8 +38,46 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
+  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
+  ...SHIELDED_ACTIONS.map((action) => SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel),
+  "shieldedHeirKeyRegistry",
+  "shieldedDeepPool",
   "transferDeepFamilyOwnership",
 ]);
+
+/** Every deployed instance, including the eight instances of the shared action adapter. */
+export const assertCompleteMainnetSourceVerification = ({ contracts, addresses } = {}) => {
+  const expected = new Map([
+    ["GovernanceTimelock", addresses?.timelock],
+    ["DeepFamily", addresses?.deepFamilyImplementation],
+    ["UUPSProxy", addresses?.deepFamily],
+    ...INTEGRATED_DEPLOYMENT_RECORDS.filter((record) => record.deploymentName !== "DeepFamily").map(
+      (record) => [
+        record.deploymentName,
+        addresses?.[
+          record.transactionLabel === "deepFamilyToken" ? "token" : record.transactionLabel
+        ],
+      ],
+    ),
+  ]);
+  if (!Array.isArray(contracts) || contracts.length !== expected.size) {
+    throw new Error("Completed mainnet checkpoint does not contain complete source verification");
+  }
+  const observed = new Set();
+  for (const contract of contracts) {
+    const expectedAddress = expected.get(contract?.label);
+    if (
+      !expectedAddress ||
+      observed.has(contract.label) ||
+      contract.status !== "passed" ||
+      !ethers.isAddress(contract.address) ||
+      ethers.getAddress(contract.address) !== ethers.getAddress(expectedAddress)
+    ) {
+      throw new Error("Completed mainnet checkpoint contains incomplete source verification");
+    }
+    observed.add(contract.label);
+  }
+};
 
 const DECIMAL_NATIVE_PATTERN = /^(?:0|[1-9][0-9]*)(?:\.[0-9]{1,18})?$/;
 const TRANSACTION_LABEL_PATTERN = /^[A-Za-z][A-Za-z0-9_-]{1,79}$/;

@@ -65,8 +65,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(19);
-      expect(observed.size).to.equal(19);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(38);
+      expect(observed.size).to.equal(38);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,7 +84,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(13);
+        expect(files).to.have.length(32);
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -92,6 +92,10 @@ describe("Upgrade tooling & governance deploy path", function () {
           "PoseidonT3.json",
           "PoseidonT4.json",
           "PoseidonT6.json",
+          "ShieldedHeirKeyRegistry.json",
+          "ShieldedDeepPool.json",
+          "ShieldedClaimVerifier.json",
+          "ShieldedClaimAdapter.json",
         ]);
         const deepFamilyMetadata = JSON.parse(
           await fs.readFile(path.join(deploymentDirectory, "DeepFamily.json"), "utf8"),
@@ -101,6 +105,19 @@ describe("Upgrade tooling & governance deploy path", function () {
           deployed.deepFamilyImplementationAddress,
         );
         expect(deepFamilyMetadata.abi).to.be.an("array").that.is.not.empty;
+        for (const [name, contract, label] of [
+          ["ShieldedHeirKeyRegistry", deployed.shieldedHeirKeyRegistry, "shieldedHeirKeyRegistry"],
+          ["ShieldedDeepPool", deployed.shieldedDeepPool, "shieldedDeepPool"],
+        ]) {
+          const metadata = JSON.parse(
+            await fs.readFile(path.join(deploymentDirectory, `${name}.json`), "utf8"),
+          );
+          expect(metadata.address).to.equal(await contract.getAddress());
+          expect(metadata.deploymentBlock).to.equal(
+            deployed.transactionReceipts[label].blockNumber,
+          );
+          expect(metadata.abi).to.be.an("array").that.is.not.empty;
+        }
       } finally {
         await fs.rm(deploymentDirectory, { recursive: true, force: true });
       }

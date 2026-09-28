@@ -59,6 +59,18 @@ import {
   validateKdfDeviceMatrixV2Evidence,
 } from "./kdfReleaseEvidence.mjs";
 import { inspectZkReleaseArtifacts, readCanonicalJsonFile } from "./zkArtifactTrust.mjs";
+import { SHIELDED_ACTIONS, SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+
+export const SHIELDED_POOL_VERIFIER_IMMUTABLES = Object.freeze({
+  shield: "SHIELD_VERIFIER",
+  createPolicy: "CREATE_POLICY_VERIFIER",
+  allocate: "ALLOCATE_VERIFIER",
+  topUp: "TOP_UP_VERIFIER",
+  mergeBudget: "MERGE_BUDGET_VERIFIER",
+  claim: "CLAIM_VERIFIER",
+  privateTransfer: "PRIVATE_TRANSFER_VERIFIER",
+  unshield: "UNSHIELD_VERIFIER",
+});
 
 export const PROTOCOL_RELEASE_MANIFEST_PATH = "protocol-release-manifest.json";
 export const PROTOCOL_PRECIS_DATA_PATH = "packages/protocol-core/precis-data.js";
@@ -87,6 +99,48 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
     contractName: "DeepFamilyReader",
     sourceName: "contracts/DeepFamilyReader.sol",
     immutableFields: Object.freeze(["DEEP_FAMILY", "ARCHIVE"]),
+  }),
+  ...Object.fromEntries(
+    Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.verifierLabel,
+      Object.freeze({
+        path: `artifacts/contracts/${spec.verifierContractName}.sol/${spec.verifierContractName}.json`,
+        contractName: spec.verifierContractName,
+        sourceName: `contracts/${spec.verifierContractName}.sol`,
+        immutableFields: Object.freeze([]),
+      }),
+    ]),
+  ),
+  ...Object.fromEntries(
+    SHIELDED_ACTIONS.map((action) => [
+      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
+      Object.freeze({
+        path: "artifacts/contracts/adapters/ShieldedGroth16ActionAdapter.sol/ShieldedGroth16ActionAdapter.json",
+        contractName: "ShieldedGroth16ActionAdapter",
+        sourceName: "contracts/adapters/ShieldedGroth16ActionAdapter.sol",
+        immutableFields: Object.freeze(["VERIFIER", "ACTION"]),
+        immutableTypes: Object.freeze({ ACTION: "uint8" }),
+      }),
+    ]),
+  ),
+  shieldedHeirKeyRegistry: Object.freeze({
+    path: "artifacts/contracts/ShieldedHeirKeyRegistry.sol/ShieldedHeirKeyRegistry.json",
+    contractName: "ShieldedHeirKeyRegistry",
+    sourceName: "contracts/ShieldedHeirKeyRegistry.sol",
+    immutableFields: Object.freeze(["LINEAGE_INDEX", "VERIFIER"]),
+    libraryFields: Object.freeze(["PoseidonT3", "PoseidonT6"]),
+  }),
+  shieldedDeepPool: Object.freeze({
+    path: "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json",
+    contractName: "ShieldedDeepPool",
+    sourceName: "contracts/ShieldedDeepPool.sol",
+    immutableFields: Object.freeze([
+      "TOKEN",
+      "LINEAGE_INDEX",
+      "KEY_REGISTRY",
+      ...Object.values(SHIELDED_POOL_VERIFIER_IMMUTABLES),
+    ]),
+    libraryFields: Object.freeze(["PoseidonT3"]),
   }),
 });
 
@@ -719,6 +773,53 @@ const encodeImmutableAddress = (value, length, label) => {
   return `${"0".repeat((length - 20) * 2)}${address}`;
 };
 
+const encodeImmutableValue = (value, length, label, type = "address") => {
+  if (type === "address") return encodeImmutableAddress(value, length, label);
+  assert(
+    type === "uint8" && Number.isSafeInteger(value) && value >= 0 && value <= 255,
+    `${label} must be uint8`,
+  );
+  const encoded = value.toString(16).padStart(length * 2, "0");
+  assert(encoded.length === length * 2, `${label} immutable value exceeds its slot`);
+  return encoded;
+};
+
+const linkDeploymentRuntime = ({ artifact, spec, libraries }) => {
+  let body = artifact.deployedBytecode.slice(2);
+  const linkedNames = new Set();
+  for (const [source, names] of Object.entries(artifact.deployedLinkReferences ?? {})) {
+    for (const [name, references] of Object.entries(names)) {
+      linkedNames.add(name);
+      const address = assertAddress(
+        libraries[`${source}:${name}`] ?? libraries[name],
+        `${spec.contractName}.${name}`,
+      ).slice(2);
+      for (const reference of references) {
+        assert(
+          Number.isSafeInteger(reference.start) &&
+            reference.start >= 0 &&
+            reference.length === 20 &&
+            (reference.start + 20) * 2 <= body.length,
+          `${name} library reference is invalid`,
+        );
+        const start = reference.start * 2;
+        body = body.slice(0, start) + address + body.slice(start + 40);
+      }
+    }
+  }
+  assertExactJson(
+    [...linkedNames].sort(),
+    [...(spec.libraryFields ?? [])].sort(),
+    `${spec.contractName} library field set`,
+  );
+  const linked = `0x${body}`;
+  assert(
+    EVM_BYTECODE.test(linked),
+    `${spec.contractName} deployed bytecode contains unresolved libraries`,
+  );
+  return linked;
+};
+
 const replaceImmutableReferences = ({ root, artifact, spec, immutableValues }) => {
   assert(
     typeof artifact.buildInfoId === "string" && artifact.buildInfoId.length > 0,
@@ -786,10 +887,11 @@ const replaceImmutableReferences = ({ root, artifact, spec, immutableValues }) =
       assert(end <= body.length, `${name} immutable reference exceeds deployed bytecode`);
       body =
         body.slice(0, start) +
-        encodeImmutableAddress(
+        encodeImmutableValue(
           immutableValues[name],
           reference.length,
           `${spec.contractName}.${name}`,
+          spec.immutableTypes?.[name],
         ) +
         body.slice(end);
     }
@@ -801,6 +903,7 @@ export const inspectProtocolDeploymentArtifact = ({
   root = process.cwd(),
   artifactName,
   immutableValues,
+  libraries = {},
 } = {}) => {
   const spec = PROTOCOL_DEPLOYMENT_ARTIFACTS[artifactName];
   assert(spec, `unknown protocol deployment artifact ${String(artifactName)}`);
@@ -824,12 +927,17 @@ export const inspectProtocolDeploymentArtifact = ({
   assert(artifact.contractName === spec.contractName, `${spec.contractName} artifact name changed`);
   assert(artifact.sourceName === spec.sourceName, `${spec.contractName} artifact source changed`);
   assert(
-    typeof artifact.deployedBytecode === "string" && EVM_BYTECODE.test(artifact.deployedBytecode),
+    typeof artifact.deployedBytecode === "string" &&
+      artifact.deployedBytecode.startsWith("0x") &&
+      artifact.deployedBytecode.length > 2,
     `${spec.contractName} deployed bytecode is missing`,
   );
   const runtimeBytecode = replaceImmutableReferences({
     root: path.resolve(root),
-    artifact,
+    artifact: {
+      ...artifact,
+      deployedBytecode: linkDeploymentRuntime({ artifact, spec, libraries }),
+    },
     spec,
     immutableValues,
   });
@@ -866,6 +974,58 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
         DEEP_FAMILY: reader?.deepFamilyImmutable,
         ARCHIVE: reader?.archiveImmutable,
       },
+    }),
+    shieldedVerifiers: Object.freeze(
+      Object.fromEntries(
+        Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+          action,
+          inspectProtocolDeploymentArtifact({
+            root,
+            artifactName: spec.verifierLabel,
+            immutableValues: {},
+          }),
+        ]),
+      ),
+    ),
+    shieldedAdapters: Object.freeze(
+      Object.fromEntries(
+        SHIELDED_ACTIONS.map((action) => [
+          action,
+          inspectProtocolDeploymentArtifact({
+            root,
+            artifactName: SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
+            immutableValues: {
+              VERIFIER: deployments?.shieldedAdapters?.[action]?.verifierImmutable,
+              ACTION: deployments?.shieldedAdapters?.[action]?.actionId,
+            },
+          }),
+        ]),
+      ),
+    ),
+    shieldedHeirKeyRegistry: inspectProtocolDeploymentArtifact({
+      root,
+      artifactName: "shieldedHeirKeyRegistry",
+      immutableValues: {
+        LINEAGE_INDEX: deployments?.shieldedHeirKeyRegistry?.lineageIndexImmutable,
+        VERIFIER: deployments?.shieldedHeirKeyRegistry?.keyRegistrationVerifierImmutable,
+      },
+      libraries: { PoseidonT3: deployments?.poseidonT3, PoseidonT6: deployments?.poseidonT6 },
+    }),
+    shieldedDeepPool: inspectProtocolDeploymentArtifact({
+      root,
+      artifactName: "shieldedDeepPool",
+      immutableValues: {
+        TOKEN: deployments?.shieldedDeepPool?.tokenImmutable,
+        LINEAGE_INDEX: deployments?.shieldedDeepPool?.lineageIndexImmutable,
+        KEY_REGISTRY: deployments?.shieldedDeepPool?.keyRegistryImmutable,
+        ...Object.fromEntries(
+          SHIELDED_ACTIONS.map((action) => [
+            SHIELDED_POOL_VERIFIER_IMMUTABLES[action],
+            deployments?.shieldedDeepPool?.adapterImmutables?.[action],
+          ]),
+        ),
+      },
+      libraries: { PoseidonT3: deployments?.poseidonT3 },
     }),
   });
 };
@@ -910,6 +1070,208 @@ const normalizeDeploymentChainId = (value, label) => {
   return normalized;
 };
 
+const SHIELDED_RECORD_HASH_KEYS = Object.freeze(["artifactSha256", "runtimeSha256"]);
+const SHIELDED_DEPLOYMENT_KEYS = Object.freeze([
+  "token",
+  "poseidonT3",
+  "poseidonT6",
+  "deepFamilyLineageIndex",
+  "shieldedVerifiers",
+  "shieldedAdapters",
+  "shieldedHeirKeyRegistry",
+  "shieldedDeepPool",
+]);
+
+const assertShieldedDeploymentShape = (deployments) => {
+  assertExactKeys(
+    deployments.shieldedVerifiers,
+    Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
+    "shielded verifier deployments",
+  );
+  for (const action of Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+    assertExactKeys(
+      deployments.shieldedVerifiers[action],
+      ["address", ...SHIELDED_RECORD_HASH_KEYS],
+      `${action} shielded verifier deployment`,
+    );
+  }
+  assertExactKeys(deployments.shieldedAdapters, SHIELDED_ACTIONS, "shielded adapter deployments");
+  for (const action of SHIELDED_ACTIONS) {
+    assertExactKeys(
+      deployments.shieldedAdapters[action],
+      ["address", "verifierImmutable", "actionId", ...SHIELDED_RECORD_HASH_KEYS],
+      `${action} shielded adapter deployment`,
+    );
+  }
+  assertExactKeys(
+    deployments.shieldedHeirKeyRegistry,
+    [
+      "address",
+      "lineageIndexImmutable",
+      "keyRegistrationVerifierImmutable",
+      ...SHIELDED_RECORD_HASH_KEYS,
+    ],
+    "shielded key registry deployment",
+  );
+  assertExactKeys(
+    deployments.shieldedDeepPool,
+    [
+      "address",
+      "tokenImmutable",
+      "lineageIndexImmutable",
+      "keyRegistryImmutable",
+      "adapterImmutables",
+      ...SHIELDED_RECORD_HASH_KEYS,
+    ],
+    "shielded pool deployment",
+  );
+  assertExactKeys(
+    deployments.shieldedDeepPool.adapterImmutables,
+    SHIELDED_ACTIONS,
+    "shielded pool action bindings",
+  );
+};
+
+/** The complete immutable bindings used by deployments, projections and acceptance evidence. */
+export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
+  token: addresses?.token,
+  poseidonT3: addresses?.poseidonT3,
+  poseidonT6: addresses?.poseidonT6,
+  deepFamilyLineageIndex: addresses?.deepFamilyLineageIndex,
+  shieldedVerifiers: Object.fromEntries(
+    Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+      action,
+      { address: addresses?.[spec.verifierLabel] },
+    ]),
+  ),
+  shieldedAdapters: Object.fromEntries(
+    SHIELDED_ACTIONS.map((action) => {
+      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+      return [
+        action,
+        {
+          address: addresses?.[spec.adapterLabel],
+          verifierImmutable: addresses?.[spec.verifierLabel],
+          actionId: spec.actionId,
+        },
+      ];
+    }),
+  ),
+  shieldedHeirKeyRegistry: {
+    address: addresses?.shieldedHeirKeyRegistry,
+    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
+    keyRegistrationVerifierImmutable: addresses?.shieldedKeyRegistrationVerifier,
+  },
+  shieldedDeepPool: {
+    address: addresses?.shieldedDeepPool,
+    tokenImmutable: addresses?.token,
+    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
+    keyRegistryImmutable: addresses?.shieldedHeirKeyRegistry,
+    adapterImmutables: Object.fromEntries(
+      SHIELDED_ACTIONS.map((action) => [
+        action,
+        addresses?.[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
+      ]),
+    ),
+  },
+});
+
+/** Normalize and check every shielded address, artifact and immutable relationship. */
+export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
+  assertShieldedDeploymentShape(deployments);
+  const addressFields = Object.fromEntries(
+    ["token", "poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].map((field) => [
+      field,
+      assertAddress(deployments[field], `deployment ${field}`),
+    ]),
+  );
+  const normalizeRecord = (record, label) => ({
+    ...record,
+    address: assertAddress(record.address, `${label} address`),
+    artifactSha256: assertSha256(record.artifactSha256, `${label} artifactSha256`),
+    runtimeSha256: assertSha256(record.runtimeSha256, `${label} runtimeSha256`),
+  });
+  const verifiers = Object.fromEntries(
+    Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+      action,
+      Object.freeze(
+        normalizeRecord(deployments.shieldedVerifiers[action], spec.verifierContractName),
+      ),
+    ]),
+  );
+  const adapters = Object.fromEntries(
+    SHIELDED_ACTIONS.map((action) => {
+      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+      const record = normalizeRecord(
+        deployments.shieldedAdapters[action],
+        spec.adapterDeploymentName,
+      );
+      record.verifierImmutable = assertAddress(
+        record.verifierImmutable,
+        `${action} adapter verifier`,
+      );
+      assert(
+        record.verifierImmutable === verifiers[action].address && record.actionId === spec.actionId,
+        `${action} shielded adapter must bind its exact verifier and action`,
+      );
+      return [action, Object.freeze(record)];
+    }),
+  );
+  const registry = normalizeRecord(deployments.shieldedHeirKeyRegistry, "ShieldedHeirKeyRegistry");
+  registry.lineageIndexImmutable = assertAddress(
+    registry.lineageIndexImmutable,
+    "key registry lineage",
+  );
+  registry.keyRegistrationVerifierImmutable = assertAddress(
+    registry.keyRegistrationVerifierImmutable,
+    "key registry verifier",
+  );
+  assert(
+    registry.lineageIndexImmutable === addressFields.deepFamilyLineageIndex &&
+      registry.keyRegistrationVerifierImmutable === verifiers.keyRegistration.address,
+    "ShieldedHeirKeyRegistry must bind the declared lineage and key registration verifier",
+  );
+  const pool = normalizeRecord(deployments.shieldedDeepPool, "ShieldedDeepPool");
+  for (const field of ["tokenImmutable", "lineageIndexImmutable", "keyRegistryImmutable"])
+    pool[field] = assertAddress(pool[field], `pool ${field}`);
+  assert(
+    pool.tokenImmutable === addressFields.token &&
+      pool.lineageIndexImmutable === addressFields.deepFamilyLineageIndex &&
+      pool.keyRegistryImmutable === registry.address,
+    "ShieldedDeepPool must bind the declared token, lineage and key registry",
+  );
+  pool.adapterImmutables = Object.freeze(
+    Object.fromEntries(
+      SHIELDED_ACTIONS.map((action) => {
+        const address = assertAddress(pool.adapterImmutables[action], `pool ${action} adapter`);
+        assert(
+          address === adapters[action].address,
+          `ShieldedDeepPool ${action} must bind its exact adapter`,
+        );
+        return [action, address];
+      }),
+    ),
+  );
+  const addresses = [
+    ...Object.values(addressFields),
+    ...Object.values(verifiers).map((record) => record.address),
+    ...Object.values(adapters).map((record) => record.address),
+    registry.address,
+    pool.address,
+  ];
+  assert(
+    new Set(addresses).size === addresses.length,
+    "shielded production deployment addresses must be distinct",
+  );
+  return Object.freeze({
+    ...addressFields,
+    shieldedVerifiers: Object.freeze(verifiers),
+    shieldedAdapters: Object.freeze(adapters),
+    shieldedHeirKeyRegistry: Object.freeze(registry),
+    shieldedDeepPool: Object.freeze(pool),
+  });
+};
+
 /**
  * Stable target-deployment projection shared by the manifest and an acceptance report for the same
  * chain and addresses. It deliberately excludes the manifest hash, timestamps and transaction
@@ -928,6 +1290,7 @@ export const protocolDeploymentEvidenceFromManifest = (manifest) => {
     protocolGeneration: manifest.protocolGeneration,
     chainId,
     contracts: Object.freeze({
+      ...protocolShieldedDeploymentEvidenceFromRecords(deployments),
       deepFamily: Object.freeze({
         proxy: assertAddress(deployments.deepFamilyProxy, "DeepFamily proxy"),
         implementation: assertAddress(
@@ -999,6 +1362,16 @@ export const protocolDeploymentEvidenceFromAcceptanceReport = (report) => {
     protocolGeneration: report?.protocolManifestEvidence?.protocolGeneration,
     chainId: normalizeDeploymentChainId(report?.network?.chainId, "acceptance deployment chainId"),
     contracts: Object.freeze({
+      ...protocolShieldedDeploymentEvidenceFromRecords({
+        token: addresses?.token,
+        poseidonT3: terminal?.poseidonT3,
+        poseidonT6: terminal?.poseidonT6,
+        deepFamilyLineageIndex: terminal?.deepFamilyLineageIndex,
+        shieldedVerifiers: terminal?.shieldedVerifiers,
+        shieldedAdapters: terminal?.shieldedAdapters,
+        shieldedHeirKeyRegistry: terminal?.shieldedHeirKeyRegistry,
+        shieldedDeepPool: terminal?.shieldedDeepPool,
+      }),
       deepFamily: Object.freeze({
         proxy: proxyAddress,
         implementation: assertAddress(
@@ -1277,7 +1650,9 @@ export const inspectProtocolReleaseManifest = ({
   try {
     const state = fs.lstatSync(precisDataPath);
     assert(
-      state.isFile() && !state.isSymbolicLink() && fs.realpathSync(precisDataPath) === precisDataPath,
+      state.isFile() &&
+        !state.isSymbolicLink() &&
+        fs.realpathSync(precisDataPath) === precisDataPath,
       "PRECIS repertoire data must be a regular non-symlink file",
     );
     precisData = fs.readFileSync(precisDataPath);
@@ -1445,9 +1820,11 @@ export const inspectProtocolReleaseManifest = ({
       "groth16VerifierAdapter",
       "deepFamilyArchive",
       "deepFamilyReader",
+      ...SHIELDED_DEPLOYMENT_KEYS,
     ],
     "deployment definition",
   );
+  assertShieldedDeploymentShape(deployments);
   assertExactKeys(
     deployments.groth16VerifierAdapter,
     [
@@ -1474,6 +1851,8 @@ export const inspectProtocolReleaseManifest = ({
     "deployment status is invalid",
   );
   if (deployments.status === "not-deployed") {
+    const leaves = (value) =>
+      value !== null && typeof value === "object" ? Object.values(value).flatMap(leaves) : [value];
     assert(
       [
         deployments.chainId,
@@ -1482,6 +1861,7 @@ export const inspectProtocolReleaseManifest = ({
         ...Object.values(deployments.groth16VerifierAdapter),
         ...Object.values(deployments.deepFamilyArchive),
         ...Object.values(deployments.deepFamilyReader),
+        ...SHIELDED_DEPLOYMENT_KEYS.flatMap((key) => leaves(deployments[key])),
       ].every((value) => value === null),
       "not-deployed state must not claim deployment evidence",
     );
@@ -1587,6 +1967,7 @@ export const inspectProtocolReleaseManifest = ({
         "groth16VerifierAdapter",
         "deepFamilyArchive",
         "deepFamilyReader",
+        ...SHIELDED_DEPLOYMENT_KEYS,
       ],
       "production deployment definition",
     );
@@ -1660,6 +2041,14 @@ export const inspectProtocolReleaseManifest = ({
       ),
       assertAddress(archive.address, "DeepFamilyArchive address"),
       assertAddress(reader.address, "DeepFamilyReader address"),
+      ...Object.values(protocolShieldedDeploymentEvidenceFromRecords(deployments)).flatMap(
+        (value) =>
+          typeof value === "string"
+            ? [value]
+            : Object.hasOwn(value, "address")
+              ? [value.address]
+              : Object.values(value).map((record) => record.address),
+      ),
     ];
     assert(
       new Set(deploymentAddresses).size === deploymentAddresses.length,
@@ -1682,13 +2071,29 @@ export const inspectProtocolReleaseManifest = ({
       ["Groth16VerifierAdapter", adapter, deploymentArtifacts.groth16VerifierAdapter],
       ["DeepFamilyArchive", archive, deploymentArtifacts.deepFamilyArchive],
       ["DeepFamilyReader", reader, deploymentArtifacts.deepFamilyReader],
+      ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+        spec.verifierContractName,
+        deployments.shieldedVerifiers[action],
+        deploymentArtifacts.shieldedVerifiers?.[action],
+      ]),
+      ...SHIELDED_ACTIONS.map((action) => [
+        SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName,
+        deployments.shieldedAdapters[action],
+        deploymentArtifacts.shieldedAdapters?.[action],
+      ]),
+      [
+        "ShieldedHeirKeyRegistry",
+        deployments.shieldedHeirKeyRegistry,
+        deploymentArtifacts.shieldedHeirKeyRegistry,
+      ],
+      ["ShieldedDeepPool", deployments.shieldedDeepPool, deploymentArtifacts.shieldedDeepPool],
     ]) {
       assert(
-        declared.artifactSha256 === actual.artifactSha256,
+        declared.artifactSha256 === actual?.artifactSha256,
         `${label} artifactSha256 does not match the compiled artifact file`,
       );
       assert(
-        declared.runtimeSha256 === actual.runtimeSha256,
+        declared.runtimeSha256 === actual?.runtimeSha256,
         `${label} runtimeSha256 does not match the immutable-linked runtime bytes`,
       );
     }

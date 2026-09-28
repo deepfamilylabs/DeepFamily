@@ -155,6 +155,7 @@ export const publishTestnetReleaseEvidence = async ({
   expectedAcceptanceInputDigest,
   protocolManifestInspector,
   protocolDeploymentArtifactInspector,
+  shieldedArtifactInspector,
   windowsAclHardener = hardenPrivateWindowsPath,
 } = {}) => {
   const realRepositoryRoot = await requireRealRepositoryRoot(repositoryRoot);
@@ -172,6 +173,7 @@ export const publishTestnetReleaseEvidence = async ({
     expectedAcceptanceInputDigest,
     protocolManifestInspector,
     protocolDeploymentArtifactInspector,
+    shieldedArtifactInspector,
   });
   if (validatedSource.reportPath === destinationPath) {
     throw new Error("release evidence source and destination must be different files");
@@ -231,6 +233,7 @@ export const publishTestnetReleaseEvidence = async ({
       expectedAcceptanceInputDigest,
       protocolManifestInspector,
       protocolDeploymentArtifactInspector,
+      shieldedArtifactInspector,
     });
     if (validatedStage.reportSha256 !== validatedSource.reportSha256) {
       throw new Error("staged release evidence does not match the validated source bytes");

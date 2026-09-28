@@ -111,8 +111,7 @@ npm run setup           # Install dependencies
 npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
-npm run dev:deploy      # Deploy contracts
-npm run dev:shielded:deploy # Build local proof keys and deploy the private pool
+npm run dev:deploy      # Check all 11 circuit artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts
@@ -146,20 +145,24 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 
 ### ZK Artifact Workflow
 
-The identity/disclosure and shielded circuits have separate build and setup commands:
+The same `zk:*` workflow covers the two identity/disclosure circuits and all nine shielded circuits:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:build`             | Compile identity and disclosure circuits                         |
-| `npm run zk:development:setup` | Rebuild every development artifact from a self-contained workflow  |
-| `npm run zk:production:setup`  | Generate and verify the production Phase 2 artifacts               |
-| `npm run zk:check`             | Generate and verify identity/disclosure proofs                    |
-| `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact set                     |
-| `npm run zk:ceremony:verify`   | Verify identity/disclosure production setup evidence             |
-| `npm run zk:shielded:development:setup` | Generate shielded development proof assets and verifiers |
-| `npm run zk:shielded:development:proof-smoke` | Verify shielded development proofs |
-| `npm run zk:shielded:release:check` | Check shielded release evidence |
+| `npm run zk:build`             | Compile all 11 circuits                                           |
+| `npm run zk:development:setup` | Generate development keys and verifiers for all 11 circuits       |
+| `npm run zk:production:setup`  | Generate production keys and verifiers for all 11 circuits        |
+| `npm run zk:check`             | Check all 11 circuit artifacts and available proof fixtures       |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 11 circuit artifacts                    |
+| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 11 circuits          |
+
+Each Groth16 circuit has its own proving and verification keys. The unified production setup
+performs the required circuit-specific setup for all 11 circuits; it does not reuse another
+circuit's `.zkey`. Both development and production setup install shielded browser files under
+`frontend/public/zk/shielded/` and generated verifiers under `contracts/`, using the same static
+asset flow as identity/disclosure. Development artifacts remain explicitly marked as such;
+`npm run release:preflight` requires production evidence for all 11 circuits.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -211,7 +214,6 @@ from the exact release-commit Git blobs, then re-hashed both before Phase 2 entr
 again immediately before the child process receives it.
 
 The current ZK artifact manifest is schema v3 and commits that snarkjs runtime-graph digest.
-Schema-v2 manifests remain readable only for legacy compatibility inspection and verification;
 `zk:production:setup` and `release:preflight` both require schema v3.
 If a reviewed dependency update changes the runtime graph after production artifacts already
 exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
@@ -219,7 +221,7 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-`zk:development:setup` verifies the committed Phase 1 pTau, then compiles the identity and disclosure circuits,
+`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all 11 circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
@@ -278,7 +280,7 @@ eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default 
 pinned public power-16 pTau and records one local Phase 2 contributor under the explicit
 `single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
 a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
-A successful, self-validated rehearsal automatically publishes the exact schema-v5 evidence to the
+A successful, self-validated rehearsal automatically publishes the exact schema-v1 evidence to the
 Git-ignored, eSpace-specific path `tmp/release-evidence/espace-release-rehearsal.json`. Diagnostic,
 failed, and recovery runs never overwrite that file. The eSpace Mainnet release commands read it
 automatically and reject a missing file, an older release commit, or mismatched artifact digest,

@@ -8,8 +8,8 @@ with one command:
 npm run zk:production:setup
 ```
 
-That command creates production artifacts for the two identity/disclosure circuits, writes an auditable transcript and
-manifest, and verifies the complete result before returning. It does **not** commit files, deploy a
+That command creates production artifacts for all 11 circuits, writes auditable transcripts and
+manifests, and verifies the complete result before returning. It does **not** commit files, deploy a
 contract, submit a transaction, or authorize a Mainnet release.
 
 ## Trust model
@@ -42,7 +42,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-Both DeepFamily circuits reuse the same published BN254 Phase 1 file:
+All 11 circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -64,7 +64,7 @@ BLAKE2b-512:
 9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3
 ```
 
-The shielded circuits use a separate development setup and require their own production Phase 2 before release.
+The unified production command performs a separate circuit-specific Phase 2 for each circuit.
 
 The exact file is committed at:
 
@@ -91,7 +91,7 @@ ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-`npm run zk:development:setup` uses the same committed Phase 1 file. Its Phase 2 contribution
+`npm run zk:development:setup` prepares all 11 circuits using the same committed Phase 1 file. Its Phase 2 contribution
 passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
 secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
 records no ceremony evidence, so it does not establish a production trust model. The resulting
@@ -207,14 +207,30 @@ npm run zk:production:setup -- \
   --ceremony-id deepfamily-production-2026-001
 ```
 
+To record shielded release thresholds, optionally pass
+`--shielded-release-criteria circuits/shielded-release-criteria.json`. The committed JSON contains
+six reviewed positive integer limits: `allocationMaxGas`, `claim12MaxGas`,
+`browserAllocationMaxMs`, `browserClaim12MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
+Key generation and cryptographic verification do not require these performance limits.
+`release:preflight` requires them alongside two independent audits and a hashed runtime benchmark
+report before publication. The benchmark report uses
+`deepfamily/shielded-runtime-benchmarks@1` and is referenced by
+`release-evidence/shielded/release-evidence.json` using
+`deepfamily/shielded-release-evidence@1`. Its full-depth result is a locally verified 64/32-depth
+cryptographic proof; allocation and 12-period claim gas come from successful local pool
+transactions. Browser timing and public-event recovery are measured separately. The unified
+testnet acceptance command produces the on-chain deployment and receipt report after preflight;
+no separate shielded testnet report is required to start that command.
+
 ### Rotate after a reviewed snarkjs runtime change
 
 Do not delete or downgrade a valid production manifest just because the committed dependency graph
 changed. First review and commit the dependency change, install exactly that clean commit, and
-record both inputs printed by these read-only commands:
+record the three inputs printed by these read-only commands:
 
 ```bash
 node --input-type=module -e "import { readCanonicalJsonFile, sha256Text } from './scripts/lib/zkArtifactTrust.mjs'; const { raw } = readCanonicalJsonFile('circuits/zk-artifacts-manifest.json'); console.log(sha256Text(raw));"
+node --input-type=module -e "import { createHash } from 'node:crypto'; import { readFileSync } from 'node:fs'; console.log(createHash('sha256').update(readFileSync('circuits/shielded-production-manifest.json')).digest('hex'));"
 node --input-type=module -e "import { inspectSnarkjsRuntime } from './scripts/lib/snarkjsToolchain.mjs'; console.log(inspectSnarkjsRuntime().sha256);"
 ```
 
@@ -224,11 +240,12 @@ After independently reviewing those exact digests, rotate with a new ceremony ID
 npm run zk:production:setup -- \
   --rotate \
   --expected-current-manifest-sha256 <current-production-manifest-sha256> \
+  --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \
   --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \
   --ceremony-id <new-stable-audit-id>
 ```
 
-The two expected digests are mandatory with `--rotate` and are rejected without it. Rotation only
+The three expected digests are mandatory with `--rotate` and are rejected without it. Rotation only
 accepts an existing schema-v3 `production` manifest using the one-contributor `single-operator`
 trust model. It rejects a development or multi-party baseline, a reused ceremony ID, and a runtime
 digest equal to the current manifest. Before generating entropy it verifies the old canonical
@@ -267,8 +284,10 @@ Internally the command:
    applies it to every zkey;
 9. exports every verification key and Solidity verifier and stages the browser WASM/zkey assets;
 10. reads the real contribution metadata embedded in every final zkey;
-11. creates `circuits/zk-ceremony-transcript.json` and updates
-    `circuits/zk-artifacts-manifest.json`;
+11. creates the identity/disclosure records at `circuits/zk-ceremony-transcript.json` and
+    `circuits/zk-artifacts-manifest.json`, plus the nine-circuit shielded records at
+    `release-evidence/shielded/phase2-transcript.json` and
+    `circuits/shielded-production-manifest.json`;
 12. rechecks the reviewed R1CS/WASM and pTau bytes, then validates the staged schema, pTau
     mathematics, zkey mathematics, contribution order, finalization metadata, and real proofs
     before any release file is replaced;
@@ -293,7 +312,7 @@ could contain those secrets.
 
 ## Generated evidence
 
-The production manifest records:
+The identity/disclosure production manifest records:
 
 - `status: production`;
 - `trustModel: single-operator`;
@@ -301,10 +320,10 @@ The production manifest records:
 - the fixed pTau source, byte length, SHA-256, BLAKE2b-512, and verification status;
 - schema v3, the canonical Circom reference, the exact snarkjs CLI hash, and the deterministic
   logical dependency-graph hash of the installed snarkjs production runtime;
-- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for every circuit;
+- the source, R1CS, WASM, zkey, vkey, and Solidity verifier hashes for both circuits;
 - the transcript and local finalization hashes.
 
-The schema-v3 transcript records:
+The identity/disclosure schema-v3 transcript records:
 
 - the release ceremony ID;
 - the same `single-operator` trust model;
@@ -316,6 +335,11 @@ The schema-v3 transcript records:
 - the one operator contribution name;
 - one embedded BLAKE2b-512 contribution hash per circuit;
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
+
+The same setup command generates the shielded production manifest and Phase 2 transcript. Their
+`@1` schemas bind all nine shielded circuits to their source and artifact hashes, the pinned
+toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
+manifests and two transcripts are generated and installed together.
 
 `platform` and `architecture` describe the Node/compiler execution runtime, not a hardware
 attestation.
@@ -337,8 +361,11 @@ git diff --stat
 git diff -- \
   circuits/zk-artifacts-manifest.json \
   circuits/zk-ceremony-transcript.json \
+  circuits/shielded-production-manifest.json \
+  release-evidence/shielded/phase2-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
+  contracts/Shielded*Verifier.sol
 
 npm run zk:ceremony:verify
 npm run zk:artifacts:check
@@ -353,15 +380,21 @@ together:
 git add \
   circuits/zk-artifacts-manifest.json \
   circuits/zk-ceremony-transcript.json \
+  circuits/shielded-production-manifest.json \
+  release-evidence/shielded/phase2-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
+  contracts/Shielded*Verifier.sol \
   frontend/public/zk
 
 git commit -m "chore: install production zk artifacts"
 ```
 
-The ignored `zk-artifacts/circuits/` build outputs must also be copied into the controlled release
-archive. A clean Git status alone does not archive ignored files.
+The controlled release archive includes both manifests and transcripts, all 11 verifier contracts,
+and all browser proving artifacts under `frontend/public/zk/`. Include the ignored R1CS/WASM build
+outputs from both `zk-artifacts/circuits/` and `zk-artifacts/shielded/`, matched to their production
+manifest hashes. The final proving and verification keys come from the public directories. A clean
+Git status alone does not archive ignored build outputs.
 
 From a clean checkout of the new commit, restore the exact dependencies, then rebuild and run the
 complete gate:
@@ -392,7 +425,7 @@ After the ZK artifacts are frozen, follow the target-chain runbook in this order
 3. commit that chain-specific state and run `release:preflight` from the clean final commit;
 4. run the target testnet acceptance command in `release-rehearsal` mode with
    `MIN_DELAY >= 86400` from that same commit;
-5. accept only a schema-v5 fresh-release report with `status=passed`, `releaseReady=true`,
+5. accept only a schema-v1 fresh-release report with `status=passed`, `releaseReady=true`,
    `evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`,
    `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
 6. archive that exact report with the release commit and ZK evidence;

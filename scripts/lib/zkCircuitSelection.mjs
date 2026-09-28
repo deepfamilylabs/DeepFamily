@@ -1,4 +1,26 @@
-const CIRCUIT_CHOICES = Object.freeze(["all", "person", "disclosure"]);
+export const SHIELDED_CIRCUITS = Object.freeze({
+  keyRegistration: "shielded_key_registration",
+  shield: "shielded_shield",
+  createPolicy: "shielded_create_policy",
+  allocate: "shielded_allocate",
+  topUp: "shielded_top_up",
+  mergeBudget: "shielded_merge_budget",
+  claim: "shielded_claim",
+  privateTransfer: "shielded_private_transfer",
+  unshield: "shielded_unshield",
+});
+
+export const LEGACY_CIRCUITS = Object.freeze(["person", "disclosure"]);
+export const SHIELDED_CIRCUIT_NAMES = Object.freeze(
+  Object.keys(SHIELDED_CIRCUITS).map((action) => `shielded:${action}`),
+);
+const CIRCUIT_CHOICES = Object.freeze([
+  "all",
+  "legacy",
+  ...LEGACY_CIRCUITS,
+  "shielded",
+  ...SHIELDED_CIRCUIT_NAMES,
+]);
 
 export const parseCircuitArguments = (argv) => {
   if (!Array.isArray(argv)) {
@@ -19,7 +41,8 @@ export const parseCircuitArguments = (argv) => {
     circuit = argv[0].slice("--circuit=".length);
   } else {
     throw new Error(
-      "Usage: --circuit <all|person|disclosure> (the option may be omitted to select all)",
+      "Usage: --circuit <all|legacy|person|disclosure|shielded|shielded:action> " +
+        "(the option may be omitted to select all)",
     );
   }
 
@@ -37,7 +60,8 @@ export const selectCircuitNames = (circuit) => {
       `Invalid circuit ${JSON.stringify(circuit)}; expected one of: ${CIRCUIT_CHOICES.join(", ")}`,
     );
   }
-  return circuit === "all"
-    ? Object.freeze(["person", "disclosure"])
-    : Object.freeze([circuit]);
+  if (circuit === "all") return Object.freeze([...LEGACY_CIRCUITS, ...SHIELDED_CIRCUIT_NAMES]);
+  if (circuit === "legacy") return LEGACY_CIRCUITS;
+  if (circuit === "shielded") return SHIELDED_CIRCUIT_NAMES;
+  return Object.freeze([circuit]);
 };

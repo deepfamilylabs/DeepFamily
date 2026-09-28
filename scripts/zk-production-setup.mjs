@@ -11,21 +11,26 @@ const usage = () => {
   npm run zk:production:setup -- --ceremony-id <stable-audit-id>
   npm run zk:production:setup -- --rotate \\
     --expected-current-manifest-sha256 <current-production-manifest-sha256> \\
+    --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \\
     --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \\
     [--ceremony-id <new-stable-audit-id>]
 
-Creates every production Groth16 proving key with:
+Optional: --shielded-release-criteria <committed-json-path> records the six reviewed
+release thresholds. These thresholds are checked by release:preflight.
+
+Creates all eleven production Groth16 proving keys with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
   - canonical R1CS/WASM hashes checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;
   - one local Phase 2 operator using OS CSPRNG entropy per circuit;
   - one finalization beacon generated only after every contribution;
-  - a schema-validated single-operator transcript and production manifest.
+  - schema-validated identity and shielded transcripts and production manifests.
 
 The Phase 1 file is read from circuits/ptau/ppot_0080_16.ptau, or from
 ZK_PTAU_PATH when set. Neither form downloads it.
 
-The default command requires a development manifest and refuses to overwrite production artifacts.
+The command requires an identity/disclosure development manifest. It refuses to overwrite
+production artifacts.
 The explicit --rotate form accepts only a valid existing schema-v3 single-operator production
 manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
 runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
@@ -34,9 +39,12 @@ production security trusts the operator to destroy every Phase 2 secret.`);
 };
 
 const USAGE_ERROR =
-  "Usage: npm run zk:production:setup -- [--ceremony-id <stable-audit-id>] or " +
+  "Usage: npm run zk:production:setup -- [--ceremony-id <stable-audit-id>] " +
+  "[--shielded-release-criteria <committed-json-path>] or " +
   "--rotate --expected-current-manifest-sha256 <sha256> " +
-  "--expected-snarkjs-runtime-sha256 <sha256> [--ceremony-id <new-stable-audit-id>]";
+  "--expected-current-shielded-manifest-sha256 <sha256> " +
+  "--expected-snarkjs-runtime-sha256 <sha256> " +
+  "[--shielded-release-criteria <committed-json-path>] [--ceremony-id <new-stable-audit-id>]";
 
 export const parseArguments = (argv) => {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
@@ -59,9 +67,13 @@ export const parseArguments = (argv) => {
         ? "ceremonyId"
         : argument === "--expected-current-manifest-sha256"
           ? "expectedCurrentManifestSha256"
-          : argument === "--expected-snarkjs-runtime-sha256"
-            ? "expectedSnarkjsRuntimeSha256"
-            : null;
+          : argument === "--expected-current-shielded-manifest-sha256"
+            ? "expectedCurrentShieldedManifestSha256"
+            : argument === "--expected-snarkjs-runtime-sha256"
+              ? "expectedSnarkjsRuntimeSha256"
+              : argument === "--shielded-release-criteria"
+                ? "shieldedReleaseCriteriaPath"
+                : null;
     if (field === null || parsed[field] !== undefined) throw new Error(USAGE_ERROR);
     const value = argv[index + 1];
     if (typeof value !== "string" || value.trim() === "" || value.startsWith("--")) {
@@ -72,11 +84,13 @@ export const parseArguments = (argv) => {
   }
   const hasRotationEvidence =
     parsed.expectedCurrentManifestSha256 !== undefined ||
-    parsed.expectedSnarkjsRuntimeSha256 !== undefined;
+    parsed.expectedSnarkjsRuntimeSha256 !== undefined ||
+    parsed.expectedCurrentShieldedManifestSha256 !== undefined;
   if (
     (parsed.rotate &&
       (parsed.expectedCurrentManifestSha256 === undefined ||
-        parsed.expectedSnarkjsRuntimeSha256 === undefined)) ||
+        parsed.expectedSnarkjsRuntimeSha256 === undefined ||
+        parsed.expectedCurrentShieldedManifestSha256 === undefined)) ||
     (!parsed.rotate && hasRotationEvidence)
   ) {
     throw new Error(USAGE_ERROR);
@@ -99,12 +113,16 @@ export const main = async (argv = process.argv.slice(2)) => {
     ceremonyId: parsed.ceremonyId,
     rotate: parsed.rotate,
     expectedCurrentManifestSha256: parsed.expectedCurrentManifestSha256,
+    expectedCurrentShieldedManifestSha256: parsed.expectedCurrentShieldedManifestSha256,
     expectedSnarkjsRuntimeSha256: parsed.expectedSnarkjsRuntimeSha256,
+    includeShielded: true,
+    shieldedReleaseCriteriaPath: parsed.shieldedReleaseCriteriaPath,
   });
   console.log("Production ZK setup completed and verified:");
   console.log(`  ceremony:   ${result.ceremonyId}`);
   console.log(`  trust:      ${result.trustModel} (${result.contributorCount} contributor)`);
   console.log(`  manifest:   ${result.manifestSha256}`);
+  console.log(`  shielded:   ${result.shieldedManifestSha256}`);
   console.log(`  transcript: ${result.transcriptSha256}`);
   console.log(
     "Review and commit every generated artifact together, then run npm run release:preflight.",

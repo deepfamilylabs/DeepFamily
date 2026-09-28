@@ -16,7 +16,12 @@ import {
   PROTOCOL_RELEASE_MANIFEST_PATH,
   PROTOCOL_PRECIS_DATA_PATH,
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
+  shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
+import {
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -108,10 +113,7 @@ const createContractInterfaceArtifactFixture = () => {
       abi: artifact.abi,
     });
   }
-  const archivePath = path.join(
-    root,
-    PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS.deepFamilyArchive.path,
-  );
+  const archivePath = path.join(root, PROTOCOL_CONTRACT_INTERFACE_ARTIFACTS.deepFamilyArchive.path);
   return {
     root,
     contractInterfaces,
@@ -273,6 +275,48 @@ const createProductionFixture = () => {
       runtimeSha256: HASHES.readerRuntime,
     },
   };
+  const shieldedBindings = shieldedDeploymentBindingsFromAddresses({
+    token: address(10),
+    poseidonT3: address(11),
+    poseidonT6: address(12),
+    deepFamilyLineageIndex: address(13),
+    ...Object.fromEntries(
+      Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec, index) => [
+        spec.verifierLabel,
+        address(100 + index),
+      ]),
+    ),
+    ...Object.fromEntries(
+      SHIELDED_ACTIONS.map((action, index) => [
+        SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
+        address(200 + index),
+      ]),
+    ),
+    shieldedHeirKeyRegistry: address(300),
+    shieldedDeepPool: address(301),
+  });
+  const withHashes = (record) => ({
+    ...record,
+    artifactSha256: HASHES.adapterArtifact,
+    runtimeSha256: HASHES.adapterRuntime,
+  });
+  Object.assign(manifest.deployments, {
+    ...shieldedBindings,
+    shieldedVerifiers: Object.fromEntries(
+      Object.entries(shieldedBindings.shieldedVerifiers).map(([action, record]) => [
+        action,
+        withHashes(record),
+      ]),
+    ),
+    shieldedAdapters: Object.fromEntries(
+      Object.entries(shieldedBindings.shieldedAdapters).map(([action, record]) => [
+        action,
+        withHashes(record),
+      ]),
+    ),
+    shieldedHeirKeyRegistry: withHashes(shieldedBindings.shieldedHeirKeyRegistry),
+    shieldedDeepPool: withHashes(shieldedBindings.shieldedDeepPool),
+  });
 
   const kdfProfiles = [
     ["identity", manifest.identitySuites["1"].kdf],
@@ -436,6 +480,26 @@ const createProductionFixture = () => {
     },
   };
   const deploymentArtifacts = {
+    shieldedVerifiers: Object.fromEntries(
+      Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
+        action,
+        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+      ]),
+    ),
+    shieldedAdapters: Object.fromEntries(
+      SHIELDED_ACTIONS.map((action) => [
+        action,
+        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+      ]),
+    ),
+    shieldedHeirKeyRegistry: {
+      artifactSha256: HASHES.adapterArtifact,
+      runtimeSha256: HASHES.adapterRuntime,
+    },
+    shieldedDeepPool: {
+      artifactSha256: HASHES.adapterArtifact,
+      runtimeSha256: HASHES.adapterRuntime,
+    },
     groth16VerifierAdapter: {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
@@ -510,8 +574,22 @@ const acceptanceReportForManifest = (manifest) => ({
     protocolGeneration: manifest.protocolGeneration,
   },
   network: { chainId: String(manifest.deployments.chainId) },
-  addresses: { deepFamily: manifest.deployments.deepFamilyProxy },
+  addresses: {
+    deepFamily: manifest.deployments.deepFamilyProxy,
+    token: manifest.deployments.token,
+  },
   terminalGovernanceState: {
+    ...Object.fromEntries(
+      [
+        "poseidonT3",
+        "poseidonT6",
+        "deepFamilyLineageIndex",
+        "shieldedVerifiers",
+        "shieldedAdapters",
+        "shieldedHeirKeyRegistry",
+        "shieldedDeepPool",
+      ].map((key) => [key, structuredClone(manifest.deployments[key])]),
+    ),
     deepFamily: {
       address: manifest.deployments.deepFamilyProxy,
       implementation: manifest.deployments.deepFamilyImplementation,
@@ -1340,6 +1418,68 @@ describe("production protocol release manifest evidence", function () {
       () => fixture.inspect(),
       /DeepFamilyArchive artifactSha256 does not match the compiled artifact file/,
     );
+  });
+
+  for (const [label, mutate, message] of [
+    [
+      "an omitted shielded circuit",
+      (deployments) => {
+        delete deployments.shieldedVerifiers.claim;
+      },
+      /shielded verifier deployments must contain exactly/,
+    ],
+    [
+      "a shielded adapter for another action",
+      (deployments) => {
+        deployments.shieldedAdapters.allocate.actionId = 5;
+      },
+      /allocate shielded adapter must bind its exact verifier and action/,
+    ],
+    [
+      "an adapter using another circuit verifier",
+      (deployments) => {
+        deployments.shieldedAdapters.allocate.verifierImmutable =
+          deployments.shieldedVerifiers.claim.address;
+      },
+      /allocate shielded adapter must bind its exact verifier and action/,
+    ],
+    [
+      "a registry using another verifier",
+      (deployments) => {
+        deployments.shieldedHeirKeyRegistry.keyRegistrationVerifierImmutable =
+          deployments.shieldedVerifiers.claim.address;
+      },
+      /key registration verifier/,
+    ],
+    [
+      "a pool using a different token",
+      (deployments) => {
+        deployments.shieldedDeepPool.tokenImmutable = address(900);
+      },
+      /declared token, lineage and key registry/,
+    ],
+    [
+      "a pool using another action adapter",
+      (deployments) => {
+        deployments.shieldedDeepPool.adapterImmutables.allocate =
+          deployments.shieldedAdapters.claim.address;
+      },
+      /allocate must bind its exact adapter/,
+    ],
+  ]) {
+    it(`rejects ${label}`, function () {
+      mutate(fixture.manifest.deployments);
+      fixture.writeManifest();
+      assert.throws(() => fixture.inspect(), message);
+    });
+  }
+
+  it("rejects a shielded verifier artifact or adapter immutable-linked runtime hash drift", function () {
+    fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = hash("0");
+    assert.throws(() => fixture.inspect(), /ShieldedClaimVerifier artifactSha256/);
+    fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = HASHES.adapterArtifact;
+    fixture.deploymentArtifacts.shieldedAdapters.allocate.runtimeSha256 = hash("0");
+    assert.throws(() => fixture.inspect(), /ShieldedAllocateAdapter runtimeSha256/);
   });
 
   it("rejects an immutable-linked runtime hash drift", function () {

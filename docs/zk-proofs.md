@@ -305,7 +305,10 @@ intentionally public NFT data.
 
 `privateTransfer` can spend one or two value notes, so a child can transfer the first claimed note immediately. The second public slot uses a secret-bound dummy nullifier for a single-note transfer. Different public input roots reveal that two real notes were spent; equal roots do not establish how many real notes were used.
 
-Development builds use `npm run zk:shielded:development:setup`. Generated development keys and verifiers stay under ignored `zk-artifacts/shielded/`. Production release needs independent setup and verification of all shielded circuits.
+`npm run zk:development:setup` prepares all 11 circuits and synchronizes their browser artifacts
+to `frontend/public/zk/`, with shielded files in the `shielded/` subdirectory. Generated shielded
+verifiers live under `contracts/Shielded*Verifier.sol`. `npm run zk:production:setup` uses the same production
+setup workflow for all 11 circuits, generating independent keys for each circuit.
 
 ## Proof Transport and Permanent Routing
 
@@ -355,7 +358,13 @@ are published under `frontend/public/zk/`:
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;
 - `disclosure_binding.wasm`, `disclosure_binding_final.zkey`,
   `disclosure_binding.vkey.json`;
-- shielded development artifacts are served from ignored `zk-artifacts/shielded/` only by the local Vite development server.
+- nine shielded WASM/zkey/vkey sets under `shielded/`.
+
+Production shielded artifacts use the same `/zk/shielded/` URLs and are installed in
+`frontend/public/zk/shielded/` by `zk:production:setup` with the production manifest. Vite serves
+these static files in both development and built previews. The unified `zk:artifacts:check`
+checks artifact digests and derived verifiers. `zk:check` and `zk:ceremony:verify` check production
+cryptography; `release:preflight` also requires the release evidence.
 
 Shielded witnesses are assembled locally by the `shielded*Preparation` services, using
 `packages/protocol-core/shielded-inheritance.js` and replayed public note and lineage events.
@@ -371,14 +380,21 @@ Supported top-level commands:
 | Command                        | Purpose                                                    |
 | ------------------------------ | ---------------------------------------------------------- |
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                        |
-| `npm run zk:build`             | Compile the person and disclosure circuits                 |
-| `npm run zk:development:setup` | Rebuild person and disclosure development artifacts        |
-| `npm run zk:production:setup`  | Produce and verify fresh production Phase-2 artifacts      |
-| `npm run zk:check`             | Generate and verify identity/disclosure proofs             |
-| `npm run zk:artifacts:check`   | Rebuild and cross-check published artifacts                |
-| `npm run zk:ceremony:verify`   | Verify identity/disclosure production setup evidence       |
-| `npm run zk:shielded:development:setup` | Build shielded development keys and verifiers |
-| `npm run zk:shielded:development:proof-smoke` | Verify shielded development proofs |
+| `npm run zk:build`             | Compile all 11 circuits                                    |
+| `npm run zk:development:setup` | Generate development artifacts for all 11 circuits         |
+| `npm run zk:production:setup`  | Generate production artifacts for all 11 circuits          |
+| `npm run zk:check`             | Check all 11 artifacts and available proof fixtures        |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 11 circuit artifact sets          |
+| `npm run zk:ceremony:verify`   | Verify production setup evidence for all 11 circuits       |
+
+The top-level commands cover identity, disclosure, and shielded circuits together.
+`zk:check` proves the identity and disclosure fixtures; in development it also checks all nine
+shielded artifact sets and runs the available allocate/claim proof fixtures. Production checks
+validate all nine shielded circuit ceremonies. Release preflight additionally checks independent
+audits and committed runtime benchmarks. The same testnet acceptance report verifies all 11
+circuits, deployment bindings, transaction receipts, and finality before Mainnet planning.
+Development keys cannot be
+used for a production release.
 
 The checked-in keys and current protocol release manifest are development-only. The manifest marks
 identity/file KDF suite 1 as `candidate-awaiting-device-benchmark`, trusted setup as requiring a

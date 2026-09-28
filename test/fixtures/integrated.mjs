@@ -5,12 +5,6 @@ export const deployIntegratedFixture = async (connection) => {
     await connection.networkHelpers?.mine?.();
   } catch {}
   const deployed = await deployIntegratedSystem(connection, { writeDeployments: false });
-  connection.__deepfamilyIntegrated = {
-    deepFamily: deployed.deepFamily,
-    token: deployed.token,
-    archive: deployed.archive,
-    deepFamilyReader: deployed.deepFamilyReader,
-    lineageIndex: deployed.lineageIndex,
-  };
+  connection.__deepfamilyIntegrated = deployed;
   return deployed;
 };

@@ -133,7 +133,7 @@ async function updateLocalConfig() {
       process.exit(1);
     }
     if (!fs.existsSync(poolPath) || !fs.existsSync(registryPath)) {
-      console.log("Shielded pool not deployed. Run `npm run dev:shielded:deploy` first.");
+      console.log("Shielded pool not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
 
@@ -146,12 +146,10 @@ async function updateLocalConfig() {
     const poolAddress = ethers.getAddress(poolDeployment.address);
     const registryAddress = ethers.getAddress(registryDeployment.address);
     if (
-      poolDeployment.developmentOnly !== true ||
-      registryDeployment.developmentOnly !== true ||
       !Number.isSafeInteger(poolDeployment.deploymentBlock) ||
       !Number.isSafeInteger(registryDeployment.deploymentBlock)
     ) {
-      throw new Error("Local shielded deployment metadata is incomplete or not development-only");
+      throw new Error("Local integrated deployment metadata is incomplete");
     }
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
@@ -177,7 +175,11 @@ async function updateLocalConfig() {
       provider.getCode(poolAddress),
       provider.getCode(registryAddress),
     ]);
-    if (localChain.chainId !== BigInt(LOCAL_CHAIN_ID) || poolCode === "0x" || registryCode === "0x") {
+    if (
+      localChain.chainId !== BigInt(LOCAL_CHAIN_ID) ||
+      poolCode === "0x" ||
+      registryCode === "0x"
+    ) {
       throw new Error("Local shielded deployment is missing or belongs to another chain");
     }
     const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
