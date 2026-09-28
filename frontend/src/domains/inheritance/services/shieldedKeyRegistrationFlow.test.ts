@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Contract, Signer } from "ethers";
+import { AbiCoder, type Contract, type Signer } from "ethers";
 import {
   computeIdentityFromDerivedSecret,
   deriveShieldedHeirKeyMaterial,
@@ -83,8 +83,12 @@ function fixture() {
     input,
     register,
     estimateGas,
-    setChainId: (value: bigint) => { chainId = value; },
-    setBalance: (value: bigint) => { gasBalance = value; },
+    setChainId: (value: bigint) => {
+      chainId = value;
+    },
+    setBalance: (value: bigint) => {
+      gasBalance = value;
+    },
   };
 }
 
@@ -97,7 +101,7 @@ beforeEach(() => {
 });
 
 describe("shielded heir key self-registration", () => {
-  it("derives the HPKE key, proves seven bound signals locally, and self-signs ABC arrays", async () => {
+  it("derives the HPKE key, proves seven bound signals locally, and signs the shared ABC proof envelope", async () => {
     const f = fixture();
     const stages: string[] = [];
     const result = await registerShieldedHeirKey({
@@ -133,9 +137,17 @@ describe("shielded heir key self-registration", () => {
       result.ownerCommitment,
       result.viewingKey,
       BigInt(signals[6]),
-      [1n, 2n],
-      [[4n, 3n], [6n, 5n]],
-      [7n, 8n],
+      AbiCoder.defaultAbiCoder().encode(
+        ["uint256[2]", "uint256[2][2]", "uint256[2]"],
+        [
+          [1n, 2n],
+          [
+            [4n, 3n],
+            [6n, 5n],
+          ],
+          [7n, 8n],
+        ],
+      ),
       { gasLimit: 240_000n },
     );
     expect(f.input.registry.connect).toHaveBeenCalledWith(f.input.signer);

@@ -1212,9 +1212,9 @@ The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They 
 
 `ShieldedDeepPool` holds pooled DEEP and a global sequence of encrypted note commitments in 32-level shards. Each action consumes one-time nullifiers and appends two ciphertext commitments. The pool exposes `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Only `shield` and `unshield` reveal a public amount; `unshield` also reveals the recipient. Policy, child, budget, and claim details are proved privately. The two lineage trees remain 64 levels deep.
 
-Each pool action has its own circuit and `ShieldedGroth16ActionAdapter`; key registration has a separate verifier. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
+Each pool action and key registration has its own circuit and generated verifier. DeepFamily, the pool and the key registry share one `Groth16VerifierAdapter` instance and the same `IProofVerifierAdapter` transport interface. The adapter fixes eleven verifier routes: person relation (purpose 0, five signals), disclosure binding (purpose 1, four signals), key registration (purpose 2, seven signals), and pool actions (purposes 3–10, 32 signals). Pool action IDs remain 0–7 and are bound by the pool and circuits; they are distinct from transport purpose IDs. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
 
-The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They bind the nine shielded verifiers, eight action adapters, key registry, and pool to the same token and lineage index as the identity and disclosure contracts. Development use does not require an audit; production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
+The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They deploy all eleven generated verifiers before the shared adapter, then bind the key registry and pool to that adapter and the same token and lineage index as the identity and disclosure contracts. Development use does not require an audit; production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
 
 ## ZK Verifier Contracts
 
@@ -1234,7 +1234,7 @@ The localhost, testnet acceptance, and guarded Mainnet release flows deploy the 
 
 ### Shielded action and key registration verifiers
 
-The pool uses eight action-specific verifiers, each with 32 public signals and a `ShieldedGroth16ActionAdapter`. Key registration uses seven public signals. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` and synchronize the matching browser assets to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses eight action-specific verifiers, each with 32 public signals; key registration uses seven public signals. Both pass encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` and synchronize the matching browser assets to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

@@ -337,9 +337,14 @@ Current generated verifiers are:
 
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- `contracts/adapters/Groth16VerifierAdapter.sol` for the transport boundary;
-- `ShieldedGroth16ActionAdapter` and eight shielded action verifiers for pool actions;
-- a separate seven-signal verifier for `ShieldedHeirKeyRegistry`.
+- eight 32-signal shielded action verifiers for pool actions;
+- a seven-signal verifier for `ShieldedHeirKeyRegistry`.
+
+All eleven circuits share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
+adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
+and disclosure, purpose 2 to key registration, and purposes 3–10 to the eight pool actions.
+Each route fixes its verifier address and checks its expected public-signal length. The pool
+constructs and binds its own action ID (0–7); the adapter handles proof transport only.
 
 ## Frontend and Shared Definitions
 

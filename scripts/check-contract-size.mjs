@@ -25,10 +25,6 @@ const ARTIFACTS = [
     "ShieldedHeirKeyRegistry",
     "artifacts/contracts/ShieldedHeirKeyRegistry.sol/ShieldedHeirKeyRegistry.json",
   ],
-  [
-    "ShieldedGroth16ActionAdapter",
-    "artifacts/contracts/adapters/ShieldedGroth16ActionAdapter.sol/ShieldedGroth16ActionAdapter.json",
-  ],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
   [
     "GovernanceTimelock",

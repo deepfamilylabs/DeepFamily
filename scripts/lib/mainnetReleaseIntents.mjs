@@ -1,6 +1,6 @@
 import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 import { MAINNET_DEPLOYMENT_NONCE_OFFSETS } from "./protocolDeploymentProjection.mjs";
-import { SHIELDED_ACTIONS, SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
 const PERSON_RELATION_CIRCUIT_ID = 1;
 const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
@@ -78,7 +78,7 @@ const normalizeIntent = ({ ethers, label, kind, nonce, from, chainId, to, value,
 };
 
 /**
- * Rebuilds the complete forty-transaction EVM mainnet release intent without a signer or RPC.
+ * Rebuilds the complete EVM mainnet release intent without a signer or RPC.
  * The returned order is the approved deployer-nonce order; callers should include its digest in
  * the reviewed plan and pass the intents to the checkpointed transaction executor.
  */
@@ -119,7 +119,6 @@ export const buildMainnetReleaseIntents = async ({
     "PoseidonT6",
     "DeepFamilyLineageIndex",
     ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierContractName),
-    "ShieldedGroth16ActionAdapter",
     "ShieldedHeirKeyRegistry",
     "ShieldedDeepPool",
   ];
@@ -129,39 +128,14 @@ export const buildMainnetReleaseIntents = async ({
   const addressAt = (offset) =>
     ethers.getCreateAddress({ from: normalizedDeployer, nonce: nonceBase + offset });
   const addresses = Object.freeze({
-    governanceTimelock: addressAt(0),
-    deepFamilyToken: addressAt(1),
-    poseidonT5: addressAt(2),
-    adultAgeGate: addressAt(3),
-    personCommitmentVerifier: addressAt(4),
-    disclosureBindingVerifier: addressAt(5),
-    groth16VerifierAdapter: addressAt(6),
-    deepFamilyImplementation: addressAt(7),
-    deepFamilyProxy: addressAt(8),
-    // nonce 9 is the tokenInitialize call.
-    deepFamilyArchive: addressAt(10),
-    // nonce 11 is the one-time setArchive call.
-    deepFamilyReader: addressAt(12),
-    // nonces 13 and 14 register the two verifier routes.
-    poseidonT3: addressAt(15),
-    poseidonT4: addressAt(16),
-    poseidonT6: addressAt(17),
-    deepFamilyLineageIndex: addressAt(18),
-    // nonce 19 is the one-time setLineageIndex call.
+    governanceTimelock: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.timelock),
+    deepFamilyToken: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.token),
     ...Object.fromEntries(
-      Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
-        spec.verifierLabel,
-        addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS[spec.verifierLabel]),
-      ]),
+      Object.entries(MAINNET_DEPLOYMENT_NONCE_OFFSETS)
+        .filter(([label]) => label !== "timelock" && label !== "token" && label !== "deepFamily")
+        .map(([label, offset]) => [label, addressAt(offset)]),
     ),
-    ...Object.fromEntries(
-      SHIELDED_ACTIONS.map((action) => {
-        const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-        return [spec.adapterLabel, addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS[spec.adapterLabel])];
-      }),
-    ),
-    shieldedHeirKeyRegistry: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.shieldedHeirKeyRegistry),
-    shieldedDeepPool: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.shieldedDeepPool),
+    deepFamilyProxy: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.deepFamily),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -201,10 +175,19 @@ export const buildMainnetReleaseIntents = async ({
     ["adultAgeGate", "AdultAgeGate", []],
     ["personCommitmentVerifier", "PersonCommitmentVerifier", []],
     ["disclosureBindingVerifier", "DisclosureBindingVerifier", []],
+    ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.verifierLabel,
+      spec.verifierContractName,
+      [],
+    ]),
     [
       "groth16VerifierAdapter",
       "Groth16VerifierAdapter",
-      [addresses.personCommitmentVerifier, addresses.disclosureBindingVerifier],
+      [
+        addresses.personCommitmentVerifier,
+        addresses.disclosureBindingVerifier,
+        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => addresses[spec.verifierLabel]),
+      ],
     ],
     ["deepFamilyImplementation", "DeepFamily", [], deepFamilyBytecode],
     ["deepFamilyProxy", "UUPSProxy", [addresses.deepFamilyImplementation, proxyInitializeData]],
@@ -292,16 +275,6 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
-  for (const spec of Object.values(SHIELDED_DEPLOYMENT_CIRCUITS)) {
-    await pushDeployment(spec.verifierLabel, spec.verifierContractName);
-  }
-  for (const action of SHIELDED_ACTIONS) {
-    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-    await pushDeployment(spec.adapterLabel, spec.adapterContractName, [
-      addresses[spec.verifierLabel],
-      spec.actionId,
-    ]);
-  }
   const keyRegistryBytecode = linkBytecode({
     ethers,
     artifact: artifact.ShieldedHeirKeyRegistry,
@@ -310,7 +283,7 @@ export const buildMainnetReleaseIntents = async ({
   await pushDeployment(
     "shieldedHeirKeyRegistry",
     "ShieldedHeirKeyRegistry",
-    [addresses.deepFamilyLineageIndex, addresses.shieldedKeyRegistrationVerifier],
+    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
     keyRegistryBytecode,
   );
   const poolBytecode = linkBytecode({
@@ -325,9 +298,7 @@ export const buildMainnetReleaseIntents = async ({
       addresses.deepFamilyToken,
       addresses.deepFamilyLineageIndex,
       addresses.shieldedHeirKeyRegistry,
-      SHIELDED_ACTIONS.map(
-        (action) => addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
-      ),
+      addresses.groth16VerifierAdapter,
     ],
     poolBytecode,
   );

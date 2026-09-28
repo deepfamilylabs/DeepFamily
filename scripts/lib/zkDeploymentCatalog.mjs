@@ -23,14 +23,9 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
           source,
           verifierContractName: `Shielded${suffix}Verifier`,
           verifierLabel: `shielded${suffix}Verifier`,
-          adapterContractName: "ShieldedGroth16ActionAdapter",
-          adapterLabel: action === "keyRegistration" ? null : `shielded${suffix}Adapter`,
-          adapterDeploymentName: action === "keyRegistration" ? null : `Shielded${suffix}Adapter`,
           actionId: action === "keyRegistration" ? null : SHIELDED_ACTIONS.indexOf(action),
-          poolVerifierGetter:
-            action === "keyRegistration"
-              ? null
-              : `${action.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}_VERIFIER`,
+          proofPurpose: action === "keyRegistration" ? 2 : 3 + SHIELDED_ACTIONS.indexOf(action),
+          adapterVerifierGetter: `${action}Verifier`,
         }),
       ];
     }),
@@ -44,6 +39,11 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
     ["AdultAgeGate", "adultAgeGate", "adultAgeGate"],
     ["PersonCommitmentVerifier", "personCommitmentVerifier", "personCommitmentVerifier"],
     ["DisclosureBindingVerifier", "nameDisclosureVerifier", "disclosureBindingVerifier"],
+    ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.verifierContractName,
+      `shieldedVerifiers.${spec.action}`,
+      spec.verifierLabel,
+    ]),
     ["Groth16VerifierAdapter", "groth16VerifierAdapter", "groth16VerifierAdapter"],
     ["DeepFamily", "deepFamily", "deepFamilyProxy"],
     ["DeepFamilyArchive", "archive", "deepFamilyArchive"],
@@ -52,20 +52,6 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
     ["PoseidonT4", "poseidonT4", "poseidonT4"],
     ["PoseidonT6", "poseidonT6", "poseidonT6"],
     ["DeepFamilyLineageIndex", "lineageIndex", "deepFamilyLineageIndex"],
-    ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
-      spec.verifierContractName,
-      `shieldedVerifiers.${spec.action}`,
-      spec.verifierLabel,
-    ]),
-    ...SHIELDED_ACTIONS.map((action) => {
-      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-      return [
-        spec.adapterDeploymentName,
-        `shieldedAdapters.${action}`,
-        spec.adapterLabel,
-        spec.adapterContractName,
-      ];
-    }),
     ["ShieldedHeirKeyRegistry", "shieldedHeirKeyRegistry", "shieldedHeirKeyRegistry"],
     ["ShieldedDeepPool", "shieldedDeepPool", "shieldedDeepPool"],
   ].map(([deploymentName, property, transactionLabel, contractName = deploymentName]) =>

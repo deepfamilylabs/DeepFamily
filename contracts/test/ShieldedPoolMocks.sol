@@ -2,15 +2,23 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IShieldedPoolActionVerifier, ShieldedDeepPool} from "../ShieldedDeepPool.sol";
+import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
+import {ShieldedDeepPool} from "../ShieldedDeepPool.sol";
 
 /** @dev Test only. This is deliberately not a ZK verifier and must never secure real funds. */
-contract ShieldedPoolVerifierMock is IShieldedPoolActionVerifier {
+contract ShieldedPoolVerifierMock is IProofVerifierAdapter {
   function verifyProof(
+    uint8 purpose,
+    uint8 proofEncodingId,
     bytes calldata proof,
-    uint256[32] calldata publicSignals
+    uint256[] calldata publicSignals
   ) external pure returns (bool) {
-    return keccak256(proof) == keccak256(abi.encode(publicSignals));
+    if (publicSignals.length != 32 || proofEncodingId != 1 || purpose != 3 + publicSignals[0]) {
+      return false;
+    }
+    uint256[32] memory fixedSignals;
+    for (uint256 i = 0; i < 32; ++i) fixedSignals[i] = publicSignals[i];
+    return keccak256(proof) == keccak256(abi.encode(fixedSignals));
   }
 }
 
@@ -58,8 +66,8 @@ contract ShieldedPoolRolloverHarness is ShieldedDeepPool {
     address token,
     address lineageIndex,
     address keyRegistry,
-    address[8] memory verifiers
-  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifiers) {}
+    address verifierAdapter
+  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifierAdapter) {}
 
   function seedFullShard() external {
     Shard storage shard = _shards[0];
@@ -82,8 +90,8 @@ contract ShieldedPoolDepthHarness is ShieldedDeepPool {
     address token,
     address lineageIndex,
     address keyRegistry,
-    address[8] memory verifiers
-  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifiers) {}
+    address verifierAdapter
+  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifierAdapter) {}
 
   function seedSyntheticLeftSubtree(uint256 leftRoot) external {
     Shard storage shard = _shards[0];

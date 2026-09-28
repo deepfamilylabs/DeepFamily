@@ -659,8 +659,8 @@ describe("Ethereum production tooling profiles", function () {
       expect(runbook).to.include("npm run release:preflight");
       expect(runbook).to.include("EVM_E2E_MODE=release-rehearsal");
     }
-    expect(espaceRunbook).to.include("40 ordered transaction intent hashes");
-    expect(espaceRunbook).to.include("incomplete 40-step checkpoint");
-    expect(espaceRunbook).not.to.match(/16 ordered|16-step/iu);
+    expect(espaceRunbook).to.include("32 ordered transaction intent hashes");
+    expect(espaceRunbook).to.include("incomplete 32-step checkpoint");
+    expect(espaceRunbook).not.to.match(/(?:16|40) ordered|(?:16|40)-step/iu);
   });
 });

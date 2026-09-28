@@ -28,7 +28,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       await token.getAddress(),
       await lineage.getAddress(),
       await keyRegistry.getAddress(),
-      Array(8).fill(await verifier.getAddress()),
+      await verifier.getAddress(),
     );
     await pool.waitForDeployment();
     await token.mint(depositor.address, 1_000n);

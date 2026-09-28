@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  GROTH16_ADAPTER_IMMUTABLE_FIELDS,
+  groth16VerifierAdapterBindingsFromAddresses,
   inspectProtocolContractInterfaces,
   inspectProtocolReleaseManifest,
   protocolCanonicalJson,
@@ -18,10 +20,7 @@ import {
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
-import {
-  SHIELDED_ACTIONS,
-  SHIELDED_DEPLOYMENT_CIRCUITS,
-} from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -275,7 +274,10 @@ const createProductionFixture = () => {
       runtimeSha256: HASHES.readerRuntime,
     },
   };
-  const shieldedBindings = shieldedDeploymentBindingsFromAddresses({
+  const shieldedAddresses = {
+    groth16VerifierAdapter: ADDRESSES.adapter,
+    personCommitmentVerifier: ADDRESSES.personVerifier,
+    disclosureBindingVerifier: ADDRESSES.disclosureVerifier,
     token: address(10),
     poseidonT3: address(11),
     poseidonT6: address(12),
@@ -286,15 +288,14 @@ const createProductionFixture = () => {
         address(100 + index),
       ]),
     ),
-    ...Object.fromEntries(
-      SHIELDED_ACTIONS.map((action, index) => [
-        SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
-        address(200 + index),
-      ]),
-    ),
     shieldedHeirKeyRegistry: address(300),
     shieldedDeepPool: address(301),
-  });
+  };
+  const shieldedBindings = shieldedDeploymentBindingsFromAddresses(shieldedAddresses);
+  Object.assign(
+    manifest.deployments.groth16VerifierAdapter,
+    groth16VerifierAdapterBindingsFromAddresses(shieldedAddresses),
+  );
   const withHashes = (record) => ({
     ...record,
     artifactSha256: HASHES.adapterArtifact,
@@ -304,12 +305,6 @@ const createProductionFixture = () => {
     ...shieldedBindings,
     shieldedVerifiers: Object.fromEntries(
       Object.entries(shieldedBindings.shieldedVerifiers).map(([action, record]) => [
-        action,
-        withHashes(record),
-      ]),
-    ),
-    shieldedAdapters: Object.fromEntries(
-      Object.entries(shieldedBindings.shieldedAdapters).map(([action, record]) => [
         action,
         withHashes(record),
       ]),
@@ -486,12 +481,6 @@ const createProductionFixture = () => {
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
     ),
-    shieldedAdapters: Object.fromEntries(
-      SHIELDED_ACTIONS.map((action) => [
-        action,
-        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
-      ]),
-    ),
     shieldedHeirKeyRegistry: {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
@@ -585,7 +574,6 @@ const acceptanceReportForManifest = (manifest) => ({
         "poseidonT6",
         "deepFamilyLineageIndex",
         "shieldedVerifiers",
-        "shieldedAdapters",
         "shieldedHeirKeyRegistry",
         "shieldedDeepPool",
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
@@ -600,6 +588,12 @@ const acceptanceReportForManifest = (manifest) => ({
       personVerifier: manifest.deployments.groth16VerifierAdapter.personVerifierImmutable,
       disclosureBindingVerifier:
         manifest.deployments.groth16VerifierAdapter.disclosureBindingVerifierImmutable,
+      ...Object.fromEntries(
+        GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
+          getter,
+          manifest.deployments.groth16VerifierAdapter[`${getter}Immutable`],
+        ]),
+      ),
       artifactSha256: manifest.deployments.groth16VerifierAdapter.artifactSha256,
       runtimeSha256: manifest.deployments.groth16VerifierAdapter.runtimeSha256,
     },
@@ -1429,42 +1423,35 @@ describe("production protocol release manifest evidence", function () {
       /shielded verifier deployments must contain exactly/,
     ],
     [
-      "a shielded adapter for another action",
-      (deployments) => {
-        deployments.shieldedAdapters.allocate.actionId = 5;
-      },
-      /allocate shielded adapter must bind its exact verifier and action/,
-    ],
-    [
       "an adapter using another circuit verifier",
       (deployments) => {
-        deployments.shieldedAdapters.allocate.verifierImmutable =
+        deployments.groth16VerifierAdapter.allocateVerifierImmutable =
           deployments.shieldedVerifiers.claim.address;
       },
-      /allocate shielded adapter must bind its exact verifier and action/,
+      /Groth16VerifierAdapter allocate must bind its exact verifier/,
     ],
     [
       "a registry using another verifier",
       (deployments) => {
-        deployments.shieldedHeirKeyRegistry.keyRegistrationVerifierImmutable =
+        deployments.shieldedHeirKeyRegistry.verifierAdapterImmutable =
           deployments.shieldedVerifiers.claim.address;
       },
-      /key registration verifier/,
+      /common verifier adapter/,
     ],
     [
       "a pool using a different token",
       (deployments) => {
         deployments.shieldedDeepPool.tokenImmutable = address(900);
       },
-      /declared token, lineage and key registry/,
+      /declared token, lineage, key registry and common verifier adapter/,
     ],
     [
-      "a pool using another action adapter",
+      "a pool using another common adapter",
       (deployments) => {
-        deployments.shieldedDeepPool.adapterImmutables.allocate =
-          deployments.shieldedAdapters.claim.address;
+        deployments.shieldedDeepPool.verifierAdapterImmutable =
+          deployments.shieldedVerifiers.claim.address;
       },
-      /allocate must bind its exact adapter/,
+      /common verifier adapter/,
     ],
   ]) {
     it(`rejects ${label}`, function () {
@@ -1478,8 +1465,8 @@ describe("production protocol release manifest evidence", function () {
     fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = hash("0");
     assert.throws(() => fixture.inspect(), /ShieldedClaimVerifier artifactSha256/);
     fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = HASHES.adapterArtifact;
-    fixture.deploymentArtifacts.shieldedAdapters.allocate.runtimeSha256 = hash("0");
-    assert.throws(() => fixture.inspect(), /ShieldedAllocateAdapter runtimeSha256/);
+    fixture.deploymentArtifacts.groth16VerifierAdapter.runtimeSha256 = hash("0");
+    assert.throws(() => fixture.inspect(), /Groth16VerifierAdapter runtimeSha256/);
   });
 
   it("rejects an immutable-linked runtime hash drift", function () {

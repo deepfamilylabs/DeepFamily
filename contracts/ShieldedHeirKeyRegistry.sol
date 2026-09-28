@@ -2,18 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
+import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
+import {ProofConstants} from "./libraries/ProofConstants.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PoseidonT6} from "poseidon-solidity/PoseidonT6.sol";
-
-/** @dev Verifier generated from circuits/shielded_key_registration.circom. */
-interface IShieldedKeyRegistrationVerifier {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[7] calldata publicSignals
-  ) external view returns (bool);
-}
 
 /**
  * @notice Lets an existing person register a public viewing key by proving knowledge of their
@@ -52,7 +44,7 @@ contract ShieldedHeirKeyRegistry {
   }
 
   IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
-  IShieldedKeyRegistrationVerifier public immutable VERIFIER;
+  IProofVerifierAdapter public immutable VERIFIER;
   uint256 public currentShardId;
   mapping(uint256 shardId => Shard shard) private _shards;
   mapping(bytes32 personHash => Registration) private _registrations;
@@ -75,7 +67,7 @@ contract ShieldedHeirKeyRegistry {
       revert InvalidConstructorAddress();
     }
     LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
-    VERIFIER = IShieldedKeyRegistrationVerifier(verifier);
+    VERIFIER = IProofVerifierAdapter(verifier);
   }
 
   function registrationOf(
@@ -156,9 +148,7 @@ contract ShieldedHeirKeyRegistry {
     uint256 ownerCommitment,
     bytes32 viewingKey,
     uint256 registrationTag,
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c
+    bytes calldata proofData
   ) external {
     if (identityCommitment == 0 || identityCommitment >= SNARK_SCALAR_FIELD) {
       revert InvalidIdentityCommitment();
@@ -176,16 +166,22 @@ contract ShieldedHeirKeyRegistry {
     }
     if (_registrations[personHash].viewingKey != bytes32(0)) revert AlreadyRegistered();
 
-    uint256[7] memory publicSignals = [
-      identityCommitment,
-      ownerCommitment,
-      uint256(uint128(uint256(viewingKey))),
-      uint256(viewingKey) >> 128,
-      block.chainid,
-      uint256(uint160(address(this))),
-      registrationTag
-    ];
-    if (!VERIFIER.verifyProof(a, b, c, publicSignals)) revert InvalidRegistrationProof();
+    uint256[] memory publicSignals = new uint256[](ProofConstants.KEY_REGISTRATION_PUBLIC_SIGNALS_LEN);
+    publicSignals[0] = identityCommitment;
+    publicSignals[1] = ownerCommitment;
+    publicSignals[2] = uint256(uint128(uint256(viewingKey)));
+    publicSignals[3] = uint256(viewingKey) >> 128;
+    publicSignals[4] = block.chainid;
+    publicSignals[5] = uint256(uint160(address(this)));
+    publicSignals[6] = registrationTag;
+    if (
+      !VERIFIER.verifyProof(
+        ProofConstants.PROOF_PURPOSE_KEY_REGISTRATION,
+        ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
+        proofData,
+        publicSignals
+      )
+    ) revert InvalidRegistrationProof();
 
     _registrations[personHash] = Registration({
       viewingKey: viewingKey,

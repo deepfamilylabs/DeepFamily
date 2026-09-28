@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
   integratedDeploymentContract,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
@@ -468,36 +467,30 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     lineageIndex,
     shieldedDeepPool: pool,
     shieldedHeirKeyRegistry: registry,
+    groth16VerifierAdapter: adapter,
   } = deployed;
-  const [tokenAddress, lineageAddress, registryAddress] = await Promise.all([
+  const [tokenAddress, lineageAddress, registryAddress, adapterAddress] = await Promise.all([
     token.getAddress(),
     lineageIndex.getAddress(),
     registry.getAddress(),
+    adapter.getAddress(),
   ]);
   for (const [value, expected, label] of [
     [await pool.TOKEN(), tokenAddress, "pool token"],
     [await pool.LINEAGE_INDEX(), lineageAddress, "pool lineage index"],
     [await pool.KEY_REGISTRY(), registryAddress, "pool key registry"],
     [await registry.LINEAGE_INDEX(), lineageAddress, "key registry lineage index"],
-    [
-      await registry.VERIFIER(),
-      await deployed.shieldedVerifiers.keyRegistration.getAddress(),
-      "key registration verifier",
-    ],
+    [await registry.VERIFIER(), adapterAddress, "key registry verifier adapter"],
+    [await pool.VERIFIER(), adapterAddress, "pool verifier adapter"],
   ]) {
     if (!sameAddress(value, expected))
       throw new Error(`Integrated deployment ${label} binding mismatch`);
   }
-  for (const action of SHIELDED_ACTIONS) {
-    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-    const adapter = deployed.shieldedAdapters[action];
+  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+    const verifierAddress = await deployed.shieldedVerifiers[action].getAddress();
     if (
-      !sameAddress(
-        await adapter.VERIFIER(),
-        await deployed.shieldedVerifiers[action].getAddress(),
-      ) ||
-      BigInt(await adapter.ACTION()) !== BigInt(spec.actionId) ||
-      !sameAddress(await pool[spec.poolVerifierGetter](), await adapter.getAddress())
+      !sameAddress(await adapter[spec.adapterVerifierGetter](), verifierAddress) ||
+      !sameAddress(await adapter.verifierForPurpose(spec.proofPurpose), verifierAddress)
     ) {
       throw new Error(`Integrated deployment ${action} verifier binding mismatch`);
     }
@@ -659,6 +652,14 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress();
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress();
 
+  // All verifier targets must exist before the single adapter fixes its eleven routes.
+  const shieldedVerifiers = {};
+  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+    shieldedVerifiers[action] = await deployContract(
+      spec.verifierLabel,
+      await ethers.getContractFactory(spec.verifierContractName, deployer),
+    );
+  }
   const Groth16VerifierAdapter = await ethers.getContractFactory(
     "Groth16VerifierAdapter",
     deployer,
@@ -666,7 +667,15 @@ export const deployIntegratedSystem = async (
   const groth16VerifierAdapter = await deployContract(
     "groth16VerifierAdapter",
     Groth16VerifierAdapter,
-    [personCommitmentVerifierAddress, nameDisclosureVerifierAddress],
+    [
+      personCommitmentVerifierAddress,
+      nameDisclosureVerifierAddress,
+      await Promise.all(
+        Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) =>
+          shieldedVerifiers[action].getAddress(),
+        ),
+      ),
+    ],
   );
   const groth16VerifierAdapterAddress = await groth16VerifierAdapter.getAddress();
 
@@ -812,25 +821,6 @@ export const deployIntegratedSystem = async (
     );
   }
 
-  const shieldedVerifiers = {};
-  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
-    shieldedVerifiers[action] = await deployContract(
-      spec.verifierLabel,
-      await ethers.getContractFactory(spec.verifierContractName, deployer),
-    );
-  }
-  const shieldedAdapters = {};
-  const ShieldedActionAdapter = await ethers.getContractFactory(
-    "ShieldedGroth16ActionAdapter",
-    deployer,
-  );
-  for (const action of SHIELDED_ACTIONS) {
-    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
-    shieldedAdapters[action] = await deployContract(spec.adapterLabel, ShieldedActionAdapter, [
-      await shieldedVerifiers[action].getAddress(),
-      spec.actionId,
-    ]);
-  }
   const ShieldedKeyRegistry = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3, PoseidonT6: lineageLibraries.PoseidonT6 },
@@ -838,7 +828,7 @@ export const deployIntegratedSystem = async (
   const shieldedHeirKeyRegistry = await deployContract(
     "shieldedHeirKeyRegistry",
     ShieldedKeyRegistry,
-    [lineageIndexAddress, await shieldedVerifiers.keyRegistration.getAddress()],
+    [lineageIndexAddress, groth16VerifierAdapterAddress],
   );
   const ShieldedPool = await ethers.getContractFactory("ShieldedDeepPool", {
     signer: deployer,
@@ -848,15 +838,19 @@ export const deployIntegratedSystem = async (
     tokenAddress,
     lineageIndexAddress,
     await shieldedHeirKeyRegistry.getAddress(),
-    await Promise.all(SHIELDED_ACTIONS.map((action) => shieldedAdapters[action].getAddress())),
+    groth16VerifierAdapterAddress,
   ]);
   const shielded = {
     shieldedVerifiers,
-    shieldedAdapters,
     shieldedHeirKeyRegistry,
     shieldedDeepPool,
   };
-  await assertIntegratedShieldedWiring({ token, lineageIndex, ...shielded });
+  await assertIntegratedShieldedWiring({
+    token,
+    lineageIndex,
+    groth16VerifierAdapter,
+    ...shielded,
+  });
 
   // Hand DeepFamily upgrade/configuration ownership to governance (intended: timelock + multisig).
   // DeepFamilyToken already retired its bootstrap owner during initialize(), so it intentionally
@@ -1089,7 +1083,6 @@ export const ensureIntegratedSystem = async (
       const deployed = {
         deepFamilyImplementationAddress: implementation,
         shieldedVerifiers: {},
-        shieldedAdapters: {},
       };
       for (const record of records) {
         const contract = await ethers.getContractAt(

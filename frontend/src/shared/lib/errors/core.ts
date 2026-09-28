@@ -200,6 +200,7 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0xc5556b05": "UnsupportedProofEncoding",
   "0x67610d0b": "MalformedProofData",
   "0xdd90c870": "UnsupportedPurpose",
+  "0x385a24cc": "VerifierNotConfigured",
   "0x2872d6ce": "DuplicateVersion",
   "0x99348b06": "DuplicateVersionCommitment",
   "0x82361e2c": "CallerOrIdentitySuiteMismatch",
@@ -302,9 +303,6 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x7eeb08ae": "InvalidRegistrationProof",
   "0x35100de8": "InvalidLeaf",
   "0xbaa3de5f": "InvalidVerifier",
-  "0x4a7f394f": "InvalidAction",
-  "0x7ba16a7b": "WrongAction",
-  "0xf4ea0ab0": "MalformedProof",
   "0x08c379a0": "Error",
 };
 
@@ -338,6 +336,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   UnsupportedProofEncoding: "Proof encoding is not supported.",
   MalformedProofData: "Proof data is malformed.",
   UnsupportedPurpose: "Proof purpose is not supported by the verifier.",
+  VerifierNotConfigured: "Proof verification is not configured for this operation.",
   DuplicateVersion: "This version already exists on-chain.",
   DuplicateVersionCommitment: "This encrypted version commitment already exists on-chain.",
   CallerOrIdentitySuiteMismatch:

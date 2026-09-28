@@ -26,7 +26,8 @@ pragma solidity ^0.8.20;
 interface IProofVerifierAdapter {
   /**
    * @notice Verify a proof envelope against its declared encoding and a backend verifier.
-   * @param purpose          Frozen entrypoint purpose (PersonRelation or DisclosureBinding).
+   * @param purpose          Verifier route defined by ProofConstants (identity, disclosure,
+   *                         key registration or one of the eight pool actions).
    * @param proofEncodingId  Payload encoding identifier (see ProofConstants).
    * @param proofData        Encoded proof payload whose layout is defined by `proofEncodingId`.
    * @param publicSignals    Flattened public signals already ordered per the business contract.

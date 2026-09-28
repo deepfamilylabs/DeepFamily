@@ -6,19 +6,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
-
-/**
- * @dev Action-specific adapters must verify a real proof for all 32 public signals. In
- *      particular, every action circuit must enforce input ownership, value conservation,
- *      permitted note transitions, and binding of each note to its ciphertext hash. A
- *      verifier that merely returns true makes the pool unsafe.
- */
-interface IShieldedPoolActionVerifier {
-  function verifyProof(
-    bytes calldata proof,
-    uint256[32] calldata publicSignals
-  ) external view returns (bool);
-}
+import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
+import {ProofConstants} from "./libraries/ProofConstants.sol";
 
 interface IShieldedKeyRegistryRoots {
   function isKnownRoot(uint256 shardId, uint256 candidate) external view returns (bool);
@@ -29,10 +18,10 @@ interface IShieldedKeyRegistryRoots {
  * @title ShieldedDeepPool
  * @notice Append-only, sharded Poseidon note tree and one-time nullifier registry for DEEP.
  *         The pool has no public inheritance IDs, policy balances, or claim recipients.
- * @dev This is an immutable verifier-bound protocol. It must only be deployed with eight
- *      independently audited, action-specific verifier adapters and their matching circuits.
- *      On-chain token conservation at shield/unshield boundaries is backed by those circuits'
- *      private value-conservation constraints for all internal transitions.
+ * @dev One immutable shared adapter selects the matching circuit for each action. The circuits
+ *      enforce input ownership, value conservation, permitted note transitions and binding of
+ *      notes to ciphertext hashes. On-chain token conservation at shield/unshield boundaries
+ *      relies on those private constraints for all internal transitions.
  */
 contract ShieldedDeepPool is ReentrancyGuardTransient {
   using SafeERC20 for IERC20;
@@ -102,14 +91,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   IERC20 public immutable TOKEN;
   IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
   IShieldedKeyRegistryRoots public immutable KEY_REGISTRY;
-  IShieldedPoolActionVerifier public immutable SHIELD_VERIFIER;
-  IShieldedPoolActionVerifier public immutable CREATE_POLICY_VERIFIER;
-  IShieldedPoolActionVerifier public immutable ALLOCATE_VERIFIER;
-  IShieldedPoolActionVerifier public immutable TOP_UP_VERIFIER;
-  IShieldedPoolActionVerifier public immutable MERGE_BUDGET_VERIFIER;
-  IShieldedPoolActionVerifier public immutable CLAIM_VERIFIER;
-  IShieldedPoolActionVerifier public immutable PRIVATE_TRANSFER_VERIFIER;
-  IShieldedPoolActionVerifier public immutable UNSHIELD_VERIFIER;
+  IProofVerifierAdapter public immutable VERIFIER;
 
   uint256 public currentShardId;
   uint256 public totalShielded;
@@ -130,31 +112,24 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   event ActionExecuted(uint8 action, uint256 inputShardId0, uint256 inputShardId1);
 
   /**
-   * @param verifiers Eight action-specific verifier adapters in Action enum order.
+   * @param verifier The shared Groth16 adapter configured with all eight pool action verifiers.
    */
   constructor(
     address token,
     address lineageIndex,
     address keyRegistry,
-    address[8] memory verifiers
+    address verifier
   ) {
-    if (token.code.length == 0 || lineageIndex.code.length == 0 || keyRegistry.code.length == 0) {
+    if (
+      token.code.length == 0 || lineageIndex.code.length == 0 || keyRegistry.code.length == 0 ||
+      verifier.code.length == 0
+    ) {
       revert InvalidConstructorAddress();
-    }
-    for (uint256 i = 0; i < verifiers.length; ++i) {
-      if (verifiers[i].code.length == 0) revert InvalidConstructorAddress();
     }
     TOKEN = IERC20(token);
     LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
     KEY_REGISTRY = IShieldedKeyRegistryRoots(keyRegistry);
-    SHIELD_VERIFIER = IShieldedPoolActionVerifier(verifiers[0]);
-    CREATE_POLICY_VERIFIER = IShieldedPoolActionVerifier(verifiers[1]);
-    ALLOCATE_VERIFIER = IShieldedPoolActionVerifier(verifiers[2]);
-    TOP_UP_VERIFIER = IShieldedPoolActionVerifier(verifiers[3]);
-    MERGE_BUDGET_VERIFIER = IShieldedPoolActionVerifier(verifiers[4]);
-    CLAIM_VERIFIER = IShieldedPoolActionVerifier(verifiers[5]);
-    PRIVATE_TRANSFER_VERIFIER = IShieldedPoolActionVerifier(verifiers[6]);
-    UNSHIELD_VERIFIER = IShieldedPoolActionVerifier(verifiers[7]);
+    VERIFIER = IProofVerifierAdapter(verifier);
   }
 
   /** @notice Publicly deposit exactly `amount` tokens and mint two privately owned notes. */
@@ -374,7 +349,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       revert InvalidActionData();
     }
 
-    uint256[32] memory signals;
+    uint256[] memory signals = new uint256[](ProofConstants.SHIELDED_ACTION_PUBLIC_SIGNALS_LEN);
     signals[0] = uint256(action);
     signals[1] = block.chainid;
     signals[2] = uint256(uint160(address(this)));
@@ -401,7 +376,14 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     for (uint256 i = 0; i < signals.length; ++i) {
       _requireField(signals[i]);
     }
-    if (!_verifier(action).verifyProof(proof, signals)) revert InvalidZKProof();
+    if (
+      !VERIFIER.verifyProof(
+        ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
+        ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
+        proof,
+        signals
+      )
+    ) revert InvalidZKProof();
   }
 
   function _spendInputs(ActionData calldata data, bool isClaim) private {
@@ -471,17 +453,6 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     }
     shard.nodes[treeDepth][0] = node;
     return node;
-  }
-
-  function _verifier(Action action) private view returns (IShieldedPoolActionVerifier) {
-    if (action == Action.Shield) return SHIELD_VERIFIER;
-    if (action == Action.CreatePolicy) return CREATE_POLICY_VERIFIER;
-    if (action == Action.Allocate) return ALLOCATE_VERIFIER;
-    if (action == Action.TopUp) return TOP_UP_VERIFIER;
-    if (action == Action.MergeBudget) return MERGE_BUDGET_VERIFIER;
-    if (action == Action.Claim) return CLAIM_VERIFIER;
-    if (action == Action.PrivateTransfer) return PRIVATE_TRANSFER_VERIFIER;
-    return UNSHIELD_VERIFIER;
   }
 
   function _requireField(uint256 value) private pure {

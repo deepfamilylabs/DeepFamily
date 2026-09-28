@@ -7,7 +7,6 @@ import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mj
 import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
 } from "./zkDeploymentCatalog.mjs";
 
@@ -24,6 +23,7 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "adultAgeGate",
   "personCommitmentVerifier",
   "disclosureBindingVerifier",
+  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
   "groth16VerifierAdapter",
   "deepFamilyImplementation",
   "deepFamilyProxy",
@@ -38,14 +38,12 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
-  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
-  ...SHIELDED_ACTIONS.map((action) => SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel),
   "shieldedHeirKeyRegistry",
   "shieldedDeepPool",
   "transferDeepFamilyOwnership",
 ]);
 
-/** Every deployed instance, including the eight instances of the shared action adapter. */
+/** Every deployed instance, including the single shared Groth16 adapter. */
 export const assertCompleteMainnetSourceVerification = ({ contracts, addresses } = {}) => {
   const expected = new Map([
     ["GovernanceTimelock", addresses?.timelock],

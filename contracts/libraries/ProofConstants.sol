@@ -3,13 +3,13 @@ pragma solidity ^0.8.20;
 
 /**
  * @title ProofConstants
- * @notice Canonical Solidity-side constants for proof transport and frozen entrypoint ABIs.
+ * @notice Canonical Solidity-side constants for proof transport and verifier routes.
  *
  * @dev This library is the single source of truth for:
  *      - `proofEncodingId` values understood by the proof verifier adapters
- *      - Solidity mirror of the public-signal lengths defined in
- *        `lib/publicSignalSpecs.js` (JS authority). The JS authority + a consistency
- *        test (added in T2.4) guarantee these mirror constants cannot drift.
+ *      - Solidity mirrors of the public-signal shapes in
+ *        `packages/proof-core/publicSignalSpecs.js` (identity/disclosure) and
+ *        `packages/protocol-core/shielded-signals.js` (registration/pool actions).
  *
  *      Every adapter and every business contract that performs transport-layer length
  *      matching MUST reference these constants. Hard-coding signal lengths
@@ -21,28 +21,44 @@ library ProofConstants {
   // ---------------------------------------------------------------------------
   //
   // `AbiEncodedGroth16ABC` = `abi.encode(uint256[2] a, uint256[2][2] b, uint256[2] c)`.
-  // The byte layout is fixed at 256 bytes (see execution plan §3.3).
+  // The byte layout is fixed at 256 bytes.
   //
   uint8 internal constant PROOF_ENCODING_ID_ABI_GROTH16_ABC = 1;
 
   // ---------------------------------------------------------------------------
-  // Proof-purpose identifiers (8-bit, mirrors DeepFamily.ProofPurpose).
+  // Proof-purpose identifiers shared by all Groth16 business entrypoints.
   // ---------------------------------------------------------------------------
   //
-  // These constants are shared by adapters to avoid each adapter maintaining a
-  // separate enum mirror. A consistency test asserts they match DeepFamily.
+  // The first two constants mirror DeepFamily.ProofPurpose. Key registration and
+  // pool actions use distinct routes, so a pool action cannot select an identity
+  // or disclosure verifier even when their local enum values are the same.
   //
   uint8 internal constant PROOF_PURPOSE_PERSON_RELATION = 0;
   uint8 internal constant PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
+  uint8 internal constant PROOF_PURPOSE_KEY_REGISTRATION = 2;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_ACTION_BASE = 3;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_SHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_CREATE_POLICY =
+    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 1;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_ALLOCATE = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 2;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_TOP_UP = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_MERGE_BUDGET =
+    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_CLAIM = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 5;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER =
+    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 6;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 7;
 
   // ---------------------------------------------------------------------------
-  // Public-signal length mirrors (Solidity side of Option B).
+  // Public-signal length mirrors.
   //
-  // JS authority: lib/publicSignalSpecs.js (added in T2.4).
-  // A consistency test asserts these mirrors match the JS authority; either
-  // side changing without the other will fail CI.
+  // JS signal builders/specs live in packages/proof-core/publicSignalSpecs.js and
+  // packages/protocol-core/shielded-signals.js. Transport length checks use these
+  // constants; fixed-array declarations preserve each generated verifier's ABI.
   // ---------------------------------------------------------------------------
 
   uint256 internal constant PERSON_RELATION_PUBLIC_SIGNALS_LEN = 5;
   uint256 internal constant DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN = 4;
+  uint256 internal constant KEY_REGISTRATION_PUBLIC_SIGNALS_LEN = 7;
+  uint256 internal constant SHIELDED_ACTION_PUBLIC_SIGNALS_LEN = 32;
 }

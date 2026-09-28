@@ -12,6 +12,8 @@ import {
 } from "../scripts/lib/testnetReleaseEvidence.mjs";
 import { publishTestnetReleaseEvidence } from "../scripts/lib/releaseEvidencePublisher.mjs";
 import {
+  GROTH16_ADAPTER_IMMUTABLE_FIELDS,
+  groth16VerifierAdapterBindingsFromAddresses,
   protocolDeploymentEvidenceFromAcceptanceReport,
   protocolDeploymentEvidenceSha256,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
@@ -22,7 +24,6 @@ import {
 import { ALLOCATE_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
-  SHIELDED_ACTIONS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import {
@@ -107,19 +108,20 @@ const SHIELDED_ADDRESSES = Object.fromEntries(
       ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
   ).map((record, index) => [record.transactionLabel, address(200 + index)]),
 );
+const ADAPTER_BINDINGS = groth16VerifierAdapterBindingsFromAddresses({
+  groth16VerifierAdapter: VERIFIER_ADAPTER,
+  personCommitmentVerifier: PERSON_VERIFIER,
+  disclosureBindingVerifier: DISCLOSURE_BINDING_VERIFIER,
+  ...SHIELDED_ADDRESSES,
+});
 const SHIELDED_BINDINGS = shieldedDeploymentBindings({
   token: TOKEN,
+  groth16VerifierAdapter: VERIFIER_ADAPTER,
   ...SHIELDED_ADDRESSES,
 });
 const SHIELDED_DEPLOYMENT_ARTIFACTS = {
   shieldedVerifiers: Object.fromEntries(
     Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
-      action,
-      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
-    ]),
-  ),
-  shieldedAdapters: Object.fromEntries(
-    SHIELDED_ACTIONS.map((action) => [
       action,
       { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
     ]),
@@ -253,7 +255,6 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
         shieldedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedVerifiers,
-        shieldedAdapters: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedAdapters,
         shieldedHeirKeyRegistry: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedHeirKeyRegistry,
         shieldedDeepPool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedDeepPool,
       },
@@ -270,6 +271,12 @@ const protocolDeploymentArtifactInspector = ({ deployments }) => {
     groth16VerifierAdapter: {
       personVerifierImmutable: PERSON_VERIFIER,
       disclosureBindingVerifierImmutable: DISCLOSURE_BINDING_VERIFIER,
+      ...Object.fromEntries(
+        Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
+          `${action}VerifierImmutable`,
+          SHIELDED_ADDRESSES[SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierLabel],
+        ]),
+      ),
     },
     deepFamilyArchive: { deepFamilyImmutable: DEEP_FAMILY },
     deepFamilyReader: {
@@ -558,6 +565,12 @@ const validReportTemplate = () => ({
       address: VERIFIER_ADAPTER,
       personVerifier: PERSON_VERIFIER,
       disclosureBindingVerifier: DISCLOSURE_BINDING_VERIFIER,
+      ...Object.fromEntries(
+        GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
+          getter,
+          ADAPTER_BINDINGS[`${getter}Immutable`],
+        ]),
+      ),
       artifactSha256: ADAPTER_ARTIFACT_SHA256,
       runtimeSha256: ADAPTER_RUNTIME_SHA256,
     },
@@ -1530,19 +1543,18 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) =>
-          (report.terminalGovernanceState.shieldedAdapters.allocate.verifierImmutable =
-            address(999)),
-        /allocate shielded adapter must bind its exact verifier and action/iu,
+          (report.terminalGovernanceState.verifierAdapter.allocateVerifier = address(999)),
+        /verifierAdapter\.allocateVerifier/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.shieldedDeepPool.tokenImmutable = address(999)),
-        /ShieldedDeepPool must bind the declared token, lineage and key registry/iu,
+        /ShieldedDeepPool must bind the declared token, lineage, key registry and common verifier adapter/iu,
       ],
       [
         (report) =>
-          (report.terminalGovernanceState.shieldedHeirKeyRegistry.keyRegistrationVerifierImmutable =
+          (report.terminalGovernanceState.shieldedHeirKeyRegistry.verifierAdapterImmutable =
             address(999)),
-        /ShieldedHeirKeyRegistry must bind the declared lineage and key registration verifier/iu,
+        /ShieldedHeirKeyRegistry must bind the declared lineage and common verifier adapter/iu,
       ],
       [
         (report) =>
