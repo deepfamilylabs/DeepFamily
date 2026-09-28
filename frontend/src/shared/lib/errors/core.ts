@@ -432,6 +432,10 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
     "Wallet confirmation timed out. Please try again and make sure to confirm in the wallet popup.",
   REPLACEMENT_UNDERPRICED:
     "There is a pending transaction with the same nonce. Please raise gas price/priority fee or wait.",
+  LOCAL_NONCE_TOO_HIGH:
+    "The wallet nonce is ahead of the local chain. Clear activity and nonce data for this network, then retry. In MetaMask: Settings → Developer tools → Delete activity and nonce data.",
+  NONCE_TOO_HIGH:
+    "The wallet nonce is ahead of the chain. Check earlier pending transactions before retrying.",
   GAS_ERROR: "Gas limit or price too low. Please increase gas and retry.",
   OUT_OF_GAS: "Transaction ran out of gas during execution.",
   INSUFFICIENT_FUNDS: "Insufficient balance to cover gas fees.",
@@ -681,6 +685,10 @@ export const resolveErrorReason = (error: any): string | undefined => {
 
   if (codeReason && codeReason !== "CALL_EXCEPTION") {
     return codeReason;
+  }
+
+  if (/\bnonce too high\b/i.test(msg)) {
+    return /\b0x7a69\b|automining/i.test(msg) ? "LOCAL_NONCE_TOO_HIGH" : "NONCE_TOO_HIGH";
   }
 
   if (error?.code === "REPLACEMENT_UNDERPRICED" || /replacement fee too low/i.test(msg)) {

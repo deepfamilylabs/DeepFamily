@@ -245,6 +245,32 @@ describe("errors", () => {
     );
   });
 
+  it("explains a local-chain nonce mismatch in both transaction flows", () => {
+    const error = Object.assign(new Error("could not coalesce error"), {
+      code: "UNKNOWN_ERROR",
+      info: {
+        error: {
+          code: -32603,
+          message:
+            "RPC 0x7a69 Custom eth_sendRawTransaction: Nonce too high. Expected nonce to be 1344 but got 1353. Note that transactions can't be queued when automining.",
+        },
+      },
+    });
+    const t = (key: string, fallback?: string) =>
+      key === "errors.contractError.LOCAL_NONCE_TOO_HIGH"
+        ? "重置本地网络的 nonce 数据"
+        : (fallback ?? key);
+
+    expect(resolveErrorReason(error)).toBe("LOCAL_NONCE_TOO_HIGH");
+    expect(getFriendlyError(error, t as any)).toMatchObject({
+      type: "LOCAL_NONCE_TOO_HIGH",
+      message: "重置本地网络的 nonce 数据",
+    });
+    expect(resolveErrorReason(new Error("Nonce too high. Expected nonce 4 but got 5"))).toBe(
+      "NONCE_TOO_HIGH",
+    );
+  });
+
   it("normalizes standard EIP-1193 wallet error codes", () => {
     expect(resolveErrorReason({ code: 4100 })).toBe("WALLET_UNAUTHORIZED");
     expect(resolveErrorReason({ code: 4200 })).toBe("WALLET_METHOD_UNSUPPORTED");
