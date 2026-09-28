@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import {
@@ -37,12 +38,6 @@ describe("public ZK command surface", function () {
       [
         "zk:fetch",
         "zk:build",
-        "zk:shielded:build",
-        "zk:shielded:development:setup",
-        "zk:shielded:development:proof-smoke",
-        "zk:shielded:testnet:rehearsal",
-        "zk:shielded:testnet:receipts",
-        "zk:shielded:release:check",
         "zk:development:setup",
         "zk:production:setup",
         "zk:check",
@@ -50,6 +45,24 @@ describe("public ZK command surface", function () {
         "zk:ceremony:verify",
       ],
     );
+  });
+
+  it("uses one local deploy command for every verifier, registry, and pool", function () {
+    const { scripts } = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    );
+    expect(scripts["dev:deploy"]).to.equal(
+      "node scripts/ensure-zk-artifacts.mjs && hardhat --config hardhat.config.mjs run scripts/deploy-integrated.mjs --network localhost",
+    );
+    expect(scripts["dev:contract"]).to.equal(
+      "npm run dev:deploy && npm run dev:fund && npm run dev:seed",
+    );
+    expect(
+      Object.keys(scripts).filter((name) => name.includes("shielded") && name.includes("deploy")),
+    ).to.deep.equal([]);
+    expect(
+      Object.keys(scripts).filter((name) => name.startsWith("zk:shielded:testnet")),
+    ).to.deep.equal([]);
   });
 });
 
@@ -73,6 +86,14 @@ describe("parameterized ZK command wrappers", function () {
           help: false,
           circuit: "disclosure",
         });
+        expect(parser(["--circuit", "shielded"])).to.deep.equal({
+          help: false,
+          circuit: "shielded",
+        });
+        expect(parser(["--circuit=shielded:claim"])).to.deep.equal({
+          help: false,
+          circuit: "shielded:claim",
+        });
         expect(parser(["-h"])).to.deep.equal({ help: true, circuit: "all" });
         expect(parser(["--help"])).to.deep.equal({ help: true, circuit: "all" });
       });
@@ -80,9 +101,11 @@ describe("parameterized ZK command wrappers", function () {
       it("rejects missing, unsupported, duplicate and unrelated arguments", function () {
         expect(() => parser(["--circuit"])).to.throw(/Usage/);
         expect(() => parser(["--circuit", "unknown"])).to.throw(
-          /expected one of: all, person, disclosure/,
+          /expected one of: all, legacy, person, disclosure/,
         );
-        expect(() => parser(["--circuit="])).to.throw(/expected one of: all, person, disclosure/);
+        expect(() => parser(["--circuit="])).to.throw(
+          /expected one of: all, legacy, person, disclosure/,
+        );
         expect(() => parser(["--circuit", "person", "--circuit", "disclosure"])).to.throw(/Usage/);
         expect(() => parser(["--unknown"])).to.throw(/Usage/);
         expect(() => parser("all")).to.throw(/argv must be an array/);
@@ -147,14 +170,54 @@ describe("parameterized ZK command wrappers", function () {
         runner: (command) => events.push(["run", command.circuit]),
       });
 
-      expect(commands.map(({ circuit }) => circuit)).to.deep.equal(["person", "disclosure"]);
+      expect(commands.map(({ circuit }) => circuit)).to.deep.equal([
+        "person",
+        "disclosure",
+        "shielded:keyRegistration",
+        "shielded:shield",
+        "shielded:createPolicy",
+        "shielded:allocate",
+        "shielded:topUp",
+        "shielded:mergeBudget",
+        "shielded:claim",
+        "shielded:privateTransfer",
+        "shielded:unshield",
+      ]);
       expect(events).to.deep.equal([
         ["inspect", fixtureRoot, "linux", "x64"],
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "circuits")],
+        ["mkdir", path.join(fixtureRoot, "zk-artifacts", "shielded")],
         ["run", "person"],
         ["run", "disclosure"],
+        ["run", "shielded:keyRegistration"],
+        ["run", "shielded:shield"],
+        ["run", "shielded:createPolicy"],
+        ["run", "shielded:allocate"],
+        ["run", "shielded:topUp"],
+        ["run", "shielded:mergeBudget"],
+        ["run", "shielded:claim"],
+        ["run", "shielded:privateTransfer"],
+        ["run", "shielded:unshield"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
+      expect(commands[2].args[0]).to.equal(
+        path.join("circuits", "shielded_key_registration.circom"),
+      );
+      expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
+    });
+
+    it("can compile one shielded action through the shared compiler path", async function () {
+      const commands = await runZkBuild({
+        root: fixtureRoot,
+        circuit: "shielded:claim",
+        platform: "linux",
+        compilerInspector: inspectFixtureCompiler,
+        directoryCreator: () => {},
+        runner: () => {},
+      });
+      expect(commands).to.have.length(1);
+      expect(commands[0].args[0]).to.equal(path.join("circuits", "shielded_claim.circom"));
+      expect(commands[0].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
     });
 
     it("propagates a compiler execution error and does not run the next circuit", async function () {
@@ -221,7 +284,7 @@ describe("parameterized ZK command wrappers", function () {
 
   describe("zk-check", function () {
     it("builds fixed proof and constraint commands in person/disclosure order", function () {
-      const commands = buildZkCheckCommands({ root: fixtureRoot });
+      const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "legacy" });
       expect(commands).to.deep.equal([
         {
           circuit: "person",
@@ -289,6 +352,39 @@ describe("parameterized ZK command wrappers", function () {
       ]);
     });
 
+    it("checks nine shielded development artifacts and the available real proof fixtures by default", function () {
+      const commands = buildZkCheckCommands({ root: fixtureRoot });
+      expect(commands.map(({ circuit, check }) => [circuit, check]).at(-1)).to.deep.equal([
+        "shielded",
+        "development-artifacts-and-proof-smoke",
+      ]);
+      expect(commands.at(-1).args).to.deep.equal([
+        path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+      ]);
+      expect(
+        buildZkCheckCommands({ root: fixtureRoot, circuit: "shielded:unshield" }).at(-1).args,
+      ).to.deep.equal([
+        path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+        "--artifact",
+        "unshield",
+      ]);
+    });
+
+    it("selects production artifact and ceremony verification when production artifacts are declared", function () {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "zk-check-production-selection-"));
+      try {
+        fs.mkdirSync(path.join(root, "circuits"));
+        fs.writeFileSync(path.join(root, "circuits", "shielded-production-manifest.json"), "{}");
+        const commands = buildZkCheckCommands({ root });
+        expect(commands.at(-1).check).to.equal("production-ceremony");
+        expect(commands.at(-1).args[0]).to.equal(
+          path.join(root, "scripts", "zk-shielded-production-check.mjs"),
+        );
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     it("runs only the selected circuit", function () {
       const seen = [];
       const commands = runZkCheck({
@@ -321,7 +417,7 @@ describe("parameterized ZK command wrappers", function () {
     it("rejects an invalid runner and programmatic circuit selection", function () {
       expect(() => runZkCheck({ runner: null })).to.throw(/runner must be a function/);
       expect(() => buildZkCheckCommands({ circuit: "invalid" })).to.throw(
-        /expected one of: all, person, disclosure/,
+        /expected one of: all, legacy, person, disclosure/,
       );
     });
   });

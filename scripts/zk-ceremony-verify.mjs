@@ -22,16 +22,17 @@ import {
   snapshotSnarkjsRuntime,
 } from "./lib/snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
+import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
 
 const usage = () => {
   console.log(`Usage:
   npm run zk:ceremony:verify
   npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
 
-The command is read-only. It requires a production ceremony manifest, verifies every checked-in
-artifact hash, verifies the Powers of Tau transcript, and cryptographically binds each final zkey
-to the frozen R1CS and the supplied Powers of Tau file. With no --ptau option it uses the file
-selected by ZK_PTAU_PATH, or the committed circuits/ptau file.`);
+The command is read-only. It verifies both original and all nine shielded production circuits,
+including artifact hashes, the Powers of Tau transcript, and each final zkey's binding to its
+frozen R1CS. With no --ptau option it uses the file selected by ZK_PTAU_PATH, or the committed
+circuits/ptau file.`);
 };
 
 const parseArguments = (argv) => {
@@ -312,17 +313,38 @@ export const verifyProductionCeremony = async ({
   });
 };
 
+export const verifyAllProductionCeremonies = async ({
+  root = process.cwd(),
+  ptauPath,
+  legacyVerifier = verifyProductionCeremony,
+  shieldedVerifier = verifyShieldedProductionCeremony,
+} = {}) => {
+  const legacy = await legacyVerifier({ root, ptauPath });
+  const expectedLegacyCircuits = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
+  if (
+    !Array.isArray(legacy?.circuits) ||
+    JSON.stringify([...legacy.circuits].sort()) !== JSON.stringify(expectedLegacyCircuits)
+  ) {
+    throw new Error("Original production ceremony verification must cover both circuits");
+  }
+  const shielded = await shieldedVerifier({ root, ptauPath });
+  if (shielded?.circuitCount !== 9) {
+    throw new Error("Shielded production ceremony verification must cover all nine circuits");
+  }
+  return Object.freeze({ legacy, shielded, circuitCount: expectedLegacyCircuits.length + 9 });
+};
+
 export const main = async (argv = process.argv.slice(2)) => {
   const parsed = parseArguments(argv);
   if (parsed.help) {
     usage();
     return;
   }
-  const result = await verifyProductionCeremony({ ptauPath: parsed.ptauPath });
+  const result = await verifyAllProductionCeremonies({ ptauPath: parsed.ptauPath });
   console.log(
-    `Production ZK ceremony verified: ${result.ceremonyId}, ` +
-      `${result.trustModel}, ${result.contributorCount} contributor(s), ` +
-      `manifest ${result.manifestSha256}`,
+    `Production ZK ceremonies verified: ${result.circuitCount} circuits, ` +
+      `original manifest ${result.legacy.manifestSha256}, ` +
+      `shielded manifest ${result.shielded.manifestSha256}`,
   );
 };
 

@@ -8,9 +8,14 @@ import { fileURLToPath } from "node:url";
 import { assertLocalCircomInstallation } from "./fetch-circom.mjs";
 import { inspectCircomCompilerOverride } from "./lib/circomCompilerOverride.mjs";
 import { CIRCOM_ARTIFACT_FLAGS, localCircomBinaryPath } from "./lib/circomToolchain.mjs";
-import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelection.mjs";
+import {
+  SHIELDED_CIRCUITS,
+  parseCircuitArguments,
+  selectCircuitNames,
+} from "./lib/zkCircuitSelection.mjs";
 
-const OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
+const LEGACY_OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
+const SHIELDED_OUTPUT_DIRECTORY = path.join("zk-artifacts", "shielded");
 const INCLUDE_ARGUMENTS = Object.freeze([
   "-l",
   "node_modules",
@@ -46,22 +51,27 @@ export const buildZkBuildCommands = ({
     throw new Error("ZK build compiler path must be absolute");
   }
   return Object.freeze(
-    selectCircuitNames(circuit).map((name) =>
-      Object.freeze({
+    selectCircuitNames(circuit).map((name) => {
+      const shieldedAction = name.startsWith("shielded:") ? name.slice("shielded:".length) : null;
+      const source = shieldedAction
+        ? path.join("circuits", `${SHIELDED_CIRCUITS[shieldedAction]}.circom`)
+        : CIRCUIT_SOURCES[name];
+      const outputDirectory = shieldedAction ? SHIELDED_OUTPUT_DIRECTORY : LEGACY_OUTPUT_DIRECTORY;
+      return Object.freeze({
         circuit: name,
         executable,
         args: Object.freeze([
-          CIRCUIT_SOURCES[name],
+          source,
           // Circom 2.2 changed its default to O1. Keep the reviewed Groth16 constraint system
           // stable across compiler upgrades by making the intended optimization explicit.
           ...CIRCOM_ARTIFACT_FLAGS,
           ...INCLUDE_ARGUMENTS,
           "-o",
-          OUTPUT_DIRECTORY,
+          outputDirectory,
         ]),
         cwd: resolvedRoot,
-      }),
-    ),
+      });
+    }),
   );
 };
 
@@ -104,7 +114,9 @@ export const runZkBuild = async ({
   if (commands.some(({ executable }) => executable !== compiler.path)) {
     throw new Error("Inspected local Circom path does not match the compiler build command");
   }
-  directoryCreator(path.join(resolvedRoot, OUTPUT_DIRECTORY));
+  for (const directory of new Set(commands.map(({ args }) => args.at(-1)))) {
+    directoryCreator(path.join(resolvedRoot, directory));
+  }
   for (const command of commands) {
     await runner(command);
   }
@@ -113,10 +125,10 @@ export const runZkBuild = async ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-build.mjs [--circuit <all|person|disclosure>]
+  node scripts/zk-build.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
 
-Compiles the selected Circom circuit with the repository's fixed R1CS, WASM, symbol,
-include-path and output settings. The default is --circuit all.`);
+Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
+settings. The default is --circuit all (the two legacy and nine shielded circuits).`);
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

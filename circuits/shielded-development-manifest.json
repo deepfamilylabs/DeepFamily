@@ -1,0 +1,116 @@
+{
+  "schema": "deepfamily/shielded-development-keys@1",
+  "developmentOnly": true,
+  "productionReady": false,
+  "ptauSha256": "ed3622a7c79b0b49aadd134ebbc5b77df8c8c59bccebdfd0d9bf2c1a51561cf9",
+  "circuits": {
+    "keyRegistration": {
+      "source": "shielded_key_registration",
+      "sourceSha256": "d26b2b6590a5fcfd62e509550566de6e8a23f99cff915f239bbc4b1dd4032bb6",
+      "r1csSha256": "54409d6241fcfffb8cf2627d0ac5d1d12da143f3f16b1c20d4ffdfe985552bce",
+      "wasmSha256": "f5ca7d0380705b92ac41d9c251a1fb583a74269a3d02e0efd498f25d3f0a838d",
+      "zkeySha256": "99de50c3ef80b8417745b32484e115ba533446d56932706bfdc02c52057a112b",
+      "verificationKeySha256": "85dfc935a4bb6162f43fdee03be95c2a77869df159df6c66af765d379142722b",
+      "verifierSha256": "73fe930108749ba2925c2a79aca21b6c784f6799fc462fb010e3ba091179dc6f",
+      "verifierPath": "contracts/ShieldedKeyRegistrationVerifier.sol",
+      "verifierContractName": "ShieldedKeyRegistrationVerifier",
+      "solidityVerifierSha256": "cbb974940ee4da0b739e3d9f031a76bdda6335796dda7ff471bcbc3d56ac92c1"
+    },
+    "shield": {
+      "source": "shielded_shield",
+      "sourceSha256": "41f521ed572a4075c1c1a8d21290fede176a56bc7329a366897800c53ce079dc",
+      "r1csSha256": "65ef7e2eea71a6fd9dfa11dc0901d294d700070134a195126054d0d1674a9a9f",
+      "wasmSha256": "c4efd8c6e2d64ed1403f3d5b624bcb4bb4e6de92c1eed5417a073758cef820ec",
+      "zkeySha256": "a1289a9d1356466240f95678b091c48b44eab3ba7c66983084d6c088bc9d9953",
+      "verificationKeySha256": "4dda95a17e16a8282c991c5c5961b0b21e1d5f5f2d37bec7f2c630697023a4af",
+      "verifierSha256": "aaf881f0e3390f3ec95849e16441666ca7466c71d4dc34fa5bed3cc6c2edc7c6",
+      "verifierPath": "contracts/ShieldedShieldVerifier.sol",
+      "verifierContractName": "ShieldedShieldVerifier",
+      "solidityVerifierSha256": "4d18fbf2d9938a64ab6d0cd1f41c13f60738408457c7ca9abd09b7d0045953ac"
+    },
+    "createPolicy": {
+      "source": "shielded_create_policy",
+      "sourceSha256": "35cc18ded402f76442f1e7a50fc99c4fb564157c0a15094c1ab4a583a56cfe85",
+      "r1csSha256": "b21c865586409e41bba05e2427a8a6ba7082585b2ac9eda8d855710763f17c65",
+      "wasmSha256": "ce7ee10d7dcdf976a11b40c6b280c9e05f9adbf2353071df501d45fc19bcc27d",
+      "zkeySha256": "b0cf7f1fbf06bb752d8d7aa34106c20d40d54496b5e8a7a28f23d66a4d8745cd",
+      "verificationKeySha256": "01589932e853dcb4f7522e69f5a284cbba518fe8c39ec591d5cfd2ab76fd7d08",
+      "verifierSha256": "7396dae6d29b220282d064f1023d5e5e825e51228276463cabfa6288be62b398",
+      "verifierPath": "contracts/ShieldedCreatePolicyVerifier.sol",
+      "verifierContractName": "ShieldedCreatePolicyVerifier",
+      "solidityVerifierSha256": "bea753e810158c05c71ab52a76fc68b0970b156fadfc57101cef6f6d1e43f3ac"
+    },
+    "allocate": {
+      "source": "shielded_allocate",
+      "sourceSha256": "22d99d86a270c69a6b4b21ea6d808627bedf819f529a138d8ae6b3b5c595584e",
+      "r1csSha256": "486873363318db762da1fd4eb406bfbe9fb849b64e8ba23dc13a706fde2276d4",
+      "wasmSha256": "55c783db5fbfcb80c7564721b178fa6e30a26c9779fb75186fd0c8b37645251d",
+      "zkeySha256": "b890ac869d283b74f4163ff5d13384ee9b3af4118e32bd821b3b47c908a1b8c6",
+      "verificationKeySha256": "72012adc092284802e4c85914f5cd0d4a5af57d102a1e1df1c1801311f8a1d0c",
+      "verifierSha256": "8f31c78c8dabb5f305f4b1e3e502c7621c060568fc1cbae79313e3f1bcd37972",
+      "verifierPath": "contracts/ShieldedAllocateVerifier.sol",
+      "verifierContractName": "ShieldedAllocateVerifier",
+      "solidityVerifierSha256": "2cd00ca37ccc2b8651f5f5aa7295848d8069e4d8a9294978b6fa4eda62bfe8fb"
+    },
+    "topUp": {
+      "source": "shielded_top_up",
+      "sourceSha256": "e4e00df409dbbf574ed52a231a32f44fd1b6fff1d51cff0cc8f8b61804bef06c",
+      "r1csSha256": "ad17a87c0b840f719c0c77491dc12e1bf6e2c3d1833813a17862917f0b82a154",
+      "wasmSha256": "91c2b85b5e1e90b5cabb41e9b53e0ae1f02d8ef6b9b021f6513fce53fea357be",
+      "zkeySha256": "50bde6a27ba1d14eefdb9e7dbd613cfac8a85290369c99a2dfe55403541f3b73",
+      "verificationKeySha256": "d929656576dadb744c868a886705748eb449b41f208d44e5b950340d0ff3388b",
+      "verifierSha256": "316d0c34a995d078ee6afb61a42675623dabc4e46a64b0f30c268e9ddd15d535",
+      "verifierPath": "contracts/ShieldedTopUpVerifier.sol",
+      "verifierContractName": "ShieldedTopUpVerifier",
+      "solidityVerifierSha256": "29220e937aa416e24e8cf2327dc41098d56d604c254744ecd451caf4b9bb3ed9"
+    },
+    "mergeBudget": {
+      "source": "shielded_merge_budget",
+      "sourceSha256": "622f12e3245e43e98090468b4abfcfe52011f45bc7dabd5fad561c1793e4c4a6",
+      "r1csSha256": "eb1a4416c0421ab8f481fd93f64f02b93ed14cc004e2af35f7021fcf1bb390f2",
+      "wasmSha256": "906df437293ba218536823bd8c50e960e01d8ab21e09dd1db898548304822911",
+      "zkeySha256": "43f505f5e68bb884ed80dbb9fda826e214e5bc9d8b14a6725d6556c289d9e270",
+      "verificationKeySha256": "7957635f536f61093f9fc924f2e3e76beeaba2569a878b61c0fd34eba2fd070d",
+      "verifierSha256": "8f8d5ca619fb7d7740517c60fcfc265a0b17f89ac224c9a8881459ec0c676c81",
+      "verifierPath": "contracts/ShieldedMergeBudgetVerifier.sol",
+      "verifierContractName": "ShieldedMergeBudgetVerifier",
+      "solidityVerifierSha256": "22956c2b6fe38a1356a8562c3a632fb3e45ee35e9a73cdf234432ac2f280e2ee"
+    },
+    "claim": {
+      "source": "shielded_claim",
+      "sourceSha256": "f25216826d0b6564823e32ec67cc24c23e0148661f908402b6c8223661c42bf7",
+      "r1csSha256": "69c540955e5899aa0bd4b5708b65c171ccf44e2ab8d6d4f1b9e82969ba6fab99",
+      "wasmSha256": "bc82615bd407038098ed5e2a0cb712056c7e4e459746d1fa045718a03f57bc9e",
+      "zkeySha256": "fe4f16a0f4cc977bc308c1d07c1172ca9784b19bfa565535e67910ed07b968b5",
+      "verificationKeySha256": "03f56330507593300f081940a208e7ea858cb1150de2937069e339b7a2cc4f35",
+      "verifierSha256": "640b71ab9983060a61c21f900667acc4b081e7c094a2b44fcf2fe0faee1720df",
+      "verifierPath": "contracts/ShieldedClaimVerifier.sol",
+      "verifierContractName": "ShieldedClaimVerifier",
+      "solidityVerifierSha256": "96ed415b29a2e1b107fb33b780f8f5f00eb053048636ec586c966b5c6d7d563b"
+    },
+    "privateTransfer": {
+      "source": "shielded_private_transfer",
+      "sourceSha256": "fcbea07af71c89ec35d568026bb92a3aa82b63b63314eb05822e42d0b3d81d72",
+      "r1csSha256": "67950f3bec57c3e1f9a314e2f2961c12e0d6e6998100507378a5a67d797f0ee6",
+      "wasmSha256": "9909403b6948c328eebdc524ea1cf3042f95a1696114e795300d77ca68a07069",
+      "zkeySha256": "278fbd90459e19e2789a2da1cd93193562f0c8beb2d5bbfda7d818a6002aa156",
+      "verificationKeySha256": "1d4230d134927bc42c4d71717a7cba5951e536b79884908b4f1dbdd5c40e0aef",
+      "verifierSha256": "1a3efc4cd2f4fe5e3adcc1ace3869297afcf22e41d734cc0336d1900f7b13e72",
+      "verifierPath": "contracts/ShieldedPrivateTransferVerifier.sol",
+      "verifierContractName": "ShieldedPrivateTransferVerifier",
+      "solidityVerifierSha256": "3f5b6d3992740ff982c9ca7383202a5ae50d8700d893b63f0cc97e1ba7e64fd5"
+    },
+    "unshield": {
+      "source": "shielded_unshield",
+      "sourceSha256": "6a95609c571f070fb054a1823d9e5906dda24b38fe8d1a080736620af789fce7",
+      "r1csSha256": "c270fc20c6608f7b1fd53199d1e09e52570778aa526498ee3e9ed5d94d74d000",
+      "wasmSha256": "4e885bcd806060373662d9afcd36eada62b3315a289b2c27d33a2b526dccaeed",
+      "zkeySha256": "bce16efa8e05fb52b8c40102fbfac8bf1b756115b2f0ce22d9b9defdfc9c51cf",
+      "verificationKeySha256": "50197adc2c554f7594626a9144334709086c228a688b9602cf695bc581e69a1e",
+      "verifierSha256": "b943780ab98a00b29765138d9d96dfa41b19d621a871d4168a0e7c71abf0150f",
+      "verifierPath": "contracts/ShieldedUnshieldVerifier.sol",
+      "verifierContractName": "ShieldedUnshieldVerifier",
+      "solidityVerifierSha256": "57041d36f3fc95c01cdc1de49207e08a0ba0612a24485f49be88a69ffb4c7c24"
+    }
+  }
+}

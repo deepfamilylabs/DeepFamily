@@ -94,9 +94,10 @@ describe("single-operator production ZK setup safety", function () {
     await fs.rm(stage, { recursive: true, force: true });
   });
 
-  it("requires both reviewed production rotation digests with the explicit rotate flag", function () {
+  it("requires all reviewed production rotation digests with the explicit rotate flag", function () {
     const currentManifestSha256 = "11".repeat(32);
     const replacementRuntimeSha256 = "22".repeat(32);
+    const shieldedManifestSha256 = "33".repeat(32);
     expect(
       parseProductionSetupArguments([
         "--expected-snarkjs-runtime-sha256",
@@ -106,6 +107,8 @@ describe("single-operator production ZK setup safety", function () {
         "deepfamily-rotation-fixture",
         "--expected-current-manifest-sha256",
         currentManifestSha256,
+        "--expected-current-shielded-manifest-sha256",
+        shieldedManifestSha256,
       ]),
     ).to.deep.equal({
       help: false,
@@ -113,6 +116,7 @@ describe("single-operator production ZK setup safety", function () {
       ceremonyId: "deepfamily-rotation-fixture",
       expectedCurrentManifestSha256: currentManifestSha256,
       expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
+      expectedCurrentShieldedManifestSha256: shieldedManifestSha256,
     });
     for (const argumentsWithoutBinding of [
       ["--rotate"],
@@ -133,6 +137,7 @@ describe("single-operator production ZK setup safety", function () {
 
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         rotate: true,
         expectedCurrentManifestSha256: "11".repeat(32),
@@ -166,6 +171,7 @@ describe("single-operator production ZK setup safety", function () {
       await fs.writeFile(manifestPath, manifestRaw);
       return captureError(() =>
         runSingleOperatorProductionSetup({
+          includeShielded: false,
           root,
           ceremonyId,
           rotate: true,
@@ -251,6 +257,7 @@ describe("single-operator production ZK setup safety", function () {
     ]) {
       const error = await captureError(() =>
         runSingleOperatorProductionSetup({
+          includeShielded: false,
           root,
           platform: "win32",
           ...runtime,
@@ -285,6 +292,7 @@ describe("single-operator production ZK setup safety", function () {
     const captureCalls = [];
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         env: {
           PATH: "/trusted/bin",
@@ -431,6 +439,7 @@ describe("single-operator production ZK setup safety", function () {
     let ptauInstallerCalled = false;
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         env: {},
         captureRunner: createFixtureGitCaptureRunner(),
@@ -463,6 +472,7 @@ describe("single-operator production ZK setup safety", function () {
 
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         env: {},
         captureRunner: createFixtureGitCaptureRunner(),
@@ -578,6 +588,7 @@ describe("single-operator production ZK setup safety", function () {
     const replacementRuntimeSha256 = "79".repeat(32);
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         ceremonyId: "deepfamily-new-production-fixture",
         rotate: true,
@@ -702,6 +713,7 @@ describe("single-operator production ZK setup safety", function () {
     let contributionInvocation;
     const error = await captureError(() =>
       runSingleOperatorProductionSetup({
+        includeShielded: false,
         root,
         env: {},
         platform: "darwin",

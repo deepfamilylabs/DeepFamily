@@ -3,7 +3,9 @@ import {
   protocolCanonicalJson,
   protocolDeploymentEvidenceFromManifest,
   protocolDeploymentEvidenceSha256,
+  shieldedDeploymentBindingsFromAddresses,
 } from "./protocolReleaseManifest.mjs";
+import { SHIELDED_ACTIONS, SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
 export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   timelock: 0,
@@ -21,6 +23,20 @@ export const MAINNET_DEPLOYMENT_NONCE_OFFSETS = Object.freeze({
   poseidonT4: 16,
   poseidonT6: 17,
   deepFamilyLineageIndex: 18,
+  ...Object.fromEntries(
+    Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec, index) => [
+      spec.verifierLabel,
+      20 + index,
+    ]),
+  ),
+  ...Object.fromEntries(
+    SHIELDED_ACTIONS.map((action, index) => [
+      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel,
+      29 + index,
+    ]),
+  ),
+  shieldedHeirKeyRegistry: 37,
+  shieldedDeepPool: 38,
 });
 
 const normalizeChainId = (value) => {
@@ -65,6 +81,7 @@ export const buildPlannedProtocolDeploymentEvidence = ({
     throw new Error("deploymentArtifactInspector must be a function");
   }
   const deploymentBindings = {
+    ...shieldedDeploymentBindingsFromAddresses(plannedAddresses),
     groth16VerifierAdapter: {
       personVerifierImmutable: plannedAddresses?.personCommitmentVerifier,
       disclosureBindingVerifierImmutable: plannedAddresses?.disclosureBindingVerifier,
@@ -76,7 +93,44 @@ export const buildPlannedProtocolDeploymentEvidence = ({
     },
   };
   const artifacts = deploymentArtifactInspector({ root, deployments: deploymentBindings });
+  const withHashes = (record, artifact) =>
+    Object.freeze({
+      ...record,
+      artifactSha256: artifact?.artifactSha256,
+      runtimeSha256: artifact?.runtimeSha256,
+    });
   const deployments = Object.freeze({
+    token: deploymentBindings.token,
+    poseidonT3: deploymentBindings.poseidonT3,
+    poseidonT6: deploymentBindings.poseidonT6,
+    deepFamilyLineageIndex: deploymentBindings.deepFamilyLineageIndex,
+    shieldedVerifiers: Object.freeze(
+      Object.fromEntries(
+        Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).map((action) => [
+          action,
+          withHashes(
+            deploymentBindings.shieldedVerifiers[action],
+            artifacts?.shieldedVerifiers?.[action],
+          ),
+        ]),
+      ),
+    ),
+    shieldedAdapters: Object.freeze(
+      Object.fromEntries(
+        SHIELDED_ACTIONS.map((action) => [
+          action,
+          withHashes(
+            deploymentBindings.shieldedAdapters[action],
+            artifacts?.shieldedAdapters?.[action],
+          ),
+        ]),
+      ),
+    ),
+    shieldedHeirKeyRegistry: withHashes(
+      deploymentBindings.shieldedHeirKeyRegistry,
+      artifacts?.shieldedHeirKeyRegistry,
+    ),
+    shieldedDeepPool: withHashes(deploymentBindings.shieldedDeepPool, artifacts?.shieldedDeepPool),
     status: "production",
     chainId: normalizeChainId(chainId),
     deepFamilyProxy: plannedAddresses?.deepFamily,
@@ -152,6 +206,25 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       deploymentArtifacts?.deepFamilyArchive,
     ],
     ["DeepFamilyReader", plannedAddresses?.deepFamilyReader, deploymentArtifacts?.deepFamilyReader],
+    ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+      spec.verifierContractName,
+      plannedAddresses?.[spec.verifierLabel],
+      deploymentArtifacts?.shieldedVerifiers?.[action],
+    ]),
+    ...SHIELDED_ACTIONS.map((action) => {
+      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+      return [
+        spec.adapterDeploymentName,
+        plannedAddresses?.[spec.adapterLabel],
+        deploymentArtifacts?.shieldedAdapters?.[action],
+      ];
+    }),
+    [
+      "ShieldedHeirKeyRegistry",
+      plannedAddresses?.shieldedHeirKeyRegistry,
+      deploymentArtifacts?.shieldedHeirKeyRegistry,
+    ],
+    ["ShieldedDeepPool", plannedAddresses?.shieldedDeepPool, deploymentArtifacts?.shieldedDeepPool],
   ];
   for (const [label, address, artifact] of checks) {
     const onChain = await provider.getCode(address);

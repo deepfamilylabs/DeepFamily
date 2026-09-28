@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,8 +68,16 @@ export const parseArguments = parseCircuitArguments;
 
 export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
   const resolvedRoot = path.resolve(root);
-  return Object.freeze(
-    selectCircuitNames(circuit).flatMap((name) =>
+  const productionManifest = path.join(
+    resolvedRoot,
+    "circuits",
+    "shielded-production-manifest.json",
+  );
+  const selected = selectCircuitNames(circuit);
+  const legacy = selected.filter((name) => !name.startsWith("shielded:"));
+  const shielded = selected.filter((name) => name.startsWith("shielded:"));
+  return Object.freeze([
+    ...legacy.flatMap((name) =>
       CHECKS[name].map((check) =>
         Object.freeze({
           circuit: name,
@@ -79,7 +88,47 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
         }),
       ),
     ),
-  );
+    ...(shielded.length === 0
+      ? []
+      : fs.existsSync(productionManifest)
+        ? [
+            Object.freeze({
+              circuit: "shielded",
+              check: "production-ceremony",
+              executable: process.execPath,
+              args: Object.freeze([
+                path.join(resolvedRoot, "scripts", "zk-shielded-production-check.mjs"),
+              ]),
+              cwd: resolvedRoot,
+            }),
+          ]
+        : shielded.length === 9
+          ? [
+              Object.freeze({
+                circuit: "shielded",
+                check: "development-artifacts-and-proof-smoke",
+                executable: process.execPath,
+                args: Object.freeze([
+                  path.join(resolvedRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+                ]),
+                cwd: resolvedRoot,
+              }),
+            ]
+          : shielded.map((name) => {
+              const action = name.slice("shielded:".length);
+              const hasProofFixture = action === "allocate" || action === "claim";
+              return Object.freeze({
+                circuit: name,
+                check: hasProofFixture ? "development-proof-smoke" : "development-artifacts",
+                executable: process.execPath,
+                args: Object.freeze([
+                  path.join(resolvedRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+                  ...(hasProofFixture ? [action] : ["--artifact", action]),
+                ]),
+                cwd: resolvedRoot,
+              });
+            })),
+  ]);
 };
 
 export const runZkCheck = ({
@@ -100,11 +149,11 @@ export const runZkCheck = ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-check.mjs [--circuit <all|person|disclosure>]
+  node scripts/zk-check.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
 
-Generates and independently verifies real proofs plus range/parent constraint regressions for the
-selected circuit using the repository's committed frontend ZK artifacts. The default is
---circuit all.`);
+Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
+all nine development artifact sets and proves allocate/claim when no production manifest exists;
+with a production manifest it verifies production artifacts and ceremony. Default: --circuit all.`);
 };
 
 export const main = (argv = process.argv.slice(2)) => {

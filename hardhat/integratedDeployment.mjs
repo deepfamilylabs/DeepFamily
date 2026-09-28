@@ -1,5 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  integratedDeploymentContract,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import {
   assertNoRemovedGovernanceEnvironmentVariables,
@@ -338,7 +344,7 @@ const refreshExistingDeployment = async (
   connection,
   artifacts,
   ethers,
-  { contractName, contract, isProxy = false, extra = {} },
+  { contractName, deploymentName = contractName, contract, isProxy = false, extra = {} },
 ) => {
   const artifact = await artifacts.readArtifact(contractName);
   const address = await contract.getAddress();
@@ -347,7 +353,11 @@ const refreshExistingDeployment = async (
     const raw = await ethers.provider.getStorage(address, ERC1967_IMPLEMENTATION_SLOT);
     refreshedExtra.implementationAddress = ethers.getAddress(ethers.dataSlice(raw, 12));
   }
-  await writeDeployment(connection, contractName, address, artifact.abi, refreshedExtra);
+  const existing = await safeReadDeployment(connection, deploymentName);
+  await writeDeployment(connection, deploymentName, address, artifact.abi, {
+    ...existing,
+    ...refreshedExtra,
+  });
 };
 
 const assertExistingIntegratedWiring = async ({
@@ -449,6 +459,48 @@ const assertExistingLineageWiring = async ({ deepFamily, lineageIndex }) => {
       `Deployment wiring mismatch: DeepFamily lineageIndex=${configuredIndex}, ` +
         `index.DEEP_FAMILY=${indexMain}`,
     );
+  }
+};
+
+export const assertIntegratedShieldedWiring = async (deployed) => {
+  const {
+    token,
+    lineageIndex,
+    shieldedDeepPool: pool,
+    shieldedHeirKeyRegistry: registry,
+  } = deployed;
+  const [tokenAddress, lineageAddress, registryAddress] = await Promise.all([
+    token.getAddress(),
+    lineageIndex.getAddress(),
+    registry.getAddress(),
+  ]);
+  for (const [value, expected, label] of [
+    [await pool.TOKEN(), tokenAddress, "pool token"],
+    [await pool.LINEAGE_INDEX(), lineageAddress, "pool lineage index"],
+    [await pool.KEY_REGISTRY(), registryAddress, "pool key registry"],
+    [await registry.LINEAGE_INDEX(), lineageAddress, "key registry lineage index"],
+    [
+      await registry.VERIFIER(),
+      await deployed.shieldedVerifiers.keyRegistration.getAddress(),
+      "key registration verifier",
+    ],
+  ]) {
+    if (!sameAddress(value, expected))
+      throw new Error(`Integrated deployment ${label} binding mismatch`);
+  }
+  for (const action of SHIELDED_ACTIONS) {
+    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+    const adapter = deployed.shieldedAdapters[action];
+    if (
+      !sameAddress(
+        await adapter.VERIFIER(),
+        await deployed.shieldedVerifiers[action].getAddress(),
+      ) ||
+      BigInt(await adapter.ACTION()) !== BigInt(spec.actionId) ||
+      !sameAddress(await pool[spec.poolVerifierGetter](), await adapter.getAddress())
+    ) {
+      throw new Error(`Integrated deployment ${action} verifier binding mismatch`);
+    }
   }
 };
 
@@ -656,9 +708,7 @@ export const deployIntegratedSystem = async (
   }
 
   const DeepFamilyArchive = await ethers.getContractFactory("DeepFamilyArchive", deployer);
-  const archive = await deployContract("deepFamilyArchive", DeepFamilyArchive, [
-    deepFamilyAddress,
-  ]);
+  const archive = await deployContract("deepFamilyArchive", DeepFamilyArchive, [deepFamilyAddress]);
   const archiveAddress = await archive.getAddress();
 
   await executeTransaction(
@@ -761,6 +811,52 @@ export const deployIntegratedSystem = async (
         `${lineageIndexAddress}/${deepFamilyAddress}`,
     );
   }
+
+  const shieldedVerifiers = {};
+  for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+    shieldedVerifiers[action] = await deployContract(
+      spec.verifierLabel,
+      await ethers.getContractFactory(spec.verifierContractName, deployer),
+    );
+  }
+  const shieldedAdapters = {};
+  const ShieldedActionAdapter = await ethers.getContractFactory(
+    "ShieldedGroth16ActionAdapter",
+    deployer,
+  );
+  for (const action of SHIELDED_ACTIONS) {
+    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+    shieldedAdapters[action] = await deployContract(spec.adapterLabel, ShieldedActionAdapter, [
+      await shieldedVerifiers[action].getAddress(),
+      spec.actionId,
+    ]);
+  }
+  const ShieldedKeyRegistry = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
+    signer: deployer,
+    libraries: { PoseidonT3: lineageLibraries.PoseidonT3, PoseidonT6: lineageLibraries.PoseidonT6 },
+  });
+  const shieldedHeirKeyRegistry = await deployContract(
+    "shieldedHeirKeyRegistry",
+    ShieldedKeyRegistry,
+    [lineageIndexAddress, await shieldedVerifiers.keyRegistration.getAddress()],
+  );
+  const ShieldedPool = await ethers.getContractFactory("ShieldedDeepPool", {
+    signer: deployer,
+    libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
+  });
+  const shieldedDeepPool = await deployContract("shieldedDeepPool", ShieldedPool, [
+    tokenAddress,
+    lineageIndexAddress,
+    await shieldedHeirKeyRegistry.getAddress(),
+    await Promise.all(SHIELDED_ACTIONS.map((action) => shieldedAdapters[action].getAddress())),
+  ]);
+  const shielded = {
+    shieldedVerifiers,
+    shieldedAdapters,
+    shieldedHeirKeyRegistry,
+    shieldedDeepPool,
+  };
+  await assertIntegratedShieldedWiring({ token, lineageIndex, ...shielded });
 
   // Hand DeepFamily upgrade/configuration ownership to governance (intended: timelock + multisig).
   // DeepFamilyToken already retired its bootstrap owner during initialize(), so it intentionally
@@ -901,6 +997,19 @@ export const deployIntegratedSystem = async (
       { deepFamilyAddress },
       deploymentDirectory,
     );
+    for (const record of INTEGRATED_DEPLOYMENT_RECORDS.filter((item) =>
+      item.property.startsWith("shielded"),
+    )) {
+      const contract = integratedDeploymentContract(shielded, record.property);
+      await writeDeployment(
+        connection,
+        record.deploymentName,
+        await contract.getAddress(),
+        (await artifacts.readArtifact(record.contractName)).abi,
+        { deploymentBlock: transactionReceipts[record.transactionLabel].blockNumber },
+        deploymentDirectory,
+      );
+    }
   }
 
   return {
@@ -920,6 +1029,7 @@ export const deployIntegratedSystem = async (
     lineageIndex,
     deepFamilyImplementationAddress,
     transactionReceipts,
+    ...shielded,
   };
 };
 
@@ -929,278 +1039,154 @@ export const ensureIntegratedSystem = async (
 ) => {
   assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
-  if (connection.__deepfamilyIntegrated?.deepFamily && connection.__deepfamilyIntegrated?.archive) {
+  if (
+    connection.__deepfamilyIntegrated?.shieldedDeepPool &&
+    connection.__deepfamilyIntegrated?.shieldedHeirKeyRegistry
+  ) {
     return connection.__deepfamilyIntegrated;
   }
-
   const { ethers } = connection;
-  const [defaultSigner] = await ethers.getSigners();
-  const currentArtifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
-  // Operational tasks run as separate processes. On a persistent localhost node, a stale
-  // address book must therefore be replaced on disk together with the freshly deployed module
-  // set; otherwise every subsequent task would deploy yet another isolated system. In-process
-  // Hardhat networks remain ephemeral and keep their existing no-write default. Callers may
-  // still explicitly override either behavior.
-  const shouldWriteDeployments =
+  const [signer] = await ethers.getSigners();
+  const artifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
+  const local = isLocalDevNetwork(connection);
+  const shouldWrite =
     writeDeployments ??
-    (isLocalDevNetwork(connection) &&
-      !isEphemeralNetwork(connection) &&
-      Boolean(currentArtifacts?.readArtifact));
-
-  const existingDeep = await safeReadDeployment(connection, "DeepFamily");
-  const existingToken = await safeReadDeployment(connection, "DeepFamilyToken");
-  const existingArchive = await safeReadDeployment(connection, "DeepFamilyArchive");
-  const existingReader = await safeReadDeployment(connection, "DeepFamilyReader");
-  const existingGroth16Adapter = await safeReadDeployment(connection, "Groth16VerifierAdapter");
-  const existingPoseidonT5 = await safeReadDeployment(connection, "PoseidonT5");
-  const existingAdultAgeGate = await safeReadDeployment(connection, "AdultAgeGate");
-  const existingPersonVerifier = await safeReadDeployment(connection, "PersonCommitmentVerifier");
-  const existingDisclosureVerifier = await safeReadDeployment(
-    connection,
-    "DisclosureBindingVerifier",
+    (local && !isEphemeralNetwork(connection) && Boolean(artifacts?.readArtifact));
+  const records = await Promise.all(
+    INTEGRATED_DEPLOYMENT_RECORDS.map(async (spec) => ({
+      ...spec,
+      deployment: await safeReadDeployment(connection, spec.deploymentName),
+    })),
   );
-  const existingLineageIndex = await safeReadDeployment(connection, "DeepFamilyLineageIndex");
-  const existingPoseidonT3 = await safeReadDeployment(connection, "PoseidonT3");
-  const existingPoseidonT4 = await safeReadDeployment(connection, "PoseidonT4");
-  const existingPoseidonT6 = await safeReadDeployment(connection, "PoseidonT6");
-  const recordedDeployments = [
-    ["DeepFamily", existingDeep],
-    ["DeepFamilyToken", existingToken],
-    ["DeepFamilyArchive", existingArchive],
-    ["DeepFamilyReader", existingReader],
-    ["Groth16VerifierAdapter", existingGroth16Adapter],
-    ["PoseidonT5", existingPoseidonT5],
-    ["AdultAgeGate", existingAdultAgeGate],
-    ["PersonCommitmentVerifier", existingPersonVerifier],
-    ["DisclosureBindingVerifier", existingDisclosureVerifier],
-    ["DeepFamilyLineageIndex", existingLineageIndex],
-    ["PoseidonT3", existingPoseidonT3],
-    ["PoseidonT4", existingPoseidonT4],
-    ["PoseidonT6", existingPoseidonT6],
-  ];
-  const recordedNames = recordedDeployments
-    .filter(([, deployment]) => deployment?.address)
-    .map(([contractName]) => contractName);
-  const hasCompleteCoreDeployment =
-    existingDeep?.address &&
-    existingToken?.address &&
-    existingArchive?.address &&
-    existingReader?.address &&
-    existingLineageIndex?.address;
-
-  if (recordedNames.length === 0 && !isLocalDevNetwork(connection)) {
+  const present = records.filter((item) => item.deployment?.address);
+  if (present.length === 0 && !local) {
     if (!allowNewDeployment) {
       throw new Error(
-        "No deployment metadata exists for this live network; refusing to deploy a new system " +
-          "from an operational task. Run the explicit integrated deployment command first.",
+        "No deployment metadata exists for this live network; refusing to deploy a new system from an operational task. Run the explicit integrated deployment command first.",
       );
     }
-    if (writeDeployments !== true || !currentArtifacts?.readArtifact) {
+    if (writeDeployments !== true || !artifacts?.readArtifact) {
       throw new Error(
-        "A new live-network deployment must persist its complete current artifact metadata; " +
-          "set writeDeployments=true and pass Hardhat artifacts.",
+        "A new live-network deployment must persist its complete current artifact metadata; set writeDeployments=true and pass Hardhat artifacts.",
       );
     }
   }
-
-  if (!hasCompleteCoreDeployment && recordedNames.length > 0) {
-    const message =
-      `Deployment metadata is partial (${recordedNames.join(", ")}); refusing to treat this ` +
-      "network as a fresh deployment";
-    if (!isLocalDevNetwork(connection)) throw new Error(message);
+  if (present.length > 0 && present.length !== records.length) {
+    const message = `Deployment metadata is partial (${present.map((item) => item.deploymentName).join(", ")}); refusing to treat this network as a fresh deployment`;
+    if (!local) throw new Error(message);
     console.warn(`[deployment] ${message}; deploying a fresh local module set`);
   }
-  if (hasCompleteCoreDeployment) {
+  if (present.length === records.length) {
     try {
-      await assertDeploymentCode(ethers, [
-        ["DeepFamily", existingDeep],
-        ["DeepFamilyToken", existingToken],
-        ["DeepFamilyArchive", existingArchive],
-        ["DeepFamilyReader", existingReader],
-        ["DeepFamilyLineageIndex", existingLineageIndex],
-      ]);
-
-      // DeepFamily must be a UUPS proxy; a legacy direct deployment would
-      // pass the code/wiring checks above yet be silently non-upgradeable.
-      const deepFamilyImplementation = await assertErc1967Proxy(ethers, "DeepFamily", existingDeep);
-
-      if (currentArtifacts?.readArtifact) {
-        const artifactBoundDeployments = [
-          ["DeepFamilyArchive", existingArchive],
-          ["PoseidonT5", existingPoseidonT5],
-          ["AdultAgeGate", existingAdultAgeGate],
-          ["PersonCommitmentVerifier", existingPersonVerifier],
-          ["DisclosureBindingVerifier", existingDisclosureVerifier],
-          ["Groth16VerifierAdapter", existingGroth16Adapter],
-          ["PoseidonT3", existingPoseidonT3],
-          ["PoseidonT4", existingPoseidonT4],
-          ["PoseidonT6", existingPoseidonT6],
-        ];
-        const missing = artifactBoundDeployments
-          .filter(([, deployment]) => !deployment?.address)
-          .map(([contractName]) => contractName);
-        if (missing.length > 0) {
-          throw new Error(
-            `Deployment metadata is missing ${missing.join(", ")}; refusing to reuse a ` +
-              "deployment whose verifier/library version cannot be checked",
-          );
-        }
-
-        await assertDeploymentCode(ethers, artifactBoundDeployments);
-
-        const groth16Adapter = await ethers.getContractAt(
-          "Groth16VerifierAdapter",
-          existingGroth16Adapter.address,
-          defaultSigner,
+      await assertDeploymentCode(
+        ethers,
+        records.map((item) => [item.deploymentName, item.deployment]),
+      );
+      const byName = Object.fromEntries(
+        records.map((item) => [item.deploymentName, item.deployment]),
+      );
+      const implementation = await assertErc1967Proxy(ethers, "DeepFamily", byName.DeepFamily);
+      const deployed = {
+        deepFamilyImplementationAddress: implementation,
+        shieldedVerifiers: {},
+        shieldedAdapters: {},
+      };
+      for (const record of records) {
+        const contract = await ethers.getContractAt(
+          record.contractName,
+          record.deployment.address,
+          signer,
         );
-        const [personVerifierBackend, disclosureVerifierBackend] = await Promise.all([
-          groth16Adapter.personVerifier(),
-          groth16Adapter.disclosureBindingVerifier(),
-        ]);
-        if (
-          !sameAddress(personVerifierBackend, existingPersonVerifier.address) ||
-          !sameAddress(disclosureVerifierBackend, existingDisclosureVerifier.address)
-        ) {
-          throw new Error(
-            "Deployment wiring mismatch: Groth16 adapter backend verifiers do not match the " +
-              "recorded PersonCommitmentVerifier/DisclosureBindingVerifier deployments",
-          );
-        }
-
+        const parts = record.property.split(".");
+        const target = parts.length === 1 ? deployed : deployed[parts[0]];
+        target[parts.at(-1)] = contract;
+      }
+      const libraries = Object.fromEntries(
+        ["PoseidonT3", "PoseidonT4", "PoseidonT5", "PoseidonT6"].map((name) => [
+          name,
+          byName[name].address,
+        ]),
+      );
+      if (artifacts?.readArtifact) {
         await assertCurrentArtifactSet({
           connection,
           ethers,
-          artifacts: currentArtifacts,
-          deepFamilyImplementation,
-          deployments: [
-            { contractName: "DeepFamilyToken", deployment: existingToken },
-            { contractName: "DeepFamilyReader", deployment: existingReader },
-            {
-              contractName: "DeepFamilyLineageIndex",
-              deployment: existingLineageIndex,
-              spec: {
-                libraries: {
-                  PoseidonT3: existingPoseidonT3.address,
-                  PoseidonT4: existingPoseidonT4.address,
-                  PoseidonT5: existingPoseidonT5.address,
-                  PoseidonT6: existingPoseidonT6.address,
-                },
-              },
-            },
-            ...artifactBoundDeployments.map(([contractName, deployment]) => ({
-              contractName,
-              deployment,
+          artifacts,
+          deepFamilyImplementation: implementation,
+          deployments: records
+            .filter((record) => record.deploymentName !== "DeepFamily")
+            .map((record) => ({
+              contractName: record.contractName,
+              deployment: record.deployment,
+              spec:
+                record.contractName === "DeepFamilyLineageIndex"
+                  ? { libraries }
+                  : record.contractName === "ShieldedHeirKeyRegistry"
+                    ? {
+                        libraries: {
+                          PoseidonT3: libraries.PoseidonT3,
+                          PoseidonT6: libraries.PoseidonT6,
+                        },
+                      }
+                    : record.contractName === "ShieldedDeepPool"
+                      ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
+                      : {
+                          needsLibraries: false,
+                          librarySelfAddress: POSEIDON_LIBRARIES.includes(record.contractName),
+                        },
             })),
-          ],
         });
       }
-
-      const deepFamily = await ethers.getContractAt(
-        "DeepFamily",
-        existingDeep.address,
-        defaultSigner,
-      );
-      const token = await ethers.getContractAt(
-        "DeepFamilyToken",
-        existingToken.address,
-        defaultSigner,
-      );
-      const archive = await ethers.getContractAt(
-        "DeepFamilyArchive",
-        existingArchive.address,
-        defaultSigner,
-      );
-      const deepFamilyReader = await ethers.getContractAt(
-        "DeepFamilyReader",
-        existingReader.address,
-        defaultSigner,
-      );
-      const lineageIndex = await ethers.getContractAt(
-        "DeepFamilyLineageIndex",
-        existingLineageIndex.address,
-        defaultSigner,
-      );
+      const [personBackend, disclosureBackend] = await Promise.all([
+        deployed.groth16VerifierAdapter.personVerifier(),
+        deployed.groth16VerifierAdapter.disclosureBindingVerifier(),
+      ]);
+      if (
+        !sameAddress(personBackend, byName.PersonCommitmentVerifier.address) ||
+        !sameAddress(disclosureBackend, byName.DisclosureBindingVerifier.address)
+      ) {
+        throw new Error(
+          "Deployment wiring mismatch: Groth16 adapter backend verifiers do not match the recorded PersonCommitmentVerifier/DisclosureBindingVerifier deployments",
+        );
+      }
       await assertExistingIntegratedWiring({
         ethers,
-        deepFamily,
-        token,
-        archive,
-        deepFamilyReader,
-        expectedGroth16Adapter: existingGroth16Adapter,
+        ...deployed,
+        expectedGroth16Adapter: byName.Groth16VerifierAdapter,
       });
-      await assertExistingLineageWiring({ deepFamily, lineageIndex });
-      await assertExistingGovernanceOwner(connection, ethers, currentArtifacts, [
-        { contractName: "DeepFamily", contract: deepFamily },
+      await assertExistingLineageWiring(deployed);
+      await assertIntegratedShieldedWiring(deployed);
+      await assertExistingGovernanceOwner(connection, ethers, artifacts, [
+        { contractName: "DeepFamily", contract: deployed.deepFamily },
       ]);
-      if (shouldWriteDeployments) {
-        const artifacts = currentArtifacts;
-        if (!artifacts?.readArtifact) {
+      if (shouldWrite) {
+        if (!artifacts?.readArtifact)
           throw new Error(
-            "Persisting deployments requires passing Hardhat hre (with artifacts) to ensureIntegratedSystem",
+            "Persisting deployments requires passing Hardhat artifacts to ensureIntegratedSystem",
           );
-        }
-        const refreshTargets = [
-          { contractName: "DeepFamily", contract: deepFamily, isProxy: true },
-          { contractName: "DeepFamilyToken", contract: token },
-          {
-            contractName: "DeepFamilyArchive",
-            contract: archive,
-            extra: { deepFamilyAddress: await deepFamily.getAddress() },
-          },
-          { contractName: "DeepFamilyReader", contract: deepFamilyReader },
-          {
-            contractName: "DeepFamilyLineageIndex",
-            contract: lineageIndex,
-            extra: { deepFamilyAddress: await deepFamily.getAddress() },
-          },
-        ];
-        if (existingGroth16Adapter?.address) {
-          const groth16Adapter = await ethers.getContractAt(
-            "Groth16VerifierAdapter",
-            existingGroth16Adapter.address,
-            defaultSigner,
-          );
-          refreshTargets.push({
-            contractName: "Groth16VerifierAdapter",
-            contract: groth16Adapter,
+        for (const record of records) {
+          await refreshExistingDeployment(connection, artifacts, ethers, {
+            contractName: record.contractName,
+            deploymentName: record.deploymentName,
+            contract: integratedDeploymentContract(deployed, record.property),
+            isProxy: record.deploymentName === "DeepFamily",
           });
         }
-        for (const target of refreshTargets) {
-          await refreshExistingDeployment(connection, artifacts, ethers, target);
-        }
       }
-      connection.__deepfamilyIntegrated = {
-        deepFamily,
-        token,
-        archive,
-        deepFamilyReader,
-        lineageIndex,
-      };
-      return connection.__deepfamilyIntegrated;
+      connection.__deepfamilyIntegrated = deployed;
+      return deployed;
     } catch (error) {
-      // Local dev networks (in-process simulated or explicitly named localhost) commonly restart with
-      // a clean chain while deployment files remain on disk. Fall through and deploy a current
-      // UUPS module set. On live networks, surface validation failures instead of silently
-      // creating a second, orphaned module set.
-      if (!isLocalDevNetwork(connection)) throw error;
+      if (!local) throw error;
       console.warn(
-        `[deployment] Existing local module set is stale or inconsistent; deploying a fresh set: ` +
-          `${error?.message || error}`,
+        `[deployment] Existing local module set is stale or inconsistent; deploying a fresh set: ${error?.message || error}`,
       );
     }
   }
-
   const deployed = await deployIntegratedSystem(connection, {
-    writeDeployments: shouldWriteDeployments,
-    signer: defaultSigner,
-    artifacts: artifactReader ?? hreOrConnection?.artifacts,
+    writeDeployments: shouldWrite,
+    signer,
+    artifacts,
   });
-  connection.__deepfamilyIntegrated = {
-    deepFamily: deployed.deepFamily,
-    token: deployed.token,
-    archive: deployed.archive,
-    deepFamilyReader: deployed.deepFamilyReader,
-    lineageIndex: deployed.lineageIndex,
-  };
-  return connection.__deepfamilyIntegrated;
+  connection.__deepfamilyIntegrated = deployed;
+  return deployed;
 };

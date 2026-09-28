@@ -181,8 +181,7 @@ const createProductionFixture = async () => {
 
   const metadataByCircuit = Object.fromEntries(
     Object.keys(ZK_RELEASE_ARTIFACTS).map((circuitName) => {
-      const hashField =
-        ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
+      const hashField = ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
       return [
         circuitName,
         {
@@ -366,8 +365,13 @@ describe("production release preflight", function () {
     let sourceEnvironment;
     const fake = createFakeRunner({
       onInvocation: (invocation, state) => {
-        if (state.kind === "command" && invocation.executable === "npm") {
-          if (invocation.args[1] === "zk:artifacts:check") {
+        if (state.kind === "command") {
+          if (
+            (invocation.executable === "npm" &&
+              ["zk:artifacts:check", "zk:check"].includes(invocation.args[1])) ||
+            (invocation.executable === process.execPath &&
+              invocation.args[0] === "scripts/zk-shielded-release-check.mjs")
+          ) {
             compilerPathDuringCheck = invocation.env?.[CIRCOM_OVERRIDE_ENV.path];
             expect(fsSync.existsSync(compilerPathDuringCheck)).to.equal(true);
             expect(invocation.env[CIRCOM_OVERRIDE_ENV.target]).to.equal("darwin-arm64");
@@ -386,6 +390,8 @@ describe("production release preflight", function () {
       commands: [
         ["npm", ["run", "contracts:check"]],
         ["npm", ["run", "zk:artifacts:check"]],
+        ["npm", ["run", "zk:check"]],
+        [process.execPath, ["scripts/zk-shielded-release-check.mjs"]],
       ],
       compilerInspector: async () => {
         cachedCompilerInspected = true;
@@ -799,7 +805,7 @@ describe("production release preflight", function () {
     expect(error?.message).to.equal("Release commit changed while preflight was running");
 
     expect(fake.calls.filter(({ executable }) => executable === "npm")).to.have.lengthOf(
-      RELEASE_PREFLIGHT_COMMANDS.length,
+      RELEASE_PREFLIGHT_COMMANDS.filter(([executable]) => executable === "npm").length,
     );
   });
 

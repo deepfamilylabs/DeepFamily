@@ -77,13 +77,27 @@ import {
   protocolDeploymentEvidenceSha256,
   protocolRuntimeBytecodeSha256,
 } from "./lib/protocolReleaseManifest.mjs";
-import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
+import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
   TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
   validateTestnetReleaseEvidence,
 } from "./lib/testnetReleaseEvidence.mjs";
 import { publishTestnetReleaseEvidence } from "./lib/releaseEvidencePublisher.mjs";
+import { loadCandidateArtifacts } from "./lib/shieldedArtifacts.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  integratedDeploymentAddresses,
+} from "./lib/zkDeploymentCatalog.mjs";
+import {
+  assertShieldedDeploymentBindings,
+  shieldedArtifactEntries,
+  shieldedDeploymentEvidence,
+} from "./lib/shieldedDeploymentEvidence.mjs";
+import { verifyShieldedReceipts } from "./lib/shieldedReceipts.mjs";
+import { runShieldedAcceptanceSmoke } from "./lib/shieldedAcceptanceSmoke.mjs";
 
 const { addPersonVersion, mintPersonVersionNFT } = seedHelpers;
 
@@ -200,6 +214,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
   archive,
   deepFamilyReader,
   groth16VerifierAdapter,
+  deployed,
 }) => {
   const [
     deepFamilyArchive,
@@ -232,9 +247,15 @@ const readTerminalProtocolDeploymentEvidence = async ({
     "Terminal Groth16 adapter immutables do not match the deployed verifiers",
   );
 
+  const shieldedBindings = await assertShieldedDeploymentBindings({
+    deployed,
+    addresses,
+    read: terminalRead,
+  });
   const deploymentArtifacts = inspectProtocolDeploymentArtifacts({
     root: process.cwd(),
     deployments: {
+      ...shieldedBindings,
       groth16VerifierAdapter: {
         personVerifierImmutable: adapterPersonVerifier,
         disclosureBindingVerifierImmutable: adapterDisclosureBindingVerifier,
@@ -254,6 +275,9 @@ const readTerminalProtocolDeploymentEvidence = async ({
     ],
     ["DeepFamilyArchive", addresses.archive, deploymentArtifacts.deepFamilyArchive],
     ["DeepFamilyReader", addresses.deepFamilyReader, deploymentArtifacts.deepFamilyReader],
+    ...shieldedArtifactEntries(shieldedBindings, deploymentArtifacts).map(
+      ([label, binding, artifact]) => [label, binding.address, artifact],
+    ),
   ];
   for (const [label, address, artifact] of runtimeContracts) {
     const runtimeBytecode = await terminalRead(`terminal ${label} runtime bytecode`, () =>
@@ -270,6 +294,7 @@ const readTerminalProtocolDeploymentEvidence = async ({
   }
 
   return {
+    ...shieldedDeploymentEvidence(shieldedBindings, deploymentArtifacts),
     deepFamilyArchive,
     verifierAdapter: {
       address: addresses.groth16VerifierAdapter,
@@ -335,6 +360,26 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       "DeepFamilyReader",
       terminalProjection.contracts.deepFamilyReader,
       manifest.deployments?.deepFamilyReader,
+    ],
+    ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+      spec.verifierContractName,
+      terminalProjection.contracts.shieldedVerifiers[action],
+      manifest.deployments.shieldedVerifiers[action],
+    ]),
+    ...SHIELDED_ACTIONS.map((action) => [
+      SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName,
+      terminalProjection.contracts.shieldedAdapters[action],
+      manifest.deployments.shieldedAdapters[action],
+    ]),
+    [
+      "ShieldedHeirKeyRegistry",
+      terminalProjection.contracts.shieldedHeirKeyRegistry,
+      manifest.deployments.shieldedHeirKeyRegistry,
+    ],
+    [
+      "ShieldedDeepPool",
+      terminalProjection.contracts.shieldedDeepPool,
+      manifest.deployments.shieldedDeepPool,
     ],
   ]) {
     assertCondition(
@@ -1010,18 +1055,48 @@ export const main = async (chainProfile) => {
     artifactsFileCount: acceptanceInputs.directories.artifacts.fileCount,
     artifactsDigest: acceptanceInputs.directories.artifacts.digest,
   };
-  const zkCeremonyVerification =
+  const ceremonyVerification =
     config.acceptanceMode === "release-rehearsal"
-      ? await verifyProductionCeremony({
+      ? await verifyAllProductionCeremonies({
           root: process.cwd(),
           ptauPath: resolveProductionPtauPath(),
         })
       : null;
+  const zkCeremonyVerification = ceremonyVerification
+    ? {
+        ...ceremonyVerification.legacy,
+        shielded: ceremonyVerification.shielded,
+        circuitCount: ceremonyVerification.circuitCount,
+      }
+    : null;
   const zkArtifactTrust = inspectZkReleaseArtifacts({
     root: process.cwd(),
     requireProduction: config.acceptanceMode === "release-rehearsal",
     requireBuiltR1cs: true,
   });
+  const shieldedCandidate = loadCandidateArtifacts({ root: process.cwd() });
+  if (
+    config.acceptanceMode === "release-rehearsal" &&
+    shieldedCandidate.manifest.productionReady !== true
+  )
+    throw new Error("Release rehearsal requires production public keys for all eleven circuits");
+  const shieldedArtifacts = {
+    status: "passed",
+    productionReady: shieldedCandidate.manifest.productionReady,
+    manifestSha256: shieldedCandidate.candidateManifestSha256,
+    circuits: Object.fromEntries(
+      Object.entries(shieldedCandidate.manifest.circuits).map(([action, item]) => [
+        action,
+        {
+          source: item.source,
+          sourceSha256: item.sourceSha256,
+          wasmSha256: item.wasmSha256,
+          zkeySha256: item.zkeySha256,
+          verificationKeySha256: item.verificationKeySha256,
+        },
+      ]),
+    ),
+  };
   const inspectedProtocolManifest = inspectProtocolReleaseManifest({
     root: process.cwd(),
     requireProduction: config.acceptanceMode === "release-rehearsal",
@@ -1059,6 +1134,7 @@ export const main = async (chainProfile) => {
     buildState,
     zkArtifactTrust,
     zkCeremonyVerification,
+    shieldedArtifacts,
     protocolManifestEvidence,
     network: {
       name: connection.networkName,
@@ -1661,30 +1737,23 @@ export const main = async (chainProfile) => {
       transactionReceipts,
     } = deployed;
     const addresses = {
-      token: await token.getAddress(),
-      poseidonT5: await poseidonT5.getAddress(),
-      adultAgeGate: await adultAgeGate.getAddress(),
-      personCommitmentVerifier: await personCommitmentVerifier.getAddress(),
-      disclosureBindingVerifier: await nameDisclosureVerifier.getAddress(),
-      groth16VerifierAdapter: await groth16VerifierAdapter.getAddress(),
-      deepFamily: await deepFamily.getAddress(),
-      deepFamilyImplementation: deepFamilyImplementationAddress,
+      ...(await integratedDeploymentAddresses(deployed)),
       archive: await archive.getAddress(),
-      deepFamilyReader: await deepFamilyReader.getAddress(),
     };
     Object.assign(report.addresses, addresses);
 
-    const expectedDeploymentMetadata = {
-      DeepFamilyToken: addresses.token,
-      PoseidonT5: addresses.poseidonT5,
-      AdultAgeGate: addresses.adultAgeGate,
-      PersonCommitmentVerifier: addresses.personCommitmentVerifier,
-      DisclosureBindingVerifier: addresses.disclosureBindingVerifier,
-      Groth16VerifierAdapter: addresses.groth16VerifierAdapter,
-      DeepFamily: addresses.deepFamily,
-      DeepFamilyArchive: addresses.archive,
-      DeepFamilyReader: addresses.deepFamilyReader,
-    };
+    const expectedDeploymentMetadata = Object.fromEntries(
+      INTEGRATED_DEPLOYMENT_RECORDS.map((record) => [
+        record.deploymentName,
+        addresses[
+          record.transactionLabel === "deepFamilyProxy"
+            ? "deepFamily"
+            : record.transactionLabel === "deepFamilyToken"
+              ? "token"
+              : record.transactionLabel
+        ],
+      ]),
+    );
     for (const [contractName, expectedAddress] of Object.entries(expectedDeploymentMetadata)) {
       const deploymentMetadata = JSON.parse(
         await fs.readFile(path.join(isolatedDeploymentDirectory, `${contractName}.json`), "utf8"),
@@ -1839,6 +1908,70 @@ export const main = async (chainProfile) => {
         addresses.deepFamily,
       ]),
     ];
+    for (const [name, address] of [
+      ["PoseidonT3", addresses.poseidonT3],
+      ["PoseidonT4", addresses.poseidonT4],
+      ["PoseidonT6", addresses.poseidonT6],
+    ])
+      initialVerificationEntries.push(await verificationEntry(hre.artifacts, name, address));
+    initialVerificationEntries.push(
+      await verificationEntry(
+        hre.artifacts,
+        "DeepFamilyLineageIndex",
+        addresses.deepFamilyLineageIndex,
+        [addresses.deepFamily],
+        {
+          PoseidonT3: addresses.poseidonT3,
+          PoseidonT4: addresses.poseidonT4,
+          PoseidonT5: addresses.poseidonT5,
+          PoseidonT6: addresses.poseidonT6,
+        },
+      ),
+    );
+    for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+      initialVerificationEntries.push(
+        await verificationEntry(
+          hre.artifacts,
+          spec.verifierContractName,
+          addresses[spec.verifierLabel],
+        ),
+      );
+      if (spec.actionId !== null)
+        initialVerificationEntries.push({
+          ...(await verificationEntry(
+            hre.artifacts,
+            spec.adapterContractName,
+            addresses[spec.adapterLabel],
+            [addresses[spec.verifierLabel], spec.actionId],
+          )),
+          label: spec.adapterDeploymentName,
+        });
+    }
+    initialVerificationEntries.push(
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedHeirKeyRegistry",
+        addresses.shieldedHeirKeyRegistry,
+        [addresses.deepFamilyLineageIndex, addresses.shieldedKeyRegistrationVerifier],
+        { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
+      ),
+    );
+    initialVerificationEntries.push(
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedDeepPool",
+        addresses.shieldedDeepPool,
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.shieldedHeirKeyRegistry,
+          SHIELDED_ACTIONS.map(
+            (action) => addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
+          ),
+        ],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
+    );
     if (config.runGovernanceLifecycle) {
       initialVerificationEntries.push({
         ...(await verificationEntry(
@@ -2382,6 +2515,27 @@ export const main = async (chainProfile) => {
         expectedSelectors: [STORY_ALREADY_SEALED_SELECTOR],
       },
     );
+    currentStep = "real-zk-shielded-business";
+    report.shielded = await runShieldedAcceptanceSmoke({
+      root: process.cwd(),
+      connection,
+      deployed,
+      signer: runDeployer,
+      person,
+      father,
+      mother,
+      personResult: addResult,
+      recordTx,
+      proofArtifacts: personProofArtifactPaths,
+    });
+    report.shielded.receipts = await verifyShieldedReceipts({
+      provider,
+      expectedChainId: EXPECTED_CHAIN_ID,
+      poolAddress: addresses.shieldedDeepPool,
+      allocationTxHash: report.transactions["shielded-action-allocate"].hash,
+    });
+    await addStep("real-zk-shielded-business", report.shielded);
+
     await recordTx(
       "cancel-endorsement",
       await deepFamily.connect(runDeployer).cancelEndorsement(personHash),
@@ -3278,6 +3432,7 @@ export const main = async (chainProfile) => {
       archive,
       deepFamilyReader,
       groth16VerifierAdapter,
+      deployed,
     });
     if (config.runGovernanceLifecycle) {
       assertCondition(
@@ -3459,6 +3614,13 @@ export const main = async (chainProfile) => {
         archive: terminalProtocolDeployment.archive,
         reader: terminalProtocolDeployment.reader,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
+        poseidonT3: terminalProtocolDeployment.poseidonT3,
+        poseidonT6: terminalProtocolDeployment.poseidonT6,
+        deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
+        shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
+        shieldedAdapters: terminalProtocolDeployment.shieldedAdapters,
+        shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
+        shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
       };
     } else {
@@ -3576,6 +3738,13 @@ export const main = async (chainProfile) => {
         verifierAdapter: terminalProtocolDeployment.verifierAdapter,
         archive: terminalProtocolDeployment.archive,
         proofRoutes: terminalProtocolDeployment.proofRoutes,
+        poseidonT3: terminalProtocolDeployment.poseidonT3,
+        poseidonT6: terminalProtocolDeployment.poseidonT6,
+        deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
+        shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
+        shieldedAdapters: terminalProtocolDeployment.shieldedAdapters,
+        shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
+        shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
       };
     }
     const terminalDeploymentEvidenceSha256 = protocolDeploymentEvidenceSha256(
@@ -3735,8 +3904,14 @@ export const main = async (chainProfile) => {
         report.productionParity.productionCeremonyVerified === true &&
         report.zkCeremonyVerification?.status === "passed" &&
         report.zkArtifactTrust.productionReady === true &&
+        report.shieldedArtifacts.productionReady === true &&
         report.protocolManifestEvidence.releaseStatus === "production",
       onchainChecksPassed: report.onchain.status === "passed",
+      shieldedCoveragePassed:
+        report.shielded?.status === "passed" &&
+        report.shielded?.receipts?.rpcChecks === "passed" &&
+        Object.keys(report.shielded?.proofs ?? {}).length === 9 &&
+        Object.values(report.shielded?.proofs ?? {}).every((proof) => proof.verified === true),
       terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
       deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,
       allRecordedStepsPassed: report.steps.every((step) => step.status === "passed"),
@@ -3761,7 +3936,7 @@ export const main = async (chainProfile) => {
         });
       } catch (validationError) {
         originalError = new Error(
-          `release-rehearsal report failed schema-v5 self-validation: ` +
+          `release-rehearsal report failed schema-v1 self-validation: ` +
             safeErrorMessage(validationError, secretValues),
         );
         report.releaseReady = false;

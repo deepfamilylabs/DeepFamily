@@ -173,7 +173,7 @@ or changing `.env` later never changes chain state.
 
 The protocol release command automatically reads the eSpace profile's fixed
 `tmp/release-evidence/espace-release-rehearsal.json` file and validates its contents rather than
-trusting its file name. It requires schema v5, `releaseReady=true`, the current clean commit and
+trusting its file name. It requires schema v1, `releaseReady=true`, the current clean commit and
 artifact-input digest, `evidenceType=initial-mainnet-release`,
 `governanceLifecycleIncluded=false`, the same deployed `MIN_DELAY`, production ZK evidence,
 finalized fresh-release transactions, complete source verification, initial governance checks, and
@@ -182,7 +182,7 @@ diagnostic, failed, or recovery mode is rejected before any Mainnet transaction.
 no Mock deployment, upgrade, governance migration, or Timelock wait.
 
 The acceptance runner retains its run-specific report beneath the ignored run directory and, only
-after a successful release rehearsal passes schema-v5 self-validation, publishes the exact bytes to
+after a successful release rehearsal passes schema-v1 self-validation, publishes the exact bytes to
 the fixed evidence path above. No environment setting or manual in-checkout copy selects release
 evidence. Record the published file's SHA-256 and independently compare it with the immutable
 off-machine archive before planning; that archive remains a review and recovery record, not an
@@ -314,7 +314,7 @@ will reject that Safe state; stop and obtain a new reviewed operational decision
 
 After Safe deployment and owner acceptance, reserve the deployer EOA exclusively and query its
 next **pending** nonce from the reviewed eSpace Mainnet RPC. This is the starting nonce of the
-16-step protocol release, not the nonce used by the already-completed Safe factory transaction:
+40-step protocol release, not the nonce used by the already-completed Safe factory transaction:
 
 ```bash
 node --env-file=.env --input-type=module -e '
@@ -337,7 +337,7 @@ npm run --silent espace:mainnet:release:projection -- \
 ```
 
 Review the chain ID `1030`, deployer, starting nonce, every derived address, every constructor
-immutable, the three compiled artifact hashes, the three exact immutable-linked runtime hashes,
+immutable, every compiled artifact hash and exact immutable-linked runtime hash,
 and `stableProjectionSha256`. Copy the output's exact `deployments` object into
 `protocol-release-manifest.json`; do not retype individual hashes or addresses. Finish freezing the
 remaining production manifest evidence and commit the complete chain-specific release state.
@@ -350,7 +350,7 @@ EVM_E2E_MODE=release-rehearsal npm run espace:acceptance
 ```
 
 The successful runner publishes
-`tmp/release-evidence/espace-release-rehearsal.json`. Accept only its schema-v5
+`tmp/release-evidence/espace-release-rehearsal.json`. Accept only its schema-v1
 `status=passed`, `releaseReady=true`, production ZK/ceremony evidence, matching release commit and
 shared release-input digest. Archive its exact bytes and SHA-256. The manifest intentionally names
 the eSpace Mainnet target while the rehearsal report contains internally verified testnet
@@ -376,7 +376,7 @@ the same clean production build used by execution. Review the printed chain,
 release commit and build inputs, deployer, Safe address and ordered owners, threshold, validated
 acceptance transaction, current Safe nonce `1`, delay, budget, expected contracts,
 verification/finality policy, checkpoint location, and plan digest. A second operator should also
-compare the 16 ordered transaction intent hashes with the approved release record and the chain
+compare the 40 ordered transaction intent hashes with the approved release record and the chain
 independently. Do not send another Safe transaction after this review.
 
 The plan also prints one exact UTF-8 EIP-191 approval message. At least two of the three current
@@ -414,8 +414,9 @@ The normal release sequence is:
 2. deploy and validate `GovernanceTimelock` with the production Safe as its sole
    proposer/canceller/executor and itself as its sole administrator;
 3. verify the Timelock source on ConfluxScan;
-4. deploy and wire the Token, libraries, ZK verifiers, adapter, DeepFamily implementation, UUPS
-   proxy, and reader while recording every receipt;
+4. deploy and wire the Token, libraries, all 11 ZK verifiers, nine adapters, DeepFamily
+   implementation and UUPS proxy, reader, lineage index, key registry, and shielded pool while
+   recording every receipt;
 5. transfer `DeepFamily.owner()` to the Timelock and confirm that the deployer has no governance
    role or protocol ownership;
 6. verify every release contract with the exact constructor arguments and linked libraries;
@@ -484,7 +485,7 @@ For Safe creation, an incomplete execution checkpoint must be resumed with
 `espace:mainnet:safe:execute` and its original reviewed digest. The Safe plan command stops when an
 incomplete checkpoint exists, so it can never claim “no transaction was broadcast” after a planned,
 submitted, or confirmed factory step. The release plan command applies the same rule to an
-incomplete 16-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
+incomplete 40-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
 approval file. A completed execute rerun performs read-only revalidation while the pinned initial
 state remains unchanged; it does not emit a new “no broadcast” plan.
 

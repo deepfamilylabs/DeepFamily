@@ -927,20 +927,14 @@
         "activeBinding": "DEEP_FAMILY.archive() == address(this)",
         "metadata": {
           "authorization": "msg.sender == DEEP_FAMILY",
-          "key": [
-            "personHash",
-            "versionIndex"
-          ],
+          "key": ["personHash", "versionIndex"],
           "writeOnce": true
         },
         "story": {
           "authorization": "msg.sender == DEEP_FAMILY.ownerOf(tokenId)",
           "schema": "nonzero opaque bytes; reserved biography schema rejected by ordinary append",
           "expectedPayloadHash": "mandatory keccak256(payload)",
-          "concurrency": [
-            "expectedIndex == totalRecords",
-            "expectedHead == recordsHead"
-          ],
+          "concurrency": ["expectedIndex == totalRecords", "expectedHead == recordsHead"],
           "initialHead": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "recordHash": "keccak256(abi.encode(STORY_RECORD_DOMAIN, uint256(chainId), address(archive), uint256(tokenId), uint64(index), bytes32(schemaId), bytes32(payloadHash), uint64(payloadLength), address(author), uint64(timestamp)))",
           "newHead": "keccak256(abi.encode(STORY_HEAD_DOMAIN, bytes32(previousHead), bytes32(recordHash)))",
@@ -976,10 +970,7 @@
             },
             "originalHash": "keccak256(complete canonical story JSON bytes)",
             "biographyType": 0,
-            "editableTypes": [
-              1,
-              19
-            ]
+            "editableTypes": [1, 19]
           }
         },
         "blob": {
@@ -1563,6 +1554,140 @@
     "deepFamilyArchive": {
       "address": null,
       "deepFamilyImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "token": null,
+    "poseidonT3": null,
+    "poseidonT6": null,
+    "deepFamilyLineageIndex": null,
+    "shieldedVerifiers": {
+      "keyRegistration": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "shield": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "createPolicy": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "allocate": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "topUp": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "mergeBudget": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "claim": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "privateTransfer": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "unshield": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      }
+    },
+    "shieldedAdapters": {
+      "shield": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "createPolicy": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "allocate": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "topUp": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "mergeBudget": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "claim": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "privateTransfer": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "unshield": {
+        "address": null,
+        "verifierImmutable": null,
+        "actionId": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      }
+    },
+    "shieldedHeirKeyRegistry": {
+      "address": null,
+      "lineageIndexImmutable": null,
+      "keyRegistrationVerifierImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "shieldedDeepPool": {
+      "address": null,
+      "tokenImmutable": null,
+      "lineageIndexImmutable": null,
+      "keyRegistryImmutable": null,
+      "adapterImmutables": {
+        "shield": null,
+        "createPolicy": null,
+        "allocate": null,
+        "topUp": null,
+        "mergeBudget": null,
+        "claim": null,
+        "privateTransfer": null,
+        "unshield": null
+      },
       "artifactSha256": null,
       "runtimeSha256": null
     }

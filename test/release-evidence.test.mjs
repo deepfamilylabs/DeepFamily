@@ -270,6 +270,7 @@ describe("multi-chain production release build evidence", function () {
 describe("shared acceptance and mainnet release input evidence", function () {
   it("uses one directory/file definition and includes protocol vectors in both flows", async function () {
     expect(RELEASE_INPUT_DIRECTORY_NAMES).to.include("protocol-vectors");
+    expect(RELEASE_INPUT_DIRECTORY_NAMES).to.include("frontend/public/zk");
     expect(RELEASE_INPUT_FILE_NAMES).to.include("protocol-release-manifest.json");
     const [acceptanceSource, mainnetSource] = await Promise.all([
       fs.readFile("scripts/evm-acceptance.mjs", "utf8"),
@@ -289,6 +290,11 @@ describe("shared acceptance and mainnet release input evidence", function () {
     try {
       for (const name of RELEASE_INPUT_FILE_NAMES) await writeFile(root, name, `${name}\n`);
       await writeFile(root, "protocol-vectors/vector.json", '{"version":1}\n');
+      await writeFile(
+        root,
+        "frontend/public/zk/shielded/shielded_claim_final.zkey",
+        "public proof key v1\n",
+      );
       const acceptanceSnapshot = await hashReleaseInputs(ethers, root);
       const mainnetSnapshot = await hashReleaseInputs(ethers, root);
       expect(acceptanceSnapshot).to.deep.equal(mainnetSnapshot);
@@ -298,6 +304,16 @@ describe("shared acceptance and mainnet release input evidence", function () {
         acceptanceSnapshot.directories["protocol-vectors"].digest,
       );
       expect(changed.digest).not.to.equal(acceptanceSnapshot.digest);
+      await writeFile(
+        root,
+        "frontend/public/zk/shielded/shielded_claim_final.zkey",
+        "public proof key v2\n",
+      );
+      const changedProofKey = await hashReleaseInputs(ethers, root);
+      expect(changedProofKey.directories["frontend/public/zk"].digest).not.to.equal(
+        changed.directories["frontend/public/zk"].digest,
+      );
+      expect(changedProofKey.digest).not.to.equal(changed.digest);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

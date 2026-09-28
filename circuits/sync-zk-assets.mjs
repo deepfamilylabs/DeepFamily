@@ -48,12 +48,13 @@ async function ensureDirectoryExists(directory) {
 export async function syncZkAssets({
   sourceDirectory = artifactsDir,
   destinationDirectory = targetDir,
+  files = FILES_TO_COPY,
   output = console,
   copyArtifact = (sourcePath, destinationPath) => fs.promises.copyFile(sourcePath, destinationPath),
 } = {}) {
   output.log("Syncing circuit artifacts to frontend/public/zk ...");
 
-  const copyPlan = FILES_TO_COPY.map((entry) => ({
+  const copyPlan = files.map((entry) => ({
     ...entry,
     sourcePath: path.join(sourceDirectory, entry.source),
     destinationPath: path.join(destinationDirectory, entry.destination),

@@ -355,10 +355,10 @@ describe("local shielded claim preparation", () => {
     await expect(prepareShieldedClaim(input)).rejects.toThrow("Single-leaf note roots");
   });
 
-  // Test-only opt-in for ignored development artifacts, never a runtime app setting.
+  // Test-only opt-in for real proofs using the same public artifacts as the app.
   // eslint-disable-next-line no-restricted-syntax
-  it.skipIf(process.env.SHIELDED_CLAIM_DEV_PROOF !== "1")(
-    "verifies a real local Groth16 claim proof with development keys",
+  it.skipIf(process.env.SHIELDED_CLAIM_PROOF !== "1")(
+    "verifies a real local Groth16 claim proof with current public keys",
     async () => {
       const input = await fixture();
       const prepared = await prepareShieldedClaim({
@@ -369,7 +369,7 @@ describe("local shielded claim preparation", () => {
       try {
         const source = "shielded_claim";
         const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
-        const artifacts = path.join(repoRoot, "zk-artifacts/shielded");
+        const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
@@ -379,8 +379,8 @@ describe("local shielded claim preparation", () => {
           cli,
           "groth16", "fullprove",
           inputPath,
-          path.join(artifacts, `${source}_js`, `${source}.wasm`),
-          path.join(artifacts, `${source}_dev_final.zkey`),
+          path.join(artifacts, `${source}.wasm`),
+          path.join(artifacts, `${source}_final.zkey`),
           proofPath,
           publicPath,
         ], { timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });

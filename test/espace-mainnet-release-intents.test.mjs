@@ -7,7 +7,16 @@ import {
   buildMainnetReleaseIntents,
   deriveMainnetReleaseIntentsDigest,
 } from "../scripts/lib/mainnetReleaseIntents.mjs";
-import { MAINNET_TRANSACTION_LABELS } from "../scripts/lib/mainnetReleaseSafety.mjs";
+import {
+  MAINNET_TRANSACTION_LABELS,
+  assertCompleteMainnetSourceVerification,
+} from "../scripts/lib/mainnetReleaseSafety.mjs";
+import { deriveMainnetPlannedAddresses } from "../scripts/lib/protocolDeploymentProjection.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const DEPLOYER = "0x1000000000000000000000000000000000000001";
 const MULTISIG = "0x2000000000000000000000000000000000000002";
@@ -16,6 +25,17 @@ const CHAIN_ID = 1030n;
 const MIN_DELAY = 86_400;
 
 const artifactPaths = {
+  ...Object.fromEntries(
+    Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.verifierContractName,
+      `artifacts/contracts/${spec.verifierContractName}.sol/${spec.verifierContractName}.json`,
+    ]),
+  ),
+  ShieldedGroth16ActionAdapter:
+    "artifacts/contracts/adapters/ShieldedGroth16ActionAdapter.sol/ShieldedGroth16ActionAdapter.json",
+  ShieldedHeirKeyRegistry:
+    "artifacts/contracts/ShieldedHeirKeyRegistry.sol/ShieldedHeirKeyRegistry.json",
+  ShieldedDeepPool: "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json",
   GovernanceTimelock:
     "artifacts/contracts/governance/GovernanceTimelock.sol/GovernanceTimelock.json",
   DeepFamilyToken: "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json",
@@ -58,11 +78,46 @@ const constructorData = (intent, artifact) =>
   `0x${intent.data.slice(String(artifact.bytecode).length)}`;
 
 describe("eSpace Mainnet release transaction intents", function () {
-  it("reconstructs the exact fifteen deployments and six calls in nonce order", async function () {
+  it("requires source verification for every deployed instance", function () {
+    const addresses = deriveMainnetPlannedAddresses({
+      ethers,
+      deployer: DEPLOYER,
+      startingNonce: STARTING_NONCE,
+    });
+    const contracts = [
+      ["GovernanceTimelock", addresses.timelock],
+      ["DeepFamily", addresses.deepFamilyImplementation],
+      ["UUPSProxy", addresses.deepFamily],
+      ...INTEGRATED_DEPLOYMENT_RECORDS.filter(
+        (record) => record.deploymentName !== "DeepFamily",
+      ).map((record) => [
+        record.deploymentName,
+        addresses[
+          record.transactionLabel === "deepFamilyToken" ? "token" : record.transactionLabel
+        ],
+      ]),
+    ].map(([label, address]) => ({ label, address, status: "passed" }));
+    expect(contracts).to.have.length(34);
+    expect(() => assertCompleteMainnetSourceVerification({ contracts, addresses })).not.to.throw();
+
+    const wrongAdapter = contracts.map((contract) => ({ ...contract }));
+    wrongAdapter.find((contract) => contract.label === "ShieldedClaimAdapter").address =
+      addresses.shieldedAllocateAdapter;
+    expect(() =>
+      assertCompleteMainnetSourceVerification({ contracts: wrongAdapter, addresses }),
+    ).to.throw(/incomplete source verification/);
+    const duplicate = contracts.map((contract) => ({ ...contract }));
+    duplicate[duplicate.length - 1] = { ...duplicate[0] };
+    expect(() =>
+      assertCompleteMainnetSourceVerification({ contracts: duplicate, addresses }),
+    ).to.throw(/incomplete source verification/);
+  });
+
+  it("reconstructs all thirty-four deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(21);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(15);
+    expect(intents).to.have.length(40);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(34);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -136,9 +191,7 @@ describe("eSpace Mainnet release transaction intents", function () {
 
     const readerArgs = decodeConstructor("deepFamilyReader", "DeepFamilyReader", ["address"]);
     expect(readerArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
-    const archiveArgs = decodeConstructor("deepFamilyArchive", "DeepFamilyArchive", [
-      "address",
-    ]);
+    const archiveArgs = decodeConstructor("deepFamilyArchive", "DeepFamilyArchive", ["address"]);
     expect(archiveArgs[0]).to.equal(byLabel.deepFamilyProxy.predictedAddress);
 
     const tokenInitialize = tokenInterface.decodeFunctionData(
@@ -176,7 +229,8 @@ describe("eSpace Mainnet release transaction intents", function () {
     const indexData = byLabel.deepFamilyLineageIndex.data.slice(2);
     for (const libraries of Object.values(loaded.DeepFamilyLineageIndex.linkReferences)) {
       for (const [libraryName, references] of Object.entries(libraries)) {
-        const expected = byLabel[`poseidon${libraryName.slice("Poseidon".length)}`].predictedAddress;
+        const expected =
+          byLabel[`poseidon${libraryName.slice("Poseidon".length)}`].predictedAddress;
         for (const { start, length } of references) {
           expect(indexData.slice(start * 2, (start + length) * 2), libraryName).to.equal(
             expected.slice(2).toLowerCase(),
@@ -195,7 +249,6 @@ describe("eSpace Mainnet release transaction intents", function () {
     expect(byLabel.setLineageIndex.to).to.equal(byLabel.deepFamilyProxy.predictedAddress);
     expect(setLineageIndex[0]).to.equal(byLabel.deepFamilyLineageIndex.predictedAddress);
     expect(byLabel.setLineageIndex.nonce).to.be.lessThan(byLabel.transferDeepFamilyOwnership.nonce);
-
   });
 
   it("changes the plan digest when any core intent field changes", async function () {

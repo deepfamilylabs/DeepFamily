@@ -362,10 +362,10 @@ describe("local private allocation and top-up preparation", () => {
     })).rejects.toThrow("belongs to another identity");
   });
 
-  // Development artifacts are ignored and never loaded by the runtime app.
+  // Test-only opt-in for real proofs using the same public artifacts as the app.
   // eslint-disable-next-line no-restricted-syntax
-  it.skipIf(process.env.SHIELDED_FUNDING_DEV_PROOF !== "1")(
-    "verifies the composed Allocate and TopUp witnesses with local development Groth16 keys",
+  it.skipIf(process.env.SHIELDED_FUNDING_PROOF !== "1")(
+    "verifies the composed Allocate and TopUp witnesses with current public Groth16 keys",
     async () => {
       const fixture = await setup();
       const allocated = await prepareShieldedAllocate({
@@ -385,7 +385,7 @@ describe("local private allocation and top-up preparation", () => {
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-funding-prep-"));
       try {
         const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
-        const artifacts = path.join(repoRoot, "zk-artifacts/shielded");
+        const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         for (const [source, witness] of [
           ["shielded_allocate", allocated.witness],
@@ -399,8 +399,8 @@ describe("local private allocation and top-up preparation", () => {
             cli,
             "groth16", "fullprove",
             inputPath,
-            path.join(artifacts, `${source}_js`, `${source}.wasm`),
-            path.join(artifacts, `${source}_dev_final.zkey`),
+            path.join(artifacts, `${source}.wasm`),
+            path.join(artifacts, `${source}_final.zkey`),
             proofPath,
             publicPath,
           ], { timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });

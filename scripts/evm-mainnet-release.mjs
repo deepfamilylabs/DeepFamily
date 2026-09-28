@@ -14,12 +14,19 @@ import { formatEther } from "ethers";
 import hre from "hardhat";
 
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
+import {
+  INTEGRATED_DEPLOYMENT_RECORDS,
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  integratedDeploymentAddresses,
+} from "./lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import { readExactTimelockRoleState } from "../tasks/lib/timelockMultisigMigration.mjs";
 import { verifyAcceptanceContracts } from "./lib/acceptanceVerification.mjs";
 import {
   MAINNET_STATE_SCHEMA_VERSION,
   MAINNET_TRANSACTION_LABELS,
+  assertCompleteMainnetSourceVerification,
   assertMainnetReleaseSafeAcceptanceNonce,
   assertPlanMatchesCheckpoint,
   buildMainnetPlanApprovalMessage,
@@ -60,7 +67,7 @@ import {
   deriveMainnetPlannedAddresses,
 } from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
-import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
+import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
 import { checkShieldedRelease } from "./zk-shielded-release-check.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
@@ -106,28 +113,14 @@ const configureChainProfile = (chainProfile) => {
 };
 const CORE_DEPLOYMENT_FILES = [
   "GovernanceTimelock.json",
-  "DeepFamilyToken.json",
-  "PoseidonT5.json",
-  "AdultAgeGate.json",
-  "PersonCommitmentVerifier.json",
-  "DisclosureBindingVerifier.json",
-  "Groth16VerifierAdapter.json",
-  "DeepFamily.json",
-  "DeepFamilyArchive.json",
-  "DeepFamilyReader.json",
+  ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => `${record.deploymentName}.json`),
 ];
 const RELEASE_ARTIFACT_NAMES = Object.freeze([
-  "GovernanceTimelock",
-  "DeepFamilyToken",
-  "PoseidonT5",
-  "AdultAgeGate",
-  "PersonCommitmentVerifier",
-  "DisclosureBindingVerifier",
-  "Groth16VerifierAdapter",
-  "DeepFamily",
-  "UUPSProxy",
-  "DeepFamilyArchive",
-  "DeepFamilyReader",
+  ...new Set([
+    "GovernanceTimelock",
+    "UUPSProxy",
+    ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => record.contractName),
+  ]),
 ]);
 
 const nowIso = () => new Date().toISOString();
@@ -254,15 +247,17 @@ const buildFingerprint = ({
     transcriptSha256: zkArtifactTrust.transcriptSha256,
     artifacts: zkArtifactTrust.artifacts,
     ceremonyVerification: {
-      status: zkCeremonyVerification.status,
-      ceremonyId: zkCeremonyVerification.ceremonyId,
-      manifestSha256: zkCeremonyVerification.manifestSha256,
-      transcriptSha256: zkCeremonyVerification.transcriptSha256,
-      trustModel: zkCeremonyVerification.trustModel,
-      contributorCount: zkCeremonyVerification.contributorCount,
-      minimumContributors: zkCeremonyVerification.minimumContributors,
-      ptauSha256: zkCeremonyVerification.ptau.sha256,
-      ptauBlake2b512: zkCeremonyVerification.ptau.blake2b512,
+      status: zkCeremonyVerification.legacy.status,
+      circuitCount: zkCeremonyVerification.circuitCount,
+      shieldedManifestSha256: zkCeremonyVerification.shielded.manifestSha256,
+      ceremonyId: zkCeremonyVerification.legacy.ceremonyId,
+      manifestSha256: zkCeremonyVerification.legacy.manifestSha256,
+      transcriptSha256: zkCeremonyVerification.legacy.transcriptSha256,
+      trustModel: zkCeremonyVerification.legacy.trustModel,
+      contributorCount: zkCeremonyVerification.legacy.contributorCount,
+      minimumContributors: zkCeremonyVerification.legacy.minimumContributors,
+      ptauSha256: zkCeremonyVerification.legacy.ptau.sha256,
+      ptauBlake2b512: zkCeremonyVerification.legacy.ptau.blake2b512,
     },
   },
   protocolReleaseManifest: {
@@ -470,6 +465,10 @@ const verifyContracts = async ({ entries, checkpoint, saveCheckpoint }) => {
       verificationProvider: MAINNET_PROFILE.verificationProvider,
       explorerName: MAINNET_PROFILE.explorerName,
     });
+    assertCompleteMainnetSourceVerification({
+      contracts: checkpoint.verification.contracts,
+      addresses: checkpoint.addresses,
+    });
     checkpoint.verification.status = "passed";
     await saveCheckpoint();
   } catch (error) {
@@ -529,6 +528,43 @@ const assertProtocolTerminalState = async ({
     ["UUPSProxy", addresses.deepFamily, { needsLibraries: false }],
     ["DeepFamilyArchive", addresses.deepFamilyArchive, { needsLibraries: false }],
     ["DeepFamilyReader", addresses.deepFamilyReader, { needsLibraries: false }],
+    ...["PoseidonT3", "PoseidonT4", "PoseidonT6"].map((name) => [
+      name,
+      addresses[name[0].toLowerCase() + name.slice(1)],
+      { needsLibraries: false, librarySelfAddress: true },
+    ]),
+    [
+      "DeepFamilyLineageIndex",
+      addresses.deepFamilyLineageIndex,
+      {
+        libraries: {
+          PoseidonT3: addresses.poseidonT3,
+          PoseidonT4: addresses.poseidonT4,
+          PoseidonT5: addresses.poseidonT5,
+          PoseidonT6: addresses.poseidonT6,
+        },
+      },
+    ],
+    ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
+      spec.verifierContractName,
+      addresses[spec.verifierLabel],
+      { needsLibraries: false },
+    ]),
+    ...SHIELDED_ACTIONS.map((action) => [
+      "ShieldedGroth16ActionAdapter",
+      addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
+      { needsLibraries: false },
+    ]),
+    [
+      "ShieldedHeirKeyRegistry",
+      addresses.shieldedHeirKeyRegistry,
+      { libraries: { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 } },
+    ],
+    [
+      "ShieldedDeepPool",
+      addresses.shieldedDeepPool,
+      { libraries: { PoseidonT3: addresses.poseidonT3 } },
+    ],
   ];
   for (const [contractName, address, spec] of artifactChecks) {
     await assertImplementationMatchesArtifact({
@@ -611,6 +647,14 @@ const assertProtocolTerminalState = async ({
     ],
   ];
   for (const [passed, message] of invariants) if (!passed) throw new Error(message);
+  if (!sameAddress(await deepFamily.lineageIndex(), addresses.deepFamilyLineageIndex))
+    throw new Error("DeepFamily lineage index binding mismatch");
+  const lineageIndex = await ethers.getContractAt(
+    "DeepFamilyLineageIndex",
+    addresses.deepFamilyLineageIndex,
+  );
+  if (!sameAddress(await lineageIndex.DEEP_FAMILY(), addresses.deepFamily))
+    throw new Error("Lineage index DeepFamily binding mismatch");
   const deploymentEvidence = assertPlannedProtocolDeploymentMatchesManifest({
     root: process.cwd(),
     chainId: config.chainId,
@@ -761,15 +805,14 @@ const revalidateCompletedRelease = async ({
     recordedLabels.some((label, index) => label !== expectedLabels[index]) ||
     expectedLabels.some((label) => checkpoint.transactions[label]?.status !== "finalized")
   ) {
-    throw new Error("Completed mainnet checkpoint does not contain exactly 18 finalized steps");
+    throw new Error(
+      `Completed mainnet checkpoint does not contain exactly ${MAINNET_TRANSACTION_LABELS.length} finalized steps`,
+    );
   }
-  const verifiedContracts = checkpoint.verification.contracts ?? [];
-  if (
-    verifiedContracts.length !== RELEASE_ARTIFACT_NAMES.length ||
-    verifiedContracts.some((entry) => entry.status !== "passed")
-  ) {
-    throw new Error("Completed mainnet checkpoint does not contain complete source verification");
-  }
+  assertCompleteMainnetSourceVerification({
+    contracts: checkpoint.verification.contracts,
+    addresses: checkpoint.addresses,
+  });
 
   await revalidateCheckpointTransactions({
     provider,
@@ -836,11 +879,6 @@ export const main = async (chainProfile) => {
     throw new Error("Mainnet release command mode does not match its approval input");
   }
 
-  // The inheritance page now targets ShieldedDeepPool. Release planning must
-  // include its verifiers, registry, and pool before any core transaction is sent.
-  if (!MAINNET_TRANSACTION_LABELS.includes("shieldedDeepPool")) {
-    throw new Error("Mainnet release plan does not yet deploy the shielded inheritance pool");
-  }
   await checkShieldedRelease({ root: process.cwd() });
 
   const connection = await hre.network.connect();
@@ -878,7 +916,7 @@ export const main = async (chainProfile) => {
       );
     }
   }
-  const zkCeremonyVerification = await verifyProductionCeremony({
+  const zkCeremonyVerification = await verifyAllProductionCeremonies({
     root: process.cwd(),
     ptauPath: resolveProductionPtauPath(),
   });
@@ -1359,6 +1397,7 @@ export const main = async (chainProfile) => {
       governanceMultisigProfile: config.governanceMultisigProfile,
     });
     const addresses = {
+      ...(await integratedDeploymentAddresses(deployed)),
       governanceSafe: config.governanceMultisig,
       timelock: timelockAddress,
       token: await deployed.token.getAddress(),
@@ -1428,6 +1467,67 @@ export const main = async (chainProfile) => {
       await verificationEntry(hre.artifacts, "DeepFamilyReader", addresses.deepFamilyReader, [
         addresses.deepFamily,
       ]),
+      ...(await Promise.all(
+        ["PoseidonT3", "PoseidonT4", "PoseidonT6"].map((name) =>
+          verificationEntry(hre.artifacts, name, addresses[name[0].toLowerCase() + name.slice(1)]),
+        ),
+      )),
+      await verificationEntry(
+        hre.artifacts,
+        "DeepFamilyLineageIndex",
+        addresses.deepFamilyLineageIndex,
+        [addresses.deepFamily],
+        {
+          PoseidonT3: addresses.poseidonT3,
+          PoseidonT4: addresses.poseidonT4,
+          PoseidonT5: addresses.poseidonT5,
+          PoseidonT6: addresses.poseidonT6,
+        },
+      ),
+      ...(await Promise.all(
+        Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) =>
+          verificationEntry(
+            hre.artifacts,
+            spec.verifierContractName,
+            addresses[spec.verifierLabel],
+          ),
+        ),
+      )),
+      ...(await Promise.all(
+        SHIELDED_ACTIONS.map(async (action) => {
+          const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+          return {
+            ...(await verificationEntry(
+              hre.artifacts,
+              spec.adapterContractName,
+              addresses[spec.adapterLabel],
+              [addresses[spec.verifierLabel], spec.actionId],
+            )),
+            label: spec.adapterDeploymentName,
+          };
+        }),
+      )),
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedHeirKeyRegistry",
+        addresses.shieldedHeirKeyRegistry,
+        [addresses.deepFamilyLineageIndex, addresses.shieldedKeyRegistrationVerifier],
+        { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedDeepPool",
+        addresses.shieldedDeepPool,
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.shieldedHeirKeyRegistry,
+          SHIELDED_ACTIONS.map(
+            (action) => addresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel],
+          ),
+        ],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
     ];
     await verifyContracts({ entries: verificationEntries, checkpoint, saveCheckpoint });
 

@@ -42,17 +42,13 @@ import {
 import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
+import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import { currentShieldedCandidateManifest } from "../scripts/lib/shieldedArtifacts.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
-const DEV_ARTIFACTS = path.join(ROOT, "zk-artifacts", "shielded");
-const MANIFEST = path.join(DEV_ARTIFACTS, "development-manifest.json");
+const PUBLIC_ARTIFACTS = path.join(ROOT, "frontend", "public", "zk", "shielded");
 const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const PERIOD = 2_592_000n;
-const CIRCUIT_SOURCES = {
-  createPolicy: "shielded_create_policy",
-  privateTransfer: "shielded_private_transfer",
-  topUp: "shielded_top_up",
-};
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const zeroData = () => ({
   inputShardIds: [0n, 0n],
@@ -68,59 +64,87 @@ const zeroData = () => ({
   registryShardId: 0n,
 });
 
-function circuitFiles(action) {
-  const source = CIRCUIT_SOURCES[action] ?? `shielded_${action}`;
+function circuitFiles(action, manifest) {
+  manifest ??= JSON.parse(
+    fs.readFileSync(path.join(ROOT, currentShieldedCandidateManifest({ root: ROOT })), "utf8"),
+  );
+  const source = SHIELDED_CIRCUITS[action];
+  assert.ok(source, `Unknown shielded circuit action: ${action}`);
   return {
     source,
+    contractName: manifest.circuits[action].verifierContractName,
     circuit: path.join(ROOT, "circuits", `${source}.circom`),
-    r1cs: path.join(DEV_ARTIFACTS, `${source}.r1cs`),
-    wasm: path.join(DEV_ARTIFACTS, `${source}_js`, `${source}.wasm`),
-    zkey: path.join(DEV_ARTIFACTS, `${source}_dev_final.zkey`),
-    vkey: path.join(DEV_ARTIFACTS, `${source}.vkey.json`),
-    verifier: path.join(DEV_ARTIFACTS, "verifiers", `${source}.sol`),
+    wasm: path.join(PUBLIC_ARTIFACTS, `${source}.wasm`),
+    zkey: path.join(PUBLIC_ARTIFACTS, `${source}_final.zkey`),
+    vkey: path.join(PUBLIC_ARTIFACTS, `${source}.vkey.json`),
+    verifier: path.join(ROOT, manifest.circuits[action].verifierPath),
   };
 }
 
-function checkedDevelopmentArtifacts(actions) {
+function checkedCurrentArtifacts(actions) {
+  const manifestFile = path.join(ROOT, currentShieldedCandidateManifest({ root: ROOT }));
+  if (!fs.existsSync(manifestFile)) return { missing: [manifestFile] };
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
+  const development = manifest.schema === "deepfamily/shielded-development-keys@1";
+  const production = manifest.schema === "deepfamily/shielded-production-artifacts@1";
+  assert.ok(development || production, "Unknown current shielded artifact manifest schema");
+  assert.equal(manifest.developmentOnly, development);
+  assert.equal(manifest.productionReady, production);
+  if (production) assert.equal(manifest.status, "production");
+  assert.deepEqual(Object.keys(manifest.circuits).sort(), Object.keys(SHIELDED_CIRCUITS).sort());
+  for (const action of actions) {
+    const item = manifest.circuits[action];
+    const contractName = `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`;
+    assert.equal(item.source, SHIELDED_CIRCUITS[action]);
+    assert.equal(item.verifierContractName, contractName);
+    assert.equal(item.verifierPath, `contracts/${contractName}.sol`);
+  }
   const paths = [
-    MANIFEST,
+    manifestFile,
     ...actions.flatMap((action) =>
-      Object.entries(circuitFiles(action))
-        .filter(([kind]) => kind !== "source")
+      Object.entries(circuitFiles(action, manifest))
+        .filter(([kind]) => kind !== "source" && kind !== "contractName")
         .map(([, file]) => file),
     ),
   ];
   const missing = paths.filter((file) => !fs.existsSync(file));
-  if (missing.length > 0) return { missing };
+  if (missing.length > 0) {
+    assert.equal(
+      production,
+      false,
+      `Current production proof artifacts are missing: ${missing.join(", ")}`,
+    );
+    return { missing };
+  }
 
-  const manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
-  assert.equal(manifest.developmentOnly, true, "Only development proving keys may run this test");
-  assert.equal(manifest.productionReady, false, "This test must never use production keys");
   for (const action of actions) {
-    const files = circuitFiles(action);
+    const files = circuitFiles(action, manifest);
     const item = manifest.circuits?.[action];
-    assert.equal(item?.source, files.source, `Missing development manifest entry for ${action}`);
+    assert.equal(item?.source, files.source, `Missing current manifest entry for ${action}`);
     for (const [kind, digest] of [
       ["circuit", item.sourceSha256],
-      ["r1cs", item.r1csSha256],
       ["wasm", item.wasmSha256],
       ["zkey", item.zkeySha256],
       ["vkey", item.verificationKeySha256],
-      ["verifier", item.verifierSha256],
+      ["verifier", development ? item.solidityVerifierSha256 : item.verifierSha256],
     ]) {
       assert.equal(
         sha256(files[kind]),
         digest,
-        `${action} ${kind} changed after development setup`,
+        `${action} ${kind} differs from the current public artifact manifest`,
       );
     }
+    assert.equal(
+      JSON.parse(fs.readFileSync(files.vkey, "utf8")).nPublic,
+      action === "keyRegistration" ? 7 : 32,
+    );
   }
   return { manifest };
 }
 
-async function deployGeneratedDevelopmentVerifiers(actions, signer) {
-  // Compile ignored, development-only snarkjs output in memory. It is never
-  // copied into contracts/, frontend/public/, ABI releases, or deployments.
+async function deployCurrentGeneratedVerifiers(actions, signer) {
+  // Compile the named contracts matching the current public proving keys and deploy only to
+  // Hardhat's in-process test chain. These measurements are never release evidence.
   const compilerModule = path.join(
     ROOT,
     "node_modules",
@@ -155,11 +179,11 @@ async function deployGeneratedDevelopmentVerifiers(actions, signer) {
   assert.deepEqual(
     errors,
     [],
-    `Development verifier compilation failed: ${JSON.stringify(errors)}`,
+    `Current public verifier compilation failed: ${JSON.stringify(errors)}`,
   );
   const deployed = {};
   for (const action of actions) {
-    const artifact = compiled.contracts[`${action}.sol`].Groth16Verifier;
+    const artifact = compiled.contracts[`${action}.sol`][circuitFiles(action).contractName];
     const factory = new hre.ethers.ContractFactory(
       artifact.abi,
       `0x${artifact.evm.bytecode.object}`,
@@ -247,7 +271,7 @@ async function prove(action, witness, expectedSignals) {
     assert.match(
       runSnarkjs(["groth16", "verify", files.vkey, publicPath, proofPath]),
       /OK!/u,
-      `${action} proof did not verify with its development verification key`,
+      `${action} proof did not verify with its current public verification key`,
     );
     const proof = JSON.parse(fs.readFileSync(proofPath, "utf8"));
     return encodeGroth16AbcProofData(normalizeGroth16Proof(proof));
@@ -276,14 +300,14 @@ function assertInvalidCircuitWitness(action, witness, expectedFailure) {
   }
 }
 
-describe("Shielded pool real Groth16 development integration", function () {
+describe("Shielded pool real Groth16 current public artifact integration", function () {
   this.timeout(1_200_000);
 
-  it("proves one synthetic full 64/32 path and twelve periods with real development keys", async function () {
-    const artifacts = checkedDevelopmentArtifacts(["claim"]);
+  it("proves one synthetic full 64/32 path and twelve periods with current public keys", async function () {
+    const artifacts = checkedCurrentArtifacts(["claim"]);
     if (artifacts.missing) {
       console.log(
-        `Skipping development-only full-path proof; run npm run zk:shielded:development:setup (${artifacts.missing.length} artifacts absent)`,
+        `Skipping local full-path proof; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
@@ -350,16 +374,16 @@ describe("Shielded pool real Groth16 development integration", function () {
   });
 
   it("uses real shield and unshield proofs through Solidity verifiers and the pool", async function () {
-    const artifacts = checkedDevelopmentArtifacts(["shield", "unshield"]);
+    const artifacts = checkedCurrentArtifacts(["shield", "unshield"]);
     if (artifacts.missing) {
       console.log(
-        `Skipping development-only real proof test; run npm run zk:shielded:development:setup (${artifacts.missing.length} artifacts absent)`,
+        `Skipping local real proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
 
     const [depositor, recipient] = await hre.ethers.getSigners();
-    const generated = await deployGeneratedDevelopmentVerifiers(["shield", "unshield"], depositor);
+    const generated = await deployCurrentGeneratedVerifiers(["shield", "unshield"], depositor);
     const shieldAdapter = await hre.ethers.deployContract("ShieldedGroth16ActionAdapter", [
       await generated.shield.getAddress(),
       0,
@@ -528,22 +552,22 @@ describe("Shielded pool real Groth16 development integration", function () {
       pool.unshield(recipient.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
     console.log(
-      `development-only Hardhat gas: shield=${shieldReceipt.gasUsed} unshield=${unshieldReceipt.gasUsed}`,
+      `local Hardhat gas (not release evidence): shield=${shieldReceipt.gasUsed} unshield=${unshieldReceipt.gasUsed}`,
     );
   });
 
   it("allocates, tops up, and claims one or twelve full periods with real proofs", async function () {
     const actions = ["shield", "createPolicy", "allocate", "topUp", "claim"];
-    const artifacts = checkedDevelopmentArtifacts(actions);
+    const artifacts = checkedCurrentArtifacts(actions);
     if (artifacts.missing) {
       console.log(
-        `Skipping development-only allocation/claim proof test; run npm run zk:shielded:development:setup (${artifacts.missing.length} artifacts absent)`,
+        `Skipping local allocation/claim proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
 
     const [depositor] = await hre.ethers.getSigners();
-    const generated = await deployGeneratedDevelopmentVerifiers(actions, depositor);
+    const generated = await deployCurrentGeneratedVerifiers(actions, depositor);
     const mockAdapter = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
     const verifierAddresses = Array(8).fill(await mockAdapter.getAddress());
     for (const [action, actionIndex] of [
@@ -1338,21 +1362,21 @@ describe("Shielded pool real Groth16 development integration", function () {
       RangeError,
     );
     console.log(
-      `development-only Hardhat gas: createPolicy=${createPolicyReceipt.gasUsed} allocate=${allocateReceipt.gasUsed} topUp=${topUpReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
+      `local Hardhat gas (not release evidence): createPolicy=${createPolicyReceipt.gasUsed} allocate=${allocateReceipt.gasUsed} topUp=${topUpReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
     );
   });
 
   it("privately transfers two owners' notes through a real proof without changing pool assets", async function () {
-    const artifacts = checkedDevelopmentArtifacts(["shield", "privateTransfer"]);
+    const artifacts = checkedCurrentArtifacts(["shield", "privateTransfer"]);
     if (artifacts.missing) {
       console.log(
-        `Skipping development-only private transfer proof test; run npm run zk:shielded:development:setup (${artifacts.missing.length} artifacts absent)`,
+        `Skipping local private transfer proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
 
     const [depositor] = await hre.ethers.getSigners();
-    const generated = await deployGeneratedDevelopmentVerifiers(
+    const generated = await deployCurrentGeneratedVerifiers(
       ["shield", "privateTransfer"],
       depositor,
     );
@@ -1549,23 +1573,25 @@ describe("Shielded pool real Groth16 development integration", function () {
     const singleSource = recipients[0];
     const singleRoot = (await pool.noteShard(0)).root;
     const singlePath = compactMembership(await pool.getNoteMerkleProof(0, 4));
-    const singleDestinations = await Promise.all([
-      { ownerSecret: 5505n, amount: 25n, nonce: 41n, hpkeIkm: "0x5555" },
-      { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
-    ].map(async (destination) => {
-      const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
-      const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
-      const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-      const note = await encryptValueNote({
-        ownerCommitment,
-        viewingKey,
-        chainId,
-        poolAddress,
-        amount: destination.amount,
-        nonce: destination.nonce,
-      });
-      return { ...destination, hpkeIkm, ownerCommitment, note };
-    }));
+    const singleDestinations = await Promise.all(
+      [
+        { ownerSecret: 5505n, amount: 25n, nonce: 41n, hpkeIkm: "0x5555" },
+        { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
+      ].map(async (destination) => {
+        const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
+        const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
+        const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+        const note = await encryptValueNote({
+          ownerCommitment,
+          viewingKey,
+          chainId,
+          poolAddress,
+          amount: destination.amount,
+          nonce: destination.nonce,
+        });
+        return { ...destination, hpkeIkm, ownerCommitment, note };
+      }),
+    );
     const singleNullifiers = [
       computeShieldedSpendNullifier({
         ownerSecret: singleSource.ownerSecret,
@@ -1601,15 +1627,18 @@ describe("Shielded pool real Groth16 development integration", function () {
         inputDepths: [singlePath.depth, "0"],
         inputIndices: [singlePath.index, "0"],
         inputSiblings: [singlePath.siblings, Array(32).fill("0")],
-        outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) => String(ownerCommitment)),
+        outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) =>
+          String(ownerCommitment),
+        ),
         outputAmounts: singleDestinations.map(({ amount }) => String(amount)),
         outputNonces: singleDestinations.map(({ nonce }) => String(nonce)),
       },
       singleSignals,
     );
     expect(await transferAdapter.verifyProof(singleProof, singleSignals)).to.equal(true);
-    await expect(pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof))
-      .to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    await expect(
+      pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
     const singleReceipt = await (await pool.privateTransfer(singleData, singleProof)).wait();
     for (const nullifier of singleNullifiers) {
       expect(await pool.nullifierSpent(nullifier)).to.equal(true);
@@ -1634,6 +1663,8 @@ describe("Shielded pool real Groth16 development integration", function () {
       pool,
       "NullifierAlreadySpent",
     );
-    console.log(`development-only Hardhat gas: privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`);
+    console.log(
+      `local Hardhat gas (not release evidence): privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`,
+    );
   });
 });

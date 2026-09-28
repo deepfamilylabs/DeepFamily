@@ -5,6 +5,16 @@ import hre from "hardhat";
 import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import { buildMainnetReleaseIntents } from "../scripts/lib/mainnetReleaseIntents.mjs";
 import { createCheckpointedTransactionExecutor } from "../scripts/lib/mainnetReleaseState.mjs";
+import { assertOnChainProtocolDeploymentRuntimes } from "../scripts/lib/protocolDeploymentProjection.mjs";
+import {
+  inspectProtocolDeploymentArtifacts,
+  shieldedDeploymentBindingsFromAddresses,
+} from "../scripts/lib/protocolReleaseManifest.mjs";
+import {
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  integratedDeploymentAddresses,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 describe("eSpace Mainnet resumable deployment integration", function () {
   this.timeout(120_000);
@@ -29,7 +39,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(19);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(38);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -50,6 +60,28 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     expect(await second.deepFamilyReader.getAddress()).to.equal(
       await first.deepFamilyReader.getAddress(),
     );
+
+    const addresses = await integratedDeploymentAddresses(first);
+    const deploymentArtifacts = inspectProtocolDeploymentArtifacts({
+      root: process.cwd(),
+      deployments: {
+        ...shieldedDeploymentBindingsFromAddresses(addresses),
+        groth16VerifierAdapter: {
+          personVerifierImmutable: addresses.personCommitmentVerifier,
+          disclosureBindingVerifierImmutable: addresses.disclosureBindingVerifier,
+        },
+        deepFamilyArchive: { deepFamilyImmutable: addresses.deepFamily },
+        deepFamilyReader: {
+          deepFamilyImmutable: addresses.deepFamily,
+          archiveImmutable: addresses.deepFamilyArchive,
+        },
+      },
+    });
+    await assertOnChainProtocolDeploymentRuntimes({
+      provider: ethers.provider,
+      plannedAddresses: addresses,
+      deploymentArtifacts,
+    });
   });
 
   it("matches all generated intents to the Hardhat factories used by the live release", async function () {
@@ -131,9 +163,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       },
       setArchive: {
         to: address("deepFamilyProxy"),
-        data: DeepFamily.interface.encodeFunctionData("setArchive", [
-          address("deepFamilyArchive"),
-        ]),
+        data: DeepFamily.interface.encodeFunctionData("setArchive", [address("deepFamilyArchive")]),
       },
       setPersonRelationVerifier: {
         to: address("deepFamilyProxy"),
@@ -168,6 +198,41 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         ]),
       },
     };
+    for (const spec of Object.values(SHIELDED_DEPLOYMENT_CIRCUITS)) {
+      requests[spec.verifierLabel] = await (
+        await ethers.getContractFactory(spec.verifierContractName, deployer)
+      ).getDeployTransaction();
+    }
+    const actionAdapterFactory = await ethers.getContractFactory(
+      "ShieldedGroth16ActionAdapter",
+      deployer,
+    );
+    for (const action of SHIELDED_ACTIONS) {
+      const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+      requests[spec.adapterLabel] = await actionAdapterFactory.getDeployTransaction(
+        address(spec.verifierLabel),
+        spec.actionId,
+      );
+    }
+    const registryFactory = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
+      signer: deployer,
+      libraries: { PoseidonT3: address("poseidonT3"), PoseidonT6: address("poseidonT6") },
+    });
+    requests.shieldedHeirKeyRegistry = await registryFactory.getDeployTransaction(
+      address("deepFamilyLineageIndex"),
+      address("shieldedKeyRegistrationVerifier"),
+    );
+    const poolFactory = await ethers.getContractFactory("ShieldedDeepPool", {
+      signer: deployer,
+      libraries: { PoseidonT3: address("poseidonT3") },
+    });
+    requests.shieldedDeepPool = await poolFactory.getDeployTransaction(
+      address("deepFamilyToken"),
+      address("deepFamilyLineageIndex"),
+      address("shieldedHeirKeyRegistry"),
+      SHIELDED_ACTIONS.map((action) => address(SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel)),
+    );
+    expect(Object.keys(requests)).to.have.length(40);
 
     for (const intent of intents) {
       const request = requests[intent.label];

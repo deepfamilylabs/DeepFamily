@@ -4,6 +4,10 @@ import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
 import {
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+} from "../scripts/lib/zkDeploymentCatalog.mjs";
+import {
   MAINNET_DEPLOYMENT_NONCE_OFFSETS,
   assertOnChainProtocolDeploymentRuntimes,
   assertPlannedProtocolDeploymentMatchesManifest,
@@ -14,6 +18,7 @@ import {
   buildProtocolDeploymentProjectionPlan,
   parseProtocolDeploymentProjectionArguments,
 } from "../scripts/protocol-deployment-projection.mjs";
+import { inspectProtocolDeploymentArtifact } from "../scripts/lib/protocolReleaseManifest.mjs";
 
 const DEPLOYER = "0x1000000000000000000000000000000000000001";
 const STARTING_NONCE = 41;
@@ -45,6 +50,23 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
     });
   };
   return Object.freeze({
+    shieldedVerifiers: Object.fromEntries(
+      Object.entries(deployments.shieldedVerifiers).map(([action, record]) => [
+        action,
+        artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierContractName, record),
+      ]),
+    ),
+    shieldedAdapters: Object.fromEntries(
+      Object.entries(deployments.shieldedAdapters).map(([action, record]) => [
+        action,
+        artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterDeploymentName, record),
+      ]),
+    ),
+    shieldedHeirKeyRegistry: artifact(
+      "ShieldedHeirKeyRegistry",
+      deployments.shieldedHeirKeyRegistry,
+    ),
+    shieldedDeepPool: artifact("ShieldedDeepPool", deployments.shieldedDeepPool),
     groth16VerifierAdapter: artifact("Groth16VerifierAdapter", {
       personVerifier: deployments.groth16VerifierAdapter.personVerifierImmutable,
       disclosureBindingVerifier:
@@ -110,6 +132,51 @@ describe("planned production protocol deployment projection", function () {
         startingNonce: Number.MAX_SAFE_INTEGER,
       }),
     ).to.throw("non-negative safe integer");
+  });
+
+  it("includes all nine verifiers and eight adapters in the exact target projection", function () {
+    const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
+    const contracts = fixture.planned.projection.contracts;
+    expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
+      Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
+    );
+    expect(Object.keys(contracts.shieldedAdapters)).to.deep.equal(SHIELDED_ACTIONS);
+    expect(contracts.shieldedDeepPool.tokenImmutable).to.equal(contracts.token);
+    for (const action of SHIELDED_ACTIONS) {
+      expect(contracts.shieldedDeepPool.adapterImmutables[action]).to.equal(
+        contracts.shieldedAdapters[action].address,
+      );
+      expect(contracts.shieldedAdapters[action].actionId).to.equal(
+        SHIELDED_DEPLOYMENT_CIRCUITS[action].actionId,
+      );
+    }
+  });
+
+  it("reconstructs real linked pool and registry runtimes and encodes each adapter action", function () {
+    const plannedAddresses = deriveMainnetPlannedAddresses({
+      ethers,
+      deployer: DEPLOYER,
+      startingNonce: STARTING_NONCE,
+    });
+    const inspected = buildPlannedProtocolDeploymentEvidence({
+      chainId: 1030,
+      plannedAddresses,
+      manifest: baseManifest(),
+    });
+    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts.shieldedAdapters)).to.have.length(8);
+    expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
+      plannedAddresses.poseidonT3.slice(2).toLowerCase(),
+    );
+    expect(inspected.artifacts.shieldedHeirKeyRegistry.runtimeBytecode).to.include(
+      plannedAddresses.poseidonT6.slice(2).toLowerCase(),
+    );
+    const actual = inspected.artifacts.shieldedAdapters.allocate;
+    const wrongAction = inspectProtocolDeploymentArtifact({
+      artifactName: SHIELDED_DEPLOYMENT_CIRCUITS.allocate.adapterLabel,
+      immutableValues: { VERIFIER: plannedAddresses.shieldedAllocateVerifier, ACTION: 5 },
+    });
+    expect(wrongAction.runtimeSha256).not.to.equal(actual.runtimeSha256);
   });
 
   for (const [profile, oppositeProfile] of [
@@ -185,6 +252,22 @@ describe("planned production protocol deployment projection", function () {
   it("checks immutable-linked deployed runtime bytes without masking", async function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const codeByAddress = new Map([
+      ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+        fixture.plannedAddresses[spec.verifierLabel].toLowerCase(),
+        fixture.planned.artifacts.shieldedVerifiers[action].runtimeBytecode,
+      ]),
+      ...SHIELDED_ACTIONS.map((action) => [
+        fixture.plannedAddresses[SHIELDED_DEPLOYMENT_CIRCUITS[action].adapterLabel].toLowerCase(),
+        fixture.planned.artifacts.shieldedAdapters[action].runtimeBytecode,
+      ]),
+      [
+        fixture.plannedAddresses.shieldedHeirKeyRegistry.toLowerCase(),
+        fixture.planned.artifacts.shieldedHeirKeyRegistry.runtimeBytecode,
+      ],
+      [
+        fixture.plannedAddresses.shieldedDeepPool.toLowerCase(),
+        fixture.planned.artifacts.shieldedDeepPool.runtimeBytecode,
+      ],
       [
         fixture.plannedAddresses.groth16VerifierAdapter.toLowerCase(),
         fixture.planned.artifacts.groth16VerifierAdapter.runtimeBytecode,

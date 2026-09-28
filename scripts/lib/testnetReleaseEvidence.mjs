@@ -8,6 +8,7 @@ import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+  ZK_RELEASE_ARTIFACTS,
   ZK_PRODUCTION_PHASE1,
   ZK_TRUST_MODEL_MULTI_PARTY,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
@@ -17,9 +18,21 @@ import {
   inspectProtocolReleaseManifest,
   protocolDeploymentEvidenceFromAcceptanceReport,
   protocolDeploymentEvidenceSha256,
+  protocolShieldedDeploymentEvidenceFromRecords,
 } from "./protocolReleaseManifest.mjs";
+import {
+  SHIELDED_ACTIONS,
+  SHIELDED_DEPLOYMENT_CIRCUITS,
+  INTEGRATED_DEPLOYMENT_RECORDS,
+} from "./zkDeploymentCatalog.mjs";
+import {
+  shieldedDeploymentBindings,
+  shieldedArtifactEntries,
+} from "./shieldedDeploymentEvidence.mjs";
+import { inspectShieldedProductionArtifacts } from "./shieldedProductionSetup.mjs";
+import { ALLOCATE_SELECTOR } from "./shieldedReceipts.mjs";
 
-export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 5;
+export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 1;
 export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
 export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
   "allRecordedStepsPassed",
@@ -33,6 +46,7 @@ export const TESTNET_RELEASE_READINESS_GATES = Object.freeze([
   "productionConfigurationMatched",
   "productionDeploymentPathsMatched",
   "refundCompleted",
+  "shieldedCoveragePassed",
   "sourceInputsUnchanged",
   "terminalGovernanceStateMatched",
 ]);
@@ -48,6 +62,7 @@ export const TESTNET_RELEASE_REQUIRED_STEPS = Object.freeze([
   "production-build-manifest-preflight",
   "protocol-release-manifest-preflight",
   "real-zk-endorsement-nft-story",
+  "real-zk-shielded-business",
   "release-rehearsal-clean-source-preflight",
   "source-verified-initial-deployment",
   "terminal-governance-state-verified",
@@ -63,18 +78,12 @@ const ZERO_ADDRESS = `0x${"0".repeat(40)}`;
 const ZERO_HASH = `0x${"0".repeat(64)}`;
 const REQUIRED_VERIFIED_CONTRACTS = Object.freeze(
   [
-    "initial-deployment:AdultAgeGate",
-    "initial-deployment:DeepFamily",
-    "initial-deployment:DeepFamilyReader",
-    "initial-deployment:DeepFamilyToken",
-    "initial-deployment:DisclosureBindingVerifier",
-    "initial-deployment:GovernanceTimelock",
-    "initial-deployment:Groth16VerifierAdapter",
-    "initial-deployment:DeepFamilyArchive",
-    "initial-deployment:PersonCommitmentVerifier",
-    "initial-deployment:PoseidonT5",
-    "initial-deployment:UUPSProxy",
-  ].sort(),
+    "GovernanceTimelock",
+    "UUPSProxy",
+    ...INTEGRATED_DEPLOYMENT_RECORDS.map((record) => record.deploymentName),
+  ]
+    .map((name) => `initial-deployment:${name}`)
+    .sort(),
 );
 const REQUIRED_VERIFICATION_PHASES = Object.freeze(["initial-deployment"]);
 const FORBIDDEN_GOVERNANCE_LIFECYCLE_FIELDS = Object.freeze([
@@ -368,7 +377,7 @@ const requireAllReadinessGates = (value) => {
   const names = Object.keys(gates).sort();
   if (JSON.stringify(names) !== JSON.stringify(TESTNET_RELEASE_READINESS_GATES)) {
     throw new Error(
-      "releaseReadinessGates must contain exactly the schema v5 initial-release gate set: " +
+      "releaseReadinessGates must contain exactly the schema v1 initial-release gate set: " +
         TESTNET_RELEASE_READINESS_GATES.join(", "),
     );
   }
@@ -411,7 +420,7 @@ const requireVerificationEvidence = (report) => {
   requireExact(verification.status, "passed", "verification.status");
   if (Object.hasOwn(verification, "gateBeforeUpgradeSchedule")) {
     throw new Error(
-      "verification.gateBeforeUpgradeSchedule is forbidden in schema v5 initial-release evidence",
+      "verification.gateBeforeUpgradeSchedule is forbidden in schema v1 initial-release evidence",
     );
   }
   if (!Array.isArray(verification.contracts) || verification.contracts.length === 0) {
@@ -433,7 +442,7 @@ const requireVerificationEvidence = (report) => {
     JSON.stringify(sortedVerifiedContracts) !== JSON.stringify(REQUIRED_VERIFIED_CONTRACTS)
   ) {
     throw new Error(
-      "verification.contracts must contain exactly the schema v5 initial-release contract set",
+      "verification.contracts must contain exactly the schema v1 initial-release contract set",
     );
   }
   if (!Array.isArray(verification.phases) || verification.phases.length === 0) {
@@ -453,7 +462,7 @@ const requireVerificationEvidence = (report) => {
     JSON.stringify(sortedPhases) !== JSON.stringify(REQUIRED_VERIFICATION_PHASES)
   ) {
     throw new Error(
-      "verification.phases must contain exactly the schema v5 initial-release phase set",
+      "verification.phases must contain exactly the schema v1 initial-release phase set",
     );
   }
   return verification;
@@ -668,6 +677,13 @@ const requireTerminalGovernanceEvidence = ({
       "timelock",
       "token",
       "verifierAdapter",
+      "poseidonT3",
+      "poseidonT6",
+      "deepFamilyLineageIndex",
+      "shieldedVerifiers",
+      "shieldedAdapters",
+      "shieldedHeirKeyRegistry",
+      "shieldedDeepPool",
     ],
   );
   requireExact(terminal.status, "passed", "terminalGovernanceState.status");
@@ -907,9 +923,36 @@ const requireTerminalGovernanceEvidence = ({
   if (typeof protocolDeploymentArtifactInspector !== "function") {
     throw new Error("protocolDeploymentArtifactInspector must be a function");
   }
+  const shieldedRecords = protocolShieldedDeploymentEvidenceFromRecords({
+    ...terminal,
+    token: addresses.token,
+  });
+  const expectedBindings = shieldedDeploymentBindings(addresses);
+  for (const [label, record, expected] of shieldedArtifactEntries(
+    shieldedRecords,
+    expectedBindings,
+  )) {
+    for (const [field, value] of Object.entries(expected)) {
+      if (typeof value === "string" && field !== "actionId")
+        requireSameAddress(record[field], value, `terminalGovernanceState ${label} ${field}`);
+      else
+        requireExact(
+          JSON.stringify(record[field]),
+          JSON.stringify(value),
+          `terminalGovernanceState ${label} ${field}`,
+        );
+    }
+  }
+  for (const field of ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"])
+    requireSameAddress(
+      shieldedRecords[field],
+      expectedBindings[field],
+      `terminalGovernanceState ${field}`,
+    );
   const inspectedArtifacts = protocolDeploymentArtifactInspector({
     root: repositoryRoot,
     deployments: {
+      ...shieldedRecords,
       groth16VerifierAdapter: {
         personVerifierImmutable: verifierAdapter.personVerifier,
         disclosureBindingVerifierImmutable: verifierAdapter.disclosureBindingVerifier,
@@ -944,6 +987,14 @@ const requireTerminalGovernanceEvidence = ({
       inspectedArtifacts?.deepFamilyReader,
       manifestDeployments.deepFamilyReader,
     ],
+    ...shieldedArtifactEntries(shieldedRecords, inspectedArtifacts).map(
+      ([label, record, artifact], index) => [
+        label,
+        record,
+        artifact,
+        shieldedArtifactEntries(manifestDeployments, manifestDeployments)[index][1],
+      ],
+    ),
   ]) {
     const reportedArtifactSha256 = requireSha256(
       reported.artifactSha256,
@@ -1034,7 +1085,7 @@ const requireProductionParityEvidence = (report) => {
   }
   if (Object.hasOwn(productionParity, "sharedGovernanceOperationBuildersMatched")) {
     throw new Error(
-      "productionParity.sharedGovernanceOperationBuildersMatched is forbidden in schema v5 " +
+      "productionParity.sharedGovernanceOperationBuildersMatched is forbidden in schema v1 " +
         "initial-release evidence",
     );
   }
@@ -1180,6 +1231,247 @@ const requireProductionZkEvidence = (report) => {
   return zkArtifactTrust;
 };
 
+const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChainId, inspector) => {
+  if (typeof inspector !== "function")
+    throw new Error("shieldedArtifactInspector must be a function");
+  const inspected = inspector({ root: repositoryRoot });
+  const criteria = requireExactRecordKeys(
+    inspected.manifest.releaseCriteria,
+    "shielded production releaseCriteria",
+    [
+      "allocationMaxGas",
+      "claim12MaxGas",
+      "browserAllocationMaxMs",
+      "browserClaim12MaxMs",
+      "recoveryMaxMs",
+      "recoveryMinEvents",
+    ],
+  );
+  for (const [field, value] of Object.entries(criteria)) {
+    requireSafeInteger(value, `shielded production releaseCriteria.${field}`, 1);
+  }
+  const artifacts = requireRecord(report.shieldedArtifacts, "shieldedArtifacts");
+  requireExact(artifacts.status, "passed", "shieldedArtifacts.status");
+  requireExact(artifacts.productionReady, true, "shieldedArtifacts.productionReady");
+  requireExact(
+    requireSha256(artifacts.manifestSha256, "shieldedArtifacts.manifestSha256"),
+    inspected.manifestSha256,
+    "shieldedArtifacts.manifestSha256",
+  );
+  const actions = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS);
+  const circuits = requireExactRecordKeys(
+    artifacts.circuits,
+    "shieldedArtifacts.circuits",
+    actions,
+  );
+  const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
+  requireExact(ceremony.circuitCount, 11, "zkCeremonyVerification.circuitCount");
+  const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
+  if (
+    !Array.isArray(ceremony.circuits) ||
+    JSON.stringify([...ceremony.circuits].sort()) !== JSON.stringify(coreCircuitNames)
+  ) {
+    throw new Error("zkCeremonyVerification.circuits must cover both original circuits");
+  }
+  const shieldedCeremony = requireExactRecordKeys(
+    ceremony.shielded,
+    "zkCeremonyVerification.shielded",
+    ["status", "manifestSha256", "circuitCount", "ptau"],
+  );
+  requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
+  requireExact(shieldedCeremony.circuitCount, 9, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(
+    shieldedCeremony.manifestSha256,
+    inspected.manifestSha256,
+    "zkCeremonyVerification.shielded.manifestSha256",
+  );
+  const shieldedPtau = requireRecord(shieldedCeremony.ptau, "zkCeremonyVerification.shielded.ptau");
+  const originalPtau = requireRecord(ceremony.ptau, "zkCeremonyVerification.ptau");
+  for (const field of ["sha256", "blake2b512", "bytes"]) {
+    requireExact(
+      shieldedPtau[field],
+      originalPtau[field],
+      `zkCeremonyVerification.shielded.ptau.${field}`,
+    );
+  }
+  const evidence = requireRecord(report.shielded, "shielded");
+  requireExact(evidence.status, "passed", "shielded.status");
+  requireExact(evidence.manifestSha256, inspected.manifestSha256, "shielded.manifestSha256");
+  const proofs = requireExactRecordKeys(evidence.proofs, "shielded.proofs", actions);
+  const transactions = requireRecord(report.transactions, "transactions");
+  if (Object.hasOwn(transactions, "shielded-action-claim")) {
+    throw new Error("Future-maturity claim must not claim an executed pool transaction");
+  }
+  for (const action of actions) {
+    const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
+    const item = inspected.manifest.circuits[action];
+    const circuit = circuits[action];
+    requireExact(circuit.source, spec.source, `shieldedArtifacts.${action}.source`);
+    for (const kind of ["sourceSha256", "wasmSha256", "zkeySha256", "verificationKeySha256"])
+      requireExact(
+        requireSha256(circuit[kind], `shieldedArtifacts.${action}.${kind}`),
+        item[kind],
+        `shieldedArtifacts.${action}.${kind}`,
+      );
+    const proof = requireRecord(proofs[action], `shielded.proofs.${action}`);
+    requireExact(proof.source, spec.source, `shielded.proofs.${action}.source`);
+    requireExact(proof.verified, true, `shielded.proofs.${action}.verified`);
+    requireSameAddress(
+      proof.verifierAddress,
+      report.addresses[spec.verifierLabel],
+      `shielded.proofs.${action}.verifierAddress`,
+    );
+    for (const kind of ["wasmSha256", "zkeySha256", "verificationKeySha256"])
+      requireExact(
+        requireSha256(proof[kind], `shielded.proofs.${action}.${kind}`),
+        item[kind],
+        `shielded.proofs.${action}.${kind}`,
+      );
+    requireSha256(proof.proofSha256, `shielded.proofs.${action}.proofSha256`);
+    if (
+      !Array.isArray(proof.publicSignals) ||
+      proof.publicSignals.length !== (action === "keyRegistration" ? 7 : 32) ||
+      proof.publicSignals.some(
+        (signal) => typeof signal !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(signal),
+      )
+    )
+      throw new Error(
+        `shielded.proofs.${action}.publicSignals must contain canonical decimal signals`,
+      );
+    const signals = proof.publicSignals;
+    requireExact(
+      requireSha256(proof.publicSignalsSha256, `shielded.proofs.${action}.publicSignalsSha256`),
+      createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
+      `shielded.proofs.${action}.publicSignalsSha256`,
+    );
+    requireExact(
+      signals[action === "keyRegistration" ? 4 : 1],
+      String(expectedChainId),
+      `shielded.proofs.${action} chain ID`,
+    );
+    requireSameAddress(
+      `0x${BigInt(signals[action === "keyRegistration" ? 5 : 2])
+        .toString(16)
+        .padStart(40, "0")}`,
+      report.addresses[
+        action === "keyRegistration" ? "shieldedHeirKeyRegistry" : "shieldedDeepPool"
+      ],
+      `shielded.proofs.${action} contract`,
+    );
+    if (action !== "keyRegistration")
+      requireExact(signals[0], String(spec.actionId), `shielded.proofs.${action} action ID`);
+    if (action === "claim") {
+      requireExact(proof.execution, "verifier-call", "shielded.proofs.claim.execution");
+      requireExact(proof.claimCount, 12, "shielded.proofs.claim.claimCount");
+      if (Object.hasOwn(proof, "transactionLabel"))
+        throw new Error("Future-maturity claim proof must not claim an executed pool transaction");
+    } else {
+      requireExact(proof.execution, "transaction", `shielded.proofs.${action}.execution`);
+      const label = `shielded-action-${action}`;
+      requireExact(proof.transactionLabel, label, `shielded.proofs.${action}.transactionLabel`);
+      requireExact(
+        requireRecord(transactions[label], `transactions.${label}`).status,
+        1,
+        `transactions.${label}.status`,
+      );
+    }
+  }
+  const scenario = requireRecord(evidence.scenario, "shielded.scenario");
+  requireExact(
+    scenario.allocationLabel,
+    "shielded-action-allocate",
+    "shielded.scenario.allocationLabel",
+  );
+  requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
+  requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
+  requireSafeInteger(scenario.registeredKeys, "shielded.scenario.registeredKeys", 2);
+  const recoveryEventCount = requireSafeInteger(
+    scenario.recoveryEventCount,
+    "shielded.scenario.recoveryEventCount",
+    1,
+  );
+  const recoveredNotes = requireSafeInteger(
+    scenario.recoveredNotes,
+    "shielded.scenario.recoveredNotes",
+    1,
+  );
+  if (recoveredNotes > recoveryEventCount) {
+    throw new Error("shielded public-event recovery exceeds observed event count");
+  }
+  for (const [field, maximum] of [
+    ["lineageDepth", 64],
+    ["noteDepth", 32],
+  ])
+    if (requireSafeInteger(scenario[field], `shielded.scenario.${field}`) > maximum)
+      throw new Error(`shielded.scenario.${field} exceeds circuit capacity`);
+  const eligibleFrom = BigInt(scenario.eligibleFrom);
+  requireExact(
+    eligibleFrom.toString(),
+    (BigInt(proofs.allocate.publicSignals[29]) + 7200n).toString(),
+    "shielded.scenario.eligibleFrom",
+  );
+  requireExact(
+    String(scenario.claimAsOf),
+    proofs.claim.publicSignals[29],
+    "shielded.scenario.claimAsOf",
+  );
+  if (BigInt(scenario.claimAsOf) < eligibleFrom + 12n * 2592000n)
+    throw new Error("shielded claim proof does not mature twelve periods");
+  const receipts = requireRecord(evidence.receipts, "shielded.receipts");
+  requireExact(receipts.rpcChecks, "passed", "shielded.receipts.rpcChecks");
+  requireExact(receipts.chainId, expectedChainId, "shielded.receipts.chainId");
+  requireSameAddress(
+    receipts.poolAddress,
+    report.addresses.shieldedDeepPool,
+    "shielded.receipts.poolAddress",
+  );
+  const observation = requireExactRecordKeys(
+    receipts.transactions,
+    "shielded.receipts.transactions",
+    ["allocation"],
+  ).allocation;
+  const recorded = transactions["shielded-action-allocate"];
+  requireExact(
+    requireHash32(observation.txHash, "shielded allocation transaction hash"),
+    recorded.hash,
+    "shielded allocation transaction hash",
+  );
+  requireExact(observation.blockNumber, recorded.blockNumber, "shielded allocation block number");
+  requireExact(observation.blockHash, recorded.blockHash, "shielded allocation block hash");
+  requireExact(observation.selector, ALLOCATE_SELECTOR, "shielded allocation selector");
+  const gas = requireSafeInteger(observation.gasUsed, "shielded allocation gasUsed", 1);
+  if (gas > criteria.allocationMaxGas) {
+    throw new Error("shielded allocation exceeds the committed production gas threshold");
+  }
+  const limit = requireSafeInteger(
+    observation.transactionGasLimit,
+    "shielded allocation transactionGasLimit",
+    1,
+  );
+  const blockLimit = requireSafeInteger(
+    observation.blockGasLimit,
+    "shielded allocation blockGasLimit",
+    1,
+  );
+  if (gas > limit || limit > blockLimit)
+    throw new Error("shielded allocation gas exceeds transaction or block limit");
+  if (recorded.gasUsed !== undefined)
+    requireExact(
+      String(observation.gasUsed),
+      String(recorded.gasUsed),
+      "shielded allocation gasUsed",
+    );
+  return {
+    manifestSha256: inspected.manifestSha256,
+    proofCount: actions.length,
+    transactionActions: actions.filter((action) => action !== "claim"),
+    verifierCallActions: ["claim"],
+    claimCount: 12,
+    lineageDepth: scenario.lineageDepth,
+    noteDepth: scenario.noteDepth,
+  };
+};
+
 const requireProtocolManifestEvidence = (report, repositoryRoot, protocolManifestInspector) => {
   const evidence = requireExactRecordKeys(
     report.protocolManifestEvidence,
@@ -1215,7 +1507,7 @@ const requireProtocolManifestEvidence = (report, repositoryRoot, protocolManifes
 };
 
 /**
- * Loads one explicitly selected schema-v5 initial-mainnet-release rehearsal report and fails closed
+ * Loads one explicitly selected schema-v1 initial-mainnet-release rehearsal report and fails closed
  * unless it is valid evidence for the exact Git commit, testnet chain and production MIN_DELAY being
  * released. Governance lifecycle exercises are deliberately outside this evidence type.
  *
@@ -1235,6 +1527,7 @@ export const validateTestnetReleaseEvidence = async ({
   expectedAcceptanceInputDigest,
   protocolManifestInspector = inspectProtocolReleaseManifest,
   protocolDeploymentArtifactInspector = inspectProtocolDeploymentArtifacts,
+  shieldedArtifactInspector = inspectShieldedProductionArtifacts,
 } = {}) => {
   const expectedChainId = requireSafeInteger(expectedTestnetChainId, "expectedTestnetChainId", 1);
   const expectedMinDelay = requireSafeInteger(
@@ -1303,6 +1596,12 @@ export const validateTestnetReleaseEvidence = async ({
     protocolManifestInspector,
   );
   const zkArtifactTrust = requireProductionZkEvidence(report);
+  const shielded = requireShieldedAcceptanceEvidence(
+    report,
+    repositoryRoot,
+    expectedChainId,
+    shieldedArtifactInspector,
+  );
   const verification = requireVerificationEvidence(report);
   const finality = requireFinalityEvidence(report);
   const terminal = requireTerminalGovernanceEvidence({
@@ -1342,7 +1641,7 @@ export const validateTestnetReleaseEvidence = async ({
   const expectedStepNames = [...TESTNET_RELEASE_REQUIRED_STEPS].sort();
   if (JSON.stringify(sortedStepNames) !== JSON.stringify(expectedStepNames)) {
     throw new Error(
-      "steps must contain exactly the schema v5 initial-release step set: " +
+      "steps must contain exactly the schema v1 initial-release step set: " +
         expectedStepNames.join(", "),
     );
   }
@@ -1391,6 +1690,7 @@ export const validateTestnetReleaseEvidence = async ({
       minimumContributors: zkArtifactTrust.minimumContributors,
       productionReady: zkArtifactTrust.productionReady,
     },
+    shielded,
     protocolManifest: {
       sha256: protocolManifest.evidence.sha256,
       protocol: protocolManifest.evidence.protocol,

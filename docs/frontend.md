@@ -313,7 +313,7 @@ npm run frontend:check      # lint + legacy-entrypoints + typecheck + build + vi
 npm run dev:all
 ```
 
-This starts a Hardhat node, deploys the integrated system and shielded pool with local development proof keys, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:shielded:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks all 11 circuit artifacts, deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 
