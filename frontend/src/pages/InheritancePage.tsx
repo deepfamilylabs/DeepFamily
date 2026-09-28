@@ -172,9 +172,9 @@ export default function InheritancePage() {
           </button>
         </div>
       ) : null}
-      {state.status === "ready" && !wrongNetwork && wallet.signer ? (
+      {state.status === "ready" && !wrongNetwork ? (
         <ShieldedInheritancePanel
-          key={`${state.modules.chainId}:${state.modules.poolAddress}:${wallet.address}`}
+          key={`${state.modules.chainId}:${state.modules.poolAddress}`}
           modules={state.modules}
           signer={wallet.signer}
           account={wallet.address}

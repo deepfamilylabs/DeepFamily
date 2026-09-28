@@ -170,6 +170,28 @@ describe("useAddVersionFlow", () => {
     );
   });
 
+  it("shows the shared local nonce guidance when the wallet rejects a send", async () => {
+    const error = Object.assign(new Error("could not coalesce error"), {
+      code: "UNKNOWN_ERROR",
+      info: {
+        error: {
+          message: "RPC 0x7a69 eth_sendRawTransaction: Nonce too high. Expected 1344 but got 1353",
+        },
+      },
+    });
+    mocks.executeAddVersionFlow.mockRejectedValue(error);
+    const { result } = renderHook(() => useAddVersionFlow());
+
+    await act(async () => {
+      await expect(result.current.runOrThrow(flowArgs)).rejects.toThrow("could not coalesce error");
+    });
+
+    expect(result.current.error).toMatchObject({
+      type: "LOCAL_NONCE_TOO_HIGH",
+      message: expect.stringContaining("Clear activity and nonce data"),
+    });
+  });
+
   it("reconciles the exact submitted hash on retry without rebuilding the frozen package", async () => {
     const transactionHash = `0x${"aa".repeat(32)}`;
     const receipt = { hash: transactionHash, status: 1, blockNumber: 10, logs: [] };

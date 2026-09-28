@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   poolIndex: "0x0000000000000000000000000000000000000006",
   poolToken: "0x0000000000000000000000000000000000000003",
   poolRegistry: "0x0000000000000000000000000000000000000005",
+  panelMounted: vi.fn(),
+  panelUnmounted: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -59,7 +61,27 @@ vi.mock("../shared/clients/contractFactory", () => ({
   createLineageIndexContract: () => ({}),
 }));
 vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
-  ShieldedInheritancePanel: () => <div data-testid="shielded-panel">new private actions</div>,
+  ShieldedInheritancePanel: ({ account, signer }: { account: string; signer: unknown }) => {
+    const [unlocked, setUnlocked] = React.useState(false);
+    const [draft, setDraft] = React.useState("");
+    React.useEffect(() => {
+      mocks.panelMounted();
+      return () => mocks.panelUnmounted();
+    }, []);
+    return (
+      <div data-testid="shielded-panel">
+        <span data-testid="shielded-session-state">{unlocked ? "unlocked" : "locked"}</span>
+        <span data-testid="shielded-signer-state">{signer ? "ready" : "reconnecting"}</span>
+        <span data-testid="shielded-account">{account}</span>
+        <button type="button" onClick={() => setUnlocked(true)}>unlock-test-session</button>
+        <input
+          aria-label="private-workflow-draft"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      </div>
+    );
+  },
 }));
 
 describe("InheritancePage private pool entry", () => {
@@ -115,5 +137,69 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "inheritance.gate.switchNetwork" }));
     expect(mocks.wallet.switchOrAddChain).toHaveBeenCalledWith(31337);
+  });
+
+  it("keeps the unlocked workflow mounted through account and temporary signer changes", async () => {
+    const { rerender } = render(<InheritancePage />);
+    const panel = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
+      target: { value: "fund a child" },
+    });
+
+    mocks.wallet.signer = null;
+    rerender(<InheritancePage />);
+    expect(screen.getByTestId("shielded-panel")).toBe(panel);
+    expect(screen.getByTestId("shielded-signer-state").textContent).toBe("reconnecting");
+
+    mocks.wallet.address = "0x00000000000000000000000000000000000000bb";
+    rerender(<InheritancePage />);
+    expect(screen.getByTestId("shielded-panel")).toBe(panel);
+    expect(screen.getByTestId("shielded-account").textContent).toBe(mocks.wallet.address);
+
+    mocks.wallet.signer = {};
+    rerender(<InheritancePage />);
+    expect(screen.getByTestId("shielded-panel")).toBe(panel);
+    expect(screen.getByTestId("shielded-signer-state").textContent).toBe("ready");
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
+    expect((screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value).toBe("fund a child");
+    expect(mocks.panelMounted).toHaveBeenCalledTimes(1);
+    expect(mocks.panelUnmounted).not.toHaveBeenCalled();
+  });
+
+  it("releases the workflow on disconnect and starts locked after reconnecting", async () => {
+    const { rerender } = render(<InheritancePage />);
+    const panel = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+
+    mocks.wallet.address = null;
+    mocks.wallet.signer = null;
+    rerender(<InheritancePage />);
+    expect(screen.queryByTestId("shielded-panel")).toBeNull();
+    expect(mocks.panelUnmounted).toHaveBeenCalledTimes(1);
+
+    mocks.wallet.address = "0x00000000000000000000000000000000000000bb";
+    mocks.wallet.signer = {};
+    rerender(<InheritancePage />);
+    expect(screen.getByTestId("shielded-panel")).not.toBe(panel);
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
+    expect(mocks.panelMounted).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the workflow on a wrong-network switch and starts locked on return", async () => {
+    const { rerender } = render(<InheritancePage />);
+    const panel = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+
+    mocks.wallet.chainId = 1;
+    rerender(<InheritancePage />);
+    expect(screen.queryByTestId("shielded-panel")).toBeNull();
+    expect(mocks.panelUnmounted).toHaveBeenCalledTimes(1);
+
+    mocks.wallet.chainId = 31337;
+    rerender(<InheritancePage />);
+    expect(screen.getByTestId("shielded-panel")).not.toBe(panel);
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
+    expect(mocks.panelMounted).toHaveBeenCalledTimes(2);
   });
 });
