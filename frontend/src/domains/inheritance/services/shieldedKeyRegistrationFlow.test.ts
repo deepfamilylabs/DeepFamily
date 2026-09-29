@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AbiCoder, type Contract, type Signer } from "ethers";
 import {
   computeIdentityFromDerivedSecret,
+  computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
   deriveShieldedHeirKeyMaterial,
 } from "@deepfamily/protocol-core";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
@@ -111,7 +113,6 @@ describe("shielded heir key self-registration", () => {
     expect(stages).toEqual(["derivingKey", "proving", "checkingGas", "submitting", "confirming"]);
     expect(result).toMatchObject({
       transactionHash: "0xregister",
-      personHash: f.input.identity.personHash,
       ownerCommitment: deriveShieldedHeirKeyMaterial(13n).ownerCommitment,
       gasEstimate: 200_000n,
       gasLimit: 240_000n,
@@ -126,17 +127,41 @@ describe("shielded heir key self-registration", () => {
     const signals = params.expectedPublicSignals;
     const publicKey = BigInt(result.viewingKey);
     expect(signals).toHaveLength(7);
-    expect(signals[2]).toBe((publicKey & ((1n << 128n) - 1n)).toString());
-    expect(signals[3]).toBe((publicKey >> 128n).toString());
-    expect(signals[4]).toBe("1030");
-    expect(signals[5]).toBe(BigInt(REGISTRY_ADDRESS).toString());
+    expect(signals[0]).toBe(result.ownerCommitment.toString());
+    expect(signals[1]).toBe((publicKey & ((1n << 128n) - 1n)).toString());
+    expect(signals[2]).toBe((publicKey >> 128n).toString());
+    expect(signals[3]).toBe("1030");
+    expect(signals[4]).toBe(BigInt(REGISTRY_ADDRESS).toString());
+    expect(signals[5]).toBe(result.registrationTag.toString());
+    expect(signals[6]).toBe(result.registrationLeaf.toString());
+    expect(signals).not.toContain(f.input.identity.identityCommitment);
+    expect(result.registrationSalt).toBe(
+      computeShieldedRegistrationSalt({
+        derivedSecretField: 13n,
+        identityCommitment: BigInt(f.input.identity.identityCommitment),
+        chainId: 1030n,
+        registryAddress: REGISTRY_ADDRESS,
+      }),
+    );
+    expect(result.registrationLeaf).toBe(
+      computeShieldedRegistrationLeaf({
+        identityCommitment: BigInt(f.input.identity.identityCommitment),
+        ownerCommitment: result.ownerCommitment,
+        viewKeyLo: publicKey & ((1n << 128n) - 1n),
+        viewKeyHi: publicKey >> 128n,
+        salt: result.registrationSalt,
+      }),
+    );
+    expect(signals).not.toContain(result.registrationSalt.toString());
     expect(params.witness.derivedSecretField).toBe("13");
+    expect(params.witness.identityCommitment).toBe(f.input.identity.identityCommitment);
+    expect(params.witness.registrationLeaf).toBe(result.registrationLeaf.toString());
     expect(params.witness.rawPassphrase).toBeUndefined();
     expect(f.register).toHaveBeenCalledWith(
-      BigInt(f.input.identity.identityCommitment),
       result.ownerCommitment,
       result.viewingKey,
-      BigInt(signals[6]),
+      result.registrationTag,
+      result.registrationLeaf,
       AbiCoder.defaultAbiCoder().encode(
         ["uint256[2]", "uint256[2][2]", "uint256[2]"],
         [
@@ -166,11 +191,11 @@ describe("shielded heir key self-registration", () => {
     const f = fixture();
     mocks.zkWorkerCall.mockImplementationOnce(async (_name, params) => {
       const publicSignals = [...params.expectedPublicSignals];
-      [publicSignals[2], publicSignals[3]] = [publicSignals[3], publicSignals[2]];
+      [publicSignals[1], publicSignals[2]] = [publicSignals[2], publicSignals[1]];
       return { proof: PROOF, publicSignals };
     });
     await expect(registerShieldedHeirKey(f.input)).rejects.toThrow(
-      "public signal 2 does not match transaction",
+      "public signal 1 does not match transaction",
     );
     expect(f.estimateGas).not.toHaveBeenCalled();
     expect(f.register).not.toHaveBeenCalled();

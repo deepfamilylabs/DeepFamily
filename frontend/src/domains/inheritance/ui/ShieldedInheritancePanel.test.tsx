@@ -2,8 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
+  computeShieldedRegistrationTag,
   deriveShieldedHeirKeyMaterial,
   INHERITANCE_PERIOD_SECONDS,
+  wrapIdentityCommitmentAsPersonHash,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { Signer } from "ethers";
@@ -11,12 +15,14 @@ import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWor
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { InheritanceError } from "../model/inheritanceErrors";
 import type { KeyRegistrySnapshot } from "../services/shieldedKeyRegistryChain";
+import { encodeShieldedReceiveCode } from "../services/shieldedReceiveCode";
 import type { OwnedShieldedNote } from "../services/shieldedPoolChain";
 import type { LocalShieldedWalletSnapshot } from "../services/shieldedWalletRecovery";
 import { ShieldedInheritancePanel } from "./ShieldedInheritancePanel";
 
 const mocks = vi.hoisted(() => ({
   deriveIdentityFromForm: vi.fn(),
+  deriveShieldedRecipientMaterial: vi.fn(),
   clearSecretInputs: vi.fn(),
   recoverLocalShieldedWallet: vi.fn(),
   listUnspentRecoveredShieldedNotes: vi.fn(),
@@ -30,7 +36,9 @@ const mocks = vi.hoisted(() => ({
   prepareShieldedCreatePolicy: vi.fn(),
   submitCreatePolicy: vi.fn(),
   prepareShieldedAllocate: vi.fn(),
+  prepareShieldedTopUp: vi.fn(),
   submitAllocateWithFreshLineage: vi.fn(),
+  submitTopUp: vi.fn(),
   prepareShieldedMergeBudget: vi.fn(),
   submitMergeBudget: vi.fn(),
   prepareShieldedClaim: vi.fn(),
@@ -77,6 +85,10 @@ vi.mock("../../tree/context", () => ({
 vi.mock("../services/inheritanceIdentity", () => ({
   deriveIdentityFromForm: mocks.deriveIdentityFromForm,
 }));
+vi.mock("../services/shieldedReceiveCode", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/shieldedReceiveCode")>()),
+  deriveShieldedRecipientMaterial: mocks.deriveShieldedRecipientMaterial,
+}));
 vi.mock("../services/shieldedWalletRecovery", () => ({
   recoverLocalShieldedWallet: mocks.recoverLocalShieldedWallet,
   listUnspentRecoveredShieldedNotes: mocks.listUnspentRecoveredShieldedNotes,
@@ -97,7 +109,7 @@ vi.mock("../services/shieldedPoolFlows", () => ({
   submitUnshield: mocks.submitUnshield,
   submitShield: vi.fn(),
   submitCreatePolicy: mocks.submitCreatePolicy,
-  submitTopUp: vi.fn(),
+  submitTopUp: mocks.submitTopUp,
   submitMergeBudget: mocks.submitMergeBudget,
 }));
 vi.mock("../services/shieldedNotePreparation", () => ({
@@ -106,7 +118,7 @@ vi.mock("../services/shieldedNotePreparation", () => ({
 }));
 vi.mock("../services/shieldedFundingPreparation", () => ({
   prepareShieldedAllocate: mocks.prepareShieldedAllocate,
-  prepareShieldedTopUp: vi.fn(),
+  prepareShieldedTopUp: mocks.prepareShieldedTopUp,
 }));
 vi.mock("../services/shieldedMergeBudgetPreparation", () => ({
   prepareShieldedMergeBudget: mocks.prepareShieldedMergeBudget,
@@ -243,6 +255,54 @@ function registrySnapshot(): KeyRegistrySnapshot {
   };
 }
 
+function addRegistration(
+  snapshot: KeyRegistrySnapshot,
+  {
+    identityCommitment,
+    registrationSalt,
+    registrationTag,
+    ownerCommitment = 98n,
+    viewingKey = `0x${"77".repeat(32)}`,
+  }: {
+    identityCommitment: bigint;
+    registrationSalt: bigint;
+    registrationTag: bigint;
+    ownerCommitment?: bigint;
+    viewingKey?: string;
+  },
+) {
+  const publicKey = BigInt(viewingKey);
+  snapshot.keys.set(registrationTag, {
+    registrationTag,
+    ownerCommitment,
+    viewingKey,
+    shardId: 0n,
+    leafIndex: 0n,
+    leaf: computeShieldedRegistrationLeaf({
+      identityCommitment,
+      ownerCommitment,
+      viewKeyHi: publicKey >> 128n,
+      viewKeyLo: publicKey & ((1n << 128n) - 1n),
+      salt: registrationSalt,
+    }),
+  });
+}
+
+function ownRegistrationContext() {
+  const input = {
+    derivedSecretField: BigInt(identity.derivedSecretField),
+    identityCommitment: BigInt(identity.identityCommitment),
+    chainId: 31337n,
+    registryAddress,
+  };
+  return {
+    identityCommitment: input.identityCommitment,
+    registrationTag: computeShieldedRegistrationTag(input),
+    registrationSalt: computeShieldedRegistrationSalt(input),
+    ownerCommitment: deriveShieldedHeirKeyMaterial(identity.derivedSecretField).ownerCommitment,
+  };
+}
+
 function renderPanel() {
   const modules = {
     chainId: 31337n,
@@ -289,6 +349,28 @@ function chooseAction(action: string) {
 
 function openOptions(key: string) {
   fireEvent.click(screen.getByText(key, { selector: "summary" }));
+}
+
+function enterRecipientCredentials(passphrase = "child identity passphrase") {
+  fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.credentials" }));
+  fireEvent.change(screen.getByLabelText("search.hashCalculator.name"), {
+    target: { value: "Child Recipient" },
+  });
+  fireEvent.change(screen.getByLabelText("search.hashCalculator.gender"), {
+    target: { value: "2" },
+  });
+  fireEvent.change(screen.getByLabelText("search.hashCalculator.birthYearLabel"), {
+    target: { value: "2004" },
+  });
+  fireEvent.change(screen.getByLabelText("search.hashCalculator.birthMonthLabel"), {
+    target: { value: "5" },
+  });
+  fireEvent.change(screen.getByLabelText("search.hashCalculator.birthDayLabel"), {
+    target: { value: "6" },
+  });
+  const password = screen.getByLabelText("search.hashCalculator.passphrase") as HTMLInputElement;
+  fireEvent.change(password, { target: { value: passphrase } });
+  return password;
 }
 
 function deferred<T>() {
@@ -380,6 +462,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
 
     openOptions("shielded.groups.tools");
     chooseAction("register");
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
     expect(mocks.registerShieldedHeirKey).toHaveBeenCalledWith(
@@ -395,6 +478,59 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       ).toBe(false),
     );
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a separate fee wallet confirmation before registration", async () => {
+    renderPanel();
+    await unlock();
+    openOptions("shielded.groups.tools");
+    chooseAction("register");
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("shielded.privateWalletRequired"),
+    );
+    expect(mocks.registerShieldedHeirKey).not.toHaveBeenCalled();
+  });
+
+  it("shows a private receive code only after this identity's registration is confirmed", async () => {
+    const before = registrySnapshot();
+    addRegistration(before, {
+      identityCommitment: 99n,
+      registrationSalt: 77n,
+      registrationTag: 88n,
+    });
+    const after = registrySnapshot();
+    addRegistration(after, {
+      identityCommitment: 99n,
+      registrationSalt: 77n,
+      registrationTag: 88n,
+    });
+    const own = ownRegistrationContext();
+    addRegistration(after, own);
+    mocks.loadKeyRegistrySnapshot
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce(after);
+
+    renderPanel();
+    await unlock();
+    expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeNull();
+
+    openOptions("shielded.groups.tools");
+    chooseAction("register");
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+
+    const code = screen.getByRole("textbox", {
+      name: "shielded.receiveCodeLabel",
+    }) as HTMLTextAreaElement;
+    expect(code.readOnly).toBe(true);
+    expect(code.value).toBe(
+      encodeShieldedReceiveCode(own.identityCommitment, own.registrationSalt),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
+    expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeNull();
   });
 
   it("clears the raw passphrase as soon as derivation completes, before recovery finishes", async () => {
@@ -484,6 +620,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await unlock();
     openOptions("shielded.groups.tools");
     chooseAction("register");
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await waitFor(() =>
@@ -503,6 +640,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await unlock();
     openOptions("shielded.groups.tools");
     chooseAction("register");
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await waitFor(() =>
@@ -560,16 +698,14 @@ describe("ShieldedInheritancePanel unlocked account", () => {
   });
 
   it("automatically selects a sufficient balance note for a transfer without manual input selection", async () => {
-    const recipientHash = `0x${"99".repeat(32)}`;
+    const recipientIdentityCommitment = 99n;
+    const registrationSalt = 77n;
+    const receiveCode = encodeShieldedReceiveCode(recipientIdentityCommitment, registrationSalt);
     const registration = registrySnapshot();
-    registration.keys.set(recipientHash, {
-      personHash: recipientHash,
-      identityCommitment: 99n,
-      ownerCommitment: 98n,
-      viewingKey: `0x${"77".repeat(32)}`,
-      shardId: 0n,
-      leafIndex: 0n,
-      leaf: 1n,
+    addRegistration(registration, {
+      identityCommitment: recipientIdentityCommitment,
+      registrationSalt,
+      registrationTag: 88n,
     });
     mocks.loadKeyRegistrySnapshot.mockResolvedValue(registration);
     mocks.recoverLocalShieldedWallet.mockResolvedValue(
@@ -578,13 +714,17 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     renderPanel();
     await unlock();
     chooseAction("privateTransfer");
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.recipient" }), {
-      target: { value: recipientHash },
-    });
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
       target: { value: "6" },
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Receive code"));
+    expect(mocks.prepareShieldedPrivateTransfer).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+      target: { value: receiveCode },
+    });
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await waitFor(() => expect(mocks.prepareShieldedPrivateTransfer).toHaveBeenCalledTimes(1));
@@ -592,12 +732,89 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       expect.objectContaining({
         inputs: [expect.objectContaining({ commitment: 2n })],
         destinations: [
-          expect.objectContaining({ kind: "registered", amount: 6n }),
+          expect.objectContaining({
+            kind: "registered",
+            identityCommitment: recipientIdentityCommitment,
+            registrationSalt,
+            amount: 6n,
+          }),
           expect.objectContaining({ kind: "inputOwner", amount: 1n }),
         ],
       }),
     );
     await screen.findByText("shielded.done");
+    expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts recipient identity credentials for a private transfer and clears the passphrase before proof work", async () => {
+    const childIdentityCommitment = 99n;
+    const registrationSalt = 77n;
+    const childHash = wrapIdentityCommitmentAsPersonHash(childIdentityCommitment);
+    const registration = registrySnapshot();
+    addRegistration(registration, {
+      identityCommitment: childIdentityCommitment,
+      registrationSalt,
+      registrationTag: 88n,
+    });
+    mocks.loadKeyRegistrySnapshot.mockResolvedValue(registration);
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 10n)]));
+    const recipientDerivation = deferred<{
+      identityCommitment: bigint;
+      registrationSalt: bigint;
+      personHash: string;
+    }>();
+    mocks.deriveShieldedRecipientMaterial.mockReturnValue(recipientDerivation.promise);
+
+    renderPanel();
+    await unlock();
+    chooseAction("privateTransfer");
+    const password = enterRecipientCredentials("child-passphrase-sentinel");
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
+      target: { value: "6" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() => expect(mocks.deriveShieldedRecipientMaterial).toHaveBeenCalledTimes(1));
+    expect(password.value).toBe("");
+    expect(mocks.deriveShieldedRecipientMaterial).toHaveBeenCalledWith({
+      identity: {
+        fullName: "Child Recipient",
+        gender: 2,
+        isBirthBC: false,
+        birthYear: 2004,
+        birthMonth: 5,
+        birthDay: 6,
+      },
+      rawPassphrase: "child-passphrase-sentinel",
+      chainId: 31337n,
+      registryAddress,
+    });
+    expect(Object.keys(mocks.deriveShieldedRecipientMaterial.mock.calls[0][0]).sort()).toEqual(
+      ["chainId", "identity", "rawPassphrase", "registryAddress"].sort(),
+    );
+
+    await act(async () =>
+      recipientDerivation.resolve({
+        identityCommitment: childIdentityCommitment,
+        registrationSalt,
+        personHash: childHash,
+      }),
+    );
+    await screen.findByText("shielded.done");
+    expect(mocks.prepareShieldedPrivateTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinations: [
+          {
+            kind: "registered",
+            identityCommitment: childIdentityCommitment,
+            registrationSalt,
+            amount: 6n,
+          },
+          { kind: "inputOwner", inputIndex: 0, amount: 4n },
+        ],
+      }),
+    );
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
 
@@ -674,16 +891,14 @@ describe("ShieldedInheritancePanel unlocked account", () => {
   });
 
   it("funds an allocation from a sufficient single balance instead of an insufficient first note", async () => {
-    const childHash = `0x${"99".repeat(32)}`;
+    const childIdentityCommitment = 99n;
+    const childHash = wrapIdentityCommitmentAsPersonHash(childIdentityCommitment);
+    const registrationSalt = 77n;
     const registration = registrySnapshot();
-    registration.keys.set(childHash, {
-      personHash: childHash,
-      identityCommitment: 99n,
-      ownerCommitment: 98n,
-      viewingKey: `0x${"77".repeat(32)}`,
-      shardId: 0n,
-      leafIndex: 0n,
-      leaf: 1n,
+    addRegistration(registration, {
+      identityCommitment: childIdentityCommitment,
+      registrationSalt,
+      registrationTag: 88n,
     });
     mocks.loadKeyRegistrySnapshot.mockResolvedValue(registration);
     mocks.loadLineageSnapshot.mockResolvedValue({
@@ -722,16 +937,117 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Receive code"));
+    expect(mocks.prepareShieldedAllocate).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+      target: { value: encodeShieldedReceiveCode(childIdentityCommitment, registrationSalt) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await screen.findByText("shielded.done");
     expect(mocks.prepareShieldedAllocate).toHaveBeenCalledWith(
       expect.objectContaining({
         donorCommitment: 2n,
         budgetPeriods: 2n,
+        heirIdentityCommitment: childIdentityCommitment,
+        registrationSalt,
         policy: expect.objectContaining({ commitment: 3n }),
       }),
     );
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects direct recipient credentials for a different child before allocation proof", async () => {
+    const selectedChildHash = wrapIdentityCommitmentAsPersonHash(99n);
+    mocks.loadLineageSnapshot.mockResolvedValue({
+      versions: new Map([
+        [
+          selectedChildHash,
+          [
+            {
+              versionIndex: 1,
+              identityCommitment: 99n,
+              fatherIdentityCommitment: 111n,
+              motherIdentityCommitment: 0n,
+            },
+          ],
+        ],
+      ]),
+    });
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(
+      walletSnapshot([valueNote(1n, 25n), policyNote(2n)]),
+    );
+    mocks.deriveShieldedRecipientMaterial.mockResolvedValue({
+      identityCommitment: 100n,
+      registrationSalt: 77n,
+      personHash: wrapIdentityCommitmentAsPersonHash(100n),
+    });
+
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("allocate");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("combobox", { name: "shielded.fields.heirPersonHash" })
+          .querySelectorAll("option").length,
+      ).toBe(2),
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.heirPersonHash" }), {
+      target: { value: selectedChildHash },
+    });
+    const password = enterRecipientCredentials();
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("shielded.recipientMismatch"),
+    );
+    expect(password.value).toBe("");
+    expect(mocks.deriveShieldedRecipientMaterial).toHaveBeenCalledTimes(1);
+    expect(mocks.submitAllocateWithFreshLineage).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedAllocate).not.toHaveBeenCalled();
+  });
+
+  it("uses matching direct recipient credentials for a top-up template", async () => {
+    const childIdentityCommitment = 99n;
+    const registrationSalt = 77n;
+    const recovered = walletSnapshot([valueNote(1n, 25n)]);
+    recovered.topUpTemplates?.set(3n, {
+      note: budgetNote(3n, { heirIdentityCommitment: childIdentityCommitment }).note as BudgetPayload,
+      commitment: 3n,
+      ciphertext: new Uint8Array(),
+      shardId: 0n,
+    });
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(recovered);
+    mocks.deriveShieldedRecipientMaterial.mockResolvedValue({
+      identityCommitment: childIdentityCommitment,
+      registrationSalt,
+      personHash: wrapIdentityCommitmentAsPersonHash(childIdentityCommitment),
+    });
+    mocks.prepareShieldedTopUp.mockResolvedValue({ data: {}, witness: {} });
+    mocks.submitTopUp.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
+
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("topUp");
+    const password = enterRecipientCredentials();
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await screen.findByText("shielded.done");
+    expect(password.value).toBe("");
+    expect(mocks.prepareShieldedTopUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        heirIdentityCommitment: childIdentityCommitment,
+        registrationSalt,
+        budget: expect.objectContaining({ commitment: 3n }),
+      }),
+    );
+    expect(mocks.submitTopUp).toHaveBeenCalledTimes(1);
   });
 
   it("automatically finds a compatible first budget when only the second merge budget is selected", async () => {
@@ -813,15 +1129,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
 
   it("defaults to depositing when recovered notes have zero value or cannot fund a whole inheritance period", async () => {
     const registration = registrySnapshot();
-    registration.keys.set(identity.personHash, {
-      personHash: identity.personHash,
-      identityCommitment: BigInt(identity.identityCommitment),
-      ownerCommitment: deriveShieldedHeirKeyMaterial(identity.derivedSecretField).ownerCommitment,
-      viewingKey: `0x${"77".repeat(32)}`,
-      shardId: 0n,
-      leafIndex: 0n,
-      leaf: 1n,
-    });
+    addRegistration(registration, ownRegistrationContext());
     mocks.loadKeyRegistrySnapshot.mockResolvedValue(registration);
     mocks.recoverLocalShieldedWallet.mockResolvedValue(
       walletSnapshot([valueNote(1n, 0n), budgetNote(2n, { remaining: 9n })]),

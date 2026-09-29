@@ -25,6 +25,7 @@ template ShieldedTopUp() {
     signal input heirOwnerCommitment;
     signal input viewKeyHi;
     signal input viewKeyLo;
+    signal input registrationSalt;
     signal input eligibleFrom;
     signal input enrollmentSalt;
     signal input registrationDepth;
@@ -80,6 +81,7 @@ template ShieldedTopUp() {
     registeredHeir.heirOwnerCommitment <== heirOwnerCommitment;
     registeredHeir.viewKeyHi <== viewKeyHi;
     registeredHeir.viewKeyLo <== viewKeyLo;
+    registeredHeir.registrationSalt <== registrationSalt;
     registeredHeir.registryRoot <== publicSignals[30];
     registeredHeir.depth <== registrationDepth;
     registeredHeir.index <== registrationIndex;

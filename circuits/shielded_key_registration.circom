@@ -3,21 +3,23 @@ pragma circom 2.2.3;
 include "lib/identity.circom";
 
 // Public signals, in registry verifier ABI order:
-// identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi,
-// chainId, registryAddress, registrationTag.
+// ownerCommitment, viewKeyLo, viewKeyHi, chainId, registryAddress,
+// registrationTag, registrationLeaf.
 //
-// The identity passphrase-derived secret authorizes the selected viewing key.
+// The private identity passphrase-derived secret authorizes the selected viewing key.
+// Neither the identity commitment nor its person hash is a public signal.
 // X25519 key generation itself happens locally; the circuit binds the selected
 // public key to this proof so its public signals cannot be replaced in flight.
 template ShieldedKeyRegistration() {
-    signal input identityCommitment;
     signal input ownerCommitment;
     signal input viewKeyLo;
     signal input viewKeyHi;
     signal input chainId;
     signal input registryAddress;
     signal input registrationTag;
+    signal input registrationLeaf;
 
+    signal input identityCommitment;
     signal input nameField;
     signal input derivedSecretField;
     signal input isBirthBC;
@@ -66,26 +68,42 @@ template ShieldedKeyRegistration() {
     component addressBits = Num2Bits(160);
     addressBits.in <== registryAddress;
 
-    component tag = Poseidon(8);
+    component tag = Poseidon(5);
     tag.inputs[0] <== 1022;
     tag.inputs[1] <== derivedSecretField;
     tag.inputs[2] <== identityCommitment;
-    tag.inputs[3] <== ownerCommitment;
-    tag.inputs[4] <== viewKeyLo;
-    tag.inputs[5] <== viewKeyHi;
-    tag.inputs[6] <== chainId;
-    tag.inputs[7] <== registryAddress;
+    tag.inputs[3] <== chainId;
+    tag.inputs[4] <== registryAddress;
     tag.out === registrationTag;
+
+    component salt = Poseidon(5);
+    salt.inputs[0] <== 1029;
+    salt.inputs[1] <== derivedSecretField;
+    salt.inputs[2] <== identityCommitment;
+    salt.inputs[3] <== chainId;
+    salt.inputs[4] <== registryAddress;
+    component saltNonzero = IsZero();
+    saltNonzero.in <== salt.out;
+    saltNonzero.out === 0;
+
+    component leaf = Poseidon(6);
+    leaf.inputs[0] <== 1023;
+    leaf.inputs[1] <== identityCommitment;
+    leaf.inputs[2] <== ownerCommitment;
+    leaf.inputs[3] <== viewKeyHi;
+    leaf.inputs[4] <== viewKeyLo;
+    leaf.inputs[5] <== salt.out;
+    leaf.out === registrationLeaf;
 }
 
 component main {
     public [
-        identityCommitment,
         ownerCommitment,
         viewKeyLo,
         viewKeyHi,
         chainId,
         registryAddress,
-        registrationTag
+        registrationTag,
+        registrationLeaf
     ]
 } = ShieldedKeyRegistration();

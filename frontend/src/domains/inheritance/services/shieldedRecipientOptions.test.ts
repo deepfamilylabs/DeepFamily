@@ -9,8 +9,8 @@ import {
 const child = `0x${"aa".repeat(32)}`;
 const other = `0x${"bb".repeat(32)}`;
 const options: ShieldedRecipientOption[] = [
-  { personHash: child, label: "Child", registered: true, eligible: true },
-  { personHash: other, registered: false, eligible: false },
+  { personHash: child, label: "Child", eligible: true },
+  { personHash: other, eligible: false },
 ];
 
 describe("shielded recipient selection", () => {
@@ -36,31 +36,29 @@ describe("shielded recipient selection", () => {
     expect(labels.has(other)).toBe(false);
   });
 
-  it("requires full hashes, current child eligibility, and receiving registration", () => {
+  it("requires full hashes and current child eligibility", () => {
     expect(
-      validateShieldedRecipientSelection({ kind: "child", value: child, options, loading: false }),
+      validateShieldedRecipientSelection({ value: child, options, loading: false }),
     ).toBeUndefined();
     expect(
-      validateShieldedRecipientSelection({ kind: "child", value: other, options, loading: false }),
+      validateShieldedRecipientSelection({ value: other, options, loading: false }),
     ).toBe("notEligibleChild");
     expect(
       validateShieldedRecipientSelection({
-        kind: "recipient",
-        value: other,
-        options,
-        loading: false,
-      }),
-    ).toBe("notRegistered");
-    expect(
-      validateShieldedRecipientSelection({
-        kind: "recipient",
         value: child.slice(0, 20),
         options,
         loading: false,
       }),
     ).toBe("invalidHash");
     expect(
-      validateShieldedRecipientSelection({ kind: "child", value: child, options, loading: true }),
+      validateShieldedRecipientSelection({
+        value: `0x${"cc".repeat(32)}`,
+        options,
+        loading: false,
+      }),
+    ).toBe("notEligibleChild");
+    expect(
+      validateShieldedRecipientSelection({ value: child, options, loading: true }),
     ).toBe("loading");
   });
 });

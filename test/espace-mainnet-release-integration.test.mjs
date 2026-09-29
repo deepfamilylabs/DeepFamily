@@ -203,10 +203,9 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     }
     const registryFactory = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
       signer: deployer,
-      libraries: { PoseidonT3: address("poseidonT3"), PoseidonT6: address("poseidonT6") },
+      libraries: { PoseidonT3: address("poseidonT3") },
     });
     requests.shieldedHeirKeyRegistry = await registryFactory.getDeployTransaction(
-      address("deepFamilyLineageIndex"),
       address("groth16VerifierAdapter"),
     );
     const poolFactory = await ethers.getContractFactory("ShieldedDeepPool", {

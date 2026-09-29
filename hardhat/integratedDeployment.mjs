@@ -479,7 +479,6 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     [await pool.TOKEN(), tokenAddress, "pool token"],
     [await pool.LINEAGE_INDEX(), lineageAddress, "pool lineage index"],
     [await pool.KEY_REGISTRY(), registryAddress, "pool key registry"],
-    [await registry.LINEAGE_INDEX(), lineageAddress, "key registry lineage index"],
     [await registry.VERIFIER(), adapterAddress, "key registry verifier adapter"],
     [await pool.VERIFIER(), adapterAddress, "pool verifier adapter"],
   ]) {
@@ -823,12 +822,12 @@ export const deployIntegratedSystem = async (
 
   const ShieldedKeyRegistry = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
     signer: deployer,
-    libraries: { PoseidonT3: lineageLibraries.PoseidonT3, PoseidonT6: lineageLibraries.PoseidonT6 },
+    libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
   });
   const shieldedHeirKeyRegistry = await deployContract(
     "shieldedHeirKeyRegistry",
     ShieldedKeyRegistry,
-    [lineageIndexAddress, groth16VerifierAdapterAddress],
+    [groth16VerifierAdapterAddress],
   );
   const ShieldedPool = await ethers.getContractFactory("ShieldedDeepPool", {
     signer: deployer,
@@ -1116,10 +1115,7 @@ export const ensureIntegratedSystem = async (
                   ? { libraries }
                   : record.contractName === "ShieldedHeirKeyRegistry"
                     ? {
-                        libraries: {
-                          PoseidonT3: libraries.PoseidonT3,
-                          PoseidonT6: libraries.PoseidonT6,
-                        },
+                        libraries: { PoseidonT3: libraries.PoseidonT3 },
                       }
                     : record.contractName === "ShieldedDeepPool"
                       ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }

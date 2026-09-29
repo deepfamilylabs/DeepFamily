@@ -169,10 +169,8 @@ describe("eSpace Mainnet release transaction intents", function () {
     );
     const registryArgs = decodeConstructor("shieldedHeirKeyRegistry", "ShieldedHeirKeyRegistry", [
       "address",
-      "address",
     ]);
     expect([...registryArgs]).to.deep.equal([
-      byLabel.deepFamilyLineageIndex.predictedAddress,
       byLabel.groth16VerifierAdapter.predictedAddress,
     ]);
     const poolArgs = decodeConstructor("shieldedDeepPool", "ShieldedDeepPool", [

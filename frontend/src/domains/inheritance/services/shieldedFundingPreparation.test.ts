@@ -9,6 +9,8 @@ import {
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
   computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
+  computeShieldedRegistrationTag,
   createLineageTree,
   decodeShieldedNotePayload,
   decryptShieldedNote,
@@ -101,17 +103,25 @@ async function setup() {
   };
   const viewingKey = await deriveShieldedViewPublicKey(heirKeys.hpkeIkm);
   const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(viewingKey);
+  const registrationIdentity = {
+    derivedSecretField: heirSecret,
+    identityCommitment: heirIdentity,
+    chainId,
+    registryAddress,
+  };
+  const registrationTag = computeShieldedRegistrationTag(registrationIdentity);
+  const registrationSalt = computeShieldedRegistrationSalt(registrationIdentity);
   const keyLeaf = computeShieldedRegistrationLeaf({
     identityCommitment: heirIdentity,
     ownerCommitment: heirKeys.ownerCommitment,
     viewKeyHi,
     viewKeyLo,
+    salt: registrationSalt,
   });
   const keyTree = createLineageTree([keyLeaf, 123n]);
   const heirPersonHash = wrapIdentityCommitmentAsPersonHash(heirIdentity).toLowerCase();
   const heirKey: PublicHeirKey = {
-    personHash: heirPersonHash,
-    identityCommitment: heirIdentity,
+    registrationTag,
     ownerCommitment: heirKeys.ownerCommitment,
     viewingKey: hexlify(viewingKey),
     shardId: 0n,
@@ -124,7 +134,7 @@ async function setup() {
     toBlock: 10,
     blockHash,
     shards: new Map([[0n, keyTree]]),
-    keys: new Map([[heirPersonHash, heirKey]]),
+    keys: new Map([[registrationTag, heirKey]]),
   };
   const parentsDigest = computeLineageParentsDigest({
     fatherIdentityCommitment: rootIdentity,
@@ -197,8 +207,10 @@ async function setup() {
     donorCommitment: shield.outputs[0].commitment,
     keyRegistry,
     heirPersonHash,
+    heirIdentityCommitment: heirIdentity,
+    registrationSalt,
   };
-  return { common, pool, policy, keyRegistry, lineage, lineageIndex, heirKeys, noteTree };
+  return { common, pool, policy, keyRegistry, lineage, lineageIndex, heirKeys, noteTree, registrationTag, registrationSalt };
 }
 
 describe("local private allocation and top-up preparation", () => {
@@ -222,6 +234,8 @@ describe("local private allocation and top-up preparation", () => {
     expect(prepared.witness.endorsementSiblings).toHaveLength(64);
     expect(prepared.witness.trustedSiblings).toHaveLength(64);
     expect(prepared.witness.registrationSiblings).toHaveLength(32);
+    expect(prepared.witness.heirIdentityCommitment).toBe(String(heirIdentity));
+    expect(prepared.witness.registrationSalt).toBe(String(fixture.registrationSalt));
     expect(await open(prepared.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget",
       heirIdentityCommitment: heirIdentity,
@@ -271,6 +285,8 @@ describe("local private allocation and top-up preparation", () => {
     expect(topUp.data.inputRoots).toEqual([fixture.noteTree.root, fixture.noteTree.root]);
     expect(topUp.witness.oldBudgetRemainingPeriods).toBe("5");
     expect(topUp.witness.topUpPeriods).toBe("3");
+    expect(topUp.witness.heirIdentityCommitment).toBe(String(heirIdentity));
+    expect(topUp.witness.registrationSalt).toBe(String(fixture.registrationSalt));
     expect(await open(topUp.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget", remaining: 30n, eligibleFrom: BigInt(timestamp + 7200),
     });
@@ -305,6 +321,25 @@ describe("local private allocation and top-up preparation", () => {
     expect(topUp.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
   });
 
+  it("rejects a receive code with the wrong private salt or heir identity", async () => {
+    const fixture = await setup();
+    const input = {
+      ...fixture.common,
+      policy: { ...fixture.policy.outputs[0], shardId: 0n },
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+      budgetPeriods: 1n,
+    };
+    await expect(prepareShieldedAllocate({
+      ...input,
+      registrationSalt: fixture.registrationSalt + 1n,
+    })).rejects.toThrow("Heir has no registered viewing key");
+    await expect(prepareShieldedAllocate({
+      ...input,
+      heirIdentityCommitment: heirIdentity + 1n,
+    })).rejects.toThrow("Receive code identity does not match the selected heir");
+  });
+
   it("rejects insufficient funds, stale lineage, a one-key root, and a substituted template", async () => {
     const fixture = await setup();
     const input = {
@@ -318,7 +353,7 @@ describe("local private allocation and top-up preparation", () => {
     fixture.lineage.endorsementTree.insert(999n);
     await expect(prepareShieldedAllocate({ ...input, budgetPeriods: 1n })).rejects.toThrow("roots are stale");
     const oneKeyFixture = await setup();
-    oneKeyFixture.keyRegistry.shards.set(0n, createLineageTree([oneKeyFixture.keyRegistry.keys.get(oneKeyFixture.common.heirPersonHash)!.leaf]));
+    oneKeyFixture.keyRegistry.shards.set(0n, createLineageTree([oneKeyFixture.keyRegistry.keys.get(oneKeyFixture.registrationTag)!.leaf]));
     await expect(prepareShieldedAllocate({
       ...oneKeyFixture.common,
       policy: { ...oneKeyFixture.policy.outputs[0], shardId: 0n },

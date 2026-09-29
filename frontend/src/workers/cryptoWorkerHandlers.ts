@@ -1,6 +1,9 @@
 import {
+  IDENTITY_SUITE_CANDIDATE_1,
   bytesToHex,
+  canonicalizeFullName,
   computePersonVersionContentCommitment,
+  computeShieldedRegistrationSalt,
   decryptPersonVersionEnvelope,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
@@ -10,6 +13,7 @@ import {
   wipePreparedPersonVersionContent,
 } from "@deepfamily/protocol-core";
 import { computeIdentityHash } from "../shared/crypto/identityHash";
+import { classifyProtocolPassphraseRisk } from "../shared/crypto/passphraseStrength";
 import { deriveKeyFromPersonData } from "../shared/crypto/secureKeyDerivation";
 import { preflightPersonVersionEnvelopeSizeV1 } from "../shared/metadata/personVersionEnvelopePreflight";
 import type {
@@ -132,6 +136,43 @@ export const cryptoWorkerHandlers: CryptoWorkerHandlerMap = {
         nameSecretCommitment: material.nameSecretCommitment.toString(),
         identityCommitment: material.identityCommitment.toString(),
         personHash: material.personHash,
+      };
+    } finally {
+      wipeBytes(material?.identitySalt);
+      wipeBytes(material?.derivedSecretBytes);
+    }
+  },
+  deriveShieldedRecipientMaterial: async ({
+    identity,
+    rawPassphrase,
+    chainId,
+    registryAddress,
+  }) => {
+    // The payer must never receive the child's derived secret or viewing key.
+    const canonicalIdentity = {
+      ...identity,
+      fullName: canonicalizeFullName(identity.fullName),
+    };
+    if (classifyProtocolPassphraseRisk(rawPassphrase) === "disallowed") {
+      throw new Error("Recipient passphrase is disallowed");
+    }
+    let material;
+    try {
+      material = await deriveIdentityMaterial({
+        identity: canonicalIdentity,
+        rawPassphrase,
+        identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
+      });
+      const registrationSalt = computeShieldedRegistrationSalt({
+        derivedSecretField: material.derivedSecretField,
+        identityCommitment: material.identityCommitment,
+        chainId,
+        registryAddress,
+      });
+      return {
+        identityCommitment: material.identityCommitment.toString(),
+        personHash: material.personHash,
+        registrationSalt: registrationSalt.toString(),
       };
     } finally {
       wipeBytes(material?.identitySalt);

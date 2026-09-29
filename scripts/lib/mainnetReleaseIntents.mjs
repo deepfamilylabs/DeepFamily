@@ -278,12 +278,12 @@ export const buildMainnetReleaseIntents = async ({
   const keyRegistryBytecode = linkBytecode({
     ethers,
     artifact: artifact.ShieldedHeirKeyRegistry,
-    libraries: { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
+    libraries: { PoseidonT3: addresses.poseidonT3 },
   });
   await pushDeployment(
     "shieldedHeirKeyRegistry",
     "ShieldedHeirKeyRegistry",
-    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+    [addresses.groth16VerifierAdapter],
     keyRegistryBytecode,
   );
   const poolBytecode = linkBytecode({

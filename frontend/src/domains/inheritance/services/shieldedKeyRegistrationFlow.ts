@@ -2,6 +2,7 @@ import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/pr
 import {
   buildShieldedKeyRegistrationPublicSignals,
   computeIdentityFromDerivedSecret,
+  computeShieldedRegistrationSalt,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
 } from "@deepfamily/protocol-core";
@@ -36,9 +37,12 @@ export type RegisterShieldedHeirKeyInput = {
 export type ShieldedKeyRegistrationResult = {
   transactionHash: string;
   receipt: TransactionReceipt;
-  personHash: string;
   ownerCommitment: bigint;
   viewingKey: string;
+  registrationTag: bigint;
+  registrationLeaf: bigint;
+  /** Share only with a payer through the private payment code. */
+  registrationSalt: bigint;
   gasEstimate: bigint;
   gasLimit: bigint;
 };
@@ -110,14 +114,21 @@ export async function registerShieldedHeirKey(
     chainId: expectedChainId,
     registryAddress,
   });
+  const registrationSalt = computeShieldedRegistrationSalt({
+    derivedSecretField: material.derivedSecretField,
+    identityCommitment: material.identityCommitment,
+    chainId: expectedChainId,
+    registryAddress,
+  });
   const witness: ShieldedWitness = {
-    identityCommitment: signals[0].toString(),
-    ownerCommitment: signals[1].toString(),
-    viewKeyLo: signals[2].toString(),
-    viewKeyHi: signals[3].toString(),
-    chainId: signals[4].toString(),
-    registryAddress: signals[5].toString(),
-    registrationTag: signals[6].toString(),
+    ownerCommitment: signals[0].toString(),
+    viewKeyLo: signals[1].toString(),
+    viewKeyHi: signals[2].toString(),
+    chainId: signals[3].toString(),
+    registryAddress: signals[4].toString(),
+    registrationTag: signals[5].toString(),
+    registrationLeaf: signals[6].toString(),
+    identityCommitment: material.identityCommitment.toString(),
     nameField: material.nameField.toString(),
     derivedSecretField: material.derivedSecretField.toString(),
     isBirthBC: Number(material.identity.isBirthBC),
@@ -144,9 +155,9 @@ export async function registerShieldedHeirKey(
     throw new Error("Shielded key registry ABI is missing register");
   }
   const args: unknown[] = [
-    material.identityCommitment,
     keys.ownerCommitment,
     viewingKey,
+    signals[5],
     signals[6],
     proofData,
   ];
@@ -171,9 +182,11 @@ export async function registerShieldedHeirKey(
   return {
     transactionHash: tx.hash,
     receipt,
-    personHash: material.personHash,
     ownerCommitment: keys.ownerCommitment,
     viewingKey,
+    registrationTag: signals[5],
+    registrationLeaf: signals[6],
+    registrationSalt,
     gasEstimate,
     gasLimit,
   };

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   asUint8Array,
+  computeShieldedRegistrationSalt,
   normalizePassphrase,
   parseCanonicalPersonVersion,
 } from "@deepfamily/protocol-core";
@@ -40,6 +41,74 @@ const context = {
 const jsonMetadata = JSON.parse(vector.metadata.canonicalJsonUtf8);
 
 describe("production crypto worker handlers", () => {
+  it("derives a child's payment material without returning spend secrets", async () => {
+    const registryAddress = "0x1111111111111111111111111111111111111111";
+    const chainId = 1030n;
+    const request: CryptoWorkerRequest = {
+      id: 45,
+      method: "deriveShieldedRecipientMaterial",
+      params: {
+        identity,
+        rawPassphrase: vector.identity.rawPassphrase,
+        chainId,
+        registryAddress,
+      },
+    };
+    const responses: CryptoWorkerResponse[] = [];
+    await handleCryptoWorkerRequest(request, (response) => responses.push(response));
+    expect(request.params).toBeUndefined();
+    expect(responses).toHaveLength(1);
+    const response = responses[0];
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error(response.error.message);
+    expect(response.result).toEqual({
+      identityCommitment: vector.identity.identityCommitment,
+      personHash: vector.identity.personHash,
+      registrationSalt: String(computeShieldedRegistrationSalt({
+        derivedSecretField: vector.identity.derivedSecretField,
+        identityCommitment: vector.identity.identityCommitment,
+        chainId,
+        registryAddress,
+      })),
+    });
+    expect(Object.keys(response.result).sort()).toEqual([
+      "identityCommitment",
+      "personHash",
+      "registrationSalt",
+    ]);
+    const changedChain = await cryptoWorkerHandlers.deriveShieldedRecipientMaterial({
+      identity,
+      rawPassphrase: vector.identity.rawPassphrase,
+      chainId: chainId + 1n,
+      registryAddress,
+    });
+    const changedRegistry = await cryptoWorkerHandlers.deriveShieldedRecipientMaterial({
+      identity,
+      rawPassphrase: vector.identity.rawPassphrase,
+      chainId,
+      registryAddress: "0x2222222222222222222222222222222222222222",
+    });
+    expect(changedChain.identityCommitment).toBe(response.result.identityCommitment);
+    expect(changedRegistry.identityCommitment).toBe(response.result.identityCommitment);
+    expect(changedChain.registrationSalt).not.toBe(response.result.registrationSalt);
+    expect(changedRegistry.registrationSalt).not.toBe(response.result.registrationSalt);
+  });
+
+  it("rejects disallowed recipient input before deriving any key", async () => {
+    await expect(cryptoWorkerHandlers.deriveShieldedRecipientMaterial({
+      identity,
+      rawPassphrase: "bad\u0001secret",
+      chainId: 1030n,
+      registryAddress: "0x1111111111111111111111111111111111111111",
+    })).rejects.toThrow("disallowed");
+    await expect(cryptoWorkerHandlers.deriveShieldedRecipientMaterial({
+      identity: { ...identity, fullName: " " },
+      rawPassphrase: "secret",
+      chainId: 1030n,
+      registryAddress: "0x1111111111111111111111111111111111111111",
+    })).rejects.toThrow();
+  });
+
   it("runs the committed golden vector through the real fresh-v1 handler boundary", async () => {
     const material = await cryptoWorkerHandlers.deriveIdentityMaterialV1({
       identity,

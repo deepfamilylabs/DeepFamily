@@ -730,6 +730,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ownerCommitment: heirOwnerCommitment,
       viewKeyHi,
       viewKeyLo,
+      salt: BigInt(allocationWitness.registrationSalt),
     });
     const unrelatedViewingKey = await deriveShieldedViewPublicKey(
       hre.ethers.getBytes(hre.ethers.zeroPadValue("0x5678", 32)),
@@ -739,6 +740,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       identityCommitment: 123456n,
       ownerCommitment: 7891011n,
       ...unrelatedKeyLimbs,
+      salt: 123456n,
     });
     const registryRoot = poseidon2([registeredHeirLeaf, unrelatedLeaf]);
     await keyRegistry.setKnownRoot(0, registryRoot, true, 2);

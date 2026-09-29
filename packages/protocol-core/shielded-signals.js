@@ -4,6 +4,8 @@ import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import {
   computeShieldedCiphertextHashField,
+  computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
   computeShieldedRegistrationTag,
 } from "./shielded-inheritance.js";
 import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
@@ -96,19 +98,29 @@ export function buildShieldedKeyRegistrationPublicSignals(input) {
   const registrationTag = computeShieldedRegistrationTag({
     derivedSecretField: input.derivedSecretField,
     identityCommitment,
-    ownerCommitment,
-    viewKeyLo,
-    viewKeyHi,
     chainId,
     registryAddress,
   });
-  return [
+  const salt = computeShieldedRegistrationSalt({
+    derivedSecretField: input.derivedSecretField,
     identityCommitment,
+    chainId,
+    registryAddress,
+  });
+  const registrationLeaf = computeShieldedRegistrationLeaf({
+    identityCommitment,
+    ownerCommitment,
+    viewKeyHi,
+    viewKeyLo,
+    salt,
+  });
+  return [
     ownerCommitment,
     viewKeyLo,
     viewKeyHi,
     chainId,
     BigInt(registryAddress),
     registrationTag,
+    registrationLeaf,
   ];
 }

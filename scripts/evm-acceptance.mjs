@@ -1951,8 +1951,8 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "ShieldedHeirKeyRegistry",
         addresses.shieldedHeirKeyRegistry,
-        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
-        { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
+        [addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
       ),
     );
     initialVerificationEntries.push(

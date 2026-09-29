@@ -4,10 +4,13 @@ import {
   buildShieldedKeyRegistrationPublicSignals,
   buildShieldedPoolPublicSignals,
   computeShieldedCiphertextHashField,
+  computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
   computeShieldedRegistrationTag,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNT,
+  splitShieldedViewPublicKey,
 } from "../index.js";
 
 const ciphertextA = Uint8Array.from({ length: 512 }, () => 0x11);
@@ -66,7 +69,7 @@ test("pool public signal order matches the immutable 32-signal Solidity ABI", ()
   );
 });
 
-test("registration public signals bind the exact HPKE public key limbs", async () => {
+test("anonymous registration public signals bind the exact HPKE public key limbs", async () => {
   const derivedSecretField = 13n;
   const keys = deriveShieldedHeirKeyMaterial(derivedSecretField);
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
@@ -79,15 +82,36 @@ test("registration public signals bind the exact HPKE public key limbs", async (
     registryAddress: "0x0000000000000000000000000000000000000001",
   };
   const signals = buildShieldedKeyRegistrationPublicSignals(input);
+  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(viewingKey);
   assert.equal(signals.length, 7);
-  assert.equal(signals[0], 19n);
-  assert.equal(signals[1], keys.ownerCommitment);
+  assert.equal(signals[0], keys.ownerCommitment);
+  assert.equal(signals[1], viewKeyLo);
+  assert.equal(signals[2], viewKeyHi);
+  assert.equal(signals[3], 1030n);
+  assert.equal(signals[4], 1n);
   assert.equal(
-    signals[6],
+    signals[5],
     computeShieldedRegistrationTag({
-      ...input,
-      viewKeyLo: signals[2],
-      viewKeyHi: signals[3],
+      derivedSecretField,
+      identityCommitment: 19n,
+      chainId: 1030n,
+      registryAddress: input.registryAddress,
     }),
   );
+  assert.equal(
+    signals[6],
+    computeShieldedRegistrationLeaf({
+      identityCommitment: 19n,
+      ownerCommitment: keys.ownerCommitment,
+      viewKeyLo: signals[1],
+      viewKeyHi: signals[2],
+      salt: computeShieldedRegistrationSalt({
+        derivedSecretField,
+        identityCommitment: 19n,
+        chainId: 1030n,
+        registryAddress: input.registryAddress,
+      }),
+    }),
+  );
+  assert.ok(!signals.includes(19n));
 });

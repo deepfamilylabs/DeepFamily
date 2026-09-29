@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract ShieldedKeyRegistryLineageMock {
-  mapping(bytes32 => uint256) public identityCommitmentOf;
-
-  function setIdentity(bytes32 personHash, uint256 commitment) external {
-    identityCommitmentOf[personHash] = commitment;
-  }
-}
-
 contract ShieldedKeyRegistryVerifierMock {
   uint256[7] private _expected;
   bool public accept;

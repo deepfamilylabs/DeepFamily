@@ -58,19 +58,17 @@ export default function InheritancePage() {
       const token = createDeepTokenContract(config.tokenAddress, provider);
       const pool = createShieldedPoolContract(poolAddress, provider);
       const registry = createShieldedKeyRegistryContract(registryAddress, provider);
-      const [network, familyIndex, poolIndex, registryIndex, poolToken, poolRegistry, decimals] =
+      const [network, familyIndex, poolIndex, poolToken, poolRegistry, decimals] =
         await Promise.all([
           provider.getNetwork(),
           deepFamily.lineageIndex() as Promise<string>,
           pool.LINEAGE_INDEX() as Promise<string>,
-          registry.LINEAGE_INDEX() as Promise<string>,
           pool.TOKEN() as Promise<string>,
           pool.KEY_REGISTRY() as Promise<string>,
           token.decimals() as Promise<bigint>,
         ]);
       if (
         !sameAddress(familyIndex, poolIndex) ||
-        !sameAddress(familyIndex, registryIndex) ||
         !sameAddress(poolToken, config.tokenAddress) ||
         !sameAddress(poolRegistry, registryAddress)
       ) {

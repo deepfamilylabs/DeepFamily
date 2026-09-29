@@ -1619,7 +1619,6 @@
     },
     "shieldedHeirKeyRegistry": {
       "address": null,
-      "lineageIndexImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
       "verifierAdapterImmutable": null

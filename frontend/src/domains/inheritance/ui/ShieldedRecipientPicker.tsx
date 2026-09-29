@@ -1,22 +1,17 @@
 import { useTranslation } from "react-i18next";
-import type {
-  ShieldedRecipientKind,
-  ShieldedRecipientOption,
-} from "../services/shieldedRecipientOptions";
+import type { ShieldedRecipientOption } from "../services/shieldedRecipientOptions";
 import { FieldBlock, shortHex } from "./inheritanceControls";
 
 const INPUT_CLASS =
   "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
 
 export function ShieldedRecipientPicker({
-  kind,
   label,
   value,
   onChange,
   options,
   loading,
 }: {
-  kind: ShieldedRecipientKind;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -24,7 +19,7 @@ export function ShieldedRecipientPicker({
   loading: boolean;
 }) {
   const { t } = useTranslation();
-  const visible = kind === "child" ? options.filter((option) => option.eligible) : options;
+  const visible = options.filter((option) => option.eligible);
   const selected = visible.find(
     (option) => option.personHash.toLowerCase() === value.trim().toLowerCase(),
   );
@@ -44,30 +39,14 @@ export function ShieldedRecipientPicker({
               : t(
                   visible.length
                     ? "shielded.recipientPicker.placeholder"
-                    : kind === "child"
-                      ? "shielded.recipientPicker.emptyChildren"
-                      : "shielded.recipientPicker.emptyRecipients",
+                    : "shielded.recipientPicker.emptyChildren",
                 )}
           </option>
           {visible.map((option, index) => (
-            <option
-              key={option.personHash.toLowerCase()}
-              value={option.personHash}
-              disabled={!option.registered}
-            >
-              {option.label ??
-                t(
-                  `shielded.recipientPicker.${kind === "child" ? "childFallback" : "recipientFallback"}`,
-                  {
-                    index: index + 1,
-                  },
-                )}{" "}
+            <option key={option.personHash.toLowerCase()} value={option.personHash}>
+              {option.label ?? t("shielded.recipientPicker.childFallback", { index: index + 1 })}{" "}
               {shortHex(option.personHash)} ·{" "}
-              {t(
-                option.registered
-                  ? "shielded.recipientPicker.registered"
-                  : "shielded.recipientPicker.unregistered",
-              )}
+              {t("shielded.recipientPicker.codeRequired")}
             </option>
           ))}
         </select>

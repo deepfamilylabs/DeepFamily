@@ -21,6 +21,7 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedPolicyNoteCommitment,
+  computeShieldedRegistrationSalt,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -439,14 +440,21 @@ export async function runShieldedAcceptanceSmoke({
         chainId,
         registryAddress,
       });
+      const registrationSalt = computeShieldedRegistrationSalt({
+        derivedSecretField: material.derivedSecretField,
+        identityCommitment: material.identityCommitment,
+        chainId,
+        registryAddress,
+      });
       const witness = {
-        identityCommitment: String(signals[0]),
-        ownerCommitment: String(signals[1]),
-        viewKeyLo: String(signals[2]),
-        viewKeyHi: String(signals[3]),
-        chainId: String(signals[4]),
-        registryAddress: String(signals[5]),
-        registrationTag: String(signals[6]),
+        ownerCommitment: String(signals[0]),
+        viewKeyLo: String(signals[1]),
+        viewKeyHi: String(signals[2]),
+        chainId: String(signals[3]),
+        registryAddress: String(signals[4]),
+        registrationTag: String(signals[5]),
+        registrationLeaf: String(signals[6]),
+        identityCommitment: String(material.identityCommitment),
         nameField: String(material.nameField),
         derivedSecretField: String(material.derivedSecretField),
         isBirthBC: Number(material.identity.isBirthBC),
@@ -461,9 +469,9 @@ export async function runShieldedAcceptanceSmoke({
       const receipt = await record(
         label,
         await registry.register(
-          material.identityCommitment,
           keys.ownerCommitment,
           hexlify(keys.viewingKey),
+          signals[5],
           signals[6],
           encodeGroth16AbcProofData(generated.normalized),
         ),
@@ -479,10 +487,12 @@ export async function runShieldedAcceptanceSmoke({
         })
         .find((event) => event?.name === "KeyLeafAppended");
       assert.ok(appended, "Key registration has no Merkle leaf event");
-      keyPositions.push({ shardId: appended.args.shardId, leafIndex: appended.args.leafIndex });
-      const registered = await registry.registrationOf(material.personHash);
-      assert.equal(registered.ownerCommitment, keys.ownerCommitment);
-      assert.equal(registered.viewingKey.toLowerCase(), hexlify(keys.viewingKey).toLowerCase());
+      assert.equal(appended.args.leaf, signals[6]);
+      keyPositions.push({
+        shardId: appended.args.shardId,
+        leafIndex: appended.args.leafIndex,
+        registrationSalt,
+      });
     }
     const keyPosition = keyPositions[0];
     const registrationProof = await registry.getMerkleProof(
@@ -639,6 +649,7 @@ export async function runShieldedAcceptanceSmoke({
       heirOwnerCommitment: String(heirOwnerCommitment),
       viewKeyHi: String(viewKeyHi),
       viewKeyLo: String(viewKeyLo),
+      registrationSalt: String(keyPosition.registrationSalt),
       registrationDepth: registration.depth,
       registrationIndex: registration.index,
       registrationSiblings: registration.siblings,
