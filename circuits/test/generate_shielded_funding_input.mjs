@@ -44,12 +44,14 @@ export function buildShieldedFundingFixtures({
   const heirOwnerCommitment = heir.ownerCommitment;
   const viewKeyHi = 105n;
   const viewKeyLo = 106n;
-  const registryLeaf = poseidon5([
+  const registrationSalt = 1234567n;
+  const registryLeaf = poseidon6([
     1023n,
     heirIdentityCommitment,
     heirOwnerCommitment,
     viewKeyHi,
     viewKeyLo,
+    registrationSalt,
   ]);
   const eligibleFrom = BigInt(heir.witness.eligibleFrom);
   const enrollmentSalt = 66666n;
@@ -116,6 +118,7 @@ export function buildShieldedFundingFixtures({
     heirOwnerCommitment: decimal(heirOwnerCommitment),
     viewKeyHi: decimal(viewKeyHi),
     viewKeyLo: decimal(viewKeyLo),
+    registrationSalt: decimal(registrationSalt),
     registrationDepth: "0",
     registrationIndex: "0",
     registrationSiblings: zeroes(),
@@ -207,6 +210,7 @@ export function buildShieldedFundingFixtures({
     policyNote,
     oldBudget,
     registryLeaf,
+    registrationSalt,
     outputBudget,
     outputChange,
   };

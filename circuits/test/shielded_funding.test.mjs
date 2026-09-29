@@ -167,6 +167,17 @@ test("shielded Allocate and TopUp constraints", async (t) => {
         }),
       );
     });
+    await t.test("Allocate and TopUp reject a changed private registration salt", async () => {
+      for (const action of ["allocate", "top_up"]) {
+        const witness = action === "allocate" ? fixture.allocate : fixture.topUp;
+        await invalid(
+          action,
+          mutate(witness, (w) => {
+            w.registrationSalt = (BigInt(w.registrationSalt) + 1n).toString();
+          }),
+        );
+      }
+    });
     await t.test("Allocate accepts full 64-level endorsement and trusted paths", async () => {
       const { allocate } = buildShieldedFundingFixtures();
       const parents = poseidon3([

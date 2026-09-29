@@ -1,7 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
+  computeShieldedRegistrationTag,
   deriveShieldedHeirKeyMaterial,
+  splitShieldedViewPublicKey,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { formatUnits, getBigInt, parseUnits, type Signer } from "ethers";
@@ -33,6 +37,10 @@ import {
 } from "../services/shieldedRecipientOptions";
 import { useShieldedIdentitySession } from "./useShieldedIdentitySession";
 import { ShieldedRecipientPicker } from "./ShieldedRecipientPicker";
+import {
+  ShieldedRecipientCredentialsForm,
+  type ShieldedRecipientCredentialsFormHandle,
+} from "./ShieldedRecipientCredentialsForm";
 import { prepareShieldedClaim } from "../services/shieldedClaimPreparation";
 import {
   prepareShieldedAllocate,
@@ -47,6 +55,13 @@ import {
   type KeyRegistrySnapshot,
 } from "../services/shieldedKeyRegistryChain";
 import { registerShieldedHeirKey } from "../services/shieldedKeyRegistrationFlow";
+import {
+  deriveShieldedRecipientMaterial,
+  encodeShieldedReceiveCode,
+  parseShieldedReceiveCode,
+  resolveShieldedRecipientMaterial,
+  type ShieldedRecipientMaterial,
+} from "../services/shieldedReceiveCode";
 import { prepareShieldedMergeBudget } from "../services/shieldedMergeBudgetPreparation";
 import {
   prepareShieldedCreatePolicy,
@@ -97,6 +112,7 @@ type Action =
   | "unshield";
 
 type TaskGroup = "wallet" | "inheritance" | "receive";
+type RecipientInputMethod = "receiveCode" | "credentials";
 const TASK_GROUPS: readonly TaskGroup[] = ["wallet", "inheritance", "receive"];
 const TASK_ACTIONS: Record<TaskGroup, readonly Action[]> = {
   wallet: ["shield", "privateTransfer", "unshield"],
@@ -213,6 +229,69 @@ function AdvancedOptions({ children }: { children: ReactNode }) {
   );
 }
 
+function RecipientInput({
+  method,
+  onMethodChange,
+  codeRef,
+  credentialsFormRef,
+  onCodeChange,
+  busy,
+}: {
+  method: RecipientInputMethod;
+  onMethodChange: (method: RecipientInputMethod) => void;
+  codeRef: RefObject<HTMLTextAreaElement>;
+  credentialsFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
+  onCodeChange?: (value: string) => void;
+  busy: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-3">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-ink">
+          {t("shielded.recipientMethodLabel")}
+        </legend>
+        <div className="flex flex-wrap gap-4">
+          {(["receiveCode", "credentials"] as const).map((option) => (
+            <label key={option} className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="shielded-recipient-method"
+                value={option}
+                checked={method === option}
+                disabled={busy}
+                onChange={() => onMethodChange(option)}
+              />
+              {t(`shielded.recipientMethods.${option}`)}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset disabled={busy}>
+        {method === "receiveCode" ? (
+          <FieldBlock
+            label={t("shielded.receiveCodeInputLabel")}
+            hint={t("shielded.receiveCodeInputHint")}
+          >
+            <textarea
+              aria-label={t("shielded.receiveCodeInputLabel")}
+              className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
+              ref={codeRef}
+              onChange={(event) => onCodeChange?.(event.target.value)}
+              rows={3}
+            />
+          </FieldBlock>
+        ) : (
+          <div className="space-y-3">
+            <WarningNotice>{t("shielded.recipientCredentialsWarning")}</WarningNotice>
+            <ShieldedRecipientCredentialsForm ref={credentialsFormRef} />
+          </div>
+        )}
+      </fieldset>
+    </div>
+  );
+}
+
 function InheritanceGuide({ expanded }: { expanded: boolean }) {
   const { t } = useTranslation();
   return (
@@ -298,9 +377,14 @@ export function ShieldedInheritancePanel({
   const [rootPersonHash, setRootPersonHash] = useState("");
   const [rootVersion, setRootVersion] = useState("");
   const [heirPersonHash, setHeirPersonHash] = useState("");
+  const heirReceiveCodeRef = useRef<HTMLTextAreaElement>(null);
+  const recipientCredentialsFormRef = useRef<ShieldedRecipientCredentialsFormHandle>(null);
+  const [recipientInputMethod, setRecipientInputMethod] =
+    useState<RecipientInputMethod>("receiveCode");
   const [periods, setPeriods] = useState("1");
   const [claimIndices, setClaimIndices] = useState("");
-  const [transferPersonHash, setTransferPersonHash] = useState("");
+  const transferReceiveCodeRef = useRef<HTMLTextAreaElement>(null);
+  const [transferReceiveTargetHash, setTransferReceiveTargetHash] = useState<string | null>(null);
   const [transferAmount, setTransferAmount] = useState("");
   const [useSecondValue, setUseSecondValue] = useState(false);
   const [exitAmount, setExitAmount] = useState("");
@@ -336,6 +420,7 @@ export function ShieldedInheritancePanel({
       activeIdentity.current = null;
       walletCache.current = null;
       registryCache.current = null;
+      recipientCredentialsFormRef.current?.clearSecretInputs();
     };
     window.addEventListener("pagehide", invalidate);
     return () => {
@@ -362,6 +447,11 @@ export function ShieldedInheritancePanel({
     setUseSecondValue(false);
     setRootPersonHash("");
     setRootVersion("");
+    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
+    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
+    recipientCredentialsFormRef.current?.clearSecretInputs();
+    setRecipientInputMethod("receiveCode");
+    setTransferReceiveTargetHash(null);
     setTransactionHash("");
     setStage("");
     setError("");
@@ -466,17 +556,52 @@ export function ShieldedInheritancePanel({
         : null,
     [currentLineage, walletSnapshot, identity, eligibleClaimBudgets],
   );
-  const registeredRecipients = useMemo<ShieldedRecipientOption[]>(
-    () =>
-      [...(registrySnapshot?.keys.values() ?? [])]
-        .map((key) => ({
-          personHash: key.personHash,
-          label: localRecipientLabels.get(key.personHash.toLowerCase()),
-          registered: true,
-        }))
-        .sort((a, b) => (a.label ?? a.personHash).localeCompare(b.label ?? b.personHash)),
-    [registrySnapshot, localRecipientLabels],
-  );
+  const ownRegistration = useMemo(() => {
+    if (!identity || !registrySnapshot) return null;
+    const identityCommitment = BigInt(identity.identityCommitment);
+    const derivedSecretField = BigInt(identity.derivedSecretField);
+    const context = {
+      identityCommitment,
+      derivedSecretField,
+      chainId: modules.chainId,
+      registryAddress: registrySnapshot.registryAddress,
+    };
+    const registrationTag = computeShieldedRegistrationTag(context);
+    const registrationSalt = computeShieldedRegistrationSalt(context);
+    const key = registrySnapshot.keys.get(registrationTag);
+    let registered = false;
+    if (key) {
+      const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(key.viewingKey);
+      registered = key.leaf === computeShieldedRegistrationLeaf({
+        identityCommitment,
+        ownerCommitment: key.ownerCommitment,
+        viewKeyHi,
+        viewKeyLo,
+        salt: registrationSalt,
+      });
+    }
+    return {
+      registered,
+      receiveCode: encodeShieldedReceiveCode(identityCommitment, registrationSalt),
+      waitingForSecondKey: Boolean(
+        key && (registrySnapshot.shards.get(key.shardId)?.sizeBigInt ?? 0n) < 2n,
+      ),
+    };
+  }, [identity, registrySnapshot, modules.chainId]);
+  const updateTransferReceiveTarget = (value: string) => {
+    try {
+      setTransferReceiveTargetHash(parseShieldedReceiveCode(value).personHash);
+    } catch {
+      setTransferReceiveTargetHash(null);
+    }
+  };
+  const changeRecipientInputMethod = (method: RecipientInputMethod) => {
+    recipientCredentialsFormRef.current?.clearSecretInputs();
+    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
+    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
+    setTransferReceiveTargetHash(null);
+    setRecipientInputMethod(method);
+  };
   const selectedPolicy = selected(available.policies, policySelection);
   const childOptions = useMemo<ShieldedRecipientOption[]>(() => {
     if (!currentLineage || selectedPolicy?.note.kind !== "policy") return [];
@@ -492,9 +617,7 @@ export function ShieldedInheritancePanel({
         )
       )
         continue;
-      const registered = registrySnapshot?.keys.get(personHash.toLowerCase());
-      const childCommitment =
-        registered?.identityCommitment ?? versions[versions.length - 1]?.identityCommitment;
+      const childCommitment = versions[versions.length - 1]?.identityCommitment;
       if (childCommitment === undefined) continue;
       const eligible = findHeirLegitimacy({
         snapshot: currentLineage.snapshot,
@@ -505,14 +628,13 @@ export function ShieldedInheritancePanel({
       candidates.push({
         personHash,
         label: localRecipientLabels.get(personHash.toLowerCase()),
-        registered: !!registered,
         eligible,
       });
     }
     return candidates.sort((a, b) =>
       (a.label ?? a.personHash).localeCompare(b.label ?? b.personHash),
     );
-  }, [currentLineage, selectedPolicy, registrySnapshot, localRecipientLabels]);
+  }, [currentLineage, selectedPolicy, localRecipientLabels]);
 
   async function refreshWallet(identity: IdentityMaterialV1Result) {
     const previous = walletCache.current;
@@ -577,6 +699,11 @@ export function ShieldedInheritancePanel({
   }
 
   function chooseAction(next: Action, preferredGroup?: TaskGroup) {
+    recipientCredentialsFormRef.current?.clearSecretInputs();
+    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
+    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
+    setRecipientInputMethod("receiveCode");
+    setTransferReceiveTargetHash(null);
     const group = TASK_GROUPS.find((candidate) => TASK_ACTIONS[candidate].includes(next));
     if (preferredGroup || group) setTaskGroup(preferredGroup ?? group!);
     setAction(next);
@@ -594,6 +721,7 @@ export function ShieldedInheritancePanel({
   function lockIdentity() {
     operationEpoch.current += 1;
     activeIdentity.current = null;
+    recipientCredentialsFormRef.current?.clearSecretInputs();
     session.lock();
     setError("");
     setStage("");
@@ -700,13 +828,44 @@ export function ShieldedInheritancePanel({
         if (next !== "confirming") assertCurrentOperation();
         setStage(t(`shielded.stages.${next}`));
       };
+      let derivedRecipient: ShieldedRecipientMaterial | null = null;
+      const resolveRecipient = () => {
+        if (recipientInputMethod === "receiveCode") {
+          const codeRef = action === "privateTransfer" ? transferReceiveCodeRef : heirReceiveCodeRef;
+          const code = codeRef.current?.value ?? "";
+          if (codeRef.current) codeRef.current.value = "";
+          return resolveShieldedRecipientMaterial({ kind: "receiveCode", code });
+        }
+        if (!derivedRecipient) throw new Error(t("shielded.recipientCredentialsMissing"));
+        return resolveShieldedRecipientMaterial({
+          kind: "derivedRecipient",
+          material: derivedRecipient,
+        });
+      };
       session.touch();
-      const isPrivate = action !== "recover" && action !== "register" && action !== "shield";
+      const isPrivate = action !== "recover" && action !== "shield";
       if (isPrivate && !privateWalletChecked) {
         throw new Error(t("shielded.privateWalletRequired"));
       }
       if (isPrivate && publicActivityAddresses.has(account.toLowerCase())) {
         throw new Error(t("shielded.walletReused"));
+      }
+      if (
+        recipientInputMethod === "credentials" &&
+        (action === "allocate" || action === "topUp" || action === "privateTransfer")
+      ) {
+        const credentialsForm = recipientCredentialsFormRef.current;
+        if (!credentialsForm) throw new Error(t("shielded.recipientCredentialsMissing"));
+        const credentials = credentialsForm.readAndClear();
+        setStage(t("shielded.stages.deriving"));
+        const registryAddress =
+          registryCache.current?.registryAddress ?? (await modules.registry.getAddress());
+        derivedRecipient = await deriveShieldedRecipientMaterial({
+          ...credentials,
+          chainId: modules.chainId,
+          registryAddress,
+        });
+        assertCurrentOperation();
       }
       if (
         (await signer.provider?.getNetwork())?.chainId !== modules.chainId ||
@@ -723,7 +882,13 @@ export function ShieldedInheritancePanel({
       } else if (action === "register") {
         setStage(t("shielded.stages.recovering"));
         const existing = await refreshRegistry();
-        if (existing.keys.has(identity.personHash.toLowerCase())) {
+        const registrationTag = computeShieldedRegistrationTag({
+          derivedSecretField: identity.derivedSecretField,
+          identityCommitment: identity.identityCommitment,
+          chainId: modules.chainId,
+          registryAddress: existing.registryAddress,
+        });
+        if (existing.keys.has(registrationTag)) {
           throw new Error(t("shielded.alreadyRegistered"));
         }
         const result = await registerShieldedHeirKey({
@@ -833,12 +998,15 @@ export function ShieldedInheritancePanel({
           const donor = fundingValue(policyNote.amountPerPeriod * budgetPeriods);
           const keyRegistry = await refreshRegistry();
           const childError = validateShieldedRecipientSelection({
-            kind: "child",
             value: heirPersonHash,
             options: childOptions,
             loading: !currentLineage && !lineageError,
           });
           if (childError) throw new Error(t(`shielded.recipientPicker.errors.${childError}`));
+          const receive = resolveRecipient();
+          if (receive.personHash.toLowerCase() !== heirPersonHash.trim().toLowerCase()) {
+            throw new Error(t("shielded.recipientMismatch"));
+          }
           const result = await submitAllocateWithFreshLineage({
             pool: modules.pool,
             signer,
@@ -853,6 +1021,8 @@ export function ShieldedInheritancePanel({
                 donorCommitment: donor.commitment,
                 keyRegistry,
                 heirPersonHash: heirPersonHash.trim(),
+                heirIdentityCommitment: receive.identityCommitment,
+                registrationSalt: receive.registrationSalt,
                 policy: {
                   note: policyNote,
                   commitment: policy.commitment,
@@ -872,6 +1042,10 @@ export function ShieldedInheritancePanel({
           if (!template) throw new Error(t("shielded.noBudgetTemplate"));
           const topUpPeriods = parsePositivePeriods(periods);
           const donor = fundingValue(getBigInt(template.note.amountPerPeriod) * topUpPeriods);
+          const receive = resolveRecipient();
+          if (receive.identityCommitment !== getBigInt(template.note.heirIdentityCommitment)) {
+            throw new Error(t("shielded.recipientMismatch"));
+          }
           const prepared = await prepareShieldedTopUp({
             pool: modules.pool,
             wallet: recovered,
@@ -881,6 +1055,8 @@ export function ShieldedInheritancePanel({
             heirPersonHash: wrapIdentityCommitmentAsPersonHash(
               template.note.heirIdentityCommitment,
             ),
+            heirIdentityCommitment: receive.identityCommitment,
+            registrationSalt: receive.registrationSalt,
             budget: template,
             topUpPeriods,
           });
@@ -1028,17 +1204,8 @@ export function ShieldedInheritancePanel({
             first.note.amount + (second?.note.kind === "value" ? second.note.amount : 0n);
           if (amount > total) throw new Error(t("shielded.amountExceedsNotes"));
           const keyRegistry = await refreshRegistry();
-          const recipientError = validateShieldedRecipientSelection({
-            kind: "recipient",
-            value: transferPersonHash,
-            options: [...keyRegistry.keys.values()].map((key) => ({
-              personHash: key.personHash,
-              registered: true,
-            })),
-            loading: false,
-          });
-          if (recipientError)
-            throw new Error(t(`shielded.recipientPicker.errors.${recipientError}`));
+          const receive = resolveRecipient();
+          setTransferReceiveTargetHash(receive.personHash);
           const prepared = await prepareShieldedPrivateTransfer({
             chainId: modules.chainId,
             poolAddress: modules.poolAddress,
@@ -1063,7 +1230,12 @@ export function ShieldedInheritancePanel({
                   },
                 ],
             destinations: [
-              { kind: "registered", personHash: transferPersonHash.trim(), amount },
+              {
+                kind: "registered",
+                identityCommitment: receive.identityCommitment,
+                registrationSalt: receive.registrationSalt,
+                amount,
+              },
               { kind: "inputOwner", inputIndex: 0, amount: total - amount },
             ],
             keyRegistry,
@@ -1144,12 +1316,13 @@ export function ShieldedInheritancePanel({
         setError(detail);
       }
     } finally {
+      recipientCredentialsFormRef.current?.clearSecretInputs();
       running.current = false;
       setBusy(false);
     }
   }
 
-  const isPrivate = action !== "recover" && action !== "register" && action !== "shield";
+  const isPrivate = action !== "recover" && action !== "shield";
 
   const feedback = (
     <>
@@ -1215,7 +1388,7 @@ export function ShieldedInheritancePanel({
     );
   }
 
-  const registered = registrySnapshot?.keys.has(identity.personHash.toLowerCase());
+  const registered = ownRegistration?.registered;
   const totalValue = available.values.reduce(
     (sum, item) => sum + (item.note.kind === "value" ? item.note.amount : 0n),
     0n,
@@ -1311,6 +1484,23 @@ export function ShieldedInheritancePanel({
             {t("shielded.actions.recover")}
           </PanelButton>
         </div>
+        {registered && ownRegistration ? (
+          <FieldBlock
+            label={t("shielded.receiveCodeLabel")}
+            hint={t("shielded.receiveCodeShareHint")}
+          >
+            <textarea
+              aria-label={t("shielded.receiveCodeLabel")}
+              className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
+              readOnly
+              value={ownRegistration.receiveCode}
+              rows={3}
+            />
+          </FieldBlock>
+        ) : null}
+        {registered && ownRegistration?.waitingForSecondKey ? (
+          <WarningNotice>{t("shielded.waitingForSecondKey")}</WarningNotice>
+        ) : null}
         {nextAction && nextAction !== action ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline p-3">
             <p className="text-sm text-ink-muted">{t(`shielded.nextStep.${nextAction}`)}</p>
@@ -1457,7 +1647,6 @@ export function ShieldedInheritancePanel({
                     decimals={modules.tokenDecimals}
                   />
                   <ShieldedRecipientPicker
-                    kind="child"
                     label={t("shielded.fields.heirPersonHash")}
                     value={heirPersonHash}
                     onChange={setHeirPersonHash}
@@ -1501,6 +1690,13 @@ export function ShieldedInheritancePanel({
                   </select>
                 </FieldBlock>
               )}
+              <RecipientInput
+                method={recipientInputMethod}
+                onMethodChange={changeRecipientInputMethod}
+                codeRef={heirReceiveCodeRef}
+                credentialsFormRef={recipientCredentialsFormRef}
+                busy={busy}
+              />
               <FieldBlock label={t("shielded.fields.periods")} hint={t("shielded.periodsHint")}>
                 <input
                   aria-label={t("shielded.fields.periods")}
@@ -1610,14 +1806,26 @@ export function ShieldedInheritancePanel({
 
           {action === "privateTransfer" ? (
             <>
-              <ShieldedRecipientPicker
-                kind="recipient"
-                label={t("shielded.fields.recipient")}
-                value={transferPersonHash}
-                onChange={setTransferPersonHash}
-                options={registeredRecipients}
-                loading={!registrySnapshot}
+              <RecipientInput
+                method={recipientInputMethod}
+                onMethodChange={changeRecipientInputMethod}
+                codeRef={transferReceiveCodeRef}
+                credentialsFormRef={recipientCredentialsFormRef}
+                onCodeChange={updateTransferReceiveTarget}
+                busy={busy}
               />
+              {transferReceiveTargetHash ? (
+                <p className="break-all rounded-xl bg-surface-alt p-3 text-sm text-ink">
+                  {t("shielded.recipientTarget", {
+                    identity:
+                      localRecipientLabels.get(transferReceiveTargetHash.toLowerCase()) ??
+                      transferReceiveTargetHash,
+                  })}
+                  <span className="mt-1 block font-mono text-xs text-ink-muted">
+                    {transferReceiveTargetHash}
+                  </span>
+                </p>
+              ) : null}
               <FieldBlock label={t("shielded.fields.transferAmount")}>
                 <input
                   aria-label={t("shielded.fields.transferAmount")}

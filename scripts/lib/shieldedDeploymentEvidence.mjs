@@ -17,7 +17,6 @@ export function shieldedDeploymentBindings(addresses) {
     ),
     shieldedHeirKeyRegistry: {
       address: address("shieldedHeirKeyRegistry"),
-      lineageIndexImmutable: address("deepFamilyLineageIndex"),
       verifierAdapterImmutable: address("groth16VerifierAdapter"),
     },
     shieldedDeepPool: {
@@ -53,11 +52,6 @@ export async function assertShieldedDeploymentBindings({
     same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
   }
   const registry = deployed.shieldedHeirKeyRegistry;
-  same(
-    await read("registry lineage", () => registry.LINEAGE_INDEX()),
-    bindings.deepFamilyLineageIndex,
-    "registry lineage",
-  );
   same(
     await read("registry verifier", () => registry.VERIFIER()),
     bindings.shieldedHeirKeyRegistry.verifierAdapterImmutable,

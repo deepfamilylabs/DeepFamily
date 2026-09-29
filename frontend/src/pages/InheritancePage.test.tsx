@@ -55,9 +55,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
     TOKEN: async () => mocks.poolToken,
     KEY_REGISTRY: async () => mocks.poolRegistry,
   }),
-  createShieldedKeyRegistryContract: () => ({
-    LINEAGE_INDEX: async () => mocks.familyIndex,
-  }),
+  createShieldedKeyRegistryContract: () => ({}),
   createLineageIndexContract: () => ({}),
 }));
 vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({

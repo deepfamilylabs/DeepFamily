@@ -2,7 +2,7 @@ import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
 import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
-import { computeShieldedRegistrationLeaf, createLineageTree } from "@deepfamily/protocol-core";
+import { createLineageTree } from "@deepfamily/protocol-core";
 
 const EMPTY_PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
@@ -18,154 +18,85 @@ const EMPTY_PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
 
 describe("Shielded heir key registry transport", function () {
   async function setup() {
-    const lineage = await hre.ethers.deployContract("ShieldedKeyRegistryLineageMock");
     const verifier = await hre.ethers.deployContract("ShieldedKeyRegistryVerifierMock");
     const adapter = await deployUnifiedVerifierAdapter(hre, { keyRegistration: verifier });
     const poseidonT3 = await hre.ethers.deployContract("PoseidonT3");
-    const poseidonT6 = await hre.ethers.deployContract("PoseidonT6");
     const Registry = await hre.ethers.getContractFactory("ShieldedHeirKeyRegistry", {
-      libraries: {
-        PoseidonT3: await poseidonT3.getAddress(),
-        PoseidonT6: await poseidonT6.getAddress(),
-      },
+      libraries: { PoseidonT3: await poseidonT3.getAddress() },
     });
-    const registry = await Registry.deploy(await lineage.getAddress(), await adapter.getAddress());
+    const registry = await Registry.deploy(await adapter.getAddress());
     const network = await hre.ethers.provider.getNetwork();
-    const identityCommitment = 123456n;
-    const personHash = hre.ethers.keccak256(
-      hre.ethers.zeroPadValue(hre.ethers.toBeHex(identityCommitment), 32),
-    );
-    // Distinct limbs detect a swapped Lo/Hi verifier signal or tree-leaf encoding.
+    // Distinct limbs detect a swapped Lo/Hi verifier signal.
     const viewingKey = `0x${"42".repeat(16)}${"43".repeat(16)}`;
     const ownerCommitment = 789n;
     const registrationTag = 987n;
+    const registrationLeaf = 123456789n;
     const signals = [
-      identityCommitment,
       ownerCommitment,
       BigInt(`0x${"43".repeat(16)}`),
       BigInt(`0x${"42".repeat(16)}`),
       network.chainId,
       BigInt(await registry.getAddress()),
       registrationTag,
+      registrationLeaf,
     ];
-    await lineage.setIdentity(personHash, identityCommitment);
     await verifier.configure(signals, true);
-    return {
-      lineage,
-      verifier,
-      registry,
-      identityCommitment,
-      personHash,
-      viewingKey,
-      ownerCommitment,
-      registrationTag,
-    };
+    return { verifier, registry, viewingKey, ownerCommitment, registrationTag, registrationLeaf, signals };
   }
 
-  it("binds identity, owner commitment, key halves, chain and registry in verifier inputs", async () => {
-    const context = await setup();
-    const {
-      registry,
-      personHash,
-      viewingKey,
-      identityCommitment,
-      ownerCommitment,
-      registrationTag,
-    } = context;
-    await expect(
-      registry.register(
-        identityCommitment,
-        ownerCommitment,
-        viewingKey,
-        registrationTag,
-        EMPTY_PROOF,
-      ),
-    )
+  it("binds the anonymous tag, owner, key, leaf, chain and registry to the proof", async () => {
+    const { registry, viewingKey, ownerCommitment, registrationTag, registrationLeaf } = await setup();
+    expect(registry.interface.getFunction("register").inputs.map((input) => input.name)).to.deep.equal([
+      "ownerCommitment", "viewingKey", "registrationTag", "registrationLeaf", "proofData",
+    ]);
+    expect(registry.interface.getEvent("ViewingKeyRegistered").inputs.map((input) => input.name))
+      .to.deep.equal(["registrationTag", "ownerCommitment", "viewingKey", "leaf"]);
+    expect(registry.interface.fragments.some((fragment) => fragment.name === "registrationOf"))
+      .to.equal(false);
+
+    await expect(registry.register(ownerCommitment, viewingKey, registrationTag, registrationLeaf, EMPTY_PROOF))
       .to.emit(registry, "ViewingKeyRegistered")
-      .withArgs(personHash, identityCommitment, viewingKey, ownerCommitment);
-    const registration = await registry.registrationOf(personHash);
-    expect(registration.viewingKey).to.equal(viewingKey);
-    expect(registration.ownerCommitment).to.equal(ownerCommitment);
-    const leaf = computeShieldedRegistrationLeaf({
-      identityCommitment,
-      ownerCommitment,
-      viewKeyHi: BigInt(`0x${"42".repeat(16)}`),
-      viewKeyLo: BigInt(`0x${"43".repeat(16)}`),
-    });
-    const tree = createLineageTree([leaf]);
+      .withArgs(registrationTag, ownerCommitment, viewingKey, registrationLeaf);
+    const tree = createLineageTree([registrationLeaf]);
     expect((await registry.keyShard(0)).root).to.equal(tree.root);
     expect(await registry.isKnownRoot(0, tree.root)).to.equal(true);
     expect(await registry.knownRootSize(0, tree.root)).to.equal(1n);
     const proof = await registry.getMerkleProof(0, 0);
-    expect(proof.leaf).to.equal(leaf);
+    expect(proof.leaf).to.equal(registrationLeaf);
     expect(proof.proofRoot).to.equal(tree.root);
     expect(proof.proofDepth).to.equal(0n);
-    const secondIdentity = identityCommitment + 1n;
-    const secondPersonHash = hre.ethers.keccak256(
-      hre.ethers.zeroPadValue(hre.ethers.toBeHex(secondIdentity), 32),
-    );
-    await context.lineage.setIdentity(secondPersonHash, secondIdentity);
-    await context.verifier.configure(
-      [
-        secondIdentity,
-        ownerCommitment,
-        BigInt(`0x${"43".repeat(16)}`),
-        BigInt(`0x${"42".repeat(16)}`),
-        (await hre.ethers.provider.getNetwork()).chainId,
-        BigInt(await registry.getAddress()),
-        registrationTag,
-      ],
-      true,
-    );
-    await registry.register(
-      secondIdentity,
-      ownerCommitment,
-      viewingKey,
-      registrationTag,
-      EMPTY_PROOF,
-    );
-    expect(await registry.knownRootSize(0, tree.root)).to.equal(1n);
-    expect(await registry.knownRootSize(0, (await registry.keyShard(0)).root)).to.equal(2n);
-    await expect(
-      registry.register(
-        identityCommitment,
-        ownerCommitment,
-        viewingKey,
-        registrationTag,
-        EMPTY_PROOF,
-      ),
-    ).to.be.revertedWithCustomError(registry, "AlreadyRegistered");
   });
 
-  it("rejects unknown identity and substituted key", async () => {
-    const context = await setup();
-    const { registry, identityCommitment, ownerCommitment, viewingKey, registrationTag } = context;
+  it("deduplicates by the identity-secret tag while allowing a distinct anonymous tag", async () => {
+    const { registry, verifier, viewingKey, ownerCommitment, registrationTag, registrationLeaf, signals } =
+      await setup();
+    await registry.register(ownerCommitment, viewingKey, registrationTag, registrationLeaf, EMPTY_PROOF);
+    const firstRoot = (await registry.keyShard(0)).root;
     await expect(
-      registry.register(
-        identityCommitment + 1n,
-        ownerCommitment,
-        viewingKey,
-        registrationTag,
-        EMPTY_PROOF,
-      ),
-    ).to.be.revertedWithCustomError(registry, "UnknownIdentity");
-    await expect(
-      registry.register(
-        identityCommitment,
-        ownerCommitment,
-        `0x${"43".repeat(32)}`,
-        registrationTag,
-        EMPTY_PROOF,
-      ),
-    ).to.be.revertedWithCustomError(registry, "InvalidRegistrationProof");
-    await expect(
-      registry.register(
-        identityCommitment,
-        ownerCommitment,
-        `0x${"42".repeat(32)}`,
-        registrationTag,
-        EMPTY_PROOF,
-      ),
-    ).to.be.revertedWithCustomError(registry, "InvalidRegistrationProof");
+      registry.register(ownerCommitment, viewingKey, registrationTag, registrationLeaf, EMPTY_PROOF),
+    ).to.be.revertedWithCustomError(registry, "AlreadyRegistered");
+
+    const secondTag = registrationTag + 1n;
+    const secondLeaf = registrationLeaf + 1n;
+    await verifier.configure([...signals.slice(0, 5), secondTag, secondLeaf], true);
+    await registry.register(ownerCommitment, viewingKey, secondTag, secondLeaf, EMPTY_PROOF);
+    expect(await registry.knownRootSize(0, firstRoot)).to.equal(1n);
+    expect(await registry.knownRootSize(0, (await registry.keyShard(0)).root)).to.equal(2n);
+    expect((await registry.getMerkleProof(0, 1)).leaf).to.equal(secondLeaf);
+  });
+
+  it("rejects substituted public inputs and invalid anonymous leaves", async () => {
+    const { registry, viewingKey, ownerCommitment, registrationTag, registrationLeaf } = await setup();
+    for (const args of [
+      [ownerCommitment + 1n, viewingKey, registrationTag, registrationLeaf],
+      [ownerCommitment, `0x${"43".repeat(32)}`, registrationTag, registrationLeaf],
+      [ownerCommitment, viewingKey, registrationTag + 1n, registrationLeaf],
+      [ownerCommitment, viewingKey, registrationTag, registrationLeaf + 1n],
+    ]) {
+      await expect(registry.register(...args, EMPTY_PROOF))
+        .to.be.revertedWithCustomError(registry, "InvalidRegistrationProof");
+    }
+    await expect(registry.register(ownerCommitment, viewingKey, registrationTag, 0n, EMPTY_PROOF))
+      .to.be.revertedWithCustomError(registry, "InvalidLeaf");
   });
 });

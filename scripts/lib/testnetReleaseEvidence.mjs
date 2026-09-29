@@ -1355,12 +1355,12 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       `shielded.proofs.${action}.publicSignalsSha256`,
     );
     requireExact(
-      signals[action === "keyRegistration" ? 4 : 1],
+      signals[action === "keyRegistration" ? 3 : 1],
       String(expectedChainId),
       `shielded.proofs.${action} chain ID`,
     );
     requireSameAddress(
-      `0x${BigInt(signals[action === "keyRegistration" ? 5 : 2])
+      `0x${BigInt(signals[action === "keyRegistration" ? 4 : 2])
         .toString(16)
         .padStart(40, "0")}`,
       report.addresses[

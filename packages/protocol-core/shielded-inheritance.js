@@ -34,6 +34,7 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   topUpUseNullifier: 1026n,
   enrollmentNullifier: 1027n,
   allocationKeyCommitment: 1028n,
+  registrationSalt: 1029n,
 });
 
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
@@ -174,27 +175,34 @@ export function computeShieldedOwnerCommitment(ownerSecret) {
   ]);
 }
 
-/**
- * Bind the public identity proof to a chain, registry, and exact HPKE public
- * key limbs. The circuit re-derives the identity and owner commitment from the
- * private identity witness; the UI derives the HPKE key pair from hpkeIkm.
- */
-export function computeShieldedRegistrationTag(input) {
+function registrationIdentityInputs(input) {
   const address = BigInt(assertAddress(input.registryAddress, "registryAddress"));
   protocolAssert(
     address > 0n && address <= MAX_UINT160,
     "INVALID_REGISTRY_ADDRESS",
     "registryAddress must be nonzero",
   );
-  return poseidon8([
-    SHIELDED_INHERITANCE_DOMAINS.registrationTag,
+  return [
     nonzeroField(input.derivedSecretField, "derivedSecretField"),
     nonzeroField(input.identityCommitment, "identityCommitment"),
-    nonzeroField(input.ownerCommitment, "ownerCommitment"),
-    uint128(input.viewKeyLo, "viewKeyLo"),
-    uint128(input.viewKeyHi, "viewKeyHi"),
     uint64(input.chainId, "chainId"),
     address,
+  ];
+}
+
+/** A public one-time tag that does not reveal the person hash. */
+export function computeShieldedRegistrationTag(input) {
+  return poseidon5([
+    SHIELDED_INHERITANCE_DOMAINS.registrationTag,
+    ...registrationIdentityInputs(input),
+  ]);
+}
+
+/** A private identity-scoped salt for the public registration leaf. */
+export function computeShieldedRegistrationSalt(input) {
+  return poseidon5([
+    SHIELDED_INHERITANCE_DOMAINS.registrationSalt,
+    ...registrationIdentityInputs(input),
   ]);
 }
 
@@ -207,12 +215,13 @@ export function computeShieldedRegistrationLeaf(input) {
     "ZERO_SHIELDED_VIEW_KEY",
     "view public key must be nonzero",
   );
-  return poseidon5([
+  return poseidon6([
     SHIELDED_INHERITANCE_DOMAINS.registrationLeaf,
     nonzeroField(input.identityCommitment, "identityCommitment"),
     nonzeroField(input.ownerCommitment, "ownerCommitment"),
     viewKeyHi,
     viewKeyLo,
+    nonzeroField(input.salt, "salt"),
   ]);
 }
 

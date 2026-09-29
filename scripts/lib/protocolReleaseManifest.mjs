@@ -129,8 +129,8 @@ export const PROTOCOL_DEPLOYMENT_ARTIFACTS = Object.freeze({
     path: "artifacts/contracts/ShieldedHeirKeyRegistry.sol/ShieldedHeirKeyRegistry.json",
     contractName: "ShieldedHeirKeyRegistry",
     sourceName: "contracts/ShieldedHeirKeyRegistry.sol",
-    immutableFields: Object.freeze(["LINEAGE_INDEX", "VERIFIER"]),
-    libraryFields: Object.freeze(["PoseidonT3", "PoseidonT6"]),
+    immutableFields: Object.freeze(["VERIFIER"]),
+    libraryFields: Object.freeze(["PoseidonT3"]),
   }),
   shieldedDeepPool: Object.freeze({
     path: "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json",
@@ -987,10 +987,9 @@ export const inspectProtocolDeploymentArtifacts = ({ root = process.cwd(), deplo
       root,
       artifactName: "shieldedHeirKeyRegistry",
       immutableValues: {
-        LINEAGE_INDEX: deployments?.shieldedHeirKeyRegistry?.lineageIndexImmutable,
         VERIFIER: deployments?.shieldedHeirKeyRegistry?.verifierAdapterImmutable,
       },
-      libraries: { PoseidonT3: deployments?.poseidonT3, PoseidonT6: deployments?.poseidonT6 },
+      libraries: { PoseidonT3: deployments?.poseidonT3 },
     }),
     shieldedDeepPool: inspectProtocolDeploymentArtifact({
       root,
@@ -1072,7 +1071,7 @@ const assertShieldedDeploymentShape = (deployments) => {
   }
   assertExactKeys(
     deployments.shieldedHeirKeyRegistry,
-    ["address", "lineageIndexImmutable", "verifierAdapterImmutable", ...SHIELDED_RECORD_HASH_KEYS],
+    ["address", "verifierAdapterImmutable", ...SHIELDED_RECORD_HASH_KEYS],
     "shielded key registry deployment",
   );
   assertExactKeys(
@@ -1103,7 +1102,6 @@ export const shieldedDeploymentBindingsFromAddresses = (addresses) => ({
   ),
   shieldedHeirKeyRegistry: {
     address: addresses?.shieldedHeirKeyRegistry,
-    lineageIndexImmutable: addresses?.deepFamilyLineageIndex,
     verifierAdapterImmutable: addresses?.groth16VerifierAdapter,
   },
   shieldedDeepPool: {
@@ -1143,18 +1141,13 @@ export const protocolShieldedDeploymentEvidenceFromRecords = (deployments) => {
     "Groth16VerifierAdapter address",
   );
   const registry = normalizeRecord(deployments.shieldedHeirKeyRegistry, "ShieldedHeirKeyRegistry");
-  registry.lineageIndexImmutable = assertAddress(
-    registry.lineageIndexImmutable,
-    "key registry lineage",
-  );
   registry.verifierAdapterImmutable = assertAddress(
     registry.verifierAdapterImmutable,
     "key registry verifier",
   );
   assert(
-    registry.lineageIndexImmutable === addressFields.deepFamilyLineageIndex &&
-      registry.verifierAdapterImmutable === adapterAddress,
-    "ShieldedHeirKeyRegistry must bind the declared lineage and common verifier adapter",
+    registry.verifierAdapterImmutable === adapterAddress,
+    "ShieldedHeirKeyRegistry must bind the common verifier adapter",
   );
   const pool = normalizeRecord(deployments.shieldedDeepPool, "ShieldedDeepPool");
   for (const field of [

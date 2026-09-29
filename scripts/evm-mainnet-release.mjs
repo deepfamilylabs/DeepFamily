@@ -566,7 +566,7 @@ const assertProtocolTerminalState = async ({
     [
       "ShieldedHeirKeyRegistry",
       addresses.shieldedHeirKeyRegistry,
-      { libraries: { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 } },
+      { libraries: { PoseidonT3: addresses.poseidonT3 } },
     ],
     [
       "ShieldedDeepPool",
@@ -1521,8 +1521,8 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "ShieldedHeirKeyRegistry",
         addresses.shieldedHeirKeyRegistry,
-        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
-        { PoseidonT3: addresses.poseidonT3, PoseidonT6: addresses.poseidonT6 },
+        [addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
         hre.artifacts,

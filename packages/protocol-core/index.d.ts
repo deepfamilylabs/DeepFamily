@@ -627,6 +627,7 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   dummyInputNullifier: bigint;
   registrationTag: bigint;
   registrationLeaf: bigint;
+  registrationSalt: bigint;
   policyNote: bigint;
   topUpUseNullifier: bigint;
   enrollmentNullifier: bigint;
@@ -675,9 +676,12 @@ export function computeShieldedOwnerCommitment(ownerSecret: BigNumberish): bigin
 export function computeShieldedRegistrationTag(input: {
   derivedSecretField: BigNumberish;
   identityCommitment: BigNumberish;
-  ownerCommitment: BigNumberish;
-  viewKeyLo: BigNumberish;
-  viewKeyHi: BigNumberish;
+  chainId: BigNumberish;
+  registryAddress: string;
+}): bigint;
+export function computeShieldedRegistrationSalt(input: {
+  derivedSecretField: BigNumberish;
+  identityCommitment: BigNumberish;
   chainId: BigNumberish;
   registryAddress: string;
 }): bigint;
@@ -686,6 +690,7 @@ export function computeShieldedRegistrationLeaf(input: {
   ownerCommitment: BigNumberish;
   viewKeyHi: BigNumberish;
   viewKeyLo: BigNumberish;
+  salt: BigNumberish;
 }): bigint;
 export function computeShieldedValueNoteCommitment(input: {
   ownerCommitment: BigNumberish;

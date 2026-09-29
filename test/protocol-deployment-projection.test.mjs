@@ -17,6 +17,7 @@ import {
 } from "../scripts/protocol-deployment-projection.mjs";
 import {
   GROTH16_ADAPTER_IMMUTABLE_FIELDS,
+  PROTOCOL_DEPLOYMENT_ARTIFACTS,
   inspectProtocolDeploymentArtifact,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 
@@ -161,8 +162,11 @@ describe("planned production protocol deployment projection", function () {
     expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedHeirKeyRegistry.libraryFields).to.deep.equal([
+      "PoseidonT3",
+    ]);
     expect(inspected.artifacts.shieldedHeirKeyRegistry.runtimeBytecode).to.include(
-      plannedAddresses.poseidonT6.slice(2).toLowerCase(),
+      plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
     const immutableValues = Object.fromEntries(
       GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [

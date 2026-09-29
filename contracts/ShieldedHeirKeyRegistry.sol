@@ -1,24 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
-import {PoseidonT6} from "poseidon-solidity/PoseidonT6.sol";
 
 /**
- * @notice Lets an existing person register a public viewing key by proving knowledge of their
- *         existing identity secret. The public key only addresses encrypted notes; note events
- *         do not name this registry entry or the person receiving them.
+ * @notice Registers a public viewing key without publishing the person's identity commitment.
+ * @dev The proof binds the same private identity secret to the owner key, viewing key, one-time
+ *      registration tag, and blinded registration leaf. Allocate separately checks the heir's
+ *      on-chain lineage eligibility.
  */
 contract ShieldedHeirKeyRegistry {
   error InvalidConstructorAddress();
-  error UnknownIdentity();
   error AlreadyRegistered();
   error InvalidViewingKey();
   error InvalidOwnerCommitment();
-  error InvalidIdentityCommitment();
   error InvalidRegistrationTag();
   error InvalidRegistrationProof();
   error InvalidLeafIndex();
@@ -38,22 +35,16 @@ contract ShieldedHeirKeyRegistry {
     mapping(uint256 root => uint256 size) rootSizes;
   }
 
-  struct Registration {
-    bytes32 viewingKey;
-    uint256 ownerCommitment;
-  }
-
-  IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
   IProofVerifierAdapter public immutable VERIFIER;
   uint256 public currentShardId;
   mapping(uint256 shardId => Shard shard) private _shards;
-  mapping(bytes32 personHash => Registration) private _registrations;
+  mapping(uint256 registrationTag => bool used) private _registrationTags;
 
   event ViewingKeyRegistered(
-    bytes32 indexed personHash,
-    uint256 identityCommitment,
+    uint256 indexed registrationTag,
+    uint256 ownerCommitment,
     bytes32 viewingKey,
-    uint256 ownerCommitment
+    uint256 leaf
   );
   event KeyLeafAppended(
     uint256 indexed shardId,
@@ -62,19 +53,11 @@ contract ShieldedHeirKeyRegistry {
     uint256 root
   );
 
-  constructor(address lineageIndex, address verifier) {
-    if (lineageIndex.code.length == 0 || verifier.code.length == 0) {
+  constructor(address verifier) {
+    if (verifier.code.length == 0) {
       revert InvalidConstructorAddress();
     }
-    LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
     VERIFIER = IProofVerifierAdapter(verifier);
-  }
-
-  function registrationOf(
-    bytes32 personHash
-  ) external view returns (bytes32 viewingKey, uint256 ownerCommitment) {
-    Registration storage entry = _registrations[personHash];
-    return (entry.viewingKey, entry.ownerCommitment);
   }
 
   function keyShard(
@@ -144,15 +127,12 @@ contract ShieldedHeirKeyRegistry {
    *      proves authorization to choose it; clients must derive/check the matching private key.
    */
   function register(
-    uint256 identityCommitment,
     uint256 ownerCommitment,
     bytes32 viewingKey,
     uint256 registrationTag,
+    uint256 registrationLeaf,
     bytes calldata proofData
   ) external {
-    if (identityCommitment == 0 || identityCommitment >= SNARK_SCALAR_FIELD) {
-      revert InvalidIdentityCommitment();
-    }
     if (viewingKey == bytes32(0)) revert InvalidViewingKey();
     if (ownerCommitment == 0 || ownerCommitment >= SNARK_SCALAR_FIELD) {
       revert InvalidOwnerCommitment();
@@ -160,20 +140,17 @@ contract ShieldedHeirKeyRegistry {
     if (registrationTag == 0 || registrationTag >= SNARK_SCALAR_FIELD) {
       revert InvalidRegistrationTag();
     }
-    bytes32 personHash = keccak256(abi.encodePacked(bytes32(identityCommitment)));
-    if (LINEAGE_INDEX.identityCommitmentOf(personHash) != identityCommitment) {
-      revert UnknownIdentity();
-    }
-    if (_registrations[personHash].viewingKey != bytes32(0)) revert AlreadyRegistered();
+    if (registrationLeaf == 0 || registrationLeaf >= SNARK_SCALAR_FIELD) revert InvalidLeaf();
+    if (_registrationTags[registrationTag]) revert AlreadyRegistered();
 
     uint256[] memory publicSignals = new uint256[](ProofConstants.KEY_REGISTRATION_PUBLIC_SIGNALS_LEN);
-    publicSignals[0] = identityCommitment;
-    publicSignals[1] = ownerCommitment;
-    publicSignals[2] = uint256(uint128(uint256(viewingKey)));
-    publicSignals[3] = uint256(viewingKey) >> 128;
-    publicSignals[4] = block.chainid;
-    publicSignals[5] = uint256(uint160(address(this)));
-    publicSignals[6] = registrationTag;
+    publicSignals[0] = ownerCommitment;
+    publicSignals[1] = uint256(uint128(uint256(viewingKey)));
+    publicSignals[2] = uint256(viewingKey) >> 128;
+    publicSignals[3] = block.chainid;
+    publicSignals[4] = uint256(uint160(address(this)));
+    publicSignals[5] = registrationTag;
+    publicSignals[6] = registrationLeaf;
     if (
       !VERIFIER.verifyProof(
         ProofConstants.PROOF_PURPOSE_KEY_REGISTRATION,
@@ -183,22 +160,9 @@ contract ShieldedHeirKeyRegistry {
       )
     ) revert InvalidRegistrationProof();
 
-    _registrations[personHash] = Registration({
-      viewingKey: viewingKey,
-      ownerCommitment: ownerCommitment
-    });
-    emit ViewingKeyRegistered(personHash, identityCommitment, viewingKey, ownerCommitment);
-    uint256 leaf = PoseidonT6.hash(
-      [
-        uint256(1023),
-        identityCommitment,
-        ownerCommitment,
-        uint256(viewingKey) >> 128,
-        uint256(uint128(uint256(viewingKey)))
-      ]
-    );
-    if (leaf == 0) revert InvalidLeaf();
-    _append(leaf);
+    _registrationTags[registrationTag] = true;
+    emit ViewingKeyRegistered(registrationTag, ownerCommitment, viewingKey, registrationLeaf);
+    _append(registrationLeaf);
   }
 
   function _append(uint256 leaf) private {

@@ -32,6 +32,7 @@ template ShieldedAllocate() {
     signal input heirOwnerCommitment;
     signal input viewKeyHi;
     signal input viewKeyLo;
+    signal input registrationSalt;
     signal input registrationDepth;
     signal input registrationIndex;
     signal input registrationSiblings[32];
@@ -126,6 +127,7 @@ template ShieldedAllocate() {
     registeredHeir.heirOwnerCommitment <== heirOwnerCommitment;
     registeredHeir.viewKeyHi <== viewKeyHi;
     registeredHeir.viewKeyLo <== viewKeyLo;
+    registeredHeir.registrationSalt <== registrationSalt;
     registeredHeir.registryRoot <== publicSignals[30];
     registeredHeir.depth <== registrationDepth;
     registeredHeir.index <== registrationIndex;

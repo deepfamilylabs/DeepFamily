@@ -76,12 +76,13 @@ template ShieldedDonorValueInput() {
 }
 
 // The child does not reveal a person hash. The registration path proves that
-// heirIdentityCommitment, ownerCommitment and view key were jointly registered.
+// heirIdentityCommitment, ownerCommitment, view key and private salt were jointly registered.
 template ShieldedRegisteredHeir() {
     signal input heirIdentityCommitment;
     signal input heirOwnerCommitment;
     signal input viewKeyHi;
     signal input viewKeyLo;
+    signal input registrationSalt;
     signal input registryRoot;
     signal input depth;
     signal input index;
@@ -100,12 +101,16 @@ template ShieldedRegisteredHeir() {
     component keyNotZero = IsZero();
     keyNotZero.in <== viewKeyHi + viewKeyLo;
     keyNotZero.out === 0;
-    component leaf = Poseidon(5);
+    component saltNotZero = IsZero();
+    saltNotZero.in <== registrationSalt;
+    saltNotZero.out === 0;
+    component leaf = Poseidon(6);
     leaf.inputs[0] <== 1023;
     leaf.inputs[1] <== heirIdentityCommitment;
     leaf.inputs[2] <== heirOwnerCommitment;
     leaf.inputs[3] <== viewKeyHi;
     leaf.inputs[4] <== viewKeyLo;
+    leaf.inputs[5] <== registrationSalt;
     component membership = ShieldedMembership32();
     membership.leaf <== leaf.out;
     membership.root <== registryRoot;

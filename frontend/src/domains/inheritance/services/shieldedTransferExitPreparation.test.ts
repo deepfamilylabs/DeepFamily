@@ -3,6 +3,8 @@ import {
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
   computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
+  computeShieldedRegistrationTag,
   computeShieldedSpendNullifier,
   createLineageTree,
   decryptShieldedNote,
@@ -28,6 +30,20 @@ const recipient = "0x2222222222222222222222222222222222222222";
 const senderSecret = 7654321n;
 const secondSecret = 8765432n;
 const recipientSecret = 9876543n;
+const registryAddress = "0x3333333333333333333333333333333333333333";
+const recipientIdentityCommitment = 12345n;
+const recipientRegistrationSalt = computeShieldedRegistrationSalt({
+  derivedSecretField: recipientSecret,
+  identityCommitment: recipientIdentityCommitment,
+  chainId,
+  registryAddress,
+});
+const recipientRegistrationTag = computeShieldedRegistrationTag({
+  derivedSecretField: recipientSecret,
+  identityCommitment: recipientIdentityCommitment,
+  chainId,
+  registryAddress,
+});
 const checkpoint = { toBlock: 42, blockHash: `0x${"12".repeat(32)}` };
 
 async function walletFixture(secondOwner = false) {
@@ -90,28 +106,32 @@ async function registryFixture(): Promise<KeyRegistrySnapshot> {
     const keys = deriveShieldedHeirKeyMaterial(secret);
     const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
     const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(viewingKey);
+    const registrationInputs = { derivedSecretField: secret, identityCommitment, chainId, registryAddress };
     return {
-      personHash: wrapIdentityCommitmentAsPersonHash(identityCommitment),
-      identityCommitment,
+      registrationTag: computeShieldedRegistrationTag(registrationInputs),
       ownerCommitment: keys.ownerCommitment,
       viewingKey: `0x${Buffer.from(viewingKey).toString("hex")}`,
       shardId: 0n,
-      leafIndex: identityCommitment === 12345n ? 0n : 1n,
+      leafIndex: identityCommitment === recipientIdentityCommitment ? 0n : 1n,
       leaf: computeShieldedRegistrationLeaf({
         identityCommitment,
         ownerCommitment: keys.ownerCommitment,
         viewKeyHi,
         viewKeyLo,
+        salt: computeShieldedRegistrationSalt(registrationInputs),
       }),
     };
   };
-  const keys = [await makeKey(12345n, recipientSecret), await makeKey(54321n, secondSecret)];
+  const keys = [
+    await makeKey(recipientIdentityCommitment, recipientSecret),
+    await makeKey(54321n, secondSecret),
+  ];
   return {
     chainId,
-    registryAddress: "0x3333333333333333333333333333333333333333",
+    registryAddress,
     ...checkpoint,
     shards: new Map([[0n, createLineageTree(keys.map((key) => key.leaf))]]),
-    keys: new Map(keys.map((key) => [key.personHash.toLowerCase(), key])),
+    keys: new Map(keys.map((key) => [key.registrationTag, key])),
   };
 }
 
@@ -134,13 +154,20 @@ describe("local private transfer and unshield preparation", () => {
   it("makes two private outputs with exact conservation and a registered recipient key", async () => {
     const { input0, input1 } = await walletFixture();
     const keyRegistry = await registryFixture();
-    const recipientHash = wrapIdentityCommitmentAsPersonHash(12345n);
+    expect(keyRegistry.keys.get(recipientRegistrationTag)).not.toHaveProperty("personHash");
+    expect(keyRegistry.keys.get(recipientRegistrationTag)).not.toHaveProperty("identityCommitment");
+    const recipientHash = wrapIdentityCommitmentAsPersonHash(recipientIdentityCommitment);
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
       inputs: [input0, input1],
       destinations: [
-        { kind: "registered", personHash: recipientHash, amount: 60n },
+        {
+          kind: "registered",
+          identityCommitment: recipientIdentityCommitment,
+          registrationSalt: recipientRegistrationSalt,
+          amount: 60n,
+        },
         { kind: "inputOwner", inputIndex: 0, amount: 40n },
       ],
       keyRegistry,
@@ -172,18 +199,46 @@ describe("local private transfer and unshield preparation", () => {
       .not.toContain(recipientHash);
   });
 
+  it("can send privately to the first anonymous key before a second key registers", async () => {
+    const { input0, input1 } = await walletFixture();
+    const keyRegistry = await registryFixture();
+    const key = keyRegistry.keys.get(recipientRegistrationTag)!;
+    keyRegistry.keys = new Map([[recipientRegistrationTag, key]]);
+    keyRegistry.shards = new Map([[0n, createLineageTree([key.leaf])]]);
+    const prepared = await prepareShieldedPrivateTransfer({
+      chainId,
+      poolAddress,
+      inputs: [input0, input1],
+      destinations: [
+        {
+          kind: "registered",
+          identityCommitment: recipientIdentityCommitment,
+          registrationSalt: recipientRegistrationSalt,
+          amount: 60n,
+        },
+        { kind: "inputOwner", inputIndex: 0, amount: 40n },
+      ],
+      keyRegistry,
+    });
+    expect(prepared.outputs[0].note.ownerCommitment).toBe(key.ownerCommitment);
+  });
+
   it("transfers from the only recovered value note with a bound dummy second input", async () => {
     const { input0 } = await walletFixture();
     const commitment = BigInt(input0.commitment);
     input0.wallet.ownedNotes = new Map([[commitment, input0.wallet.ownedNotes.get(commitment)!]]);
     const keyRegistry = await registryFixture();
-    const recipientHash = wrapIdentityCommitmentAsPersonHash(12345n);
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
       inputs: [input0],
       destinations: [
-        { kind: "registered", personHash: recipientHash, amount: 60n },
+        {
+          kind: "registered",
+          identityCommitment: recipientIdentityCommitment,
+          registrationSalt: recipientRegistrationSalt,
+          amount: 60n,
+        },
         { kind: "inputOwner", inputIndex: 0, amount: 10n },
       ],
       keyRegistry,
@@ -299,19 +354,33 @@ describe("local private transfer and unshield preparation", () => {
   it("rejects missing recipient registration and tampered key binding", async () => {
     const { input0, input1 } = await walletFixture();
     const keyRegistry = await registryFixture();
-    const recipientHash = wrapIdentityCommitmentAsPersonHash(12345n);
     const base = {
       chainId, poolAddress, inputs: [input0, input1] as const,
       destinations: [
-        { kind: "registered", personHash: recipientHash, amount: 60n },
+        {
+          kind: "registered",
+          identityCommitment: recipientIdentityCommitment,
+          registrationSalt: recipientRegistrationSalt,
+          amount: 60n,
+        },
         { kind: "inputOwner", inputIndex: 0, amount: 40n },
       ] as const,
     };
     await expect(prepareShieldedPrivateTransfer(base)).rejects.toThrow("key registry snapshot");
-    const key = keyRegistry.keys.get(recipientHash.toLowerCase())!;
+    const key = keyRegistry.keys.get(recipientRegistrationTag)!;
+    const originalViewingKey = key.viewingKey;
     key.viewingKey = `0x${"ff".repeat(32)}`;
     await expect(prepareShieldedPrivateTransfer({ ...base, keyRegistry }))
-      .rejects.toThrow("does not match the local registry leaf");
+      .rejects.toThrow("Heir has no registered viewing key");
+    key.viewingKey = originalViewingKey;
+    await expect(prepareShieldedPrivateTransfer({
+      ...base,
+      keyRegistry,
+      destinations: [
+        { ...base.destinations[0], registrationSalt: recipientRegistrationSalt + 1n },
+        base.destinations[1],
+      ],
+    })).rejects.toThrow("Heir has no registered viewing key");
   });
 
   it("rejects an invalid withdrawal amount, recipient, dummy spend and exposing root", async () => {

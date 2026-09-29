@@ -3,14 +3,13 @@ import {
   createLineageTree,
   type LineageTree,
 } from "@deepfamily/protocol-core";
-import { keccak256, toBeHex, zeroPadValue, type Contract, type Log } from "ethers";
+import { type Contract, type Log } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 
 const MAX_SHARD_LEAVES = 1n << 32n;
 
 export type PublicHeirKey = {
-  personHash: string;
-  identityCommitment: bigint;
+  registrationTag: bigint;
   ownerCommitment: bigint;
   viewingKey: string;
   shardId: bigint;
@@ -24,7 +23,7 @@ export type KeyRegistrySnapshot = {
   toBlock: number;
   blockHash: string;
   shards: Map<bigint, LineageTree>;
-  keys: Map<string, PublicHeirKey>;
+  keys: Map<bigint, PublicHeirKey>;
   invalidated?: boolean;
 };
 
@@ -66,7 +65,7 @@ export async function loadKeyRegistrySnapshot(
   if (!registrationEvent || !leafEvent)
     throw new Error("Key registry ABI is missing public events");
   const shards = previous?.shards ?? new Map<bigint, LineageTree>();
-  const keys = previous?.keys ?? new Map<string, PublicHeirKey>();
+  const keys = previous?.keys ?? new Map<bigint, PublicHeirKey>();
 
   try {
     for (let start = fromBlock; start <= toBlock; start += blockChunk) {
@@ -78,34 +77,24 @@ export async function loadKeyRegistrySnapshot(
       });
       logs.sort((a: Log, b: Log) => a.blockNumber - b.blockNumber || a.index - b.index);
       const pending = new Map<string, PublicHeirKey[]>();
+      const seenTags = new Set(keys.keys());
       for (const log of logs) {
         const parsed = registry.interface.parseLog(log);
         if (!parsed) throw new Error("Unrecognized key registry log");
         const txHash = log.transactionHash.toLowerCase();
         if (parsed.name === "ViewingKeyRegistered") {
-          const identityCommitment = BigInt(parsed.args.identityCommitment);
-          const personHash = String(parsed.args.personHash).toLowerCase();
-          if (
-            keccak256(zeroPadValue(toBeHex(identityCommitment), 32)).toLowerCase() !== personHash
-          ) {
-            throw new Error("Key registry identity hash does not match commitment");
-          }
-          if (keys.has(personHash)) throw new Error("Duplicate key registration event");
+          const registrationTag = BigInt(parsed.args.registrationTag);
+          if (seenTags.has(registrationTag)) throw new Error("Duplicate key registration event");
+          seenTags.add(registrationTag);
           const viewingKey = String(parsed.args.viewingKey).toLowerCase();
           const ownerCommitment = BigInt(parsed.args.ownerCommitment);
           const key: PublicHeirKey = {
-            personHash,
-            identityCommitment,
+            registrationTag,
             ownerCommitment,
             viewingKey,
             shardId: -1n,
             leafIndex: -1n,
-            leaf: computeShieldedRegistrationLeaf({
-              identityCommitment,
-              ownerCommitment,
-              viewKeyHi: BigInt(viewingKey) >> 128n,
-              viewKeyLo: BigInt(viewingKey) & ((1n << 128n) - 1n),
-            }),
+            leaf: BigInt(parsed.args[3]),
           };
           const queue = pending.get(txHash) ?? [];
           queue.push(key);
@@ -139,7 +128,7 @@ export async function loadKeyRegistrySnapshot(
         }
         key.shardId = shardId;
         key.leafIndex = leafIndex;
-        keys.set(key.personHash, key);
+        keys.set(key.registrationTag, key);
       }
       if ([...pending.values()].some((queue) => queue.length !== 0)) {
         throw new Error("Key registry registration has no matching leaf");
@@ -174,13 +163,45 @@ export async function loadKeyRegistrySnapshot(
   }
 }
 
-/** Local registry witness for Allocate/TopUp without querying the child's leaf slot. */
-export function getLocalHeirKeyProof(snapshot: KeyRegistrySnapshot, personHash: string) {
+/** Match a privately shared payment code against a locally scanned public registry. */
+export function findLocalHeirKey(
+  snapshot: KeyRegistrySnapshot,
+  identityCommitment: bigint,
+  registrationSalt: bigint,
+): PublicHeirKey {
   if (snapshot.invalidated) throw new Error("Key registry snapshot is invalid");
-  const key = snapshot.keys.get(personHash.toLowerCase());
+  let key: PublicHeirKey | undefined;
+  for (const candidate of snapshot.keys.values()) {
+    const viewingKey = BigInt(candidate.viewingKey);
+    const leaf = computeShieldedRegistrationLeaf({
+      identityCommitment,
+      ownerCommitment: candidate.ownerCommitment,
+      viewKeyHi: viewingKey >> 128n,
+      viewKeyLo: viewingKey & ((1n << 128n) - 1n),
+      salt: registrationSalt,
+    });
+    if (leaf === candidate.leaf) {
+      if (key) throw new Error("Payment code matches multiple key registrations");
+      key = candidate;
+    }
+  }
   if (!key) throw new Error("Heir has no registered viewing key");
   const tree = snapshot.shards.get(key.shardId);
   if (!tree) throw new Error("Key registry shard is missing");
+  if (tree.generateProof(key.leafIndex).leaf !== key.leaf) {
+    throw new Error("Local key registry proof is invalid");
+  }
+  return key;
+}
+
+/** Funding proofs require at least two leaves to avoid a singleton registry root. */
+export function getLocalHeirKeyProof(
+  snapshot: KeyRegistrySnapshot,
+  identityCommitment: bigint,
+  registrationSalt: bigint,
+) {
+  const key = findLocalHeirKey(snapshot, identityCommitment, registrationSalt);
+  const tree = snapshot.shards.get(key.shardId)!;
   if (tree.sizeBigInt < 2n) {
     throw new Error("Key registry shard needs at least two keys before private allocation");
   }

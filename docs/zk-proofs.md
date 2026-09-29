@@ -299,7 +299,7 @@ intentionally public NFT data.
 
 ## Shielded inheritance circuits
 
-`circuits/shielded_key_registration.circom` proves that the registrant knows the existing identity secret and binds a viewing key to that person. Eight pool action circuits prove ownership and value conservation for `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Their public inputs have a fixed 32-signal shape.
+`circuits/shielded_key_registration.circom` proves that the registrant knows a self-consistent private identity secret and binds a viewing key to its blinded registration leaf. Registration alone does not prove that the identity exists in DeepFamily; `allocate` proves the intended recipient's lineage eligibility. Eight pool action circuits prove ownership and value conservation for `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Their public inputs have a fixed 32-signal shape.
 
 `ShieldedDeepPool` stores encrypted notes and one-time spend and period nullifiers. The pool note and key-registry trees are 32-level rotating shards; the two lineage trees remain 64 levels deep. A claim proves an eligible direct child, current endorsement and recommended source, complete due periods, and sufficient budget. It creates a private child-controlled note. An exit later exposes its public recipient and amount.
 

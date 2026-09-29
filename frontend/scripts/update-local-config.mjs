@@ -183,20 +183,17 @@ async function updateLocalConfig() {
       throw new Error("Local shielded deployment is missing or belongs to another chain");
     }
     const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
-    const registry = new ethers.Contract(registryAddress, registryDeployment.abi, provider);
-    const [familyToken, familyLineage, poolToken, poolLineage, poolRegistry, registryLineage] =
+    const [familyToken, familyLineage, poolToken, poolLineage, poolRegistry] =
       await Promise.all([
         deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
         deepFamily.lineageIndex(),
         pool.TOKEN(),
         pool.LINEAGE_INDEX(),
         pool.KEY_REGISTRY(),
-        registry.LINEAGE_INDEX(),
       ]);
     if (
       ethers.getAddress(familyToken) !== ethers.getAddress(poolToken) ||
       ethers.getAddress(familyLineage) !== ethers.getAddress(poolLineage) ||
-      ethers.getAddress(familyLineage) !== ethers.getAddress(registryLineage) ||
       ethers.getAddress(poolRegistry) !== registryAddress
     ) {
       throw new Error("Local shielded pool and key registry are not bound to this DeepFamily");

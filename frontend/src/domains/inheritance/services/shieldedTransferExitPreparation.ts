@@ -4,7 +4,6 @@ import {
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
   computeShieldedOwnerCommitment,
-  computeShieldedRegistrationLeaf,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
@@ -13,13 +12,11 @@ import {
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
-  wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
-import type { KeyRegistrySnapshot } from "./shieldedKeyRegistryChain";
+import { findLocalHeirKey, type KeyRegistrySnapshot } from "./shieldedKeyRegistryChain";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -37,7 +34,7 @@ export type ShieldedValueInput = {
 /** A registered destination is resolved from a locally replayed public key registry. */
 export type ShieldedValueDestination =
   | { kind: "inputOwner"; inputIndex: 0 | 1; amount: BigNumberish }
-  | { kind: "registered"; personHash: string; amount: BigNumberish };
+  | { kind: "registered"; identityCommitment: BigNumberish; registrationSalt: BigNumberish; amount: BigNumberish };
 
 export type PreparedShieldedValueOutput = {
   /** This plaintext and the proof witness stay on the user's device. */
@@ -199,29 +196,20 @@ async function encryptValueOutput(
   }
 }
 
-function registeredRecipient(snapshot: KeyRegistrySnapshot, personHash: string, ctx: Context) {
+function registeredRecipient(
+  snapshot: KeyRegistrySnapshot,
+  identityCommitment: BigNumberish,
+  registrationSalt: BigNumberish,
+  ctx: Context,
+) {
   if (snapshot.invalidated || snapshot.chainId !== ctx.chainId) {
     throw new Error("Key registry snapshot belongs to another chain or is invalid");
   }
-  const key = snapshot.keys.get(personHash.toLowerCase());
-  if (!key) throw new Error("Recipient has no registered viewing key");
-  if (
-    key.personHash.toLowerCase() !== personHash.toLowerCase() ||
-    wrapIdentityCommitmentAsPersonHash(key.identityCommitment).toLowerCase() !== key.personHash.toLowerCase()
-  ) throw new Error("Recipient identity does not match the local registry key");
-  const tree = snapshot.shards.get(key.shardId);
-  if (!tree) throw new Error("Recipient key shard is missing");
-  const proof = tree.generateProof(key.leafIndex);
-  const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(getBytes(key.viewingKey));
-  if (
-    proof.leaf !== key.leaf ||
-    proof.leaf !== computeShieldedRegistrationLeaf({
-      identityCommitment: key.identityCommitment,
-      ownerCommitment: key.ownerCommitment,
-      viewKeyHi,
-      viewKeyLo,
-    })
-  ) throw new Error("Recipient viewing key does not match the local registry leaf");
+  const key = findLocalHeirKey(
+    snapshot,
+    getBigInt(identityCommitment),
+    getBigInt(registrationSalt),
+  );
   return { ownerCommitment: key.ownerCommitment, viewingKey: getBytes(key.viewingKey) };
 }
 
@@ -320,7 +308,12 @@ export async function prepareShieldedPrivateTransfer(input: {
       };
     }
     if (!input.keyRegistry) throw new Error("Registered destination needs a local key registry snapshot");
-    return registeredRecipient(input.keyRegistry, destination.personHash, ctx);
+    return registeredRecipient(
+      input.keyRegistry,
+      destination.identityCommitment,
+      destination.registrationSalt,
+      ctx,
+    );
   })) as [
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },

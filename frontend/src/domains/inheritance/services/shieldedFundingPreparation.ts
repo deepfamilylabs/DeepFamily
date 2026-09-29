@@ -56,6 +56,8 @@ type CommonFundingInput = {
   donorCommitment: BigNumberish;
   keyRegistry: KeyRegistrySnapshot;
   heirPersonHash: string;
+  heirIdentityCommitment: BigNumberish;
+  registrationSalt: BigNumberish;
 };
 
 export type PreparedFundingOutput<T> = {
@@ -146,9 +148,14 @@ async function currentContext(input: CommonFundingInput) {
   if (input.wallet.walletOwnerCommitment !== keys.ownerCommitment) {
     throw new Error("Donor wallet belongs to another identity");
   }
-  const registration = getLocalHeirKeyProof(input.keyRegistry, input.heirPersonHash);
+  const identityCommitment = getBigInt(input.heirIdentityCommitment);
+  if (wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !== input.heirPersonHash.toLowerCase()) {
+    throw new Error("Receive code identity does not match the selected heir");
+  }
+  const registration = getLocalHeirKeyProof(input.keyRegistry, identityCommitment, getBigInt(input.registrationSalt));
   const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(registration.key.viewingKey);
-  return { provider, latestBlock, chainId, poolAddress: getAddress(poolAddress), keys, registration, viewKeyHi, viewKeyLo };
+  const heir = { ...registration.key, identityCommitment, personHash: input.heirPersonHash };
+  return { provider, latestBlock, chainId, poolAddress: getAddress(poolAddress), keys, registration, heir, viewKeyHi, viewKeyLo };
 }
 
 function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
@@ -332,7 +339,7 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
   }) !== template.commitment) throw new Error("Policy template commitment mismatch");
   const { periods, amount } = fundingAmount(uint128(policy.amountPerPeriod, "rate"), input.budgetPeriods);
   if (donor.note.amount < amount) throw new Error("Donor value note cannot fund the whole child budget");
-  const heir = ctx.registration.key;
+  const heir = ctx.heir;
   const enrollmentNullifier = computeShieldedEnrollmentNullifier({
     allocationKey: policy.allocationKey,
     policyCommitment,
@@ -439,6 +446,7 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     heirOwnerCommitment: String(heir.ownerCommitment),
     viewKeyHi: String(ctx.viewKeyHi),
     viewKeyLo: String(ctx.viewKeyLo),
+    registrationSalt: String(input.registrationSalt),
     registrationDepth: ctx.registration.proofDepth,
     registrationIndex: String(ctx.registration.proofIndex),
     registrationSiblings: decimal(ctx.registration.siblings),
@@ -469,7 +477,7 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
   const donor = donorInput(input, ctx.keys.ownerSecret);
   const template = templatePath(input.wallet, input.budget, encodeShieldedBudgetNotePayload);
   const old = input.budget.note;
-  const heir = ctx.registration.key;
+  const heir = ctx.heir;
   if (
     getBigInt(old.heirIdentityCommitment) !== heir.identityCommitment ||
     getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment
@@ -524,6 +532,7 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
     heirOwnerCommitment: String(heir.ownerCommitment),
     viewKeyHi: String(ctx.viewKeyHi),
     viewKeyLo: String(ctx.viewKeyLo),
+    registrationSalt: String(input.registrationSalt),
     eligibleFrom: String(old.eligibleFrom),
     enrollmentSalt: String(old.enrollmentSalt),
     registrationDepth: ctx.registration.proofDepth,

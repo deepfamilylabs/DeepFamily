@@ -18,6 +18,7 @@ import {
   computeShieldedPolicyCommitment,
   computeShieldedPolicyNoteCommitment,
   computeShieldedRegistrationLeaf,
+  computeShieldedRegistrationSalt,
   computeShieldedRegistrationTag,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
@@ -133,26 +134,30 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
     }),
     12001897392482960812365406448463074777459291847217290518247189554253528529057n,
   );
+  const registrationIdentity = {
+    derivedSecretField: 13n,
+    identityCommitment: 19n,
+    chainId: 1030n,
+    registryAddress: "0x0000000000000000000000000000000000000001",
+  };
+  const registrationSalt = computeShieldedRegistrationSalt(registrationIdentity);
+  assert.equal(
+    registrationSalt,
+    5266609480743984829877981256091165364808878746814819922695497528218735115760n,
+  );
   assert.equal(
     computeShieldedRegistrationLeaf({
       identityCommitment: 19n,
       ownerCommitment: heir.ownerCommitment,
       viewKeyHi: 2n,
       viewKeyLo: 1n,
+      salt: registrationSalt,
     }),
-    19349709071285623768469286676373440792219380078139969497260329055242930810832n,
+    15424124922268235894159309081843558537769356514573222594683393519528094457701n,
   );
   assert.equal(
-    computeShieldedRegistrationTag({
-      derivedSecretField: 13n,
-      identityCommitment: 19n,
-      ownerCommitment: heir.ownerCommitment,
-      viewKeyLo: 1n,
-      viewKeyHi: 2n,
-      chainId: 1030n,
-      registryAddress: "0x0000000000000000000000000000000000000001",
-    }),
-    13679518065608758139791935362468749469255697864143206147972258982062477129940n,
+    computeShieldedRegistrationTag(registrationIdentity),
+    18557983368424212007215379822623963116491534966877686070486726809622688046430n,
   );
 });
 
@@ -384,43 +389,44 @@ test("field, uint128, randomness, and whole-period budget bounds are enforced", 
   assert.ok(sample > 0n);
 });
 
-test("registration tag binds exact chain, contract, and public key limbs", () => {
+test("anonymous registration tag and salt bind identity, chain, and registry", () => {
   const heir = deriveShieldedHeirKeyMaterial(13n);
   const base = {
     derivedSecretField: 13n,
     identityCommitment: 19n,
-    ownerCommitment: heir.ownerCommitment,
-    viewKeyLo: 1n,
-    viewKeyHi: 2n,
     chainId: 1030n,
     registryAddress: "0x0000000000000000000000000000000000000001",
   };
-  const original = computeShieldedRegistrationTag(base);
-  assert.notEqual(original, computeShieldedRegistrationTag({ ...base, viewKeyHi: 3n }));
-  assert.notEqual(original, computeShieldedRegistrationTag({ ...base, chainId: 1031n }));
+  const tag = computeShieldedRegistrationTag(base);
+  const salt = computeShieldedRegistrationSalt(base);
+  assert.notEqual(tag, salt);
+  for (const changed of [
+    { ...base, derivedSecretField: 14n },
+    { ...base, identityCommitment: 20n },
+    { ...base, chainId: 1031n },
+    { ...base, registryAddress: "0x0000000000000000000000000000000000000002" },
+  ]) {
+    assert.notEqual(tag, computeShieldedRegistrationTag(changed));
+    assert.notEqual(salt, computeShieldedRegistrationSalt(changed));
+  }
+  const leaf = {
+    identityCommitment: 19n,
+    ownerCommitment: heir.ownerCommitment,
+    viewKeyHi: 2n,
+    viewKeyLo: 1n,
+    salt,
+  };
   assert.notEqual(
-    original,
-    computeShieldedRegistrationTag({
-      ...base,
-      registryAddress: "0x0000000000000000000000000000000000000002",
-    }),
+    computeShieldedRegistrationLeaf(leaf),
+    computeShieldedRegistrationLeaf({ ...leaf, viewKeyHi: 1n, viewKeyLo: 2n }),
   );
   assert.notEqual(
-    computeShieldedRegistrationLeaf({
-      identityCommitment: 19n,
-      ownerCommitment: heir.ownerCommitment,
-      viewKeyHi: 2n,
-      viewKeyLo: 1n,
-    }),
-    computeShieldedRegistrationLeaf({
-      identityCommitment: 19n,
-      ownerCommitment: heir.ownerCommitment,
-      viewKeyHi: 1n,
-      viewKeyLo: 2n,
-    }),
+    computeShieldedRegistrationLeaf(leaf),
+    computeShieldedRegistrationLeaf({ ...leaf, salt: salt + 1n }),
   );
+  assert.throws(() => computeShieldedRegistrationLeaf({ ...leaf, salt: 0n }));
   assert.throws(
-    () => computeShieldedRegistrationTag({ ...base, viewKeyLo: MAX_UINT128 + 1n }),
+    () => computeShieldedRegistrationLeaf({ ...leaf, viewKeyLo: MAX_UINT128 + 1n }),
     (error) => error.code === "INTEGER_OUT_OF_RANGE",
   );
   assert.throws(
@@ -429,7 +435,7 @@ test("registration tag binds exact chain, contract, and public key limbs", () =>
   );
   assert.throws(
     () =>
-      computeShieldedRegistrationTag({
+      computeShieldedRegistrationSalt({
         ...base,
         registryAddress: "0x0000000000000000000000000000000000000000",
       }),

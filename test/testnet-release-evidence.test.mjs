@@ -313,8 +313,8 @@ const shieldedProofs = (chainId) =>
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
       const signals = Array(action === "keyRegistration" ? 7 : 32).fill("0");
       if (action === "keyRegistration") {
-        signals[4] = String(chainId);
-        signals[5] = BigInt(SHIELDED_ADDRESSES.shieldedHeirKeyRegistry).toString();
+        signals[3] = String(chainId);
+        signals[4] = BigInt(SHIELDED_ADDRESSES.shieldedHeirKeyRegistry).toString();
       } else {
         signals[0] = String(spec.actionId);
         signals[1] = String(chainId);
@@ -876,7 +876,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
     report.shielded.receipts.chainId = sepoliaChainId;
     for (const [action, proof] of Object.entries(report.shielded.proofs)) {
-      proof.publicSignals[action === "keyRegistration" ? 4 : 1] = String(sepoliaChainId);
+      proof.publicSignals[action === "keyRegistration" ? 3 : 1] = String(sepoliaChainId);
       proof.publicSignalsSha256 = createHash("sha256")
         .update(JSON.stringify(proof.publicSignals))
         .digest("hex");
@@ -1554,7 +1554,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         (report) =>
           (report.terminalGovernanceState.shieldedHeirKeyRegistry.verifierAdapterImmutable =
             address(999)),
-        /ShieldedHeirKeyRegistry must bind the declared lineage and common verifier adapter/iu,
+        /ShieldedHeirKeyRegistry must bind the common verifier adapter/iu,
       ],
       [
         (report) =>
