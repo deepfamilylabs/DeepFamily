@@ -12,6 +12,15 @@ const CSP_HEADER_REPORT_ONLY = 'Content-Security-Policy-Report-Only'
 
 const uniq = <T,>(items: T[]): T[] => Array.from(new Set(items))
 
+// Payers verify receive codes in the browser. The verification key is embedded in the bundle
+// so that replacing a file under /zk cannot make a forged receive code verify.
+const shieldedReceiveCodeVerificationKey = JSON.parse(
+  fs.readFileSync(
+    fileURLToPath(new URL('./public/zk/shielded/shielded_receive_code.vkey.json', import.meta.url)),
+    'utf8'
+  )
+)
+
 const parseExtraSources = (value: string | undefined): string[] => {
   if (!value) return []
   return value
@@ -275,6 +284,9 @@ export default defineConfig(({ command, mode }) => {
   const inquireShimPath = fileURLToPath(new URL('./src/shims/protobufjs-inquire.ts', import.meta.url))
 
   return {
+    define: {
+      __SHIELDED_RECEIVE_CODE_VKEY__: JSON.stringify(shieldedReceiveCodeVerificationKey),
+    },
     plugins: [
       react(),
       cspReportPlugin({ reportFile }),
@@ -310,6 +322,16 @@ export default defineConfig(({ command, mode }) => {
       },
       // Increase chunk size warning limit to 1MB since some third-party libraries are indeed large
       chunkSizeWarningLimit: 1000
+    },
+    // Workers are single IIFE bundles. The ZK worker derives receive-code viewing
+    // keys with @hpke, whose Node <= 18 fallback is a dynamic import("crypto");
+    // workers always have globalThis.crypto, so inline it instead of splitting.
+    worker: {
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true
+        }
+      }
     },
     // Optimize dependency pre-bundling. The dep scanner does not follow Worker
     // entries, so snarkjs (zk.worker) is listed to avoid a mid-proof full reload

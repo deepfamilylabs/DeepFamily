@@ -39,7 +39,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(30);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(28);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -201,13 +201,6 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         await ethers.getContractFactory(spec.verifierContractName, deployer)
       ).getDeployTransaction();
     }
-    const registryFactory = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
-      signer: deployer,
-      libraries: { PoseidonT3: address("poseidonT3") },
-    });
-    requests.shieldedHeirKeyRegistry = await registryFactory.getDeployTransaction(
-      address("groth16VerifierAdapter"),
-    );
     const poolFactory = await ethers.getContractFactory("ShieldedDeepPool", {
       signer: deployer,
       libraries: { PoseidonT3: address("poseidonT3") },
@@ -215,10 +208,9 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     requests.shieldedDeepPool = await poolFactory.getDeployTransaction(
       address("deepFamilyToken"),
       address("deepFamilyLineageIndex"),
-      address("shieldedHeirKeyRegistry"),
       address("groth16VerifierAdapter"),
     );
-    expect(Object.keys(requests)).to.have.length(32);
+    expect(Object.keys(requests)).to.have.length(30);
 
     for (const intent of intents) {
       const request = requests[intent.label];

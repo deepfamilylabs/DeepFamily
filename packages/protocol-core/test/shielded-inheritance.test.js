@@ -17,9 +17,6 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedPolicyNoteCommitment,
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -133,31 +130,6 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
       heirIdentityCommitment: 19n,
     }),
     12001897392482960812365406448463074777459291847217290518247189554253528529057n,
-  );
-  const registrationIdentity = {
-    derivedSecretField: 13n,
-    identityCommitment: 19n,
-    chainId: 1030n,
-    registryAddress: "0x0000000000000000000000000000000000000001",
-  };
-  const registrationSalt = computeShieldedRegistrationSalt(registrationIdentity);
-  assert.equal(
-    registrationSalt,
-    5266609480743984829877981256091165364808878746814819922695497528218735115760n,
-  );
-  assert.equal(
-    computeShieldedRegistrationLeaf({
-      identityCommitment: 19n,
-      ownerCommitment: heir.ownerCommitment,
-      viewKeyHi: 2n,
-      viewKeyLo: 1n,
-      salt: registrationSalt,
-    }),
-    15424124922268235894159309081843558537769356514573222594683393519528094457701n,
-  );
-  assert.equal(
-    computeShieldedRegistrationTag(registrationIdentity),
-    18557983368424212007215379822623963116491534966877686070486726809622688046430n,
   );
 });
 
@@ -387,58 +359,4 @@ test("field, uint128, randomness, and whole-period budget bounds are enforced", 
   );
   const sample = generateShieldedRandomField();
   assert.ok(sample > 0n);
-});
-
-test("anonymous registration tag and salt bind identity, chain, and registry", () => {
-  const heir = deriveShieldedHeirKeyMaterial(13n);
-  const base = {
-    derivedSecretField: 13n,
-    identityCommitment: 19n,
-    chainId: 1030n,
-    registryAddress: "0x0000000000000000000000000000000000000001",
-  };
-  const tag = computeShieldedRegistrationTag(base);
-  const salt = computeShieldedRegistrationSalt(base);
-  assert.notEqual(tag, salt);
-  for (const changed of [
-    { ...base, derivedSecretField: 14n },
-    { ...base, identityCommitment: 20n },
-    { ...base, chainId: 1031n },
-    { ...base, registryAddress: "0x0000000000000000000000000000000000000002" },
-  ]) {
-    assert.notEqual(tag, computeShieldedRegistrationTag(changed));
-    assert.notEqual(salt, computeShieldedRegistrationSalt(changed));
-  }
-  const leaf = {
-    identityCommitment: 19n,
-    ownerCommitment: heir.ownerCommitment,
-    viewKeyHi: 2n,
-    viewKeyLo: 1n,
-    salt,
-  };
-  assert.notEqual(
-    computeShieldedRegistrationLeaf(leaf),
-    computeShieldedRegistrationLeaf({ ...leaf, viewKeyHi: 1n, viewKeyLo: 2n }),
-  );
-  assert.notEqual(
-    computeShieldedRegistrationLeaf(leaf),
-    computeShieldedRegistrationLeaf({ ...leaf, salt: salt + 1n }),
-  );
-  assert.throws(() => computeShieldedRegistrationLeaf({ ...leaf, salt: 0n }));
-  assert.throws(
-    () => computeShieldedRegistrationLeaf({ ...leaf, viewKeyLo: MAX_UINT128 + 1n }),
-    (error) => error.code === "INTEGER_OUT_OF_RANGE",
-  );
-  assert.throws(
-    () => computeShieldedRegistrationTag({ ...base, chainId: 1n << 64n }),
-    (error) => error.code === "INTEGER_OUT_OF_RANGE",
-  );
-  assert.throws(
-    () =>
-      computeShieldedRegistrationSalt({
-        ...base,
-        registryAddress: "0x0000000000000000000000000000000000000000",
-      }),
-    (error) => error.code === "INVALID_REGISTRY_ADDRESS",
-  );
 });

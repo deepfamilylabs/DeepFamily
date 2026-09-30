@@ -7,8 +7,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAddress, getBytes, hexlify } from "ethers";
 import {
-  buildShieldedKeyRegistrationPublicSignals,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
+  buildShieldedReceiveCodePublicSignals,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
@@ -21,20 +21,20 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedPolicyNoteCommitment,
-  computeShieldedRegistrationSalt,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
+  decodeShieldedReceiveCode,
   decryptShieldedNote,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedPolicyNotePayload,
+  encodeShieldedReceiveCode,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wipeBytes,
 } from "@deepfamily/protocol-core";
@@ -67,8 +67,6 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
-  registryRoot: 0n,
-  registryShardId: 0n,
 });
 
 function compactPath(proof, capacity) {
@@ -81,30 +79,30 @@ function compactPath(proof, capacity) {
   };
 }
 
+const snarkjs = (root, args) =>
+  execFileSync(process.execPath, [path.join(root, "node_modules/snarkjs/build/cli.cjs"), ...args], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+
 /** Witnesses stay in a private temporary directory and are removed after each proof. */
 function generateProof(root, files, witness, expectedSignals) {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-acceptance-"));
   const input = path.join(temporary, "input.json");
   const proofFile = path.join(temporary, "proof.json");
   const publicFile = path.join(temporary, "public.json");
-  const cli = path.join(root, "node_modules/snarkjs/build/cli.cjs");
-  const run = (args) =>
-    execFileSync(process.execPath, [cli, ...args], {
-      cwd: root,
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 16 * 1024 * 1024,
-    });
   try {
     fs.writeFileSync(input, JSON.stringify(witness), { mode: 0o600 });
-    run(["groth16", "fullprove", input, files.wasm, files.zkey, proofFile, publicFile]);
+    snarkjs(root, ["groth16", "fullprove", input, files.wasm, files.zkey, proofFile, publicFile]);
     const publicSignals = JSON.parse(fs.readFileSync(publicFile, "utf8"));
     assert.deepEqual(
       publicSignals.map(BigInt),
       expectedSignals,
       `${files.source} public signals differ from the action`,
     );
-    assert.match(run(["groth16", "verify", files.vkey, publicFile, proofFile]), /OK!/u);
+    assert.match(snarkjs(root, ["groth16", "verify", files.vkey, publicFile, proofFile]), /OK!/u);
     const raw = JSON.parse(fs.readFileSync(proofFile, "utf8"));
     const normalized = normalizeGroth16Proof(raw);
     return { raw, normalized, publicSignals, encoded: encodeGroth16AbcProofData(normalized) };
@@ -113,10 +111,27 @@ function generateProof(root, files, witness, expectedSignals) {
   }
 }
 
+/** Check a proof taken from a receive code against the candidate verification key. */
+function verifyProof(root, files, proof, publicSignals) {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-acceptance-"));
+  const proofFile = path.join(temporary, "proof.json");
+  const publicFile = path.join(temporary, "public.json");
+  try {
+    fs.writeFileSync(proofFile, JSON.stringify(proof));
+    fs.writeFileSync(publicFile, JSON.stringify(publicSignals.map(String)));
+    return /OK!/u.test(snarkjs(root, ["groth16", "verify", files.vkey, publicFile, proofFile]));
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
 /**
- * Exercises current public keys with the integrated DEEP, lineage, registry and pool.
- * A new allocation cannot mature in this run: Claim is verified at its future asOf
- * against the current real roots, without submitting a premature claim transaction.
+ * Exercises current public keys with the integrated DEEP, lineage and pool. The donor
+ * pays the heir from the heir's receive code alone. A new allocation cannot mature in
+ * this run: Claim is verified at its future asOf against the current real roots,
+ * without submitting a premature claim transaction.
  */
 export async function runShieldedAcceptanceSmoke({
   root = DEFAULT_ROOT,
@@ -138,11 +153,10 @@ export async function runShieldedAcceptanceSmoke({
   const family = deployed.deepFamily.connect(signer);
   const lineage = deployed.lineageIndex;
   const token = deployed.token.connect(signer);
-  const registry = deployed.shieldedHeirKeyRegistry.connect(signer);
   const pool = deployed.shieldedDeepPool.connect(signer);
   const poolAddress = await pool.getAddress();
-  const registryAddress = await registry.getAddress();
   const proofs = {};
+  let receiveCode;
   const materials = [];
   const keyMaterials = [];
   const recorded = [];
@@ -201,6 +215,51 @@ export async function runShieldedAcceptanceSmoke({
     const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
     keyMaterials.push(keys);
     return { ...keys, viewingKey: await deriveShieldedViewPublicKey(keys.hpkeIkm) };
+  };
+  const receiveCodeFor = (material, keys) => {
+    const files = candidate.circuits.receiveCode;
+    const signals = buildShieldedReceiveCodePublicSignals({
+      identityCommitment: material.identityCommitment,
+      ownerCommitment: keys.ownerCommitment,
+      viewingKey: keys.viewingKey,
+    });
+    const generated = generateProof(
+      root,
+      files,
+      {
+        identityCommitment: String(signals[0]),
+        ownerCommitment: String(signals[1]),
+        viewKeyLo: String(signals[2]),
+        viewKeyHi: String(signals[3]),
+        nameField: String(material.nameField),
+        derivedSecretField: String(material.derivedSecretField),
+        isBirthBC: Number(material.identity.isBirthBC),
+        birthYear: material.identity.birthYear,
+        birthMonth: material.identity.birthMonth,
+        birthDay: material.identity.birthDay,
+        gender: material.identity.gender,
+        suiteId: 1,
+      },
+      signals,
+    );
+    const code = encodeShieldedReceiveCode({
+      identityCommitment: material.identityCommitment,
+      ownerCommitment: keys.ownerCommitment,
+      viewingKey: keys.viewingKey,
+      proof: generated.raw,
+    });
+    // The payer holds only the code and checks its proof as the browser does.
+    const decoded = decodeShieldedReceiveCode(code);
+    assert.ok(
+      verifyProof(root, files, decoded.proof, decoded.publicSignals),
+      "Receive code proof did not verify",
+    );
+    receiveCode = {
+      verificationKeySha256: candidate.manifest.circuits.receiveCode.verificationKeySha256,
+      proofSha256: jsonHash(generated.raw),
+      verified: true,
+    };
+    return decoded;
   };
   const encrypt = async (keys, note, encode, commitment) => {
     const payload = encode(note);
@@ -310,8 +369,8 @@ export async function runShieldedAcceptanceSmoke({
     inputRoots: paths.map((item) => item.root),
     inputNullifiers: nullifiers,
   });
-  const signalsFor = (action, data, external = {}) =>
-    buildShieldedPoolPublicSignals({
+  const publicInputsFor = (action, data, external = {}) =>
+    buildShieldedPoolPublicInputs({
       action: ACTION_IDS[action],
       chainId,
       poolAddress,
@@ -430,78 +489,13 @@ export async function runShieldedAcceptanceSmoke({
     };
     const childKeys = await keysFor(childMaterial);
     const donorKeys = await keysFor(fatherMaterial);
-    const keyPositions = [];
-    for (const [index, material] of [childMaterial, fatherMaterial].entries()) {
-      const keys = index === 0 ? childKeys : donorKeys;
-      const signals = buildShieldedKeyRegistrationPublicSignals({
-        ...material,
-        ...keys,
-        viewingKey: keys.viewingKey,
-        chainId,
-        registryAddress,
-      });
-      const registrationSalt = computeShieldedRegistrationSalt({
-        derivedSecretField: material.derivedSecretField,
-        identityCommitment: material.identityCommitment,
-        chainId,
-        registryAddress,
-      });
-      const witness = {
-        ownerCommitment: String(signals[0]),
-        viewKeyLo: String(signals[1]),
-        viewKeyHi: String(signals[2]),
-        chainId: String(signals[3]),
-        registryAddress: String(signals[4]),
-        registrationTag: String(signals[5]),
-        registrationLeaf: String(signals[6]),
-        identityCommitment: String(material.identityCommitment),
-        nameField: String(material.nameField),
-        derivedSecretField: String(material.derivedSecretField),
-        isBirthBC: Number(material.identity.isBirthBC),
-        birthYear: material.identity.birthYear,
-        birthMonth: material.identity.birthMonth,
-        birthDay: material.identity.birthDay,
-        gender: material.identity.gender,
-        suiteId: 1,
-      };
-      const label = index === 0 ? "shielded-action-keyRegistration" : "shielded-register-root-key";
-      const generated = await prove("keyRegistration", witness, signals, { label });
-      const receipt = await record(
-        label,
-        await registry.register(
-          keys.ownerCommitment,
-          hexlify(keys.viewingKey),
-          signals[5],
-          signals[6],
-          encodeGroth16AbcProofData(generated.normalized),
-        ),
-      );
-      const appended = receipt.logs
-        .filter((log) => getAddress(log.address) === getAddress(registryAddress))
-        .map((log) => {
-          try {
-            return registry.interface.parseLog(log);
-          } catch {
-            return null;
-          }
-        })
-        .find((event) => event?.name === "KeyLeafAppended");
-      assert.ok(appended, "Key registration has no Merkle leaf event");
-      assert.equal(appended.args.leaf, signals[6]);
-      keyPositions.push({
-        shardId: appended.args.shardId,
-        leafIndex: appended.args.leafIndex,
-        registrationSalt,
-      });
-    }
-    const keyPosition = keyPositions[0];
-    const registrationProof = await registry.getMerkleProof(
-      keyPosition.shardId,
-      keyPosition.leafIndex,
-    );
-    const registration = compactPath(registrationProof, 32);
-    assert.ok((await registry.knownRootSize(keyPosition.shardId, registration.root)) >= 2n);
-    const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(childKeys.viewingKey);
+    const recipient = receiveCodeFor(childMaterial, childKeys);
+    // Notes for the heir use the code's keys; the heir still spends with its own secret.
+    const heirKeys = {
+      ...childKeys,
+      ownerCommitment: recipient.ownerCommitment,
+      viewingKey: recipient.viewingKey,
+    };
     const rate = 100n;
     const shieldedAmount = 2000n;
     const unshieldedAmount = 100n;
@@ -518,16 +512,16 @@ export async function runShieldedAcceptanceSmoke({
       valueNote(donorKeys, 0n),
     ]);
     const shieldData = { ...zeroData(), ...outputs(initial) };
-    const shieldSignals = signalsFor("shield", shieldData, { amount: shieldedAmount });
+    const shieldInputs = publicInputsFor("shield", shieldData, { amount: shieldedAmount });
     const shieldProof = await prove(
       "shield",
       {
-        publicSignals: decimals(shieldSignals),
+        ...shieldInputs.witness,
         ownerSecret: String(donorKeys.ownerSecret),
         outputAmounts: decimals(initial.map((note) => note.amount)),
         outputNonces: decimals(initial.map((note) => note.nonce)),
       },
-      shieldSignals,
+      shieldInputs.signals,
     );
     await submit("shield", shieldData, shieldProof, initial, { amount: shieldedAmount });
 
@@ -562,11 +556,11 @@ export async function runShieldedAcceptanceSmoke({
       ...inputs([initialPath, initialPath], [spend(initial[0]), dummySpend(initial[0])]),
       ...outputs([policyNote, renewed]),
     };
-    const createPolicySignals = signalsFor("createPolicy", createPolicyData);
+    const createPolicyInputs = publicInputsFor("createPolicy", createPolicyData);
     const createPolicyProof = await prove(
       "createPolicy",
       {
-        publicSignals: decimals(createPolicySignals),
+        ...createPolicyInputs.witness,
         ownerSecret: String(donorKeys.ownerSecret),
         inputAmount: String(shieldedAmount),
         inputNonce: String(initial[0].nonce),
@@ -582,15 +576,15 @@ export async function runShieldedAcceptanceSmoke({
         policyNonce: String(policyNote.nonce),
         changeNonce: String(renewed.nonce),
       },
-      createPolicySignals,
+      createPolicyInputs.signals,
     );
     await submit("createPolicy", createPolicyData, createPolicyProof, [policyNote, renewed]);
 
     const asOf = BigInt((await provider.getBlock("latest")).timestamp);
     const eligibleFrom = asOf + 7200n;
     const enrollmentSalt = generateShieldedRandomField();
-    const heirIdentityCommitment = childMaterial.identityCommitment;
-    const heirOwnerCommitment = childKeys.ownerCommitment;
+    const heirIdentityCommitment = recipient.identityCommitment;
+    const heirOwnerCommitment = recipient.ownerCommitment;
     const enrollmentCommitment = computeShieldedEnrollmentCommitment({
       policyCommitment,
       heirIdentityCommitment,
@@ -606,7 +600,7 @@ export async function runShieldedAcceptanceSmoke({
     };
     const budgetNote = (remaining) => {
       const note = { ...budgetFields, remaining, nonce: generateShieldedRandomField() };
-      return encrypt(childKeys, note, encodeShieldedBudgetNotePayload, (ciphertextHashField) =>
+      return encrypt(heirKeys, note, encodeShieldedBudgetNotePayload, (ciphertextHashField) =>
         computeShieldedBudgetNoteCommitment({
           policyCommitment,
           enrollmentCommitment,
@@ -636,10 +630,8 @@ export async function runShieldedAcceptanceSmoke({
       relation0: endorsement.root,
       relation1: trusted.root,
       asOf,
-      registryRoot: registration.root,
-      registryShardId: keyPosition.shardId,
     };
-    const allocationSignals = signalsFor("allocate", allocationData);
+    const allocationInputs = publicInputsFor("allocate", allocationData);
     const commonFunding = {
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
@@ -647,12 +639,6 @@ export async function runShieldedAcceptanceSmoke({
       policySalt: String(policySalt),
       heirIdentityCommitment: String(heirIdentityCommitment),
       heirOwnerCommitment: String(heirOwnerCommitment),
-      viewKeyHi: String(viewKeyHi),
-      viewKeyLo: String(viewKeyLo),
-      registrationSalt: String(keyPosition.registrationSalt),
-      registrationDepth: registration.depth,
-      registrationIndex: registration.index,
-      registrationSiblings: registration.siblings,
       eligibleFrom: String(eligibleFrom),
       enrollmentSalt: String(enrollmentSalt),
     };
@@ -662,7 +648,7 @@ export async function runShieldedAcceptanceSmoke({
         ...commonFunding,
         ...lineageWitness,
         ...donorWitness(renewed, renewedPath),
-        publicSignals: decimals(allocationSignals),
+        ...allocationInputs.witness,
         policyNonce: String(policyNote.nonce),
         policyCiphertextHash: String(policyNote.ciphertextHashField),
         policyDepth: policyPath.depth,
@@ -674,7 +660,7 @@ export async function runShieldedAcceptanceSmoke({
         budgetNonce: String(budget.nonce),
         changeNonce: String(allocationChange.nonce),
       },
-      allocationSignals,
+      allocationInputs.signals,
       { asOf: String(asOf) },
     );
     await submit("allocate", allocationData, allocationProof, [budget, allocationChange]);
@@ -698,16 +684,14 @@ export async function runShieldedAcceptanceSmoke({
         ],
       ),
       ...outputs([topUpBudget, topUpChange]),
-      registryRoot: registration.root,
-      registryShardId: keyPosition.shardId,
     };
-    const topUpSignals = signalsFor("topUp", topUpData);
+    const topUpInputs = publicInputsFor("topUp", topUpData);
     const topUpProof = await prove(
       "topUp",
       {
         ...commonFunding,
         ...donorWitness(allocationChange, changePath),
-        publicSignals: decimals(topUpSignals),
+        ...topUpInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
         oldBudgetRemaining: "1200",
         oldBudgetRemainingPeriods: "12",
@@ -721,7 +705,7 @@ export async function runShieldedAcceptanceSmoke({
         newBudgetNonce: String(topUpBudget.nonce),
         changeNonce: String(topUpChange.nonce),
       },
-      topUpSignals,
+      topUpInputs.signals,
     );
     await submit("topUp", topUpData, topUpProof, [topUpBudget, topUpChange]);
     assert.equal(
@@ -738,11 +722,11 @@ export async function runShieldedAcceptanceSmoke({
       ...inputs(mergePaths, [spend(budget), spend(topUpBudget)]),
       ...outputs([mergedBudget, mergeDummy]),
     };
-    const mergeSignals = signalsFor("mergeBudget", mergeData);
+    const mergeInputs = publicInputsFor("mergeBudget", mergeData);
     const mergeProof = await prove(
       "mergeBudget",
       {
-        publicSignals: decimals(mergeSignals),
+        ...mergeInputs.witness,
         ownerSecret: String(childKeys.ownerSecret),
         policyCommitment: String(policyCommitment),
         enrollmentCommitment: String(enrollmentCommitment),
@@ -760,7 +744,7 @@ export async function runShieldedAcceptanceSmoke({
         mergedNonce: String(mergedBudget.nonce),
         dummyNonce: String(mergeDummy.nonce),
       },
-      mergeSignals,
+      mergeInputs.signals,
     );
     await submit("mergeBudget", mergeData, mergeProof, [mergedBudget, mergeDummy]);
 
@@ -783,11 +767,11 @@ export async function runShieldedAcceptanceSmoke({
       relation1: trusted.root,
       asOf: claimAsOf,
     };
-    const claimSignals = signalsFor("claim", claimData);
+    const claimInputs = publicInputsFor("claim", claimData);
     await prove(
       "claim",
       {
-        publicSignals: decimals(claimSignals),
+        ...claimInputs.witness,
         ...lineageWitness,
         nameField: String(childMaterial.nameField),
         derivedSecretField: String(childMaterial.derivedSecretField),
@@ -815,7 +799,7 @@ export async function runShieldedAcceptanceSmoke({
         newBudgetNonce: String(remainingBudget.nonce),
         payoutNonce: String(payout.nonce),
       },
-      claimSignals,
+      claimInputs.signals,
       { execution: "verifier-call", claimCount: 12, asOf: String(claimAsOf) },
     );
     assert.equal(
@@ -830,7 +814,7 @@ export async function runShieldedAcceptanceSmoke({
     );
 
     const transferOutputs = await Promise.all([
-      valueNote(childKeys, 400n),
+      valueNote(heirKeys, 400n),
       valueNote(donorKeys, 100n),
     ]);
     const transferPath = await notePath(topUpChange);
@@ -839,11 +823,11 @@ export async function runShieldedAcceptanceSmoke({
       ...inputs([transferPath, transferPath], [spend(topUpChange), dummySpend(topUpChange)]),
       ...outputs(transferOutputs),
     };
-    const transferSignals = signalsFor("privateTransfer", transferData);
+    const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",
       {
-        publicSignals: decimals(transferSignals),
+        ...transferInputs.witness,
         hasSecondInput: "0",
         inputOwnerSecrets: [String(donorKeys.ownerSecret), "0"],
         inputAmounts: ["500", "0"],
@@ -856,7 +840,7 @@ export async function runShieldedAcceptanceSmoke({
         outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
         outputNonces: decimals(transferOutputs.map((note) => note.nonce)),
       },
-      transferSignals,
+      transferInputs.signals,
     );
     await submit("privateTransfer", transferData, transferProof, transferOutputs);
 
@@ -871,14 +855,14 @@ export async function runShieldedAcceptanceSmoke({
       ...inputs([unshieldPath, unshieldPath], [spend(unshieldSource), dummySpend(unshieldSource)]),
       ...outputs(unshieldOutputs),
     };
-    const unshieldSignals = signalsFor("unshield", unshieldData, {
+    const unshieldInputs = publicInputsFor("unshield", unshieldData, {
       amount: unshieldedAmount,
       recipient: signerAddress,
     });
     const unshieldProof = await prove(
       "unshield",
       {
-        publicSignals: decimals(unshieldSignals),
+        ...unshieldInputs.witness,
         ownerSecret: String(childKeys.ownerSecret),
         inputAmount: "400",
         inputNonce: String(unshieldSource.nonce),
@@ -890,7 +874,7 @@ export async function runShieldedAcceptanceSmoke({
         changeNonce: String(unshieldOutputs[0].nonce),
         dummyNonce: String(unshieldOutputs[1].nonce),
       },
-      unshieldSignals,
+      unshieldInputs.signals,
     );
     await submit("unshield", unshieldData, unshieldProof, unshieldOutputs, {
       amount: unshieldedAmount,
@@ -931,7 +915,7 @@ export async function runShieldedAcceptanceSmoke({
       }
     }
     assert.equal(recoveredNotes, journal.size, "Public event recovery lost an appended note");
-    assert.equal(Object.keys(proofs).length, 9);
+    assert.equal(Object.keys(proofs).length, Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).length);
     const finalCandidate = loadCandidateArtifacts({ root });
     assert.equal(
       finalCandidate.candidateManifestSha256,
@@ -952,7 +936,7 @@ export async function runShieldedAcceptanceSmoke({
         endorsementDepth: Number(endorsement.depth),
         trustedDepth: Number(trusted.depth),
         noteDepth: Number(mergedPath.depth),
-        registeredKeys: 2,
+        receiveCode,
         shieldedAmount: String(shieldedAmount),
         unshieldedAmount: String(unshieldedAmount),
         totalShieldedBefore: String(totalShieldedBefore),

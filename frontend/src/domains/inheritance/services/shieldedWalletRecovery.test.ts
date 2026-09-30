@@ -316,7 +316,6 @@ describe("local shielded wallet recovery", () => {
         estimatedMaxFeeDrip: 4n,
         directlyFundedFromPublicWallet: true,
         reusedForPublicActivity: true,
-        usedForIdentityKeyRegistration: true,
         withdrawingImmediately: true,
         distinctiveWithdrawalAmount: true,
       }),
@@ -326,7 +325,6 @@ describe("local shielded wallet recovery", () => {
         "insufficientGas",
         "directPublicWalletFunding",
         "reusedPublicWallet",
-        "identityRegistrationWalletReused",
         "immediateWithdrawal",
         "distinctiveWithdrawalAmount",
       ],
@@ -335,13 +333,6 @@ describe("local shielded wallet recovery", () => {
       canSubmit: true,
       issues: [],
     });
-    expect(
-      assessShieldedGasWallet({
-        gasBalanceDrip: 4n,
-        estimatedMaxFeeDrip: 4n,
-        usedForIdentityKeyRegistration: true,
-      }),
-    ).toEqual({ canSubmit: false, issues: ["identityRegistrationWalletReused"] });
     expect(
       assessShieldedGasWallet({
         gasBalanceDrip: 4n,

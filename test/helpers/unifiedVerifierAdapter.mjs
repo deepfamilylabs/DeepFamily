@@ -1,5 +1,4 @@
 const SHIELDED_ROUTES = [
-  "keyRegistration",
   "shield",
   "createPolicy",
   "allocate",

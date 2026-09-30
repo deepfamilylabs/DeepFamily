@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureProductionPtau } from "./lib/productionPtau.mjs";
 import { syncShieldedDevelopmentAssets } from "./lib/shieldedDevelopmentAssets.mjs";
-import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS, hasShieldedSolidityVerifier } from "./lib/zkCircuitSelection.mjs";
 import { runZkBuild } from "./zk-build.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -59,7 +59,9 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
     const initial = path.join(artifactDirectory, `${sourceName}_0000.zkey`);
     const final = path.join(artifactDirectory, `${sourceName}_dev_final.zkey`);
     const vkey = path.join(artifactDirectory, `${sourceName}.vkey.json`);
-    const verifier = path.join(verifierDirectory, `${sourceName}.sol`);
+    const verifier = hasShieldedSolidityVerifier(action)
+      ? path.join(verifierDirectory, `${sourceName}.sol`)
+      : null;
     run(["groth16", "setup", r1cs, ptau, initial]);
     run([
       "zkey",
@@ -70,7 +72,7 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
       "-e=development-only-entropy-label",
     ]);
     run(["zkey", "export", "verificationkey", final, vkey]);
-    run(["zkey", "export", "solidityverifier", final, verifier]);
+    if (verifier) run(["zkey", "export", "solidityverifier", final, verifier]);
     manifest.circuits[action] = {
       source: sourceName,
       sourceSha256: sha256(path.join(root, "circuits", `${sourceName}.circom`)),
@@ -78,7 +80,7 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
       wasmSha256: sha256(wasm),
       zkeySha256: sha256(final),
       verificationKeySha256: sha256(vkey),
-      verifierSha256: sha256(verifier),
+      ...(verifier && { verifierSha256: sha256(verifier) }),
     };
   }
   fs.writeFileSync(

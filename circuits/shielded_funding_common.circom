@@ -5,8 +5,8 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Compact LeanIMT membership, matching ShieldedDeepPool and the heir key
-// registry. A missing right sibling is absent from this path, not hash(leaf,0).
+// Compact LeanIMT membership, matching ShieldedDeepPool's note shards. A
+// missing right sibling is absent from this path, not hash(leaf,0).
 template ShieldedMembership32() {
     signal input leaf;
     signal input root;
@@ -73,50 +73,6 @@ template ShieldedDonorValueInput() {
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== noteCommitment;
     spendNullifier <== spend.out;
-}
-
-// The child does not reveal a person hash. The registration path proves that
-// heirIdentityCommitment, ownerCommitment, view key and private salt were jointly registered.
-template ShieldedRegisteredHeir() {
-    signal input heirIdentityCommitment;
-    signal input heirOwnerCommitment;
-    signal input viewKeyHi;
-    signal input viewKeyLo;
-    signal input registrationSalt;
-    signal input registryRoot;
-    signal input depth;
-    signal input index;
-    signal input siblings[32];
-
-    component heirNotZero = IsZero();
-    heirNotZero.in <== heirIdentityCommitment;
-    heirNotZero.out === 0;
-    component ownerNotZero = IsZero();
-    ownerNotZero.in <== heirOwnerCommitment;
-    ownerNotZero.out === 0;
-    component viewKeyHiBits = Num2Bits(128);
-    viewKeyHiBits.in <== viewKeyHi;
-    component viewKeyLoBits = Num2Bits(128);
-    viewKeyLoBits.in <== viewKeyLo;
-    component keyNotZero = IsZero();
-    keyNotZero.in <== viewKeyHi + viewKeyLo;
-    keyNotZero.out === 0;
-    component saltNotZero = IsZero();
-    saltNotZero.in <== registrationSalt;
-    saltNotZero.out === 0;
-    component leaf = Poseidon(6);
-    leaf.inputs[0] <== 1023;
-    leaf.inputs[1] <== heirIdentityCommitment;
-    leaf.inputs[2] <== heirOwnerCommitment;
-    leaf.inputs[3] <== viewKeyHi;
-    leaf.inputs[4] <== viewKeyLo;
-    leaf.inputs[5] <== registrationSalt;
-    component membership = ShieldedMembership32();
-    membership.leaf <== leaf.out;
-    membership.root <== registryRoot;
-    membership.depth <== depth;
-    membership.index <== index;
-    membership.siblings <== siblings;
 }
 
 template ShieldedPrivatePolicy() {

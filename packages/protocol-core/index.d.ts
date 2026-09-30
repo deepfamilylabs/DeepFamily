@@ -625,9 +625,6 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   viewSeed: bigint;
   dummyPeriodNullifier: bigint;
   dummyInputNullifier: bigint;
-  registrationTag: bigint;
-  registrationLeaf: bigint;
-  registrationSalt: bigint;
   policyNote: bigint;
   topUpUseNullifier: bigint;
   enrollmentNullifier: bigint;
@@ -673,25 +670,6 @@ export function deriveShieldedHeirKeyMaterial(derivedSecretField: BigNumberish):
   hpkeIkm: string;
 };
 export function computeShieldedOwnerCommitment(ownerSecret: BigNumberish): bigint;
-export function computeShieldedRegistrationTag(input: {
-  derivedSecretField: BigNumberish;
-  identityCommitment: BigNumberish;
-  chainId: BigNumberish;
-  registryAddress: string;
-}): bigint;
-export function computeShieldedRegistrationSalt(input: {
-  derivedSecretField: BigNumberish;
-  identityCommitment: BigNumberish;
-  chainId: BigNumberish;
-  registryAddress: string;
-}): bigint;
-export function computeShieldedRegistrationLeaf(input: {
-  identityCommitment: BigNumberish;
-  ownerCommitment: BigNumberish;
-  viewKeyHi: BigNumberish;
-  viewKeyLo: BigNumberish;
-  salt: BigNumberish;
-}): bigint;
 export function computeShieldedValueNoteCommitment(input: {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
@@ -845,30 +823,80 @@ export const SHIELDED_POOL_ACTION: Readonly<{
   PrivateTransfer: 6;
   Unshield: 7;
 }>;
-export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNT: 32;
-export function buildShieldedPoolPublicSignals(input: {
+export type ShieldedPoolPublicInputName =
+  | "chainId"
+  | "pool"
+  | "inputShardId"
+  | "inputRoot"
+  | "inputShardIds"
+  | "inputRoots"
+  | "inputNullifiers"
+  | "periodNullifiers"
+  | "outputCommitments"
+  | "ciphertextHashes"
+  | "amount"
+  | "recipient"
+  | "endorsementRoot"
+  | "trustedRoot"
+  | "asOf";
+/** Each pool action circuit's named public inputs, in verifier order. */
+export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
+  Record<number, readonly ShieldedPoolPublicInputName[]>
+>;
+export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
+export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 4;
+export interface ShieldedPoolPublicSignalInput {
   action: BigNumberish;
   chainId: BigNumberish;
   poolAddress: string;
-  inputShardIds: [BigNumberish, BigNumberish];
-  inputRoots: [BigNumberish, BigNumberish];
-  inputNullifiers: [BigNumberish, BigNumberish];
-  periodNullifiers: BigNumberish[];
-  outputCommitments: [BigNumberish, BigNumberish];
-  outputCiphertexts: [BytesLike, BytesLike];
+  inputShardIds: readonly [BigNumberish, BigNumberish];
+  inputRoots: readonly [BigNumberish, BigNumberish];
+  inputNullifiers: readonly [BigNumberish, BigNumberish];
+  periodNullifiers: readonly BigNumberish[];
+  outputCommitments: readonly [BigNumberish, BigNumberish];
+  outputCiphertexts: readonly [BytesLike, BytesLike];
   amount?: BigNumberish;
   recipient?: string;
   relation0?: BigNumberish;
   relation1?: BigNumberish;
   asOf?: BigNumberish;
-  registryRoot?: BigNumberish;
-  registryShardId?: BigNumberish;
-}): bigint[];
-export function buildShieldedKeyRegistrationPublicSignals(input: {
-  derivedSecretField: BigNumberish;
+}
+export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInput): {
+  signals: bigint[];
+  /** The same values under the circuit's named inputs, as decimal strings. */
+  witness: Record<string, string | string[]>;
+};
+export function buildShieldedPoolPublicSignals(input: ShieldedPoolPublicSignalInput): bigint[];
+export function buildShieldedReceiveCodePublicSignals(input: {
   identityCommitment: BigNumberish;
   ownerCommitment: BigNumberish;
   viewingKey: BytesLike;
-  chainId: BigNumberish;
-  registryAddress: string;
-}): bigint[];
+}): [bigint, bigint, bigint, bigint];
+
+export const SHIELDED_RECEIVE_CODE_PREFIX: "dfrecv";
+export const SHIELDED_RECEIVE_CODE_VERSION: 1;
+export interface ShieldedReceiveCodeProof {
+  pi_a: [string, string, string];
+  pi_b: [[string, string], [string, string], [string, string]];
+  pi_c: [string, string, string];
+  protocol: "groth16";
+  curve: "bn128";
+}
+export function encodeShieldedReceiveCode(input: {
+  identityCommitment: BigNumberish;
+  ownerCommitment: BigNumberish;
+  viewingKey: BytesLike;
+  proof: {
+    pi_a: ReadonlyArray<BigNumberish>;
+    pi_b: ReadonlyArray<ReadonlyArray<BigNumberish>>;
+    pi_c: ReadonlyArray<BigNumberish>;
+  };
+}): string;
+/** Parses and range-checks a code; the caller must still verify its proof. */
+export function decodeShieldedReceiveCode(code: string): {
+  identityCommitment: bigint;
+  ownerCommitment: bigint;
+  viewingKey: Uint8Array;
+  publicSignals: [bigint, bigint, bigint, bigint];
+  proof: ShieldedReceiveCodeProof;
+};

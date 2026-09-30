@@ -25,8 +25,6 @@ export type ShieldedPoolActionData = {
   relation0: BigNumberish;
   relation1: BigNumberish;
   asOf: BigNumberish;
-  registryRoot: BigNumberish;
-  registryShardId: BigNumberish;
 };
 
 type ContractActionData = {
@@ -39,8 +37,6 @@ type ContractActionData = {
   relation0: bigint;
   relation1: bigint;
   asOf: bigint;
-  registryRoot: bigint;
-  registryShardId: bigint;
 };
 
 export type ShieldedPoolFlowStage = "proving" | "checkingGas" | "submitting" | "confirming";
@@ -125,8 +121,6 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
     relation0: getBigInt(data.relation0),
     relation1: getBigInt(data.relation1),
     asOf: getBigInt(data.asOf),
-    registryRoot: getBigInt(data.registryRoot),
-    registryShardId: getBigInt(data.registryShardId),
   };
 }
 
@@ -203,8 +197,6 @@ async function submitAction(
     relation0: data.relation0,
     relation1: data.relation1,
     asOf: data.asOf,
-    registryRoot: data.registryRoot,
-    registryShardId: data.registryShardId,
   }).map(String);
   onStage?.("proving");
   const generated = await zkWorkerCall(

@@ -229,8 +229,8 @@ export function checkShieldedDevelopmentArtifacts({
       }
       const spec = SHIELDED_SETUP_CIRCUITS[action];
       if (
-        item.verifierPath !== spec.verifierPath ||
-        item.verifierContractName !== spec.verifierContractName
+        (item.verifierPath ?? null) !== spec.verifierPath ||
+        (item.verifierContractName ?? null) !== spec.verifierContractName
       ) {
         throw new Error(`${action} development verifier identity differs from its circuit action`);
       }
@@ -242,7 +242,8 @@ export function checkShieldedDevelopmentArtifacts({
         wasmSha256: `${prefix}_js/${name}.wasm`,
         zkeySha256: `${browser}_final.zkey`,
         verificationKeySha256: `${browser}.vkey.json`,
-        solidityVerifierSha256: spec.verifierPath,
+        // The receive code is verified in the browser and has no Solidity verifier.
+        ...(spec.verifierPath && { solidityVerifierSha256: spec.verifierPath }),
       };
       for (const [field, relativePath] of Object.entries(paths)) {
         const expectedHash = item[field];
@@ -260,33 +261,38 @@ export function checkShieldedDevelopmentArtifacts({
       );
       const exportedVkey = path.join(tempDir, `${name}.vkey.json`);
       const exportedVerifier = path.join(tempDir, `${name}.sol`);
+      const zkey = path.join(root, paths.zkeySha256);
       for (const args of [
-        ["zkey", "export", "verificationkey", path.join(root, paths.zkeySha256), exportedVkey],
-        ["zkey", "export", "solidityverifier", path.join(root, paths.zkeySha256), exportedVerifier],
+        ["zkey", "export", "verificationkey", zkey, exportedVkey],
+        ...(spec.verifierPath
+          ? [["zkey", "export", "solidityverifier", zkey, exportedVerifier]]
+          : []),
       ]) {
         const command = buildSnarkjsCommand({ root, args });
         runner(command.executable, command.args);
       }
-      fs.writeFileSync(
-        exportedVerifier,
-        renameZkVerifierSource(
-          fs.readFileSync(exportedVerifier, "utf8"),
-          spec.verifierContractName,
-        ),
-      );
       assertSameFile(
         exportedVkey,
         path.join(root, paths.verificationKeySha256),
         `${action} development verification key`,
         { canonicalText: true },
       );
-      assertSameFile(
-        exportedVerifier,
-        path.join(root, paths.solidityVerifierSha256),
-        `${action} development verifier`,
-        { canonicalText: true },
-      );
-      console.log(`${action}: development R1CS/WASM and zkey-derived verifier match`);
+      if (spec.verifierPath) {
+        fs.writeFileSync(
+          exportedVerifier,
+          renameZkVerifierSource(
+            fs.readFileSync(exportedVerifier, "utf8"),
+            spec.verifierContractName,
+          ),
+        );
+        assertSameFile(
+          exportedVerifier,
+          path.join(root, paths.solidityVerifierSha256),
+          `${action} development verifier`,
+          { canonicalText: true },
+        );
+      }
+      console.log(`${action}: development R1CS/WASM and zkey-derived outputs match`);
     }
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

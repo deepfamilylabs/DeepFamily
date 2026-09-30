@@ -3,6 +3,11 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
+import {
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
+} from "@deepfamily/protocol-core";
 import { SHIELDED_CIRCUITS } from "../zk-shielded-build.mjs";
 import { CIRCOM_VERSION, CIRCOM_LINUX_X64_SHA256 } from "./circomToolchain.mjs";
 import {
@@ -12,6 +17,7 @@ import {
 } from "./productionPtau.mjs";
 import { checkedFile, sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
+import { hasShieldedSolidityVerifier } from "./zkCircuitSelection.mjs";
 import { assertSnarkjsRuntimeHash } from "./snarkjsToolchain.mjs";
 import { verifyShieldedCeremonyArtifacts } from "./shieldedCeremonyVerification.mjs";
 
@@ -34,19 +40,28 @@ const sameKeys = (value, expected) =>
   !Array.isArray(value) &&
   Object.keys(value).sort().join(",") === [...expected].sort().join(",");
 
+const suffix = (action) => action[0].toUpperCase() + action.slice(1);
+
+/** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
+const publicSignalCount = (action) =>
+  action === "receiveCode"
+    ? SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT
+    : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
+
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
   Object.fromEntries(
     Object.entries(SHIELDED_CIRCUITS).map(([action, source]) => {
-      const suffix = action[0].toUpperCase() + action.slice(1);
-      const verifierContractName = `Shielded${suffix}Verifier`;
+      const verifierContractName = hasShieldedSolidityVerifier(action)
+        ? `Shielded${suffix(action)}Verifier`
+        : null;
       return [
         action,
         Object.freeze({
           action,
           source,
-          publicSignals: action === "keyRegistration" ? 7 : 32,
+          publicSignals: publicSignalCount(action),
           verifierContractName,
-          verifierPath: `contracts/${verifierContractName}.sol`,
+          verifierPath: verifierContractName && `contracts/${verifierContractName}.sol`,
         }),
       ];
     }),
@@ -208,9 +223,11 @@ export async function buildShieldedProductionRecords({
       wasmSha256: built.wasmSha256,
       zkeySha256,
       verificationKeySha256: sha256File(key.verificationKey),
-      verifierPath: spec.verifierPath,
-      verifierSha256: sha256File(key.solidityVerifier),
-      verifierContractName: spec.verifierContractName,
+      ...(spec.verifierPath && {
+        verifierPath: spec.verifierPath,
+        verifierSha256: sha256File(key.solidityVerifier),
+        verifierContractName: spec.verifierContractName,
+      }),
     };
     transcriptCircuits[action] = {
       r1csSha256: built.r1csSha256,
@@ -276,7 +293,9 @@ export function shieldedProductionInstallEntries({ compiled, finalized, records 
       { source: built.wasm, destination: `${artifact}_js/${spec.source}.wasm` },
       { source: key.finalZkey, destination: `${artifact}_final.zkey` },
       { source: key.verificationKey, destination: `${artifact}.vkey.json` },
-      { source: key.solidityVerifier, destination: spec.verifierPath },
+      ...(spec.verifierPath
+        ? [{ source: key.solidityVerifier, destination: spec.verifierPath }]
+        : []),
       { source: built.wasm, destination: `${browser}.wasm` },
       { source: key.finalZkey, destination: `${browser}_final.zkey` },
       { source: key.verificationKey, destination: `${browser}.vkey.json` },
@@ -407,8 +426,8 @@ export function inspectShieldedProductionArtifacts({
     if (
       item.source !== spec.source ||
       item.publicSignals !== spec.publicSignals ||
-      item.verifierContractName !== spec.verifierContractName ||
-      item.verifierPath !== spec.verifierPath
+      (item.verifierContractName ?? null) !== spec.verifierContractName ||
+      (item.verifierPath ?? null) !== spec.verifierPath
     ) {
       throw new Error(`${action} shielded manifest circuit identity mismatch`);
     }
@@ -449,13 +468,15 @@ export function inspectShieldedProductionArtifacts({
       `${action} vkey`,
       "frontend/public/zk/shielded/",
     );
-    const verifier = requireHashedFile(
-      root,
-      item.verifierPath,
-      item.verifierSha256,
-      `${action} verifier`,
-      "contracts/",
-    );
+    const verifier =
+      spec.verifierPath &&
+      requireHashedFile(
+        root,
+        item.verifierPath,
+        item.verifierSha256,
+        `${action} verifier`,
+        "contracts/",
+      );
     requireHashedFile(
       root,
       `${browser}.wasm`,

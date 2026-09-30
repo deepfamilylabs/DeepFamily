@@ -527,7 +527,7 @@ Token
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
 → PoseidonT3/T4/T6 libraries, then DeepFamilyLineageIndex(proxy) linked to T3–T6
 → proxy.setLineageIndex(index) exactly once
-→ ShieldedHeirKeyRegistry and ShieldedDeepPool with action-specific verifier adapters
+→ ShieldedDeepPool(token, lineage index, shared verifier adapter)
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
 → verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
   parameterized runtimes, and release-manifest hashes
@@ -1208,17 +1208,32 @@ The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They 
 
 ## Shielded inheritance contracts
 
-`ShieldedHeirKeyRegistry` accepts a zero-knowledge proof that one private identity commitment, its secret, the owner commitment, and the viewing key are consistent. Registration publishes an anonymous `registrationTag`, owner commitment, viewing key, and blinded registration leaf in a public tree split into 32-level shards. Its seven public proof signals are `[ownerCommitment, viewKeyLo, viewKeyHi, chainId, registryAddress, registrationTag, registrationLeaf]`; `identityCommitment` remains private. Neither the registration calldata, proof public signals, events, nor registry lookup exposes `personHash` or `identityCommitment`. The tag is `Poseidon(1022, derivedSecret, identityCommitment, chainId, registryAddress)` and prevents a second registration for the same identity. A separate, privately derived `registrationSalt = Poseidon(1029, derivedSecret, identityCommitment, chainId, registryAddress)` blinds `registrationLeaf = Poseidon(1023, identityCommitment, ownerCommitment, viewKeyHi, viewKeyLo, registrationSalt)`.
+Recipients do not register keys on chain. A recipient shares a receive code: a bech32m string with the `dfrecv` prefix that carries the identity commitment, owner commitment, and X25519 viewing key, plus a Groth16 proof from `circuits/shielded_receive_code.circom`. Its four public signals are `[identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi]`. The proof shows that the holder of the identity secret derived the owner commitment from it (`Poseidon(1013, Poseidon(1012, derivedSecret))`) and chose this viewing key, so neither key can be replaced in transit. The circuit does not prove how the viewing key was derived. The payer's browser verifies the proof locally against the verification key built into the app, and also checks that the proof's G2 point lies in the BN254 subgroup. The payer needs no contract call. The keys depend on neither the chain nor the pool, so one code serves every deployment.
 
-A receive code contains the identity commitment and registration salt. An intended sender uses it to find and verify the matching public key locally. Anyone given that code can link the identity to its registered key, so it must be shared privately.
+Anyone holding a receive code can link the identity to those payment keys, so the code must be shared privately. Enabling receipt creates no transaction and no fee-wallet trail.
 
-Registration does not prove that the identity already exists in DeepFamily: the lineage index has no tree of all identities that could support such a private proof. The registry therefore has no lineage index dependency. Anyone who knows a self-consistent identity secret can register a key. An initial `allocate` still proves the recipient is a direct child with a current endorsement by a trusted source; `topUp` proves it uses an existing budget bound to that heir. Registration transactions and their fee wallets remain public, so wallet reuse, funding trails, and timing can reveal who registered even though the person hash is absent.
+A receive code does not prove that the identity already exists in DeepFamily. An initial `allocate` still proves the recipient is a direct child with a current endorsement by a trusted source. `topUp` proves it uses an existing budget bound to that heir.
 
 `ShieldedDeepPool` holds pooled DEEP and a global sequence of encrypted note commitments in 32-level shards. Each action consumes one-time nullifiers and appends two ciphertext commitments. The pool exposes `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Only `shield` and `unshield` reveal a public amount; `unshield` also reveals the recipient. Policy, child, budget, and claim details are proved privately. The two lineage trees remain 64 levels deep.
 
-Each pool action and key registration has its own circuit and generated verifier. DeepFamily, the pool and the key registry share one `Groth16VerifierAdapter` instance and the same `IProofVerifierAdapter` transport interface. The adapter fixes eleven verifier routes: person relation (purpose 0, five signals), disclosure binding (purpose 1, four signals), key registration (purpose 2, seven signals), and pool actions (purposes 3–10, 32 signals). Pool action IDs remain 0–7 and are bound by the pool and circuits; they are distinct from transport purpose IDs. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
+Each pool action has its own circuit and generated verifier. DeepFamily and the pool share one `Groth16VerifierAdapter` instance and the same `IProofVerifierAdapter` transport interface. The adapter fixes ten verifier routes: person relation (purpose 0, five signals), disclosure binding (purpose 1, four signals), and the pool actions (purposes 2–9, pool action ID + 2).
 
-The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They deploy all eleven generated verifiers before the shared adapter, bind the key registry to that adapter, and bind the pool to the adapter, key registry, token, and lineage index. Development use does not require an audit; production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
+Each pool action's public signals contain only the inputs that action uses:
+
+| Action | Purpose | Signals | Public inputs, in order |
+| --- | --- | --- | --- |
+| `shield` | 2 | 7 | chainId, pool, outputCommitments[2], ciphertextHashes[2], amount |
+| `createPolicy` | 3 | 10 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], outputCommitments[2], ciphertextHashes[2] |
+| `allocate` | 4 | 15 | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf |
+| `topUp` | 5 | 12 | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2] |
+| `mergeBudget` | 6 | 12 | same as `topUp` |
+| `claim` | 7 | 25 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], periodNullifiers[12], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf |
+| `privateTransfer` | 8 | 12 | same as `topUp` |
+| `unshield` | 9 | 12 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], amount, recipient |
+
+`ShieldedDeepPool` builds each sequence from `ActionData`, and `@deepfamily/protocol-core` exports the same layouts (`SHIELDED_POOL_PUBLIC_INPUTS`). The action is not a public signal: its proof purpose selects the verifier. `createPolicy`, `claim`, and `unshield` spend one note. They must repeat its shard and root in `ActionData`'s second slot, and the pool rejects any other value. `ActionData` fields that an action does not use must be zero. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
+
+The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They deploy the eight generated pool verifiers before the shared adapter. They then bind the pool to the adapter, token, and lineage index. The receive-code circuit goes through the same build, setup, and ceremony, but it has no Solidity verifier and nothing is deployed for it. Development use does not require an audit. Production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
 
 ## ZK Verifier Contracts
 
@@ -1236,9 +1251,9 @@ The localhost, testnet acceptance, and guarded Mainnet release flows deploy the 
 `suiteCommitment`)
 **Verification**: Groth16 proof with circuit `disclosure_binding.circom`
 
-### Shielded action and key registration verifiers
+### Shielded action verifiers
 
-The pool uses eight action-specific verifiers, each with 32 public signals; key registration uses seven public signals. Both pass encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` and synchronize the matching browser assets to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses eight action-specific verifiers with 7 to 25 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` for the eight pool actions. They also synchronize the matching browser assets, including the receive-code proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

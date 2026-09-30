@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { loadCandidateArtifacts } from "../scripts/lib/shieldedArtifacts.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
 import { ensureZkArtifacts } from "../scripts/ensure-zk-artifacts.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -26,23 +26,25 @@ function writeFixture(root, { production = false } = {}) {
     fs.writeFileSync(absolute, content);
     return sha256(content);
   };
-  for (const [action, source] of Object.entries(SHIELDED_CIRCUITS)) {
-    const vkey = JSON.stringify({ nPublic: action === "keyRegistration" ? 7 : 32 });
-    const contractName = `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`;
-    const verifierPath = `contracts/${contractName}.sol`;
-    const verifierSha256 = write(verifierPath, `contract ${contractName} { /* ${action} */ }`);
+  for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
+    const { source, verifierContractName: contractName, verifierPath } = spec;
+    const vkey = JSON.stringify({ nPublic: spec.publicSignals });
+    const verifierSha256 =
+      verifierPath && write(verifierPath, `contract ${contractName} { /* ${action} */ }`);
     write(`frontend/public/zk/shielded/${source}.wasm`, `wasm-${action}`);
     manifest.circuits[action] = {
       source,
-      publicSignals: action === "keyRegistration" ? 7 : 32,
+      publicSignals: spec.publicSignals,
       sourceSha256: write(`circuits/${source}.circom`, `source-${action}`),
       r1csSha256: write(`zk-artifacts/shielded/${source}.r1cs`, `r1cs-${action}`),
       wasmSha256: write(`zk-artifacts/shielded/${source}_js/${source}.wasm`, `wasm-${action}`),
       zkeySha256: write(`frontend/public/zk/shielded/${source}_final.zkey`, `zkey-${action}`),
       verificationKeySha256: write(`frontend/public/zk/shielded/${source}.vkey.json`, vkey),
-      verifierPath,
-      verifierContractName: contractName,
-      ...(production ? { verifierSha256 } : { solidityVerifierSha256: verifierSha256 }),
+      ...(verifierPath && {
+        verifierPath,
+        verifierContractName: contractName,
+        ...(production ? { verifierSha256 } : { solidityVerifierSha256: verifierSha256 }),
+      }),
     };
   }
   const candidateManifest = `circuits/shielded-${production ? "production" : "development"}-manifest.json`;
@@ -53,7 +55,7 @@ function writeFixture(root, { production = false } = {}) {
 }
 
 describe("current public shielded artifacts", function () {
-  it("checks all nine candidate verifier files and proof-artifact digests", function () {
+  it("checks the eight candidate verifier files and all nine proof-artifact digests", function () {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-rehearsal-test-"));
     try {
       const options = writeFixture(root);
@@ -65,9 +67,12 @@ describe("current public shielded artifacts", function () {
         assert.ok(entry.vkey.includes(path.join("frontend", "public", "zk", "shielded")));
         assert.equal(
           entry.contractName,
-          `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`,
+          action === "receiveCode"
+            ? null
+            : `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`,
         );
       }
+      assert.equal(candidate.circuits.receiveCode.verifier, null);
       fs.appendFileSync(candidate.circuits.claim.verifier, "\nmodified");
       assert.throws(
         () => loadCandidateArtifacts({ root, ...options }),

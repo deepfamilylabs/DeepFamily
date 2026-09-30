@@ -1,5 +1,5 @@
 export const SHIELDED_CIRCUITS = Object.freeze({
-  keyRegistration: "shielded_key_registration",
+  receiveCode: "shielded_receive_code",
   shield: "shielded_shield",
   createPolicy: "shielded_create_policy",
   allocate: "shielded_allocate",
@@ -9,6 +9,14 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
 });
+
+/**
+ * Receive-code proofs are verified only in the payer's browser. These circuits
+ * go through the same build, setup and ceremony, but have no Solidity verifier.
+ */
+export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze(["receiveCode"]);
+export const hasShieldedSolidityVerifier = (action) =>
+  !SHIELDED_CLIENT_ONLY_CIRCUITS.includes(action);
 
 export const LEGACY_CIRCUITS = Object.freeze(["person", "disclosure"]);
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze(

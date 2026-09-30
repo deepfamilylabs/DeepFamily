@@ -1,6 +1,6 @@
 import {
   SHIELDED_POOL_ACTION,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
   computeShieldedOwnerCommitment,
@@ -16,7 +16,7 @@ import {
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
-import { findLocalHeirKey, type KeyRegistrySnapshot } from "./shieldedKeyRegistryChain";
+import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -31,10 +31,10 @@ export type ShieldedValueInput = {
   commitment: BigNumberish;
 };
 
-/** A registered destination is resolved from a locally replayed public key registry. */
+/** A recipient destination uses keys from a receive code that has already been verified. */
 export type ShieldedValueDestination =
   | { kind: "inputOwner"; inputIndex: 0 | 1; amount: BigNumberish }
-  | { kind: "registered"; identityCommitment: BigNumberish; registrationSalt: BigNumberish; amount: BigNumberish };
+  | { kind: "recipient"; recipient: VerifiedShieldedRecipient; amount: BigNumberish };
 
 export type PreparedShieldedValueOutput = {
   /** This plaintext and the proof witness stay on the user's device. */
@@ -196,23 +196,6 @@ async function encryptValueOutput(
   }
 }
 
-function registeredRecipient(
-  snapshot: KeyRegistrySnapshot,
-  identityCommitment: BigNumberish,
-  registrationSalt: BigNumberish,
-  ctx: Context,
-) {
-  if (snapshot.invalidated || snapshot.chainId !== ctx.chainId) {
-    throw new Error("Key registry snapshot belongs to another chain or is invalid");
-  }
-  const key = findLocalHeirKey(
-    snapshot,
-    getBigInt(identityCommitment),
-    getBigInt(registrationSalt),
-  );
-  return { ownerCommitment: key.ownerCommitment, viewingKey: getBytes(key.viewingKey) };
-}
-
 function actionData(
   paths: readonly [OpenedValueInput, OpenedValueInput],
   nullifiers: readonly [bigint, bigint],
@@ -228,19 +211,18 @@ function actionData(
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
-    registryRoot: 0n,
-    registryShardId: 0n,
   };
 }
 
-function signals(
+/** The circuit's named public inputs for this action and data. */
+function publicInputs(
   action: number,
   ctx: Context,
   data: ShieldedPoolActionData,
   amount = 0n,
   recipient?: string,
 ) {
-  return decimal(buildShieldedPoolPublicSignals({
+  return buildShieldedPoolPublicInputs({
     action,
     chainId: ctx.chainId,
     poolAddress: ctx.poolAddress,
@@ -253,24 +235,21 @@ function signals(
     relation0: data.relation0,
     relation1: data.relation1,
     asOf: data.asOf,
-    registryRoot: data.registryRoot,
-    registryShardId: data.registryShardId,
     amount,
     recipient,
-  }));
+  }).witness;
 }
 
 /**
  * Spend one or two locally recovered value notes into two encrypted value notes.
- * Recipient identity is absent from the public proof and event. A registered
- * recipient's key is read from the unfiltered local key-registry snapshot.
+ * Recipient identity is absent from the public proof and event. The recipient's
+ * keys come from a receive code that was verified before preparation.
  */
 export async function prepareShieldedPrivateTransfer(input: {
   chainId: BigNumberish;
   poolAddress: string;
   inputs: readonly [ShieldedValueInput] | readonly [ShieldedValueInput, ShieldedValueInput];
   destinations: readonly [ShieldedValueDestination, ShieldedValueDestination];
-  keyRegistry?: KeyRegistrySnapshot;
 }): Promise<PreparedShieldedPrivateTransfer> {
   const ctx = context(input.chainId, input.poolAddress);
   if (input.inputs.length !== 1 && input.inputs.length !== 2) {
@@ -307,13 +286,10 @@ export async function prepareShieldedPrivateTransfer(input: {
         selfHpkeIkm: source.hpkeIkm,
       };
     }
-    if (!input.keyRegistry) throw new Error("Registered destination needs a local key registry snapshot");
-    return registeredRecipient(
-      input.keyRegistry,
-      destination.identityCommitment,
-      destination.registrationSalt,
-      ctx,
-    );
+    return {
+      ownerCommitment: destination.recipient.ownerCommitment,
+      viewingKey: getBytes(destination.recipient.viewingKey),
+    };
   })) as [
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
@@ -340,7 +316,7 @@ export async function prepareShieldedPrivateTransfer(input: {
   );
   const zeroSiblings = Array<bigint>(32).fill(0n);
   const witness: ShieldedWitness = {
-    publicSignals: signals(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
+    ...publicInputs(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
     hasSecondInput: second ? "1" : "0",
     inputOwnerSecrets: decimal([first.ownerSecret, second?.ownerSecret ?? 0n]),
     inputAmounts: decimal([first.note.amount, second?.note.amount ?? 0n]),
@@ -391,7 +367,7 @@ export async function prepareShieldedUnshield(input: {
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
   const data = actionData([opened, opened], [opened.nullifier, dummyNullifier], outputs);
   const witness: ShieldedWitness = {
-    publicSignals: signals(SHIELDED_POOL_ACTION.Unshield, ctx, data, amount, recipient),
+    ...publicInputs(SHIELDED_POOL_ACTION.Unshield, ctx, data, amount, recipient),
     ownerSecret: String(opened.ownerSecret),
     inputAmount: String(opened.note.amount),
     inputNonce: String(opened.note.nonce),

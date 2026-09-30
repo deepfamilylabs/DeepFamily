@@ -1,7 +1,7 @@
 import {
   SHIELDED_POOL_ACTION,
   buildLineageMerkleProof,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
   computeIdentityFromDerivedSecret,
   computeShieldedBudgetNoteCommitment,
   computeShieldedCiphertextHashField,
@@ -352,10 +352,8 @@ export async function prepareShieldedClaim(
     relation0: endorsement.root,
     relation1: trusted.root,
     asOf,
-    registryRoot: 0n,
-    registryShardId: 0n,
   } satisfies ShieldedPoolActionData;
-  const publicSignals = buildShieldedPoolPublicSignals({
+  const { witness: publicInputs } = buildShieldedPoolPublicInputs({
     action: SHIELDED_POOL_ACTION.Claim,
     chainId,
     poolAddress,
@@ -363,7 +361,7 @@ export async function prepareShieldedClaim(
   });
   const decimal = (values: readonly bigint[]) => values.map(String);
   const witness: ShieldedWitness = {
-    publicSignals: decimal(publicSignals),
+    ...publicInputs,
     nameField: String(material.nameField),
     derivedSecretField: String(material.derivedSecretField),
     isBirthBC: Number(material.identity.isBirthBC),

@@ -1541,7 +1541,6 @@
       "address": null,
       "personVerifierImmutable": null,
       "disclosureBindingVerifierImmutable": null,
-      "keyRegistrationVerifierImmutable": null,
       "shieldVerifierImmutable": null,
       "createPolicyVerifierImmutable": null,
       "allocateVerifierImmutable": null,
@@ -1571,11 +1570,6 @@
     "poseidonT6": null,
     "deepFamilyLineageIndex": null,
     "shieldedVerifiers": {
-      "keyRegistration": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
       "shield": {
         "address": null,
         "artifactSha256": null,
@@ -1617,17 +1611,10 @@
         "runtimeSha256": null
       }
     },
-    "shieldedHeirKeyRegistry": {
-      "address": null,
-      "artifactSha256": null,
-      "runtimeSha256": null,
-      "verifierAdapterImmutable": null
-    },
     "shieldedDeepPool": {
       "address": null,
       "tokenImmutable": null,
       "lineageIndexImmutable": null,
-      "keyRegistryImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
       "verifierAdapterImmutable": null

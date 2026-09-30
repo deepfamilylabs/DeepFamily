@@ -1,6 +1,6 @@
 import {
   SHIELDED_POOL_ACTION,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
@@ -22,7 +22,6 @@ import {
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
   type ShieldedBudgetNotePayload,
@@ -32,7 +31,7 @@ import {
 import { getAddress, getBigInt, getBytes, type BigNumberish, type Contract } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import { findHeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
-import { getLocalHeirKeyProof, type KeyRegistrySnapshot } from "./shieldedKeyRegistryChain";
+import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -54,10 +53,8 @@ type CommonFundingInput = {
   wallet: LocalShieldedWalletSnapshot;
   donorDerivedSecretField: BigNumberish;
   donorCommitment: BigNumberish;
-  keyRegistry: KeyRegistrySnapshot;
-  heirPersonHash: string;
-  heirIdentityCommitment: BigNumberish;
-  registrationSalt: BigNumberish;
+  /** Verified before preparation; its keys receive the new budget. */
+  recipient: VerifiedShieldedRecipient;
 };
 
 export type PreparedFundingOutput<T> = {
@@ -119,43 +116,35 @@ function assertSnapshotBlock(snapshot: { toBlock: number; blockHash: string; inv
 async function currentContext(input: CommonFundingInput) {
   const provider = input.pool.runner?.provider;
   if (!provider) throw new Error("Shielded pool has no provider");
-  const [network, poolAddress, registryAddress, latestBlock, walletBlock, keyBlock] = await Promise.all([
+  const [network, poolAddress, latestBlock, walletBlock] = await Promise.all([
     provider.getNetwork(),
     input.pool.getAddress(),
-    input.pool.KEY_REGISTRY(),
     provider.getBlock("latest"),
     provider.getBlock(input.wallet.toBlock),
-    provider.getBlock(input.keyRegistry.toBlock),
   ]);
   if (!latestBlock || input.wallet.toBlock > latestBlock.number) {
     throw new Error("Wallet snapshot is ahead of the chain");
   }
-  if (input.keyRegistry.toBlock > latestBlock.number) {
-    throw new Error("Key registry snapshot is ahead of the chain");
-  }
   const chainId = uint64(network.chainId, "chainId");
   if (
     input.wallet.chainId !== chainId ||
-    input.wallet.poolAddress.toLowerCase() !== poolAddress.toLowerCase() ||
-    input.keyRegistry.chainId !== chainId ||
-    input.keyRegistry.registryAddress.toLowerCase() !== getAddress(registryAddress).toLowerCase()
+    input.wallet.poolAddress.toLowerCase() !== poolAddress.toLowerCase()
   ) {
-    throw new Error("Funding snapshots belong to another chain or contract");
+    throw new Error("Funding snapshot belongs to another chain or contract");
   }
   assertSnapshotBlock(input.wallet, walletBlock, "Wallet");
-  assertSnapshotBlock(input.keyRegistry, keyBlock, "Key registry");
   const keys = deriveShieldedHeirKeyMaterial(input.donorDerivedSecretField);
   if (input.wallet.walletOwnerCommitment !== keys.ownerCommitment) {
     throw new Error("Donor wallet belongs to another identity");
   }
-  const identityCommitment = getBigInt(input.heirIdentityCommitment);
-  if (wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !== input.heirPersonHash.toLowerCase()) {
-    throw new Error("Receive code identity does not match the selected heir");
+  const heir = input.recipient;
+  if (
+    wrapIdentityCommitmentAsPersonHash(heir.identityCommitment).toLowerCase() !==
+    heir.personHash.toLowerCase()
+  ) {
+    throw new Error("Recipient identity does not match its person hash");
   }
-  const registration = getLocalHeirKeyProof(input.keyRegistry, identityCommitment, getBigInt(input.registrationSalt));
-  const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(registration.key.viewingKey);
-  const heir = { ...registration.key, identityCommitment, personHash: input.heirPersonHash };
-  return { provider, latestBlock, chainId, poolAddress: getAddress(poolAddress), keys, registration, heir, viewKeyHi, viewKeyLo };
+  return { provider, latestBlock, chainId, poolAddress: getAddress(poolAddress), keys, heir };
 }
 
 function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
@@ -282,7 +271,6 @@ function actionData(input: {
   template: ReturnType<typeof templatePath>;
   useNullifier: bigint;
   outputs: readonly [PreparedFundingOutput<ShieldedBudgetNotePayload>, PreparedFundingOutput<ShieldedValueNotePayload>];
-  registry: ReturnType<typeof getLocalHeirKeyProof>;
   relation0?: bigint;
   relation1?: bigint;
   asOf?: bigint;
@@ -297,13 +285,12 @@ function actionData(input: {
     relation0: input.relation0 ?? 0n,
     relation1: input.relation1 ?? 0n,
     asOf: input.asOf ?? 0n,
-    registryRoot: input.registry.root,
-    registryShardId: input.registry.shardId,
   };
 }
 
-function signals(action: number, chainId: bigint, poolAddress: string, data: ShieldedPoolActionData) {
-  return decimal(buildShieldedPoolPublicSignals({
+/** The circuit's named public inputs for this action and data. */
+function publicInputs(action: number, chainId: bigint, poolAddress: string, data: ShieldedPoolActionData) {
+  return buildShieldedPoolPublicInputs({
     action,
     chainId,
     poolAddress,
@@ -317,9 +304,7 @@ function signals(action: number, chainId: bigint, poolAddress: string, data: Shi
     relation0: data.relation0,
     relation1: data.relation1,
     asOf: data.asOf,
-    registryRoot: data.registryRoot,
-    registryShardId: data.registryShardId,
-  }));
+  }).witness;
 }
 
 /** Build a new, independent child budget from a donor value note and a saved policy template. */
@@ -422,9 +407,9 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     enrollmentCommitment,
   });
   const data = actionData({ donor, template, useNullifier: enrollmentNullifier, outputs,
-    registry: ctx.registration, relation0: BigInt(endorsementRoot), relation1: BigInt(trustedRoot), asOf });
+    relation0: BigInt(endorsementRoot), relation1: BigInt(trustedRoot), asOf });
   const witness: ShieldedWitness = {
-    publicSignals: signals(SHIELDED_POOL_ACTION.Allocate, ctx.chainId, ctx.poolAddress, data),
+    ...publicInputs(SHIELDED_POOL_ACTION.Allocate, ctx.chainId, ctx.poolAddress, data),
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
     donorNonce: String(donor.note.nonce),
@@ -444,12 +429,6 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     policySiblings: decimal(template.siblings),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
-    viewKeyHi: String(ctx.viewKeyHi),
-    viewKeyLo: String(ctx.viewKeyLo),
-    registrationSalt: String(input.registrationSalt),
-    registrationDepth: ctx.registration.proofDepth,
-    registrationIndex: String(ctx.registration.proofIndex),
-    registrationSiblings: decimal(ctx.registration.siblings),
     heirVersionIndex: String(legitimacy.versionIndex),
     fatherIdentityCommitment: String(legitimacy.fatherIdentityCommitment),
     motherIdentityCommitment: String(legitimacy.motherIdentityCommitment),
@@ -481,7 +460,7 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
   if (
     getBigInt(old.heirIdentityCommitment) !== heir.identityCommitment ||
     getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment
-  ) throw new Error("Budget template does not belong to the registered heir");
+  ) throw new Error("Budget template does not belong to this receive code's recipient");
   const rate = uint128(old.amountPerPeriod, "rate");
   const oldRemaining = uint128(old.remaining, "old remaining budget");
   if (rate === 0n || oldRemaining % rate !== 0n) throw new Error("Template budget has fractional periods");
@@ -513,9 +492,9 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
     policyCommitment,
     enrollmentCommitment,
   });
-  const data = actionData({ donor, template, useNullifier, outputs, registry: ctx.registration });
+  const data = actionData({ donor, template, useNullifier, outputs });
   const witness: ShieldedWitness = {
-    publicSignals: signals(SHIELDED_POOL_ACTION.TopUp, ctx.chainId, ctx.poolAddress, data),
+    ...publicInputs(SHIELDED_POOL_ACTION.TopUp, ctx.chainId, ctx.poolAddress, data),
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
     donorNonce: String(donor.note.nonce),
@@ -530,14 +509,8 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
     allocationKeyCommitment: String(old.allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
-    viewKeyHi: String(ctx.viewKeyHi),
-    viewKeyLo: String(ctx.viewKeyLo),
-    registrationSalt: String(input.registrationSalt),
     eligibleFrom: String(old.eligibleFrom),
     enrollmentSalt: String(old.enrollmentSalt),
-    registrationDepth: ctx.registration.proofDepth,
-    registrationIndex: String(ctx.registration.proofIndex),
-    registrationSiblings: decimal(ctx.registration.siblings),
     oldBudgetRemaining: String(oldRemaining),
     oldBudgetRemainingPeriods: String(oldRemaining / rate),
     oldBudgetNonce: String(old.nonce),

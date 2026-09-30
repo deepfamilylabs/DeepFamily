@@ -18,11 +18,9 @@ const mocks = vi.hoisted(() => ({
     tokenAddress: "0x0000000000000000000000000000000000000003",
   },
   poolAddress: "0x0000000000000000000000000000000000000004",
-  registryAddress: "0x0000000000000000000000000000000000000005",
   familyIndex: "0x0000000000000000000000000000000000000006",
   poolIndex: "0x0000000000000000000000000000000000000006",
   poolToken: "0x0000000000000000000000000000000000000003",
-  poolRegistry: "0x0000000000000000000000000000000000000005",
   panelMounted: vi.fn(),
   panelUnmounted: vi.fn(),
 }));
@@ -40,7 +38,6 @@ vi.mock("../domains/wallet", () => ({
 }));
 vi.mock("../shared/config/env", () => ({
   getShieldedPoolAddress: () => mocks.poolAddress,
-  getShieldedKeyRegistryAddress: () => mocks.registryAddress,
 }));
 vi.mock("../shared/clients/providerRegistry", () => ({
   getReadonlyProvider: () => ({
@@ -53,9 +50,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
   createShieldedPoolContract: () => ({
     LINEAGE_INDEX: async () => mocks.poolIndex,
     TOKEN: async () => mocks.poolToken,
-    KEY_REGISTRY: async () => mocks.poolRegistry,
   }),
-  createShieldedKeyRegistryContract: () => ({}),
   createLineageIndexContract: () => ({}),
 }));
 vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
@@ -88,10 +83,8 @@ describe("InheritancePage private pool entry", () => {
     mocks.wallet.chainId = 31337;
     mocks.wallet.signer = {};
     mocks.poolAddress = "0x0000000000000000000000000000000000000004";
-    mocks.registryAddress = "0x0000000000000000000000000000000000000005";
     mocks.poolIndex = mocks.familyIndex;
     mocks.poolToken = mocks.config.tokenAddress;
-    mocks.poolRegistry = mocks.registryAddress;
   });
 
   afterEach(() => {

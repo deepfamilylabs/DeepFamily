@@ -6,19 +6,22 @@ include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 include "lib/identity.circom";
 
-// Isolated prototype for action 5 of the shielded pool's fixed 32-signal ABI.
-// No production verifier or deployment should use this circuit without the other
-// action circuits, a fresh ceremony, end-to-end tests, and an independent audit.
-//
-// publicSignals:
-//  0 action, 1 chainId, 2 pool, 3 inputShard0, 4 inputRoot0,
-//  5 inputShard1, 6 inputRoot1, 7 inputNullifier0, 8 inputNullifier1,
-//  9..20 periodNullifiers, 21 budgetOutput, 22 payoutOutput,
-//  23 budgetCiphertextHash, 24 payoutCiphertextHash,
-//  25 externalAmount, 26 externalRecipient, 27 endorsementRoot,
-//  28 trustedRoot, 29 asOf.
+// Action 5 of ShieldedDeepPool. The pool requires the budget note's shard and
+// root to fill both input slots; the second nullifier is a dummy bound to it.
+// All twelve period nullifiers are public, and inactive slots carry
+// domain-separated dummies.
 template ShieldedClaim() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input inputShardId;
+    signal input inputRoot;
+    signal input inputNullifiers[2];
+    signal input periodNullifiers[12];
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+    signal input endorsementRoot;
+    signal input trustedRoot;
+    signal input asOf;
 
     // Identity witness follows the active person commitment circuit.
     signal input nameField;
@@ -69,19 +72,12 @@ template ShieldedClaim() {
     signal input newBudgetNonce;
     signal input payoutNonce;
 
-    publicSignals[0] === 5;
-    publicSignals[3] === publicSignals[5];
-    publicSignals[4] === publicSignals[6];
-    publicSignals[25] === 0;
-    publicSignals[26] === 0;
-    publicSignals[30] === 0;
-    publicSignals[31] === 0;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
+    poolBits.in <== pool;
     component asOfBits = Num2Bits(64);
-    asOfBits.in <== publicSignals[29];
+    asOfBits.in <== asOf;
 
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
@@ -140,13 +136,13 @@ template ShieldedClaim() {
     endorsementMerkle.depth <== endorsementDepth;
     endorsementMerkle.index <== endorsementIndex;
     endorsementMerkle.siblings <== endorsementSiblings;
-    endorsementMerkle.out === publicSignals[27];
+    endorsementMerkle.out === endorsementRoot;
     component trustedMerkle = BinaryMerkleRoot(64);
     trustedMerkle.leaf <== trustedLeaf.out;
     trustedMerkle.depth <== trustedDepth;
     trustedMerkle.index <== trustedIndex;
     trustedMerkle.siblings <== trustedSiblings;
-    trustedMerkle.out === publicSignals[28];
+    trustedMerkle.out === trustedRoot;
 
     component derivedSecretNotZero = IsZero();
     derivedSecretNotZero.in <== derivedSecretField;
@@ -223,18 +219,18 @@ template ShieldedClaim() {
     noteMerkle.depth <== noteDepth;
     noteMerkle.index <== noteIndex;
     noteMerkle.siblings <== noteSiblings;
-    noteMerkle.out === publicSignals[4];
+    noteMerkle.out === inputRoot;
 
     component spend = Poseidon(3);
     spend.inputs[0] <== 1016;
     spend.inputs[1] <== ownerSecret.out;
     spend.inputs[2] <== oldBudget.out;
-    spend.out === publicSignals[7];
+    spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
     dummySpend.inputs[0] <== 1021;
     dummySpend.inputs[1] <== ownerSecret.out;
     dummySpend.inputs[2] <== oldBudget.out;
-    dummySpend.out === publicSignals[8];
+    dummySpend.out === inputNullifiers[1];
 
     component countBits = Num2Bits(4);
     countBits.in <== claimCount;
@@ -264,7 +260,7 @@ template ShieldedClaim() {
         // start; period k matures at eligibleFrom + (k + 1) * 30 days.
         epochMature[i] = LessEqThan(87);
         epochMature[i].in[0] <== eligibleFrom + (periodIndices[i] + 1) * 2592000;
-        epochMature[i].in[1] <== publicSignals[29];
+        epochMature[i].in[1] <== asOf;
         active[i].out * (1 - epochMature[i].out) === 0;
         if (i > 0) {
             ascending[i - 1] = LessThan(65);
@@ -282,7 +278,7 @@ template ShieldedClaim() {
         dummyPeriod[i].inputs[1] <== ownerSecret.out;
         dummyPeriod[i].inputs[2] <== oldBudget.out;
         dummyPeriod[i].inputs[3] <== i;
-        publicSignals[9 + i] ===
+        periodNullifiers[i] ===
             dummyPeriod[i].out + active[i].out * (realPeriod[i].out - dummyPeriod[i].out);
     }
 
@@ -305,16 +301,30 @@ template ShieldedClaim() {
     nextBudget.inputs[4] <== rate;
     nextBudget.inputs[5] <== newRemaining;
     nextBudget.inputs[6] <== newBudgetNonce;
-    nextBudget.inputs[7] <== publicSignals[23];
-    nextBudget.out === publicSignals[21];
+    nextBudget.inputs[7] <== ciphertextHashes[0];
+    nextBudget.out === outputCommitments[0];
 
     component payoutNote = Poseidon(5);
     payoutNote.inputs[0] <== 1014;
     payoutNote.inputs[1] <== ownerCommitment.out;
     payoutNote.inputs[2] <== payout;
     payoutNote.inputs[3] <== payoutNonce;
-    payoutNote.inputs[4] <== publicSignals[24];
-    payoutNote.out === publicSignals[22];
+    payoutNote.inputs[4] <== ciphertextHashes[1];
+    payoutNote.out === outputCommitments[1];
 }
 
-component main { public [publicSignals] } = ShieldedClaim();
+component main {
+    public [
+        chainId,
+        pool,
+        inputShardId,
+        inputRoot,
+        inputNullifiers,
+        periodNullifiers,
+        outputCommitments,
+        ciphertextHashes,
+        endorsementRoot,
+        trustedRoot,
+        asOf
+    ]
+} = ShieldedClaim();

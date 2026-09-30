@@ -9,7 +9,7 @@ pragma solidity ^0.8.20;
  *      - `proofEncodingId` values understood by the proof verifier adapters
  *      - Solidity mirrors of the public-signal shapes in
  *        `packages/proof-core/publicSignalSpecs.js` (identity/disclosure) and
- *        `packages/protocol-core/shielded-signals.js` (registration/pool actions).
+ *        `packages/protocol-core/shielded-signals.js` (pool actions).
  *
  *      Every adapter and every business contract that performs transport-layer length
  *      matching MUST reference these constants. Hard-coding signal lengths
@@ -29,14 +29,13 @@ library ProofConstants {
   // Proof-purpose identifiers shared by all Groth16 business entrypoints.
   // ---------------------------------------------------------------------------
   //
-  // The first two constants mirror DeepFamily.ProofPurpose. Key registration and
-  // pool actions use distinct routes, so a pool action cannot select an identity
-  // or disclosure verifier even when their local enum values are the same.
+  // The first two constants mirror DeepFamily.ProofPurpose. Pool actions use distinct
+  // routes, so a pool action cannot select an identity or disclosure verifier even when
+  // their local enum values are the same.
   //
   uint8 internal constant PROOF_PURPOSE_PERSON_RELATION = 0;
   uint8 internal constant PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
-  uint8 internal constant PROOF_PURPOSE_KEY_REGISTRATION = 2;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_ACTION_BASE = 3;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_ACTION_BASE = 2;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_SHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_CREATE_POLICY =
     PROOF_PURPOSE_SHIELDED_ACTION_BASE + 1;
@@ -59,6 +58,14 @@ library ProofConstants {
 
   uint256 internal constant PERSON_RELATION_PUBLIC_SIGNALS_LEN = 5;
   uint256 internal constant DISCLOSURE_BINDING_PUBLIC_SIGNALS_LEN = 4;
-  uint256 internal constant KEY_REGISTRATION_PUBLIC_SIGNALS_LEN = 7;
-  uint256 internal constant SHIELDED_ACTION_PUBLIC_SIGNALS_LEN = 32;
+
+  // Each pool action proves only the inputs it uses, in ShieldedDeepPool._publicSignals order.
+  uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
+  uint256 internal constant SHIELDED_CREATE_POLICY_PUBLIC_SIGNALS_LEN = 10;
+  uint256 internal constant SHIELDED_ALLOCATE_PUBLIC_SIGNALS_LEN = 15;
+  uint256 internal constant SHIELDED_TOP_UP_PUBLIC_SIGNALS_LEN = 12;
+  uint256 internal constant SHIELDED_MERGE_BUDGET_PUBLIC_SIGNALS_LEN = 12;
+  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 25;
+  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 12;
+  uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 12;
 }

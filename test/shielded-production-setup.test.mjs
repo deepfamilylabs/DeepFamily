@@ -332,7 +332,8 @@ describe("shielded production setup artifacts", function () {
       });
       expect(result).to.include({ status: "passed", circuitCount: 9 });
       expect(result.ptau.path).to.equal(external);
-      expect(calls).to.have.length(37);
+      // The receive code exports a verification key but no Solidity verifier.
+      expect(calls).to.have.length(36);
     }
   });
 
@@ -352,7 +353,7 @@ describe("shielded production setup artifacts", function () {
     }
   });
 
-  it("installs exactly 27 browser artifacts and a distinct Solidity verifier for each circuit", async function () {
+  it("installs exactly 27 browser artifacts and a distinct Solidity verifier for each pool circuit", async function () {
     const records = await fixture.createRecords();
     const plan = shieldedProductionInstallEntries({
       compiled: fixture.compiled,
@@ -371,8 +372,9 @@ describe("shielded production setup artifacts", function () {
             destination === `frontend/public/zk/shielded/${spec.source}_final.zkey`,
         ).source,
       ).to.equal(fixture.finalized[action].finalZkey);
-      expect(destinations).to.include(spec.verifierPath);
+      if (spec.verifierPath) expect(destinations).to.include(spec.verifierPath);
     }
+    expect(destinations.filter((name) => name.startsWith("contracts/"))).to.have.length(8);
     expect(destinations.at(-1)).to.equal(SHIELDED_PRODUCTION_MANIFEST_PATH);
   });
 

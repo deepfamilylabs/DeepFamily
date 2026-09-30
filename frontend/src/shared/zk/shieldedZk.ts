@@ -1,9 +1,14 @@
+import {
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
+} from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "./zk";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
-  keyRegistration: "shielded_key_registration",
+  receiveCode: "shielded_receive_code",
   shield: "shielded_shield",
   createPolicy: "shielded_create_policy",
   allocate: "shielded_allocate",
@@ -15,6 +20,25 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
 });
 
 export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
+
+/** Pool action counts mirror ProofConstants.sol; receive codes are verified off-chain. */
+const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
+  receiveCode: SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
+  shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
+  createPolicy: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.CreatePolicy],
+  allocate: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Allocate],
+  topUp: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.TopUp],
+  mergeBudget: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.MergeBudget],
+  claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
+  privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
+  unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],
+};
+
+/**
+ * Receive codes are verified against the key embedded at build time rather than a fetched
+ * file, because this key decides whether a payer trusts a recipient's payment keys.
+ */
+export const SHIELDED_RECEIVE_CODE_VERIFICATION_KEY = __SHIELDED_RECEIVE_CODE_VKEY__;
 export type ShieldedWitness = Record<string, string | number | Array<string | string[]>>;
 type Artifacts = { wasm: Uint8Array; zkey: Uint8Array; vkey: unknown };
 const cache = new Map<ShieldedCircuitName, Promise<Artifacts>>();
@@ -57,7 +81,7 @@ export function assertShieldedPublicSignals(
   actual: ReadonlyArray<string | bigint | number>,
   expected: ReadonlyArray<string | bigint | number>,
 ) {
-  const length = circuit === "keyRegistration" ? 7 : 32;
+  const length = PUBLIC_SIGNAL_COUNTS[circuit];
   if (actual.length !== length || expected.length !== length) {
     throw new Error(`Shielded ${circuit} proof must have ${length} public signals`);
   }
@@ -77,7 +101,9 @@ export async function generateShieldedProof(input: {
   const { wasm, zkey, vkey } = await loadArtifacts(input.circuit);
   const result = await snarkjs.groth16.fullProve(input.witness, wasm, zkey);
   assertShieldedPublicSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
-  if (!(await snarkjs.groth16.verify(vkey, result.publicSignals, result.proof))) {
+  const verificationKey =
+    input.circuit === "receiveCode" ? SHIELDED_RECEIVE_CODE_VERIFICATION_KEY : vkey;
+  if (!(await snarkjs.groth16.verify(verificationKey, result.publicSignals, result.proof))) {
     throw new Error(`Shielded ${input.circuit} proof failed local verification`);
   }
   return result;

@@ -4,6 +4,14 @@ import {
   type ShieldedCircuitName,
   type ShieldedWitness,
 } from "../shared/zk/shieldedZk";
+import {
+  createShieldedReceiveCode,
+  createShieldedReceiveCodeFromCredentials,
+  verifyShieldedReceiveCode,
+  type ShieldedReceiveCodeCheck,
+  type ShieldedReceiveCodeIdentity,
+} from "../shared/zk/shieldedReceiveCode";
+import type { IdentityFields } from "@deepfamily/protocol-core";
 import type {
   DisclosureBindingProofParameters,
   PersonRelationProofParameters,
@@ -40,6 +48,18 @@ type ZkWorkerMethods = {
       expectedPublicSignals: string[];
     };
     result: { proof: Groth16Proof; publicSignals: string[] };
+  };
+  createShieldedReceiveCode: {
+    params: ShieldedReceiveCodeIdentity;
+    result: { code: string; personHash: string };
+  };
+  createShieldedReceiveCodeFromCredentials: {
+    params: { identity: IdentityFields; rawPassphrase: string };
+    result: { code: string; personHash: string };
+  };
+  verifyShieldedReceiveCode: {
+    params: { code: string };
+    result: ShieldedReceiveCodeCheck;
   };
 };
 
@@ -88,6 +108,10 @@ const handlers: {
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
   generateShieldedProof: async (parameters) => await generateShieldedProof(parameters),
+  createShieldedReceiveCode: async (identity) => await createShieldedReceiveCode(identity),
+  createShieldedReceiveCodeFromCredentials: async (credentials) =>
+    await createShieldedReceiveCodeFromCredentials(credentials),
+  verifyShieldedReceiveCode: async ({ code }) => await verifyShieldedReceiveCode(code),
 };
 
 self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) => {

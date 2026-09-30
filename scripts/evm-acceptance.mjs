@@ -376,11 +376,6 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       manifest.deployments.shieldedVerifiers[action],
     ]),
     [
-      "ShieldedHeirKeyRegistry",
-      terminalProjection.contracts.shieldedHeirKeyRegistry,
-      manifest.deployments.shieldedHeirKeyRegistry,
-    ],
-    [
       "ShieldedDeepPool",
       terminalProjection.contracts.shieldedDeepPool,
       manifest.deployments.shieldedDeepPool,
@@ -1949,23 +1944,9 @@ export const main = async (chainProfile) => {
     initialVerificationEntries.push(
       await verificationEntry(
         hre.artifacts,
-        "ShieldedHeirKeyRegistry",
-        addresses.shieldedHeirKeyRegistry,
-        [addresses.groth16VerifierAdapter],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-    );
-    initialVerificationEntries.push(
-      await verificationEntry(
-        hre.artifacts,
         "ShieldedDeepPool",
         addresses.shieldedDeepPool,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.shieldedHeirKeyRegistry,
-          addresses.groth16VerifierAdapter,
-        ],
+        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
         { PoseidonT3: addresses.poseidonT3 },
       ),
     );
@@ -3621,7 +3602,6 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
         shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
       };
@@ -3744,7 +3724,6 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedHeirKeyRegistry: terminalProtocolDeployment.shieldedHeirKeyRegistry,
         shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
       };
     }

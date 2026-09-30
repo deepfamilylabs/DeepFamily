@@ -5,13 +5,22 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Action 7 of ShieldedDeepPool's fixed publicSignals[32] interface. One real
-// input note is spent; the second input slot is a domain-separated dummy tag
-// bound to that same note. The output slots contain private change and an
-// encrypted zero-value dummy. Clients merge notes before unshielding more than
-// one input value note at a time.
+// Action 7 of ShieldedDeepPool. One real input note is spent; the second
+// nullifier is a domain-separated dummy tag bound to that same note. The pool
+// requires the input's shard and root to fill both of its input slots. The
+// output slots contain private change and an encrypted zero-value dummy.
+// Clients merge notes before unshielding more than one input value note.
 template ShieldedUnshield() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input inputShardId;
+    signal input inputRoot;
+    signal input inputNullifiers[2];
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+    signal input amount;
+    signal input recipient;
+
     signal input ownerSecret;
     signal input inputAmount;
     signal input inputNonce;
@@ -23,31 +32,20 @@ template ShieldedUnshield() {
     signal input changeNonce;
     signal input dummyNonce;
 
-    publicSignals[0] === 7;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
-    publicSignals[3] === publicSignals[5];
-    publicSignals[4] === publicSignals[6];
-    for (var i = 9; i <= 20; i++) {
-        publicSignals[i] === 0;
-    }
-    publicSignals[27] === 0;
-    publicSignals[28] === 0;
-    publicSignals[29] === 0;
-    publicSignals[30] === 0;
-    publicSignals[31] === 0;
+    poolBits.in <== pool;
 
     component amountBits = Num2Bits(128);
-    amountBits.in <== publicSignals[25];
+    amountBits.in <== amount;
     component amountNotZero = IsZero();
-    amountNotZero.in <== publicSignals[25];
+    amountNotZero.in <== amount;
     amountNotZero.out === 0;
     component recipientBits = Num2Bits(160);
-    recipientBits.in <== publicSignals[26];
+    recipientBits.in <== recipient;
     component recipientNotZero = IsZero();
-    recipientNotZero.in <== publicSignals[26];
+    recipientNotZero.in <== recipient;
     recipientNotZero.out === 0;
 
     component ownerNotZero = IsZero();
@@ -79,22 +77,22 @@ template ShieldedUnshield() {
     membership.depth <== noteDepth;
     membership.index <== noteIndex;
     membership.siblings <== noteSiblings;
-    membership.out === publicSignals[4];
+    membership.out === inputRoot;
 
     component spend = Poseidon(3);
     spend.inputs[0] <== 1016;
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== inputNote.out;
-    spend.out === publicSignals[7];
+    spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
     dummySpend.inputs[0] <== 1021;
     dummySpend.inputs[1] <== ownerSecret;
     dummySpend.inputs[2] <== inputNote.out;
-    dummySpend.out === publicSignals[8];
+    dummySpend.out === inputNullifiers[1];
 
     component changeBits = Num2Bits(128);
     changeBits.in <== changeAmount;
-    inputAmount === publicSignals[25] + changeAmount;
+    inputAmount === amount + changeAmount;
     component changeNonceNotZero = IsZero();
     changeNonceNotZero.in <== changeNonce;
     changeNonceNotZero.out === 0;
@@ -107,15 +105,27 @@ template ShieldedUnshield() {
     changeNote.inputs[1] <== owner.out;
     changeNote.inputs[2] <== changeAmount;
     changeNote.inputs[3] <== changeNonce;
-    changeNote.inputs[4] <== publicSignals[23];
-    changeNote.out === publicSignals[21];
+    changeNote.inputs[4] <== ciphertextHashes[0];
+    changeNote.out === outputCommitments[0];
     component dummyNote = Poseidon(5);
     dummyNote.inputs[0] <== 1014;
     dummyNote.inputs[1] <== owner.out;
     dummyNote.inputs[2] <== 0;
     dummyNote.inputs[3] <== dummyNonce;
-    dummyNote.inputs[4] <== publicSignals[24];
-    dummyNote.out === publicSignals[22];
+    dummyNote.inputs[4] <== ciphertextHashes[1];
+    dummyNote.out === outputCommitments[1];
 }
 
-component main { public [publicSignals] } = ShieldedUnshield();
+component main {
+    public [
+        chainId,
+        pool,
+        inputShardId,
+        inputRoot,
+        inputNullifiers,
+        outputCommitments,
+        ciphertextHashes,
+        amount,
+        recipient
+    ]
+} = ShieldedUnshield();

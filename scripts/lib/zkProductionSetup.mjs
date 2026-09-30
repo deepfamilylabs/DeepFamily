@@ -87,6 +87,9 @@ const SHIELDED_CIRCUITS_BY_SOURCE = Object.freeze(
   ),
 );
 
+const verifierContractName = (circuitName) =>
+  (SETUP_CIRCUITS[circuitName] ?? SHIELDED_CIRCUITS_BY_SOURCE[circuitName]).contractName;
+
 // Collects one per-circuit metadata value under each circuit's ceremony field name.
 const ceremonyFieldsFrom = (circuits, metadataKey) =>
   Object.fromEntries(
@@ -928,7 +931,10 @@ const generateCircuitKeys = async ({
   const contributedZkey = path.join(keyDirectory, `${circuitName}_contributed.zkey`);
   const finalZkey = path.join(releaseDirectory, `${circuitName}_final.zkey`);
   const verificationKey = path.join(releaseDirectory, `${circuitName}.vkey.json`);
-  const solidityVerifier = path.join(releaseDirectory, `${circuitName}.sol`);
+  // Browser-only shielded circuits, such as the receive code, have no Solidity verifier.
+  const solidityVerifier = verifierContractName(circuitName)
+    ? path.join(releaseDirectory, `${circuitName}.sol`)
+    : null;
 
   // Revalidate immediately before every Phase 2 setup. This closes the long window in which the
   // second circuit (or the shared pTau) could otherwise change after the initial batch check.
@@ -1001,21 +1007,21 @@ const finalizeCircuitKeys = async ({
     }),
     env: commandEnvironment,
   });
-  await runner({
-    ...buildProductionSnarkjsCommand({
-      root,
-      runtimeRoot,
-      args: ["zkey", "export", "solidityverifier", circuit.finalZkey, circuit.solidityVerifier],
-    }),
-    env: commandEnvironment,
-  });
-  renameZkVerifierFile({
-    targetPath: circuit.solidityVerifier,
-    contractName: (
-      SETUP_CIRCUITS[circuit.circuitName] ?? SHIELDED_CIRCUITS_BY_SOURCE[circuit.circuitName]
-    ).contractName,
-    root: "/",
-  });
+  if (circuit.solidityVerifier) {
+    await runner({
+      ...buildProductionSnarkjsCommand({
+        root,
+        runtimeRoot,
+        args: ["zkey", "export", "solidityverifier", circuit.finalZkey, circuit.solidityVerifier],
+      }),
+      env: commandEnvironment,
+    });
+    renameZkVerifierFile({
+      targetPath: circuit.solidityVerifier,
+      contractName: verifierContractName(circuit.circuitName),
+      root: "/",
+    });
+  }
   const finalMetadata = await metadataReader(circuit.finalZkey);
   const metadata = assertSingleOperatorMetadata({
     circuitName: circuit.circuitName,

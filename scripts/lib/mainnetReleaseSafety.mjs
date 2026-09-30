@@ -38,7 +38,6 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
-  "shieldedHeirKeyRegistry",
   "shieldedDeepPool",
   "transferDeepFamilyOwnership",
 ]);

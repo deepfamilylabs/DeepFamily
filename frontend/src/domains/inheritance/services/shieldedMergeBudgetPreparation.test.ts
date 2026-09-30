@@ -130,16 +130,14 @@ describe("local shielded budget merge preparation", () => {
   it("consumes two distinct owned budgets and encrypts an exact merged budget plus dummy", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedMergeBudget(input);
-    const signals = prepared.witness.publicSignals as string[];
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("4");
-    expect(signals[3]).toBe("0");
-    expect(signals[5]).toBe("0");
-    expect(signals[4]).toBe(String(input.wallet.shards.get(0n)!.root));
-    expect(signals[6]).toBe(signals[4]);
-    expect(signals[7]).not.toBe(signals[8]);
-    expect(signals.slice(9, 21)).toEqual(Array(12).fill("0"));
-    expect(signals.slice(25)).toEqual(Array(7).fill("0"));
+    const { witness } = prepared;
+    const root = String(input.wallet.shards.get(0n)!.root);
+    expect(witness.inputShardIds).toEqual(["0", "0"]);
+    expect(witness.inputRoots).toEqual([root, root]);
+    const nullifiers = witness.inputNullifiers as string[];
+    expect(nullifiers[0]).not.toBe(nullifiers[1]);
+    expect(witness).not.toHaveProperty("periodNullifiers");
+    expect(witness).not.toHaveProperty("asOf");
     expect(prepared.witness.remaining).toEqual(["30", "20"]);
     expect(prepared.witness.remainingPeriods).toEqual(["3", "2"]);
     expect(prepared.witness.inputDepths).toEqual(["1", "1"]);

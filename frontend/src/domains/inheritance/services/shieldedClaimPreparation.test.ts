@@ -185,19 +185,18 @@ describe("local shielded claim preparation", () => {
   it("builds exact fixed public inputs and encrypted continuation/payout notes", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedClaim(input);
-    const signals = prepared.witness.publicSignals as string[];
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("5");
-    expect(signals[3]).toBe(signals[5]);
-    expect(signals[4]).toBe(signals[6]);
-    expect(signals[7]).not.toBe(signals[8]);
-    expect(signals.slice(9, 21)).toHaveLength(12);
-    expect(signals[25]).toBe("0");
-    expect(signals[26]).toBe("0");
-    expect(signals[27]).toBe(String(input.lineage.endorsementTree.root));
-    expect(signals[28]).toBe(String(input.lineage.trustedTree.root));
-    expect(signals[30]).toBe("0");
-    expect(signals[31]).toBe("0");
+    const { witness } = prepared;
+    // One budget note: the pool requires its shard and root in both input slots.
+    expect(prepared.data.inputShardIds[1]).toBe(prepared.data.inputShardIds[0]);
+    expect(prepared.data.inputRoots[1]).toBe(prepared.data.inputRoots[0]);
+    expect(witness.inputRoot).toBe(String(prepared.data.inputRoots[0]));
+    const nullifiers = witness.inputNullifiers as string[];
+    expect(nullifiers[0]).not.toBe(nullifiers[1]);
+    expect(witness.periodNullifiers).toHaveLength(12);
+    expect(witness.endorsementRoot).toBe(String(input.lineage.endorsementTree.root));
+    expect(witness.trustedRoot).toBe(String(input.lineage.trustedTree.root));
+    expect(witness).not.toHaveProperty("amount");
+    expect(witness).not.toHaveProperty("recipient");
     expect(prepared.amount).toBe(100n);
     expect(prepared.witness.remainingPeriods).toBe("12");
     expect(prepared.witness.periodIndices).toEqual(["0", ...Array(11).fill("0")]);
@@ -279,7 +278,7 @@ describe("local shielded claim preparation", () => {
     const prepared = await prepareShieldedClaim(input);
     expect(prepared.witness.versionIndex).toBe("3");
     expect(prepared.outputs[0].note.eligibleFrom).toBe(eligibleFrom);
-    expect(prepared.witness.publicSignals).toContain(String(input.lineage.endorsementTree.root));
+    expect(prepared.witness.endorsementRoot).toBe(String(input.lineage.endorsementTree.root));
   });
 
   it("rejects a lineage endorsement newer than the selected claim timestamp", async () => {
@@ -348,7 +347,7 @@ describe("local shielded claim preparation", () => {
   it("fails before encryption when a budget was spent or its note root has one leaf", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedClaim(input);
-    input.wallet.spentNullifiers.add(BigInt((prepared.witness.publicSignals as string[])[7]));
+    input.wallet.spentNullifiers.add(BigInt((prepared.witness.inputNullifiers as string[])[0]));
     await expect(prepareShieldedClaim(input)).rejects.toThrow("already been spent");
     input.wallet.spentNullifiers.clear();
     input.wallet.shards.set(0n, createLineageTree([input.budgetCommitment]));

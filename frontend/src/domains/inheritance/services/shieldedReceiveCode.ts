@@ -1,95 +1,102 @@
 import {
-  SNARK_SCALAR_FIELD,
+  decodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
 } from "@deepfamily/protocol-core";
-import { getBigInt, toBeHex, type BigNumberish } from "ethers";
-import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
+import { getBigInt } from "ethers";
+import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
+import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
 
-const RECEIVE_CODE = /^dfrecv1:(0x[0-9a-fA-F]{64}):(0x[0-9a-fA-F]{64})$/;
+declare const verifiedRecipient: unique symbol;
 
-/** Share only with an intended sender. The salt opens the anonymous registry leaf. */
-export function encodeShieldedReceiveCode(
-  identityCommitment: BigNumberish,
-  registrationSalt: BigNumberish,
-): string {
-  const identity = getBigInt(identityCommitment);
-  const salt = getBigInt(registrationSalt);
-  if (identity <= 0n || identity >= SNARK_SCALAR_FIELD) {
-    throw new Error("Receive code identity commitment is invalid");
+/**
+ * Payment keys from a receive code whose proof verified in the ZK worker. Only
+ * verifyShieldedReceiveCode creates this type, so funding and transfers cannot use
+ * keys that the recipient's identity did not authorize.
+ */
+export type VerifiedShieldedRecipient = {
+  readonly identityCommitment: bigint;
+  readonly ownerCommitment: bigint;
+  readonly viewingKey: string;
+  readonly personHash: string;
+  readonly [verifiedRecipient]: true;
+};
+
+export class ShieldedReceiveCodeError extends Error {
+  constructor(readonly reason: "malformed" | "invalid") {
+    super(
+      reason === "malformed"
+        ? "Receive code is incomplete or mistyped"
+        : "Receive code failed verification",
+    );
+    this.name = "ShieldedReceiveCodeError";
   }
-  if (salt <= 0n || salt >= SNARK_SCALAR_FIELD) {
-    throw new Error("Receive code registration salt is invalid");
-  }
-  return `dfrecv1:${toBeHex(identity, 32)}:${toBeHex(salt, 32)}`;
 }
 
-export function parseShieldedReceiveCode(value: string) {
-  const match = RECEIVE_CODE.exec(value.trim());
-  if (!match) throw new Error("Receive code format is invalid");
-  const identityCommitment = BigInt(match[1]);
-  const registrationSalt = BigInt(match[2]);
+// Argon2id derivation and a first proof can each take a while on slower devices.
+const RECEIVE_CODE_TIMEOUT_MS = 240_000;
+
+export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedShieldedRecipient> {
+  const result = await zkWorkerCall(
+    "verifyShieldedReceiveCode",
+    { code },
+    { timeoutMs: RECEIVE_CODE_TIMEOUT_MS },
+  );
+  if (!result.ok) throw new ShieldedReceiveCodeError(result.reason);
+  const identityCommitment = getBigInt(result.identityCommitment);
   if (
-    identityCommitment <= 0n ||
-    identityCommitment >= SNARK_SCALAR_FIELD ||
-    registrationSalt <= 0n ||
-    registrationSalt >= SNARK_SCALAR_FIELD
+    wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !==
+    result.personHash.toLowerCase()
   ) {
-    throw new Error("Receive code contains an invalid field element");
+    throw new ShieldedReceiveCodeError("invalid");
   }
   return {
     identityCommitment,
-    registrationSalt,
-    personHash: wrapIdentityCommitmentAsPersonHash(identityCommitment),
-  };
-}
-
-export type ShieldedRecipientMaterialSource =
-  | { kind: "receiveCode"; code: string }
-  | { kind: "derivedRecipient"; material: ShieldedRecipientMaterial };
-
-export type ShieldedRecipientMaterial = ReturnType<typeof parseShieldedReceiveCode>;
-
-/** Derive only payment material in the worker; the child's spend secret stays there. */
-export async function deriveShieldedRecipientMaterial(input: {
-  identity: IdentityFields;
-  rawPassphrase: string;
-  /** Use the current key registry snapshot's chain and address. */
-  chainId: bigint;
-  registryAddress: string;
-}): Promise<ShieldedRecipientMaterial> {
-  const result = await cryptoWorkerCall("deriveShieldedRecipientMaterial", input, {
-    timeoutMs: 240_000,
-  });
-  return resolveShieldedRecipientMaterial({
-    kind: "derivedRecipient",
-    material: {
-      identityCommitment: BigInt(result.identityCommitment),
-      registrationSalt: BigInt(result.registrationSalt),
-      personHash: result.personHash,
-    },
-  });
+    ownerCommitment: getBigInt(result.ownerCommitment),
+    viewingKey: result.viewingKey,
+    personHash: result.personHash,
+  } as VerifiedShieldedRecipient;
 }
 
 /**
- * Normalize either private payment method without fetching a target identity.
+ * For display before submission only: the person a code names. Its proof is checked by
+ * verifyShieldedReceiveCode before any payment uses the code.
  */
-export function resolveShieldedRecipientMaterial(source: ShieldedRecipientMaterialSource) {
-  if (source.kind === "receiveCode") return parseShieldedReceiveCode(source.code);
-  const { material } = source;
-  if (
-    material.identityCommitment <= 0n ||
-    material.identityCommitment >= SNARK_SCALAR_FIELD ||
-    material.registrationSalt <= 0n ||
-    material.registrationSalt >= SNARK_SCALAR_FIELD ||
-    material.personHash.toLowerCase() !==
-      wrapIdentityCommitmentAsPersonHash(material.identityCommitment).toLowerCase()
-  ) {
-    throw new Error("Derived recipient material is invalid");
+export function peekShieldedReceiveCodePersonHash(code: string): string | null {
+  if (!code.trim()) return null;
+  try {
+    return wrapIdentityCommitmentAsPersonHash(decodeShieldedReceiveCode(code).identityCommitment);
+  } catch {
+    return null;
   }
-  return {
-    identityCommitment: material.identityCommitment,
-    registrationSalt: material.registrationSalt,
-    personHash: material.personHash,
-  };
+}
+
+/** The unlocked identity's own code. It is regenerated on demand and never stored. */
+export async function createOwnShieldedReceiveCode(
+  identity: IdentityMaterialV1Result,
+): Promise<string> {
+  const { code, personHash } = await zkWorkerCall(
+    "createShieldedReceiveCode",
+    {
+      identity: identity.identity,
+      identitySuiteId: identity.identitySuiteId,
+      derivedSecretField: identity.derivedSecretField,
+    },
+    { timeoutMs: RECEIVE_CODE_TIMEOUT_MS },
+  );
+  if (personHash.toLowerCase() !== identity.personHash.toLowerCase()) {
+    throw new Error("Receive code does not belong to the unlocked identity");
+  }
+  return code;
+}
+
+/** Create another person's code from their details. Their secret stays in the ZK worker. */
+export async function createShieldedReceiveCodeForRecipient(credentials: {
+  identity: IdentityFields;
+  rawPassphrase: string;
+}): Promise<string> {
+  const { code } = await zkWorkerCall("createShieldedReceiveCodeFromCredentials", credentials, {
+    timeoutMs: RECEIVE_CODE_TIMEOUT_MS,
+  });
+  return code;
 }

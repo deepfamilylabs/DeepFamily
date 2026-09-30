@@ -119,7 +119,6 @@ export const buildMainnetReleaseIntents = async ({
     "PoseidonT6",
     "DeepFamilyLineageIndex",
     ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierContractName),
-    "ShieldedHeirKeyRegistry",
     "ShieldedDeepPool",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
@@ -275,17 +274,6 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
-  const keyRegistryBytecode = linkBytecode({
-    ethers,
-    artifact: artifact.ShieldedHeirKeyRegistry,
-    libraries: { PoseidonT3: addresses.poseidonT3 },
-  });
-  await pushDeployment(
-    "shieldedHeirKeyRegistry",
-    "ShieldedHeirKeyRegistry",
-    [addresses.groth16VerifierAdapter],
-    keyRegistryBytecode,
-  );
   const poolBytecode = linkBytecode({
     ethers,
     artifact: artifact.ShieldedDeepPool,
@@ -294,12 +282,7 @@ export const buildMainnetReleaseIntents = async ({
   await pushDeployment(
     "shieldedDeepPool",
     "ShieldedDeepPool",
-    [
-      addresses.deepFamilyToken,
-      addresses.deepFamilyLineageIndex,
-      addresses.shieldedHeirKeyRegistry,
-      addresses.groth16VerifierAdapter,
-    ],
+    [addresses.deepFamilyToken, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
     poolBytecode,
   );
   pushCall(

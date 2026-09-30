@@ -288,7 +288,6 @@ const createProductionFixture = () => {
         address(100 + index),
       ]),
     ),
-    shieldedHeirKeyRegistry: address(300),
     shieldedDeepPool: address(301),
   };
   const shieldedBindings = shieldedDeploymentBindingsFromAddresses(shieldedAddresses);
@@ -309,7 +308,6 @@ const createProductionFixture = () => {
         withHashes(record),
       ]),
     ),
-    shieldedHeirKeyRegistry: withHashes(shieldedBindings.shieldedHeirKeyRegistry),
     shieldedDeepPool: withHashes(shieldedBindings.shieldedDeepPool),
   });
 
@@ -481,10 +479,6 @@ const createProductionFixture = () => {
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
     ),
-    shieldedHeirKeyRegistry: {
-      artifactSha256: HASHES.adapterArtifact,
-      runtimeSha256: HASHES.adapterRuntime,
-    },
     shieldedDeepPool: {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
@@ -574,7 +568,6 @@ const acceptanceReportForManifest = (manifest) => ({
         "poseidonT6",
         "deepFamilyLineageIndex",
         "shieldedVerifiers",
-        "shieldedHeirKeyRegistry",
         "shieldedDeepPool",
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
     ),
@@ -1431,19 +1424,11 @@ describe("production protocol release manifest evidence", function () {
       /Groth16VerifierAdapter allocate must bind its exact verifier/,
     ],
     [
-      "a registry using another verifier",
-      (deployments) => {
-        deployments.shieldedHeirKeyRegistry.verifierAdapterImmutable =
-          deployments.shieldedVerifiers.claim.address;
-      },
-      /common verifier adapter/,
-    ],
-    [
       "a pool using a different token",
       (deployments) => {
         deployments.shieldedDeepPool.tokenImmutable = address(900);
       },
-      /declared token, lineage, key registry and common verifier adapter/,
+      /declared token, lineage and common verifier adapter/,
     ],
     [
       "a pool using another common adapter",

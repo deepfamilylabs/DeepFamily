@@ -81,7 +81,6 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
 | **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy          |
 | **ShieldedDeepPool.sol** | Shared DEEP pool with encrypted note commitments, private allocations, claims, transfers, and public exits |
-| **ShieldedHeirKeyRegistry.sol** | Identity-proved viewing-key registry for private allocations |
 
 ## Quick Start
 

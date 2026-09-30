@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { renameZkVerifierSource } from "../rename-zk-verifier.mjs";
-import { SHIELDED_CIRCUITS } from "./zkCircuitSelection.mjs";
+import { SHIELDED_SETUP_CIRCUITS } from "./shieldedProductionSetup.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -48,7 +48,10 @@ export function currentShieldedCandidateManifest({ root = DEFAULT_ROOT } = {}) {
     : "circuits/shielded-development-manifest.json";
 }
 
-/** Accepts the nine pinned public artifact sets and their matching named contract verifiers. */
+/**
+ * Accepts the nine pinned public artifact sets and the named contract verifiers of the eight
+ * pool actions. The receive-code circuit is verified in the browser and has no contract.
+ */
 export function loadCandidateArtifacts({
   root = DEFAULT_ROOT,
   candidateManifest = currentShieldedCandidateManifest({ root }),
@@ -70,7 +73,7 @@ export function loadCandidateArtifacts({
   ) {
     throw new Error("Production candidate manifest has inconsistent status flags");
   }
-  const expectedActions = Object.keys(SHIELDED_CIRCUITS).sort();
+  const expectedActions = Object.keys(SHIELDED_SETUP_CIRCUITS).sort();
   if (
     Object.keys(manifest.circuits ?? {})
       .sort()
@@ -79,20 +82,24 @@ export function loadCandidateArtifacts({
     throw new Error("Candidate manifest must contain exactly the nine shielded circuits");
   }
   const circuits = {};
-  for (const [action, source] of Object.entries(SHIELDED_CIRCUITS)) {
+  for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
+    const { source, verifierContractName: contractName, verifierPath } = spec;
     const item = manifest.circuits[action];
     if (item?.source !== source) throw new Error(`${action} candidate circuit source is wrong`);
-    const contractName = `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`;
-    const verifierRelative = `contracts/${contractName}.sol`;
-    if (item.verifierPath !== verifierRelative || item.verifierContractName !== contractName) {
+    if (
+      (item.verifierPath ?? null) !== verifierPath ||
+      (item.verifierContractName ?? null) !== contractName
+    ) {
       throw new Error(`${action} verifier identity differs from its circuit action`);
     }
-    const verifier = checkedHash(
-      root,
-      verifierRelative,
-      development ? item.solidityVerifierSha256 : item.verifierSha256,
-      `${action} verifier`,
-    );
+    const verifier =
+      verifierPath &&
+      checkedHash(
+        root,
+        verifierPath,
+        development ? item.solidityVerifierSha256 : item.verifierSha256,
+        `${action} verifier`,
+      );
     checkedHash(root, `circuits/${source}.circom`, item.sourceSha256, `${action} source`);
     const r1cs = checkedHash(
       root,
@@ -115,7 +122,7 @@ export function loadCandidateArtifacts({
       item.verificationKeySha256,
       `${action} verification key`,
     );
-    const expectedSignals = action === "keyRegistration" ? 7 : 32;
+    const expectedSignals = spec.publicSignals;
     if (JSON.parse(fs.readFileSync(vkey, "utf8")).nPublic !== expectedSignals) {
       throw new Error(`${action} verification key has the wrong public-signal count`);
     }
@@ -144,14 +151,21 @@ export function verifyCandidateDerivation(candidate, { root = DEFAULT_ROOT } = {
     for (const [action, entry] of Object.entries(candidate.circuits)) {
       const exportedVerifier = path.join(temporary, `${action}.sol`);
       const exportedVkey = path.join(temporary, `${action}.vkey.json`);
-      execFileSync(
-        process.execPath,
-        [snarkjs, "zkey", "export", "solidityverifier", entry.zkey, exportedVerifier],
-        {
-          cwd: root,
-          stdio: "pipe",
-        },
-      );
+      if (entry.verifier) {
+        execFileSync(
+          process.execPath,
+          [snarkjs, "zkey", "export", "solidityverifier", entry.zkey, exportedVerifier],
+          {
+            cwd: root,
+            stdio: "pipe",
+          },
+        );
+        const generated = fs.readFileSync(exportedVerifier, "utf8");
+        const expected = renameZkVerifierSource(generated, entry.contractName);
+        if (expected !== fs.readFileSync(entry.verifier, "utf8")) {
+          throw new Error(`${action} candidate verifier is not derived from its zkey`);
+        }
+      }
       execFileSync(
         process.execPath,
         [snarkjs, "zkey", "export", "verificationkey", entry.zkey, exportedVkey],
@@ -160,11 +174,6 @@ export function verifyCandidateDerivation(candidate, { root = DEFAULT_ROOT } = {
           stdio: "pipe",
         },
       );
-      const generated = fs.readFileSync(exportedVerifier, "utf8");
-      const expected = renameZkVerifierSource(generated, entry.contractName);
-      if (expected !== fs.readFileSync(entry.verifier, "utf8")) {
-        throw new Error(`${action} candidate verifier is not derived from its zkey`);
-      }
       if (
         JSON.stringify(JSON.parse(fs.readFileSync(exportedVkey, "utf8"))) !==
         JSON.stringify(JSON.parse(fs.readFileSync(entry.vkey, "utf8")))
@@ -177,6 +186,7 @@ export function verifyCandidateDerivation(candidate, { root = DEFAULT_ROOT } = {
   }
 }
 
+/** Compiles the eight pool action verifiers; the receive code has none. */
 export async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT } = {}) {
   const hardhatCompiler = path.join(
     root,
@@ -184,8 +194,9 @@ export async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT
   );
   const { getCompiler } = await import(pathToFileURL(hardhatCompiler).href);
   const compiler = await getCompiler("0.8.28", { preferWasm: false });
+  const withVerifiers = Object.entries(candidate.circuits).filter(([, entry]) => entry.verifier);
   const sources = Object.fromEntries(
-    Object.entries(candidate.circuits).map(([action, entry]) => [
+    withVerifiers.map(([action, entry]) => [
       `${action}.sol`,
       { content: fs.readFileSync(entry.verifier, "utf8") },
     ]),
@@ -207,7 +218,7 @@ export async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT
     );
   }
   return Object.fromEntries(
-    Object.entries(candidate.circuits).map(([action, entry]) => {
+    withVerifiers.map(([action, entry]) => {
       const artifact = output.contracts?.[`${action}.sol`]?.[entry.contractName];
       if (!artifact?.evm?.bytecode?.object || !artifact.abi) {
         throw new Error(`${action} compiled verifier contract is missing`);

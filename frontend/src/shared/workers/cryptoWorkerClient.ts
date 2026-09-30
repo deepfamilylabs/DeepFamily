@@ -25,13 +25,6 @@ export interface IdentityMaterialV1Result {
   personHash: string;
 }
 
-/** The only child identity data the payer's main thread receives. */
-export interface ShieldedRecipientMaterialResult {
-  identityCommitment: string;
-  personHash: string;
-  registrationSalt: string;
-}
-
 export interface PreparedPersonVersionContentV1Result {
   canonicalJsonLength: number;
   contentDigestLo: string;
@@ -113,15 +106,6 @@ export type CryptoWorkerCallMap = {
       identitySuiteId?: number | string | bigint;
     };
     result: IdentityMaterialV1Result;
-  };
-  deriveShieldedRecipientMaterial: {
-    params: {
-      identity: IdentityFields;
-      rawPassphrase: string;
-      chainId: bigint;
-      registryAddress: string;
-    };
-    result: ShieldedRecipientMaterialResult;
   };
   preparePersonVersionContentV1: {
     params: {

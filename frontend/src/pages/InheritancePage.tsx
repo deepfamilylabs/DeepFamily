@@ -8,11 +8,10 @@ import {
   createDeepFamilyContract,
   createDeepTokenContract,
   createLineageIndexContract,
-  createShieldedKeyRegistryContract,
   createShieldedPoolContract,
 } from "../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../shared/clients/providerRegistry";
-import { getShieldedKeyRegistryAddress, getShieldedPoolAddress } from "../shared/config/env";
+import { getShieldedPoolAddress } from "../shared/config/env";
 import { EmptyState, PageContainer, PageHead } from "../shared/ui";
 
 type ModulesState =
@@ -29,24 +28,17 @@ export default function InheritancePage() {
   const config = useConfig();
   const wallet = useWallet();
   const poolAddress = getShieldedPoolAddress(config.chainId);
-  const registryAddress = getShieldedKeyRegistryAddress(config.chainId);
   const configurationMissing = t("shielded.configurationMissing");
   const configurationMismatch = t("shielded.configurationMismatch");
   const invalidDecimals = t("shielded.invalidDecimals");
   const unreachable = t("shielded.unreachable");
   const [state, setState] = useState<ModulesState>({ status: "loading" });
-  // Kept across wallet switches during this page visit so a public deposit or
-  // identity registration wallet cannot be reused immediately for private actions.
+  // Kept across wallet switches during this page visit so a public deposit wallet
+  // cannot be reused immediately for private actions.
   const publicActivityAddresses = useRef(new Set<string>());
 
   useEffect(() => {
-    if (
-      !config.rpcUrl ||
-      !config.contractAddress ||
-      !config.tokenAddress ||
-      !poolAddress ||
-      !registryAddress
-    ) {
+    if (!config.rpcUrl || !config.contractAddress || !config.tokenAddress || !poolAddress) {
       setState({ status: "unavailable", message: configurationMissing });
       return;
     }
@@ -57,21 +49,14 @@ export default function InheritancePage() {
       const deepFamily = createDeepFamilyContract(config.contractAddress, provider);
       const token = createDeepTokenContract(config.tokenAddress, provider);
       const pool = createShieldedPoolContract(poolAddress, provider);
-      const registry = createShieldedKeyRegistryContract(registryAddress, provider);
-      const [network, familyIndex, poolIndex, poolToken, poolRegistry, decimals] =
-        await Promise.all([
-          provider.getNetwork(),
-          deepFamily.lineageIndex() as Promise<string>,
-          pool.LINEAGE_INDEX() as Promise<string>,
-          pool.TOKEN() as Promise<string>,
-          pool.KEY_REGISTRY() as Promise<string>,
-          token.decimals() as Promise<bigint>,
-        ]);
-      if (
-        !sameAddress(familyIndex, poolIndex) ||
-        !sameAddress(poolToken, config.tokenAddress) ||
-        !sameAddress(poolRegistry, registryAddress)
-      ) {
+      const [network, familyIndex, poolIndex, poolToken, decimals] = await Promise.all([
+        provider.getNetwork(),
+        deepFamily.lineageIndex() as Promise<string>,
+        pool.LINEAGE_INDEX() as Promise<string>,
+        pool.TOKEN() as Promise<string>,
+        token.decimals() as Promise<bigint>,
+      ]);
+      if (!sameAddress(familyIndex, poolIndex) || !sameAddress(poolToken, config.tokenAddress)) {
         throw new Error(configurationMismatch);
       }
       const tokenDecimals = Number(decimals);
@@ -88,7 +73,6 @@ export default function InheritancePage() {
             lineageIndex: createLineageIndexContract(familyIndex, provider),
             token,
             pool,
-            registry,
             poolAddress,
             tokenDecimals,
           },
@@ -112,7 +96,6 @@ export default function InheritancePage() {
     config.contractAddress,
     config.tokenAddress,
     poolAddress,
-    registryAddress,
     configurationMissing,
     configurationMismatch,
     invalidDecimals,
