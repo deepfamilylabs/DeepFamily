@@ -42,8 +42,6 @@ function actionData(): ShieldedPoolActionData {
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
-    registryRoot: 0n,
-    registryShardId: 0n,
   };
 }
 
@@ -144,12 +142,10 @@ describe("shielded pool local proof and self-submit flows", () => {
       { timeoutMs: 1_200_000 },
     );
     const signals = mocks.zkWorkerCall.mock.calls[0][1].expectedPublicSignals;
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("0");
-    expect(signals[25]).toBe("100");
-    expect(signals[26]).toBe("0");
-    expect(signals[30]).toBe("0");
-    expect(signals[31]).toBe("0");
+    // Shield proves chainId, pool, two outputs, two ciphertext hashes and the amount.
+    expect(signals).toHaveLength(7);
+    expect(signals[1]).toBe(BigInt(POOL_ADDRESS).toString());
+    expect(signals[6]).toBe("100");
     expect(f.methods.shield).toHaveBeenCalledWith(
       100n,
       expect.objectContaining({ outputCommitments: [123n, 456n] }),
@@ -179,9 +175,9 @@ describe("shielded pool local proof and self-submit flows", () => {
     const f = fixture();
     await submitUnshield({ ...f.common, recipient: RECIPIENT, amount: 75n });
     const signals = mocks.zkWorkerCall.mock.lastCall?.[1].expectedPublicSignals;
-    expect(signals[0]).toBe("7");
-    expect(signals[25]).toBe("75");
-    expect(signals[26]).toBe(BigInt(RECIPIENT).toString());
+    expect(signals).toHaveLength(12);
+    expect(signals[10]).toBe("75");
+    expect(signals[11]).toBe(BigInt(RECIPIENT).toString());
     expect(f.methods.unshield.mock.calls[0][0]).toBe(RECIPIENT);
     expect(f.methods.unshield.mock.calls[0][1]).toBe(75n);
   });
@@ -191,11 +187,11 @@ describe("shielded pool local proof and self-submit flows", () => {
     mocks.zkWorkerCall.mockImplementationOnce(async (_name, params) => ({
       proof: PROOF,
       publicSignals: params.expectedPublicSignals.map((value: string, index: number) =>
-        index === 25 ? "999" : value,
+        index === 6 ? "999" : value,
       ),
     }));
     await expect(submitShield({ ...f.common, amount: 100n })).rejects.toThrow(
-      "public signal 25 does not match transaction",
+      "public signal 6 does not match transaction",
     );
     expect(f.estimateGas).not.toHaveBeenCalled();
     expect(f.methods.shield).not.toHaveBeenCalled();

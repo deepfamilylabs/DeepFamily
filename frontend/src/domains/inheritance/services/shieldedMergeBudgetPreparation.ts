@@ -1,6 +1,6 @@
 import {
   SHIELDED_POOL_ACTION,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
   computeShieldedBudgetNoteCommitment,
   computeShieldedCiphertextHashField,
   computeShieldedEnrollmentCommitment,
@@ -261,10 +261,8 @@ export async function prepareShieldedMergeBudget(
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
-    registryRoot: 0n,
-    registryShardId: 0n,
   } satisfies ShieldedPoolActionData;
-  const publicSignals = buildShieldedPoolPublicSignals({
+  const { witness: publicInputs } = buildShieldedPoolPublicInputs({
     action: SHIELDED_POOL_ACTION.MergeBudget,
     chainId,
     poolAddress,
@@ -272,7 +270,7 @@ export async function prepareShieldedMergeBudget(
   });
   const decimal = (values: readonly bigint[]) => values.map(String);
   const witness: ShieldedWitness = {
-    publicSignals: decimal(publicSignals),
+    ...publicInputs,
     ownerSecret: String(keys.ownerSecret),
     policyCommitment: String(policyCommitment),
     enrollmentCommitment: String(enrollmentCommitment),

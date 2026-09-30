@@ -5,9 +5,20 @@ include "shielded_lineage_common.circom";
 
 // Action 2: spend only the donor's VALUE note. The second input is a read-only
 // POLICY_NOTE template; its public nullifier is a one-time unlinkable use tag.
-// Its policy value is zero and must never be counted as funding.
+// Its policy value is zero and must never be counted as funding. The payer
+// checks the heir's receive code before proving; the claim circuit binds the
+// budget's owner to the heir's identity secret.
 template ShieldedAllocate() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input inputShardIds[2];
+    signal input inputRoots[2];
+    signal input inputNullifiers[2];
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+    signal input endorsementRoot;
+    signal input trustedRoot;
+    signal input asOf;
 
     signal input donorOwnerSecret;
     signal input donorAmount;
@@ -30,12 +41,6 @@ template ShieldedAllocate() {
 
     signal input heirIdentityCommitment;
     signal input heirOwnerCommitment;
-    signal input viewKeyHi;
-    signal input viewKeyLo;
-    signal input registrationSalt;
-    signal input registrationDepth;
-    signal input registrationIndex;
-    signal input registrationSiblings[32];
 
     signal input heirVersionIndex;
     signal input fatherIdentityCommitment;
@@ -56,35 +61,27 @@ template ShieldedAllocate() {
     signal input budgetNonce;
     signal input changeNonce;
 
-    publicSignals[0] === 2;
-    for (var i = 9; i <= 20; i++) {
-        publicSignals[i] === 0;
-    }
-    publicSignals[25] === 0;
-    publicSignals[26] === 0;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
+    poolBits.in <== pool;
     component donorShardBits = Num2Bits(128);
-    donorShardBits.in <== publicSignals[3];
+    donorShardBits.in <== inputShardIds[0];
     component policyShardBits = Num2Bits(128);
-    policyShardBits.in <== publicSignals[5];
-    component registryShardBits = Num2Bits(128);
-    registryShardBits.in <== publicSignals[31];
+    policyShardBits.in <== inputShardIds[1];
     component asOfBits = Num2Bits(64);
-    asOfBits.in <== publicSignals[29];
+    asOfBits.in <== asOf;
 
     component donor = ShieldedDonorValueInput();
     donor.ownerSecret <== donorOwnerSecret;
     donor.amount <== donorAmount;
     donor.nonce <== donorNonce;
     donor.ciphertextHash <== donorCiphertextHash;
-    donor.shardRoot <== publicSignals[4];
+    donor.shardRoot <== inputRoots[0];
     donor.depth <== donorDepth;
     donor.index <== donorIndex;
     donor.siblings <== donorSiblings;
-    donor.spendNullifier === publicSignals[7];
+    donor.spendNullifier === inputNullifiers[0];
 
     component policy = ShieldedPrivatePolicy();
     policy.rootIdentityCommitment <== rootIdentityCommitment;
@@ -108,7 +105,7 @@ template ShieldedAllocate() {
     policyNote.inputs[3] <== policyCiphertextHash;
     component policyMembership = ShieldedMembership32();
     policyMembership.leaf <== policyNote.out;
-    policyMembership.root <== publicSignals[6];
+    policyMembership.root <== inputRoots[1];
     policyMembership.depth <== policyDepth;
     policyMembership.index <== policyIndex;
     policyMembership.siblings <== policySiblings;
@@ -120,18 +117,11 @@ template ShieldedAllocate() {
     enrollmentTag.inputs[1] <== allocationKey;
     enrollmentTag.inputs[2] <== policy.commitment;
     enrollmentTag.inputs[3] <== heirIdentityCommitment;
-    enrollmentTag.out === publicSignals[8];
+    enrollmentTag.out === inputNullifiers[1];
 
-    component registeredHeir = ShieldedRegisteredHeir();
-    registeredHeir.heirIdentityCommitment <== heirIdentityCommitment;
-    registeredHeir.heirOwnerCommitment <== heirOwnerCommitment;
-    registeredHeir.viewKeyHi <== viewKeyHi;
-    registeredHeir.viewKeyLo <== viewKeyLo;
-    registeredHeir.registrationSalt <== registrationSalt;
-    registeredHeir.registryRoot <== publicSignals[30];
-    registeredHeir.depth <== registrationDepth;
-    registeredHeir.index <== registrationIndex;
-    registeredHeir.siblings <== registrationSiblings;
+    component heirOwnerNotZero = IsZero();
+    heirOwnerNotZero.in <== heirOwnerCommitment;
+    heirOwnerNotZero.out === 0;
 
     component directChild = ShieldedDirectChildCurrent();
     directChild.heirIdentityCommitment <== heirIdentityCommitment;
@@ -149,9 +139,9 @@ template ShieldedAllocate() {
     directChild.trustedDepth <== trustedDepth;
     directChild.trustedIndex <== trustedIndex;
     directChild.trustedSiblings <== trustedSiblings;
-    directChild.endorsementRoot <== publicSignals[27];
-    directChild.trustedRoot <== publicSignals[28];
-    directChild.asOf <== publicSignals[29];
+    directChild.endorsementRoot <== endorsementRoot;
+    directChild.trustedRoot <== trustedRoot;
+    directChild.asOf <== asOf;
 
     component enrollment = ShieldedPrivateEnrollment();
     enrollment.policyCommitment <== policy.commitment;
@@ -160,7 +150,7 @@ template ShieldedAllocate() {
     enrollment.enrollmentSalt <== enrollmentSalt;
     // The pool accepts asOf only for two hours. Fixing this offset prevents
     // an allocator from choosing a distant future qualification start.
-    eligibleFrom === publicSignals[29] + 7200;
+    eligibleFrom === asOf + 7200;
 
     component budget = ShieldedBudgetOutput();
     budget.policyCommitment <== policy.commitment;
@@ -169,16 +159,29 @@ template ShieldedAllocate() {
     budget.rate <== rate;
     budget.periods <== budgetPeriods;
     budget.nonce <== budgetNonce;
-    budget.ciphertextHash <== publicSignals[23];
-    budget.noteCommitment === publicSignals[21];
+    budget.ciphertextHash <== ciphertextHashes[0];
+    budget.noteCommitment === outputCommitments[0];
 
     signal changeAmount <== donorAmount - budget.amount;
     component change = ShieldedDonorChange();
     change.ownerCommitment <== donor.ownerCommitment;
     change.amount <== changeAmount;
     change.nonce <== changeNonce;
-    change.ciphertextHash <== publicSignals[24];
-    change.noteCommitment === publicSignals[22];
+    change.ciphertextHash <== ciphertextHashes[1];
+    change.noteCommitment === outputCommitments[1];
 }
 
-component main { public [publicSignals] } = ShieldedAllocate();
+component main {
+    public [
+        chainId,
+        pool,
+        inputShardIds,
+        inputRoots,
+        inputNullifiers,
+        outputCommitments,
+        ciphertextHashes,
+        endorsementRoot,
+        trustedRoot,
+        asOf
+    ]
+} = ShieldedAllocate();

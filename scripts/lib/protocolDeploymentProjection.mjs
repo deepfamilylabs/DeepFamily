@@ -110,10 +110,6 @@ export const buildPlannedProtocolDeploymentEvidence = ({
         ]),
       ),
     ),
-    shieldedHeirKeyRegistry: withHashes(
-      deploymentBindings.shieldedHeirKeyRegistry,
-      artifacts?.shieldedHeirKeyRegistry,
-    ),
     shieldedDeepPool: withHashes(deploymentBindings.shieldedDeepPool, artifacts?.shieldedDeepPool),
     status: "production",
     chainId: normalizeChainId(chainId),
@@ -193,11 +189,6 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
     ]),
-    [
-      "ShieldedHeirKeyRegistry",
-      plannedAddresses?.shieldedHeirKeyRegistry,
-      deploymentArtifacts?.shieldedHeirKeyRegistry,
-    ],
     ["ShieldedDeepPool", plannedAddresses?.shieldedDeepPool, deploymentArtifacts?.shieldedDeepPool],
   ];
   for (const [label, address, artifact] of checks) {

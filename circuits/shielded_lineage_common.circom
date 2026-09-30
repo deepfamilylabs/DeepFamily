@@ -5,7 +5,7 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Proves that the registered heir's currently endorsed version names the
+// Proves that the heir's currently endorsed version names the
 // private policy root as a direct parent, and the endorser is recommended by
 // that root version. Both roots are checked against current chain state by
 // ShieldedDeepPool before this proof is accepted.

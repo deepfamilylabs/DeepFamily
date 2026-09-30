@@ -1,0 +1,115 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { bech32m } from "@scure/base";
+import {
+  SHIELDED_RECEIVE_CODE_PREFIX,
+  computeIdentityFromDerivedSecret,
+  decodeShieldedReceiveCode,
+  deriveShieldedHeirKeyMaterial,
+  deriveShieldedViewPublicKey,
+  wrapIdentityCommitmentAsPersonHash,
+} from "@deepfamily/protocol-core";
+import { hexlify } from "ethers";
+// @ts-ignore snarkjs does not publish complete browser typings.
+import * as snarkjs from "snarkjs";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  createShieldedReceiveCode,
+  isInG2Subgroup,
+  verifyShieldedReceiveCode,
+} from "./shieldedReceiveCode";
+
+const PUBLIC_DIRECTORY = fileURLToPath(new URL("../../../public", import.meta.url));
+
+const identity = {
+  identity: {
+    fullName: "Ada Example",
+    gender: 2,
+    birthYear: 1990,
+    birthMonth: 5,
+    birthDay: 17,
+    isBirthBC: false,
+  },
+  identitySuiteId: 1,
+  derivedSecretField: 123456789n,
+};
+
+function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
+  const payload = bech32m.fromWords(bech32m.decode(code as `${string}1${string}`, false).words);
+  payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 1 + wordIndex * 32);
+  return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
+}
+
+describe("receive code proofs", () => {
+  let code = "";
+
+  beforeAll(async () => {
+    // The worker fetches same-origin artifacts; serve the synchronized public files.
+    vi.stubGlobal(
+      "fetch",
+      async (url: string) => new Response(fs.readFileSync(path.join(PUBLIC_DIRECTORY, url))),
+    );
+    ({ code } = await createShieldedReceiveCode(identity));
+  }, 120_000);
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("verifies the identity's own keys", async () => {
+    const material = computeIdentityFromDerivedSecret(identity);
+    const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
+    const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+    await expect(verifyShieldedReceiveCode(code)).resolves.toEqual({
+      ok: true,
+      identityCommitment: material.identityCommitment.toString(),
+      ownerCommitment: keys.ownerCommitment.toString(),
+      viewingKey: hexlify(viewingKey),
+      personHash: wrapIdentityCommitmentAsPersonHash(material.identityCommitment),
+    });
+  }, 60_000);
+
+  it("rejects a well-formed code whose keys were swapped", async () => {
+    const decoded = decodeShieldedReceiveCode(code);
+    const otherOwner = replacePayloadWord(code, 1, decoded.ownerCommitment + 1n);
+    await expect(verifyShieldedReceiveCode(otherOwner)).resolves.toEqual({
+      ok: false,
+      reason: "invalid",
+    });
+    const otherViewingKey = replacePayloadWord(code, 2, 12345n);
+    await expect(verifyShieldedReceiveCode(otherViewingKey)).resolves.toEqual({
+      ok: false,
+      reason: "invalid",
+    });
+  }, 60_000);
+
+  it("reports a copying mistake separately from tampering", async () => {
+    const typo = `${code.slice(0, 30)}${code[30] === "q" ? "p" : "q"}${code.slice(31)}`;
+    await expect(verifyShieldedReceiveCode(typo)).resolves.toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+    await expect(verifyShieldedReceiveCode("")).resolves.toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+  });
+
+  it("rejects a G2 point that is on the curve but outside the subgroup", async () => {
+    const curve = await snarkjs.curves.getCurveFromName("bn128");
+    const F2 = curve.G2.F;
+    let outside: string[][] | undefined;
+    for (let seed = 1n; !outside; seed += 1n) {
+      const x = F2.fromObject([seed, 1n]);
+      const rhs = F2.add(F2.mul(F2.square(x), x), curve.G2.b);
+      if (!F2.isSquare(rhs)) continue;
+      const y = F2.sqrt(rhs);
+      outside = [F2.toObject(x).map(String), F2.toObject(y).map(String)];
+    }
+    const point = curve.G2.fromObject([outside[0].map(BigInt), outside[1].map(BigInt), [1n, 0n]]);
+    expect(curve.G2.isValid(point)).toBe(true);
+    expect(await isInG2Subgroup(outside)).toBe(false);
+    expect(await isInG2Subgroup(decodeShieldedReceiveCode(code).proof.pi_b)).toBe(true);
+  }, 60_000);
+});

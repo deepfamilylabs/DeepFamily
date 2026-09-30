@@ -71,10 +71,8 @@ async function localWallet(): Promise<{
 describe("local shield and policy note preparation", () => {
   it("encrypts both shield outputs, including the zero-value dummy, under the one identity key", async () => {
     const prepared = await prepareShieldedShield({ ...identity, amount: 100n });
-    const publicSignals = prepared.witness.publicSignals as string[];
-    expect(publicSignals).toHaveLength(32);
-    expect(publicSignals[0]).toBe("0");
-    expect(publicSignals[25]).toBe("100");
+    expect(prepared.witness.amount).toBe("100");
+    expect(prepared.witness).not.toHaveProperty("inputNullifiers");
     expect(prepared.witness.outputAmounts).toEqual(["100", "0"]);
     expect(prepared.data.inputRoots).toEqual([0n, 0n]);
     expect(prepared.outputs[0].note.nonce).not.toBe(prepared.outputs[1].note.nonce);
@@ -111,9 +109,8 @@ describe("local shield and policy note preparation", () => {
       rootVersionIndex: 3n,
       amountPerPeriod: 10n,
     });
-    const publicSignals = prepared.witness.publicSignals as string[];
-    expect(publicSignals).toHaveLength(32);
-    expect(publicSignals[0]).toBe("1");
+    expect(prepared.witness.inputShardId).toBe("0");
+    expect(prepared.witness.inputRoot).toBe(String(wallet.shards.get(0n)?.root));
     expect(prepared.data.inputShardIds).toEqual([0n, 0n]);
     expect(prepared.data.inputRoots).toEqual([wallet.shards.get(0n)?.root, wallet.shards.get(0n)?.root]);
     expect(prepared.data.inputNullifiers[0]).not.toBe(prepared.data.inputNullifiers[1]);

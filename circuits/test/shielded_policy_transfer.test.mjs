@@ -55,23 +55,21 @@ function createPolicyFixture() {
     policySalt,
     allocationKeyCommitment: computeShieldedAllocationKeyCommitment(allocationKey),
   });
-  const signals = Array(32).fill(0n);
-  signals[0] = 1n;
-  signals[1] = 31337n;
-  signals[2] = 0x1234n;
-  signals[4] = inputCommitment;
-  signals[6] = inputCommitment;
-  signals[7] = computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment });
-  signals[8] = computeShieldedDummyInputNullifier({
-    ownerSecret,
-    noteCommitment: inputCommitment,
-  });
-  signals[23] = hash(2);
-  signals[24] = hash(3);
-  signals[21] = poseidon4([1024n, policy, policyNonce, signals[23]]);
-  signals[22] = valueNote(owner(ownerSecret), inputAmount, changeNonce, signals[24]);
+  const ciphertextHashes = [hash(2), hash(3)];
   return {
-    publicSignals: strs(signals),
+    chainId: "31337",
+    pool: String(0x1234n),
+    inputShardId: "0",
+    inputRoot: inputCommitment.toString(),
+    inputNullifiers: strs([
+      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }),
+      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: inputCommitment }),
+    ]),
+    outputCommitments: strs([
+      poseidon4([1024n, policy, policyNonce, ciphertextHashes[0]]),
+      valueNote(owner(ownerSecret), inputAmount, changeNonce, ciphertextHashes[1]),
+    ]),
+    ciphertextHashes: strs(ciphertextHashes),
     ownerSecret: ownerSecret.toString(),
     inputAmount: inputAmount.toString(),
     inputNonce: inputNonce.toString(),
@@ -98,33 +96,25 @@ function privateTransferFixture() {
   const outputAmounts = [60n, 40n];
   const outputNonces = [4401n, 4402n];
   const outputHashes = [hash(6), hash(7)];
-  const signals = Array(32).fill(0n);
-  signals[0] = 6n;
-  signals[1] = 31337n;
-  signals[2] = 0x1234n;
-  signals[5] = 1n;
-  for (let i = 0; i < 2; i += 1) {
-    const input = valueNote(
-      owner(inputOwnerSecrets[i]),
-      inputAmounts[i],
-      inputNonces[i],
-      inputCiphertextHashes[i],
-    );
-    signals[4 + i * 2] = input;
-    signals[7 + i] = computeShieldedSpendNullifier({
-      ownerSecret: inputOwnerSecrets[i],
-      noteCommitment: input,
-    });
-    signals[23 + i] = outputHashes[i];
-    signals[21 + i] = valueNote(
-      outputOwnerCommitments[i],
-      outputAmounts[i],
-      outputNonces[i],
-      outputHashes[i],
-    );
-  }
+  const inputs = inputAmounts.map((amount, i) =>
+    valueNote(owner(inputOwnerSecrets[i]), amount, inputNonces[i], inputCiphertextHashes[i]),
+  );
   return {
-    publicSignals: strs(signals),
+    chainId: "31337",
+    pool: String(0x1234n),
+    inputShardIds: ["0", "1"],
+    inputRoots: strs(inputs),
+    inputNullifiers: strs(
+      inputs.map((noteCommitment, i) =>
+        computeShieldedSpendNullifier({ ownerSecret: inputOwnerSecrets[i], noteCommitment }),
+      ),
+    ),
+    outputCommitments: strs(
+      outputAmounts.map((amount, i) =>
+        valueNote(outputOwnerCommitments[i], amount, outputNonces[i], outputHashes[i]),
+      ),
+    ),
+    ciphertextHashes: strs(outputHashes),
     hasSecondInput: "1",
     inputOwnerSecrets: strs(inputOwnerSecrets),
     inputAmounts: strs(inputAmounts),
@@ -141,23 +131,21 @@ function privateTransferFixture() {
 
 function singleInputPrivateTransferFixture() {
   const witness = privateTransferFixture();
-  const signals = witness.publicSignals.map(BigInt);
   const ownerSecret = BigInt(witness.inputOwnerSecrets[0]);
-  const firstCommitment = signals[4];
-  signals[5] = signals[3];
-  signals[6] = signals[4];
-  signals[8] = computeShieldedDummyInputNullifier({
+  const firstCommitment = BigInt(witness.inputRoots[0]);
+  witness.inputShardIds[1] = witness.inputShardIds[0];
+  witness.inputRoots[1] = witness.inputRoots[0];
+  witness.inputNullifiers[1] = computeShieldedDummyInputNullifier({
     ownerSecret,
     noteCommitment: firstCommitment,
-  });
+  }).toString();
   const secondOutputAmount = 10n;
-  signals[22] = valueNote(
+  witness.outputCommitments[1] = valueNote(
     BigInt(witness.outputOwnerCommitments[1]),
     secondOutputAmount,
     BigInt(witness.outputNonces[1]),
-    signals[24],
-  );
-  witness.publicSignals = strs(signals);
+    BigInt(witness.ciphertextHashes[1]),
+  ).toString();
   witness.hasSecondInput = "0";
   witness.inputOwnerSecrets[1] = "0";
   witness.inputAmounts[1] = "0";
@@ -187,13 +175,8 @@ function mergeBudgetFixture({
   const remaining = periods.map((count) => count * rate);
   const mergedNonce = 4401n;
   const dummyNonce = 4402n;
-  const signals = Array(32).fill(0n);
-  signals[0] = 4n;
-  signals[1] = 31337n;
-  signals[2] = 0x1234n;
-  signals[5] = 1n;
-  for (let i = 0; i < 2; i += 1) {
-    const input = computeShieldedBudgetNoteCommitment({
+  const inputs = [0, 1].map((i) =>
+    computeShieldedBudgetNoteCommitment({
       policyCommitment: i === 1 && mismatch ? secondPolicy : policyCommitment,
       enrollmentCommitment: i === 1 && mismatch ? secondEnrollment : enrollmentCommitment,
       heirOwnerCommitment: owner(ownerSecret),
@@ -201,28 +184,31 @@ function mergeBudgetFixture({
       remaining: remaining[i],
       nonce: inputNonces[i],
       ciphertextHashField: inputCiphertextHashes[i],
-    });
-    signals[4 + i * 2] = input;
-    signals[7 + i] = computeShieldedSpendNullifier({
-      ownerSecret,
-      noteCommitment: input,
-    });
-  }
-  signals[23] = hash(10);
-  signals[24] = hash(11);
-  signals[21] = poseidon8([
-    1015n,
-    policyCommitment,
-    enrollmentCommitment,
-    owner(ownerSecret),
-    rate,
-    remaining[0] + remaining[1],
-    mergedNonce,
-    signals[23],
-  ]);
-  signals[22] = valueNote(owner(ownerSecret), 0n, dummyNonce, signals[24]);
+    }),
+  );
+  const ciphertextHashes = [hash(10), hash(11)];
   return {
-    publicSignals: strs(signals),
+    chainId: "31337",
+    pool: String(0x1234n),
+    inputShardIds: ["0", "1"],
+    inputRoots: strs(inputs),
+    inputNullifiers: strs(
+      inputs.map((noteCommitment) => computeShieldedSpendNullifier({ ownerSecret, noteCommitment })),
+    ),
+    outputCommitments: strs([
+      poseidon8([
+        1015n,
+        policyCommitment,
+        enrollmentCommitment,
+        owner(ownerSecret),
+        rate,
+        remaining[0] + remaining[1],
+        mergedNonce,
+        ciphertextHashes[0],
+      ]),
+      valueNote(owner(ownerSecret), 0n, dummyNonce, ciphertextHashes[1]),
+    ]),
+    ciphertextHashes: strs(ciphertextHashes),
     ownerSecret: ownerSecret.toString(),
     policyCommitment: policyCommitment.toString(),
     enrollmentCommitment: enrollmentCommitment.toString(),
@@ -333,17 +319,12 @@ test("policy creation and private transfer circuits", async (t) => {
       );
       await policy.invalid(
         mutate(validPolicy, (w) => {
-          w.publicSignals[21] = "123";
+          w.outputCommitments[0] = "123";
         }),
       );
       await policy.invalid(
         mutate(validPolicy, (w) => {
-          w.publicSignals[24] = "123";
-        }),
-      );
-      await policy.invalid(
-        mutate(validPolicy, (w) => {
-          w.publicSignals[25] = "1";
+          w.ciphertextHashes[1] = "123";
         }),
       );
     });
@@ -368,7 +349,7 @@ test("policy creation and private transfer circuits", async (t) => {
       );
       await transfer.invalid(
         mutate(validTransfer, (w) => {
-          w.publicSignals[6] = "123";
+          w.inputRoots[1] = "123";
         }),
       );
       await transfer.invalid(
@@ -378,20 +359,15 @@ test("policy creation and private transfer circuits", async (t) => {
       );
       await transfer.invalid(
         mutate(validTransfer, (w) => {
-          w.publicSignals[23] = "123";
-        }),
-      );
-      await transfer.invalid(
-        mutate(validTransfer, (w) => {
-          w.publicSignals[26] = "1";
+          w.ciphertextHashes[0] = "123";
         }),
       );
     });
     await t.test("single-note transfer rejects forged amount, root, nullifier, and mode", async () => {
       await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputAmounts[1] = "1"; }));
-      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[5] = "1"; }));
-      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[6] = "123"; }));
-      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.publicSignals[8] = "123"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputShardIds[1] = "1"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputRoots[1] = "123"; }));
+      await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputNullifiers[1] = "123"; }));
       await transfer.invalid(mutate(validSingleTransfer, (w) => { w.inputOwnerSecrets[1] = "1"; }));
       await transfer.invalid(mutate(validSingleTransfer, (w) => { w.hasSecondInput = "2"; }));
       await transfer.invalid(mutate(validSingleTransfer, (w) => { w.outputAmounts[1] = "11"; }));
@@ -416,12 +392,12 @@ test("policy creation and private transfer circuits", async (t) => {
       );
       await merge.invalid(
         mutate(validMerge, (w) => {
-          w.publicSignals[21] = "123";
+          w.outputCommitments[0] = "123";
         }),
       );
       await merge.invalid(
         mutate(validMerge, (w) => {
-          w.publicSignals[24] = "123";
+          w.ciphertextHashes[1] = "123";
         }),
       );
     });

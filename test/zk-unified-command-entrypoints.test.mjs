@@ -14,6 +14,7 @@ import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs
 import { SHIELDED_CIRCUITS } from "../scripts/zk-shielded-build.mjs";
 import { syncShieldedDevelopmentAssets } from "../scripts/lib/shieldedDevelopmentAssets.mjs";
 import { PRODUCTION_PTAU_RELATIVE_PATH } from "../scripts/lib/productionPtau.mjs";
+import { hasShieldedSolidityVerifier } from "../scripts/lib/zkCircuitSelection.mjs";
 
 const sha256 = (filePath) => createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
@@ -49,11 +50,13 @@ async function developmentFixture() {
       wasmSha256: write(root, `${prefix}_js/${name}.wasm`, `${name} wasm\n`),
       zkeySha256: write(root, `${prefix}_dev_final.zkey`, `${name} zkey\n`),
       verificationKeySha256: write(root, `${prefix}.vkey.json`, `${name} vkey\n`),
-      verifierSha256: write(
-        root,
-        `zk-artifacts/shielded/verifiers/${name}.sol`,
-        `pragma solidity ^0.8.20;\ncontract Groth16Verifier {}\n`,
-      ),
+      ...(hasShieldedSolidityVerifier(action) && {
+        verifierSha256: write(
+          root,
+          `zk-artifacts/shielded/verifiers/${name}.sol`,
+          `pragma solidity ^0.8.20;\ncontract Groth16Verifier {}\n`,
+        ),
+      }),
     };
     manifest.circuits[action] = {
       source: name,
@@ -108,7 +111,8 @@ describe("unified ZK command entrypoints", function () {
       runner: fixture.runner,
     });
     expect(result).to.deep.equal({ status: "development", circuitCount: 9 });
-    expect(fixture.calls).to.have.length(18);
+    // Nine verification keys and eight Solidity verifiers: the receive code has none.
+    expect(fixture.calls).to.have.length(17);
   });
 
   it("checks development artifacts using an external pinned pTau selected by ZK_PTAU_PATH", function () {
@@ -161,10 +165,14 @@ describe("unified ZK command entrypoints", function () {
   it("synchronizes every development proof file and verifier to the shared public locations", function () {
     const publicDirectory = path.join(fixture.root, "frontend/public/zk/shielded");
     expect(fs.readdirSync(publicDirectory)).to.have.length(27);
-    for (const item of Object.values(fixture.manifest.circuits)) {
+    for (const [action, item] of Object.entries(fixture.manifest.circuits)) {
       expect(sha256(path.join(publicDirectory, `${item.source}_final.zkey`))).to.equal(
         item.zkeySha256,
       );
+      if (!hasShieldedSolidityVerifier(action)) {
+        expect(item).not.to.have.property("verifierPath");
+        continue;
+      }
       expect(sha256(path.join(fixture.root, item.verifierPath))).to.equal(
         item.solidityVerifierSha256,
       );
@@ -195,7 +203,9 @@ describe("unified ZK command entrypoints", function () {
     for (const name of Object.values(SHIELDED_CIRCUITS)) {
       fs.rmSync(path.join(fixture.root, `zk-artifacts/shielded/${name}_dev_final.zkey`));
       fs.rmSync(path.join(fixture.root, `zk-artifacts/shielded/${name}.vkey.json`));
-      fs.rmSync(path.join(fixture.root, `zk-artifacts/shielded/verifiers/${name}.sol`));
+      fs.rmSync(path.join(fixture.root, `zk-artifacts/shielded/verifiers/${name}.sol`), {
+        force: true,
+      });
     }
     const result = checkShieldedDevelopmentArtifacts({
       root: fixture.root,

@@ -2,12 +2,7 @@ import { getAddress } from "ethers";
 import { bigintFrom } from "./bytes.js";
 import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
-import {
-  computeShieldedCiphertextHashField,
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
-} from "./shielded-inheritance.js";
+import { computeShieldedCiphertextHashField } from "./shielded-inheritance.js";
 import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
 
 export const SHIELDED_POOL_ACTION = Object.freeze({
@@ -20,107 +15,189 @@ export const SHIELDED_POOL_ACTION = Object.freeze({
   PrivateTransfer: 6,
   Unshield: 7,
 });
-export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNT = 32;
+
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 
-function pair(values, label) {
+const CONTEXT = ["chainId", "pool"];
+const ONE_INPUT = ["inputShardId", "inputRoot", "inputNullifiers"];
+const TWO_INPUTS = ["inputShardIds", "inputRoots", "inputNullifiers"];
+const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
+const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
+
+/**
+ * Each action's circuit declares exactly these named public inputs, in this order.
+ * ShieldedDeepPool._publicSignals builds the same sequence. Single-input actions
+ * repeat their first input shard and root in ActionData's second slot; only the
+ * first pair is a public input.
+ */
+export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
+  [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),
+  [SHIELDED_POOL_ACTION.CreatePolicy]: Object.freeze([...CONTEXT, ...ONE_INPUT, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.Allocate]: Object.freeze([
+    ...CONTEXT,
+    ...TWO_INPUTS,
+    ...OUTPUTS,
+    ...LINEAGE,
+  ]),
+  [SHIELDED_POOL_ACTION.TopUp]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.MergeBudget]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.Claim]: Object.freeze([
+    ...CONTEXT,
+    ...ONE_INPUT,
+    "periodNullifiers",
+    ...OUTPUTS,
+    ...LINEAGE,
+  ]),
+  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.Unshield]: Object.freeze([
+    ...CONTEXT,
+    ...ONE_INPUT,
+    ...OUTPUTS,
+    "amount",
+    "recipient",
+  ]),
+});
+
+const INPUT_WIDTHS = Object.freeze({
+  chainId: 1,
+  pool: 1,
+  inputShardId: 1,
+  inputRoot: 1,
+  inputShardIds: 2,
+  inputRoots: 2,
+  inputNullifiers: 2,
+  periodNullifiers: 12,
+  outputCommitments: 2,
+  ciphertextHashes: 2,
+  amount: 1,
+  recipient: 1,
+  endorsementRoot: 1,
+  trustedRoot: 1,
+  asOf: 1,
+});
+
+/** Mirrors the per-purpose lengths in ProofConstants.sol. */
+export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(SHIELDED_POOL_PUBLIC_INPUTS).map(([action, names]) => [
+      action,
+      names.reduce((total, name) => total + INPUT_WIDTHS[name], 0),
+    ]),
+  ),
+);
+
+export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT = 4;
+
+function values(list, length, label) {
   protocolAssert(
-    Array.isArray(values) && values.length === 2,
+    Array.isArray(list) && list.length === length,
     "INVALID_SHIELDED_SIGNAL_SHAPE",
-    `${label} must have 2 values`,
+    `${label} must have ${length} values`,
   );
-  return values.map((value, index) => field(value, `${label}[${index}]`));
+  return list.map((value, index) => field(value, `${label}[${index}]`));
 }
 
-/** Mirrors ShieldedDeepPool._execute's exact 32-field proof ABI. */
-export function buildShieldedPoolPublicSignals(input) {
-  const action = bigintFrom(input.action, "action", 7n);
-  const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
-  const pool = BigInt(getAddress(input.poolAddress));
-  const inputShardIds = pair(input.inputShardIds, "inputShardIds");
-  const inputRoots = pair(input.inputRoots, "inputRoots");
-  const inputNullifiers = pair(input.inputNullifiers, "inputNullifiers");
-  const outputCommitments = pair(input.outputCommitments, "outputCommitments");
-  protocolAssert(
-    Array.isArray(input.periodNullifiers) && input.periodNullifiers.length === 12,
-    "INVALID_SHIELDED_SIGNAL_SHAPE",
-    "periodNullifiers must have 12 values",
-  );
+function unused(condition, label) {
+  protocolAssert(condition, "INVALID_SHIELDED_ACTION_DATA", `${label} is not used by this action`);
+}
+
+/**
+ * Build one action's proof inputs from ShieldedDeepPool.ActionData plus the
+ * external amount and recipient. `signals` is the ordered verifier input;
+ * `witness` holds the same values under the circuit's named inputs.
+ * Data the action does not use must be zero, as the pool requires.
+ */
+export function buildShieldedPoolPublicInputs(input) {
+  const action = Number(bigintFrom(input.action, "action", 7n));
+  const names = SHIELDED_POOL_PUBLIC_INPUTS[action];
+  const inputShardIds = values(input.inputShardIds, 2, "inputShardIds");
+  const inputRoots = values(input.inputRoots, 2, "inputRoots");
+  const inputNullifiers = values(input.inputNullifiers, 2, "inputNullifiers");
+  const periodNullifiers = values(input.periodNullifiers, 12, "periodNullifiers");
+  const outputCommitments = values(input.outputCommitments, 2, "outputCommitments");
   protocolAssert(
     Array.isArray(input.outputCiphertexts) && input.outputCiphertexts.length === 2,
     "INVALID_SHIELDED_SIGNAL_SHAPE",
     "outputCiphertexts must have 2 values",
   );
-  const periodNullifiers = input.periodNullifiers.map((value, index) =>
-    field(value, `periodNullifiers[${index}]`),
-  );
-  const ciphertextHashes = input.outputCiphertexts.map(computeShieldedCiphertextHashField);
-  const amount = bigintFrom(input.amount ?? 0n, "amount", MAX_UINT128);
-  const recipient = input.recipient === undefined ? 0n : BigInt(getAddress(input.recipient));
-  const relation0 = field(input.relation0 ?? 0n, "relation0");
-  const relation1 = field(input.relation1 ?? 0n, "relation1");
-  const asOf = bigintFrom(input.asOf ?? 0n, "asOf", MAX_UINT64);
-  const registryRoot = field(input.registryRoot ?? 0n, "registryRoot");
-  const registryShardId = field(input.registryShardId ?? 0n, "registryShardId");
-  return [
-    action,
-    chainId,
-    pool,
-    inputShardIds[0],
-    inputRoots[0],
-    inputShardIds[1],
-    inputRoots[1],
-    inputNullifiers[0],
-    inputNullifiers[1],
-    ...periodNullifiers,
-    outputCommitments[0],
-    outputCommitments[1],
-    ciphertextHashes[0],
-    ciphertextHashes[1],
-    amount,
-    recipient,
-    relation0,
-    relation1,
-    asOf,
-    registryRoot,
-    registryShardId,
-  ];
+  const available = {
+    chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
+    pool: [BigInt(getAddress(input.poolAddress))],
+    inputShardId: [inputShardIds[0]],
+    inputRoot: [inputRoots[0]],
+    inputShardIds,
+    inputRoots,
+    inputNullifiers,
+    periodNullifiers,
+    outputCommitments,
+    ciphertextHashes: input.outputCiphertexts.map(computeShieldedCiphertextHashField),
+    amount: [bigintFrom(input.amount ?? 0n, "amount", MAX_UINT128)],
+    recipient: [input.recipient === undefined ? 0n : BigInt(getAddress(input.recipient))],
+    endorsementRoot: [field(input.relation0 ?? 0n, "relation0")],
+    trustedRoot: [field(input.relation1 ?? 0n, "relation1")],
+    asOf: [bigintFrom(input.asOf ?? 0n, "asOf", MAX_UINT64)],
+  };
+
+  const uses = new Set(names);
+  if (uses.has("inputShardId")) {
+    unused(
+      inputShardIds[1] === inputShardIds[0] && inputRoots[1] === inputRoots[0],
+      "A second input root",
+    );
+  } else if (!uses.has("inputShardIds")) {
+    unused(
+      [...inputShardIds, ...inputRoots, ...inputNullifiers].every((value) => value === 0n),
+      "Note input",
+    );
+  }
+  for (const name of [
+    "periodNullifiers",
+    "amount",
+    "recipient",
+    "endorsementRoot",
+    "trustedRoot",
+    "asOf",
+  ]) {
+    if (!uses.has(name))
+      unused(
+        available[name].every((value) => value === 0n),
+        name,
+      );
+  }
+
+  const signals = [];
+  const witness = {};
+  for (const name of names) {
+    const entries = available[name];
+    signals.push(...entries);
+    witness[name] = INPUT_WIDTHS[name] === 1 ? entries[0].toString() : entries.map(String);
+  }
+  return { signals, witness };
 }
 
-/** The identity holder signs these seven public registration signals with a real proof. */
-export function buildShieldedKeyRegistrationPublicSignals(input) {
-  const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(input.viewingKey);
+/** The ordered verifier input for one pool action. */
+export function buildShieldedPoolPublicSignals(input) {
+  return buildShieldedPoolPublicInputs(input).signals;
+}
+
+/**
+ * A receive code proves that the holder of `identityCommitment` chose these
+ * payment keys. The keys do not depend on chain or pool, so neither is bound.
+ */
+export function buildShieldedReceiveCodePublicSignals(input) {
   const identityCommitment = field(input.identityCommitment, "identityCommitment");
   const ownerCommitment = field(input.ownerCommitment, "ownerCommitment");
-  const chainId = bigintFrom(input.chainId, "chainId", MAX_UINT64);
-  const registryAddress = getAddress(input.registryAddress);
-  const registrationTag = computeShieldedRegistrationTag({
-    derivedSecretField: input.derivedSecretField,
-    identityCommitment,
-    chainId,
-    registryAddress,
-  });
-  const salt = computeShieldedRegistrationSalt({
-    derivedSecretField: input.derivedSecretField,
-    identityCommitment,
-    chainId,
-    registryAddress,
-  });
-  const registrationLeaf = computeShieldedRegistrationLeaf({
-    identityCommitment,
-    ownerCommitment,
-    viewKeyHi,
-    viewKeyLo,
-    salt,
-  });
-  return [
-    ownerCommitment,
-    viewKeyLo,
-    viewKeyHi,
-    chainId,
-    BigInt(registryAddress),
-    registrationTag,
-    registrationLeaf,
-  ];
+  protocolAssert(
+    identityCommitment !== 0n && ownerCommitment !== 0n,
+    "ZERO_SHIELDED_SECRET",
+    "Receive code commitments must be nonzero",
+  );
+  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(input.viewingKey);
+  protocolAssert(
+    viewKeyLo !== 0n || viewKeyHi !== 0n,
+    "ZERO_SHIELDED_VIEW_KEY",
+    "view public key must be nonzero",
+  );
+  return [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi];
 }

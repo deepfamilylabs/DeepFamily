@@ -5,11 +5,9 @@ import {
   INHERITANCE_PERIOD_SECONDS,
   MAX_UINT64,
   MAX_UINT128,
-  MAX_UINT160,
   SNARK_SCALAR_FIELD,
 } from "./constants.js";
 import { protocolAssert } from "./errors.js";
-import { assertAddress } from "./identity.js";
 
 /**
  * V1 domains are deliberately disjoint from identity (1000–1004) and the old
@@ -28,13 +26,10 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   viewSeed: 1018n,
   dummyPeriodNullifier: 1019n,
   dummyInputNullifier: 1021n,
-  registrationTag: 1022n,
-  registrationLeaf: 1023n,
   policyNote: 1024n,
   topUpUseNullifier: 1026n,
   enrollmentNullifier: 1027n,
   allocationKeyCommitment: 1028n,
-  registrationSalt: 1029n,
 });
 
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
@@ -172,56 +167,6 @@ export function computeShieldedOwnerCommitment(ownerSecret) {
   return poseidon2([
     SHIELDED_INHERITANCE_DOMAINS.ownerCommitment,
     nonzeroField(ownerSecret, "ownerSecret"),
-  ]);
-}
-
-function registrationIdentityInputs(input) {
-  const address = BigInt(assertAddress(input.registryAddress, "registryAddress"));
-  protocolAssert(
-    address > 0n && address <= MAX_UINT160,
-    "INVALID_REGISTRY_ADDRESS",
-    "registryAddress must be nonzero",
-  );
-  return [
-    nonzeroField(input.derivedSecretField, "derivedSecretField"),
-    nonzeroField(input.identityCommitment, "identityCommitment"),
-    uint64(input.chainId, "chainId"),
-    address,
-  ];
-}
-
-/** A public one-time tag that does not reveal the person hash. */
-export function computeShieldedRegistrationTag(input) {
-  return poseidon5([
-    SHIELDED_INHERITANCE_DOMAINS.registrationTag,
-    ...registrationIdentityInputs(input),
-  ]);
-}
-
-/** A private identity-scoped salt for the public registration leaf. */
-export function computeShieldedRegistrationSalt(input) {
-  return poseidon5([
-    SHIELDED_INHERITANCE_DOMAINS.registrationSalt,
-    ...registrationIdentityInputs(input),
-  ]);
-}
-
-/** The private-key registry's 32-depth append-only Merkle leaf. */
-export function computeShieldedRegistrationLeaf(input) {
-  const viewKeyHi = uint128(input.viewKeyHi, "viewKeyHi");
-  const viewKeyLo = uint128(input.viewKeyLo, "viewKeyLo");
-  protocolAssert(
-    viewKeyHi !== 0n || viewKeyLo !== 0n,
-    "ZERO_SHIELDED_VIEW_KEY",
-    "view public key must be nonzero",
-  );
-  return poseidon6([
-    SHIELDED_INHERITANCE_DOMAINS.registrationLeaf,
-    nonzeroField(input.identityCommitment, "identityCommitment"),
-    nonzeroField(input.ownerCommitment, "ownerCommitment"),
-    viewKeyHi,
-    viewKeyLo,
-    nonzeroField(input.salt, "salt"),
   ]);
 }
 

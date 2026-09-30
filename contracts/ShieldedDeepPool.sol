@@ -9,11 +9,6 @@ import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol"
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 
-interface IShieldedKeyRegistryRoots {
-  function isKnownRoot(uint256 shardId, uint256 candidate) external view returns (bool);
-  function knownRootSize(uint256 shardId, uint256 candidate) external view returns (uint256);
-}
-
 /**
  * @title ShieldedDeepPool
  * @notice Append-only, sharded Poseidon note tree and one-time nullifier registry for DEEP.
@@ -21,7 +16,8 @@ interface IShieldedKeyRegistryRoots {
  * @dev One immutable shared adapter selects the matching circuit for each action. The circuits
  *      enforce input ownership, value conservation, permitted note transitions and binding of
  *      notes to ciphertext hashes. On-chain token conservation at shield/unshield boundaries
- *      relies on those private constraints for all internal transitions.
+ *      relies on those private constraints for all internal transitions. Recipients share
+ *      self-authenticating receive codes off-chain; the pool keeps no key registry.
  */
 contract ShieldedDeepPool is ReentrancyGuardTransient {
   using SafeERC20 for IERC20;
@@ -37,8 +33,6 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   error UnknownNoteRoot();
   error SingleLeafNoteRoot();
   error UnknownLineageRoot();
-  error UnknownKeyRegistryRoot();
-  error SingleLeafKeyRegistryRoot();
   error InvalidClaimTime();
   error InvalidZKProof();
   error UnexpectedTokenTransfer();
@@ -55,7 +49,11 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     Unshield
   }
 
-  /// @notice All actions use two output slots and two input slots. Circuits enforce dummy slots.
+  /**
+   * @notice All actions use two output slots and two input slots. CreatePolicy, Claim and
+   *         Unshield spend one note and repeat its shard and root in the second input slot;
+   *         their circuits bind the second nullifier as a dummy.
+   */
   struct ActionData {
     uint256[2] inputShardIds;
     uint256[2] inputRoots;
@@ -67,9 +65,6 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     uint256 relation0;
     uint256 relation1;
     uint256 asOf;
-    // Allocate/TopUp: recipient key registry root/shard.
-    uint256 registryRoot;
-    uint256 registryShardId;
   }
 
   struct Shard {
@@ -90,7 +85,6 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
 
   IERC20 public immutable TOKEN;
   IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
-  IShieldedKeyRegistryRoots public immutable KEY_REGISTRY;
   IProofVerifierAdapter public immutable VERIFIER;
 
   uint256 public currentShardId;
@@ -114,21 +108,12 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   /**
    * @param verifier The shared Groth16 adapter configured with all eight pool action verifiers.
    */
-  constructor(
-    address token,
-    address lineageIndex,
-    address keyRegistry,
-    address verifier
-  ) {
-    if (
-      token.code.length == 0 || lineageIndex.code.length == 0 || keyRegistry.code.length == 0 ||
-      verifier.code.length == 0
-    ) {
+  constructor(address token, address lineageIndex, address verifier) {
+    if (token.code.length == 0 || lineageIndex.code.length == 0 || verifier.code.length == 0) {
       revert InvalidConstructorAddress();
     }
     TOKEN = IERC20(token);
     LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
-    KEY_REGISTRY = IShieldedKeyRegistryRoots(keyRegistry);
     VERIFIER = IProofVerifierAdapter(verifier);
   }
 
@@ -306,6 +291,10 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     if (!isShield && data.inputNullifiers[0] == data.inputNullifiers[1]) {
       revert NullifierAlreadySpent();
     }
+    if (
+      _inputCount(action) == 1 &&
+      (data.inputShardIds[1] != data.inputShardIds[0] || data.inputRoots[1] != data.inputRoots[0])
+    ) revert InvalidActionData();
 
     for (uint256 i = 0; i < data.periodNullifiers.length; ++i) {
       uint256 periodNullifier = data.periodNullifiers[i];
@@ -329,18 +318,6 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     } else if (data.relation0 != 0 || data.relation1 != 0) {
       revert InvalidActionData();
     }
-    if (action == Action.Allocate || action == Action.TopUp) {
-      _requireNonzeroField(data.registryRoot);
-      _requireField(data.registryShardId);
-      if (!KEY_REGISTRY.isKnownRoot(data.registryShardId, data.registryRoot)) {
-        revert UnknownKeyRegistryRoot();
-      }
-      if (KEY_REGISTRY.knownRootSize(data.registryShardId, data.registryRoot) < 2) {
-        revert SingleLeafKeyRegistryRoot();
-      }
-    } else if (data.registryRoot != 0 || data.registryShardId != 0) {
-      revert InvalidActionData();
-    }
     if (isClaim || action == Action.Allocate) {
       if (data.asOf > block.timestamp || block.timestamp - data.asOf >= ACTION_PROOF_LIFETIME) {
         revert InvalidClaimTime();
@@ -349,30 +326,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       revert InvalidActionData();
     }
 
-    uint256[] memory signals = new uint256[](ProofConstants.SHIELDED_ACTION_PUBLIC_SIGNALS_LEN);
-    signals[0] = uint256(action);
-    signals[1] = block.chainid;
-    signals[2] = uint256(uint160(address(this)));
-    signals[3] = data.inputShardIds[0];
-    signals[4] = data.inputRoots[0];
-    signals[5] = data.inputShardIds[1];
-    signals[6] = data.inputRoots[1];
-    signals[7] = data.inputNullifiers[0];
-    signals[8] = data.inputNullifiers[1];
-    for (uint256 i = 0; i < 12; ++i) {
-      signals[9 + i] = data.periodNullifiers[i];
-    }
-    signals[21] = data.outputCommitments[0];
-    signals[22] = data.outputCommitments[1];
-    signals[23] = uint256(keccak256(data.outputCiphertexts[0])) % SNARK_SCALAR_FIELD;
-    signals[24] = uint256(keccak256(data.outputCiphertexts[1])) % SNARK_SCALAR_FIELD;
-    signals[25] = amount;
-    signals[26] = uint256(uint160(recipient));
-    signals[27] = data.relation0;
-    signals[28] = data.relation1;
-    signals[29] = data.asOf;
-    signals[30] = data.registryRoot;
-    signals[31] = data.registryShardId;
+    uint256[] memory signals = _publicSignals(action, data, amount, recipient);
     for (uint256 i = 0; i < signals.length; ++i) {
       _requireField(signals[i]);
     }
@@ -384,6 +338,64 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
         signals
       )
     ) revert InvalidZKProof();
+  }
+
+  /**
+   * @dev Each circuit proves only the inputs its action uses, in this order. Mirrors
+   *      SHIELDED_POOL_PUBLIC_INPUTS in packages/protocol-core/shielded-signals.js; the adapter
+   *      rejects a length that differs from ProofConstants.
+   */
+  function _publicSignals(
+    Action action,
+    ActionData calldata data,
+    uint256 amount,
+    address recipient
+  ) private view returns (uint256[] memory signals) {
+    uint256 inputs = _inputCount(action);
+    bool isClaim = action == Action.Claim;
+    bool hasLineage = isClaim || action == Action.Allocate;
+    bool hasAmount = action == Action.Shield || action == Action.Unshield;
+    bool hasRecipient = action == Action.Unshield;
+    signals = new uint256[](
+      6 +
+        (inputs == 0 ? 0 : 2 * inputs + 2) +
+        (isClaim ? 12 : 0) +
+        (hasAmount ? 1 : 0) +
+        (hasRecipient ? 1 : 0) +
+        (hasLineage ? 3 : 0)
+    );
+    uint256 n;
+    signals[n++] = block.chainid;
+    signals[n++] = uint256(uint160(address(this)));
+    for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputShardIds[i];
+    for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputRoots[i];
+    if (inputs != 0) {
+      signals[n++] = data.inputNullifiers[0];
+      signals[n++] = data.inputNullifiers[1];
+    }
+    if (isClaim) {
+      for (uint256 i = 0; i < 12; ++i) signals[n++] = data.periodNullifiers[i];
+    }
+    signals[n++] = data.outputCommitments[0];
+    signals[n++] = data.outputCommitments[1];
+    signals[n++] = uint256(keccak256(data.outputCiphertexts[0])) % SNARK_SCALAR_FIELD;
+    signals[n++] = uint256(keccak256(data.outputCiphertexts[1])) % SNARK_SCALAR_FIELD;
+    if (hasAmount) signals[n++] = amount;
+    if (hasRecipient) signals[n++] = uint256(uint160(recipient));
+    if (hasLineage) {
+      signals[n++] = data.relation0;
+      signals[n++] = data.relation1;
+      signals[n++] = data.asOf;
+    }
+  }
+
+  /** @dev Shield spends no notes; CreatePolicy, Claim and Unshield spend exactly one. */
+  function _inputCount(Action action) private pure returns (uint256) {
+    if (action == Action.Shield) return 0;
+    if (action == Action.CreatePolicy || action == Action.Claim || action == Action.Unshield) {
+      return 1;
+    }
+    return 2;
   }
 
   function _spendInputs(ActionData calldata data, bool isClaim) private {

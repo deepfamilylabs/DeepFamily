@@ -7,10 +7,17 @@ include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
 // Action 4. A child combines two of their BUDGET_NOTEs from the same private
 // policy/enrollment. Both old notes are consumed. The combined budget remains
-// in whole periods, and the second public output is an encrypted zero-value
+// in whole periods, and the second output is an encrypted zero-value
 // VALUE_NOTE to preserve the pool's two-output transaction shape.
 template ShieldedMergeBudget() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input inputShardIds[2];
+    signal input inputRoots[2];
+    signal input inputNullifiers[2];
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+
     signal input ownerSecret;
     signal input policyCommitment;
     signal input enrollmentCommitment;
@@ -25,17 +32,10 @@ template ShieldedMergeBudget() {
     signal input mergedNonce;
     signal input dummyNonce;
 
-    publicSignals[0] === 4;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
-    for (var i = 9; i <= 20; i++) {
-        publicSignals[i] === 0;
-    }
-    for (var i = 25; i <= 31; i++) {
-        publicSignals[i] === 0;
-    }
+    poolBits.in <== pool;
 
     component ownerNotZero = IsZero();
     ownerNotZero.in <== ownerSecret;
@@ -94,12 +94,12 @@ template ShieldedMergeBudget() {
         for (var level = 0; level < 32; level++) {
             membership[i].siblings[level] <== inputSiblings[i][level];
         }
-        membership[i].out === publicSignals[4 + i * 2];
+        membership[i].out === inputRoots[i];
         spend[i] = Poseidon(3);
         spend[i].inputs[0] <== 1016;
         spend[i].inputs[1] <== ownerSecret;
         spend[i].inputs[2] <== inputBudget[i].out;
-        spend[i].out === publicSignals[7 + i];
+        spend[i].out === inputNullifiers[i];
     }
     component notesAreDistinct = IsEqual();
     notesAreDistinct.in[0] <== inputBudget[0].out;
@@ -127,15 +127,25 @@ template ShieldedMergeBudget() {
     mergedBudget.inputs[4] <== rate;
     mergedBudget.inputs[5] <== mergedRemaining;
     mergedBudget.inputs[6] <== mergedNonce;
-    mergedBudget.inputs[7] <== publicSignals[23];
-    mergedBudget.out === publicSignals[21];
+    mergedBudget.inputs[7] <== ciphertextHashes[0];
+    mergedBudget.out === outputCommitments[0];
     component dummyValue = Poseidon(5);
     dummyValue.inputs[0] <== 1014;
     dummyValue.inputs[1] <== owner.out;
     dummyValue.inputs[2] <== 0;
     dummyValue.inputs[3] <== dummyNonce;
-    dummyValue.inputs[4] <== publicSignals[24];
-    dummyValue.out === publicSignals[22];
+    dummyValue.inputs[4] <== ciphertextHashes[1];
+    dummyValue.out === outputCommitments[1];
 }
 
-component main { public [publicSignals] } = ShieldedMergeBudget();
+component main {
+    public [
+        chainId,
+        pool,
+        inputShardIds,
+        inputRoots,
+        inputNullifiers,
+        outputCommitments,
+        ciphertextHashes
+    ]
+} = ShieldedMergeBudget();

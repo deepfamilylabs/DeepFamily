@@ -77,23 +77,18 @@ test("shielded Allocate and TopUp constraints", async (t) => {
     const fixture = buildShieldedFundingFixtures();
 
     await t.test("first eligibility is exactly two hours after the proof timestamp", () => {
-      assert.equal(
-        BigInt(fixture.allocate.eligibleFrom),
-        BigInt(fixture.allocate.publicSignals[29]) + 7200n,
-      );
-      assert.equal(fixture.allocate.publicSignals.length, 32);
-      assert.equal(fixture.topUp.publicSignals.length, 32);
+      assert.equal(BigInt(fixture.allocate.eligibleFrom), BigInt(fixture.allocate.asOf) + 7200n);
     });
 
     await t.test("one policy and heir keep the same allocation tag across changed funding", () => {
       const changedFunding = buildShieldedFundingFixtures({ donorAmount: 400n });
-      assert.equal(fixture.allocate.publicSignals[8], changedFunding.allocate.publicSignals[8]);
+      assert.equal(fixture.allocate.inputNullifiers[1], changedFunding.allocate.inputNullifiers[1]);
       assert.notEqual(
-        fixture.allocate.publicSignals[22],
-        changedFunding.allocate.publicSignals[22],
+        fixture.allocate.outputCommitments[1],
+        changedFunding.allocate.outputCommitments[1],
       );
       assert.equal(
-        fixture.allocate.publicSignals[8],
+        fixture.allocate.inputNullifiers[1],
         computeShieldedEnrollmentNullifier({
           allocationKey: fixture.allocate.allocationKey,
           policyCommitment: fixture.policy,
@@ -149,34 +144,8 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       }
       allocate.policyDepth = "32";
       allocate.policyIndex = (1n << 31n).toString();
-      allocate.publicSignals[6] = root.toString();
+      allocate.inputRoots[1] = root.toString();
       await valid("allocate", allocate);
-    });
-    await t.test("Allocate accepts full 32-level registered-heir membership", async () => {
-      const { allocate, registryLeaf } = buildShieldedFundingFixtures();
-      const path = fullSyntheticPath(registryLeaf, 32, (1n << 31n) | 5n, 1300);
-      allocate.registrationDepth = path.depth;
-      allocate.registrationIndex = path.index;
-      allocate.registrationSiblings = path.siblings;
-      allocate.publicSignals[30] = path.root.toString();
-      await valid("allocate", allocate);
-      await invalid(
-        "allocate",
-        mutate(allocate, (w) => {
-          w.registrationSiblings[31] = (BigInt(w.registrationSiblings[31]) + 1n).toString();
-        }),
-      );
-    });
-    await t.test("Allocate and TopUp reject a changed private registration salt", async () => {
-      for (const action of ["allocate", "top_up"]) {
-        const witness = action === "allocate" ? fixture.allocate : fixture.topUp;
-        await invalid(
-          action,
-          mutate(witness, (w) => {
-            w.registrationSalt = (BigInt(w.registrationSalt) + 1n).toString();
-          }),
-        );
-      }
     });
     await t.test("Allocate accepts full 64-level endorsement and trusted paths", async () => {
       const { allocate } = buildShieldedFundingFixtures();
@@ -203,11 +172,11 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       allocate.endorsementDepth = endorsement.depth;
       allocate.endorsementIndex = endorsement.index;
       allocate.endorsementSiblings = endorsement.siblings;
-      allocate.publicSignals[27] = endorsement.root.toString();
+      allocate.endorsementRoot = endorsement.root.toString();
       allocate.trustedDepth = trusted.depth;
       allocate.trustedIndex = trusted.index;
       allocate.trustedSiblings = trusted.siblings;
-      allocate.publicSignals[28] = trusted.root.toString();
+      allocate.trustedRoot = trusted.root.toString();
       await valid("allocate", allocate);
       await invalid(
         "allocate",
@@ -220,7 +189,7 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       await invalid(
         "allocate",
         mutate(fixture.allocate, (w) => {
-          w.publicSignals[29] = (BigInt(w.publicSignals[29]) + 1n).toString();
+          w.asOf = (BigInt(w.asOf) + 1n).toString();
         }),
       );
     });
@@ -242,13 +211,13 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       await invalid(
         "allocate",
         mutate(fixture.allocate, (w) => {
-          w.publicSignals[27] = "123";
+          w.endorsementRoot = "123";
         }),
       );
       await invalid(
         "allocate",
         mutate(fixture.allocate, (w) => {
-          w.publicSignals[28] = "123";
+          w.trustedRoot = "123";
         }),
       );
       await invalid(
@@ -262,23 +231,48 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       await invalid(
         "allocate",
         mutate(fixture.allocate, (w) => {
-          w.publicSignals[8] = (BigInt(w.publicSignals[8]) + 1n).toString();
+          w.inputNullifiers[1] = (BigInt(w.inputNullifiers[1]) + 1n).toString();
         }),
       );
     });
-    await t.test("Allocate rejects a mismatched registered heir owner", async () => {
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.heirOwnerCommitment = "123";
-        }),
-      );
+    await t.test("Allocate and TopUp bind the heir owner into the new budget", async () => {
+      for (const [action, witness] of [
+        ["allocate", fixture.allocate],
+        ["top_up", fixture.topUp],
+      ]) {
+        await invalid(
+          action,
+          mutate(witness, (w) => {
+            w.heirOwnerCommitment = "123";
+          }),
+        );
+      }
+    });
+    await t.test("Allocate rejects a zero heir owner even with a matching budget", async () => {
+      const { allocate, policy, enrollment } = fixture;
+      const withOwner = (owner) =>
+        mutate(allocate, (w) => {
+          w.heirOwnerCommitment = owner.toString();
+          w.outputCommitments[0] = poseidon8([
+            1015n,
+            policy,
+            enrollment,
+            owner,
+            BigInt(w.rate),
+            BigInt(w.rate) * BigInt(w.budgetPeriods),
+            BigInt(w.budgetNonce),
+            BigInt(w.ciphertextHashes[0]),
+          ]).toString();
+        });
+      // The payer, not the circuit, checks that the owner belongs to the heir.
+      await valid("allocate", withOwner(123n));
+      await invalid("allocate", withOwner(0n));
     });
     await t.test("Allocate rejects a policy note without membership", async () => {
       await invalid(
         "allocate",
         mutate(fixture.allocate, (w) => {
-          w.publicSignals[6] = "123";
+          w.inputRoots[1] = "123";
         }),
       );
     });
@@ -302,7 +296,7 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       const { topUp, policy, enrollment } = fixture;
       const attempted = mutate(topUp, (w) => {
         w.topUpPeriods = "7";
-        w.publicSignals[21] = poseidon8([
+        w.outputCommitments[0] = poseidon8([
           1015n,
           policy,
           enrollment,
@@ -310,7 +304,7 @@ test("shielded Allocate and TopUp constraints", async (t) => {
           BigInt(w.rate),
           700n,
           BigInt(w.newBudgetNonce),
-          BigInt(w.publicSignals[23]),
+          BigInt(w.ciphertextHashes[0]),
         ]).toString();
       });
       await invalid("top_up", attempted);
@@ -319,7 +313,7 @@ test("shielded Allocate and TopUp constraints", async (t) => {
       await invalid(
         "top_up",
         mutate(fixture.topUp, (w) => {
-          w.publicSignals[24] = "123";
+          w.ciphertextHashes[1] = "123";
         }),
       );
     });

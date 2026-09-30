@@ -1,7 +1,7 @@
 import {
   SHIELDED_POOL_ACTION,
   buildShieldedHpkeAad,
-  buildShieldedPoolPublicSignals,
+  buildShieldedPoolPublicInputs,
   computeShieldedAllocationKeyCommitment,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
@@ -140,19 +140,18 @@ function emptyActionData(
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
-    registryRoot: 0n,
-    registryShardId: 0n,
   };
 }
 
-function publicSignalsFor(
+/** The circuit's named public inputs for this action and data. */
+function publicInputsFor(
   action: number,
   chainId: bigint,
   poolAddress: string,
   data: ShieldedPoolActionData,
   amount = 0n,
-): bigint[] {
-  return buildShieldedPoolPublicSignals({
+) {
+  return buildShieldedPoolPublicInputs({
     action,
     chainId,
     poolAddress,
@@ -166,9 +165,7 @@ function publicSignalsFor(
     relation0: data.relation0,
     relation1: data.relation1,
     asOf: data.asOf,
-    registryRoot: data.registryRoot,
-    registryShardId: data.registryShardId,
-  });
+  }).witness;
 }
 
 /**
@@ -213,9 +210,9 @@ export async function prepareShieldedShield(
     ),
   ) as [PreparedOutput<ShieldedValueNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
   const data = emptyActionData(outputs);
-  const publicSignals = publicSignalsFor(SHIELDED_POOL_ACTION.Shield, chainId, poolAddress, data, amount);
+  const publicInputs = publicInputsFor(SHIELDED_POOL_ACTION.Shield, chainId, poolAddress, data, amount);
   const witness: ShieldedWitness = {
-    publicSignals: decimal(publicSignals),
+    ...publicInputs,
     ownerSecret: String(keys.ownerSecret),
     outputAmounts: decimal(outputAmounts),
     outputNonces: decimal(outputNonces),
@@ -334,9 +331,9 @@ export async function prepareShieldedCreatePolicy(
     inputRoots: [path.root, path.root] as const,
     inputNullifiers: [realNullifier, dummyNullifier] as const,
   } satisfies ShieldedPoolActionData;
-  const publicSignals = publicSignalsFor(SHIELDED_POOL_ACTION.CreatePolicy, chainId, poolAddress, data);
+  const publicInputs = publicInputsFor(SHIELDED_POOL_ACTION.CreatePolicy, chainId, poolAddress, data);
   const witness: ShieldedWitness = {
-    publicSignals: decimal(publicSignals),
+    ...publicInputs,
     ownerSecret: String(keys.ownerSecret),
     inputAmount: String(inputNote.amount),
     inputNonce: String(inputNote.nonce),

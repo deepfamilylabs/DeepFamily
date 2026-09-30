@@ -2,20 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
   computeShieldedSpendNullifier,
   createLineageTree,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
-import { getBigInt, getBytes } from "ethers";
-import type { KeyRegistrySnapshot, PublicHeirKey } from "./shieldedKeyRegistryChain";
+import { getBigInt, getBytes, hexlify } from "ethers";
+import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import {
   prepareShieldedPrivateTransfer,
@@ -30,20 +26,7 @@ const recipient = "0x2222222222222222222222222222222222222222";
 const senderSecret = 7654321n;
 const secondSecret = 8765432n;
 const recipientSecret = 9876543n;
-const registryAddress = "0x3333333333333333333333333333333333333333";
 const recipientIdentityCommitment = 12345n;
-const recipientRegistrationSalt = computeShieldedRegistrationSalt({
-  derivedSecretField: recipientSecret,
-  identityCommitment: recipientIdentityCommitment,
-  chainId,
-  registryAddress,
-});
-const recipientRegistrationTag = computeShieldedRegistrationTag({
-  derivedSecretField: recipientSecret,
-  identityCommitment: recipientIdentityCommitment,
-  chainId,
-  registryAddress,
-});
 const checkpoint = { toBlock: 42, blockHash: `0x${"12".repeat(32)}` };
 
 async function walletFixture(secondOwner = false) {
@@ -101,38 +84,15 @@ async function walletFixture(secondOwner = false) {
   return { senderWallet, otherWallet, input0, input1 };
 }
 
-async function registryFixture(): Promise<KeyRegistrySnapshot> {
-  const makeKey = async (identityCommitment: bigint, secret: bigint): Promise<PublicHeirKey> => {
-    const keys = deriveShieldedHeirKeyMaterial(secret);
-    const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-    const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(viewingKey);
-    const registrationInputs = { derivedSecretField: secret, identityCommitment, chainId, registryAddress };
-    return {
-      registrationTag: computeShieldedRegistrationTag(registrationInputs),
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey: `0x${Buffer.from(viewingKey).toString("hex")}`,
-      shardId: 0n,
-      leafIndex: identityCommitment === recipientIdentityCommitment ? 0n : 1n,
-      leaf: computeShieldedRegistrationLeaf({
-        identityCommitment,
-        ownerCommitment: keys.ownerCommitment,
-        viewKeyHi,
-        viewKeyLo,
-        salt: computeShieldedRegistrationSalt(registrationInputs),
-      }),
-    };
-  };
-  const keys = [
-    await makeKey(recipientIdentityCommitment, recipientSecret),
-    await makeKey(54321n, secondSecret),
-  ];
+/** Keys from a receive code that the ZK worker has already verified. */
+async function recipientFixture(): Promise<VerifiedShieldedRecipient> {
+  const keys = deriveShieldedHeirKeyMaterial(recipientSecret);
   return {
-    chainId,
-    registryAddress,
-    ...checkpoint,
-    shards: new Map([[0n, createLineageTree(keys.map((key) => key.leaf))]]),
-    keys: new Map(keys.map((key) => [key.registrationTag, key])),
-  };
+    identityCommitment: recipientIdentityCommitment,
+    ownerCommitment: keys.ownerCommitment,
+    viewingKey: hexlify(await deriveShieldedViewPublicKey(keys.hpkeIkm)),
+    personHash: wrapIdentityCommitmentAsPersonHash(recipientIdentityCommitment),
+  } as VerifiedShieldedRecipient;
 }
 
 async function openedValue(ciphertext: Uint8Array, secret: bigint, commitment: bigint) {
@@ -151,32 +111,29 @@ async function openedValue(ciphertext: Uint8Array, secret: bigint, commitment: b
 }
 
 describe("local private transfer and unshield preparation", () => {
-  it("makes two private outputs with exact conservation and a registered recipient key", async () => {
+  it("makes two private outputs with exact conservation and a verified recipient key", async () => {
     const { input0, input1 } = await walletFixture();
-    const keyRegistry = await registryFixture();
-    expect(keyRegistry.keys.get(recipientRegistrationTag)).not.toHaveProperty("personHash");
-    expect(keyRegistry.keys.get(recipientRegistrationTag)).not.toHaveProperty("identityCommitment");
-    const recipientHash = wrapIdentityCommitmentAsPersonHash(recipientIdentityCommitment);
+    const receiver = await recipientFixture();
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
       inputs: [input0, input1],
       destinations: [
-        {
-          kind: "registered",
-          identityCommitment: recipientIdentityCommitment,
-          registrationSalt: recipientRegistrationSalt,
-          amount: 60n,
-        },
+        { kind: "recipient", recipient: receiver, amount: 60n },
         { kind: "inputOwner", inputIndex: 0, amount: 40n },
       ],
-      keyRegistry,
     });
-    const signals = prepared.witness.publicSignals as string[];
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("6");
-    expect(signals.slice(9, 21)).toEqual(Array(12).fill("0"));
-    expect(signals.slice(25)).toEqual(Array(7).fill("0"));
+    expect(Object.keys(prepared.witness).slice(0, 7)).toEqual([
+      "chainId",
+      "pool",
+      "inputShardIds",
+      "inputRoots",
+      "inputNullifiers",
+      "outputCommitments",
+      "ciphertextHashes",
+    ]);
+    expect(prepared.witness).not.toHaveProperty("periodNullifiers");
+    expect(prepared.witness).not.toHaveProperty("recipient");
     expect(prepared.data.inputNullifiers[0]).not.toBe(prepared.data.inputNullifiers[1]);
     expect(prepared.witness.inputAmounts).toEqual(["70", "30"]);
     expect(prepared.witness.hasSecondInput).toBe("1");
@@ -196,52 +153,21 @@ describe("local private transfer and unshield preparation", () => {
     await expect(openedValue(prepared.outputs[0].ciphertext, senderSecret, prepared.outputs[0].commitment))
       .rejects.toThrow();
     expect(JSON.stringify(prepared.data, (_, value) => typeof value === "bigint" ? value.toString() : value))
-      .not.toContain(recipientHash);
-  });
-
-  it("can send privately to the first anonymous key before a second key registers", async () => {
-    const { input0, input1 } = await walletFixture();
-    const keyRegistry = await registryFixture();
-    const key = keyRegistry.keys.get(recipientRegistrationTag)!;
-    keyRegistry.keys = new Map([[recipientRegistrationTag, key]]);
-    keyRegistry.shards = new Map([[0n, createLineageTree([key.leaf])]]);
-    const prepared = await prepareShieldedPrivateTransfer({
-      chainId,
-      poolAddress,
-      inputs: [input0, input1],
-      destinations: [
-        {
-          kind: "registered",
-          identityCommitment: recipientIdentityCommitment,
-          registrationSalt: recipientRegistrationSalt,
-          amount: 60n,
-        },
-        { kind: "inputOwner", inputIndex: 0, amount: 40n },
-      ],
-      keyRegistry,
-    });
-    expect(prepared.outputs[0].note.ownerCommitment).toBe(key.ownerCommitment);
+      .not.toContain(receiver.personHash);
   });
 
   it("transfers from the only recovered value note with a bound dummy second input", async () => {
     const { input0 } = await walletFixture();
     const commitment = BigInt(input0.commitment);
     input0.wallet.ownedNotes = new Map([[commitment, input0.wallet.ownedNotes.get(commitment)!]]);
-    const keyRegistry = await registryFixture();
     const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
       inputs: [input0],
       destinations: [
-        {
-          kind: "registered",
-          identityCommitment: recipientIdentityCommitment,
-          registrationSalt: recipientRegistrationSalt,
-          amount: 60n,
-        },
+        { kind: "recipient", recipient: await recipientFixture(), amount: 60n },
         { kind: "inputOwner", inputIndex: 0, amount: 10n },
       ],
-      keyRegistry,
     });
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
     expect(prepared.witness.hasSecondInput).toBe("0");
@@ -304,12 +230,10 @@ describe("local private transfer and unshield preparation", () => {
       amount: 30n,
       recipient,
     });
-    const signals = prepared.witness.publicSignals as string[];
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("7");
-    expect(signals[25]).toBe("30");
-    expect(signals[26]).toBe(String(BigInt(recipient)));
+    expect(prepared.witness.amount).toBe("30");
+    expect(prepared.witness.recipient).toBe(String(BigInt(recipient)));
+    expect(prepared.witness.inputRoot).toBe(String(prepared.data.inputRoots[0]));
     expect(prepared.data.inputRoots[0]).toBe(prepared.data.inputRoots[1]);
     expect(prepared.data.inputNullifiers).toEqual([
       computeShieldedSpendNullifier({ ownerSecret, noteCommitment: input0.commitment }),
@@ -351,36 +275,31 @@ describe("local private transfer and unshield preparation", () => {
     await expect(prepareShieldedPrivateTransfer(base)).rejects.toThrow("public ciphertext");
   });
 
-  it("rejects missing recipient registration and tampered key binding", async () => {
+  it("encrypts to the verified viewing key, so another key cannot read the note", async () => {
     const { input0, input1 } = await walletFixture();
-    const keyRegistry = await registryFixture();
-    const base = {
-      chainId, poolAddress, inputs: [input0, input1] as const,
+    const receiver = await recipientFixture();
+    const otherKey = hexlify(
+      await deriveShieldedViewPublicKey(deriveShieldedHeirKeyMaterial(secondSecret).hpkeIkm),
+    );
+    const prepared = await prepareShieldedPrivateTransfer({
+      chainId,
+      poolAddress,
+      inputs: [input0, input1],
       destinations: [
         {
-          kind: "registered",
-          identityCommitment: recipientIdentityCommitment,
-          registrationSalt: recipientRegistrationSalt,
+          kind: "recipient",
+          recipient: { ...receiver, viewingKey: otherKey } as VerifiedShieldedRecipient,
           amount: 60n,
         },
         { kind: "inputOwner", inputIndex: 0, amount: 40n },
-      ] as const,
-    };
-    await expect(prepareShieldedPrivateTransfer(base)).rejects.toThrow("key registry snapshot");
-    const key = keyRegistry.keys.get(recipientRegistrationTag)!;
-    const originalViewingKey = key.viewingKey;
-    key.viewingKey = `0x${"ff".repeat(32)}`;
-    await expect(prepareShieldedPrivateTransfer({ ...base, keyRegistry }))
-      .rejects.toThrow("Heir has no registered viewing key");
-    key.viewingKey = originalViewingKey;
-    await expect(prepareShieldedPrivateTransfer({
-      ...base,
-      keyRegistry,
-      destinations: [
-        { ...base.destinations[0], registrationSalt: recipientRegistrationSalt + 1n },
-        base.destinations[1],
       ],
-    })).rejects.toThrow("Heir has no registered viewing key");
+    });
+    await expect(
+      openedValue(prepared.outputs[0].ciphertext, recipientSecret, prepared.outputs[0].commitment),
+    ).rejects.toThrow();
+    expect(
+      await openedValue(prepared.outputs[0].ciphertext, secondSecret, prepared.outputs[0].commitment),
+    ).toMatchObject({ ownerCommitment: receiver.ownerCommitment, amount: 60n });
   });
 
   it("rejects an invalid withdrawal amount, recipient, dummy spend and exposing root", async () => {

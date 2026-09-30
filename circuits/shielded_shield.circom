@@ -4,37 +4,30 @@ include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 
-// Action 0 of ShieldedDeepPool's fixed publicSignals[32] interface. The
-// deposited ERC20 amount is public; the two output amounts and their owner are
-// private. Both outputs, including a zero-value dummy, must carry distinct
-// encrypted note ciphertexts whose exact hashes occupy signals 23 and 24.
+// Action 0 of ShieldedDeepPool. The deposited ERC20 amount is public; the two
+// output amounts and their owner are private. Both outputs, including a
+// zero-value dummy, must carry distinct encrypted note ciphertexts whose exact
+// hashes are public inputs. Shielding consumes no old notes.
 template ShieldedShield() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+    signal input amount;
+
     signal input ownerSecret;
     signal input outputAmounts[2];
     signal input outputNonces[2];
 
-    publicSignals[0] === 0;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
-
-    // Shielding consumes no old notes or period entitlements.
-    for (var i = 3; i <= 20; i++) {
-        publicSignals[i] === 0;
-    }
-    publicSignals[26] === 0;
-    publicSignals[27] === 0;
-    publicSignals[28] === 0;
-    publicSignals[29] === 0;
-    publicSignals[30] === 0;
-    publicSignals[31] === 0;
+    poolBits.in <== pool;
 
     component amountBits = Num2Bits(128);
-    amountBits.in <== publicSignals[25];
+    amountBits.in <== amount;
     component amountNotZero = IsZero();
-    amountNotZero.in <== publicSignals[25];
+    amountNotZero.in <== amount;
     amountNotZero.out === 0;
 
     component ownerNotZero = IsZero();
@@ -58,10 +51,12 @@ template ShieldedShield() {
         notes[i].inputs[1] <== owner.out;
         notes[i].inputs[2] <== outputAmounts[i];
         notes[i].inputs[3] <== outputNonces[i];
-        notes[i].inputs[4] <== publicSignals[23 + i];
-        notes[i].out === publicSignals[21 + i];
+        notes[i].inputs[4] <== ciphertextHashes[i];
+        notes[i].out === outputCommitments[i];
     }
-    outputAmounts[0] + outputAmounts[1] === publicSignals[25];
+    outputAmounts[0] + outputAmounts[1] === amount;
 }
 
-component main { public [publicSignals] } = ShieldedShield();
+component main {
+    public [chainId, pool, outputCommitments, ciphertextHashes, amount]
+} = ShieldedShield();

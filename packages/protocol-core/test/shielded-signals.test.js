@@ -1,117 +1,187 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  buildShieldedKeyRegistrationPublicSignals,
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_INPUTS,
+  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+  buildShieldedPoolPublicInputs,
   buildShieldedPoolPublicSignals,
+  buildShieldedReceiveCodePublicSignals,
   computeShieldedCiphertextHashField,
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
-  SHIELDED_POOL_PUBLIC_SIGNAL_COUNT,
   splitShieldedViewPublicKey,
 } from "../index.js";
 
 const ciphertextA = Uint8Array.from({ length: 512 }, () => 0x11);
 const ciphertextB = Uint8Array.from({ length: 512 }, () => 0x22);
+const hashA = computeShieldedCiphertextHashField(ciphertextA);
+const hashB = computeShieldedCiphertextHashField(ciphertextB);
+const pool = "0x0000000000000000000000000000000000000001";
+const zeroPeriods = Array(12).fill(0);
 
-test("pool public signal order matches the immutable 32-signal Solidity ABI", () => {
-  const signals = buildShieldedPoolPublicSignals({
-    action: 5,
-    chainId: 1030,
-    poolAddress: "0x0000000000000000000000000000000000000001",
-    inputShardIds: [2, 3],
-    inputRoots: [11, 12],
-    inputNullifiers: [13, 14],
-    periodNullifiers: Array.from({ length: 12 }, (_, i) => i + 15),
-    outputCommitments: [27, 28],
-    outputCiphertexts: [ciphertextA, ciphertextB],
+const base = {
+  chainId: 1030,
+  poolAddress: pool,
+  inputShardIds: [2, 3],
+  inputRoots: [11, 12],
+  inputNullifiers: [13, 14],
+  periodNullifiers: zeroPeriods,
+  outputCommitments: [27, 28],
+  outputCiphertexts: [ciphertextA, ciphertextB],
+};
+
+test("each pool action has the verifier input count in ProofConstants.sol", () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(SHIELDED_POOL_ACTION).map(([name, action]) => [
+        name,
+        SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[action],
+      ]),
+    ),
+    {
+      Shield: 7,
+      CreatePolicy: 10,
+      Allocate: 15,
+      TopUp: 12,
+      MergeBudget: 12,
+      Claim: 25,
+      PrivateTransfer: 12,
+      Unshield: 12,
+    },
+  );
+});
+
+test("claim signals follow the circuit's named public inputs", () => {
+  const periodNullifiers = Array.from({ length: 12 }, (_, i) => i + 15);
+  const { signals, witness } = buildShieldedPoolPublicInputs({
+    ...base,
+    action: SHIELDED_POOL_ACTION.Claim,
+    inputShardIds: [2, 2],
+    inputRoots: [11, 11],
+    periodNullifiers,
     relation0: 29,
     relation1: 30,
     asOf: 31,
-    registryRoot: 32,
-    registryShardId: 33,
   });
-  assert.equal(signals.length, SHIELDED_POOL_PUBLIC_SIGNAL_COUNT);
-  assert.deepEqual(signals.slice(0, 9), [5n, 1030n, 1n, 2n, 11n, 3n, 12n, 13n, 14n]);
-  assert.deepEqual(
-    signals.slice(9, 21),
-    Array.from({ length: 12 }, (_, i) => BigInt(i + 15)),
-  );
-  assert.deepEqual(signals.slice(21), [
+  assert.deepEqual(signals, [
+    1030n,
+    1n,
+    2n,
+    11n,
+    13n,
+    14n,
+    ...periodNullifiers.map(BigInt),
     27n,
     28n,
-    computeShieldedCiphertextHashField(ciphertextA),
-    computeShieldedCiphertextHashField(ciphertextB),
-    0n,
-    0n,
+    hashA,
+    hashB,
     29n,
     30n,
     31n,
-    32n,
-    33n,
   ]);
+  assert.deepEqual(Object.keys(witness), [
+    ...SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Claim],
+  ]);
+  assert.equal(witness.inputShardId, "2");
+  assert.deepEqual(witness.inputNullifiers, ["13", "14"]);
+  assert.deepEqual(witness.ciphertextHashes, [String(hashA), String(hashB)]);
+  assert.equal(witness.asOf, "31");
+});
+
+test("two-input actions list both shard ids before both roots", () => {
+  const signals = buildShieldedPoolPublicSignals({
+    ...base,
+    action: SHIELDED_POOL_ACTION.PrivateTransfer,
+  });
+  assert.deepEqual(signals, [1030n, 1n, 2n, 3n, 11n, 12n, 13n, 14n, 27n, 28n, hashA, hashB]);
+});
+
+test("shield and unshield bind their public amount and recipient", () => {
+  const recipient = "0x00000000000000000000000000000000000000aa";
+  assert.deepEqual(
+    buildShieldedPoolPublicSignals({
+      ...base,
+      action: SHIELDED_POOL_ACTION.Shield,
+      inputShardIds: [0, 0],
+      inputRoots: [0, 0],
+      inputNullifiers: [0, 0],
+      amount: 500,
+    }),
+    [1030n, 1n, 27n, 28n, hashA, hashB, 500n],
+  );
+  assert.deepEqual(
+    buildShieldedPoolPublicSignals({
+      ...base,
+      action: SHIELDED_POOL_ACTION.Unshield,
+      inputShardIds: [2, 2],
+      inputRoots: [11, 11],
+      amount: 500,
+      recipient,
+    }),
+    [1030n, 1n, 2n, 11n, 13n, 14n, 27n, 28n, hashA, hashB, 500n, 0xaan],
+  );
+});
+
+test("data an action does not use must be zero, as the pool requires", () => {
+  const rejects = (input, label) =>
+    assert.throws(
+      () => buildShieldedPoolPublicSignals(input),
+      (error) => error.code === "INVALID_SHIELDED_ACTION_DATA",
+      label,
+    );
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.TopUp, relation0: 1 }, "top-up lineage root");
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.MergeBudget, asOf: 1 }, "merge asOf");
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.PrivateTransfer, amount: 1 }, "transfer amount");
+  rejects(
+    {
+      ...base,
+      action: SHIELDED_POOL_ACTION.Allocate,
+      periodNullifiers: [1, ...Array(11).fill(0)],
+    },
+    "allocate period nullifier",
+  );
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.Shield, amount: 1 }, "shield note inputs");
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.CreatePolicy }, "single-input second root");
   assert.throws(
     () =>
       buildShieldedPoolPublicSignals({
-        action: 5,
-        chainId: 1030,
-        poolAddress: "0x0000000000000000000000000000000000000001",
-        inputShardIds: [0, 0],
-        inputRoots: [0, 0],
-        inputNullifiers: [0, 0],
+        ...base,
+        action: SHIELDED_POOL_ACTION.Claim,
         periodNullifiers: [0],
-        outputCommitments: [1, 2],
-        outputCiphertexts: [ciphertextA, ciphertextB],
       }),
     (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
   );
 });
 
-test("anonymous registration public signals bind the exact HPKE public key limbs", async () => {
-  const derivedSecretField = 13n;
-  const keys = deriveShieldedHeirKeyMaterial(derivedSecretField);
+test("receive code signals bind the identity, owner and exact HPKE key limbs", async () => {
+  const keys = deriveShieldedHeirKeyMaterial(13n);
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const input = {
-    derivedSecretField,
-    identityCommitment: 19n,
-    ownerCommitment: keys.ownerCommitment,
-    viewingKey,
-    chainId: 1030n,
-    registryAddress: "0x0000000000000000000000000000000000000001",
-  };
-  const signals = buildShieldedKeyRegistrationPublicSignals(input);
   const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(viewingKey);
-  assert.equal(signals.length, 7);
-  assert.equal(signals[0], keys.ownerCommitment);
-  assert.equal(signals[1], viewKeyLo);
-  assert.equal(signals[2], viewKeyHi);
-  assert.equal(signals[3], 1030n);
-  assert.equal(signals[4], 1n);
-  assert.equal(
-    signals[5],
-    computeShieldedRegistrationTag({
-      derivedSecretField,
-      identityCommitment: 19n,
-      chainId: 1030n,
-      registryAddress: input.registryAddress,
-    }),
-  );
-  assert.equal(
-    signals[6],
-    computeShieldedRegistrationLeaf({
+  assert.deepEqual(
+    buildShieldedReceiveCodePublicSignals({
       identityCommitment: 19n,
       ownerCommitment: keys.ownerCommitment,
-      viewKeyLo: signals[1],
-      viewKeyHi: signals[2],
-      salt: computeShieldedRegistrationSalt({
-        derivedSecretField,
-        identityCommitment: 19n,
-        chainId: 1030n,
-        registryAddress: input.registryAddress,
-      }),
+      viewingKey,
     }),
+    [19n, keys.ownerCommitment, viewKeyLo, viewKeyHi],
   );
-  assert.ok(!signals.includes(19n));
+  assert.throws(
+    () =>
+      buildShieldedReceiveCodePublicSignals({
+        identityCommitment: 0n,
+        ownerCommitment: keys.ownerCommitment,
+        viewingKey,
+      }),
+    (error) => error.code === "ZERO_SHIELDED_SECRET",
+  );
+  assert.throws(
+    () =>
+      buildShieldedReceiveCodePublicSignals({
+        identityCommitment: 19n,
+        ownerCommitment: keys.ownerCommitment,
+        viewingKey: new Uint8Array(32),
+      }),
+    (error) => error.code === "ZERO_SHIELDED_VIEW_KEY",
+  );
 });

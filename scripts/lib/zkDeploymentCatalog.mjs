@@ -11,20 +11,26 @@ export const SHIELDED_ACTIONS = Object.freeze([
   "unshield",
 ]);
 
-/** The same circuit contracts and action order are deployed in every environment. */
+/** ProofConstants.sol routes pool actions after person relation (0) and disclosure (1). */
+export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
+
+/**
+ * The same eight pool action verifiers and action order are deployed in every environment.
+ * The receive-code circuit is verified in the browser and is never deployed.
+ */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   Object.fromEntries(
-    Object.entries(SHIELDED_CIRCUITS).map(([action, source]) => {
+    SHIELDED_ACTIONS.map((action, actionId) => {
       const suffix = action[0].toUpperCase() + action.slice(1);
       return [
         action,
         Object.freeze({
           action,
-          source,
+          source: SHIELDED_CIRCUITS[action],
           verifierContractName: `Shielded${suffix}Verifier`,
           verifierLabel: `shielded${suffix}Verifier`,
-          actionId: action === "keyRegistration" ? null : SHIELDED_ACTIONS.indexOf(action),
-          proofPurpose: action === "keyRegistration" ? 2 : 3 + SHIELDED_ACTIONS.indexOf(action),
+          actionId,
+          proofPurpose: SHIELDED_ACTION_PROOF_PURPOSE_BASE + actionId,
           adapterVerifierGetter: `${action}Verifier`,
         }),
       ];
@@ -52,7 +58,6 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
     ["PoseidonT4", "poseidonT4", "poseidonT4"],
     ["PoseidonT6", "poseidonT6", "poseidonT6"],
     ["DeepFamilyLineageIndex", "lineageIndex", "deepFamilyLineageIndex"],
-    ["ShieldedHeirKeyRegistry", "shieldedHeirKeyRegistry", "shieldedHeirKeyRegistry"],
     ["ShieldedDeepPool", "shieldedDeepPool", "shieldedDeepPool"],
   ].map(([deploymentName, property, transactionLabel, contractName = deploymentName]) =>
     Object.freeze({ deploymentName, property, transactionLabel, contractName }),

@@ -173,7 +173,7 @@ describe("parameterized ZK command wrappers", function () {
       expect(commands.map(({ circuit }) => circuit)).to.deep.equal([
         "person",
         "disclosure",
-        "shielded:keyRegistration",
+        "shielded:receiveCode",
         "shielded:shield",
         "shielded:createPolicy",
         "shielded:allocate",
@@ -189,7 +189,7 @@ describe("parameterized ZK command wrappers", function () {
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "shielded")],
         ["run", "person"],
         ["run", "disclosure"],
-        ["run", "shielded:keyRegistration"],
+        ["run", "shielded:receiveCode"],
         ["run", "shielded:shield"],
         ["run", "shielded:createPolicy"],
         ["run", "shielded:allocate"],
@@ -200,9 +200,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:unshield"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
-      expect(commands[2].args[0]).to.equal(
-        path.join("circuits", "shielded_key_registration.circom"),
-      );
+      expect(commands[2].args[0]).to.equal(path.join("circuits", "shielded_receive_code.circom"));
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
     });
 

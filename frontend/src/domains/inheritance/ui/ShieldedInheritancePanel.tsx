@@ -1,11 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
   deriveShieldedHeirKeyMaterial,
-  splitShieldedViewPublicKey,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { formatUnits, getBigInt, parseUnits, type Signer } from "ethers";
@@ -51,16 +47,11 @@ import {
   submitClaimWithFreshLineage,
 } from "../services/shieldedFreshLineageSubmit";
 import {
-  loadKeyRegistrySnapshot,
-  type KeyRegistrySnapshot,
-} from "../services/shieldedKeyRegistryChain";
-import { registerShieldedHeirKey } from "../services/shieldedKeyRegistrationFlow";
-import {
-  deriveShieldedRecipientMaterial,
-  encodeShieldedReceiveCode,
-  parseShieldedReceiveCode,
-  resolveShieldedRecipientMaterial,
-  type ShieldedRecipientMaterial,
+  createOwnShieldedReceiveCode,
+  createShieldedReceiveCodeForRecipient,
+  peekShieldedReceiveCodePersonHash,
+  ShieldedReceiveCodeError,
+  verifyShieldedReceiveCode,
 } from "../services/shieldedReceiveCode";
 import { prepareShieldedMergeBudget } from "../services/shieldedMergeBudgetPreparation";
 import {
@@ -76,10 +67,7 @@ import {
   submitUnshield,
   type ShieldedPoolFlowStage,
 } from "../services/shieldedPoolFlows";
-import {
-  getShieldedKeyRegistryDeploymentBlock,
-  getShieldedPoolDeploymentBlock,
-} from "../../../shared/config/env";
+import { getShieldedPoolDeploymentBlock } from "../../../shared/config/env";
 import {
   prepareShieldedPrivateTransfer,
   prepareShieldedUnshield,
@@ -101,7 +89,7 @@ import {
 
 type Action =
   | "recover"
-  | "register"
+  | "receiveCode"
   | "shield"
   | "createPolicy"
   | "allocate"
@@ -117,7 +105,7 @@ const TASK_GROUPS: readonly TaskGroup[] = ["wallet", "inheritance", "receive"];
 const TASK_ACTIONS: Record<TaskGroup, readonly Action[]> = {
   wallet: ["shield", "privateTransfer", "unshield"],
   inheritance: ["shield", "createPolicy", "allocate", "topUp"],
-  receive: ["register", "claim"],
+  receive: ["receiveCode", "claim"],
 };
 
 const INPUT_CLASS =
@@ -232,16 +220,19 @@ function AdvancedOptions({ children }: { children: ReactNode }) {
 function RecipientInput({
   method,
   onMethodChange,
-  codeRef,
-  credentialsFormRef,
+  code,
   onCodeChange,
+  credentialsFormRef,
+  onGenerateCode,
   busy,
 }: {
   method: RecipientInputMethod;
   onMethodChange: (method: RecipientInputMethod) => void;
-  codeRef: RefObject<HTMLTextAreaElement>;
+  code: string;
+  onCodeChange: (value: string) => void;
   credentialsFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
-  onCodeChange?: (value: string) => void;
+  /** Generates the recipient's receive code; every payment then verifies that code. */
+  onGenerateCode: () => void;
   busy: boolean;
 }) {
   const { t } = useTranslation();
@@ -276,8 +267,9 @@ function RecipientInput({
             <textarea
               aria-label={t("shielded.receiveCodeInputLabel")}
               className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
-              ref={codeRef}
-              onChange={(event) => onCodeChange?.(event.target.value)}
+              value={code}
+              onChange={(event) => onCodeChange(event.target.value)}
+              spellCheck={false}
               rows={3}
             />
           </FieldBlock>
@@ -285,6 +277,9 @@ function RecipientInput({
           <div className="space-y-3">
             <WarningNotice>{t("shielded.recipientCredentialsWarning")}</WarningNotice>
             <ShieldedRecipientCredentialsForm ref={credentialsFormRef} />
+            <PanelButton busy={busy} disabled={busy} onClick={onGenerateCode}>
+              {t("shielded.generateReceiveCode")}
+            </PanelButton>
           </div>
         )}
       </fieldset>
@@ -345,7 +340,6 @@ export function ShieldedInheritancePanel({
   );
   const identityForm = useRef<PersonHashCalculatorHandle>(null);
   const walletCache = useRef<LocalShieldedWalletSnapshot | null>(null);
-  const registryCache = useRef<KeyRegistrySnapshot | null>(null);
   const running = useRef(false);
   const [action, setAction] = useState<Action>("shield");
   const [taskGroup, setTaskGroup] = useState<TaskGroup>("wallet");
@@ -370,21 +364,22 @@ export function ShieldedInheritancePanel({
   const [transactionHash, setTransactionHash] = useState("");
   const [walletSnapshot, setWalletSnapshot] = useState<LocalShieldedWalletSnapshot | null>(null);
   const [unspentNotes, setUnspentNotes] = useState<Note[]>([]);
-  const [registrySnapshot, setRegistrySnapshot] = useState<KeyRegistrySnapshot | null>(null);
+  const [ownReceiveCode, setOwnReceiveCode] = useState("");
   const [privateWalletChecked, setPrivateWalletChecked] = useState(false);
   const [shieldAmount, setShieldAmount] = useState("");
   const [rate, setRate] = useState("");
   const [rootPersonHash, setRootPersonHash] = useState("");
   const [rootVersion, setRootVersion] = useState("");
   const [heirPersonHash, setHeirPersonHash] = useState("");
-  const heirReceiveCodeRef = useRef<HTMLTextAreaElement>(null);
+  // A receive code is shareable, so it may live in page state; the recipient's
+  // passphrase stays in the uncontrolled credentials form until it is used.
+  const [recipientCode, setRecipientCode] = useState("");
+  const [recipientConfirmed, setRecipientConfirmed] = useState(false);
   const recipientCredentialsFormRef = useRef<ShieldedRecipientCredentialsFormHandle>(null);
   const [recipientInputMethod, setRecipientInputMethod] =
     useState<RecipientInputMethod>("receiveCode");
   const [periods, setPeriods] = useState("1");
   const [claimIndices, setClaimIndices] = useState("");
-  const transferReceiveCodeRef = useRef<HTMLTextAreaElement>(null);
-  const [transferReceiveTargetHash, setTransferReceiveTargetHash] = useState<string | null>(null);
   const [transferAmount, setTransferAmount] = useState("");
   const [useSecondValue, setUseSecondValue] = useState(false);
   const [exitAmount, setExitAmount] = useState("");
@@ -419,7 +414,6 @@ export function ShieldedInheritancePanel({
       operationEpoch.current += 1;
       activeIdentity.current = null;
       walletCache.current = null;
-      registryCache.current = null;
       recipientCredentialsFormRef.current?.clearSecretInputs();
     };
     window.addEventListener("pagehide", invalidate);
@@ -432,10 +426,9 @@ export function ShieldedInheritancePanel({
   useEffect(() => {
     if (identity) return;
     walletCache.current = null;
-    registryCache.current = null;
     setWalletSnapshot(null);
     setUnspentNotes([]);
-    setRegistrySnapshot(null);
+    setOwnReceiveCode("");
     setValueSelection("");
     setSecondValueSelection("");
     setBudgetSelection("");
@@ -447,11 +440,10 @@ export function ShieldedInheritancePanel({
     setUseSecondValue(false);
     setRootPersonHash("");
     setRootVersion("");
-    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
-    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
+    setRecipientCode("");
+    setRecipientConfirmed(false);
     recipientCredentialsFormRef.current?.clearSecretInputs();
     setRecipientInputMethod("receiveCode");
-    setTransferReceiveTargetHash(null);
     setTransactionHash("");
     setStage("");
     setError("");
@@ -486,7 +478,7 @@ export function ShieldedInheritancePanel({
   const labels = useMemo<Record<Action, string>>(
     () => ({
       recover: t("shielded.actions.recover"),
-      register: t("shielded.actions.register"),
+      receiveCode: t("shielded.actions.receiveCode"),
       shield: t("shielded.actions.shield"),
       createPolicy: t("shielded.actions.createPolicy"),
       allocate: t("shielded.actions.allocate"),
@@ -556,50 +548,23 @@ export function ShieldedInheritancePanel({
         : null,
     [currentLineage, walletSnapshot, identity, eligibleClaimBudgets],
   );
-  const ownRegistration = useMemo(() => {
-    if (!identity || !registrySnapshot) return null;
-    const identityCommitment = BigInt(identity.identityCommitment);
-    const derivedSecretField = BigInt(identity.derivedSecretField);
-    const context = {
-      identityCommitment,
-      derivedSecretField,
-      chainId: modules.chainId,
-      registryAddress: registrySnapshot.registryAddress,
-    };
-    const registrationTag = computeShieldedRegistrationTag(context);
-    const registrationSalt = computeShieldedRegistrationSalt(context);
-    const key = registrySnapshot.keys.get(registrationTag);
-    let registered = false;
-    if (key) {
-      const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(key.viewingKey);
-      registered = key.leaf === computeShieldedRegistrationLeaf({
-        identityCommitment,
-        ownerCommitment: key.ownerCommitment,
-        viewKeyHi,
-        viewKeyLo,
-        salt: registrationSalt,
-      });
-    }
-    return {
-      registered,
-      receiveCode: encodeShieldedReceiveCode(identityCommitment, registrationSalt),
-      waitingForSecondKey: Boolean(
-        key && (registrySnapshot.shards.get(key.shardId)?.sizeBigInt ?? 0n) < 2n,
-      ),
-    };
-  }, [identity, registrySnapshot, modules.chainId]);
-  const updateTransferReceiveTarget = (value: string) => {
-    try {
-      setTransferReceiveTargetHash(parseShieldedReceiveCode(value).personHash);
-    } catch {
-      setTransferReceiveTargetHash(null);
-    }
+  const recipientTargetHash = useMemo(
+    () => peekShieldedReceiveCodePersonHash(recipientCode),
+    [recipientCode],
+  );
+  const recipientTargetName = recipientTargetHash
+    ? localRecipientLabels.get(recipientTargetHash.toLowerCase())
+    : undefined;
+  // A payer can recognize a named relative. Without a name, only an explicit
+  // check with the recipient guards against a swapped code.
+  const recipientNeedsConfirmation =
+    action === "privateTransfer" && recipientTargetHash !== null && !recipientTargetName;
+  const changeRecipientCode = (value: string) => {
+    setRecipientCode(value);
+    setRecipientConfirmed(false);
   };
   const changeRecipientInputMethod = (method: RecipientInputMethod) => {
     recipientCredentialsFormRef.current?.clearSecretInputs();
-    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
-    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
-    setTransferReceiveTargetHash(null);
     setRecipientInputMethod(method);
   };
   const selectedPolicy = selected(available.policies, policySelection);
@@ -676,34 +641,11 @@ export function ShieldedInheritancePanel({
     }
   }
 
-  async function refreshRegistry() {
-    const currentIdentity = activeIdentity.current;
-    const previous = registryCache.current;
-    try {
-      const snapshot = await loadKeyRegistrySnapshot(modules.registry, {
-        fromBlock: getShieldedKeyRegistryDeploymentBlock(Number(modules.chainId)),
-        previous: previous && !previous.invalidated ? previous : undefined,
-      });
-      if (currentIdentity && activeIdentity.current === currentIdentity) {
-        registryCache.current = snapshot;
-        setRegistrySnapshot(snapshot);
-      }
-      return snapshot;
-    } catch (cause) {
-      if (currentIdentity && activeIdentity.current === currentIdentity) {
-        registryCache.current = null;
-        setRegistrySnapshot(null);
-      }
-      throw cause;
-    }
-  }
-
   function chooseAction(next: Action, preferredGroup?: TaskGroup) {
     recipientCredentialsFormRef.current?.clearSecretInputs();
-    if (heirReceiveCodeRef.current) heirReceiveCodeRef.current.value = "";
-    if (transferReceiveCodeRef.current) transferReceiveCodeRef.current.value = "";
+    setRecipientCode("");
+    setRecipientConfirmed(false);
     setRecipientInputMethod("receiveCode");
-    setTransferReceiveTargetHash(null);
     const group = TASK_GROUPS.find((candidate) => TASK_ACTIONS[candidate].includes(next));
     if (preferredGroup || group) setTaskGroup(preferredGroup ?? group!);
     setAction(next);
@@ -742,10 +684,7 @@ export function ShieldedInheritancePanel({
       session.unlock(material);
       identityForm.current?.clearSecretInputs();
       setStage(t("shielded.stages.recovering"));
-      const [recovery, registration] = await Promise.allSettled([
-        refreshWallet(material),
-        refreshRegistry(),
-      ]);
+      const [recovery] = await Promise.allSettled([refreshWallet(material)]);
       if (activeIdentity.current !== material) return;
       if (recovery.status === "fulfilled") {
         const notes = listUnspentRecoveredShieldedNotes(
@@ -767,13 +706,8 @@ export function ShieldedInheritancePanel({
               : "shield",
         );
       }
-      if (recovery.status === "rejected" || registration.status === "rejected") {
-        const cause =
-          recovery.status === "rejected"
-            ? recovery.reason
-            : registration.status === "rejected"
-              ? registration.reason
-              : undefined;
+      if (recovery.status === "rejected") {
+        const cause = recovery.reason;
         setError(
           t("shielded.refreshFailed", {
             detail: cause instanceof Error ? cause.message : t("shielded.unknownError"),
@@ -798,6 +732,33 @@ export function ShieldedInheritancePanel({
     }
   }
 
+  async function generateRecipientCode() {
+    const form = recipientCredentialsFormRef.current;
+    if (running.current || !form) return;
+    running.current = true;
+    const epoch = operationEpoch.current;
+    setBusy(true);
+    setError("");
+    setTransactionHash("");
+    setStage(t("shielded.stages.receiveCode"));
+    try {
+      const code = await createShieldedReceiveCodeForRecipient(form.readAndClear());
+      if (epoch !== operationEpoch.current) return;
+      setRecipientCode(code);
+      setRecipientConfirmed(false);
+      setRecipientInputMethod("receiveCode");
+      setStage("");
+    } catch (cause) {
+      if (epoch !== operationEpoch.current) return;
+      setError(cause instanceof Error ? cause.message : t("shielded.unknownError"));
+      setStage("");
+    } finally {
+      form.clearSecretInputs();
+      running.current = false;
+      setBusy(false);
+    }
+  }
+
   async function submitSelected(requestedAction: Action = action) {
     if (running.current) return;
     const action = requestedAction;
@@ -812,6 +773,15 @@ export function ShieldedInheritancePanel({
     try {
       const identity = session.identity;
       if (!identity) throw new Error(t("shielded.unlockRequired"));
+      if (action === "receiveCode") {
+        session.touch();
+        setStage(t("shielded.stages.receiveCode"));
+        const code = await createOwnShieldedReceiveCode(identity);
+        if (activeIdentity.current !== identity) throw new Error(t("shielded.unlockRequired"));
+        setOwnReceiveCode(code);
+        setStage("");
+        return;
+      }
       if (!signer) throw new Error(t("shielded.walletNotReady"));
       const walletEpoch = transactionEpoch.current;
       const assertCurrentOperation = () => {
@@ -828,19 +798,14 @@ export function ShieldedInheritancePanel({
         if (next !== "confirming") assertCurrentOperation();
         setStage(t(`shielded.stages.${next}`));
       };
-      let derivedRecipient: ShieldedRecipientMaterial | null = null;
-      const resolveRecipient = () => {
-        if (recipientInputMethod === "receiveCode") {
-          const codeRef = action === "privateTransfer" ? transferReceiveCodeRef : heirReceiveCodeRef;
-          const code = codeRef.current?.value ?? "";
-          if (codeRef.current) codeRef.current.value = "";
-          return resolveShieldedRecipientMaterial({ kind: "receiveCode", code });
+      // Every payment uses a verified receive code; the credentials form only creates one.
+      const verifyRecipient = async () => {
+        if (recipientInputMethod !== "receiveCode") {
+          throw new Error(t("shielded.generateReceiveCodeFirst"));
         }
-        if (!derivedRecipient) throw new Error(t("shielded.recipientCredentialsMissing"));
-        return resolveShieldedRecipientMaterial({
-          kind: "derivedRecipient",
-          material: derivedRecipient,
-        });
+        const recipient = await verifyShieldedReceiveCode(recipientCode);
+        assertCurrentOperation();
+        return recipient;
       };
       session.touch();
       const isPrivate = action !== "recover" && action !== "shield";
@@ -851,60 +816,17 @@ export function ShieldedInheritancePanel({
         throw new Error(t("shielded.walletReused"));
       }
       if (
-        recipientInputMethod === "credentials" &&
-        (action === "allocate" || action === "topUp" || action === "privateTransfer")
-      ) {
-        const credentialsForm = recipientCredentialsFormRef.current;
-        if (!credentialsForm) throw new Error(t("shielded.recipientCredentialsMissing"));
-        const credentials = credentialsForm.readAndClear();
-        setStage(t("shielded.stages.deriving"));
-        const registryAddress =
-          registryCache.current?.registryAddress ?? (await modules.registry.getAddress());
-        derivedRecipient = await deriveShieldedRecipientMaterial({
-          ...credentials,
-          chainId: modules.chainId,
-          registryAddress,
-        });
-        assertCurrentOperation();
-      }
-      if (
         (await signer.provider?.getNetwork())?.chainId !== modules.chainId ||
         (await signer.getAddress()).toLowerCase() !== account.toLowerCase()
       ) {
         throw new Error(t("shielded.walletChanged"));
       }
       assertCurrentOperation();
-      let shouldRefreshWallet = action !== "register" && action !== "recover";
+      let shouldRefreshWallet = action !== "recover";
       if (action === "recover") {
         setStage(t("shielded.stages.recovering"));
-        await Promise.all([refreshWallet(identity), refreshRegistry()]);
+        await refreshWallet(identity);
         shouldRefreshWallet = false;
-      } else if (action === "register") {
-        setStage(t("shielded.stages.recovering"));
-        const existing = await refreshRegistry();
-        const registrationTag = computeShieldedRegistrationTag({
-          derivedSecretField: identity.derivedSecretField,
-          identityCommitment: identity.identityCommitment,
-          chainId: modules.chainId,
-          registryAddress: existing.registryAddress,
-        });
-        if (existing.keys.has(registrationTag)) {
-          throw new Error(t("shielded.alreadyRegistered"));
-        }
-        const result = await registerShieldedHeirKey({
-          registry: modules.registry,
-          signer,
-          expectedChainId: modules.chainId,
-          identity,
-          onStage: (next) => {
-            if (next !== "confirming") assertCurrentOperation();
-            setStage(t(`shielded.stages.${next}`));
-          },
-        });
-        checkReceipt(result.receipt.status, result.transactionHash);
-        hash = result.transactionHash;
-        publicActivityAddresses.add(account.toLowerCase());
-        await refreshRegistry();
       } else if (action === "shield") {
         const amount = parsePositiveTokenAmount(shieldAmount, modules.tokenDecimals);
         const prepared = await prepareShieldedShield({
@@ -996,15 +918,14 @@ export function ShieldedInheritancePanel({
           const policyNote = policy.note;
           const budgetPeriods = parsePositivePeriods(periods);
           const donor = fundingValue(policyNote.amountPerPeriod * budgetPeriods);
-          const keyRegistry = await refreshRegistry();
           const childError = validateShieldedRecipientSelection({
             value: heirPersonHash,
             options: childOptions,
             loading: !currentLineage && !lineageError,
           });
           if (childError) throw new Error(t(`shielded.recipientPicker.errors.${childError}`));
-          const receive = resolveRecipient();
-          if (receive.personHash.toLowerCase() !== heirPersonHash.trim().toLowerCase()) {
+          const recipient = await verifyRecipient();
+          if (recipient.personHash.toLowerCase() !== heirPersonHash.trim().toLowerCase()) {
             throw new Error(t("shielded.recipientMismatch"));
           }
           const result = await submitAllocateWithFreshLineage({
@@ -1019,10 +940,7 @@ export function ShieldedInheritancePanel({
                 wallet: recovered,
                 donorDerivedSecretField: identity.derivedSecretField,
                 donorCommitment: donor.commitment,
-                keyRegistry,
-                heirPersonHash: heirPersonHash.trim(),
-                heirIdentityCommitment: receive.identityCommitment,
-                registrationSalt: receive.registrationSalt,
+                recipient,
                 policy: {
                   note: policyNote,
                   commitment: policy.commitment,
@@ -1037,13 +955,15 @@ export function ShieldedInheritancePanel({
           hash = result.transactionHash;
         } else if (action === "topUp") {
           if (!value) throw new Error(t("shielded.noValueNote"));
-          const keyRegistry = await refreshRegistry();
           const template = selected(listRecoveredTopUpTemplates(recovered), topUpSelection);
           if (!template) throw new Error(t("shielded.noBudgetTemplate"));
           const topUpPeriods = parsePositivePeriods(periods);
           const donor = fundingValue(getBigInt(template.note.amountPerPeriod) * topUpPeriods);
-          const receive = resolveRecipient();
-          if (receive.identityCommitment !== getBigInt(template.note.heirIdentityCommitment)) {
+          const recipient = await verifyRecipient();
+          if (
+            recipient.identityCommitment !== getBigInt(template.note.heirIdentityCommitment) ||
+            recipient.ownerCommitment !== getBigInt(template.note.heirOwnerCommitment)
+          ) {
             throw new Error(t("shielded.recipientMismatch"));
           }
           const prepared = await prepareShieldedTopUp({
@@ -1051,12 +971,7 @@ export function ShieldedInheritancePanel({
             wallet: recovered,
             donorDerivedSecretField: identity.derivedSecretField,
             donorCommitment: donor.commitment,
-            keyRegistry,
-            heirPersonHash: wrapIdentityCommitmentAsPersonHash(
-              template.note.heirIdentityCommitment,
-            ),
-            heirIdentityCommitment: receive.identityCommitment,
-            registrationSalt: receive.registrationSalt,
+            recipient,
             budget: template,
             topUpPeriods,
           });
@@ -1203,9 +1118,7 @@ export function ShieldedInheritancePanel({
           const total =
             first.note.amount + (second?.note.kind === "value" ? second.note.amount : 0n);
           if (amount > total) throw new Error(t("shielded.amountExceedsNotes"));
-          const keyRegistry = await refreshRegistry();
-          const receive = resolveRecipient();
-          setTransferReceiveTargetHash(receive.personHash);
+          const recipient = await verifyRecipient();
           const prepared = await prepareShieldedPrivateTransfer({
             chainId: modules.chainId,
             poolAddress: modules.poolAddress,
@@ -1230,15 +1143,9 @@ export function ShieldedInheritancePanel({
                   },
                 ],
             destinations: [
-              {
-                kind: "registered",
-                identityCommitment: receive.identityCommitment,
-                registrationSalt: receive.registrationSalt,
-                amount,
-              },
+              { kind: "recipient", recipient, amount },
               { kind: "inputOwner", inputIndex: 0, amount: total - amount },
             ],
-            keyRegistry,
           });
           const result = await submitPrivateTransfer({
             pool: modules.pool,
@@ -1288,9 +1195,9 @@ export function ShieldedInheritancePanel({
         setAction("allocate");
       } else if (action === "shield" && taskGroup === "inheritance") {
         setAction(available.policies.length ? "allocate" : "createPolicy");
-      } else if (action === "register" && taskGroup === "receive") {
-        setAction("claim");
       }
+      setRecipientCode("");
+      setRecipientConfirmed(false);
       setTransactionHash(hash);
       setStage(t("shielded.done"));
       setValueSelection("");
@@ -1304,7 +1211,9 @@ export function ShieldedInheritancePanel({
       const detail =
         cause instanceof InheritanceError
           ? t(`inheritance.errors.${cause.code}`)
-          : errorReason === "LOCAL_NONCE_TOO_HIGH" || errorReason === "NONCE_TOO_HIGH"
+          : cause instanceof ShieldedReceiveCodeError
+            ? t(`shielded.receiveCodeErrors.${cause.reason}`)
+            : errorReason === "LOCAL_NONCE_TOO_HIGH" || errorReason === "NONCE_TOO_HIGH"
             ? getFriendlyError(cause, t).message
             : cause instanceof Error
               ? cause.message
@@ -1322,7 +1231,7 @@ export function ShieldedInheritancePanel({
     }
   }
 
-  const isPrivate = action !== "recover" && action !== "shield";
+  const isPrivate = action !== "recover" && action !== "shield" && action !== "receiveCode";
 
   const feedback = (
     <>
@@ -1388,7 +1297,6 @@ export function ShieldedInheritancePanel({
     );
   }
 
-  const registered = ownRegistration?.registered;
   const totalValue = available.values.reduce(
     (sum, item) => sum + (item.note.kind === "value" ? item.note.amount : 0n),
     0n,
@@ -1402,10 +1310,10 @@ export function ShieldedInheritancePanel({
   );
   const nextAction: Action | null =
     taskGroup === "receive"
-      ? registered === false
-        ? "register"
-        : claimOverview?.claim
-          ? "claim"
+      ? claimOverview?.claim
+        ? "claim"
+        : available.budgets.length === 0
+          ? "receiveCode"
           : null
       : taskGroup === "inheritance"
         ? !hasSpendableValue
@@ -1424,9 +1332,9 @@ export function ShieldedInheritancePanel({
           ? "allocate"
           : "createPolicy"
       : group === "receive"
-        ? registered === false
-          ? "register"
-          : "claim"
+        ? available.budgets.length
+          ? "claim"
+          : "receiveCode"
         : hasSpendableValue
           ? "privateTransfer"
           : "shield";
@@ -1476,31 +1384,12 @@ export function ShieldedInheritancePanel({
         </dl>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-muted">
-            {registered === undefined
-              ? t("shielded.recoverFirst")
-              : t(registered ? "shielded.registered" : "shielded.pendingRegistration")}
+            {walletSnapshot ? null : t("shielded.recoverFirst")}
           </p>
           <PanelButton disabled={busy} onClick={() => void submitSelected("recover")}>
             {t("shielded.actions.recover")}
           </PanelButton>
         </div>
-        {registered && ownRegistration ? (
-          <FieldBlock
-            label={t("shielded.receiveCodeLabel")}
-            hint={t("shielded.receiveCodeShareHint")}
-          >
-            <textarea
-              aria-label={t("shielded.receiveCodeLabel")}
-              className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
-              readOnly
-              value={ownRegistration.receiveCode}
-              rows={3}
-            />
-          </FieldBlock>
-        ) : null}
-        {registered && ownRegistration?.waitingForSecondKey ? (
-          <WarningNotice>{t("shielded.waitingForSecondKey")}</WarningNotice>
-        ) : null}
         {nextAction && nextAction !== action ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline p-3">
             <p className="text-sm text-ink-muted">{t(`shielded.nextStep.${nextAction}`)}</p>
@@ -1557,22 +1446,35 @@ export function ShieldedInheritancePanel({
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        {TASK_ACTIONS[taskGroup]
-          .filter((item) => item !== "register" || registered !== true)
-          .map((item) => (
-            <PanelButton
-              key={item}
-              variant={item === action ? "primary" : "secondary"}
-              aria-pressed={item === action}
-              disabled={busy}
-              onClick={() => chooseAction(item, taskGroup)}
-            >
-              {labels[item]}
-            </PanelButton>
-          ))}
+        {TASK_ACTIONS[taskGroup].map((item) => (
+          <PanelButton
+            key={item}
+            variant={item === action ? "primary" : "secondary"}
+            aria-pressed={item === action}
+            disabled={busy}
+            onClick={() => chooseAction(item, taskGroup)}
+          >
+            {labels[item]}
+          </PanelButton>
+        ))}
       </div>
       <div id="shielded-task-panel" role="tabpanel" aria-labelledby={`shielded-tab-${taskGroup}`}>
         <PanelShell title={labels[action]} description={t(`shielded.descriptions.${action}`)}>
+          {action === "receiveCode" && ownReceiveCode ? (
+            <FieldBlock
+              label={t("shielded.receiveCodeLabel")}
+              hint={t("shielded.receiveCodeShareHint")}
+            >
+              <textarea
+                aria-label={t("shielded.receiveCodeLabel")}
+                className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
+                readOnly
+                value={ownReceiveCode}
+                rows={4}
+              />
+            </FieldBlock>
+          ) : null}
+
           {action === "shield" ? (
             <FieldBlock label={t("shielded.fields.amount")} hint={t("shielded.publicDepositHint")}>
               <input
@@ -1693,8 +1595,10 @@ export function ShieldedInheritancePanel({
               <RecipientInput
                 method={recipientInputMethod}
                 onMethodChange={changeRecipientInputMethod}
-                codeRef={heirReceiveCodeRef}
+                code={recipientCode}
+                onCodeChange={changeRecipientCode}
                 credentialsFormRef={recipientCredentialsFormRef}
+                onGenerateCode={() => void generateRecipientCode()}
                 busy={busy}
               />
               <FieldBlock label={t("shielded.fields.periods")} hint={t("shielded.periodsHint")}>
@@ -1809,22 +1713,40 @@ export function ShieldedInheritancePanel({
               <RecipientInput
                 method={recipientInputMethod}
                 onMethodChange={changeRecipientInputMethod}
-                codeRef={transferReceiveCodeRef}
+                code={recipientCode}
+                onCodeChange={changeRecipientCode}
                 credentialsFormRef={recipientCredentialsFormRef}
-                onCodeChange={updateTransferReceiveTarget}
+                onGenerateCode={() => void generateRecipientCode()}
                 busy={busy}
               />
-              {transferReceiveTargetHash ? (
-                <p className="break-all rounded-xl bg-surface-alt p-3 text-sm text-ink">
-                  {t("shielded.recipientTarget", {
-                    identity:
-                      localRecipientLabels.get(transferReceiveTargetHash.toLowerCase()) ??
-                      transferReceiveTargetHash,
-                  })}
-                  <span className="mt-1 block font-mono text-xs text-ink-muted">
-                    {transferReceiveTargetHash}
-                  </span>
-                </p>
+              {recipientInputMethod === "receiveCode" && recipientTargetHash ? (
+                <div className="space-y-2 break-all rounded-xl bg-surface-alt p-3 text-sm text-ink">
+                  <p>
+                    {t("shielded.recipientTarget", {
+                      identity: recipientTargetName ?? recipientTargetHash,
+                    })}
+                    <span className="mt-1 block font-mono text-xs text-ink-muted">
+                      {recipientTargetHash}
+                    </span>
+                  </p>
+                  {recipientNeedsConfirmation ? (
+                    <>
+                      <p className="text-xs text-warning">
+                        {t("shielded.recipientTargetUnverified")}
+                      </p>
+                      <label className="flex items-start gap-3 break-normal">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={recipientConfirmed}
+                          disabled={busy}
+                          onChange={(event) => setRecipientConfirmed(event.target.checked)}
+                        />
+                        <span>{t("shielded.recipientConfirm")}</span>
+                      </label>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
               <FieldBlock label={t("shielded.fields.transferAmount")}>
                 <input
@@ -1914,7 +1836,9 @@ export function ShieldedInheritancePanel({
               <span>{t("shielded.privateWalletCheck")}</span>
             </label>
           ) : null}
-          {!signer ? <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice> : null}
+          {!signer && action !== "receiveCode" ? (
+            <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice>
+          ) : null}
           {isPrivate && publicActivityAddresses.has(account.toLowerCase()) ? (
             <WarningNotice>{t("shielded.switchWalletPrompt")}</WarningNotice>
           ) : null}
@@ -1922,7 +1846,10 @@ export function ShieldedInheritancePanel({
             variant="primary"
             busy={busy}
             disabled={
-              busy || !signer || (isPrivate && publicActivityAddresses.has(account.toLowerCase()))
+              busy ||
+              (!signer && action !== "receiveCode") ||
+              (isPrivate && publicActivityAddresses.has(account.toLowerCase())) ||
+              (recipientNeedsConfirmation && !recipientConfirmed)
             }
             onClick={() => void submitSelected()}
           >
@@ -1937,12 +1864,8 @@ export function ShieldedInheritancePanel({
         </summary>
         <p className="mt-3 text-sm text-ink-muted">{t("shielded.groups.toolsHint")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {(["register", "mergeBudget"] as const).map((item) => (
-            <PanelButton
-              key={item}
-              disabled={busy || (item === "register" && registered === true)}
-              onClick={() => chooseAction(item)}
-            >
+          {(["receiveCode", "mergeBudget"] as const).map((item) => (
+            <PanelButton key={item} disabled={busy} onClick={() => chooseAction(item)}>
               {labels[item]}
             </PanelButton>
           ))}

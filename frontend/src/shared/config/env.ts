@@ -113,8 +113,8 @@ export function getDefaultRpcUrl(): string {
 /**
  * The entry reader for the chain `VITE_RPC_URL` points at.
  *
- * The entry reader for person and tree data. The shielded pool and heir key
- * registry have separate addresses because they are not modules of DeepFamily.
+ * The entry reader for person and tree data. The shielded pool has a separate
+ * address because it is not a module of DeepFamily.
  */
 export function getDefaultReaderAddress(): string {
   return getStringEnv("VITE_READER_ADDRESS");
@@ -144,11 +144,6 @@ export function getShieldedPoolAddress(chainId: number): string {
   return getModuleAddress("VITE_SHIELDED_POOL_ADDRESS", chainId);
 }
 
-/** Address of the heir viewing-key registry for the selected chain. */
-export function getShieldedKeyRegistryAddress(chainId: number): string {
-  return getModuleAddress("VITE_SHIELDED_KEY_REGISTRY_ADDRESS", chainId);
-}
-
 function getShieldedDeploymentBlock(key: string, chainId: number): number {
   const value =
     Number.isSafeInteger(chainId) && chainId > 0
@@ -160,10 +155,6 @@ function getShieldedDeploymentBlock(key: string, chainId: number): number {
 
 export function getShieldedPoolDeploymentBlock(chainId: number): number {
   return getShieldedDeploymentBlock("VITE_SHIELDED_POOL_FROM_BLOCK", chainId);
-}
-
-export function getShieldedKeyRegistryDeploymentBlock(chainId: number): number {
-  return getShieldedDeploymentBlock("VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK", chainId);
 }
 
 export function getDefaultRootHash(): string {

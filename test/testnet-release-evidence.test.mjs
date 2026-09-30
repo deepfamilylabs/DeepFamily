@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect } from "chai";
+import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
 
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
@@ -26,6 +27,7 @@ import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
@@ -126,10 +128,6 @@ const SHIELDED_DEPLOYMENT_ARTIFACTS = {
       { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
     ]),
   ),
-  shieldedHeirKeyRegistry: {
-    artifactSha256: SHIELDED_ARTIFACT_SHA256,
-    runtimeSha256: SHIELDED_RUNTIME_SHA256,
-  },
   shieldedDeepPool: {
     artifactSha256: SHIELDED_ARTIFACT_SHA256,
     runtimeSha256: SHIELDED_RUNTIME_SHA256,
@@ -140,10 +138,10 @@ const SHIELDED_DEPLOYMENT_EVIDENCE = shieldedDeploymentEvidence(
   SHIELDED_DEPLOYMENT_ARTIFACTS,
 );
 const SHIELDED_MANIFEST_CIRCUITS = Object.fromEntries(
-  Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
+  Object.entries(SHIELDED_CIRCUITS).map(([action, source]) => [
     action,
     {
-      source: spec.source,
+      source,
       sourceSha256: SHIELDED_SOURCE_SHA256,
       wasmSha256: SHIELDED_WASM_SHA256,
       zkeySha256: SHIELDED_ZKEY_SHA256,
@@ -255,7 +253,6 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
         shieldedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedVerifiers,
-        shieldedHeirKeyRegistry: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedHeirKeyRegistry,
         shieldedDeepPool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedDeepPool,
       },
     },
@@ -311,17 +308,12 @@ const bindDeploymentEvidence = (report) => {
 const shieldedProofs = (chainId) =>
   Object.fromEntries(
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
-      const signals = Array(action === "keyRegistration" ? 7 : 32).fill("0");
-      if (action === "keyRegistration") {
-        signals[3] = String(chainId);
-        signals[4] = BigInt(SHIELDED_ADDRESSES.shieldedHeirKeyRegistry).toString();
-      } else {
-        signals[0] = String(spec.actionId);
-        signals[1] = String(chainId);
-        signals[2] = BigInt(SHIELDED_ADDRESSES.shieldedDeepPool).toString();
-        if (action === "allocate") signals[29] = "1000";
-        if (action === "claim") signals[29] = String(8200 + 12 * 2_592_000);
-      }
+      const signals = Array(SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
+      signals[0] = String(chainId);
+      signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedDeepPool).toString();
+      // asOf closes the allocate and claim inputs.
+      if (action === "allocate") signals[signals.length - 1] = "1000";
+      if (action === "claim") signals[signals.length - 1] = String(8200 + 12 * 2_592_000);
       return [
         action,
         {
@@ -477,7 +469,11 @@ const validReportTemplate = () => ({
       allocationLabel: "shielded-action-allocate",
       claimExecution: "verifier-call",
       claimCount: 12,
-      registeredKeys: 2,
+      receiveCode: {
+        verificationKeySha256: SHIELDED_VERIFICATION_KEY_SHA256,
+        proofSha256: SHIELDED_PROOF_SHA256,
+        verified: true,
+      },
       recoveryEventCount: 2,
       recoveredNotes: 1,
       lineageDepth: 1,
@@ -736,16 +732,16 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(9);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(8);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 9,
+      proofCount: 8,
       claimCount: 12,
       lineageDepth: 1,
       noteDepth: 1,
     });
     expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
-    expect(result.publicSummary.shielded.transactionActions).to.have.length(8);
+    expect(result.publicSummary.shielded.transactionActions).to.have.length(7);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -875,8 +871,8 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
     report.shielded.receipts.chainId = sepoliaChainId;
-    for (const [action, proof] of Object.entries(report.shielded.proofs)) {
-      proof.publicSignals[action === "keyRegistration" ? 3 : 1] = String(sepoliaChainId);
+    for (const proof of Object.values(report.shielded.proofs)) {
+      proof.publicSignals[0] = String(sepoliaChainId);
       proof.publicSignalsSha256 = createHash("sha256")
         .update(JSON.stringify(proof.publicSignals))
         .digest("hex");
@@ -1488,8 +1484,8 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /shielded\.proofs\.allocate\.verified/iu,
       ],
       [
-        (report) => (report.shielded.proofs.keyRegistration.verifierAddress = address(999)),
-        /shielded\.proofs\.keyRegistration\.verifierAddress/iu,
+        (report) => (report.shielded.proofs.shield.verifierAddress = address(999)),
+        /shielded\.proofs\.shield\.verifierAddress/iu,
       ],
       [
         (report) => (report.shielded.proofs.shield.publicSignals[1] = "11155111"),
@@ -1548,13 +1544,20 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => (report.terminalGovernanceState.shieldedDeepPool.tokenImmutable = address(999)),
-        /ShieldedDeepPool must bind the declared token, lineage, key registry and common verifier adapter/iu,
+        /ShieldedDeepPool must bind the declared token, lineage and common verifier adapter/iu,
       ],
       [
         (report) =>
-          (report.terminalGovernanceState.shieldedHeirKeyRegistry.verifierAdapterImmutable =
-            address(999)),
-        /ShieldedHeirKeyRegistry must bind the common verifier adapter/iu,
+          (report.terminalGovernanceState.shieldedDeepPool.verifierAdapterImmutable = address(999)),
+        /ShieldedDeepPool must bind the declared token, lineage and common verifier adapter/iu,
+      ],
+      [
+        (report) => (report.shielded.scenario.receiveCode.verified = false),
+        /shielded\.scenario\.receiveCode\.verified/iu,
+      ],
+      [
+        (report) => delete report.shieldedArtifacts.circuits.receiveCode,
+        /shieldedArtifacts\.circuits must contain exactly/iu,
       ],
       [
         (report) =>

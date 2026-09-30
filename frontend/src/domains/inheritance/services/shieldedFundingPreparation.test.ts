@@ -5,31 +5,28 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  SHIELDED_POOL_ACTION,
+  buildShieldedPoolPublicSignals,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
-  computeShieldedRegistrationLeaf,
-  computeShieldedRegistrationSalt,
-  computeShieldedRegistrationTag,
   createLineageTree,
   decodeShieldedNotePayload,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { getBigInt, getBytes, hexlify, type Contract } from "ethers";
 import type { LineageSnapshot } from "./inheritanceChain";
-import type { KeyRegistrySnapshot, PublicHeirKey } from "./shieldedKeyRegistryChain";
+import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import { prepareShieldedAllocate, prepareShieldedTopUp } from "./shieldedFundingPreparation";
 import { prepareShieldedCreatePolicy, prepareShieldedShield } from "./shieldedNotePreparation";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
 const chainId = 1030n;
 const poolAddress = "0x1111111111111111111111111111111111111111";
-const registryAddress = "0x2222222222222222222222222222222222222222";
 const lineageAddress = "0x3333333333333333333333333333333333333333";
 const endorser = "0x4444444444444444444444444444444444444444";
 const donorSecret = 77_777n;
@@ -102,40 +99,14 @@ async function setup() {
     shards: new Map([[0n, noteTree]]),
   };
   const viewingKey = await deriveShieldedViewPublicKey(heirKeys.hpkeIkm);
-  const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(viewingKey);
-  const registrationIdentity = {
-    derivedSecretField: heirSecret,
-    identityCommitment: heirIdentity,
-    chainId,
-    registryAddress,
-  };
-  const registrationTag = computeShieldedRegistrationTag(registrationIdentity);
-  const registrationSalt = computeShieldedRegistrationSalt(registrationIdentity);
-  const keyLeaf = computeShieldedRegistrationLeaf({
-    identityCommitment: heirIdentity,
-    ownerCommitment: heirKeys.ownerCommitment,
-    viewKeyHi,
-    viewKeyLo,
-    salt: registrationSalt,
-  });
-  const keyTree = createLineageTree([keyLeaf, 123n]);
   const heirPersonHash = wrapIdentityCommitmentAsPersonHash(heirIdentity).toLowerCase();
-  const heirKey: PublicHeirKey = {
-    registrationTag,
+  // The worker verifies a receive code before a payer can hold this type.
+  const recipient = {
+    identityCommitment: heirIdentity,
     ownerCommitment: heirKeys.ownerCommitment,
     viewingKey: hexlify(viewingKey),
-    shardId: 0n,
-    leafIndex: 0n,
-    leaf: keyLeaf,
-  };
-  const keyRegistry: KeyRegistrySnapshot = {
-    registryAddress: registryAddress.toLowerCase(),
-    chainId,
-    toBlock: 10,
-    blockHash,
-    shards: new Map([[0n, keyTree]]),
-    keys: new Map([[registrationTag, heirKey]]),
-  };
+    personHash: heirPersonHash,
+  } as VerifiedShieldedRecipient;
   const parentsDigest = computeLineageParentsDigest({
     fatherIdentityCommitment: rootIdentity,
     motherIdentityCommitment: 555n,
@@ -193,7 +164,6 @@ async function setup() {
   const pool = {
     runner: { provider },
     getAddress: async () => poolAddress,
-    KEY_REGISTRY: async () => registryAddress,
     LINEAGE_INDEX: async () => lineageAddress,
   } as unknown as Contract;
   const lineageIndex = {
@@ -205,16 +175,13 @@ async function setup() {
     wallet,
     donorDerivedSecretField: donorSecret,
     donorCommitment: shield.outputs[0].commitment,
-    keyRegistry,
-    heirPersonHash,
-    heirIdentityCommitment: heirIdentity,
-    registrationSalt,
+    recipient,
   };
-  return { common, pool, policy, keyRegistry, lineage, lineageIndex, heirKeys, noteTree, registrationTag, registrationSalt };
+  return { common, pool, policy, lineage, lineageIndex, heirKeys, noteTree, recipient };
 }
 
 describe("local private allocation and top-up preparation", () => {
-  it("builds exact 32 public signals, a current direct-child witness, and a child-decryptable budget", async () => {
+  it("builds the allocation's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {
     const fixture = await setup();
     const prepared = await prepareShieldedAllocate({
       ...fixture.common,
@@ -223,19 +190,20 @@ describe("local private allocation and top-up preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 5n,
     });
-    const signals = prepared.witness.publicSignals as string[];
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("2");
-    expect(signals[27]).toBe(String(fixture.lineage.endorsementTree.root));
-    expect(signals[28]).toBe(String(fixture.lineage.trustedTree.root));
-    expect(signals[29]).toBe(String(timestamp));
-    expect(signals[30]).toBe(String(fixture.keyRegistry.shards.get(0n)!.root));
+    expect(prepared.witness.endorsementRoot).toBe(String(fixture.lineage.endorsementTree.root));
+    expect(prepared.witness.trustedRoot).toBe(String(fixture.lineage.trustedTree.root));
+    expect(prepared.witness.asOf).toBe(String(timestamp));
+    expect(prepared.witness.inputRoots).toEqual([
+      String(fixture.noteTree.root),
+      String(fixture.noteTree.root),
+    ]);
     expect(prepared.data.inputRoots).toEqual([fixture.noteTree.root, fixture.noteTree.root]);
     expect(prepared.witness.endorsementSiblings).toHaveLength(64);
     expect(prepared.witness.trustedSiblings).toHaveLength(64);
-    expect(prepared.witness.registrationSiblings).toHaveLength(32);
     expect(prepared.witness.heirIdentityCommitment).toBe(String(heirIdentity));
-    expect(prepared.witness.registrationSalt).toBe(String(fixture.registrationSalt));
+    expect(prepared.witness.heirOwnerCommitment).toBe(String(fixture.heirKeys.ownerCommitment));
+    expect(prepared.witness).not.toHaveProperty("viewKeyHi");
+    expect(prepared.witness).not.toHaveProperty("publicSignals");
     expect(await open(prepared.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget",
       heirIdentityCommitment: heirIdentity,
@@ -276,24 +244,20 @@ describe("local private allocation and top-up preparation", () => {
       budget: { ...allocated.outputs[0], shardId: 0n },
       topUpPeriods: 3n,
     });
-    const signals = topUp.witness.publicSignals as string[];
-    expect(signals).toHaveLength(32);
-    expect(signals[0]).toBe("3");
-    expect(signals[27]).toBe("0");
-    expect(signals[28]).toBe("0");
-    expect(signals[29]).toBe("0");
+    // Top-ups prove no lineage, so these inputs are absent rather than zero.
+    expect(topUp.witness).not.toHaveProperty("endorsementRoot");
+    expect(topUp.witness).not.toHaveProperty("asOf");
     expect(topUp.data.inputRoots).toEqual([fixture.noteTree.root, fixture.noteTree.root]);
     expect(topUp.witness.oldBudgetRemainingPeriods).toBe("5");
     expect(topUp.witness.topUpPeriods).toBe("3");
     expect(topUp.witness.heirIdentityCommitment).toBe(String(heirIdentity));
-    expect(topUp.witness.registrationSalt).toBe(String(fixture.registrationSalt));
     expect(await open(topUp.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget", remaining: 30n, eligibleFrom: BigInt(timestamp + 7200),
     });
     expect(await open(topUp.outputs[1].ciphertext, donorSecret)).toMatchObject({ kind: "value", amount: 70n });
   });
 
-  it("accepts canonical wallet and key snapshots when unrelated blocks arrive before funding", async () => {
+  it("accepts a canonical wallet snapshot when unrelated blocks arrive before funding", async () => {
     const fixture = await setup();
     const provider = fixture.pool.runner!.provider as unknown as {
       getBlock: (block: number | string) => Promise<{ number: number; timestamp: number; hash: string } | null>;
@@ -321,7 +285,7 @@ describe("local private allocation and top-up preparation", () => {
     expect(topUp.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
   });
 
-  it("rejects a receive code with the wrong private salt or heir identity", async () => {
+  it("rejects a recipient whose identity is inconsistent or not an endorsed direct child", async () => {
     const fixture = await setup();
     const input = {
       ...fixture.common,
@@ -332,15 +296,38 @@ describe("local private allocation and top-up preparation", () => {
     };
     await expect(prepareShieldedAllocate({
       ...input,
-      registrationSalt: fixture.registrationSalt + 1n,
-    })).rejects.toThrow("Heir has no registered viewing key");
+      recipient: { ...fixture.recipient, identityCommitment: heirIdentity + 1n },
+    })).rejects.toThrow("Recipient identity does not match its person hash");
     await expect(prepareShieldedAllocate({
       ...input,
-      heirIdentityCommitment: heirIdentity + 1n,
-    })).rejects.toThrow("Receive code identity does not match the selected heir");
+      recipient: {
+        ...fixture.recipient,
+        identityCommitment: heirIdentity + 1n,
+        personHash: wrapIdentityCommitmentAsPersonHash(heirIdentity + 1n),
+      },
+    })).rejects.toThrow("no current direct-child endorsement");
   });
 
-  it("rejects insufficient funds, stale lineage, a one-key root, and a substituted template", async () => {
+  it("rejects a top-up for a different recipient than the budget's heir", async () => {
+    const fixture = await setup();
+    const allocated = await prepareShieldedAllocate({
+      ...fixture.common,
+      policy: { ...fixture.policy.outputs[0], shardId: 0n },
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+      budgetPeriods: 2n,
+    });
+    fixture.noteTree.insert(allocated.outputs[0].commitment);
+    fixture.noteTree.insert(allocated.outputs[1].commitment);
+    await expect(prepareShieldedTopUp({
+      ...fixture.common,
+      recipient: { ...fixture.recipient, ownerCommitment: fixture.recipient.ownerCommitment + 1n },
+      budget: { ...allocated.outputs[0], shardId: 0n },
+      topUpPeriods: 1n,
+    })).rejects.toThrow("does not belong to this receive code's recipient");
+  });
+
+  it("rejects insufficient funds, stale lineage, and a substituted template", async () => {
     const fixture = await setup();
     const input = {
       ...fixture.common,
@@ -352,15 +339,6 @@ describe("local private allocation and top-up preparation", () => {
     await expect(prepareShieldedAllocate(input)).rejects.toThrow("cannot fund the whole");
     fixture.lineage.endorsementTree.insert(999n);
     await expect(prepareShieldedAllocate({ ...input, budgetPeriods: 1n })).rejects.toThrow("roots are stale");
-    const oneKeyFixture = await setup();
-    oneKeyFixture.keyRegistry.shards.set(0n, createLineageTree([oneKeyFixture.keyRegistry.keys.get(oneKeyFixture.registrationTag)!.leaf]));
-    await expect(prepareShieldedAllocate({
-      ...oneKeyFixture.common,
-      policy: { ...oneKeyFixture.policy.outputs[0], shardId: 0n },
-      lineageIndex: oneKeyFixture.lineageIndex,
-      lineage: oneKeyFixture.lineage,
-      budgetPeriods: 1n,
-    })).rejects.toThrow("at least two keys");
     const validFixture = await setup();
     const tampered = new Uint8Array(validFixture.policy.outputs[0].ciphertext);
     tampered[100] ^= 1;
@@ -422,10 +400,11 @@ describe("local private allocation and top-up preparation", () => {
         const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
         const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
-        for (const [source, witness] of [
-          ["shielded_allocate", allocated.witness],
-          ["shielded_top_up", topUp.witness],
+        for (const [source, action, prepared] of [
+          ["shielded_allocate", SHIELDED_POOL_ACTION.Allocate, allocated],
+          ["shielded_top_up", SHIELDED_POOL_ACTION.TopUp, topUp],
         ] as const) {
+          const { witness } = prepared;
           const inputPath = path.join(temporary, `${source}.input.json`);
           const proofPath = path.join(temporary, `${source}.proof.json`);
           const publicPath = path.join(temporary, `${source}.public.json`);
@@ -439,7 +418,11 @@ describe("local private allocation and top-up preparation", () => {
             proofPath,
             publicPath,
           ], { timeout: 120_000, maxBuffer: 16 * 1024 * 1024 });
-          expect(JSON.parse(fs.readFileSync(publicPath, "utf8"))).toEqual(witness.publicSignals);
+          expect(JSON.parse(fs.readFileSync(publicPath, "utf8"))).toEqual(
+            buildShieldedPoolPublicSignals({ action, chainId, poolAddress, ...prepared.data }).map(
+              String,
+            ),
+          );
           const verified = execFileSync(process.execPath, [
             cli, "groth16", "verify",
             path.join(artifacts, `${source}.vkey.json`),

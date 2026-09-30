@@ -7,9 +7,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { SHIELDED_POOL_PUBLIC_INPUTS } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./lib/zkDeploymentCatalog.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "./lib/shieldedProductionSetup.mjs";
 
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -21,6 +23,11 @@ const fixtures = {
   claim: () => buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 }).witness,
 };
 const sources = { allocate: SHIELDED_CIRCUITS.allocate, claim: SHIELDED_CIRCUITS.claim };
+/** The witness's named public inputs, in the order the circuit declares them. */
+const expectedPublicSignals = (action, witness) =>
+  SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_DEPLOYMENT_CIRCUITS[action].actionId].flatMap((name) =>
+    [witness[name]].flat().map(BigInt),
+  );
 
 function runSnarkjs(args) {
   return execFileSync(process.execPath, [cli, ...args], {
@@ -52,9 +59,9 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
     const item = manifest.circuits[action];
     assert.equal(item.source, source, `Development manifest source mismatch for ${action}`);
     const spec = SHIELDED_SETUP_CIRCUITS[action];
-    assert.equal(item.verifierPath, spec.verifierPath, `${action} verifier path mismatch`);
+    assert.equal(item.verifierPath ?? null, spec.verifierPath, `${action} verifier path mismatch`);
     assert.equal(
-      item.verifierContractName,
+      item.verifierContractName ?? null,
       spec.verifierContractName,
       `${action} verifier name mismatch`,
     );
@@ -67,7 +74,10 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
         path.join(root, `frontend/public/zk/shielded/${source}.vkey.json`),
         item.verificationKeySha256,
       ],
-      [path.join(root, spec.verifierPath), item.solidityVerifierSha256],
+      // The receive code is verified in the browser and has no Solidity verifier.
+      ...(spec.verifierPath
+        ? [[path.join(root, spec.verifierPath), item.solidityVerifierSha256]]
+        : []),
     ]) {
       if (!/^[0-9a-f]{64}$/.test(digest ?? "") || !fs.existsSync(file) || sha256(file) !== digest) {
         throw new Error(`${action} development artifacts changed after setup`);
@@ -101,7 +111,11 @@ export function smokeDevelopmentProofs(actions = ["allocate", "claim"]) {
       const started = Date.now();
       runSnarkjs(["groth16", "fullprove", inputPath, wasm, zkey, proofPath, publicPath]);
       const actual = JSON.parse(fs.readFileSync(publicPath, "utf8")).map(BigInt);
-      assert.deepEqual(actual, input.publicSignals.map(BigInt), `${action} public signals changed`);
+      assert.deepEqual(
+        actual,
+        expectedPublicSignals(action, input),
+        `${action} public signals changed`,
+      );
       const verified = runSnarkjs(["groth16", "verify", vkey, publicPath, proofPath]);
       assert.match(verified, /OK!/u, `${action} real proof did not verify`);
       console.log(`development-only ${action} real proof verified in ${Date.now() - started} ms`);

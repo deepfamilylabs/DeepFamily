@@ -4,7 +4,6 @@ import DeepFamilyArchive from "../../abi/DeepFamilyArchive.json";
 import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
 import DeepFamilyLineageIndex from "../../abi/DeepFamilyLineageIndex.json";
 import ShieldedDeepPool from "../../abi/ShieldedDeepPool.json";
-import ShieldedHeirKeyRegistry from "../../abi/ShieldedHeirKeyRegistry.json";
 
 export const DEEP_TOKEN_ABI = [
   "function recentReward() view returns (uint256)",
@@ -55,13 +54,6 @@ export function createShieldedPoolContract(
   runner: ethers.ContractRunner,
 ): ethers.Contract {
   return new ethers.Contract(poolAddress, ShieldedDeepPool.abi, runner);
-}
-
-export function createShieldedKeyRegistryContract(
-  registryAddress: string,
-  runner: ethers.ContractRunner,
-): ethers.Contract {
-  return new ethers.Contract(registryAddress, ShieldedHeirKeyRegistry.abi, runner);
 }
 
 export function createDeepFamilyInterface(): ethers.Interface {

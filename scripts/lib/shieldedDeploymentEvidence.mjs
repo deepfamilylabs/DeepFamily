@@ -15,21 +15,16 @@ export function shieldedDeploymentBindings(addresses) {
         { address: address(spec.verifierLabel) },
       ]),
     ),
-    shieldedHeirKeyRegistry: {
-      address: address("shieldedHeirKeyRegistry"),
-      verifierAdapterImmutable: address("groth16VerifierAdapter"),
-    },
     shieldedDeepPool: {
       address: address("shieldedDeepPool"),
       tokenImmutable: address("token"),
       lineageIndexImmutable: address("deepFamilyLineageIndex"),
-      keyRegistryImmutable: address("shieldedHeirKeyRegistry"),
       verifierAdapterImmutable: address("groth16VerifierAdapter"),
     },
   };
 }
 
-/** Reads every deployed immutable; a registry or adapter from another pool fails before proofs. */
+/** Reads every deployed immutable; an adapter or lineage index from another pool fails before proofs. */
 export async function assertShieldedDeploymentBindings({
   deployed,
   addresses,
@@ -51,17 +46,10 @@ export async function assertShieldedDeploymentBindings({
     same(verifier, addresses[label], `adapter ${getter}`);
     same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
   }
-  const registry = deployed.shieldedHeirKeyRegistry;
-  same(
-    await read("registry verifier", () => registry.VERIFIER()),
-    bindings.shieldedHeirKeyRegistry.verifierAdapterImmutable,
-    "registry verifier",
-  );
   const pool = deployed.shieldedDeepPool;
   for (const [method, expected] of [
     ["TOKEN", bindings.token],
     ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
-    ["KEY_REGISTRY", bindings.shieldedHeirKeyRegistry.address],
     ["VERIFIER", bindings.shieldedDeepPool.verifierAdapterImmutable],
   ])
     same(await read(`pool ${method}`, () => pool[method]()), expected, `pool ${method}`);
@@ -85,11 +73,6 @@ export function shieldedArtifactEntries(bindings, artifacts) {
       bindings.shieldedVerifiers[action],
       artifacts.shieldedVerifiers[action],
     ]),
-    [
-      "ShieldedHeirKeyRegistry",
-      bindings.shieldedHeirKeyRegistry,
-      artifacts.shieldedHeirKeyRegistry,
-    ],
     ["ShieldedDeepPool", bindings.shieldedDeepPool, artifacts.shieldedDeepPool],
   ];
 }
@@ -102,7 +85,6 @@ export function shieldedDeploymentEvidence(bindings, artifacts) {
   });
   for (const action of Object.keys(evidence.shieldedVerifiers))
     Object.assign(evidence.shieldedVerifiers[action], hashes(artifacts.shieldedVerifiers[action]));
-  Object.assign(evidence.shieldedHeirKeyRegistry, hashes(artifacts.shieldedHeirKeyRegistry));
   Object.assign(evidence.shieldedDeepPool, hashes(artifacts.shieldedDeepPool));
   delete evidence.token;
   return evidence;

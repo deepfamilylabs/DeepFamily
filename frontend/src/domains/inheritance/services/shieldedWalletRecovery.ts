@@ -221,7 +221,6 @@ export type ShieldedGasWalletIssue =
   | "insufficientGas"
   | "directPublicWalletFunding"
   | "reusedPublicWallet"
-  | "identityRegistrationWalletReused"
   | "immediateWithdrawal"
   | "distinctiveWithdrawalAmount";
 
@@ -234,7 +233,6 @@ export function assessShieldedGasWallet(input: {
   estimatedMaxFeeDrip: bigint;
   directlyFundedFromPublicWallet?: boolean;
   reusedForPublicActivity?: boolean;
-  usedForIdentityKeyRegistration?: boolean;
   withdrawingImmediately?: boolean;
   distinctiveWithdrawalAmount?: boolean;
 }): { canSubmit: boolean; issues: ShieldedGasWalletIssue[] } {
@@ -242,18 +240,12 @@ export function assessShieldedGasWallet(input: {
     throw new Error("Gas balance and estimated fee must be nonnegative");
   }
   const issues: ShieldedGasWalletIssue[] = [];
-  // The registry event names the person, so using that sender again for a
-  // private action reveals the person behind the private-action transaction.
   const gasSufficient = input.gasBalanceDrip >= input.estimatedMaxFeeDrip;
   const canSubmit =
-    gasSufficient &&
-    !input.directlyFundedFromPublicWallet &&
-    !input.reusedForPublicActivity &&
-    !input.usedForIdentityKeyRegistration;
+    gasSufficient && !input.directlyFundedFromPublicWallet && !input.reusedForPublicActivity;
   if (!gasSufficient) issues.push("insufficientGas");
   if (input.directlyFundedFromPublicWallet) issues.push("directPublicWalletFunding");
   if (input.reusedForPublicActivity) issues.push("reusedPublicWallet");
-  if (input.usedForIdentityKeyRegistration) issues.push("identityRegistrationWalletReused");
   if (input.withdrawingImmediately) issues.push("immediateWithdrawal");
   if (input.distinctiveWithdrawalAmount) issues.push("distinctiveWithdrawalAmount");
   return { canSubmit, issues };

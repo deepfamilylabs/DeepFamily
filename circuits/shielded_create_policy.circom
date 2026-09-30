@@ -7,9 +7,17 @@ include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
 // Action 1. The policy note carries no DEEP value; the entire input value is
 // returned as a fresh private value note. The policy itself is hidden behind
-// a random salt and a separate random note nonce.
+// a random salt and a separate random note nonce. The pool requires the
+// single input's shard and root to fill both of its input slots.
 template ShieldedCreatePolicy() {
-    signal input publicSignals[32];
+    signal input chainId;
+    signal input pool;
+    signal input inputShardId;
+    signal input inputRoot;
+    signal input inputNullifiers[2];
+    signal input outputCommitments[2];
+    signal input ciphertextHashes[2];
+
     signal input ownerSecret;
     signal input inputAmount;
     signal input inputNonce;
@@ -25,19 +33,10 @@ template ShieldedCreatePolicy() {
     signal input policyNonce;
     signal input changeNonce;
 
-    publicSignals[0] === 1;
     component chainBits = Num2Bits(64);
-    chainBits.in <== publicSignals[1];
+    chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
-    poolBits.in <== publicSignals[2];
-    publicSignals[3] === publicSignals[5];
-    publicSignals[4] === publicSignals[6];
-    for (var i = 9; i <= 20; i++) {
-        publicSignals[i] === 0;
-    }
-    for (var i = 25; i <= 31; i++) {
-        publicSignals[i] === 0;
-    }
+    poolBits.in <== pool;
 
     component ownerNotZero = IsZero();
     ownerNotZero.in <== ownerSecret;
@@ -68,18 +67,18 @@ template ShieldedCreatePolicy() {
     membership.depth <== noteDepth;
     membership.index <== noteIndex;
     membership.siblings <== noteSiblings;
-    membership.out === publicSignals[4];
+    membership.out === inputRoot;
 
     component spend = Poseidon(3);
     spend.inputs[0] <== 1016;
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== inputNote.out;
-    spend.out === publicSignals[7];
+    spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
     dummySpend.inputs[0] <== 1021;
     dummySpend.inputs[1] <== ownerSecret;
     dummySpend.inputs[2] <== inputNote.out;
-    dummySpend.out === publicSignals[8];
+    dummySpend.out === inputNullifiers[1];
 
     component rootNotZero = IsZero();
     rootNotZero.in <== rootIdentityCommitment;
@@ -118,16 +117,26 @@ template ShieldedCreatePolicy() {
     policyNote.inputs[0] <== 1024;
     policyNote.inputs[1] <== policy.out;
     policyNote.inputs[2] <== policyNonce;
-    policyNote.inputs[3] <== publicSignals[23];
-    policyNote.out === publicSignals[21];
+    policyNote.inputs[3] <== ciphertextHashes[0];
+    policyNote.out === outputCommitments[0];
 
     component change = Poseidon(5);
     change.inputs[0] <== 1014;
     change.inputs[1] <== owner.out;
     change.inputs[2] <== inputAmount;
     change.inputs[3] <== changeNonce;
-    change.inputs[4] <== publicSignals[24];
-    change.out === publicSignals[22];
+    change.inputs[4] <== ciphertextHashes[1];
+    change.out === outputCommitments[1];
 }
 
-component main { public [publicSignals] } = ShieldedCreatePolicy();
+component main {
+    public [
+        chainId,
+        pool,
+        inputShardId,
+        inputRoot,
+        inputNullifiers,
+        outputCommitments,
+        ciphertextHashes
+    ]
+} = ShieldedCreatePolicy();

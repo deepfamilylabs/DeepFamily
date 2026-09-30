@@ -27,6 +27,7 @@ import {
   snapshotSnarkjsRuntime,
 } from "./snarkjsToolchain.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
+import { hasShieldedSolidityVerifier } from "./zkCircuitSelection.mjs";
 import { readZkeyMpcMetadata } from "./zkeyMpcMetadata.mjs";
 
 const defaultRunner = ({ executable, args, cwd, env }) =>
@@ -242,7 +243,8 @@ export async function verifyShieldedCeremonyArtifacts({
         ["wasm", "wasmSha256", ".wasm"],
         ["zkey", "zkeySha256", ".zkey"],
         ["vkey", "verificationKeySha256", ".vkey.json"],
-        ["verifier", "verifierSha256", ".sol"],
+        // The receive code is verified in the browser and has no Solidity verifier.
+        ...(hasShieldedSolidityVerifier(action) ? [["verifier", "verifierSha256", ".sol"]] : []),
       ]) {
         files[field] = copy(
           artifact[field],
@@ -290,20 +292,22 @@ export async function verifyShieldedCeremonyArtifacts({
       const exportedVkey = path.join(build, `${action}.vkey.json`);
       const exportedVerifier = path.join(build, `${action}.sol`);
       await runSnarkjs(["zkey", "export", "verificationkey", files.zkey, exportedVkey]);
-      await runSnarkjs(["zkey", "export", "solidityverifier", files.zkey, exportedVerifier]);
       if (
         JSON.stringify(JSON.parse(fs.readFileSync(exportedVkey, "utf8"))) !==
         JSON.stringify(JSON.parse(fs.readFileSync(files.vkey, "utf8")))
       ) {
         throw new Error(`${action} vkey was not exported from the production zkey`);
       }
-      if (
-        renameZkVerifierSource(
-          fs.readFileSync(exportedVerifier, "utf8"),
-          item.verifierContractName,
-        ) !== fs.readFileSync(files.verifier, "utf8")
-      ) {
-        throw new Error(`${action} Solidity verifier was not exported from the production zkey`);
+      if (files.verifier) {
+        await runSnarkjs(["zkey", "export", "solidityverifier", files.zkey, exportedVerifier]);
+        if (
+          renameZkVerifierSource(
+            fs.readFileSync(exportedVerifier, "utf8"),
+            item.verifierContractName,
+          ) !== fs.readFileSync(files.verifier, "utf8")
+        ) {
+          throw new Error(`${action} Solidity verifier was not exported from the production zkey`);
+        }
       }
       snapshots.push(
         {

@@ -21,10 +21,6 @@ const ARTIFACTS = [
     "artifacts/contracts/DeepFamilyLineageIndex.sol/DeepFamilyLineageIndex.json",
   ],
   ["ShieldedDeepPool", "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json"],
-  [
-    "ShieldedHeirKeyRegistry",
-    "artifacts/contracts/ShieldedHeirKeyRegistry.sol/ShieldedHeirKeyRegistry.json",
-  ],
   ["DeepFamilyToken", "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json"],
   [
     "GovernanceTimelock",

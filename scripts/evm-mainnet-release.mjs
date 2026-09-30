@@ -317,14 +317,9 @@ const buildFingerprint = ({
       deepFamilyArchive: [plannedAddresses.deepFamily],
       deepFamilyArchiveBinding: plannedAddresses.deepFamilyArchive,
       deepFamilyReader: [plannedAddresses.deepFamily],
-      shieldedHeirKeyRegistry: [
-        plannedAddresses.deepFamilyLineageIndex,
-        plannedAddresses.groth16VerifierAdapter,
-      ],
       shieldedDeepPool: [
         plannedAddresses.token,
         plannedAddresses.deepFamilyLineageIndex,
-        plannedAddresses.shieldedHeirKeyRegistry,
         plannedAddresses.groth16VerifierAdapter,
       ],
     },
@@ -564,11 +559,6 @@ const assertProtocolTerminalState = async ({
       { needsLibraries: false },
     ]),
     [
-      "ShieldedHeirKeyRegistry",
-      addresses.shieldedHeirKeyRegistry,
-      { libraries: { PoseidonT3: addresses.poseidonT3 } },
-    ],
-    [
       "ShieldedDeepPool",
       addresses.shieldedDeepPool,
       { libraries: { PoseidonT3: addresses.poseidonT3 } },
@@ -667,10 +657,6 @@ const assertProtocolTerminalState = async ({
     deployed: {
       ...deployed,
       lineageIndex,
-      shieldedHeirKeyRegistry: await ethers.getContractAt(
-        "ShieldedHeirKeyRegistry",
-        addresses.shieldedHeirKeyRegistry,
-      ),
       shieldedDeepPool: await ethers.getContractAt("ShieldedDeepPool", addresses.shieldedDeepPool),
     },
     addresses,
@@ -1519,21 +1505,9 @@ export const main = async (chainProfile) => {
       )),
       await verificationEntry(
         hre.artifacts,
-        "ShieldedHeirKeyRegistry",
-        addresses.shieldedHeirKeyRegistry,
-        [addresses.groth16VerifierAdapter],
-        { PoseidonT3: addresses.poseidonT3 },
-      ),
-      await verificationEntry(
-        hre.artifacts,
         "ShieldedDeepPool",
         addresses.shieldedDeepPool,
-        [
-          addresses.token,
-          addresses.deepFamilyLineageIndex,
-          addresses.shieldedHeirKeyRegistry,
-          addresses.groth16VerifierAdapter,
-        ],
+        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
         { PoseidonT3: addresses.poseidonT3 },
       ),
     ];

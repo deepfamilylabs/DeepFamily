@@ -7,8 +7,8 @@ import { CIRCOM_LINUX_X64_SHA256, CIRCOM_VERSION } from "../scripts/lib/circomTo
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 import { verifyShieldedCeremonyArtifacts } from "../scripts/lib/shieldedCeremonyVerification.mjs";
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
+import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
 import { sha256File } from "../scripts/lib/zkArtifactTrust.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 
 const write = (root, relativePath, contents) => {
   const file = path.join(root, relativePath);
@@ -43,8 +43,8 @@ async function createFixture() {
   const compiler = write(root, "bin/circom", "verified native source compiler\n");
   const artifacts = {};
   const metadata = {};
-  for (const [action, source] of Object.entries(SHIELDED_CIRCUITS)) {
-    const verifierContractName = `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`;
+  for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
+    const { source, verifierContractName } = spec;
     const files = {
       sourcePath: write(root, `circuits/${source}.circom`, `${source} source\n`),
       r1cs: write(root, `compiled/${source}.r1cs`, `${source} reviewed R1CS\n`),
@@ -53,13 +53,15 @@ async function createFixture() {
       vkey: write(
         root,
         `public/${source}.vkey.json`,
-        JSON.stringify({ protocol: "groth16", nPublic: action === "keyRegistration" ? 7 : 32 }),
+        JSON.stringify({ protocol: "groth16", nPublic: spec.publicSignals }),
       ),
-      verifier: write(
-        root,
-        `contracts/${verifierContractName}.sol`,
-        `contract ${verifierContractName} { }\n`,
-      ),
+      verifier:
+        verifierContractName &&
+        write(
+          root,
+          `contracts/${verifierContractName}.sol`,
+          `contract ${verifierContractName} { }\n`,
+        ),
     };
     const ceremony = {
       contributions: [
@@ -77,13 +79,15 @@ async function createFixture() {
       ceremony,
       item: {
         source,
-        verifierContractName,
         sourceSha256: sha256File(files.sourcePath),
         r1csSha256: sha256File(files.r1cs),
         wasmSha256: sha256File(files.wasm),
         zkeySha256: sha256File(files.zkey),
         verificationKeySha256: sha256File(files.vkey),
-        verifierSha256: sha256File(files.verifier),
+        ...(verifierContractName && {
+          verifierContractName,
+          verifierSha256: sha256File(files.verifier),
+        }),
       },
     };
     metadata[action] = {
@@ -180,7 +184,9 @@ describe("shielded production ceremony verification snapshots", function () {
       circuitCount: 9,
       manifestSha256: fixture.inspected.manifestSha256,
     });
-    expect(fixture.calls).to.have.length(37);
+    expect(fixture.calls).to.have.length(36);
+    // The receive code is verified in the browser and exports no Solidity verifier.
+    expect(fixture.calls.filter(({ args }) => args[3] === "solidityverifier")).to.have.length(8);
     const snapshotRoot = path.dirname(fixture.calls[0].args[3]);
     expect(snapshotRoot).not.to.equal(path.dirname(fixture.ptau));
     const nativeCalls = fixture.calls.filter(({ executable }) => executable !== process.execPath);
@@ -242,9 +248,9 @@ describe("shielded production ceremony verification snapshots", function () {
   });
 
   it("checks the embedded final beacon after the mathematical zkey check", async function () {
-    fixture.metadata.keyRegistration.contributions[1].beaconHash = "ff".repeat(32);
+    fixture.metadata.receiveCode.contributions[1].beaconHash = "ff".repeat(32);
     const error = await captureError(() => verifyShieldedCeremonyArtifacts(fixture.options));
-    expect(error.message).to.include("keyRegistration zkey beacon differs");
+    expect(error.message).to.include("receiveCode zkey beacon differs");
     expect(fixture.calls).to.have.length(3);
     const snapshotRoot = path.dirname(fixture.calls[0].args[3]);
     expect(fs.existsSync(snapshotRoot)).to.equal(false);
@@ -253,8 +259,8 @@ describe("shielded production ceremony verification snapshots", function () {
   for (const [name, locate, message] of [
     [
       "zkey",
-      (root) => path.join(root, "keyRegistration.zkey"),
-      "keyRegistration zkey snapshot SHA-256 mismatch",
+      (root) => path.join(root, "receiveCode.zkey"),
+      "receiveCode zkey snapshot SHA-256 mismatch",
     ],
     ["compiler", (root) => path.join(root, "circom"), "Circom compiler snapshot SHA-256 mismatch"],
     ["pTau", (root) => path.join(root, "phase1.ptau"), "Powers of Tau snapshot SHA-256 mismatch"],
@@ -270,7 +276,7 @@ describe("shielded production ceremony verification snapshots", function () {
           ...fixture.options,
           runner: (invocation) => {
             fixture.runner(invocation);
-            if (fixture.calls.length === 37) {
+            if (fixture.calls.length === 36) {
               mutate(locate(path.dirname(fixture.calls[0].args[3])));
             }
           },
@@ -288,12 +294,12 @@ describe("shielded production ceremony verification snapshots", function () {
         runner: (invocation) => {
           fixture.runner(invocation);
           if (fixture.calls.length === 2) {
-            mutate(path.join(invocation.args.at(-1), "shielded_key_registration.r1cs"));
+            mutate(path.join(invocation.args.at(-1), "shielded_receive_code.r1cs"));
           }
         },
       }),
     );
-    expect(error.message).to.include("keyRegistration rebuilt R1CS SHA-256 mismatch");
+    expect(error.message).to.include("receiveCode rebuilt R1CS SHA-256 mismatch");
     expect(fixture.calls).to.have.length(2);
   });
 });

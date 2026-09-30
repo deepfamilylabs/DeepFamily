@@ -5,7 +5,11 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
 import {ShieldedDeepPool} from "../ShieldedDeepPool.sol";
 
-/** @dev Test only. This is deliberately not a ZK verifier and must never secure real funds. */
+/**
+ * @dev Test only. This is deliberately not a ZK verifier and must never secure real funds.
+ *      A "proof" is abi.encode(purpose, publicSignals), so it matches only the exact route and
+ *      public signals that the pool builds.
+ */
 contract ShieldedPoolVerifierMock is IProofVerifierAdapter {
   function verifyProof(
     uint8 purpose,
@@ -13,12 +17,8 @@ contract ShieldedPoolVerifierMock is IProofVerifierAdapter {
     bytes calldata proof,
     uint256[] calldata publicSignals
   ) external pure returns (bool) {
-    if (publicSignals.length != 32 || proofEncodingId != 1 || purpose != 3 + publicSignals[0]) {
-      return false;
-    }
-    uint256[32] memory fixedSignals;
-    for (uint256 i = 0; i < 32; ++i) fixedSignals[i] = publicSignals[i];
-    return keccak256(proof) == keccak256(abi.encode(fixedSignals));
+    if (proofEncodingId != 1) return false;
+    return keccak256(proof) == keccak256(abi.encode(purpose, publicSignals));
   }
 }
 
@@ -31,24 +31,6 @@ contract ShieldedPoolLineageMock {
 
   function root(uint8 treeId) external view returns (uint256) {
     return _roots[treeId];
-  }
-}
-
-contract ShieldedPoolKeyRegistryMock {
-  mapping(uint256 shardId => mapping(uint256 root => bool known)) private _known;
-  mapping(uint256 shardId => mapping(uint256 root => uint256 size)) private _sizes;
-
-  function setKnownRoot(uint256 shardId, uint256 root, bool known, uint256 size) external {
-    _known[shardId][root] = known;
-    _sizes[shardId][root] = known ? size : 0;
-  }
-
-  function isKnownRoot(uint256 shardId, uint256 root) external view returns (bool) {
-    return _known[shardId][root];
-  }
-
-  function knownRootSize(uint256 shardId, uint256 root) external view returns (uint256) {
-    return _sizes[shardId][root];
   }
 }
 
@@ -65,9 +47,8 @@ contract ShieldedPoolRolloverHarness is ShieldedDeepPool {
   constructor(
     address token,
     address lineageIndex,
-    address keyRegistry,
     address verifierAdapter
-  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifierAdapter) {}
+  ) ShieldedDeepPool(token, lineageIndex, verifierAdapter) {}
 
   function seedFullShard() external {
     Shard storage shard = _shards[0];
@@ -89,9 +70,8 @@ contract ShieldedPoolDepthHarness is ShieldedDeepPool {
   constructor(
     address token,
     address lineageIndex,
-    address keyRegistry,
     address verifierAdapter
-  ) ShieldedDeepPool(token, lineageIndex, keyRegistry, verifierAdapter) {}
+  ) ShieldedDeepPool(token, lineageIndex, verifierAdapter) {}
 
   function seedSyntheticLeftSubtree(uint256 leftRoot) external {
     Shard storage shard = _shards[0];

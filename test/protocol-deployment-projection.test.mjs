@@ -57,10 +57,6 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
         artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierContractName, record),
       ]),
     ),
-    shieldedHeirKeyRegistry: artifact(
-      "ShieldedHeirKeyRegistry",
-      deployments.shieldedHeirKeyRegistry,
-    ),
     shieldedDeepPool: artifact("ShieldedDeepPool", deployments.shieldedDeepPool),
     groth16VerifierAdapter: artifact("Groth16VerifierAdapter", deployments.groth16VerifierAdapter),
     deepFamilyArchive: artifact("DeepFamilyArchive", {
@@ -125,7 +121,7 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes all nine shielded verifiers behind the common eleven-route adapter", function () {
+  it("includes all eight shielded verifiers behind the common ten-route adapter", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
@@ -136,9 +132,7 @@ describe("planned production protocol deployment projection", function () {
     expect(contracts.shieldedDeepPool.verifierAdapterImmutable).to.equal(
       contracts.groth16VerifierAdapter.address,
     );
-    expect(contracts.shieldedHeirKeyRegistry.verifierAdapterImmutable).to.equal(
-      contracts.groth16VerifierAdapter.address,
-    );
+    expect(contracts).not.to.have.property("shieldedHeirKeyRegistry");
     for (const action of Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)) {
       expect(contracts.groth16VerifierAdapter[`${action}VerifierImmutable`]).to.equal(
         contracts.shieldedVerifiers[action].address,
@@ -146,7 +140,7 @@ describe("planned production protocol deployment projection", function () {
     }
   });
 
-  it("reconstructs linked pool and registry runtimes and pins every adapter verifier", function () {
+  it("reconstructs the linked pool runtime and pins every adapter verifier", function () {
     const plannedAddresses = deriveMainnetPlannedAddresses({
       ethers,
       deployer: DEPLOYER,
@@ -157,17 +151,19 @@ describe("planned production protocol deployment projection", function () {
       plannedAddresses,
       manifest: baseManifest(),
     });
-    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(8);
     expect(inspected.artifacts).not.to.have.property("shieldedAdapters");
     expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
-    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedHeirKeyRegistry.libraryFields).to.deep.equal([
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedDeepPool.libraryFields).to.deep.equal([
       "PoseidonT3",
     ]);
-    expect(inspected.artifacts.shieldedHeirKeyRegistry.runtimeBytecode).to.include(
-      plannedAddresses.poseidonT3.slice(2).toLowerCase(),
-    );
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedDeepPool.immutableFields).to.deep.equal([
+      "TOKEN",
+      "LINEAGE_INDEX",
+      "VERIFIER",
+    ]);
     const immutableValues = Object.fromEntries(
       GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
         getter,
@@ -232,8 +228,6 @@ describe("planned production protocol deployment projection", function () {
             (manifest.deployments.groth16VerifierAdapter[`${action}VerifierImmutable`] = DEPLOYER),
         ),
         (manifest) => (manifest.deployments.shieldedDeepPool.verifierAdapterImmutable = DEPLOYER),
-        (manifest) =>
-          (manifest.deployments.shieldedHeirKeyRegistry.verifierAdapterImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.address = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.address = DEPLOYER),
@@ -268,10 +262,6 @@ describe("planned production protocol deployment projection", function () {
         fixture.plannedAddresses[spec.verifierLabel].toLowerCase(),
         fixture.planned.artifacts.shieldedVerifiers[action].runtimeBytecode,
       ]),
-      [
-        fixture.plannedAddresses.shieldedHeirKeyRegistry.toLowerCase(),
-        fixture.planned.artifacts.shieldedHeirKeyRegistry.runtimeBytecode,
-      ],
       [
         fixture.plannedAddresses.shieldedDeepPool.toLowerCase(),
         fixture.planned.artifacts.shieldedDeepPool.runtimeBytecode,

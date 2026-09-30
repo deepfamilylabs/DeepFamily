@@ -1,24 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  SNARK_SCALAR_FIELD,
   computeIdentityFromDerivedSecret,
-  computeShieldedRegistrationSalt,
+  encodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
+import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import {
-  deriveShieldedRecipientMaterial,
-  encodeShieldedReceiveCode,
-  parseShieldedReceiveCode,
-  resolveShieldedRecipientMaterial,
+  ShieldedReceiveCodeError,
+  createOwnShieldedReceiveCode,
+  createShieldedReceiveCodeForRecipient,
+  peekShieldedReceiveCodePersonHash,
+  verifyShieldedReceiveCode,
 } from "./shieldedReceiveCode";
 
-const mocks = vi.hoisted(() => ({ cryptoWorkerCall: vi.fn() }));
-vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({
-  cryptoWorkerCall: mocks.cryptoWorkerCall,
+const mocks = vi.hoisted(() => ({ zkWorkerCall: vi.fn() }));
+vi.mock("../../../shared/workers/zkWorkerClient", () => ({
+  zkWorkerCall: mocks.zkWorkerCall,
 }));
 
-const registryAddress = "0x1111111111111111111111111111111111111111";
-const chainId = 1030n;
 const identity = {
   fullName: "Child Example",
   gender: 1,
@@ -32,85 +31,108 @@ const fixture = computeIdentityFromDerivedSecret({
   identitySuiteId: 1,
   derivedSecretField: 13n,
 });
-const registrationSalt = computeShieldedRegistrationSalt({
-  derivedSecretField: fixture.derivedSecretField,
+const personHash = wrapIdentityCommitmentAsPersonHash(fixture.identityCommitment);
+const viewingKey = `0x${"42".repeat(32)}`;
+// Decoding only needs canonical proof coordinates; the worker verifies the proof.
+const code = encodeShieldedReceiveCode({
   identityCommitment: fixture.identityCommitment,
-  chainId,
-  registryAddress,
+  ownerCommitment: 29n,
+  viewingKey,
+  proof: {
+    pi_a: ["1", "2", "1"],
+    pi_b: [
+      ["3", "4"],
+      ["5", "6"],
+      ["1", "0"],
+    ],
+    pi_c: ["7", "8", "1"],
+  },
 });
 
 beforeEach(() => {
-  mocks.cryptoWorkerCall.mockReset();
+  mocks.zkWorkerCall.mockReset();
 });
 
-describe("private shielded recipient material", () => {
-  it("round trips the receive code without a public identity lookup", () => {
-    const code = encodeShieldedReceiveCode(19n, 23n);
-    const expected = {
-      identityCommitment: 19n,
-      registrationSalt: 23n,
-      personHash: wrapIdentityCommitmentAsPersonHash(19n),
-    };
-    expect(parseShieldedReceiveCode(code)).toEqual(expected);
-    expect(resolveShieldedRecipientMaterial({ kind: "receiveCode", code })).toEqual(expected);
-  });
-
-  it("rejects malformed or out-of-field receive codes", () => {
-    expect(() => parseShieldedReceiveCode("0x1234")).toThrow("format");
-    expect(() => encodeShieldedReceiveCode(0n, 23n)).toThrow("identity");
-    expect(() => encodeShieldedReceiveCode(19n, SNARK_SCALAR_FIELD)).toThrow("salt");
-  });
-
-  it("uses the dedicated worker and returns only narrow recipient material", async () => {
-    mocks.cryptoWorkerCall.mockResolvedValueOnce({
-      identityCommitment: String(fixture.identityCommitment),
-      registrationSalt: String(registrationSalt),
-      personHash: fixture.personHash,
+describe("shielded receive codes", () => {
+  it("returns payment keys only after the worker verifies the code", async () => {
+    mocks.zkWorkerCall.mockResolvedValueOnce({
+      ok: true,
+      identityCommitment: fixture.identityCommitment.toString(),
+      ownerCommitment: "29",
+      viewingKey,
+      personHash,
     });
-    const rawPassphrase = "child secret for this test";
-    const direct = await deriveShieldedRecipientMaterial({
-      identity,
-      rawPassphrase,
-      chainId,
-      registryAddress,
-    });
-    const fromCode = parseShieldedReceiveCode(
-      encodeShieldedReceiveCode(fixture.identityCommitment, registrationSalt),
+    const recipient = await verifyShieldedReceiveCode(code);
+    expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
+      "verifyShieldedReceiveCode",
+      { code },
+      expect.objectContaining({ timeoutMs: expect.any(Number) }),
     );
-
-    expect(mocks.cryptoWorkerCall).toHaveBeenCalledWith(
-      "deriveShieldedRecipientMaterial",
-      { identity, rawPassphrase, chainId, registryAddress },
-      { timeoutMs: 240_000 },
-    );
-    expect(direct).toEqual(fromCode);
-    expect(Object.keys(direct).sort()).toEqual([
-      "identityCommitment",
-      "personHash",
-      "registrationSalt",
-    ]);
+    expect(recipient).toEqual({
+      identityCommitment: fixture.identityCommitment,
+      ownerCommitment: 29n,
+      viewingKey,
+      personHash,
+    });
   });
 
-  it("rejects forged narrow worker output", async () => {
-    mocks.cryptoWorkerCall.mockResolvedValueOnce({
-      identityCommitment: String(fixture.identityCommitment),
-      registrationSalt: String(registrationSalt),
-      personHash: `0x${"ab".repeat(32)}`,
+  it("separates copying mistakes, tampering and an inconsistent identity", async () => {
+    mocks.zkWorkerCall.mockResolvedValueOnce({ ok: false, reason: "malformed" });
+    await expect(verifyShieldedReceiveCode("dfrecv1q")).rejects.toMatchObject({
+      name: "ShieldedReceiveCodeError",
+      reason: "malformed",
     });
-    await expect(deriveShieldedRecipientMaterial({
-      identity,
-      rawPassphrase: "secret",
-      chainId,
-      registryAddress,
-    })).rejects.toThrow("invalid");
+    mocks.zkWorkerCall.mockResolvedValueOnce({ ok: false, reason: "invalid" });
+    await expect(verifyShieldedReceiveCode(code)).rejects.toBeInstanceOf(
+      ShieldedReceiveCodeError,
+    );
+    mocks.zkWorkerCall.mockResolvedValueOnce({
+      ok: true,
+      identityCommitment: fixture.identityCommitment.toString(),
+      ownerCommitment: "29",
+      viewingKey,
+      personHash: wrapIdentityCommitmentAsPersonHash(fixture.identityCommitment + 1n),
+    });
+    await expect(verifyShieldedReceiveCode(code)).rejects.toMatchObject({ reason: "invalid" });
+  });
 
-    expect(() => resolveShieldedRecipientMaterial({
-      kind: "derivedRecipient",
-      material: {
-        identityCommitment: fixture.identityCommitment,
-        registrationSalt: 0n,
-        personHash: fixture.personHash,
-      },
-    })).toThrow("invalid");
+  it("previews the named person without verifying the proof", () => {
+    expect(peekShieldedReceiveCodePersonHash(code)).toBe(personHash);
+    expect(peekShieldedReceiveCodePersonHash(`  ${code}\n`)).toBe(personHash);
+    expect(peekShieldedReceiveCodePersonHash("")).toBeNull();
+    expect(peekShieldedReceiveCodePersonHash(code.slice(0, -1))).toBeNull();
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+  });
+
+  it("creates the unlocked identity's own code in the worker", async () => {
+    const material = {
+      identity,
+      identitySuiteId: 1,
+      derivedSecretField: "13",
+      personHash,
+    } as IdentityMaterialV1Result;
+    mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
+    await expect(createOwnShieldedReceiveCode(material)).resolves.toBe(code);
+    expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
+      "createShieldedReceiveCode",
+      { identity, identitySuiteId: 1, derivedSecretField: "13" },
+      expect.any(Object),
+    );
+    mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash: `0x${"00".repeat(32)}` });
+    await expect(createOwnShieldedReceiveCode(material)).rejects.toThrow(
+      "does not belong to the unlocked identity",
+    );
+  });
+
+  it("returns only the code when creating one from a recipient's credentials", async () => {
+    mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
+    await expect(
+      createShieldedReceiveCodeForRecipient({ identity, rawPassphrase: "secret phrase" }),
+    ).resolves.toBe(code);
+    expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
+      "createShieldedReceiveCodeFromCredentials",
+      { identity, rawPassphrase: "secret phrase" },
+      expect.any(Object),
+    );
   });
 });

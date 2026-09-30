@@ -33,8 +33,6 @@ function actionData(roots: CurrentLineageRoots): ShieldedPoolActionData {
     relation0: roots.endorsement,
     relation1: roots.trusted,
     asOf: 1n,
-    registryRoot: 0n,
-    registryShardId: 0n,
   };
 }
 

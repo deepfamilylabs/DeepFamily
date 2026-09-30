@@ -34,16 +34,14 @@ function shieldFixture() {
   const outputAmounts = [70n, 30n];
   const outputNonces = [4001n, 4002n];
   const hashes = [field(1), field(2)];
-  const signals = Array(32).fill(0n);
-  signals[1] = 31337n;
-  signals[2] = 0x1234n;
-  for (let i = 0; i < 2; i += 1) {
-    signals[21 + i] = valueNote(outputAmounts[i], outputNonces[i], hashes[i]);
-    signals[23 + i] = hashes[i];
-  }
-  signals[25] = 100n;
   return {
-    publicSignals: asStrings(signals),
+    chainId: "31337",
+    pool: String(0x1234n),
+    outputCommitments: asStrings(
+      outputAmounts.map((amount, i) => valueNote(amount, outputNonces[i], hashes[i])),
+    ),
+    ciphertextHashes: asStrings(hashes),
+    amount: "100",
     ownerSecret: ownerSecret.toString(),
     outputAmounts: asStrings(outputAmounts),
     outputNonces: asStrings(outputNonces),
@@ -60,25 +58,22 @@ function unshieldFixture() {
   const dummyNonce = 4402n;
   const changeHash = field(4);
   const dummyHash = field(5);
-  const signals = Array(32).fill(0n);
-  signals[0] = 7n;
-  signals[1] = 31337n;
-  signals[2] = 0x1234n;
-  signals[4] = inputCommitment;
-  signals[6] = inputCommitment;
-  signals[7] = computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment });
-  signals[8] = computeShieldedDummyInputNullifier({
-    ownerSecret,
-    noteCommitment: inputCommitment,
-  });
-  signals[21] = valueNote(changeAmount, changeNonce, changeHash);
-  signals[22] = valueNote(0n, dummyNonce, dummyHash);
-  signals[23] = changeHash;
-  signals[24] = dummyHash;
-  signals[25] = 30n;
-  signals[26] = 0x5678n;
   return {
-    publicSignals: asStrings(signals),
+    chainId: "31337",
+    pool: String(0x1234n),
+    inputShardId: "0",
+    inputRoot: inputCommitment.toString(),
+    inputNullifiers: asStrings([
+      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }),
+      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: inputCommitment }),
+    ]),
+    outputCommitments: asStrings([
+      valueNote(changeAmount, changeNonce, changeHash),
+      valueNote(0n, dummyNonce, dummyHash),
+    ]),
+    ciphertextHashes: asStrings([changeHash, dummyHash]),
+    amount: "30",
+    recipient: String(0x5678n),
     ownerSecret: ownerSecret.toString(),
     inputAmount: inputAmount.toString(),
     inputNonce: inputNonce.toString(),
@@ -176,7 +171,7 @@ test("shield and unshield boundary circuits", async (t) => {
     await t.test("shield rejects amount inflation and output substitution", async () => {
       await shield.invalid(
         mutated(deposit, (w) => {
-          w.publicSignals[25] = "101";
+          w.amount = "101";
         }),
       );
       await shield.invalid(
@@ -186,22 +181,17 @@ test("shield and unshield boundary circuits", async (t) => {
       );
       await shield.invalid(
         mutated(deposit, (w) => {
-          w.publicSignals[21] = "123";
+          w.outputCommitments[0] = "123";
         }),
       );
       await shield.invalid(
         mutated(deposit, (w) => {
-          w.publicSignals[23] = "123";
+          w.ciphertextHashes[0] = "123";
         }),
       );
       await shield.invalid(
         mutated(deposit, (w) => {
           w.ownerSecret = "0";
-        }),
-      );
-      await shield.invalid(
-        mutated(deposit, (w) => {
-          w.publicSignals[7] = "1";
         }),
       );
     });
@@ -218,13 +208,12 @@ test("shield and unshield boundary circuits", async (t) => {
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.publicSignals[4] = "123";
-          w.publicSignals[6] = "123";
+          w.inputRoot = "123";
         }),
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.publicSignals[25] = "31";
+          w.amount = "31";
         }),
       );
       await unshield.invalid(
@@ -234,24 +223,24 @@ test("shield and unshield boundary circuits", async (t) => {
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.publicSignals[21] = "123";
+          w.outputCommitments[0] = "123";
         }),
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.publicSignals[24] = "123";
+          w.ciphertextHashes[1] = "123";
         }),
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.publicSignals[26] = "0";
+          w.recipient = "0";
         }),
       );
     });
 
     await t.test("unshield accepts an exact 32-level LeanIMT path", async () => {
       const deep = structuredClone(withdrawal);
-      let root = BigInt(deep.publicSignals[4]);
+      let root = BigInt(deep.inputRoot);
       for (let level = 0; level < 32; level += 1) {
         const sibling = BigInt(level + 1);
         deep.noteSiblings[level] = sibling.toString();
@@ -259,8 +248,7 @@ test("shield and unshield boundary circuits", async (t) => {
       }
       deep.noteDepth = "32";
       deep.noteIndex = (1n << 31n).toString();
-      deep.publicSignals[4] = root.toString();
-      deep.publicSignals[6] = root.toString();
+      deep.inputRoot = root.toString();
       await unshield.valid(deep);
     });
   } finally {

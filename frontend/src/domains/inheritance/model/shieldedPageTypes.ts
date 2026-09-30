@@ -7,7 +7,6 @@ export type ShieldedPageModules = {
   lineageIndex: Contract;
   token: Contract;
   pool: Contract;
-  registry: Contract;
   poolAddress: string;
   tokenDecimals: number;
 };

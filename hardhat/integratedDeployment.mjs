@@ -462,24 +462,15 @@ const assertExistingLineageWiring = async ({ deepFamily, lineageIndex }) => {
 };
 
 export const assertIntegratedShieldedWiring = async (deployed) => {
-  const {
-    token,
-    lineageIndex,
-    shieldedDeepPool: pool,
-    shieldedHeirKeyRegistry: registry,
-    groth16VerifierAdapter: adapter,
-  } = deployed;
-  const [tokenAddress, lineageAddress, registryAddress, adapterAddress] = await Promise.all([
+  const { token, lineageIndex, shieldedDeepPool: pool, groth16VerifierAdapter: adapter } = deployed;
+  const [tokenAddress, lineageAddress, adapterAddress] = await Promise.all([
     token.getAddress(),
     lineageIndex.getAddress(),
-    registry.getAddress(),
     adapter.getAddress(),
   ]);
   for (const [value, expected, label] of [
     [await pool.TOKEN(), tokenAddress, "pool token"],
     [await pool.LINEAGE_INDEX(), lineageAddress, "pool lineage index"],
-    [await pool.KEY_REGISTRY(), registryAddress, "pool key registry"],
-    [await registry.VERIFIER(), adapterAddress, "key registry verifier adapter"],
     [await pool.VERIFIER(), adapterAddress, "pool verifier adapter"],
   ]) {
     if (!sameAddress(value, expected))
@@ -651,7 +642,7 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress();
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress();
 
-  // All verifier targets must exist before the single adapter fixes its eleven routes.
+  // All verifier targets must exist before the single adapter fixes its ten routes.
   const shieldedVerifiers = {};
   for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
     shieldedVerifiers[action] = await deployContract(
@@ -820,15 +811,6 @@ export const deployIntegratedSystem = async (
     );
   }
 
-  const ShieldedKeyRegistry = await ethers.getContractFactory("ShieldedHeirKeyRegistry", {
-    signer: deployer,
-    libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
-  });
-  const shieldedHeirKeyRegistry = await deployContract(
-    "shieldedHeirKeyRegistry",
-    ShieldedKeyRegistry,
-    [groth16VerifierAdapterAddress],
-  );
   const ShieldedPool = await ethers.getContractFactory("ShieldedDeepPool", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
@@ -836,12 +818,10 @@ export const deployIntegratedSystem = async (
   const shieldedDeepPool = await deployContract("shieldedDeepPool", ShieldedPool, [
     tokenAddress,
     lineageIndexAddress,
-    await shieldedHeirKeyRegistry.getAddress(),
     groth16VerifierAdapterAddress,
   ]);
   const shielded = {
     shieldedVerifiers,
-    shieldedHeirKeyRegistry,
     shieldedDeepPool,
   };
   await assertIntegratedShieldedWiring({
@@ -1032,10 +1012,7 @@ export const ensureIntegratedSystem = async (
 ) => {
   assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
-  if (
-    connection.__deepfamilyIntegrated?.shieldedDeepPool &&
-    connection.__deepfamilyIntegrated?.shieldedHeirKeyRegistry
-  ) {
+  if (connection.__deepfamilyIntegrated?.shieldedDeepPool) {
     return connection.__deepfamilyIntegrated;
   }
   const { ethers } = connection;
@@ -1113,16 +1090,12 @@ export const ensureIntegratedSystem = async (
               spec:
                 record.contractName === "DeepFamilyLineageIndex"
                   ? { libraries }
-                  : record.contractName === "ShieldedHeirKeyRegistry"
-                    ? {
-                        libraries: { PoseidonT3: libraries.PoseidonT3 },
-                      }
-                    : record.contractName === "ShieldedDeepPool"
-                      ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
-                      : {
-                          needsLibraries: false,
-                          librarySelfAddress: POSEIDON_LIBRARIES.includes(record.contractName),
-                        },
+                  : record.contractName === "ShieldedDeepPool"
+                    ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
+                    : {
+                        needsLibraries: false,
+                        librarySelfAddress: POSEIDON_LIBRARIES.includes(record.contractName),
+                      },
             })),
         });
       }

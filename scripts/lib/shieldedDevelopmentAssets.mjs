@@ -53,6 +53,7 @@ export async function syncShieldedDevelopmentAssets({
         throw new Error(`${action} ${field} mismatch before synchronization`);
       files.push({ source, destination });
     }
+    if (!spec.verifierPath) continue;
     const verifier = checkedFile(
       root,
       `zk-artifacts/shielded/verifiers/${spec.source}.sol`,

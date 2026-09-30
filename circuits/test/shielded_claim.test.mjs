@@ -1,6 +1,6 @@
 // Run with: node --test circuits/test/shielded_claim.test.mjs
-// This compiles the isolated prototype to a temporary directory. It does not
-// generate or trust a production Groth16 key.
+// This compiles the circuit to a temporary directory. It does not generate or
+// trust a production Groth16 key.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -123,7 +123,7 @@ test("shielded claim constraints", async (t) => {
           ownerSecret: keys.ownerSecret,
           noteCommitment: inputBudget,
         }).toString(),
-        witness.publicSignals[8],
+        witness.inputNullifiers[1],
       );
       assert.equal(
         computeShieldedPeriodNullifier({
@@ -131,23 +131,23 @@ test("shielded claim constraints", async (t) => {
           policyCommitment: policy,
           periodIndex: witness.periodIndices[0],
         }).toString(),
-        witness.publicSignals[9],
+        witness.periodNullifiers[0],
       );
-      assert.equal(witness.publicSignals.length, 32);
+      assert.equal(witness.periodNullifiers.length, 12);
       assert.equal(
         computeShieldedDummyPeriodNullifier({
           ownerSecret: keys.ownerSecret,
           budgetNoteCommitment: inputBudget,
           slotIndex: 2,
         }).toString(),
-        witness.publicSignals[11],
+        witness.periodNullifiers[2],
       );
       assert.deepEqual(
         computeShieldedClaimBatch({
           amountPerPeriod: witness.rate,
           remaining: witness.remaining,
           eligibleFrom: witness.eligibleFrom,
-          now: witness.publicSignals[29],
+          now: witness.asOf,
           periodIndices: witness.periodIndices.slice(0, Number(witness.claimCount)),
         }),
         {
@@ -199,8 +199,7 @@ test("shielded claim constraints", async (t) => {
       }
       witness.noteDepth = "32";
       witness.noteIndex = (1n << 31n).toString();
-      witness.publicSignals[4] = root.toString();
-      witness.publicSignals[6] = root.toString();
+      witness.inputRoot = root.toString();
       await valid(witness);
     });
     await t.test("full 64-level endorsement and trusted paths verify the child", async () => {
@@ -232,11 +231,11 @@ test("shielded claim constraints", async (t) => {
       witness.endorsementDepth = endorsement.depth;
       witness.endorsementIndex = endorsement.index;
       witness.endorsementSiblings = endorsement.siblings;
-      witness.publicSignals[27] = endorsement.root.toString();
+      witness.endorsementRoot = endorsement.root.toString();
       witness.trustedDepth = trusted.depth;
       witness.trustedIndex = trusted.index;
       witness.trustedSiblings = trusted.siblings;
-      witness.publicSignals[28] = trusted.root.toString();
+      witness.trustedRoot = trusted.root.toString();
       await valid(witness);
       await invalid(
         mutate(witness, (w) => {
@@ -268,7 +267,7 @@ test("shielded claim constraints", async (t) => {
             : poseidon2([root, sibling]);
       }
       witness.writtenAt = newWrittenAt.toString();
-      witness.publicSignals[27] = root.toString();
+      witness.endorsementRoot = root.toString();
       assert.ok(newWrittenAt > BigInt(witness.eligibleFrom));
       await valid(witness);
     });
@@ -284,7 +283,7 @@ test("shielded claim constraints", async (t) => {
     await t.test("rejects a period before its full end", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.publicSignals[29] = (BigInt(w.publicSignals[29]) - 1n).toString();
+          w.asOf = (BigInt(w.asOf) - 1n).toString();
         }),
       );
     });
@@ -300,12 +299,12 @@ test("shielded claim constraints", async (t) => {
             policySalt: w.policySalt,
             allocationKeyCommitment: w.allocationKeyCommitment,
           });
-          w.publicSignals[9] = computeShieldedPeriodNullifier({
+          w.periodNullifiers[0] = computeShieldedPeriodNullifier({
             derivedSecretField: w.derivedSecretField,
             policyCommitment: policy,
             periodIndex: 2n,
           }).toString();
-          w.publicSignals[10] = computeShieldedPeriodNullifier({
+          w.periodNullifiers[1] = computeShieldedPeriodNullifier({
             derivedSecretField: w.derivedSecretField,
             policyCommitment: policy,
             periodIndex: 3n,
@@ -317,7 +316,7 @@ test("shielded claim constraints", async (t) => {
       await invalid(
         mutate(base, (w) => {
           w.periodIndices[1] = w.periodIndices[0];
-          w.publicSignals[10] = w.publicSignals[9];
+          w.periodNullifiers[1] = w.periodNullifiers[0];
         }),
       );
     });
@@ -345,29 +344,21 @@ test("shielded claim constraints", async (t) => {
     await t.test("rejects an unrelated note root", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.publicSignals[4] = "123";
-          w.publicSignals[6] = "123";
+          w.inputRoot = "123";
         }),
       );
     });
     await t.test("rejects a forged payout commitment", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.publicSignals[22] = "123";
+          w.outputCommitments[1] = "123";
         }),
       );
     });
     await t.test("rejects ciphertext substitution", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.publicSignals[24] = "123";
-        }),
-      );
-    });
-    await t.test("rejects direct public payout", async () => {
-      await invalid(
-        mutate(base, (w) => {
-          w.publicSignals[26] = "1";
+          w.ciphertextHashes[1] = "123";
         }),
       );
     });

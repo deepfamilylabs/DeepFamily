@@ -19,7 +19,7 @@ commitment; `personHash` carries no route-recency marker.
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
 
-The shielded inheritance pool uses a separate set of action circuits and a key-registration circuit. Their proofs do not use the DeepFamily `ProofEnvelope` route.
+The shielded inheritance pool uses a separate set of action circuits, plus a receive-code circuit that is verified only in the browser. Their proofs do not use the DeepFamily `ProofEnvelope` route.
 
 ## Identity and Commitment Architecture
 
@@ -299,15 +299,18 @@ intentionally public NFT data.
 
 ## Shielded inheritance circuits
 
-`circuits/shielded_key_registration.circom` proves that the registrant knows a self-consistent private identity secret and binds a viewing key to its blinded registration leaf. Registration alone does not prove that the identity exists in DeepFamily; `allocate` proves the intended recipient's lineage eligibility. Eight pool action circuits prove ownership and value conservation for `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Their public inputs have a fixed 32-signal shape.
+`circuits/shielded_receive_code.circom` backs a recipient's receive code. The proof shows that whoever knows the identity secret behind `identityCommitment` derived `ownerCommitment` from that secret and chose the X25519 viewing key. Its four public signals are `[identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi]`. The payer's browser verifies the proof with the verification key built into the app, plus a BN254 G2 subgroup check. There is no on-chain verifier or registry. A receive code does not prove that the identity exists in DeepFamily; `allocate` proves the intended recipient's lineage eligibility.
 
-`ShieldedDeepPool` stores encrypted notes and one-time spend and period nullifiers. The pool note and key-registry trees are 32-level rotating shards; the two lineage trees remain 64 levels deep. A claim proves an eligible direct child, current endorsement and recommended source, complete due periods, and sufficient budget. It creates a private child-controlled note. An exit later exposes its public recipient and amount.
+Eight pool action circuits prove ownership and value conservation for `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Each circuit declares as public inputs only the values its action uses, from 7 signals (`shield`) to 25 (`claim`). The pool builds the same order; see [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout.
+
+`ShieldedDeepPool` stores encrypted notes and one-time spend and period nullifiers. The pool note tree uses 32-level rotating shards; the two lineage trees remain 64 levels deep. A claim proves an eligible direct child, current endorsement and recommended source, complete due periods, and sufficient budget. It creates a private child-controlled note. An exit later exposes its public recipient and amount.
 
 `privateTransfer` can spend one or two value notes, so a child can transfer the first claimed note immediately. The second public slot uses a secret-bound dummy nullifier for a single-note transfer. Different public input roots reveal that two real notes were spent; equal roots do not establish how many real notes were used.
 
 `npm run zk:development:setup` prepares all 11 circuits and synchronizes their browser artifacts
 to `frontend/public/zk/`, with shielded files in the `shielded/` subdirectory. Generated shielded
-verifiers live under `contracts/Shielded*Verifier.sol`. `npm run zk:production:setup` uses the same production
+verifiers for the eight pool actions live under `contracts/Shielded*Verifier.sol`; the receive
+code has none. `npm run zk:production:setup` uses the same production
 setup workflow for all 11 circuits, generating independent keys for each circuit.
 
 ## Proof Transport and Permanent Routing
@@ -337,14 +340,13 @@ Current generated verifiers are:
 
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- eight 32-signal shielded action verifiers for pool actions;
-- a seven-signal verifier for `ShieldedHeirKeyRegistry`.
+- eight shielded action verifiers for pool actions, with 7 to 25 public signals.
 
-All eleven circuits share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
+These ten verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
 adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
-and disclosure, purpose 2 to key registration, and purposes 3–10 to the eight pool actions.
-Each route fixes its verifier address and checks its expected public-signal length. The pool
-constructs and binds its own action ID (0–7); the adapter handles proof transport only.
+and disclosure and purposes 2–9 to the eight pool actions (pool action ID + 2). Each route fixes
+its verifier address and checks its expected public-signal length. The action is not a public
+signal: the pool picks the purpose for its action, and the adapter handles proof transport only.
 
 ## Frontend and Shared Definitions
 

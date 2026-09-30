@@ -11,7 +11,9 @@ import hre from "hardhat";
 import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 import { poseidon2, poseidon8 } from "poseidon-lite";
 import {
-  buildShieldedPoolPublicSignals,
+  SHIELDED_POOL_ACTION,
+  SHIELDED_POOL_PUBLIC_INPUTS,
+  buildShieldedPoolPublicInputs,
   computeShieldedAllocationKeyCommitment,
   computeShieldedBudgetNoteCommitment,
   computeShieldedDummyInputNullifier,
@@ -22,7 +24,6 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedPolicyNoteCommitment,
-  computeShieldedRegistrationLeaf,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -37,7 +38,6 @@ import {
   encodeShieldedPolicyNotePayload,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
-  splitShieldedViewPublicKey,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
@@ -45,6 +45,7 @@ import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_cl
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 import { currentShieldedCandidateManifest } from "../scripts/lib/shieldedArtifacts.mjs";
+import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PUBLIC_ARTIFACTS = path.join(ROOT, "frontend", "public", "zk", "shielded");
@@ -61,9 +62,13 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
-  registryRoot: 0n,
-  registryShardId: 0n,
 });
+
+/** Ordered verifier inputs of a witness that uses the circuit's named public inputs. */
+const claimSignalsOf = (witness) =>
+  SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Claim].flatMap((name) =>
+    [witness[name]].flat().map(BigInt),
+  );
 
 function circuitFiles(action, manifest) {
   manifest ??= JSON.parse(
@@ -137,7 +142,7 @@ function checkedCurrentArtifacts(actions) {
     }
     assert.equal(
       JSON.parse(fs.readFileSync(files.vkey, "utf8")).nPublic,
-      action === "keyRegistration" ? 7 : 32,
+      SHIELDED_SETUP_CIRCUITS[action].publicSignals,
     );
   }
   return { manifest };
@@ -320,8 +325,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     witness.noteDepth = note.depth;
     witness.noteIndex = note.index;
     witness.noteSiblings = note.siblings;
-    witness.publicSignals[4] = note.root.toString();
-    witness.publicSignals[6] = note.root.toString();
+    witness.inputRoot = note.root.toString();
 
     const endorser = hre.ethers.toBeHex(BigInt(witness.endorser), 20);
     const parentsDigest = computeLineageParentsDigest({
@@ -349,14 +353,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     witness.endorsementDepth = endorsement.depth;
     witness.endorsementIndex = endorsement.index;
     witness.endorsementSiblings = endorsement.siblings;
-    witness.publicSignals[27] = endorsement.root.toString();
+    witness.endorsementRoot = endorsement.root.toString();
     witness.trustedDepth = trusted.depth;
     witness.trustedIndex = trusted.index;
     witness.trustedSiblings = trusted.siblings;
-    witness.publicSignals[28] = trusted.root.toString();
+    witness.trustedRoot = trusted.root.toString();
 
     const start = performance.now();
-    const proof = await prove("claim", witness, witness.publicSignals.map(BigInt));
+    const proof = await prove("claim", witness, claimSignalsOf(witness));
     const nodeProofMs = Math.ceil(performance.now() - start);
     assert.ok(proof.length > 2);
     if (process.env.SHIELDED_FULL_DEPTH_PROOF_REPORT === "1") {
@@ -375,7 +379,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
   });
 
   it("uses real shield and unshield proofs through Solidity verifiers and the pool", async function () {
-    const artifacts = checkedCurrentArtifacts(["shield", "unshield"]);
+    const artifacts = checkedCurrentArtifacts(["shield", "unshield", "privateTransfer"]);
     if (artifacts.missing) {
       console.log(
         `Skipping local real proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
@@ -384,16 +388,16 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     }
 
     const [depositor, recipient] = await hre.ethers.getSigners();
-    const generated = await deployCurrentGeneratedVerifiers(["shield", "unshield"], depositor);
+    const generated = await deployCurrentGeneratedVerifiers(
+      ["shield", "unshield", "privateTransfer"],
+      depositor,
+    );
     const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
-    const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
-        contract.waitForDeployment(),
-      ),
+      [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
     );
     const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
@@ -401,7 +405,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const pool = await Pool.deploy(
       await token.getAddress(),
       await lineage.getAddress(),
-      await keyRegistry.getAddress(),
       await adapter.getAddress(),
     );
     await pool.waitForDeployment();
@@ -421,7 +424,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: initialNotes.map((note) => note.commitment),
       outputCiphertexts: initialNotes.map((note) => note.ciphertextHex),
     };
-    const shieldSignals = buildShieldedPoolPublicSignals({
+    const { signals: shieldSignals, witness: shieldPublicInputs } = buildShieldedPoolPublicInputs({
       action: 0,
       chainId,
       poolAddress,
@@ -431,16 +434,18 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const shieldProof = await prove(
       "shield",
       {
-        publicSignals: shieldSignals.map(String),
+        ...shieldPublicInputs,
         ownerSecret: String(ownerSecret),
         outputAmounts: ["100", "0"],
         outputNonces: ["11", "12"],
       },
       shieldSignals,
     );
-    expect(await adapter.verifyProof(3, 1, shieldProof, shieldSignals)).to.equal(true);
-    // Equal public-signal lengths do not allow a proof from one circuit to verify in another.
-    expect(await adapter.verifyProof(10, 1, shieldProof, shieldSignals)).to.equal(false);
+    expect(await adapter.verifyProof(2, 1, shieldProof, shieldSignals)).to.equal(true);
+    // A proof can only reach the verifier route with its own public-signal count.
+    await expect(
+      adapter.verifyProof(9, 1, shieldProof, shieldSignals),
+    ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     await token.mint(depositor.address, 100n);
     await token.approve(poolAddress, 100n);
     await expect(pool.shield(101n, shieldData, shieldProof)).to.be.revertedWithCustomError(
@@ -499,18 +504,19 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: changeNotes.map((note) => note.commitment),
       outputCiphertexts: changeNotes.map((note) => note.ciphertextHex),
     };
-    const unshieldSignals = buildShieldedPoolPublicSignals({
-      action: 7,
-      chainId,
-      poolAddress,
-      ...unshieldData,
-      amount: 30n,
-      recipient: recipient.address,
-    });
+    const { signals: unshieldSignals, witness: unshieldPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 7,
+        chainId,
+        poolAddress,
+        ...unshieldData,
+        amount: 30n,
+        recipient: recipient.address,
+      });
     const unshieldProof = await prove(
       "unshield",
       {
-        publicSignals: unshieldSignals.map(String),
+        ...unshieldPublicInputs,
         ownerSecret: String(ownerSecret),
         inputAmount: "100",
         inputNonce: "11",
@@ -527,7 +533,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       unshieldSignals,
     );
-    expect(await adapter.verifyProof(10, 1, unshieldProof, unshieldSignals)).to.equal(true);
+    expect(await adapter.verifyProof(9, 1, unshieldProof, unshieldSignals)).to.equal(true);
+    // Equal public-signal lengths do not allow a proof from one circuit to verify in another.
+    expect(await adapter.verifyProof(8, 1, unshieldProof, unshieldSignals)).to.equal(false);
     await expect(
       pool.unshield(depositor.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
@@ -562,12 +570,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
-    const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
-        contract.waitForDeployment(),
-      ),
+      [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
     );
     const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
@@ -575,7 +580,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const pool = await Pool.deploy(
       await token.getAddress(),
       await lineage.getAddress(),
-      await keyRegistry.getAddress(),
       await adapter.getAddress(),
     );
     await pool.waitForDeployment();
@@ -609,7 +613,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: [firstDonorNote.commitment, firstDummyNote.commitment],
       outputCiphertexts: [firstDonorNote.ciphertextHex, firstDummyNote.ciphertextHex],
     };
-    const shieldSignals = buildShieldedPoolPublicSignals({
+    const { signals: shieldSignals, witness: shieldPublicInputs } = buildShieldedPoolPublicInputs({
       action: 0,
       chainId,
       poolAddress,
@@ -619,7 +623,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const shieldProof = await prove(
       "shield",
       {
-        publicSignals: shieldSignals.map(String),
+        ...shieldPublicInputs,
         ownerSecret: String(donorOwnerSecret),
         outputAmounts: ["2000", "0"],
         outputNonces: ["101", "102"],
@@ -636,7 +640,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const heirKeys = deriveShieldedHeirKeyMaterial(claimFixture.witness.derivedSecretField);
     assert.equal(heirKeys.ownerCommitment, BigInt(allocationWitness.heirOwnerCommitment));
     const heirViewingKey = await deriveShieldedViewPublicKey(heirKeys.hpkeIkm);
-    const { viewKeyHi, viewKeyLo } = splitShieldedViewPublicKey(heirViewingKey);
     const rootIdentityCommitment = BigInt(allocationWitness.rootIdentityCommitment);
     const rootVersionIndex = BigInt(allocationWitness.rootVersionIndex);
     const rate = 100n;
@@ -691,16 +694,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: [policyNoteCommitment, renewedDonorNote.commitment],
       outputCiphertexts: [encryptedPolicy.ciphertextHex, renewedDonorNote.ciphertextHex],
     };
-    const createPolicySignals = buildShieldedPoolPublicSignals({
-      action: 1,
-      chainId,
-      poolAddress,
-      ...createPolicyData,
-    });
+    const { signals: createPolicySignals, witness: createPolicyPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 1,
+        chainId,
+        poolAddress,
+        ...createPolicyData,
+      });
     const createPolicyProof = await prove(
       "createPolicy",
       {
-        publicSignals: createPolicySignals.map(String),
+        ...createPolicyPublicInputs,
         ownerSecret: String(donorOwnerSecret),
         inputAmount: "2000",
         inputNonce: "101",
@@ -725,27 +729,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
 
     const heirIdentityCommitment = BigInt(allocationWitness.heirIdentityCommitment);
     const heirOwnerCommitment = BigInt(allocationWitness.heirOwnerCommitment);
-    const registeredHeirLeaf = computeShieldedRegistrationLeaf({
-      identityCommitment: heirIdentityCommitment,
-      ownerCommitment: heirOwnerCommitment,
-      viewKeyHi,
-      viewKeyLo,
-      salt: BigInt(allocationWitness.registrationSalt),
-    });
-    const unrelatedViewingKey = await deriveShieldedViewPublicKey(
-      hre.ethers.getBytes(hre.ethers.zeroPadValue("0x5678", 32)),
-    );
-    const unrelatedKeyLimbs = splitShieldedViewPublicKey(unrelatedViewingKey);
-    const unrelatedLeaf = computeShieldedRegistrationLeaf({
-      identityCommitment: 123456n,
-      ownerCommitment: 7891011n,
-      ...unrelatedKeyLimbs,
-      salt: 123456n,
-    });
-    const registryRoot = poseidon2([registeredHeirLeaf, unrelatedLeaf]);
-    await keyRegistry.setKnownRoot(0, registryRoot, true, 2);
-    const endorsementRoot = BigInt(claimFixture.witness.publicSignals[27]);
-    const trustedRoot = BigInt(claimFixture.witness.publicSignals[28]);
+    const endorsementRoot = BigInt(claimFixture.witness.endorsementRoot);
+    const trustedRoot = BigInt(claimFixture.witness.trustedRoot);
     await lineage.setRoot(0, endorsementRoot);
     await lineage.setRoot(1, trustedRoot);
 
@@ -814,18 +799,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       relation0: endorsementRoot,
       relation1: trustedRoot,
       asOf,
-      registryRoot,
-      registryShardId: 0n,
     };
-    const allocationSignals = buildShieldedPoolPublicSignals({
-      action: 2,
-      chainId,
-      poolAddress,
-      ...allocationData,
-    });
+    const { signals: allocationSignals, witness: allocationPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 2,
+        chainId,
+        poolAddress,
+        ...allocationData,
+      });
     const realAllocationWitness = {
       ...allocationWitness,
-      publicSignals: allocationSignals.map(String),
+      ...allocationPublicInputs,
       donorNonce: "103",
       donorCiphertextHash: String(renewedDonorNote.ciphertextHashField),
       donorDepth: donorMembership.depth,
@@ -836,28 +820,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       policyDepth: policyMembership.depth,
       policyIndex: policyMembership.index,
       policySiblings: policyMembership.siblings,
-      viewKeyHi: String(viewKeyHi),
-      viewKeyLo: String(viewKeyLo),
-      registrationDepth: "1",
-      registrationIndex: "0",
-      registrationSiblings: [String(unrelatedLeaf), ...Array(31).fill("0")],
       eligibleFrom: String(eligibleFrom),
       budgetPeriods: "12",
       budgetNonce: String(budgetNonce),
       changeNonce: "109",
     };
     const allocationProof = await prove("allocate", realAllocationWitness, allocationSignals);
-    await keyRegistry.setKnownRoot(0, registryRoot, false, 0);
-    await expect(pool.allocate(allocationData, allocationProof)).to.be.revertedWithCustomError(
-      pool,
-      "UnknownKeyRegistryRoot",
-    );
-    await keyRegistry.setKnownRoot(0, registryRoot, true, 1);
-    await expect(pool.allocate(allocationData, allocationProof)).to.be.revertedWithCustomError(
-      pool,
-      "SingleLeafKeyRegistryRoot",
-    );
-    await keyRegistry.setKnownRoot(0, registryRoot, true, 2);
     await lineage.setRoot(0, endorsementRoot + 1n);
     await expect(pool.allocate(allocationData, allocationProof)).to.be.revertedWithCustomError(
       pool,
@@ -924,10 +892,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ],
       outputCommitments: [topUpBudgetCommitment, topUpDonorChange.commitment],
       outputCiphertexts: [encryptedTopUpBudget.ciphertextHex, topUpDonorChange.ciphertextHex],
-      registryRoot,
-      registryShardId: 0n,
     };
-    const topUpSignals = buildShieldedPoolPublicSignals({
+    const { signals: topUpSignals, witness: topUpPublicInputs } = buildShieldedPoolPublicInputs({
       action: 3,
       chainId,
       poolAddress,
@@ -935,18 +901,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     });
     const topUpWitness = {
       ...fundingFixture.topUp,
-      publicSignals: topUpSignals.map(String),
+      ...topUpPublicInputs,
       donorAmount: "800",
       donorNonce: "109",
       donorCiphertextHash: String(donorChange.ciphertextHashField),
       donorDepth: topUpDonorMembership.depth,
       donorIndex: topUpDonorMembership.index,
       donorSiblings: topUpDonorMembership.siblings,
-      viewKeyHi: String(viewKeyHi),
-      viewKeyLo: String(viewKeyLo),
-      registrationDepth: "1",
-      registrationIndex: "0",
-      registrationSiblings: [String(unrelatedLeaf), ...Array(31).fill("0")],
       eligibleFrom: String(eligibleFrom),
       oldBudgetRemaining: "1200",
       oldBudgetRemainingPeriods: "12",
@@ -1076,7 +1037,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         relation1: trustedRoot,
         asOf: claimAsOf,
       };
-      const claimSignals = buildShieldedPoolPublicSignals({
+      const { signals: claimSignals, witness: claimPublicInputs } = buildShieldedPoolPublicInputs({
         action: 5,
         chainId,
         poolAddress,
@@ -1088,7 +1049,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       }).witness;
       const witness = {
         ...baseWitness,
-        publicSignals: claimSignals.map(String),
+        ...claimPublicInputs,
         eligibleFrom: String(eligibleFrom),
         remaining: "1200",
         remainingPeriods: "12",
@@ -1114,8 +1075,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const branch = await hre.networkHelpers.takeSnapshot();
     const onePeriod = await makeClaim(1);
     const oneProof = await prove("claim", onePeriod.witness, onePeriod.claimSignals);
-    // Identity knowledge must match the endorsed, registered child and the
-    // budget owner. Merely changing the secret cannot authorize this payout.
+    // Identity knowledge must match the endorsed child and the budget owner.
+    // Merely changing the secret cannot authorize this payout.
     assertInvalidCircuitWitness(
       "claim",
       {
@@ -1126,12 +1087,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     );
     // At the start of the last second before period 0 matures, the same
     // credential and budget cannot produce a valid claim proof.
-    const earlySignals = onePeriod.claimSignals.map((signal, index) =>
-      index === 29 ? String(eligibleFrom + PERIOD - 1n) : String(signal),
-    );
     assertInvalidCircuitWitness(
       "claim",
-      { ...onePeriod.witness, publicSignals: earlySignals },
+      { ...onePeriod.witness, asOf: String(eligibleFrom + PERIOD - 1n) },
       /Assert Failed/u,
     );
     await expect(pool.claim(onePeriod.claimData, oneProof)).to.be.revertedWithCustomError(
@@ -1180,15 +1138,16 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       "UnknownLineageRoot",
     );
     const renewedClaimData = { ...onePeriod.claimData, relation0: renewedRoot };
-    const renewedClaimSignals = buildShieldedPoolPublicSignals({
-      action: 5,
-      chainId,
-      poolAddress,
-      ...renewedClaimData,
-    });
+    const { signals: renewedClaimSignals, witness: renewedClaimPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 5,
+        chainId,
+        poolAddress,
+        ...renewedClaimData,
+      });
     const renewedWitness = {
       ...onePeriod.witness,
-      publicSignals: renewedClaimSignals.map(String),
+      ...renewedClaimPublicInputs,
       versionIndex: String(renewedVersionIndex),
       writtenAt: String(renewedWrittenAt),
       endorsementDepth: String(renewedPath.siblings.length),
@@ -1272,17 +1231,18 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         fourPeriods.claimData.outputCommitments[1],
       ],
     };
-    const underfundedClaimSignals = buildShieldedPoolPublicSignals({
-      action: 5,
-      chainId,
-      poolAddress,
-      ...underfundedClaimData,
-    });
+    const { signals: underfundedClaimSignals, witness: underfundedClaimPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 5,
+        chainId,
+        poolAddress,
+        ...underfundedClaimData,
+      });
     assertInvalidCircuitWitness(
       "claim",
       {
         ...fourPeriods.witness,
-        publicSignals: underfundedClaimSignals.map(String),
+        ...underfundedClaimPublicInputs,
         remaining: "300",
         remainingPeriods: "3",
         budgetNonce: String(topUpBudgetNonce),
@@ -1291,7 +1251,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         noteIndex: topUpClaimMembership.index,
         noteSiblings: topUpClaimMembership.siblings,
       },
-      /ShieldedClaim.*line: 294/u,
+      /ShieldedClaim.*line: 290/u,
     );
 
     const twelvePeriods = await makeClaim(12);
@@ -1301,7 +1261,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     assertInvalidCircuitWitness(
       "claim",
       { ...twelvePeriods.witness, claimCount: "13" },
-      /ShieldedClaim.*line: 248/u,
+      /ShieldedClaim.*line: 244/u,
     );
     expect(onePeriod.claimData.periodNullifiers[0]).to.equal(
       twelvePeriods.claimData.periodNullifiers[0],
@@ -1361,12 +1321,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const adapter = await deployUnifiedVerifierAdapter(hre, generated);
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
-    const keyRegistry = await hre.ethers.deployContract("ShieldedPoolKeyRegistryMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all(
-      [adapter, token, lineage, keyRegistry, poseidon].map((contract) =>
-        contract.waitForDeployment(),
-      ),
+      [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
     );
     const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
@@ -1374,7 +1331,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const pool = await Pool.deploy(
       await token.getAddress(),
       await lineage.getAddress(),
-      await keyRegistry.getAddress(),
       await adapter.getAddress(),
     );
     await pool.waitForDeployment();
@@ -1410,17 +1366,19 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         outputCommitments: [realNote.commitment, dummyNote.commitment],
         outputCiphertexts: [realNote.ciphertextHex, dummyNote.ciphertextHex],
       };
-      const shieldSignals = buildShieldedPoolPublicSignals({
-        action: 0,
-        chainId,
-        poolAddress,
-        ...shieldData,
-        amount: sourceAmounts[index],
-      });
+      const { signals: shieldSignals, witness: shieldPublicInputs } = buildShieldedPoolPublicInputs(
+        {
+          action: 0,
+          chainId,
+          poolAddress,
+          ...shieldData,
+          amount: sourceAmounts[index],
+        },
+      );
       const shieldProof = await prove(
         "shield",
         {
-          publicSignals: shieldSignals.map(String),
+          ...shieldPublicInputs,
           ownerSecret: String(ownerSecret),
           outputAmounts: [String(sourceAmounts[index]), "0"],
           outputNonces: [String(sourceNonces[index]), String(sourceNonces[index] + 1n)],
@@ -1468,16 +1426,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: recipients.map(({ note }) => note.commitment),
       outputCiphertexts: recipients.map(({ note }) => note.ciphertextHex),
     };
-    const transferSignals = buildShieldedPoolPublicSignals({
-      action: 6,
-      chainId,
-      poolAddress,
-      ...transferData,
-    });
+    const { signals: transferSignals, witness: transferPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 6,
+        chainId,
+        poolAddress,
+        ...transferData,
+      });
     const transferProof = await prove(
       "privateTransfer",
       {
-        publicSignals: transferSignals.map(String),
+        ...transferPublicInputs,
         hasSecondInput: "1",
         inputOwnerSecrets: sourceOwners.map(String),
         inputAmounts: sourceAmounts.map(String),
@@ -1492,7 +1451,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       transferSignals,
     );
-    expect(await adapter.verifyProof(9, 1, transferProof, transferSignals)).to.equal(true);
+    expect(await adapter.verifyProof(8, 1, transferProof, transferSignals)).to.equal(true);
     const tampered = {
       ...transferData,
       outputCiphertexts: [
@@ -1576,7 +1535,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCommitments: singleDestinations.map(({ note }) => note.commitment),
       outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
     };
-    const singleSignals = buildShieldedPoolPublicSignals({
+    const { signals: singleSignals, witness: singlePublicInputs } = buildShieldedPoolPublicInputs({
       action: 6,
       chainId,
       poolAddress,
@@ -1585,7 +1544,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const singleProof = await prove(
       "privateTransfer",
       {
-        publicSignals: singleSignals.map(String),
+        ...singlePublicInputs,
         hasSecondInput: "0",
         inputOwnerSecrets: [String(singleSource.ownerSecret), "0"],
         inputAmounts: [String(singleSource.amount), "0"],
@@ -1602,7 +1561,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       singleSignals,
     );
-    expect(await adapter.verifyProof(9, 1, singleProof, singleSignals)).to.equal(true);
+    expect(await adapter.verifyProof(8, 1, singleProof, singleSignals)).to.equal(true);
     await expect(
       pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");

@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
@@ -26,6 +27,7 @@ import {
   SHIELDED_DEPLOYMENT_CIRCUITS,
   INTEGRATED_DEPLOYMENT_RECORDS,
 } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_CIRCUITS, SHIELDED_CLIENT_ONLY_CIRCUITS } from "./zkCircuitSelection.mjs";
 import {
   shieldedDeploymentBindings,
   shieldedArtifactEntries,
@@ -682,7 +684,6 @@ const requireTerminalGovernanceEvidence = ({
       "poseidonT6",
       "deepFamilyLineageIndex",
       "shieldedVerifiers",
-      "shieldedHeirKeyRegistry",
       "shieldedDeepPool",
     ],
   );
@@ -1269,11 +1270,20 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     "shieldedArtifacts.manifestSha256",
   );
   const actions = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS);
-  const circuits = requireExactRecordKeys(
-    artifacts.circuits,
-    "shieldedArtifacts.circuits",
-    actions,
-  );
+  const circuits = requireExactRecordKeys(artifacts.circuits, "shieldedArtifacts.circuits", [
+    ...actions,
+    ...SHIELDED_CLIENT_ONLY_CIRCUITS,
+  ]);
+  for (const [name, circuit] of Object.entries(circuits)) {
+    const item = inspected.manifest.circuits[name];
+    requireExact(circuit.source, SHIELDED_CIRCUITS[name], `shieldedArtifacts.${name}.source`);
+    for (const kind of ["sourceSha256", "wasmSha256", "zkeySha256", "verificationKeySha256"])
+      requireExact(
+        requireSha256(circuit[kind], `shieldedArtifacts.${name}.${kind}`),
+        item[kind],
+        `shieldedArtifacts.${name}.${kind}`,
+      );
+  }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
   requireExact(ceremony.circuitCount, 11, "zkCeremonyVerification.circuitCount");
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
@@ -1315,14 +1325,6 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   for (const action of actions) {
     const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
     const item = inspected.manifest.circuits[action];
-    const circuit = circuits[action];
-    requireExact(circuit.source, spec.source, `shieldedArtifacts.${action}.source`);
-    for (const kind of ["sourceSha256", "wasmSha256", "zkeySha256", "verificationKeySha256"])
-      requireExact(
-        requireSha256(circuit[kind], `shieldedArtifacts.${action}.${kind}`),
-        item[kind],
-        `shieldedArtifacts.${action}.${kind}`,
-      );
     const proof = requireRecord(proofs[action], `shielded.proofs.${action}`);
     requireExact(proof.source, spec.source, `shielded.proofs.${action}.source`);
     requireExact(proof.verified, true, `shielded.proofs.${action}.verified`);
@@ -1340,7 +1342,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     requireSha256(proof.proofSha256, `shielded.proofs.${action}.proofSha256`);
     if (
       !Array.isArray(proof.publicSignals) ||
-      proof.publicSignals.length !== (action === "keyRegistration" ? 7 : 32) ||
+      proof.publicSignals.length !== SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId] ||
       proof.publicSignals.some(
         (signal) => typeof signal !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(signal),
       )
@@ -1354,22 +1356,13 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
       `shielded.proofs.${action}.publicSignalsSha256`,
     );
-    requireExact(
-      signals[action === "keyRegistration" ? 3 : 1],
-      String(expectedChainId),
-      `shielded.proofs.${action} chain ID`,
-    );
+    // Every pool action's public inputs open with the chain and the pool.
+    requireExact(signals[0], String(expectedChainId), `shielded.proofs.${action} chain ID`);
     requireSameAddress(
-      `0x${BigInt(signals[action === "keyRegistration" ? 4 : 2])
-        .toString(16)
-        .padStart(40, "0")}`,
-      report.addresses[
-        action === "keyRegistration" ? "shieldedHeirKeyRegistry" : "shieldedDeepPool"
-      ],
+      `0x${BigInt(signals[1]).toString(16).padStart(40, "0")}`,
+      report.addresses.shieldedDeepPool,
       `shielded.proofs.${action} contract`,
     );
-    if (action !== "keyRegistration")
-      requireExact(signals[0], String(spec.actionId), `shielded.proofs.${action} action ID`);
     if (action === "claim") {
       requireExact(proof.execution, "verifier-call", "shielded.proofs.claim.execution");
       requireExact(proof.claimCount, 12, "shielded.proofs.claim.claimCount");
@@ -1394,7 +1387,18 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   );
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
   requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
-  requireSafeInteger(scenario.registeredKeys, "shielded.scenario.registeredKeys", 2);
+  const receiveCode = requireExactRecordKeys(
+    scenario.receiveCode,
+    "shielded.scenario.receiveCode",
+    ["verificationKeySha256", "proofSha256", "verified"],
+  );
+  requireExact(
+    receiveCode.verificationKeySha256,
+    inspected.manifest.circuits.receiveCode.verificationKeySha256,
+    "shielded.scenario.receiveCode.verificationKeySha256",
+  );
+  requireSha256(receiveCode.proofSha256, "shielded.scenario.receiveCode.proofSha256");
+  requireExact(receiveCode.verified, true, "shielded.scenario.receiveCode.verified");
   const recoveryEventCount = requireSafeInteger(
     scenario.recoveryEventCount,
     "shielded.scenario.recoveryEventCount",
@@ -1414,15 +1418,16 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   ])
     if (requireSafeInteger(scenario[field], `shielded.scenario.${field}`) > maximum)
       throw new Error(`shielded.scenario.${field} exceeds circuit capacity`);
+  // asOf is the last public input of both allocate and claim.
   const eligibleFrom = BigInt(scenario.eligibleFrom);
   requireExact(
     eligibleFrom.toString(),
-    (BigInt(proofs.allocate.publicSignals[29]) + 7200n).toString(),
+    (BigInt(proofs.allocate.publicSignals.at(-1)) + 7200n).toString(),
     "shielded.scenario.eligibleFrom",
   );
   requireExact(
     String(scenario.claimAsOf),
-    proofs.claim.publicSignals[29],
+    proofs.claim.publicSignals.at(-1),
     "shielded.scenario.claimAsOf",
   );
   if (BigInt(scenario.claimAsOf) < eligibleFrom + 12n * 2592000n)

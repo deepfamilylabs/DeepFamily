@@ -42,17 +42,6 @@ export function buildShieldedFundingFixtures({
   const policyNote = poseidon4([1024n, policy, policyNonce, policyCiphertextHash]);
   const heirIdentityCommitment = heir.heirIdentityCommitment;
   const heirOwnerCommitment = heir.ownerCommitment;
-  const viewKeyHi = 105n;
-  const viewKeyLo = 106n;
-  const registrationSalt = 1234567n;
-  const registryLeaf = poseidon6([
-    1023n,
-    heirIdentityCommitment,
-    heirOwnerCommitment,
-    viewKeyHi,
-    viewKeyLo,
-    registrationSalt,
-  ]);
   const eligibleFrom = BigInt(heir.witness.eligibleFrom);
   const enrollmentSalt = 66666n;
   const enrollment = poseidon5([
@@ -116,50 +105,27 @@ export function buildShieldedFundingFixtures({
     policySalt: decimal(policySalt),
     heirIdentityCommitment: decimal(heirIdentityCommitment),
     heirOwnerCommitment: decimal(heirOwnerCommitment),
-    viewKeyHi: decimal(viewKeyHi),
-    viewKeyLo: decimal(viewKeyLo),
-    registrationSalt: decimal(registrationSalt),
-    registrationDepth: "0",
-    registrationIndex: "0",
-    registrationSiblings: zeroes(),
     eligibleFrom: decimal(eligibleFrom),
     enrollmentSalt: decimal(enrollmentSalt),
     changeNonce: decimal(changeNonce),
   };
-  const commonSignals = [
-    0n,
-    1030n,
-    pool,
-    0n,
-    donorNote,
-    0n,
-    0n,
-    donorSpend,
-    0n,
-    ...Array(12).fill(0n),
-    outputBudget,
-    outputChange,
-    budgetCiphertextHash,
-    changeCiphertextHash,
-    0n,
-    0n,
-    0n,
-    0n,
-    0n,
-    registryLeaf,
-    0n,
-  ];
+  const commonPublicInputs = {
+    chainId: "1030",
+    pool: decimal(pool),
+    inputShardIds: ["0", "0"],
+    outputCommitments: [outputBudget, outputChange].map(decimal),
+    ciphertextHashes: [budgetCiphertextHash, changeCiphertextHash].map(decimal),
+  };
+  const enrollmentTag = poseidon4([1027n, allocationKey, policy, heirIdentityCommitment]);
 
-  const allocateSignals = [...commonSignals];
-  allocateSignals[0] = 2n;
-  allocateSignals[6] = policyNote;
-  allocateSignals[8] = poseidon4([1027n, allocationKey, policy, heirIdentityCommitment]);
-  allocateSignals[27] = BigInt(heir.witness.publicSignals[27]);
-  allocateSignals[28] = BigInt(heir.witness.publicSignals[28]);
-  allocateSignals[29] = eligibleFrom - 7200n;
   const allocate = {
+    ...commonPublicInputs,
+    inputRoots: [donorNote, policyNote].map(decimal),
+    inputNullifiers: [donorSpend, enrollmentTag].map(decimal),
+    endorsementRoot: heir.witness.endorsementRoot,
+    trustedRoot: heir.witness.trustedRoot,
+    asOf: decimal(eligibleFrom - 7200n),
     ...commonWitness,
-    publicSignals: allocateSignals.map(decimal),
     policyNonce: decimal(policyNonce),
     policyCiphertextHash: decimal(policyCiphertextHash),
     policyDepth: "0",
@@ -182,14 +148,14 @@ export function buildShieldedFundingFixtures({
     budgetNonce: decimal(budgetNonce),
   };
 
-  const topUpSignals = [...commonSignals];
-  topUpSignals[0] = 3n;
-  topUpSignals[6] = oldBudget;
-  topUpSignals[8] = poseidon4([1026n, policySalt, oldBudget, budgetUseNonce]);
   const topUp = {
+    ...commonPublicInputs,
+    inputRoots: [donorNote, oldBudget].map(decimal),
+    inputNullifiers: [donorSpend, poseidon4([1026n, policySalt, oldBudget, budgetUseNonce])].map(
+      decimal,
+    ),
     ...commonWitness,
     allocationKeyCommitment: decimal(allocationKeyCommitment),
-    publicSignals: topUpSignals.map(decimal),
     oldBudgetRemaining: decimal(oldBudgetRemaining),
     oldBudgetRemainingPeriods: decimal(oldBudgetRemainingPeriods),
     oldBudgetNonce: decimal(oldBudgetNonce),
@@ -209,8 +175,6 @@ export function buildShieldedFundingFixtures({
     donorNote,
     policyNote,
     oldBudget,
-    registryLeaf,
-    registrationSalt,
     outputBudget,
     outputChange,
   };
