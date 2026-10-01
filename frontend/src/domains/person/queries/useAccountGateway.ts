@@ -6,7 +6,10 @@ import {
 } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
-import { createAccountReadGateway, type AccountReadGateway } from "../api/accountReadGateway";
+import {
+  createAccountReadGateway,
+  type AccountReadGateway,
+} from "../../../shared/clients/accountReadGateway";
 
 /**
  * Account-scoped gateway. Unlike `usePersonGateway` this binds the MAIN

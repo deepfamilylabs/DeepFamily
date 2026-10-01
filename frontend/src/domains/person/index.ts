@@ -1,22 +1,6 @@
 export * from "./config/recordTypes";
 export * from "./config/recordTypeGroups";
-export { createPersonReadGateway } from "./api/personReadGateway";
-export type {
-  DetailQueryOptions,
-  ParsedNftDetails,
-  ParsedVersionDetails,
-  PersonReadGateway,
-} from "./api/personReadGateway";
 export { usePersonGateway } from "./queries/usePersonGateway";
-export { createAccountReadGateway, identityKey } from "./api/accountReadGateway";
-export type {
-  AccountReadGateway,
-  AccountVersionRow,
-  AccountEndorsementRow,
-  AccountNftRow,
-  AccountPage,
-  MintedIdentity,
-} from "./api/accountReadGateway";
 export { useAccountGateway } from "./queries/useAccountGateway";
 export { usePersonDetails } from "./queries/usePersonDetails";
 export type { UsePersonDetailsResult } from "./queries/usePersonDetails";
@@ -30,12 +14,7 @@ export {
   type EndorseSuccessHandler,
   type EndorseTarget,
 } from "./ui/EndorseModalProvider";
-export {
-  NodeDetailProvider,
-  useNodeDetail,
-  type NodeKeyMinimal,
-  type TrustedEndorserAccess,
-} from "./ui";
+export { NodeDetailProvider, useNodeDetail, type TrustedEndorserAccess } from "./ui";
 export {
   default as PersonHashCalculator,
   type HashForm,
@@ -53,7 +32,6 @@ export {
   type StoryTimelineEntryProps,
 } from "./ui/StoryRecordTimeline";
 export { useStoryRecordOrder } from "./ui/useStoryRecordOrder";
-export { default as SecureKeyDerivation } from "./ui/SecureKeyDerivation";
 export { default as PersonStoryModal } from "./ui/PersonStoryModal";
 
 export { useNftStoryAccess } from "./queries/useNftStoryAccess";

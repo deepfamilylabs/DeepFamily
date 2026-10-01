@@ -940,7 +940,7 @@ export const main = async (chainProfile) => {
     await Promise.all([
       Promise.resolve(gitWorkingTreeState()),
       hashReleaseInputs(ethers),
-      readProductionBuildInfoState(ethers, process.cwd(), {
+      readProductionBuildInfoState(ethers, {
         artifacts: hre.artifacts,
         releaseArtifactNames: RELEASE_ARTIFACT_NAMES,
       }),

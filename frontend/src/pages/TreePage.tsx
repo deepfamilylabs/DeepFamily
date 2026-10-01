@@ -28,7 +28,7 @@ import {
 } from "../domains/person";
 import { useConfig } from "../domains/config";
 import { useWallet } from "../domains/wallet";
-import { TreeConfigDrawer } from "./tree/sections/TreeConfigDrawer";
+import { FamilySettingsDrawer } from "./family/FamilySettingsDrawer";
 import { TreePageBar } from "./tree/sections/TreePageBar";
 import { TreeStatsPill } from "./tree/ui/TreeStatsPill";
 import { isTreeDebugEnabled, shouldPreferFlatTree } from "../shared/config/env";
@@ -240,7 +240,11 @@ export default function TreePage() {
 
               {/* Family settings share this push-on-desktop, overlay-on-mobile content row. */}
               <div className="relative flex min-h-0 flex-1 overflow-hidden">
-                <TreeConfigDrawer t={t} open={configOpen} onClose={() => setConfigOpen(false)} />
+                <FamilySettingsDrawer
+                  t={t}
+                  open={configOpen}
+                  onClose={() => setConfigOpen(false)}
+                />
 
                 <div className="relative min-h-0 flex-1 overflow-hidden bg-surface-body">
                   <ViewContainer

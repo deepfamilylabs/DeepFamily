@@ -47,7 +47,7 @@ describe("public ZK command surface", function () {
     );
   });
 
-  it("uses one local deploy command for every verifier, registry, and pool", function () {
+  it("uses one local deploy command for every verifier and the pool", function () {
     const { scripts } = JSON.parse(
       fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     );
@@ -57,12 +57,6 @@ describe("public ZK command surface", function () {
     expect(scripts["dev:contract"]).to.equal(
       "npm run dev:deploy && npm run dev:fund && npm run dev:seed",
     );
-    expect(
-      Object.keys(scripts).filter((name) => name.includes("shielded") && name.includes("deploy")),
-    ).to.deep.equal([]);
-    expect(
-      Object.keys(scripts).filter((name) => name.startsWith("zk:shielded:testnet")),
-    ).to.deep.equal([]);
   });
 });
 

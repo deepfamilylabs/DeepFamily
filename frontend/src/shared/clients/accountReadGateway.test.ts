@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { QueryCache } from "../../../shared/cache/QueryCache";
+import { QueryCache } from "../cache/QueryCache";
 import { createAccountReadGateway } from "./accountReadGateway";
 
 const ACCOUNT = "0x00000000000000000000000000000000000000aa";

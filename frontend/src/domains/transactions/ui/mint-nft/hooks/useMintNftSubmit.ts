@@ -129,7 +129,7 @@ export function useMintNftSubmit({
           toMintNFTErrorResult(
             "PASSPHRASE_DISALLOWED",
             t(
-              "keyDerivation.component.recommendations.disallowedCodePoint",
+              "mintNFT.passphraseDisallowed",
               "This passphrase contains a code point the protocol does not accept, such as a control or invisible character.",
             ),
           ),

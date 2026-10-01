@@ -11,14 +11,12 @@ import { loadCustomNetworks, resolveEntryReaderForChain, saveCustomNetworks } fr
 /**
  * Which chain the app reads from, as a menu.
  *
- * This used to be staged inside the family settings drawer and applied on save,
- * sitting beside the reader address and the root hash. But it is not a property
- * of a family — it is which network the whole app is talking to, which is what
- * the status bar reports — so it now lives next to that readout and applies the
- * moment a network is picked.
+ * The network is not a property of a family — it is which network the whole
+ * app is talking to, which is what the status bar reports — so it lives next to
+ * that readout and applies the moment a network is picked.
  *
- * Picking one clears the resolved module addresses the way the settings save
- * always did: they belong to the chain being left, and `ConfigProvider`
+ * Picking one clears the resolved module addresses: they belong to the chain
+ * being left, and `ConfigProvider`
  * re-derives them from the reader against the new RPC. The reader and the root
  * are per-chain too — see `switchTo`.
  */

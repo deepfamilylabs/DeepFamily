@@ -3,7 +3,10 @@ import { useConfig } from "../../config";
 import { createDeepFamilyReaderContract } from "../../../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../../../shared/clients/providerRegistry";
 import { getScopedQueryClient } from "../../../shared/cache/queryClient";
-import { createPersonReadGateway, type PersonReadGateway } from "../api/personReadGateway";
+import {
+  createPersonReadGateway,
+  type PersonReadGateway,
+} from "../../../shared/clients/personReadGateway";
 
 /**
  * Shared hook that builds a PersonReadGateway backed by the shared query cache,

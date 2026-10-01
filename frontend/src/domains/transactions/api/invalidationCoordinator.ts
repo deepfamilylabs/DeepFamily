@@ -20,8 +20,7 @@ export interface InvalidationOptions {
  * transaction and clears them from the shared QueryCache.
  *
  * This is the single entry-point that flow hooks / modals should call
- * after a successful tx. It replaces the older scattered tree invalidation
- * logic that used to live inside the legacy tree context implementation.
+ * after a successful tx.
  */
 export function invalidateCacheAfterTx(
   input: TreeTxInvalidationInput | null | undefined,

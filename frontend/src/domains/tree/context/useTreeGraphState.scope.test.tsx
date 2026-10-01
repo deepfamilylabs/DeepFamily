@@ -42,6 +42,7 @@ const unlockedNode: NodeData = {
   metadataSegmentCount: 1,
   metadataPayloadLength: 256,
   metadataUnlockValidated: true,
+  metadataUnlockPersistence: "device",
   metadataProtocolGeneration: "df-onchain-biography-v1",
   metadataFormatVersion: 1,
   identitySuiteId: 1,

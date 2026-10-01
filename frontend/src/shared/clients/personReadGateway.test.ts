@@ -5,7 +5,7 @@ import {
   STORY_ENVELOPE_SCHEMA_ID,
 } from "@deepfamily/protocol-core";
 import { describe, expect, it, vi } from "vitest";
-import { QueryCache } from "../../../shared/cache/QueryCache";
+import { QueryCache } from "../cache/QueryCache";
 import { createPersonReadGateway } from "./personReadGateway";
 
 describe("personReadGateway", () => {

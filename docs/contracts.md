@@ -474,9 +474,9 @@ verifiers, the verifier adapter, and the libraries.
 - The proxy is a thin `ERC1967Proxy` wrapper (`contracts/proxy/UUPSProxy.sol`).
 - The implementation disables initializers in its constructor (`_disableInitializers()`), so the
   logic contract can never be initialized directly — only the proxy is, exactly once.
-- `DeepFamily.initialize(token, initialOwner)` replaces the constructor. The token address, which
-  was previously `immutable`, is now plain storage written once in
-  `initialize` with no setter (effectively immutable; `immutable` is unusable behind a proxy).
+- `DeepFamily.initialize(token, initialOwner)` replaces the constructor. The token address is plain
+  storage written once in `initialize` with no setter (effectively immutable; `immutable` is
+  unusable behind a proxy).
 
 ### Upgrade Authorization & Governance
 
@@ -694,8 +694,7 @@ the protocol release requires that smoke transaction to remain the Safe's first 
 (`nonce == 1`).
 
 Complete Ethereum environment, digest review, execution, checkpoint and recovery instructions are
-in the [Ethereum Mainnet release runbook](ethereum-mainnet-release.md). The local Sepolia
-acceptance procedure is in `ethereum-sepolia-acceptance.local.md`.
+in the [Ethereum Mainnet release runbook](ethereum-mainnet-release.md).
 
 For manual deployment on another supported network, or an explicitly reviewed recovery, deploy the
 Timelock first with one Safe Proxy. The deploy script requires `MIN_DELAY` and
@@ -986,7 +985,7 @@ cancelled with `governance-cancel` while the old Timelock still owns `main`.
   verification succeeds, rerun with that address in `--implementation` to create the operation.
 - The current baseline includes the single `archive` slot and the `PersonVersion`
   `versionCommitment` field. A supported implementation must not move, reuse, clear, or reinterpret
-  that Archive binding, and must not reintroduce the retired plaintext version fields.
+  that Archive binding.
 
 ### Reentrancy Guard
 

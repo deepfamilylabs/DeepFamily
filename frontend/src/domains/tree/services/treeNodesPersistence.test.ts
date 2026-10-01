@@ -75,18 +75,18 @@ describe("tree metadata persistence lifetime", () => {
     });
   });
 
-  it("filters automatic snapshots while preserving device and legacy unlocks", async () => {
+  it("filters automatic snapshots while preserving only device unlocks", async () => {
     const session = unlockedNode("1", "session");
     const device = unlockedNode("2", "device");
-    const legacy = unlockedNode("3");
-    const snapshot = { [session.id]: session, [device.id]: device, [legacy.id]: legacy };
+    const unmarked = unlockedNode("3");
+    const snapshot = { [session.id]: session, [device.id]: device, [unmarked.id]: unmarked };
 
     await writeTreeNodesSnapshot("automatic-lifetimes", snapshot);
 
     const durable = persistence.blobs.get("automatic-lifetimes")!;
     expect(durable[session.id]).toEqual(clearMetadataUnlock(session));
     expect(durable[device.id]).toEqual(device);
-    expect(durable[legacy.id]).toEqual(legacy);
+    expect(durable[unmarked.id]).toEqual(clearMetadataUnlock(unmarked));
     expect(JSON.stringify(durable)).not.toContain(session.biography);
     expect(JSON.stringify(durable)).not.toContain(session.fullName);
     expect(isMetadataUnlockUsable(snapshot[session.id])).toBe(true);

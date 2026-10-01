@@ -13,7 +13,7 @@ contract DeepFamilyTokenHarness is DeepFamilyToken {
     totalAdditions = additions;
   }
 
-  /// @dev Test-only hook for exercising monitoring against a legacy/non-retired token owner.
+  /// @dev Test-only hook for exercising monitoring against a token whose bootstrap owner remains.
   function forceBootstrapOwnerForTest(address account) external {
     _transferOwnership(account);
   }

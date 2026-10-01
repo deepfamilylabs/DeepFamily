@@ -11,11 +11,12 @@ import {
 import {
   CIRCOM_VERSION,
   localCircomBinaryPath,
+  resolveCircomTargetPolicy,
   resolveLocalCircomTarget,
 } from "../scripts/lib/circomToolchain.mjs";
 import { CIRCOM_OVERRIDE_ENV } from "../scripts/lib/circomCompilerOverride.mjs";
 import {
-  MINIMUM_PRODUCTION_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
@@ -125,12 +126,15 @@ const createProductionFixture = async () => {
       { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
     ]),
   );
-  const contributions = Array.from({ length: MINIMUM_PRODUCTION_CONTRIBUTORS }, (_, index) => ({
-    sequence: index + 1,
-    participantId: `participant-${index + 1}`,
-    personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
-    disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-  }));
+  const contributions = Array.from(
+    { length: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS },
+    (_, index) => ({
+      sequence: index + 1,
+      participantId: `participant-${index + 1}`,
+      personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
+      disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+    }),
+  );
   const beacon = {
     name: "deepfamily-public-beacon",
     hash: sha256Text("public-randomness-beacon"),
@@ -139,14 +143,29 @@ const createProductionFixture = async () => {
     personCommitmentContributionHash: "aa".repeat(64),
     disclosureBindingContributionHash: "bb".repeat(64),
   };
+  const compilerTarget = resolveCircomTargetPolicy({
+    version: CIRCOM_VERSION,
+    platform: "linux",
+    arch: "x64",
+  });
   const transcript = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
     contributions,
     beacon,
+    compiler: {
+      version: CIRCOM_VERSION,
+      target: compilerTarget.id,
+      platform: compilerTarget.platform,
+      arch: compilerTarget.arch,
+      strategy: compilerTarget.strategy,
+      binarySha256: compilerTarget.sha256,
+      libcEvidence: compilerTarget.libcEvidence ?? null,
+      sourceBuild: null,
+    },
   };
   const transcriptPath = await writeTranscript(root, transcript);
   const manifest = {
@@ -163,7 +182,7 @@ const createProductionFixture = async () => {
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
       ceremonyId,
-      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       contributorCount: contributions.length,
       phase1: {
         ...expectedProductionPhase1,
@@ -657,10 +676,9 @@ describe("production release preflight", function () {
     expect(fake.calls.some(({ executable }) => executable === "npm")).to.equal(false);
   });
 
-  it("requires schemaVersion 3 before starting a compiler source build", async function () {
+  it("rejects an unsupported manifest schema before starting a compiler source build", async function () {
     const fixture = await productionFixture();
-    fixture.manifest.schemaVersion = 2;
-    delete fixture.manifest.toolchain.snarkjsRuntimeSha256;
+    fixture.manifest.schemaVersion = 4;
     await writeManifest(fixture.root, fixture.manifest);
     const fake = createFakeRunner();
     let sourceBuildCalled = false;
@@ -679,9 +697,7 @@ describe("production release preflight", function () {
       }),
     );
 
-    expect(error?.message).to.equal(
-      "Release preflight requires ZK manifest schemaVersion 3 with a reviewed snarkjs runtime graph",
-    );
+    expect(error?.message).to.equal("ZK artifact manifest schemaVersion must be 3");
     expect(sourceBuildCalled).to.equal(false);
     expect(fake.calls.map(commandLabel)).to.deep.equal([
       "git rev-parse HEAD",
@@ -745,8 +761,8 @@ describe("production release preflight", function () {
       releaseCommit: COMMIT,
       zkCeremonyId: fixture.manifest.trustedSetup.ceremonyId,
       zkTrustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
-      zkContributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
-      zkMinimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      zkContributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+      zkMinimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       zkManifestSha256: sha256File(fixture.manifestPath),
       zkTranscriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
       protocolManifestSha256: "cd".repeat(32),

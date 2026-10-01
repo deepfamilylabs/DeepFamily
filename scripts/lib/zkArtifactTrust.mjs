@@ -22,8 +22,6 @@ export const ZK_TRUST_MODEL_SINGLE_OPERATOR = "single-operator";
 export const ZK_TRUST_MODEL_MULTI_PARTY = "multi-party";
 export const MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS = 1;
 export const MINIMUM_MULTI_PARTY_CONTRIBUTORS = 2;
-// Kept as a compatibility alias for callers that only need the lowest valid production count.
-export const MINIMUM_PRODUCTION_CONTRIBUTORS = MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS;
 export const ZK_CONTRIBUTION_APPROVAL_DOMAIN = "deepfamily:zk-ceremony-contribution:v1";
 export const ZK_PRODUCTION_PHASE1 = Object.freeze({
   source: PRODUCTION_PTAU_URL,
@@ -125,15 +123,6 @@ const canonicalize = (value) => {
 
 export const canonicalJson = (value) => JSON.stringify(canonicalize(value));
 
-const normalizeTextLineEndings = (raw, label) => {
-  const crlfCount = raw.split("\r\n").length - 1;
-  const lfCount = raw.split("\n").length - 1;
-  if (raw.replaceAll("\r\n", "").includes("\r") || (crlfCount > 0 && crlfCount !== lfCount)) {
-    throw new Error(`${label} must use uniform LF or CRLF line endings`);
-  }
-  return crlfCount > 0 ? raw.replaceAll("\r\n", "\n") : raw;
-};
-
 export const readCanonicalJsonFile = (filePath, label = "JSON file") => {
   let stats;
   try {
@@ -154,28 +143,24 @@ export const readCanonicalJsonFile = (filePath, label = "JSON file") => {
   } catch (error) {
     throw new Error(`${label} is unavailable: ${filePath}`, { cause: error });
   }
-  const canonicalRaw = normalizeTextLineEndings(raw, label);
   let parsed;
   try {
-    parsed = JSON.parse(canonicalRaw);
+    parsed = JSON.parse(raw);
   } catch (error) {
     throw new Error(`${label} is not valid JSON: ${filePath}`, { cause: error });
   }
-  if (canonicalRaw !== `${JSON.stringify(parsed, null, 2)}\n`) {
+  if (raw !== `${JSON.stringify(parsed, null, 2)}\n`) {
     throw new Error(
-      `${label} must use canonical two-space JSON with one trailing newline and no duplicate keys`,
+      `${label} must use canonical two-space JSON with LF line endings, one trailing newline and no duplicate keys`,
     );
   }
-  return { parsed, raw: canonicalRaw };
+  return { parsed, raw };
 };
 
 export const sha256File = (filePath) =>
   createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
 export const sha256Text = (value) => createHash("sha256").update(value).digest("hex");
-
-export const sha256CanonicalTextFile = (filePath, label = "Text file") =>
-  sha256Text(normalizeTextLineEndings(fs.readFileSync(filePath, "utf8"), label));
 
 const assertBlake2b512 = (value, label) => {
   if (typeof value !== "string" || !BLAKE2B_512_PATTERN.test(value)) {
@@ -216,13 +201,7 @@ const validateTrustModelCounts = (setup, label) => {
   );
 };
 
-const assertFileHash = (
-  root,
-  relativePath,
-  expectedHash,
-  label,
-  { canonicalText = false } = {},
-) => {
+const assertFileHash = (root, relativePath, expectedHash, label) => {
   const filePath = path.join(root, relativePath);
   let stats;
   try {
@@ -237,10 +216,7 @@ const assertFileHash = (
     throw new Error(`${label} path must not traverse a symbolic link: ${relativePath}`);
   }
   const fileBytes = fs.readFileSync(filePath);
-  const hashedBytes = canonicalText
-    ? Buffer.from(normalizeTextLineEndings(fileBytes.toString("utf8"), label), "utf8")
-    : fileBytes;
-  const actualHash = createHash("sha256").update(hashedBytes).digest("hex");
+  const actualHash = createHash("sha256").update(fileBytes).digest("hex");
   if (actualHash !== expectedHash) {
     throw new Error(
       `${label} SHA-256 mismatch for ${relativePath}; expected ${expectedHash}, got ${actualHash}`,
@@ -248,7 +224,7 @@ const assertFileHash = (
   }
   return Object.freeze({
     path: relativePath,
-    bytes: hashedBytes.length,
+    bytes: fileBytes.length,
     sha256: actualHash,
   });
 };
@@ -337,14 +313,7 @@ const validateProductionSetup = (setup, expectedPhase1) => {
   const beacon = assertPlainObject(setup.beacon, "trustedSetup.beacon");
   assertExactKeys(
     beacon,
-    [
-      "applied",
-      "name",
-      "hash",
-      "numIterationsExp",
-      "source",
-      ...CONTRIBUTION_HASH_FIELDS,
-    ],
+    ["applied", "name", "hash", "numIterationsExp", "source", ...CONTRIBUTION_HASH_FIELDS],
     "trustedSetup.beacon",
   );
   if (beacon.applied !== true) throw new Error("trustedSetup.beacon.applied must be true");
@@ -384,7 +353,7 @@ export const buildZkContributionApprovalMessage = ({
 
 export const validateProductionTranscript = ({ transcript, manifest }) => {
   assertPlainObject(transcript, "ZK ceremony transcript");
-  const singleOperatorTranscript = transcript.schemaVersion === 2 || transcript.schemaVersion === 3;
+  const singleOperatorTranscript = transcript.schemaVersion === 3;
   let compiler = null;
   if (singleOperatorTranscript) {
     assertExactKeys(
@@ -397,7 +366,7 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
         "circuits",
         "contributions",
         "beacon",
-        ...(transcript.schemaVersion === 3 ? ["compiler"] : []),
+        "compiler",
       ],
       "ZK ceremony transcript",
     );
@@ -410,118 +379,114 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
           "single-operator trustModel",
       );
     }
-    if (transcript.schemaVersion === 3) {
-      const compilerRecord = assertPlainObject(
-        transcript.compiler,
-        "ZK ceremony transcript compiler",
+    const compilerRecord = assertPlainObject(
+      transcript.compiler,
+      "ZK ceremony transcript compiler",
+    );
+    assertExactKeys(
+      compilerRecord,
+      [
+        "version",
+        "target",
+        "platform",
+        "arch",
+        "strategy",
+        "binarySha256",
+        "libcEvidence",
+        "sourceBuild",
+      ],
+      "ZK ceremony transcript compiler",
+    );
+    if (compilerRecord.version !== manifest.circomVersion) {
+      throw new Error("ZK ceremony transcript compiler version does not match the manifest");
+    }
+    let libcEvidence = null;
+    if (compilerRecord.platform === "linux") {
+      const record = assertPlainObject(
+        compilerRecord.libcEvidence,
+        "ZK ceremony transcript compiler.libcEvidence",
       );
       assertExactKeys(
-        compilerRecord,
-        [
-          "version",
-          "target",
-          "platform",
-          "arch",
-          "strategy",
-          "binarySha256",
-          "libcEvidence",
-          "sourceBuild",
-        ],
-        "ZK ceremony transcript compiler",
+        record,
+        ["family", "version", "source"],
+        "ZK ceremony transcript compiler.libcEvidence",
       );
-      if (compilerRecord.version !== manifest.circomVersion) {
-        throw new Error("ZK ceremony transcript compiler version does not match the manifest");
-      }
-      let libcEvidence = null;
-      if (compilerRecord.platform === "linux") {
-        const record = assertPlainObject(
-          compilerRecord.libcEvidence,
-          "ZK ceremony transcript compiler.libcEvidence",
-        );
-        assertExactKeys(
-          record,
-          ["family", "version", "source"],
-          "ZK ceremony transcript compiler.libcEvidence",
-        );
-        if (!["glibc", "musl"].includes(record.family)) {
-          throw new Error(
-            "ZK ceremony transcript compiler.libcEvidence.family must be glibc or musl",
-          );
-        }
-        if (
-          record.version !== null &&
-          (typeof record.version !== "string" || record.version.length === 0)
-        ) {
-          throw new Error(
-            "ZK ceremony transcript compiler.libcEvidence.version must be null or non-empty",
-          );
-        }
-        if (
-          ![
-            "process.report.header.glibcVersionRuntime",
-            "explicit-libc",
-            "simulated-linux-default",
-          ].includes(record.source)
-        ) {
-          throw new Error("ZK ceremony transcript compiler.libcEvidence.source is not recognized");
-        }
-        libcEvidence = Object.freeze({ ...record });
-      } else if (compilerRecord.libcEvidence !== null) {
-        throw new Error("ZK ceremony transcript non-Linux compiler must not declare libc evidence");
-      }
-      const target = resolveCircomTargetPolicy({
-        version: compilerRecord.version,
-        platform: compilerRecord.platform,
-        arch: compilerRecord.arch,
-        ...(libcEvidence === null ? {} : { libc: libcEvidence.family }),
-      });
-      for (const [field, expected] of [
-        ["target", target.id],
-        ["platform", target.platform],
-        ["arch", target.arch],
-        ["strategy", target.strategy],
-      ]) {
-        if (compilerRecord[field] !== expected) {
-          throw new Error(`ZK ceremony transcript compiler ${field} does not match its target`);
-        }
-      }
-      assertSha256(compilerRecord.binarySha256, "ZK ceremony transcript compiler.binarySha256");
-      if (target.strategy === "official-binary" && compilerRecord.binarySha256 !== target.sha256) {
+      if (!["glibc", "musl"].includes(record.family)) {
         throw new Error(
-          "ZK ceremony transcript official compiler binarySha256 does not match the pinned target",
+          "ZK ceremony transcript compiler.libcEvidence.family must be glibc or musl",
         );
       }
-      let sourceBuild = null;
-      if (target.strategy === "pinned-source") {
-        const record = assertPlainObject(
-          compilerRecord.sourceBuild,
-          "ZK ceremony transcript compiler.sourceBuild",
-        );
-        assertExactKeys(
-          record,
-          ["repository", "commit", "cargoVersion", "rustcVersion"],
-          "ZK ceremony transcript compiler.sourceBuild",
-        );
-        if (record.repository !== target.repository || record.commit !== target.commit) {
-          throw new Error(
-            "ZK ceremony transcript compiler.sourceBuild does not match the pinned source",
-          );
-        }
-        for (const field of ["cargoVersion", "rustcVersion"]) {
-          if (typeof record[field] !== "string" || record[field].trim() === "") {
-            throw new Error(
-              `ZK ceremony transcript compiler.sourceBuild.${field} must be non-empty`,
-            );
-          }
-        }
-        sourceBuild = Object.freeze({ ...record });
-      } else if (compilerRecord.sourceBuild !== null) {
+      if (
+        record.version !== null &&
+        (typeof record.version !== "string" || record.version.length === 0)
+      ) {
         throw new Error(
-          "ZK ceremony transcript official compiler must not declare source-build evidence",
+          "ZK ceremony transcript compiler.libcEvidence.version must be null or non-empty",
         );
       }
-      compiler = Object.freeze({ ...compilerRecord, libcEvidence, sourceBuild });
+      if (
+        ![
+          "process.report.header.glibcVersionRuntime",
+          "explicit-libc",
+          "simulated-linux-default",
+        ].includes(record.source)
+      ) {
+        throw new Error("ZK ceremony transcript compiler.libcEvidence.source is not recognized");
+      }
+      libcEvidence = Object.freeze({ ...record });
+    } else if (compilerRecord.libcEvidence !== null) {
+      throw new Error("ZK ceremony transcript non-Linux compiler must not declare libc evidence");
     }
+    const target = resolveCircomTargetPolicy({
+      version: compilerRecord.version,
+      platform: compilerRecord.platform,
+      arch: compilerRecord.arch,
+      ...(libcEvidence === null ? {} : { libc: libcEvidence.family }),
+    });
+    for (const [field, expected] of [
+      ["target", target.id],
+      ["platform", target.platform],
+      ["arch", target.arch],
+      ["strategy", target.strategy],
+    ]) {
+      if (compilerRecord[field] !== expected) {
+        throw new Error(`ZK ceremony transcript compiler ${field} does not match its target`);
+      }
+    }
+    assertSha256(compilerRecord.binarySha256, "ZK ceremony transcript compiler.binarySha256");
+    if (target.strategy === "official-binary" && compilerRecord.binarySha256 !== target.sha256) {
+      throw new Error(
+        "ZK ceremony transcript official compiler binarySha256 does not match the pinned target",
+      );
+    }
+    let sourceBuild = null;
+    if (target.strategy === "pinned-source") {
+      const record = assertPlainObject(
+        compilerRecord.sourceBuild,
+        "ZK ceremony transcript compiler.sourceBuild",
+      );
+      assertExactKeys(
+        record,
+        ["repository", "commit", "cargoVersion", "rustcVersion"],
+        "ZK ceremony transcript compiler.sourceBuild",
+      );
+      if (record.repository !== target.repository || record.commit !== target.commit) {
+        throw new Error(
+          "ZK ceremony transcript compiler.sourceBuild does not match the pinned source",
+        );
+      }
+      for (const field of ["cargoVersion", "rustcVersion"]) {
+        if (typeof record[field] !== "string" || record[field].trim() === "") {
+          throw new Error(`ZK ceremony transcript compiler.sourceBuild.${field} must be non-empty`);
+        }
+      }
+      sourceBuild = Object.freeze({ ...record });
+    } else if (compilerRecord.sourceBuild !== null) {
+      throw new Error(
+        "ZK ceremony transcript official compiler must not declare source-build evidence",
+      );
+    }
+    compiler = Object.freeze({ ...compilerRecord, libcEvidence, sourceBuild });
   } else if (transcript.schemaVersion === 1) {
     assertExactKeys(
       transcript,
@@ -532,7 +497,9 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
       throw new Error("ZK ceremony transcript schemaVersion 1 requires multi-party trustModel");
     }
   } else {
-    throw new Error("ZK ceremony transcript schemaVersion must be 1, 2, or 3");
+    throw new Error(
+      "ZK ceremony transcript schemaVersion must be 3 (single-operator) or 1 (multi-party)",
+    );
   }
   if (transcript.ceremonyId !== manifest.trustedSetup.ceremonyId) {
     throw new Error("ZK ceremony transcript ceremonyId does not match the manifest");
@@ -666,13 +633,7 @@ export const validateProductionTranscript = ({ transcript, manifest }) => {
   const transcriptBeacon = assertPlainObject(transcript.beacon, "ZK ceremony transcript beacon");
   assertExactKeys(
     transcriptBeacon,
-    [
-      "name",
-      "hash",
-      "numIterationsExp",
-      "source",
-      ...CONTRIBUTION_HASH_FIELDS,
-    ],
+    ["name", "hash", "numIterationsExp", "source", ...CONTRIBUTION_HASH_FIELDS],
     "ZK ceremony transcript beacon",
   );
   const manifestBeacon = {
@@ -709,8 +670,8 @@ export const validateZkArtifactManifest = (
     ["schemaVersion", "circomVersion", "snarkjsVersion", "toolchain", "trustedSetup", "circuits"],
     "ZK artifact manifest",
   );
-  if (manifest.schemaVersion !== 2 && manifest.schemaVersion !== 3) {
-    throw new Error("ZK artifact manifest schemaVersion must be 2 or 3");
+  if (manifest.schemaVersion !== 3) {
+    throw new Error("ZK artifact manifest schemaVersion must be 3");
   }
   for (const [field, value] of [
     ["circomVersion", manifest.circomVersion],
@@ -723,18 +684,12 @@ export const validateZkArtifactManifest = (
   const toolchain = assertPlainObject(manifest.toolchain, "toolchain");
   assertExactKeys(
     toolchain,
-    [
-      "circomBinarySha256",
-      "snarkjsCliSha256",
-      ...(manifest.schemaVersion >= 3 ? ["snarkjsRuntimeSha256"] : []),
-    ],
+    ["circomBinarySha256", "snarkjsCliSha256", "snarkjsRuntimeSha256"],
     "toolchain",
   );
   assertSha256(toolchain.circomBinarySha256, "toolchain.circomBinarySha256");
   assertSha256(toolchain.snarkjsCliSha256, "toolchain.snarkjsCliSha256");
-  if (manifest.schemaVersion >= 3) {
-    assertSha256(toolchain.snarkjsRuntimeSha256, "toolchain.snarkjsRuntimeSha256");
-  }
+  assertSha256(toolchain.snarkjsRuntimeSha256, "toolchain.snarkjsRuntimeSha256");
 
   const setup = assertPlainObject(manifest.trustedSetup, "trustedSetup");
   if (setup.status === "development") validateDevelopmentSetup(setup);
@@ -785,13 +740,9 @@ export const inspectZkReleaseArtifacts = ({
   const { parsed: manifest, raw } = readCanonicalJsonFile(manifestPath, "ZK artifact manifest");
   validateZkArtifactManifest(manifest, { requireProduction, expectedProductionPhase1 });
   if (productionRotationRuntimeSha256 !== undefined) {
-    if (
-      requireProduction !== true ||
-      manifest.schemaVersion !== 3 ||
-      manifest.trustedSetup.status !== "production"
-    ) {
+    if (requireProduction !== true || manifest.trustedSetup.status !== "production") {
       throw new Error(
-        "A production rotation runtime binding requires a schema-v3 production manifest inspection",
+        "A production rotation runtime binding requires a production manifest inspection",
       );
     }
   }
@@ -810,24 +761,18 @@ export const inspectZkReleaseArtifacts = ({
       manifest.toolchain.snarkjsCliSha256,
       "Installed snarkjs CLI",
     ),
-    snarkjsRuntime:
-      manifest.schemaVersion >= 3
-        ? assertSnarkjsRuntimeHash({
-            root: resolvedRoot,
-            expectedSha256: expectedInstalledRuntimeSha256,
-          })
-        : null,
-    snarkjsRuntimeBinding:
-      manifest.schemaVersion >= 3
-        ? Object.freeze({
-            source:
-              productionRotationRuntimeSha256 === undefined
-                ? "manifest"
-                : "production-rotation-expected-digest",
-            declaredSha256: manifest.toolchain.snarkjsRuntimeSha256,
-            expectedInstalledSha256: expectedInstalledRuntimeSha256,
-          })
-        : null,
+    snarkjsRuntime: assertSnarkjsRuntimeHash({
+      root: resolvedRoot,
+      expectedSha256: expectedInstalledRuntimeSha256,
+    }),
+    snarkjsRuntimeBinding: Object.freeze({
+      source:
+        productionRotationRuntimeSha256 === undefined
+          ? "manifest"
+          : "production-rotation-expected-digest",
+      declaredSha256: manifest.toolchain.snarkjsRuntimeSha256,
+      expectedInstalledSha256: expectedInstalledRuntimeSha256,
+    }),
   });
   const installedSnarkjsPackage = toolchain.snarkjsRuntime?.packages.find(
     ({ logicalPath }) => logicalPath.length === 1 && logicalPath[0] === "snarkjs",
@@ -873,7 +818,6 @@ export const inspectZkReleaseArtifacts = ({
         spec.source,
         expected.sourceSha256,
         `${circuitName} source`,
-        { canonicalText: true },
       ),
       wasm: assertFileHash(resolvedRoot, spec.wasm, expected.wasmSha256, `${circuitName} WASM`),
       zkey: assertFileHash(resolvedRoot, spec.zkey, expected.zkeySha256, `${circuitName} zkey`),
@@ -882,14 +826,12 @@ export const inspectZkReleaseArtifacts = ({
         spec.verificationKey,
         expected.verificationKeySha256,
         `${circuitName} verification key`,
-        { canonicalText: true },
       ),
       solidityVerifier: assertFileHash(
         resolvedRoot,
         spec.solidityVerifier,
         expected.solidityVerifierSha256,
         `${circuitName} Solidity verifier`,
-        { canonicalText: true },
       ),
     };
     if (requireBuiltR1cs) {

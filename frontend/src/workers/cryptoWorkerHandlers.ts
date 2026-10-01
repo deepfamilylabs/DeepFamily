@@ -10,7 +10,6 @@ import {
   wipePreparedPersonVersionContent,
 } from "@deepfamily/protocol-core";
 import { computeIdentityHash } from "../shared/crypto/identityHash";
-import { deriveKeyFromPersonData } from "../shared/crypto/secureKeyDerivation";
 import { preflightPersonVersionEnvelopeSizeV1 } from "../shared/metadata/personVersionEnvelopePreflight";
 import type {
   CryptoWorkerCallMap,
@@ -114,9 +113,6 @@ const serializeValidatedPersonVersion = (result: {
 export const cryptoWorkerHandlers: CryptoWorkerHandlerMap = {
   computeIdentityHash: async ({ input }) => {
     return { identityHash: await computeIdentityHash(input) };
-  },
-  deriveKey: async ({ input, purpose, preset }) => {
-    return await deriveKeyFromPersonData(input, purpose ?? "PRIVATE_KEY", preset ?? "BALANCED");
   },
   deriveIdentityMaterialV1: async ({ identity, rawPassphrase, identitySuiteId }) => {
     let material;

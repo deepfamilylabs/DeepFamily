@@ -127,12 +127,10 @@ describe("planned production protocol deployment projection", function () {
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
       Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
     );
-    expect(contracts).not.to.have.property("shieldedAdapters");
     expect(contracts.shieldedDeepPool.tokenImmutable).to.equal(contracts.token);
     expect(contracts.shieldedDeepPool.verifierAdapterImmutable).to.equal(
       contracts.groth16VerifierAdapter.address,
     );
-    expect(contracts).not.to.have.property("shieldedHeirKeyRegistry");
     for (const action of Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)) {
       expect(contracts.groth16VerifierAdapter[`${action}VerifierImmutable`]).to.equal(
         contracts.shieldedVerifiers[action].address,
@@ -152,7 +150,6 @@ describe("planned production protocol deployment projection", function () {
       manifest: baseManifest(),
     });
     expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(8);
-    expect(inspected.artifacts).not.to.have.property("shieldedAdapters");
     expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );

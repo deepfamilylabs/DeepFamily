@@ -71,20 +71,6 @@ describe("Timelock deployment configuration", function () {
     ).to.be.rejectedWith(/requires explicit GOVERNANCE_SAFE_ADDRESS/i);
   });
 
-  it("rejects removed governance aliases before resolving live-network settings", async () => {
-    const removedVariables = {
-      GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
-      GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
-      GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
-    };
-
-    for (const [removedName, replacementName] of Object.entries(removedVariables)) {
-      await expect(resolve({ env: { [removedName]: "legacy-value" } })).to.be.rejectedWith(
-        `${removedName} has been removed; use ${replacementName} instead`,
-      );
-    }
-  });
-
   it("accepts only positive safe integer delays", function () {
     expect(parsePositiveSafeInteger("172800", "MIN_DELAY")).to.equal(172800);
 

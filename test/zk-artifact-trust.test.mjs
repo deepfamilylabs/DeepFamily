@@ -7,7 +7,7 @@ import path from "node:path";
 import { CIRCOM_VERSION, resolveCircomTargetPolicy } from "../scripts/lib/circomToolchain.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
-  MINIMUM_PRODUCTION_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_PRODUCTION_PHASE1,
@@ -42,9 +42,8 @@ const writeTranscript = async (root, transcript) =>
 const createProductionFixture = async ({
   trustModel = ZK_TRUST_MODEL_SINGLE_OPERATOR,
   contributorCount = trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR
-    ? MINIMUM_PRODUCTION_CONTRIBUTORS
+    ? MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS
     : MINIMUM_MULTI_PARTY_CONTRIBUTORS,
-  singleOperatorSchemaVersion = 3,
   compilerRuntime = { platform: "linux", arch: "x64" },
 } = {}) => {
   const root = await createCanonicalTemporaryDirectory("deepfamily-zk-artifact-trust-");
@@ -195,11 +194,8 @@ const createProductionFixture = async ({
         : null,
   };
   const transcript = {
-    schemaVersion: trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? singleOperatorSchemaVersion : 1,
-    ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? { trustModel } : {}),
-    ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR && singleOperatorSchemaVersion === 3
-      ? { compiler }
-      : {}),
+    schemaVersion: trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? 3 : 1,
+    ...(trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR ? { trustModel, compiler } : {}),
     ceremonyId,
     phase1Sha256,
     circuits: transcriptCircuits,
@@ -226,7 +222,7 @@ const createProductionFixture = async ({
       ceremonyId,
       minimumContributors:
         trustModel === ZK_TRUST_MODEL_SINGLE_OPERATOR
-          ? MINIMUM_PRODUCTION_CONTRIBUTORS
+          ? MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS
           : MINIMUM_MULTI_PARTY_CONTRIBUTORS,
       contributorCount: contributions.length,
       phase1: {
@@ -262,7 +258,7 @@ describe("ZK artifact trust", function () {
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         warning:
           "Single local contributor with public fixed entropy; development and testing only.",
-        minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+        minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
         contributorCount: 1,
         beaconApplied: false,
         transcriptSha256: null,
@@ -278,7 +274,7 @@ describe("ZK artifact trust", function () {
         productionReady: false,
         ceremonyId: null,
         contributorCount: 1,
-        minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+        minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
         beaconApplied: false,
         transcriptSha256: null,
       });
@@ -320,8 +316,8 @@ describe("ZK artifact trust", function () {
         trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
         productionReady: true,
         ceremonyId: "deepfamily-production-2026-01",
-        contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
-        minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+        contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+        minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
         beaconApplied: true,
         transcriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
       });
@@ -358,81 +354,22 @@ describe("ZK artifact trust", function () {
       }
     });
 
-    it("accepts canonical CRLF checkout text with LF-normalized evidence hashes", async function () {
-      const transcriptLf = `${JSON.stringify(fixture.transcript, null, 2)}\n`;
+    it("rejects non-canonical indentation, duplicate JSON keys and non-LF line endings", async function () {
+      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
       const manifestLf = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
-      const expectedTranscriptSha256 = sha256Text(transcriptLf);
-      const expectedManifestSha256 = sha256Text(manifestLf);
-      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
-      const transcriptPath = artifactPath(fixture.root, ZK_CEREMONY_TRANSCRIPT_PATH);
-
-      expect(fixture.manifest.trustedSetup.transcript.sha256).to.equal(expectedTranscriptSha256);
-      for (const spec of Object.values(ZK_RELEASE_ARTIFACTS)) {
-        for (const relativePath of [spec.source, spec.verificationKey, spec.solidityVerifier]) {
-          const filePath = artifactPath(fixture.root, relativePath);
-          const lf = await fs.readFile(filePath, "utf8");
-          await fs.writeFile(filePath, lf.replaceAll("\n", "\r\n"));
-        }
-      }
-      await fs.writeFile(transcriptPath, transcriptLf.replaceAll("\n", "\r\n"));
-      await fs.writeFile(manifestPath, manifestLf.replaceAll("\n", "\r\n"));
-
-      const result = inspectProductionFixture(fixture);
-      expect(readCanonicalJsonFile(manifestPath).raw).to.equal(manifestLf);
-      expect(readCanonicalJsonFile(transcriptPath).raw).to.equal(transcriptLf);
-      expect(result.manifestSha256).to.equal(expectedManifestSha256);
-      expect(result.transcriptSha256).to.equal(expectedTranscriptSha256);
-      expect(result.transcript.sha256).to.equal(expectedTranscriptSha256);
-      expect(result.transcript.bytes).to.equal(Buffer.byteLength(transcriptLf));
-    });
-
-    it("rejects non-canonical indentation and duplicate JSON keys", async function () {
-      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
       const invalidDocuments = [
         `${JSON.stringify(fixture.manifest)}\n`,
-        '{\n  "schemaVersion": 2,\n  "schemaVersion": 2\n}\n',
+        '{\n  "schemaVersion": 3,\n  "schemaVersion": 3\n}\n',
+        manifestLf.replaceAll("\n", "\r\n"),
+        manifestLf.replace("\n", "\r"),
       ];
 
       for (const contents of invalidDocuments) {
         await fs.writeFile(manifestPath, contents);
         expect(() => readCanonicalJsonFile(manifestPath, "fixture JSON")).to.throw(
-          "fixture JSON must use canonical two-space JSON with one trailing newline and no duplicate keys",
+          "fixture JSON must use canonical two-space JSON with LF line endings, one trailing newline and no duplicate keys",
         );
       }
-    });
-
-    it("rejects mixed line endings and isolated carriage returns", async function () {
-      const manifestPath = artifactPath(fixture.root, ZK_ARTIFACT_MANIFEST_PATH);
-      const manifestLf = `${JSON.stringify(fixture.manifest, null, 2)}\n`;
-      const invalidDocuments = [manifestLf.replace("\n", "\r\n"), manifestLf.replace("\n", "\r")];
-
-      for (const contents of invalidDocuments) {
-        await fs.writeFile(manifestPath, contents);
-        expect(() => readCanonicalJsonFile(manifestPath, "fixture JSON")).to.throw(
-          "fixture JSON must use uniform LF or CRLF line endings",
-        );
-      }
-    });
-
-    it("continues to accept a legacy schema-v2 single-operator transcript", async function () {
-      await replaceFixture({ singleOperatorSchemaVersion: 2 });
-
-      const result = inspectProductionFixture(fixture);
-
-      expect(fixture.transcript).not.to.have.property("compiler");
-      expect(result.compiler).to.equal(null);
-      expect(result.transcript.record.compiler).to.equal(null);
-    });
-
-    it("can inspect a legacy schema-v2 manifest without claiming runtime-graph evidence", async function () {
-      fixture.manifest.schemaVersion = 2;
-      delete fixture.manifest.toolchain.snarkjsRuntimeSha256;
-      await writeManifest(fixture.root, fixture.manifest);
-
-      const result = inspectProductionFixture(fixture);
-
-      expect(result.schemaVersion).to.equal(2);
-      expect(result.toolchain.snarkjsRuntime).to.equal(null);
     });
 
     it("validates schema-v3 compiler evidence for every supported Circom 2.2.3 target", async function () {
@@ -545,7 +482,7 @@ describe("ZK artifact trust", function () {
           productionRotationRuntimeSha256: replacementRuntimeSha256,
           expectedProductionPhase1: fixture.expectedProductionPhase1,
         }),
-      ).to.throw("requires a schema-v3 production manifest inspection");
+      ).to.throw("requires a production manifest inspection");
 
       const result = inspectZkReleaseArtifacts({
         root: fixture.root,

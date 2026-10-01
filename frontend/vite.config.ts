@@ -60,8 +60,7 @@ const getManualChunk = (id: string): string | undefined => {
   if (
     normalized.includes('/node_modules/@noble/hashes/') ||
     normalized.includes('/node_modules/hash-wasm/') ||
-    normalized.includes('/node_modules/poseidon-lite/') ||
-    normalized.includes('/node_modules/scrypt-js/')
+    normalized.includes('/node_modules/poseidon-lite/')
   ) {
     return 'crypto-vendor'
   }
@@ -255,8 +254,6 @@ export default defineConfig(({ command, mode }) => {
     ...connectSrcBase,
     'ws://localhost:5173',
     'ws://127.0.0.1:5173',
-    // Back-compat for local Hardhat defaults when `VITE_RPC_URL` isn't set.
-    ...(rpcOrigin ? [] : ['http://127.0.0.1:8545', 'http://localhost:8545']),
   ])
 
   const connectSrcNonDev = uniq(connectSrcBase)

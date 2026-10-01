@@ -1318,7 +1318,7 @@ describe("PaperGenealogyView", () => {
     );
   });
 
-  it("does not use the old overfull Ou-style split point beside the spine", () => {
+  it("does not split an Ou-style record at an overfull point beside the spine", () => {
     const wide = makeWideGenerationGraph(1);
     const child = wide.graph.nodes[1];
     const generations = buildPaperGenerations({
@@ -1524,7 +1524,7 @@ describe("PaperGenealogyView", () => {
     expect(screen.getByTestId(`paper-ou-relation-${secondSon.id}`).textContent).toBe("曹操次子");
     // The root keeps the shared 始祖 relation label.
     expect(screen.getByTestId(`paper-ou-relation-${root.id}`).textContent).toContain("ancestor");
-    // The label is no longer duplicated inline at the head of the biography body.
+    // The label is not duplicated inline at the head of the biography body.
     expect(screen.getByTestId(`paper-ou-detail-${firstSon.id}`).textContent).not.toContain(
       "曹操长子",
     );

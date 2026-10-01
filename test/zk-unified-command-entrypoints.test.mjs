@@ -26,7 +26,9 @@ function write(root, relativePath, contents) {
 }
 
 async function developmentFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-unified-zk-check-"));
+  const root = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-unified-zk-check-")),
+  );
   write(root, "node_modules/snarkjs/build/cli.cjs", "fixture snarkjs CLI\n");
   const ptau = path.join(root, PRODUCTION_PTAU_RELATIVE_PATH);
   fs.mkdirSync(path.dirname(ptau), { recursive: true });

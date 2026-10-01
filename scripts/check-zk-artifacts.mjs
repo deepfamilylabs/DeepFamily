@@ -18,7 +18,7 @@ import {
   SHIELDED_SETUP_CIRCUITS,
   inspectShieldedProductionArtifacts,
 } from "./lib/shieldedProductionSetup.mjs";
-import { inspectZkReleaseArtifacts, sha256CanonicalTextFile } from "./lib/zkArtifactTrust.mjs";
+import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
 import { SHIELDED_CIRCUITS } from "./zk-shielded-build.mjs";
 
@@ -74,10 +74,9 @@ function assertHash(filePath, expected, label) {
   }
 }
 
-function assertSameFile(actualPath, expectedPath, label, { canonicalText = false } = {}) {
-  const hash = canonicalText ? (filePath) => sha256CanonicalTextFile(filePath, label) : sha256;
-  const actual = hash(actualPath);
-  const expected = hash(expectedPath);
+function assertSameFile(actualPath, expectedPath, label) {
+  const actual = sha256(actualPath);
+  const expected = sha256(expectedPath);
   if (actual !== expected) {
     throw new Error(
       `${label} is stale or was generated from a different artifact\n` +
@@ -154,12 +153,8 @@ export function checkLegacyArtifacts() {
       }
       run(process.execPath, [renameVerifierScript, exportedVerifier, circuit.verifierContractName]);
 
-      assertSameFile(exportedVkey, committedVkey, `${circuit.name} verification key`, {
-        canonicalText: true,
-      });
-      assertSameFile(exportedVerifier, verifier, `${circuit.name} Solidity verifier`, {
-        canonicalText: true,
-      });
+      assertSameFile(exportedVkey, committedVkey, `${circuit.name} verification key`);
+      assertSameFile(exportedVerifier, verifier, `${circuit.name} Solidity verifier`);
       console.log(
         `${circuit.name}: compiled R1CS/WASM and zkey-derived vkey/Solidity verifier match`,
       );
@@ -275,7 +270,6 @@ export function checkShieldedDevelopmentArtifacts({
         exportedVkey,
         path.join(root, paths.verificationKeySha256),
         `${action} development verification key`,
-        { canonicalText: true },
       );
       if (spec.verifierPath) {
         fs.writeFileSync(
@@ -289,7 +283,6 @@ export function checkShieldedDevelopmentArtifacts({
           exportedVerifier,
           path.join(root, paths.solidityVerifierSha256),
           `${action} development verifier`,
-          { canonicalText: true },
         );
       }
       console.log(`${action}: development R1CS/WASM and zkey-derived outputs match`);

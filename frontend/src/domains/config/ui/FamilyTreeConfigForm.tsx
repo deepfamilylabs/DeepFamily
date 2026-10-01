@@ -16,11 +16,9 @@ import {
  * The family settings panel: one flat, scrolling column under two group
  * headings, with the save actions docked at the bottom.
  *
- * It used to be three collapsible cards, which put every field at least one
- * disclosure click away and hid each control's meaning behind a help icon and a
- * floating tooltip. In a 320px drawer there is room to simply show the fields
- * and say what each one does, so the structure is carried by headings and
- * hairlines instead.
+ * In a 320px drawer there is room to simply show the fields and say what each
+ * one does, so the structure is carried by headings and hairlines rather than
+ * collapsible cards or help tooltips.
  *
  * The two halves behave differently, and the panel says so: the data source is
  * staged locally and only applied on save (the footer tracks that), while the

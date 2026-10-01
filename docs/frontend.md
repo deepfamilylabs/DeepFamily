@@ -56,7 +56,7 @@ Use the directory tree for ownership boundaries, and these files as first-read e
 
 - App shell: `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/AppProviders.tsx`, `frontend/src/app/ui/Layout.tsx`
 - Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/app/config/brandBadge.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
-- Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/domains/person/api/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
+- Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
 - Worker/ZK/metadata boundaries: `frontend/src/workers/crypto.worker.ts`,
   `frontend/src/workers/zk.worker.ts`, `frontend/src/shared/workers/`,
@@ -82,7 +82,7 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 
 - `shared/` must not import from `domains/`, `pages/`, or `app/`.
 - `domains/*` must not import from sibling domains. Cross-domain needs belong in `shared/` or are wired at the `pages/` / `app/` layer.
-- Contract result parsers, `NodeData` merge helpers, and shared read gateways used by multiple domains live under `shared/model` or `shared/clients`; domain-local files may re-export them for compatibility.
+- Contract result parsers, `NodeData` merge helpers, and shared read gateways used by multiple domains live under `shared/model` or `shared/clients`; import them from there rather than through domain re-exports.
 - `pages/` compose domains; they should not contain reusable logic — extract to the relevant domain instead.
 - Code imported by a worker (`workers/*.worker.ts`) must stay worker-safe: no React, no DOM, no `window`. Put such code under `shared/crypto/`, `shared/zk/`, or `shared/lib/`.
 
@@ -91,8 +91,8 @@ That package must remain browser- and Node-neutral: no filesystem access, `snark
 paths, or browser URLs. Node artifact candidates belong in `lib/proofDescriptors.js`; browser
 artifact URLs belong in `frontend/src/shared/zk/proofDescriptors.ts`.
 
-`frontend:legacy-entrypoints` enforces that retired entrypoints and the pre-fresh-v1 random/recovery
-identity APIs stay removed; re-run it after large refactors.
+`frontend:source-rules` keeps frontend source inside its owning layers, keeps `scripts/check-root.mjs`
+from printing a passphrase, and keeps Argon2id behind `@deepfamily/protocol-core`.
 
 ### React page and transaction UI structure
 
@@ -311,7 +311,7 @@ This reads `deployments/localhost/` and writes `frontend/.env.local`, including 
 npm run frontend:dev        # Vite dev server (auto ABI sync)
 npm run frontend:build      # Production build
 npm run frontend:preview    # Serve the built bundle
-npm run frontend:check      # lint + legacy-entrypoints + typecheck + build + vitest
+npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 ```
 
 `frontend:check` is the gate to run before committing — it matches what CI runs.
@@ -449,8 +449,7 @@ cache.
 
 Private `biography` is distinct from the NFT supplement `story` and public on-chain DFS1 Story
 data. Any UI action that copies private text into an NFT story must require explicit confirmation
-that the destination is public. Attachment URIs and NFT token URIs remain supported; the legacy
-external person-metadata/decryption flow is retired.
+that the destination is public. Attachment URIs and NFT token URIs are supported.
 
 ## Security
 

@@ -5,7 +5,7 @@ import path from "node:path";
 import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
 import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomToolchain.mjs";
 import {
-  MINIMUM_PRODUCTION_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
@@ -99,7 +99,7 @@ const createProductionFixture = async () => {
       { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
     ]),
   );
-  const contributions = Array.from({ length: MINIMUM_PRODUCTION_CONTRIBUTORS }, (_, index) => ({
+  const contributions = Array.from({ length: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS }, (_, index) => ({
     sequence: index + 1,
     participantId: `participant-${index + 1}`,
     personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
@@ -153,7 +153,7 @@ const createProductionFixture = async () => {
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
       ceremonyId,
-      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       contributorCount: contributions.length,
       phase1: {
         ...expectedProductionPhase1,
@@ -271,8 +271,8 @@ describe("production ZK ceremony verifier", function () {
       ceremonyId: fixture.manifest.trustedSetup.ceremonyId,
       transcriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
-      contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
-      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+      minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
       compiler: fixture.compiler,
       circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
     });
@@ -317,25 +317,6 @@ describe("production ZK ceremony verifier", function () {
       });
       expect(Object.isFrozen(invocation.env)).to.equal(true);
     }
-  });
-
-  it("continues to verify a legacy schema-v2 single-operator transcript", async function () {
-    fixture.transcript.schemaVersion = 2;
-    delete fixture.transcript.compiler;
-    const transcriptPath = await writeTranscript(fixture.root, fixture.transcript);
-    fixture.manifest.trustedSetup.transcript.sha256 = sha256File(transcriptPath);
-    await writeManifest(fixture.root, fixture.manifest);
-
-    const result = await verifyProductionCeremony({
-      root: fixture.root,
-      expectedProductionPhase1: fixture.expectedProductionPhase1,
-      ptauPath: fixture.ptauPath,
-      runner: () => {},
-      mpcMetadataReader: async (zkeyPath) =>
-        fixture.metadataByCircuit[path.basename(zkeyPath, ".zkey")],
-    });
-
-    expect(result.compiler).to.equal(null);
   });
 
   it("rejects a Powers of Tau file whose bytes do not match the manifest", async function () {

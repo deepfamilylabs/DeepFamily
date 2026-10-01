@@ -416,8 +416,7 @@ This broadcasts real Ethereum Mainnet transactions and spends real ETH. A real
 `EXPLORER_API_KEY` is mandatory for Ethereum Mainnet source verification; Sepolia
 acceptance uses API-key-free Blockscout. See the complete
 environment, owner-smoke, approval, checkpoint, resumption, and recovery procedure in the
-[Ethereum Mainnet release runbook](docs/ethereum-mainnet-release.md). The local Sepolia setup and
-rerun procedure is in `docs/ethereum-sepolia-acceptance.local.md`.
+[Ethereum Mainnet release runbook](docs/ethereum-mainnet-release.md).
 
 ### Manual and other-network deployment
 

@@ -1,8 +1,6 @@
 /**
  * Destructive Ethereum Sepolia acceptance (fixed network sepolia / chain ID 11155111):
  *   npm run ethereum:acceptance
- *
- * See docs/ethereum-sepolia-acceptance.local.md for diagnostic, release-rehearsal and recovery use.
  */
 import { ETHEREUM_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { main, safeErrorMessage } from "./evm-acceptance.mjs";

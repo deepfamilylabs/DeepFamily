@@ -104,12 +104,6 @@ describe("acceptance command wrapper", function () {
     expect(ETHEREUM_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
       "tmp/release-evidence/ethereum-release-rehearsal.json",
     );
-    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
-      "testnetReleaseReportEnvironmentName",
-    );
-    expect(ETHEREUM_CHAIN_PROFILE.mainnet).not.to.have.property(
-      "testnetReleaseReportEnvironmentName",
-    );
     expect(ESPACE_CHAIN_PROFILE.mainnet.safePlanDigestDomain).not.to.equal(
       ETHEREUM_CHAIN_PROFILE.mainnet.safePlanDigestDomain,
     );

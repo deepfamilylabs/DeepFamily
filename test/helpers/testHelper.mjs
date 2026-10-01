@@ -105,11 +105,6 @@ export function computeIdentityCommitment(
   identitySuiteId = 1,
   derivedSecretField = 0n,
 ) {
-  if (arguments.length > 5) {
-    throw new Error(
-      "computeIdentityCommitment accepts one atomic identitySuiteId, not legacy version fields",
-    );
-  }
   const suiteCommitment = computeSuiteCommitment(identitySuiteId);
   const nameSecretCommitment = computeNameSecretCommitment(
     ethers,
@@ -126,11 +121,6 @@ export function computeIdentityCommitment(
 }
 
 export function computeDisclosureBinding(ethers, fullName, basicInfo, identitySuiteId = 1) {
-  if (arguments.length > 4) {
-    throw new Error(
-      "computeDisclosureBinding accepts one atomic identitySuiteId, not legacy version fields",
-    );
-  }
   return poseidon4([
     DOMAIN_DISCLOSURE,
     computeNameField(ethers, fullName),

@@ -137,14 +137,11 @@ const createCeremonySnapshot = async ({
       }
       circuits[circuitName] = Object.freeze({ r1csPath, zkeyPath });
     }
-    const runtime =
-      evidence.schemaVersion >= 3
-        ? runtimeSnapshotter({
-            root: resolvedRoot,
-            destinationRoot: path.join(snapshotRoot, "snarkjs-runtime"),
-            expectedSha256: evidence.toolchain.snarkjsRuntime.sha256,
-          })
-        : Object.freeze({ root: resolvedRoot, sha256: null });
+    const runtime = runtimeSnapshotter({
+      root: resolvedRoot,
+      destinationRoot: path.join(snapshotRoot, "snarkjs-runtime"),
+      expectedSha256: evidence.toolchain.snarkjsRuntime.sha256,
+    });
     return Object.freeze({
       root: snapshotRoot,
       ptauPath,
@@ -169,12 +166,10 @@ const assertSnapshotUnchanged = ({ snapshot, evidence }) => {
       throw new Error(`${circuitName} snapshot zkey changed while checks were running`);
     }
   }
-  if (snapshot.runtime.sha256 !== null) {
-    assertSnarkjsRuntimeHash({
-      root: snapshot.runtime.root,
-      expectedSha256: snapshot.runtime.sha256,
-    });
-  }
+  assertSnarkjsRuntimeHash({
+    root: snapshot.runtime.root,
+    expectedSha256: snapshot.runtime.sha256,
+  });
 };
 
 const requireRegularFile = (filePath, label) => {

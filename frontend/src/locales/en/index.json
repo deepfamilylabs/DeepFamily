@@ -468,7 +468,6 @@
       "spineSectionLabel": "Spine",
       "backCoverSectionLabel": "Back cover",
       "coverStyleLabel": "Layout",
-      "backCoverModeLabel": "Back cover",
       "coverSpineLabel": "Show title and hall name",
       "coverInscriptionLabel": "Cover inscription",
       "coverInscriptionPlaceholder": "For example: Revised in spring 2024",
@@ -547,7 +546,6 @@
       "nftPublicStory": "Public NFT Biography",
       "endorsements": "Endorsements",
       "children": "Children",
-      "descendants": "Children",
       "spouse": "Spouse",
       "spouseWife": "Wife",
       "spouseHusband": "Husband"
@@ -587,7 +585,6 @@
       "networkUnconfigured": "No contract",
       "removeCustomNetwork": "Remove {{name}}",
       "removeCustomNetworkShort": "Remove network",
-      "contract": "Contract",
       "unnamedNetwork": "chain {{chainId}}",
       "versionNeedsContract": "No contract deployed, so versions cannot be read",
       "root": "Root Hash",
@@ -603,7 +600,6 @@
       "versionNeedsHash": "Enter a root hash to list its on-chain versions",
       "versionLookupFailed": "Version lookup failed. Re-enter the hash to retry",
       "versionNone": "This hash carries no on-chain version",
-      "clearAndRefresh": "Clear",
       "rootHistory": "Root hash history",
       "displayAppliesInstantly": "Applies instantly",
       "unsavedChanges": "Unsaved changes",
@@ -613,7 +609,6 @@
     },
     "ui": {
       "versionNumber": "Version Index",
-      "contractModeConfig": "Config",
       "traversalDFS": "DFS: load down one branch first, then return to sibling branches",
       "traversalBFS": "BFS: load the current generation first, then continue to the next",
       "traversal": "Traversal Mode",
@@ -622,9 +617,7 @@
       "rootLabel": "Root",
       "peopleUnit": "People",
       "generationsUnit": "Generations",
-      "edit": "Edit",
       "save": "Save",
-      "cancel": "Cancel",
       "childrenMode": "Node Mode",
       "childrenModeUnion": "Merge",
       "childrenModeStrict": "Exact",
@@ -651,10 +644,6 @@
     "status": {
       "contractModeRootNotFound": "Root node version not found. Please check the hash and version number.",
       "rootNotFound": "Root node not found. Please check the Root configuration or wait for indexing",
-      "badge": {
-        "checking": "Checking",
-        "ok": "OK"
-      },
       "networkError": "Network request failed",
       "rateLimited": "RPC rate limit exceeded. Please try again later.",
       "rootNotTrustedEndorsed": "The current root version is not endorsed by any recommended source."
@@ -682,7 +671,6 @@
       "gender": "Gender",
       "birth": "Birth",
       "death": "Death",
-      "story": "Biography",
       "encyclopedia": "Encyclopedia",
       "editStory": "Edit Story",
       "mintNFTTooltip": "Mint this person as an NFT",
@@ -723,7 +711,6 @@
       "title": "Person Version Details"
     },
     "validation": {
-      "contract": "Please enter a valid contract address (0x + 40 hex chars)",
       "root": "Please enter a valid root hash (0x + 64 hex chars)",
       "version": "Please select an on-chain version",
       "customNetwork": "Please enter network name, valid chain ID, RPC URL and contract address",
@@ -767,8 +754,6 @@
     "clearCache": "Clear plaintext cache",
     "errors": {
       "config": "Configure a valid RPC endpoint, chain ID, and DeepFamily proxy first.",
-      "noCandidates": "No locked version in the current family view has a complete Archive reference.",
-      "partialFailure": "{{count}} version(s) could not be unlocked with this passphrase.",
       "failed": "Metadata unlock failed"
     },
     "automaticHint": "Only versions in the current family view are tried once with an empty passphrase in the background. You can unlock the remaining versions here.",
@@ -938,12 +923,6 @@
       "recordAddedGeneric": "Story record added successfully",
       "storySealed": "Story sealed successfully ({{total}} records)",
       "storySealedGeneric": "Story sealed successfully"
-    },
-    "errors": {
-      "userRejected": "Transaction was rejected by user",
-      "walletTimeout": "Wallet confirmation timed out. Please reopen your wallet and confirm the transaction.",
-      "walletPending": "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
-      "noWallet": "No wallet connected. Please connect your wallet first."
     },
     "contents": "Contents",
     "orderLabel": "Record order",
@@ -1211,6 +1190,7 @@
     "consentAge": "I confirm the person is 18 years or older.",
     "consentLegal": "I confirm the data is lawful, truthful, and authorized for public disclosure without extra private content.",
     "passphraseMismatch": "The identity passphrases do not match.",
+    "passphraseDisallowed": "This passphrase contains a code point the protocol does not accept, such as a control or invisible character. It cannot be used until that character is removed, because an invisible character cannot be retyped and the passphrase is not recoverable.",
     "consentMissing": "Please confirm all required checkboxes before minting.",
     "supplementalInfo": "Supplemental Information",
     "birthPlace": "Birth Place",
@@ -1247,7 +1227,6 @@
     "validation": {
       "birthPlaceTooLong": "Birth place is too long",
       "deathPlaceTooLong": "Death place is too long",
-      "storyTooLong": "Biography is too long",
       "tokenURITooLong": "Token URI is too long",
       "invalidTokenURI": "Invalid URL or IPFS URI",
       "yearExceedsCurrent": "AD year cannot exceed current year",
@@ -1302,11 +1281,6 @@
     "transactionFailed": "Transaction failed. Please check the error message and try again.",
     "transactionFailedDetails": "The transaction was submitted but failed to complete successfully.",
     "approvingDesc": "Please confirm the DEEP utility approval in your wallet",
-    "errors": {
-      "invalidTarget": "Invalid person hash or version index",
-      "needApprove": "Allowance too low, please approve DEEP utility points again",
-      "userRejected": "Transaction was rejected by user"
-    },
     "retryTransaction": "Retry Transaction",
     "quickTitle": "Endorse Version",
     "processing": "Submitting endorsement...",
@@ -1364,63 +1338,6 @@
     "mintSuccess": "NFT minted successfully",
     "mintFailed": "Failed to mint NFT",
     "queryFailed": "Failed to query data"
-  },
-  "keyDerivation": {
-    "title": "Secure Key Derivation",
-    "subtitle": "Derive EVM-compatible wallet private keys from personal information and a strong passphrase using a KDF. Recover them deterministically without storing private keys.",
-    "howItWorks": "How It Works",
-    "description": "Name + birthday + passphrase → Argon2id-derived PersonHash → scrypt KDF (N=131072) → Private Key → EVM Address",
-    "note": "Same input always generates same key | PersonHash uses local Argon2id derivation before scrypt key stretching",
-    "component": {
-      "title": "Secure Key Derivation",
-      "description": "Derive secure EVM-compatible wallet private keys from personal information and a strong passphrase using a KDF.",
-      "passphraseWarning": "Must use a strong passphrase with 15+ characters!",
-      "passphraseMismatch": "The identity passphrases do not match.",
-      "fillInfoFirst": "Please fill in personal information first",
-      "nameRequired": "Name cannot be empty",
-      "success": "Private key derived successfully",
-      "failed": "Private key derivation failed",
-      "kdfStrength": "KDF Strength (affects security and computation time)",
-      "presets": {
-        "testing": "Testing",
-        "recommended": "Recommended",
-        "strongest": "Strongest"
-      },
-      "estimatedTime": "Estimated time:",
-      "deriving": "Deriving... ({{progress}}%)",
-      "deriveButton": "Derive Secure Private Key",
-      "derivedSuccess": "Private Key Derived Successfully",
-      "evmAddress": "EVM Address",
-      "address": "Address",
-      "privateKey": "Private Key (Keep it safe!)",
-      "privateKeyLabel": "Private Key",
-      "copied": "{{label}} copied",
-      "copyFailed": "Copy failed",
-      "securityTips": "Security Tips:",
-      "tip1": "Private key controls assets, never reveal to anyone",
-      "tip2": "Remember your name, birthday and passphrase to recover anytime",
-      "tip3": "Any tiny change in information will produce a different private key",
-      "tip4": "Recommended to backup passphrase to a secure location",
-      "weakPassphraseTitle": "Weak Passphrase Warning",
-      "weakPassphraseMessage": "Passphrase strength is insufficient!",
-      "weakPassphraseContinue": "Do you still want to continue? (Not recommended)",
-      "proceedAnyway": "Proceed Anyway",
-      "improvePassphrase": "Improve Passphrase",
-      "recommendations": {
-        "empty": "Empty passphrase: zero passphrase entropy. Anyone who knows the identity fields can reproduce this key derivation input; the KDF cannot restore missing entropy.",
-        "unicodeWhitespace": "This passphrase contains only Unicode White_Space after normalization. It is not trimmed, but it is highly guessable and must be treated as a high-risk choice.",
-        "disallowedCodePoint": "This passphrase contains a code point the protocol does not accept, such as a control or invisible character. It cannot be used until that character is removed, because an invisible character cannot be retyped and the passphrase is not recoverable.",
-        "weak": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Insufficient security. Recommend: 15+ mixed characters or 20+ letters",
-        "medium": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Below recommended threshold. Recommend: 18+ characters with symbols",
-        "strong": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Good security",
-        "veryStrong": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Strong security",
-        "excellent": "Raw entropy: ~{{raw}} bits · Adjusted strength score: ~{{adjusted}}. Excellent security"
-      },
-      "progress": {
-        "preparingKDF": "Preparing KDF...",
-        "keyDerivationComplete": "Key derivation complete"
-      }
-    }
   },
   "logo": {
     "label": "Logo"

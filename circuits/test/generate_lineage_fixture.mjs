@@ -1,5 +1,5 @@
-// Shared lineage fixture for shielded circuit tests. It uses live lineage
-// commitments and LeanIMT paths without depending on the retired claim circuit.
+// Shared lineage fixture for shielded circuit tests, built from live lineage
+// commitments and LeanIMT paths.
 import {
   buildLineageMerkleProof,
   computeIdentityFromDerivedSecret,

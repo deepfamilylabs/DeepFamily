@@ -161,21 +161,7 @@ const resolveBuildSourcePath = (root, sourceName) => {
   );
 };
 
-const normalizeArtifactNames = (options) => {
-  const configured = [
-    options.releaseArtifactNames,
-    options.artifactNames,
-    options.contractNames,
-  ].filter((value) => value !== undefined);
-  if (configured.length > 1) {
-    const normalized = configured.map((value) => canonicalJson(value));
-    if (!normalized.every((value) => value === normalized[0])) {
-      throw new Error(
-        "releaseArtifactNames, artifactNames and contractNames aliases must not disagree",
-      );
-    }
-  }
-  const artifactNames = configured[0] ?? [];
+const normalizeArtifactNames = ({ artifacts, releaseArtifactNames: artifactNames = [] }) => {
   if (
     !Array.isArray(artifactNames) ||
     artifactNames.some((name) => typeof name !== "string" || name.trim() === "")
@@ -186,33 +172,13 @@ const normalizeArtifactNames = (options) => {
   if (new Set(normalized).size !== normalized.length) {
     throw new Error("releaseArtifactNames must not contain duplicates");
   }
-  if (normalized.length > 0 && typeof options.artifacts?.readArtifact !== "function") {
+  if (normalized.length > 0 && typeof artifacts?.readArtifact !== "function") {
     throw new Error("artifacts.readArtifact is required when release artifacts are requested");
   }
-  if (normalized.length === 0 && options.artifacts !== undefined) {
+  if (normalized.length === 0 && artifacts !== undefined) {
     throw new Error("releaseArtifactNames is required when artifacts is provided");
   }
   return normalized;
-};
-
-const normalizeBuildEvidenceArguments = (rootOrOptions, maybeOptions) => {
-  if (
-    rootOrOptions !== null &&
-    typeof rootOrOptions === "object" &&
-    !Array.isArray(rootOrOptions)
-  ) {
-    if (maybeOptions !== undefined) {
-      throw new Error("Build evidence options must be provided only once");
-    }
-    return {
-      root: rootOrOptions.root ?? process.cwd(),
-      options: rootOrOptions,
-    };
-  }
-  return {
-    root: rootOrOptions ?? process.cwd(),
-    options: maybeOptions ?? {},
-  };
 };
 
 const compilerArtifactFields = (compilerContract) => ({
@@ -246,19 +212,11 @@ const assertArtifactFieldMatches = (artifactName, field, actual, expected) => {
  * currently present in the workspace and installed npm packages. When release artifacts are
  * supplied, every artifact is additionally traced through buildInfoId/inputSourceName to its
  * compiler output and all deployable artifact fields are compared.
- *
- * Backward-compatible form:
- *   readProductionBuildInfoState(ethers, root, { artifacts, releaseArtifactNames })
- * Object form:
- *   readProductionBuildInfoState(ethers, { root, artifacts, releaseArtifactNames })
- * `artifactNames` and `contractNames` are accepted aliases for releaseArtifactNames.
  */
 export const readProductionBuildInfoState = async (
   ethers,
-  rootOrOptions = process.cwd(),
-  maybeOptions,
+  { root = process.cwd(), ...options } = {},
 ) => {
-  const { root, options } = normalizeBuildEvidenceArguments(rootOrOptions, maybeOptions);
   const releaseArtifactNames = normalizeArtifactNames(options);
   const directory = path.join(root, "artifacts", "build-info");
   const entries = await fs.readdir(directory, { withFileTypes: true });

@@ -273,28 +273,6 @@ async function updateLocalConfig() {
       }
     }
 
-    // The reader address was once written under a name that says "contract".
-    // That name is not read anywhere any more, so a line left over from an
-    // older run does nothing at all — which is exactly why it is swept up:
-    // editing an inert variable and seeing no effect is worse than not having
-    // it. Removing it here keeps a long-lived .env.local honest.
-    for (const legacyKey of [
-      "VITE_CONTRACT_ADDRESS",
-      `VITE_CONTRACT_ADDRESS_${LOCAL_CHAIN_ID}`,
-      "VITE_INHERITANCE_ADDRESS",
-      `VITE_INHERITANCE_ADDRESS_${LOCAL_CHAIN_ID}`,
-      "VITE_SHIELDED_KEY_REGISTRY_ADDRESS",
-      `VITE_SHIELDED_KEY_REGISTRY_ADDRESS_${LOCAL_CHAIN_ID}`,
-      "VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK",
-      `VITE_SHIELDED_KEY_REGISTRY_FROM_BLOCK_${LOCAL_CHAIN_ID}`,
-    ]) {
-      const legacyLine = new RegExp(`^${legacyKey}=.*\\n?`, "m");
-      if (legacyLine.test(updatedContent)) {
-        updatedContent = updatedContent.replace(legacyLine, "");
-        console.log(`Removed retired ${legacyKey} from local config`);
-      }
-    }
-
     // End on exactly one newline. New keys are appended as `\n${key}=${value}`,
     // which leaves the file without a trailing one, and the next thing appended
     // by hand then lands glued onto the last variable's value.

@@ -1,14 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useAccountGateway,
-  usePersonGateway,
-  type ParsedNftDetails,
-  type AccountEndorsementRow,
-  type AccountNftRow,
-  type AccountPage,
-  type AccountVersionRow,
-} from "../../../domains/person";
+import { useAccountGateway, usePersonGateway } from "../../../domains/person";
+import type {
+  AccountEndorsementRow,
+  AccountNftRow,
+  AccountPage,
+  AccountVersionRow,
+} from "../../../shared/clients/accountReadGateway";
+import type { ParsedNftDetails } from "../../../shared/clients/personReadGateway";
 import { getFriendlyErrorMessage } from "../../../shared/lib/errors";
 import { getPreviousPageOffset } from "../model/searchPageModel";
 

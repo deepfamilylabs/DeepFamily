@@ -4,7 +4,6 @@ import type {
   PersonVersionMetadataInput,
 } from "@deepfamily/protocol-core";
 import type { IdentityHashInput } from "../crypto/identityHash";
-import type { DerivedKey, KeyPurpose, KDFPreset } from "../crypto/secureKeyDerivation";
 
 export interface IdentityMaterialV1Result {
   identitySuiteId: number;
@@ -95,10 +94,6 @@ export interface ValidatedPersonVersionV1Result {
 
 export type CryptoWorkerCallMap = {
   computeIdentityHash: { params: { input: IdentityHashInput }; result: { identityHash: string } };
-  deriveKey: {
-    params: { input: IdentityHashInput; purpose?: KeyPurpose; preset?: KDFPreset };
-    result: DerivedKey;
-  };
   deriveIdentityMaterialV1: {
     params: {
       identity: IdentityFields;

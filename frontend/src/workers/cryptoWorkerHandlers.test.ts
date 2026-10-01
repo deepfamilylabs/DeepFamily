@@ -237,19 +237,15 @@ describe("production crypto worker handlers", () => {
 
   it("redacts nested shared-identity passphrases from Worker errors", async () => {
     const rawPassphrase = "nested-worker-passphrase-\u00e9-sentinel";
-    const deriveKey = vi.spyOn(cryptoWorkerHandlers, "deriveKey").mockRejectedValueOnce(
+    const computeHash = vi.spyOn(cryptoWorkerHandlers, "computeIdentityHash").mockRejectedValueOnce(
       Object.assign(new Error(`derive failed for ${rawPassphrase.normalize("NFC")}`), {
         code: "KDF_FAILED",
       }),
     );
     const request: CryptoWorkerRequest = {
       id: 43,
-      method: "deriveKey",
-      params: {
-        input: { ...identity, passphrase: rawPassphrase },
-        purpose: "PRIVATE_KEY",
-        preset: "FAST",
-      },
+      method: "computeIdentityHash",
+      params: { input: { ...identity, passphrase: rawPassphrase } },
     };
     const responses: CryptoWorkerResponse[] = [];
 
@@ -263,24 +259,20 @@ describe("production crypto worker handlers", () => {
     });
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase.normalize("NFC"));
-    deriveKey.mockRestore();
+    computeHash.mockRestore();
   });
 
   it("redacts the protocol-normalized secret, not only the raw input", async () => {
     const rawPassphrase = "a\u030a-worker-secret";
     const normalizedPassphrase = normalizePassphrase(rawPassphrase);
     expect(normalizedPassphrase).toBe("\u00e5-worker-secret");
-    const deriveKey = vi
-      .spyOn(cryptoWorkerHandlers, "deriveKey")
+    const computeHash = vi
+      .spyOn(cryptoWorkerHandlers, "computeIdentityHash")
       .mockRejectedValueOnce(new Error(`derive failed for ${normalizedPassphrase}`));
     const request: CryptoWorkerRequest = {
       id: 44,
-      method: "deriveKey",
-      params: {
-        input: { ...identity, passphrase: rawPassphrase },
-        purpose: "PRIVATE_KEY",
-        preset: "FAST",
-      },
+      method: "computeIdentityHash",
+      params: { input: { ...identity, passphrase: rawPassphrase } },
     };
     const responses: CryptoWorkerResponse[] = [];
 
@@ -293,6 +285,6 @@ describe("production crypto worker handlers", () => {
     });
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
     expect(JSON.stringify(responses)).not.toContain(normalizedPassphrase);
-    deriveKey.mockRestore();
+    computeHash.mockRestore();
   });
 });

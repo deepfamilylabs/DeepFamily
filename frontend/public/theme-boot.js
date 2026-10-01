@@ -9,7 +9,7 @@
  */
 (function () {
   try {
-    var stored = localStorage.getItem("df-theme") || localStorage.getItem("theme");
+    var stored = localStorage.getItem("df-theme");
     var dark =
       stored === "dark" ||
       (stored !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);

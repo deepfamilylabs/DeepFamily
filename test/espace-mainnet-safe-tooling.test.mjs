@@ -183,12 +183,8 @@ describe("eSpace Mainnet Safe command wiring", function () {
       "EVM_MAINNET_PLAN_DIGEST",
       "EVM_MAINNET_PLAN_APPROVAL_SIGNATURES",
       "EVM_MAINNET_RECOVERY_TXS",
-      "EVM_MAINNET_TESTNET_RELEASE_REPORT",
       "EVM_MAINNET_CONFIRMATIONS",
       "EVM_MAINNET_FINALITY_TIMEOUT",
-      "GOVERNANCE_MULTISIG",
-      "GOVERNANCE_OWNER",
-      "GOVERNANCE_MULTISIG_PROFILE",
       "GOVERNANCE_TIMELOCK_ADDRESS",
     ]) {
       expect(example, name).not.to.include(`${name}=`);

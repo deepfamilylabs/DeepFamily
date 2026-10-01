@@ -1,4 +1,4 @@
-export { NodeDetailProvider, useNodeDetail, type NodeKeyMinimal } from "./NodeDetailProvider";
+export { NodeDetailProvider, useNodeDetail } from "./NodeDetailProvider";
 export type { TrustedEndorserAccess } from "./NodeDetailModalSections";
 export {
   EndorseModalProvider,
@@ -24,4 +24,3 @@ export {
   type SecretHashInputs,
   type PersonHashCalculatorHandle,
 } from "./PersonHashCalculator";
-export { default as SecureKeyDerivation } from "./SecureKeyDerivation";

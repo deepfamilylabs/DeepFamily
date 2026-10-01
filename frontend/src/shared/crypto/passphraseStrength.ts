@@ -2,7 +2,7 @@
  * Passphrase Strength Validation Utility
  *
  * Shared logic for validating passphrase strength across the application.
- * Used by PersonHashCalculator and SecureKeyDerivation components.
+ * Used by the PersonHashCalculator component.
  */
 
 import {

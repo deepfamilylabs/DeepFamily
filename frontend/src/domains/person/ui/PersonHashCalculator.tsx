@@ -36,7 +36,6 @@ import {
   getGraphemeLength as getGraphemeLengthUtil,
   type ProtocolPassphraseRisk,
 } from "../../../shared/crypto/passphraseStrength";
-import { computeIdentityHash, computePersonHash } from "../../../shared/crypto/identityHash";
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 
@@ -195,15 +194,6 @@ type HashFormInput = {
   birthDay?: number | "";
   gender: number;
 };
-
-// Password strength calculation (uses shared utility from passphraseStrength.ts)
-// Note: This is a simple wrapper that maintains backward compatibility with the UI
-const calculatePasswordStrength = (password: string) => {
-  return validatePassphraseStrength(password, false);
-};
-
-// Hash calculation function using Poseidon (matches circuit and contract)
-export { computePersonHash, computeIdentityHash };
 
 // Component props interface
 interface PersonHashCalculatorProps {
@@ -394,7 +384,7 @@ export const PersonHashCalculator = forwardRef<
     const hasPassphrase = normalizedPassphrase.length > 0;
     // Calculate password strength
     const passwordStrength = useMemo(() => {
-      return calculatePasswordStrength(normalizedPassphrase);
+      return validatePassphraseStrength(normalizedPassphrase, false);
     }, [normalizedPassphrase]);
 
     const buildTransformedData = (values?: Partial<HashFormInput>): HashForm => {

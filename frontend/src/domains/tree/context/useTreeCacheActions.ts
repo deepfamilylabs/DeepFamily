@@ -442,9 +442,8 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       // This is the only missing-node path. Its caller must have already checked
       // the post-confirmation Reader/Archive anchors; the explicit projection
       // prevents Worker diagnostics or secret intermediates from being retained.
-      // A newly confirmed version is new plaintext, not a legacy hydrated
-      // cache. Apply the current scope's preference unless its producer already
-      // chose a lifetime explicitly.
+      // Apply the current scope's preference unless the producer of this
+      // plaintext already chose a lifetime explicitly.
       const committed = projectConfirmedPersonVersion(
         node.metadataUnlockPersistence === undefined
           ? {

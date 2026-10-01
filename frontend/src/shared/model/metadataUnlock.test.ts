@@ -90,10 +90,14 @@ describe("validated NodeData metadata cache", () => {
     expect(cleared.metadataParents).toBeUndefined();
   });
 
-  it("sanitizes stale IndexedDB nodes while preserving complete validated unlocks", () => {
-    const valid = mergeValidatedMetadataUnlock(node, anchors, unlocked);
+  it("sanitizes stale IndexedDB nodes while preserving complete device unlocks", () => {
+    const valid: NodeData = {
+      ...mergeValidatedMetadataUnlock(node, anchors, unlocked),
+      metadataUnlockPersistence: "device",
+    };
     const stale = { ...valid, metadataUnlockValidated: false };
-    const hydrated = sanitizeHydratedMetadataUnlocks({ valid, stale });
+    const unmarked = mergeValidatedMetadataUnlock(node, anchors, unlocked);
+    const hydrated = sanitizeHydratedMetadataUnlocks({ valid, stale, unmarked });
 
     expect(isMetadataUnlockUsable(hydrated.valid)).toBe(true);
     expect(hydrated.valid.tag).toBe("");
@@ -101,6 +105,8 @@ describe("validated NodeData metadata cache", () => {
     expect(hydrated.stale.tag).toBeUndefined();
     expect(hydrated.stale.biography).toBeUndefined();
     expect(hydrated.stale.metadataPerson).toBeUndefined();
+    // Stored plaintext must say it was remembered on purpose.
+    expect(hydrated.unmarked).toEqual(clearMetadataUnlock(unmarked));
   });
 
   it("leaves ordinary public-only cached nodes untouched", () => {
@@ -183,15 +189,15 @@ describe("validated NodeData metadata cache", () => {
       metadataUnlockPersistence: "session",
     };
     const device: NodeData = { ...session, metadataUnlockPersistence: "device" };
-    const legacy = mergeValidatedMetadataUnlock(node, anchors, unlocked);
+    const unmarked = mergeValidatedMetadataUnlock(node, anchors, unlocked);
 
-    const durable = stripSessionMetadataUnlocks({ session, device, legacy });
+    const durable = stripSessionMetadataUnlocks({ session, device, unmarked });
 
     expect(durable.session).toEqual(clearMetadataUnlock(session));
     expect(durable.session).not.toHaveProperty("fullName");
     expect(durable.session).not.toHaveProperty("metadataUnlockPersistence");
     expect(durable.device).toBe(device);
-    expect(durable.legacy).toBe(legacy);
+    expect(durable.unmarked).toEqual(clearMetadataUnlock(unmarked));
     expect(session.metadataUnlockPersistence).toBe("session");
     expect(isMetadataUnlockUsable(session)).toBe(true);
   });

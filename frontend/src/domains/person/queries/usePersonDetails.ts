@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TTL } from "../../../shared/cache/ttl";
 import { defaultErrorTranslator, getFriendlyErrorMessage } from "../../../shared/lib/errors";
-import {
-  type ParsedVersionDetails,
-} from "../api/personReadGateway";
+import type { ParsedVersionDetails } from "../../../shared/clients/personReadGateway";
 import { usePersonGateway } from "./usePersonGateway";
 
 export interface UsePersonDetailsResult {

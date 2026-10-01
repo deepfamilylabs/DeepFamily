@@ -4,7 +4,6 @@
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mjs";
-import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
@@ -227,7 +226,6 @@ export const parseProductionMainnetReleaseConfig = ({
   chainId,
   commandInputLabels = {},
 } = {}) => {
-  assertNoRemovedGovernanceEnvironmentVariables(env);
   const mainnet = chainProfile.mainnet;
   const planDigestLabel = commandInputLabels.planDigest ?? mainnet.planDigestEnvironmentName;
   const planApprovalSignaturesLabel =

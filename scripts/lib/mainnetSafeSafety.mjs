@@ -4,7 +4,6 @@
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE, getChainProfile } from "./chainProfiles.mjs";
-import { assertNoRemovedGovernanceEnvironmentVariables } from "./governanceSafety.mjs";
 import {
   CANONICAL_SAFE_OWNER_COUNT,
   CANONICAL_SAFE_THRESHOLD,
@@ -197,7 +196,6 @@ export const parseProductionMainnetSafeConfig = ({
   networkName,
   chainId,
 } = {}) => {
-  assertNoRemovedGovernanceEnvironmentVariables(env);
   const mainnet = chainProfile.mainnet;
   // Authorization is parsed first so an invalid non-empty plan digest fails before any caller needs
   // to open an RPC connection or load a deployer private key.

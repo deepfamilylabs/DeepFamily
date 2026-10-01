@@ -8,7 +8,7 @@
     "dev:local": "npm run config:local && npm run dev",
     "build": "npm run sync:abi && vite build && node ./scripts/generate-pages-headers.mjs",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "legacy-entrypoints:check": "node ./scripts/check-legacy-entrypoints.mjs",
+    "source-rules:check": "node ./scripts/check-source-rules.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "csp:scan": "node ./scripts/csp-scan.mjs",
@@ -37,7 +37,6 @@
     "react-i18next": "^15.7.1",
     "react-router-dom": "^7.18.2",
     "react-window": "^1.8.11",
-    "scrypt-js": "^3.0.1",
     "snarkjs": "^0.7.5",
     "zod": "4.0.17"
   },

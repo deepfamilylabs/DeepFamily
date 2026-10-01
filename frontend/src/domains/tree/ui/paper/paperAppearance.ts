@@ -40,8 +40,8 @@ export type PaperColorThemeId = (typeof PAPER_COLOR_THEME)[keyof typeof PAPER_CO
 // light theme and is only overridden where a theme needs it (the dark 磁青 theme inverts it).
 export const PAPER_COLOR_THEMES: Record<PaperColorThemeId, Record<string, string>> = {
   xuan: PAPER_COLOR_VARS_XUAN,
-  // 素白: a clean, faintly cool neutral. Whites and grays now share one cool-neutral hue
-  // (rgb ≈ 94/102/110) so the sheet no longer reads warm against the cool ink; the fish-tail tab is
+  // 素白: a clean, faintly cool neutral. Whites and grays share one cool-neutral hue
+  // (rgb ≈ 94/102/110) so the sheet does not read warm against the cool ink; the fish-tail tab is
   // a matching cool near-black. The accent stays a restrained brick so relationship lines read.
   plain: {
     "--df-paper-bg": "#d7dade",

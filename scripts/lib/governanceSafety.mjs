@@ -12,24 +12,6 @@ const MULTISIG_INSPECTION_ABI = [
 const LOCAL_HTTP_NETWORK_NAMES = new Set(["localhost"]);
 export { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE, ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE };
 
-const REMOVED_GOVERNANCE_ENVIRONMENT_NAMES = Object.freeze({
-  GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
-  GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
-  GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
-});
-
-export const assertNoRemovedGovernanceEnvironmentVariables = (env = process.env) => {
-  for (const [removedName, replacementName] of Object.entries(
-    REMOVED_GOVERNANCE_ENVIRONMENT_NAMES,
-  )) {
-    if (String(env[removedName] ?? "").trim() !== "") {
-      throw new Error(
-        `${removedName} has been removed; use ${replacementName} instead (do not set both)`,
-      );
-    }
-  }
-};
-
 const PROFILE_CHAIN_IDS = Object.freeze({
   [CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([71n, 1030n]),
   [ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE]: new Set([1n, 11155111n]),
@@ -37,7 +19,6 @@ const PROFILE_CHAIN_IDS = Object.freeze({
 
 export const normalizeGovernanceMultisigProfile = (profile) => {
   if (profile === undefined) {
-    assertNoRemovedGovernanceEnvironmentVariables(process.env);
     return String(process.env.GOVERNANCE_SAFE_PROFILE ?? "").trim();
   }
   return String(profile ?? "").trim();
