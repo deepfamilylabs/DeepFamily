@@ -1570,8 +1570,6 @@
     "invalidDecimals": "DEEP amounts cannot be displayed correctly. Ask the maintainer to check the token settings.",
     "unreachable": "The network cannot be reached to read the amounts. Try again later.",
     "wrongNetwork": "Switch your wallet to the network used by this page (number {{chainId}}).",
-    "privacyNotice": "Wallets used to deposit, withdraw, and pay fees are public. Receive codes are never published on chain; share yours only with intended senders, because anyone holding it can link your identity to your receiving keys. Use a separate CFX wallet for private transfers and avoid funding it directly from a public identity wallet. Timing, amounts, and a small user set may also reveal links.",
-    "privacySummary": "Moving money from or back to an ordinary wallet is public. Use a separate CFX transaction wallet for transfers within this page.",
     "identityTitle": "Enter your own identity details and passphrase",
     "identityDescription": "When funding, use the giver's own details; when claiming, use the recipient's own. Closing the page does not lose your money; leaving or 10 idle minutes locks it.",
     "actionsTitle": "What would you like to do?",
@@ -1589,15 +1587,15 @@
     },
     "descriptions": {
       "recover": "Check your page balance, money family has set aside for you to claim, and the amounts you previously set per period. You can find these records with the same identity details and passphrase even after clearing your browser.",
-      "receiveCode": "Generate this identity's receive code and share it privately with family so they can send you money or set aside money for you to claim over time. The code is not published on chain and costs no fee; you can generate it again at any time with the same identity details and passphrase. Anyone holding the code can link your identity to your receiving keys, so do not publish it.",
-      "shield": "Move DEEP from the connected wallet into your balance on this page. The sending wallet, amount, and time are public. Your wallet may first ask you to allow this page to move DEEP.",
+      "receiveCode": "Generate this identity's receive code so family can send you money or fund periodic claims.",
+      "shield": "Move DEEP from the connected ordinary wallet into your page balance. Your wallet may first ask you to allow this page to move DEEP.",
       "createPolicy": "Save a new claim setting: how much a parent’s direct children in the family records can claim every 30 days. This only saves a setting. It does not provide money or change an arrangement that has already been funded.",
       "allocate": "Choose a confirmed direct child in the family records and set aside money for a number of periods. The child's private receive code is required. The first period is due 30 days and 2 hours after the first funding. The giver cannot take the money back.",
       "topUp": "Add money for more periods using this child’s original amount per period and starting time. The giver cannot take this money back.",
       "mergeBudget": "Two pieces of claim money can be combined if they are for the same child, use the same amount-per-period arrangement, and start counting time from the same point.",
       "claim": "Claim due periods with enough money into your page balance, up to 12 periods at a time. The family records must still confirm you as this parent’s direct child. A period stays unclaimed if there is not enough money to pay it in full.",
       "privateTransfer": "Send money from your page balance to a family member using their private receive code. The rest stays in your page balance. This step does not send money to the recipient’s ordinary wallet.",
-      "unshield": "Move money from your page balance to an ordinary wallet. Money on this page is stored in separate pieces; each withdrawal can use only one piece and cannot exceed its amount. The recipient address and amount are public."
+      "unshield": "Move your page balance to an ordinary wallet. Each withdrawal uses one piece of money and cannot exceed its amount."
     },
     "fields": {
       "amount": "How much DEEP",
@@ -1624,7 +1622,7 @@
     "selectedBudget": "This arrangement has {{amount}} DEEP left to claim.",
     "recoveredSummary": "Found {{values}} pieces of page balance, {{budgets}} pieces of family money for you to claim, {{policies}} amount-per-period arrangements, and {{templates}} child arrangements you can add money to.",
     "receiveCodeLabel": "My private receive code",
-    "receiveCodeShareHint": "Share only with senders you trust, and do not publish it. Anyone holding this code can link your identity to your receiving keys. You can generate it again at any time with the same identity details and passphrase; each code differs, but all of them are valid.",
+    "receiveCodeShareHint": "Share privately with trusted senders; do not publish. Holders can link your identity to your receiving keys. Regenerate with the same identity details and passphrase.",
     "receiveCodeInputLabel": "Private receive code from the recipient",
     "receiveCodeInputHint": "Ask the recipient for their complete code privately. When funding a child, it must match the selected child.",
     "generateReceiveCode": "Generate receive code",
@@ -1646,9 +1644,6 @@
     "recoverFirst": "Open this page with your identity details and passphrase to see your money.",
     "noRecoveredNote": "No money available to use",
     "noRecoveredTemplate": "No child arrangement to add money to yet",
-    "privateWalletCheck": "I confirm this CFX fee wallet was not previously used for a public identity (including NFT minting or updates) or a DEEP deposit, and received no CFX directly from those wallets. Timing and amounts may still link my actions.",
-    "privateWalletRequired": "First confirm that you are using a separate CFX transaction wallet.",
-    "walletReused": "This wallet was just used to move DEEP onto this page. Connect a separate CFX transaction wallet before actions within this page.",
     "walletChanged": "The connected wallet or network changed. Check it and try the action again.",
     "noValueNote": "There is no money available on this page. Move DEEP from an ordinary wallet or ask family to send you money.",
     "noPolicyNote": "First set how much can be claimed every 30 days, then actually provide the money for a child.",
@@ -1682,9 +1677,7 @@
     "groups": {
       "wallet": "My money",
       "inheritance": "Set money aside for children",
-      "receive": "Claim money family set aside",
-      "tools": "Other actions",
-      "toolsHint": "Generate your receive code or combine two pieces of claim money under the same arrangement."
+      "receive": "Claim money family set aside"
     },
     "nextStep": {
       "receiveCode": "First generate your receive code and share it privately with family. They can then send DEEP or set aside money for you to claim over time.",
@@ -1732,7 +1725,7 @@
     "policyOption": "Claim setting {{index}} · {{amount}} DEEP every 30 days",
     "fundingTargetOption": "Child {{identity}} · {{amount}} DEEP every 30 days",
     "walletNotReady": "Connecting to your wallet. Please wait.",
-    "switchWalletPrompt": "Switch to a separate CFX transaction wallet. Your open identity and form entries will stay here.",
+    "switchWalletPrompt": "This wallet was just used to deposit DEEP. Continuing with it may link the deposit to later transfers. You can choose another CFX wallet or continue with this one.",
     "claimOverview": {
       "checking": "Checking claim dates…",
       "unavailable": "Claim dates cannot be checked now. Refresh your balances.",

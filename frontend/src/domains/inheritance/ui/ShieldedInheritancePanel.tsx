@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   deriveShieldedHeirKeyMaterial,
@@ -287,10 +295,10 @@ function RecipientInput({
   );
 }
 
-function InheritanceGuide({ expanded }: { expanded: boolean }) {
+function InheritanceGuide() {
   const { t } = useTranslation();
   return (
-    <details open={expanded} className="rounded-2xl border border-hairline bg-surface p-5">
+    <details className="rounded-2xl border border-hairline bg-surface p-5">
       <summary className="cursor-pointer text-base font-medium text-ink">
         {t("shielded.guide.title")}
       </summary>
@@ -365,7 +373,6 @@ export function ShieldedInheritancePanel({
   const [walletSnapshot, setWalletSnapshot] = useState<LocalShieldedWalletSnapshot | null>(null);
   const [unspentNotes, setUnspentNotes] = useState<Note[]>([]);
   const [ownReceiveCode, setOwnReceiveCode] = useState("");
-  const [privateWalletChecked, setPrivateWalletChecked] = useState(false);
   const [shieldAmount, setShieldAmount] = useState("");
   const [rate, setRate] = useState("");
   const [rootPersonHash, setRootPersonHash] = useState("");
@@ -399,7 +406,6 @@ export function ShieldedInheritancePanel({
 
   useLayoutEffect(() => {
     transactionEpoch.current += 1;
-    setPrivateWalletChecked(false);
   }, [account, signer]);
 
   useEffect(() => {
@@ -435,7 +441,6 @@ export function ShieldedInheritancePanel({
     setSecondBudgetSelection("");
     setPolicySelection("");
     setTopUpSelection("");
-    setPrivateWalletChecked(false);
     setClaimIndices("");
     setUseSecondValue(false);
     setRootPersonHash("");
@@ -558,7 +563,10 @@ export function ShieldedInheritancePanel({
   // A payer can recognize a named relative. Without a name, only an explicit
   // check with the recipient guards against a swapped code.
   const recipientNeedsConfirmation =
-    action === "privateTransfer" && recipientTargetHash !== null && !recipientTargetName;
+    action === "privateTransfer" &&
+    recipientInputMethod === "receiveCode" &&
+    recipientTargetHash !== null &&
+    !recipientTargetName;
   const changeRecipientCode = (value: string) => {
     setRecipientCode(value);
     setRecipientConfirmed(false);
@@ -808,13 +816,6 @@ export function ShieldedInheritancePanel({
         return recipient;
       };
       session.touch();
-      const isPrivate = action !== "recover" && action !== "shield";
-      if (isPrivate && !privateWalletChecked) {
-        throw new Error(t("shielded.privateWalletRequired"));
-      }
-      if (isPrivate && publicActivityAddresses.has(account.toLowerCase())) {
-        throw new Error(t("shielded.walletReused"));
-      }
       if (
         (await signer.provider?.getNetwork())?.chainId !== modules.chainId ||
         (await signer.getAddress()).toLowerCase() !== account.toLowerCase()
@@ -1214,10 +1215,10 @@ export function ShieldedInheritancePanel({
           : cause instanceof ShieldedReceiveCodeError
             ? t(`shielded.receiveCodeErrors.${cause.reason}`)
             : errorReason === "LOCAL_NONCE_TOO_HIGH" || errorReason === "NONCE_TOO_HIGH"
-            ? getFriendlyError(cause, t).message
-            : cause instanceof Error
-              ? cause.message
-              : t("shielded.unknownError");
+              ? getFriendlyError(cause, t).message
+              : cause instanceof Error
+                ? cause.message
+                : t("shielded.unknownError");
       if (hash) {
         setTransactionHash(hash);
         setError(t("shielded.confirmedRefreshFailed", { detail }));
@@ -1259,19 +1260,10 @@ export function ShieldedInheritancePanel({
     </>
   );
 
-  const privacy = (
-    <details className="rounded-xl border border-warning/30 bg-warning/5 p-4">
-      <summary className="cursor-pointer text-sm text-ink">{t("shielded.privacySummary")}</summary>
-      <div className="mt-3">
-        <WarningNotice>{t("shielded.privacyNotice")}</WarningNotice>
-      </div>
-    </details>
-  );
-
   if (!identity) {
     return (
       <div className="space-y-6 break-normal">
-        <InheritanceGuide expanded />
+        <InheritanceGuide />
         <PanelShell
           title={t("shielded.identityTitle")}
           description={t("shielded.identityDescription")}
@@ -1292,7 +1284,6 @@ export function ShieldedInheritancePanel({
           </PanelButton>
           {feedback}
         </PanelShell>
-        {privacy}
       </div>
     );
   }
@@ -1352,7 +1343,7 @@ export function ShieldedInheritancePanel({
 
   return (
     <div className="space-y-6 break-normal">
-      <InheritanceGuide expanded={false} />
+      <InheritanceGuide />
       <PanelShell title={t("shielded.balanceTitle")} description={t("shielded.sessionHint")}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1391,12 +1382,9 @@ export function ShieldedInheritancePanel({
           </PanelButton>
         </div>
         {nextAction && nextAction !== action ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-hairline p-3">
-            <p className="text-sm text-ink-muted">{t(`shielded.nextStep.${nextAction}`)}</p>
-            <PanelButton disabled={busy} onClick={() => chooseAction(nextAction, taskGroup)}>
-              {labels[nextAction]}
-            </PanelButton>
-          </div>
+          <p className="rounded-xl border border-hairline p-3 text-sm text-ink-muted">
+            {t(`shielded.nextStep.${nextAction}`)}
+          </p>
         ) : null}
         <details className="text-xs text-ink-muted">
           <summary className="cursor-pointer">{t("shielded.identityHashLabel")}</summary>
@@ -1702,6 +1690,14 @@ export function ShieldedInheritancePanel({
                         placeholder="0,1,2"
                       />
                     </FieldBlock>
+                    {selectCompatibleBudgetPair(available.budgets) ? (
+                      <PanelButton
+                        disabled={busy}
+                        onClick={() => chooseAction("mergeBudget", "receive")}
+                      >
+                        {labels.mergeBudget}
+                      </PanelButton>
+                    ) : null}
                   </>
                 )}
               </AdvancedOptions>
@@ -1725,9 +1721,11 @@ export function ShieldedInheritancePanel({
                     {t("shielded.recipientTarget", {
                       identity: recipientTargetName ?? recipientTargetHash,
                     })}
-                    <span className="mt-1 block font-mono text-xs text-ink-muted">
-                      {recipientTargetHash}
-                    </span>
+                    {recipientTargetName ? (
+                      <span className="mt-1 block font-mono text-xs text-ink-muted">
+                        {recipientTargetHash}
+                      </span>
+                    ) : null}
                   </p>
                   {recipientNeedsConfirmation ? (
                     <>
@@ -1824,23 +1822,11 @@ export function ShieldedInheritancePanel({
             </>
           ) : null}
 
-          {isPrivate ? (
-            <label className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/5 p-3 text-sm text-ink">
-              <input
-                aria-label={t("shielded.privateWalletCheck")}
-                type="checkbox"
-                className="mt-1"
-                checked={privateWalletChecked}
-                onChange={(event) => setPrivateWalletChecked(event.target.checked)}
-              />
-              <span>{t("shielded.privateWalletCheck")}</span>
-            </label>
+          {isPrivate && publicActivityAddresses.has(account.toLowerCase()) ? (
+            <WarningNotice>{t("shielded.switchWalletPrompt")}</WarningNotice>
           ) : null}
           {!signer && action !== "receiveCode" ? (
             <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice>
-          ) : null}
-          {isPrivate && publicActivityAddresses.has(account.toLowerCase()) ? (
-            <WarningNotice>{t("shielded.switchWalletPrompt")}</WarningNotice>
           ) : null}
           <PanelButton
             variant="primary"
@@ -1848,7 +1834,6 @@ export function ShieldedInheritancePanel({
             disabled={
               busy ||
               (!signer && action !== "receiveCode") ||
-              (isPrivate && publicActivityAddresses.has(account.toLowerCase())) ||
               (recipientNeedsConfirmation && !recipientConfirmed)
             }
             onClick={() => void submitSelected()}
@@ -1858,20 +1843,6 @@ export function ShieldedInheritancePanel({
           {feedback}
         </PanelShell>
       </div>
-      <details className="rounded-xl border border-hairline p-4">
-        <summary className="cursor-pointer text-sm font-medium text-ink-muted">
-          {t("shielded.groups.tools")}
-        </summary>
-        <p className="mt-3 text-sm text-ink-muted">{t("shielded.groups.toolsHint")}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(["receiveCode", "mergeBudget"] as const).map((item) => (
-            <PanelButton key={item} disabled={busy} onClick={() => chooseAction(item)}>
-              {labels[item]}
-            </PanelButton>
-          ))}
-        </div>
-      </details>
-      {privacy}
     </div>
   );
 }

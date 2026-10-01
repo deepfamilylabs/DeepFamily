@@ -8,6 +8,7 @@ import {
   decodeShieldedReceiveCode,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
+  encodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { hexlify } from "ethers";
@@ -70,19 +71,42 @@ describe("receive code proofs", () => {
     });
   }, 60_000);
 
-  it("rejects a well-formed code whose keys were swapped", async () => {
+  it("rejects a well-formed code whose identity was swapped", async () => {
+    const decoded = decodeShieldedReceiveCode(code);
+    const otherIdentity = replacePayloadWord(code, 0, decoded.identityCommitment + 1n);
+    await expect(verifyShieldedReceiveCode(otherIdentity)).resolves.toEqual({
+      ok: false,
+      reason: "invalid",
+    });
+  }, 60_000);
+
+  it("rejects a well-formed code whose owner key was swapped", async () => {
     const decoded = decodeShieldedReceiveCode(code);
     const otherOwner = replacePayloadWord(code, 1, decoded.ownerCommitment + 1n);
     await expect(verifyShieldedReceiveCode(otherOwner)).resolves.toEqual({
       ok: false,
       reason: "invalid",
     });
-    const otherViewingKey = replacePayloadWord(code, 2, 12345n);
-    await expect(verifyShieldedReceiveCode(otherViewingKey)).resolves.toEqual({
-      ok: false,
-      reason: "invalid",
-    });
   }, 60_000);
+
+  it.each([
+    ["viewKeyLo", 16],
+    ["viewKeyHi", 0],
+  ] as const)(
+    "rejects a well-formed code with only %s changed",
+    async (_name, byteIndex) => {
+      const decoded = decodeShieldedReceiveCode(code);
+      const viewingKey = decoded.viewingKey.slice();
+      viewingKey[byteIndex] ^= 1;
+      // Keep the identity, owner and proof intact and regenerate the checksum.
+      const otherViewingKey = encodeShieldedReceiveCode({ ...decoded, viewingKey });
+      await expect(verifyShieldedReceiveCode(otherViewingKey)).resolves.toEqual({
+        ok: false,
+        reason: "invalid",
+      });
+    },
+    60_000,
+  );
 
   it("reports a copying mistake separately from tampering", async () => {
     const typo = `${code.slice(0, 30)}${code[30] === "q" ? "p" : "q"}${code.slice(31)}`;

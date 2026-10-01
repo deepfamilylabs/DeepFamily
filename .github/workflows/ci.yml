@@ -38,6 +38,9 @@ jobs:
       - name: Check ZK artifacts and proofs
         run: npm run zk:artifacts:check && npm run zk:check
 
+      - name: Check shielded circuit constraints
+        run: node --test circuits/test/shielded_*.test.mjs
+
       - name: Lint (solhint)
         run: npm run lint
 

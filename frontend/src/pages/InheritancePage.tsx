@@ -33,8 +33,8 @@ export default function InheritancePage() {
   const invalidDecimals = t("shielded.invalidDecimals");
   const unreachable = t("shielded.unreachable");
   const [state, setState] = useState<ModulesState>({ status: "loading" });
-  // Kept across wallet switches during this page visit so a public deposit wallet
-  // cannot be reused immediately for private actions.
+  // Remember deposits across wallet switches during this page visit so the
+  // panel can explain the privacy implications of reusing a deposit wallet.
   const publicActivityAddresses = useRef(new Set<string>());
 
   useEffect(() => {
