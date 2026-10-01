@@ -6,7 +6,7 @@ import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 const { addPersonVersion } = seedHelpers;
 
 const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const { deepFamily } = await ensureIntegratedSystem(connection, { artifacts: hre.artifacts });
   const [signer] = await ethers.getSigners();

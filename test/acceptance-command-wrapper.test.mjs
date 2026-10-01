@@ -326,7 +326,7 @@ describe("acceptance command wrapper", function () {
   it("checks the release-rehearsal wrapper before opening the RPC", async function () {
     const source = await fs.readFile("scripts/evm-acceptance.mjs", "utf8");
     const wrapperCheck = source.indexOf("await assertAcceptanceReleaseRehearsalWrapper");
-    const rpcConnect = source.indexOf("await hre.network.connect()");
+    const rpcConnect = source.indexOf("await hre.network.create()");
     expect(wrapperCheck).to.be.greaterThan(-1);
     expect(rpcConnect).to.be.greaterThan(wrapperCheck);
   });

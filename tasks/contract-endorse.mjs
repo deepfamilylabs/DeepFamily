@@ -5,7 +5,7 @@ import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 // Fee is paid in DeepFamilyToken equal to recentReward(), requiring ERC20 allowance
 
 const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
   const signerAddr = await signer.getAddress();

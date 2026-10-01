@@ -24,7 +24,7 @@ import {
 } from "./lib/timelockGovernance.mjs";
 
 export const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
   const operation = await resolveGovernanceOperation({ connection, ethers, args });

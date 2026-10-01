@@ -53,7 +53,7 @@ describe("timelocked DeepFamily treasury tooling", function () {
     const taskHre = {
       artifacts: hre.artifacts,
       network: {
-        connect: async () => ({ ethers: hre.ethers, networkName }),
+        create: async () => ({ ethers: hre.ethers, networkName }),
       },
     };
 

@@ -607,7 +607,7 @@ export const main = async (chainProfile) => {
     }
   }
 
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const provider = ethers.provider;
   await assertRawMainnetChain(provider);

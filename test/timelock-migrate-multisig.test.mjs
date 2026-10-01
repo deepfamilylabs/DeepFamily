@@ -58,7 +58,7 @@ describe("timelock-migrate-multisig task", function () {
     const taskHre = {
       artifacts: hre.artifacts,
       network: {
-        connect: async () => ({ ethers: ethersWithoutSigner, networkName }),
+        create: async () => ({ ethers: ethersWithoutSigner, networkName }),
       },
     };
 

@@ -6,7 +6,7 @@ import { createCheckpointedTransactionExecutor } from "../scripts/lib/mainnetRel
 
 describe("eSpace Mainnet Safe factory-call journal integration", function () {
   it("checkpoints one CALL and revalidates it without a second broadcast", async function () {
-    const connection = await hre.network.connect();
+    const connection = await hre.network.create();
     const { ethers } = connection;
     const [deployer, target] = await ethers.getSigners();
     const deployerAddress = await deployer.getAddress();

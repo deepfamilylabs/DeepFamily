@@ -86,7 +86,7 @@ describe("timelock-migrate-owner task", function () {
     const taskHre = {
       artifacts: hre.artifacts,
       network: {
-        connect: async () => ({ ethers: ethersWithoutSigner, networkName }),
+        create: async () => ({ ethers: ethersWithoutSigner, networkName }),
       },
     };
     try {

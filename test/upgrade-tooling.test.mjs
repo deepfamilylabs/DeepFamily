@@ -54,7 +54,7 @@ describe("Upgrade tooling & governance deploy path", function () {
     });
 
     it("publishes every confirmed deployment receipt through the callback", async () => {
-      const connection = await hre.network.connect();
+      const connection = await hre.network.create();
       const observed = new Map();
       const deployed = await deployIntegratedSystem(connection, {
         writeDeployments: false,
@@ -77,7 +77,7 @@ describe("Upgrade tooling & governance deploy path", function () {
         path.join(os.tmpdir(), "deepfamily-isolated-deployments-"),
       );
       try {
-        const connection = await hre.network.connect();
+        const connection = await hre.network.create();
         const deployed = await deployIntegratedSystem(connection, {
           writeDeployments: true,
           artifacts: hre.artifacts,

@@ -22,11 +22,11 @@ const resolveConnection = async (hreOrConnection) => {
     return hreOrConnection;
   }
 
-  if (hreOrConnection?.network?.connect) {
-    return hreOrConnection.network.connect();
+  if (hreOrConnection?.network?.create) {
+    return hreOrConnection.network.create();
   }
 
-  throw new Error("Expected a Hardhat 3 connection or an hre with network.connect()");
+  throw new Error("Expected a Hardhat 3 connection or an hre with network.create()");
 };
 
 const getNetworkDeploymentsDir = (connection, deploymentDirectory) => {

@@ -887,7 +887,7 @@ export const main = async (chainProfile) => {
 
   await checkShieldedRelease({ root: process.cwd() });
 
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const provider = ethers.provider;
   const rawChainId = await provider.send("eth_chainId", []);

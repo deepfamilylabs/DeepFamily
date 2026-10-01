@@ -149,7 +149,7 @@ const printMembers = (label, members) => {
 };
 
 export const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const contractName = parseArtifactName(
     args.contractName,

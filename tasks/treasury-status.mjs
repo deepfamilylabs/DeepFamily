@@ -15,7 +15,7 @@ import { DEFAULT_TIMELOCK_ARTIFACT } from "./lib/timelockArtifacts.mjs";
 import { DEFAULT_TOKEN_ARTIFACT, resolveTreasury } from "./lib/timelockTreasury.mjs";
 
 export const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const treasury = await resolveTreasury({ hre, connection, ethers, args });
   const {

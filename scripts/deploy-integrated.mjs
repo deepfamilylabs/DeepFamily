@@ -5,7 +5,7 @@ import {
 } from "../hardhat/integratedDeployment.mjs";
 
 const main = async () => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const networkName = connection.networkName || "unknown";
   const { ethers } = connection;
   const [deployer] = await ethers.getSigners();
