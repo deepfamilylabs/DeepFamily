@@ -63,7 +63,7 @@ const verifyExecutedRoleState = async ({ ethers, timelock, timelockAddress, newM
 
 export const action = async (args, hre) => {
   const phase = parseMultisigMigrationPhase(args.phase);
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
   const contractName = parseArtifactName(

@@ -921,7 +921,7 @@ export const main = async (chainProfile) => {
       root: process.cwd(),
     });
   }
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const provider = ethers.provider;
   const rawTestnetChainId = await retryBounded(() => provider.send("eth_chainId", []), {

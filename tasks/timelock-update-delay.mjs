@@ -138,7 +138,7 @@ export const resolveDelayUpdateOperation = async ({ hre, connection, ethers, arg
 };
 
 export const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
   const operation = await resolveDelayUpdateOperation({ hre, connection, ethers, args });

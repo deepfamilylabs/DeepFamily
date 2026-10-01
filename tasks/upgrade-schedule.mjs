@@ -32,7 +32,7 @@ import {
 } from "./lib/explorerVerification.mjs";
 
 const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
 

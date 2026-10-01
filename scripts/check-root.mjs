@@ -101,7 +101,7 @@ async function main() {
   console.log("DeepFamily Person Check Tool");
   console.log("=".repeat(70));
 
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const { deepFamily, deepFamilyReader, token } = await ensureIntegratedSystem(connection, {
     writeDeployments: true,

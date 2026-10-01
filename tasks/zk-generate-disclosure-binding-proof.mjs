@@ -136,7 +136,7 @@ const action = async (args, hre) => {
   console.log("Generating disclosure-binding ZK proof");
   console.log("========================================\n");
 
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const signer = (await ethers.getSigners())[0];
   const defaultMinter = signer ? await signer.getAddress() : "";

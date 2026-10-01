@@ -16,7 +16,7 @@ import { ArgumentType } from "hardhat/types/arguments";
 import { resolveGovernedTarget, sendOrPrint } from "./lib/timelockUpgrade.mjs";
 
 export const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [signer] = await ethers.getSigners();
 

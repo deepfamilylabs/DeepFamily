@@ -234,7 +234,7 @@ describe("Generic governance tooling", function () {
 
       const taskHre = {
         network: {
-          connect: async () => ({ ethers: hre.ethers, networkName }),
+          create: async () => ({ ethers: hre.ethers, networkName }),
         },
       };
       const scheduledCall = {

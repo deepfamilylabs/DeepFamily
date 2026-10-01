@@ -4,7 +4,7 @@ import { ArgumentType } from "hardhat/types/arguments";
 import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 const action = async (args, hre) => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { deepFamilyReader } = await ensureIntegratedSystem(connection, {
     artifacts: hre.artifacts,
   });

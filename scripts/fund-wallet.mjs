@@ -37,7 +37,7 @@ function resolveTargetAddress(ethers) {
 }
 
 async function main() {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [deployer] = await ethers.getSigners();
 

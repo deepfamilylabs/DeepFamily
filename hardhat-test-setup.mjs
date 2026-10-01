@@ -12,17 +12,17 @@ delete process.env.GOVERNANCE_SAFE_PROFILE;
 // Tests and task integrations can create additional Hardhat 3 connections. Track every connection
 // created through the shared HRE so the root teardown closes all EDR workers instead of relying on
 // a forced process.exit(), which would hide Mocha's eventual non-zero failure status.
-const originalNetworkConnect = hre.network.connect.bind(hre.network);
+const originalNetworkCreate = hre.network.create.bind(hre.network);
 const trackedTestConnections = new Set();
-hre.network.connect = async (...args) => {
-  const testConnection = await originalNetworkConnect(...args);
+hre.network.create = async (...args) => {
+  const testConnection = await originalNetworkCreate(...args);
   trackedTestConnections.add(testConnection);
   return testConnection;
 };
 
 const getOrCreateTestConnection = async () => {
   if (!globalThis.__deepfamilyTestConnectionPromise) {
-    globalThis.__deepfamilyTestConnectionPromise = hre.network.connect();
+    globalThis.__deepfamilyTestConnectionPromise = hre.network.create();
   }
   return globalThis.__deepfamilyTestConnectionPromise;
 };

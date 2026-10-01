@@ -37,7 +37,7 @@ describe("timelock-update-delay task", function () {
     const taskHre = {
       artifacts: hre.artifacts,
       network: {
-        connect: async () => ({ ethers: taskEthers, networkName }),
+        create: async () => ({ ethers: taskEthers, networkName }),
       },
     };
 

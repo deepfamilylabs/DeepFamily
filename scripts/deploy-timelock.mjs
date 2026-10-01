@@ -13,7 +13,7 @@ import { resolveTimelockDeploymentConfig } from "./lib/timelockDeployment.mjs";
 // one multisig all proposer/canceller/executor roles and has no external admin.
 
 const main = async () => {
-  const connection = await hre.network.connect();
+  const connection = await hre.network.create();
   const { ethers } = connection;
   const [deployer] = await ethers.getSigners();
   if (!deployer) {

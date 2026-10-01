@@ -42,7 +42,7 @@ import { resolveHistoricalSeedSigner } from "./lib/seedSigner.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const connection = await hre.network.connect();
+const connection = await hre.network.create();
 const { ethers } = connection;
 const {
   addPersonVersion,

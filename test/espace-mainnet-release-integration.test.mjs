@@ -20,7 +20,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
   this.timeout(120_000);
 
   it("reconstructs the integrated deployment from its transaction journal without a second broadcast", async function () {
-    const connection = await hre.network.connect();
+    const connection = await hre.network.create();
     const { ethers } = connection;
     const [deployer] = await ethers.getSigners();
     const deployerAddress = await deployer.getAddress();
@@ -82,7 +82,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
   });
 
   it("matches all generated intents to the Hardhat factories used by the live release", async function () {
-    const connection = await hre.network.connect();
+    const connection = await hre.network.create();
     const { ethers } = connection;
     const [deployer] = await ethers.getSigners();
     const deployerAddress = await deployer.getAddress();

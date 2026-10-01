@@ -11,7 +11,7 @@ describe("integrated shielded acceptance smoke", function () {
   this.timeout(600_000);
 
   it("pays a verified receive code with all eight pool proofs, the shared DEEP token and actual lineage", async function () {
-    const connection = await hre.network.connect();
+    const connection = await hre.network.create();
     const deployed = await deployIntegratedFixture(connection);
     const [signer] = await connection.ethers.getSigners();
     const person = {

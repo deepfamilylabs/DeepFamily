@@ -16,7 +16,7 @@ describe("Hardhat Tasks Integration", function () {
   let deepFamilyReader;
   let signer;
   let signerAddress;
-  let originalConnect;
+  let originalCreate;
   let personHash;
 
   const personArgs = {
@@ -36,9 +36,9 @@ describe("Hardhat Tasks Integration", function () {
   };
 
   before(async function () {
-    connection = await hre.network.connect();
-    originalConnect = hre.network.connect.bind(hre.network);
-    hre.network.connect = async () => connection;
+    connection = await hre.network.create();
+    originalCreate = hre.network.create.bind(hre.network);
+    hre.network.create = async () => connection;
 
     ({ deepFamily, deepFamilyReader } = await ensureIntegratedSystem(connection));
     [signer] = await connection.ethers.getSigners();
@@ -57,7 +57,7 @@ describe("Hardhat Tasks Integration", function () {
   });
 
   after(async function () {
-    hre.network.connect = originalConnect;
+    hre.network.create = originalCreate;
     await connection?.close?.();
   });
 
