@@ -29,6 +29,9 @@ const mocks = vi.hoisted(() => ({
   recoverLocalShieldedWallet: vi.fn(),
   listUnspentRecoveredShieldedNotes: vi.fn(),
   listRecoveredTopUpTemplates: vi.fn(),
+  prepareShieldedShield: vi.fn(),
+  submitShield: vi.fn(),
+  tokenAllowance: vi.fn(),
   prepareShieldedPrivateTransfer: vi.fn(),
   prepareShieldedUnshield: vi.fn(),
   submitPrivateTransfer: vi.fn(),
@@ -51,12 +54,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { detail?: string }) => {
+    t: (key: string, options?: { detail?: string; identity?: string }) => {
       if (key === "shielded.confirmedRefreshFailed") {
         return `Transaction confirmed; balances refresh failed: ${options?.detail}`;
       }
       if (key === "shielded.refreshFailed") {
         return `Balances refresh failed; account still unlocked: ${options?.detail}`;
+      }
+      if (key === "shielded.recipientTarget") {
+        return `Recipient: ${options?.identity}`;
       }
       return key;
     },
@@ -103,14 +109,14 @@ vi.mock("../services/shieldedTransferExitPreparation", () => ({
 vi.mock("../services/shieldedPoolFlows", () => ({
   submitPrivateTransfer: mocks.submitPrivateTransfer,
   submitUnshield: mocks.submitUnshield,
-  submitShield: vi.fn(),
+  submitShield: mocks.submitShield,
   submitCreatePolicy: mocks.submitCreatePolicy,
   submitTopUp: mocks.submitTopUp,
   submitMergeBudget: mocks.submitMergeBudget,
 }));
 vi.mock("../services/shieldedNotePreparation", () => ({
   prepareShieldedCreatePolicy: mocks.prepareShieldedCreatePolicy,
-  prepareShieldedShield: vi.fn(),
+  prepareShieldedShield: mocks.prepareShieldedShield,
 }));
 vi.mock("../services/shieldedFundingPreparation", () => ({
   prepareShieldedAllocate: mocks.prepareShieldedAllocate,
@@ -277,7 +283,6 @@ function fillTransfer(code: string, amount: string) {
   fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
     target: { value: amount },
   });
-  fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
 }
 
 function renderPanel() {
@@ -285,6 +290,7 @@ function renderPanel() {
     chainId: 31337n,
     poolAddress,
     pool: {},
+    token: { allowance: mocks.tokenAllowance },
     tokenDecimals: 0,
     provider: { getBlock: mocks.getBlock },
     lineageIndex: {},
@@ -320,7 +326,7 @@ async function unlock() {
 }
 
 function chooseAction(action: string) {
-  fireEvent.click(screen.getAllByRole("button", { name: `shielded.actions.${action}` })[0]);
+  fireEvent.click(screen.getByRole("button", { name: `shielded.actions.${action}` }));
 }
 
 function openOptions(key: string) {
@@ -373,6 +379,9 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     );
     mocks.prepareShieldedPrivateTransfer.mockResolvedValue({ data: {}, witness: {} });
     mocks.submitPrivateTransfer.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
+    mocks.prepareShieldedShield.mockResolvedValue({ data: {}, witness: {} });
+    mocks.submitShield.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
+    mocks.tokenAllowance.mockResolvedValue(1_000n);
     mocks.prepareShieldedClaim.mockResolvedValue({ data: {}, witness: {} });
     mocks.submitClaimWithFreshLineage.mockImplementation(
       async ({ prepare }: { prepare: () => Promise<unknown> }) => {
@@ -435,7 +444,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       identityCommitment: identity.identityCommitment,
     });
 
-    openOptions("shielded.groups.tools");
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
     chooseAction("receiveCode");
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     const code = (await screen.findByRole("textbox", {
@@ -459,10 +468,9 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     const panel = renderPanel();
     await unlock();
     panel.rerenderAccount(account, null);
-    openOptions("shielded.groups.tools");
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
     chooseAction("receiveCode");
 
-    expect(screen.queryByRole("checkbox", { name: "shielded.privateWalletCheck" })).toBeNull();
     expect(screen.queryByText("shielded.walletNotReady")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     expect(await screen.findByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeTruthy();
@@ -476,7 +484,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await unlock();
     expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeNull();
 
-    openOptions("shielded.groups.tools");
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
     chooseAction("receiveCode");
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     const code = (await screen.findByRole("textbox", {
@@ -487,7 +495,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
     expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeNull();
     await unlock();
-    openOptions("shielded.groups.tools");
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
     chooseAction("receiveCode");
     expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeLabel" })).toBeNull();
   });
@@ -653,6 +661,58 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     ).toBeNull();
   });
 
+  it("keeps the same-wallet privacy warning advisory after a successful deposit", async () => {
+    const code = receiveCodeFor(99n);
+    const recipient = verifiedRecipient(99n);
+    mocks.verifyShieldedReceiveCode.mockResolvedValue(recipient);
+    mocks.recoverLocalShieldedWallet
+      .mockResolvedValue(walletSnapshot([valueNote(1n, 10n)]))
+      .mockResolvedValueOnce(walletSnapshot());
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.submitShield).toHaveBeenCalledTimes(1);
+    expect(mocks.tokenAllowance).toHaveBeenCalledWith(account, poolAddress);
+
+    chooseAction("privateTransfer");
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+      target: { value: code },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.recipientConfirm" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
+      target: { value: "6" },
+    });
+    const submit = screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement;
+    expect(screen.getByText("shielded.switchWalletPrompt")).toBeTruthy();
+    expect(submit.disabled).toBe(false);
+    expect(screen.queryByRole("checkbox", { name: "shielded.switchWalletPrompt" })).toBeNull();
+    fireEvent.click(submit);
+    await screen.findByText("shielded.done");
+    expect(mocks.verifyShieldedReceiveCode).toHaveBeenCalledWith(code);
+    expect(mocks.submitPrivateTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a private transfer without a default wallet reminder", async () => {
+    const code = receiveCodeFor(99n);
+    mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 10n)]));
+    renderPanel();
+    await unlock();
+    fillTransfer(code, "6");
+
+    expect(screen.queryByText("shielded.switchWalletPrompt")).toBeNull();
+    const submit = screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await screen.findByText("shielded.done");
+    expect(mocks.verifyShieldedReceiveCode).toHaveBeenCalledWith(code);
+    expect(mocks.submitPrivateTransfer).toHaveBeenCalledTimes(1);
+  });
+
   it("automatically selects a sufficient balance note and pays only a verified receive code", async () => {
     const recipient = verifiedRecipient(99n);
     const code = receiveCodeFor(99n);
@@ -665,7 +725,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
       target: { value: "6" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     const submit = screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement;
     fireEvent.click(submit);
     await waitFor(() =>
@@ -678,7 +737,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
       target: { value: code },
     });
-    expect(screen.getByText(recipient.personHash)).toBeTruthy();
+    expect(screen.getByText(`Recipient: ${recipient.personHash}`)).toBeTruthy();
     // The page cannot name this recipient, so the payer must confirm the identity first.
     expect(submit.disabled).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: "shielded.recipientConfirm" }));
@@ -728,7 +787,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
       target: { value: "6" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     enterRecipientCredentials();
     // A payment never reads credentials; they only create a receive code.
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
@@ -774,6 +832,58 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
 
+  it("does not block credentials with a hidden receive-code confirmation and reconfirms a new code", async () => {
+    const oldCode = receiveCodeFor(99n);
+    const newCode = receiveCodeFor(100n);
+    const generation = deferred<string>();
+    mocks.createShieldedReceiveCodeForRecipient.mockReturnValue(generation.promise);
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 10n)]));
+    renderPanel();
+    await unlock();
+    chooseAction("privateTransfer");
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
+      target: { value: "6" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+      target: { value: oldCode },
+    });
+    const submit = screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+
+    enterRecipientCredentials();
+    expect(screen.queryByRole("checkbox", { name: "shielded.recipientConfirm" })).toBeNull();
+    expect(submit.disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("shielded.generateReceiveCodeFirst"),
+    );
+    expect(mocks.verifyShieldedReceiveCode).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedPrivateTransfer).not.toHaveBeenCalled();
+
+    // Confirm the old code before generating another recipient's code. That
+    // confirmation must not carry over to the newly generated identity.
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.recipientMethods.receiveCode" }));
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.recipientConfirm" }));
+    expect(submit.disabled).toBe(false);
+    enterRecipientCredentials();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.generateReceiveCode" }));
+    await waitFor(() => expect(mocks.createShieldedReceiveCodeForRecipient).toHaveBeenCalledTimes(1));
+    await act(async () => generation.resolve(newCode));
+
+    expect(
+      (screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }) as HTMLTextAreaElement)
+        .value,
+    ).toBe(newCode);
+    const confirmation = screen.getByRole("checkbox", {
+      name: "shielded.recipientConfirm",
+    }) as HTMLInputElement;
+    expect(confirmation.checked).toBe(false);
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(confirmation);
+    expect(submit.disabled).toBe(false);
+  });
+
   it("automatically skips immature, underfunded, and revoked budgets when claiming inheritance", async () => {
     const timestamp = Number(1_000n + 2n * INHERITANCE_PERIOD_SECONDS);
     const recovered = walletSnapshot([
@@ -791,7 +901,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await unlock();
     fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
     chooseAction("claim");
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await waitFor(() => expect(mocks.prepareShieldedClaim).toHaveBeenCalledTimes(1));
@@ -816,7 +925,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
       target: { value: "10" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await screen.findByText("shielded.done");
@@ -883,7 +991,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.periods" }), {
       target: { value: "2" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain(
@@ -959,7 +1066,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       ).toBe(receiveCodeFor(100n)),
     );
     expect(password.value).toBe("");
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await waitFor(() =>
@@ -996,7 +1102,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
       target: { value: receiveCodeFor(childIdentityCommitment) },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("shielded.recipientMismatch"),
@@ -1016,19 +1121,32 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.submitTopUp).toHaveBeenCalledTimes(1);
   });
 
-  it("automatically finds a compatible first budget when only the second merge budget is selected", async () => {
-    mocks.recoverLocalShieldedWallet.mockResolvedValue(
-      walletSnapshot([budgetNote(1n, { policySalt: 999n }), budgetNote(2n), budgetNote(3n)]),
-    );
+  it("offers merging only for compatible budgets and finds a first budget for the selected second one", async () => {
+    mocks.recoverLocalShieldedWallet
+      .mockResolvedValue(
+        walletSnapshot([budgetNote(1n, { policySalt: 999n }), budgetNote(2n), budgetNote(3n)]),
+      )
+      .mockResolvedValueOnce(
+        walletSnapshot([budgetNote(1n, { policySalt: 999n }), budgetNote(2n)]),
+      );
     renderPanel();
     await unlock();
-    openOptions("shielded.groups.tools");
-    chooseAction("mergeBudget");
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
+    chooseAction("claim");
     openOptions("shielded.advancedOptions");
+    expect(screen.queryByRole("button", { name: "shielded.actions.mergeBudget" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
+    await waitFor(() =>
+      expect(
+        (screen.getByRole("button", { name: "shielded.actions.mergeBudget" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
+    );
+    chooseAction("mergeBudget");
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.secondBudgetNote" }), {
       target: { value: "3" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
 
     await screen.findByText("shielded.done");
@@ -1063,7 +1181,6 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.transferAmount" }), {
       target: { value: "5" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }));
     panel.rerenderAccount(account, null);
     expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
     expect(
@@ -1077,8 +1194,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         .value,
     ).toBe("5");
     expect(
-      (screen.getByRole("checkbox", { name: "shielded.privateWalletCheck" }) as HTMLInputElement)
-        .checked,
+      (screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement).disabled,
     ).toBe(false);
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
@@ -1087,10 +1203,8 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     renderPanel();
     await unlock();
     fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.receive" }));
-    const receiveCode = screen
-      .getAllByRole("button", { name: "shielded.actions.receiveCode" })
-      .find((button) => button.getAttribute("aria-pressed") === "true");
-    expect(receiveCode).toBeTruthy();
+    const receiveCode = screen.getByRole("button", { name: "shielded.actions.receiveCode" });
+    expect(receiveCode.getAttribute("aria-pressed")).toBe("true");
     chooseAction("claim");
     expect(screen.getByText("shielded.nextStep.receiveCode")).toBeTruthy();
   });
@@ -1114,12 +1228,9 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(
       screen.getByRole("tab", { name: "shielded.groups.wallet" }).getAttribute("aria-selected"),
     ).toBe("true");
-    const deposit = screen
-      .getAllByRole("button", { name: "shielded.actions.shield" })
-      .find((button) => button.getAttribute("aria-pressed") === "true");
-    expect(deposit).toBeTruthy();
+    const deposit = screen.getByRole("button", { name: "shielded.actions.shield" });
+    expect(deposit.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("textbox", { name: "shielded.fields.amount" })).toBeTruthy();
     expect(screen.queryByText("shielded.nextStep.shield")).toBeNull();
-    expect(screen.queryByRole("checkbox", { name: "shielded.privateWalletCheck" })).toBeNull();
   });
 });

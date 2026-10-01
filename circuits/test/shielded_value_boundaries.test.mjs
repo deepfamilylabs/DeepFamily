@@ -8,8 +8,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2 } from "poseidon-lite";
+import { poseidon2, poseidon5 } from "poseidon-lite";
 import {
+  SNARK_SCALAR_FIELD,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
   computeShieldedSpendNullifier,
@@ -196,6 +197,27 @@ test("shield and unshield boundary circuits", async (t) => {
       );
     });
 
+    await t.test("shield rejects field-wrapped outputs with matching commitments", async () => {
+      const wrapped = structuredClone(deposit);
+      const amounts = [SNARK_SCALAR_FIELD - 1n, 101n];
+      assert.equal((amounts[0] + amounts[1]) % SNARK_SCALAR_FIELD, BigInt(wrapped.amount));
+      wrapped.outputAmounts = asStrings(amounts);
+      // Bypass the protocol helper's uint128 guard so the circuit itself must
+      // reject the negative amount, even though its sum and hashes are valid.
+      wrapped.outputCommitments = asStrings(
+        amounts.map((amount, i) =>
+          poseidon5([
+            1014n,
+            ownerCommitment,
+            amount,
+            BigInt(wrapped.outputNonces[i]),
+            BigInt(wrapped.ciphertextHashes[i]),
+          ]),
+        ),
+      );
+      await shield.invalid(wrapped);
+    });
+
     await t.test("valid unshield witness satisfies R1CS", async () => {
       await unshield.valid(withdrawal);
       unshield.r1csCheck(withdrawal);
@@ -236,6 +258,26 @@ test("shield and unshield boundary circuits", async (t) => {
           w.recipient = "0";
         }),
       );
+    });
+
+    await t.test("unshield rejects field-wrapped change with a matching commitment", async () => {
+      const wrapped = structuredClone(withdrawal);
+      wrapped.amount = "101";
+      wrapped.changeAmount = String(SNARK_SCALAR_FIELD - 1n);
+      assert.equal(
+        (BigInt(wrapped.amount) + BigInt(wrapped.changeAmount)) % SNARK_SCALAR_FIELD,
+        BigInt(wrapped.inputAmount),
+      );
+      wrapped.outputCommitments[0] = String(
+        poseidon5([
+          1014n,
+          ownerCommitment,
+          BigInt(wrapped.changeAmount),
+          BigInt(wrapped.changeNonce),
+          BigInt(wrapped.ciphertextHashes[0]),
+        ]),
+      );
+      await unshield.invalid(wrapped);
     });
 
     await t.test("unshield accepts an exact 32-level LeanIMT path", async () => {
