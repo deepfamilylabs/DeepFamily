@@ -78,18 +78,13 @@ describe("eSpace Mainnet release safety", function () {
     expect(() => parse({}, { chainId: 71n })).to.throw("requires chainId 1030");
   });
 
-  it("uses immutable testnet release evidence instead of a legacy environment override", function () {
-    const config = parse({
-      EVM_MAINNET_TESTNET_RELEASE_REPORT: "/tmp/untrusted-release-report.json",
-    });
+  it("reads testnet release evidence only from the profile's fixed path", function () {
+    const config = parse();
     expect(config.testnetReleaseReportPath).to.equal(
       "tmp/release-evidence/espace-release-rehearsal.json",
     );
     expect(ESPACE_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
       config.testnetReleaseReportPath,
-    );
-    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
-      "testnetReleaseReportEnvironmentName",
     );
   });
 
@@ -106,20 +101,6 @@ describe("eSpace Mainnet release safety", function () {
     expect(() => parse({ EVM_MAINNET_EXPECTED_DEPLOYER: OWNERS[1] })).to.throw(
       "must not be one of the Safe owners",
     );
-  });
-
-  it("rejects every removed governance environment variable instead of accepting aliases", function () {
-    const removedVariables = {
-      GOVERNANCE_MULTISIG: "GOVERNANCE_SAFE_ADDRESS",
-      GOVERNANCE_OWNER: "GOVERNANCE_TIMELOCK_ADDRESS",
-      GOVERNANCE_MULTISIG_PROFILE: "GOVERNANCE_SAFE_PROFILE",
-    };
-
-    for (const [removedName, replacementName] of Object.entries(removedVariables)) {
-      expect(() => parse({ [removedName]: "legacy-value" })).to.throw(
-        `${removedName} has been removed; use ${replacementName} instead`,
-      );
-    }
   });
 
   it("enforces the production delay floor, finality, verification and an explicit budget", function () {

@@ -1160,7 +1160,7 @@ describe("production protocol release manifest evidence", function () {
     assert.throws(() => fixture.inspect(), /evidence file hash does not match the manifest/);
   });
 
-  it("rejects legacy KDF device-matrix schema bindings in production", function () {
+  it("rejects an unsupported KDF device-matrix schema binding in production", function () {
     fixture.manifest.releaseEvidence.kdfDeviceMatrix.schemaVersion = 1;
     fixture.writeManifest();
 
@@ -1169,7 +1169,7 @@ describe("production protocol release manifest evidence", function () {
 
   for (const [label, mutate, pattern] of [
     [
-      "legacy device-matrix report schema",
+      "unsupported device-matrix report schema",
       (report) => {
         report.schemaVersion = 1;
       },
@@ -1273,7 +1273,7 @@ describe("production protocol release manifest evidence", function () {
     });
   }
 
-  it("rejects legacy KDF attacker-study schema bindings in production", function () {
+  it("rejects an unsupported KDF attacker-study schema binding in production", function () {
     fixture.manifest.releaseEvidence.kdfAttackerCostStudy.schemaVersion = 1;
     fixture.writeManifest();
 
@@ -1282,7 +1282,7 @@ describe("production protocol release manifest evidence", function () {
 
   for (const [label, mutate, pattern] of [
     [
-      "legacy attacker-study report schema",
+      "unsupported attacker-study report schema",
       (report) => {
         report.schemaVersion = 1;
       },

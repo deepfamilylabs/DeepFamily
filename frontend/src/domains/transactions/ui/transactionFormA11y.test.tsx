@@ -126,15 +126,11 @@ describe("transaction form accessibility", () => {
     expect(alerts.every((alert) => alert.getAttribute("aria-live") === "assertive")).toBe(true);
   });
 
-  it("renders only private tag/biography fields, with no legacy metadata password or CID", () => {
+  it("names the private tag and biography fields", () => {
     render(<MetadataEncryptionSection t={t as any} register={register} isSubmitting={false} />);
 
-    // The labels name the fields.
     expect(screen.getByRole("textbox", { name: "Tag" })).toBeTruthy();
     expect(screen.getByRole("textbox", { name: "Biography" })).toBeTruthy();
-    expect(screen.queryByPlaceholderText("Password (min 8 chars)")).toBeNull();
-    expect(screen.queryByPlaceholderText("Confirm password")).toBeNull();
-    expect(screen.queryByText("Metadata CID")).toBeNull();
   });
 
   it("counts tag bytes as typed and flags a tag over the limit", () => {

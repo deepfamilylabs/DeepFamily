@@ -651,7 +651,7 @@ async function seedSingleLanguage(dataFile, deepFamily, deepFamilyReader, archiv
 
   for (let idx = 0; idx < addedPersons.length; idx++) {
     const person = addedPersons[idx];
-    // Check if NFT should be minted (defaults to true for backward compatibility)
+    // Mint unless the record opts out with mintNFT: false.
     const shouldMintNFT = person.mintNFT !== false;
 
     if (!shouldMintNFT) {

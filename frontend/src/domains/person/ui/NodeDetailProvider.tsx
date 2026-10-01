@@ -8,10 +8,11 @@ import {
   type NodeKeyMinimal,
   type StoryDataResult,
 } from "../../../shared/model";
-import type { ParsedNftDetails, ParsedVersionDetails } from "../api/personReadGateway";
+import type {
+  ParsedNftDetails,
+  ParsedVersionDetails,
+} from "../../../shared/clients/personReadGateway";
 import { usePersonDetails, useNFTDetails, useStoryData } from "../queries";
-
-export type { NodeKeyMinimal } from "../../../shared/model";
 
 interface NodeDetailValue {
   open: boolean;

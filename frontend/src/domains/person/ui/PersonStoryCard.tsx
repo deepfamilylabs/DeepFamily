@@ -23,10 +23,8 @@ interface PersonStoryCardProps {
 }
 
 /**
- * Compact person card — roughly 220px tall against the previous 520px, so four
- * fit per row instead of three. Life dates collapse into the line under the
- * name and the two places into a single row, replacing the old pair of 44px
- * icon rows.
+ * Compact person card, roughly 220px tall so four fit per row. Life dates
+ * collapse into the line under the name and the two places into a single row.
  */
 function PersonStoryCard({
   person,

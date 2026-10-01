@@ -161,11 +161,11 @@ export interface PaperSettingsDrawerProps {
 /**
  * 纸谱设置, as a slide-over rather than a permanently docked column.
  *
- * Two changes over the old aside. It no longer holds 256px of the stage for good — what it contains
- * (colour, font, page margin) is set once and then left alone, while the book is what the page is
- * for; and its four stacked <details> became four tabs, because at 256px wide they ran to well over
- * a screen of scrolling to reach the last group. There is deliberately no scrim: the point of these
- * controls is watching the sheet change, so the book stays visible and simply re-fits beside it.
+ * It does not hold part of the stage for good: what it contains (colour, font, page margin) is set
+ * once and then left alone, while the book is what the page is for. Its four groups are tabs,
+ * because stacked in a narrow column they run to well over a screen of scrolling. There is
+ * deliberately no scrim: the point of these controls is watching the sheet change, so the book
+ * stays visible and simply re-fits beside it.
  */
 export function PaperSettingsDrawer({
   t,

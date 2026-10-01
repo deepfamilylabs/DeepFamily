@@ -137,12 +137,6 @@ describe("Ethereum production tooling profiles", function () {
     expect(ETHEREUM_CHAIN_PROFILE.mainnet.testnetReleaseReportRelativePath).to.equal(
       "tmp/release-evidence/ethereum-release-rehearsal.json",
     );
-    expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property(
-      "testnetReleaseReportEnvironmentName",
-    );
-    expect(ETHEREUM_CHAIN_PROFILE.mainnet).not.to.have.property(
-      "testnetReleaseReportEnvironmentName",
-    );
     expect(() => {
       ETHEREUM_CHAIN_PROFILE.mainnet.chainId = 2n;
     }).to.throw(TypeError);
@@ -180,14 +174,6 @@ describe("Ethereum production tooling profiles", function () {
       "ethereum:mainnet:release:execute":
         "node scripts/ethereum-mainnet-release-command.mjs --execute",
     });
-    for (const removedName of [
-      "espace:mainnet:safe",
-      "espace:mainnet:release",
-      "ethereum:mainnet:safe",
-      "ethereum:mainnet:release",
-    ]) {
-      expect(packageJson.scripts).not.to.have.property(removedName);
-    }
     for (const name of [
       "espace:acceptance",
       "espace:mainnet:safe:plan",
@@ -261,10 +247,6 @@ describe("Ethereum production tooling profiles", function () {
     }
     expect(example).not.to.include("EVM_E2E_RUN_ID=");
     expect(example).not.to.include("EVM_E2E_RECOVER=");
-    expect(example).not.to.include("EVM_MAINNET_TESTNET_RELEASE_REPORT=");
-    expect(example).not.to.include("GOVERNANCE_MULTISIG=");
-    expect(example).not.to.include("GOVERNANCE_OWNER=");
-    expect(example).not.to.include("GOVERNANCE_MULTISIG_PROFILE=");
     expect(example).not.to.include("GOVERNANCE_TIMELOCK_ADDRESS=");
   });
 
@@ -488,9 +470,7 @@ describe("Ethereum production tooling profiles", function () {
 
   it("shares public release variables while retaining Ethereum network, chain and digest guards", function () {
     const config = parseEthereumMainnetReleaseConfig({
-      env: ethereumReleaseEnv({
-        EVM_MAINNET_TESTNET_RELEASE_REPORT: "/tmp/untrusted-release-report.json",
-      }),
+      env: ethereumReleaseEnv(),
       networkName: "mainnet",
       chainId: 1n,
     });

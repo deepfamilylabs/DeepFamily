@@ -1,8 +1,8 @@
 /**
  * Minimal hook for accessing read-only and signer-backed contract instances.
  *
- * This replaces the read-side of the old `useContract` hook. Write operations
- * should go through feature-local transaction hooks and transaction services.
+ * Write operations should go through feature-local transaction hooks and
+ * transaction services.
  */
 import { useMemo } from "react";
 import { useConfig } from "../../config";

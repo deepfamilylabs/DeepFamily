@@ -413,6 +413,7 @@ describe("useTreeCacheActions", () => {
       identitySuiteId: 1,
       metadataProtocolGeneration: "df-onchain-biography-v1",
       metadataUnlockValidated: true,
+      metadataUnlockPersistence: "device",
       ...sentinels,
     } as NodeData;
     const harness = createTreeCacheActionsHarness(

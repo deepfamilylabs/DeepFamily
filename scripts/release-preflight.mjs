@@ -36,7 +36,6 @@ import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
-  Object.freeze(["npm", ["run", "protocol:legacy:check"]]),
   // Re-run the pinned Unicode 17 conformance suite before a production release.
   Object.freeze(["npm", ["run", "protocol:unicode:check"]]),
   // Contracts must build before the frontend synchronizes ABI artifacts.
@@ -160,11 +159,6 @@ export const runReleasePreflight = async ({
     requireBuiltR1cs: false,
     expectedProductionPhase1,
   });
-  if (initialZkEvidence.schemaVersion !== 3) {
-    throw new Error(
-      "Release preflight requires ZK manifest schemaVersion 3 with a reviewed snarkjs runtime graph",
-    );
-  }
   let compilerStageRoot;
   try {
     let localCompiler;

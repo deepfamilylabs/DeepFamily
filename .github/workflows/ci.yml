@@ -43,8 +43,6 @@ jobs:
 
       - name: Build (compile contracts)
         run: npm run build
-        env:
-          CONTRACT_SIZER_STRICT: "false"
 
       - name: Frontend checks
         run: npm run frontend:check
@@ -57,8 +55,6 @@ jobs:
 
       - name: Test
         run: npm test
-        env:
-          REPORT_GAS: "true"
 
   zk-native-platforms:
     name: ZK native (${{ matrix.name }})
@@ -156,8 +152,6 @@ jobs:
 
       - name: Compile contracts on the target runtime
         run: npm run build
-        env:
-          CONTRACT_SIZER_STRICT: "false"
 
       - name: Run cross-platform tests
         run: npm test

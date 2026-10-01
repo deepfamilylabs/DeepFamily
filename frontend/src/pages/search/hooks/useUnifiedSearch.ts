@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  identityKey,
-  useAccountGateway,
-  usePersonGateway,
-  type MintedIdentity,
-  type ParsedNftDetails,
-} from "../../../domains/person";
+import { useAccountGateway, usePersonGateway } from "../../../domains/person";
+import { identityKey, type MintedIdentity } from "../../../shared/clients/accountReadGateway";
+import type { ParsedNftDetails } from "../../../shared/clients/personReadGateway";
 import { MAX_SEARCH_PAGE_SIZE } from "../model/searchPageModel";
 import {
   detectSearchSubject,

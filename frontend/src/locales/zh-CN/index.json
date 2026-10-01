@@ -468,7 +468,6 @@
       "spineSectionLabel": "书脊",
       "backCoverSectionLabel": "封底",
       "coverStyleLabel": "版式",
-      "backCoverModeLabel": "封底内容",
       "coverSpineLabel": "显示谱名与堂号",
       "coverInscriptionLabel": "封面题记",
       "coverInscriptionPlaceholder": "例如：甲辰年仲春重修",
@@ -547,7 +546,6 @@
       "nftPublicStory": "NFT 公开传记",
       "endorsements": "背书",
       "children": "子女",
-      "descendants": "子嗣",
       "spouse": "配偶",
       "spouseWife": "配",
       "spouseHusband": "適"
@@ -587,7 +585,6 @@
       "networkUnconfigured": "无合约",
       "removeCustomNetwork": "删除 {{name}}",
       "removeCustomNetworkShort": "删除网络",
-      "contract": "合约",
       "unnamedNetwork": "链 {{chainId}}",
       "versionNeedsContract": "合约未部署，无法读取版本",
       "root": "根节点哈希",
@@ -603,7 +600,6 @@
       "versionNeedsHash": "输入根哈希以列出其链上版本",
       "versionLookupFailed": "版本查询失败，请重新输入哈希重试",
       "versionNone": "该哈希在链上没有任何版本",
-      "clearAndRefresh": "清空",
       "rootHistory": "根哈希历史",
       "displayAppliesInstantly": "即时生效",
       "unsavedChanges": "有未保存改动",
@@ -613,7 +609,6 @@
     },
     "ui": {
       "versionNumber": "版本序号",
-      "contractModeConfig": "配置",
       "traversalDFS": "DFS 深度优先：先沿一条分支向下加载，再回到同层分支",
       "traversalBFS": "BFS 广度优先：先按代加载同层节点，再进入下一层",
       "traversal": "遍历方式",
@@ -622,9 +617,7 @@
       "rootLabel": "本源",
       "peopleUnit": "人",
       "generationsUnit": "世",
-      "edit": "编辑",
       "save": "保存",
-      "cancel": "取消",
       "childrenMode": "节点模式",
       "childrenModeUnion": "合并",
       "childrenModeStrict": "精确",
@@ -651,10 +644,6 @@
     "status": {
       "contractModeRootNotFound": "未找到该根节点版本，请检查哈希与版本序号",
       "rootNotFound": "未找到根节点，请检查哈希与版本序号或等待索引",
-      "badge": {
-        "checking": "检查中",
-        "ok": "正常"
-      },
       "networkError": "网络请求失败",
       "rateLimited": "已达到每日请求上限，请稍后再试",
       "rootNotTrustedEndorsed": "当前根版本未被任何推荐来源背书"
@@ -682,7 +671,6 @@
       "gender": "性别",
       "birth": "出生",
       "death": "逝世",
-      "story": "传记",
       "encyclopedia": "人物百科",
       "editStory": "编辑档案",
       "mintNFTTooltip": "将此人物铸造成 NFT",
@@ -723,7 +711,6 @@
       "title": "人物版本详情"
     },
     "validation": {
-      "contract": "请输入有效的合约地址 (0x + 40位16进制)",
       "root": "请输入有效的根哈希 (0x + 64位16进制)",
       "version": "请选择链上版本",
       "customNetwork": "请输入网络名称、有效的链 ID、RPC URL 和合约地址",
@@ -767,8 +754,6 @@
     "clearCache": "清除明文缓存",
     "errors": {
       "config": "请先配置有效的 RPC 端点、链 ID 和 DeepFamily 代理地址。",
-      "noCandidates": "当前家族视图中的锁定版本均不包含完整 Archive 引用。",
-      "partialFailure": "有 {{count}} 个版本无法使用该口令解锁。",
       "failed": "元数据解锁失败"
     },
     "automaticHint": "系统仅为当前家族视图中的版本在后台尝试一次空口令。其余版本可在这里输入对应口令解锁。",
@@ -938,12 +923,6 @@
       "recordAddedGeneric": "记录添加成功",
       "storySealed": "档案封存成功（共 {{total}} 个记录）",
       "storySealedGeneric": "档案封存成功"
-    },
-    "errors": {
-      "userRejected": "用户拒绝了交易",
-      "walletTimeout": "钱包确认超时，请重新打开钱包并完成确认。",
-      "walletPending": "钱包中存在待处理请求，请打开钱包确认或取消后再试。",
-      "noWallet": "未连接钱包。请先连接您的钱包。"
     },
     "contents": "目录",
     "orderLabel": "排列方式",
@@ -1211,6 +1190,7 @@
     "consentAge": "我确认被铸造人物已年满 18 周岁。",
     "consentLegal": "我确认提交内容合法、真实且有权公开，不包含超出约定范围的个人隐私数据。",
     "passphraseMismatch": "两次输入的身份口令不一致。",
+    "passphraseDisallowed": "此口令包含协议不接受的码点，例如控制字符或不可见字符。必须先移除该字符才能使用，因为不可见字符无法重新键入，而口令不可找回。",
     "consentMissing": "请勾选所有必选项后再铸造。",
     "supplementalInfo": "补充信息",
     "birthPlace": "出生地",
@@ -1247,7 +1227,6 @@
     "validation": {
       "birthPlaceTooLong": "出生地过长",
       "deathPlaceTooLong": "死亡地过长",
-      "storyTooLong": "传记内容过长",
       "tokenURITooLong": "Token URI 过长",
       "invalidTokenURI": "无效的 URL 或 IPFS URI",
       "yearExceedsCurrent": "公元年份不能超过当前年份",
@@ -1302,11 +1281,6 @@
     "transactionFailed": "交易失败。请检查错误信息后重试。",
     "transactionFailedDetails": "交易已提交但未能成功完成。",
     "approvingDesc": "请在钱包中确认功能积分授权",
-    "errors": {
-      "invalidTarget": "无效的人物哈希或版本序号",
-      "needApprove": "授权额度不足，请重新授权 DEEP 功能积分",
-      "userRejected": "用户拒绝交易"
-    },
     "retryTransaction": "重试交易",
     "quickTitle": "背书版本",
     "processing": "正在提交背书...",
@@ -1364,63 +1338,6 @@
     "mintSuccess": "NFT 铸造成功",
     "mintFailed": "NFT 铸造失败",
     "queryFailed": "查询数据失败"
-  },
-  "keyDerivation": {
-    "title": "安全密钥派生",
-    "subtitle": "使用 KDF 算法从个人信息和强口令短语派生 EVM 兼容钱包私钥。可确定性恢复，无需存储私钥。",
-    "howItWorks": "工作原理",
-    "description": "姓名 + 生日 + 口令短语 → 经 Argon2id 派生 PersonHash → scrypt KDF (N=131072) → 私钥 → EVM 地址",
-    "note": "相同输入始终生成相同密钥 | PersonHash 会先在本地执行 Argon2id 派生，再进入 scrypt 密钥强化",
-    "component": {
-      "title": "安全密钥派生",
-      "description": "使用 KDF 算法从个人信息和强口令短语派生安全的 EVM 兼容钱包私钥。",
-      "passphraseWarning": "推荐使用 15+ 字符的强口令短语！",
-      "passphraseMismatch": "两次输入的身份口令不一致。",
-      "fillInfoFirst": "请先填写个人信息",
-      "nameRequired": "姓名不能为空",
-      "success": "私钥派生成功",
-      "failed": "私钥派生失败",
-      "kdfStrength": "KDF 强度（影响安全性和计算时间）",
-      "presets": {
-        "testing": "测试",
-        "recommended": "推荐",
-        "strongest": "最强"
-      },
-      "estimatedTime": "预计时间：",
-      "deriving": "派生中... ({{progress}}%)",
-      "deriveButton": "派生安全私钥",
-      "derivedSuccess": "私钥派生成功",
-      "evmAddress": "EVM 地址",
-      "address": "地址",
-      "privateKey": "私钥（请妥善保管！）",
-      "privateKeyLabel": "私钥",
-      "copied": "{{label}} 已复制",
-      "copyFailed": "复制失败",
-      "securityTips": "安全提示：",
-      "tip1": "私钥控制资产，切勿向任何人透露",
-      "tip2": "记住您的姓名、生日和口令短语，可随时恢复",
-      "tip3": "信息的任何微小变化都会产生不同的私钥",
-      "tip4": "建议将口令短语备份到安全位置",
-      "weakPassphraseTitle": "弱口令短语警告",
-      "weakPassphraseMessage": "口令短语强度不足！",
-      "weakPassphraseContinue": "您仍要继续吗？（不推荐）",
-      "proceedAnyway": "仍然继续",
-      "improvePassphrase": "改进口令短语",
-      "recommendations": {
-        "empty": "空口令的口令熵为零。任何知道身份字段的人都能复现此密钥派生输入，KDF 无法弥补缺失的熵。",
-        "unicodeWhitespace": "此口令经规范化后仅包含 Unicode White_Space。系统不会裁剪它，但该口令极易被猜中，必须视为高风险选择。",
-        "disallowedCodePoint": "此口令包含协议不接受的码点，例如控制字符或不可见字符。必须先移除该字符才能使用，因为不可见字符无法重新键入，而口令不可找回。",
-        "weak": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性不足。建议：15+ 混合字符或 20+ 纯字母",
-        "medium": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。低于推荐阈值。建议：18+ 字符并混合符号",
-        "strong": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性良好",
-        "veryStrong": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性很强",
-        "excellent": "原始熵约 {{raw}} bits · 评估强度评分约 {{adjusted}}。安全性极佳"
-      },
-      "progress": {
-        "preparingKDF": "正在准备 KDF...",
-        "keyDerivationComplete": "密钥派生完成"
-      }
-    }
   },
   "logo": {
     "label": "Logo"

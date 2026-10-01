@@ -173,7 +173,8 @@ describe("multi-chain production release build evidence", function () {
   });
 
   it("matches every project/npm source and traces a release artifact to compiler output", async function () {
-    const result = await readProductionBuildInfoState(ethers, fixture.root, {
+    const result = await readProductionBuildInfoState(ethers, {
+      root: fixture.root,
       artifacts: { readArtifact: async () => fixture.artifact },
       releaseArtifactNames: ["DeepFamily"],
     });
@@ -194,8 +195,8 @@ describe("multi-chain production release build evidence", function () {
     });
   });
 
-  it("keeps the legacy no-artifact call while making unchecked provenance explicit", async function () {
-    const result = await readProductionBuildInfoState(ethers, fixture.root);
+  it("marks artifact provenance unchecked when no release artifacts are named", async function () {
+    const result = await readProductionBuildInfoState(ethers, { root: fixture.root });
     expect(result.sourceContentsMatched).to.equal(true);
     expect(result.artifactProvenanceChecked).to.equal(false);
     expect(result.artifactProvenanceMatched).to.equal(null);
@@ -209,7 +210,7 @@ describe("multi-chain production release build evidence", function () {
       "pragma solidity 0.8.28; library ChangedLibrary {}\n",
     );
     await expectRejected(
-      () => readProductionBuildInfoState(ethers, fixture.root),
+      () => readProductionBuildInfoState(ethers, { root: fixture.root }),
       /does not exactly match.*compiler input/iu,
     );
   });
@@ -225,7 +226,7 @@ describe("multi-chain production release build evidence", function () {
     output.id = "different-build-id";
     await fs.writeFile(outputPath, JSON.stringify(output));
     await expectRejected(
-      () => readProductionBuildInfoState(ethers, fixture.root),
+      () => readProductionBuildInfoState(ethers, { root: fixture.root }),
       /inconsistent IDs or output/iu,
     );
   });
@@ -247,7 +248,7 @@ describe("multi-chain production release build evidence", function () {
           readProductionBuildInfoState(ethers, {
             root: fixture.root,
             artifacts: { readArtifact: async () => artifact },
-            contractNames: ["DeepFamily"],
+            releaseArtifactNames: ["DeepFamily"],
           }),
         new RegExp(`DeepFamily ${field} does not match`, "iu"),
       );
@@ -258,9 +259,10 @@ describe("multi-chain production release build evidence", function () {
     const artifact = { ...fixture.artifact, buildInfoId: "missing-build-info" };
     await expectRejected(
       () =>
-        readProductionBuildInfoState(ethers, fixture.root, {
+        readProductionBuildInfoState(ethers, {
+          root: fixture.root,
           artifacts: { readArtifact: async () => artifact },
-          artifactNames: ["DeepFamily"],
+          releaseArtifactNames: ["DeepFamily"],
         }),
       /references unavailable buildInfoId/iu,
     );

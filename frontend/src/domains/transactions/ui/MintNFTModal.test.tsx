@@ -349,7 +349,7 @@ describe("MintNFTModal", () => {
         versionIndex: 2,
         selfSuiteId: 1,
         tokenURI: "ipfs://token",
-        // The modal no longer offers a title, so the record's title stays empty.
+        // The modal offers no title field, so the record's title stays empty.
         storyTitle: "",
         story: "  A public life story  ",
         coreInfo: expect.objectContaining({

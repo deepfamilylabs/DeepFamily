@@ -118,10 +118,10 @@ After all unlock checks succeed, new manual and automatic results default to
 remembered and makes subsequent results session-only in memory (`"session"`). Only this boolean
 preference is stored in localStorage. Every complete snapshot and
 read/modify/write filters session-only decrypted fields, so saving a different node cannot persist
-them accidentally. Hydration also strips any session-only snapshot that was incorrectly stored.
-Existing device caches without the new marker remain compatible.
+them accidentally. Hydration also strips any session-only snapshot that was incorrectly stored,
+and clears any unlock without an explicit `"session"` or `"device"` mode.
 Newly created, confirmed versions also use the scope's preference when their validated result has
-no explicit persistence mode; the legacy-cache fallback does not implicitly persist new plaintext.
+no explicit persistence mode.
 
 Remembered plaintext includes decrypted identity/parent display fields, `tag`, `biography`, public
 chain/archive anchors, and an explicit validation marker. Empty `tag` and empty `biography` are

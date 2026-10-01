@@ -44,7 +44,7 @@ function makeGraph() {
 }
 
 describe("buildSvgPaperLayout", () => {
-  it("uses the tree-backed node dimensions for legacy vertical-register SVG layouts", () => {
+  it("uses the tree-backed node dimensions for vertical-register (Dieji) SVG layouts", () => {
     const { graph, rootId, nodesData } = makeGraph();
     const generations = buildPaperGenerations({ graph, nodesData, t: translate });
 

@@ -180,9 +180,9 @@ export function useFamilyTreeConfigForm() {
 
   const applyConfigChanges = useCallback(() => {
     if (!validateAll()) return;
-    // Only the root moves from here now. The reader and the addresses derived
-    // from it belong to the connection, which this panel no longer edits, so
-    // clearing them would cost a resolution round trip for nothing.
+    // Only the root moves from here. The reader and the addresses derived from
+    // it belong to the connection, which this panel does not edit, so clearing
+    // them would cost a resolution round trip for nothing.
     update({
       rootHash: localRootHash,
       rootVersionIndex: localVersion,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeIdentityHashMaterial,
   computeIdentitySaltHex,
-  computePersonHash,
+  computeIdentityHash,
 } from "../identityHash";
 
 const identity = {
@@ -31,7 +31,7 @@ describe("fresh-v1 identityHash integration", () => {
 
   it("runs the same Argon2id path for an empty passphrase", async () => {
     const empty = await computeIdentityHashMaterial({ ...identity, passphrase: "" });
-    const protectedHash = await computePersonHash(identity);
+    const protectedHash = await computeIdentityHash(identity);
 
     expect(empty.derivedSecretField).not.toBe(0n);
     expect(empty.personHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -50,6 +50,6 @@ describe("fresh-v1 identityHash integration", () => {
     await expect(computeIdentityHashMaterial({ ...identity, identitySuiteId: 999 })).rejects.toMatchObject({
       code: "UNSUPPORTED_IDENTITY_SUITE",
     });
-    await expect(computePersonHash({ ...identity, identitySuiteId: 999 })).resolves.toBe("");
+    await expect(computeIdentityHash({ ...identity, identitySuiteId: 999 })).resolves.toBe("");
   });
 });

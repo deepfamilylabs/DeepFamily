@@ -7,7 +7,6 @@ import {
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
 import {
-  assertNoRemovedGovernanceEnvironmentVariables,
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "../scripts/lib/governanceSafety.mjs";
@@ -90,7 +89,7 @@ const ERC1967_IMPLEMENTATION_SLOT =
   "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // Confirm a recorded deployment is genuinely an ERC-1967 proxy whose implementation slot points
-// at deployed code. A legacy non-proxy deployment satisfies the plain code/wiring checks, so
+// at deployed code. A non-proxy deployment would satisfy the plain code/wiring checks, so
 // reusing it would silently leave the system non-upgradeable and skip the governance handover.
 // On persistent networks we refuse anything that is not a real proxy instead of failing later
 // when an upgrade or recovery is actually needed.
@@ -517,7 +516,6 @@ export const deployIntegratedSystem = async (
     governanceMultisigProfile = process.env.GOVERNANCE_SAFE_PROFILE,
   } = {},
 ) => {
-  assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
   const { ethers } = connection;
   const currentArtifacts = artifactReader ?? hreOrConnection?.artifacts ?? null;
@@ -1010,7 +1008,6 @@ export const ensureIntegratedSystem = async (
   hreOrConnection,
   { writeDeployments, artifacts: artifactReader, allowNewDeployment = false } = {},
 ) => {
-  assertNoRemovedGovernanceEnvironmentVariables(process.env);
   const connection = await resolveConnection(hreOrConnection);
   if (connection.__deepfamilyIntegrated?.shieldedDeepPool) {
     return connection.__deepfamilyIntegrated;

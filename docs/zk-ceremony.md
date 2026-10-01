@@ -156,13 +156,10 @@ On Windows x64, invoke these entry points through `npm run` so child npm command
 JavaScript CLI. The complete preflight test suite must run in an environment permitted to create
 symbolic links (for example, Windows Developer Mode). CI uses GitHub's `ubuntu-latest` x64/glibc
 runner and also exercises macOS arm64 and Windows x64. Repository
-`.gitattributes` keeps hashed circuit and source text on canonical LF line endings across operating
-systems. The strict manifest/transcript reader also accepts an older checkout containing uniform
-CRLF and normalizes it to LF before calculating evidence hashes; mixed line endings remain invalid.
+`.gitattributes` keeps hashed circuit and source text on LF line endings across operating systems;
+evidence hashes cover the exact file bytes.
 
-The current artifact manifest is schema v3 and includes the reviewed snarkjs runtime-graph digest.
-Schema-v2 manifests are accepted only by legacy compatibility inspection and ceremony verification;
-they cannot start `zk:production:setup` or pass `release:preflight`.
+The artifact manifest is schema v3 and includes the reviewed snarkjs runtime-graph digest.
 
 ## Before running the command
 

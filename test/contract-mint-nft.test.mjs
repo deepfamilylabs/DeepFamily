@@ -560,20 +560,20 @@ describe("Mint NFT Tests", function () {
         birthDay: 1,
         gender: 1,
       };
-      const formerlyAliasedBasicInfo = {
+      const collidingCandidateBasicInfo = {
         ...canonicalBasicInfo,
         birthDay: 0,
         gender: 129,
       };
 
       expect(packBirthGenderField(canonicalBasicInfo)).to.not.equal(
-        packBirthGenderField(formerlyAliasedBasicInfo),
+        packBirthGenderField(collidingCandidateBasicInfo),
       );
       expect(computeDisclosureBinding(hre.ethers, fullName, canonicalBasicInfo, 1)).to.not.equal(
-        computeDisclosureBinding(hre.ethers, fullName, formerlyAliasedBasicInfo, 1),
+        computeDisclosureBinding(hre.ethers, fullName, collidingCandidateBasicInfo, 1),
       );
       expect(computeIdentityCommitment(hre.ethers, fullName, canonicalBasicInfo, 1)).to.not.equal(
-        computeIdentityCommitment(hre.ethers, fullName, formerlyAliasedBasicInfo, 1),
+        computeIdentityCommitment(hre.ethers, fullName, collidingCandidateBasicInfo, 1),
       );
     });
   });

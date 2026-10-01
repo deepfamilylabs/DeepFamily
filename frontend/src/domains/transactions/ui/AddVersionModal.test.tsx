@@ -503,9 +503,6 @@ describe("AddVersionModal", () => {
 
   it("reports confirmed success even when local confirmed-node persistence fails", async () => {
     const flowResult = successfulFlowResult();
-    // A malformed/legacy provider result must never resurrect the removed
-    // public event tag in the success UI.
-    Object.assign(flowResult.events.PersonVersionAdded!, { tag: "legacy-public-tag" });
     mocks.addVersionRunOrThrow.mockResolvedValue(flowResult);
     mocks.cacheValidatedPersonVersion.mockRejectedValueOnce(
       new Error("IndexedDB confirmed-node write failed"),
@@ -587,7 +584,6 @@ describe("AddVersionModal", () => {
     });
     expect(mocks.onSuccess).toHaveBeenCalledWith(flowResult);
     expect(await screen.findByText("Version Added Successfully")).toBeTruthy();
-    expect(screen.queryByText(/legacy-public-tag/)).toBeNull();
   });
 
   it("refuses to cache plaintext when the confirmed Reader ref differs from the frozen envelope", async () => {

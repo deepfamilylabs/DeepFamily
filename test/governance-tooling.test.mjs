@@ -95,15 +95,15 @@ describe("Generic governance tooling", function () {
         ).to.throw(reason);
       }
 
-      // OpenZeppelin 5's UUPS ABI currently exposes upgradeToAndCall only. Keep the legacy
-      // upgradeTo selector covered as well so a future ABI change cannot reopen the generic path.
-      const legacyUpgradeTarget = {
+      // OpenZeppelin 5's UUPS ABI exposes upgradeToAndCall only. Cover OpenZeppelin 4's upgradeTo
+      // selector as well so a future ABI change cannot reopen the generic path.
+      const upgradeToTarget = {
         interface: new hre.ethers.Interface(["function upgradeTo(address)"]),
       };
       expect(() =>
         resolveGovernanceCall({
           ethers: hre.ethers,
-          targetContract: legacyUpgradeTarget,
+          targetContract: upgradeToTarget,
           functionName: "upgradeTo",
           rawArgs: `["${hre.ethers.ZeroAddress}"]`,
         }),

@@ -1,8 +1,6 @@
 /**
  * Destructive Conflux eSpace Testnet acceptance (fixed network confluxTestnet / chain ID 71):
  *   npm run espace:acceptance
- *
- * See docs/espace-testnet-acceptance.local.md for diagnostic, release-rehearsal and recovery use.
  */
 import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
 import { main, safeErrorMessage } from "./evm-acceptance.mjs";

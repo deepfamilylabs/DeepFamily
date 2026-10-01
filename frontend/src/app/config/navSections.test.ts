@@ -22,8 +22,8 @@ describe("resolveNavSection", () => {
   });
 
   it("returns null for routes no nav entry owns", () => {
-    expect(resolveNavSection("/keygen")).toBeNull();
-    expect(resolveNavSection("/decrypt")).toBeNull();
+    expect(resolveNavSection("/terms")).toBeNull();
+    expect(resolveNavSection("/privacy")).toBeNull();
   });
 
   it("does not treat a longer path segment as a match", () => {

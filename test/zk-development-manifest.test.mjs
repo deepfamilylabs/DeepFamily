@@ -4,14 +4,13 @@ import path from "node:path";
 
 import { updateDevelopmentManifest } from "../scripts/update-zk-development-manifest.mjs";
 import {
-  MINIMUM_PRODUCTION_CONTRIBUTORS,
+  MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   ZK_ARTIFACT_MANIFEST_PATH,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_PRODUCTION_PHASE1,
   ZK_RELEASE_ARTIFACTS,
   ZK_TOOLCHAIN_PATHS,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
-  sha256CanonicalTextFile,
   sha256File,
   sha256Text,
 } from "../scripts/lib/zkArtifactTrust.mjs";
@@ -34,7 +33,7 @@ const developmentSetup = () => ({
   status: "development",
   trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
   warning: "Single local contributor fixture; development and testing only.",
-  minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+  minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
   contributorCount: 1,
   beaconApplied: false,
   transcriptSha256: null,
@@ -46,8 +45,8 @@ const productionSetup = () => {
     trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
     warning: "Single operator must destroy every circuit-specific Phase 2 secret.",
     ceremonyId: "deepfamily-production-2026-01",
-    minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
-    contributorCount: MINIMUM_PRODUCTION_CONTRIBUTORS,
+    minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
+    contributorCount: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
     phase1: {
       ...ZK_PRODUCTION_PHASE1,
       verified: true,
@@ -179,7 +178,7 @@ describe("development ZK manifest updater", function () {
       trustModel: ZK_TRUST_MODEL_SINGLE_OPERATOR,
       productionReady: false,
       contributorCount: 1,
-      minimumContributors: MINIMUM_PRODUCTION_CONTRIBUTORS,
+      minimumContributors: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
     });
     for (const circuitName of Object.keys(ZK_RELEASE_ARTIFACTS)) {
       expect(evidence.artifacts[circuitName].r1cs.sha256).to.equal(
@@ -212,35 +211,5 @@ describe("development ZK manifest updater", function () {
     );
     expect(await fs.readFile(fixture.manifestPath, "utf8")).to.equal(original);
     expectRegularFileWithPosixMode(await fs.lstat(fixture.manifestPath), MANIFEST_MODE);
-  });
-
-  it("normalizes CRLF source, verification key, and Solidity hashes to canonical LF", async function () {
-    for (const spec of Object.values(ZK_RELEASE_ARTIFACTS)) {
-      for (const relativePath of [spec.source, spec.verificationKey, spec.solidityVerifier]) {
-        const filePath = artifactPath(fixture.root, relativePath);
-        const lf = await fs.readFile(filePath, "utf8");
-        await fs.writeFile(filePath, lf.replaceAll("\n", "\r\n"));
-      }
-    }
-
-    updateDevelopmentManifest({ root: fixture.root });
-    const updated = JSON.parse(await fs.readFile(fixture.manifestPath, "utf8"));
-
-    for (const [circuitName, spec] of Object.entries(ZK_RELEASE_ARTIFACTS)) {
-      expect(updated.circuits[circuitName]).to.include({
-        sourceSha256: sha256CanonicalTextFile(artifactPath(fixture.root, spec.source)),
-        verificationKeySha256: sha256CanonicalTextFile(
-          artifactPath(fixture.root, spec.verificationKey),
-        ),
-        solidityVerifierSha256: sha256CanonicalTextFile(
-          artifactPath(fixture.root, spec.solidityVerifier),
-        ),
-      });
-      expect(updated.circuits[circuitName]).to.include({
-        sourceSha256: fixture.expectedHashes[circuitName].sourceSha256,
-        verificationKeySha256: fixture.expectedHashes[circuitName].verificationKeySha256,
-        solidityVerifierSha256: fixture.expectedHashes[circuitName].solidityVerifierSha256,
-      });
-    }
   });
 });

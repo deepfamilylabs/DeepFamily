@@ -29,7 +29,7 @@ const getOrCreateTestConnection = async () => {
 
 const connection = await getOrCreateTestConnection();
 
-// Make legacy Hardhat v2-style helpers available to existing tests.
+// Expose the shared test connection's ethers and network helpers on hre for every test.
 hre.ethers = connection.ethers;
 hre.networkHelpers = connection.networkHelpers;
 

@@ -18,8 +18,6 @@ const routes = [
   '/search',
   '/people',
   '/create',
-  '/keygen',
-  '/decrypt',
   '/person/1',
   '/editor/1',
 ]

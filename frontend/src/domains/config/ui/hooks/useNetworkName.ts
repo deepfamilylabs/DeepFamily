@@ -9,8 +9,8 @@ import { loadCustomNetworks } from "../../services";
  *
  * Every message about a missing reader or root is about one particular chain,
  * and "this network" only lands where the network is already on screen. The
- * family settings panel no longer names it anywhere — the picker moved out — so
- * the messages have to carry the name themselves.
+ * family settings panel does not name it anywhere — the picker lives elsewhere —
+ * so the messages have to carry the name themselves.
  *
  * Custom networks count: they are the ones whose name nobody else knows.
  */

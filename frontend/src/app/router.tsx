@@ -13,7 +13,6 @@ const PersonPage = lazy(() => import("../pages/PersonPage"));
 const PeoplePage = lazy(() => import("../pages/PeoplePage"));
 const StoryEditorPage = lazy(() => import("../pages/StoryEditorPage"));
 const CreatePage = lazy(() => import("../pages/CreatePage"));
-const KeyDerivationPage = lazy(() => import("../pages/KeyDerivationPage"));
 const GenealogyBookPage = lazy(() => import("../pages/GenealogyBookPage"));
 const InheritancePage = lazy(() => import("../pages/InheritancePage"));
 const TermsPage = lazy(() => import("../pages/TermsPage"));
@@ -49,8 +48,6 @@ function TitleUpdater() {
           return `${baseName} - ${t("navigation.create", "Create")}`;
         case "/inheritance":
           return `${baseName} - ${t("navigation.inheritance")}`;
-        case "/keygen":
-          return `${baseName} - Secure Key Derivation`;
         case "/terms":
           return `${baseName} - ${t("footer.terms")}`;
         case "/privacy":
@@ -87,7 +84,6 @@ export function AppRouter() {
               <Route path="people" element={<DomainErrorBoundary domain="people"><PeoplePage /></DomainErrorBoundary>} />
               <Route path="create" element={<CreatePage />} />
               <Route path="inheritance" element={<DomainErrorBoundary domain="inheritance"><InheritancePage /></DomainErrorBoundary>} />
-              <Route path="keygen" element={<KeyDerivationPage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="privacy" element={<PrivacyPage />} />
               <Route path="person/:tokenId" element={<DomainErrorBoundary domain="person"><PersonPage /></DomainErrorBoundary>} />

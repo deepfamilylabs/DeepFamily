@@ -230,28 +230,34 @@ export function clearAllMetadataUnlocks(nodes: Record<string, NodeData>): Record
   );
 }
 
+/** Only unlocks explicitly remembered on this device may come back from storage. */
 export function sanitizeHydratedMetadataUnlocks(
   nodes: Record<string, NodeData>,
 ): Record<string, NodeData> {
   return Object.fromEntries(
     Object.entries(nodes).map(([id, node]) => [
       id,
-      node.metadataUnlockPersistence !== "session" &&
-      (!hasMetadataUnlockFootprint(node) || isMetadataUnlockUsable(node))
+      !hasMetadataUnlockFootprint(node) ||
+      (node.metadataUnlockPersistence === "device" && isMetadataUnlockUsable(node))
         ? node
         : clearMetadataUnlock(node),
     ]),
   );
 }
 
-/** Projects session-only unlocks back to their public fields at the durable boundary. */
+/**
+ * Projects every unlock not explicitly remembered on this device back to its
+ * public fields at the durable boundary.
+ */
 export function stripSessionMetadataUnlocks(
   nodes: Record<string, NodeData>,
 ): Record<string, NodeData> {
   return Object.fromEntries(
     Object.entries(nodes).map(([id, node]) => [
       id,
-      node.metadataUnlockPersistence === "session" ? clearMetadataUnlock(node) : node,
+      hasMetadataUnlockFootprint(node) && node.metadataUnlockPersistence !== "device"
+        ? clearMetadataUnlock(node)
+        : node,
     ]),
   );
 }

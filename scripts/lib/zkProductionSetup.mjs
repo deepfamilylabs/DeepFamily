@@ -29,7 +29,6 @@ import {
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
   inspectZkReleaseArtifacts,
   readCanonicalJsonFile,
-  sha256CanonicalTextFile,
   sha256File,
   sha256Text,
   validateZkArtifactManifest,
@@ -1047,7 +1046,7 @@ export const buildTranscriptAndManifest = async ({
     Object.entries(circuits).map(([circuitName, circuit]) => {
       const reviewed = initialManifest?.circuits?.[circuitName];
       const sourcePath = path.join(root, SETUP_CIRCUITS[circuitName].source);
-      const sourceSha256 = sha256CanonicalTextFile(sourcePath, `${circuitName} source`);
+      const sourceSha256 = sha256File(sourcePath);
       if (sourceSha256 !== reviewed?.sourceSha256) {
         throw new Error(
           `Production ZK setup ${circuitName} source SHA-256 mismatch; expected ` +
@@ -1065,14 +1064,8 @@ export const buildTranscriptAndManifest = async ({
           r1csSha256: compiled.r1csSha256,
           wasmSha256: compiled.wasmSha256,
           zkeySha256: sha256File(circuit.finalZkey),
-          verificationKeySha256: sha256CanonicalTextFile(
-            circuit.verificationKey,
-            `${circuitName} verification key`,
-          ),
-          solidityVerifierSha256: sha256CanonicalTextFile(
-            circuit.solidityVerifier,
-            `${circuitName} Solidity verifier`,
-          ),
+          verificationKeySha256: sha256File(circuit.verificationKey),
+          solidityVerifierSha256: sha256File(circuit.solidityVerifier),
         },
       ];
     }),
@@ -1473,11 +1466,6 @@ export const runSingleOperatorProductionSetup = async ({
     throw new Error(
       `Production ZK rotation current manifest SHA-256 mismatch; expected ` +
         `${expectedCurrentManifestSha256}, got ${validatedManifestSha256}`,
-    );
-  }
-  if (initialManifest.schemaVersion !== 3) {
-    throw new Error(
-      "Production ZK setup requires manifest schemaVersion 3; refresh the development artifacts first",
     );
   }
   if (rotate) {

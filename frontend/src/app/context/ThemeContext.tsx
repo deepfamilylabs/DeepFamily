@@ -11,7 +11,6 @@ export type Theme = "light" | "dark";
  * (stored value, then system preference) identical in both places.
  */
 const STORAGE_KEY = "df-theme";
-const LEGACY_STORAGE_KEY = "theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 interface ThemeContextType {
@@ -26,7 +25,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 function readStoredTheme(): Theme | null {
   if (typeof window === "undefined") return null;
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    const stored = window.localStorage.getItem(STORAGE_KEY);
     return stored === "dark" || stored === "light" ? stored : null;
   } catch {
     return null;
@@ -76,8 +75,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setIsPinned(true);
     try {
       window.localStorage.setItem(STORAGE_KEY, next);
-      // Older builds wrote both keys; df-theme is the only one we read back now.
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     } catch {
       /* storage unavailable (private mode, blocked cookies) — theme stays for this session */
     }

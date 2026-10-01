@@ -66,12 +66,10 @@ export async function computeIdentityHashMaterial(
   }
 }
 
-export async function computePersonHash(input: IdentityHashInput): Promise<string> {
+export async function computeIdentityHash(input: IdentityHashInput): Promise<string> {
   try {
     return (await computeIdentityHashMaterial(input)).personHash;
   } catch {
     return "";
   }
 }
-
-export const computeIdentityHash = computePersonHash;

@@ -96,8 +96,8 @@ vi.mock("../../../../shared/config/env", () => ({
 
 import { useFamilyTreeConfigForm } from "./useFamilyTreeConfigForm";
 
-// Network selection moved out to useRpcNetworkMenu — this form now stages only
-// the reader address, root hash and version.
+// Network selection lives in useRpcNetworkMenu; this form stages only the
+// reader address, root hash and version.
 describe("useFamilyTreeConfigForm", () => {
   beforeEach(() => {
     localStorage.clear();

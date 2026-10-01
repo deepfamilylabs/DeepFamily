@@ -1,5 +1,4 @@
 import {
-  assertNoRemovedGovernanceEnvironmentVariables,
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "./governanceSafety.mjs";
@@ -43,7 +42,6 @@ export const resolveTimelockDeploymentConfig = async ({
   provider = ethers.provider,
   inspectMultisig,
 }) => {
-  assertNoRemovedGovernanceEnvironmentVariables(env);
   const isLocal = isLocalTimelockNetwork({ connection });
 
   if (!isLocal) {
