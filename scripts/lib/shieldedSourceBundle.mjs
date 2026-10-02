@@ -37,6 +37,7 @@ const SOURCE_EXCLUSIONS = new Set([
   "contracts/ShieldedClaimVerifier.sol",
   "contracts/ShieldedPrivateTransferVerifier.sol",
   "contracts/ShieldedUnshieldVerifier.sol",
+  "contracts/ShieldedClaimPublicVerifier.sol",
   ...Object.values(SHIELDED_CIRCUITS).flatMap((source) => [
     `frontend/public/zk/shielded/${source}.wasm`,
     `frontend/public/zk/shielded/${source}_final.zkey`,

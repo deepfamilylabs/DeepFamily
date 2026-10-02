@@ -106,6 +106,31 @@ function fixture(batchViaProxy = false) {
 }
 
 describe("public shielded pool observer loader", () => {
+  it("accepts public-budget claims with empty input slots and two private VALUE outputs", async () => {
+    const f = fixture();
+    const event = f.pool.interface.encodeEventLog(f.pool.interface.getEvent("ActionExecuted")!, [
+      5,
+      0n,
+      0n,
+    ]);
+    Object.assign(f.logs[6], event);
+    const observed = await loadPublicPoolActionObservations(f.pool, { deploymentBlock: 1 });
+    expect(observed.actions[2]).toMatchObject({
+      action: 5,
+      inputShardIds: [0n, 0n],
+      outputs: [
+        { commitment: 201n, shardId: 0n },
+        { commitment: 202n, shardId: 0n },
+      ],
+    });
+    Object.assign(
+      f.logs[6],
+      f.pool.interface.encodeEventLog(f.pool.interface.getEvent("ActionExecuted")!, [5, 1n, 0n]),
+    );
+    await expect(loadPublicPoolActionObservations(f.pool, { deploymentBlock: 1 })).rejects.toThrow(
+      "empty shielded input",
+    );
+  });
   it("replays all public actions and notes, then feeds the linkability audit", async () => {
     const { pool, filters, claimTxHash } = fixture();
     const observed = await loadPublicPoolActionObservations(pool, { deploymentBlock: 1 });

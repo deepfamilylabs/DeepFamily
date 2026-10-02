@@ -173,6 +173,7 @@ describe("parameterized ZK command wrappers", function () {
         "shielded:claim",
         "shielded:privateTransfer",
         "shielded:unshield",
+        "shielded:claimPublic",
       ]);
       expect(events).to.deep.equal([
         ["inspect", fixtureRoot, "linux", "x64"],
@@ -186,6 +187,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:claim"],
         ["run", "shielded:privateTransfer"],
         ["run", "shielded:unshield"],
+        ["run", "shielded:claimPublic"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
       expect(commands[2].args[0]).to.equal(path.join("circuits", "shielded_receive_code.circom"));
@@ -338,7 +340,7 @@ describe("parameterized ZK command wrappers", function () {
       ]);
     });
 
-    it("checks six shielded development artifacts and the available real proof fixtures by default", function () {
+    it("checks seven shielded development artifacts and the available real proof fixtures by default", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot });
       expect(commands.map(({ circuit, check }) => [circuit, check]).at(-1)).to.deep.equal([
         "shielded",

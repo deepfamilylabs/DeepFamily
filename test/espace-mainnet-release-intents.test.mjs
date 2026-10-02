@@ -92,7 +92,7 @@ describe("eSpace Mainnet release transaction intents", function () {
         ],
       ]),
     ].map(([label, address]) => ({ label, address, status: "passed" }));
-    expect(contracts).to.have.length(21);
+    expect(contracts).to.have.length(22);
     expect(() => assertCompleteMainnetSourceVerification({ contracts, addresses })).not.to.throw();
 
     const wrongAdapter = contracts.map((contract) => ({ ...contract }));
@@ -108,11 +108,11 @@ describe("eSpace Mainnet release transaction intents", function () {
     ).to.throw(/incomplete source verification/);
   });
 
-  it("reconstructs all twenty-one deployments and six calls in nonce order", async function () {
+  it("reconstructs all twenty-two deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(27);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(21);
+    expect(intents).to.have.length(28);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(22);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -156,7 +156,7 @@ describe("eSpace Mainnet release transaction intents", function () {
     const adapterArgs = decodeConstructor("groth16VerifierAdapter", "Groth16VerifierAdapter", [
       "address",
       "address",
-      "address[5]",
+      "address[6]",
     ]);
     expect(adapterArgs[0]).to.equal(byLabel.personCommitmentVerifier.predictedAddress);
     expect(adapterArgs[1]).to.equal(byLabel.disclosureBindingVerifier.predictedAddress);

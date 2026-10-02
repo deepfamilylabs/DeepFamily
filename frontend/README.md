@@ -7,15 +7,22 @@ The first run builds missing circuit outputs and reuses the checked-in public ke
 development proving keys only if they are missing or stale. Key generation can take several minutes.
 To regenerate them manually, run
 `npm run zk:development:setup`.
-The local deploy command binds the shielded pool and key registry to the same DeepFamily token
+The local deploy command binds the shielded pool to the same DeepFamily token
 and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
 `.env.local` from the integrated deployment records.
 Both setup commands synchronize browser WASM/zkey/vkey files to `public/zk/shielded/` and generated
 verifiers to `contracts/`, following the identity/disclosure flow. Vite serves the files directly
-at `/zk/shielded/`, including built previews. `zk:artifacts:check` validates all 11 artifact sets;
+at `/zk/shielded/`, including built previews. `zk:artifacts:check` validates all 9 artifact sets;
 `zk:check` and `zk:ceremony:verify` perform the cryptographic checks.
 The checked-in keys are development-only. `release:preflight` requires production keys and release
 evidence before publication.
+
+The inheritance funding dialog offers private and public funding. Private funding spends the
+parent's private balance and needs the child's verified receive code. Public funding spends
+ordinary-wallet DEEP, needs only the selected child's identity hash, and shows a token approval
+step when required. Its arrangement details are public. Both budget types use the same pool;
+claims create private VALUE balances after identity, current family eligibility, maturity and
+allowance checks. Additional public funding preserves the arrangement's original rate and clock.
 
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 

@@ -29,7 +29,7 @@ const usage = () => {
   npm run zk:ceremony:verify
   npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
 
-The command is read-only. It verifies both original and all six shielded production circuits,
+The command is read-only. It verifies both original and all seven shielded production circuits,
 including artifact hashes, the Powers of Tau transcript, and each final zkey's binding to its
 frozen R1CS. With no --ptau option it uses the file selected by ZK_PTAU_PATH, or the committed
 circuits/ptau file.`);
@@ -323,10 +323,10 @@ export const verifyAllProductionCeremonies = async ({
     throw new Error("Original production ceremony verification must cover both circuits");
   }
   const shielded = await shieldedVerifier({ root, ptauPath });
-  if (shielded?.circuitCount !== 6) {
-    throw new Error("Shielded production ceremony verification must cover all six circuits");
+  if (shielded?.circuitCount !== 7) {
+    throw new Error("Shielded production ceremony verification must cover all seven circuits");
   }
-  return Object.freeze({ legacy, shielded, circuitCount: expectedLegacyCircuits.length + 6 });
+  return Object.freeze({ legacy, shielded, circuitCount: expectedLegacyCircuits.length + 7 });
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

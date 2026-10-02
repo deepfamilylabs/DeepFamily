@@ -14,10 +14,13 @@ const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
 /**
- * Development setup and public synchronization, shared by the top-level eight-circuit command.
+ * Development setup and public synchronization, shared by the top-level nine-circuit command.
  */
-export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
+export async function setupShieldedDevelopmentKeys({ root = ROOT, circuit = "all" } = {}) {
   root = path.resolve(root);
+  if (circuit !== "all" && !Object.hasOwn(SHIELDED_CIRCUITS, circuit)) {
+    throw new Error(`Unknown shielded circuit: ${circuit}`);
+  }
   const artifactDirectory = path.join(root, "zk-artifacts", "shielded");
   const snarkjs = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
   const run = (args) =>
@@ -43,17 +46,24 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
     }
   }
   const { path: ptau } = await ensureProductionPtau({ root });
-  await runZkBuild({ root, circuit: "shielded" });
+  await runZkBuild({ root, circuit: circuit === "all" ? "shielded" : `shielded:${circuit}` });
   const verifierDirectory = path.join(artifactDirectory, "verifiers");
   fs.mkdirSync(verifierDirectory, { recursive: true });
-  const manifest = {
-    schema: "deepfamily/shielded-development-keys@1",
-    developmentOnly: true,
-    productionReady: false,
-    ptauSha256: sha256(ptau),
-    circuits: {},
-  };
+  const manifest =
+    circuit !== "all" && fs.existsSync(existingManifest)
+      ? JSON.parse(fs.readFileSync(existingManifest, "utf8"))
+      : {
+          schema: "deepfamily/shielded-development-keys@1",
+          developmentOnly: true,
+          productionReady: false,
+          ptauSha256: sha256(ptau),
+          circuits: {},
+        };
+  if (manifest.ptauSha256 !== sha256(ptau)) {
+    throw new Error("Selective development setup requires the same pinned Powers of Tau");
+  }
   for (const [action, sourceName] of Object.entries(SHIELDED_CIRCUITS)) {
+    if (circuit !== "all" && action !== circuit) continue;
     const r1cs = path.join(artifactDirectory, `${sourceName}.r1cs`);
     const wasm = path.join(artifactDirectory, `${sourceName}_js`, `${sourceName}.wasm`);
     const initial = path.join(artifactDirectory, `${sourceName}_0000.zkey`);
@@ -91,7 +101,8 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.length !== 2)
-    throw new Error("Usage: node scripts/zk-shielded-development-setup.mjs");
-  await setupShieldedDevelopmentKeys();
+  const args = process.argv.slice(2);
+  if (args.length !== 0 && (args.length !== 2 || args[0] !== "--circuit"))
+    throw new Error("Usage: node scripts/zk-shielded-development-setup.mjs [--circuit action]");
+  await setupShieldedDevelopmentKeys({ circuit: args[1] ?? "all" });
 }

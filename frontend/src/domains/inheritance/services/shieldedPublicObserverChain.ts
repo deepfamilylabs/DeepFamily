@@ -5,7 +5,7 @@ import type { PublicPoolActionObservation } from "./shieldedPublicObserverAudit"
 
 const MAX_SHARD_LEAVES = 1n << 32n;
 const CIPHERTEXT_BYTES = 512;
-const MAX_ACTION = 4;
+const MAX_ACTION = 5;
 
 export type PublicPoolObservationSnapshot = {
   poolAddress: string;
@@ -112,6 +112,12 @@ export async function loadPublicPoolActionObservations(
         const rawAction = Number(parsed.args.action);
         if (!Number.isInteger(rawAction) || rawAction < 0 || rawAction > MAX_ACTION) {
           throw new Error("Pool action event has an unknown action code");
+        }
+        if (
+          rawAction === 5 &&
+          (BigInt(parsed.args.inputShardId0) !== 0n || BigInt(parsed.args.inputShardId1) !== 0n)
+        ) {
+          throw new Error("Public budget claim must have empty shielded input slots");
         }
         pending = {
           txHash,

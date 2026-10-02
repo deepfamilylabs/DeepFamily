@@ -11,6 +11,7 @@ export const SHIELDED_POOL_ACTION = Object.freeze({
   Claim: 2,
   PrivateTransfer: 3,
   Unshield: 4,
+  ClaimPublic: 5,
 });
 
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
@@ -52,6 +53,15 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
     "amount",
     "recipient",
   ]),
+  [SHIELDED_POOL_ACTION.ClaimPublic]: Object.freeze([
+    ...CONTEXT,
+    "budgetId",
+    "heirIdentityCommitment",
+    "firstPeriod",
+    "claimCount",
+    "amount",
+    ...OUTPUTS,
+  ]),
 });
 
 const INPUT_WIDTHS = Object.freeze({
@@ -71,6 +81,10 @@ const INPUT_WIDTHS = Object.freeze({
   endorsementRoot: 1,
   trustedRoot: 1,
   asOf: 1,
+  budgetId: 1,
+  heirIdentityCommitment: 1,
+  firstPeriod: 1,
+  claimCount: 1,
 });
 
 /** Mirrors the per-purpose lengths in ProofConstants.sol. */
@@ -191,6 +205,51 @@ export function buildShieldedPoolPublicInputs(input) {
 /** The ordered verifier input for one pool action. */
 export function buildShieldedPoolPublicSignals(input) {
   return buildShieldedPoolPublicInputs(input).signals;
+}
+
+/** Public budget claims have their own calldata shape and no note inputs. */
+export function buildShieldedPublicClaimPublicInputs(input) {
+  const budgetId = bigintFrom(input.budgetId, "budgetId", MAX_UINT64);
+  const identity = field(input.heirIdentityCommitment, "heirIdentityCommitment");
+  const firstPeriod = bigintFrom(input.firstPeriod, "firstPeriod", MAX_UINT64);
+  const claimCount = bigintFrom(input.claimCount, "claimCount", 12n);
+  const amount = bigintFrom(input.amount, "amount", MAX_UINT128);
+  const outputCommitments = values(input.outputCommitments, 2, "outputCommitments");
+  protocolAssert(
+    budgetId > 0n &&
+      identity > 0n &&
+      claimCount > 0n &&
+      amount > 0n &&
+      firstPeriod + claimCount <= MAX_UINT64 &&
+      outputCommitments.every((value) => value > 0n) &&
+      outputCommitments[0] !== outputCommitments[1],
+    "INVALID_SHIELDED_PUBLIC_CLAIM",
+    "Public claim needs a budget, identity, mature period range and distinct outputs",
+  );
+  protocolAssert(
+    Array.isArray(input.outputCiphertexts) && input.outputCiphertexts.length === 2,
+    "INVALID_SHIELDED_SIGNAL_SHAPE",
+    "outputCiphertexts must have 2 values",
+  );
+  const available = {
+    chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
+    pool: [BigInt(getAddress(input.poolAddress))],
+    budgetId: [budgetId],
+    heirIdentityCommitment: [identity],
+    firstPeriod: [firstPeriod],
+    claimCount: [claimCount],
+    amount: [amount],
+    outputCommitments,
+    ciphertextHashes: input.outputCiphertexts.map(computeShieldedCiphertextHashField),
+  };
+  const signals = [];
+  const witness = {};
+  for (const name of SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.ClaimPublic]) {
+    signals.push(...available[name]);
+    witness[name] =
+      INPUT_WIDTHS[name] === 1 ? available[name][0].toString() : available[name].map(String);
+  }
+  return { signals, witness };
 }
 
 /**

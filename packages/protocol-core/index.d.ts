@@ -818,6 +818,7 @@ export const SHIELDED_POOL_ACTION: Readonly<{
   Claim: 2;
   PrivateTransfer: 3;
   Unshield: 4;
+  ClaimPublic: 5;
 }>;
 export type ShieldedPoolPublicInputName =
   | "chainId"
@@ -835,7 +836,11 @@ export type ShieldedPoolPublicInputName =
   | "recipient"
   | "endorsementRoot"
   | "trustedRoot"
-  | "asOf";
+  | "asOf"
+  | "budgetId"
+  | "heirIdentityCommitment"
+  | "firstPeriod"
+  | "claimCount";
 /** Each pool action circuit's named public inputs, in verifier order. */
 export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
@@ -865,6 +870,20 @@ export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInp
   witness: Record<string, string | string[]>;
 };
 export function buildShieldedPoolPublicSignals(input: ShieldedPoolPublicSignalInput): bigint[];
+export function buildShieldedPublicClaimPublicInputs(input: {
+  chainId: BigNumberish;
+  poolAddress: string;
+  budgetId: BigNumberish;
+  heirIdentityCommitment: BigNumberish;
+  firstPeriod: BigNumberish;
+  claimCount: BigNumberish;
+  amount: BigNumberish;
+  outputCommitments: readonly [BigNumberish, BigNumberish];
+  outputCiphertexts: readonly [BytesLike, BytesLike];
+}): {
+  signals: bigint[];
+  witness: Record<string, string | string[]>;
+};
 export function buildShieldedReceiveCodePublicSignals(input: {
   identityCommitment: BigNumberish;
   ownerCommitment: BigNumberish;
