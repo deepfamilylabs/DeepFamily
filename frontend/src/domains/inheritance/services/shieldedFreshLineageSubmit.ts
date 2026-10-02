@@ -1,6 +1,6 @@
 import { getAddress, getBigInt, type Contract } from "ethers";
 import {
-  submitAllocate,
+  submitFund,
   submitClaim,
   type PrivatePoolFlowInput,
   type ShieldedPoolFlowResult,
@@ -48,14 +48,18 @@ export class ShieldedLineageSubmissionError extends Error {
 class StaleLineageBeforeSubmit extends Error {}
 
 function matches(roots: CurrentLineageRoots, data: PreparedLineageAction["data"]): boolean {
-  return roots.endorsement === getBigInt(data.relation0) && roots.trusted === getBigInt(data.relation1);
+  return (
+    roots.endorsement === getBigInt(data.relation0) && roots.trusted === getBigInt(data.relation1)
+  );
 }
 
 function sameRoots(a: CurrentLineageRoots, b: CurrentLineageRoots): boolean {
   return a.endorsement === b.endorsement && a.trusted === b.trusted;
 }
 
-async function readCurrentRoots(input: FreshLineageSubmitInput<PreparedLineageAction>): Promise<CurrentLineageRoots> {
+async function readCurrentRoots(
+  input: FreshLineageSubmitInput<PreparedLineageAction>,
+): Promise<CurrentLineageRoots> {
   const provider = input.signer.provider;
   if (!provider) throw new Error("CFX transaction wallet has no provider");
   // Both roots must come from the same block. Reading each at `latest` separately
@@ -88,7 +92,9 @@ function changeDescription(changed: boolean | undefined): string {
       : "";
 }
 
-async function assertPoolLineageIndex(input: FreshLineageSubmitInput<PreparedLineageAction>): Promise<void> {
+async function assertPoolLineageIndex(
+  input: FreshLineageSubmitInput<PreparedLineageAction>,
+): Promise<void> {
   const [configured, supplied] = await Promise.all([
     input.pool.LINEAGE_INDEX() as Promise<string>,
     input.lineageIndex.getAddress(),
@@ -104,7 +110,7 @@ type PoolMethod = ((...args: unknown[]) => Promise<{ hash: string }>) & {
 
 function guardedPool<T extends PreparedLineageAction>(
   input: FreshLineageSubmitInput<T>,
-  action: "allocate" | "claim",
+  action: "fund" | "claim",
   prepared: T,
   setBroadcastHash: (hash: string) => void,
 ): Contract {
@@ -118,7 +124,7 @@ function guardedPool<T extends PreparedLineageAction>(
       }
       const method = Object.assign(
         async (...args: unknown[]) => {
-          // `submitAllocate`/`submitClaim` have already entered their submitting
+          // `submitFund`/`submitClaim` have already entered their submitting
           // stage. A change here aborts without an automatic retry.
           if (!matches(await readCurrentRoots(input), prepared.data)) {
             throw new ShieldedLineageSubmissionError(
@@ -159,14 +165,14 @@ function guardedPool<T extends PreparedLineageAction>(
 
 async function submitWithFreshLineage<T extends PreparedLineageAction>(
   input: FreshLineageSubmitInput<T>,
-  action: "allocate" | "claim",
+  action: "fund" | "claim",
 ): Promise<FreshLineageSubmitResult<T>> {
   await assertPoolLineageIndex(input);
   const maxAttempts = input.maxAttempts ?? 3;
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 3) {
     throw new Error("Lineage proof attempts must be between 1 and 3");
   }
-  const submit = action === "allocate" ? submitAllocate : submitClaim;
+  const submit = action === "fund" ? submitFund : submitClaim;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const roots = await readCurrentRoots(input);
     let prepared: T;
@@ -189,7 +195,9 @@ async function submitWithFreshLineage<T extends PreparedLineageAction>(
     };
     try {
       const result = await submit({
-        pool: guardedPool(input, action, prepared, (hash) => { broadcastHash = hash; }),
+        pool: guardedPool(input, action, prepared, (hash) => {
+          broadcastHash = hash;
+        }),
         signer: input.signer,
         expectedChainId: input.expectedChainId,
         data: prepared.data,
@@ -207,9 +215,15 @@ async function submitWithFreshLineage<T extends PreparedLineageAction>(
       }
       return { ...result, prepared, attempts: attempt };
     } catch (error) {
-      if (error instanceof StaleLineageBeforeSubmit && stage !== "submitting" && stage !== "confirming") {
+      if (
+        error instanceof StaleLineageBeforeSubmit &&
+        stage !== "submitting" &&
+        stage !== "confirming"
+      ) {
         if (attempt < maxAttempts) continue;
-        throw new Error(`Lineage roots changed before submission; exhausted ${maxAttempts} attempts`);
+        throw new Error(
+          `Lineage roots changed before submission; exhausted ${maxAttempts} attempts`,
+        );
       }
       if (error instanceof ShieldedLineageSubmissionError) throw error;
       if (stage === "submitting" || stage === "confirming") {
@@ -234,10 +248,10 @@ async function submitWithFreshLineage<T extends PreparedLineageAction>(
  * still land between the final read and transaction inclusion; this remains a
  * release liveness blocker and cannot be guaranteed away by a frontend read.
  */
-export function submitAllocateWithFreshLineage<T extends PreparedLineageAction>(
+export function submitFundWithFreshLineage<T extends PreparedLineageAction>(
   input: FreshLineageSubmitInput<T>,
 ): Promise<FreshLineageSubmitResult<T>> {
-  return submitWithFreshLineage(input, "allocate");
+  return submitWithFreshLineage(input, "fund");
 }
 
 /** Uses the same bounded refresh policy for an heir's self-submitted claim. */

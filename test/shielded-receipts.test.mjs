@@ -3,7 +3,7 @@ import { Interface, ZeroAddress } from "ethers";
 import hre from "hardhat";
 
 import {
-  ALLOCATE_SELECTOR,
+  FUND_SELECTOR,
   CLAIM_SELECTOR,
   verifyShieldedReceipts,
 } from "../scripts/lib/shieldedReceipts.mjs";
@@ -24,7 +24,7 @@ function fixtureProvider({ chainId = 71, change = () => {} } = {}) {
         hash: allocationTxHash,
         chainId: BigInt(chainId),
         to: poolAddress,
-        data: `${ALLOCATE_SELECTOR}abcd`,
+        data: `${FUND_SELECTOR}abcd`,
         gasLimit: 900_000n,
         blockHash: allocationBlockHash,
         blockNumber: 10,
@@ -112,10 +112,10 @@ const input = (provider, expectedChainId = 71) => ({
 });
 
 describe("shielded receipt observer", function () {
-  it("uses the pool's actual allocate and claim ABI selectors", async function () {
+  it("uses the pool's actual fund and claim ABI selectors", async function () {
     const artifact = await hre.artifacts.readArtifact("ShieldedDeepPool");
     const abi = new Interface(artifact.abi);
-    assert.equal(ALLOCATE_SELECTOR, abi.getFunction("allocate").selector);
+    assert.equal(FUND_SELECTOR, abi.getFunction("fund").selector);
     assert.equal(CLAIM_SELECTOR, abi.getFunction("claim").selector);
   });
 
@@ -176,7 +176,7 @@ describe("shielded receipt observer", function () {
             txHash: allocationTxHash,
             blockNumber: 10,
             blockHash: allocationBlockHash,
-            selector: ALLOCATE_SELECTOR,
+            selector: FUND_SELECTOR,
             gasUsed: "800000",
             transactionGasLimit: "900000",
             blockGasLimit: "30000000",
@@ -325,7 +325,7 @@ describe("shielded receipt observer", function () {
       ],
       [
         (fixture) => {
-          fixture.transactions[claimTxHash].data = `${ALLOCATE_SELECTOR}abcd`;
+          fixture.transactions[claimTxHash].data = `${FUND_SELECTOR}abcd`;
         },
         /wrong pool method selector/,
       ],

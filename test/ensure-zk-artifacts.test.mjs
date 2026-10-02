@@ -15,9 +15,9 @@ describe("integrated local ZK artifact preparation", function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("compiles all 11 circuits and reuses verified current keys", async function () {
+  it("compiles all 8 circuits and reuses verified current keys", async function () {
     const calls = [];
-    const artifacts = { status: "development", circuitCount: 11 };
+    const artifacts = { status: "development", circuitCount: 8 };
     const result = await ensureZkArtifacts({
       root,
       build: async (options) => calls.push(["build", options.circuit]),
@@ -45,7 +45,7 @@ describe("integrated local ZK artifact preparation", function () {
       check: async () => {
         calls.push("check");
         if (!ready) throw new Error("missing shielded key");
-        return { status: "development", circuitCount: 11 };
+        return { status: "development", circuitCount: 8 };
       },
       setup: async () => {
         calls.push("setup-all");

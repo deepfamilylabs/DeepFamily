@@ -6,15 +6,15 @@ include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 include "lib/identity.circom";
 
-// Action 5 of ShieldedDeepPool. The pool requires the budget note's shard and
-// root to fill both input slots; the second nullifier is a dummy bound to it.
+// Claim consumes one or two distinct budgets with one policy/enrollment/owner.
+// An absent second input repeats the first root and has a bound dummy nullifier.
 // All twelve period nullifiers are public, and inactive slots carry
 // domain-separated dummies.
 template ShieldedClaim() {
     signal input chainId;
     signal input pool;
-    signal input inputShardId;
-    signal input inputRoot;
+    signal input inputShardIds[2];
+    signal input inputRoots[2];
     signal input inputNullifiers[2];
     signal input periodNullifiers[12];
     signal input outputCommitments[2];
@@ -64,6 +64,14 @@ template ShieldedClaim() {
     signal input noteDepth;
     signal input noteIndex;
     signal input noteSiblings[32];
+    signal input hasSecondInput;
+    signal input secondRemaining;
+    signal input secondRemainingPeriods;
+    signal input secondBudgetNonce;
+    signal input secondBudgetCiphertextHash;
+    signal input secondNoteDepth;
+    signal input secondNoteIndex;
+    signal input secondNoteSiblings[32];
 
     // All 12 slots are public nullifiers. claimCount is private; inactive slots
     // have domain-separated dummy nullifiers and zero periodIndex witnesses.
@@ -78,6 +86,11 @@ template ShieldedClaim() {
     poolBits.in <== pool;
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
+    hasSecondInput * (1 - hasSecondInput) === 0;
+    (1 - hasSecondInput) * (inputShardIds[1] - inputShardIds[0]) === 0;
+    (1 - hasSecondInput) * (inputRoots[1] - inputRoots[0]) === 0;
+    component rootVersionBits = Num2Bits(64);
+    rootVersionBits.in <== rootVersionIndex;
 
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
@@ -219,7 +232,7 @@ template ShieldedClaim() {
     noteMerkle.depth <== noteDepth;
     noteMerkle.index <== noteIndex;
     noteMerkle.siblings <== noteSiblings;
-    noteMerkle.out === inputRoot;
+    noteMerkle.out === inputRoots[0];
 
     component spend = Poseidon(3);
     spend.inputs[0] <== 1016;
@@ -230,7 +243,60 @@ template ShieldedClaim() {
     dummySpend.inputs[0] <== 1021;
     dummySpend.inputs[1] <== ownerSecret.out;
     dummySpend.inputs[2] <== oldBudget.out;
-    dummySpend.out === inputNullifiers[1];
+    // The optional second budget uses the same policy, enrollment and owner.
+    // Its value is counted only when its membership and spend are proved.
+    (1 - hasSecondInput) * secondRemaining === 0;
+    (1 - hasSecondInput) * secondRemainingPeriods === 0;
+    (1 - hasSecondInput) * secondBudgetNonce === 0;
+    (1 - hasSecondInput) * secondBudgetCiphertextHash === 0;
+    (1 - hasSecondInput) * secondNoteDepth === 0;
+    (1 - hasSecondInput) * secondNoteIndex === 0;
+    for (var i = 0; i < 32; i++) (1 - hasSecondInput) * secondNoteSiblings[i] === 0;
+    component secondAmountBits = Num2Bits(128);
+    secondAmountBits.in <== secondRemaining;
+    component secondPeriodsBits = Num2Bits(64);
+    secondPeriodsBits.in <== secondRemainingPeriods;
+    secondRemaining === rate * secondRemainingPeriods;
+    component secondNonceNotZero = IsZero();
+    secondNonceNotZero.in <== secondBudgetNonce;
+    hasSecondInput * secondNonceNotZero.out === 0;
+    component secondBudget = Poseidon(8);
+    secondBudget.inputs[0] <== 1015;
+    secondBudget.inputs[1] <== policy.out;
+    secondBudget.inputs[2] <== enrollment.out;
+    secondBudget.inputs[3] <== ownerCommitment.out;
+    secondBudget.inputs[4] <== rate;
+    secondBudget.inputs[5] <== secondRemaining;
+    secondBudget.inputs[6] <== secondBudgetNonce;
+    secondBudget.inputs[7] <== secondBudgetCiphertextHash;
+    component secondDepthBits = Num2Bits(6);
+    secondDepthBits.in <== secondNoteDepth;
+    component secondDepthOk = LessEqThan(6);
+    secondDepthOk.in[0] <== secondNoteDepth;
+    secondDepthOk.in[1] <== 32;
+    secondDepthOk.out === 1;
+    component secondMembership = BinaryMerkleRoot(32);
+    secondMembership.leaf <== secondBudget.out;
+    secondMembership.depth <== secondNoteDepth;
+    secondMembership.index <== secondNoteIndex;
+    secondMembership.siblings <== secondNoteSiblings;
+    hasSecondInput * (secondMembership.out - inputRoots[1]) === 0;
+    component distinctBudgets = IsEqual();
+    distinctBudgets.in[0] <== oldBudget.out;
+    distinctBudgets.in[1] <== secondBudget.out;
+    hasSecondInput * distinctBudgets.out === 0;
+    component secondSpend = Poseidon(3);
+    secondSpend.inputs[0] <== 1016;
+    secondSpend.inputs[1] <== ownerSecret.out;
+    secondSpend.inputs[2] <== secondBudget.out;
+    inputNullifiers[1] === dummySpend.out + hasSecondInput * (secondSpend.out - dummySpend.out);
+    signal totalRemaining <== remaining + secondRemaining;
+    component totalAmountBits = Num2Bits(128);
+    totalAmountBits.in <== totalRemaining;
+    signal totalPeriods <== remainingPeriods + secondRemainingPeriods;
+    component totalPeriodsBits = Num2Bits(64);
+    totalPeriodsBits.in <== totalPeriods;
+    totalRemaining === rate * totalPeriods;
 
     component countBits = Num2Bits(4);
     countBits.in <== claimCount;
@@ -285,10 +351,10 @@ template ShieldedClaim() {
     signal payout <== rate * claimCount;
     component payoutBits = Num2Bits(128);
     payoutBits.in <== payout;
-    signal newRemaining <== remaining - payout;
+    signal newRemaining <== totalRemaining - payout;
     component newRemainingBits = Num2Bits(128);
     newRemainingBits.in <== newRemaining;
-    signal newRemainingPeriods <== remainingPeriods - claimCount;
+    signal newRemainingPeriods <== totalPeriods - claimCount;
     component newRemainingPeriodsBits = Num2Bits(64);
     newRemainingPeriodsBits.in <== newRemainingPeriods;
     newRemaining === rate * newRemainingPeriods;
@@ -317,8 +383,8 @@ component main {
     public [
         chainId,
         pool,
-        inputShardId,
-        inputRoot,
+        inputShardIds,
+        inputRoots,
         inputNullifiers,
         periodNullifiers,
         outputCommitments,

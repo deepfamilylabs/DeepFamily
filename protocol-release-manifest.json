@@ -1542,15 +1542,12 @@
       "personVerifierImmutable": null,
       "disclosureBindingVerifierImmutable": null,
       "shieldVerifierImmutable": null,
-      "createPolicyVerifierImmutable": null,
-      "allocateVerifierImmutable": null,
-      "topUpVerifierImmutable": null,
-      "mergeBudgetVerifierImmutable": null,
       "claimVerifierImmutable": null,
       "privateTransferVerifierImmutable": null,
       "unshieldVerifierImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null
+      "runtimeSha256": null,
+      "fundVerifierImmutable": null
     },
     "deepFamilyReader": {
       "address": null,
@@ -1575,26 +1572,6 @@
         "artifactSha256": null,
         "runtimeSha256": null
       },
-      "createPolicy": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "allocate": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "topUp": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
-      "mergeBudget": {
-        "address": null,
-        "artifactSha256": null,
-        "runtimeSha256": null
-      },
       "claim": {
         "address": null,
         "artifactSha256": null,
@@ -1606,6 +1583,11 @@
         "runtimeSha256": null
       },
       "unshield": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "fund": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null

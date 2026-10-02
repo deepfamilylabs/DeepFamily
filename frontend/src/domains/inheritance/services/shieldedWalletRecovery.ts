@@ -4,10 +4,13 @@ import {
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   computeShieldedSpendNullifier,
+  computeShieldedAllocationKeyCommitment,
+  computeShieldedPolicyCommitment,
   encodeShieldedBudgetNotePayload,
   verifyShieldedNotePayload,
   type DecodedShieldedNotePayload,
   type ShieldedBudgetNotePayload,
+  type ShieldedPolicyDescriptor,
 } from "@deepfamily/protocol-core";
 import { getBytes, getBigInt, type BigNumberish, type Contract } from "ethers";
 import {
@@ -28,10 +31,11 @@ export type LocalShieldedWalletSnapshot = ShieldedPoolSnapshot<DecodedShieldedNo
   walletOwnerCommitment: bigint;
   walletIdentityCommitment?: bigint;
   /** Donor-readable copies of child budget templates carried by change notes. */
-  topUpTemplates?: Map<bigint, RecoveredTopUpTemplate>;
+  fundingTemplates?: Map<bigint, RecoveredFundingTemplate>;
+  shieldedPolicies?: Map<bigint, ShieldedPolicyDescriptor>;
 };
 
-export type RecoveredTopUpTemplate = {
+export type RecoveredFundingTemplate = {
   note: ShieldedBudgetNotePayload;
   commitment: bigint;
   ciphertext: Uint8Array;
@@ -76,8 +80,10 @@ export async function recoverLocalShieldedWallet(
   }
 
   const hpkeIkm = getBytes(keys.hpkeIkm);
-  const topUpTemplates =
-    options.previous?.topUpTemplates ?? new Map<bigint, RecoveredTopUpTemplate>();
+  const fundingTemplates =
+    options.previous?.fundingTemplates ?? new Map<bigint, RecoveredFundingTemplate>();
+  const shieldedPolicies =
+    options.previous?.shieldedPolicies ?? new Map<bigint, ShieldedPolicyDescriptor>();
   let precedingPublicNote: PublicShieldedNote | undefined;
   try {
     const chainId = (await provider.getNetwork()).chainId;
@@ -123,7 +129,7 @@ export async function recoverLocalShieldedWallet(
             note.topUpMemo &&
             previousPublicNote?.commitment === note.topUpMemo.budgetCommitment
           ) {
-            // Allocate/TopUp append the child's budget directly before the
+            // Fund appends the child's budget directly before the
             // donor's change note. Match and validate it from the public scan;
             // no recipient or note-index query reaches the RPC.
             const budgetPayload = encodeShieldedBudgetNotePayload(note.topUpMemo.budgetNote);
@@ -133,12 +139,27 @@ export async function recoverLocalShieldedWallet(
                 ciphertext: previousPublicNote.ciphertext,
                 noteCommitment: previousPublicNote.commitment,
               });
-              topUpTemplates.set(previousPublicNote.commitment, {
+              fundingTemplates.set(previousPublicNote.commitment, {
                 note: note.topUpMemo.budgetNote,
                 commitment: previousPublicNote.commitment,
                 ciphertext: previousPublicNote.ciphertext,
                 shardId: previousPublicNote.shardId,
               });
+              const allocationKey = note.topUpMemo.allocationKey;
+              if (
+                allocationKey !== undefined &&
+                computeShieldedAllocationKeyCommitment(allocationKey) ===
+                  note.topUpMemo.budgetNote.allocationKeyCommitment
+              ) {
+                const budget = note.topUpMemo.budgetNote;
+                shieldedPolicies.set(computeShieldedPolicyCommitment(budget), {
+                  rootIdentityCommitment: budget.rootIdentityCommitment,
+                  rootVersionIndex: budget.rootVersionIndex,
+                  amountPerPeriod: budget.amountPerPeriod,
+                  policySalt: budget.policySalt,
+                  allocationKey,
+                });
+              }
             } catch (error) {
               // A sender can put arbitrary encrypted memos in a value note.
               // Preserve a valid value note while ignoring a bad backup.
@@ -163,28 +184,37 @@ export async function recoverLocalShieldedWallet(
       ...snapshot,
       walletOwnerCommitment: keys.ownerCommitment,
       walletIdentityCommitment: expectedIdentityCommitment,
-      topUpTemplates,
+      fundingTemplates,
+      shieldedPolicies,
     };
   } finally {
     hpkeIkm.fill(0);
   }
 }
 
-export function listRecoveredTopUpTemplates(
+export function listRecoveredFundingTemplates(
   snapshot: LocalShieldedWalletSnapshot,
-): RecoveredTopUpTemplate[] {
+): RecoveredFundingTemplate[] {
   if (snapshot.invalidated) throw new Error("Shielded wallet snapshot is invalid");
-  return [...(snapshot.topUpTemplates?.values() ?? [])];
+  return [...(snapshot.fundingTemplates?.values() ?? [])];
 }
 
-export function getRecoveredTopUpTemplate(
+export function getRecoveredFundingTemplate(
   snapshot: LocalShieldedWalletSnapshot,
   commitment: bigint,
-): RecoveredTopUpTemplate {
+): RecoveredFundingTemplate {
   if (snapshot.invalidated) throw new Error("Shielded wallet snapshot is invalid");
-  const template = snapshot.topUpTemplates?.get(commitment);
-  if (!template) throw new Error("Top-up template is not recoverable from this wallet");
+  const template = snapshot.fundingTemplates?.get(commitment);
+  if (!template) throw new Error("Funding template is not recoverable from this wallet");
   return template;
+}
+
+/** Recovered from all donor change notes, including spent and zero-value notes. */
+export function listRecoveredShieldedPolicies(
+  snapshot: LocalShieldedWalletSnapshot,
+): ShieldedPolicyDescriptor[] {
+  if (snapshot.invalidated) throw new Error("Shielded wallet snapshot is invalid");
+  return [...(snapshot.shieldedPolicies?.values() ?? [])];
 }
 
 /** Nullifiers are computed only on the device from the holder's secret. */
@@ -199,7 +229,6 @@ export function listUnspentRecoveredShieldedNotes(
   }
   return [...snapshot.ownedNotes.values()].filter(
     (event) =>
-      event.note.kind !== "policy" &&
       !snapshot.spentNullifiers.has(
         computeShieldedSpendNullifier({
           ownerSecret: keys.ownerSecret,

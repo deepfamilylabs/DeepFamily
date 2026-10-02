@@ -224,21 +224,21 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 ### Shielded family inheritance
 
-`/inheritance` uses `ShieldedDeepPool`. The page derives shielded spend and viewing keys from the existing identity passphrase on the device, reads public note and lineage events, opens matching ciphertexts locally, and creates proofs in the ZK worker. It presents receive-code creation, a public `shield` deposit, private policy creation and child allocation, private top-ups and claims, private transfers, and a separate public exit.
+`/inheritance` uses `ShieldedDeepPool`. The page derives shielded spend and viewing keys from the existing identity passphrase on the device, reads public note and lineage events, opens matching ciphertexts locally, and creates proofs in the ZK worker. It presents receiving details, a public `shield` deposit, unified private funding, budget claims, private transfers, and a separate public exit. Funding initializes a rule and enrollment or adds funds to a recovered enrollment. There are no separate policy-creation or budget-merge actions. Claims automatically choose up to two compatible budgets and consolidate the remainder; funding and public exits automatically consolidate free-value notes when necessary.
 
-A recipient creates a receive code from their unlocked identity. The ZK worker derives the payment keys and proves that the identity chose them (see [the receive-code circuit](zk-proofs.md#shielded-inheritance-circuits)). Creating a code needs no wallet or transaction, and each generated code differs but all are valid. Senders paste the code for child allocation, top-ups, and private transfers.
+A recipient creates a receive code from their unlocked identity. The ZK worker derives the payment keys and proves that the identity chose them (see [the receive-code circuit](zk-proofs.md#shielded-inheritance-circuits)). Creating a code needs no wallet or transaction, and each generated code differs but all are valid. Senders paste the code for funding and private transfers.
 
 The ZK worker verifies each pasted code before any key is used. It checks the proof against the verification key compiled into the bundle (`__SHIELDED_RECEIVE_CODE_VKEY__`, defined in `vite.config.ts`) and runs a BN254 G2 subgroup check. A code that fails its bech32m checksum is reported as a copying mistake. A code whose contents or proof fail is reported as possibly altered and must not be paid. Only a verified code becomes a `VerifiedShieldedRecipient`, the type the funding and transfer preparation services require.
 
-For child allocation, the page checks that the code belongs to the selected child. A top-up checks the code against the existing budget. A private transfer shows the recipient's name when the locally loaded tree knows the code's person hash. Without a name, the sender must confirm that they checked the identity number with the recipient before submitting. The entered code is cleared after a successful action. Anyone holding a receive code can link the identity to its payment keys, so the code should be shared privately and not published.
+For initial funding, the page checks that the code belongs to the selected child. Additional funding checks the code against the existing budget. A private transfer shows the recipient's name when the locally loaded tree knows the code's person hash. Without a name, the sender must confirm that they checked the identity number with the recipient before submitting. The entered code is cleared after a successful action. Anyone holding a receive code can link the identity to its payment keys, so the code should be shared privately and not published.
 
 A sender can also generate a code for someone else from that person's complete identity details and identity passphrase. The ZK worker derives the keys and proof and returns only the code. The derived secret never reaches the page, and the passphrase input is cleared once the code is generated. Complete identity details and the identity passphrase grant much broader access than a receive code: anyone who knows them can derive the recipient's spend and viewing keys and access their private funds and encrypted content. The page recommends asking the recipient for their receive code and warns before this option.
 
-A receive code does not establish that an identity exists on chain or qualifies as a child. Initial allocation checks the current lineage endorsement and trusted source, and a top-up must match a previously allocated budget.
+A receive code does not establish that an identity exists on chain or qualifies as a child. Initial funding checks the current lineage endorsement and trusted source, and additional funding must match an existing budget enrollment.
 
 The pool address is a chain-specific configuration value. The page checks pool/token/lineage wiring and the connected wallet’s chain. Creating a receive code sends nothing on chain. For private actions, the sender pays native gas and must acknowledge using an independent fee wallet. The page warns about reusing public wallets, funding a private action wallet directly from a known wallet, immediate exits, and unusual amounts. Fee wallets are visible, so a wallet associated with an NFT, or funded from one, can link private actions to a person. Timing and a small user set can also weaken anonymity. Public deposits and exits expose amounts and senders or recipients. A local cache can be cleared and reconstructed from all public events, without a private-note or child-specific RPC filter.
 
-`shieldedWalletRecovery.ts` and the snapshot readers verify roots against the chain while rebuilding the public trees. Funding and claiming check current lineage snapshots before preparing witnesses. They use a 32-level note shard proof and, where needed, 64-level lineage proofs. A reorg or concurrent write can require a fresh scan and proof.
+`shieldedWalletRecovery.ts` and the snapshot readers verify roots against the chain while rebuilding the public trees. Initial funding and claiming check current lineage snapshots before preparing witnesses; additional funding verifies an existing enrollment without restarting its clock. They use a 32-level note shard proof and, where needed, 64-level lineage proofs. A reorg or concurrent write can require a fresh scan and proof.
 
 ### Workers (crypto + ZK)
 
@@ -281,17 +281,17 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Commonly used optional vars**
 
-| Variable                                                         | Purpose                                                                    |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>` | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
-| `VITE_IPFS_GATEWAY_BASE_URLS`                                    | Override gateways for IPFS NFT/attachment URIs; must match CSP allowlist   |
-| `VITE_DF_HARD_NODE_LIMIT`                                        | Cap tree node count for public/low-budget RPCs                             |
-| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                   | Query cache tuning                                                         |
-| `VITE_USE_INDEXEDDB_CACHE`                                       | Persist tree caches in IndexedDB                                           |
-| `VITE_SHOW_DEBUG`                                                | Enable debug UI (tree debug panel, etc.)                                   |
-| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                         | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
-| `VITE_SHIELDED_POOL_ADDRESS`, `VITE_SHIELDED_POOL_ADDRESS_<chainId>` | Shared shielded DEEP pool address for `/inheritance` |
-| `VITE_BRAND_BADGE`                                               | Show a build/brand badge in the header                                     |
+| Variable                                                             | Purpose                                                                    |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`     | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
+| `VITE_IPFS_GATEWAY_BASE_URLS`                                        | Override gateways for IPFS NFT/attachment URIs; must match CSP allowlist   |
+| `VITE_DF_HARD_NODE_LIMIT`                                            | Cap tree node count for public/low-budget RPCs                             |
+| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                       | Query cache tuning                                                         |
+| `VITE_USE_INDEXEDDB_CACHE`                                           | Persist tree caches in IndexedDB                                           |
+| `VITE_SHOW_DEBUG`                                                    | Enable debug UI (tree debug panel, etc.)                                   |
+| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
+| `VITE_SHIELDED_POOL_ADDRESS`, `VITE_SHIELDED_POOL_ADDRESS_<chainId>` | Shared shielded DEEP pool address for `/inheritance`                       |
+| `VITE_BRAND_BADGE`                                                   | Show a build/brand badge in the header                                     |
 
 ### Local auto-config
 
@@ -322,7 +322,7 @@ npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks all 11 circuit artifacts, deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks all 8 circuit artifacts, deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 

@@ -1418,10 +1418,10 @@ describe("production protocol release manifest evidence", function () {
     [
       "an adapter using another circuit verifier",
       (deployments) => {
-        deployments.groth16VerifierAdapter.allocateVerifierImmutable =
+        deployments.groth16VerifierAdapter.fundVerifierImmutable =
           deployments.shieldedVerifiers.claim.address;
       },
-      /Groth16VerifierAdapter allocate must bind its exact verifier/,
+      /Groth16VerifierAdapter fund must bind its exact verifier/,
     ],
     [
       "a pool using a different token",

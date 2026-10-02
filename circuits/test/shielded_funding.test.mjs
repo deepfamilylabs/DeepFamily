@@ -27,11 +27,11 @@ function fullSyntheticPath(leaf, depth, index, siblingSeed) {
   return { root, siblings, index: index.toString(), depth: depth.toString() };
 }
 
-test("shielded Allocate and TopUp constraints", async (t) => {
+test("shielded initial Fund and continuation Fund constraints", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-funding-"));
   try {
     const calculators = {};
-    for (const action of ["allocate", "top_up"]) {
+    for (const action of ["fund"]) {
       const circuit = `shielded_${action}`;
       execFileSync(
         path.join(repoRoot, "bin/circom"),
@@ -77,31 +77,31 @@ test("shielded Allocate and TopUp constraints", async (t) => {
     const fixture = buildShieldedFundingFixtures();
 
     await t.test("first eligibility is exactly two hours after the proof timestamp", () => {
-      assert.equal(BigInt(fixture.allocate.eligibleFrom), BigInt(fixture.allocate.asOf) + 7200n);
+      assert.equal(BigInt(fixture.initial.eligibleFrom), BigInt(fixture.initial.asOf) + 7200n);
     });
 
     await t.test("one policy and heir keep the same allocation tag across changed funding", () => {
       const changedFunding = buildShieldedFundingFixtures({ donorAmount: 400n });
-      assert.equal(fixture.allocate.inputNullifiers[1], changedFunding.allocate.inputNullifiers[1]);
+      assert.equal(fixture.initial.inputNullifiers[1], changedFunding.initial.inputNullifiers[1]);
       assert.notEqual(
-        fixture.allocate.outputCommitments[1],
-        changedFunding.allocate.outputCommitments[1],
+        fixture.initial.outputCommitments[1],
+        changedFunding.initial.outputCommitments[1],
       );
       assert.equal(
-        fixture.allocate.inputNullifiers[1],
+        fixture.initial.inputNullifiers[1],
         computeShieldedEnrollmentNullifier({
-          allocationKey: fixture.allocate.allocationKey,
+          allocationKey: fixture.initial.allocationKey,
           policyCommitment: fixture.policy,
-          heirIdentityCommitment: fixture.allocate.heirIdentityCommitment,
+          heirIdentityCommitment: fixture.initial.heirIdentityCommitment,
         }).toString(),
       );
     });
 
-    await t.test("valid Allocate and TopUp satisfy compiled R1CS", async () => {
+    await t.test("valid initial Fund and continuation Fund satisfy compiled R1CS", async () => {
       const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
       for (const [action, witness] of [
-        ["allocate", fixture.allocate],
-        ["top_up", fixture.topUp],
+        ["fund", fixture.initial],
+        ["fund", fixture.continuation],
       ]) {
         await valid(action, witness);
         const circuit = `shielded_${action}`;
@@ -128,130 +128,138 @@ test("shielded Allocate and TopUp constraints", async (t) => {
         assert.match(result, /WITNESS IS CORRECT/u);
       }
     });
-    await t.test("Allocate can spend exact donor amount with zero-value change", async () => {
-      await valid("allocate", buildShieldedFundingFixtures({ donorAmount: 400n }).allocate);
+    await t.test("initial Fund can spend exact donor amount with zero-value change", async () => {
+      await valid("fund", buildShieldedFundingFixtures({ donorAmount: 400n }).initial);
     });
-    await t.test("TopUp can reference an exhausted old budget", async () => {
-      await valid("top_up", buildShieldedFundingFixtures({ oldBudgetRemainingPeriods: 0n }).topUp);
+    await t.test("continuation Fund can reference an exhausted old budget", async () => {
+      await valid(
+        "fund",
+        buildShieldedFundingFixtures({ oldBudgetRemainingPeriods: 0n }).continuation,
+      );
     });
-    await t.test("Allocate accepts full 32-level policy membership", async () => {
-      const { allocate, policyNote } = buildShieldedFundingFixtures();
-      let root = policyNote;
-      for (let level = 0; level < 32; level += 1) {
-        const sibling = BigInt(level + 1);
-        allocate.policySiblings[level] = sibling.toString();
-        root = level === 31 ? poseidon2([sibling, root]) : poseidon2([root, sibling]);
-      }
-      allocate.policyDepth = "32";
-      allocate.policyIndex = (1n << 31n).toString();
-      allocate.inputRoots[1] = root.toString();
-      await valid("allocate", allocate);
+    await t.test("initial Fund accepts full 32-level donor membership", async () => {
+      const { initial, donorNote } = buildShieldedFundingFixtures();
+      const proof = fullSyntheticPath(donorNote, 32, 1n << 31n, 1100);
+      initial.donorDepth = proof.depth;
+      initial.donorIndex = proof.index;
+      initial.donorSiblings = proof.siblings;
+      initial.inputRoots = [proof.root, proof.root].map(String);
+      await valid("fund", initial);
     });
-    await t.test("Allocate accepts full 64-level endorsement and trusted paths", async () => {
-      const { allocate } = buildShieldedFundingFixtures();
+    await t.test("initial Fund accepts full 64-level endorsement and trusted paths", async () => {
+      const { initial } = buildShieldedFundingFixtures();
       const parents = poseidon3([
         1009n,
-        BigInt(allocate.fatherIdentityCommitment),
-        BigInt(allocate.motherIdentityCommitment),
+        BigInt(initial.fatherIdentityCommitment),
+        BigInt(initial.motherIdentityCommitment),
       ]);
       const endorsementLeaf = poseidon5([
         1007n,
-        BigInt(allocate.heirIdentityCommitment),
+        BigInt(initial.heirIdentityCommitment),
         parents,
-        BigInt(allocate.heirVersionIndex),
-        (BigInt(allocate.writtenAt) << 160n) + BigInt(allocate.endorser),
+        BigInt(initial.heirVersionIndex),
+        (BigInt(initial.writtenAt) << 160n) + BigInt(initial.endorser),
       ]);
       const trustedLeaf = poseidon4([
         1008n,
-        BigInt(allocate.rootIdentityCommitment),
-        BigInt(allocate.rootVersionIndex),
-        BigInt(allocate.endorser),
+        BigInt(initial.rootIdentityCommitment),
+        BigInt(initial.rootVersionIndex),
+        BigInt(initial.endorser),
       ]);
       const endorsement = fullSyntheticPath(endorsementLeaf, 64, (1n << 63n) | 9n, 1400);
       const trusted = fullSyntheticPath(trustedLeaf, 64, (1n << 62n) | 6n, 1500);
-      allocate.endorsementDepth = endorsement.depth;
-      allocate.endorsementIndex = endorsement.index;
-      allocate.endorsementSiblings = endorsement.siblings;
-      allocate.endorsementRoot = endorsement.root.toString();
-      allocate.trustedDepth = trusted.depth;
-      allocate.trustedIndex = trusted.index;
-      allocate.trustedSiblings = trusted.siblings;
-      allocate.trustedRoot = trusted.root.toString();
-      await valid("allocate", allocate);
+      initial.endorsementDepth = endorsement.depth;
+      initial.endorsementIndex = endorsement.index;
+      initial.endorsementSiblings = endorsement.siblings;
+      initial.endorsementRoot = endorsement.root.toString();
+      initial.trustedDepth = trusted.depth;
+      initial.trustedIndex = trusted.index;
+      initial.trustedSiblings = trusted.siblings;
+      initial.trustedRoot = trusted.root.toString();
+      await valid("fund", initial);
       await invalid(
-        "allocate",
-        mutate(allocate, (w) => {
+        "fund",
+        mutate(initial, (w) => {
           w.endorsementSiblings[63] = (BigInt(w.endorsementSiblings[63]) + 1n).toString();
         }),
       );
     });
-    await t.test("Allocate rejects backdated first eligibility", async () => {
+    await t.test("initial Fund rejects backdated first eligibility", async () => {
       await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
+        "fund",
+        mutate(fixture.initial, (w) => {
           w.asOf = (BigInt(w.asOf) + 1n).toString();
         }),
       );
     });
-    await t.test("Allocate rejects a non-child parent and a wrong direct-parent side", async () => {
+    await t.test(
+      "initial Fund rejects a non-child parent and a wrong direct-parent side",
+      async () => {
+        await invalid(
+          "fund",
+          mutate(fixture.initial, (w) => {
+            w.fatherIdentityCommitment = (BigInt(w.fatherIdentityCommitment) + 1n).toString();
+          }),
+        );
+        await invalid(
+          "fund",
+          mutate(fixture.initial, (w) => {
+            w.rootIsMother = w.rootIsMother === "0" ? "1" : "0";
+          }),
+        );
+      },
+    );
+    await t.test(
+      "initial Fund rejects stale endorsement and recommendation witnesses",
+      async () => {
+        await invalid(
+          "fund",
+          mutate(fixture.initial, (w) => {
+            w.endorsementRoot = "123";
+          }),
+        );
+        await invalid(
+          "fund",
+          mutate(fixture.initial, (w) => {
+            w.trustedRoot = "123";
+          }),
+        );
+        await invalid(
+          "fund",
+          mutate(fixture.initial, (w) => {
+            w.endorser = (BigInt(w.endorser) + 1n).toString();
+          }),
+        );
+      },
+    );
+    await t.test("initial Fund cannot change its unique tag for a second allocation", async () => {
       await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.fatherIdentityCommitment = (BigInt(w.fatherIdentityCommitment) + 1n).toString();
-        }),
-      );
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.rootIsMother = w.rootIsMother === "0" ? "1" : "0";
-        }),
-      );
-    });
-    await t.test("Allocate rejects stale endorsement and recommendation witnesses", async () => {
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.endorsementRoot = "123";
-        }),
-      );
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.trustedRoot = "123";
-        }),
-      );
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
-          w.endorser = (BigInt(w.endorser) + 1n).toString();
-        }),
-      );
-    });
-    await t.test("Allocate cannot change its unique tag for a second allocation", async () => {
-      await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
+        "fund",
+        mutate(fixture.initial, (w) => {
           w.inputNullifiers[1] = (BigInt(w.inputNullifiers[1]) + 1n).toString();
         }),
       );
     });
-    await t.test("Allocate and TopUp bind the heir owner into the new budget", async () => {
-      for (const [action, witness] of [
-        ["allocate", fixture.allocate],
-        ["top_up", fixture.topUp],
-      ]) {
-        await invalid(
-          action,
-          mutate(witness, (w) => {
-            w.heirOwnerCommitment = "123";
-          }),
-        );
-      }
-    });
-    await t.test("Allocate rejects a zero heir owner even with a matching budget", async () => {
-      const { allocate, policy, enrollment } = fixture;
+    await t.test(
+      "initial Fund and continuation Fund bind the heir owner into the new budget",
+      async () => {
+        for (const [action, witness] of [
+          ["fund", fixture.initial],
+          ["fund", fixture.continuation],
+        ]) {
+          await invalid(
+            action,
+            mutate(witness, (w) => {
+              w.heirOwnerCommitment = "123";
+            }),
+          );
+        }
+      },
+    );
+    await t.test("initial Fund rejects a zero heir owner even with a matching budget", async () => {
+      const { initial, policy, enrollment } = fixture;
       const withOwner = (owner) =>
-        mutate(allocate, (w) => {
+        mutate(initial, (w) => {
           w.heirOwnerCommitment = owner.toString();
           w.outputCommitments[0] = poseidon8([
             1015n,
@@ -265,37 +273,49 @@ test("shielded Allocate and TopUp constraints", async (t) => {
           ]).toString();
         });
       // The payer, not the circuit, checks that the owner belongs to the heir.
-      await valid("allocate", withOwner(123n));
-      await invalid("allocate", withOwner(0n));
+      await valid("fund", withOwner(123n));
+      await invalid("fund", withOwner(0n));
     });
-    await t.test("Allocate rejects a policy note without membership", async () => {
+    await t.test("initial Fund requires a repeated root and correct allocation key", async () => {
       await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
+        "fund",
+        mutate(fixture.initial, (w) => {
           w.inputRoots[1] = "123";
         }),
       );
-    });
-    await t.test("Allocate rejects funding above donor balance", async () => {
       await invalid(
-        "allocate",
-        mutate(fixture.allocate, (w) => {
+        "fund",
+        mutate(fixture.initial, (w) => {
+          w.allocationKey = "123";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.initial, (w) => {
+          w.oldBudgetNonce = "1";
+        }),
+      );
+    });
+    await t.test("initial Fund rejects funding above donor balance", async () => {
+      await invalid(
+        "fund",
+        mutate(fixture.initial, (w) => {
           w.budgetPeriods = "11";
         }),
       );
     });
-    await t.test("TopUp cannot reset enrollment eligibility", async () => {
+    await t.test("continuation Fund cannot reset enrollment eligibility", async () => {
       await invalid(
-        "top_up",
-        mutate(fixture.topUp, (w) => {
+        "fund",
+        mutate(fixture.continuation, (w) => {
           w.eligibleFrom = (BigInt(w.eligibleFrom) - 2_592_000n).toString();
         }),
       );
     });
-    await t.test("TopUp cannot count old budget value as new funding", async () => {
-      const { topUp, policy, enrollment } = fixture;
-      const attempted = mutate(topUp, (w) => {
-        w.topUpPeriods = "7";
+    await t.test("continuation Fund cannot count old budget value as new funding", async () => {
+      const { continuation, policy, enrollment } = fixture;
+      const attempted = mutate(continuation, (w) => {
+        w.budgetPeriods = "7";
         w.outputCommitments[0] = poseidon8([
           1015n,
           policy,
@@ -303,17 +323,55 @@ test("shielded Allocate and TopUp constraints", async (t) => {
           BigInt(w.heirOwnerCommitment),
           BigInt(w.rate),
           700n,
-          BigInt(w.newBudgetNonce),
+          BigInt(w.budgetNonce),
           BigInt(w.ciphertextHashes[0]),
         ]).toString();
       });
-      await invalid("top_up", attempted);
+      await invalid("fund", attempted);
     });
-    await t.test("TopUp rejects forged change ciphertext hash", async () => {
+    await t.test("continuation Fund rejects forged change ciphertext hash", async () => {
       await invalid(
-        "top_up",
-        mutate(fixture.topUp, (w) => {
+        "fund",
+        mutate(fixture.continuation, (w) => {
           w.ciphertextHashes[1] = "123";
+        }),
+      );
+    });
+    await t.test("fund rejects invalid mode and inactive branch witnesses", async () => {
+      await invalid(
+        "fund",
+        mutate(fixture.initial, (w) => {
+          w.fundMode = "2";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.continuation, (w) => {
+          w.allocationKey = "1";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.continuation, (w) => {
+          w.asOf = "1";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.continuation, (w) => {
+          w.endorsementSiblings[0] = "1";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.continuation, (w) => {
+          w.inputRoots[1] = "123";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.continuation, (w) => {
+          w.heirOwnerCommitment = "123";
         }),
       );
     });

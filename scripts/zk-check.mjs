@@ -102,7 +102,7 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
               cwd: resolvedRoot,
             }),
           ]
-        : shielded.length === 9
+        : shielded.length === 6
           ? [
               Object.freeze({
                 circuit: "shielded",
@@ -116,7 +116,7 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
             ]
           : shielded.map((name) => {
               const action = name.slice("shielded:".length);
-              const hasProofFixture = action === "allocate" || action === "claim";
+              const hasProofFixture = action === "fund" || action === "claim";
               return Object.freeze({
                 circuit: name,
                 check: hasProofFixture ? "development-proof-smoke" : "development-artifacts",
@@ -152,7 +152,7 @@ const printUsage = () => {
   node scripts/zk-check.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
 
 Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
-all nine development artifact sets and proves allocate/claim when no production manifest exists;
+all six development artifact sets and proves fund/claim when no production manifest exists;
 with a production manifest it verifies production artifacts and ceremony. Default: --circuit all.`);
 };
 

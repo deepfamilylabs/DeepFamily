@@ -16,6 +16,7 @@ import type { ShieldedCircuitName, ShieldedWitness } from "../../../shared/zk/sh
 
 /** All private values stay in the caller's memory and the local ZK worker. */
 export type ShieldedPoolActionData = {
+  fundMode: BigNumberish;
   inputShardIds: readonly [BigNumberish, BigNumberish];
   inputRoots: readonly [BigNumberish, BigNumberish];
   inputNullifiers: readonly [BigNumberish, BigNumberish];
@@ -28,6 +29,7 @@ export type ShieldedPoolActionData = {
 };
 
 type ContractActionData = {
+  fundMode: bigint;
   inputShardIds: [bigint, bigint];
   inputRoots: [bigint, bigint];
   inputNullifiers: [bigint, bigint];
@@ -66,15 +68,7 @@ export type ShieldedPoolFlowResult = {
   gasLimit: bigint;
 };
 
-type PoolAction =
-  | "shield"
-  | "createPolicy"
-  | "allocate"
-  | "topUp"
-  | "mergeBudget"
-  | "claim"
-  | "privateTransfer"
-  | "unshield";
+type PoolAction = "shield" | "fund" | "claim" | "privateTransfer" | "unshield";
 
 type PoolTransactionMethod = ((...args: unknown[]) => Promise<ContractTransactionResponse>) & {
   estimateGas: (...args: unknown[]) => Promise<bigint>;
@@ -82,10 +76,7 @@ type PoolTransactionMethod = ((...args: unknown[]) => Promise<ContractTransactio
 
 const ACTIONS: Record<PoolAction, { circuit: ShieldedCircuitName; id: number }> = {
   shield: { circuit: "shield", id: SHIELDED_POOL_ACTION.Shield },
-  createPolicy: { circuit: "createPolicy", id: SHIELDED_POOL_ACTION.CreatePolicy },
-  allocate: { circuit: "allocate", id: SHIELDED_POOL_ACTION.Allocate },
-  topUp: { circuit: "topUp", id: SHIELDED_POOL_ACTION.TopUp },
-  mergeBudget: { circuit: "mergeBudget", id: SHIELDED_POOL_ACTION.MergeBudget },
+  fund: { circuit: "fund", id: SHIELDED_POOL_ACTION.Fund },
   claim: { circuit: "claim", id: SHIELDED_POOL_ACTION.Claim },
   privateTransfer: { circuit: "privateTransfer", id: SHIELDED_POOL_ACTION.PrivateTransfer },
   unshield: { circuit: "unshield", id: SHIELDED_POOL_ACTION.Unshield },
@@ -112,6 +103,7 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
     throw new Error("Shielded output ciphertext must be exactly 512 bytes");
   }
   return {
+    fundMode: getBigInt(data.fundMode),
     inputShardIds: copyPair(data.inputShardIds),
     inputRoots: copyPair(data.inputRoots),
     inputNullifiers: copyPair(data.inputNullifiers),
@@ -184,6 +176,7 @@ async function submitAction(
   const { circuit, id } = ACTIONS[action];
   const expectedSignals = buildShieldedPoolPublicSignals({
     action: id,
+    fundMode: data.fundMode,
     chainId: expectedChainId,
     poolAddress,
     inputShardIds: data.inputShardIds,
@@ -238,20 +231,8 @@ export function submitShield(input: ShieldFlowInput): Promise<ShieldedPoolFlowRe
   return submitAction("shield", input, amount);
 }
 
-export function submitCreatePolicy(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("createPolicy", input);
-}
-
-export function submitAllocate(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("allocate", input);
-}
-
-export function submitTopUp(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("topUp", input);
-}
-
-export function submitMergeBudget(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("mergeBudget", input);
+export function submitFund(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
+  return submitAction("fund", input);
 }
 
 export function submitClaim(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {

@@ -27,11 +27,7 @@ import {
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
-import {
-  findHeirLegitimacy,
-  type HeirLegitimacy,
-  type LineageSnapshot,
-} from "./inheritanceChain";
+import { findHeirLegitimacy, type HeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import {
   getRecoveredShieldedNoteProof,
@@ -57,6 +53,7 @@ export type PrepareShieldedClaimInput = {
   /** Reconstructed from unfiltered public events; refresh roots before submission. */
   lineage: LineageSnapshot;
   budgetCommitment: BigNumberish;
+  secondBudgetCommitment?: BigNumberish;
   /** Current chain timestamp used as public asOf; the pool enforces its recency. */
   asOf: BigNumberish;
   /** Strictly increasing, due period indices, with 1–12 entries. */
@@ -70,10 +67,7 @@ export type PreparedShieldedClaim = {
   policyCommitment: bigint;
   data: ShieldedPoolActionData;
   witness: ShieldedWitness;
-  outputs: readonly [
-    ClaimOutput<ShieldedBudgetNotePayload>,
-    ClaimOutput<ShieldedValueNotePayload>,
-  ];
+  outputs: readonly [ClaimOutput<ShieldedBudgetNotePayload>, ClaimOutput<ShieldedValueNotePayload>];
 };
 
 function checkedUint64(value: BigNumberish, label: string): bigint {
@@ -117,9 +111,10 @@ function currentSource(
     rootVersionIndex: Number(note.rootVersionIndex),
   });
   const source = selected
-    ? candidates.find((candidate) =>
-        candidate.versionIndex === selected.versionIndex &&
-        candidate.endorser.toLowerCase() === selected.endorser.toLowerCase(),
+    ? candidates.find(
+        (candidate) =>
+          candidate.versionIndex === selected.versionIndex &&
+          candidate.endorser.toLowerCase() === selected.endorser.toLowerCase(),
       )
     : candidates[0];
   if (!source) {
@@ -196,13 +191,7 @@ export async function prepareShieldedClaim(
     throw new Error("Identity material does not match the passphrase-derived secret");
   }
   const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
-  sameWallet(
-    input.wallet,
-    chainId,
-    poolAddress,
-    keys.ownerCommitment,
-    material.identityCommitment,
-  );
+  sameWallet(input.wallet, chainId, poolAddress, keys.ownerCommitment, material.identityCommitment);
   const budgetCommitment = getBigInt(input.budgetCommitment);
   const owned = input.wallet.ownedNotes.get(budgetCommitment);
   if (!owned || owned.note.kind !== "budget") {
@@ -248,9 +237,62 @@ export async function prepareShieldedClaim(
   if (input.wallet.spentNullifiers.has(spend) || input.wallet.spentNullifiers.has(dummySpend)) {
     throw new Error("Budget note has already been spent");
   }
+  const secondCommitment =
+    input.secondBudgetCommitment === undefined
+      ? undefined
+      : getBigInt(input.secondBudgetCommitment);
+  if (secondCommitment === budgetCommitment) throw new Error("Claim needs distinct budget notes");
+  const secondOwned =
+    secondCommitment === undefined ? undefined : input.wallet.ownedNotes.get(secondCommitment);
+  if (secondCommitment !== undefined && (!secondOwned || secondOwned.note.kind !== "budget")) {
+    throw new Error("Second input must be a locally recovered budget note");
+  }
+  const secondBudget = secondOwned?.note.kind === "budget" ? secondOwned.note : undefined;
+  let secondSpend: bigint | undefined;
+  let secondHash = 0n;
+  let secondPath: ReturnType<typeof getRecoveredShieldedNoteProof> | undefined;
+  if (secondBudget && secondOwned && secondCommitment !== undefined) {
+    for (const field of [
+      "rootIdentityCommitment",
+      "rootVersionIndex",
+      "policySalt",
+      "allocationKeyCommitment",
+      "heirIdentityCommitment",
+      "eligibleFrom",
+      "enrollmentSalt",
+      "heirOwnerCommitment",
+      "amountPerPeriod",
+    ] as const) {
+      if (secondBudget[field] !== budget[field])
+        throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
+    }
+    const payload = encodeShieldedBudgetNotePayload(secondBudget);
+    try {
+      verifyShieldedNotePayload({
+        payload,
+        ciphertext: secondOwned.ciphertext,
+        noteCommitment: secondCommitment,
+      });
+    } finally {
+      payload.fill(0);
+    }
+    secondHash = computeShieldedCiphertextHashField(secondOwned.ciphertext);
+    if (secondHash !== secondOwned.ciphertextHashField)
+      throw new Error("Second budget does not match its public ciphertext");
+    secondSpend = computeShieldedSpendNullifier({
+      ownerSecret: keys.ownerSecret,
+      noteCommitment: secondCommitment,
+    });
+    if (input.wallet.spentNullifiers.has(secondSpend))
+      throw new Error("Second budget note has already been spent");
+    secondPath = getRecoveredShieldedNoteProof(input.wallet, secondCommitment);
+  }
+  const combinedRemaining = budget.remaining + (secondBudget?.remaining ?? 0n);
+  if (combinedRemaining / budget.amountPerPeriod > MAX_UINT64)
+    throw new Error("Combined budget exceeds the period limit");
   const batch = computeShieldedClaimBatch({
     amountPerPeriod: budget.amountPerPeriod,
-    remaining: budget.remaining,
+    remaining: combinedRemaining,
     eligibleFrom: budget.eligibleFrom,
     now: asOf,
     periodIndices: [...input.periodIndices],
@@ -284,10 +326,7 @@ export async function prepareShieldedClaim(
     input.lineage.endorsementTree,
     source.endorsementLeafIndex,
   );
-  const trusted = buildLineageMerkleProof(
-    input.lineage.trustedTree,
-    source.trustedLeafIndex,
-  );
+  const trusted = buildLineageMerkleProof(input.lineage.trustedTree, source.trustedLeafIndex);
   if (endorsement.root === 0n || trusted.root === 0n) {
     throw new Error("Both current lineage roots must be nonzero");
   }
@@ -311,19 +350,20 @@ export async function prepareShieldedClaim(
     nonce: generateShieldedRandomField(),
   };
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const outputs = await Promise.all([
+  const outputs = (await Promise.all([
     encryptOwnOutput(
       budgetOutput,
       encodeShieldedBudgetNotePayload,
-      (ciphertextHashField) => computeShieldedBudgetNoteCommitment({
-        policyCommitment,
-        enrollmentCommitment,
-        heirOwnerCommitment: keys.ownerCommitment,
-        amountPerPeriod: budget.amountPerPeriod,
-        remaining: batch.remaining,
-        nonce: budgetOutput.nonce,
-        ciphertextHashField,
-      }),
+      (ciphertextHashField) =>
+        computeShieldedBudgetNoteCommitment({
+          policyCommitment,
+          enrollmentCommitment,
+          heirOwnerCommitment: keys.ownerCommitment,
+          amountPerPeriod: budget.amountPerPeriod,
+          remaining: batch.remaining,
+          nonce: budgetOutput.nonce,
+          ciphertextHashField,
+        }),
       viewingKey,
       keys.hpkeIkm,
       chainId,
@@ -332,20 +372,22 @@ export async function prepareShieldedClaim(
     encryptOwnOutput(
       payoutOutput,
       encodeShieldedValueNotePayload,
-      (ciphertextHashField) => computeShieldedValueNoteCommitment({
-        ...payoutOutput,
-        ciphertextHashField,
-      }),
+      (ciphertextHashField) =>
+        computeShieldedValueNoteCommitment({
+          ...payoutOutput,
+          ciphertextHashField,
+        }),
       viewingKey,
       keys.hpkeIkm,
       chainId,
       poolAddress,
     ),
-  ]) as [ClaimOutput<ShieldedBudgetNotePayload>, ClaimOutput<ShieldedValueNotePayload>];
+  ])) as [ClaimOutput<ShieldedBudgetNotePayload>, ClaimOutput<ShieldedValueNotePayload>];
   const data = {
-    inputShardIds: [path.shardId, path.shardId],
-    inputRoots: [path.root, path.root],
-    inputNullifiers: [spend, dummySpend],
+    fundMode: 0n,
+    inputShardIds: [path.shardId, secondPath?.shardId ?? path.shardId],
+    inputRoots: [path.root, secondPath?.root ?? path.root],
+    inputNullifiers: [spend, secondSpend ?? dummySpend],
     periodNullifiers,
     outputCommitments: [outputs[0].commitment, outputs[1].commitment],
     outputCiphertexts: [outputs[0].ciphertext, outputs[1].ciphertext],
@@ -362,6 +404,16 @@ export async function prepareShieldedClaim(
   const decimal = (values: readonly bigint[]) => values.map(String);
   const witness: ShieldedWitness = {
     ...publicInputs,
+    hasSecondInput: secondBudget ? "1" : "0",
+    secondRemaining: String(secondBudget?.remaining ?? 0n),
+    secondRemainingPeriods: String(
+      secondBudget ? secondBudget.remaining / secondBudget.amountPerPeriod : 0n,
+    ),
+    secondBudgetNonce: String(secondBudget?.nonce ?? 0n),
+    secondBudgetCiphertextHash: String(secondHash),
+    secondNoteDepth: secondPath?.proofDepth ?? 0,
+    secondNoteIndex: String(secondPath?.proofIndex ?? 0n),
+    secondNoteSiblings: (secondPath?.siblings ?? Array<bigint>(32).fill(0n)).map(String),
     nameField: String(material.nameField),
     derivedSecretField: String(material.derivedSecretField),
     isBirthBC: Number(material.identity.isBirthBC),

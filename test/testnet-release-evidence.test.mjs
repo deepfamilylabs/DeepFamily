@@ -22,7 +22,7 @@ import {
   shieldedDeploymentBindings,
   shieldedDeploymentEvidence,
 } from "../scripts/lib/shieldedDeploymentEvidence.mjs";
-import { ALLOCATE_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
+import { FUND_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
@@ -311,8 +311,8 @@ const shieldedProofs = (chainId) =>
       const signals = Array(SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
       signals[0] = String(chainId);
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedDeepPool).toString();
-      // asOf closes the allocate and claim inputs.
-      if (action === "allocate") signals[signals.length - 1] = "1000";
+      // asOf closes the fund and claim inputs.
+      if (action === "fund") signals[signals.length - 1] = "1000";
       if (action === "claim") signals[signals.length - 1] = String(8200 + 12 * 2_592_000);
       return [
         action,
@@ -443,10 +443,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: 11,
+    circuitCount: 8,
     shielded: {
       status: "passed",
-      circuitCount: 9,
+      circuitCount: 6,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -466,7 +466,7 @@ const validReportTemplate = () => ({
     manifestSha256: SHIELDED_MANIFEST_SHA256,
     proofs: shieldedProofs(CHAIN_ID),
     scenario: {
-      allocationLabel: "shielded-action-allocate",
+      allocationLabel: "shielded-action-fund",
       claimExecution: "verifier-call",
       claimCount: 12,
       receiveCode: {
@@ -487,10 +487,10 @@ const validReportTemplate = () => ({
       poolAddress: SHIELDED_ADDRESSES.shieldedDeepPool,
       transactions: {
         allocation: {
-          txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-allocate"].hash,
+          txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-fund"].hash,
           blockNumber: 100,
           blockHash: FINALIZED_BLOCK_HASH,
-          selector: ALLOCATE_SELECTOR,
+          selector: FUND_SELECTOR,
           gasUsed: "200000",
           transactionGasLimit: "300000",
           blockGasLimit: "30000000",
@@ -732,16 +732,16 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(8);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(5);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 8,
+      proofCount: 5,
       claimCount: 12,
       lineageDepth: 1,
       noteDepth: 1,
     });
     expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
-    expect(result.publicSummary.shielded.transactionActions).to.have.length(7);
+    expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -1461,7 +1461,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all nine public proof assets and the claim verifier call to the selected chain", async function () {
+  it("binds all six public proof assets and the claim verifier call to the selected chain", async function () {
     const cases = [
       [
         (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),
@@ -1472,16 +1472,17 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /shieldedArtifacts\.circuits must contain exactly/iu,
       ],
       [
-        (report) => (report.shieldedArtifacts.circuits.topUp.zkeySha256 = "ff".repeat(32)),
-        /shieldedArtifacts\.topUp\.zkeySha256/iu,
+        (report) =>
+          (report.shieldedArtifacts.circuits.privateTransfer.zkeySha256 = "ff".repeat(32)),
+        /shieldedArtifacts\.privateTransfer\.zkeySha256/iu,
       ],
       [
         (report) => delete report.shielded.proofs.unshield,
         /shielded\.proofs must contain exactly/iu,
       ],
       [
-        (report) => (report.shielded.proofs.allocate.verified = false),
-        /shielded\.proofs\.allocate\.verified/iu,
+        (report) => (report.shielded.proofs.fund.verified = false),
+        /shielded\.proofs\.fund\.verified/iu,
       ],
       [
         (report) => (report.shielded.proofs.shield.verifierAddress = address(999)),
@@ -1538,9 +1539,8 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /shielded allocation exceeds the committed production gas threshold/iu,
       ],
       [
-        (report) =>
-          (report.terminalGovernanceState.verifierAdapter.allocateVerifier = address(999)),
-        /verifierAdapter\.allocateVerifier/iu,
+        (report) => (report.terminalGovernanceState.verifierAdapter.fundVerifier = address(999)),
+        /verifierAdapter\.fundVerifier/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.shieldedDeepPool.tokenImmutable = address(999)),

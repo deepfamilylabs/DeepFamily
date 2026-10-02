@@ -65,8 +65,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(28);
-      expect(observed.size).to.equal(28);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(25);
+      expect(observed.size).to.equal(25);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,7 +84,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(22);
+        expect(files).to.have.length(19);
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -93,6 +93,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           "PoseidonT4.json",
           "PoseidonT6.json",
           "ShieldedDeepPool.json",
+          "ShieldedFundVerifier.json",
           "ShieldedClaimVerifier.json",
           "Groth16VerifierAdapter.json",
         ]);

@@ -189,6 +189,109 @@ test("shielded claim constraints", async (t) => {
     await t.test("twelve full periods", async () => {
       await valid(buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 }).witness);
     });
+    await t.test(
+      "two budgets jointly fund a claim exceeding either individual balance",
+      async () => {
+        await valid(
+          buildShieldedClaimFixture({
+            claimCount: 4,
+            remainingPeriods: 2,
+            secondRemainingPeriods: 2,
+          }).witness,
+        );
+      },
+    );
+    await t.test(
+      "second budget must be distinct, spendable, and share the enrollment",
+      async () => {
+        const fixture = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
+        await invalid(
+          mutate(fixture.witness, (w) => {
+            w.inputRoots[1] = "123";
+          }),
+        );
+        await invalid(
+          mutate(fixture.witness, (w) => {
+            w.inputNullifiers[1] = "123";
+          }),
+        );
+        await invalid(
+          mutate(fixture.witness, (w) => {
+            w.secondBudgetNonce = "0";
+          }),
+        );
+        await invalid(
+          mutate(fixture.witness, (w) => {
+            w.secondRemaining = w.remaining;
+            w.secondRemainingPeriods = w.remainingPeriods;
+            w.secondBudgetNonce = w.budgetNonce;
+            w.secondBudgetCiphertextHash = w.budgetCiphertextHash;
+            w.inputRoots[1] = w.inputRoots[0];
+            w.inputNullifiers[1] = w.inputNullifiers[0];
+            // Balance the attempted double spend so only note distinctness
+            // rejects it, rather than an unrelated output-value mismatch.
+            w.outputCommitments[0] = computeShieldedBudgetNoteCommitment({
+              policyCommitment: fixture.policy,
+              enrollmentCommitment: fixture.enrollment,
+              heirOwnerCommitment: fixture.ownerCommitment,
+              amountPerPeriod: w.rate,
+              remaining: 2n * BigInt(w.remaining) - BigInt(w.claimCount) * BigInt(w.rate),
+              nonce: w.newBudgetNonce,
+              ciphertextHashField: w.ciphertextHashes[0],
+            }).toString();
+          }),
+        );
+        const wrongEnrollmentBudget = computeShieldedBudgetNoteCommitment({
+          policyCommitment: fixture.policy,
+          enrollmentCommitment: fixture.enrollment + 1n,
+          heirOwnerCommitment: fixture.ownerCommitment,
+          amountPerPeriod: fixture.witness.rate,
+          remaining: fixture.witness.secondRemaining,
+          nonce: fixture.witness.secondBudgetNonce,
+          ciphertextHashField: fixture.witness.secondBudgetCiphertextHash,
+        });
+        await invalid(
+          mutate(fixture.witness, (w) => {
+            w.inputRoots[1] = String(wrongEnrollmentBudget);
+          }),
+        );
+      },
+    );
+    await t.test(
+      "absent second input has canonical zero witnesses and repeated public root",
+      async () => {
+        const witness = buildShieldedClaimFixture().witness;
+        await invalid(
+          mutate(witness, (w) => {
+            w.hasSecondInput = "2";
+          }),
+        );
+        await invalid(
+          mutate(witness, (w) => {
+            w.secondRemaining = "100";
+            w.secondRemainingPeriods = "1";
+          }),
+        );
+        await invalid(
+          mutate(witness, (w) => {
+            w.secondNoteSiblings[0] = "1";
+          }),
+        );
+        await invalid(
+          mutate(witness, (w) => {
+            w.inputRoots[1] = "123";
+          }),
+        );
+      },
+    );
+    await t.test("combined period count cannot overflow uint64", async () => {
+      await invalid(
+        buildShieldedClaimFixture({
+          remainingPeriods: 1n << 63n,
+          secondRemainingPeriods: 1n << 63n,
+        }).witness,
+      );
+    });
     await t.test("exact 32-level note path", async () => {
       const { witness, inputBudget } = buildShieldedClaimFixture();
       let root = inputBudget;
@@ -199,7 +302,7 @@ test("shielded claim constraints", async (t) => {
       }
       witness.noteDepth = "32";
       witness.noteIndex = (1n << 31n).toString();
-      witness.inputRoot = root.toString();
+      witness.inputRoots = [root.toString(), root.toString()];
       await valid(witness);
     });
     await t.test("full 64-level endorsement and trusted paths verify the child", async () => {
@@ -344,7 +447,7 @@ test("shielded claim constraints", async (t) => {
     await t.test("rejects an unrelated note root", async () => {
       await invalid(
         mutate(base, (w) => {
-          w.inputRoot = "123";
+          w.inputRoots[0] = "123";
         }),
       );
     });

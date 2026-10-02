@@ -9,104 +9,68 @@
       "sourceSha256": "9fa8bb4154b4f4f553bcbd4ee29c5faccd22ec6a37de02f60804201528d9bb7c",
       "r1csSha256": "88131d7ae07af520c39bab68bf0a8eee3d59d43cb97b9d856961583e6136aad6",
       "wasmSha256": "904d3e08631263d56e2548383ddada6b73926790f12839142009f36caa5518e2",
-      "zkeySha256": "c79fbf38a59efd9a223a8f890ad1a2672df3d05424b9d99ea3bdc318b6ab8afb",
-      "verificationKeySha256": "2587b5978e8e3b4cbce209b1ca91dc3ee92d4598aa34262acf57cfc2ebde3111"
+      "zkeySha256": "9a4cc8e51074dcd90d241eb8c530f257421774b3770e0d78f766b249be87ad4c",
+      "verificationKeySha256": "9939056d650f1e44ef5407f6d430de5464f7eeaae2a191cf58cd6fa0dbe9b352"
     },
     "shield": {
       "source": "shielded_shield",
       "sourceSha256": "9b55655f0ba9bf3fe116b916a3ceeba8c62b495353d7e26b60e393539b9dfeaf",
       "r1csSha256": "c6303e0f90e973cf6f7cc9a178487a390ddbe6b2de0f13ea10d7f772805a4584",
       "wasmSha256": "85fda7de32ce406d577d76dbb8021bcb3a32bfafdc9456c37f14ddbcd2ab623c",
-      "zkeySha256": "d1cce4c560866f2d231b94b5cc31a01f0563bdb6eb54bb54e2a2aae9bc2639d5",
-      "verificationKeySha256": "f97c1f68c1cce269432a39de9ac37af01cbdde7740b0b517e8284bf9f652885b",
-      "verifierSha256": "17b6cbe16114a10e319ec41fe32e3d8aa8347ee15f239443f0ed4353f170f6d3",
+      "zkeySha256": "4273948c4eb507bb8dadb6b60d3964a7fc46ce895c27615069583561e49565ff",
+      "verificationKeySha256": "36f261943ce5d2ce6d4f3ca0fe2840bd43dcac8f75463c9fcb9b9606ec179cae",
+      "verifierSha256": "0a571b5de1ff71a1886364e46f25a95c21b2552f41e7a263d5f488acc035c8a9",
       "verifierPath": "contracts/ShieldedShieldVerifier.sol",
       "verifierContractName": "ShieldedShieldVerifier",
-      "solidityVerifierSha256": "d86b33ffa3f15cc57e0a2ad42e18b6973d376e95dd48936d6127c48a7a29bb0c"
+      "solidityVerifierSha256": "13e3dd13f63bd258f1e7b41e7292270d42af78085926965c86f2cd9cf25bb11c"
     },
-    "createPolicy": {
-      "source": "shielded_create_policy",
-      "sourceSha256": "825d9a28077f8f0ce40a619c6e33b62d90d110226253b948d934988b6592b489",
-      "r1csSha256": "c7ec611894e8ca66630e6392a007464f31df601321fae590fe312a8d080b17cf",
-      "wasmSha256": "28bbfbbd9203272399d29ee7fdce225712428390835cc7f59ffdc2840822d3a1",
-      "zkeySha256": "f75ee6ec5125d73717b20860925c4caf1b4e9e827b1c183e9164df4ef04334e6",
-      "verificationKeySha256": "9cd31b3efccd10aadb6722bc3b6d6e3f44b8c2fd6c16793079d59c4db8abe6aa",
-      "verifierSha256": "a86f4600b42174afd2f3f21bc80ed608b0f56e9d91551beee6e41899fc7d39b9",
-      "verifierPath": "contracts/ShieldedCreatePolicyVerifier.sol",
-      "verifierContractName": "ShieldedCreatePolicyVerifier",
-      "solidityVerifierSha256": "00072dba8b3a90f1728de02ea1bcc7875f7a8a1f59678d46b95e7fd24cd0f9ec"
-    },
-    "allocate": {
-      "source": "shielded_allocate",
-      "sourceSha256": "c7e17545a554d7011668df3925f7b8abf156453c1be76b94c1f8e22a2d736a67",
-      "r1csSha256": "a950c57643663168eac76e60302645c2c08ff38d751d13cf8b8ed584ac19e522",
-      "wasmSha256": "e92b5138af6c93440f003b6d715233f33addd5ae87983847f097e3c360899f12",
-      "zkeySha256": "637ad3474052d0ad6f2ef97895f0138839813863591781e953ec490608a0a5bd",
-      "verificationKeySha256": "f529730de288f3e1f52ddde6ddcac5efc4f0e75d6e4d033d7dbb1c1e5327648c",
-      "verifierSha256": "3260a7c5c0c6d69e837ccc1f552187611e9de5e5e5ed3433822a7b1b7b13f65b",
-      "verifierPath": "contracts/ShieldedAllocateVerifier.sol",
-      "verifierContractName": "ShieldedAllocateVerifier",
-      "solidityVerifierSha256": "4fb7b958682c0e3f16060709088c74fd123b6b8c272077cafcbe9ee721ae82d6"
-    },
-    "topUp": {
-      "source": "shielded_top_up",
-      "sourceSha256": "5b37067039c238225e92c8ebf92a7041070cc2b448d069c4972eb38d8f7a873b",
-      "r1csSha256": "fbc15c493cc088f76cd69482be89893d08a20bf79088534d0542b1476e614584",
-      "wasmSha256": "b49bca6a11c684b370dd6f46f257729eaa29ec60adf9033a4c3a16349828a76a",
-      "zkeySha256": "4f7ca0634a7969021b04333cdf76055bc1a669c8c879821ba63e6448d3fcf7db",
-      "verificationKeySha256": "2da2f19125c9f040c0be791da294c1f93d0f3238b488b7df0d067466e066118f",
-      "verifierSha256": "a49eb08560f5450bbeb18b54c465ae569a32cac8e79895fbccca5280c45136bb",
-      "verifierPath": "contracts/ShieldedTopUpVerifier.sol",
-      "verifierContractName": "ShieldedTopUpVerifier",
-      "solidityVerifierSha256": "f8b9703bdc5eb006cf161b9c3669eaf6ffd8e056d9aae86f4771da9e8207b3bf"
-    },
-    "mergeBudget": {
-      "source": "shielded_merge_budget",
-      "sourceSha256": "42bf875b79ccf9ec16caa62cf8a527b9010f972339a6f99395ecce9679f1469b",
-      "r1csSha256": "f5f8e3a3f99a684a48e8226b448db64f2523b0d78527684959cdd044f13569bf",
-      "wasmSha256": "7ab51ed92fa8d5540d6f86252e04ecfae9bdbff7fab535182309d43a24c5c36c",
-      "zkeySha256": "97f7a47d54077359b38abc9da2bc6c1f8c8c79c271cc4bac16e2a146a5e92599",
-      "verificationKeySha256": "18e64060c7ac164a2c66e10c537879487ac6a4eb704c68f345a6016c833c016c",
-      "verifierSha256": "cb8f05886ba0c2bbf458e3eddfa4b2c7ed433a029786637fdb2da4b45facb789",
-      "verifierPath": "contracts/ShieldedMergeBudgetVerifier.sol",
-      "verifierContractName": "ShieldedMergeBudgetVerifier",
-      "solidityVerifierSha256": "71ab9c5fa706317c241f0927d68532fb31d9b3b211f18e168ed038f1cf29136e"
+    "fund": {
+      "source": "shielded_fund",
+      "sourceSha256": "35ebaff06dc82ba1c9b04490798be6609df858c06cd9f4e4219dbd9088ada38d",
+      "r1csSha256": "53cb74ff609f7a44400fccc89a33b34e90e95fced2a02762d758c191cce11a1f",
+      "wasmSha256": "299dff5efb07025b63492651da00303a45bef095f7ec62281a72f2e5f2c443d8",
+      "zkeySha256": "92494ad35b9db491ffae468d33cbfb6812cef3929800866fe0963324580c0310",
+      "verificationKeySha256": "4992bd5f0743984f3fa01385de66da4741de79a60a61a2c56e65cd8118d3d2da",
+      "verifierSha256": "760d4fcb5c0143ea89eac35f8479ef2485ee81f583a60b9a76dc4f93336fcf95",
+      "verifierPath": "contracts/ShieldedFundVerifier.sol",
+      "verifierContractName": "ShieldedFundVerifier",
+      "solidityVerifierSha256": "a3fe006526f985ab31e65e484bf4efb11cc4a278221d2c9c2e8cd5184a6b4130"
     },
     "claim": {
       "source": "shielded_claim",
-      "sourceSha256": "a13499e64c673a955f785bf4309abf489f1309f1dfeba4fc2f777449d8a76cc8",
-      "r1csSha256": "5e1f762e48242d88011bc5dee968dbd8ff5c9f266f1d6e6b35e35d5f06f0ca6d",
-      "wasmSha256": "b2bccc6a831b824de71d97ba2b71ee9ba831748187253100f463914847ee45c8",
-      "zkeySha256": "c90036f31f408861828d84e5d0506b2b82a4839ce4eaa8c36cca7fbd30e1e2aa",
-      "verificationKeySha256": "eaddcfdc544834e32ea596b3e5f07da3253312703e083a50e02a720445edff0c",
-      "verifierSha256": "f61bcd2b509938a10f5b259a5175efe96026a386b04a9b25423534cdb65950a9",
+      "sourceSha256": "fe4b18de313af38a24b0171e118b19564ba8dd2f8e33dc4f29d7b3571447622c",
+      "r1csSha256": "cb9ced1a592e9897e1c7ecae2ed63b7884c6b0fd748e6bc7986e770a79725b82",
+      "wasmSha256": "e9502e9933766a87eb975e88aa1d3d2f5ba747b0d29bee24b90148572c674caf",
+      "zkeySha256": "9f93959610d07696d851d959d0aac27b3b81cdad88a458d268c579de4dd698df",
+      "verificationKeySha256": "45b26f92d8efa97e5b5df52e601e99275afcbf71d3de308f9be515046161e344",
+      "verifierSha256": "7435ba647215444f73fc9b95d3c86d636d2d651ce88b3d7c4346fcc21c9981b8",
       "verifierPath": "contracts/ShieldedClaimVerifier.sol",
       "verifierContractName": "ShieldedClaimVerifier",
-      "solidityVerifierSha256": "73be81f1b0aac8ca25ef0e72eeff78ac6188f184290f963d84f8d613a0bd37af"
+      "solidityVerifierSha256": "4d5a57116d05e570c4181bbd29e3ef7b9611320b908f2417dd81b9de3e431991"
     },
     "privateTransfer": {
       "source": "shielded_private_transfer",
       "sourceSha256": "11b3d0eb32732ba0b215c74bab19c17df2125fd0d5b9aa22e4b6311b017f3a36",
       "r1csSha256": "b9b844bcfb8b7204a13dab19d47ff4597ba551d7392152d28e01476a5e4a409e",
       "wasmSha256": "7238102798a98988c96b5c3f2077294eeabc0fbc8a3fa71f14924ff17e299eef",
-      "zkeySha256": "80430cf1d02ddd56217426379ca09d837a4e88fdc8e831370795d5b1ed2b15c8",
-      "verificationKeySha256": "22cce08dc3c0c1b3e74f801668e7848259e16f8ad3fc1153856a1b08f8a032b3",
-      "verifierSha256": "f4bfc587fcd553a4d4cf5d7b759e2bcd5dfab83fedae840889f96f4757487b08",
+      "zkeySha256": "bce164a6e0d16e4898bef8540b7388eabc5b5ddc51cd0ad963e501acb90a9a7f",
+      "verificationKeySha256": "31c9676196e9f6f145b4ebfab497179f2bb6fc01c55f0011521da1b0201e59a0",
+      "verifierSha256": "6e13bdf42372a83b7f81566dc5d4fdf8259206755d437cd50f9be696fff7813c",
       "verifierPath": "contracts/ShieldedPrivateTransferVerifier.sol",
       "verifierContractName": "ShieldedPrivateTransferVerifier",
-      "solidityVerifierSha256": "fc7a9a5a7852e9f8ccb4bf2c6e51ad4f98bbcce224755cd4f97dba8452e96b6a"
+      "solidityVerifierSha256": "ee67d999a2152327903e3ad14145de348b96c28f06329c15938c857224560bab"
     },
     "unshield": {
       "source": "shielded_unshield",
       "sourceSha256": "69e395b292095c7b89173c73318a813049c5dcd0adf5887981c0ad7018282ded",
       "r1csSha256": "0e51ea27b41270b9142c0ebed125a4040b200dafce287c8e3f2d59dc3f296a09",
       "wasmSha256": "920a5c92311d932e49b1cdc02d748ea7a717db99d1e44e048440b4a080bc08f1",
-      "zkeySha256": "f87dcf165b3c601a4f5bd1821ae45194b796c6444c946fb161321d4e4d6bc658",
-      "verificationKeySha256": "63e57c0983c584e6f450976f3dfdb992b22788950a3bd4f1849f4167a45e2a70",
-      "verifierSha256": "3dd23f7d16ee31344afe05e4fa0525bbadbd6fdc88c8b29efb42f0ac85cdc90f",
+      "zkeySha256": "0070ac760a34b34be88f50898c875984e8fcfb0ab5b87fc2bf1e257f0c565cb4",
+      "verificationKeySha256": "0c17ec109f9652e39976c9cff8dff3724d8e6e7af2d7fff15d5888366fa55947",
+      "verifierSha256": "501a9f0e7b3b2a1babe08474e27e4fe7ca553d4e085c8e0b2b0a31f052567e5b",
       "verifierPath": "contracts/ShieldedUnshieldVerifier.sol",
       "verifierContractName": "ShieldedUnshieldVerifier",
-      "solidityVerifierSha256": "ba765d61ccb1e93053a8b2240b5280345bf59c3c99b0cf119f899fd189e1605e"
+      "solidityVerifierSha256": "98efaa2153b9ae5f6cbcdc5da9d2c524dce2b909ac5a7ada8947a5cd0b5d6de7"
     }
   }
 }

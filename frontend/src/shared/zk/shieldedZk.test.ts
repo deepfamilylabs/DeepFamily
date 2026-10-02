@@ -23,9 +23,8 @@ describe("shielded proof public inputs", () => {
     for (const [circuit, count] of [
       ["receiveCode", 4],
       ["shield", 7],
-      ["createPolicy", 10],
-      ["allocate", 15],
-      ["claim", 25],
+      ["fund", 16],
+      ["claim", 27],
     ] as const) {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count).fill("0"), Array(count).fill("0")),

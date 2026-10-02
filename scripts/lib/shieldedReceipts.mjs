@@ -2,8 +2,8 @@ import { getAddress, id, ZeroAddress } from "ethers";
 
 const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
 const ACTION_DATA_SIGNATURE =
-  "(uint256[2],uint256[2],uint256[2],uint256[12],uint256[2],bytes[2],uint256,uint256,uint256)";
-export const ALLOCATE_SELECTOR = id(`allocate(${ACTION_DATA_SIGNATURE},bytes)`).slice(0, 10);
+  "(uint256[2],uint256[2],uint256[2],uint256[12],uint256[2],bytes[2],uint256,uint256,uint256,uint256)";
+export const FUND_SELECTOR = id(`fund(${ACTION_DATA_SIGNATURE},bytes)`).slice(0, 10);
 export const CLAIM_SELECTOR = id(`claim(${ACTION_DATA_SIGNATURE},bytes)`).slice(0, 10);
 
 function requireTxHash(value, label) {
@@ -166,7 +166,7 @@ export async function verifyShieldedReceipts({
       hash: allocationHash,
       expectedChainId: chainId,
       poolAddress: pool,
-      selector: ALLOCATE_SELECTOR,
+      selector: FUND_SELECTOR,
       label: "Allocation",
     }),
     claimHash === undefined

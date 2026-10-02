@@ -10,6 +10,7 @@ include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 // that root version. Both roots are checked against current chain state by
 // ShieldedDeepPool before this proof is accepted.
 template ShieldedDirectChildCurrent() {
+    signal input enabled;
     signal input heirIdentityCommitment;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
@@ -29,10 +30,11 @@ template ShieldedDirectChildCurrent() {
     signal input trustedRoot;
     signal input asOf;
 
+    enabled * (1 - enabled) === 0;
     rootIsMother * (1 - rootIsMother) === 0;
-    rootIdentityCommitment ===
-        fatherIdentityCommitment + rootIsMother *
+    signal selectedParent <== fatherIdentityCommitment + rootIsMother *
         (motherIdentityCommitment - fatherIdentityCommitment);
+    enabled * (rootIdentityCommitment - selectedParent) === 0;
     component heirNotZero = IsZero();
     heirNotZero.in <== heirIdentityCommitment;
     heirNotZero.out === 0;
@@ -45,7 +47,7 @@ template ShieldedDirectChildCurrent() {
     component alreadyEndorsed = LessEqThan(64);
     alreadyEndorsed.in[0] <== writtenAt;
     alreadyEndorsed.in[1] <== asOf;
-    alreadyEndorsed.out === 1;
+    enabled * (1 - alreadyEndorsed.out) === 0;
 
     component parents = Poseidon(3);
     parents.inputs[0] <== 1009;
@@ -81,11 +83,11 @@ template ShieldedDirectChildCurrent() {
     endorsementMerkle.depth <== endorsementDepth;
     endorsementMerkle.index <== endorsementIndex;
     endorsementMerkle.siblings <== endorsementSiblings;
-    endorsementMerkle.out === endorsementRoot;
+    enabled * (endorsementMerkle.out - endorsementRoot) === 0;
     component trustedMerkle = BinaryMerkleRoot(64);
     trustedMerkle.leaf <== trustedLeaf.out;
     trustedMerkle.depth <== trustedDepth;
     trustedMerkle.index <== trustedIndex;
     trustedMerkle.siblings <== trustedSiblings;
-    trustedMerkle.out === trustedRoot;
+    enabled * (trustedMerkle.out - trustedRoot) === 0;
 }

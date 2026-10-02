@@ -19,10 +19,10 @@ const artifacts = path.join(root, "zk-artifacts", "shielded");
 const cli = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const fixtures = {
-  allocate: () => buildShieldedFundingFixtures().allocate,
+  fund: () => buildShieldedFundingFixtures().initial,
   claim: () => buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 }).witness,
 };
-const sources = { allocate: SHIELDED_CIRCUITS.allocate, claim: SHIELDED_CIRCUITS.claim };
+const sources = { fund: SHIELDED_CIRCUITS.fund, claim: SHIELDED_CIRCUITS.claim };
 /** The witness's named public inputs, in the order the circuit declares them. */
 const expectedPublicSignals = (action, witness) =>
   SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_DEPLOYMENT_CIRCUITS[action].actionId].flatMap((name) =>
@@ -38,7 +38,7 @@ function runSnarkjs(args) {
   });
 }
 
-/** Check every selected development artifact against the complete nine-circuit manifest. */
+/** Check every selected development artifact against the complete six-circuit manifest. */
 export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUITS)) {
   const manifestPath = path.join(root, "circuits/shielded-development-manifest.json");
   if (!fs.existsSync(manifestPath)) {
@@ -51,7 +51,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
   assert.deepEqual(
     Object.keys(manifest.circuits ?? {}).sort(),
     Object.keys(SHIELDED_CIRCUITS).sort(),
-    "Development manifest must cover all nine shielded circuits",
+    "Development manifest must cover all six shielded circuits",
   );
   for (const action of actions) {
     const source = SHIELDED_CIRCUITS[action];
@@ -88,7 +88,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
 }
 
 /** Repeatable, development-key-only real Groth16 proof smoke; never release evidence. */
-export function smokeDevelopmentProofs(actions = ["allocate", "claim"]) {
+export function smokeDevelopmentProofs(actions = ["fund", "claim"]) {
   const manifest = verifyDevelopmentArtifacts();
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-proof-"));
   try {

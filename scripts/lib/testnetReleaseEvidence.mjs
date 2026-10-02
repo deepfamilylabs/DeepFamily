@@ -33,7 +33,7 @@ import {
   shieldedArtifactEntries,
 } from "./shieldedDeploymentEvidence.mjs";
 import { inspectShieldedProductionArtifacts } from "./shieldedProductionSetup.mjs";
-import { ALLOCATE_SELECTOR } from "./shieldedReceipts.mjs";
+import { FUND_SELECTOR } from "./shieldedReceipts.mjs";
 
 export const TESTNET_RELEASE_REPORT_SCHEMA_VERSION = 1;
 export const TESTNET_RELEASE_EVIDENCE_TYPE = "initial-mainnet-release";
@@ -1285,7 +1285,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       );
   }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
-  requireExact(ceremony.circuitCount, 11, "zkCeremonyVerification.circuitCount");
+  requireExact(ceremony.circuitCount, 8, "zkCeremonyVerification.circuitCount");
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
     !Array.isArray(ceremony.circuits) ||
@@ -1299,7 +1299,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["status", "manifestSha256", "circuitCount", "ptau"],
   );
   requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
-  requireExact(shieldedCeremony.circuitCount, 9, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(shieldedCeremony.circuitCount, 6, "zkCeremonyVerification.shielded.circuitCount");
   requireExact(
     shieldedCeremony.manifestSha256,
     inspected.manifestSha256,
@@ -1382,7 +1382,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   const scenario = requireRecord(evidence.scenario, "shielded.scenario");
   requireExact(
     scenario.allocationLabel,
-    "shielded-action-allocate",
+    "shielded-action-fund",
     "shielded.scenario.allocationLabel",
   );
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
@@ -1418,11 +1418,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   ])
     if (requireSafeInteger(scenario[field], `shielded.scenario.${field}`) > maximum)
       throw new Error(`shielded.scenario.${field} exceeds circuit capacity`);
-  // asOf is the last public input of both allocate and claim.
+  // asOf is the last public input of both fund and claim.
   const eligibleFrom = BigInt(scenario.eligibleFrom);
   requireExact(
     eligibleFrom.toString(),
-    (BigInt(proofs.allocate.publicSignals.at(-1)) + 7200n).toString(),
+    (BigInt(proofs.fund.publicSignals.at(-1)) + 7200n).toString(),
     "shielded.scenario.eligibleFrom",
   );
   requireExact(
@@ -1445,7 +1445,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     "shielded.receipts.transactions",
     ["allocation"],
   ).allocation;
-  const recorded = transactions["shielded-action-allocate"];
+  const recorded = transactions["shielded-action-fund"];
   requireExact(
     requireHash32(observation.txHash, "shielded allocation transaction hash"),
     recorded.hash,
@@ -1453,7 +1453,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   );
   requireExact(observation.blockNumber, recorded.blockNumber, "shielded allocation block number");
   requireExact(observation.blockHash, recorded.blockHash, "shielded allocation block hash");
-  requireExact(observation.selector, ALLOCATE_SELECTOR, "shielded allocation selector");
+  requireExact(observation.selector, FUND_SELECTOR, "shielded allocation selector");
   const gas = requireSafeInteger(observation.gasUsed, "shielded allocation gasUsed", 1);
   if (gas > criteria.allocationMaxGas) {
     throw new Error("shielded allocation exceeds the committed production gas threshold");

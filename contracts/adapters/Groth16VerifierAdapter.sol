@@ -40,16 +40,6 @@ interface IGroth16Verifier7 {
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the ten-signal policy-creation circuit. */
-interface IGroth16Verifier10 {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[10] calldata publicSignals
-  ) external view returns (bool);
-}
-
 /** @dev Generated verifier interface shared by the twelve-signal pool circuits. */
 interface IGroth16Verifier12 {
   function verifyProof(
@@ -60,29 +50,29 @@ interface IGroth16Verifier12 {
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the fifteen-signal allocation circuit. */
-interface IGroth16Verifier15 {
+/** @dev Generated verifier interface for the sixteen-signal funding circuit. */
+interface IGroth16Verifier16 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[15] calldata publicSignals
+    uint256[16] calldata publicSignals
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the twenty-five-signal claim circuit. */
-interface IGroth16Verifier25 {
+/** @dev Generated verifier interface for the twenty-seven-signal claim circuit. */
+interface IGroth16Verifier27 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[25] calldata publicSignals
+    uint256[27] calldata publicSignals
   ) external view returns (bool);
 }
 
 /**
  * @title Groth16VerifierAdapter
- * @notice Shared Groth16 proof transport for identity, disclosure and the eight shielded pool
+ * @notice Shared Groth16 proof transport for identity, disclosure and the five shielded pool
  *         actions. Each route has an immutable verifier address.
  *
  *         Business contracts select a purpose and construct its public signals. This adapter
@@ -101,22 +91,19 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable personVerifier;
   address public immutable disclosureBindingVerifier;
   address public immutable shieldVerifier;
-  address public immutable createPolicyVerifier;
-  address public immutable allocateVerifier;
-  address public immutable topUpVerifier;
-  address public immutable mergeBudgetVerifier;
+  address public immutable fundVerifier;
   address public immutable claimVerifier;
   address public immutable privateTransferVerifier;
   address public immutable unshieldVerifier;
 
   /**
-   * @param shieldedVerifiers The eight ShieldedDeepPool actions in Action enum order. A zero
+   * @param shieldedVerifiers The five ShieldedDeepPool actions in Action enum order. A zero
    *                          address explicitly disables a route.
    */
   constructor(
     address _personVerifier,
     address _disclosureBindingVerifier,
-    address[8] memory shieldedVerifiers
+    address[5] memory shieldedVerifiers
   ) {
     _validateVerifier(_personVerifier);
     _validateVerifier(_disclosureBindingVerifier);
@@ -126,13 +113,10 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     personVerifier = _personVerifier;
     disclosureBindingVerifier = _disclosureBindingVerifier;
     shieldVerifier = shieldedVerifiers[0];
-    createPolicyVerifier = shieldedVerifiers[1];
-    allocateVerifier = shieldedVerifiers[2];
-    topUpVerifier = shieldedVerifiers[3];
-    mergeBudgetVerifier = shieldedVerifiers[4];
-    claimVerifier = shieldedVerifiers[5];
-    privateTransferVerifier = shieldedVerifiers[6];
-    unshieldVerifier = shieldedVerifiers[7];
+    fundVerifier = shieldedVerifiers[1];
+    claimVerifier = shieldedVerifiers[2];
+    privateTransferVerifier = shieldedVerifiers[3];
+    unshieldVerifier = shieldedVerifiers[4];
   }
 
   /** @notice Returns a known route's verifier, or zero when the route was explicitly disabled. */
@@ -142,10 +126,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       return disclosureBindingVerifier;
     }
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_SHIELD) return shieldVerifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CREATE_POLICY) return createPolicyVerifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_ALLOCATE) return allocateVerifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_TOP_UP) return topUpVerifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_MERGE_BUDGET) return mergeBudgetVerifier;
+    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_FUND) return fundVerifier;
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CLAIM) return claimVerifier;
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER) {
       return privateTransferVerifier;
@@ -162,7 +143,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
    *        `PROOF_ENCODING_ID_ABI_GROTH16_ABC`.
    *      - `MalformedProofData` — `proofData` is not exactly 256 bytes, or
    *        `publicSignals.length` does not match the purpose-specific constant.
-   *      - `UnsupportedPurpose` — `purpose` does not identify one of the ten circuit routes.
+   *      - `UnsupportedPurpose` — `purpose` does not identify one of the seven circuit routes.
    *      - `VerifierNotConfigured` — the selected route was explicitly disabled at deployment.
    *      - `false` — proof cryptographically rejected by the underlying Groth16 verifier.
    */
@@ -221,24 +202,19 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       for (uint256 i = 0; i < length; ++i) signals7[i] = publicSignals[i];
       return IGroth16Verifier7(verifier).verifyProof(a, b, c, signals7);
     }
-    if (length == 10) {
-      uint256[10] memory signals10;
-      for (uint256 i = 0; i < length; ++i) signals10[i] = publicSignals[i];
-      return IGroth16Verifier10(verifier).verifyProof(a, b, c, signals10);
-    }
     if (length == 12) {
       uint256[12] memory signals12;
       for (uint256 i = 0; i < length; ++i) signals12[i] = publicSignals[i];
       return IGroth16Verifier12(verifier).verifyProof(a, b, c, signals12);
     }
-    if (length == 15) {
-      uint256[15] memory signals15;
-      for (uint256 i = 0; i < length; ++i) signals15[i] = publicSignals[i];
-      return IGroth16Verifier15(verifier).verifyProof(a, b, c, signals15);
+    if (length == 16) {
+      uint256[16] memory signals16;
+      for (uint256 i = 0; i < length; ++i) signals16[i] = publicSignals[i];
+      return IGroth16Verifier16(verifier).verifyProof(a, b, c, signals16);
     }
-    uint256[25] memory signals25;
-    for (uint256 i = 0; i < length; ++i) signals25[i] = publicSignals[i];
-    return IGroth16Verifier25(verifier).verifyProof(a, b, c, signals25);
+    uint256[27] memory signals27;
+    for (uint256 i = 0; i < length; ++i) signals27[i] = publicSignals[i];
+    return IGroth16Verifier27(verifier).verifyProof(a, b, c, signals27);
   }
 
   function _publicSignalsLength(uint8 purpose) private pure returns (uint256) {
@@ -251,17 +227,8 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_SHIELD) {
       return ProofConstants.SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN;
     }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CREATE_POLICY) {
-      return ProofConstants.SHIELDED_CREATE_POLICY_PUBLIC_SIGNALS_LEN;
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_ALLOCATE) {
-      return ProofConstants.SHIELDED_ALLOCATE_PUBLIC_SIGNALS_LEN;
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_TOP_UP) {
-      return ProofConstants.SHIELDED_TOP_UP_PUBLIC_SIGNALS_LEN;
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_MERGE_BUDGET) {
-      return ProofConstants.SHIELDED_MERGE_BUDGET_PUBLIC_SIGNALS_LEN;
+    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_FUND) {
+      return ProofConstants.SHIELDED_FUND_PUBLIC_SIGNALS_LEN;
     }
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CLAIM) {
       return ProofConstants.SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN;

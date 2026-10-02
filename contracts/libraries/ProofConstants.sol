@@ -37,16 +37,12 @@ library ProofConstants {
   uint8 internal constant PROOF_PURPOSE_DISCLOSURE_BINDING = 1;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_ACTION_BASE = 2;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_SHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_CREATE_POLICY =
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_FUND =
     PROOF_PURPOSE_SHIELDED_ACTION_BASE + 1;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_ALLOCATE = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 2;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_TOP_UP = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_MERGE_BUDGET =
-    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_CLAIM = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 5;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_CLAIM = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 2;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER =
-    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 6;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 7;
+    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
 
   // ---------------------------------------------------------------------------
   // Public-signal length mirrors.
@@ -61,11 +57,8 @@ library ProofConstants {
 
   // Each pool action proves only the inputs it uses, in ShieldedDeepPool._publicSignals order.
   uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
-  uint256 internal constant SHIELDED_CREATE_POLICY_PUBLIC_SIGNALS_LEN = 10;
-  uint256 internal constant SHIELDED_ALLOCATE_PUBLIC_SIGNALS_LEN = 15;
-  uint256 internal constant SHIELDED_TOP_UP_PUBLIC_SIGNALS_LEN = 12;
-  uint256 internal constant SHIELDED_MERGE_BUDGET_PUBLIC_SIGNALS_LEN = 12;
-  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 25;
+  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 16;
+  uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 27;
   uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 12;
   uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 12;
 }

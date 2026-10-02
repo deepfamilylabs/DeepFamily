@@ -5,7 +5,7 @@ import type { PublicPoolActionObservation } from "./shieldedPublicObserverAudit"
 
 const MAX_SHARD_LEAVES = 1n << 32n;
 const CIPHERTEXT_BYTES = 512;
-const MAX_ACTION = 7;
+const MAX_ACTION = 4;
 
 export type PublicPoolObservationSnapshot = {
   poolAddress: string;

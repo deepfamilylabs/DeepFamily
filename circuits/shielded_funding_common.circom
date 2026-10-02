@@ -86,6 +86,8 @@ template ShieldedPrivatePolicy() {
     component rootNotZero = IsZero();
     rootNotZero.in <== rootIdentityCommitment;
     rootNotZero.out === 0;
+    component versionBits = Num2Bits(64);
+    versionBits.in <== rootVersionIndex;
     component rateBits = Num2Bits(128);
     rateBits.in <== rate;
     component rateNotZero = IsZero();

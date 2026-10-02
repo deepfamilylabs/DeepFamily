@@ -44,6 +44,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
+    fundMode: 0n,
     ...overrides,
   });
 
@@ -86,7 +87,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       outputCommitments: [191n, 192n],
     });
     await expect(
-      pool.privateTransfer(exposedRootSpend, await proofFor(pool, 6, exposedRootSpend)),
+      pool.privateTransfer(exposedRootSpend, await proofFor(pool, 3, exposedRootSpend)),
     ).to.be.revertedWithCustomError(pool, "SingleLeafNoteRoot");
 
     const firstRoot = (await pool.noteShard(0)).root;
@@ -96,7 +97,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       outputCommitments: [103n, 104n],
       outputCiphertexts: [ciphertext("03"), ciphertext("04")],
     });
-    await pool.privateTransfer(transfer, await proofFor(pool, 6, transfer));
+    await pool.privateTransfer(transfer, await proofFor(pool, 3, transfer));
     expect(await pool.nullifierSpent(201n)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(100n);
 
@@ -126,14 +127,14 @@ describe("ShieldedDeepPool contract boundaries", function () {
       recipient.address,
       30n,
       withdrawal,
-      await proofFor(pool, 7, withdrawal, 30n, recipient.address),
+      await proofFor(pool, 4, withdrawal, 30n, recipient.address),
     );
     expect(await token.balanceOf(recipient.address)).to.equal(30n);
     expect(await pool.totalShielded()).to.equal(70n);
     expect(await token.balanceOf(await pool.getAddress())).to.equal(70n);
     const actionEvents = await pool.queryFilter(pool.filters.ActionExecuted());
     const finalNotes = await pool.queryFilter(pool.filters.NoteAppended());
-    expect(actionEvents.map(({ args }) => args.action)).to.deep.equal([0n, 6n, 7n]);
+    expect(actionEvents.map(({ args }) => args.action)).to.deep.equal([0n, 3n, 4n]);
     expect(actionEvents.map(({ args }) => args.inputShardId0)).to.deep.equal([0n, 0n, 0n]);
     for (const actionEvent of actionEvents) {
       const notes = finalNotes.filter(
@@ -144,7 +145,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       expect(notes[0].index).to.be.lessThan(notes[1].index);
     }
     await expect(
-      pool.privateTransfer(transfer, await proofFor(pool, 6, transfer)),
+      pool.privateTransfer(transfer, await proofFor(pool, 3, transfer)),
     ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
   });
 
@@ -184,7 +185,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       relation1: 800n,
       asOf,
     });
-    const claimProof = await proofFor(pool, 5, claim);
+    const claimProof = await proofFor(pool, 2, claim);
     await lineage.setRoot(0, 701n);
     await expect(pool.claim(claim, claimProof)).to.be.revertedWithCustomError(
       pool,
@@ -207,11 +208,11 @@ describe("ShieldedDeepPool contract boundaries", function () {
     });
     await hre.networkHelpers.time.increase(7200);
     await expect(
-      pool.claim(nextClaim, await proofFor(pool, 5, nextClaim)),
+      pool.claim(nextClaim, await proofFor(pool, 2, nextClaim)),
     ).to.be.revertedWithCustomError(pool, "InvalidClaimTime");
   });
 
-  it("funds allocations and top-ups without a key registry", async () => {
+  it("funds initial and historical enrollments without a key registry", async () => {
     const { pool, lineage } = await setup();
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
@@ -228,16 +229,20 @@ describe("ShieldedDeepPool contract boundaries", function () {
       relation1: 800n,
       asOf,
     });
-    const allocationProof = await proofFor(pool, 2, allocation);
+    const allocationProof = await proofFor(pool, 1, allocation);
+    await expect(
+      pool.fund({ ...allocation, fundMode: 2n }, allocationProof),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     await lineage.setRoot(0, 701n);
-    await expect(pool.allocate(allocation, allocationProof)).to.be.revertedWithCustomError(
+    await expect(pool.fund(allocation, allocationProof)).to.be.revertedWithCustomError(
       pool,
       "UnknownLineageRoot",
     );
     await lineage.setRoot(0, 700n);
-    await pool.allocate(allocation, allocationProof);
+    await pool.fund(allocation, allocationProof);
     const toppedRoot = (await pool.noteShard(0)).root;
     const topUp = actionData({
+      fundMode: 1n,
       inputRoots: [toppedRoot, toppedRoot],
       inputNullifiers: [703n, 704n],
       outputCommitments: [113n, 114n],
@@ -245,10 +250,15 @@ describe("ShieldedDeepPool contract boundaries", function () {
     });
     const lineageTopUp = { ...topUp, relation0: 700n, relation1: 800n };
     await expect(
-      pool.topUp(lineageTopUp, await proofFor(pool, 3, topUp)),
+      pool.fund(lineageTopUp, await proofFor(pool, 1, topUp)),
     ).to.be.revertedWithCustomError(pool, "InvalidActionData");
-    await pool.topUp(topUp, await proofFor(pool, 3, topUp));
+    await pool.fund(topUp, await proofFor(pool, 1, topUp));
     expect(await pool.nullifierSpent(704n)).to.equal(true);
+    const forbiddenMode = actionData({ fundMode: 1n, outputCommitments: [115n, 116n] });
+    await expect(pool.shield(100n, forbiddenMode, "0x")).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
   });
 
   it("requires single-input actions to repeat their input slot", async () => {
@@ -269,13 +279,45 @@ describe("ShieldedDeepPool contract boundaries", function () {
       outputCommitments: [121n, 122n],
       outputCiphertexts: [ciphertext("11"), ciphertext("12")],
     });
-    const proof = await proofFor(pool, 7, withdrawal, 30n, recipient.address);
+    const proof = await proofFor(pool, 4, withdrawal, 30n, recipient.address);
     const mixedRoots = { ...withdrawal, inputRoots: [latestRoot, olderRoot] };
     await expect(
       pool.unshield(recipient.address, 30n, mixedRoots, proof),
     ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     await pool.unshield(recipient.address, 30n, withdrawal, proof);
     expect(await pool.nullifierSpent(802n)).to.equal(true);
+  });
+
+  it("binds both claim roots while accepting budgets from different known roots", async () => {
+    const { pool, lineage } = await setup();
+    const firstDeposit = actionData();
+    await pool.shield(100n, firstDeposit, await proofFor(pool, 0, firstDeposit, 100n));
+    const firstRoot = (await pool.noteShard(0)).root;
+    const secondDeposit = actionData({
+      outputCommitments: [103n, 104n],
+      outputCiphertexts: [ciphertext("03"), ciphertext("04")],
+    });
+    await pool.shield(100n, secondDeposit, await proofFor(pool, 0, secondDeposit, 100n));
+    const secondRoot = (await pool.noteShard(0)).root;
+    await lineage.setRoot(0, 700n);
+    await lineage.setRoot(1, 800n);
+    const claim = actionData({
+      inputRoots: [firstRoot, secondRoot],
+      inputNullifiers: [901n, 902n],
+      periodNullifiers: Array.from({ length: 12 }, (_, index) => 1001n + BigInt(index)),
+      outputCommitments: [105n, 106n],
+      relation0: 700n,
+      relation1: 800n,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+    });
+    const proof = await proofFor(pool, 2, claim);
+    await expect(
+      pool.claim({ ...claim, inputRoots: [firstRoot, firstRoot] }, proof),
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    await pool.claim(claim, proof);
+    expect(await pool.nullifierSpent(901n)).to.equal(true);
+    expect(await pool.nullifierSpent(902n)).to.equal(true);
+    expect(await pool.totalShielded()).to.equal(200n);
   });
 
   it("rolls over a full 32-level shard without imposing a pool-wide note cap", async () => {
@@ -296,7 +338,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       outputCommitments: [103n, 104n],
       outputCiphertexts: [ciphertext("03"), ciphertext("04")],
     });
-    await pool.privateTransfer(transfer, await proofFor(pool, 6, transfer));
+    await pool.privateTransfer(transfer, await proofFor(pool, 3, transfer));
     expect((await pool.noteShard(1)).size).to.equal(4n);
   });
 
@@ -330,7 +372,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
         asOf,
       });
       const allocationReceipt = await (
-        await pool.allocate(allocation, await proofFor(pool, 2, allocation))
+        await pool.fund(allocation, await proofFor(pool, 1, allocation))
       ).wait();
       const claim = actionData({
         inputRoots: Array(2).fill((await pool.noteShard(0)).root),
@@ -342,7 +384,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
         relation1: 800n,
         asOf,
       });
-      const claimReceipt = await (await pool.claim(claim, await proofFor(pool, 5, claim))).wait();
+      const claimReceipt = await (await pool.claim(claim, await proofFor(pool, 2, claim))).wait();
       const size = (await pool.noteShard(0)).size;
       return {
         shield: shieldReceipt.gasUsed,

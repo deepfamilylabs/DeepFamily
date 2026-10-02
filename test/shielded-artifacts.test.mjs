@@ -55,12 +55,12 @@ function writeFixture(root, { production = false } = {}) {
 }
 
 describe("current public shielded artifacts", function () {
-  it("checks the eight candidate verifier files and all nine proof-artifact digests", function () {
+  it("checks the five candidate verifier files and all six proof-artifact digests", function () {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-rehearsal-test-"));
     try {
       const options = writeFixture(root);
       const candidate = loadCandidateArtifacts({ root, ...options });
-      assert.equal(Object.keys(candidate.circuits).length, 9);
+      assert.equal(Object.keys(candidate.circuits).length, 6);
       assert.equal(candidate.candidateClass, "development-only");
       for (const [action, entry] of Object.entries(candidate.circuits)) {
         assert.ok(entry.zkey.includes(path.join("frontend", "public", "zk", "shielded")));
@@ -140,7 +140,7 @@ describe("current public shielded artifacts", function () {
         });
         assert.equal(builds, 1);
         assert.equal(result.regenerated, false);
-        assert.equal(Object.keys(result.artifacts.circuits).length, 9);
+        assert.equal(Object.keys(result.artifacts.circuits).length, 6);
         assert.deepEqual(
           Object.values(result.artifacts.circuits).map((entry) =>
             sha256(fs.readFileSync(entry.zkey)),
@@ -159,9 +159,8 @@ describe("current public shielded artifacts", function () {
       const options = writeFixture(root);
       const file = path.join(root, options.candidateManifest);
       const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
-      manifest.circuits.claim.verifierPath = manifest.circuits.allocate.verifierPath;
-      manifest.circuits.claim.verifierContractName =
-        manifest.circuits.allocate.verifierContractName;
+      manifest.circuits.claim.verifierPath = manifest.circuits.fund.verifierPath;
+      manifest.circuits.claim.verifierContractName = manifest.circuits.fund.verifierContractName;
       fs.writeFileSync(file, JSON.stringify(manifest));
       assert.throws(
         () => loadCandidateArtifacts({ root, ...options }),

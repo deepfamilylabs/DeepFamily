@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Contract, Signer } from "ethers";
 import {
   ShieldedLineageSubmissionError,
-  submitAllocateWithFreshLineage,
+  submitFundWithFreshLineage,
   submitClaimWithFreshLineage,
   type CurrentLineageRoots,
 } from "./shieldedFreshLineageSubmit";
@@ -18,12 +18,17 @@ const WALLET_ADDRESS = "0x4444444444444444444444444444444444444444";
 const CIPHERTEXT = `0x${"ab".repeat(512)}`;
 const PROOF = {
   pi_a: ["1", "2", "1"],
-  pi_b: [["3", "4"], ["5", "6"], ["1", "0"]],
+  pi_b: [
+    ["3", "4"],
+    ["5", "6"],
+    ["1", "0"],
+  ],
   pi_c: ["7", "8", "1"],
 };
 
 function actionData(roots: CurrentLineageRoots): ShieldedPoolActionData {
   return {
+    fundMode: 0n,
     inputShardIds: [0n, 0n],
     inputRoots: [0n, 0n],
     inputNullifiers: [0n, 0n],
@@ -43,8 +48,8 @@ function fixture() {
   let afterBalance: ((calls: number) => void) | undefined;
   const receipt = { status: 1 };
   const estimateGas = vi.fn(async () => 100_000n);
-  const allocate = Object.assign(
-    vi.fn(async () => ({ hash: "0xallocate", wait: async () => receipt })),
+  const fund = Object.assign(
+    vi.fn(async () => ({ hash: "0xfund", wait: async () => receipt })),
     { estimateGas },
   );
   const claim = Object.assign(
@@ -64,12 +69,12 @@ function fixture() {
   const signer = { provider, getAddress: vi.fn(async () => WALLET_ADDRESS) } as unknown as Signer;
   const lineageIndex = {
     getAddress: vi.fn(async () => LINEAGE_ADDRESS),
-    root: vi.fn(async (kind: number) => kind === 0 ? roots.endorsement : roots.trusted),
+    root: vi.fn(async (kind: number) => (kind === 0 ? roots.endorsement : roots.trusted)),
   } as unknown as Contract;
   const pool = {
     getAddress: vi.fn(async () => POOL_ADDRESS),
     LINEAGE_INDEX: vi.fn(async () => configuredIndex),
-    connect: vi.fn(() => ({ allocate, claim })),
+    connect: vi.fn(() => ({ fund, claim })),
   } as unknown as Contract;
   const prepare = vi.fn(async (current: CurrentLineageRoots, attempt: number) => ({
     data: actionData(current),
@@ -77,10 +82,22 @@ function fixture() {
   }));
   const common = { pool, lineageIndex, signer, expectedChainId: 71n, prepare };
   return {
-    common, prepare, allocate, claim, estimateGas, lineageIndex, provider,
-    setRoots: (endorsement: bigint, trusted: bigint) => { roots = { endorsement, trusted }; },
-    setIndex: (value: string) => { configuredIndex = value; },
-    onBalance: (callback: (calls: number) => void) => { afterBalance = callback; },
+    common,
+    prepare,
+    fund,
+    claim,
+    estimateGas,
+    lineageIndex,
+    provider,
+    setRoots: (endorsement: bigint, trusted: bigint) => {
+      roots = { endorsement, trusted };
+    },
+    setIndex: (value: string) => {
+      configuredIndex = value;
+    },
+    onBalance: (callback: (calls: number) => void) => {
+      afterBalance = callback;
+    },
   };
 }
 
@@ -94,36 +111,44 @@ beforeEach(() => {
 
 describe("fresh lineage proof self-submit", () => {
   it.each([
-    ["allocate", submitAllocateWithFreshLineage],
+    ["fund", submitFundWithFreshLineage],
     ["claim", submitClaimWithFreshLineage],
-  ] as const)("rebuilds %s before broadcast when roots change during proving", async (action, submit) => {
-    const f = fixture();
-    let proofCount = 0;
-    mocks.zkWorkerCall.mockImplementation(async (_name, params) => {
-      proofCount += 1;
-      if (proofCount === 1) f.setRoots(11n, 21n);
-      return { proof: PROOF, publicSignals: params.expectedPublicSignals };
-    });
-    const result = await submit(f.common);
-    expect(result.attempts).toBe(2);
-    expect(result.prepared.witness).toEqual({ attempt: 2 });
-    expect(f.prepare).toHaveBeenCalledTimes(2);
-    expect(mocks.zkWorkerCall).toHaveBeenCalledTimes(2);
-    expect(f[action]).toHaveBeenCalledOnce();
-    expect(f[action]).toHaveBeenCalledWith(
-      expect.objectContaining({ relation0: 11n, relation1: 21n }),
-      expect.any(String),
-      { gasLimit: 120_000n },
-    );
-    expect(f.lineageIndex.root).toHaveBeenCalledWith(0, { blockTag: 100 });
-    expect(f.lineageIndex.root).toHaveBeenCalledWith(1, { blockTag: 100 });
-  });
+  ] as const)(
+    "rebuilds %s before broadcast when roots change during proving",
+    async (action, submit) => {
+      const f = fixture();
+      let proofCount = 0;
+      mocks.zkWorkerCall.mockImplementation(async (_name, params) => {
+        proofCount += 1;
+        if (proofCount === 1) f.setRoots(11n, 21n);
+        return { proof: PROOF, publicSignals: params.expectedPublicSignals };
+      });
+      const result = await submit(f.common);
+      expect(result.attempts).toBe(2);
+      expect(result.prepared.witness).toEqual({ attempt: 2 });
+      expect(f.prepare).toHaveBeenCalledTimes(2);
+      expect(mocks.zkWorkerCall).toHaveBeenCalledTimes(2);
+      expect(f[action]).toHaveBeenCalledOnce();
+      expect(f[action]).toHaveBeenCalledWith(
+        expect.objectContaining({ relation0: 11n, relation1: 21n }),
+        expect.any(String),
+        { gasLimit: 120_000n },
+      );
+      expect(f.lineageIndex.root).toHaveBeenCalledWith(0, { blockTag: 100 });
+      expect(f.lineageIndex.root).toHaveBeenCalledWith(1, { blockTag: 100 });
+    },
+  );
 
   it("does not retry after broadcast and reports the transaction hash when roots change", async () => {
     const f = fixture();
     f.claim.mockImplementationOnce(async () => {
       f.setRoots(11n, 21n);
-      return { hash: "0xclaim", wait: async () => { throw new Error("transaction reverted"); } };
+      return {
+        hash: "0xclaim",
+        wait: async () => {
+          throw new Error("transaction reverted");
+        },
+      };
     });
     await expect(submitClaimWithFreshLineage(f.common)).rejects.toMatchObject({
       name: "ShieldedLineageSubmissionError",
@@ -136,12 +161,14 @@ describe("fresh lineage proof self-submit", () => {
 
   it("aborts without an automatic retry if roots change as submitting begins", async () => {
     const f = fixture();
-    f.onBalance((calls) => { if (calls === 2) f.setRoots(11n, 21n); });
-    await expect(submitAllocateWithFreshLineage(f.common)).rejects.toThrow(
+    f.onBalance((calls) => {
+      if (calls === 2) f.setRoots(11n, 21n);
+    });
+    await expect(submitFundWithFreshLineage(f.common)).rejects.toThrow(
       "Lineage roots changed as submission began",
     );
     expect(f.prepare).toHaveBeenCalledOnce();
-    expect(f.allocate).not.toHaveBeenCalled();
+    expect(f.fund).not.toHaveBeenCalled();
   });
 
   it("stops after the bounded number of stale proofs without broadcasting", async () => {
@@ -152,13 +179,11 @@ describe("fresh lineage proof self-submit", () => {
       next += 1n;
       return { proof: PROOF, publicSignals: params.expectedPublicSignals };
     });
-    await expect(submitAllocateWithFreshLineage(f.common)).rejects.toThrow(
-      "exhausted 3 attempts",
-    );
+    await expect(submitFundWithFreshLineage(f.common)).rejects.toThrow("exhausted 3 attempts");
     expect(f.prepare).toHaveBeenCalledTimes(3);
     expect(mocks.zkWorkerCall).toHaveBeenCalledTimes(3);
     expect(f.estimateGas).not.toHaveBeenCalled();
-    expect(f.allocate).not.toHaveBeenCalled();
+    expect(f.fund).not.toHaveBeenCalled();
   });
 
   it("checks that the supplied global lineage index belongs to the pool", async () => {
@@ -178,7 +203,11 @@ describe("fresh lineage proof self-submit", () => {
       wait: async () => ({ status: 0 }),
     }));
     let error: unknown;
-    try { await submitClaimWithFreshLineage(f.common); } catch (caught) { error = caught; }
+    try {
+      await submitClaimWithFreshLineage(f.common);
+    } catch (caught) {
+      error = caught;
+    }
     expect(error).toBeInstanceOf(ShieldedLineageSubmissionError);
     expect(error).toMatchObject({ transactionHash: "0xclaim", receiptStatus: 0 });
     expect(f.prepare).toHaveBeenCalledOnce();
