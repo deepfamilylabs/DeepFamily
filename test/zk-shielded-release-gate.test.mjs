@@ -10,9 +10,9 @@ import { assertRuntimeBenchmarkReport } from "../scripts/zk-shielded-release-che
 describe("unified shielded runtime benchmarks", function () {
   const manifestSha256 = "a".repeat(64);
   const criteria = {
-    allocationMaxGas: 3_000_000,
+    fundMaxGas: 3_000_000,
     claim12MaxGas: 3_000_000,
-    browserAllocationMaxMs: 30_000,
+    browserFundMaxMs: 30_000,
     browserClaim12MaxMs: 30_000,
     recoveryMaxMs: 30_000,
     recoveryMinEvents: 2,
@@ -30,7 +30,7 @@ describe("unified shielded runtime benchmarks", function () {
       },
     },
     localPoolGas: {
-      allocation: {
+      fund: {
         measurement: "local-pool-transaction",
         receiptStatus: 1,
         gasUsed: 1_000_000,
@@ -49,7 +49,7 @@ describe("unified shielded runtime benchmarks", function () {
     browserProof: {
       device: "test device",
       browser: "test browser",
-      allocationMs: 1_000,
+      fundMs: 1_000,
       claim12Ms: 1_000,
     },
     recovery: {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Interface, type Contract } from "ethers";
 import { createLineageTree } from "@deepfamily/protocol-core";
-import { auditKnownAllocationClaimLink } from "./shieldedPublicObserverAudit";
+import { auditKnownFundingClaimLink } from "./shieldedPublicObserverAudit";
 import { loadPublicPoolActionObservations } from "./shieldedPublicObserverChain";
 
 const ADDRESS = "0x1111111111111111111111111111111111111111";
@@ -81,7 +81,7 @@ function fixture(batchViaProxy = false) {
     return txHash;
   };
   add(0, 1, [11n, 12n]);
-  const allocationTxHash = add(1, 2, [101n, 102n]);
+  const fundTxHash = add(1, 2, [101n, 102n]);
   const claimTxHash = add(2, 3, [201n, 202n]);
   const filters: Array<Record<string, unknown>> = [];
   const provider = {
@@ -102,7 +102,7 @@ function fixture(batchViaProxy = false) {
     currentShardId: async () => 0n,
     noteShard: async () => ({ size: tree.sizeBigInt, root: tree.root }),
   } as unknown as Contract;
-  return { pool, logs, receipts, filters, allocationTxHash, claimTxHash };
+  return { pool, logs, receipts, filters, fundTxHash, claimTxHash };
 }
 
 describe("public shielded pool observer loader", () => {
@@ -149,9 +149,9 @@ describe("public shielded pool observer loader", () => {
       ],
     ]);
     expect(
-      auditKnownAllocationClaimLink({
+      auditKnownFundingClaimLink({
         actions: observed.actions,
-        knownAllocationCommitment: 101n,
+        knownFundingCommitment: 101n,
         claimTxHash,
         historyVerifiedFromDeployment: observed.historyVerifiedFromDeployment,
       }).verdict,
@@ -159,17 +159,17 @@ describe("public shielded pool observer loader", () => {
   });
 
   it("accepts two pool calls through a proxy in the same successful transaction", async () => {
-    const { pool, allocationTxHash, claimTxHash, receipts } = fixture(true);
-    expect(allocationTxHash).toBe(claimTxHash);
+    const { pool, fundTxHash, claimTxHash, receipts } = fixture(true);
+    expect(fundTxHash).toBe(claimTxHash);
     expect(receipts.get(claimTxHash)?.to).toBe(PROXY);
     const observed = await loadPublicPoolActionObservations(pool, { deploymentBlock: 1 });
     expect(observed.actions).toHaveLength(3);
     expect(observed.actions[1].txHash).toBe(observed.actions[2].txHash);
     expect(observed.actions[1].actionLogIndex).not.toBe(observed.actions[2].actionLogIndex);
     expect(
-      auditKnownAllocationClaimLink({
+      auditKnownFundingClaimLink({
         actions: observed.actions,
-        knownAllocationCommitment: 101n,
+        knownFundingCommitment: 101n,
         claimTxHash,
         claimActionLogIndex: observed.actions[2].actionLogIndex,
         historyVerifiedFromDeployment: observed.historyVerifiedFromDeployment,

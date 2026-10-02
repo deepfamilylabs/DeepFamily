@@ -138,7 +138,7 @@ export function getShieldedClaimOverview(
   let nextDueAt: bigint | undefined;
   let scanLimited = false;
   for (const funding of policies.values()) {
-    // Distinct initial allocations under one policy can start on different
+    // Distinct initial enrollments under one policy can start on different
     // dates while sharing the period-nullifier sequence. A single date would
     // claim more certainty than the wallet snapshot provides.
     if (funding.mixedStartTimes) {

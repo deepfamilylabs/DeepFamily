@@ -42,7 +42,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All 8 circuits reuse the same published BN254 Phase 1 file:
+All 9 circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -205,16 +205,16 @@ npm run zk:production:setup -- \
 ```
 
 To record shielded release thresholds, optionally pass
-`--shielded-release-criteria circuits/shielded-release-criteria.json`. The committed JSON contains
-six reviewed positive integer limits: `allocationMaxGas`, `claim12MaxGas`,
-`browserAllocationMaxMs`, `browserClaim12MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
+`--shielded-release-criteria <reviewed-criteria.json>`. Supply a reviewed JSON file containing
+six positive integer limits: `fundMaxGas`, `claim12MaxGas`,
+`browserFundMaxMs`, `browserClaim12MaxMs`, `recoveryMaxMs`, and `recoveryMinEvents`.
 Key generation and cryptographic verification do not require these performance limits.
 `release:preflight` requires them alongside two independent audits and a hashed runtime benchmark
 report before publication. The benchmark report uses
 `deepfamily/shielded-runtime-benchmarks@1` and is referenced by
 `release-evidence/shielded/release-evidence.json` using
 `deepfamily/shielded-release-evidence@1`. Its full-depth result is a locally verified 64/32-depth
-cryptographic proof; allocation and 12-period claim gas come from successful local pool
+cryptographic proof; initial fund and 12-period claim gas come from successful local pool
 transactions. Browser timing and public-event recovery are measured separately. The unified
 testnet acceptance command produces the on-chain deployment and receipt report after preflight;
 no separate shielded testnet report is required to start that command.

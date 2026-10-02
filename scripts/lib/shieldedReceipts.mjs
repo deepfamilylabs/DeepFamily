@@ -146,28 +146,28 @@ export async function verifyShieldedReceipts({
   provider,
   expectedChainId,
   poolAddress,
-  allocationTxHash,
+  fundTxHash,
   claimTxHash,
 }) {
   const chainId = requireChainId(expectedChainId);
   const pool = requireAddress(poolAddress, "pool address");
-  const allocationHash = requireTxHash(allocationTxHash, "allocation transaction");
+  const fundHash = requireTxHash(fundTxHash, "fund transaction");
   const claimHash =
     claimTxHash === undefined ? undefined : requireTxHash(claimTxHash, "claim transaction");
-  if (allocationHash === claimHash) {
-    throw new Error("Allocation and claim must be distinct transactions");
+  if (fundHash === claimHash) {
+    throw new Error("Fund and claim must be distinct transactions");
   }
   await assertChain(provider, chainId);
   if ((await provider.getCode(pool)) === "0x") {
     throw new Error(`Selected shielded pool address has no code on chain ID ${chainId}`);
   }
-  const [allocation, claim] = await Promise.all([
+  const [fund, claim] = await Promise.all([
     checkTransaction(provider, {
-      hash: allocationHash,
+      hash: fundHash,
       expectedChainId: chainId,
       poolAddress: pool,
       selector: FUND_SELECTOR,
-      label: "Allocation",
+      label: "Fund",
     }),
     claimHash === undefined
       ? undefined
@@ -184,6 +184,6 @@ export async function verifyShieldedReceipts({
     chainId: Number(chainId),
     poolAddress: pool,
     rpcChecks: "passed",
-    transactions: { allocation, ...(claim === undefined ? {} : { claim }) },
+    transactions: { fund, ...(claim === undefined ? {} : { claim }) },
   };
 }

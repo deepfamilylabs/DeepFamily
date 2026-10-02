@@ -14,7 +14,7 @@ import {
   selectCircuitNames,
 } from "./lib/zkCircuitSelection.mjs";
 
-const LEGACY_OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
+const CORE_OUTPUT_DIRECTORY = path.join("zk-artifacts", "circuits");
 const SHIELDED_OUTPUT_DIRECTORY = path.join("zk-artifacts", "shielded");
 const INCLUDE_ARGUMENTS = Object.freeze([
   "-l",
@@ -56,7 +56,7 @@ export const buildZkBuildCommands = ({
       const source = shieldedAction
         ? path.join("circuits", `${SHIELDED_CIRCUITS[shieldedAction]}.circom`)
         : CIRCUIT_SOURCES[name];
-      const outputDirectory = shieldedAction ? SHIELDED_OUTPUT_DIRECTORY : LEGACY_OUTPUT_DIRECTORY;
+      const outputDirectory = shieldedAction ? SHIELDED_OUTPUT_DIRECTORY : CORE_OUTPUT_DIRECTORY;
       return Object.freeze({
         circuit: name,
         executable,
@@ -125,10 +125,10 @@ export const runZkBuild = async ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-build.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
+  node scripts/zk-build.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
-settings. The default is --circuit all (the two legacy and seven shielded circuits).`);
+settings. The default is --circuit all (the two core and seven shielded circuits).`);
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

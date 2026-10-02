@@ -14,14 +14,14 @@ import {
 export const SHIELDED_NOTE_PAYLOAD_VERSION = 1;
 export const SHIELDED_VALUE_NOTE_KIND = 1;
 export const SHIELDED_BUDGET_NOTE_KIND = 2;
-export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 4;
-export const SHIELDED_VALUE_WITH_POLICY_MEMO_KIND = 5;
+export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 3;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND = 4;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES = 86;
 export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES = 302;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES =
   SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32 + SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES;
 
-export const SHIELDED_VALUE_WITH_POLICY_MEMO_PAYLOAD_BYTES =
+export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES =
   SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES + 32;
 
 const MAGIC = Uint8Array.of(0x44, 0x46, 0x53, 0x4e); // DFSN
@@ -93,25 +93,25 @@ function encode(kind, value, schema, expectedLength) {
 export function encodeShieldedValueNotePayload(note) {
   // Validate nonzero owner/nonce exactly as the commitment helper does.
   computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: 0n });
-  if (note.topUpMemo === undefined) {
+  if (note.fundingMemo === undefined) {
     return encode(SHIELDED_VALUE_NOTE_KIND, note, valueSchema, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES);
   }
-  const hasAllocationKey = note.topUpMemo.allocationKey !== undefined;
+  const hasAllocationKey = note.fundingMemo.allocationKey !== undefined;
   const base = encode(
-    hasAllocationKey ? SHIELDED_VALUE_WITH_POLICY_MEMO_KIND : SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND,
+    hasAllocationKey ? SHIELDED_VALUE_WITH_RULE_MEMO_KIND : SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND,
     note,
     valueSchema,
     SHIELDED_VALUE_NOTE_PAYLOAD_BYTES,
   );
-  const budget = encodeShieldedBudgetNotePayload(note.topUpMemo.budgetNote);
+  const budget = encodeShieldedBudgetNotePayload(note.fundingMemo.budgetNote);
   const output = new Uint8Array(
     hasAllocationKey
-      ? SHIELDED_VALUE_WITH_POLICY_MEMO_PAYLOAD_BYTES
+      ? SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES
       : SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES,
   );
   try {
     const budgetCommitment = bigintFrom(
-      note.topUpMemo.budgetCommitment,
+      note.fundingMemo.budgetCommitment,
       "budgetCommitment",
       MAX_FIELD,
     );
@@ -132,15 +132,15 @@ export function encodeShieldedValueNotePayload(note) {
     output.set(budget, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32);
     if (hasAllocationKey) {
       protocolAssert(
-        computeShieldedAllocationKeyCommitment(note.topUpMemo.allocationKey) ===
-          BigInt(note.topUpMemo.budgetNote.allocationKeyCommitment),
+        computeShieldedAllocationKeyCommitment(note.fundingMemo.allocationKey) ===
+          BigInt(note.fundingMemo.budgetNote.allocationKeyCommitment),
         "INVALID_SHIELDED_ALLOCATION_KEY",
-        "Memo allocation key does not match its budget",
+        "Memo funding key does not match its budget",
       );
       writeFixedUint(
         output,
         SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES,
-        note.topUpMemo.allocationKey,
+        note.fundingMemo.allocationKey,
         32,
         MAX_FIELD,
         "allocationKey",
@@ -156,7 +156,7 @@ export function encodeShieldedValueNotePayload(note) {
   }
 }
 
-/** Encode an allocated or continuation budget note, including zero remainder. */
+/** Encode a funded or remaining budget note, including zero remainder. */
 export function encodeShieldedBudgetNotePayload(note) {
   const policyCommitment = computeShieldedPolicyCommitment(note);
   const enrollmentCommitment = computeShieldedEnrollmentCommitment({
@@ -199,7 +199,7 @@ export function decodeShieldedNotePayload(payload) {
   const isValue = [
     SHIELDED_VALUE_NOTE_KIND,
     SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND,
-    SHIELDED_VALUE_WITH_POLICY_MEMO_KIND,
+    SHIELDED_VALUE_WITH_RULE_MEMO_KIND,
   ].includes(kind);
   const schema = isValue ? valueSchema : kind === SHIELDED_BUDGET_NOTE_KIND ? budgetSchema : null;
   protocolAssert(schema !== null, "UNSUPPORTED_SHIELDED_NOTE_KIND", "Unsupported note kind");
@@ -208,8 +208,8 @@ export function decodeShieldedNotePayload(payload) {
       ? SHIELDED_VALUE_NOTE_PAYLOAD_BYTES
       : kind === SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND
         ? SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES
-        : kind === SHIELDED_VALUE_WITH_POLICY_MEMO_KIND
-          ? SHIELDED_VALUE_WITH_POLICY_MEMO_PAYLOAD_BYTES
+        : kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND
+          ? SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES
           : SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES;
   protocolAssert(
     input.length === expectedLength,
@@ -224,7 +224,7 @@ export function decodeShieldedNotePayload(payload) {
   }
   if (
     kind === SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND ||
-    kind === SHIELDED_VALUE_WITH_POLICY_MEMO_KIND
+    kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND
   ) {
     // A value commitment binds ciphertext, not the correctness of optional memos.
     // Ignore malformed backups while retaining the spendable value note.
@@ -245,11 +245,11 @@ export function decodeShieldedNotePayload(payload) {
       );
       const budgetFields = { ...budgetNote };
       delete budgetFields.kind;
-      note.topUpMemo = { budgetCommitment, budgetNote: budgetFields };
-      if (kind === SHIELDED_VALUE_WITH_POLICY_MEMO_KIND) {
+      note.fundingMemo = { budgetCommitment, budgetNote: budgetFields };
+      if (kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND) {
         // Recovery validates this separately: a bad rule backup must not discard a good budget backup.
         try {
-          note.topUpMemo.allocationKey = readFixedUint(
+          note.fundingMemo.allocationKey = readFixedUint(
             input,
             SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES,
             32,

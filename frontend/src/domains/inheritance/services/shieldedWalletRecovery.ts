@@ -126,13 +126,13 @@ export async function recoverLocalShieldedWallet(
           }
           if (
             note.kind === "value" &&
-            note.topUpMemo &&
-            previousPublicNote?.commitment === note.topUpMemo.budgetCommitment
+            note.fundingMemo &&
+            previousPublicNote?.commitment === note.fundingMemo.budgetCommitment
           ) {
             // Fund appends the child's budget directly before the
             // donor's change note. Match and validate it from the public scan;
             // no recipient or note-index query reaches the RPC.
-            const budgetPayload = encodeShieldedBudgetNotePayload(note.topUpMemo.budgetNote);
+            const budgetPayload = encodeShieldedBudgetNotePayload(note.fundingMemo.budgetNote);
             try {
               verifyShieldedNotePayload({
                 payload: budgetPayload,
@@ -140,18 +140,18 @@ export async function recoverLocalShieldedWallet(
                 noteCommitment: previousPublicNote.commitment,
               });
               fundingTemplates.set(previousPublicNote.commitment, {
-                note: note.topUpMemo.budgetNote,
+                note: note.fundingMemo.budgetNote,
                 commitment: previousPublicNote.commitment,
                 ciphertext: previousPublicNote.ciphertext,
                 shardId: previousPublicNote.shardId,
               });
-              const allocationKey = note.topUpMemo.allocationKey;
+              const allocationKey = note.fundingMemo.allocationKey;
               if (
                 allocationKey !== undefined &&
                 computeShieldedAllocationKeyCommitment(allocationKey) ===
-                  note.topUpMemo.budgetNote.allocationKeyCommitment
+                  note.fundingMemo.budgetNote.allocationKeyCommitment
               ) {
-                const budget = note.topUpMemo.budgetNote;
+                const budget = note.fundingMemo.budgetNote;
                 shieldedPolicies.set(computeShieldedPolicyCommitment(budget), {
                   rootIdentityCommitment: budget.rootIdentityCommitment,
                   rootVersionIndex: budget.rootVersionIndex,

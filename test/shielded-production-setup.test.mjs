@@ -41,9 +41,9 @@ const captureError = async (operation) => {
   }
 };
 const criteria = {
-  allocationMaxGas: 3000000,
+  fundMaxGas: 3000000,
   claim12MaxGas: 3000000,
-  browserAllocationMaxMs: 60000,
+  browserFundMaxMs: 60000,
   browserClaim12MaxMs: 60000,
   recoveryMaxMs: 30000,
   recoveryMinEvents: 100,
@@ -345,7 +345,7 @@ describe("shielded production setup artifacts", function () {
     expect(
       inspectShieldedProductionArtifacts({ root: fixture.root }).manifest.releaseCriteria,
     ).to.deep.equal(criteria);
-    for (const invalid of [{ allocationMaxGas: 1 }, { ...criteria, recoveryMinEvents: 0 }]) {
+    for (const invalid of [{ fundMaxGas: 1 }, { ...criteria, recoveryMinEvents: 0 }]) {
       const error = await captureError(() => fixture.createRecords({ releaseCriteria: invalid }));
       expect(error.message).to.match(
         /release criteria are incomplete|must be a positive safe integer/u,

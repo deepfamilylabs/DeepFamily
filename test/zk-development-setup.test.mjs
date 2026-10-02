@@ -168,7 +168,7 @@ describe("development ZK setup", function () {
       try {
         await runZkDevelopmentSetup({
           root,
-          manifestGuard: () => calls.push("legacy-guard"),
+          manifestGuard: () => calls.push("core-guard"),
           ptauInstaller: () => calls.push("ptau"),
           commandRunner: () => calls.push("command"),
         });
@@ -176,7 +176,7 @@ describe("development ZK setup", function () {
         caught = error;
       }
       expect(caught?.message).to.include("Refusing to overwrite shielded production artifacts");
-      expect(calls).to.deep.equal(["legacy-guard"]);
+      expect(calls).to.deep.equal(["core-guard"]);
       expect(await fs.readFile(manifest, "utf8")).to.equal("{}\n");
     } finally {
       await fs.rm(root, { recursive: true, force: true });
@@ -230,12 +230,12 @@ describe("development ZK setup", function () {
     expect(commandCalls).to.have.length(4 + DEVELOPMENT_CIRCUITS.length * 5);
     expect(commandCalls[0][1]).to.deep.equal({
       executable: process.execPath,
-      args: [path.join(root, "scripts/zk-build.mjs"), "--circuit", "legacy"],
+      args: [path.join(root, "scripts/zk-build.mjs"), "--circuit", "core"],
       cwd: root,
     });
     expect(commandCalls.at(-3)[1]).to.deep.equal({
       executable: process.execPath,
-      args: [path.join(root, "scripts/zk-check.mjs"), "--circuit", "legacy"],
+      args: [path.join(root, "scripts/zk-check.mjs"), "--circuit", "core"],
       cwd: root,
     });
     expect(commandCalls.at(-2)[1]).to.deep.equal({

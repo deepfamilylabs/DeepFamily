@@ -10,8 +10,7 @@ import {
 import { protocolAssert } from "./errors.js";
 
 /**
- * V1 domains are deliberately disjoint from identity (1000–1004) and the old
- * public inheritance protocol (1005–1009). These numbers are part of the
+ * Shielded domains are disjoint from identity and lineage domains. They are part of the
  * proof/contract ABI and must match the corresponding Circom constants.
  */
 export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
@@ -26,7 +25,7 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   viewSeed: 1018n,
   dummyPeriodNullifier: 1019n,
   dummyInputNullifier: 1021n,
-  topUpUseNullifier: 1026n,
+  budgetUseNullifier: 1026n,
   enrollmentNullifier: 1027n,
   allocationKeyCommitment: 1028n,
 });
@@ -52,7 +51,7 @@ function nonzeroAmount(value, label) {
 
 /**
  * Return a uniformly sampled, nonzero BN254 field element. Use independent
- * samples for every policy salt, allocation key, enrollment salt, and note nonce. A bare
+ * samples for every policy salt, funding key, enrollment salt, and note nonce. A bare
  * deterministic commitment is not a substitute for an unpredictable nonce.
  */
 export function generateShieldedRandomField() {
@@ -96,7 +95,7 @@ export function computeShieldedPolicyCommitment(input) {
   ]);
 }
 
-/** Commitment to a policy-specific key kept only by the initial allocator. */
+/** Commitment to a policy-specific key kept only by the initial donor. */
 export function computeShieldedAllocationKeyCommitment(allocationKey) {
   return poseidon2([
     SHIELDED_INHERITANCE_DOMAINS.allocationKeyCommitment,
@@ -104,7 +103,7 @@ export function computeShieldedAllocationKeyCommitment(allocationKey) {
   ]);
 }
 
-/** One initial allocation per policy and heir; the key is never in child notes. */
+/** One initial funding per policy and heir; the key is never in child notes. */
 export function computeShieldedEnrollmentNullifier(input) {
   return poseidon4([
     SHIELDED_INHERITANCE_DOMAINS.enrollmentNullifier,
@@ -115,9 +114,9 @@ export function computeShieldedEnrollmentNullifier(input) {
 }
 
 /** A randomized, one-time read authorization for the original child budget. */
-export function computeShieldedTopUpUseNullifier(input) {
+export function computeShieldedBudgetUseNullifier(input) {
   return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.topUpUseNullifier,
+    SHIELDED_INHERITANCE_DOMAINS.budgetUseNullifier,
     nonzeroField(input.policySalt, "policySalt"),
     nonzeroField(input.budgetNoteCommitment, "budgetNoteCommitment"),
     nonzeroField(input.useNonce, "useNonce"),
@@ -171,7 +170,7 @@ export function computeShieldedValueNoteCommitment(input) {
   ]);
 }
 
-/** A separate budget note per child allows a private, irreversible allocation. */
+/** A separate budget note per child allows a private, irreversible funding. */
 export function computeShieldedBudgetNoteCommitment(input) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   // A claim that exactly exhausts a budget emits a zero-value continuation
@@ -209,8 +208,8 @@ export function computeShieldedSpendNullifier(input) {
 }
 
 /**
- * Period indices start at zero from the unique initial allocation for a policy
- * and heir. Top-ups carry that enrollment, so the tag cannot reset after refill.
+ * Period indices start at zero from the unique initial funding for a policy
+ * and heir. Additional funding carries that enrollment, so the tag cannot reset after refill.
  */
 export function computeShieldedPeriodNullifier(input) {
   return poseidon4([

@@ -25,7 +25,7 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
-  computeShieldedTopUpUseNullifier,
+  computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -898,24 +898,24 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       budgetNonce: String(budgetNonce),
       changeNonce: "109",
     };
-    const allocationProof = await prove("fund", realAllocationWitness, allocationSignals);
+    const fundProof = await prove("fund", realAllocationWitness, allocationSignals);
     await lineage.setRoot(0, endorsementRoot + 1n);
-    await expect(pool.fund(allocationData, allocationProof)).to.be.revertedWithCustomError(
+    await expect(pool.fund(allocationData, fundProof)).to.be.revertedWithCustomError(
       pool,
       "UnknownLineageRoot",
     );
     await lineage.setRoot(0, endorsementRoot);
-    const allocateReceipt = await (await pool.fund(allocationData, allocationProof)).wait();
+    const fundReceipt = await (await pool.fund(allocationData, fundProof)).wait();
     expect(await pool.nullifierSpent(allocationData.inputNullifiers[1])).to.equal(true);
     expect(await pool.totalShielded()).to.equal(2000n);
     expect(await token.balanceOf(poolAddress)).to.equal(2000n);
 
     // The old child budget is a read-only template: this action spends only
     // the donor's 800-value change note and creates a separate 300-value budget.
-    const topUpUseNonce = 114n;
-    const topUpBudgetNonce = 111n;
-    const topUpChangeNonce = 113n;
-    const topUpBudgetPayload = encodeShieldedBudgetNotePayload({
+    const additionalFundingUseNonce = 114n;
+    const additionalFundingBudgetNonce = 111n;
+    const additionalFundingChangeNonce = 113n;
+    const additionalFundingBudgetPayload = encodeShieldedBudgetNotePayload({
       rootIdentityCommitment,
       rootVersionIndex,
       policySalt,
@@ -926,87 +926,104 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       heirOwnerCommitment,
       amountPerPeriod: rate,
       remaining: 300n,
-      nonce: topUpBudgetNonce,
+      nonce: additionalFundingBudgetNonce,
     });
-    const encryptedTopUpBudget = await encryptPayloadNote(
+    const encryptedAdditionalFundingBudget = await encryptPayloadNote(
       { viewingKey: heirViewingKey, chainId, poolAddress },
-      topUpBudgetPayload,
+      additionalFundingBudgetPayload,
     );
-    const topUpBudgetCommitment = computeShieldedBudgetNoteCommitment({
+    const additionalFundingBudgetCommitment = computeShieldedBudgetNoteCommitment({
       policyCommitment,
       enrollmentCommitment,
       heirOwnerCommitment,
       amountPerPeriod: rate,
       remaining: 300n,
-      nonce: topUpBudgetNonce,
-      ciphertextHashField: encryptedTopUpBudget.ciphertextHashField,
+      nonce: additionalFundingBudgetNonce,
+      ciphertextHashField: encryptedAdditionalFundingBudget.ciphertextHashField,
     });
-    const topUpDonorChange = await encryptValueNote({
+    const additionalFundingDonorChange = await encryptValueNote({
       ...donorNoteInput,
       amount: 500n,
-      nonce: topUpChangeNonce,
+      nonce: additionalFundingChangeNonce,
     });
-    const preTopUpRoot = (await pool.noteShard(0)).root;
-    const topUpDonorMembership = compactMembership(await pool.getNoteMerkleProof(0, 3));
-    const topUpBudgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
-    const topUpData = {
+    const preAdditionalFundingRoot = (await pool.noteShard(0)).root;
+    const additionalFundingDonorMembership = compactMembership(await pool.getNoteMerkleProof(0, 3));
+    const additionalFundingBudgetMembership = compactMembership(
+      await pool.getNoteMerkleProof(0, 2),
+    );
+    const additionalFundingData = {
       ...zeroData(),
       fundMode: 1n,
-      inputRoots: [preTopUpRoot, preTopUpRoot],
+      inputRoots: [preAdditionalFundingRoot, preAdditionalFundingRoot],
       inputNullifiers: [
         computeShieldedSpendNullifier({
           ownerSecret: donorOwnerSecret,
           noteCommitment: donorChange.commitment,
         }),
-        computeShieldedTopUpUseNullifier({
+        computeShieldedBudgetUseNullifier({
           policySalt,
           budgetNoteCommitment: budgetCommitment,
-          useNonce: topUpUseNonce,
+          useNonce: additionalFundingUseNonce,
         }),
       ],
-      outputCommitments: [topUpBudgetCommitment, topUpDonorChange.commitment],
-      outputCiphertexts: [encryptedTopUpBudget.ciphertextHex, topUpDonorChange.ciphertextHex],
+      outputCommitments: [
+        additionalFundingBudgetCommitment,
+        additionalFundingDonorChange.commitment,
+      ],
+      outputCiphertexts: [
+        encryptedAdditionalFundingBudget.ciphertextHex,
+        additionalFundingDonorChange.ciphertextHex,
+      ],
     };
-    const { signals: topUpSignals, witness: topUpPublicInputs } = buildShieldedPoolPublicInputs({
-      action: 1,
-      chainId,
-      poolAddress,
-      ...topUpData,
-    });
-    const topUpWitness = {
+    const { signals: additionalFundingSignals, witness: additionalFundingPublicInputs } =
+      buildShieldedPoolPublicInputs({
+        action: 1,
+        chainId,
+        poolAddress,
+        ...additionalFundingData,
+      });
+    const additionalFundingWitness = {
       ...fundingFixture.continuation,
-      ...topUpPublicInputs,
+      ...additionalFundingPublicInputs,
       donorAmount: "800",
       donorNonce: "109",
       donorCiphertextHash: String(donorChange.ciphertextHashField),
-      donorDepth: topUpDonorMembership.depth,
-      donorIndex: topUpDonorMembership.index,
-      donorSiblings: topUpDonorMembership.siblings,
+      donorDepth: additionalFundingDonorMembership.depth,
+      donorIndex: additionalFundingDonorMembership.index,
+      donorSiblings: additionalFundingDonorMembership.siblings,
       eligibleFrom: String(eligibleFrom),
       oldBudgetRemaining: "1200",
       oldBudgetRemainingPeriods: "12",
       oldBudgetNonce: String(budgetNonce),
       oldBudgetCiphertextHash: String(encryptedBudget.ciphertextHashField),
-      oldBudgetDepth: topUpBudgetMembership.depth,
-      oldBudgetIndex: topUpBudgetMembership.index,
-      oldBudgetSiblings: topUpBudgetMembership.siblings,
-      budgetUseNonce: String(topUpUseNonce),
+      oldBudgetDepth: additionalFundingBudgetMembership.depth,
+      oldBudgetIndex: additionalFundingBudgetMembership.index,
+      oldBudgetSiblings: additionalFundingBudgetMembership.siblings,
+      budgetUseNonce: String(additionalFundingUseNonce),
       budgetPeriods: "3",
-      budgetNonce: String(topUpBudgetNonce),
-      changeNonce: String(topUpChangeNonce),
+      budgetNonce: String(additionalFundingBudgetNonce),
+      changeNonce: String(additionalFundingChangeNonce),
     };
-    const topUpProof = await prove("fund", topUpWitness, topUpSignals);
-    const tamperedTopUp = {
-      ...topUpData,
-      outputCommitments: [topUpBudgetCommitment + 1n, topUpDonorChange.commitment],
-    };
-    await expect(pool.fund(tamperedTopUp, topUpProof)).to.be.revertedWithCustomError(
-      pool,
-      "InvalidZKProof",
+    const additionalFundingProof = await prove(
+      "fund",
+      additionalFundingWitness,
+      additionalFundingSignals,
     );
-    const topUpReceipt = await (await pool.fund(topUpData, topUpProof)).wait();
-    expect(await pool.nullifierSpent(topUpData.inputNullifiers[0])).to.equal(true);
-    expect(await pool.nullifierSpent(topUpData.inputNullifiers[1])).to.equal(true);
+    const tamperedAdditionalFunding = {
+      ...additionalFundingData,
+      outputCommitments: [
+        additionalFundingBudgetCommitment + 1n,
+        additionalFundingDonorChange.commitment,
+      ],
+    };
+    await expect(
+      pool.fund(tamperedAdditionalFunding, additionalFundingProof),
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    const additionalFundingReceipt = await (
+      await pool.fund(additionalFundingData, additionalFundingProof)
+    ).wait();
+    expect(await pool.nullifierSpent(additionalFundingData.inputNullifiers[0])).to.equal(true);
+    expect(await pool.nullifierSpent(additionalFundingData.inputNullifiers[1])).to.equal(true);
     expect(
       await pool.nullifierSpent(
         computeShieldedSpendNullifier({
@@ -1018,23 +1035,22 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     expect(await pool.commitmentExists(budgetCommitment)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(2000n);
     expect(await token.balanceOf(poolAddress)).to.equal(2000n);
-    const recoveredTopUpPayload = await decryptShieldedNote({
-      ciphertext: encryptedTopUpBudget.ciphertext,
+    const recoveredAdditionalFundingPayload = await decryptShieldedNote({
+      ciphertext: encryptedAdditionalFundingBudget.ciphertext,
       hpkeIkm: heirKeys.hpkeIkm,
       chainId,
       poolAddress,
     });
     expect(
       verifyShieldedNotePayload({
-        payload: recoveredTopUpPayload,
-        ciphertext: encryptedTopUpBudget.ciphertext,
-        noteCommitment: topUpBudgetCommitment,
+        payload: recoveredAdditionalFundingPayload,
+        ciphertext: encryptedAdditionalFundingBudget.ciphertext,
+        noteCommitment: additionalFundingBudgetCommitment,
       }).note.remaining,
     ).to.equal(300n);
-    await expect(pool.fund(topUpData, topUpProof)).to.be.revertedWithCustomError(
-      pool,
-      "NullifierAlreadySpent",
-    );
+    await expect(
+      pool.fund(additionalFundingData, additionalFundingProof),
+    ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
 
     const preClaimRoot = (await pool.noteShard(0)).root;
     const budgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
@@ -1109,7 +1125,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           useSecond
             ? computeShieldedSpendNullifier({
                 ownerSecret: heirKeys.ownerSecret,
-                noteCommitment: topUpBudgetCommitment,
+                noteCommitment: additionalFundingBudgetCommitment,
               })
             : dummyBudgetTag,
         ],
@@ -1146,8 +1162,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ? {
               secondRemaining: "300",
               secondRemainingPeriods: "3",
-              secondBudgetNonce: String(topUpBudgetNonce),
-              secondBudgetCiphertextHash: String(encryptedTopUpBudget.ciphertextHashField),
+              secondBudgetNonce: String(additionalFundingBudgetNonce),
+              secondBudgetCiphertextHash: String(
+                encryptedAdditionalFundingBudget.ciphertextHashField,
+              ),
               secondNoteDepth: secondBudgetMembership.depth,
               secondNoteIndex: secondBudgetMembership.index,
               secondNoteSiblings: secondBudgetMembership.siblings,
@@ -1235,9 +1253,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       inputNullifiers: [
         computeShieldedSpendNullifier({
           ownerSecret: donorOwnerSecret,
-          noteCommitment: topUpDonorChange.commitment,
+          noteCommitment: additionalFundingDonorChange.commitment,
         }),
-        computeShieldedTopUpUseNullifier({
+        computeShieldedBudgetUseNullifier({
           policySalt,
           budgetNoteCommitment: budgetCommitment,
           useNonce: 224n,
@@ -1255,11 +1273,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const continuedProof = await prove(
       "fund",
       {
-        ...topUpWitness,
+        ...additionalFundingWitness,
         ...continuedInputs.witness,
         donorAmount: "500",
-        donorNonce: String(topUpChangeNonce),
-        donorCiphertextHash: String(topUpDonorChange.ciphertextHashField),
+        donorNonce: String(additionalFundingChangeNonce),
+        donorCiphertextHash: String(additionalFundingDonorChange.ciphertextHashField),
         donorDepth: continuingDonor.depth,
         donorIndex: continuingDonor.index,
         donorSiblings: continuingDonor.siblings,
@@ -1397,20 +1415,20 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     ).to.equal(1100n);
     await branch.restore();
 
-    // This separate top-up budget contains only three whole periods. A four
+    // This additional budget contains only three whole periods. A four
     // period claim is invalid even though all four periods are already due.
     const fourPeriods = await makeClaim(4);
-    const topUpClaimMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    const additionalFundingClaimMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
     const underfundedClaimData = {
       ...fourPeriods.claimData,
       inputNullifiers: [
         computeShieldedSpendNullifier({
           ownerSecret: heirKeys.ownerSecret,
-          noteCommitment: topUpBudgetCommitment,
+          noteCommitment: additionalFundingBudgetCommitment,
         }),
         computeShieldedDummyInputNullifier({
           ownerSecret: heirKeys.ownerSecret,
-          noteCommitment: topUpBudgetCommitment,
+          noteCommitment: additionalFundingBudgetCommitment,
         }),
       ],
       periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
@@ -1418,7 +1436,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           ? fourPeriods.claimData.periodNullifiers[slot]
           : computeShieldedDummyPeriodNullifier({
               ownerSecret: heirKeys.ownerSecret,
-              budgetNoteCommitment: topUpBudgetCommitment,
+              budgetNoteCommitment: additionalFundingBudgetCommitment,
               slotIndex: slot,
             }),
       ),
@@ -1453,11 +1471,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         ...underfundedClaimPublicInputs,
         remaining: "300",
         remainingPeriods: "3",
-        budgetNonce: String(topUpBudgetNonce),
-        budgetCiphertextHash: String(encryptedTopUpBudget.ciphertextHashField),
-        noteDepth: topUpClaimMembership.depth,
-        noteIndex: topUpClaimMembership.index,
-        noteSiblings: topUpClaimMembership.siblings,
+        budgetNonce: String(additionalFundingBudgetNonce),
+        budgetCiphertextHash: String(encryptedAdditionalFundingBudget.ciphertextHashField),
+        noteDepth: additionalFundingClaimMembership.depth,
+        noteIndex: additionalFundingClaimMembership.index,
+        noteSiblings: additionalFundingClaimMembership.siblings,
       },
       /ShieldedClaim/u,
     );
@@ -1508,7 +1526,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       RangeError,
     );
     console.log(
-      `local Hardhat gas (not release evidence): fundInitial=${allocateReceipt.gasUsed} fundContinuation=${topUpReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
+      `local Hardhat gas (not release evidence): fundInitial=${fundReceipt.gasUsed} fundContinuation=${additionalFundingReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
     );
   });
 

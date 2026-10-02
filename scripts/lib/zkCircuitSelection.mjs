@@ -16,14 +16,14 @@ export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze(["receiveCode"]);
 export const hasShieldedSolidityVerifier = (action) =>
   !SHIELDED_CLIENT_ONLY_CIRCUITS.includes(action);
 
-export const LEGACY_CIRCUITS = Object.freeze(["person", "disclosure"]);
+export const CORE_CIRCUITS = Object.freeze(["person", "disclosure"]);
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze(
   Object.keys(SHIELDED_CIRCUITS).map((action) => `shielded:${action}`),
 );
 const CIRCUIT_CHOICES = Object.freeze([
   "all",
-  "legacy",
-  ...LEGACY_CIRCUITS,
+  "core",
+  ...CORE_CIRCUITS,
   "shielded",
   ...SHIELDED_CIRCUIT_NAMES,
 ]);
@@ -47,7 +47,7 @@ export const parseCircuitArguments = (argv) => {
     circuit = argv[0].slice("--circuit=".length);
   } else {
     throw new Error(
-      "Usage: --circuit <all|legacy|person|disclosure|shielded|shielded:action> " +
+      "Usage: --circuit <all|core|person|disclosure|shielded|shielded:action> " +
         "(the option may be omitted to select all)",
     );
   }
@@ -66,8 +66,8 @@ export const selectCircuitNames = (circuit) => {
       `Invalid circuit ${JSON.stringify(circuit)}; expected one of: ${CIRCUIT_CHOICES.join(", ")}`,
     );
   }
-  if (circuit === "all") return Object.freeze([...LEGACY_CIRCUITS, ...SHIELDED_CIRCUIT_NAMES]);
-  if (circuit === "legacy") return LEGACY_CIRCUITS;
+  if (circuit === "all") return Object.freeze([...CORE_CIRCUITS, ...SHIELDED_CIRCUIT_NAMES]);
+  if (circuit === "core") return CORE_CIRCUITS;
   if (circuit === "shielded") return SHIELDED_CIRCUIT_NAMES;
   return Object.freeze([circuit]);
 };

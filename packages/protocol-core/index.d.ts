@@ -625,7 +625,7 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   viewSeed: bigint;
   dummyPeriodNullifier: bigint;
   dummyInputNullifier: bigint;
-  topUpUseNullifier: bigint;
+  budgetUseNullifier: bigint;
   enrollmentNullifier: bigint;
   allocationKeyCommitment: bigint;
 }>;
@@ -646,7 +646,7 @@ export function computeShieldedEnrollmentNullifier(input: {
   policyCommitment: BigNumberish;
   heirIdentityCommitment: BigNumberish;
 }): bigint;
-export function computeShieldedTopUpUseNullifier(input: {
+export function computeShieldedBudgetUseNullifier(input: {
   policySalt: BigNumberish;
   budgetNoteCommitment: BigNumberish;
   useNonce: BigNumberish;
@@ -739,18 +739,18 @@ export function decryptShieldedNote(input: {
 export const SHIELDED_NOTE_PAYLOAD_VERSION: 1;
 export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
-export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 4;
-export const SHIELDED_VALUE_WITH_POLICY_MEMO_KIND: 5;
+export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND: 4;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
 export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 302;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 420;
-export const SHIELDED_VALUE_WITH_POLICY_MEMO_PAYLOAD_BYTES: 452;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 452;
 export interface ShieldedValueNotePayload {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
   nonce: BigNumberish;
-  /** Encrypted to the value-note owner, so its allocator can recover top-up materials. */
-  topUpMemo?: {
+  /** Encrypted to the value-note owner, so its donor can recover funding materials. */
+  fundingMemo?: {
     budgetCommitment: BigNumberish;
     budgetNote: ShieldedBudgetNotePayload;
     allocationKey?: BigNumberish;
@@ -782,7 +782,7 @@ export type DecodedShieldedNotePayload =
       ownerCommitment: bigint;
       amount: bigint;
       nonce: bigint;
-      topUpMemo?: {
+      fundingMemo?: {
         budgetCommitment: bigint;
         budgetNote: { [K in keyof ShieldedBudgetNotePayload]: bigint };
         allocationKey?: bigint;

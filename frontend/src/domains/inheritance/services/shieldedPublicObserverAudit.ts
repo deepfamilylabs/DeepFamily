@@ -21,12 +21,12 @@ export type PublicPoolActionObservation = {
   outputs: readonly [PublicNoteOutput, PublicNoteOutput];
 };
 
-export type KnownAllocationClaimLink = {
+export type KnownFundingClaimLink = {
   verdict: "directly-linkable" | "not-established" | "incomplete-history";
   claimTxHash: string;
   claimActionLogIndex?: number;
-  claimInputShardId: bigint;
-  knownAllocationCommitment: bigint;
+  claimInputShardIds: readonly [bigint, bigint];
+  knownFundingCommitment: bigint;
   /** Conservative inventory of all budget-shaped outputs before the claim in this shard. */
   candidateBudgetCommitments: bigint[];
 };
@@ -39,10 +39,10 @@ const BUDGET_OUTPUT_ACTIONS = new Set<ShieldedAction>([
 /**
  * Check a narrow public-data inference, not a general anonymity guarantee.
  * The circuits make output slot 0 a budget note for the actions above. A
- * successful Claim publicly exposes its input note shard in both input slots.
- * If every budget-shaped note ever appended to that shard before this claim is
- * known to belong to the same child as an initial allocation, an observer can
- * identify the child even when a top-up creates another possible budget input.
+ * successful Claim publicly exposes both input shard slots, which may differ.
+ * If every budget-shaped note ever appended to those shards before this claim is
+ * known to belong to the same child as initial funding, an observer can
+ * identify the child even when additional funding creates another possible budget input.
  *
  * Feed this only complete, chain-ordered, receipt-verified pool transactions
  * through the target claim. The caller should reconcile all NoteAppended logs
@@ -54,16 +54,16 @@ const BUDGET_OUTPUT_ACTIONS = new Set<ShieldedAction>([
  * when they may have been spent, so it cannot undercount candidates by guessing
  * secret nullifier-to-note relationships.
  */
-export function auditKnownAllocationClaimLink(input: {
+export function auditKnownFundingClaimLink(input: {
   actions: readonly PublicPoolActionObservation[];
-  knownAllocationCommitment: bigint;
-  /** Additional budgets known to belong to the initial allocation's child. */
+  knownFundingCommitment: bigint;
+  /** Additional budgets known to belong to the initial funding's child. */
   knownChildBudgetCommitments?: readonly bigint[];
   claimTxHash: string;
   /** Required only if the same transaction contains multiple Claim actions. */
   claimActionLogIndex?: number;
   historyVerifiedFromDeployment: boolean;
-}): KnownAllocationClaimLink {
+}): KnownFundingClaimLink {
   const claims = input.actions.flatMap((action, index) =>
     action.txHash === input.claimTxHash &&
     action.action === SHIELDED_POOL_ACTION.Claim &&
@@ -78,14 +78,13 @@ export function auditKnownAllocationClaimLink(input: {
   const claimIndex = claims[0];
   const claim = input.actions[claimIndex];
   const priorActions = input.actions.slice(0, claimIndex);
-  const allocation = priorActions.find(
+  const funding = priorActions.find(
     (action) =>
       action.action === SHIELDED_POOL_ACTION.Fund &&
-      action.outputs[0].commitment === input.knownAllocationCommitment,
+      action.outputs[0].commitment === input.knownFundingCommitment,
   );
-  if (!allocation) throw new Error("Known commitment is not an earlier allocation output");
+  if (!funding) throw new Error("Known commitment is not an earlier funding output");
 
-  const claimInputShardId = claim.inputShardIds[0];
   const candidateBudgetCommitments = priorActions
     .filter(
       (action) =>
@@ -94,7 +93,7 @@ export function auditKnownAllocationClaimLink(input: {
     )
     .map((action) => action.outputs[0].commitment);
   const knownChildBudgets = new Set([
-    input.knownAllocationCommitment,
+    input.knownFundingCommitment,
     ...(input.knownChildBudgetCommitments ?? []),
   ]);
   return {
@@ -106,8 +105,8 @@ export function auditKnownAllocationClaimLink(input: {
         : "not-established",
     claimTxHash: input.claimTxHash,
     ...(claim.actionLogIndex === undefined ? {} : { claimActionLogIndex: claim.actionLogIndex }),
-    claimInputShardId,
-    knownAllocationCommitment: input.knownAllocationCommitment,
+    claimInputShardIds: claim.inputShardIds,
+    knownFundingCommitment: input.knownFundingCommitment,
     candidateBudgetCommitments,
   };
 }

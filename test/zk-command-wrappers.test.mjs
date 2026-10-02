@@ -72,6 +72,10 @@ describe("parameterized ZK command wrappers", function () {
           help: false,
           circuit: "all",
         });
+        expect(parser(["--circuit", "core"])).to.deep.equal({
+          help: false,
+          circuit: "core",
+        });
         expect(parser(["--circuit", "person"])).to.deep.equal({
           help: false,
           circuit: "person",
@@ -95,10 +99,13 @@ describe("parameterized ZK command wrappers", function () {
       it("rejects missing, unsupported, duplicate and unrelated arguments", function () {
         expect(() => parser(["--circuit"])).to.throw(/Usage/);
         expect(() => parser(["--circuit", "unknown"])).to.throw(
-          /expected one of: all, legacy, person, disclosure/,
+          /expected one of: all, core, person, disclosure/,
         );
         expect(() => parser(["--circuit="])).to.throw(
-          /expected one of: all, legacy, person, disclosure/,
+          /expected one of: all, core, person, disclosure/,
+        );
+        expect(() => parser(["--circuit", "legacy"])).to.throw(
+          /expected one of: all, core, person, disclosure/,
         );
         expect(() => parser(["--circuit", "person", "--circuit", "disclosure"])).to.throw(/Usage/);
         expect(() => parser(["--unknown"])).to.throw(/Usage/);
@@ -272,7 +279,7 @@ describe("parameterized ZK command wrappers", function () {
 
   describe("zk-check", function () {
     it("builds fixed proof and constraint commands in person/disclosure order", function () {
-      const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "legacy" });
+      const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "core" });
       expect(commands).to.deep.equal([
         {
           circuit: "person",
@@ -405,7 +412,7 @@ describe("parameterized ZK command wrappers", function () {
     it("rejects an invalid runner and programmatic circuit selection", function () {
       expect(() => runZkCheck({ runner: null })).to.throw(/runner must be a function/);
       expect(() => buildZkCheckCommands({ circuit: "invalid" })).to.throw(
-        /expected one of: all, legacy, person, disclosure/,
+        /expected one of: all, core, person, disclosure/,
       );
     });
   });

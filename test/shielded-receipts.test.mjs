@@ -9,9 +9,9 @@ import {
 } from "../scripts/lib/shieldedReceipts.mjs";
 
 const poolAddress = "0x0000000000000000000000000000000000000071";
-const allocationTxHash = `0x${"11".repeat(32)}`;
+const fundTxHash = `0x${"11".repeat(32)}`;
 const claimTxHash = `0x${"22".repeat(32)}`;
-const allocationBlockHash = `0x${"aa".repeat(32)}`;
+const fundBlockHash = `0x${"aa".repeat(32)}`;
 const claimBlockHash = `0x${"bb".repeat(32)}`;
 
 function fixtureProvider({ chainId = 71, change = () => {} } = {}) {
@@ -20,13 +20,13 @@ function fixtureProvider({ chainId = 71, change = () => {} } = {}) {
     providerChainId: BigInt(chainId),
     code: "0x6000",
     transactions: {
-      [allocationTxHash]: {
-        hash: allocationTxHash,
+      [fundTxHash]: {
+        hash: fundTxHash,
         chainId: BigInt(chainId),
         to: poolAddress,
         data: `${FUND_SELECTOR}abcd`,
         gasLimit: 900_000n,
-        blockHash: allocationBlockHash,
+        blockHash: fundBlockHash,
         blockNumber: 10,
       },
       [claimTxHash]: {
@@ -40,11 +40,11 @@ function fixtureProvider({ chainId = 71, change = () => {} } = {}) {
       },
     },
     receipts: {
-      [allocationTxHash]: {
-        hash: allocationTxHash,
+      [fundTxHash]: {
+        hash: fundTxHash,
         to: poolAddress,
         status: 1,
-        blockHash: allocationBlockHash,
+        blockHash: fundBlockHash,
         blockNumber: 10,
         gasUsed: 800_000n,
       },
@@ -58,11 +58,11 @@ function fixtureProvider({ chainId = 71, change = () => {} } = {}) {
       },
     },
     blocks: {
-      [allocationBlockHash]: { hash: allocationBlockHash, number: 10, gasLimit: 30_000_000n },
+      [fundBlockHash]: { hash: fundBlockHash, number: 10, gasLimit: 30_000_000n },
       [claimBlockHash]: { hash: claimBlockHash, number: 11, gasLimit: 30_000_000n },
     },
     canonicalBlocks: {
-      10: { hash: allocationBlockHash, number: 10, gasLimit: 30_000_000n },
+      10: { hash: fundBlockHash, number: 10, gasLimit: 30_000_000n },
       11: { hash: claimBlockHash, number: 11, gasLimit: 30_000_000n },
     },
   };
@@ -107,7 +107,7 @@ const input = (provider, expectedChainId = 71) => ({
   provider,
   expectedChainId,
   poolAddress,
-  allocationTxHash,
+  fundTxHash,
   claimTxHash,
 });
 
@@ -144,9 +144,9 @@ describe("shielded receipt observer", function () {
     for (const [overrides, expected] of [
       [{ poolAddress: "invalid" }, /valid EVM address/],
       [{ poolAddress: ZeroAddress }, /zero address/],
-      [{ allocationTxHash: "0x1234" }, /32-byte transaction hash/],
+      [{ fundTxHash: "0x1234" }, /32-byte transaction hash/],
       [{ claimTxHash: "0x1234" }, /32-byte transaction hash/],
-      [{ claimTxHash: allocationTxHash }, /distinct/],
+      [{ claimTxHash: fundTxHash }, /distinct/],
     ]) {
       const { provider, calls } = fixtureProvider();
       await assert.rejects(verifyShieldedReceipts({ ...input(provider), ...overrides }), expected);
@@ -154,11 +154,11 @@ describe("shielded receipt observer", function () {
     }
   });
 
-  it("observes allocation alone when no mature claim transaction is supplied", async function () {
+  it("observes fund alone when no mature claim transaction is supplied", async function () {
     const { provider, calls } = fixtureProvider();
     const result = await verifyShieldedReceipts({ ...input(provider), claimTxHash: undefined });
-    assert.deepEqual(Object.keys(result.transactions), ["allocation"]);
-    assert.equal(result.transactions.allocation.txHash, allocationTxHash);
+    assert.deepEqual(Object.keys(result.transactions), ["fund"]);
+    assert.equal(result.transactions.fund.txHash, fundTxHash);
     assert.equal(calls.filter((method) => method === "getTransaction").length, 1);
   });
 
@@ -172,10 +172,10 @@ describe("shielded receipt observer", function () {
         poolAddress,
         rpcChecks: "passed",
         transactions: {
-          allocation: {
-            txHash: allocationTxHash,
+          fund: {
+            txHash: fundTxHash,
             blockNumber: 10,
-            blockHash: allocationBlockHash,
+            blockHash: fundBlockHash,
             selector: FUND_SELECTOR,
             gasUsed: "800000",
             transactionGasLimit: "900000",
@@ -194,7 +194,7 @@ describe("shielded receipt observer", function () {
       });
       assert.deepEqual(calls.slice(0, 2).sort(), ["eth_chainId", "getNetwork"]);
       assert.equal(calls.filter((method) => method === "getTransaction").length, 2);
-      assert.ok(blockLookups.includes(allocationBlockHash));
+      assert.ok(blockLookups.includes(fundBlockHash));
       assert.ok(blockLookups.includes(claimBlockHash));
       assert.ok(blockLookups.includes(10));
       assert.ok(blockLookups.includes(11));
@@ -261,7 +261,7 @@ describe("shielded receipt observer", function () {
     for (const [change, expected] of [
       [
         (fixture) => {
-          delete fixture.transactions[allocationTxHash];
+          delete fixture.transactions[fundTxHash];
         },
         /transaction or receipt is missing/,
       ],
@@ -292,7 +292,7 @@ describe("shielded receipt observer", function () {
   it("rejects a reorged receipt block by rechecking its canonical height", async function () {
     const { provider, blockLookups } = fixtureProvider({
       change: (fixture) => {
-        fixture.canonicalBlocks[11].hash = allocationBlockHash;
+        fixture.canonicalBlocks[11].hash = fundBlockHash;
       },
     });
     await assert.rejects(
@@ -313,7 +313,7 @@ describe("shielded receipt observer", function () {
       ],
       [
         (fixture) => {
-          fixture.transactions[allocationTxHash].to = "0x0000000000000000000000000000000000000002";
+          fixture.transactions[fundTxHash].to = "0x0000000000000000000000000000000000000002";
         },
         /selected shielded pool/,
       ],
@@ -331,13 +331,13 @@ describe("shielded receipt observer", function () {
       ],
       [
         (fixture) => {
-          fixture.receipts[claimTxHash].hash = allocationTxHash;
+          fixture.receipts[claimTxHash].hash = fundTxHash;
         },
         /different transaction hash/,
       ],
       [
         (fixture) => {
-          fixture.receipts[allocationTxHash].gasUsed = 1_000_000n;
+          fixture.receipts[fundTxHash].gasUsed = 1_000_000n;
         },
         /gas exceeds/,
       ],
@@ -349,7 +349,7 @@ describe("shielded receipt observer", function () {
       ],
       [
         (fixture) => {
-          fixture.receipts[allocationTxHash].gasUsed = 0n;
+          fixture.receipts[fundTxHash].gasUsed = 0n;
         },
         /gas values must be positive/,
       ],
@@ -367,13 +367,13 @@ describe("shielded receipt observer", function () {
       ],
       [
         (fixture) => {
-          fixture.blocks[allocationBlockHash].number = 12;
+          fixture.blocks[fundBlockHash].number = 12;
         },
         /inclusion block/,
       ],
       [
         (fixture) => {
-          fixture.transactions[claimTxHash].blockHash = allocationBlockHash;
+          fixture.transactions[claimTxHash].blockHash = fundBlockHash;
         },
         /disagree on the inclusion block/,
       ],

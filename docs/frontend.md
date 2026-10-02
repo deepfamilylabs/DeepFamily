@@ -24,7 +24,7 @@ frontend/src/
 ├── pages/       # Route-level composition; imports from domains + shared only
 ├── domains/     # Feature code grouped by bounded context
 │   ├── config/        # Network/contract config context and UI
-│   ├── inheritance/   # Shared private DEEP pool: deposits, allocations, claims, exits
+│   ├── inheritance/   # Shared DEEP pool: private/public funding, claims, transfers, exits
 │   ├── wallet/        # Wallet + network selection
 │   ├── person/        # Person model, queries, UI coordination
 │   ├── tree/          # Family-tree context/queries/selectors/services and view UI
@@ -66,8 +66,10 @@ Use the directory tree for ownership boundaries, and these files as first-read e
   `frontend/src/shared/zk/proofDescriptors.ts`
 - Family inheritance: `frontend/src/pages/InheritancePage.tsx`,
   `frontend/src/domains/inheritance/services/inheritanceChain.ts` (tree replay and legitimacy
-  lookup), `frontend/src/domains/inheritance/services/inheritanceFlows.ts` (funding, claim math,
-  submission), and `packages/protocol-core/inheritance.js` (witness builder)
+  lookup), `frontend/src/domains/inheritance/services/shieldedFundingPreparation.ts` (private
+  funding), `frontend/src/domains/inheritance/services/shieldedClaimPreparation.ts` (private
+  claims), `frontend/src/domains/inheritance/services/publicBudgetFlows.ts` (public budgets),
+  and `packages/protocol-core/shielded-inheritance.js` (commitments and claim math)
 - Boundary tests: `frontend/src/shared/config/env.test.ts`, `frontend/src/pages/TreePage.test.tsx`, `frontend/src/domains/tree/api/treeReadGateway.test.ts`, `frontend/src/domains/transactions/api/txGateway.test.ts`, `frontend/src/pages/InheritancePage.test.tsx`
 
 Update this section when adding or moving stable entry points, route groups, domain gateways, app providers, shared config/client/cache layers, worker boundaries, or boundary-level tests. Do not list ordinary leaf components, local renderers, or one-off helpers here; keep them discoverable through their owning directory.
@@ -224,7 +226,7 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 ### Shielded family inheritance
 
-`/inheritance` uses `ShieldedDeepPool`. The page derives shielded spend and viewing keys from the existing identity passphrase on the device, reads public note and lineage events, opens matching ciphertexts locally, and creates proofs in the ZK worker. It presents receiving details, a public `shield` deposit, unified private funding, budget claims, private transfers, and a separate public exit. Funding initializes a rule and enrollment or adds funds to a recovered enrollment. There are no separate policy-creation or budget-merge actions. Claims automatically choose up to two compatible budgets and consolidate the remainder; funding and public exits automatically consolidate free-value notes when necessary.
+`/inheritance` uses `ShieldedDeepPool`. The page derives shielded spend and viewing keys from the existing identity passphrase on the device, reads public note and lineage events, opens matching ciphertexts locally, and creates proofs in the ZK worker. It presents receiving details, a public `shield` deposit, private and public budget funding, budget claims, private transfers, and a public exit. Private `fund` binds a rule and initializes an enrollment or adds funds to a recovered enrollment. Public `fundPublic` uses the child's existing identity without a receive code; `claimPublic` proves ownership of that identity and pays private VALUE notes. Claims automatically choose up to two compatible budgets and consolidate the remainder; private funding and public exits consolidate free-value notes when automatic input selection needs a larger note. Manually selected notes must cover the requested amount.
 
 A recipient creates a receive code from their unlocked identity. The ZK worker derives the payment keys and proves that the identity chose them (see [the receive-code circuit](zk-proofs.md#shielded-inheritance-circuits)). Creating a code needs no wallet or transaction, and each generated code differs but all are valid. Senders paste the code for funding and private transfers.
 

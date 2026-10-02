@@ -37,7 +37,7 @@ const budget = {
 };
 const memoValue = {
   ...value,
-  topUpMemo: { budgetCommitment: 71n, budgetNote: budget },
+  fundingMemo: { budgetCommitment: 71n, budgetNote: budget },
 };
 
 test("strict binary value and budget payloads round-trip within HPKE envelope", () => {
@@ -119,10 +119,12 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     () => decodeShieldedNotePayload(modified(4, 2)),
     (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_VERSION",
   );
-  assert.throws(
-    () => decodeShieldedNotePayload(modified(5, 3)),
-    (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_KIND",
-  );
+  for (const unsupportedKind of [0, 5, 255]) {
+    assert.throws(
+      () => decodeShieldedNotePayload(modified(5, unsupportedKind)),
+      (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_KIND",
+    );
+  }
   assert.throws(
     () => decodeShieldedNotePayload(new Uint8Array([...payload, 0])),
     (error) => error.code === "INVALID_SHIELDED_NOTE_LENGTH",
@@ -144,7 +146,7 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     () =>
       encodeShieldedValueNotePayload({
         ...value,
-        topUpMemo: { budgetCommitment: 0n, budgetNote: budget },
+        fundingMemo: { budgetCommitment: 0n, budgetNote: budget },
       }),
     (error) => error.code === "ZERO_SHIELDED_BUDGET_COMMITMENT",
   );
@@ -169,7 +171,7 @@ test("budget codec rejects zero rates, fractional periods and oversized counts",
 });
 
 test("donor-only rule backup fits the fixed envelope and never becomes a note", () => {
-  const ruleMemo = { ...memoValue, topUpMemo: { ...memoValue.topUpMemo, allocationKey: 41n } };
+  const ruleMemo = { ...memoValue, fundingMemo: { ...memoValue.fundingMemo, allocationKey: 41n } };
   const payload = encodeShieldedValueNotePayload(ruleMemo);
   assert.equal(payload.length, 452);
   assert.ok(payload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
@@ -181,7 +183,7 @@ test("donor-only rule backup fits the fixed envelope and never becomes a note", 
     () =>
       encodeShieldedValueNotePayload({
         ...ruleMemo,
-        topUpMemo: { ...ruleMemo.topUpMemo, allocationKey: 42n },
+        fundingMemo: { ...ruleMemo.fundingMemo, allocationKey: 42n },
       }),
     (error) => error.code === "INVALID_SHIELDED_ALLOCATION_KEY",
   );

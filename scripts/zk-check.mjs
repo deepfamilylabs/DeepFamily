@@ -74,10 +74,10 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
     "shielded-production-manifest.json",
   );
   const selected = selectCircuitNames(circuit);
-  const legacy = selected.filter((name) => !name.startsWith("shielded:"));
+  const core = selected.filter((name) => !name.startsWith("shielded:"));
   const shielded = selected.filter((name) => name.startsWith("shielded:"));
   return Object.freeze([
-    ...legacy.flatMap((name) =>
+    ...core.flatMap((name) =>
       CHECKS[name].map((check) =>
         Object.freeze({
           circuit: name,
@@ -149,7 +149,7 @@ export const runZkCheck = ({
 
 const printUsage = () => {
   console.log(`Usage:
-  node scripts/zk-check.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
+  node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
 all seven development artifact sets and proves fund/claim/claimPublic when no production manifest exists;

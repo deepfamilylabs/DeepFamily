@@ -27,9 +27,9 @@ export const SHIELDED_PHASE2_TRANSCRIPT_PATH = "release-evidence/shielded/phase2
 const SHA256 = /^[0-9a-f]{64}$/u;
 const BLAKE2B512 = /^[0-9a-f]{128}$/u;
 const RELEASE_CRITERIA_FIELDS = Object.freeze([
-  "allocationMaxGas",
+  "fundMaxGas",
   "claim12MaxGas",
-  "browserAllocationMaxMs",
+  "browserFundMaxMs",
   "browserClaim12MaxMs",
   "recoveryMaxMs",
   "recoveryMinEvents",

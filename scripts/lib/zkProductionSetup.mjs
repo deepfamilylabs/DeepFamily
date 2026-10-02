@@ -1743,23 +1743,23 @@ export const runSingleOperatorProductionSetup = async ({
         sourceDigest: shieldedSourceDigest,
       });
     }
-    const legacyEntries = buildInstallEntries({
+    const coreEntries = buildInstallEntries({
       circuits: finalized,
       records,
     });
-    // The old manifest remains the final installation marker. The shielded manifest is installed
+    // The core manifest remains the final installation marker. The shielded manifest is installed
     // immediately before it, after all nine circuit artifacts and the shielded transcript.
     const entries = includeShielded
       ? [
-          ...legacyEntries.slice(0, -1),
+          ...coreEntries.slice(0, -1),
           ...shieldedProductionInstallEntries({
             compiled: shieldedCompiled,
             finalized: shieldedFinalized,
             records: shieldedRecords,
           }),
-          legacyEntries.at(-1),
+          coreEntries.at(-1),
         ]
-      : legacyEntries;
+      : coreEntries;
     await validateStagedProductionArtifacts({
       root: resolvedRoot,
       ptauPath: stagedPtau.path,
