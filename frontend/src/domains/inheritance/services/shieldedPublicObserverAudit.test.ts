@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SHIELDED_POOL_ACTION } from "@deepfamily/protocol-core";
 import {
-  auditKnownAllocationClaimLink,
+  auditKnownFundingClaimLink,
   type PublicPoolActionObservation,
 } from "./shieldedPublicObserverAudit";
 
@@ -14,17 +14,8 @@ const shield: PublicPoolActionObservation = {
     { commitment: 12n, shardId: 0n },
   ],
 };
-const policy: PublicPoolActionObservation = {
-  txHash: "policy",
-  action: SHIELDED_POOL_ACTION.PrivateTransfer,
-  inputShardIds: [0n, 0n],
-  outputs: [
-    { commitment: 21n, shardId: 0n },
-    { commitment: 22n, shardId: 0n },
-  ],
-};
-const allocation: PublicPoolActionObservation = {
-  txHash: "allocation",
+const funding: PublicPoolActionObservation = {
+  txHash: "funding",
   action: SHIELDED_POOL_ACTION.Fund,
   inputShardIds: [0n, 0n],
   outputs: [
@@ -46,54 +37,54 @@ function audit(
   actions: readonly PublicPoolActionObservation[],
   historyVerifiedFromDeployment = true,
 ) {
-  return auditKnownAllocationClaimLink({
+  return auditKnownFundingClaimLink({
     actions,
-    knownAllocationCommitment: 101n,
+    knownFundingCommitment: 101n,
     claimTxHash: "claim",
     historyVerifiedFromDeployment,
   });
 }
 
 describe("public observer linkability audit", () => {
-  it("links a claim to a known allocation when its shard has one budget candidate", () => {
-    const result = audit([shield, policy, allocation, claim]);
+  it("links a claim to a known funding when its shard has one budget candidate", () => {
+    const result = audit([shield, funding, claim]);
     expect(result).toEqual({
       verdict: "directly-linkable",
       claimTxHash: "claim",
-      claimInputShardId: 0n,
-      knownAllocationCommitment: 101n,
+      claimInputShardIds: [0n, 0n],
+      knownFundingCommitment: 101n,
       candidateBudgetCommitments: [101n],
     });
   });
 
   it("counts another budget in the same shard and makes no anonymity claim", () => {
-    const otherAllocation: PublicPoolActionObservation = {
-      ...allocation,
-      txHash: "other-allocation",
+    const otherFunding: PublicPoolActionObservation = {
+      ...funding,
+      txHash: "other-fund",
       outputs: [
         { commitment: 301n, shardId: 0n },
         { commitment: 302n, shardId: 0n },
       ],
     };
-    const result = audit([shield, policy, allocation, otherAllocation, claim]);
+    const result = audit([shield, funding, otherFunding, claim]);
     expect(result.verdict).toBe("not-established");
     expect(result.candidateBudgetCommitments).toEqual([101n, 301n]);
   });
 
   it("links a claim when all same-shard budgets are known to be for the same child", () => {
-    const sameChildTopUp: PublicPoolActionObservation = {
-      ...allocation,
-      txHash: "same-child-top-up",
+    const sameChildAdditionalFunding: PublicPoolActionObservation = {
+      ...funding,
+      txHash: "same-child-additional-fund",
       action: SHIELDED_POOL_ACTION.Fund,
       outputs: [
         { commitment: 301n, shardId: 0n },
         { commitment: 302n, shardId: 0n },
       ],
     };
-    const actions = [shield, policy, allocation, sameChildTopUp, claim];
-    const result = auditKnownAllocationClaimLink({
+    const actions = [shield, funding, sameChildAdditionalFunding, claim];
+    const result = auditKnownFundingClaimLink({
       actions,
-      knownAllocationCommitment: 101n,
+      knownFundingCommitment: 101n,
       knownChildBudgetCommitments: [301n],
       claimTxHash: "claim",
       historyVerifiedFromDeployment: true,
@@ -101,17 +92,17 @@ describe("public observer linkability audit", () => {
     expect(result.verdict).toBe("directly-linkable");
     expect(result.candidateBudgetCommitments).toEqual([101n, 301n]);
 
-    const unknownChildAllocation: PublicPoolActionObservation = {
-      ...allocation,
-      txHash: "unknown-child-allocation",
+    const unknownChildFunding: PublicPoolActionObservation = {
+      ...funding,
+      txHash: "unknown-child-fund",
       outputs: [
         { commitment: 401n, shardId: 0n },
         { commitment: 402n, shardId: 0n },
       ],
     };
-    const withUnknownChild = auditKnownAllocationClaimLink({
-      actions: [shield, policy, allocation, sameChildTopUp, unknownChildAllocation, claim],
-      knownAllocationCommitment: 101n,
+    const withUnknownChild = auditKnownFundingClaimLink({
+      actions: [shield, funding, sameChildAdditionalFunding, unknownChildFunding, claim],
+      knownFundingCommitment: 101n,
       knownChildBudgetCommitments: [301n],
       claimTxHash: "claim",
       historyVerifiedFromDeployment: true,
@@ -122,7 +113,7 @@ describe("public observer linkability audit", () => {
 
   it("counts only the claim input shard, including budget continuations", () => {
     const otherShardBudget: PublicPoolActionObservation = {
-      ...allocation,
+      ...funding,
       txHash: "other-shard-budget",
       action: SHIELDED_POOL_ACTION.Fund,
       outputs: [
@@ -130,9 +121,7 @@ describe("public observer linkability audit", () => {
         { commitment: 302n, shardId: 1n },
       ],
     };
-    expect(audit([shield, policy, allocation, otherShardBudget, claim]).verdict).toBe(
-      "directly-linkable",
-    );
+    expect(audit([shield, funding, otherShardBudget, claim]).verdict).toBe("directly-linkable");
     const laterClaim: PublicPoolActionObservation = {
       ...claim,
       txHash: "later-claim",
@@ -141,9 +130,9 @@ describe("public observer linkability audit", () => {
         { commitment: 402n, shardId: 0n },
       ],
     };
-    const afterFirstClaim = auditKnownAllocationClaimLink({
-      actions: [shield, policy, allocation, claim, laterClaim],
-      knownAllocationCommitment: 101n,
+    const afterFirstClaim = auditKnownFundingClaimLink({
+      actions: [shield, funding, claim, laterClaim],
+      knownFundingCommitment: 101n,
       claimTxHash: "later-claim",
       historyVerifiedFromDeployment: true,
     });
@@ -152,19 +141,17 @@ describe("public observer linkability audit", () => {
   });
 
   it("refuses a unique-link conclusion without complete verified history", () => {
-    expect(audit([shield, policy, allocation, claim], false).verdict).toBe("incomplete-history");
+    expect(audit([shield, funding, claim], false).verdict).toBe("incomplete-history");
     expect(
-      auditKnownAllocationClaimLink({
-        actions: [shield, policy, allocation, claim],
-        knownAllocationCommitment: 101n,
+      auditKnownFundingClaimLink({
+        actions: [shield, funding, claim],
+        knownFundingCommitment: 101n,
         knownChildBudgetCommitments: [201n],
         claimTxHash: "claim",
         historyVerifiedFromDeployment: false,
       }).verdict,
     ).toBe("incomplete-history");
-    expect(() => audit([shield, policy, claim])).toThrow("earlier allocation output");
-    expect(() =>
-      audit([shield, policy, allocation, { ...claim, inputShardIds: [0n, 1n] }]),
-    ).not.toThrow();
+    expect(() => audit([shield, claim])).toThrow("earlier funding output");
+    expect(() => audit([shield, funding, { ...claim, inputShardIds: [0n, 1n] }])).not.toThrow();
   });
 });

@@ -1251,9 +1251,9 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     inspected.manifest.releaseCriteria,
     "shielded production releaseCriteria",
     [
-      "allocationMaxGas",
+      "fundMaxGas",
       "claim12MaxGas",
-      "browserAllocationMaxMs",
+      "browserFundMaxMs",
       "browserClaim12MaxMs",
       "recoveryMaxMs",
       "recoveryMinEvents",
@@ -1292,7 +1292,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     !Array.isArray(ceremony.circuits) ||
     JSON.stringify([...ceremony.circuits].sort()) !== JSON.stringify(coreCircuitNames)
   ) {
-    throw new Error("zkCeremonyVerification.circuits must cover both original circuits");
+    throw new Error("zkCeremonyVerification.circuits must cover both core circuits");
   }
   const shieldedCeremony = requireExactRecordKeys(
     ceremony.shielded,
@@ -1385,17 +1385,13 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     }
   }
   const scenario = requireRecord(evidence.scenario, "shielded.scenario");
-  requireExact(
-    scenario.allocationLabel,
-    "shielded-action-fund",
-    "shielded.scenario.allocationLabel",
-  );
+  requireExact(scenario.fundLabel, "shielded-action-fund", "shielded.scenario.fundLabel");
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
   requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
   const publicBudget = requireRecord(scenario.publicBudget, "shielded.scenario.publicBudget");
   for (const [field, label] of [
     ["fundingLabel", "public-budget-fund"],
-    ["topUpLabel", "public-budget-top-up"],
+    ["additionalFundingLabel", "public-budget-fund-additional"],
   ]) {
     requireExact(publicBudget[field], label, `shielded.scenario.publicBudget.${field}`);
     requireExact(
@@ -1513,39 +1509,35 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   const observation = requireExactRecordKeys(
     receipts.transactions,
     "shielded.receipts.transactions",
-    ["allocation"],
-  ).allocation;
+    ["fund"],
+  ).fund;
   const recorded = transactions["shielded-action-fund"];
   requireExact(
-    requireHash32(observation.txHash, "shielded allocation transaction hash"),
+    requireHash32(observation.txHash, "shielded fund transaction hash"),
     recorded.hash,
-    "shielded allocation transaction hash",
+    "shielded fund transaction hash",
   );
-  requireExact(observation.blockNumber, recorded.blockNumber, "shielded allocation block number");
-  requireExact(observation.blockHash, recorded.blockHash, "shielded allocation block hash");
-  requireExact(observation.selector, FUND_SELECTOR, "shielded allocation selector");
-  const gas = requireSafeInteger(observation.gasUsed, "shielded allocation gasUsed", 1);
-  if (gas > criteria.allocationMaxGas) {
-    throw new Error("shielded allocation exceeds the committed production gas threshold");
+  requireExact(observation.blockNumber, recorded.blockNumber, "shielded fund block number");
+  requireExact(observation.blockHash, recorded.blockHash, "shielded fund block hash");
+  requireExact(observation.selector, FUND_SELECTOR, "shielded fund selector");
+  const gas = requireSafeInteger(observation.gasUsed, "shielded fund gasUsed", 1);
+  if (gas > criteria.fundMaxGas) {
+    throw new Error("shielded fund exceeds the committed production gas threshold");
   }
   const limit = requireSafeInteger(
     observation.transactionGasLimit,
-    "shielded allocation transactionGasLimit",
+    "shielded fund transactionGasLimit",
     1,
   );
   const blockLimit = requireSafeInteger(
     observation.blockGasLimit,
-    "shielded allocation blockGasLimit",
+    "shielded fund blockGasLimit",
     1,
   );
   if (gas > limit || limit > blockLimit)
-    throw new Error("shielded allocation gas exceeds transaction or block limit");
+    throw new Error("shielded fund gas exceeds transaction or block limit");
   if (recorded.gasUsed !== undefined)
-    requireExact(
-      String(observation.gasUsed),
-      String(recorded.gasUsed),
-      "shielded allocation gasUsed",
-    );
+    requireExact(String(observation.gasUsed), String(recorded.gasUsed), "shielded fund gasUsed");
   return {
     manifestSha256: inspected.manifestSha256,
     proofCount: actions.length,

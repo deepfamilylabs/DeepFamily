@@ -229,7 +229,7 @@ async function recordFunding(
 }
 
 describe("local unified funding preparation", () => {
-  it("builds the allocation's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {
+  it("builds the funding's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {
     const fixture = await setup();
     const prepared = await prepareShieldedFund({
       ...fixture.common,
@@ -253,7 +253,7 @@ describe("local unified funding preparation", () => {
     expect(prepared.witness.oldBudgetSiblings).toEqual(Array(32).fill("0"));
     expect(prepared.witness).not.toHaveProperty("policyNonce");
     const change = await open(prepared.outputs[1].ciphertext, donorSecret);
-    expect(change.kind === "value" && change.topUpMemo?.allocationKey).toBe(
+    expect(change.kind === "value" && change.fundingMemo?.allocationKey).toBe(
       fixture.policy.allocationKey,
     );
     const child = await open(prepared.outputs[0].ciphertext, heirSecret);
@@ -293,7 +293,7 @@ describe("local unified funding preparation", () => {
 
   it("uses an existing child budget only as a read-only template and funds new periods from donor value", async () => {
     const fixture = await setup();
-    const allocated = await prepareShieldedFund({
+    const initialFunding = await prepareShieldedFund({
       ...fixture.common,
       fundMode: 0 as const,
       policy: fixture.policy,
@@ -301,29 +301,32 @@ describe("local unified funding preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 5n,
     });
-    await recordFunding(fixture, allocated);
-    const topUp = await prepareShieldedFund({
+    await recordFunding(fixture, initialFunding);
+    const additionalFunding = await prepareShieldedFund({
       fundMode: 1,
       ...fixture.common,
-      budget: { ...allocated.outputs[0], shardId: 0n },
+      budget: { ...initialFunding.outputs[0], shardId: 0n },
       budgetPeriods: 3n,
     });
     // Continuation funding keeps the original enrollment and uses canonical zero lineage inputs.
-    expect(topUp.witness.endorsementRoot).toBe("0");
-    expect(topUp.witness.asOf).toBe("0");
-    expect(topUp.data.inputRoots).toEqual([fixture.noteTree.root, fixture.noteTree.root]);
-    expect(topUp.witness.oldBudgetRemainingPeriods).toBe("5");
-    expect(topUp.witness.allocationKey).toBe("0");
-    expect(topUp.witness.endorsementSiblings).toEqual(Array(64).fill("0"));
-    expect(topUp.witness.fundMode).toBe("1");
-    expect(topUp.witness.budgetPeriods).toBe("3");
-    expect(topUp.witness.heirIdentityCommitment).toBe(String(heirIdentity));
-    expect(await open(topUp.outputs[0].ciphertext, heirSecret)).toMatchObject({
+    expect(additionalFunding.witness.endorsementRoot).toBe("0");
+    expect(additionalFunding.witness.asOf).toBe("0");
+    expect(additionalFunding.data.inputRoots).toEqual([
+      fixture.noteTree.root,
+      fixture.noteTree.root,
+    ]);
+    expect(additionalFunding.witness.oldBudgetRemainingPeriods).toBe("5");
+    expect(additionalFunding.witness.allocationKey).toBe("0");
+    expect(additionalFunding.witness.endorsementSiblings).toEqual(Array(64).fill("0"));
+    expect(additionalFunding.witness.fundMode).toBe("1");
+    expect(additionalFunding.witness.budgetPeriods).toBe("3");
+    expect(additionalFunding.witness.heirIdentityCommitment).toBe(String(heirIdentity));
+    expect(await open(additionalFunding.outputs[0].ciphertext, heirSecret)).toMatchObject({
       kind: "budget",
       remaining: 30n,
       eligibleFrom: BigInt(timestamp + 7200),
     });
-    expect(await open(topUp.outputs[1].ciphertext, donorSecret)).toMatchObject({
+    expect(await open(additionalFunding.outputs[1].ciphertext, donorSecret)).toMatchObject({
       kind: "value",
       amount: 20n,
     });
@@ -343,7 +346,7 @@ describe("local unified funding preparation", () => {
     await recordFunding(fixture, initial);
     await expect(
       prepareShieldedFund({ ...args, donorCommitment: fixture.common.donorCommitment }),
-    ).rejects.toThrow("already allocated");
+    ).rejects.toThrow("already enrolled");
     const spent = await setup();
     const first = await prepareShieldedFund({
       ...spent.common,
@@ -391,7 +394,7 @@ describe("local unified funding preparation", () => {
         ? { number: 11, timestamp: timestamp + 2, hash: `0x${"cd".repeat(32)}` }
         : getBlock(block);
 
-    const allocated = await prepareShieldedFund({
+    const initialFunding = await prepareShieldedFund({
       ...fixture.common,
       fundMode: 0 as const,
       policy: fixture.policy,
@@ -399,15 +402,15 @@ describe("local unified funding preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 1n,
     });
-    expect(allocated.data.asOf).toBe(BigInt(timestamp + 2));
-    await recordFunding(fixture, allocated);
-    const topUp = await prepareShieldedFund({
+    expect(initialFunding.data.asOf).toBe(BigInt(timestamp + 2));
+    await recordFunding(fixture, initialFunding);
+    const additionalFunding = await prepareShieldedFund({
       fundMode: 1,
       ...fixture.common,
-      budget: { ...allocated.outputs[0], shardId: 0n },
+      budget: { ...initialFunding.outputs[0], shardId: 0n },
       budgetPeriods: 1n,
     });
-    expect(topUp.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
+    expect(additionalFunding.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
   });
 
   it("rejects a recipient whose identity is inconsistent or not an endorsed direct child", async () => {
@@ -438,9 +441,9 @@ describe("local unified funding preparation", () => {
     ).rejects.toThrow("no current direct-child endorsement");
   });
 
-  it("rejects a top-up for a different recipient than the budget's heir", async () => {
+  it("rejects additional funding for a different recipient than the budget's heir", async () => {
     const fixture = await setup();
-    const allocated = await prepareShieldedFund({
+    const initialFunding = await prepareShieldedFund({
       ...fixture.common,
       fundMode: 0 as const,
       policy: fixture.policy,
@@ -448,7 +451,7 @@ describe("local unified funding preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 2n,
     });
-    await recordFunding(fixture, allocated);
+    await recordFunding(fixture, initialFunding);
     await expect(
       prepareShieldedFund({
         fundMode: 1,
@@ -457,7 +460,7 @@ describe("local unified funding preparation", () => {
           ...fixture.recipient,
           ownerCommitment: fixture.recipient.ownerCommitment + 1n,
         },
-        budget: { ...allocated.outputs[0], shardId: 0n },
+        budget: { ...initialFunding.outputs[0], shardId: 0n },
         budgetPeriods: 1n,
       }),
     ).rejects.toThrow("does not belong to this receive code's recipient");
@@ -530,7 +533,7 @@ describe("local unified funding preparation", () => {
     "verifies both funding modes with current public Groth16 keys",
     async () => {
       const fixture = await setup();
-      const allocated = await prepareShieldedFund({
+      const initialFunding = await prepareShieldedFund({
         ...fixture.common,
         fundMode: 0 as const,
         policy: fixture.policy,
@@ -538,11 +541,11 @@ describe("local unified funding preparation", () => {
         lineage: fixture.lineage,
         budgetPeriods: 5n,
       });
-      await recordFunding(fixture, allocated);
-      const topUp = await prepareShieldedFund({
+      await recordFunding(fixture, initialFunding);
+      const additionalFunding = await prepareShieldedFund({
         fundMode: 1,
         ...fixture.common,
-        budget: { ...allocated.outputs[0], shardId: 0n },
+        budget: { ...initialFunding.outputs[0], shardId: 0n },
         budgetPeriods: 3n,
       });
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-funding-prep-"));
@@ -551,8 +554,8 @@ describe("local unified funding preparation", () => {
         const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         for (const [source, action, prepared] of [
-          ["shielded_fund", SHIELDED_POOL_ACTION.Fund, allocated],
-          ["shielded_fund", SHIELDED_POOL_ACTION.Fund, topUp],
+          ["shielded_fund", SHIELDED_POOL_ACTION.Fund, initialFunding],
+          ["shielded_fund", SHIELDED_POOL_ACTION.Fund, additionalFunding],
         ] as const) {
           const { witness } = prepared;
           const inputPath = path.join(temporary, `${source}.input.json`);

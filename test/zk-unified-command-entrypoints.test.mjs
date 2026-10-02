@@ -287,8 +287,8 @@ describe("unified ZK command entrypoints", function () {
     const options = {
       root: fixture.root,
       ptauPath: path.join(fixture.root, "ceremony.ptau"),
-      legacyVerifier: async (args) => {
-        calls.push(["legacy", args]);
+      coreVerifier: async (args) => {
+        calls.push(["core", args]);
         return {
           circuits: ["person_commitment", "disclosure_binding"],
           manifestSha256: "11".repeat(32),
@@ -301,10 +301,12 @@ describe("unified ZK command entrypoints", function () {
     };
     const result = await verifyAllProductionCeremonies(options);
     expect(calls).to.deep.equal([
-      ["legacy", { root: options.root, ptauPath: options.ptauPath }],
+      ["core", { root: options.root, ptauPath: options.ptauPath }],
       ["shielded", { root: options.root, ptauPath: options.ptauPath }],
     ]);
     expect(result.circuitCount).to.equal(9);
+    expect(result.core.circuits).to.deep.equal(["person_commitment", "disclosure_binding"]);
+    expect(Object.keys(result)).to.deep.equal(["core", "shielded", "circuitCount"]);
     await assert.rejects(
       () =>
         verifyAllProductionCeremonies({
@@ -317,7 +319,7 @@ describe("unified ZK command entrypoints", function () {
       () =>
         verifyAllProductionCeremonies({
           ...options,
-          legacyVerifier: async () => ({ circuits: ["person_commitment"] }),
+          coreVerifier: async () => ({ circuits: ["person_commitment"] }),
         }),
       /both circuits/u,
     );

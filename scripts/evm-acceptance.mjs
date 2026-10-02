@@ -1063,7 +1063,7 @@ export const main = async (chainProfile) => {
       : null;
   const zkCeremonyVerification = ceremonyVerification
     ? {
-        ...ceremonyVerification.legacy,
+        ...ceremonyVerification.core,
         shielded: ceremonyVerification.shielded,
         circuitCount: ceremonyVerification.circuitCount,
       }
@@ -2516,7 +2516,7 @@ export const main = async (chainProfile) => {
       provider,
       expectedChainId: EXPECTED_CHAIN_ID,
       poolAddress: addresses.shieldedDeepPool,
-      allocationTxHash: report.transactions["shielded-action-fund"].hash,
+      fundTxHash: report.transactions["shielded-action-fund"].hash,
     });
     await addStep("real-zk-shielded-business", report.shielded);
 

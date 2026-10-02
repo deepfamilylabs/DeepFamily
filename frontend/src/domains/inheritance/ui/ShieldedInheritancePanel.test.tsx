@@ -1224,13 +1224,12 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
   });
 
-  it("claims two compatible budgets automatically with no separate merge action", async () => {
+  it("claims two compatible budgets in one transaction", async () => {
     mocks.recoverLocalShieldedWallet.mockResolvedValue(
       walletSnapshot([budgetNote(2n, { remaining: 10n }), budgetNote(3n, { remaining: 10n })]),
     );
     renderPanel();
     await unlock();
-    expect(screen.queryByRole("button", { name: /mergeBudget/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
     expect(mocks.prepareShieldedClaim).toHaveBeenCalledWith(

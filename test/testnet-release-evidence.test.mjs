@@ -85,17 +85,19 @@ const SHIELDED_ACTION_TRANSACTION_LABELS = Object.keys(SHIELDED_DEPLOYMENT_CIRCU
   .filter((action) => !["claim", "claimPublic"].includes(action))
   .map((action) => `shielded-action-${action}`);
 const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
-  [...SHIELDED_ACTION_TRANSACTION_LABELS, "public-budget-fund", "public-budget-top-up"].map(
-    (label, index) => [
-      label,
-      {
-        hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
-        blockNumber: 100,
-        blockHash: FINALIZED_BLOCK_HASH,
-        status: 1,
-      },
-    ],
-  ),
+  [
+    ...SHIELDED_ACTION_TRANSACTION_LABELS,
+    "public-budget-fund",
+    "public-budget-fund-additional",
+  ].map((label, index) => [
+    label,
+    {
+      hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
+      blockNumber: 100,
+      blockHash: FINALIZED_BLOCK_HASH,
+      status: 1,
+    },
+  ]),
 );
 const REPORT_TRANSACTIONS = {
   "critical-transaction": {
@@ -157,9 +159,9 @@ const shieldedArtifactInspector = () => ({
   manifest: {
     circuits: structuredClone(SHIELDED_MANIFEST_CIRCUITS),
     releaseCriteria: {
-      allocationMaxGas: 300_000,
+      fundMaxGas: 300_000,
       claim12MaxGas: 300_000,
-      browserAllocationMaxMs: 60_000,
+      browserFundMaxMs: 60_000,
       browserClaim12MaxMs: 60_000,
       recoveryMaxMs: 60_000,
       recoveryMinEvents: 1,
@@ -478,7 +480,7 @@ const validReportTemplate = () => ({
     scenario: {
       publicBudget: {
         fundingLabel: "public-budget-fund",
-        topUpLabel: "public-budget-top-up",
+        additionalFundingLabel: "public-budget-fund-additional",
         budgetId: "1",
         heirPersonHash: keccak256(toBeHex(123n, 32)),
         amountPerPeriod: "100",
@@ -489,7 +491,7 @@ const validReportTemplate = () => ({
         claimExecution: "verifier-call",
         claimCount: 12,
       },
-      allocationLabel: "shielded-action-fund",
+      fundLabel: "shielded-action-fund",
       claimExecution: "verifier-call",
       claimCount: 12,
       receiveCode: {
@@ -509,7 +511,7 @@ const validReportTemplate = () => ({
       chainId: CHAIN_ID,
       poolAddress: SHIELDED_ADDRESSES.shieldedDeepPool,
       transactions: {
-        allocation: {
+        fund: {
           txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-fund"].hash,
           blockNumber: 100,
           blockHash: FINALIZED_BLOCK_HASH,
@@ -1528,7 +1530,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) => (report.zkCeremonyVerification.circuits = ["person_commitment"]),
-        /zkCeremonyVerification\.circuits must cover both original circuits/iu,
+        /zkCeremonyVerification\.circuits must cover both core circuits/iu,
       ],
       [
         (report) => (report.zkCeremonyVerification.shielded.ptau.sha256 = "ff".repeat(32)),
@@ -1584,17 +1586,16 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     const cases = [
       [(report) => (report.shielded.receipts.chainId = 11155111), /shielded\.receipts\.chainId/iu],
       [
-        (report) =>
-          (report.shielded.receipts.transactions.allocation.txHash = `0x${"ef".repeat(32)}`),
-        /shielded allocation transaction hash/iu,
+        (report) => (report.shielded.receipts.transactions.fund.txHash = `0x${"ef".repeat(32)}`),
+        /shielded fund transaction hash/iu,
       ],
       [
-        (report) => (report.shielded.receipts.transactions.allocation.selector = "0x12345678"),
-        /shielded allocation selector/iu,
+        (report) => (report.shielded.receipts.transactions.fund.selector = "0x12345678"),
+        /shielded fund selector/iu,
       ],
       [
-        (report) => (report.shielded.receipts.transactions.allocation.gasUsed = "300001"),
-        /shielded allocation exceeds the committed production gas threshold/iu,
+        (report) => (report.shielded.receipts.transactions.fund.gasUsed = "300001"),
+        /shielded fund exceeds the committed production gas threshold/iu,
       ],
       [
         (report) => (report.terminalGovernanceState.verifierAdapter.fundVerifier = address(999)),

@@ -156,7 +156,7 @@ describe("local shielded wallet recovery", () => {
       ownerCommitment: donor.ownerCommitment,
       amount: 0n,
       nonce: 37n,
-      topUpMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
+      fundingMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
     });
     const changeCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
@@ -266,7 +266,7 @@ describe("local shielded wallet recovery", () => {
       ownerCommitment: donor.ownerCommitment,
       amount: 300n,
       nonce: 38n,
-      topUpMemo: { budgetCommitment: budgetCommitment + 1n, budgetNote: budget },
+      fundingMemo: { budgetCommitment: budgetCommitment + 1n, budgetNote: budget },
     });
     const forgedCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),

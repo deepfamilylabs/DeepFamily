@@ -12,7 +12,7 @@ import {
   computeShieldedOwnerCommitment,
   computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
-  computeShieldedTopUpUseNullifier,
+  computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
@@ -335,13 +335,13 @@ async function fundingOutputs(input: {
     input.poolAddress,
   );
   // The child budget is addressed only to the child. An encrypted copy of its
-  // private template in the donor's change note makes future top-ups recoverable
+  // private template in the donor's change note makes future funding recoverable
   // from public events after the donor clears local storage.
   const change: ShieldedValueNotePayload = {
     ownerCommitment: input.donorOwnerCommitment,
     amount: input.donorChangeAmount,
     nonce: generateShieldedRandomField(),
-    topUpMemo: {
+    fundingMemo: {
       budgetCommitment: encryptedBudget.commitment,
       budgetNote: input.budget,
       ...(input.allocationKey === undefined ? {} : { allocationKey: input.allocationKey }),
@@ -435,7 +435,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     heirIdentityCommitment: heir.identityCommitment,
   });
   if (input.wallet.spentNullifiers.has(enrollmentNullifier))
-    throw new Error("This child is already allocated under this policy");
+    throw new Error("This child is already enrolled under this policy");
   const latestBlock = ctx.latestBlock;
   if (input.lineage.blockNumber > latestBlock.number)
     throw new Error("Lineage snapshot is ahead of the chain");
@@ -596,7 +596,8 @@ async function prepareContinuationFunding(
   if (rate === 0n || oldRemaining % rate !== 0n)
     throw new Error("Template budget has fractional periods");
   const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
-  if (donor.note.amount < amount) throw new Error("Donor value note cannot fund the whole top-up");
+  if (donor.note.amount < amount)
+    throw new Error("Donor value note cannot fund the full additional amount");
   const policyCommitment = computeShieldedPolicyCommitment(old);
   const enrollmentCommitment = computeShieldedEnrollmentCommitment({
     policyCommitment,
@@ -605,13 +606,13 @@ async function prepareContinuationFunding(
     enrollmentSalt: old.enrollmentSalt,
   });
   const budgetUseNonce = generateShieldedRandomField();
-  const useNullifier = computeShieldedTopUpUseNullifier({
+  const useNullifier = computeShieldedBudgetUseNullifier({
     policySalt: old.policySalt,
     budgetNoteCommitment: template.commitment,
     useNonce: budgetUseNonce,
   });
   if (input.wallet.spentNullifiers.has(useNullifier))
-    throw new Error("Top-up authorization was already used");
+    throw new Error("Funding authorization was already used");
   const budget: ShieldedBudgetNotePayload = {
     ...old,
     remaining: amount,

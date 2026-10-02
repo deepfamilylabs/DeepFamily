@@ -59,9 +59,9 @@ function assertCleanCheckout(root) {
 
 function assertReleaseCriteria(criteria) {
   for (const field of [
-    "allocationMaxGas",
+    "fundMaxGas",
     "claim12MaxGas",
-    "browserAllocationMaxMs",
+    "browserFundMaxMs",
     "browserClaim12MaxMs",
     "recoveryMaxMs",
     "recoveryMinEvents",
@@ -131,7 +131,7 @@ export function assertRuntimeBenchmarkReport(report, manifestSha256, criteria) {
     "Full 64/32-depth cryptographic proof benchmark is missing",
   );
   for (const [name, limit, expectedPeriods] of [
-    ["allocation", "allocationMaxGas", null],
+    ["fund", "fundMaxGas", null],
     ["claim12", "claim12MaxGas", 12],
   ]) {
     const tx = report.localPoolGas?.[name];
@@ -160,9 +160,8 @@ export function assertRuntimeBenchmarkReport(report, manifestSha256, criteria) {
     "Browser proof browser version is missing",
   );
   requireValue(
-    positiveMeasure(browser.allocationMs, "Browser allocation proof time") <=
-      criteria.browserAllocationMaxMs,
-    "Browser allocation proof exceeds precommitted time threshold",
+    positiveMeasure(browser.fundMs, "Browser fund proof time") <= criteria.browserFundMaxMs,
+    "Browser fund proof exceeds precommitted time threshold",
   );
   requireValue(
     positiveMeasure(browser.claim12Ms, "Browser 12-period proof time") <=

@@ -125,7 +125,7 @@ export const runZkDevelopmentSetup = async ({
 
     await commandRunner({
       executable: process.execPath,
-      args: [absolute(resolvedRoot, "scripts/zk-build.mjs"), "--circuit", "legacy"],
+      args: [absolute(resolvedRoot, "scripts/zk-build.mjs"), "--circuit", "core"],
       cwd: resolvedRoot,
     });
 
@@ -150,7 +150,7 @@ export const runZkDevelopmentSetup = async ({
 
     await commandRunner({
       executable: process.execPath,
-      args: [absolute(resolvedRoot, "scripts/zk-check.mjs"), "--circuit", "legacy"],
+      args: [absolute(resolvedRoot, "scripts/zk-check.mjs"), "--circuit", "core"],
       cwd: resolvedRoot,
     });
 

@@ -22,7 +22,7 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
-  computeShieldedTopUpUseNullifier,
+  computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
   decodeShieldedReceiveCode,
   decryptShieldedNote,
@@ -122,7 +122,7 @@ function verifyProof(root, files, proof, publicSignals) {
 
 /**
  * Exercises current public keys with the integrated DEEP, lineage and pool. The donor
- * pays the heir from the heir's receive code alone. A new allocation cannot mature in
+ * pays the heir from the heir's receive code alone. A new fund cannot mature in
  * this run: Claim is verified at its future asOf against the current real roots,
  * without submitting a premature claim transaction.
  */
@@ -529,7 +529,7 @@ export async function runShieldedAcceptanceSmoke({
     const publicBlock = await provider.getBlock(publicReceipt.blockNumber);
     assert.equal(publicRowBefore.eligibleFrom, BigInt(publicBlock.timestamp) + 7200n);
     await record(
-      "public-budget-top-up",
+      "public-budget-fund-additional",
       await pool.fundPublic({
         ...publicFunding,
         budgetId: publicBudgetId,
@@ -542,7 +542,7 @@ export async function runShieldedAcceptanceSmoke({
     assert.equal(
       publicRow.eligibleFrom,
       publicRowBefore.eligibleFrom,
-      "Public top-up reset maturity",
+      "Additional public funding reset maturity",
     );
     assert.equal(publicRow.remaining, publicFundedAmount);
     assert.equal(publicRow.nextPeriod, 0n);
@@ -638,9 +638,9 @@ export async function runShieldedAcceptanceSmoke({
       );
     };
     const budget = await budgetNote(1200n);
-    const allocationChange = await valueNote(donorKeys, 800n);
+    const fundChange = await valueNote(donorKeys, 800n);
     const initialPath = await notePath(initial[0]);
-    const allocationData = {
+    const fundData = {
       ...zeroData(),
       ...inputs(
         [initialPath, initialPath],
@@ -653,12 +653,12 @@ export async function runShieldedAcceptanceSmoke({
           }),
         ],
       ),
-      ...outputs([budget, allocationChange]),
+      ...outputs([budget, fundChange]),
       relation0: endorsement.root,
       relation1: trusted.root,
       asOf,
     };
-    const allocationInputs = publicInputsFor("fund", allocationData);
+    const fundInputs = publicInputsFor("fund", fundData);
     const commonFunding = {
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
@@ -669,13 +669,13 @@ export async function runShieldedAcceptanceSmoke({
       eligibleFrom: String(eligibleFrom),
       enrollmentSalt: String(enrollmentSalt),
     };
-    const allocationProof = await prove(
+    const fundProof = await prove(
       "fund",
       {
         ...commonFunding,
         ...lineageWitness,
         ...donorWitness(initial[0], initialPath),
-        ...allocationInputs.witness,
+        ...fundInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
         oldBudgetRemaining: "0",
         oldBudgetRemainingPeriods: "0",
@@ -689,41 +689,41 @@ export async function runShieldedAcceptanceSmoke({
         heirVersionIndex: "1",
         budgetPeriods: "12",
         budgetNonce: String(budget.nonce),
-        changeNonce: String(allocationChange.nonce),
+        changeNonce: String(fundChange.nonce),
       },
-      allocationInputs.signals,
+      fundInputs.signals,
       { asOf: String(asOf) },
     );
-    await submit("fund", allocationData, allocationProof, [budget, allocationChange]);
+    await submit("fund", fundData, fundProof, [budget, fundChange]);
 
-    const topUpBudget = await budgetNote(300n);
-    const topUpChange = await valueNote(donorKeys, 500n);
-    const changePath = await notePath(allocationChange);
+    const additionalFundingBudget = await budgetNote(300n);
+    const additionalFundingChange = await valueNote(donorKeys, 500n);
+    const changePath = await notePath(fundChange);
     const budgetPath = await notePath(budget);
     const useNonce = generateShieldedRandomField();
-    const topUpData = {
+    const additionalFundingData = {
       ...zeroData(),
       fundMode: 1n,
       ...inputs(
         [changePath, budgetPath],
         [
-          spend(allocationChange),
-          computeShieldedTopUpUseNullifier({
+          spend(fundChange),
+          computeShieldedBudgetUseNullifier({
             policySalt,
             budgetNoteCommitment: budget.commitment,
             useNonce,
           }),
         ],
       ),
-      ...outputs([topUpBudget, topUpChange]),
+      ...outputs([additionalFundingBudget, additionalFundingChange]),
     };
-    const topUpInputs = publicInputsFor("fund", topUpData);
-    const topUpProof = await prove(
+    const additionalFundingInputs = publicInputsFor("fund", additionalFundingData);
+    const additionalFundingProof = await prove(
       "fund",
       {
         ...commonFunding,
-        ...donorWitness(allocationChange, changePath),
-        ...topUpInputs.witness,
+        ...donorWitness(fundChange, changePath),
+        ...additionalFundingInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
         oldBudgetRemaining: "1200",
         oldBudgetRemainingPeriods: "12",
@@ -747,34 +747,34 @@ export async function runShieldedAcceptanceSmoke({
         trustedIndex: "0",
         trustedSiblings: Array(64).fill("0"),
         budgetPeriods: "3",
-        budgetNonce: String(topUpBudget.nonce),
-        changeNonce: String(topUpChange.nonce),
+        budgetNonce: String(additionalFundingBudget.nonce),
+        changeNonce: String(additionalFundingChange.nonce),
       },
-      topUpInputs.signals,
+      additionalFundingInputs.signals,
       { label: "shielded-action-fund-additional" },
     );
     await submit(
       "fund",
-      topUpData,
-      topUpProof,
-      [topUpBudget, topUpChange],
+      additionalFundingData,
+      additionalFundingProof,
+      [additionalFundingBudget, additionalFundingChange],
       {},
       "shielded-action-fund-additional",
     );
     assert.equal(
       await pool.nullifierSpent(spend(budget)),
       false,
-      "Top-up spent its read-only template",
+      "Additional funding spent its read-only template",
     );
 
     const claimAsOf = eligibleFrom + 12n * PERIOD;
     const remainingBudget = await budgetNote(300n);
     const payout = await valueNote(childKeys, 1200n);
-    const claimPaths = await Promise.all([notePath(budget), notePath(topUpBudget)]);
+    const claimPaths = await Promise.all([notePath(budget), notePath(additionalFundingBudget)]);
     const [budgetClaimPath, secondClaimPath] = claimPaths;
     const claimData = {
       ...zeroData(),
-      ...inputs(claimPaths, [spend(budget), spend(topUpBudget)]),
+      ...inputs(claimPaths, [spend(budget), spend(additionalFundingBudget)]),
       periodNullifiers: Array.from({ length: 12 }, (_, periodIndex) =>
         computeShieldedPeriodNullifier({
           derivedSecretField: childMaterial.derivedSecretField,
@@ -817,8 +817,8 @@ export async function runShieldedAcceptanceSmoke({
         noteSiblings: budgetClaimPath.siblings,
         secondRemaining: "300",
         secondRemainingPeriods: "3",
-        secondBudgetNonce: String(topUpBudget.nonce),
-        secondBudgetCiphertextHash: String(topUpBudget.ciphertextHashField),
+        secondBudgetNonce: String(additionalFundingBudget.nonce),
+        secondBudgetCiphertextHash: String(additionalFundingBudget.ciphertextHashField),
         secondNoteDepth: secondClaimPath.depth,
         secondNoteIndex: secondClaimPath.index,
         secondNoteSiblings: secondClaimPath.siblings,
@@ -845,10 +845,13 @@ export async function runShieldedAcceptanceSmoke({
       valueNote(heirKeys, 400n),
       valueNote(donorKeys, 100n),
     ]);
-    const transferPath = await notePath(topUpChange);
+    const transferPath = await notePath(additionalFundingChange);
     const transferData = {
       ...zeroData(),
-      ...inputs([transferPath, transferPath], [spend(topUpChange), dummySpend(topUpChange)]),
+      ...inputs(
+        [transferPath, transferPath],
+        [spend(additionalFundingChange), dummySpend(additionalFundingChange)],
+      ),
       ...outputs(transferOutputs),
     };
     const transferInputs = publicInputsFor("privateTransfer", transferData);
@@ -859,8 +862,8 @@ export async function runShieldedAcceptanceSmoke({
         hasSecondInput: "0",
         inputOwnerSecrets: [String(donorKeys.ownerSecret), "0"],
         inputAmounts: ["500", "0"],
-        inputNonces: [String(topUpChange.nonce), "0"],
-        inputCiphertextHashes: [String(topUpChange.ciphertextHashField), "0"],
+        inputNonces: [String(additionalFundingChange.nonce), "0"],
+        inputCiphertextHashes: [String(additionalFundingChange.ciphertextHashField), "0"],
         inputDepths: [transferPath.depth, "0"],
         inputIndices: [transferPath.index, "0"],
         inputSiblings: [transferPath.siblings, Array(32).fill("0")],
@@ -967,7 +970,7 @@ export async function runShieldedAcceptanceSmoke({
       manifestSha256: candidate.candidateManifestSha256,
       proofs,
       scenario: {
-        allocationLabel: "shielded-action-fund",
+        fundLabel: "shielded-action-fund",
         claimExecution: "verifier-call",
         claimCount: 12,
         claimAsOf: String(claimAsOf),
@@ -979,7 +982,7 @@ export async function runShieldedAcceptanceSmoke({
         receiveCode,
         publicBudget: {
           fundingLabel: "public-budget-fund",
-          topUpLabel: "public-budget-top-up",
+          additionalFundingLabel: "public-budget-fund-additional",
           budgetId: String(publicBudgetId),
           heirPersonHash: childMaterial.personHash,
           amountPerPeriod: String(rate),

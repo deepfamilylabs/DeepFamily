@@ -18,7 +18,7 @@ import {
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
-  computeShieldedTopUpUseNullifier,
+  computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
   deriveShieldedHeirKeyMaterial,
   generateShieldedRandomField,
@@ -171,15 +171,15 @@ test("ciphertext bytes, note nonce, and owner secret bind outputs independently"
   );
 });
 
-test("allocation uniqueness and read-only use tags keep separate purposes", () => {
+test("funding uniqueness and read-only use tags keep separate purposes", () => {
   const policyCommitment = computeShieldedPolicyCommitment(policyInput);
-  const allocationTag = computeShieldedEnrollmentNullifier({
+  const enrollmentTag = computeShieldedEnrollmentNullifier({
     allocationKey: 41n,
     policyCommitment,
     heirIdentityCommitment: 19n,
   });
   assert.notEqual(
-    allocationTag,
+    enrollmentTag,
     computeShieldedEnrollmentNullifier({
       allocationKey: 41n,
       policyCommitment,
@@ -187,7 +187,7 @@ test("allocation uniqueness and read-only use tags keep separate purposes", () =
     }),
   );
   assert.notEqual(
-    allocationTag,
+    enrollmentTag,
     computeShieldedEnrollmentNullifier({
       allocationKey: 42n,
       policyCommitment,
@@ -195,7 +195,7 @@ test("allocation uniqueness and read-only use tags keep separate purposes", () =
     }),
   );
   assert.notEqual(
-    allocationTag,
+    enrollmentTag,
     computeShieldedEnrollmentNullifier({
       allocationKey: 41n,
       policyCommitment: 1n,
@@ -210,8 +210,8 @@ test("allocation uniqueness and read-only use tags keep separate purposes", () =
     }),
   );
   assert.notEqual(
-    allocationTag,
-    computeShieldedTopUpUseNullifier({
+    enrollmentTag,
+    computeShieldedBudgetUseNullifier({
       policySalt: policyInput.policySalt,
       budgetNoteCommitment: 47n,
       useNonce: 43n,

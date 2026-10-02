@@ -11,7 +11,7 @@ import {
 describe("Public budgets with private VALUE payouts", function () {
   this.timeout(120000);
   const setup = () => hre.networkHelpers.loadFixture(deployPublicBudgetFixture);
-  const topUp = (funding, overrides = {}) => ({
+  const additionalFunding = (funding, overrides = {}) => ({
     ...funding,
     budgetId: 1n,
     heirVersionIndex: 0n,
@@ -48,7 +48,7 @@ describe("Public budgets with private VALUE payouts", function () {
     await pool.fundPublic(funding);
     const original = await pool.publicBudgets(1);
     await deepFamily.cancelEndorsement(heirHash);
-    await pool.connect(other).fundPublic(topUp(funding, { budgetPeriods: 2n }));
+    await pool.connect(other).fundPublic(additionalFunding(funding, { budgetPeriods: 2n }));
     const budget = await pool.publicBudgets(1);
     expect(budget.createdBy).to.equal(funder.address);
     expect(budget.eligibleFrom).to.equal(original.eligibleFrom);
@@ -63,14 +63,12 @@ describe("Public budgets with private VALUE payouts", function () {
       { heirVersionIndex: 1n },
       { endorser: funder.address },
     ])
-      await expect(pool.fundPublic(topUp(funding, changed))).to.be.revertedWithCustomError(
-        pool,
-        "InvalidPublicBudgetData",
-      );
-    await expect(pool.fundPublic(topUp(funding, { budgetId: 2n }))).to.be.revertedWithCustomError(
-      pool,
-      "UnknownPublicBudget",
-    );
+      await expect(
+        pool.fundPublic(additionalFunding(funding, changed)),
+      ).to.be.revertedWithCustomError(pool, "InvalidPublicBudgetData");
+    await expect(
+      pool.fundPublic(additionalFunding(funding, { budgetId: 2n })),
+    ).to.be.revertedWithCustomError(pool, "UnknownPublicBudget");
   });
 
   it("rejects invalid first funding, zero budgets, and overflowing deposits without state changes", async () => {
@@ -104,7 +102,7 @@ describe("Public budgets with private VALUE payouts", function () {
     await token.mint(funder.address, maximum);
     const huge = { ...funding, amountPerPeriod: maximum, budgetPeriods: 1n };
     await pool.fundPublic(huge);
-    await expect(pool.fundPublic(topUp(huge))).to.be.revertedWithCustomError(
+    await expect(pool.fundPublic(additionalFunding(huge))).to.be.revertedWithCustomError(
       pool,
       "InvalidPublicBudgetData",
     );

@@ -93,7 +93,7 @@ function run(command, args) {
   });
 }
 
-export function checkLegacyArtifacts() {
+export function checkCoreArtifacts() {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const snarkjsCli = resolveSnarkjsCliPath({ root: projectRoot });
   const renameVerifierScript = absolute("scripts/rename-zk-verifier.mjs");
@@ -310,9 +310,9 @@ export function checkShieldedArtifacts({
 }
 
 export function main() {
-  const legacy = checkLegacyArtifacts();
+  const core = checkCoreArtifacts();
   const shielded = checkShieldedArtifacts();
-  return { legacy, shielded };
+  return { core, shielded };
 }
 
 const isMain =
