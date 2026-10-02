@@ -23,7 +23,6 @@ import {
   computeShieldedOwnerCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
-  computeShieldedPolicyNoteCommitment,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -35,7 +34,6 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
-  encodeShieldedPolicyNotePayload,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   verifyShieldedNotePayload,
@@ -62,6 +60,7 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
+  fundMode: 0n,
 });
 
 /** Ordered verifier inputs of a witness that uses the circuit's named public inputs. */
@@ -325,7 +324,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     witness.noteDepth = note.depth;
     witness.noteIndex = note.index;
     witness.noteSiblings = note.siblings;
-    witness.inputRoot = note.root.toString();
+    witness.inputRoots = [note.root.toString(), note.root.toString()];
 
     const endorser = hre.ethers.toBeHex(BigInt(witness.endorser), 20);
     const parentsDigest = computeLineageParentsDigest({
@@ -444,7 +443,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     expect(await adapter.verifyProof(2, 1, shieldProof, shieldSignals)).to.equal(true);
     // A proof can only reach the verifier route with its own public-signal count.
     await expect(
-      adapter.verifyProof(9, 1, shieldProof, shieldSignals),
+      adapter.verifyProof(6, 1, shieldProof, shieldSignals),
     ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     await token.mint(depositor.address, 100n);
     await token.approve(poolAddress, 100n);
@@ -506,7 +505,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
     const { signals: unshieldSignals, witness: unshieldPublicInputs } =
       buildShieldedPoolPublicInputs({
-        action: 7,
+        action: 4,
         chainId,
         poolAddress,
         ...unshieldData,
@@ -533,9 +532,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       unshieldSignals,
     );
-    expect(await adapter.verifyProof(9, 1, unshieldProof, unshieldSignals)).to.equal(true);
+    expect(await adapter.verifyProof(6, 1, unshieldProof, unshieldSignals)).to.equal(true);
     // Equal public-signal lengths do not allow a proof from one circuit to verify in another.
-    expect(await adapter.verifyProof(8, 1, unshieldProof, unshieldSignals)).to.equal(false);
+    expect(await adapter.verifyProof(5, 1, unshieldProof, unshieldSignals)).to.equal(false);
     await expect(
       pool.unshield(depositor.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
@@ -555,12 +554,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     );
   });
 
-  it("allocates, tops up, and claims one or twelve full periods with real proofs", async function () {
-    const actions = ["shield", "createPolicy", "allocate", "topUp", "claim"];
+  it("funds initial and historical enrollments and claims one or two budgets with real proofs", async function () {
+    const actions = ["shield", "fund", "claim"];
     const artifacts = checkedCurrentArtifacts(actions);
     if (artifacts.missing) {
       console.log(
-        `Skipping local allocation/claim proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+        `Skipping local fund/claim proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
@@ -635,7 +634,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await (await pool.shield(2000n, shieldData, shieldProof)).wait();
 
     const fundingFixture = buildShieldedFundingFixtures({ donorAmount: 2000n });
-    const allocationWitness = fundingFixture.allocate;
+    const allocationWitness = fundingFixture.initial;
     const claimFixture = buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 });
     const heirKeys = deriveShieldedHeirKeyMaterial(claimFixture.witness.derivedSecretField);
     assert.equal(heirKeys.ownerCommitment, BigInt(allocationWitness.heirOwnerCommitment));
@@ -653,80 +652,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       policySalt,
       allocationKeyCommitment,
     });
-    const policyNonce = 104n;
-    const policyPayload = encodeShieldedPolicyNotePayload({
-      rootIdentityCommitment,
-      rootVersionIndex,
-      amountPerPeriod: rate,
-      policySalt,
-      allocationKey,
-      nonce: policyNonce,
-    });
-    const encryptedPolicy = await encryptPayloadNote(
-      { viewingKey: donorViewingKey, chainId, poolAddress },
-      policyPayload,
-    );
-    const policyNoteCommitment = computeShieldedPolicyNoteCommitment({
-      policyCommitment,
-      nonce: policyNonce,
-      ciphertextHashField: encryptedPolicy.ciphertextHashField,
-    });
-    const renewedDonorNote = await encryptValueNote({
-      ...donorNoteInput,
-      amount: 2000n,
-      nonce: 103n,
-    });
-    const shieldRoot = (await pool.noteShard(0)).root;
-    const firstDonorMembership = compactMembership(await pool.getNoteMerkleProof(0, 0));
-    const createPolicyData = {
-      ...zeroData(),
-      inputRoots: [shieldRoot, shieldRoot],
-      inputNullifiers: [
-        computeShieldedSpendNullifier({
-          ownerSecret: donorOwnerSecret,
-          noteCommitment: firstDonorNote.commitment,
-        }),
-        computeShieldedDummyInputNullifier({
-          ownerSecret: donorOwnerSecret,
-          noteCommitment: firstDonorNote.commitment,
-        }),
-      ],
-      outputCommitments: [policyNoteCommitment, renewedDonorNote.commitment],
-      outputCiphertexts: [encryptedPolicy.ciphertextHex, renewedDonorNote.ciphertextHex],
-    };
-    const { signals: createPolicySignals, witness: createPolicyPublicInputs } =
-      buildShieldedPoolPublicInputs({
-        action: 1,
-        chainId,
-        poolAddress,
-        ...createPolicyData,
-      });
-    const createPolicyProof = await prove(
-      "createPolicy",
-      {
-        ...createPolicyPublicInputs,
-        ownerSecret: String(donorOwnerSecret),
-        inputAmount: "2000",
-        inputNonce: "101",
-        inputCiphertextHash: String(firstDonorNote.ciphertextHashField),
-        noteDepth: firstDonorMembership.depth,
-        noteIndex: firstDonorMembership.index,
-        noteSiblings: firstDonorMembership.siblings,
-        rootIdentityCommitment: String(rootIdentityCommitment),
-        rootVersionIndex: String(rootVersionIndex),
-        rate: String(rate),
-        policySalt: String(policySalt),
-        allocationKey: String(allocationKey),
-        policyNonce: String(policyNonce),
-        changeNonce: "103",
-      },
-      createPolicySignals,
-    );
-    const createPolicyReceipt = await (
-      await pool.createPolicy(createPolicyData, createPolicyProof)
-    ).wait();
-    expect(await pool.totalShielded()).to.equal(2000n);
-
     const heirIdentityCommitment = BigInt(allocationWitness.heirIdentityCommitment);
     const heirOwnerCommitment = BigInt(allocationWitness.heirOwnerCommitment);
     const endorsementRoot = BigInt(claimFixture.witness.endorsementRoot);
@@ -776,17 +701,15 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       nonce: 109n,
     });
     const preAllocationRoot = (await pool.noteShard(0)).root;
-    const donorMembership = compactMembership(await pool.getNoteMerkleProof(0, 3));
-    const policyMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
-    assert.equal(donorMembership.depth, "2");
-    assert.equal(policyMembership.depth, "2");
+    const donorMembership = compactMembership(await pool.getNoteMerkleProof(0, 0));
+    assert.equal(donorMembership.depth, "1");
     const allocationData = {
       ...zeroData(),
       inputRoots: [preAllocationRoot, preAllocationRoot],
       inputNullifiers: [
         computeShieldedSpendNullifier({
           ownerSecret: donorOwnerSecret,
-          noteCommitment: renewedDonorNote.commitment,
+          noteCommitment: firstDonorNote.commitment,
         }),
         computeShieldedEnrollmentNullifier({
           allocationKey,
@@ -802,7 +725,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
     const { signals: allocationSignals, witness: allocationPublicInputs } =
       buildShieldedPoolPublicInputs({
-        action: 2,
+        action: 1,
         chainId,
         poolAddress,
         ...allocationData,
@@ -810,29 +733,24 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const realAllocationWitness = {
       ...allocationWitness,
       ...allocationPublicInputs,
-      donorNonce: "103",
-      donorCiphertextHash: String(renewedDonorNote.ciphertextHashField),
+      donorNonce: "101",
+      donorCiphertextHash: String(firstDonorNote.ciphertextHashField),
       donorDepth: donorMembership.depth,
       donorIndex: donorMembership.index,
       donorSiblings: donorMembership.siblings,
-      policyNonce: String(policyNonce),
-      policyCiphertextHash: String(encryptedPolicy.ciphertextHashField),
-      policyDepth: policyMembership.depth,
-      policyIndex: policyMembership.index,
-      policySiblings: policyMembership.siblings,
       eligibleFrom: String(eligibleFrom),
       budgetPeriods: "12",
       budgetNonce: String(budgetNonce),
       changeNonce: "109",
     };
-    const allocationProof = await prove("allocate", realAllocationWitness, allocationSignals);
+    const allocationProof = await prove("fund", realAllocationWitness, allocationSignals);
     await lineage.setRoot(0, endorsementRoot + 1n);
-    await expect(pool.allocate(allocationData, allocationProof)).to.be.revertedWithCustomError(
+    await expect(pool.fund(allocationData, allocationProof)).to.be.revertedWithCustomError(
       pool,
       "UnknownLineageRoot",
     );
     await lineage.setRoot(0, endorsementRoot);
-    const allocateReceipt = await (await pool.allocate(allocationData, allocationProof)).wait();
+    const allocateReceipt = await (await pool.fund(allocationData, allocationProof)).wait();
     expect(await pool.nullifierSpent(allocationData.inputNullifiers[1])).to.equal(true);
     expect(await pool.totalShielded()).to.equal(2000n);
     expect(await token.balanceOf(poolAddress)).to.equal(2000n);
@@ -874,10 +792,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       nonce: topUpChangeNonce,
     });
     const preTopUpRoot = (await pool.noteShard(0)).root;
-    const topUpDonorMembership = compactMembership(await pool.getNoteMerkleProof(0, 5));
-    const topUpBudgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    const topUpDonorMembership = compactMembership(await pool.getNoteMerkleProof(0, 3));
+    const topUpBudgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
     const topUpData = {
       ...zeroData(),
+      fundMode: 1n,
       inputRoots: [preTopUpRoot, preTopUpRoot],
       inputNullifiers: [
         computeShieldedSpendNullifier({
@@ -894,13 +813,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCiphertexts: [encryptedTopUpBudget.ciphertextHex, topUpDonorChange.ciphertextHex],
     };
     const { signals: topUpSignals, witness: topUpPublicInputs } = buildShieldedPoolPublicInputs({
-      action: 3,
+      action: 1,
       chainId,
       poolAddress,
       ...topUpData,
     });
     const topUpWitness = {
-      ...fundingFixture.topUp,
+      ...fundingFixture.continuation,
       ...topUpPublicInputs,
       donorAmount: "800",
       donorNonce: "109",
@@ -917,20 +836,20 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       oldBudgetIndex: topUpBudgetMembership.index,
       oldBudgetSiblings: topUpBudgetMembership.siblings,
       budgetUseNonce: String(topUpUseNonce),
-      topUpPeriods: "3",
-      newBudgetNonce: String(topUpBudgetNonce),
+      budgetPeriods: "3",
+      budgetNonce: String(topUpBudgetNonce),
       changeNonce: String(topUpChangeNonce),
     };
-    const topUpProof = await prove("topUp", topUpWitness, topUpSignals);
+    const topUpProof = await prove("fund", topUpWitness, topUpSignals);
     const tamperedTopUp = {
       ...topUpData,
       outputCommitments: [topUpBudgetCommitment + 1n, topUpDonorChange.commitment],
     };
-    await expect(pool.topUp(tamperedTopUp, topUpProof)).to.be.revertedWithCustomError(
+    await expect(pool.fund(tamperedTopUp, topUpProof)).to.be.revertedWithCustomError(
       pool,
       "InvalidZKProof",
     );
-    const topUpReceipt = await (await pool.topUp(topUpData, topUpProof)).wait();
+    const topUpReceipt = await (await pool.fund(topUpData, topUpProof)).wait();
     expect(await pool.nullifierSpent(topUpData.inputNullifiers[0])).to.equal(true);
     expect(await pool.nullifierSpent(topUpData.inputNullifiers[1])).to.equal(true);
     expect(
@@ -957,13 +876,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         noteCommitment: topUpBudgetCommitment,
       }).note.remaining,
     ).to.equal(300n);
-    await expect(pool.topUp(topUpData, topUpProof)).to.be.revertedWithCustomError(
+    await expect(pool.fund(topUpData, topUpProof)).to.be.revertedWithCustomError(
       pool,
       "NullifierAlreadySpent",
     );
 
     const preClaimRoot = (await pool.noteShard(0)).root;
-    const budgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    const budgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
     assert.equal(budgetMembership.depth, "3");
     const spendBudgetTag = computeShieldedSpendNullifier({
       ownerSecret: heirKeys.ownerSecret,
@@ -973,9 +892,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ownerSecret: heirKeys.ownerSecret,
       noteCommitment: budgetCommitment,
     });
-    const makeClaim = async (count) => {
+    const secondBudgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
+    const makeClaim = async (count, useSecond = false) => {
       const claimAsOf = eligibleFrom + BigInt(count) * PERIOD;
-      const remaining = 1200n - BigInt(count) * rate;
+      const remaining = 1200n + (useSecond ? 300n : 0n) - BigInt(count) * rate;
       const nextBudgetNonce = 99999n;
       const payoutNonce = 123456n;
       const nextBudgetPayload = encodeShieldedBudgetNotePayload({
@@ -1029,7 +949,15 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const claimData = {
         ...zeroData(),
         inputRoots: [preClaimRoot, preClaimRoot],
-        inputNullifiers: [spendBudgetTag, dummyBudgetTag],
+        inputNullifiers: [
+          spendBudgetTag,
+          useSecond
+            ? computeShieldedSpendNullifier({
+                ownerSecret: heirKeys.ownerSecret,
+                noteCommitment: topUpBudgetCommitment,
+              })
+            : dummyBudgetTag,
+        ],
         periodNullifiers,
         outputCommitments: [nextBudgetCommitment, payoutNote.commitment],
         outputCiphertexts: [nextBudgetCiphertext.ciphertextHex, payoutNote.ciphertextHex],
@@ -1038,7 +966,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         asOf: claimAsOf,
       };
       const { signals: claimSignals, witness: claimPublicInputs } = buildShieldedPoolPublicInputs({
-        action: 5,
+        action: 2,
         chainId,
         poolAddress,
         ...claimData,
@@ -1046,6 +974,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const baseWitness = buildShieldedClaimFixture({
         claimCount: count,
         remainingPeriods: 12,
+        secondRemainingPeriods: useSecond ? 3 : 0,
       }).witness;
       const witness = {
         ...baseWitness,
@@ -1058,6 +987,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         noteDepth: budgetMembership.depth,
         noteIndex: budgetMembership.index,
         noteSiblings: budgetMembership.siblings,
+        ...(useSecond
+          ? {
+              secondRemaining: "300",
+              secondRemainingPeriods: "3",
+              secondBudgetNonce: String(topUpBudgetNonce),
+              secondBudgetCiphertextHash: String(encryptedTopUpBudget.ciphertextHashField),
+              secondNoteDepth: secondBudgetMembership.depth,
+              secondNoteIndex: secondBudgetMembership.index,
+              secondNoteSiblings: secondBudgetMembership.siblings,
+            }
+          : {}),
         newBudgetNonce: String(nextBudgetNonce),
         payoutNonce: String(payoutNonce),
       };
@@ -1071,6 +1011,119 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         nextBudgetCommitment,
       };
     };
+
+    const mergedBranch = await hre.networkHelpers.takeSnapshot();
+    const mergedClaim = await makeClaim(12, true);
+    const mergedProof = await prove("claim", mergedClaim.witness, mergedClaim.claimSignals);
+    await hre.networkHelpers.time.increaseTo(Number(mergedClaim.claimAsOf));
+    await pool.claim(mergedClaim.claimData, mergedProof);
+    expect(await pool.nullifierSpent(mergedClaim.claimData.inputNullifiers[0])).to.equal(true);
+    expect(await pool.nullifierSpent(mergedClaim.claimData.inputNullifiers[1])).to.equal(true);
+    const mergedRemainder = await decryptShieldedNote({
+      ciphertext: mergedClaim.nextBudgetCiphertext.ciphertext,
+      hpkeIkm: heirKeys.hpkeIkm,
+      chainId,
+      poolAddress,
+    });
+    expect(
+      verifyShieldedNotePayload({
+        payload: mergedRemainder,
+        ciphertext: mergedClaim.nextBudgetCiphertext.ciphertext,
+        noteCommitment: mergedClaim.nextBudgetCommitment,
+      }).note.remaining,
+    ).to.equal(300n);
+    await expect(pool.claim(mergedClaim.claimData, mergedProof)).to.be.revertedWithCustomError(
+      pool,
+      "NullifierAlreadySpent",
+    );
+
+    // A spent budget still authenticates its historical enrollment. Continuing
+    // funding reads that budget, spends fresh donor value, and preserves its start.
+    const historicalBudget = compactMembership(await pool.getNoteMerkleProof(0, 2));
+    const continuingDonor = compactMembership(await pool.getNoteMerkleProof(0, 5));
+    const continuingRoot = (await pool.noteShard(0)).root;
+    const continuedPayload = encodeShieldedBudgetNotePayload({
+      rootIdentityCommitment,
+      rootVersionIndex,
+      policySalt,
+      allocationKeyCommitment,
+      heirIdentityCommitment,
+      eligibleFrom,
+      enrollmentSalt,
+      heirOwnerCommitment,
+      amountPerPeriod: rate,
+      remaining: 100n,
+      nonce: 221n,
+    });
+    const continuedBudget = await encryptPayloadNote(
+      { viewingKey: heirViewingKey, chainId, poolAddress },
+      continuedPayload,
+    );
+    const continuedBudgetCommitment = computeShieldedBudgetNoteCommitment({
+      policyCommitment,
+      enrollmentCommitment,
+      heirOwnerCommitment,
+      amountPerPeriod: rate,
+      remaining: 100n,
+      nonce: 221n,
+      ciphertextHashField: continuedBudget.ciphertextHashField,
+    });
+    const continuedChange = await encryptValueNote({
+      ...donorNoteInput,
+      amount: 400n,
+      nonce: 223n,
+    });
+    const continuedData = {
+      ...zeroData(),
+      fundMode: 1n,
+      inputRoots: [continuingRoot, continuingRoot],
+      inputNullifiers: [
+        computeShieldedSpendNullifier({
+          ownerSecret: donorOwnerSecret,
+          noteCommitment: topUpDonorChange.commitment,
+        }),
+        computeShieldedTopUpUseNullifier({
+          policySalt,
+          budgetNoteCommitment: budgetCommitment,
+          useNonce: 224n,
+        }),
+      ],
+      outputCommitments: [continuedBudgetCommitment, continuedChange.commitment],
+      outputCiphertexts: [continuedBudget.ciphertextHex, continuedChange.ciphertextHex],
+    };
+    const continuedInputs = buildShieldedPoolPublicInputs({
+      action: 1,
+      chainId,
+      poolAddress,
+      ...continuedData,
+    });
+    const continuedProof = await prove(
+      "fund",
+      {
+        ...topUpWitness,
+        ...continuedInputs.witness,
+        donorAmount: "500",
+        donorNonce: String(topUpChangeNonce),
+        donorCiphertextHash: String(topUpDonorChange.ciphertextHashField),
+        donorDepth: continuingDonor.depth,
+        donorIndex: continuingDonor.index,
+        donorSiblings: continuingDonor.siblings,
+        oldBudgetDepth: historicalBudget.depth,
+        oldBudgetIndex: historicalBudget.index,
+        oldBudgetSiblings: historicalBudget.siblings,
+        budgetUseNonce: "224",
+        budgetPeriods: "1",
+        budgetNonce: "221",
+        changeNonce: "223",
+      },
+      continuedInputs.signals,
+    );
+    await pool.fund(continuedData, continuedProof);
+    expect(await pool.nullifierSpent(spendBudgetTag)).to.equal(true);
+    expect(await pool.nullifierSpent(continuedData.inputNullifiers[0])).to.equal(true);
+    expect(await pool.nullifierSpent(continuedData.inputNullifiers[1])).to.equal(true);
+    expect(await pool.totalShielded()).to.equal(2000n);
+    await mergedBranch.restore();
 
     const branch = await hre.networkHelpers.takeSnapshot();
     const onePeriod = await makeClaim(1);
@@ -1140,7 +1193,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const renewedClaimData = { ...onePeriod.claimData, relation0: renewedRoot };
     const { signals: renewedClaimSignals, witness: renewedClaimPublicInputs } =
       buildShieldedPoolPublicInputs({
-        action: 5,
+        action: 2,
         chainId,
         poolAddress,
         ...renewedClaimData,
@@ -1192,7 +1245,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     // This separate top-up budget contains only three whole periods. A four
     // period claim is invalid even though all four periods are already due.
     const fourPeriods = await makeClaim(4);
-    const topUpClaimMembership = compactMembership(await pool.getNoteMerkleProof(0, 6));
+    const topUpClaimMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
     const underfundedClaimData = {
       ...fourPeriods.claimData,
       inputNullifiers: [
@@ -1233,7 +1286,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
     const { signals: underfundedClaimSignals, witness: underfundedClaimPublicInputs } =
       buildShieldedPoolPublicInputs({
-        action: 5,
+        action: 2,
         chainId,
         poolAddress,
         ...underfundedClaimData,
@@ -1251,7 +1304,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         noteIndex: topUpClaimMembership.index,
         noteSiblings: topUpClaimMembership.siblings,
       },
-      /ShieldedClaim.*line: 290/u,
+      /ShieldedClaim/u,
     );
 
     const twelvePeriods = await makeClaim(12);
@@ -1261,7 +1314,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     assertInvalidCircuitWitness(
       "claim",
       { ...twelvePeriods.witness, claimCount: "13" },
-      /ShieldedClaim.*line: 244/u,
+      /ShieldedClaim/u,
     );
     expect(onePeriod.claimData.periodNullifiers[0]).to.equal(
       twelvePeriods.claimData.periodNullifiers[0],
@@ -1300,7 +1353,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       RangeError,
     );
     console.log(
-      `local Hardhat gas (not release evidence): createPolicy=${createPolicyReceipt.gasUsed} allocate=${allocateReceipt.gasUsed} topUp=${topUpReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
+      `local Hardhat gas (not release evidence): fundInitial=${allocateReceipt.gasUsed} fundContinuation=${topUpReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
     );
   });
 
@@ -1428,7 +1481,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
     const { signals: transferSignals, witness: transferPublicInputs } =
       buildShieldedPoolPublicInputs({
-        action: 6,
+        action: 3,
         chainId,
         poolAddress,
         ...transferData,
@@ -1451,7 +1504,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       transferSignals,
     );
-    expect(await adapter.verifyProof(8, 1, transferProof, transferSignals)).to.equal(true);
+    expect(await adapter.verifyProof(5, 1, transferProof, transferSignals)).to.equal(true);
     const tampered = {
       ...transferData,
       outputCiphertexts: [
@@ -1536,7 +1589,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
     };
     const { signals: singleSignals, witness: singlePublicInputs } = buildShieldedPoolPublicInputs({
-      action: 6,
+      action: 3,
       chainId,
       poolAddress,
       ...singleData,
@@ -1561,7 +1614,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       },
       singleSignals,
     );
-    expect(await adapter.verifyProof(8, 1, singleProof, singleSignals)).to.equal(true);
+    expect(await adapter.verifyProof(5, 1, singleProof, singleSignals)).to.equal(true);
     await expect(
       pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");

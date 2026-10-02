@@ -6,7 +6,11 @@ import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
 const PERIOD = 2_592_000n;
 const decimal = (value) => BigInt(value).toString();
 
-export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3 } = {}) {
+export function buildShieldedClaimFixture({
+  claimCount = 2,
+  remainingPeriods = 3,
+  secondRemainingPeriods = 0,
+} = {}) {
   if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 12) {
     throw new RangeError("claimCount fixture must be 1..12");
   }
@@ -64,6 +68,21 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
     budgetNonce,
     budgetCiphertextHash,
   ]);
+  const secondPeriodCount = BigInt(secondRemainingPeriods);
+  const hasSecondInput = secondPeriodCount > 0n;
+  const secondRemaining = rate * secondPeriodCount;
+  const secondBudgetNonce = hasSecondInput ? 22222n : 0n;
+  const secondBudgetCiphertextHash = hasSecondInput ? 11111n : 0n;
+  const secondBudget = poseidon8([
+    1015n,
+    policy,
+    enrollment,
+    ownerCommitment,
+    rate,
+    secondRemaining,
+    secondBudgetNonce,
+    secondBudgetCiphertextHash,
+  ]);
   const claimCountBigInt = BigInt(claimCount);
   const periodIndices = Array.from({ length: 12 }, (_, slot) =>
     slot < claimCount ? BigInt(slot) : 0n,
@@ -81,7 +100,7 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
     enrollment,
     ownerCommitment,
     rate,
-    remaining - payout,
+    remaining + secondRemaining - payout,
     newBudgetNonce,
     budgetOutputCiphertextHash,
   ]);
@@ -95,11 +114,13 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
   const publicInputs = {
     chainId: "1030",
     pool: decimal(BigInt("0x1111111111111111111111111111111111111111")),
-    inputShardId: "0",
-    inputRoot: decimal(inputBudget),
+    inputShardIds: ["0", "0"],
+    inputRoots: [inputBudget, hasSecondInput ? secondBudget : inputBudget].map(decimal),
     inputNullifiers: [
       poseidon3([1016n, ownerSecret, inputBudget]),
-      poseidon3([1021n, ownerSecret, inputBudget]),
+      hasSecondInput
+        ? poseidon3([1016n, ownerSecret, secondBudget])
+        : poseidon3([1021n, ownerSecret, inputBudget]),
     ].map(decimal),
     periodNullifiers: periodNullifiers.map(decimal),
     outputCommitments: [budgetOutput, payoutOutput].map(decimal),
@@ -143,6 +164,14 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
     noteDepth: "0",
     noteIndex: "0",
     noteSiblings: Array(32).fill("0"),
+    hasSecondInput: hasSecondInput ? "1" : "0",
+    secondRemaining: decimal(secondRemaining),
+    secondRemainingPeriods: decimal(secondPeriodCount),
+    secondBudgetNonce: decimal(secondBudgetNonce),
+    secondBudgetCiphertextHash: decimal(secondBudgetCiphertextHash),
+    secondNoteDepth: "0",
+    secondNoteIndex: "0",
+    secondNoteSiblings: Array(32).fill("0"),
     claimCount: decimal(claimCountBigInt),
     periodIndices: periodIndices.map(decimal),
     newBudgetNonce: decimal(newBudgetNonce),
@@ -153,6 +182,7 @@ export function buildShieldedClaimFixture({ claimCount = 2, remainingPeriods = 3
     policy,
     enrollment,
     inputBudget,
+    secondBudget,
     heirIdentityCommitment,
     ownerSecret,
     ownerCommitment,

@@ -7,13 +7,10 @@ import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
 
 export const SHIELDED_POOL_ACTION = Object.freeze({
   Shield: 0,
-  CreatePolicy: 1,
-  Allocate: 2,
-  TopUp: 3,
-  MergeBudget: 4,
-  Claim: 5,
-  PrivateTransfer: 6,
-  Unshield: 7,
+  Fund: 1,
+  Claim: 2,
+  PrivateTransfer: 3,
+  Unshield: 4,
 });
 
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
@@ -33,18 +30,16 @@ const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
  */
 export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),
-  [SHIELDED_POOL_ACTION.CreatePolicy]: Object.freeze([...CONTEXT, ...ONE_INPUT, ...OUTPUTS]),
-  [SHIELDED_POOL_ACTION.Allocate]: Object.freeze([
+  [SHIELDED_POOL_ACTION.Fund]: Object.freeze([
     ...CONTEXT,
+    "fundMode",
     ...TWO_INPUTS,
     ...OUTPUTS,
     ...LINEAGE,
   ]),
-  [SHIELDED_POOL_ACTION.TopUp]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
-  [SHIELDED_POOL_ACTION.MergeBudget]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
   [SHIELDED_POOL_ACTION.Claim]: Object.freeze([
     ...CONTEXT,
-    ...ONE_INPUT,
+    ...TWO_INPUTS,
     "periodNullifiers",
     ...OUTPUTS,
     ...LINEAGE,
@@ -62,6 +57,7 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
 const INPUT_WIDTHS = Object.freeze({
   chainId: 1,
   pool: 1,
+  fundMode: 1,
   inputShardId: 1,
   inputRoot: 1,
   inputShardIds: 2,
@@ -109,7 +105,7 @@ function unused(condition, label) {
  * Data the action does not use must be zero, as the pool requires.
  */
 export function buildShieldedPoolPublicInputs(input) {
-  const action = Number(bigintFrom(input.action, "action", 7n));
+  const action = Number(bigintFrom(input.action, "action", 4n));
   const names = SHIELDED_POOL_PUBLIC_INPUTS[action];
   const inputShardIds = values(input.inputShardIds, 2, "inputShardIds");
   const inputRoots = values(input.inputRoots, 2, "inputRoots");
@@ -124,6 +120,7 @@ export function buildShieldedPoolPublicInputs(input) {
   const available = {
     chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
     pool: [BigInt(getAddress(input.poolAddress))],
+    fundMode: [bigintFrom(input.fundMode ?? 0n, "fundMode", 1n)],
     inputShardId: [inputShardIds[0]],
     inputRoot: [inputRoots[0]],
     inputShardIds,
@@ -140,6 +137,20 @@ export function buildShieldedPoolPublicInputs(input) {
   };
 
   const uses = new Set(names);
+  if (action === SHIELDED_POOL_ACTION.Fund && available.fundMode[0] === 0n) {
+    unused(
+      inputShardIds[1] === inputShardIds[0] && inputRoots[1] === inputRoots[0],
+      "Initial fund second root",
+    );
+  }
+  if (action === SHIELDED_POOL_ACTION.Fund && available.fundMode[0] === 1n) {
+    unused(
+      [...available.endorsementRoot, ...available.trustedRoot, ...available.asOf].every(
+        (value) => value === 0n,
+      ),
+      "Continuation fund lineage/time",
+    );
+  }
   if (uses.has("inputShardId")) {
     unused(
       inputShardIds[1] === inputShardIds[0] && inputRoots[1] === inputRoots[0],
@@ -153,6 +164,7 @@ export function buildShieldedPoolPublicInputs(input) {
   }
   for (const name of [
     "periodNullifiers",
+    "fundMode",
     "amount",
     "recipient",
     "endorsementRoot",

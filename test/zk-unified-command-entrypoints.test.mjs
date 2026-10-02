@@ -107,14 +107,14 @@ describe("unified ZK command entrypoints", function () {
     if (fixture.externalRoot) fs.rmSync(fixture.externalRoot, { recursive: true, force: true });
   });
 
-  it("checks all nine shielded development circuits and their zkey-derived outputs", function () {
+  it("checks all six shielded development circuits and their zkey-derived outputs", function () {
     const result = checkShieldedDevelopmentArtifacts({
       root: fixture.root,
       runner: fixture.runner,
     });
-    expect(result).to.deep.equal({ status: "development", circuitCount: 9 });
-    // Nine verification keys and eight Solidity verifiers: the receive code has none.
-    expect(fixture.calls).to.have.length(17);
+    expect(result).to.deep.equal({ status: "development", circuitCount: 6 });
+    // Six verification keys and five Solidity verifiers: the receive code has none.
+    expect(fixture.calls).to.have.length(11);
   });
 
   it("checks development artifacts using an external pinned pTau selected by ZK_PTAU_PATH", function () {
@@ -124,7 +124,7 @@ describe("unified ZK command entrypoints", function () {
       runner: fixture.runner,
       env: { ZK_PTAU_PATH: external },
     });
-    expect(result.circuitCount).to.equal(9);
+    expect(result.circuitCount).to.equal(6);
     expect(fs.existsSync(path.join(fixture.root, PRODUCTION_PTAU_RELATIVE_PATH))).to.equal(false);
   });
 
@@ -134,14 +134,14 @@ describe("unified ZK command entrypoints", function () {
     expect(
       checkShieldedDevelopmentArtifacts({ ...options, env: { zk_ptau_path: external } })
         .circuitCount,
-    ).to.equal(9);
+    ).to.equal(6);
     expect(
       checkShieldedDevelopmentArtifacts({
         ...options,
         ptauPath: external,
         env: { ZK_PTAU_PATH: "missing.ptau" },
       }).circuitCount,
-    ).to.equal(9);
+    ).to.equal(6);
   });
 
   it("rejects unpinned external pTau contents and symlink file or directory paths", function () {
@@ -166,7 +166,7 @@ describe("unified ZK command entrypoints", function () {
 
   it("synchronizes every development proof file and verifier to the shared public locations", function () {
     const publicDirectory = path.join(fixture.root, "frontend/public/zk/shielded");
-    expect(fs.readdirSync(publicDirectory)).to.have.length(27);
+    expect(fs.readdirSync(publicDirectory)).to.have.length(18);
     for (const [action, item] of Object.entries(fixture.manifest.circuits)) {
       expect(sha256(path.join(publicDirectory, `${item.source}_final.zkey`))).to.equal(
         item.zkeySha256,
@@ -187,11 +187,11 @@ describe("unified ZK command entrypoints", function () {
   it("rejects a modified input before replacing any public development assets", async function () {
     const publicKey = path.join(
       fixture.root,
-      "frontend/public/zk/shielded/shielded_allocate_final.zkey",
+      "frontend/public/zk/shielded/shielded_fund_final.zkey",
     );
     const baseline = sha256(publicKey);
     fs.appendFileSync(
-      path.join(fixture.root, "zk-artifacts/shielded/shielded_allocate_dev_final.zkey"),
+      path.join(fixture.root, "zk-artifacts/shielded/shielded_fund_dev_final.zkey"),
       "tampered",
     );
     await assert.rejects(
@@ -213,7 +213,7 @@ describe("unified ZK command entrypoints", function () {
       root: fixture.root,
       runner: fixture.runner,
     });
-    expect(result.circuitCount).to.equal(9);
+    expect(result.circuitCount).to.equal(6);
   });
 
   it("rejects an omitted circuit or a modified development zkey", function () {
@@ -222,7 +222,7 @@ describe("unified ZK command entrypoints", function () {
     write(fixture.root, fixture.manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
     expect(() =>
       checkShieldedDevelopmentArtifacts({ root: fixture.root, runner: fixture.runner }),
-    ).to.throw("exactly all nine circuits");
+    ).to.throw("exactly all six circuits");
 
     fixture.manifest.circuits.claim = claim;
     write(fixture.root, fixture.manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
@@ -245,11 +245,11 @@ describe("unified ZK command entrypoints", function () {
   });
 
   it("rejects a verifier assigned to the wrong circuit action", function () {
-    fixture.manifest.circuits.allocate.verifierPath = fixture.manifest.circuits.claim.verifierPath;
+    fixture.manifest.circuits.fund.verifierPath = fixture.manifest.circuits.claim.verifierPath;
     write(fixture.root, fixture.manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
     expect(() =>
       checkShieldedDevelopmentArtifacts({ root: fixture.root, runner: fixture.runner }),
-    ).to.throw("allocate development verifier identity differs from its circuit action");
+    ).to.throw("fund development verifier identity differs from its circuit action");
   });
 
   it("uses production inspection when a production manifest exists", function () {
@@ -266,23 +266,23 @@ describe("unified ZK command entrypoints", function () {
       },
     });
     expect(calls).to.deep.equal([fixture.root]);
-    expect(result).to.deep.equal({ status: "production", circuitCount: 9 });
+    expect(result).to.deep.equal({ status: "production", circuitCount: 6 });
     expect(() =>
       checkShieldedArtifacts({
         root: fixture.root,
         productionInspector: () => ({
           artifacts: Object.fromEntries(
             Object.keys(SHIELDED_CIRCUITS)
-              .slice(0, 8)
+              .slice(0, 5)
               .map((name) => [name, {}]),
           ),
           manifestSha256: "ab".repeat(32),
         }),
       }),
-    ).to.throw("all nine circuits");
+    ).to.throw("all six circuits");
   });
 
-  it("runs both production ceremony verifiers and requires all nine shielded circuits", async function () {
+  it("runs both production ceremony verifiers and requires all six shielded circuits", async function () {
     const calls = [];
     const options = {
       root: fixture.root,
@@ -296,7 +296,7 @@ describe("unified ZK command entrypoints", function () {
       },
       shieldedVerifier: async (args) => {
         calls.push(["shielded", args]);
-        return { circuitCount: 9, manifestSha256: "22".repeat(32) };
+        return { circuitCount: 6, manifestSha256: "22".repeat(32) };
       },
     };
     const result = await verifyAllProductionCeremonies(options);
@@ -304,14 +304,14 @@ describe("unified ZK command entrypoints", function () {
       ["legacy", { root: options.root, ptauPath: options.ptauPath }],
       ["shielded", { root: options.root, ptauPath: options.ptauPath }],
     ]);
-    expect(result.circuitCount).to.equal(11);
+    expect(result.circuitCount).to.equal(8);
     await assert.rejects(
       () =>
         verifyAllProductionCeremonies({
           ...options,
-          shieldedVerifier: async () => ({ circuitCount: 8 }),
+          shieldedVerifier: async () => ({ circuitCount: 5 }),
         }),
-      /all nine circuits/u,
+      /all six circuits/u,
     );
     await assert.rejects(
       () =>

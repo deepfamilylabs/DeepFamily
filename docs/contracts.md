@@ -1099,12 +1099,12 @@ function getReward(uint256 recordCount) public pure returns (uint256)  // Reward
 
 ### State Variables
 
-| Variable             | Type    | Purpose                                          |
-| -------------------- | ------- | ------------------------------------------------ |
-| `deepFamilyContract` | address | Authorized minting contract                      |
-| `initialized`        | bool    | Prevents re-initialization                       |
-| `totalAdditions`     | uint256 | Count of successful reward-generating additions  |
-| `recentReward`       | uint256 | Latest mint result, including zero; fee basis    |
+| Variable             | Type    | Purpose                                         |
+| -------------------- | ------- | ----------------------------------------------- |
+| `deepFamilyContract` | address | Authorized minting contract                     |
+| `initialized`        | bool    | Prevents re-initialization                      |
+| `totalAdditions`     | uint256 | Count of successful reward-generating additions |
+| `recentReward`       | uint256 | Latest mint result, including zero; fee basis   |
 
 ### Events
 
@@ -1139,10 +1139,10 @@ indexed reveals nothing DeepFamily does not already publish.
 it once through `setLineageIndex`, which checks ERC-165 support, the reverse binding,
 `indexKind() == keccak256("deepfamily.lineage-index.v1")`, and `apiVersion() == 1`.
 
-| Tree | Id | One leaf per                        | Leaf                                                                            |
-| ---- | -- | ----------------------------------- | ------------------------------------------------------------------------------- |
-| Endorsement | 0 | (person, endorser)         | `Poseidon(1007, identityCommitment, parentsDigest, versionIndex, writtenAt << 160 \| endorser)` |
-| Trusted     | 1 | (person, version, account) | `Poseidon(1008, identityCommitment, versionIndex, account)`                      |
+| Tree        | Id  | One leaf per               | Leaf                                                                                            |
+| ----------- | --- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| Endorsement | 0   | (person, endorser)         | `Poseidon(1007, identityCommitment, parentsDigest, versionIndex, writtenAt << 160 \| endorser)` |
+| Trusted     | 1   | (person, version, account) | `Poseidon(1008, identityCommitment, versionIndex, account)`                                     |
 
 `parentsDigest = Poseidon(1009, fatherIdentityCommitment, motherIdentityCommitment)` is stored per
 version by `onVersionAdded`, which also checks `keccak256(bytes32(identityCommitment)) ==
@@ -1163,25 +1163,36 @@ function depth(uint8 treeId) external view returns (uint256);
 function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
 function identityCommitmentOf(bytes32 personHash) external view returns (uint256);
 function parentsDigestOf(bytes32 personHash, uint256 versionIndex) external view returns (uint256);
-function endorsementLeafIndex(bytes32 personHash, address endorser)
-    external view returns (bool exists, uint256 leafIndex);
-function trustedLeafIndex(bytes32 personHash, uint256 versionIndex, address account)
-    external view returns (bool exists, uint256 leafIndex);
-function getMerkleProof(uint8 treeId, uint256 leafIndex) external view returns (
+function endorsementLeafIndex(
+  bytes32 personHash,
+  address endorser
+) external view returns (bool exists, uint256 leafIndex);
+function trustedLeafIndex(
+  bytes32 personHash,
+  uint256 versionIndex,
+  address account
+) external view returns (bool exists, uint256 leafIndex);
+function getMerkleProof(
+  uint8 treeId,
+  uint256 leafIndex
+)
+  external
+  view
+  returns (
     uint256 leaf,
     uint256 proofRoot,
     uint256 proofIndex,
     uint256 proofDepth,
     uint256[] memory siblings
-);
+  );
 
 event LeafWritten(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
 event VersionIndexed(
-    bytes32 indexed personHash,
-    uint256 indexed versionIndex,
-    uint256 identityCommitment,
-    uint256 fatherIdentityCommitment,
-    uint256 motherIdentityCommitment
+  bytes32 indexed personHash,
+  uint256 indexed versionIndex,
+  uint256 identityCommitment,
+  uint256 fatherIdentityCommitment,
+  uint256 motherIdentityCommitment
 );
 ```
 
@@ -1211,28 +1222,27 @@ Recipients do not register keys on chain. A recipient shares a receive code: a b
 
 Anyone holding a receive code can link the identity to those payment keys, so the code must be shared privately. Enabling receipt creates no transaction and no fee-wallet trail.
 
-A receive code does not prove that the identity already exists in DeepFamily. An initial `allocate` still proves the recipient is a direct child with a current endorsement by a trusted source. `topUp` proves it uses an existing budget bound to that heir.
+A receive code does not prove that the identity already exists in DeepFamily. Initial `fund` proves the recipient is a direct child with a current endorsement by a trusted source. Additional `fund` proves membership of an existing budget bound to that heir, preserves its enrollment and start time, and does not consume or count its balance. A spent or zero-value budget can still be a read-only template.
 
-`ShieldedDeepPool` holds pooled DEEP and a global sequence of encrypted note commitments in 32-level shards. Each action consumes one-time nullifiers and appends two ciphertext commitments. The pool exposes `shield`, `createPolicy`, `allocate`, `topUp`, `mergeBudget`, `claim`, `privateTransfer`, and `unshield`. Only `shield` and `unshield` reveal a public amount; `unshield` also reveals the recipient. Policy, child, budget, and claim details are proved privately. The two lineage trees remain 64 levels deep.
+`ShieldedDeepPool` holds pooled DEEP and a global sequence of encrypted note commitments in 32-level shards. It exposes `shield`, `fund`, `claim`, `privateTransfer`, and `unshield`. All actions append two ciphertext commitments. Only `shield` and `unshield` reveal a public amount; `unshield` also reveals the recipient. The two lineage trees remain 64 levels deep.
 
-Each pool action has its own circuit and generated verifier. DeepFamily and the pool share one `Groth16VerifierAdapter` instance and the same `IProofVerifierAdapter` transport interface. The adapter fixes ten verifier routes: person relation (purpose 0, five signals), disclosure binding (purpose 1, four signals), and the pool actions (purposes 2–9, pool action ID + 2).
+Rules are private parameters rather than registered notes. A rule commitment binds the root identity, root version, per-period amount, random salt and allocation-key commitment. Initial `fund` consumes the donor VALUE and a unique rule/heir enrollment nullifier, and fixes `eligibleFrom = asOf + 7200`. Additional `fund` consumes only the donor VALUE plus a randomized read-use tag. The donor change memo backs up the child budget and, for initial funding, the allocation key. Recovery validates the key against the budget's key commitment; the key is never included in the child's budget. Historical change memos remain recoverable after their VALUE is spent.
 
-Each pool action's public signals contain only the inputs that action uses:
+`claim` consumes one or two compatible BUDGET notes, checks current lineage and 1–12 distinct unpaid mature periods, and outputs one remaining BUDGET plus a free VALUE payout. Both inputs must share the rule, enrollment, owner and rate. This combines budget consolidation with claiming. For a single input, the second witness is zero, the shard/root repeats the first and the second nullifier is a secret-bound dummy. `privateTransfer` spends one or two VALUE notes into two VALUE outputs, supporting private payments and internal wallet consolidation. It cannot spend restricted budgets.
 
-| Action | Purpose | Signals | Public inputs, in order |
-| --- | --- | --- | --- |
-| `shield` | 2 | 7 | chainId, pool, outputCommitments[2], ciphertextHashes[2], amount |
-| `createPolicy` | 3 | 10 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], outputCommitments[2], ciphertextHashes[2] |
-| `allocate` | 4 | 15 | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf |
-| `topUp` | 5 | 12 | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2] |
-| `mergeBudget` | 6 | 12 | same as `topUp` |
-| `claim` | 7 | 25 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], periodNullifiers[12], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf |
-| `privateTransfer` | 8 | 12 | same as `topUp` |
-| `unshield` | 9 | 12 | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], amount, recipient |
+Each pool action has its own circuit and generated verifier. DeepFamily and the pool share one `Groth16VerifierAdapter` instance with seven routes: person relation (purpose 0), disclosure binding (purpose 1), and pool actions (purposes 2–6, action ID + 2).
 
-`ShieldedDeepPool` builds each sequence from `ActionData`, and `@deepfamily/protocol-core` exports the same layouts (`SHIELDED_POOL_PUBLIC_INPUTS`). The action is not a public signal: its proof purpose selects the verifier. `createPolicy`, `claim`, and `unshield` spend one note. They must repeat its shard and root in `ActionData`'s second slot, and the pool rejects any other value. `ActionData` fields that an action does not use must be zero. Production deployment must bind the generated verifiers for the exact circuits in use. See [the shielded proof implementation](../circuits/shielded_claim.circom) and [development commands](../package.json).
+| Action            | Purpose | Signals | Public inputs, in order                                                                                                                                                 |
+| ----------------- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shield`          | 2       | 7       | chainId, pool, outputCommitments[2], ciphertextHashes[2], amount                                                                                                        |
+| `fund`            | 3       | 16      | chainId, pool, fundMode, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf             |
+| `claim`           | 4       | 27      | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], periodNullifiers[12], outputCommitments[2], ciphertextHashes[2], endorsementRoot, trustedRoot, asOf |
+| `privateTransfer` | 5       | 12      | chainId, pool, inputShardIds[2], inputRoots[2], inputNullifiers[2], outputCommitments[2], ciphertextHashes[2]                                                           |
+| `unshield`        | 6       | 12      | chainId, pool, inputShardId, inputRoot, inputNullifiers[2], outputCommitments[2], ciphertextHashes[2], amount, recipient                                                |
 
-The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They deploy the eight generated pool verifiers before the shared adapter. They then bind the pool to the adapter, token, and lineage index. The receive-code circuit goes through the same build, setup, and ceremony, but it has no Solidity verifier and nothing is deployed for it. Development use does not require an audit. Production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
+`fundMode` is public: 0 initializes an enrollment and requires current lineage roots and a recent `asOf`; 1 funds an existing enrollment and requires zero lineage roots and time. Other actions require `fundMode = 0`. Initial `fund` and `unshield` repeat the donor's shard/root in both `ActionData` slots. Unused fields must be zero. The contract and `@deepfamily/protocol-core` build matching signal layouts. Production deployments must bind newly generated verifiers for these exact circuits; this unreleased protocol has no compatibility routes for removed actions.
+
+The localhost, testnet acceptance, and guarded Mainnet release flows deploy the same integrated system. They deploy the five generated pool verifiers before the shared adapter. They then bind the pool to the adapter, token, and lineage index. The receive-code circuit goes through the same build, setup, and ceremony, but it has no Solidity verifier and nothing is deployed for it. Development use does not require an audit. Production release remains gated by the reviewed production artifacts, independent audits, runtime benchmarks, and integrated testnet evidence.
 
 ## ZK Verifier Contracts
 
@@ -1252,7 +1262,7 @@ The localhost, testnet acceptance, and guarded Mainnet release flows deploy the 
 
 ### Shielded action verifiers
 
-The pool uses eight action-specific verifiers with 7 to 25 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` for the eight pool actions. They also synchronize the matching browser assets, including the receive-code proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses five action-specific verifiers with 7 to 27 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` for the five pool actions. They also synchronize the matching browser assets, including the receive-code proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:
@@ -1273,7 +1283,6 @@ function verifyProof(
   uint256[2] calldata c,
   uint256[4] calldata publicSignals
 ) external view returns (bool);
-
 ```
 
 ## Contract Security Summary

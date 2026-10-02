@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES,
   SHIELDED_HPKE_MAX_PAYLOAD_BYTES,
-  SHIELDED_POLICY_NOTE_PAYLOAD_BYTES,
   SHIELDED_VALUE_NOTE_PAYLOAD_BYTES,
   SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES,
   SNARK_SCALAR_FIELD,
@@ -15,7 +14,6 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
-  encodeShieldedPolicyNotePayload,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   verifyShieldedNotePayload,
@@ -37,14 +35,6 @@ const budget = {
   remaining: 1200n,
   nonce: 31n,
 };
-const policy = {
-  rootIdentityCommitment: 11n,
-  rootVersionIndex: 2n,
-  amountPerPeriod: 100n,
-  policySalt: 17n,
-  allocationKey: 41n,
-  nonce: 41n,
-};
 const memoValue = {
   ...value,
   topUpMemo: { budgetCommitment: 71n, budgetNote: budget },
@@ -53,17 +43,14 @@ const memoValue = {
 test("strict binary value and budget payloads round-trip within HPKE envelope", () => {
   const valuePayload = encodeShieldedValueNotePayload(value);
   const budgetPayload = encodeShieldedBudgetNotePayload(budget);
-  const policyPayload = encodeShieldedPolicyNotePayload(policy);
   const memoPayload = encodeShieldedValueNotePayload(memoValue);
   assert.equal(valuePayload.length, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES);
   assert.equal(budgetPayload.length, SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES);
-  assert.equal(policyPayload.length, SHIELDED_POLICY_NOTE_PAYLOAD_BYTES);
   assert.equal(memoPayload.length, SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES);
   assert.ok(memoPayload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
   assert.ok(budgetPayload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
   assert.deepEqual(decodeShieldedNotePayload(valuePayload), { kind: "value", ...value });
   assert.deepEqual(decodeShieldedNotePayload(budgetPayload), { kind: "budget", ...budget });
-  assert.deepEqual(decodeShieldedNotePayload(policyPayload), { kind: "policy", ...policy });
   assert.deepEqual(decodeShieldedNotePayload(memoPayload), { kind: "value", ...memoValue });
   assert.deepEqual(
     decodeShieldedNotePayload(encodeShieldedValueNotePayload({ ...value, amount: 0n })),
@@ -84,7 +71,6 @@ test("decrypted notes recompute exact on-chain commitments", async () => {
   for (const payload of [
     encodeShieldedValueNotePayload(value),
     encodeShieldedBudgetNotePayload(budget),
-    encodeShieldedPolicyNotePayload(policy),
     encodeShieldedValueNotePayload(memoValue),
   ]) {
     const ciphertext = await encryptShieldedNote({ recipientPublicKey, payload, ...context });
@@ -134,7 +120,7 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_VERSION",
   );
   assert.throws(
-    () => decodeShieldedNotePayload(modified(5, 5)),
+    () => decodeShieldedNotePayload(modified(5, 3)),
     (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_KIND",
   );
   assert.throws(
@@ -155,18 +141,16 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     (error) => error.code === "INTEGER_OUT_OF_RANGE",
   );
   assert.throws(
-    () => encodeShieldedValueNotePayload({
-      ...value,
-      topUpMemo: { budgetCommitment: 0n, budgetNote: budget },
-    }),
+    () =>
+      encodeShieldedValueNotePayload({
+        ...value,
+        topUpMemo: { budgetCommitment: 0n, budgetNote: budget },
+      }),
     (error) => error.code === "ZERO_SHIELDED_BUDGET_COMMITMENT",
   );
   const badMemo = encodeShieldedValueNotePayload(memoValue);
   badMemo[SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32] = 0;
-  assert.throws(
-    () => decodeShieldedNotePayload(badMemo),
-    (error) => error.code === "INVALID_SHIELDED_NOTE_MAGIC",
-  );
+  assert.deepEqual(decodeShieldedNotePayload(badMemo), { kind: "value", ...value });
 });
 
 test("budget codec rejects zero rates, fractional periods and oversized counts", () => {
@@ -181,5 +165,24 @@ test("budget codec rejects zero rates, fractional periods and oversized counts",
   assert.throws(
     () => encodeShieldedBudgetNotePayload({ ...budget, amountPerPeriod: 1n, remaining: 1n << 64n }),
     (error) => error.code === "SHIELDED_PERIOD_COUNT_OVERFLOW",
+  );
+});
+
+test("donor-only rule backup fits the fixed envelope and never becomes a note", () => {
+  const ruleMemo = { ...memoValue, topUpMemo: { ...memoValue.topUpMemo, allocationKey: 41n } };
+  const payload = encodeShieldedValueNotePayload(ruleMemo);
+  assert.equal(payload.length, 452);
+  assert.ok(payload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
+  assert.deepEqual(decodeShieldedNotePayload(payload), { kind: "value", ...ruleMemo });
+  const malformedKey = payload.slice();
+  malformedKey.fill(255, SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES);
+  assert.deepEqual(decodeShieldedNotePayload(malformedKey), { kind: "value", ...memoValue });
+  assert.throws(
+    () =>
+      encodeShieldedValueNotePayload({
+        ...ruleMemo,
+        topUpMemo: { ...ruleMemo.topUpMemo, allocationKey: 42n },
+      }),
+    (error) => error.code === "INVALID_SHIELDED_ALLOCATION_KEY",
   );
 });

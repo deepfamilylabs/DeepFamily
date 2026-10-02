@@ -1,4 +1,4 @@
-// Shared positive fixtures for the isolated Allocate and TopUp circuits.
+// Shared positive fixtures for initial and continuation Fund modes.
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 
@@ -37,9 +37,6 @@ export function buildShieldedFundingFixtures({
     policySalt,
     allocationKeyCommitment,
   ]);
-  const policyNonce = 103n;
-  const policyCiphertextHash = 104n;
-  const policyNote = poseidon4([1024n, policy, policyNonce, policyCiphertextHash]);
   const heirIdentityCommitment = heir.heirIdentityCommitment;
   const heirOwnerCommitment = heir.ownerCommitment;
   const eligibleFrom = BigInt(heir.witness.eligibleFrom);
@@ -103,11 +100,14 @@ export function buildShieldedFundingFixtures({
     rootVersionIndex: decimal(rootVersionIndex),
     rate: decimal(rate),
     policySalt: decimal(policySalt),
+    allocationKeyCommitment: decimal(allocationKeyCommitment),
     heirIdentityCommitment: decimal(heirIdentityCommitment),
     heirOwnerCommitment: decimal(heirOwnerCommitment),
     eligibleFrom: decimal(eligibleFrom),
     enrollmentSalt: decimal(enrollmentSalt),
     changeNonce: decimal(changeNonce),
+    budgetPeriods: decimal(budgetPeriods),
+    budgetNonce: decimal(budgetNonce),
   };
   const commonPublicInputs = {
     chainId: "1030",
@@ -118,20 +118,7 @@ export function buildShieldedFundingFixtures({
   };
   const enrollmentTag = poseidon4([1027n, allocationKey, policy, heirIdentityCommitment]);
 
-  const allocate = {
-    ...commonPublicInputs,
-    inputRoots: [donorNote, policyNote].map(decimal),
-    inputNullifiers: [donorSpend, enrollmentTag].map(decimal),
-    endorsementRoot: heir.witness.endorsementRoot,
-    trustedRoot: heir.witness.trustedRoot,
-    asOf: decimal(eligibleFrom - 7200n),
-    ...commonWitness,
-    policyNonce: decimal(policyNonce),
-    policyCiphertextHash: decimal(policyCiphertextHash),
-    policyDepth: "0",
-    policyIndex: "0",
-    policySiblings: zeroes(),
-    allocationKey: decimal(allocationKey),
+  const lineageFields = {
     heirVersionIndex: heir.witness.versionIndex,
     fatherIdentityCommitment: heir.witness.fatherIdentityCommitment,
     motherIdentityCommitment: heir.witness.motherIdentityCommitment,
@@ -144,18 +131,8 @@ export function buildShieldedFundingFixtures({
     trustedDepth: heir.witness.trustedDepth,
     trustedIndex: heir.witness.trustedIndex,
     trustedSiblings: heir.witness.trustedSiblings,
-    budgetPeriods: decimal(budgetPeriods),
-    budgetNonce: decimal(budgetNonce),
   };
-
-  const topUp = {
-    ...commonPublicInputs,
-    inputRoots: [donorNote, oldBudget].map(decimal),
-    inputNullifiers: [donorSpend, poseidon4([1026n, policySalt, oldBudget, budgetUseNonce])].map(
-      decimal,
-    ),
-    ...commonWitness,
-    allocationKeyCommitment: decimal(allocationKeyCommitment),
+  const oldFields = {
     oldBudgetRemaining: decimal(oldBudgetRemaining),
     oldBudgetRemainingPeriods: decimal(oldBudgetRemainingPeriods),
     oldBudgetNonce: decimal(oldBudgetNonce),
@@ -164,16 +141,48 @@ export function buildShieldedFundingFixtures({
     oldBudgetIndex: "0",
     oldBudgetSiblings: zeroes(),
     budgetUseNonce: decimal(budgetUseNonce),
-    topUpPeriods: decimal(budgetPeriods),
-    newBudgetNonce: decimal(budgetNonce),
+  };
+  const zeroFields = (fields) =>
+    Object.fromEntries(
+      Object.entries(fields).map(([key, value]) => [
+        key,
+        Array.isArray(value) ? value.map(() => "0") : "0",
+      ]),
+    );
+  const initial = {
+    ...commonPublicInputs,
+    ...commonWitness,
+    ...lineageFields,
+    ...zeroFields(oldFields),
+    fundMode: "0",
+    inputRoots: [donorNote, donorNote].map(decimal),
+    inputNullifiers: [donorSpend, enrollmentTag].map(decimal),
+    endorsementRoot: heir.witness.endorsementRoot,
+    trustedRoot: heir.witness.trustedRoot,
+    asOf: decimal(eligibleFrom - 7200n),
+    allocationKey: decimal(allocationKey),
+  };
+  const continuation = {
+    ...commonPublicInputs,
+    ...commonWitness,
+    ...zeroFields(lineageFields),
+    ...oldFields,
+    fundMode: "1",
+    inputRoots: [donorNote, oldBudget].map(decimal),
+    inputNullifiers: [donorSpend, poseidon4([1026n, policySalt, oldBudget, budgetUseNonce])].map(
+      decimal,
+    ),
+    endorsementRoot: "0",
+    trustedRoot: "0",
+    asOf: "0",
+    allocationKey: "0",
   };
   return {
-    allocate,
-    topUp,
+    initial,
+    continuation,
     policy,
     enrollment,
     donorNote,
-    policyNote,
     oldBudget,
     outputBudget,
     outputChange,

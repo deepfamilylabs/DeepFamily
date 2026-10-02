@@ -40,19 +40,16 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
 
   enum Action {
     Shield,
-    CreatePolicy,
-    Allocate,
-    TopUp,
-    MergeBudget,
+    Fund,
     Claim,
     PrivateTransfer,
     Unshield
   }
 
   /**
-   * @notice All actions use two output slots and two input slots. CreatePolicy, Claim and
-   *         Unshield spend one note and repeat its shard and root in the second input slot;
-   *         their circuits bind the second nullifier as a dummy.
+   * @notice All actions use two output slots and two input slots. Initial Fund and
+   *         single-input Claim/PrivateTransfer repeat the first shard and root;
+   *         Unshield has one proved input and repeats its shard and root.
    */
   struct ActionData {
     uint256[2] inputShardIds;
@@ -61,10 +58,12 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     uint256[12] periodNullifiers;
     uint256[2] outputCommitments;
     bytes[2] outputCiphertexts;
-    // Allocate/Claim: current endorsement/trusted roots.
+    // Initial Fund/Claim: current endorsement/trusted roots.
     uint256 relation0;
     uint256 relation1;
     uint256 asOf;
+    // Fund only: 0 starts an enrollment; 1 continues a historical enrollment.
+    uint256 fundMode;
   }
 
   struct Shard {
@@ -106,7 +105,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   event ActionExecuted(uint8 action, uint256 inputShardId0, uint256 inputShardId1);
 
   /**
-   * @param verifier The shared Groth16 adapter configured with all eight pool action verifiers.
+   * @param verifier The shared Groth16 adapter configured with all five pool action verifiers.
    */
   constructor(address token, address lineageIndex, address verifier) {
     if (token.code.length == 0 || lineageIndex.code.length == 0 || verifier.code.length == 0) {
@@ -134,27 +133,15 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     _appendOutputs(Action.Shield, data);
   }
 
-  function createPolicy(ActionData calldata data, bytes calldata proof) external nonReentrant {
-    _privateAction(Action.CreatePolicy, data, proof);
-  }
-
-  /** @dev The Allocate circuit enforces eligibleFrom == asOf + ACTION_PROOF_LIFETIME. */
-  function allocate(ActionData calldata data, bytes calldata proof) external nonReentrant {
-    _privateAction(Action.Allocate, data, proof);
-  }
-
-  function topUp(ActionData calldata data, bytes calldata proof) external nonReentrant {
-    _privateAction(Action.TopUp, data, proof);
-  }
-
-  function mergeBudget(ActionData calldata data, bytes calldata proof) external nonReentrant {
-    _privateAction(Action.MergeBudget, data, proof);
+  /** @dev Initial Fund enforces eligibleFrom == asOf + ACTION_PROOF_LIFETIME. */
+  function fund(ActionData calldata data, bytes calldata proof) external nonReentrant {
+    _privateAction(Action.Fund, data, proof);
   }
 
   /**
    * @notice Produces shielded output notes only; no ordinary wallet receives DEEP here.
    * @dev The Claim circuit uses complete 30-day periods from the per-heir eligibility start.
-   *      The start is a private witness but is derivable from the allocation's public asOf.
+   *      The start is a private witness but is derivable from the initial fund's public asOf.
    *      The one-time initial enrollment tag prevents competing starts for a policy and heir.
    */
   function claim(ActionData calldata data, bytes calldata proof) external nonReentrant {
@@ -261,6 +248,10 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   ) private view {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
+    bool isInitialFund = action == Action.Fund && data.fundMode == 0;
+    if (action == Action.Fund) {
+      if (data.fundMode > 1) revert InvalidActionData();
+    } else if (data.fundMode != 0) revert InvalidActionData();
     for (uint256 i = 0; i < 2; ++i) {
       if (isShield) {
         if (data.inputShardIds[i] != 0 || data.inputRoots[i] != 0 || data.inputNullifiers[i] != 0)
@@ -292,7 +283,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       revert NullifierAlreadySpent();
     }
     if (
-      _inputCount(action) == 1 &&
+      (_inputCount(action) == 1 || isInitialFund) &&
       (data.inputShardIds[1] != data.inputShardIds[0] || data.inputRoots[1] != data.inputRoots[0])
     ) revert InvalidActionData();
 
@@ -310,7 +301,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       _requireNonzeroField(data.relation1);
       if (data.relation0 != LINEAGE_INDEX.root(0) || data.relation1 != LINEAGE_INDEX.root(1))
         revert UnknownLineageRoot();
-    } else if (action == Action.Allocate) {
+    } else if (isInitialFund) {
       _requireNonzeroField(data.relation0);
       _requireNonzeroField(data.relation1);
       if (data.relation0 != LINEAGE_INDEX.root(0) || data.relation1 != LINEAGE_INDEX.root(1))
@@ -318,7 +309,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     } else if (data.relation0 != 0 || data.relation1 != 0) {
       revert InvalidActionData();
     }
-    if (isClaim || action == Action.Allocate) {
+    if (isClaim || isInitialFund) {
       if (data.asOf > block.timestamp || block.timestamp - data.asOf >= ACTION_PROOF_LIFETIME) {
         revert InvalidClaimTime();
       }
@@ -353,13 +344,14 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   ) private view returns (uint256[] memory signals) {
     uint256 inputs = _inputCount(action);
     bool isClaim = action == Action.Claim;
-    bool hasLineage = isClaim || action == Action.Allocate;
+    bool hasLineage = isClaim || action == Action.Fund;
     bool hasAmount = action == Action.Shield || action == Action.Unshield;
     bool hasRecipient = action == Action.Unshield;
     signals = new uint256[](
       6 +
         (inputs == 0 ? 0 : 2 * inputs + 2) +
         (isClaim ? 12 : 0) +
+        (action == Action.Fund ? 1 : 0) +
         (hasAmount ? 1 : 0) +
         (hasRecipient ? 1 : 0) +
         (hasLineage ? 3 : 0)
@@ -367,6 +359,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     uint256 n;
     signals[n++] = block.chainid;
     signals[n++] = uint256(uint160(address(this)));
+    if (action == Action.Fund) signals[n++] = data.fundMode;
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputShardIds[i];
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputRoots[i];
     if (inputs != 0) {
@@ -389,10 +382,10 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     }
   }
 
-  /** @dev Shield spends no notes; CreatePolicy, Claim and Unshield spend exactly one. */
+  /** @dev Fund/Claim prove two root slots; only Unshield has one public input root. */
   function _inputCount(Action action) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
-    if (action == Action.CreatePolicy || action == Action.Claim || action == Action.Unshield) {
+    if (action == Action.Unshield) {
       return 1;
     }
     return 2;

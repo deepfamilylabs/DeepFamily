@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Contract, Signer } from "ethers";
 import {
-  submitAllocate,
+  submitFund,
   submitClaim,
-  submitCreatePolicy,
-  submitMergeBudget,
   submitPrivateTransfer,
   submitShield,
-  submitTopUp,
   submitUnshield,
   type ShieldedPoolActionData,
 } from "./shieldedPoolFlows";
@@ -33,6 +30,7 @@ const PROOF = {
 
 function actionData(): ShieldedPoolActionData {
   return {
+    fundMode: 0n,
     inputShardIds: [0n, 0n],
     inputRoots: [0n, 0n],
     inputNullifiers: [0n, 0n],
@@ -50,16 +48,7 @@ function fixture() {
   let gasBalance = 10n ** 18n;
   const receipt = { status: 1 };
   const estimateGas = vi.fn(async () => 100_000n);
-  const methodNames = [
-    "shield",
-    "createPolicy",
-    "allocate",
-    "topUp",
-    "mergeBudget",
-    "claim",
-    "privateTransfer",
-    "unshield",
-  ] as const;
+  const methodNames = ["shield", "fund", "claim", "privateTransfer", "unshield"] as const;
   const methods = Object.fromEntries(
     methodNames.map((name) => {
       const method = Object.assign(
@@ -158,10 +147,7 @@ describe("shielded pool local proof and self-submit flows", () => {
 
   it("routes each private action and public withdrawal to the matching circuit and method", async () => {
     const cases = [
-      ["createPolicy", submitCreatePolicy],
-      ["allocate", submitAllocate],
-      ["topUp", submitTopUp],
-      ["mergeBudget", submitMergeBudget],
+      ["fund", submitFund],
       ["claim", submitClaim],
       ["privateTransfer", submitPrivateTransfer],
     ] as const;

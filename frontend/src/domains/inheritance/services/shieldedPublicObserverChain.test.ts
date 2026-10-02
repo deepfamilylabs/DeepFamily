@@ -81,8 +81,8 @@ function fixture(batchViaProxy = false) {
     return txHash;
   };
   add(0, 1, [11n, 12n]);
-  const allocationTxHash = add(2, 2, [101n, 102n]);
-  const claimTxHash = add(5, 3, [201n, 202n]);
+  const allocationTxHash = add(1, 2, [101n, 102n]);
+  const claimTxHash = add(2, 3, [201n, 202n]);
   const filters: Array<Record<string, unknown>> = [];
   const provider = {
     getBlockNumber: async () => 1,

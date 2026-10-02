@@ -19,6 +19,7 @@ export type ShieldedClaimOverview = {
   /** Exactly the budget and period batch used by automatic claim selection. */
   claim?: {
     budget: ShieldedSelectableBudgetNote;
+    secondBudget?: ShieldedSelectableBudgetNote;
     periodIndices: bigint[];
     amount: bigint;
   };

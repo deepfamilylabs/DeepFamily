@@ -26,7 +26,6 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   viewSeed: 1018n,
   dummyPeriodNullifier: 1019n,
   dummyInputNullifier: 1021n,
-  policyNote: 1024n,
   topUpUseNullifier: 1026n,
   enrollmentNullifier: 1027n,
   allocationKeyCommitment: 1028n,
@@ -90,7 +89,7 @@ export function computeShieldedPolicyCommitment(input) {
   return poseidon6([
     SHIELDED_INHERITANCE_DOMAINS.policy,
     nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
-    field(input.rootVersionIndex, "rootVersionIndex"),
+    uint64(input.rootVersionIndex, "rootVersionIndex"),
     nonzeroAmount(input.amountPerPeriod, "amountPerPeriod"),
     nonzeroField(input.policySalt, "policySalt"),
     nonzeroField(input.allocationKeyCommitment, "allocationKeyCommitment"),
@@ -112,16 +111,6 @@ export function computeShieldedEnrollmentNullifier(input) {
     nonzeroField(input.allocationKey, "allocationKey"),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
-  ]);
-}
-
-/** A zero-value policy template whose ciphertext is bound before allocation. */
-export function computeShieldedPolicyNoteCommitment(input) {
-  return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.policyNote,
-    nonzeroField(input.policyCommitment, "policyCommitment"),
-    nonzeroField(input.nonce, "nonce"),
-    field(input.ciphertextHashField, "ciphertextHashField"),
   ]);
 }
 

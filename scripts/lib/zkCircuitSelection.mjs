@@ -1,10 +1,7 @@
 export const SHIELDED_CIRCUITS = Object.freeze({
   receiveCode: "shielded_receive_code",
   shield: "shielded_shield",
-  createPolicy: "shielded_create_policy",
-  allocate: "shielded_allocate",
-  topUp: "shielded_top_up",
-  mergeBudget: "shielded_merge_budget",
+  fund: "shielded_fund",
   claim: "shielded_claim",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",

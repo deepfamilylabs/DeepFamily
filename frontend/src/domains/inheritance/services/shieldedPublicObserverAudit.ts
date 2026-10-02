@@ -32,9 +32,7 @@ export type KnownAllocationClaimLink = {
 };
 
 const BUDGET_OUTPUT_ACTIONS = new Set<ShieldedAction>([
-  SHIELDED_POOL_ACTION.Allocate,
-  SHIELDED_POOL_ACTION.TopUp,
-  SHIELDED_POOL_ACTION.MergeBudget,
+  SHIELDED_POOL_ACTION.Fund,
   SHIELDED_POOL_ACTION.Claim,
 ]);
 
@@ -79,13 +77,10 @@ export function auditKnownAllocationClaimLink(input: {
   }
   const claimIndex = claims[0];
   const claim = input.actions[claimIndex];
-  if (claim.inputShardIds[0] !== claim.inputShardIds[1]) {
-    throw new Error("Claim input shard IDs disagree");
-  }
   const priorActions = input.actions.slice(0, claimIndex);
   const allocation = priorActions.find(
     (action) =>
-      action.action === SHIELDED_POOL_ACTION.Allocate &&
+      action.action === SHIELDED_POOL_ACTION.Fund &&
       action.outputs[0].commitment === input.knownAllocationCommitment,
   );
   if (!allocation) throw new Error("Known commitment is not an earlier allocation output");
@@ -94,7 +89,8 @@ export function auditKnownAllocationClaimLink(input: {
   const candidateBudgetCommitments = priorActions
     .filter(
       (action) =>
-        BUDGET_OUTPUT_ACTIONS.has(action.action) && action.outputs[0].shardId === claimInputShardId,
+        BUDGET_OUTPUT_ACTIONS.has(action.action) &&
+        claim.inputShardIds.includes(action.outputs[0].shardId),
     )
     .map((action) => action.outputs[0].commitment);
   const knownChildBudgets = new Set([

@@ -414,7 +414,7 @@ The normal release sequence is:
 2. deploy and validate `GovernanceTimelock` with the production Safe as its sole
    proposer/canceller/executor and itself as its sole administrator;
 3. verify the Timelock source on ConfluxScan;
-4. deploy and wire the Token, libraries, all 11 ZK verifiers, nine adapters, DeepFamily
+4. deploy and wire the Token, libraries, all 7 ZK verifiers, the shared adapter, DeepFamily
    implementation and UUPS proxy, reader, lineage index, key registry, and shielded pool while
    recording every receipt;
 5. transfer `DeepFamily.owner()` to the Timelock and confirm that the deployer has no governance

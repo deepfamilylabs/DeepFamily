@@ -14,9 +14,10 @@ import {
 } from "@deepfamily/protocol-core";
 import {
   assessShieldedGasWallet,
-  getRecoveredTopUpTemplate,
+  getRecoveredFundingTemplate,
   getRecoveredShieldedNoteProof,
-  listRecoveredTopUpTemplates,
+  listRecoveredFundingTemplates,
+  listRecoveredShieldedPolicies,
   listUnspentRecoveredShieldedNotes,
   recoverLocalShieldedWallet,
 } from "./shieldedWalletRecovery";
@@ -153,9 +154,9 @@ describe("local shielded wallet recovery", () => {
     }).noteCommitment;
     const changePayload = encodeShieldedValueNotePayload({
       ownerCommitment: donor.ownerCommitment,
-      amount: 300n,
+      amount: 0n,
       nonce: 37n,
-      topUpMemo: { budgetCommitment, budgetNote: budget },
+      topUpMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
     });
     const changeCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
@@ -197,20 +198,70 @@ describe("local shielded wallet recovery", () => {
       currentShardId: async () => 0n,
       noteShard: async () => ({ size: 2n, root: tree.root }),
     } as unknown as Contract;
+    const spent = computeShieldedSpendNullifier({
+      ownerSecret: donor.ownerSecret,
+      noteCommitment: changeCommitment,
+    });
+    logs.push({
+      ...iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]),
+      address: context.poolAddress,
+      blockNumber: 1,
+      index: 2,
+    });
     const restored = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...restored.ownedNotes.keys()]).toEqual([changeCommitment]);
-    expect(listRecoveredTopUpTemplates(restored)).toHaveLength(1);
-    expect(getRecoveredTopUpTemplate(restored, budgetCommitment)).toMatchObject({
+    expect(listRecoveredFundingTemplates(restored)).toHaveLength(1);
+    expect(listUnspentRecoveredShieldedNotes(restored, 13n)).toEqual([]);
+    expect(listRecoveredShieldedPolicies(restored)).toEqual([
+      {
+        rootIdentityCommitment: budget.rootIdentityCommitment,
+        rootVersionIndex: budget.rootVersionIndex,
+        amountPerPeriod: budget.amountPerPeriod,
+        policySalt: budget.policySalt,
+        allocationKey: 41n,
+      },
+    ]);
+    expect(getRecoveredFundingTemplate(restored, budgetCommitment)).toMatchObject({
       commitment: budgetCommitment,
       shardId: 0n,
       note: budget,
     });
-    expect(getRecoveredTopUpTemplate(restored, budgetCommitment).ciphertext).toEqual(
+    expect(getRecoveredFundingTemplate(restored, budgetCommitment).ciphertext).toEqual(
       budgetCiphertext,
     );
     await expect(recoverLocalShieldedWallet(pool, 14n, { fromBlock: 1 })).resolves.toMatchObject({
-      topUpTemplates: new Map(),
+      fundingTemplates: new Map(),
     });
+    // An attacker can encrypt a valid value note with a deliberately bad rule backup.
+    const badKeyPayload = changePayload.slice();
+    badKeyPayload[badKeyPayload.length - 1] ^= 1;
+    const badKeyCiphertext = await encryptShieldedNote({
+      recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
+      payload: badKeyPayload,
+      ...context,
+    });
+    const badKeyCommitment = computeShieldedNoteCommitmentFromPayload({
+      payload: badKeyPayload,
+      ciphertextHashField: computeShieldedCiphertextHashField(badKeyCiphertext),
+    }).noteCommitment;
+    tree.update(1n, badKeyCommitment);
+    logs[1] = {
+      ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
+        0n,
+        1n,
+        badKeyCommitment,
+        tree.root,
+        badKeyCiphertext,
+      ]),
+      address: context.poolAddress,
+      blockNumber: 1,
+      index: 1,
+    };
+    const badKeyRecovery = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
+    expect([...badKeyRecovery.ownedNotes.keys()]).toEqual([badKeyCommitment]);
+    expect(listRecoveredFundingTemplates(badKeyRecovery)).toHaveLength(1);
+    expect(listRecoveredShieldedPolicies(badKeyRecovery)).toEqual([]);
+
     const forgedPayload = encodeShieldedValueNotePayload({
       ownerCommitment: donor.ownerCommitment,
       amount: 300n,
@@ -241,8 +292,8 @@ describe("local shielded wallet recovery", () => {
     };
     const forgedRecovery = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...forgedRecovery.ownedNotes.keys()]).toEqual([forgedCommitment]);
-    expect(listRecoveredTopUpTemplates(forgedRecovery)).toHaveLength(0);
-    expect(() => getRecoveredTopUpTemplate(forgedRecovery, budgetCommitment)).toThrow(
+    expect(listRecoveredFundingTemplates(forgedRecovery)).toHaveLength(0);
+    expect(() => getRecoveredFundingTemplate(forgedRecovery, budgetCommitment)).toThrow(
       "not recoverable",
     );
   });
@@ -266,25 +317,6 @@ describe("local shielded wallet recovery", () => {
       proofIndex: 0n,
     });
     expect(getRecoveredShieldedNoteProof(snapshot, commitments[0]).siblings).toHaveLength(32);
-    expect(
-      listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField).map(
-        (n) => n.commitment,
-      ),
-    ).toEqual([commitments[1]]);
-    const example = snapshot.ownedNotes.get(commitments[0])!;
-    snapshot.ownedNotes.set(987n, {
-      ...example,
-      commitment: 987n,
-      note: {
-        kind: "policy",
-        rootIdentityCommitment: 11n,
-        rootVersionIndex: 0n,
-        amountPerPeriod: 100n,
-        policySalt: 2n,
-        allocationKey: 3n,
-        nonce: 4n,
-      },
-    });
     expect(
       listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField).map(
         (n) => n.commitment,

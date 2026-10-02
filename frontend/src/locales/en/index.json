@@ -1575,37 +1575,28 @@
     "actionsTitle": "What would you like to do?",
     "actions": {
       "recover": "Check amounts again",
-      "receiveCode": "Let family send me money",
+      "receiveCode": "Share my receiving details",
       "shield": "Move money from my wallet",
-      "createPolicy": "Set the amount per period",
-      "allocate": "Set aside claim money for a child",
-      "topUp": "Add more money for a child",
-      "mergeBudget": "Combine money under the same arrangement",
       "claim": "Claim into my page balance",
-      "privateTransfer": "Send to family",
-      "unshield": "Move back to an ordinary wallet"
+      "privateTransfer": "Private transfer",
+      "unshield": "Move back to an ordinary wallet",
+      "fund": "Set aside money for a child"
     },
     "descriptions": {
-      "recover": "Check your page balance, money family has set aside for you to claim, and the amounts you previously set per period. You can find these records with the same identity details and passphrase even after clearing your browser.",
-      "receiveCode": "Generate this identity's receive code so family can send you money or fund periodic claims.",
+      "recover": "Check your private balance, family claim funds, and saved funding arrangements. The same identity details and passphrase recover these records after clearing your browser.",
+      "receiveCode": "Generate reusable receiving details to share privately with senders. This takes no transaction and changes no balance.",
       "shield": "Move DEEP from the connected ordinary wallet into your page balance. Your wallet may first ask you to allow this page to move DEEP.",
-      "createPolicy": "Save a new claim setting: how much a parent’s direct children in the family records can claim every 30 days. This only saves a setting. It does not provide money or change an arrangement that has already been funded.",
-      "allocate": "Choose a confirmed direct child in the family records and set aside money for a number of periods. The child's private receive code is required. The first period is due 30 days and 2 hours after the first funding. The giver cannot take the money back.",
-      "topUp": "Add money for more periods using this child’s original amount per period and starting time. The giver cannot take this money back.",
-      "mergeBudget": "Two pieces of claim money can be combined if they are for the same child, use the same amount-per-period arrangement, and start counting time from the same point.",
-      "claim": "Claim due periods with enough money into your page balance, up to 12 periods at a time. The family records must still confirm you as this parent’s direct child. A period stays unclaimed if there is not enough money to pay it in full.",
-      "privateTransfer": "Send money from your page balance to a family member using their private receive code. The rest stays in your page balance. This step does not send money to the recipient’s ordinary wallet.",
-      "unshield": "Move your page balance to an ordinary wallet. Each withdrawal uses one piece of money and cannot exceed its amount."
+      "claim": "Claim due periods into your private balance, up to 12 periods at a time. Compatible claim funds are selected and combined automatically. The current family records must still confirm you as this parent’s direct child.",
+      "privateTransfer": "Send DEEP from your private balance using the recipient’s receiving details. Amount and recipient stay private; any change remains in your balance.",
+      "unshield": "Move DEEP from your private balance to an ordinary wallet. Separate pieces of balance are organized automatically when needed; your wallet may ask you to confirm additional transactions.",
+      "fund": "Choose a direct child and fund a number of periods. Set the amount per period here or reuse a saved arrangement. Adding money to the same child and arrangement preserves the original starting time. The first period is due 30 days and 2 hours after initial funding; the giver cannot take the money back."
     },
     "fields": {
       "amount": "How much DEEP",
       "valueNote": "Which money to use",
       "secondValueNote": "Which other money to use",
-      "useSecondValueNote": "Use another piece of money too",
+      "useSecondValueNote": "Choose a second piece of balance manually",
       "budgetNote": "Which family money to claim",
-      "secondBudgetNote": "Which family money to combine",
-      "policyNote": "Which amount-per-period arrangement",
-      "budgetTemplate": "Which child’s existing arrangement to add to",
       "rootPersonHash": "Which parent’s family records define the children",
       "rootVersion": "Which record of the parent to use",
       "rate": "How much DEEP can be claimed every 30 days",
@@ -1613,14 +1604,13 @@
       "periods": "How many periods to fund",
       "claimIndices": "Choose periods yourself (optional)",
       "transferAmount": "How much DEEP",
-      "exitRecipient": "Ordinary wallet address to send to"
+      "exitRecipient": "Ordinary wallet address to send to",
+      "fundingRule": "Funding arrangement"
     },
     "ownIdentityDefault": "Leave blank to use the identity you just opened",
     "publicDepositHint": "This money comes from the connected wallet. The wallet address, amount, and time are public.",
     "publicExitHint": "The recipient wallet address and amount are public.",
     "claimIndicesHint": "Leave blank to claim the earliest due, unclaimed money automatically. To choose manually, write 0 for the first period, 1 for the second, and so on. Enter 1–12 numbers separated by commas.",
-    "selectedBudget": "This arrangement has {{amount}} DEEP left to claim.",
-    "recoveredSummary": "Found {{values}} pieces of page balance, {{budgets}} pieces of family money for you to claim, {{policies}} amount-per-period arrangements, and {{templates}} child arrangements you can add money to.",
     "receiveCodeLabel": "My private receive code",
     "receiveCodeShareHint": "Share privately with trusted senders; do not publish. Holders can link your identity to your receiving keys. Regenerate with the same identity details and passphrase.",
     "receiveCodeInputLabel": "Private receive code from the recipient",
@@ -1643,12 +1633,8 @@
     "recipientConfirm": "I have checked this identity number with the recipient",
     "recoverFirst": "Open this page with your identity details and passphrase to see your money.",
     "noRecoveredNote": "No money available to use",
-    "noRecoveredTemplate": "No child arrangement to add money to yet",
     "walletChanged": "The connected wallet or network changed. Check it and try the action again.",
     "noValueNote": "There is no money available on this page. Move DEEP from an ordinary wallet or ask family to send you money.",
-    "noPolicyNote": "First set how much can be claimed every 30 days, then actually provide the money for a child.",
-    "noBudgetTemplate": "There is no previous arrangement to add money to. First set aside the child’s initial claim money.",
-    "needTwoBudgets": "Choose two different pieces of claim money to combine.",
     "noBudgetNote": "There is no family money waiting for you to claim. Ask family to set aside claim money for this identity first.",
     "needTwoValues": "Choose two different pieces of money. The same money cannot be counted twice.",
     "amountExceedsNotes": "The money you selected cannot cover this amount. Enter a smaller amount or choose different money.",
@@ -1663,9 +1649,8 @@
     "unlockRequired": "Enter your identity details and passphrase to open your balance first.",
     "advancedOptions": "Other choices (optional)",
     "automaticSelection": "Let this page choose",
-    "noCompatibleBudgets": "No two pieces of money can be combined. They must be for the same child, use the same amount-per-period arrangement, and start counting time from the same point.",
     "noClaimableBudget": "No due period has enough money to pay in full. Check whether it is time to claim, whether family provided enough money, and whether the family records still confirm you as this parent’s direct child.",
-    "automaticFundingUnavailable": "Money on this page is stored in separate pieces. The pieces this action can use cannot cover the amount. Enter a smaller amount or choose the money yourself under Other choices.",
+    "automaticFundingUnavailable": "Your available private balance cannot cover this amount. Enter a smaller amount or change the selected funds under Other choices.",
     "latestVersion": "Latest family record",
     "rootVersionHint": "Leave blank to use the parent’s latest family record. Enter a number only if you want an older record.",
     "balanceTitle": "My balance on this page",
@@ -1680,13 +1665,11 @@
       "receive": "Claim money family set aside"
     },
     "nextStep": {
-      "receiveCode": "First generate your receive code and share it privately with family. They can then send DEEP or set aside money for you to claim over time.",
+      "receiveCode": "Share your receiving details privately when someone needs to send you DEEP or fund periodic claims.",
       "shield": "There is no money available on this page. Move DEEP from an ordinary wallet before sending to family or setting money aside for children.",
       "claim": "Family has set aside money for you. Check whether it is due, then claim it into your balance on this page.",
-      "createPolicy": "First set how much children can claim every 30 days. This step does not provide money; you still need to fund a child afterward.",
-      "allocate": "The amount per period is set. Next, choose a confirmed direct child and provide money for a number of periods.",
       "privateTransfer": "Money is available here. You can send it to family with their receive code.",
-      "topUp": "Provide money for more periods under this child’s existing arrangement."
+      "fund": "Choose a child, set the amount per period, and provide the money in one action. Reuse an arrangement when adding more."
     },
     "unknownError": "This action did not complete. Try again.",
     "stages": {
@@ -1704,10 +1687,9 @@
       "intro": "Send money to family or set aside periodic payments for children. Money you move in, receive, or claim appears here.",
       "giverTitle": "Set money aside for a child",
       "stepDeposit": "Move DEEP from your ordinary wallet first.",
-      "stepSetAmount": "Set how much the child can claim every 30 days.",
-      "stepFund": "Choose a confirmed direct child in the family records, enter the periods, and fund them.",
+      "stepFund": "Choose a confirmed direct child, set the amount per period, enter the periods, and fund them in one action.",
       "receiverTitle": "Claim money family left",
-      "stepReceive": "Tap “Let family send me money” to generate your receive code, share it privately, then ask family to fund your claims.",
+      "stepReceive": "Share your receiving details privately with family when they need them. You can regenerate the same details at any time.",
       "stepClaim": "Claim due money yourself; it enters your balance here.",
       "stepWithdraw": "To move it to an ordinary wallet, enter the address and amount.",
       "exampleTitle": "Example",
@@ -1716,14 +1698,13 @@
     },
     "balanceHint": "This money is separate from your ordinary wallet; moving it in or out takes a separate action.",
     "budgetHint": "Once due and available to claim, move this money into your page balance first.",
-    "rateHint": "Each period is 30 days. This step only sets the amount per period. You still need to actually provide money for a child in the next step.",
+    "rateHint": "Each period is 30 days. The amount per period is saved privately with this funding, with no separate setup transaction.",
     "periodsHint": "Money needed = amount per period × number of periods. At 10 DEEP per period, 6 periods need 60 DEEP. The first funding sets the claim schedule; adding money does not restart it.",
     "fundingPreview": "Set aside {{amount}} DEEP for this child: {{periods}} periods at {{rate}} DEEP each.",
     "rootIdentityHint": "Leave blank to use the identity you just opened. Only confirmed direct children of this parent in the family records can claim under this arrangement. Other family members can provide the money.",
     "valueOption": "Balance {{index}} · {{amount}} DEEP",
     "budgetOption": "Claim funds {{index}} · {{amount}} DEEP remaining",
-    "policyOption": "Claim setting {{index}} · {{amount}} DEEP every 30 days",
-    "fundingTargetOption": "Child {{identity}} · {{amount}} DEEP every 30 days",
+    "policyOption": "Arrangement {{index}} · parent {{identity}} · {{amount}} DEEP every 30 days",
     "walletNotReady": "Connecting to your wallet. Please wait.",
     "switchWalletPrompt": "This wallet was just used to deposit DEEP. Continuing with it may link the deposit to later transfers. You can choose another CFX wallet or continue with this one.",
     "claimOverview": {
@@ -1751,6 +1732,11 @@
         "invalidHash": "Enter the complete identity number.",
         "notEligibleChild": "This identity is not a confirmed direct child for this arrangement."
       }
-    }
+    },
+    "newFundingRule": "New arrangement",
+    "fundingRuleHint": "Reuse an arrangement to add money without restarting this child’s schedule, or fund another child with the same rules.",
+    "noFundingRule": "This saved arrangement could not be recovered. Refresh your balance and choose it again.",
+    "preparedButNotCompleted": "Your balance was organized, but the requested action has not completed: {{detail}}. Refresh your balance before trying again.",
+    "invalidExitRecipient": "Enter a nonzero ordinary wallet address."
   }
 }

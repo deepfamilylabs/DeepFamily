@@ -625,7 +625,6 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   viewSeed: bigint;
   dummyPeriodNullifier: bigint;
   dummyInputNullifier: bigint;
-  policyNote: bigint;
   topUpUseNullifier: bigint;
   enrollmentNullifier: bigint;
   allocationKeyCommitment: bigint;
@@ -646,11 +645,6 @@ export function computeShieldedEnrollmentNullifier(input: {
   allocationKey: BigNumberish;
   policyCommitment: BigNumberish;
   heirIdentityCommitment: BigNumberish;
-}): bigint;
-export function computeShieldedPolicyNoteCommitment(input: {
-  policyCommitment: BigNumberish;
-  nonce: BigNumberish;
-  ciphertextHashField: BigNumberish;
 }): bigint;
 export function computeShieldedTopUpUseNullifier(input: {
   policySalt: BigNumberish;
@@ -745,12 +739,12 @@ export function decryptShieldedNote(input: {
 export const SHIELDED_NOTE_PAYLOAD_VERSION: 1;
 export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
-export const SHIELDED_POLICY_NOTE_KIND: 3;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 4;
+export const SHIELDED_VALUE_WITH_POLICY_MEMO_KIND: 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
 export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 302;
-export const SHIELDED_POLICY_NOTE_PAYLOAD_BYTES: 182;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 420;
+export const SHIELDED_VALUE_WITH_POLICY_MEMO_PAYLOAD_BYTES: 452;
 export interface ShieldedValueNotePayload {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
@@ -759,6 +753,7 @@ export interface ShieldedValueNotePayload {
   topUpMemo?: {
     budgetCommitment: BigNumberish;
     budgetNote: ShieldedBudgetNotePayload;
+    allocationKey?: BigNumberish;
   };
 }
 export interface ShieldedBudgetNotePayload {
@@ -774,24 +769,28 @@ export interface ShieldedBudgetNotePayload {
   remaining: BigNumberish;
   nonce: BigNumberish;
 }
-export interface ShieldedPolicyNotePayload {
-  rootIdentityCommitment: BigNumberish;
-  rootVersionIndex: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  policySalt: BigNumberish;
-  allocationKey: BigNumberish;
-  nonce: BigNumberish;
+export interface ShieldedPolicyDescriptor {
+  rootIdentityCommitment: bigint;
+  rootVersionIndex: bigint;
+  amountPerPeriod: bigint;
+  policySalt: bigint;
+  allocationKey: bigint;
 }
 export type DecodedShieldedNotePayload =
-  | ({ kind: "value"; ownerCommitment: bigint; amount: bigint; nonce: bigint; topUpMemo?: {
-      budgetCommitment: bigint;
-      budgetNote: { [K in keyof ShieldedBudgetNotePayload]: bigint };
-    } })
-  | ({ kind: "budget" } & { [K in keyof ShieldedBudgetNotePayload]: bigint })
-  | ({ kind: "policy" } & { [K in keyof ShieldedPolicyNotePayload]: bigint });
+  | {
+      kind: "value";
+      ownerCommitment: bigint;
+      amount: bigint;
+      nonce: bigint;
+      topUpMemo?: {
+        budgetCommitment: bigint;
+        budgetNote: { [K in keyof ShieldedBudgetNotePayload]: bigint };
+        allocationKey?: bigint;
+      };
+    }
+  | ({ kind: "budget" } & { [K in keyof ShieldedBudgetNotePayload]: bigint });
 export function encodeShieldedValueNotePayload(note: ShieldedValueNotePayload): Uint8Array;
 export function encodeShieldedBudgetNotePayload(note: ShieldedBudgetNotePayload): Uint8Array;
-export function encodeShieldedPolicyNotePayload(note: ShieldedPolicyNotePayload): Uint8Array;
 export function decodeShieldedNotePayload(payload: BytesLike): DecodedShieldedNotePayload;
 export function computeShieldedNoteCommitmentFromPayload(input: {
   payload: BytesLike;
@@ -815,17 +814,15 @@ export function verifyShieldedNotePayload(input: {
 
 export const SHIELDED_POOL_ACTION: Readonly<{
   Shield: 0;
-  CreatePolicy: 1;
-  Allocate: 2;
-  TopUp: 3;
-  MergeBudget: 4;
-  Claim: 5;
-  PrivateTransfer: 6;
-  Unshield: 7;
+  Fund: 1;
+  Claim: 2;
+  PrivateTransfer: 3;
+  Unshield: 4;
 }>;
 export type ShieldedPoolPublicInputName =
   | "chainId"
   | "pool"
+  | "fundMode"
   | "inputShardId"
   | "inputRoot"
   | "inputShardIds"
@@ -846,6 +843,7 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
 export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 4;
 export interface ShieldedPoolPublicSignalInput {
+  fundMode?: BigNumberish;
   action: BigNumberish;
   chainId: BigNumberish;
   poolAddress: string;

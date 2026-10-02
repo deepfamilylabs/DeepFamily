@@ -1313,7 +1313,7 @@ export const runSingleOperatorProductionSetup = async ({
     throw new Error("Production ZK setup includeShielded option must be a boolean");
   }
   if (!includeShielded && (shieldedReleaseCriteriaPath || expectedCurrentShieldedManifestSha256)) {
-    throw new Error("Shielded production options require the eleven-circuit setup");
+    throw new Error("Shielded production options require the eight-circuit setup");
   }
   if (!rotate && expectedCurrentShieldedManifestSha256 !== undefined) {
     throw new Error("Shielded rotation manifest hash requires the explicit rotate option");
@@ -1748,7 +1748,7 @@ export const runSingleOperatorProductionSetup = async ({
       records,
     });
     // The old manifest remains the final installation marker. The shielded manifest is installed
-    // immediately before it, after all eleven circuit artifacts and the shielded transcript.
+    // immediately before it, after all eight circuit artifacts and the shielded transcript.
     const entries = includeShielded
       ? [
           ...legacyEntries.slice(0, -1),
@@ -1852,7 +1852,7 @@ export const runSingleOperatorProductionSetup = async ({
         validation?.artifacts?.manifestSha256 ??
         sha256File(path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH)),
       ...(includeShielded
-        ? { shieldedManifestSha256: sha256File(shieldedRecords.manifestPath), circuitCount: 11 }
+        ? { shieldedManifestSha256: sha256File(shieldedRecords.manifestPath), circuitCount: 8 }
         : { circuitCount: 2 }),
       transcriptSha256:
         validation?.artifacts?.transcriptSha256 ?? records.manifest.trustedSetup.transcript.sha256,

@@ -41,11 +41,8 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     ),
     {
       Shield: 7,
-      CreatePolicy: 10,
-      Allocate: 15,
-      TopUp: 12,
-      MergeBudget: 12,
-      Claim: 25,
+      Fund: 16,
+      Claim: 27,
       PrivateTransfer: 12,
       Unshield: 12,
     },
@@ -68,6 +65,8 @@ test("claim signals follow the circuit's named public inputs", () => {
     1030n,
     1n,
     2n,
+    2n,
+    11n,
     11n,
     13n,
     14n,
@@ -83,7 +82,7 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.deepEqual(Object.keys(witness), [
     ...SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Claim],
   ]);
-  assert.equal(witness.inputShardId, "2");
+  assert.deepEqual(witness.inputShardIds, ["2", "2"]);
   assert.deepEqual(witness.inputNullifiers, ["13", "14"]);
   assert.deepEqual(witness.ciphertextHashes, [String(hashA), String(hashB)]);
   assert.equal(witness.asOf, "31");
@@ -95,6 +94,40 @@ test("two-input actions list both shard ids before both roots", () => {
     action: SHIELDED_POOL_ACTION.PrivateTransfer,
   });
   assert.deepEqual(signals, [1030n, 1n, 2n, 3n, 11n, 12n, 13n, 14n, 27n, 28n, hashA, hashB]);
+});
+
+test("fund includes its mode before the roots and keeps lineage only for the initial enrollment", () => {
+  assert.deepEqual(
+    buildShieldedPoolPublicSignals({
+      ...base,
+      action: SHIELDED_POOL_ACTION.Fund,
+      fundMode: 0,
+      inputShardIds: [2, 2],
+      inputRoots: [11, 11],
+      relation0: 29,
+      relation1: 30,
+      asOf: 31,
+    }),
+    [1030n, 1n, 0n, 2n, 2n, 11n, 11n, 13n, 14n, 27n, 28n, hashA, hashB, 29n, 30n, 31n],
+  );
+  assert.deepEqual(
+    buildShieldedPoolPublicSignals({
+      ...base,
+      action: SHIELDED_POOL_ACTION.Fund,
+      fundMode: 1,
+    }),
+    [1030n, 1n, 1n, 2n, 3n, 11n, 12n, 13n, 14n, 27n, 28n, hashA, hashB, 0n, 0n, 0n],
+  );
+  assert.throws(() =>
+    buildShieldedPoolPublicSignals({ ...base, action: SHIELDED_POOL_ACTION.Fund, fundMode: 2 }),
+  );
+  assert.throws(() =>
+    buildShieldedPoolPublicSignals({
+      ...base,
+      action: SHIELDED_POOL_ACTION.PrivateTransfer,
+      fundMode: 1,
+    }),
+  );
 });
 
 test("shield and unshield bind their public amount and recipient", () => {
@@ -130,19 +163,22 @@ test("data an action does not use must be zero, as the pool requires", () => {
       (error) => error.code === "INVALID_SHIELDED_ACTION_DATA",
       label,
     );
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.TopUp, relation0: 1 }, "top-up lineage root");
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.MergeBudget, asOf: 1 }, "merge asOf");
+  rejects(
+    { ...base, action: SHIELDED_POOL_ACTION.Fund, fundMode: 1, relation0: 1 },
+    "continuation lineage root",
+  );
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.PrivateTransfer, asOf: 1 }, "transfer asOf");
   rejects({ ...base, action: SHIELDED_POOL_ACTION.PrivateTransfer, amount: 1 }, "transfer amount");
   rejects(
     {
       ...base,
-      action: SHIELDED_POOL_ACTION.Allocate,
+      action: SHIELDED_POOL_ACTION.Fund,
       periodNullifiers: [1, ...Array(11).fill(0)],
     },
-    "allocate period nullifier",
+    "fund period nullifier",
   );
   rejects({ ...base, action: SHIELDED_POOL_ACTION.Shield, amount: 1 }, "shield note inputs");
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.CreatePolicy }, "single-input second root");
+  rejects({ ...base, action: SHIELDED_POOL_ACTION.Unshield }, "single-input second root");
   assert.throws(
     () =>
       buildShieldedPoolPublicSignals({

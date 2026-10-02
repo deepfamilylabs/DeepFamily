@@ -8,7 +8,6 @@ import {
 import {
   nextClaimPeriods,
   selectClaimBudget,
-  selectCompatibleBudgetPair,
   selectValueNotes,
   type ShieldedSelectableBudgetNote,
   type ShieldedSelectableValueNote,
@@ -123,54 +122,6 @@ describe("automatic shielded value note selection", () => {
   });
 });
 
-describe("automatic compatible budget selection", () => {
-  it("finds matching budgets after an incompatible first note and preserves commitment order", () => {
-    const notes = [budget(3n), budget(1n, { policySalt: 999n }), budget(2n, { remaining: 500n })];
-    expect(selectCompatibleBudgetPair(notes)?.map((note) => note.commitment)).toEqual([2n, 3n]);
-    expect(
-      selectCompatibleBudgetPair([...notes].reverse())?.map((note) => note.commitment),
-    ).toEqual([2n, 3n]);
-  });
-
-  it.each([
-    "rootIdentityCommitment",
-    "rootVersionIndex",
-    "policySalt",
-    "allocationKeyCommitment",
-    "heirIdentityCommitment",
-    "eligibleFrom",
-    "enrollmentSalt",
-    "heirOwnerCommitment",
-    "amountPerPeriod",
-  ] as const)("does not merge budgets with a different %s", (field) => {
-    const first = budget(1n);
-    const second = budget(2n, { [field]: first.note[field] + 1n });
-    expect(selectCompatibleBudgetPair([first, second])).toBeUndefined();
-  });
-
-  it("requires two distinct commitments", () => {
-    const first = budget(1n);
-    expect(selectCompatibleBudgetPair([first, { ...first }, value(2n, 100n)])).toBeUndefined();
-  });
-
-  it("skips combined amount and period-count overflows before choosing a valid pair", () => {
-    const largeRate = 1n << 127n;
-    expect(
-      selectCompatibleBudgetPair([
-        budget(1n, { amountPerPeriod: largeRate, remaining: largeRate }),
-        budget(2n, { amountPerPeriod: largeRate, remaining: largeRate }),
-      ]),
-    ).toBeUndefined();
-    const maxPeriods = (1n << 64n) - 1n;
-    const notes = [
-      budget(1n, { amountPerPeriod: 1n, remaining: maxPeriods }),
-      budget(2n, { amountPerPeriod: 1n, remaining: 2n }),
-      budget(3n, { amountPerPeriod: 1n, remaining: 3n }),
-    ];
-    expect(selectCompatibleBudgetPair(notes)?.map((note) => note.commitment)).toEqual([2n, 3n]);
-  });
-});
-
 describe("automatic shielded claim selection", () => {
   it("selects only whole due periods and caps a claim at the funded whole periods", () => {
     const note = budget(1n, { remaining: 300n });
@@ -201,6 +152,36 @@ describe("automatic shielded claim selection", () => {
     expect(selected?.budget).toBe(note);
     expect(selected?.periodIndices).toEqual([1n, 3n, 4n]);
     expect(wallet.spentNullifiers).toEqual(original);
+  });
+
+  it("selects two compatible budgets when they can pay more due periods", () => {
+    const first = budget(1n, { remaining: 100n });
+    const second = budget(2n, { remaining: 200n });
+    const selected = selectClaimBudget(
+      [first, second],
+      { spentNullifiers: new Set() },
+      secret,
+      eligibleFrom + 4n * INHERITANCE_PERIOD_SECONDS,
+    );
+    expect(selected?.budget).toBe(first);
+    expect(selected?.secondBudget).toBe(second);
+    expect(selected?.periodIndices).toEqual([0n, 1n, 2n]);
+    expect(
+      selectClaimBudget(
+        [first, second],
+        { spentNullifiers: new Set() },
+        secret,
+        eligibleFrom + INHERITANCE_PERIOD_SECONDS,
+      )?.secondBudget,
+    ).toBeUndefined();
+    expect(
+      selectClaimBudget(
+        [first, budget(2n, { remaining: 200n, enrollmentSalt: 999n })],
+        { spentNullifiers: new Set() },
+        secret,
+        eligibleFrom + 4n * INHERITANCE_PERIOD_SECONDS,
+      )?.secondBudget,
+    ).toBeUndefined();
   });
 
   it("limits one automatic claim to the circuit's twelve period slots", () => {

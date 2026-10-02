@@ -20,7 +20,6 @@ import {
   computeShieldedEnrollmentNullifier,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
-  computeShieldedPolicyNoteCommitment,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -30,7 +29,6 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
-  encodeShieldedPolicyNotePayload,
   encodeShieldedReceiveCode,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
@@ -45,16 +43,9 @@ import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const PERIOD = 2_592_000n;
-const ACTION_IDS = {
-  shield: 0,
-  createPolicy: 1,
-  allocate: 2,
-  topUp: 3,
-  mergeBudget: 4,
-  claim: 5,
-  privateTransfer: 6,
-  unshield: 7,
-};
+const ACTION_IDS = Object.fromEntries(
+  Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action, spec.actionId]),
+);
 const jsonHash = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const decimals = (values) => values.map(String);
 const zeroData = () => ({
@@ -67,6 +58,7 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
+  fundMode: 0n,
 });
 
 function compactPath(proof, capacity) {
@@ -318,14 +310,21 @@ export async function runShieldedAcceptanceSmoke({
       ownerSecret: note.keys.ownerSecret,
       noteCommitment: note.commitment,
     });
-  const submit = async (action, data, generated, notes, external = {}) => {
+  const submit = async (
+    action,
+    data,
+    generated,
+    notes,
+    external = {},
+    label = `shielded-action-${action}`,
+  ) => {
     const args =
       action === "shield"
         ? [external.amount, data, generated.encoded]
         : action === "unshield"
           ? [external.recipient, external.amount, data, generated.encoded]
           : [data, generated.encoded];
-    const receipt = await record(`shielded-action-${action}`, await pool[action](...args));
+    const receipt = await record(label, await pool[action](...args));
     if (action === "shield") firstShieldBlock = receipt.blockNumber;
     const events = receipt.logs
       .filter((log) => getAddress(log.address) === getAddress(poolAddress))
@@ -537,49 +536,6 @@ export async function runShieldedAcceptanceSmoke({
       allocationKeyCommitment,
     };
     const policyCommitment = computeShieldedPolicyCommitment(policyFields);
-    const policyPayload = { ...policyFields, allocationKey, nonce: generateShieldedRandomField() };
-    const policyNote = await encrypt(
-      donorKeys,
-      policyPayload,
-      encodeShieldedPolicyNotePayload,
-      (ciphertextHashField) =>
-        computeShieldedPolicyNoteCommitment({
-          policyCommitment,
-          nonce: policyPayload.nonce,
-          ciphertextHashField,
-        }),
-    );
-    const renewed = await valueNote(donorKeys, shieldedAmount);
-    const initialPath = await notePath(initial[0]);
-    const createPolicyData = {
-      ...zeroData(),
-      ...inputs([initialPath, initialPath], [spend(initial[0]), dummySpend(initial[0])]),
-      ...outputs([policyNote, renewed]),
-    };
-    const createPolicyInputs = publicInputsFor("createPolicy", createPolicyData);
-    const createPolicyProof = await prove(
-      "createPolicy",
-      {
-        ...createPolicyInputs.witness,
-        ownerSecret: String(donorKeys.ownerSecret),
-        inputAmount: String(shieldedAmount),
-        inputNonce: String(initial[0].nonce),
-        inputCiphertextHash: String(initial[0].ciphertextHashField),
-        noteDepth: initialPath.depth,
-        noteIndex: initialPath.index,
-        noteSiblings: initialPath.siblings,
-        rootIdentityCommitment: String(rootIdentityCommitment),
-        rootVersionIndex: "1",
-        rate: String(rate),
-        policySalt: String(policySalt),
-        allocationKey: String(allocationKey),
-        policyNonce: String(policyNote.nonce),
-        changeNonce: String(renewed.nonce),
-      },
-      createPolicyInputs.signals,
-    );
-    await submit("createPolicy", createPolicyData, createPolicyProof, [policyNote, renewed]);
-
     const asOf = BigInt((await provider.getBlock("latest")).timestamp);
     const eligibleFrom = asOf + 7200n;
     const enrollmentSalt = generateShieldedRandomField();
@@ -611,14 +567,13 @@ export async function runShieldedAcceptanceSmoke({
     };
     const budget = await budgetNote(1200n);
     const allocationChange = await valueNote(donorKeys, 800n);
-    const renewedPath = await notePath(renewed);
-    const policyPath = await notePath(policyNote);
+    const initialPath = await notePath(initial[0]);
     const allocationData = {
       ...zeroData(),
       ...inputs(
-        [renewedPath, policyPath],
+        [initialPath, initialPath],
         [
-          spend(renewed),
+          spend(initial[0]),
           computeShieldedEnrollmentNullifier({
             allocationKey,
             policyCommitment,
@@ -631,7 +586,7 @@ export async function runShieldedAcceptanceSmoke({
       relation1: trusted.root,
       asOf,
     };
-    const allocationInputs = publicInputsFor("allocate", allocationData);
+    const allocationInputs = publicInputsFor("fund", allocationData);
     const commonFunding = {
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
@@ -643,17 +598,21 @@ export async function runShieldedAcceptanceSmoke({
       enrollmentSalt: String(enrollmentSalt),
     };
     const allocationProof = await prove(
-      "allocate",
+      "fund",
       {
         ...commonFunding,
         ...lineageWitness,
-        ...donorWitness(renewed, renewedPath),
+        ...donorWitness(initial[0], initialPath),
         ...allocationInputs.witness,
-        policyNonce: String(policyNote.nonce),
-        policyCiphertextHash: String(policyNote.ciphertextHashField),
-        policyDepth: policyPath.depth,
-        policyIndex: policyPath.index,
-        policySiblings: policyPath.siblings,
+        allocationKeyCommitment: String(allocationKeyCommitment),
+        oldBudgetRemaining: "0",
+        oldBudgetRemainingPeriods: "0",
+        oldBudgetNonce: "0",
+        oldBudgetCiphertextHash: "0",
+        oldBudgetDepth: "0",
+        oldBudgetIndex: "0",
+        oldBudgetSiblings: Array(32).fill("0"),
+        budgetUseNonce: "0",
         allocationKey: String(allocationKey),
         heirVersionIndex: "1",
         budgetPeriods: "12",
@@ -663,7 +622,7 @@ export async function runShieldedAcceptanceSmoke({
       allocationInputs.signals,
       { asOf: String(asOf) },
     );
-    await submit("allocate", allocationData, allocationProof, [budget, allocationChange]);
+    await submit("fund", allocationData, allocationProof, [budget, allocationChange]);
 
     const topUpBudget = await budgetNote(300n);
     const topUpChange = await valueNote(donorKeys, 500n);
@@ -672,6 +631,7 @@ export async function runShieldedAcceptanceSmoke({
     const useNonce = generateShieldedRandomField();
     const topUpData = {
       ...zeroData(),
+      fundMode: 1n,
       ...inputs(
         [changePath, budgetPath],
         [
@@ -685,9 +645,9 @@ export async function runShieldedAcceptanceSmoke({
       ),
       ...outputs([topUpBudget, topUpChange]),
     };
-    const topUpInputs = publicInputsFor("topUp", topUpData);
+    const topUpInputs = publicInputsFor("fund", topUpData);
     const topUpProof = await prove(
-      "topUp",
+      "fund",
       {
         ...commonFunding,
         ...donorWitness(allocationChange, changePath),
@@ -701,60 +661,48 @@ export async function runShieldedAcceptanceSmoke({
         oldBudgetIndex: budgetPath.index,
         oldBudgetSiblings: budgetPath.siblings,
         budgetUseNonce: String(useNonce),
-        topUpPeriods: "3",
-        newBudgetNonce: String(topUpBudget.nonce),
+        allocationKey: "0",
+        heirVersionIndex: "0",
+        fatherIdentityCommitment: "0",
+        motherIdentityCommitment: "0",
+        rootIsMother: "0",
+        endorser: "0",
+        writtenAt: "0",
+        endorsementDepth: "0",
+        endorsementIndex: "0",
+        endorsementSiblings: Array(64).fill("0"),
+        trustedDepth: "0",
+        trustedIndex: "0",
+        trustedSiblings: Array(64).fill("0"),
+        budgetPeriods: "3",
+        budgetNonce: String(topUpBudget.nonce),
         changeNonce: String(topUpChange.nonce),
       },
       topUpInputs.signals,
+      { label: "shielded-action-fund-additional" },
     );
-    await submit("topUp", topUpData, topUpProof, [topUpBudget, topUpChange]);
+    await submit(
+      "fund",
+      topUpData,
+      topUpProof,
+      [topUpBudget, topUpChange],
+      {},
+      "shielded-action-fund-additional",
+    );
     assert.equal(
       await pool.nullifierSpent(spend(budget)),
       false,
       "Top-up spent its read-only template",
     );
 
-    const mergedBudget = await budgetNote(1500n);
-    const mergeDummy = await valueNote(childKeys, 0n);
-    const mergePaths = await Promise.all([notePath(budget), notePath(topUpBudget)]);
-    const mergeData = {
-      ...zeroData(),
-      ...inputs(mergePaths, [spend(budget), spend(topUpBudget)]),
-      ...outputs([mergedBudget, mergeDummy]),
-    };
-    const mergeInputs = publicInputsFor("mergeBudget", mergeData);
-    const mergeProof = await prove(
-      "mergeBudget",
-      {
-        ...mergeInputs.witness,
-        ownerSecret: String(childKeys.ownerSecret),
-        policyCommitment: String(policyCommitment),
-        enrollmentCommitment: String(enrollmentCommitment),
-        rate: String(rate),
-        remaining: ["1200", "300"],
-        remainingPeriods: ["12", "3"],
-        inputNonces: decimals([budget.nonce, topUpBudget.nonce]),
-        inputCiphertextHashes: decimals([
-          budget.ciphertextHashField,
-          topUpBudget.ciphertextHashField,
-        ]),
-        inputDepths: mergePaths.map((item) => item.depth),
-        inputIndices: mergePaths.map((item) => item.index),
-        inputSiblings: mergePaths.map((item) => item.siblings),
-        mergedNonce: String(mergedBudget.nonce),
-        dummyNonce: String(mergeDummy.nonce),
-      },
-      mergeInputs.signals,
-    );
-    await submit("mergeBudget", mergeData, mergeProof, [mergedBudget, mergeDummy]);
-
     const claimAsOf = eligibleFrom + 12n * PERIOD;
     const remainingBudget = await budgetNote(300n);
     const payout = await valueNote(childKeys, 1200n);
-    const mergedPath = await notePath(mergedBudget);
+    const claimPaths = await Promise.all([notePath(budget), notePath(topUpBudget)]);
+    const [budgetClaimPath, secondClaimPath] = claimPaths;
     const claimData = {
       ...zeroData(),
-      ...inputs([mergedPath, mergedPath], [spend(mergedBudget), dummySpend(mergedBudget)]),
+      ...inputs(claimPaths, [spend(budget), spend(topUpBudget)]),
       periodNullifiers: Array.from({ length: 12 }, (_, periodIndex) =>
         computeShieldedPeriodNullifier({
           derivedSecretField: childMaterial.derivedSecretField,
@@ -787,13 +735,21 @@ export async function runShieldedAcceptanceSmoke({
         enrollmentSalt: String(enrollmentSalt),
         eligibleFrom: String(eligibleFrom),
         rate: String(rate),
-        remaining: "1500",
-        remainingPeriods: "15",
-        budgetNonce: String(mergedBudget.nonce),
-        budgetCiphertextHash: String(mergedBudget.ciphertextHashField),
-        noteDepth: mergedPath.depth,
-        noteIndex: mergedPath.index,
-        noteSiblings: mergedPath.siblings,
+        hasSecondInput: "1",
+        remaining: "1200",
+        remainingPeriods: "12",
+        budgetNonce: String(budget.nonce),
+        budgetCiphertextHash: String(budget.ciphertextHashField),
+        noteDepth: budgetClaimPath.depth,
+        noteIndex: budgetClaimPath.index,
+        noteSiblings: budgetClaimPath.siblings,
+        secondRemaining: "300",
+        secondRemainingPeriods: "3",
+        secondBudgetNonce: String(topUpBudget.nonce),
+        secondBudgetCiphertextHash: String(topUpBudget.ciphertextHashField),
+        secondNoteDepth: secondClaimPath.depth,
+        secondNoteIndex: secondClaimPath.index,
+        secondNoteSiblings: secondClaimPath.siblings,
         claimCount: "12",
         periodIndices: Array.from({ length: 12 }, (_, index) => String(index)),
         newBudgetNonce: String(remainingBudget.nonce),
@@ -803,7 +759,7 @@ export async function runShieldedAcceptanceSmoke({
       { execution: "verifier-call", claimCount: 12, asOf: String(claimAsOf) },
     );
     assert.equal(
-      await pool.nullifierSpent(spend(mergedBudget)),
+      await pool.nullifierSpent(spend(budget)),
       false,
       "Verifier-only claim changed pool state",
     );
@@ -927,7 +883,7 @@ export async function runShieldedAcceptanceSmoke({
       manifestSha256: candidate.candidateManifestSha256,
       proofs,
       scenario: {
-        allocationLabel: "shielded-action-allocate",
+        allocationLabel: "shielded-action-fund",
         claimExecution: "verifier-call",
         claimCount: 12,
         claimAsOf: String(claimAsOf),
@@ -935,7 +891,7 @@ export async function runShieldedAcceptanceSmoke({
         lineageDepth: Math.max(Number(endorsement.depth), Number(trusted.depth)),
         endorsementDepth: Number(endorsement.depth),
         trustedDepth: Number(trusted.depth),
-        noteDepth: Number(mergedPath.depth),
+        noteDepth: Math.max(Number(budgetClaimPath.depth), Number(secondClaimPath.depth)),
         receiveCode,
         shieldedAmount: String(shieldedAmount),
         unshieldedAmount: String(unshieldedAmount),

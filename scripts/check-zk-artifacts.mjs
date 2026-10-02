@@ -211,7 +211,7 @@ export function checkShieldedDevelopmentArtifacts({
   const expectedActions = Object.keys(SHIELDED_CIRCUITS).sort();
   const actualActions = Object.keys(manifest.circuits ?? {}).sort();
   if (JSON.stringify(actualActions) !== JSON.stringify(expectedActions)) {
-    throw new Error("Shielded development manifest must contain exactly all nine circuits");
+    throw new Error("Shielded development manifest must contain exactly all six circuits");
   }
   const snarkjsCli = resolveSnarkjsCliPath({ root });
   requireFile(snarkjsCli, "snarkjs CLI (run `npm install` first)");
@@ -301,7 +301,7 @@ export function checkShieldedArtifacts({
     const result = productionInspector({ root });
     const circuitCount = Object.keys(result.artifacts).length;
     if (circuitCount !== Object.keys(SHIELDED_CIRCUITS).length) {
-      throw new Error("Shielded production artifact check must cover all nine circuits");
+      throw new Error("Shielded production artifact check must cover all six circuits");
     }
     console.log(`Shielded production manifest: ${circuitCount} circuits, ` + result.manifestSha256);
     return { status: "production", circuitCount };

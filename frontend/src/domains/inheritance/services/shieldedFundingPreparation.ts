@@ -11,21 +11,19 @@ import {
   computeShieldedEnrollmentNullifier,
   computeShieldedOwnerCommitment,
   computeShieldedPolicyCommitment,
-  computeShieldedPolicyNoteCommitment,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
-  encodeShieldedPolicyNotePayload,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
   type ShieldedBudgetNotePayload,
-  type ShieldedPolicyNotePayload,
+  type ShieldedPolicyDescriptor,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish, type Contract } from "ethers";
@@ -33,14 +31,17 @@ import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import { findHeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
-import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
+import {
+  getRecoveredShieldedNoteProof,
+  type LocalShieldedWalletSnapshot,
+} from "./shieldedWalletRecovery";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const PROOF_LIFETIME = 7200n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
 
-type SavedTemplate<T> = {
+export type SavedTemplate<T> = {
   /** Locally saved plaintext and public envelope. Do not send plaintext to an RPC. */
   note: T;
   commitment: BigNumberish;
@@ -68,20 +69,88 @@ export type PreparedShieldedFunding = {
   data: ShieldedPoolActionData;
   witness: ShieldedWitness;
   policyCommitment: bigint;
-  outputs: readonly [PreparedFundingOutput<ShieldedBudgetNotePayload>, PreparedFundingOutput<ShieldedValueNotePayload>];
+  outputs: readonly [
+    PreparedFundingOutput<ShieldedBudgetNotePayload>,
+    PreparedFundingOutput<ShieldedValueNotePayload>,
+  ];
 };
 
-export type PrepareShieldedAllocateInput = CommonFundingInput & {
-  policy: SavedTemplate<ShieldedPolicyNotePayload>;
-  lineageIndex: Contract;
-  lineage: LineageSnapshot;
-  budgetPeriods: BigNumberish;
+export type PrepareShieldedFundInput = CommonFundingInput &
+  (
+    | {
+        fundMode: 0;
+        policy: ShieldedPolicyDescriptor;
+        lineageIndex: Contract;
+        lineage: LineageSnapshot;
+        budgetPeriods: BigNumberish;
+      }
+    | {
+        fundMode: 1;
+        budget: SavedTemplate<ShieldedBudgetNotePayload>;
+        budgetPeriods: BigNumberish;
+      }
+  );
+
+type InitialFundingInput = Extract<PrepareShieldedFundInput, { fundMode: 0 }>;
+type ContinuationFundingInput = Extract<PrepareShieldedFundInput, { fundMode: 1 }>;
+
+export function shieldedPolicyCommitment(policy: ShieldedPolicyDescriptor): bigint {
+  return computeShieldedPolicyCommitment({
+    ...policy,
+    allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
+  });
+}
+
+/** A draft is local until its first funding transaction backs it up in encrypted change. */
+export function createShieldedPolicyDescriptor(input: {
+  rootIdentityCommitment: BigNumberish;
+  rootVersionIndex: BigNumberish;
+  amountPerPeriod: BigNumberish;
+}): ShieldedPolicyDescriptor {
+  const policy = {
+    rootIdentityCommitment: getBigInt(input.rootIdentityCommitment),
+    rootVersionIndex: uint64(input.rootVersionIndex, "rootVersionIndex"),
+    amountPerPeriod: uint128(input.amountPerPeriod, "amountPerPeriod"),
+    policySalt: generateShieldedRandomField(),
+    allocationKey: generateShieldedRandomField(),
+  };
+  shieldedPolicyCommitment(policy);
+  return policy;
+}
+
+const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
+  oldBudgetRemaining: "0",
+  oldBudgetRemainingPeriods: "0",
+  oldBudgetNonce: "0",
+  oldBudgetCiphertextHash: "0",
+  oldBudgetDepth: 0,
+  oldBudgetIndex: "0",
+  oldBudgetSiblings: Array<string>(32).fill("0"),
+  budgetUseNonce: "0",
+};
+const ZERO_LINEAGE_WITNESS: ShieldedWitness = {
+  allocationKey: "0",
+  heirVersionIndex: "0",
+  fatherIdentityCommitment: "0",
+  motherIdentityCommitment: "0",
+  rootIsMother: "0",
+  endorser: "0",
+  writtenAt: "0",
+  endorsementDepth: 0,
+  endorsementIndex: "0",
+  endorsementSiblings: Array<string>(64).fill("0"),
+  trustedDepth: 0,
+  trustedIndex: "0",
+  trustedSiblings: Array<string>(64).fill("0"),
 };
 
-export type PrepareShieldedTopUpInput = CommonFundingInput & {
-  budget: SavedTemplate<ShieldedBudgetNotePayload>;
-  topUpPeriods: BigNumberish;
-};
+export function prepareShieldedFund(
+  input: PrepareShieldedFundInput,
+): Promise<PreparedShieldedFunding> {
+  if (input.fundMode === 0) return prepareInitialFunding(input);
+  if (input.fundMode === 1) return prepareContinuationFunding(input);
+  throw new Error("Fund mode must be initial or continuation");
+}
 
 function uint64(value: BigNumberish, name: string): bigint {
   const parsed = getBigInt(value);
@@ -95,9 +164,13 @@ function uint128(value: BigNumberish, name: string): bigint {
   return parsed;
 }
 
-function fundingAmount(rate: bigint, periodsInput: BigNumberish): { periods: bigint; amount: bigint } {
+function fundingAmount(
+  rate: bigint,
+  periodsInput: BigNumberish,
+): { periods: bigint; amount: bigint } {
   const periods = uint64(periodsInput, "periods");
-  if (rate === 0n || periods === 0n) throw new Error("Funding requires a positive rate and period count");
+  if (rate === 0n || periods === 0n)
+    throw new Error("Funding requires a positive rate and period count");
   const amount = rate * periods;
   if (amount > MAX_UINT128) throw new Error("Funding amount exceeds uint128");
   return { periods, amount };
@@ -107,7 +180,11 @@ function decimal(values: readonly bigint[]): string[] {
   return values.map(String);
 }
 
-function assertSnapshotBlock(snapshot: { toBlock: number; blockHash: string; invalidated?: boolean }, block: { hash?: string | null } | null, name: string) {
+function assertSnapshotBlock(
+  snapshot: { toBlock: number; blockHash: string; invalidated?: boolean },
+  block: { hash?: string | null } | null,
+  name: string,
+) {
   if (snapshot.invalidated || !block?.hash || block.hash !== snapshot.blockHash) {
     throw new Error(`${name} snapshot is stale or reorganized`);
   }
@@ -150,7 +227,8 @@ async function currentContext(input: CommonFundingInput) {
 function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
   const commitment = getBigInt(input.donorCommitment);
   const owned = input.wallet.ownedNotes.get(commitment);
-  if (!owned || owned.note.kind !== "value") throw new Error("Donor must select a recovered value note");
+  if (!owned || owned.note.kind !== "value")
+    throw new Error("Donor must select a recovered value note");
   const note = owned.note;
   if (note.ownerCommitment !== computeShieldedOwnerCommitment(ownerSecret)) {
     throw new Error("Donor value note belongs to another identity");
@@ -159,14 +237,16 @@ function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
   if (
     hash !== owned.ciphertextHashField ||
     computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: hash }) !== commitment
-  ) throw new Error("Donor note does not match its public ciphertext and commitment");
+  )
+    throw new Error("Donor note does not match its public ciphertext and commitment");
   const nullifier = computeShieldedSpendNullifier({ ownerSecret, noteCommitment: commitment });
-  if (input.wallet.spentNullifiers.has(nullifier)) throw new Error("Donor value note has already been spent");
+  if (input.wallet.spentNullifiers.has(nullifier))
+    throw new Error("Donor value note has already been spent");
   const path = getRecoveredShieldedNoteProof(input.wallet, commitment);
   return { note, hash, nullifier, path };
 }
 
-function templatePath<T extends ShieldedPolicyNotePayload | ShieldedBudgetNotePayload>(
+function templatePath<T extends ShieldedBudgetNotePayload>(
   wallet: LocalShieldedWalletSnapshot,
   saved: SavedTemplate<T>,
   encode: (note: T) => Uint8Array,
@@ -175,7 +255,11 @@ function templatePath<T extends ShieldedPolicyNotePayload | ShieldedBudgetNotePa
   const shardId = getBigInt(saved.shardId);
   const payload = encode(saved.note);
   try {
-    verifyShieldedNotePayload({ payload, ciphertext: saved.ciphertext, noteCommitment: commitment });
+    verifyShieldedNotePayload({
+      payload,
+      ciphertext: saved.ciphertext,
+      noteCommitment: commitment,
+    });
   } finally {
     payload.fill(0);
   }
@@ -185,7 +269,8 @@ function templatePath<T extends ShieldedPolicyNotePayload | ShieldedBudgetNotePa
   const index = tree.indexOf(commitment);
   if (BigInt(index) < 0n) throw new Error("Template note is absent from the public wallet replay");
   const proof = tree.generateProof(index);
-  if (proof.leaf !== commitment || proof.siblings.length > 32) throw new Error("Template note proof is invalid");
+  if (proof.leaf !== commitment || proof.siblings.length > 32)
+    throw new Error("Template note proof is invalid");
   return {
     commitment,
     ciphertextHash: computeShieldedCiphertextHashField(saved.ciphertext),
@@ -207,7 +292,12 @@ async function encryptOutput<T extends ShieldedBudgetNotePayload | ShieldedValue
 ): Promise<PreparedFundingOutput<T>> {
   const payload = encode(note);
   try {
-    const ciphertext = await encryptShieldedNote({ recipientPublicKey, payload, chainId, poolAddress });
+    const ciphertext = await encryptShieldedNote({
+      recipientPublicKey,
+      payload,
+      chainId,
+      poolAddress,
+    });
     const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
     return { note, ciphertext, ciphertextHashField, commitment: commit(ciphertextHashField) };
   } finally {
@@ -225,19 +315,21 @@ async function fundingOutputs(input: {
   poolAddress: string;
   policyCommitment: bigint;
   enrollmentCommitment: bigint;
+  allocationKey?: bigint;
 }) {
   const encryptedBudget = await encryptOutput(
     input.budget,
     encodeShieldedBudgetNotePayload,
-    (ciphertextHashField) => computeShieldedBudgetNoteCommitment({
-      policyCommitment: input.policyCommitment,
-      enrollmentCommitment: input.enrollmentCommitment,
-      heirOwnerCommitment: input.budget.heirOwnerCommitment,
-      amountPerPeriod: input.budget.amountPerPeriod,
-      remaining: input.budget.remaining,
-      nonce: input.budget.nonce,
-      ciphertextHashField,
-    }),
+    (ciphertextHashField) =>
+      computeShieldedBudgetNoteCommitment({
+        policyCommitment: input.policyCommitment,
+        enrollmentCommitment: input.enrollmentCommitment,
+        heirOwnerCommitment: input.budget.heirOwnerCommitment,
+        amountPerPeriod: input.budget.amountPerPeriod,
+        remaining: input.budget.remaining,
+        nonce: input.budget.nonce,
+        ciphertextHashField,
+      }),
     input.heirViewingKey,
     input.chainId,
     input.poolAddress,
@@ -252,6 +344,7 @@ async function fundingOutputs(input: {
     topUpMemo: {
       budgetCommitment: encryptedBudget.commitment,
       budgetNote: input.budget,
+      ...(input.allocationKey === undefined ? {} : { allocationKey: input.allocationKey }),
     },
   };
   const donorViewingKey = await deriveShieldedViewPublicKey(input.donorViewIkm);
@@ -267,17 +360,22 @@ async function fundingOutputs(input: {
 }
 
 function actionData(input: {
+  fundMode: 0 | 1;
   donor: ReturnType<typeof donorInput>;
-  template: ReturnType<typeof templatePath>;
+  template?: ReturnType<typeof templatePath>;
   useNullifier: bigint;
-  outputs: readonly [PreparedFundingOutput<ShieldedBudgetNotePayload>, PreparedFundingOutput<ShieldedValueNotePayload>];
+  outputs: readonly [
+    PreparedFundingOutput<ShieldedBudgetNotePayload>,
+    PreparedFundingOutput<ShieldedValueNotePayload>,
+  ];
   relation0?: bigint;
   relation1?: bigint;
   asOf?: bigint;
 }): ShieldedPoolActionData {
   return {
-    inputShardIds: [input.donor.path.shardId, input.template.shardId],
-    inputRoots: [input.donor.path.root, input.template.root],
+    fundMode: BigInt(input.fundMode),
+    inputShardIds: [input.donor.path.shardId, input.template?.shardId ?? input.donor.path.shardId],
+    inputRoots: [input.donor.path.root, input.template?.root ?? input.donor.path.root],
     inputNullifiers: [input.donor.nullifier, input.useNullifier],
     periodNullifiers: [...ZERO_PERIODS],
     outputCommitments: [input.outputs[0].commitment, input.outputs[1].commitment],
@@ -289,9 +387,15 @@ function actionData(input: {
 }
 
 /** The circuit's named public inputs for this action and data. */
-function publicInputs(action: number, chainId: bigint, poolAddress: string, data: ShieldedPoolActionData) {
+function publicInputs(
+  action: number,
+  chainId: bigint,
+  poolAddress: string,
+  data: ShieldedPoolActionData,
+) {
   return buildShieldedPoolPublicInputs({
     action,
+    fundMode: data.fundMode,
     chainId,
     poolAddress,
     inputShardIds: [...data.inputShardIds],
@@ -307,32 +411,34 @@ function publicInputs(action: number, chainId: bigint, poolAddress: string, data
   }).witness;
 }
 
-/** Build a new, independent child budget from a donor value note and a saved policy template. */
-export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInput): Promise<PreparedShieldedFunding> {
+/** Fund a first budget for one heir under a private rule. */
+async function prepareInitialFunding(input: InitialFundingInput): Promise<PreparedShieldedFunding> {
   const ctx = await currentContext(input);
   const expectedIndex = getAddress(await input.pool.LINEAGE_INDEX());
   if (expectedIndex.toLowerCase() !== (await input.lineageIndex.getAddress()).toLowerCase()) {
     throw new Error("Lineage index does not belong to this shielded pool");
   }
   const donor = donorInput(input, ctx.keys.ownerSecret);
-  const template = templatePath(input.wallet, input.policy, encodeShieldedPolicyNotePayload);
-  const policy = input.policy.note;
+  const policy = input.policy;
   const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey);
-  const policyCommitment = computeShieldedPolicyCommitment({ ...policy, allocationKeyCommitment });
-  if (computeShieldedPolicyNoteCommitment({
-    policyCommitment, nonce: policy.nonce, ciphertextHashField: template.ciphertextHash,
-  }) !== template.commitment) throw new Error("Policy template commitment mismatch");
-  const { periods, amount } = fundingAmount(uint128(policy.amountPerPeriod, "rate"), input.budgetPeriods);
-  if (donor.note.amount < amount) throw new Error("Donor value note cannot fund the whole child budget");
+  const policyCommitment = shieldedPolicyCommitment(policy);
+  const { periods, amount } = fundingAmount(
+    uint128(policy.amountPerPeriod, "rate"),
+    input.budgetPeriods,
+  );
+  if (donor.note.amount < amount)
+    throw new Error("Donor value note cannot fund the whole child budget");
   const heir = ctx.heir;
   const enrollmentNullifier = computeShieldedEnrollmentNullifier({
     allocationKey: policy.allocationKey,
     policyCommitment,
     heirIdentityCommitment: heir.identityCommitment,
   });
-  if (input.wallet.spentNullifiers.has(enrollmentNullifier)) throw new Error("This child is already allocated under this policy");
+  if (input.wallet.spentNullifiers.has(enrollmentNullifier))
+    throw new Error("This child is already allocated under this policy");
   const latestBlock = ctx.latestBlock;
-  if (input.lineage.blockNumber > latestBlock.number) throw new Error("Lineage snapshot is ahead of the chain");
+  if (input.lineage.blockNumber > latestBlock.number)
+    throw new Error("Lineage snapshot is ahead of the chain");
   const [endorsementRoot, trustedRoot] = await Promise.all([
     input.lineageIndex.root(0, { blockTag: latestBlock.number }),
     input.lineageIndex.root(1, { blockTag: latestBlock.number }),
@@ -340,13 +446,14 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
   if (
     input.lineage.endorsementTree.root !== BigInt(endorsementRoot) ||
     input.lineage.trustedTree.root !== BigInt(trustedRoot)
-  ) throw new Error("Lineage snapshot roots are stale; replay public events");
+  )
+    throw new Error("Lineage snapshot roots are stale; replay public events");
   const asOf = uint64(latestBlock.timestamp, "asOf");
   const eligibleFrom = uint64(asOf + PROOF_LIFETIME, "eligibleFrom");
   const rootPersonHash = wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment);
-  const rootVersion = input.lineage.versions.get(rootPersonHash.toLowerCase())?.find(
-    (version) => BigInt(version.versionIndex) === getBigInt(policy.rootVersionIndex),
-  );
+  const rootVersion = input.lineage.versions
+    .get(rootPersonHash.toLowerCase())
+    ?.find((version) => BigInt(version.versionIndex) === getBigInt(policy.rootVersionIndex));
   if (!rootVersion || rootVersion.identityCommitment !== getBigInt(policy.rootIdentityCommitment)) {
     throw new Error("Policy root version is absent from the lineage snapshot");
   }
@@ -356,8 +463,11 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     root: { identityCommitment: getBigInt(policy.rootIdentityCommitment) },
     rootVersionIndex: Number(policy.rootVersionIndex),
   }).find((candidate) => candidate.writtenAt <= asOf);
-  if (!legitimacy) throw new Error("Heir has no current direct-child endorsement from a trusted source");
-  const endorsementProof = input.lineage.endorsementTree.generateProof(legitimacy.endorsementLeafIndex);
+  if (!legitimacy)
+    throw new Error("Heir has no current direct-child endorsement from a trusted source");
+  const endorsementProof = input.lineage.endorsementTree.generateProof(
+    legitimacy.endorsementLeafIndex,
+  );
   const trustedProof = input.lineage.trustedTree.generateProof(legitimacy.trustedLeafIndex);
   const endorsementLeaf = computeLineageEndorsementLeaf({
     identityCommitment: heir.identityCommitment,
@@ -375,12 +485,18 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     account: legitimacy.endorser,
   });
   if (
-    endorsementProof.leaf !== endorsementLeaf || trustedProof.leaf !== trustedLeaf ||
-    endorsementProof.siblings.length > 64 || trustedProof.siblings.length > 64
-  ) throw new Error("Lineage proof does not match active endorsement and trust leaves");
+    endorsementProof.leaf !== endorsementLeaf ||
+    trustedProof.leaf !== trustedLeaf ||
+    endorsementProof.siblings.length > 64 ||
+    trustedProof.siblings.length > 64
+  )
+    throw new Error("Lineage proof does not match active endorsement and trust leaves");
   const enrollmentSalt = generateShieldedRandomField();
   const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment, heirIdentityCommitment: heir.identityCommitment, eligibleFrom, enrollmentSalt,
+    policyCommitment,
+    heirIdentityCommitment: heir.identityCommitment,
+    eligibleFrom,
+    enrollmentSalt,
   });
   const budget: ShieldedBudgetNotePayload = {
     rootIdentityCommitment: policy.rootIdentityCommitment,
@@ -405,11 +521,20 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     poolAddress: ctx.poolAddress,
     policyCommitment,
     enrollmentCommitment,
+    allocationKey: policy.allocationKey,
   });
-  const data = actionData({ donor, template, useNullifier: enrollmentNullifier, outputs,
-    relation0: BigInt(endorsementRoot), relation1: BigInt(trustedRoot), asOf });
+  const data = actionData({
+    fundMode: 0,
+    donor,
+    useNullifier: enrollmentNullifier,
+    outputs,
+    relation0: BigInt(endorsementRoot),
+    relation1: BigInt(trustedRoot),
+    asOf,
+  });
   const witness: ShieldedWitness = {
-    ...publicInputs(SHIELDED_POOL_ACTION.Allocate, ctx.chainId, ctx.poolAddress, data),
+    ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
+    ...ZERO_TEMPLATE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
     donorNonce: String(donor.note.nonce),
@@ -422,11 +547,7 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     rate: String(policy.amountPerPeriod),
     policySalt: String(policy.policySalt),
     allocationKey: String(policy.allocationKey),
-    policyNonce: String(policy.nonce),
-    policyCiphertextHash: String(template.ciphertextHash),
-    policyDepth: template.depth,
-    policyIndex: String(template.index),
-    policySiblings: decimal(template.siblings),
+    allocationKeyCommitment: String(allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
     heirVersionIndex: String(legitimacy.versionIndex),
@@ -437,10 +558,16 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
     writtenAt: String(legitimacy.writtenAt),
     endorsementDepth: endorsementProof.siblings.length,
     endorsementIndex: String(endorsementProof.index),
-    endorsementSiblings: decimal([...endorsementProof.siblings, ...Array<bigint>(64 - endorsementProof.siblings.length).fill(0n)]),
+    endorsementSiblings: decimal([
+      ...endorsementProof.siblings,
+      ...Array<bigint>(64 - endorsementProof.siblings.length).fill(0n),
+    ]),
     trustedDepth: trustedProof.siblings.length,
     trustedIndex: String(trustedProof.index),
-    trustedSiblings: decimal([...trustedProof.siblings, ...Array<bigint>(64 - trustedProof.siblings.length).fill(0n)]),
+    trustedSiblings: decimal([
+      ...trustedProof.siblings,
+      ...Array<bigint>(64 - trustedProof.siblings.length).fill(0n),
+    ]),
     eligibleFrom: String(eligibleFrom),
     enrollmentSalt: String(enrollmentSalt),
     budgetPeriods: String(periods),
@@ -451,7 +578,9 @@ export async function prepareShieldedAllocate(input: PrepareShieldedAllocateInpu
 }
 
 /** Add a new whole-period budget using a saved child budget as read-only template. */
-export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Promise<PreparedShieldedFunding> {
+async function prepareContinuationFunding(
+  input: ContinuationFundingInput,
+): Promise<PreparedShieldedFunding> {
   const ctx = await currentContext(input);
   const donor = donorInput(input, ctx.keys.ownerSecret);
   const template = templatePath(input.wallet, input.budget, encodeShieldedBudgetNotePayload);
@@ -460,22 +589,29 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
   if (
     getBigInt(old.heirIdentityCommitment) !== heir.identityCommitment ||
     getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment
-  ) throw new Error("Budget template does not belong to this receive code's recipient");
+  )
+    throw new Error("Budget template does not belong to this receive code's recipient");
   const rate = uint128(old.amountPerPeriod, "rate");
   const oldRemaining = uint128(old.remaining, "old remaining budget");
-  if (rate === 0n || oldRemaining % rate !== 0n) throw new Error("Template budget has fractional periods");
-  const { periods, amount } = fundingAmount(rate, input.topUpPeriods);
+  if (rate === 0n || oldRemaining % rate !== 0n)
+    throw new Error("Template budget has fractional periods");
+  const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
   if (donor.note.amount < amount) throw new Error("Donor value note cannot fund the whole top-up");
   const policyCommitment = computeShieldedPolicyCommitment(old);
   const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment, heirIdentityCommitment: old.heirIdentityCommitment,
-    eligibleFrom: old.eligibleFrom, enrollmentSalt: old.enrollmentSalt,
+    policyCommitment,
+    heirIdentityCommitment: old.heirIdentityCommitment,
+    eligibleFrom: old.eligibleFrom,
+    enrollmentSalt: old.enrollmentSalt,
   });
   const budgetUseNonce = generateShieldedRandomField();
   const useNullifier = computeShieldedTopUpUseNullifier({
-    policySalt: old.policySalt, budgetNoteCommitment: template.commitment, useNonce: budgetUseNonce,
+    policySalt: old.policySalt,
+    budgetNoteCommitment: template.commitment,
+    useNonce: budgetUseNonce,
   });
-  if (input.wallet.spentNullifiers.has(useNullifier)) throw new Error("Top-up authorization was already used");
+  if (input.wallet.spentNullifiers.has(useNullifier))
+    throw new Error("Top-up authorization was already used");
   const budget: ShieldedBudgetNotePayload = {
     ...old,
     remaining: amount,
@@ -492,9 +628,10 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
     policyCommitment,
     enrollmentCommitment,
   });
-  const data = actionData({ donor, template, useNullifier, outputs });
+  const data = actionData({ fundMode: 1, donor, template, useNullifier, outputs });
   const witness: ShieldedWitness = {
-    ...publicInputs(SHIELDED_POOL_ACTION.TopUp, ctx.chainId, ctx.poolAddress, data),
+    ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
+    ...ZERO_LINEAGE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
     donorNonce: String(donor.note.nonce),
@@ -519,8 +656,8 @@ export async function prepareShieldedTopUp(input: PrepareShieldedTopUpInput): Pr
     oldBudgetIndex: String(template.index),
     oldBudgetSiblings: decimal(template.siblings),
     budgetUseNonce: String(budgetUseNonce),
-    topUpPeriods: String(periods),
-    newBudgetNonce: String(budget.nonce),
+    budgetPeriods: String(periods),
+    budgetNonce: String(budget.nonce),
     changeNonce: String(outputs[1].note.nonce),
   };
   return { data, witness, policyCommitment, outputs };

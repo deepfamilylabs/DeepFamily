@@ -40,7 +40,7 @@ async function deployStubAdapter({
   const adapter = await adapterFactory.deploy(
     await personVerifier.getAddress(),
     await disclosureVerifier.getAddress(),
-    Array(8).fill(hre.ethers.ZeroAddress),
+    Array(5).fill(hre.ethers.ZeroAddress),
   );
   await adapter.waitForDeployment();
 

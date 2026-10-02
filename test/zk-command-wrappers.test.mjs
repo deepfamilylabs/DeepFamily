@@ -169,10 +169,7 @@ describe("parameterized ZK command wrappers", function () {
         "disclosure",
         "shielded:receiveCode",
         "shielded:shield",
-        "shielded:createPolicy",
-        "shielded:allocate",
-        "shielded:topUp",
-        "shielded:mergeBudget",
+        "shielded:fund",
         "shielded:claim",
         "shielded:privateTransfer",
         "shielded:unshield",
@@ -185,10 +182,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "disclosure"],
         ["run", "shielded:receiveCode"],
         ["run", "shielded:shield"],
-        ["run", "shielded:createPolicy"],
-        ["run", "shielded:allocate"],
-        ["run", "shielded:topUp"],
-        ["run", "shielded:mergeBudget"],
+        ["run", "shielded:fund"],
         ["run", "shielded:claim"],
         ["run", "shielded:privateTransfer"],
         ["run", "shielded:unshield"],
@@ -344,7 +338,7 @@ describe("parameterized ZK command wrappers", function () {
       ]);
     });
 
-    it("checks nine shielded development artifacts and the available real proof fixtures by default", function () {
+    it("checks six shielded development artifacts and the available real proof fixtures by default", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot });
       expect(commands.map(({ circuit, check }) => [circuit, check]).at(-1)).to.deep.equal([
         "shielded",

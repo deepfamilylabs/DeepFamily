@@ -14,11 +14,16 @@ import {
   generateShieldedRandomField,
   verifyShieldedNotePayload,
 } from "@deepfamily/protocol-core";
+import { selectValueNotes } from "./shieldedActionSelection";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
-import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
+import {
+  getRecoveredShieldedNoteProof,
+  listUnspentRecoveredShieldedNotes,
+  type LocalShieldedWalletSnapshot,
+} from "./shieldedWalletRecovery";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -86,10 +91,12 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
   const keys = deriveShieldedHeirKeyMaterial(input.derivedSecretField);
   const wallet = input.wallet;
   if (
-    wallet.invalidated || wallet.chainId !== ctx.chainId ||
+    wallet.invalidated ||
+    wallet.chainId !== ctx.chainId ||
     wallet.poolAddress.toLowerCase() !== ctx.poolAddress.toLowerCase() ||
     wallet.walletOwnerCommitment !== keys.ownerCommitment
-  ) throw new Error("Value wallet does not match this identity, chain, or pool");
+  )
+    throw new Error("Value wallet does not match this identity, chain, or pool");
   const commitment = getBigInt(input.commitment);
   const owned = wallet.ownedNotes.get(commitment);
   if (!owned || owned.note.kind !== "value") {
@@ -107,7 +114,8 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
   if (
     owned.ciphertextHashField !== ciphertextHashField ||
     computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }) !== commitment
-  ) throw new Error("Input note does not match its public ciphertext and commitment");
+  )
+    throw new Error("Input note does not match its public ciphertext and commitment");
 
   // Reopen the actual event ciphertext, rather than trusting mutable cached plaintext.
   const hpkeIkm = getBytes(keys.hpkeIkm);
@@ -125,9 +133,12 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
       noteCommitment: commitment,
     }).note;
     if (
-      reopened.kind !== "value" || reopened.ownerCommitment !== note.ownerCommitment ||
-      reopened.amount !== note.amount || reopened.nonce !== note.nonce
-    ) throw new Error("Cached input plaintext does not match its ciphertext");
+      reopened.kind !== "value" ||
+      reopened.ownerCommitment !== note.ownerCommitment ||
+      reopened.amount !== note.amount ||
+      reopened.nonce !== note.nonce
+    )
+      throw new Error("Cached input plaintext does not match its ciphertext");
   } finally {
     payload?.fill(0);
     hpkeIkm.fill(0);
@@ -137,7 +148,8 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
     ownerSecret: keys.ownerSecret,
     noteCommitment: commitment,
   });
-  if (wallet.spentNullifiers.has(nullifier)) throw new Error("Input value note has already been spent");
+  if (wallet.spentNullifiers.has(nullifier))
+    throw new Error("Input value note has already been spent");
   const path = getRecoveredShieldedNoteProof(wallet, commitment);
   return {
     note,
@@ -185,9 +197,12 @@ async function encryptValueOutput(
         noteCommitment: commitment,
       }).note;
       if (
-        recovered.kind !== "value" || recovered.ownerCommitment !== note.ownerCommitment ||
-        recovered.amount !== note.amount || recovered.nonce !== note.nonce
-      ) throw new Error("Self output did not decrypt to its intended value note");
+        recovered.kind !== "value" ||
+        recovered.ownerCommitment !== note.ownerCommitment ||
+        recovered.amount !== note.amount ||
+        recovered.nonce !== note.nonce
+      )
+        throw new Error("Self output did not decrypt to its intended value note");
     }
     return { note, commitment, ciphertext, ciphertextHashField };
   } finally {
@@ -202,6 +217,7 @@ function actionData(
   outputs: readonly [PreparedShieldedValueOutput, PreparedShieldedValueOutput],
 ): ShieldedPoolActionData {
   return {
+    fundMode: 0n,
     inputShardIds: [paths[0].path.shardId, paths[1].path.shardId],
     inputRoots: [paths[0].path.root, paths[1].path.root],
     inputNullifiers: nullifiers,
@@ -226,6 +242,7 @@ function publicInputs(
     action,
     chainId: ctx.chainId,
     poolAddress: ctx.poolAddress,
+    fundMode: 0n,
     inputShardIds: [...data.inputShardIds],
     inputRoots: [...data.inputRoots],
     inputNullifiers: [...data.inputNullifiers],
@@ -255,8 +272,10 @@ export async function prepareShieldedPrivateTransfer(input: {
   if (input.inputs.length !== 1 && input.inputs.length !== 2) {
     throw new Error("Private transfer needs one or two input notes");
   }
-  if (input.inputs.length === 2 &&
-      getBigInt(input.inputs[0].commitment) === getBigInt(input.inputs[1].commitment)) {
+  if (
+    input.inputs.length === 2 &&
+    getBigInt(input.inputs[0].commitment) === getBigInt(input.inputs[1].commitment)
+  ) {
     throw new Error("Private transfer needs two distinct input notes");
   }
   const opened = await Promise.all(input.inputs.map((note) => openValueInput(note, ctx)));
@@ -265,55 +284,60 @@ export async function prepareShieldedPrivateTransfer(input: {
   const secondInput = input.inputs[1];
   if (!first) throw new Error("Private transfer needs a value note");
   // Different wallet scans must be anchored to the same public chain state.
-  if (secondInput && (
-    input.inputs[0].wallet.toBlock !== secondInput.wallet.toBlock ||
-    input.inputs[0].wallet.blockHash !== secondInput.wallet.blockHash
-  )) throw new Error("Private transfer input wallets must share one public snapshot block");
+  if (
+    secondInput &&
+    (input.inputs[0].wallet.toBlock !== secondInput.wallet.toBlock ||
+      input.inputs[0].wallet.blockHash !== secondInput.wallet.blockHash)
+  )
+    throw new Error("Private transfer input wallets must share one public snapshot block");
   const total = first.note.amount + (second?.note.amount ?? 0n);
   if (total === 0n) throw new Error("Private transfer requires positive input value");
   const outputAmounts = input.destinations.map((destination, index) =>
-    uint128(destination.amount, `destinations[${index}].amount`)) as [bigint, bigint];
+    uint128(destination.amount, `destinations[${index}].amount`),
+  ) as [bigint, bigint];
   if (outputAmounts[0] + outputAmounts[1] !== total) {
     throw new Error("Private transfer outputs must equal the two input amounts");
   }
-  const destinationKeys = await Promise.all(input.destinations.map(async (destination) => {
-    if (destination.kind === "inputOwner") {
-      const source = opened[destination.inputIndex];
-      if (!source) throw new Error("Invalid private transfer input owner index");
+  const destinationKeys = (await Promise.all(
+    input.destinations.map(async (destination) => {
+      if (destination.kind === "inputOwner") {
+        const source = opened[destination.inputIndex];
+        if (!source) throw new Error("Invalid private transfer input owner index");
+        return {
+          ownerCommitment: source.ownerCommitment,
+          viewingKey: await deriveShieldedViewPublicKey(source.hpkeIkm),
+          selfHpkeIkm: source.hpkeIkm,
+        };
+      }
       return {
-        ownerCommitment: source.ownerCommitment,
-        viewingKey: await deriveShieldedViewPublicKey(source.hpkeIkm),
-        selfHpkeIkm: source.hpkeIkm,
+        ownerCommitment: destination.recipient.ownerCommitment,
+        viewingKey: getBytes(destination.recipient.viewingKey),
       };
-    }
-    return {
-      ownerCommitment: destination.recipient.ownerCommitment,
-      viewingKey: getBytes(destination.recipient.viewingKey),
-    };
-  })) as [
+    }),
+  )) as [
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
     { ownerCommitment: bigint; viewingKey: Uint8Array; selfHpkeIkm?: string },
   ];
-  const outputs = await Promise.all(destinationKeys.map((destination, index) => {
-    const note: ValueNote = {
-      ownerCommitment: destination.ownerCommitment,
-      amount: outputAmounts[index],
-      nonce: generateShieldedRandomField(),
-    };
-    return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
-  })) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
-  const secondNullifier = second?.nullifier ?? computeShieldedDummyInputNullifier({
-    ownerSecret: first.ownerSecret,
-    noteCommitment: getBigInt(input.inputs[0].commitment),
-  });
+  const outputs = (await Promise.all(
+    destinationKeys.map((destination, index) => {
+      const note: ValueNote = {
+        ownerCommitment: destination.ownerCommitment,
+        amount: outputAmounts[index],
+        nonce: generateShieldedRandomField(),
+      };
+      return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
+    }),
+  )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
+  const secondNullifier =
+    second?.nullifier ??
+    computeShieldedDummyInputNullifier({
+      ownerSecret: first.ownerSecret,
+      noteCommitment: getBigInt(input.inputs[0].commitment),
+    });
   if (!second && input.inputs[0].wallet.spentNullifiers.has(secondNullifier)) {
     throw new Error("Input value note has already been spent");
   }
-  const data = actionData(
-    [first, second ?? first],
-    [first.nullifier, secondNullifier],
-    outputs,
-  );
+  const data = actionData([first, second ?? first], [first.nullifier, secondNullifier], outputs);
   const zeroSiblings = Array<bigint>(32).fill(0n);
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
@@ -325,7 +349,9 @@ export async function prepareShieldedPrivateTransfer(input: {
     inputDepths: [String(first.path.proofDepth), String(second?.path.proofDepth ?? 0)],
     inputIndices: decimal([first.path.proofIndex, second?.path.proofIndex ?? 0n]),
     inputSiblings: [decimal(first.path.siblings), decimal(second?.path.siblings ?? zeroSiblings)],
-    outputOwnerCommitments: decimal(destinationKeys.map((destination) => destination.ownerCommitment)),
+    outputOwnerCommitments: decimal(
+      destinationKeys.map((destination) => destination.ownerCommitment),
+    ),
     outputAmounts: decimal(outputAmounts),
     outputNonces: decimal(outputs.map((output) => output.note.nonce)),
   };
@@ -359,11 +385,15 @@ export async function prepareShieldedUnshield(input: {
   }
   const viewingKey = await deriveShieldedViewPublicKey(opened.hpkeIkm);
   const notes: readonly [ValueNote, ValueNote] = [
-    { ownerCommitment: opened.ownerCommitment, amount: opened.note.amount - amount, nonce: generateShieldedRandomField() },
+    {
+      ownerCommitment: opened.ownerCommitment,
+      amount: opened.note.amount - amount,
+      nonce: generateShieldedRandomField(),
+    },
     { ownerCommitment: opened.ownerCommitment, amount: 0n, nonce: generateShieldedRandomField() },
   ];
-  const outputs = await Promise.all(notes.map((note) =>
-    encryptValueOutput(note, viewingKey, ctx, opened.hpkeIkm),
+  const outputs = (await Promise.all(
+    notes.map((note) => encryptValueOutput(note, viewingKey, ctx, opened.hpkeIkm)),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
   const data = actionData([opened, opened], [opened.nullifier, dummyNullifier], outputs);
   const witness: ShieldedWitness = {
@@ -380,4 +410,62 @@ export async function prepareShieldedUnshield(input: {
     dummyNonce: String(notes[1].nonce),
   };
   return { amount, recipient, data, witness, outputs };
+}
+
+/** Join two owned value notes as needed before a single-input funding or withdrawal.
+ * Repeating this after each receipt also consolidates wallets with more than two notes.
+ */
+export async function prepareShieldedValueConsolidation(input: {
+  chainId: BigNumberish;
+  poolAddress: string;
+  wallet: LocalShieldedWalletSnapshot;
+  derivedSecretField: BigNumberish;
+  amount: BigNumberish;
+}): Promise<PreparedShieldedPrivateTransfer | undefined> {
+  const amount = uint128(input.amount, "amount");
+  if (amount === 0n) throw new Error("Consolidation target must be positive");
+  const notes = listUnspentRecoveredShieldedNotes(input.wallet, input.derivedSecretField);
+  if (selectValueNotes(notes, amount)) return undefined;
+  const values = notes.filter(
+    (note): note is typeof note & { note: ValueNote } =>
+      note.note.kind === "value" && note.note.amount > 0n,
+  );
+  const total = values.reduce((sum, note) => sum + note.note.amount, 0n);
+  if (total < amount) throw new Error("Shielded value balance cannot fund the requested amount");
+  const selected =
+    selectValueNotes(notes, amount, 2) ??
+    values
+      .sort((a, b) =>
+        a.note.amount > b.note.amount
+          ? -1
+          : a.note.amount < b.note.amount
+            ? 1
+            : a.commitment < b.commitment
+              ? -1
+              : 1,
+      )
+      .slice(0, 2);
+  if (selected.length !== 2) throw new Error("Consolidation needs two value notes");
+  const combined = selected[0].note.amount + selected[1].note.amount;
+  const outputAmount = combined > MAX_UINT128 ? amount : combined;
+  return prepareShieldedPrivateTransfer({
+    chainId: input.chainId,
+    poolAddress: input.poolAddress,
+    inputs: [
+      {
+        wallet: input.wallet,
+        derivedSecretField: input.derivedSecretField,
+        commitment: selected[0].commitment,
+      },
+      {
+        wallet: input.wallet,
+        derivedSecretField: input.derivedSecretField,
+        commitment: selected[1].commitment,
+      },
+    ],
+    destinations: [
+      { kind: "inputOwner", inputIndex: 0, amount: outputAmount },
+      { kind: "inputOwner", inputIndex: 0, amount: combined - outputAmount },
+    ],
+  });
 }

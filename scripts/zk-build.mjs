@@ -128,7 +128,7 @@ const printUsage = () => {
   node scripts/zk-build.mjs [--circuit <all|legacy|person|disclosure|shielded|shielded:action>]
 
 Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
-settings. The default is --circuit all (the two legacy and nine shielded circuits).`);
+settings. The default is --circuit all (the two legacy and six shielded circuits).`);
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

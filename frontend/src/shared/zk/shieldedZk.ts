@@ -10,10 +10,7 @@ import * as snarkjs from "snarkjs";
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   receiveCode: "shielded_receive_code",
   shield: "shielded_shield",
-  createPolicy: "shielded_create_policy",
-  allocate: "shielded_allocate",
-  topUp: "shielded_top_up",
-  mergeBudget: "shielded_merge_budget",
+  fund: "shielded_fund",
   claim: "shielded_claim",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
@@ -25,10 +22,7 @@ export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
 const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   receiveCode: SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
-  createPolicy: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.CreatePolicy],
-  allocate: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Allocate],
-  topUp: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.TopUp],
-  mergeBudget: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.MergeBudget],
+  fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
   unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],

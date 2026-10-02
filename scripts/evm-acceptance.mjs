@@ -1078,7 +1078,7 @@ export const main = async (chainProfile) => {
     config.acceptanceMode === "release-rehearsal" &&
     shieldedCandidate.manifest.productionReady !== true
   )
-    throw new Error("Release rehearsal requires production public keys for all eleven circuits");
+    throw new Error("Release rehearsal requires production public keys for all eight circuits");
   const shieldedArtifacts = {
     status: "passed",
     productionReady: shieldedCandidate.manifest.productionReady,
@@ -2516,7 +2516,7 @@ export const main = async (chainProfile) => {
       provider,
       expectedChainId: EXPECTED_CHAIN_ID,
       poolAddress: addresses.shieldedDeepPool,
-      allocationTxHash: report.transactions["shielded-action-allocate"].hash,
+      allocationTxHash: report.transactions["shielded-action-fund"].hash,
     });
     await addStep("real-zk-shielded-business", report.shielded);
 
@@ -3890,7 +3890,8 @@ export const main = async (chainProfile) => {
       shieldedCoveragePassed:
         report.shielded?.status === "passed" &&
         report.shielded?.receipts?.rpcChecks === "passed" &&
-        Object.keys(report.shielded?.proofs ?? {}).length === 9 &&
+        Object.keys(report.shielded?.proofs ?? {}).length ===
+          Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS).length &&
         Object.values(report.shielded?.proofs ?? {}).every((proof) => proof.verified === true),
       terminalGovernanceStateMatched: report.terminalGovernanceState.status === "passed",
       deploymentDirectoryUnchanged: report.deploymentsDirectory.unchanged === true,

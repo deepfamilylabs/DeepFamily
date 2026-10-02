@@ -121,7 +121,7 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes all eight shielded verifiers behind the common ten-route adapter", function () {
+  it("includes all five shielded verifiers behind the common seven-route adapter", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
@@ -149,7 +149,7 @@ describe("planned production protocol deployment projection", function () {
       plannedAddresses,
       manifest: baseManifest(),
     });
-    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(8);
+    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(5);
     expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
@@ -167,7 +167,7 @@ describe("planned production protocol deployment projection", function () {
         inspected.deployments.groth16VerifierAdapter[`${getter}Immutable`],
       ]),
     );
-    immutableValues.allocateVerifier = plannedAddresses.shieldedClaimVerifier;
+    immutableValues.fundVerifier = plannedAddresses.shieldedClaimVerifier;
     const wrongRoute = inspectProtocolDeploymentArtifact({
       artifactName: "groth16VerifierAdapter",
       immutableValues,

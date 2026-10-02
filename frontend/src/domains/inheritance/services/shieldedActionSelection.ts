@@ -109,62 +109,6 @@ function budgetIdentity(note: BudgetPayload): string {
   return BUDGET_IDENTITY_FIELDS.map((field) => note[field].toString()).join(":");
 }
 
-/** Match the policy, enrollment, owner, rate and bounds enforced by merge preparation. */
-export function selectCompatibleBudgetPair(
-  notes: readonly Note[],
-): [ShieldedSelectableBudgetNote, ShieldedSelectableBudgetNote] | undefined {
-  const budgets = uniqueNotes(
-    notes.filter((note): note is ShieldedSelectableBudgetNote => note.note.kind === "budget"),
-  ).sort((a, b) => compareBigInt(a.commitment, b.commitment));
-  const groups = new Map<string, ShieldedSelectableBudgetNote[]>();
-  for (const budget of budgets) {
-    const { amountPerPeriod: rate, remaining } = budget.note;
-    if (
-      rate <= 0n ||
-      remaining < 0n ||
-      remaining > MAX_UINT128 ||
-      remaining % rate !== 0n ||
-      remaining / rate > MAX_UINT64
-    )
-      continue;
-    const identity = budgetIdentity(budget.note);
-    const group = groups.get(identity) ?? [];
-    group.push(budget);
-    groups.set(identity, group);
-  }
-  let best: [ShieldedSelectableBudgetNote, ShieldedSelectableBudgetNote] | undefined;
-  for (const group of groups.values()) {
-    const rate = group[0].note.amountPerPeriod;
-    const periodLimit = rate * MAX_UINT64;
-    const remainingLimit = periodLimit < MAX_UINT128 ? periodLimit : MAX_UINT128;
-    const suffixMinimum = Array<bigint>(group.length);
-    for (let index = group.length - 1; index >= 0; index -= 1) {
-      const remaining = group[index].note.remaining;
-      suffixMinimum[index] =
-        index === group.length - 1 || remaining < suffixMinimum[index + 1]
-          ? remaining
-          : suffixMinimum[index + 1];
-    }
-    for (let first = 0; first < group.length - 1; first += 1) {
-      if (group[first].note.remaining + suffixMinimum[first + 1] > remainingLimit) continue;
-      for (let second = first + 1; second < group.length; second += 1) {
-        const pair: [ShieldedSelectableBudgetNote, ShieldedSelectableBudgetNote] = [
-          group[first],
-          group[second],
-        ];
-        const remaining = pair[0].note.remaining + pair[1].note.remaining;
-        if (remaining > remainingLimit) continue;
-        if (!best || comparePairs(pair, best) < 0) best = pair;
-        // Later partners have larger commitments than this valid partner.
-        break;
-      }
-      // This is the group's smallest commitment with a valid partner.
-      break;
-    }
-  }
-  return best;
-}
-
 function findClaimPeriods(
   wallet: PeriodWallet,
   derivedSecretField: BigNumberish,
@@ -217,7 +161,13 @@ export function selectClaimBudget(
   wallet: PeriodWallet,
   derivedSecretField: BigNumberish,
   now: bigint,
-): { budget: ShieldedSelectableBudgetNote; periodIndices: bigint[] } | undefined {
+):
+  | {
+      budget: ShieldedSelectableBudgetNote;
+      secondBudget?: ShieldedSelectableBudgetNote;
+      periodIndices: bigint[];
+    }
+  | undefined {
   const budgets = uniqueNotes(
     notes.filter((note): note is ShieldedSelectableBudgetNote => note.note.kind === "budget"),
   ).sort(
@@ -227,7 +177,29 @@ export function selectClaimBudget(
   );
   for (const budget of budgets) {
     const periodIndices = findClaimPeriods(wallet, derivedSecretField, budget.note, now);
-    if (periodIndices.length) return { budget, periodIndices };
+    if (!periodIndices.length) continue;
+    if (periodIndices.length < 12) {
+      for (const secondBudget of budgets) {
+        if (
+          secondBudget.commitment === budget.commitment ||
+          secondBudget.note.remaining <= 0n ||
+          budgetIdentity(secondBudget.note) !== budgetIdentity(budget.note)
+        )
+          continue;
+        const remaining = budget.note.remaining + secondBudget.note.remaining;
+        if (remaining > MAX_UINT128 || remaining / budget.note.amountPerPeriod > MAX_UINT64)
+          continue;
+        const combinedPeriods = findClaimPeriods(
+          wallet,
+          derivedSecretField,
+          { ...budget.note, remaining },
+          now,
+        );
+        if (combinedPeriods.length > periodIndices.length)
+          return { budget, secondBudget, periodIndices: combinedPeriods };
+      }
+    }
+    return { budget, periodIndices };
   }
   return undefined;
 }

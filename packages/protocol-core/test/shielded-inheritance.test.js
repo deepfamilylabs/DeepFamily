@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   INHERITANCE_PERIOD_SECONDS,
+  MAX_UINT64,
   MAX_UINT128,
   SHIELDED_CIPHERTEXT_BYTES,
   SHIELDED_MAX_BATCH_PERIODS,
@@ -16,7 +17,6 @@ import {
   computeShieldedOwnerCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
-  computeShieldedPolicyNoteCommitment,
   computeShieldedSpendNullifier,
   computeShieldedTopUpUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -209,21 +209,6 @@ test("allocation uniqueness and read-only use tags keep separate purposes", () =
       allocationKeyCommitment: computeShieldedAllocationKeyCommitment(42n),
     }),
   );
-  const policyNote = computeShieldedPolicyNoteCommitment({
-    policyCommitment,
-    nonce: 41n,
-    ciphertextHashField: computeShieldedCiphertextHashField(VECTOR_CIPHERTEXT),
-  });
-  const differentCiphertext = Uint8Array.from(VECTOR_CIPHERTEXT);
-  differentCiphertext[0] ^= 1;
-  assert.notEqual(
-    policyNote,
-    computeShieldedPolicyNoteCommitment({
-      policyCommitment,
-      nonce: 41n,
-      ciphertextHashField: computeShieldedCiphertextHashField(differentCiphertext),
-    }),
-  );
   assert.notEqual(
     allocationTag,
     computeShieldedTopUpUseNullifier({
@@ -281,6 +266,11 @@ test("only full 30-day periods from private eligibility count and batches are al
 });
 
 test("field, uint128, randomness, and whole-period budget bounds are enforced", () => {
+  assert.ok(computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 }) > 0n);
+  assert.throws(
+    () => computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 + 1n }),
+    (error) => error.code === "INTEGER_OUT_OF_RANGE",
+  );
   assert.throws(
     () => computeShieldedPolicyCommitment({ ...policyInput, policySalt: 0n }),
     (error) => error.code === "ZERO_SHIELDED_SECRET",

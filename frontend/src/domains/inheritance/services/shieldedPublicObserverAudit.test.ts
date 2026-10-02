@@ -16,7 +16,7 @@ const shield: PublicPoolActionObservation = {
 };
 const policy: PublicPoolActionObservation = {
   txHash: "policy",
-  action: SHIELDED_POOL_ACTION.CreatePolicy,
+  action: SHIELDED_POOL_ACTION.PrivateTransfer,
   inputShardIds: [0n, 0n],
   outputs: [
     { commitment: 21n, shardId: 0n },
@@ -25,7 +25,7 @@ const policy: PublicPoolActionObservation = {
 };
 const allocation: PublicPoolActionObservation = {
   txHash: "allocation",
-  action: SHIELDED_POOL_ACTION.Allocate,
+  action: SHIELDED_POOL_ACTION.Fund,
   inputShardIds: [0n, 0n],
   outputs: [
     { commitment: 101n, shardId: 0n },
@@ -84,7 +84,7 @@ describe("public observer linkability audit", () => {
     const sameChildTopUp: PublicPoolActionObservation = {
       ...allocation,
       txHash: "same-child-top-up",
-      action: SHIELDED_POOL_ACTION.TopUp,
+      action: SHIELDED_POOL_ACTION.Fund,
       outputs: [
         { commitment: 301n, shardId: 0n },
         { commitment: 302n, shardId: 0n },
@@ -124,7 +124,7 @@ describe("public observer linkability audit", () => {
     const otherShardBudget: PublicPoolActionObservation = {
       ...allocation,
       txHash: "other-shard-budget",
-      action: SHIELDED_POOL_ACTION.TopUp,
+      action: SHIELDED_POOL_ACTION.Fund,
       outputs: [
         { commitment: 301n, shardId: 1n },
         { commitment: 302n, shardId: 1n },
@@ -165,6 +165,6 @@ describe("public observer linkability audit", () => {
     expect(() => audit([shield, policy, claim])).toThrow("earlier allocation output");
     expect(() =>
       audit([shield, policy, allocation, { ...claim, inputShardIds: [0n, 1n] }]),
-    ).toThrow("shard IDs disagree");
+    ).not.toThrow();
   });
 });

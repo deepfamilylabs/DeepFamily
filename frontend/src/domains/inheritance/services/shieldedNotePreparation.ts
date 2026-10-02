@@ -2,28 +2,20 @@ import {
   SHIELDED_POOL_ACTION,
   buildShieldedHpkeAad,
   buildShieldedPoolPublicInputs,
-  computeShieldedAllocationKeyCommitment,
   computeShieldedCiphertextHashField,
-  computeShieldedDummyInputNullifier,
-  computeShieldedPolicyCommitment,
-  computeShieldedPolicyNoteCommitment,
-  computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
-  encodeShieldedPolicyNotePayload,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
   verifyShieldedNotePayload,
-  type ShieldedPolicyNotePayload,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
-import { getRecoveredShieldedNoteProof, type LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
 const ZERO_PERIOD_NULLIFIERS = Array<bigint>(12).fill(0n);
 const MAX_UINT64 = (1n << 64n) - 1n;
@@ -48,14 +40,10 @@ export type PreparedShieldedShield = {
   amount: bigint;
   data: ShieldedPoolActionData;
   witness: ShieldedWitness;
-  outputs: readonly [PreparedOutput<ShieldedValueNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
-};
-
-export type PreparedShieldedCreatePolicy = {
-  data: ShieldedPoolActionData;
-  witness: ShieldedWitness;
-  policyCommitment: bigint;
-  outputs: readonly [PreparedOutput<ShieldedPolicyNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
+  outputs: readonly [
+    PreparedOutput<ShieldedValueNotePayload>,
+    PreparedOutput<ShieldedValueNotePayload>,
+  ];
 };
 
 function decimal(values: readonly bigint[]): string[] {
@@ -90,7 +78,7 @@ function context(input: CommonPreparationInput) {
  * Confirm that an output decrypts with this identity and that its plaintext
  * recomputes the commitment bound to the exact ciphertext being published.
  */
-async function encryptOwnOutput<T extends ShieldedValueNotePayload | ShieldedPolicyNotePayload>(
+async function encryptOwnOutput<T extends ShieldedValueNotePayload>(
   note: T,
   encode: (value: T) => Uint8Array,
   commitment: (ciphertextHashField: bigint) => bigint,
@@ -131,6 +119,7 @@ function emptyActionData(
   outputs: readonly [PreparedOutput<unknown>, PreparedOutput<unknown>],
 ): ShieldedPoolActionData {
   return {
+    fundMode: 0n,
     inputShardIds: [0n, 0n],
     inputRoots: [0n, 0n],
     inputNullifiers: [0n, 0n],
@@ -182,7 +171,10 @@ export async function prepareShieldedShield(
   const amount = assertUint128(input.amount, "amount");
   if (amount === 0n) throw new Error("Shield amount must be positive");
   const outputAmounts: readonly [bigint, bigint] = input.outputAmounts
-    ? [assertUint128(input.outputAmounts[0], "outputAmounts[0]"), assertUint128(input.outputAmounts[1], "outputAmounts[1]")]
+    ? [
+        assertUint128(input.outputAmounts[0], "outputAmounts[0]"),
+        assertUint128(input.outputAmounts[1], "outputAmounts[1]"),
+      ]
     : [amount, 0n];
   if (outputAmounts[0] + outputAmounts[1] !== amount) {
     throw new Error("Shield outputs must sum to the public deposit");
@@ -196,21 +188,28 @@ export async function prepareShieldedShield(
     { ownerCommitment: keys.ownerCommitment, amount: outputAmounts[0], nonce: outputNonces[0] },
     { ownerCommitment: keys.ownerCommitment, amount: outputAmounts[1], nonce: outputNonces[1] },
   ];
-  const outputs = await Promise.all(
+  const outputs = (await Promise.all(
     notes.map((note) =>
       encryptOwnOutput(
         note,
         encodeShieldedValueNotePayload,
-        (ciphertextHashField) => computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }),
+        (ciphertextHashField) =>
+          computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }),
         viewingKey,
         keys.hpkeIkm,
         chainId,
         poolAddress,
       ),
     ),
-  ) as [PreparedOutput<ShieldedValueNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
+  )) as [PreparedOutput<ShieldedValueNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
   const data = emptyActionData(outputs);
-  const publicInputs = publicInputsFor(SHIELDED_POOL_ACTION.Shield, chainId, poolAddress, data, amount);
+  const publicInputs = publicInputsFor(
+    SHIELDED_POOL_ACTION.Shield,
+    chainId,
+    poolAddress,
+    data,
+    amount,
+  );
   const witness: ShieldedWitness = {
     ...publicInputs,
     ownerSecret: String(keys.ownerSecret),
@@ -218,136 +217,4 @@ export async function prepareShieldedShield(
     outputNonces: decimal(outputNonces),
   };
   return { amount, data, witness, outputs };
-}
-
-/**
- * Spend one locally recovered value note to create a private policy template.
- * The full input amount remains the owner's private change note.
- */
-export async function prepareShieldedCreatePolicy(
-  input: CommonPreparationInput & {
-    wallet: LocalShieldedWalletSnapshot;
-    inputCommitment: BigNumberish;
-    rootIdentityCommitment: BigNumberish;
-    rootVersionIndex: BigNumberish;
-    amountPerPeriod: BigNumberish;
-  },
-): Promise<PreparedShieldedCreatePolicy> {
-  const { chainId, poolAddress, keys } = context(input);
-  if (
-    input.wallet.invalidated ||
-    input.wallet.chainId !== chainId ||
-    input.wallet.poolAddress.toLowerCase() !== poolAddress.toLowerCase() ||
-    input.wallet.walletOwnerCommitment !== keys.ownerCommitment
-  ) {
-    throw new Error("Shielded wallet does not match this identity, chain, or pool");
-  }
-  const inputCommitment = getBigInt(input.inputCommitment);
-  const owned = input.wallet.ownedNotes.get(inputCommitment);
-  if (!owned || owned.note.kind !== "value") {
-    throw new Error("Input must be a locally recovered value note");
-  }
-  const inputNote = owned.note;
-  if (inputNote.ownerCommitment !== keys.ownerCommitment) {
-    throw new Error("Input value note belongs to another identity");
-  }
-  const inputCiphertextHash = computeShieldedCiphertextHashField(owned.ciphertext);
-  if (
-    inputCiphertextHash !== owned.ciphertextHashField ||
-    computeShieldedValueNoteCommitment({ ...inputNote, ciphertextHashField: inputCiphertextHash }) !== inputCommitment
-  ) {
-    throw new Error("Input note does not match its public ciphertext and commitment");
-  }
-  const realNullifier = computeShieldedSpendNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: inputCommitment,
-  });
-  const dummyNullifier = computeShieldedDummyInputNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: inputCommitment,
-  });
-  if (
-    input.wallet.spentNullifiers.has(realNullifier) ||
-    input.wallet.spentNullifiers.has(dummyNullifier)
-  ) {
-    throw new Error("Input value note has already been spent");
-  }
-  const path = getRecoveredShieldedNoteProof(input.wallet, inputCommitment);
-  const rootIdentityCommitment = getBigInt(input.rootIdentityCommitment);
-  const rootVersionIndex = assertUint64(input.rootVersionIndex, "rootVersionIndex");
-  const amountPerPeriod = assertUint128(input.amountPerPeriod, "amountPerPeriod");
-  const policySalt = generateShieldedRandomField();
-  const allocationKey = generateShieldedRandomField();
-  const policyNonce = generateShieldedRandomField();
-  const changeNonce = generateShieldedRandomField();
-  const policyNote: ShieldedPolicyNotePayload = {
-    rootIdentityCommitment,
-    rootVersionIndex,
-    amountPerPeriod,
-    policySalt,
-    allocationKey,
-    nonce: policyNonce,
-  };
-  const policyCommitment = computeShieldedPolicyCommitment({
-    rootIdentityCommitment,
-    rootVersionIndex,
-    amountPerPeriod,
-    policySalt,
-    allocationKeyCommitment: computeShieldedAllocationKeyCommitment(allocationKey),
-  });
-  const changeNote: ShieldedValueNotePayload = {
-    ownerCommitment: keys.ownerCommitment,
-    amount: inputNote.amount,
-    nonce: changeNonce,
-  };
-  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const outputs = await Promise.all([
-    encryptOwnOutput(
-      policyNote,
-      encodeShieldedPolicyNotePayload,
-      (ciphertextHashField) => computeShieldedPolicyNoteCommitment({
-        policyCommitment,
-        nonce: policyNonce,
-        ciphertextHashField,
-      }),
-      viewingKey,
-      keys.hpkeIkm,
-      chainId,
-      poolAddress,
-    ),
-    encryptOwnOutput(
-      changeNote,
-      encodeShieldedValueNotePayload,
-      (ciphertextHashField) => computeShieldedValueNoteCommitment({ ...changeNote, ciphertextHashField }),
-      viewingKey,
-      keys.hpkeIkm,
-      chainId,
-      poolAddress,
-    ),
-  ]) as [PreparedOutput<ShieldedPolicyNotePayload>, PreparedOutput<ShieldedValueNotePayload>];
-  const data = {
-    ...emptyActionData(outputs),
-    inputShardIds: [path.shardId, path.shardId] as const,
-    inputRoots: [path.root, path.root] as const,
-    inputNullifiers: [realNullifier, dummyNullifier] as const,
-  } satisfies ShieldedPoolActionData;
-  const publicInputs = publicInputsFor(SHIELDED_POOL_ACTION.CreatePolicy, chainId, poolAddress, data);
-  const witness: ShieldedWitness = {
-    ...publicInputs,
-    ownerSecret: String(keys.ownerSecret),
-    inputAmount: String(inputNote.amount),
-    inputNonce: String(inputNote.nonce),
-    inputCiphertextHash: String(inputCiphertextHash),
-    noteDepth: path.proofDepth,
-    noteIndex: String(path.proofIndex),
-    noteSiblings: decimal(path.siblings),
-    rootIdentityCommitment: String(rootIdentityCommitment),
-    rootVersionIndex: String(rootVersionIndex),
-    rate: String(amountPerPeriod),
-    policySalt: String(policySalt),
-    allocationKey: String(allocationKey),
-    policyNonce: String(policyNonce),
-    changeNonce: String(changeNonce),
-  };
-  return { data, witness, policyCommitment, outputs };
 }

@@ -14,7 +14,7 @@ const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
 /**
- * Development setup and public synchronization, shared by the top-level eleven-circuit command.
+ * Development setup and public synchronization, shared by the top-level eight-circuit command.
  */
 export async function setupShieldedDevelopmentKeys({ root = ROOT } = {}) {
   root = path.resolve(root);
