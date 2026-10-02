@@ -1078,7 +1078,7 @@ export const main = async (chainProfile) => {
     config.acceptanceMode === "release-rehearsal" &&
     shieldedCandidate.manifest.productionReady !== true
   )
-    throw new Error("Release rehearsal requires production public keys for all eight circuits");
+    throw new Error("Release rehearsal requires production public keys for all nine circuits");
   const shieldedArtifacts = {
     status: "passed",
     productionReady: shieldedCandidate.manifest.productionReady,

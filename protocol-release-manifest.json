@@ -1547,7 +1547,8 @@
       "unshieldVerifierImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
-      "fundVerifierImmutable": null
+      "fundVerifierImmutable": null,
+      "claimPublicVerifierImmutable": null
     },
     "deepFamilyReader": {
       "address": null,
@@ -1588,6 +1589,11 @@
         "runtimeSha256": null
       },
       "fund": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "claimPublic": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null

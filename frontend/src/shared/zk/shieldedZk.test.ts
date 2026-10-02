@@ -25,6 +25,7 @@ describe("shielded proof public inputs", () => {
       ["shield", 7],
       ["fund", 16],
       ["claim", 27],
+      ["claimPublic", 11],
     ] as const) {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count).fill("0"), Array(count).fill("0")),

@@ -6,6 +6,7 @@ import {
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
   buildShieldedPoolPublicInputs,
   buildShieldedPoolPublicSignals,
+  buildShieldedPublicClaimPublicInputs,
   buildShieldedReceiveCodePublicSignals,
   computeShieldedCiphertextHashField,
   deriveShieldedHeirKeyMaterial,
@@ -45,7 +46,40 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
       Claim: 27,
       PrivateTransfer: 12,
       Unshield: 12,
+      ClaimPublic: 11,
     },
+  );
+});
+
+test("public claim binds ledger, identity, period range and exact private payout outputs", () => {
+  const input = {
+    chainId: 1030,
+    poolAddress: pool,
+    budgetId: 4,
+    heirIdentityCommitment: 33,
+    firstPeriod: 2,
+    claimCount: 3,
+    amount: 300,
+    outputCommitments: [27, 28],
+    outputCiphertexts: [ciphertextA, ciphertextB],
+  };
+  const { signals, witness } = buildShieldedPublicClaimPublicInputs(input);
+  assert.deepEqual(signals, [1030n, 1n, 4n, 33n, 2n, 3n, 300n, 27n, 28n, hashA, hashB]);
+  assert.deepEqual(Object.keys(witness), [
+    ...SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.ClaimPublic],
+  ]);
+  for (const [name, value] of [
+    ["budgetId", 0],
+    ["heirIdentityCommitment", 0],
+    ["claimCount", 0],
+    ["claimCount", 13],
+    ["amount", 0],
+    ["firstPeriod", (1n << 64n) - 1n],
+    ["amount", 1n << 128n],
+  ])
+    assert.throws(() => buildShieldedPublicClaimPublicInputs({ ...input, [name]: value }));
+  assert.throws(() =>
+    buildShieldedPublicClaimPublicInputs({ ...input, outputCommitments: [27, 27] }),
   );
 });
 

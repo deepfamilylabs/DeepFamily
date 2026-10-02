@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { getAddress, getBytes, hexlify } from "ethers";
 import {
   buildShieldedPoolPublicInputs,
+  buildShieldedPublicClaimPublicInputs,
   buildShieldedReceiveCodePublicSignals,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -499,13 +500,84 @@ export async function runShieldedAcceptanceSmoke({
     const shieldedAmount = 2000n;
     const unshieldedAmount = 100n;
     const totalShieldedBefore = await pool.totalShielded();
+    const totalPublicBefore = await pool.totalPublicBudget();
+    const publicFundedAmount = 1500n;
     const poolTokenBefore = await token.balanceOf(poolAddress);
     const signerTokenBefore = await token.balanceOf(signerAddress);
     assert.ok(
-      signerTokenBefore >= shieldedAmount,
-      "Acceptance signer has insufficient DEEP to shield",
+      signerTokenBefore >= shieldedAmount + publicFundedAmount,
+      "Acceptance signer has insufficient DEEP to fund both budget paths",
     );
-    await record("shielded-token-approve", await token.approve(poolAddress, shieldedAmount));
+    await record(
+      "shielded-token-approve",
+      await token.approve(poolAddress, shieldedAmount + publicFundedAmount),
+    );
+    // Public funding needs the child's identity hash and existing public family facts only.
+    const publicFunding = {
+      budgetId: 0n,
+      rootPersonHash: fatherMaterial.personHash,
+      rootVersionIndex: 1n,
+      heirPersonHash: childMaterial.personHash,
+      amountPerPeriod: rate,
+      budgetPeriods: 12n,
+      heirVersionIndex: 1n,
+      endorser: signerAddress,
+    };
+    const publicReceipt = await record("public-budget-fund", await pool.fundPublic(publicFunding));
+    const publicBudgetId = await pool.publicBudgetCount();
+    const publicRowBefore = await pool.publicBudgets(publicBudgetId);
+    const publicBlock = await provider.getBlock(publicReceipt.blockNumber);
+    assert.equal(publicRowBefore.eligibleFrom, BigInt(publicBlock.timestamp) + 7200n);
+    await record(
+      "public-budget-top-up",
+      await pool.fundPublic({
+        ...publicFunding,
+        budgetId: publicBudgetId,
+        budgetPeriods: 3n,
+        heirVersionIndex: 0n,
+        endorser: "0x0000000000000000000000000000000000000000",
+      }),
+    );
+    const publicRow = await pool.publicBudgets(publicBudgetId);
+    assert.equal(
+      publicRow.eligibleFrom,
+      publicRowBefore.eligibleFrom,
+      "Public top-up reset maturity",
+    );
+    assert.equal(publicRow.remaining, publicFundedAmount);
+    assert.equal(publicRow.nextPeriod, 0n);
+    const publicOutputs = await Promise.all([
+      valueNote(childKeys, 1200n),
+      valueNote(childKeys, 0n),
+    ]);
+    const publicInputs = buildShieldedPublicClaimPublicInputs({
+      chainId,
+      poolAddress,
+      budgetId: publicBudgetId,
+      heirIdentityCommitment: childMaterial.identityCommitment,
+      firstPeriod: 0n,
+      claimCount: 12n,
+      amount: 1200n,
+      ...outputs(publicOutputs),
+    });
+    await prove(
+      "claimPublic",
+      {
+        ...publicInputs.witness,
+        nameField: String(childMaterial.nameField),
+        derivedSecretField: String(childMaterial.derivedSecretField),
+        isBirthBC: Number(childMaterial.identity.isBirthBC),
+        birthYear: childMaterial.identity.birthYear,
+        birthMonth: childMaterial.identity.birthMonth,
+        birthDay: childMaterial.identity.birthDay,
+        gender: childMaterial.identity.gender,
+        suiteId: 1,
+        outputNonces: decimals(publicOutputs.map((note) => note.nonce)),
+      },
+      publicInputs.signals,
+      { execution: "verifier-call", claimCount: 12 },
+    );
+    assert.equal(await pool.commitmentExists(publicOutputs[0].commitment), false);
     const initial = await Promise.all([
       valueNote(donorKeys, shieldedAmount),
       valueNote(donorKeys, 0n),
@@ -838,11 +910,23 @@ export async function runShieldedAcceptanceSmoke({
     });
 
     const totalShieldedAfter = await pool.totalShielded();
+    const totalPublicAfter = await pool.totalPublicBudget();
     const poolTokenAfter = await token.balanceOf(poolAddress);
     const signerTokenAfter = await token.balanceOf(signerAddress);
     assert.equal(totalShieldedAfter - totalShieldedBefore, shieldedAmount - unshieldedAmount);
-    assert.equal(poolTokenAfter - poolTokenBefore, shieldedAmount - unshieldedAmount);
-    assert.equal(signerTokenBefore - signerTokenAfter, shieldedAmount - unshieldedAmount);
+    assert.equal(totalPublicAfter - totalPublicBefore, publicFundedAmount);
+    assert.equal(
+      poolTokenAfter - poolTokenBefore,
+      shieldedAmount - unshieldedAmount + publicFundedAmount,
+    );
+    assert.equal(
+      signerTokenBefore - signerTokenAfter,
+      shieldedAmount - unshieldedAmount + publicFundedAmount,
+    );
+    assert.ok(
+      poolTokenAfter >= totalShieldedAfter + totalPublicAfter,
+      "Pool custody does not cover both liabilities",
+    );
     const noteEvents = await pool.queryFilter(
       pool.filters.NoteAppended(),
       firstShieldBlock,
@@ -893,10 +977,25 @@ export async function runShieldedAcceptanceSmoke({
         trustedDepth: Number(trusted.depth),
         noteDepth: Math.max(Number(budgetClaimPath.depth), Number(secondClaimPath.depth)),
         receiveCode,
+        publicBudget: {
+          fundingLabel: "public-budget-fund",
+          topUpLabel: "public-budget-top-up",
+          budgetId: String(publicBudgetId),
+          heirPersonHash: childMaterial.personHash,
+          amountPerPeriod: String(rate),
+          eligibleFrom: String(publicRow.eligibleFrom),
+          remaining: String(publicRow.remaining),
+          nextPeriod: String(publicRow.nextPeriod),
+          fundingTimestamp: String(publicBlock.timestamp),
+          claimExecution: "verifier-call",
+          claimCount: 12,
+        },
         shieldedAmount: String(shieldedAmount),
         unshieldedAmount: String(unshieldedAmount),
         totalShieldedBefore: String(totalShieldedBefore),
         totalShieldedAfter: String(totalShieldedAfter),
+        totalPublicBefore: String(totalPublicBefore),
+        totalPublicAfter: String(totalPublicAfter),
         poolTokenBefore: String(poolTokenBefore),
         poolTokenAfter: String(poolTokenAfter),
         recoveredNotes,

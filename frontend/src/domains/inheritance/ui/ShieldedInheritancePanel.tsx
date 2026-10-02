@@ -48,6 +48,19 @@ import {
 } from "./ShieldedRecipientCredentialsForm";
 import { prepareShieldedClaim } from "../services/shieldedClaimPreparation";
 import {
+  listIncomingPublicBudgets,
+  listOutgoingPublicBudgets,
+  preparePublicBudgetClaim,
+  preparePublicBudgetFunding,
+  previewPublicBudgetClaim,
+  readPublicBudgets,
+  submitPublicBudgetClaim,
+  submitPublicBudgetFunding,
+  type PublicBudget,
+  type PublicBudgetSnapshot,
+  type PublicBudgetFlowStage,
+} from "../services/publicBudgetFlows";
+import {
   createShieldedPolicyDescriptor,
   prepareShieldedFund,
 } from "../services/shieldedFundingPreparation";
@@ -103,6 +116,7 @@ type Action =
 
 type TaskGroup = "wallet" | "inheritance" | "receive";
 type RecipientInputMethod = "receiveCode" | "credentials";
+type BudgetPrivacy = "private" | "public";
 const TASK_GROUPS: readonly TaskGroup[] = ["wallet", "inheritance", "receive"];
 const TASK_ACTIONS: Record<TaskGroup, readonly Action[]> = {
   wallet: ["shield", "privateTransfer", "unshield"],
@@ -385,8 +399,20 @@ export function ShieldedInheritancePanel({
   const [secondValueSelection, setSecondValueSelection] = useState("");
   const [budgetSelection, setBudgetSelection] = useState("");
   const [policySelection, setPolicySelection] = useState("");
+  const [fundingMode, setFundingMode] = useState<BudgetPrivacy>("private");
+  const [claimMode, setClaimMode] = useState<BudgetPrivacy>("private");
+  const [publicFundingSelection, setPublicFundingSelection] = useState("");
+  const [publicClaimSelection, setPublicClaimSelection] = useState("");
+  const [publicBudgetContext, setPublicBudgetContext] = useState<{
+    identity: IdentityMaterialV1Result;
+    scope: string;
+    snapshot: PublicBudgetSnapshot;
+  } | null>(null);
+  const [publicBudgetError, setPublicBudgetError] = useState("");
   const [lineageContext, setLineageContext] = useState<{
-    wallet: LocalShieldedWalletSnapshot;
+    scope: string;
+    identity: IdentityMaterialV1Result;
+    wallet: LocalShieldedWalletSnapshot | null;
     snapshot: LineageSnapshot;
     asOf: bigint;
   } | null>(null);
@@ -400,6 +426,9 @@ export function ShieldedInheritancePanel({
     if (previousScope.current !== scope) {
       previousScope.current = scope;
       operationEpoch.current += 1;
+      setPublicFundingSelection("");
+      setPublicClaimSelection("");
+      setPublicBudgetContext(null);
     }
   }, [scope]);
 
@@ -427,6 +456,12 @@ export function ShieldedInheritancePanel({
     setSecondValueSelection("");
     setBudgetSelection("");
     setPolicySelection("");
+    setFundingMode("private");
+    setClaimMode("private");
+    setPublicFundingSelection("");
+    setPublicClaimSelection("");
+    setPublicBudgetContext(null);
+    setPublicBudgetError("");
     setClaimIndices("");
     setUseSecondValue(false);
     setRootPersonHash("");
@@ -464,6 +499,30 @@ export function ShieldedInheritancePanel({
     };
   }, [walletSnapshot, unspentNotes]);
 
+  const publicBudgetSnapshot =
+    publicBudgetContext?.identity === identity && publicBudgetContext.scope === scope
+      ? publicBudgetContext.snapshot
+      : null;
+  const incomingPublicBudgets = useMemo(
+    () =>
+      publicBudgetSnapshot && identity
+        ? listIncomingPublicBudgets(publicBudgetSnapshot, identity.personHash)
+        : [],
+    [publicBudgetSnapshot, identity],
+  );
+  const publicFundingBudgets = useMemo(() => {
+    if (!publicBudgetSnapshot || !identity) return [];
+    const outgoing = listOutgoingPublicBudgets(publicBudgetSnapshot, account);
+    return publicBudgetSnapshot.budgets.filter(
+      (budget) =>
+        budget.rootPersonHash.toLowerCase() === identity.personHash.toLowerCase() ||
+        outgoing.some((candidate) => candidate.budgetId === budget.budgetId),
+    );
+  }, [publicBudgetSnapshot, identity, account]);
+  const selectedPublicFunding = publicFundingSelection
+    ? publicFundingBudgets.find((budget) => budget.budgetId.toString() === publicFundingSelection)
+    : undefined;
+
   const labels = useMemo<Record<Action, string>>(
     () => ({
       recover: t("shielded.actions.recover"),
@@ -478,7 +537,7 @@ export function ShieldedInheritancePanel({
   );
 
   useEffect(() => {
-    if (!identity || !walletSnapshot || taskGroup === "wallet") return;
+    if (!identity || taskGroup === "wallet") return;
     let cancelled = false;
     setLineageContext(null);
     setLineageError("");
@@ -487,9 +546,16 @@ export function ShieldedInheritancePanel({
       modules.provider.getBlock("latest"),
     ])
       .then(([snapshot, block]) => {
-        if (cancelled || activeIdentity.current !== identity) return;
+        if (cancelled || activeIdentity.current !== identity || currentScope.current !== scope)
+          return;
         if (!block) throw new Error("Latest block unavailable");
-        setLineageContext({ wallet: walletSnapshot, snapshot, asOf: BigInt(block.timestamp) });
+        setLineageContext({
+          scope,
+          identity,
+          wallet: walletSnapshot,
+          snapshot,
+          asOf: BigInt(block.timestamp),
+        });
       })
       .catch((cause: unknown) => {
         if (cancelled || activeIdentity.current !== identity) return;
@@ -505,9 +571,43 @@ export function ShieldedInheritancePanel({
     modules.lineageIndex,
     modules.deepFamily,
     modules.provider,
+    scope,
   ]);
 
-  const currentLineage = lineageContext?.wallet === walletSnapshot ? lineageContext : null;
+  const currentLineage =
+    lineageContext?.wallet === walletSnapshot &&
+    lineageContext.identity === identity &&
+    lineageContext.scope === scope
+      ? lineageContext
+      : null;
+  const eligiblePublicBudgets = useMemo(() => {
+    if (!currentLineage || !identity) return [];
+    return incomingPublicBudgets.filter((budget) => {
+      if (budget.rootVersionIndex > BigInt(Number.MAX_SAFE_INTEGER)) return false;
+      const root = currentLineage.snapshot.versions
+        .get(budget.rootPersonHash.toLowerCase())
+        ?.find((version) => BigInt(version.versionIndex) === budget.rootVersionIndex);
+      return (
+        root !== undefined &&
+        findHeirLegitimacy({
+          snapshot: currentLineage.snapshot,
+          heir: identity,
+          root: { identityCommitment: root.identityCommitment },
+          rootVersionIndex: Number(budget.rootVersionIndex),
+        }).some((source) => source.writtenAt <= currentLineage.asOf)
+      );
+    });
+  }, [incomingPublicBudgets, currentLineage, identity]);
+  const publicClaimBudget = publicClaimSelection
+    ? incomingPublicBudgets.find((budget) => budget.budgetId.toString() === publicClaimSelection)
+    : (eligiblePublicBudgets.find(
+        (budget) =>
+          currentLineage && previewPublicBudgetClaim(budget, currentLineage.asOf).claimCount > 0,
+      ) ?? eligiblePublicBudgets.find((budget) => budget.remaining > 0n));
+  const publicClaimPreview =
+    publicClaimBudget && currentLineage
+      ? previewPublicBudgetClaim(publicClaimBudget, currentLineage.asOf)
+      : undefined;
   const eligibleClaimBudgets = useMemo(() => {
     if (!currentLineage || !identity) return [] as Note[];
     return available.budgets.filter(
@@ -560,7 +660,20 @@ export function ShieldedInheritancePanel({
     ? available.policies.find((policy) => fundingPolicyKey(policy) === policySelection)
     : undefined;
   const fundingRoot = useMemo(() => {
-    if (selectedPolicy) return selectedPolicy;
+    if (fundingMode === "public" && selectedPublicFunding) {
+      const version = currentLineage?.snapshot.versions
+        .get(selectedPublicFunding.rootPersonHash.toLowerCase())
+        ?.find(
+          (candidate) => BigInt(candidate.versionIndex) === selectedPublicFunding.rootVersionIndex,
+        );
+      return version
+        ? {
+            rootIdentityCommitment: version.identityCommitment,
+            rootVersionIndex: selectedPublicFunding.rootVersionIndex,
+          }
+        : undefined;
+    }
+    if (fundingMode === "private" && selectedPolicy) return selectedPolicy;
     const versions = currentLineage?.snapshot.versions.get(
       (rootPersonHash.trim() || identity?.personHash || "").toLowerCase(),
     );
@@ -577,10 +690,18 @@ export function ShieldedInheritancePanel({
           rootVersionIndex: BigInt(version.versionIndex),
         }
       : undefined;
-  }, [selectedPolicy, currentLineage, rootPersonHash, rootVersion, identity]);
+  }, [
+    fundingMode,
+    selectedPublicFunding,
+    selectedPolicy,
+    currentLineage,
+    rootPersonHash,
+    rootVersion,
+    identity,
+  ]);
   const childOptions = useMemo<ShieldedRecipientOption[]>(() => {
     const candidates: ShieldedRecipientOption[] = [];
-    if (selectedPolicy) {
+    if (fundingMode === "private" && selectedPolicy) {
       const policyCommitment = computeShieldedPolicyCommitment({
         ...selectedPolicy,
         allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
@@ -630,7 +751,33 @@ export function ShieldedInheritancePanel({
     return candidates.sort((a, b) =>
       (a.label ?? a.personHash).localeCompare(b.label ?? b.personHash),
     );
-  }, [currentLineage, fundingRoot, selectedPolicy, available.templates, localRecipientLabels]);
+  }, [
+    fundingMode,
+    currentLineage,
+    fundingRoot,
+    selectedPolicy,
+    available.templates,
+    localRecipientLabels,
+  ]);
+
+  async function refreshPublicBudgets(identity: IdentityMaterialV1Result) {
+    try {
+      const snapshot = await readPublicBudgets(modules.pool, {
+        fromBlock: getShieldedPoolDeploymentBlock(Number(modules.chainId)),
+      });
+      if (activeIdentity.current === identity && currentScope.current === scope) {
+        setPublicBudgetContext({ identity, scope, snapshot });
+        setPublicBudgetError("");
+      }
+      return snapshot;
+    } catch (cause) {
+      if (activeIdentity.current === identity && currentScope.current === scope) {
+        setPublicBudgetContext(null);
+        setPublicBudgetError(cause instanceof Error ? cause.message : t("shielded.unknownError"));
+      }
+      throw cause;
+    }
+  }
 
   async function refreshWallet(identity: IdentityMaterialV1Result) {
     const previous = walletCache.current;
@@ -686,6 +833,7 @@ export function ShieldedInheritancePanel({
     setValueSelection("");
     setSecondValueSelection("");
     setBudgetSelection("");
+    setPublicClaimSelection("");
     setUseSecondValue(false);
     setClaimIndices("");
   }
@@ -714,8 +862,16 @@ export function ShieldedInheritancePanel({
       session.unlock(material);
       identityForm.current?.clearSecretInputs();
       setStage(t("shielded.stages.recovering"));
-      const [recovery] = await Promise.allSettled([refreshWallet(material)]);
+      const [recovery, publicRecovery] = await Promise.allSettled([
+        refreshWallet(material),
+        refreshPublicBudgets(material),
+      ]);
       if (activeIdentity.current !== material) return;
+      const hasPublicBudgets =
+        publicRecovery.status === "fulfilled" &&
+        listIncomingPublicBudgets(publicRecovery.value, material.personHash).some(
+          (budget) => budget.remaining >= budget.amountPerPeriod && budget.amountPerPeriod > 0n,
+        );
       if (recovery.status === "fulfilled") {
         const notes = listUnspentRecoveredShieldedNotes(
           recovery.value,
@@ -727,14 +883,20 @@ export function ShieldedInheritancePanel({
             item.note.amountPerPeriod > 0n &&
             item.note.remaining >= item.note.amountPerPeriod,
         );
-        setTaskGroup(hasBudgets ? "receive" : "wallet");
+        setClaimMode(hasBudgets ? "private" : hasPublicBudgets ? "public" : "private");
+        setTaskGroup(hasBudgets || hasPublicBudgets ? "receive" : "wallet");
         setAction(
-          hasBudgets
+          hasBudgets || hasPublicBudgets
             ? "claim"
             : notes.some((item) => item.note.kind === "value" && item.note.amount > 0n)
               ? "privateTransfer"
               : "shield",
         );
+      }
+      if (recovery.status === "rejected" && hasPublicBudgets) {
+        setClaimMode("public");
+        setTaskGroup("receive");
+        setAction("claim");
       }
       if (recovery.status === "rejected") {
         const cause = recovery.reason;
@@ -824,7 +986,7 @@ export function ShieldedInheritancePanel({
           throw new Error(t("shielded.walletChanged"));
         }
       };
-      const onStage = (next: ShieldedPoolFlowStage) => {
+      const onStage = (next: ShieldedPoolFlowStage | PublicBudgetFlowStage) => {
         if (next !== "confirming") assertCurrentOperation();
         setStage(t(`shielded.stages.${next}`));
       };
@@ -848,7 +1010,7 @@ export function ShieldedInheritancePanel({
       let shouldRefreshWallet = action !== "recover";
       if (action === "recover") {
         setStage(t("shielded.stages.recovering"));
-        await refreshWallet(identity);
+        await Promise.all([refreshWallet(identity), refreshPublicBudgets(identity)]);
         shouldRefreshWallet = false;
       } else if (action === "shield") {
         const amount = parsePositiveTokenAmount(shieldAmount, modules.tokenDecimals);
@@ -880,6 +1042,108 @@ export function ShieldedInheritancePanel({
         checkReceipt(result.receipt.status, result.transactionHash);
         hash = result.transactionHash;
         publicActivityAddresses.add(account.toLowerCase());
+      } else if (action === "fund" && fundingMode === "public") {
+        setStage(t("shielded.stages.recovering"));
+        const latestPublic = await refreshPublicBudgets(identity);
+        const budgetPeriods = parsePositivePeriods(periods);
+        const existing = publicFundingSelection
+          ? latestPublic.budgets.find(
+              (budget) => budget.budgetId.toString() === publicFundingSelection,
+            )
+          : undefined;
+        if (publicFundingSelection && !existing) throw new Error(t("shielded.publicBudgetMissing"));
+        const rootHash = existing?.rootPersonHash ?? (rootPersonHash.trim() || identity.personHash);
+        const roots = await loadRootRegistry(modules.lineageIndex, modules.deepFamily);
+        const knownVersions = roots.versions.get(rootHash.toLowerCase()) ?? [];
+        const versionIndex = existing
+          ? Number(existing.rootVersionIndex)
+          : rootVersion.trim()
+            ? Number(rootVersion)
+            : knownVersions.reduce((latest, version) => Math.max(latest, version.versionIndex), 0);
+        if (!Number.isSafeInteger(versionIndex) || versionIndex < 1) {
+          throw new Error(t("shielded.invalidVersion"));
+        }
+        assertVersionKnown(roots, rootHash, versionIndex);
+        if (!existing) {
+          const childError = validateShieldedRecipientSelection({
+            value: heirPersonHash,
+            options: childOptions,
+            loading: !currentLineage && !lineageError && childOptions.length === 0,
+          });
+          if (childError) throw new Error(t(`shielded.recipientPicker.errors.${childError}`));
+        }
+        const prepared = await preparePublicBudgetFunding({
+          pool: modules.pool,
+          lineageIndex: modules.lineageIndex,
+          lineage: await loadLineageSnapshot(modules.lineageIndex, modules.deepFamily),
+          budgetId: existing?.budgetId,
+          rootPersonHash: rootHash,
+          rootVersionIndex: BigInt(versionIndex),
+          heirPersonHash: existing?.heirPersonHash ?? heirPersonHash,
+          amountPerPeriod:
+            existing?.amountPerPeriod ?? parsePositiveTokenAmount(rate, modules.tokenDecimals),
+          budgetPeriods,
+        });
+        assertCurrentOperation();
+        const result = await submitPublicBudgetFunding({
+          pool: modules.pool,
+          token: modules.token,
+          signer,
+          expectedChainId: modules.chainId,
+          prepared,
+          onStage,
+        });
+        checkReceipt(result.receipt.status, result.transactionHash);
+        hash = result.transactionHash;
+        publicActivityAddresses.add(account.toLowerCase());
+      } else if (action === "claim" && claimMode === "public") {
+        setStage(t("shielded.stages.recovering"));
+        const latestPublic = await refreshPublicBudgets(identity);
+        const latest = await modules.provider.getBlock("latest");
+        if (!latest) throw new Error(t("shielded.unreachable"));
+        const lineage = await loadLineageSnapshot(modules.lineageIndex, modules.deepFamily);
+        const incoming = listIncomingPublicBudgets(latestPublic, identity.personHash);
+        const eligible = (budget: PublicBudget) => {
+          if (budget.rootVersionIndex > BigInt(Number.MAX_SAFE_INTEGER)) return false;
+          const root = lineage.versions
+            .get(budget.rootPersonHash.toLowerCase())
+            ?.find((version) => BigInt(version.versionIndex) === budget.rootVersionIndex);
+          return (
+            root &&
+            findHeirLegitimacy({
+              snapshot: lineage,
+              heir: identity,
+              root: { identityCommitment: root.identityCommitment },
+              rootVersionIndex: Number(budget.rootVersionIndex),
+            }).some((source) => source.writtenAt <= BigInt(latest.timestamp))
+          );
+        };
+        const budget = publicClaimSelection
+          ? incoming.find((candidate) => candidate.budgetId.toString() === publicClaimSelection)
+          : incoming.find(
+              (candidate) =>
+                eligible(candidate) &&
+                previewPublicBudgetClaim(candidate, BigInt(latest.timestamp)).claimCount > 0,
+            );
+        if (!budget || !eligible(budget)) throw new Error(t("shielded.noClaimableBudget"));
+        const prepared = await preparePublicBudgetClaim({
+          pool: modules.pool,
+          lineageIndex: modules.lineageIndex,
+          lineage,
+          identity,
+          budgetId: budget.budgetId,
+        });
+        assertCurrentOperation();
+        const result = await submitPublicBudgetClaim({
+          pool: modules.pool,
+          lineageIndex: modules.lineageIndex,
+          signer,
+          expectedChainId: modules.chainId,
+          prepared,
+          onStage,
+        });
+        checkReceipt(result.receipt.status, result.transactionHash);
+        hash = result.transactionHash;
       } else {
         setStage(t("shielded.stages.recovering"));
         let recovered = await refreshWallet(identity);
@@ -1182,7 +1446,7 @@ export function ShieldedInheritancePanel({
       if (fundedPolicyCommitment) setPolicySelection(fundedPolicyCommitment);
       if (shouldRefreshWallet) {
         setStage(t("shielded.stages.recovering"));
-        await refreshWallet(identity);
+        await Promise.all([refreshWallet(identity), refreshPublicBudgets(identity)]);
       }
       if (action === "shield" && taskGroup === "inheritance") setAction("fund");
       setRecipientCode("");
@@ -1192,6 +1456,7 @@ export function ShieldedInheritancePanel({
       setValueSelection("");
       setSecondValueSelection("");
       setBudgetSelection("");
+      setPublicClaimSelection("");
       setUseSecondValue(false);
       setClaimIndices("");
     } catch (cause) {
@@ -1201,7 +1466,15 @@ export function ShieldedInheritancePanel({
           ? t(`inheritance.errors.${cause.code}`)
           : cause instanceof ShieldedReceiveCodeError
             ? t(`shielded.receiveCodeErrors.${cause.reason}`)
-            : errorReason === "LOCAL_NONCE_TOO_HIGH" || errorReason === "NONCE_TOO_HIGH"
+            : errorReason === "LOCAL_NONCE_TOO_HIGH" ||
+                errorReason === "NONCE_TOO_HIGH" ||
+                [
+                  "UnknownPublicBudget",
+                  "InvalidPublicBudgetData",
+                  "IneligiblePublicBeneficiary",
+                  "PublicBudgetNotMature",
+                  "InsufficientPublicBudget",
+                ].includes(errorReason ?? "")
               ? getFriendlyError(cause, t).message
               : cause instanceof Error
                 ? cause.message
@@ -1222,7 +1495,11 @@ export function ShieldedInheritancePanel({
     }
   }
 
-  const isPrivate = action !== "recover" && action !== "shield" && action !== "receiveCode";
+  const isPrivate =
+    action !== "recover" &&
+    action !== "shield" &&
+    action !== "receiveCode" &&
+    !(action === "fund" && fundingMode === "public");
 
   const feedback = (
     <>
@@ -1282,22 +1559,25 @@ export function ShieldedInheritancePanel({
     (sum, item) => sum + (item.note.kind === "value" ? item.note.amount : 0n),
     0n,
   );
-  const totalBudget = available.budgets.reduce(
+  const totalPrivateBudget = available.budgets.reduce(
     (sum, item) => sum + (item.note.kind === "budget" ? item.note.remaining : 0n),
     0n,
   );
+  const totalBudget =
+    totalPrivateBudget + incomingPublicBudgets.reduce((sum, budget) => sum + budget.remaining, 0n);
+  const hasPublicBudget = incomingPublicBudgets.some((budget) => budget.remaining > 0n);
   const hasSpendableValue = available.values.some(
     (item) => item.note.kind === "value" && item.note.amount > 0n,
   );
   const nextAction: Action | null =
     taskGroup === "receive"
-      ? claimOverview?.claim
+      ? claimOverview?.claim || (publicClaimPreview?.claimCount ?? 0) > 0
         ? "claim"
-        : available.budgets.length === 0
+        : available.budgets.length === 0 && !hasPublicBudget
           ? "receiveCode"
           : null
       : taskGroup === "inheritance"
-        ? !hasSpendableValue
+        ? fundingMode === "private" && !hasSpendableValue
           ? "shield"
           : "fund"
         : hasSpendableValue
@@ -1305,18 +1585,21 @@ export function ShieldedInheritancePanel({
           : "shield";
   const firstActionForGroup = (group: TaskGroup): Action =>
     group === "inheritance"
-      ? !hasSpendableValue
+      ? fundingMode === "private" && !hasSpendableValue
         ? "shield"
         : "fund"
       : group === "receive"
-        ? available.budgets.length
+        ? available.budgets.length || hasPublicBudget
           ? "claim"
           : "receiveCode"
         : hasSpendableValue
           ? "privateTransfer"
           : "shield";
-  let fundingRate = selectedPolicy?.amountPerPeriod;
-  if (!selectedPolicy && action === "fund" && rate.trim()) {
+  let fundingRate =
+    fundingMode === "public"
+      ? selectedPublicFunding?.amountPerPeriod
+      : selectedPolicy?.amountPerPeriod;
+  if (fundingRate === undefined && action === "fund" && rate.trim()) {
     try {
       fundingRate = parsePositiveTokenAmount(rate, modules.tokenDecimals);
     } catch {
@@ -1348,7 +1631,11 @@ export function ShieldedInheritancePanel({
             <div key={label}>
               <dt className="text-xs text-ink-muted">{t(`shielded.${label}`)}</dt>
               <dd className="mt-1 break-words text-xl font-semibold text-ink">
-                {walletSnapshot ? formatUnits(amount, modules.tokenDecimals) : "—"}
+                {(
+                  label === "budgetAmount" ? walletSnapshot && publicBudgetSnapshot : walletSnapshot
+                )
+                  ? formatUnits(amount, modules.tokenDecimals)
+                  : "—"}
                 <span className="ml-1 inline-block whitespace-nowrap text-xs font-normal text-ink-muted">
                   DEEP
                 </span>
@@ -1359,6 +1646,33 @@ export function ShieldedInheritancePanel({
             </div>
           ))}
         </dl>
+        {publicBudgetError ? (
+          <p role="status" className="text-sm text-warning">
+            {t("shielded.publicBudgetsUnavailable", { detail: publicBudgetError })}
+          </p>
+        ) : null}
+        {publicFundingBudgets.length > 0 ? (
+          <details className="rounded-xl border border-hairline p-3 text-sm text-ink">
+            <summary className="cursor-pointer font-medium">
+              {t("shielded.publicOutgoingTitle")}
+            </summary>
+            <ul className="mt-3 space-y-3">
+              {publicFundingBudgets.map((budget) => (
+                <li key={budget.budgetId.toString()} className="rounded-lg bg-surface-alt p-3">
+                  {t("shielded.publicSchedule", {
+                    id: budget.budgetId.toString(),
+                    child:
+                      localRecipientLabels.get(budget.heirPersonHash.toLowerCase()) ??
+                      shortHex(budget.heirPersonHash),
+                    rate: formatUnits(budget.amountPerPeriod, modules.tokenDecimals),
+                    remaining: formatUnits(budget.remaining, modules.tokenDecimals),
+                    date: new Date(Number(budget.eligibleFrom) * 1000).toLocaleString(),
+                  })}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-ink-muted">
             {walletSnapshot ? null : t("shielded.recoverFirst")}
@@ -1464,184 +1778,454 @@ export function ShieldedInheritancePanel({
 
           {action === "fund" ? (
             <>
-              <FieldBlock
-                label={t("shielded.fields.fundingRule")}
-                hint={t("shielded.fundingRuleHint")}
-              >
-                <select
-                  aria-label={t("shielded.fields.fundingRule")}
-                  className={INPUT_CLASS}
-                  value={policySelection}
-                  onChange={(event) => {
-                    setPolicySelection(event.target.value);
-                    setHeirPersonHash("");
-                  }}
-                >
-                  <option value="">{t("shielded.newFundingRule")}</option>
-                  {available.policies.map((policy, index) => (
-                    <option key={fundingPolicyKey(policy)} value={fundingPolicyKey(policy)}>
-                      {t("shielded.policyOption", {
-                        index: index + 1,
-                        identity:
-                          localRecipientLabels.get(
-                            wrapIdentityCommitmentAsPersonHash(
-                              policy.rootIdentityCommitment,
-                            ).toLowerCase(),
-                          ) ??
-                          shortHex(
-                            wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment),
-                          ),
-                        amount: formatUnits(policy.amountPerPeriod, modules.tokenDecimals),
-                      })}
-                    </option>
+              <fieldset className="space-y-2" disabled={busy}>
+                <legend className="text-sm font-medium text-ink">
+                  {t("shielded.fundingModeLabel")}
+                </legend>
+                <div className="flex flex-wrap gap-4">
+                  {(["private", "public"] as const).map((mode) => (
+                    <label key={mode} className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="shielded-funding-mode"
+                        checked={fundingMode === mode}
+                        onChange={() => {
+                          setFundingMode(mode);
+                          setPolicySelection("");
+                          setPublicFundingSelection("");
+                          setHeirPersonHash("");
+                          setRootPersonHash("");
+                          setRootVersion("");
+                          setRate("");
+                          setValueSelection("");
+                          changeRecipientCode("");
+                          recipientCredentialsFormRef.current?.clearSecretInputs();
+                          setRecipientInputMethod("receiveCode");
+                          setError("");
+                        }}
+                      />
+                      {t(`shielded.fundingModes.${mode}`)}
+                    </label>
                   ))}
-                </select>
-              </FieldBlock>
-              {!selectedPolicy ? (
-                <FieldBlock label={t("shielded.fields.rate")} hint={t("shielded.rateHint")}>
-                  <input
-                    aria-label={t("shielded.fields.rate")}
-                    className={INPUT_CLASS}
-                    inputMode="decimal"
-                    value={rate}
-                    onChange={(event) => setRate(event.target.value)}
-                    placeholder="10"
+                </div>
+              </fieldset>
+              <p className="rounded-xl bg-surface-alt p-3 text-sm text-ink">
+                {t(`shielded.fundingSources.${fundingMode}`, { wallet: account })}
+              </p>
+              {fundingMode === "private" ? (
+                <>
+                  <FieldBlock
+                    label={t("shielded.fields.fundingRule")}
+                    hint={t("shielded.fundingRuleHint")}
+                  >
+                    <select
+                      aria-label={t("shielded.fields.fundingRule")}
+                      className={INPUT_CLASS}
+                      value={policySelection}
+                      onChange={(event) => {
+                        setPolicySelection(event.target.value);
+                        setHeirPersonHash("");
+                      }}
+                    >
+                      <option value="">{t("shielded.newFundingRule")}</option>
+                      {available.policies.map((policy, index) => (
+                        <option key={fundingPolicyKey(policy)} value={fundingPolicyKey(policy)}>
+                          {t("shielded.policyOption", {
+                            index: index + 1,
+                            identity:
+                              localRecipientLabels.get(
+                                wrapIdentityCommitmentAsPersonHash(
+                                  policy.rootIdentityCommitment,
+                                ).toLowerCase(),
+                              ) ??
+                              shortHex(
+                                wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment),
+                              ),
+                            amount: formatUnits(policy.amountPerPeriod, modules.tokenDecimals),
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldBlock>
+                  {!selectedPolicy ? (
+                    <FieldBlock label={t("shielded.fields.rate")} hint={t("shielded.rateHint")}>
+                      <input
+                        aria-label={t("shielded.fields.rate")}
+                        className={INPUT_CLASS}
+                        inputMode="decimal"
+                        value={rate}
+                        onChange={(event) => setRate(event.target.value)}
+                        placeholder="10"
+                      />
+                    </FieldBlock>
+                  ) : null}
+                  <ShieldedRecipientPicker
+                    label={t("shielded.fields.heirPersonHash")}
+                    value={heirPersonHash}
+                    onChange={setHeirPersonHash}
+                    options={childOptions}
+                    loading={!currentLineage && !lineageError && childOptions.length === 0}
                   />
-                </FieldBlock>
-              ) : null}
-              <ShieldedRecipientPicker
-                label={t("shielded.fields.heirPersonHash")}
-                value={heirPersonHash}
-                onChange={setHeirPersonHash}
-                options={childOptions}
-                loading={!currentLineage && !lineageError && childOptions.length === 0}
-              />
-              <RecipientInput
-                method={recipientInputMethod}
-                onMethodChange={changeRecipientInputMethod}
-                code={recipientCode}
-                onCodeChange={changeRecipientCode}
-                credentialsFormRef={recipientCredentialsFormRef}
-                onGenerateCode={() => void generateRecipientCode()}
-                busy={busy}
-              />
-              <FieldBlock label={t("shielded.fields.periods")} hint={t("shielded.periodsHint")}>
-                <input
-                  aria-label={t("shielded.fields.periods")}
-                  className={INPUT_CLASS}
-                  inputMode="numeric"
-                  value={periods}
-                  onChange={(event) => setPeriods(event.target.value)}
-                />
-              </FieldBlock>
-              {fundingRate !== undefined && fundingRate > 0n && fundingPeriods !== undefined ? (
-                <p
-                  role="status"
-                  className="rounded-xl bg-primary/5 p-3 text-sm leading-relaxed text-ink"
-                >
-                  {t("shielded.fundingPreview", {
-                    amount: formatUnits(fundingRate * fundingPeriods, modules.tokenDecimals),
-                    periods: fundingPeriods.toString(),
-                    rate: formatUnits(fundingRate, modules.tokenDecimals),
-                  })}
-                </p>
-              ) : null}
-              <AdvancedOptions>
-                <NoteSelect
-                  label={t("shielded.fields.valueNote")}
-                  notes={available.values}
-                  selectedValue={valueSelection}
-                  onChange={setValueSelection}
-                  decimals={modules.tokenDecimals}
-                />
-                {!selectedPolicy ? (
-                  <>
-                    <FieldBlock
-                      label={t("shielded.fields.rootPersonHash")}
-                      hint={t("shielded.rootIdentityHint")}
+                  <RecipientInput
+                    method={recipientInputMethod}
+                    onMethodChange={changeRecipientInputMethod}
+                    code={recipientCode}
+                    onCodeChange={changeRecipientCode}
+                    credentialsFormRef={recipientCredentialsFormRef}
+                    onGenerateCode={() => void generateRecipientCode()}
+                    busy={busy}
+                  />
+                  <FieldBlock label={t("shielded.fields.periods")} hint={t("shielded.periodsHint")}>
+                    <input
+                      aria-label={t("shielded.fields.periods")}
+                      className={INPUT_CLASS}
+                      inputMode="numeric"
+                      value={periods}
+                      onChange={(event) => setPeriods(event.target.value)}
+                    />
+                  </FieldBlock>
+                  {fundingRate !== undefined && fundingRate > 0n && fundingPeriods !== undefined ? (
+                    <p
+                      role="status"
+                      className="rounded-xl bg-primary/5 p-3 text-sm leading-relaxed text-ink"
                     >
-                      <input
-                        aria-label={t("shielded.fields.rootPersonHash")}
-                        className={INPUT_CLASS}
-                        value={rootPersonHash}
-                        onChange={(event) => setRootPersonHash(event.target.value)}
-                        placeholder={t("shielded.ownIdentityDefault")}
-                      />
-                    </FieldBlock>
-                    <FieldBlock
-                      label={t("shielded.fields.rootVersion")}
-                      hint={t("shielded.rootVersionHint")}
+                      {t("shielded.fundingPreview", {
+                        amount: formatUnits(fundingRate * fundingPeriods, modules.tokenDecimals),
+                        periods: fundingPeriods.toString(),
+                        rate: formatUnits(fundingRate, modules.tokenDecimals),
+                      })}
+                    </p>
+                  ) : null}
+                  <AdvancedOptions>
+                    <NoteSelect
+                      label={t("shielded.fields.valueNote")}
+                      notes={available.values}
+                      selectedValue={valueSelection}
+                      onChange={setValueSelection}
+                      decimals={modules.tokenDecimals}
+                    />
+                    {!selectedPolicy ? (
+                      <>
+                        <FieldBlock
+                          label={t("shielded.fields.rootPersonHash")}
+                          hint={t("shielded.rootIdentityHint")}
+                        >
+                          <input
+                            aria-label={t("shielded.fields.rootPersonHash")}
+                            className={INPUT_CLASS}
+                            value={rootPersonHash}
+                            onChange={(event) => setRootPersonHash(event.target.value)}
+                            placeholder={t("shielded.ownIdentityDefault")}
+                          />
+                        </FieldBlock>
+                        <FieldBlock
+                          label={t("shielded.fields.rootVersion")}
+                          hint={t("shielded.rootVersionHint")}
+                        >
+                          <input
+                            aria-label={t("shielded.fields.rootVersion")}
+                            className={INPUT_CLASS}
+                            inputMode="numeric"
+                            value={rootVersion}
+                            onChange={(event) => setRootVersion(event.target.value)}
+                            placeholder={t("shielded.latestVersion")}
+                          />
+                        </FieldBlock>
+                      </>
+                    ) : null}
+                  </AdvancedOptions>
+                </>
+              ) : (
+                <>
+                  <WarningNotice>{t("shielded.publicFundingVisibility")}</WarningNotice>
+                  <FieldBlock
+                    label={t("shielded.fields.publicArrangement")}
+                    hint={t("shielded.publicArrangementHint")}
+                  >
+                    <select
+                      aria-label={t("shielded.fields.publicArrangement")}
+                      className={INPUT_CLASS}
+                      value={publicFundingSelection}
+                      disabled={busy || !publicBudgetSnapshot}
+                      onChange={(event) => {
+                        setPublicFundingSelection(event.target.value);
+                        setHeirPersonHash("");
+                      }}
                     >
-                      <input
-                        aria-label={t("shielded.fields.rootVersion")}
-                        className={INPUT_CLASS}
-                        inputMode="numeric"
-                        value={rootVersion}
-                        onChange={(event) => setRootVersion(event.target.value)}
-                        placeholder={t("shielded.latestVersion")}
+                      <option value="">{t("shielded.newPublicArrangement")}</option>
+                      {publicFundingBudgets.map((budget) => (
+                        <option key={budget.budgetId.toString()} value={budget.budgetId.toString()}>
+                          {t("shielded.publicArrangementOption", {
+                            id: budget.budgetId.toString(),
+                            child:
+                              localRecipientLabels.get(budget.heirPersonHash.toLowerCase()) ??
+                              shortHex(budget.heirPersonHash),
+                            amount: formatUnits(budget.amountPerPeriod, modules.tokenDecimals),
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldBlock>
+                  {selectedPublicFunding ? (
+                    <p className="rounded-xl bg-surface-alt p-3 text-sm text-ink">
+                      {t("shielded.publicSchedule", {
+                        id: selectedPublicFunding.budgetId.toString(),
+                        child:
+                          localRecipientLabels.get(
+                            selectedPublicFunding.heirPersonHash.toLowerCase(),
+                          ) ?? shortHex(selectedPublicFunding.heirPersonHash),
+                        rate: formatUnits(
+                          selectedPublicFunding.amountPerPeriod,
+                          modules.tokenDecimals,
+                        ),
+                        remaining: formatUnits(
+                          selectedPublicFunding.remaining,
+                          modules.tokenDecimals,
+                        ),
+                        date: new Date(
+                          Number(selectedPublicFunding.eligibleFrom) * 1000,
+                        ).toLocaleString(),
+                      })}
+                    </p>
+                  ) : (
+                    <>
+                      <FieldBlock label={t("shielded.fields.rate")} hint={t("shielded.rateHint")}>
+                        <input
+                          aria-label={t("shielded.fields.rate")}
+                          className={INPUT_CLASS}
+                          inputMode="decimal"
+                          value={rate}
+                          onChange={(event) => setRate(event.target.value)}
+                          placeholder="10"
+                        />
+                      </FieldBlock>
+                      <ShieldedRecipientPicker
+                        label={t("shielded.fields.heirPersonHash")}
+                        value={heirPersonHash}
+                        onChange={setHeirPersonHash}
+                        options={childOptions}
+                        loading={!currentLineage && !lineageError && childOptions.length === 0}
                       />
-                    </FieldBlock>
-                  </>
-                ) : null}
-              </AdvancedOptions>
+                      <AdvancedOptions>
+                        <FieldBlock
+                          label={t("shielded.fields.rootPersonHash")}
+                          hint={t("shielded.rootIdentityHint")}
+                        >
+                          <input
+                            aria-label={t("shielded.fields.rootPersonHash")}
+                            className={INPUT_CLASS}
+                            value={rootPersonHash}
+                            onChange={(event) => setRootPersonHash(event.target.value)}
+                            placeholder={t("shielded.ownIdentityDefault")}
+                          />
+                        </FieldBlock>
+                        <FieldBlock
+                          label={t("shielded.fields.rootVersion")}
+                          hint={t("shielded.rootVersionHint")}
+                        >
+                          <input
+                            aria-label={t("shielded.fields.rootVersion")}
+                            className={INPUT_CLASS}
+                            inputMode="numeric"
+                            value={rootVersion}
+                            onChange={(event) => setRootVersion(event.target.value)}
+                            placeholder={t("shielded.latestVersion")}
+                          />
+                        </FieldBlock>
+                      </AdvancedOptions>
+                    </>
+                  )}
+                  <FieldBlock label={t("shielded.fields.periods")} hint={t("shielded.periodsHint")}>
+                    <input
+                      aria-label={t("shielded.fields.periods")}
+                      className={INPUT_CLASS}
+                      inputMode="numeric"
+                      value={periods}
+                      onChange={(event) => setPeriods(event.target.value)}
+                    />
+                  </FieldBlock>
+                  {fundingRate !== undefined && fundingRate > 0n && fundingPeriods !== undefined ? (
+                    <p
+                      role="status"
+                      className="rounded-xl bg-primary/5 p-3 text-sm leading-relaxed text-ink"
+                    >
+                      {t("shielded.fundingPreview", {
+                        amount: formatUnits(fundingRate * fundingPeriods, modules.tokenDecimals),
+                        periods: fundingPeriods.toString(),
+                        rate: formatUnits(fundingRate, modules.tokenDecimals),
+                      })}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </>
           ) : null}
 
           {action === "claim" ? (
             <>
-              <div
-                role="status"
-                className="space-y-1 rounded-xl bg-surface-alt p-3 text-sm text-ink"
-              >
-                <p>
-                  {lineageError
-                    ? t("shielded.claimOverview.unavailable")
-                    : !currentLineage
-                      ? t("shielded.claimOverview.checking")
-                      : available.budgets.length > 0 && eligibleClaimBudgets.length === 0
-                        ? t("shielded.claimOverview.ineligible")
-                        : claimOverview?.claim
-                          ? t("shielded.claimOverview.claimable", {
-                              amount: formatUnits(
-                                claimOverview.claim.amount,
-                                modules.tokenDecimals,
-                              ),
-                              periods: claimOverview.claim.periodIndices.length,
-                            })
-                          : t(`shielded.claimOverview.${claimOverview?.status ?? "noFunds"}`)}
-                </p>
-                {claimOverview?.nextDueAt !== undefined ? (
-                  <p className="text-xs text-ink-muted">
-                    {t("shielded.claimOverview.nextDue", {
-                      date: new Date(Number(claimOverview.nextDueAt) * 1000).toLocaleString(),
-                    })}
-                  </p>
-                ) : null}
-                {lineageError ? (
-                  <p className="break-words text-xs text-ink-muted">{lineageError}</p>
-                ) : null}
-              </div>
-              <AdvancedOptions>
-                <NoteSelect
-                  label={t("shielded.fields.budgetNote")}
-                  notes={available.budgets}
-                  selectedValue={budgetSelection}
-                  onChange={setBudgetSelection}
-                  decimals={modules.tokenDecimals}
-                />
-                <FieldBlock
-                  label={t("shielded.fields.claimIndices")}
-                  hint={t("shielded.claimIndicesHint")}
-                >
-                  <input
-                    aria-label={t("shielded.fields.claimIndices")}
-                    className={INPUT_CLASS}
-                    value={claimIndices}
-                    onChange={(event) => setClaimIndices(event.target.value)}
-                    placeholder="0,1,2"
-                  />
-                </FieldBlock>
-              </AdvancedOptions>
+              <fieldset className="space-y-2" disabled={busy}>
+                <legend className="text-sm font-medium text-ink">
+                  {t("shielded.claimModeLabel")}
+                </legend>
+                <div className="flex flex-wrap gap-4">
+                  {(["private", "public"] as const).map((mode) => (
+                    <label key={mode} className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="radio"
+                        name="shielded-claim-mode"
+                        checked={claimMode === mode}
+                        onChange={() => {
+                          setClaimMode(mode);
+                          setBudgetSelection("");
+                          setPublicClaimSelection("");
+                          setClaimIndices("");
+                          setError("");
+                        }}
+                      />
+                      {t(`shielded.claimModes.${mode}`)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {claimMode === "private" ? (
+                <>
+                  <div
+                    role="status"
+                    className="space-y-1 rounded-xl bg-surface-alt p-3 text-sm text-ink"
+                  >
+                    <p>
+                      {lineageError
+                        ? t("shielded.claimOverview.unavailable")
+                        : !currentLineage
+                          ? t("shielded.claimOverview.checking")
+                          : available.budgets.length > 0 && eligibleClaimBudgets.length === 0
+                            ? t("shielded.claimOverview.ineligible")
+                            : claimOverview?.claim
+                              ? t("shielded.claimOverview.claimable", {
+                                  amount: formatUnits(
+                                    claimOverview.claim.amount,
+                                    modules.tokenDecimals,
+                                  ),
+                                  periods: claimOverview.claim.periodIndices.length,
+                                })
+                              : t(`shielded.claimOverview.${claimOverview?.status ?? "noFunds"}`)}
+                    </p>
+                    {claimOverview?.nextDueAt !== undefined ? (
+                      <p className="text-xs text-ink-muted">
+                        {t("shielded.claimOverview.nextDue", {
+                          date: new Date(Number(claimOverview.nextDueAt) * 1000).toLocaleString(),
+                        })}
+                      </p>
+                    ) : null}
+                    {lineageError ? (
+                      <p className="break-words text-xs text-ink-muted">{lineageError}</p>
+                    ) : null}
+                  </div>
+                  <AdvancedOptions>
+                    <NoteSelect
+                      label={t("shielded.fields.budgetNote")}
+                      notes={available.budgets}
+                      selectedValue={budgetSelection}
+                      onChange={setBudgetSelection}
+                      decimals={modules.tokenDecimals}
+                    />
+                    <FieldBlock
+                      label={t("shielded.fields.claimIndices")}
+                      hint={t("shielded.claimIndicesHint")}
+                    >
+                      <input
+                        aria-label={t("shielded.fields.claimIndices")}
+                        className={INPUT_CLASS}
+                        value={claimIndices}
+                        onChange={(event) => setClaimIndices(event.target.value)}
+                        placeholder="0,1,2"
+                      />
+                    </FieldBlock>
+                  </AdvancedOptions>
+                </>
+              ) : (
+                <>
+                  <WarningNotice>{t("shielded.publicClaimVisibility")}</WarningNotice>
+                  <FieldBlock
+                    label={t("shielded.fields.publicClaimArrangement")}
+                    hint={t("shielded.publicClaimHint")}
+                  >
+                    <select
+                      aria-label={t("shielded.fields.publicClaimArrangement")}
+                      className={INPUT_CLASS}
+                      value={publicClaimSelection}
+                      disabled={busy || !publicBudgetSnapshot}
+                      onChange={(event) => setPublicClaimSelection(event.target.value)}
+                    >
+                      <option value="">{t("shielded.automaticSelection")}</option>
+                      {incomingPublicBudgets.map((budget) => (
+                        <option key={budget.budgetId.toString()} value={budget.budgetId.toString()}>
+                          {t("shielded.publicClaimOption", {
+                            id: budget.budgetId.toString(),
+                            parent:
+                              localRecipientLabels.get(budget.rootPersonHash.toLowerCase()) ??
+                              shortHex(budget.rootPersonHash),
+                            amount: formatUnits(budget.remaining, modules.tokenDecimals),
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </FieldBlock>
+                  <div
+                    role="status"
+                    className="space-y-1 rounded-xl bg-surface-alt p-3 text-sm text-ink"
+                  >
+                    <p>
+                      {publicBudgetError || lineageError
+                        ? t("shielded.claimOverview.unavailable")
+                        : !publicBudgetSnapshot || !currentLineage
+                          ? t("shielded.claimOverview.checking")
+                          : incomingPublicBudgets.length > 0 &&
+                              (eligiblePublicBudgets.length === 0 ||
+                                (publicClaimBudget &&
+                                  !eligiblePublicBudgets.some(
+                                    (budget) => budget.budgetId === publicClaimBudget.budgetId,
+                                  )))
+                            ? t("shielded.claimOverview.ineligible")
+                            : publicClaimPreview && publicClaimPreview.claimCount > 0
+                              ? t("shielded.claimOverview.claimable", {
+                                  amount: formatUnits(
+                                    publicClaimPreview.amount,
+                                    modules.tokenDecimals,
+                                  ),
+                                  periods: publicClaimPreview.claimCount.toString(),
+                                })
+                              : t(
+                                  `shielded.claimOverview.${
+                                    incomingPublicBudgets.length === 0
+                                      ? "noFunds"
+                                      : incomingPublicBudgets.every(
+                                            (budget) => budget.remaining === 0n,
+                                          )
+                                        ? "exhausted"
+                                        : "notDue"
+                                  }`,
+                                )}
+                    </p>
+                    {publicClaimPreview?.nextDueAt !== undefined ? (
+                      <p className="text-xs text-ink-muted">
+                        {t("shielded.claimOverview.nextDue", {
+                          date: new Date(
+                            Number(publicClaimPreview.nextDueAt) * 1000,
+                          ).toLocaleString(),
+                        })}
+                      </p>
+                    ) : null}
+                  </div>
+                  {publicClaimBudget ? (
+                    <p className="text-xs text-ink-muted">
+                      {t("shielded.publicClaimSequence", {
+                        period: (publicClaimBudget.nextPeriod + 1n).toString(),
+                      })}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </>
           ) : null}
 
@@ -1775,6 +2359,11 @@ export function ShieldedInheritancePanel({
             disabled={
               busy ||
               (!signer && action !== "receiveCode") ||
+              (action === "fund" &&
+                fundingMode === "public" &&
+                (!publicBudgetSnapshot ||
+                  (publicFundingSelection !== "" && !selectedPublicFunding))) ||
+              (action === "claim" && claimMode === "public" && !publicBudgetSnapshot) ||
               (recipientNeedsConfirmation && !recipientConfirmed)
             }
             onClick={() => void submitSelected()}

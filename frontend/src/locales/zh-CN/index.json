@@ -1484,7 +1484,12 @@
       "InvalidRecipient": "收款地址无效。",
       "UnknownLineageRoot": "证明所用的世系记录已过期或未知，请重新查找后再试。",
       "InvalidEligibility": "证明中的起领周期对该传承无效。",
-      "NothingToClaim": "当前没有可领取的数额。"
+      "NothingToClaim": "当前没有可领取的数额。",
+      "UnknownPublicBudget": "没有找到此公开安排。请刷新余额后重新选择。",
+      "InvalidPublicBudgetData": "公开安排资料或期数无效。请检查后再试。",
+      "IneligiblePublicBeneficiary": "当前家庭记录未确认此收款人是有资格领取的直接子女。",
+      "PublicBudgetNotMature": "此公开安排的下一期尚未到领取时间。",
+      "InsufficientPublicBudget": "此公开安排的余额不足以支付所选期数。请刷新余额后再试。"
     },
     "unknown": "提交失败，请稍后重试或核对输入。"
   },
@@ -1586,10 +1591,10 @@
       "recover": "重新查看私密余额、家人为你存的待领取资金，以及已有的资助安排。即使清空浏览器，相同身份资料和口令仍可找回这些记录。",
       "receiveCode": "生成可重复使用的收款资料，私下分享给付款人。此操作无需交易，也不改变余额。",
       "shield": "把当前普通钱包里的 DEEP 转到本页余额。首次使用时，可能需要先在钱包中授权转入。",
-      "claim": "把已到期的钱领到私密余额，每次最多 12 期。系统自动选择并合用同一安排的领取资金。当前家族记录仍需确认你是该父母的直接子女。",
+      "claim": "选择公开或私密家庭资金，领取到期的钱到本页私密余额，每次最多 12 期。当前家庭记录仍须确认你是这位父母的直接子女。",
       "privateTransfer": "凭收款人的收款资料，转出私密余额中的 DEEP。金额与收款人保持私密，剩余金额留在你的余额中。",
       "unshield": "把私密余额中的 DEEP 转到普通钱包。需要时系统会自动整理分散的余额，钱包可能要求确认额外交易。",
-      "fund": "选择直接子女，存入几期的钱。在这里设置每期金额，或沿用已有安排。同一安排下给同一子女继续加钱，会保留原来的计时起点。首次存入后等待 30 天和 2 小时可领第 1 期；出资者不能取回这笔钱。"
+      "fund": "选择直接子女，存入几期的钱。私密存入使用本页余额和子女收款码；公开存入直接使用普通钱包中的 DEEP，无需收款码。在这里设置每期金额，或沿用已有安排。继续加钱会保留原计时起点；出资者不能取回这笔钱。"
     },
     "fields": {
       "amount": "转多少 DEEP",
@@ -1605,7 +1610,9 @@
       "claimIndices": "手动指定领哪几期（可不填）",
       "transferAmount": "转多少 DEEP",
       "exitRecipient": "转到哪个普通钱包地址",
-      "fundingRule": "资助安排"
+      "fundingRule": "资助安排",
+      "publicArrangement": "公开资助安排",
+      "publicClaimArrangement": "要领取的公开安排"
     },
     "ownIdentityDefault": "不填就使用你刚打开的身份",
     "publicDepositHint": "转入的钱来自当前连接的钱包。钱包地址、金额和时间都会公开。",
@@ -1686,8 +1693,8 @@
       "title": "这页怎么用",
       "intro": "给家人转钱，或给子女存入按期领取的钱。转入、收到和领到的钱都显示在这里。",
       "giverTitle": "给子女留钱",
-      "stepDeposit": "先从普通钱包转入 DEEP。",
-      "stepFund": "选择已确认的直接子女，设置每期金额并填写期数，一次存入资金。",
+      "stepDeposit": "私密存入需先把 DEEP 转入本页；公开存入直接使用普通钱包中的 DEEP。",
+      "stepFund": "选择已确认的直接子女和公开或私密存入，设置每期金额，然后一次存入所需期数的资金。",
       "receiverTitle": "领家人留的钱",
       "stepReceive": "家人需要时，私下分享你的收款资料；随时可重新生成相同资料。",
       "stepClaim": "到期后自己点领取，钱进入本页余额。",
@@ -1697,8 +1704,8 @@
       "noDeathRequirement": "父母在世时也能给子女留钱。"
     },
     "balanceHint": "这里的钱不包括普通钱包余额，转入或转回钱包都需单独操作。",
-    "budgetHint": "到期并符合领取条件后，先领到本页余额。",
-    "rateHint": "每期为 30 天。每期金额随这次资助私密保存，无需单独的设置交易。",
+    "budgetHint": "包含公开和私密家庭资金。到期后先领取到本页私密余额，再使用这笔钱。",
+    "rateHint": "每期为 30 天。首次存入时在此设置每期金额，无需单独发送设置交易。",
     "periodsHint": "需存入的金额＝每期金额 × 期数。例如每期 10 DEEP，存 6 期需准备 60 DEEP。第一次存入会确定领取时间，追加资金不会重新计时。",
     "fundingPreview": "本次给子女存入：{{amount}} DEEP，可领 {{periods}} 期，每期 {{rate}} DEEP。",
     "rootIdentityHint": "不填就按你刚打开的身份确定子女。只有家族记录中已确认的该父母直接子女可以按这个安排领取；出钱的人可以是其他家人。",
@@ -1737,6 +1744,32 @@
     "fundingRuleHint": "沿用已有安排给子女加钱，不会重启其计时；也可以按相同规则资助另一位子女。",
     "noFundingRule": "无法找回所选安排，请刷新余额后重新选择。",
     "preparedButNotCompleted": "余额已完成整理，但本次操作尚未完成：{{detail}}。请刷新余额后重试。",
-    "invalidExitRecipient": "请输入非零的普通钱包地址。"
+    "invalidExitRecipient": "请输入非零的普通钱包地址。",
+    "fundingModeLabel": "如何存入领取资金",
+    "fundingModes": {
+      "private": "私密存入",
+      "public": "公开存入"
+    },
+    "fundingSources": {
+      "private": "资金来自本页的私密余额，金额和子女身份保持私密。",
+      "public": "资金来自当前普通钱包中的 DEEP：{{wallet}}。无需本页私密余额，也无需子女收款码。"
+    },
+    "claimModeLabel": "领取哪一类家庭资金",
+    "claimModes": {
+      "private": "私密家庭资金",
+      "public": "公开家庭资金"
+    },
+    "publicFundingVisibility": "公开存入会显示父母和子女身份、每期金额、资助余额、出资钱包及领取记录。存入后不能取回。首次存入后等待 30 天和 2 小时可领第 1 期；追加资金沿用原计时。",
+    "publicClaimVisibility": "领取的 DEEP 进入本页私密余额。公开安排、领取身份、金额和领取记录仍会公开显示。",
+    "publicArrangementHint": "沿用已有公开安排加钱，会保留原子女、每期金额和计时起点。",
+    "newPublicArrangement": "新建公开安排",
+    "publicArrangementOption": "安排 {{id}} · 子女 {{child}} · 每 30 天 {{amount}} DEEP",
+    "publicClaimOption": "安排 {{id}} · 父母 {{parent}} · 剩余 {{amount}} DEEP",
+    "publicSchedule": "安排 {{id}} · 子女 {{child}} · 每 30 天 {{rate}} DEEP · 剩余 {{remaining}} DEEP · 计时起点 {{date}}",
+    "publicOutgoingTitle": "我出资或作为父母管理的公开安排",
+    "publicClaimHint": "每次从一个安排领取接下来到期的最多 12 期，资金进入本页私密余额。公开安排与私密安排分别领取。",
+    "publicClaimSequence": "从此安排的第 {{period}} 期继续领取。",
+    "publicBudgetMissing": "此公开安排暂不可用。请刷新余额后重新选择。",
+    "publicBudgetsUnavailable": "暂时无法读取公开家庭资金：{{detail}}。使用公开安排前请刷新。"
   }
 }

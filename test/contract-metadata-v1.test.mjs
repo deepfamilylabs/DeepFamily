@@ -159,7 +159,7 @@ async function deployAdapter({ personShouldVerify = true, disclosureShouldVerify
   const adapter = await Adapter.deploy(
     await personVerifier.getAddress(),
     await disclosureVerifier.getAddress(),
-    Array(5).fill(hre.ethers.ZeroAddress),
+    Array(6).fill(hre.ethers.ZeroAddress),
   );
   await adapter.waitForDeployment();
   return { adapter, personVerifier, disclosureVerifier };

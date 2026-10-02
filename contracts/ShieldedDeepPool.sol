@@ -6,13 +6,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
+import {IDeepFamilyPublicInheritance} from "./interfaces/IDeepFamilyPublicInheritance.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 
 /**
  * @title ShieldedDeepPool
  * @notice Append-only, sharded Poseidon note tree and one-time nullifier registry for DEEP.
- *         The pool has no public inheritance IDs, policy balances, or claim recipients.
+ *         Private note actions keep inheritance identifiers and policy balances hidden.
+ *         Public budgets expose their family identifiers, terms and remaining balances.
  * @dev One immutable shared adapter selects the matching circuit for each action. The circuits
  *      enforce input ownership, value conservation, permitted note transitions and binding of
  *      notes to ciphertext hashes. On-chain token conservation at shield/unshield boundaries
@@ -37,13 +39,19 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   error InvalidZKProof();
   error UnexpectedTokenTransfer();
   error InvalidLeafIndex();
+  error UnknownPublicBudget();
+  error InvalidPublicBudgetData();
+  error IneligiblePublicBeneficiary();
+  error PublicBudgetNotMature();
+  error InsufficientPublicBudget();
 
   enum Action {
     Shield,
     Fund,
     Claim,
     PrivateTransfer,
-    Unshield
+    Unshield,
+    ClaimPublic
   }
 
   /**
@@ -75,6 +83,38 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     mapping(uint256 root => uint256 size) rootSizes;
   }
 
+  struct PublicFundingData {
+    uint64 budgetId;
+    bytes32 rootPersonHash;
+    uint64 rootVersionIndex;
+    bytes32 heirPersonHash;
+    uint128 amountPerPeriod;
+    uint64 budgetPeriods;
+    uint64 heirVersionIndex;
+    address endorser;
+  }
+
+  struct PublicClaimData {
+    uint64 budgetId;
+    uint64 firstPeriod;
+    uint8 claimCount;
+    uint64 heirVersionIndex;
+    address endorser;
+    uint256[2] outputCommitments;
+    bytes[2] outputCiphertexts;
+  }
+
+  struct PublicBudget {
+    address createdBy;
+    bytes32 rootPersonHash;
+    uint64 rootVersionIndex;
+    bytes32 heirPersonHash;
+    uint128 amountPerPeriod;
+    uint64 eligibleFrom;
+    uint128 remaining;
+    uint64 nextPeriod;
+  }
+
   uint256 public constant NOTE_TREE_DEPTH = 32;
   uint256 public constant MAX_SHARD_LEAVES = uint256(1) << NOTE_TREE_DEPTH;
   uint256 public constant CIPHERTEXT_BYTES = 512;
@@ -88,6 +128,9 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
 
   uint256 public currentShardId;
   uint256 public totalShielded;
+  uint256 public totalPublicBudget;
+  uint64 public publicBudgetCount;
+  mapping(uint64 budgetId => PublicBudget budget) public publicBudgets;
   mapping(uint256 shardId => Shard shard) internal _shards;
   mapping(uint256 nullifier => bool spent) public nullifierSpent;
   mapping(uint256 commitment => bool exists) public commitmentExists;
@@ -103,9 +146,28 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   event NullifierSpent(uint256 nullifier);
   /// @notice Public action boundary for direct calls and contract-batched calls alike.
   event ActionExecuted(uint8 action, uint256 inputShardId0, uint256 inputShardId1);
+  event PublicBudgetFunded(
+    uint64 indexed budgetId,
+    bytes32 indexed heirPersonHash,
+    address indexed funder,
+    bytes32 rootPersonHash,
+    uint64 rootVersionIndex,
+    uint128 amountPerPeriod,
+    uint64 eligibleFrom,
+    uint128 amount,
+    uint128 remaining
+  );
+  event PublicBudgetClaimed(
+    uint64 indexed budgetId,
+    bytes32 indexed heirPersonHash,
+    uint64 firstPeriod,
+    uint8 claimCount,
+    uint128 amount,
+    uint128 remaining
+  );
 
   /**
-   * @param verifier The shared Groth16 adapter configured with all five pool action verifiers.
+   * @param verifier The shared Groth16 adapter configured with all six pool action verifiers.
    */
   constructor(address token, address lineageIndex, address verifier) {
     if (token.code.length == 0 || lineageIndex.code.length == 0 || verifier.code.length == 0) {
@@ -150,6 +212,180 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
 
   function privateTransfer(ActionData calldata data, bytes calldata proof) external nonReentrant {
     _privateAction(Action.PrivateTransfer, data, proof);
+  }
+
+  /** @notice Fund a public arrangement without asking the beneficiary for payment keys. */
+  function fundPublic(PublicFundingData calldata funding) external nonReentrant {
+    if (funding.amountPerPeriod == 0 || funding.budgetPeriods == 0) {
+      revert InvalidPublicBudgetData();
+    }
+    uint256 amount = uint256(funding.amountPerPeriod) * funding.budgetPeriods;
+    if (amount > type(uint128).max) revert InvalidPublicBudgetData();
+    uint64 budgetId = funding.budgetId;
+    if (budgetId == 0) {
+      _requirePublicLineage(
+        funding.rootPersonHash,
+        funding.rootVersionIndex,
+        funding.heirPersonHash,
+        funding.heirVersionIndex,
+        funding.endorser
+      );
+      uint256 eligibleFrom = block.timestamp + ACTION_PROOF_LIFETIME;
+      if (eligibleFrom > type(uint64).max) revert InvalidPublicBudgetData();
+      budgetId = ++publicBudgetCount;
+      publicBudgets[budgetId] = PublicBudget({
+        createdBy: msg.sender,
+        rootPersonHash: funding.rootPersonHash,
+        rootVersionIndex: funding.rootVersionIndex,
+        heirPersonHash: funding.heirPersonHash,
+        amountPerPeriod: funding.amountPerPeriod,
+        eligibleFrom: uint64(eligibleFrom),
+        remaining: 0,
+        nextPeriod: 0
+      });
+    } else {
+      PublicBudget storage existing = publicBudgets[budgetId];
+      if (existing.createdBy == address(0)) revert UnknownPublicBudget();
+      if (
+        funding.rootPersonHash != existing.rootPersonHash ||
+        funding.rootVersionIndex != existing.rootVersionIndex ||
+        funding.heirPersonHash != existing.heirPersonHash ||
+        funding.amountPerPeriod != existing.amountPerPeriod ||
+        funding.heirVersionIndex != 0 ||
+        funding.endorser != address(0)
+      ) {
+        revert InvalidPublicBudgetData();
+      }
+    }
+    PublicBudget storage budget = publicBudgets[budgetId];
+    uint256 remaining = uint256(budget.remaining) + amount;
+    if (remaining > type(uint128).max) revert InvalidPublicBudgetData();
+    uint256 beforeBalance = TOKEN.balanceOf(address(this));
+    TOKEN.safeTransferFrom(msg.sender, address(this), amount);
+    if (TOKEN.balanceOf(address(this)) - beforeBalance != amount) {
+      revert UnexpectedTokenTransfer();
+    }
+    budget.remaining = uint128(remaining);
+    totalPublicBudget += amount;
+    emit PublicBudgetFunded(
+      budgetId,
+      budget.heirPersonHash,
+      msg.sender,
+      budget.rootPersonHash,
+      budget.rootVersionIndex,
+      budget.amountPerPeriod,
+      budget.eligibleFrom,
+      uint128(amount),
+      budget.remaining
+    );
+  }
+
+  /** @notice Claim sequential public periods into privately owned VALUE notes. */
+  function claimPublic(PublicClaimData calldata data, bytes calldata proof) external nonReentrant {
+    PublicBudget storage budget = publicBudgets[data.budgetId];
+    if (budget.createdBy == address(0)) revert UnknownPublicBudget();
+    uint256 nextPeriod = uint256(data.firstPeriod) + data.claimCount;
+    if (
+      data.firstPeriod != budget.nextPeriod ||
+      data.claimCount == 0 ||
+      data.claimCount > 12 ||
+      nextPeriod > type(uint64).max
+    ) {
+      revert InvalidPublicBudgetData();
+    }
+    if (uint256(budget.eligibleFrom) + nextPeriod * 30 days > block.timestamp) {
+      revert PublicBudgetNotMature();
+    }
+    uint256 amount = uint256(budget.amountPerPeriod) * data.claimCount;
+    if (amount > budget.remaining) revert InsufficientPublicBudget();
+    uint256 identityCommitment = _requirePublicLineage(
+      budget.rootPersonHash,
+      budget.rootVersionIndex,
+      budget.heirPersonHash,
+      data.heirVersionIndex,
+      data.endorser
+    );
+    uint256[] memory signals = new uint256[](
+      ProofConstants.SHIELDED_CLAIM_PUBLIC_PUBLIC_SIGNALS_LEN
+    );
+    signals[0] = block.chainid;
+    signals[1] = uint256(uint160(address(this)));
+    signals[2] = data.budgetId;
+    signals[3] = identityCommitment;
+    signals[4] = data.firstPeriod;
+    signals[5] = data.claimCount;
+    signals[6] = amount;
+    for (uint256 i = 0; i < 2; ++i) {
+      _requireNonzeroField(data.outputCommitments[i]);
+      if (commitmentExists[data.outputCommitments[i]]) revert DuplicateCommitment();
+      if (data.outputCiphertexts[i].length != CIPHERTEXT_BYTES) revert InvalidCiphertext();
+      signals[7 + i] = data.outputCommitments[i];
+      signals[9 + i] = uint256(keccak256(data.outputCiphertexts[i])) % SNARK_SCALAR_FIELD;
+    }
+    if (data.outputCommitments[0] == data.outputCommitments[1]) revert DuplicateCommitment();
+    for (uint256 i = 0; i < signals.length; ++i) _requireField(signals[i]);
+    if (
+      !VERIFIER.verifyProof(
+        ProofConstants.PROOF_PURPOSE_SHIELDED_CLAIM_PUBLIC,
+        ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
+        proof,
+        signals
+      )
+    ) revert InvalidZKProof();
+    budget.remaining -= uint128(amount);
+    budget.nextPeriod = uint64(nextPeriod);
+    totalPublicBudget -= amount;
+    totalShielded += amount;
+    emit PublicBudgetClaimed(
+      data.budgetId,
+      budget.heirPersonHash,
+      data.firstPeriod,
+      data.claimCount,
+      uint128(amount),
+      budget.remaining
+    );
+    emit ActionExecuted(uint8(Action.ClaimPublic), 0, 0);
+    for (uint256 i = 0; i < 2; ++i) {
+      commitmentExists[data.outputCommitments[i]] = true;
+      _append(data.outputCommitments[i], data.outputCiphertexts[i]);
+    }
+  }
+
+  function _requirePublicLineage(
+    bytes32 rootHash,
+    uint64 rootVersion,
+    bytes32 heirHash,
+    uint64 heirVersion,
+    address endorser
+  ) private view returns (uint256 identity) {
+    if (
+      rootHash == bytes32(0) ||
+      heirHash == bytes32(0) ||
+      rootVersion == 0 ||
+      heirVersion == 0 ||
+      endorser == address(0)
+    ) revert IneligiblePublicBeneficiary();
+    IDeepFamilyPublicInheritance family = IDeepFamilyPublicInheritance(LINEAGE_INDEX.DEEP_FAMILY());
+    if (
+      rootVersion > family.personVersionsCount(rootHash) ||
+      heirVersion > family.personVersionsCount(heirHash) ||
+      family.endorsedVersionIndex(heirHash, endorser) != heirVersion ||
+      !family.trustedEndorserOf(rootHash, rootVersion, endorser)
+    ) revert IneligiblePublicBeneficiary();
+    IDeepFamilyPublicInheritance.PersonVersion memory version = family.personVersionAt(
+      heirHash,
+      heirVersion - 1
+    );
+    if (
+      version.personHash != heirHash ||
+      (version.fatherHash != rootHash && version.motherHash != rootHash)
+    ) {
+      revert IneligiblePublicBeneficiary();
+    }
+    identity = LINEAGE_INDEX.identityCommitmentOf(heirHash);
+    _requireNonzeroField(identity);
+    if (keccak256(abi.encodePacked(bytes32(identity))) != heirHash)
+      revert IneligiblePublicBeneficiary();
   }
 
   /** @notice Burn a private value note and pay an ordinary, publicly visible recipient. */

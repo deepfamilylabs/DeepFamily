@@ -3,6 +3,7 @@ import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { keccak256, toBeHex } from "ethers";
 
 import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
@@ -1285,7 +1286,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       );
   }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
-  requireExact(ceremony.circuitCount, 8, "zkCeremonyVerification.circuitCount");
+  requireExact(ceremony.circuitCount, 9, "zkCeremonyVerification.circuitCount");
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
     !Array.isArray(ceremony.circuits) ||
@@ -1299,7 +1300,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["status", "manifestSha256", "circuitCount", "ptau"],
   );
   requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
-  requireExact(shieldedCeremony.circuitCount, 6, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(shieldedCeremony.circuitCount, 7, "zkCeremonyVerification.shielded.circuitCount");
   requireExact(
     shieldedCeremony.manifestSha256,
     inspected.manifestSha256,
@@ -1319,7 +1320,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(evidence.manifestSha256, inspected.manifestSha256, "shielded.manifestSha256");
   const proofs = requireExactRecordKeys(evidence.proofs, "shielded.proofs", actions);
   const transactions = requireRecord(report.transactions, "transactions");
-  if (Object.hasOwn(transactions, "shielded-action-claim")) {
+  if (
+    ["shielded-action-claim", "shielded-action-claimPublic"].some((label) =>
+      Object.hasOwn(transactions, label),
+    )
+  ) {
     throw new Error("Future-maturity claim must not claim an executed pool transaction");
   }
   for (const action of actions) {
@@ -1363,9 +1368,9 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       report.addresses.shieldedDeepPool,
       `shielded.proofs.${action} contract`,
     );
-    if (action === "claim") {
-      requireExact(proof.execution, "verifier-call", "shielded.proofs.claim.execution");
-      requireExact(proof.claimCount, 12, "shielded.proofs.claim.claimCount");
+    if (action === "claim" || action === "claimPublic") {
+      requireExact(proof.execution, "verifier-call", `shielded.proofs.${action}.execution`);
+      requireExact(proof.claimCount, 12, `shielded.proofs.${action}.claimCount`);
       if (Object.hasOwn(proof, "transactionLabel"))
         throw new Error("Future-maturity claim proof must not claim an executed pool transaction");
     } else {
@@ -1387,6 +1392,71 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   );
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
   requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
+  const publicBudget = requireRecord(scenario.publicBudget, "shielded.scenario.publicBudget");
+  for (const [field, label] of [
+    ["fundingLabel", "public-budget-fund"],
+    ["topUpLabel", "public-budget-top-up"],
+  ]) {
+    requireExact(publicBudget[field], label, `shielded.scenario.publicBudget.${field}`);
+    requireExact(
+      requireRecord(transactions[label], `transactions.${label}`).status,
+      1,
+      `transactions.${label}.status`,
+    );
+  }
+  requireExact(
+    publicBudget.claimExecution,
+    "verifier-call",
+    "shielded.scenario.publicBudget.claimExecution",
+  );
+  requireExact(publicBudget.claimCount, 12, "shielded.scenario.publicBudget.claimCount");
+  const publicValues = {};
+  for (const field of [
+    "budgetId",
+    "amountPerPeriod",
+    "eligibleFrom",
+    "remaining",
+    "nextPeriod",
+    "fundingTimestamp",
+  ]) {
+    const value = publicBudget[field];
+    if (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(value))
+      throw new Error(`shielded.scenario.publicBudget.${field} must be a canonical decimal`);
+    publicValues[field] = BigInt(value);
+  }
+  if (
+    publicValues.budgetId === 0n ||
+    publicValues.budgetId >= 1n << 64n ||
+    publicValues.amountPerPeriod === 0n ||
+    publicValues.amountPerPeriod >= 1n << 128n
+  )
+    throw new Error("shielded.scenario.publicBudget has invalid budget ID or rate");
+  const publicSignals = proofs.claimPublic.publicSignals;
+  requireExact(publicSignals[2], publicBudget.budgetId, "shielded.proofs.claimPublic budget ID");
+  requireExact(
+    requireHash32(publicBudget.heirPersonHash, "public budget heirPersonHash"),
+    keccak256(toBeHex(BigInt(publicSignals[3]), 32)),
+    "shielded.proofs.claimPublic heir identity",
+  );
+  requireExact(publicBudget.nextPeriod, "0", "shielded.scenario.publicBudget.nextPeriod");
+  requireExact(
+    publicSignals[4],
+    publicBudget.nextPeriod,
+    "shielded.proofs.claimPublic first period",
+  );
+  requireExact(publicSignals[5], "12", "shielded.proofs.claimPublic claim count");
+  requireExact(
+    publicSignals[6],
+    (publicValues.amountPerPeriod * 12n).toString(),
+    "shielded.proofs.claimPublic amount",
+  );
+  requireExact(
+    publicBudget.eligibleFrom,
+    (publicValues.fundingTimestamp + 7200n).toString(),
+    "shielded.scenario.publicBudget.eligibleFrom",
+  );
+  if (publicValues.remaining < publicValues.amountPerPeriod * 12n)
+    throw new Error("shielded.scenario.publicBudget cannot cover twelve periods");
   const receiveCode = requireExactRecordKeys(
     scenario.receiveCode,
     "shielded.scenario.receiveCode",
@@ -1479,8 +1549,8 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   return {
     manifestSha256: inspected.manifestSha256,
     proofCount: actions.length,
-    transactionActions: actions.filter((action) => action !== "claim"),
-    verifierCallActions: ["claim"],
+    transactionActions: actions.filter((action) => proofs[action].execution === "transaction"),
+    verifierCallActions: actions.filter((action) => proofs[action].execution === "verifier-call"),
     claimCount: 12,
     lineageDepth: scenario.lineageDepth,
     noteDepth: scenario.noteDepth,

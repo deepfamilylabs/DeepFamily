@@ -1484,7 +1484,12 @@
       "InvalidRecipient": "Recipient address is invalid.",
       "UnknownLineageRoot": "The proof used lineage records that are too old or unknown. Search again and retry.",
       "InvalidEligibility": "The proof's first claimable period is not valid for this inheritance.",
-      "NothingToClaim": "Nothing is claimable right now."
+      "NothingToClaim": "Nothing is claimable right now.",
+      "UnknownPublicBudget": "This public arrangement was not found. Refresh balances and select it again.",
+      "InvalidPublicBudgetData": "The public arrangement details or period count are invalid. Check them and try again.",
+      "IneligiblePublicBeneficiary": "The current family records do not confirm this recipient as an eligible direct child.",
+      "PublicBudgetNotMature": "This public arrangement's next period is not due yet.",
+      "InsufficientPublicBudget": "This public arrangement has too little money for the requested periods. Refresh balances before trying again."
     },
     "unknown": "Submission failed. Please retry later or verify your inputs."
   },
@@ -1586,10 +1591,10 @@
       "recover": "Check your private balance, family claim funds, and saved funding arrangements. The same identity details and passphrase recover these records after clearing your browser.",
       "receiveCode": "Generate reusable receiving details to share privately with senders. This takes no transaction and changes no balance.",
       "shield": "Move DEEP from the connected ordinary wallet into your page balance. Your wallet may first ask you to allow this page to move DEEP.",
-      "claim": "Claim due periods into your private balance, up to 12 periods at a time. Compatible claim funds are selected and combined automatically. The current family records must still confirm you as this parent’s direct child.",
+      "claim": "Claim due family money into your private balance, up to 12 periods at a time. Choose public or private family funds. The current family records must still confirm you as this parent’s direct child.",
       "privateTransfer": "Send DEEP from your private balance using the recipient’s receiving details. Amount and recipient stay private; any change remains in your balance.",
       "unshield": "Move DEEP from your private balance to an ordinary wallet. Separate pieces of balance are organized automatically when needed; your wallet may ask you to confirm additional transactions.",
-      "fund": "Choose a direct child and fund a number of periods. Set the amount per period here or reuse a saved arrangement. Adding money to the same child and arrangement preserves the original starting time. The first period is due 30 days and 2 hours after initial funding; the giver cannot take the money back."
+      "fund": "Choose a direct child and fund a number of periods. Private funding uses your page balance and the child’s receive code; public funding uses DEEP in your ordinary wallet without a receive code. Set the amount per period here or reuse an arrangement. Adding money preserves its starting time, and the giver cannot take it back."
     },
     "fields": {
       "amount": "How much DEEP",
@@ -1605,7 +1610,9 @@
       "claimIndices": "Choose periods yourself (optional)",
       "transferAmount": "How much DEEP",
       "exitRecipient": "Ordinary wallet address to send to",
-      "fundingRule": "Funding arrangement"
+      "fundingRule": "Funding arrangement",
+      "publicArrangement": "Public funding arrangement",
+      "publicClaimArrangement": "Public arrangement to claim"
     },
     "ownIdentityDefault": "Leave blank to use the identity you just opened",
     "publicDepositHint": "This money comes from the connected wallet. The wallet address, amount, and time are public.",
@@ -1686,8 +1693,8 @@
       "title": "How this page works",
       "intro": "Send money to family or set aside periodic payments for children. Money you move in, receive, or claim appears here.",
       "giverTitle": "Set money aside for a child",
-      "stepDeposit": "Move DEEP from your ordinary wallet first.",
-      "stepFund": "Choose a confirmed direct child, set the amount per period, enter the periods, and fund them in one action.",
+      "stepDeposit": "For private funding, move DEEP from your ordinary wallet first. Public funding uses the ordinary wallet directly.",
+      "stepFund": "Choose a confirmed direct child and public or private funding, set the amount per period, then fund the periods in one action.",
       "receiverTitle": "Claim money family left",
       "stepReceive": "Share your receiving details privately with family when they need them. You can regenerate the same details at any time.",
       "stepClaim": "Claim due money yourself; it enters your balance here.",
@@ -1697,8 +1704,8 @@
       "noDeathRequirement": "Parents can set money aside for children while they are alive."
     },
     "balanceHint": "This money is separate from your ordinary wallet; moving it in or out takes a separate action.",
-    "budgetHint": "Once due and available to claim, move this money into your page balance first.",
-    "rateHint": "Each period is 30 days. The amount per period is saved privately with this funding, with no separate setup transaction.",
+    "budgetHint": "Includes public and private family funds. Claim due money into your private balance before spending it.",
+    "rateHint": "Each period is 30 days. Set the amount here when you first fund an arrangement, with no separate setup transaction.",
     "periodsHint": "Money needed = amount per period × number of periods. At 10 DEEP per period, 6 periods need 60 DEEP. The first funding sets the claim schedule; adding money does not restart it.",
     "fundingPreview": "Set aside {{amount}} DEEP for this child: {{periods}} periods at {{rate}} DEEP each.",
     "rootIdentityHint": "Leave blank to use the identity you just opened. Only confirmed direct children of this parent in the family records can claim under this arrangement. Other family members can provide the money.",
@@ -1737,6 +1744,32 @@
     "fundingRuleHint": "Reuse an arrangement to add money without restarting this child’s schedule, or fund another child with the same rules.",
     "noFundingRule": "This saved arrangement could not be recovered. Refresh your balance and choose it again.",
     "preparedButNotCompleted": "Your balance was organized, but the requested action has not completed: {{detail}}. Refresh your balance before trying again.",
-    "invalidExitRecipient": "Enter a nonzero ordinary wallet address."
+    "invalidExitRecipient": "Enter a nonzero ordinary wallet address.",
+    "fundingModeLabel": "How to set money aside",
+    "fundingModes": {
+      "private": "Private funding",
+      "public": "Public funding"
+    },
+    "fundingSources": {
+      "private": "Paid from your private balance on this page. The amount and child stay private.",
+      "public": "Paid from DEEP in your connected ordinary wallet: {{wallet}}. No private balance or receive code is needed."
+    },
+    "claimModeLabel": "Which family funds to claim",
+    "claimModes": {
+      "private": "Private family funds",
+      "public": "Public family funds"
+    },
+    "publicFundingVisibility": "Public funding shows the parent and child identities, per-period amount, funded balance, funding wallet, and claim records. The money cannot be taken back. The first period is due after 30 days and 2 hours; adding money keeps the original schedule.",
+    "publicClaimVisibility": "Claimed DEEP enters your private balance on this page. The public arrangement, claiming identity, amount, and claim record remain visible.",
+    "publicArrangementHint": "Choose an existing public arrangement to add money with the same child, amount per period, and starting time.",
+    "newPublicArrangement": "New public arrangement",
+    "publicArrangementOption": "Arrangement {{id}} · child {{child}} · {{amount}} DEEP every 30 days",
+    "publicClaimOption": "Arrangement {{id}} · parent {{parent}} · {{amount}} DEEP remaining",
+    "publicSchedule": "Arrangement {{id}} · child {{child}} · {{rate}} DEEP every 30 days · {{remaining}} DEEP remaining · schedule starts {{date}}",
+    "publicOutgoingTitle": "Public arrangements I fund or manage as the parent",
+    "publicClaimHint": "Each claim uses one arrangement and claims its next due periods, up to 12. The money enters your private balance; public and private arrangements are claimed separately.",
+    "publicClaimSequence": "Claiming continues from period {{period}} of this arrangement.",
+    "publicBudgetMissing": "This public arrangement is unavailable. Refresh the balances and choose it again.",
+    "publicBudgetsUnavailable": "Public family funds could not be read: {{detail}}. Refresh before using a public arrangement."
   }
 }

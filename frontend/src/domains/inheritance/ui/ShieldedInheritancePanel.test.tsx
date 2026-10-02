@@ -20,6 +20,7 @@ import {
 } from "../services/shieldedReceiveCode";
 import type { OwnedShieldedNote } from "../services/shieldedPoolChain";
 import type { LocalShieldedWalletSnapshot } from "../services/shieldedWalletRecovery";
+import type { PublicBudget, PublicBudgetSnapshot } from "../services/publicBudgetFlows";
 import { ShieldedInheritancePanel } from "./ShieldedInheritancePanel";
 
 const mocks = vi.hoisted(() => ({
@@ -50,6 +51,11 @@ const mocks = vi.hoisted(() => ({
   loadRootRegistry: vi.fn(),
   findHeirLegitimacy: vi.fn(),
   getBlock: vi.fn(),
+  readPublicBudgets: vi.fn(),
+  preparePublicBudgetFunding: vi.fn(),
+  submitPublicBudgetFunding: vi.fn(),
+  preparePublicBudgetClaim: vi.fn(),
+  submitPublicBudgetClaim: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -123,6 +129,14 @@ vi.mock("../services/shieldedFundingPreparation", () => ({
 }));
 vi.mock("../services/shieldedClaimPreparation", () => ({
   prepareShieldedClaim: mocks.prepareShieldedClaim,
+}));
+vi.mock("../services/publicBudgetFlows", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../services/publicBudgetFlows")>()),
+  readPublicBudgets: mocks.readPublicBudgets,
+  preparePublicBudgetFunding: mocks.preparePublicBudgetFunding,
+  submitPublicBudgetFunding: mocks.submitPublicBudgetFunding,
+  preparePublicBudgetClaim: mocks.preparePublicBudgetClaim,
+  submitPublicBudgetClaim: mocks.submitPublicBudgetClaim,
 }));
 vi.mock("../services/shieldedFreshLineageSubmit", () => ({
   submitClaimWithFreshLineage: mocks.submitClaimWithFreshLineage,
@@ -232,6 +246,33 @@ function walletSnapshot(notes: Note[] = [], material = identity): LocalShieldedW
       .ownerCommitment,
     walletIdentityCommitment: BigInt(material.identityCommitment),
     fundingTemplates: new Map(),
+  };
+}
+
+function publicBudget(overrides: Partial<PublicBudget> = {}): PublicBudget {
+  return {
+    budgetId: 1n,
+    createdBy: account,
+    rootPersonHash: identity.personHash,
+    rootVersionIndex: 7n,
+    heirPersonHash: wrapIdentityCommitmentAsPersonHash(99n),
+    amountPerPeriod: 10n,
+    eligibleFrom: 1_000n,
+    remaining: 30n,
+    nextPeriod: 0n,
+    ...overrides,
+  };
+}
+
+function publicSnapshot(budgets: PublicBudget[] = []): PublicBudgetSnapshot {
+  return {
+    poolAddress,
+    chainId: 31337n,
+    toBlock: 1,
+    blockHash: `0x${"cd".repeat(32)}`,
+    asOf: 1_000n + 2n * INHERITANCE_PERIOD_SECONDS,
+    budgets,
+    funders: new Map(budgets.map((budget) => [budget.budgetId, new Set([account.toLowerCase()])])),
   };
 }
 
@@ -395,6 +436,16 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     vi.resetAllMocks();
     mocks.deriveIdentityFromForm.mockResolvedValue(identity);
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot());
+    mocks.readPublicBudgets.mockResolvedValue(publicSnapshot());
+    mocks.preparePublicBudgetFunding.mockResolvedValue({ data: {}, amount: 30n, context: {} });
+    mocks.submitPublicBudgetFunding.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
+    mocks.preparePublicBudgetClaim.mockResolvedValue({
+      data: {},
+      amount: 20n,
+      witness: {},
+      context: {},
+    });
+    mocks.submitPublicBudgetClaim.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
     mocks.verifyShieldedReceiveCode.mockRejectedValue(new ShieldedReceiveCodeError("malformed"));
     mocks.createOwnShieldedReceiveCode.mockResolvedValue("dfrecv1ownreceivecode");
     mocks.listUnspentRecoveredShieldedNotes.mockImplementation(
@@ -1333,5 +1384,258 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(deposit.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("textbox", { name: "shielded.fields.amount" })).toBeTruthy();
     expect(screen.queryByText("shielded.nextStep.shield")).toBeNull();
+  });
+
+  it("funds a public arrangement directly from the ordinary wallet without free VALUE or a receive code", async () => {
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("fund");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+    expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeInputLabel" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "shielded.fields.valueNote" })).toBeNull();
+    expect(screen.getByText("shielded.publicFundingVisibility")).toBeTruthy();
+    expect(screen.getByText("shielded.fundingSources.public")).toBeTruthy();
+    const child = wrapIdentityCommitmentAsPersonHash(99n);
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("combobox", { name: "shielded.fields.heirPersonHash" })
+          .querySelector(`option[value="${child}"]`),
+      ).toBeTruthy(),
+    );
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.heirPersonHash" }), {
+      target: { value: child },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.periods" }), {
+      target: { value: "3" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.preparePublicBudgetFunding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budgetId: undefined,
+        rootPersonHash: identity.personHash,
+        rootVersionIndex: 7n,
+        heirPersonHash: child,
+        amountPerPeriod: 10n,
+        budgetPeriods: 3n,
+      }),
+    );
+    expect(mocks.submitPublicBudgetFunding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: expect.objectContaining({ allowance: mocks.tokenAllowance }),
+        expectedChainId: 31337n,
+        prepared: expect.objectContaining({ amount: 30n }),
+      }),
+    );
+    expect(mocks.verifyShieldedReceiveCode).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedValueConsolidation).not.toHaveBeenCalled();
+  });
+
+  it("adds public money using an existing arrangement's fixed child, rate, root version, and clock", async () => {
+    const budget = publicBudget({ budgetId: 9n, rootVersionIndex: 3n, eligibleFrom: 123n });
+    mocks.readPublicBudgets.mockResolvedValue(publicSnapshot([budget]));
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("fund");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.publicArrangement" }), {
+      target: { value: "9" },
+    });
+    expect(screen.queryByRole("textbox", { name: "shielded.fields.rate" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "shielded.fields.heirPersonHash" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "shielded.fields.rootVersion" })).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.periods" }), {
+      target: { value: "4" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.preparePublicBudgetFunding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        budgetId: 9n,
+        rootPersonHash: budget.rootPersonHash,
+        rootVersionIndex: 3n,
+        heirPersonHash: budget.heirPersonHash,
+        amountPerPeriod: budget.amountPerPeriod,
+        budgetPeriods: 4n,
+      }),
+    );
+    expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
+    expect(mocks.submitFund).not.toHaveBeenCalled();
+    expect(mocks.submitFundWithFreshLineage).not.toHaveBeenCalled();
+  });
+
+  it("claims an incoming public arrangement into the private page balance without a recipient code", async () => {
+    const parentHash = wrapIdentityCommitmentAsPersonHash(777n);
+    const budget = publicBudget({
+      budgetId: 7n,
+      rootPersonHash: parentHash,
+      heirPersonHash: identity.personHash,
+      nextPeriod: 1n,
+      remaining: 40n,
+    });
+    const snapshots = publicSnapshot([budget]);
+    mocks.readPublicBudgets.mockResolvedValue(snapshots);
+    mocks.loadLineageSnapshot.mockResolvedValue({
+      versions: new Map([
+        [parentHash, [{ versionIndex: 7, identityCommitment: 777n }]],
+        [
+          identity.personHash,
+          [{ versionIndex: 1, identityCommitment: 56n, fatherIdentityCommitment: 777n }],
+        ],
+      ]),
+    });
+    renderPanel();
+    await unlock();
+    expect(
+      (screen.getByRole("radio", { name: "shielded.claimModes.public" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    await screen.findByText("shielded.claimOverview.claimable");
+    expect(screen.getByText("shielded.publicClaimVisibility")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "shielded.fields.claimIndices" })).toBeNull();
+    expect(screen.getByText("shielded.budgetAmount").parentElement?.textContent).toContain("40");
+    mocks.submitPublicBudgetClaim.mockImplementation(async () => {
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(22n, 10n)]));
+      mocks.readPublicBudgets.mockResolvedValue(
+        publicSnapshot([{ ...budget, remaining: 30n, nextPeriod: 2n }]),
+      );
+      return { receipt: { status: 1 }, transactionHash };
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.preparePublicBudgetClaim).toHaveBeenCalledWith(
+      expect.objectContaining({ identity, budgetId: 7n }),
+    );
+    expect(mocks.submitPublicBudgetClaim).toHaveBeenCalledTimes(1);
+    expect(mocks.verifyShieldedReceiveCode).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedClaim).not.toHaveBeenCalled();
+    expect(screen.getByText("shielded.balanceAmount").parentElement?.textContent).toContain("10");
+    expect(screen.getByText("shielded.budgetAmount").parentElement?.textContent).toContain("30");
+  });
+
+  it("counts public and private incoming funds together while keeping their claim inputs separate", async () => {
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(
+      walletSnapshot([budgetNote(1n, { remaining: 20n })]),
+    );
+    mocks.readPublicBudgets.mockResolvedValue(
+      publicSnapshot([
+        publicBudget({ budgetId: 7n, heirPersonHash: identity.personHash, remaining: 30n }),
+      ]),
+    );
+    renderPanel();
+    await unlock();
+    expect(screen.getByText("shielded.budgetAmount").parentElement?.textContent).toContain("50");
+    expect(
+      (screen.getByRole("radio", { name: "shielded.claimModes.private" }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.claimModes.public" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "shielded.fields.publicClaimArrangement" }),
+      {
+        target: { value: "7" },
+      },
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.claimModes.private" }));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.prepareShieldedClaim).toHaveBeenCalledWith(
+      expect.objectContaining({ budgetCommitment: 1n }),
+    );
+    expect(mocks.preparePublicBudgetClaim).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.claimModes.public" }));
+    expect(
+      (
+        screen.getByRole("combobox", {
+          name: "shielded.fields.publicClaimArrangement",
+        }) as HTMLSelectElement
+      ).value,
+    ).toBe("");
+  });
+
+  it("clears the public arrangement and recipient-code state when changing funding privacy", async () => {
+    mocks.readPublicBudgets.mockResolvedValue(publicSnapshot([publicBudget({ budgetId: 9n })]));
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("fund");
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+      target: { value: receiveCodeFor(99n) },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.publicArrangement" }), {
+      target: { value: "9" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.private" }));
+    expect(
+      (screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }) as HTMLInputElement)
+        .value,
+    ).toBe("");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+    expect(
+      (
+        screen.getByRole("combobox", {
+          name: "shielded.fields.publicArrangement",
+        }) as HTMLSelectElement
+      ).value,
+    ).toBe("");
+    expect(screen.getByRole("textbox", { name: "shielded.fields.rate" })).toBeTruthy();
+    expect(mocks.preparePublicBudgetFunding).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale public arrangement after refreshing the current ledger", async () => {
+    mocks.readPublicBudgets.mockResolvedValue(publicSnapshot([publicBudget({ budgetId: 9n })]));
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    chooseAction("fund");
+    fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.publicArrangement" }), {
+      target: { value: "9" },
+    });
+    mocks.readPublicBudgets.mockResolvedValue(publicSnapshot());
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("shielded.publicBudgetMissing"),
+    );
+    expect(mocks.preparePublicBudgetFunding).not.toHaveBeenCalled();
+    expect(mocks.submitPublicBudgetFunding).not.toHaveBeenCalled();
+  });
+
+  it("shows a localized public claim rejection while preserving actionable preparation errors", async () => {
+    mocks.readPublicBudgets.mockResolvedValue(
+      publicSnapshot([publicBudget({ budgetId: 7n, heirPersonHash: identity.personHash })]),
+    );
+    mocks.submitPublicBudgetClaim.mockRejectedValue({
+      code: "CALL_EXCEPTION",
+      data: "0x6a35c33f",
+      message: "execution reverted",
+    });
+    renderPanel();
+    await unlock();
+    await screen.findByText("shielded.claimOverview.claimable");
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain(
+        "errors.contractError.PublicBudgetNotMature",
+      ),
+    );
+    expect(screen.queryByText("shielded.done")).toBeNull();
+
+    mocks.preparePublicBudgetClaim.mockRejectedValue(
+      new Error("Refresh the public family records"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe("Refresh the public family records"),
+    );
+    expect(mocks.submitPublicBudgetClaim).toHaveBeenCalledTimes(1);
   });
 });

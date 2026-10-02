@@ -42,6 +42,24 @@ contract ShieldedPoolTokenMock is ERC20 {
   }
 }
 
+/** @dev Test only: recipients receive one token less than the requested transfer. */
+contract ShieldedPoolFeeTokenMock is ERC20 {
+  constructor() ERC20("Fee DEEP", "FDEEP") {}
+
+  function mint(address recipient, uint256 amount) external {
+    _mint(recipient, amount);
+  }
+
+  function _update(address from, address to, uint256 amount) internal override {
+    if (from != address(0) && to != address(0) && amount != 0) {
+      super._update(from, to, amount - 1);
+      super._update(from, address(0), 1);
+    } else {
+      super._update(from, to, amount);
+    }
+  }
+}
+
 /** @dev Test only: initializes an otherwise impossible 2^32-leaf boundary state. */
 contract ShieldedPoolRolloverHarness is ShieldedDeepPool {
   constructor(

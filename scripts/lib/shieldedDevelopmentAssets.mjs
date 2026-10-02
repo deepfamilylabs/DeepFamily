@@ -32,7 +32,7 @@ export async function syncShieldedDevelopmentAssets({
       .sort()
       .join(",") !== Object.keys(SHIELDED_SETUP_CIRCUITS).sort().join(",")
   ) {
-    throw new Error("Shielded development manifest must cover all six development circuits");
+    throw new Error("Shielded development manifest must cover all seven development circuits");
   }
   const files = [];
   const verifiers = [];

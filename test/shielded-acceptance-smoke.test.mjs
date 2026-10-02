@@ -10,7 +10,7 @@ import { runShieldedAcceptanceSmoke } from "../scripts/lib/shieldedAcceptanceSmo
 describe("integrated shielded acceptance smoke", function () {
   this.timeout(600_000);
 
-  it("pays a verified receive code with all five pool proofs, the shared DEEP token and actual lineage", async function () {
+  it("funds both budget paths with all six pool proofs, the shared DEEP token and actual lineage", async function () {
     const connection = await hre.network.create();
     const deployed = await deployIntegratedFixture(connection);
     const [signer] = await connection.ethers.getSigners();
@@ -70,11 +70,15 @@ describe("integrated shielded acceptance smoke", function () {
       proofArtifacts,
     });
     assert.equal(result.status, "passed");
-    assert.equal(Object.keys(result.proofs).length, 5);
+    assert.equal(Object.keys(result.proofs).length, 6);
     assert.equal(result.scenario.receiveCode.verified, true);
     assert.equal(result.proofs.claim.execution, "verifier-call");
     assert.equal(result.scenario.claimCount, 12);
     assert.equal(result.scenario.recoveredNotes, result.scenario.recoveryEventCount);
     assert.equal(result.scenario.totalShieldedAfter, "1900");
+    assert.equal(result.scenario.totalPublicAfter, "1500");
+    assert.equal(result.scenario.poolTokenAfter, "3400");
+    assert.equal(result.proofs.claimPublic.execution, "verifier-call");
+    assert.equal(result.scenario.publicBudget.nextPeriod, "0");
   });
 });
