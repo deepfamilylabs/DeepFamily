@@ -261,6 +261,7 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x0dc149f0": "AlreadyInitialized",
   "0x87138d5c": "NotInitialized",
   "0xfb8f41b2": "ERC20InsufficientAllowance",
+  "0xe450d38c": "ERC20InsufficientBalance",
   "0x30cd7471": "NotOwner",
   "0x101f817a": "AlreadyApproved",
   "0xdb5e659b": "TransactionAlreadyExecuted",
@@ -413,6 +414,10 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
     "The wallet nonce is ahead of the local chain. Clear activity and nonce data for this network, then retry. In MetaMask: Settings → Developer tools → Delete activity and nonce data.",
   NONCE_TOO_HIGH:
     "The wallet nonce is ahead of the chain. Check earlier pending transactions before retrying.",
+  LOCAL_NONCE_TOO_LOW:
+    "The wallet reused a transaction nonce already consumed on the local chain. Refresh the page and retry.",
+  NONCE_EXPIRED:
+    "This transaction nonce has already been used. Check the previous transaction result before retrying.",
   GAS_ERROR: "Gas limit or price too low. Please increase gas and retry.",
   OUT_OF_GAS: "Transaction ran out of gas during execution.",
   INSUFFICIENT_FUNDS: "Insufficient balance to cover gas fees.",
@@ -443,6 +448,7 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
     "Wallet has a pending request. Open your wallet to confirm or cancel it, then try again.",
   CALL_EXCEPTION: "Contract validation failed. Please check input data.",
   ERC20InsufficientAllowance: "Allowance insufficient. Please re-approve the token allowance.",
+  ERC20InsufficientBalance: "Insufficient token balance for this transaction.",
 };
 
 const RETRYABLE_REASONS = new Set([
@@ -660,6 +666,13 @@ export const resolveErrorReason = (error: any): string | undefined => {
     return "WALLET_REQUEST_PENDING";
   }
 
+  if (
+    error?.code === "NONCE_EXPIRED" ||
+    /\bnonce too low\b|nonce has already been used/i.test(msg)
+  ) {
+    return /\b0x7a69\b|automining/i.test(msg) ? "LOCAL_NONCE_TOO_LOW" : "NONCE_EXPIRED";
+  }
+
   if (codeReason && codeReason !== "CALL_EXCEPTION") {
     return codeReason;
   }
@@ -687,7 +700,8 @@ export const resolveErrorReason = (error: any): string | undefined => {
 
   if (/insufficient allowance|ERC20InsufficientAllowance/i.test(msg))
     return "ERC20InsufficientAllowance";
-  if (/insufficient funds|ERC20InsufficientBalance/i.test(msg)) return "INSUFFICIENT_FUNDS";
+  if (/ERC20InsufficientBalance/i.test(msg)) return "ERC20InsufficientBalance";
+  if (/insufficient funds/i.test(msg)) return "INSUFFICIENT_FUNDS";
 
   if (error?.code === "NETWORK_ERROR" || /network/i.test(msg)) {
     return "NETWORK_ERROR";

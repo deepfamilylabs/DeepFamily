@@ -8,7 +8,7 @@ import {
   trustedEndorsementVisibilityKey,
   trustedEndorsersKey,
 } from "../../../shared/cache/queryKeys";
-import { makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
+import { clearMetadataUnlock, makeNodeId, type NodeData, type NodeId } from "../../../shared/model";
 import type { EdgeStoreStrict, EdgeStoreUnion } from "../model/treeStore";
 import { readTreeNodesSnapshot } from "../services/treeNodesPersistence";
 import {
@@ -96,6 +96,78 @@ function createTreeCacheActionsHarness(
       return nodesData;
     },
   };
+}
+
+function confirmedVersionFixture(): NodeData {
+  const personHash = `0x${"a1".repeat(32)}`;
+  return {
+    id: makeNodeId(personHash, 2),
+    personHash,
+    versionIndex: 2,
+    versionCommitment: "123456789",
+    metadataPointer: `0x${"a2".repeat(20)}`,
+    metadataPayloadHash: `0x${"a3".repeat(32)}`,
+    metadataSegmentCount: 1,
+    metadataPayloadLength: 512,
+    metadataUnlockValidated: true,
+    metadataUnlockPersistence: "device",
+    metadataProtocolGeneration: "df-onchain-biography-v1",
+    metadataFormatVersion: 1,
+    identitySuiteId: 1,
+    metadataPerson: {
+      fullName: "Confirmed af",
+      gender: 1,
+      birthYear: 1990,
+      birthMonth: 3,
+      birthDay: 4,
+      isBirthBC: false,
+      personHash,
+    },
+    metadataParents: { father: null, mother: null },
+    tag: "confirmed-regression-private-tag",
+    biography: "confirmed-regression-private-biography",
+  };
+}
+
+/** Unlike the synchronous harness, React may run an updater after the ref changed. */
+function createReactTreeCacheActionsHarness(
+  initialNodes: Record<string, NodeData>,
+  storageNS: string,
+) {
+  return renderHook(
+    ({ storageNS: scope }) => {
+      const [nodesData, setNodesData] = useState(initialNodes);
+      const nodesDataRef = useRef(nodesData);
+      const queryCacheRef = useRef(new QueryCache());
+      useEffect(() => {
+        nodesDataRef.current = nodesData;
+      }, [nodesData]);
+      const actions = useTreeCacheActions({
+        api: null,
+        contract: null,
+        contractAddress: null,
+        eventInterfaceRef: { current: null },
+        queryCacheRef,
+        nodesDataRef,
+        edgesStrictRef: { current: {} },
+        reachableNodeIdsRef: { current: [] },
+        setNodesData,
+        setEdgesUnion: vi.fn(),
+        setEdgesStrict: vi.fn(),
+        setReachableNodeIds: vi.fn(),
+        setProgress: vi.fn(),
+        refresh: vi.fn(),
+        storageNS: scope,
+        edgesUnionKey: `${scope}::edges.union.v1`,
+        edgesStrictKey: `${scope}::edges.strict.v1`,
+        useIndexedDbCache: true,
+        childrenPageLimit: 200,
+        totalVersionsTtlMs: 60_000,
+      });
+      return { actions, nodesData, nodesDataRef, setNodesData };
+    },
+    { initialProps: { storageNS } },
+  );
 }
 
 describe("useTreeCacheActions", () => {
@@ -880,5 +952,216 @@ describe("useTreeCacheActions", () => {
     const durable = persistenceMocks.blobs.get("fenced-confirmation::nodesData");
     expect(JSON.stringify(durable)).not.toContain("fenced-confirmation-tag");
     expect(JSON.stringify(durable)).not.toContain("fenced-confirmation-biography");
+  });
+
+  it("confirms a version after a queued tree action creates its anchorless placeholder", async () => {
+    const confirmed = confirmedVersionFixture();
+    const scope = "confirmed-after-queued-placeholder";
+    const hook = createReactTreeCacheActionsHarness({}, scope);
+    let persistence!: Promise<void>;
+
+    act(() => {
+      const actions = hook.result.current.actions;
+      actions.bumpEndorsementCount(confirmed.personHash, confirmed.versionIndex, 1);
+      persistence = actions.cacheConfirmedPersonVersion(
+        confirmed,
+        actions.captureMetadataCacheRevision(),
+      );
+    });
+    await persistence;
+
+    expect(hook.result.current.nodesData[confirmed.id]).toMatchObject({
+      versionCommitment: confirmed.versionCommitment,
+      metadataPointer: confirmed.metadataPointer,
+      metadataPayloadHash: confirmed.metadataPayloadHash,
+      metadataPayloadLength: confirmed.metadataPayloadLength,
+      metadataSegmentCount: confirmed.metadataSegmentCount,
+      endorsementCount: 1,
+      metadataUnlockValidated: true,
+      biography: confirmed.biography,
+    });
+    expect(hook.result.current.nodesDataRef.current).toEqual(hook.result.current.nodesData);
+    expect(persistenceMocks.blobs.get(`${scope}::nodesData`)).toEqual(
+      hook.result.current.nodesData,
+    );
+  });
+
+  it("completes matching partial anchors while preserving the current public node fields", async () => {
+    const confirmed = confirmedVersionFixture();
+    const partial: NodeData = {
+      id: confirmed.id,
+      personHash: confirmed.personHash,
+      versionIndex: confirmed.versionIndex,
+      versionCommitment: confirmed.versionCommitment,
+      metadataPointer: confirmed.metadataPointer,
+      metadataPayloadHash: undefined,
+      tokenId: "77",
+      nftTokenURI: "ipfs://minted-public-token",
+      endorsementCount: 5,
+      totalVersions: 9,
+    };
+    const scope = "confirmed-partial-public-anchors";
+    persistenceMocks.blobs.set(`${scope}::nodesData`, {
+      [confirmed.id]: {
+        ...clearMetadataUnlock(confirmed),
+        tokenId: "0",
+        endorsementCount: 1,
+        totalVersions: 2,
+      },
+    });
+    const hook = createReactTreeCacheActionsHarness({ [confirmed.id]: partial }, scope);
+
+    await act(async () => {
+      await hook.result.current.actions.cacheConfirmedPersonVersion(
+        confirmed,
+        hook.result.current.actions.captureMetadataCacheRevision(),
+      );
+    });
+
+    expect(hook.result.current.nodesData[confirmed.id]).toMatchObject({
+      metadataPayloadHash: confirmed.metadataPayloadHash,
+      metadataPayloadLength: confirmed.metadataPayloadLength,
+      metadataSegmentCount: confirmed.metadataSegmentCount,
+      metadataUnlockValidated: true,
+      metadataPerson: confirmed.metadataPerson,
+      biography: confirmed.biography,
+      tokenId: "77",
+      nftTokenURI: "ipfs://minted-public-token",
+      endorsementCount: 5,
+      totalVersions: 9,
+    });
+    expect(hook.result.current.nodesDataRef.current).toEqual(hook.result.current.nodesData);
+    expect(persistenceMocks.blobs.get(`${scope}::nodesData`)).toEqual(
+      hook.result.current.nodesData,
+    );
+  });
+
+  it.each([
+    { field: "versionCommitment", value: "999999999" },
+    { field: "metadataPointer", value: `0x${"b2".repeat(20)}` },
+    { field: "metadataPayloadHash", value: `0x${"b3".repeat(32)}` },
+    { field: "metadataPayloadLength", value: 1024 },
+    { field: "metadataSegmentCount", value: 2 },
+  ])(
+    "keeps conflicting $field anchors out of the confirmed plaintext cache",
+    async ({ field, value }) => {
+      const confirmed = confirmedVersionFixture();
+      const publicNode = { ...clearMetadataUnlock(confirmed), [field]: value };
+      const snapshot = { [confirmed.id]: publicNode };
+      const scope = `confirmed-conflict-${field}`;
+      persistenceMocks.blobs.set(`${scope}::nodesData`, snapshot);
+      const hook = createReactTreeCacheActionsHarness(snapshot, scope);
+
+      await act(async () => {
+        // AddVersion can report a cache error; its React updater must remain safe.
+        await expect(
+          hook.result.current.actions.cacheConfirmedPersonVersion(
+            confirmed,
+            hook.result.current.actions.captureMetadataCacheRevision(),
+          ),
+        ).rejects.toThrow(/public anchors/);
+      });
+
+      expect(hook.result.current.nodesData).toEqual(snapshot);
+      expect(hook.result.current.nodesDataRef.current).toEqual(snapshot);
+      expect(persistenceMocks.blobs.get(`${scope}::nodesData`)).toEqual(snapshot);
+      expect(persistenceMocks.writeBlob).not.toHaveBeenCalled();
+      expect(JSON.stringify(hook.result.current.nodesData)).not.toContain(
+        "confirmed-regression-private",
+      );
+    },
+  );
+
+  it("does not retain confirmed plaintext after a same-tick metadata clear", async () => {
+    const confirmed = confirmedVersionFixture();
+    const scope = "confirmed-queued-before-clear";
+    const hook = createReactTreeCacheActionsHarness({}, scope);
+    let persistence!: Promise<void>;
+    let clearing!: Promise<void>;
+
+    act(() => {
+      const actions = hook.result.current.actions;
+      actions.bumpEndorsementCount(confirmed.personHash, confirmed.versionIndex, 1);
+      persistence = actions.cacheConfirmedPersonVersion(
+        confirmed,
+        actions.captureMetadataCacheRevision(),
+      );
+      clearing = actions.clearMetadataUnlockCache();
+    });
+    await Promise.all([persistence, clearing]);
+
+    expect(hook.result.current.nodesDataRef.current).toEqual(hook.result.current.nodesData);
+    expect(JSON.stringify(hook.result.current.nodesData)).not.toContain(
+      "confirmed-regression-private",
+    );
+    expect(JSON.stringify(persistenceMocks.blobs.get(`${scope}::nodesData`))).not.toContain(
+      "confirmed-regression-private",
+    );
+    expect(hook.result.current.nodesData[confirmed.id]?.metadataUnlockValidated).not.toBe(true);
+  });
+
+  it("rejects anchors queued ahead of confirmation without a React crash or cached plaintext", async () => {
+    const confirmed = confirmedVersionFixture();
+    const publicNode = clearMetadataUnlock(confirmed);
+    const conflicting = { ...publicNode, metadataPayloadHash: `0x${"b4".repeat(32)}` };
+    const scope = "confirmed-conflict-before-render";
+    persistenceMocks.blobs.set(`${scope}::nodesData`, { [confirmed.id]: publicNode });
+    const hook = createReactTreeCacheActionsHarness({ [confirmed.id]: publicNode }, scope);
+    let persistence!: Promise<void>;
+
+    act(() => {
+      hook.result.current.setNodesData({ [confirmed.id]: conflicting });
+      persistence = hook.result.current.actions.cacheConfirmedPersonVersion(
+        confirmed,
+        hook.result.current.actions.captureMetadataCacheRevision(),
+      );
+    });
+    await expect(persistence).rejects.toThrow(/public anchors/);
+
+    expect(hook.result.current.nodesData).toEqual({ [confirmed.id]: conflicting });
+    expect(hook.result.current.nodesDataRef.current).toEqual(hook.result.current.nodesData);
+    expect(persistenceMocks.blobs.get(`${scope}::nodesData`)).toEqual({
+      [confirmed.id]: publicNode,
+    });
+    expect(JSON.stringify(persistenceMocks.blobs.get(`${scope}::nodesData`))).not.toContain(
+      "confirmed-regression-private",
+    );
+  });
+
+  it("does not write an old scope's confirmation into the newly active tree scope", async () => {
+    const confirmed = confirmedVersionFixture();
+    const sourceScope = "confirmed-source-scope";
+    const targetScope = "confirmed-target-scope";
+    const hook = createReactTreeCacheActionsHarness({}, sourceScope);
+    const oldActions = hook.result.current.actions;
+    const oldRevision = oldActions.captureMetadataCacheRevision();
+    hook.rerender({ storageNS: targetScope });
+
+    await act(async () => {
+      await oldActions.cacheConfirmedPersonVersion(confirmed, oldRevision);
+    });
+
+    expect(hook.result.current.nodesData).toEqual({});
+    expect(hook.result.current.nodesDataRef.current).toEqual({});
+    expect(persistenceMocks.blobs.has(`${sourceScope}::nodesData`)).toBe(false);
+    expect(persistenceMocks.blobs.has(`${targetScope}::nodesData`)).toBe(false);
+  });
+
+  it("keeps an old confirmation invalid when the same storage scope becomes active again", async () => {
+    const confirmed = confirmedVersionFixture();
+    const scope = "confirmed-scope-roundtrip";
+    const hook = createReactTreeCacheActionsHarness({}, scope);
+    const oldActions = hook.result.current.actions;
+    const revision = oldActions.captureMetadataCacheRevision();
+    hook.rerender({ storageNS: `${scope}-other` });
+    hook.rerender({ storageNS: scope });
+
+    await act(async () => {
+      await oldActions.cacheConfirmedPersonVersion(confirmed, revision);
+    });
+
+    expect(hook.result.current.nodesData).toEqual({});
+    expect(hook.result.current.nodesDataRef.current).toEqual({});
+    expect(persistenceMocks.blobs.has(`${scope}::nodesData`)).toBe(false);
   });
 });

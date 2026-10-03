@@ -56,6 +56,7 @@ Use the directory tree for ownership boundaries, and these files as first-read e
 
 - App shell: `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/AppProviders.tsx`, `frontend/src/app/ui/Layout.tsx`
 - Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/app/config/brandBadge.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
+- Wallet connection and local transaction boundary: `frontend/src/domains/wallet/context/WalletContext.tsx`, `frontend/src/domains/wallet/services/walletProvider.ts`
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
 - Worker/ZK/metadata boundaries: `frontend/src/workers/crypto.worker.ts`,
@@ -129,6 +130,10 @@ For TypeScript:
 Transaction modal flow models may start under `domains/transactions/ui/<flow>/model/` when they are local to one UI flow. Move them upward only after another flow or non-UI caller has a real reuse need.
 
 Each transaction flow should have one canonical React flow hook. When the flow is owned by a transaction modal, place that hook under `domains/transactions/ui/<flow>/hooks/useXxxFlow.ts` and make it the only React orchestration entry point for that flow. Do not keep a parallel `domains/transactions/flows/useXxxFlow.ts` compatibility hook. Shared non-React behavior belongs in `domains/transactions/services/*`, `domains/transactions/api/*`, `domains/transactions/model/*`, or `shared/*`.
+
+### Local development wallet transactions
+
+All wallet connections, reconnects, account changes and network changes create their ethers provider through `domains/wallet/services/walletProvider.ts`. In Vite development mode on the built-in Hardhat network (31337, `http://127.0.0.1:8545`), an ordinary transaction without an explicit nonce reads the node's fresh pending transaction count immediately before sending. This bypasses stale injected-wallet nonce tracking after instant mining or local seed transactions. Each approval and subsequent contract call reads separately. Sends for the same wallet provider and account are serialized, including across provider recreation, and failures release that queue without automatic rebroadcast. The adapter checks the node and wallet chain IDs and passes the chain ID with the nonce. Explicit nonces and other networks retain wallet-controlled behavior; production builds do not enable this adapter.
 
 ### Transaction flow state
 
@@ -243,6 +248,8 @@ New arrangements use the currently unlocked parent’s latest family record. An 
 The unlocked family identity and the connected ordinary wallet have separate roles. The identity derives the spending and viewing keys for recovered VALUE and fixes the budget parent. Any connected wallet can provide DEEP for `shield` and pay transaction gas; its address does not establish the parent-child relationship or determine the person hash. These are client funding-flow restrictions. The current `fund` circuit independently proves donor VALUE control and the recipient’s direct-child relationship to the policy root; it does not require the donor’s identity commitment to equal that root.
 
 The unlocked header is a compact bar with the identity's name, Available balance, Budget balance, Refresh and Exit. It also shows the unlocked identity's full person hash with a copy button; the hash wraps on narrow screens and follows the identity session rather than the transaction wallet. Task navigation uses small underlined tabs. Private assets contains wallet deposits, private transfers, withdrawals and sharing the identity's receive code. Child budgets opens the funding form directly; Claim budgets opens the claim form directly, including its empty state when there are no budgets. Only Private assets has an action switcher, labeled Deposit, Transfer, Withdraw and Receive code; the operation headings identify the ordinary-wallet direction or private transfer. Exit clears the unlocked session; leaving the page or ten idle minutes still locks it automatically.
+
+Each deposit checks the connected ordinary wallet's current DEEP balance before preparing the note, approving tokens or generating a proof. Insufficient funds show the available and required DEEP amounts; recovered private VALUE cannot cover an ordinary-wallet deposit. If the balance changes after that check, an on-chain `ERC20InsufficientBalance` revert still produces a localized token-balance message rather than raw RPC data or a gas-fee warning.
 
 Own-identity unlock and generating a recipient's receive code use the same identity input component and layout. Both identity forms disable live identity-hash computation and derive only when the user starts the action. They omit the generic optional-passphrase help, character count and strength details; required-passphrase and invalid-character checks still apply. The recipient wrapper reads only the identity fields and raw passphrase, then immediately clears the passphrase input before generation begins; it does not open a recipient session. Repeated funding tutorials are omitted, while the amount preview, family record and concise privacy and irreversible-funding notices remain visible. The header labels total remaining BUDGET as Budget balance, which includes funds not yet due; the claim view separately reports currently claimable amounts. Claims show checkboxes for the earliest up to 12 funded, due, unpaid periods, selected by default and labeled from Period 1 with an amount and due date. The summary updates to the selected total; clearing all disables submission. Budgets with the same enrollment are grouped, preserving the two-input claim path, and a budget selector appears only when several arrangements are available. There is no optional-settings foldout or manual period-index input. Refresh preserves explicit selections, and submission rechecks the displayed budget commitments, periods and current child eligibility; stale selections require choosing again. Input and receipt failures use localized messages, preserving the distinction between a completed transaction with a failed refresh and an action that did not complete.
 
@@ -466,7 +473,11 @@ including decrypted display fields, `tag`, and `biography`. An explicit opt-out 
 keeps subsequent results in memory for the session (`"session"`). All snapshot write paths strip
 session-only private fields, including when another
 node is saved. Newly created confirmed versions use the same preference when no explicit mode is
-provided. Older device caches remain readable. Cache scope includes chain ID, DeepFamily proxy,
+provided. After the submission is verified against Reader/Archive, the confirmed-version cache
+can complete missing public anchors on a tree placeholder. Defined anchors must still match; ref,
+React state and durable writes use the same reconciliation rule. Deferred state updates safely
+reject concurrent anchor changes instead of throwing during rendering. Clear revisions and storage
+scope changes invalidate queued plaintext writes. Older device caches remain readable. Cache scope includes chain ID, DeepFamily proxy,
 and protocol/cache generation. Refreshing the same scope can display remembered plaintext without
 another KDF. Users can clear local unlocked metadata, but this is best-effort and
 does not protect browser-profile backups or defend against same-origin XSS. Passphrases, identity

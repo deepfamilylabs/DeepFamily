@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import {
   getMetadataUnlockPreference,
   pauseAutomaticMetadataUnlock,
@@ -115,8 +115,33 @@ function projectConfirmedPersonVersion(node: NodeData): NodeData {
   return rebaseValidatedMetadataUnlock(publicSnapshot, node);
 }
 
+function reconcileConfirmedPersonVersion(
+  current: NodeData | undefined,
+  confirmed: NodeData,
+): NodeData {
+  if (!current) return confirmed;
+  // The confirmed Reader/Archive snapshot may complete a tree placeholder.
+  // Keep defined anchors and live NFT/endorsement fields so the strict rebase
+  // still rejects a real conflict rather than overwriting it with new plaintext.
+  const definedCurrent = Object.fromEntries(
+    Object.entries(current).filter(([, value]) => value !== undefined),
+  );
+  return rebaseValidatedMetadataUnlock({ ...confirmed, ...definedCurrent }, confirmed);
+}
+
 export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
   const nodesStorageKey = `${options.storageNS}::nodesData`;
+  const storageScopeRef = useRef({ storageNS: options.storageNS });
+  if (storageScopeRef.current.storageNS !== options.storageNS) {
+    storageScopeRef.current = { storageNS: options.storageNS };
+  }
+  const storageScope = storageScopeRef.current;
+  const isMetadataCacheRevisionCurrent = useCallback(
+    (revision: number) =>
+      storageScopeRef.current === storageScope &&
+      isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, revision),
+    [nodesStorageKey, storageScope],
+  );
   const captureMetadataCacheRevision = useCallback(
     () => captureTreeNodesPersistenceRevision(nodesStorageKey),
     [nodesStorageKey],
@@ -420,11 +445,12 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         throw new Error("Only fully validated metadata may enter the NodeData unlock cache");
       }
       const id = makeNodeId(node.personHash, Number(node.versionIndex));
-      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) return;
+      if (!isMetadataCacheRevisionCurrent(expectedRevision)) return;
       const latest = options.nodesDataRef.current[id];
       if (!latest) throw new Error("Cannot cache metadata for a node that is no longer loaded");
       rebaseValidatedMetadataUnlock(latest, node);
       options.setNodesData((current) => {
+        if (!isMetadataCacheRevisionCurrent(expectedRevision)) return current;
         const currentNode = current[id];
         if (!currentNode) return current;
         try {
@@ -434,11 +460,11 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         }
       });
     },
-    [nodesStorageKey, options.nodesDataRef, options.setNodesData],
+    [isMetadataCacheRevisionCurrent, options.nodesDataRef, options.setNodesData],
   );
 
   const cacheConfirmedPersonVersion = useCallback(
-    (node: NodeData, expectedRevision: number): Promise<void> => {
+    async (node: NodeData, expectedRevision: number): Promise<void> => {
       // This is the only missing-node path. Its caller must have already checked
       // the post-confirmation Reader/Archive anchors; the explicit projection
       // prevents Worker diagnostics or secret intermediates from being retained.
@@ -454,34 +480,46 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
             }
           : node,
       );
-      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) {
-        return Promise.resolve();
-      }
+      if (!isMetadataCacheRevisionCurrent(expectedRevision)) return;
       const id = committed.id;
-      const nextNodes = upsertNode(options.nodesDataRef.current, committed);
+      const nextNodes = upsertNode(
+        options.nodesDataRef.current,
+        reconcileConfirmedPersonVersion(options.nodesDataRef.current[id], committed),
+      );
       options.nodesDataRef.current = nextNodes;
       options.setNodesData((current) => {
-        const currentNode = current[id];
-        if (!currentNode) return upsertNode(current, committed);
-        return upsertNode(current, rebaseValidatedMetadataUnlock(currentNode, committed));
+        if (!isMetadataCacheRevisionCurrent(expectedRevision)) return current;
+        try {
+          return upsertNode(current, reconcileConfirmedPersonVersion(current[id], committed));
+        } catch {
+          // A concurrent public-anchor change rejects the old unlock without
+          // throwing from React's deferred state updater into the whole page.
+          return current;
+        }
       });
 
-      if (!options.useIndexedDbCache || !isIndexedDBSupported()) return Promise.resolve();
+      if (!options.useIndexedDbCache || !isIndexedDBSupported()) return;
       return updateTreeNodesSnapshot(
         nodesStorageKey,
-        (persisted) => ({
-          ...persisted,
-          ...nextNodes,
-          [id]: {
-            ...(persisted[id] ?? {}),
-            ...committed,
-          },
-        }),
+        (persisted) => {
+          if (!isMetadataCacheRevisionCurrent(expectedRevision)) return persisted;
+          const currentNodes = options.nodesDataRef.current;
+          const latest = currentNodes[id];
+          if (!latest) return persisted;
+          const reconciled = reconcileConfirmedPersonVersion(latest, committed);
+          const durable = reconcileConfirmedPersonVersion(persisted[id], reconciled);
+          return {
+            ...persisted,
+            ...currentNodes,
+            [id]: { ...durable, ...reconciled },
+          };
+        },
         expectedRevision,
       );
     },
     [
       nodesStorageKey,
+      isMetadataCacheRevisionCurrent,
       options.storageNS,
       options.nodesDataRef,
       options.setNodesData,
@@ -494,7 +532,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       if (!isMetadataUnlockUsable(node)) {
         throw new Error("Only fully validated metadata may enter the IndexedDB unlock cache");
       }
-      if (!isTreeNodesPersistenceRevisionCurrent(nodesStorageKey, expectedRevision)) return;
+      if (!isMetadataCacheRevisionCurrent(expectedRevision)) return;
       if (!options.useIndexedDbCache || !isIndexedDBSupported()) return;
 
       const id = makeNodeId(node.personHash, Number(node.versionIndex));
@@ -507,6 +545,7 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
       await updateTreeNodesSnapshot(
         nodesStorageKey,
         (persisted) => {
+          if (!isMetadataCacheRevisionCurrent(expectedRevision)) return persisted;
           const currentNodes = options.nodesDataRef.current;
           const latest = currentNodes[id];
           if (!latest) {
@@ -525,7 +564,12 @@ export function useTreeCacheActions(options: UseTreeCacheActionsOptions) {
         expectedRevision,
       );
     },
-    [nodesStorageKey, options.nodesDataRef, options.useIndexedDbCache],
+    [
+      nodesStorageKey,
+      isMetadataCacheRevisionCurrent,
+      options.nodesDataRef,
+      options.useIndexedDbCache,
+    ],
   );
 
   const mergeNodeDetail = useCallback(

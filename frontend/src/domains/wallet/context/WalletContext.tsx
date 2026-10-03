@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { getAddChainParams } from "../../../shared/config";
 import { normalizeFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
 import { SUPPORTED_WALLETS } from "../config/wallets";
+import { createWalletProvider } from "../services/walletProvider";
 
 // localStorage key for persisting wallet type
 const WALLET_TYPE_STORAGE_KEY = "deepfamily_last_wallet_type";
@@ -180,7 +181,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           throw new Error("No accounts returned");
         }
 
-        const provider = new ethers.BrowserProvider(selectedProvider as any);
+        const provider = createWalletProvider(selectedProvider);
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
         const network = await provider.getNetwork();
@@ -350,7 +351,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             toast.success(t("wallet.chainAdded", "Network added successfully"));
             return true;
           } catch (addError: any) {
-            console.error("[WalletContext] Failed to add chain:", sanitizeErrorForLogging(addError));
+            console.error(
+              "[WalletContext] Failed to add chain:",
+              sanitizeErrorForLogging(addError),
+            );
             showWalletError(addError, t("wallet.chainAddFailed", "Failed to add network"));
             return false;
           }
@@ -379,7 +383,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         // Account changed, refresh signer/address without prompting
         (async () => {
           try {
-            const provider = new ethers.BrowserProvider(rawProvider as any);
+            const provider = createWalletProvider(rawProvider);
             const signer = await provider.getSigner();
             const address = await signer.getAddress();
             setWalletState((prev) => ({ ...prev, provider, signer, address }));
@@ -398,7 +402,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // retain the old cached network and throw NETWORK_ERROR on the next call.
       (async () => {
         try {
-          const provider = new ethers.BrowserProvider(rawProvider as any);
+          const provider = createWalletProvider(rawProvider);
           const signer = await provider.getSigner();
           const address = await signer.getAddress();
           const balance = await provider.getBalance(address);
@@ -546,7 +550,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         const accounts = await targetWallet.provider.request({ method: "eth_accounts" });
         if (accounts && accounts.length > 0) {
           // Hydrate state without prompting user
-          const provider = new ethers.BrowserProvider(targetWallet.provider as any);
+          const provider = createWalletProvider(targetWallet.provider);
           const signer = await provider.getSigner();
           const address = await signer.getAddress();
           const network = await provider.getNetwork();

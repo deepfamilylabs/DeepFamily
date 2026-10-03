@@ -163,6 +163,40 @@ describe("errors", () => {
     expect(ERROR_SELECTOR_MAP["0x2872d6ce"]).toBe("DuplicateVersion");
   });
 
+  it("identifies an ERC20 balance revert even when the pool ABI cannot decode it", () => {
+    const tokenInterface = new ethers.Interface([
+      "error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)",
+    ]);
+    const data = tokenInterface.encodeErrorResult("ERC20InsufficientBalance", [
+      "0x327C01dA6Da9A6818805cadB9eA8d62B10c20000",
+      0n,
+      ethers.parseUnits("1000", 18),
+    ]);
+    const error = {
+      code: "CALL_EXCEPTION",
+      action: "estimateGas",
+      shortMessage: "execution reverted (unknown custom error)",
+      info: { error: { code: -32603, data } },
+    };
+
+    expect(data.slice(0, 10)).toBe("0xe450d38c");
+    expect(resolveErrorReason({ data })).toBe("ERC20InsufficientBalance");
+    expect(resolveErrorReason(error)).toBe("ERC20InsufficientBalance");
+    expect(getFriendlyError(error, passthroughT as any)).toMatchObject({
+      type: "ERC20InsufficientBalance",
+      message: "Insufficient token balance for this transaction.",
+    });
+  });
+
+  it("distinguishes a named token balance error from insufficient gas funds", () => {
+    expect(resolveErrorReason(new Error("ERC20InsufficientBalance(sender, 0, 1000)"))).toBe(
+      "ERC20InsufficientBalance",
+    );
+    expect(resolveErrorReason(new Error("insufficient funds for gas * price + value"))).toBe(
+      "INSUFFICIENT_FUNDS",
+    );
+  });
+
   it("maps rejected direct transfers without assuming the native currency is ETH", () => {
     const selector = selectorOf("DirectNativeCurrencyNotAccepted()");
 
@@ -268,6 +302,34 @@ describe("errors", () => {
     });
     expect(resolveErrorReason(new Error("Nonce too high. Expected nonce 4 but got 5"))).toBe(
       "NONCE_TOO_HIGH",
+    );
+  });
+
+  it("explains a reused nonce without showing the raw approval transaction", () => {
+    const error = {
+      code: "NONCE_EXPIRED",
+      message: "nonce has already been used",
+      transaction: { data: "0x095ea7b3", from: "0x327c01da6da9a6818805cadb9ea8d62b10c20000" },
+      info: {
+        error: {
+          code: -32603,
+          message:
+            "RPC 0x7a69 Custom eth_sendRawTransaction: Nonce too low. Expected nonce to be 1346 but got 1345. Note that transactions can't be queued when automining.",
+        },
+      },
+    };
+
+    expect(resolveErrorReason(error)).toBe("LOCAL_NONCE_TOO_LOW");
+    expect(getFriendlyError(error, passthroughT as any)).toMatchObject({
+      type: "LOCAL_NONCE_TOO_LOW",
+      message:
+        "The wallet reused a transaction nonce already consumed on the local chain. Refresh the page and retry.",
+    });
+    expect(
+      resolveErrorReason({ code: "NONCE_EXPIRED", message: "nonce has already been used" }),
+    ).toBe("NONCE_EXPIRED");
+    expect(resolveErrorReason(new Error("Nonce too low. Expected nonce 6 but got 5"))).toBe(
+      "NONCE_EXPIRED",
     );
   });
 
