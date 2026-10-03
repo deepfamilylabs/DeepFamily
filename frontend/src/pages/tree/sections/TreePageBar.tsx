@@ -1,6 +1,7 @@
 import {
   KeyRound,
   Layers,
+  Pencil,
   RefreshCw,
   Trash2,
   Users,
@@ -64,6 +65,21 @@ export function TreePageBar({
               <span className="shrink-0">{t("familyTree.ui.rootLabel", "Root")}</span>
               <b className="min-w-0 truncate text-[13px] font-semibold text-ink">{rootLabel}</b>
               <span className="shrink-0 font-mono text-ink-subtle">v{rootVersion}</span>
+              <button
+                type="button"
+                onClick={onToggleConfig}
+                title={t("familyTree.actions.editConfig", "Edit family settings")}
+                aria-label={t("familyTree.actions.editConfig", "Edit family settings")}
+                aria-expanded={configOpen}
+                aria-haspopup="dialog"
+                className={`-my-1 -mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                  configOpen
+                    ? "bg-primary/10 text-primary"
+                    : "text-ink-subtle hover:bg-surface hover:text-ink"
+                }`}
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden />
+              </button>
             </span>
             <span className="hidden h-5 w-px bg-hairline xl:block" aria-hidden />
           </>

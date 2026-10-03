@@ -653,6 +653,7 @@
       "remove": "Remove",
       "clearAll": "Clear all",
       "openConfig": "Family settings",
+      "editConfig": "Edit family settings",
       "clearCaches": "Clear caches"
     },
     "nodeDetail": {

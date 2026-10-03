@@ -653,6 +653,7 @@
       "remove": "移除",
       "clearAll": "清空历史",
       "openConfig": "家族设置",
+      "editConfig": "修改家族设置",
       "clearCaches": "清空缓存"
     },
     "nodeDetail": {
