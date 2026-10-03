@@ -301,21 +301,19 @@ intentionally public NFT data.
 
 `circuits/shielded_receive_code.circom` backs a recipient's receive code. The proof shows that whoever knows the identity secret behind `identityCommitment` derived `ownerCommitment` from that secret and chose the X25519 viewing key. Its four public signals are `[identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi]`. The payer's browser verifies the proof with the verification key built into the app, plus a BN254 G2 subgroup check. There is no on-chain verifier or registry. A receive code does not prove that the identity exists in DeepFamily; initial `fund` proves the intended recipient's lineage eligibility.
 
-Six pool action circuits prove ownership and value conservation for `shield`, `fund`, `claim`, `privateTransfer`, `unshield`, and `claimPublic`. Each circuit declares as public inputs only the values its action uses, from 7 signals (`shield`) to 27 (`claim`). The pool builds the same order; see [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout.
+Five pool action circuits prove ownership and value conservation for `shield`, `fund`, `claim`, `privateTransfer`, and `unshield`. Together with the receive-code circuit there are six shielded circuits; identity and disclosure bring the build catalog to eight. Pool public inputs range from 7 (`shield`) to 27 (`claim`), with 26 for `fund`; see [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout.
 
-Public funding uses ordinary-wallet DEEP and the child's existing `personHash`, with no receive-code circuit. `shielded_claim_public.circom` proves ownership of the identity secret and creates two identity-owned VALUE commitments for the public payout and a zero-value output. Its 11 signals are `[chainId, pool, budgetId, heirIdentityCommitment, firstPeriod, claimCount, amount, outputCommitments[2], ciphertextHashes[2]]`. The pool checks current public lineage, maturity, the remaining balance and the sequential unpaid-period counter. Public and private budgets share token custody; claiming a public budget moves its accounting liability into private VALUE notes.
+Public and private budget funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. `fundMode` selects initial enrollment or additional funding. Independently, `budgetKind` selects an encrypted owner-bound private budget or a publicly delivered identity-bound budget. Public addressing needs only the selected child's existing `personHash`; the client resolves its identity commitment and proves the same lineage eligibility. It publishes the new budget's nine canonical recovery fields, while private funding publishes nine zeros. Both modes prove the donor VALUE spend, conservation, private rule/enrollment openings and the same initial-enrollment uniqueness tag.
 
-`ShieldedDeepPool` stores encrypted notes and one-time spend and period nullifiers. The pool note tree uses 32-level rotating shards; the two lineage trees remain 64 levels deep. A claim proves an eligible direct child, current endorsement and recommended source, complete due periods, and sufficient budget. It spends one or two budgets sharing the same rule and enrollment, consolidates their remaining balances, and creates a private child-controlled VALUE note. A unified fund circuit has separate initial and additional funding branches; only initial funding consumes an enrollment nullifier and checks current lineage. Rules are private parameters, backed up in donor change memos. An exit later exposes its public recipient and amount.
+The original private budget preimage and domain 1015 remain unchanged. Identity budgets use terms domain 1029 and note domain 1030, binding the recipient, parent/version, rate and eligibility start to opaque policy/enrollment commitments. The public kind-5 payload is 214 bytes padded with zeros to a 512-byte envelope; it excludes owner, rule salts and allocation-key material. The fund proof binds the parsed fields to the actual output. Donor rule openings stay in encrypted change memos.
 
-`privateTransfer` can spend one or two value notes, so a child can transfer the first claimed note immediately. The second public slot uses a secret-bound dummy nullifier for a single-note transfer. Different public input roots reveal that two real notes were spent; equal roots do not establish how many real notes were used.
+`claim` spends one or two compatible budgets, including a mixed pair, and proves the identity secret, current direct-child endorsement, trusted source, complete mature periods and sufficient funds. Input binding selectors are private witnesses committed by the note domains; they cannot bypass private owner or rule-opening checks. Any active owner-bound input forces an owner-bound remainder. Pure identity inputs retain their format; both remainder and VALUE are encrypted to the claimant. The 27 public signals expose neither input identity nor binding kind. Period nullifiers depend on the same identity secret, policy commitment and period index across both formats, so additional funding and format changes cannot reset allowances.
 
-`npm run zk:development:setup` prepares all 9 circuits and synchronizes their browser artifacts
-to `frontend/public/zk/`, with shielded files in the `shielded/` subdirectory. Generated shielded
-verifiers for the six pool actions live under `contracts/Shielded*Verifier.sol`; the receive
-code has none. `npm run zk:production:setup` uses the same production
-setup workflow for all 9 circuits, generating independent keys for each circuit.
+`ShieldedDeepPool` maintains the same 32-level note shards and secret-derived spend/period nullifiers for both formats. The lineage trees remain 64 levels deep. `privateTransfer` spends one or two VALUE notes into two VALUE outputs, supporting payments and consolidation; its absent second input uses a secret-bound dummy. Different public roots reveal two real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and fixed proof shapes do not prevent timing, wallet or small-set correlation.
 
-To rebuild one development shielded key after changing only its circuit, use `node scripts/zk-shielded-development-setup.mjs --circuit claimPublic` (or another shielded action). The command preserves the other manifest entries and keys, validates the same pinned Phase-1 file, and synchronizes the complete artifact set. A fresh checkout without a complete development set needs the full setup first.
+`npm run zk:development:setup` prepares all 8 circuits and synchronizes browser artifacts to `frontend/public/zk/`, with the six shielded sets under `shielded/`. Generated Solidity verifiers for the five pool actions live under `contracts/Shielded*Verifier.sol`; the receive code has none. `npm run zk:production:setup` uses the same production workflow for all 8 circuits, generating independent keys for each.
+
+To rebuild one development shielded key after changing its circuit, use `node scripts/zk-shielded-development-setup.mjs --circuit claim` (or another shielded action). The command preserves other manifest entries and keys, validates the pinned Phase-1 file, and synchronizes the complete artifact set. A fresh checkout without a complete development set needs full setup first.
 
 ## Proof Transport and Permanent Routing
 
@@ -344,11 +342,11 @@ Current generated verifiers are:
 
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- six shielded action verifiers for pool actions, with 7 to 27 public signals.
+- five shielded action verifiers for pool actions, with 7 to 27 public signals.
 
-These eight verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
+These seven verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
 adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
-and disclosure and purposes 2–7 to the six pool actions (pool action ID + 2). Each route fixes
+and disclosure and purposes 2–6 to the five pool actions (pool action ID + 2). Each route fixes
 its verifier address and checks its expected public-signal length. The action is not a public
 signal: the pool picks the purpose for its action, and the adapter handles proof transport only.
 
@@ -369,7 +367,7 @@ are published under `frontend/public/zk/`:
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;
 - `disclosure_binding.wasm`, `disclosure_binding_final.zkey`,
   `disclosure_binding.vkey.json`;
-- seven shielded WASM/zkey/vkey sets under `shielded/`.
+- six shielded WASM/zkey/vkey sets under `shielded/`.
 
 Production shielded artifacts use the same `/zk/shielded/` URLs and are installed in
 `frontend/public/zk/shielded/` by `zk:production:setup` with the production manifest. Vite serves
@@ -391,18 +389,18 @@ Supported top-level commands:
 | Command                        | Purpose                                             |
 | ------------------------------ | --------------------------------------------------- |
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                 |
-| `npm run zk:build`             | Compile all 9 circuits                              |
-| `npm run zk:development:setup` | Generate development artifacts for all 9 circuits   |
-| `npm run zk:production:setup`  | Generate production artifacts for all 9 circuits    |
-| `npm run zk:check`             | Check all 9 artifacts and available proof fixtures  |
-| `npm run zk:artifacts:check`   | Rebuild and validate all 9 circuit artifact sets    |
-| `npm run zk:ceremony:verify`   | Verify production setup evidence for all 9 circuits |
+| `npm run zk:build`             | Compile all 8 circuits                              |
+| `npm run zk:development:setup` | Generate development artifacts for all 8 circuits   |
+| `npm run zk:production:setup`  | Generate production artifacts for all 8 circuits    |
+| `npm run zk:check`             | Check all 8 artifacts and available proof fixtures  |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 8 circuit artifact sets    |
+| `npm run zk:ceremony:verify`   | Verify production setup evidence for all 8 circuits |
 
 The top-level commands cover identity, disclosure, and shielded circuits together.
-`zk:check` proves the identity and disclosure fixtures; in development it also checks all seven
-shielded artifact sets and runs the available fund/claim/claimPublic proof fixtures. Production checks
-validate all seven shielded circuit ceremonies. Release preflight additionally checks independent
-audits and committed runtime benchmarks. The same testnet acceptance report verifies all 9
+`zk:check` proves the identity and disclosure fixtures; in development it also checks all six
+shielded artifact sets and runs the available fund/claim proof fixtures. Production checks
+validate all six shielded circuit ceremonies. Release preflight additionally checks independent
+audits and committed runtime benchmarks. The same testnet acceptance report verifies all 8
 circuits, deployment bindings, transaction receipts, and finality before Mainnet planning.
 Development keys cannot be
 used for a production release.

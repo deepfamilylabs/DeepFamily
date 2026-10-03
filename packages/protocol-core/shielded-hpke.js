@@ -1,5 +1,5 @@
 import { Aes128Gcm, CipherSuite, DhkemX25519HkdfSha256, HkdfSha256 } from "@hpke/core";
-import { getBytes, keccak256, solidityPacked, toBeHex, toUtf8Bytes, zeroPadValue } from "ethers";
+import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from "ethers";
 import {
   asUint8Array,
   bigintFrom,
@@ -8,12 +8,11 @@ import {
   copyBytes,
   wipeBytes,
 } from "./bytes.js";
-import { MAX_UINT64, MAX_UINT128 } from "./constants.js";
+import { MAX_UINT64 } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { assertAddress } from "./identity.js";
 import { SHIELDED_CIPHERTEXT_BYTES } from "./shielded-inheritance.js";
 
-export const SHIELDED_HPKE_SUITE = "DHKEM(X25519,HKDF-SHA256)/HKDF-SHA256/AES-128-GCM";
 export const SHIELDED_HPKE_ENCAPSULATED_BYTES = 32;
 export const SHIELDED_HPKE_PLAINTEXT_BYTES = 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES = SHIELDED_HPKE_PLAINTEXT_BYTES - 3;
@@ -41,18 +40,9 @@ export function splitShieldedViewPublicKey(publicKey) {
   };
 }
 
-export function joinShieldedViewPublicKey(input) {
-  const hi = bigintFrom(input.viewKeyHi, "viewKeyHi", MAX_UINT128);
-  const lo = bigintFrom(input.viewKeyLo, "viewKeyLo", MAX_UINT128);
-  return concatBytes(
-    getBytes(zeroPadValue(toBeHex(hi), 16)),
-    getBytes(zeroPadValue(toBeHex(lo), 16)),
-  );
-}
-
 /**
  * RFC 9180 DeriveKeyPair with high-entropy IKM derived from the existing
- * identity secret. The result can be publicly registered without sharing IKM.
+ * identity secret. The receive code includes its public key without sharing IKM.
  */
 export async function deriveShieldedViewPublicKey(hpkeIkm) {
   const ikm = bytes32(hpkeIkm, "hpkeIkm");

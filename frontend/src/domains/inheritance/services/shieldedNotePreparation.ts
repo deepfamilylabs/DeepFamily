@@ -120,6 +120,7 @@ function emptyActionData(
 ): ShieldedPoolActionData {
   return {
     fundMode: 0n,
+    budgetKind: 0n,
     inputShardIds: [0n, 0n],
     inputRoots: [0n, 0n],
     inputNullifiers: [0n, 0n],

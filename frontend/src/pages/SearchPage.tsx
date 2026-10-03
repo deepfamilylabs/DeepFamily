@@ -5,7 +5,11 @@ import { PersonHashCalculator } from "../domains/person";
 import { PageHead } from "../shared/ui";
 import { useUnifiedSearch } from "./search/hooks/useUnifiedSearch";
 import { getFacetDescriptor, type SearchFacetKey } from "./search/model/searchSubject";
-import { FACET_LABELS, FACET_TOTAL_LABEL_KEYS, FacetPanel } from "./search/sections/SearchFacetPanels";
+import {
+  FACET_LABELS,
+  FACET_TOTAL_LABEL_KEYS,
+  FacetPanel,
+} from "./search/sections/SearchFacetPanels";
 import {
   CommandBar,
   EntryCards,
@@ -40,7 +44,7 @@ export default function SearchPage() {
   }, [query, searchFor]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-8 text-ink md:pb-0">
+    <div className="space-y-6 text-ink">
       <PageHead
         title={t("navigation.search")}
         subtitle={t(
@@ -78,9 +82,7 @@ export default function SearchPage() {
               const lastCalculatorHash = lastCalculatorHashRef.current;
               lastCalculatorHashRef.current = null;
               if (lastCalculatorHash) {
-                unified.setQueryInput((current) =>
-                  current === lastCalculatorHash ? "" : current,
-                );
+                unified.setQueryInput((current) => (current === lastCalculatorHash ? "" : current));
               }
             }}
           />

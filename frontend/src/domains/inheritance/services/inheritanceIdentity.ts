@@ -3,7 +3,7 @@ import {
   ProtocolError,
   canonicalizeFullName,
 } from "@deepfamily/protocol-core";
-import { classifyProtocolPassphraseRisk } from "../../../shared/crypto/passphraseStrength";
+import { getFundingPassphraseError } from "../../../shared/crypto/passphraseStrength";
 import {
   cryptoWorkerCall,
   type IdentityMaterialV1Result,
@@ -32,9 +32,8 @@ export async function deriveIdentityFromForm(
     throw error;
   }
   const rawPassphrase = form.getSecretInputs().passphrase;
-  if (classifyProtocolPassphraseRisk(rawPassphrase) === "disallowed") {
-    throw new InheritanceError("passphraseDisallowed");
-  }
+  const passphraseError = getFundingPassphraseError(rawPassphrase);
+  if (passphraseError) throw new InheritanceError(passphraseError);
   return cryptoWorkerCall(
     "deriveIdentityMaterialV1",
     {

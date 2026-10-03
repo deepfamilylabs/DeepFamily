@@ -45,8 +45,7 @@ export function ShieldedRecipientPicker({
           {visible.map((option, index) => (
             <option key={option.personHash.toLowerCase()} value={option.personHash}>
               {option.label ?? t("shielded.recipientPicker.childFallback", { index: index + 1 })}{" "}
-              {shortHex(option.personHash)} ·{" "}
-              {t("shielded.recipientPicker.codeRequired")}
+              {shortHex(option.personHash)}
             </option>
           ))}
         </select>

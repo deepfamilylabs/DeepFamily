@@ -130,40 +130,6 @@ template ShieldedPrivateEnrollment() {
     commitment <== enrollment.out;
 }
 
-template ShieldedBudgetOutput() {
-    signal input policyCommitment;
-    signal input enrollmentCommitment;
-    signal input heirOwnerCommitment;
-    signal input rate;
-    signal input periods;
-    signal input nonce;
-    signal input ciphertextHash;
-    signal output amount;
-    signal output noteCommitment;
-
-    component periodsBits = Num2Bits(64);
-    periodsBits.in <== periods;
-    component periodsNotZero = IsZero();
-    periodsNotZero.in <== periods;
-    periodsNotZero.out === 0;
-    amount <== rate * periods;
-    component amountBits = Num2Bits(128);
-    amountBits.in <== amount;
-    component nonceNotZero = IsZero();
-    nonceNotZero.in <== nonce;
-    nonceNotZero.out === 0;
-    component note = Poseidon(8);
-    note.inputs[0] <== 1015;
-    note.inputs[1] <== policyCommitment;
-    note.inputs[2] <== enrollmentCommitment;
-    note.inputs[3] <== heirOwnerCommitment;
-    note.inputs[4] <== rate;
-    note.inputs[5] <== amount;
-    note.inputs[6] <== nonce;
-    note.inputs[7] <== ciphertextHash;
-    noteCommitment <== note.out;
-}
-
 template ShieldedDonorChange() {
     signal input ownerCommitment;
     signal input amount;
@@ -183,4 +149,49 @@ template ShieldedDonorChange() {
     note.inputs[3] <== nonce;
     note.inputs[4] <== ciphertextHash;
     noteCommitment <== note.out;
+}
+
+// The binding selector is committed in the domain and the third binding field.
+// Private kind 0 preserves the exact historical owner-bound note preimage.
+// Identity kind 1 binds all public terms without exposing private openings.
+template ShieldedBoundBudgetCommitment() {
+    signal input budgetKind;
+    signal input policyCommitment;
+    signal input enrollmentCommitment;
+    signal input termsCommitment;
+    signal input ownerCommitment;
+    signal input rate;
+    signal input remaining;
+    signal input nonce;
+    signal input ciphertextHash;
+    signal output commitment;
+
+    budgetKind * (1 - budgetKind) === 0;
+    component note = Poseidon(8);
+    note.inputs[0] <== 1015 + 15 * budgetKind;
+    note.inputs[1] <== policyCommitment;
+    note.inputs[2] <== enrollmentCommitment;
+    note.inputs[3] <== ownerCommitment + budgetKind * (termsCommitment - ownerCommitment);
+    note.inputs[4] <== rate;
+    note.inputs[5] <== remaining;
+    note.inputs[6] <== nonce;
+    note.inputs[7] <== ciphertextHash;
+    commitment <== note.out;
+}
+
+template ShieldedIdentityBudgetTerms() {
+    signal input rootIdentityCommitment;
+    signal input rootVersionIndex;
+    signal input heirIdentityCommitment;
+    signal input eligibleFrom;
+    signal input rate;
+    signal output commitment;
+    component terms = Poseidon(6);
+    terms.inputs[0] <== 1029;
+    terms.inputs[1] <== rootIdentityCommitment;
+    terms.inputs[2] <== rootVersionIndex;
+    terms.inputs[3] <== heirIdentityCommitment;
+    terms.inputs[4] <== eligibleFrom;
+    terms.inputs[5] <== rate;
+    commitment <== terms.out;
 }

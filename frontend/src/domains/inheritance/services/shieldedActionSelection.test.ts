@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShieldedPeriodNullifier,
-  computeShieldedPolicyCommitment,
+  getShieldedBudgetCommitments,
   INHERITANCE_PERIOD_SECONDS,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
@@ -13,7 +13,7 @@ import {
   type ShieldedSelectableValueNote,
 } from "./shieldedActionSelection";
 
-type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget" }>;
+type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget"; binding?: "owner" }>;
 const secret = "987654321";
 const eligibleFrom = 1_000n;
 
@@ -61,10 +61,13 @@ function budget(
   };
 }
 
-function spentPeriod(note: BudgetPayload, periodIndex: bigint): bigint {
+function spentPeriod(
+  note: Extract<DecodedShieldedNotePayload, { kind: "budget" }>,
+  periodIndex: bigint,
+): bigint {
   return computeShieldedPeriodNullifier({
     derivedSecretField: secret,
-    policyCommitment: computeShieldedPolicyCommitment(note),
+    policyCommitment: getShieldedBudgetCommitments(note).policyCommitment,
     periodIndex,
   });
 }

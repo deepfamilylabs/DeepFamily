@@ -9,12 +9,7 @@ import {
 } from "@deepfamily/protocol-core";
 import DeepFamily from "../../../abi/DeepFamily.json";
 import DeepFamilyLineageIndex from "../../../abi/DeepFamilyLineageIndex.json";
-import {
-  findHeirLegitimacy,
-  loadLineageSnapshot,
-  loadRootRegistry,
-  countTrustedEndorsers,
-} from "./inheritanceChain";
+import { findHeirLegitimacy, loadLineageSnapshot } from "./inheritanceChain";
 
 const INDEX = "0x00000000000000000000000000000000000000d1";
 const FAMILY = "0x00000000000000000000000000000000000000d2";
@@ -142,7 +137,7 @@ describe("loadLineageSnapshot", () => {
       versionIndex: 2,
       timestamp: 300n,
     });
-    expect(countTrustedEndorsers(snapshot, ROOT, 1)).toBe(1);
+    expect(snapshot.trustedEndorsers.get(`${ROOT.toLowerCase()}:1`)).toEqual(new Set([B]));
   });
 
   it("never names a person in a log filter", async () => {
@@ -151,7 +146,6 @@ describe("loadLineageSnapshot", () => {
       root: async (id: number) => expectedRoots(id),
     });
     await loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any);
-    await loadRootRegistry(index as any, chain.contract(FAMILY, familyIface) as any);
 
     for (const [filter] of chain.provider.getLogs.mock.calls) {
       // One topic position: the event types. Nothing narrows by person, endorser, or version.

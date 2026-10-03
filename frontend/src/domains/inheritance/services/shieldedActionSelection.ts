@@ -1,6 +1,6 @@
 import {
   computeShieldedPeriodNullifier,
-  computeShieldedPolicyCommitment,
+  getShieldedBudgetCommitments,
   INHERITANCE_PERIOD_SECONDS,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
@@ -93,20 +93,20 @@ export function selectValueNotes(
   return best;
 }
 
-const BUDGET_IDENTITY_FIELDS = [
-  "rootIdentityCommitment",
-  "rootVersionIndex",
-  "policySalt",
-  "allocationKeyCommitment",
-  "heirIdentityCommitment",
-  "eligibleFrom",
-  "enrollmentSalt",
-  "heirOwnerCommitment",
-  "amountPerPeriod",
-] as const satisfies readonly (keyof BudgetPayload)[];
-
-function budgetIdentity(note: BudgetPayload): string {
-  return BUDGET_IDENTITY_FIELDS.map((field) => note[field].toString()).join(":");
+/** Stable key for budget notes that may fund a single claim together. */
+export function getShieldedClaimBudgetKey(note: BudgetPayload): string {
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note);
+  return [
+    policyCommitment,
+    enrollmentCommitment,
+    note.rootIdentityCommitment,
+    note.rootVersionIndex,
+    note.heirIdentityCommitment,
+    note.eligibleFrom,
+    note.amountPerPeriod,
+  ]
+    .map(String)
+    .join(":");
 }
 
 function findClaimPeriods(
@@ -121,7 +121,7 @@ function findClaimPeriods(
   const target = Number(fundedCount < 12n ? fundedCount : 12n);
   if (target < 1) return [];
   const dueCount = elapsed / INHERITANCE_PERIOD_SECONDS;
-  const policyCommitment = computeShieldedPolicyCommitment(budget);
+  const policyCommitment = getShieldedBudgetCommitments(budget).policyCommitment;
   const result: bigint[] = [];
   const scanLimit = dueCount < MAX_AUTOMATIC_PERIOD_SCAN ? dueCount : MAX_AUTOMATIC_PERIOD_SCAN;
   for (let index = 0n; index < scanLimit && result.length < target; index += 1n) {
@@ -150,7 +150,7 @@ export function nextClaimPeriods(
   }
   const periods = findClaimPeriods(wallet, derivedSecretField, budget, now);
   if (!periods.length) {
-    throw new Error("No unclaimed due period was found; enter exact period indices");
+    throw new Error("No unclaimed due period could be selected");
   }
   return periods;
 }
@@ -183,7 +183,7 @@ export function selectClaimBudget(
         if (
           secondBudget.commitment === budget.commitment ||
           secondBudget.note.remaining <= 0n ||
-          budgetIdentity(secondBudget.note) !== budgetIdentity(budget.note)
+          getShieldedClaimBudgetKey(secondBudget.note) !== getShieldedClaimBudgetKey(budget.note)
         )
           continue;
         const remaining = budget.note.remaining + secondBudget.note.remaining;

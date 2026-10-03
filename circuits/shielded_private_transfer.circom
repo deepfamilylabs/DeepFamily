@@ -5,7 +5,7 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Action 6. One or two independently owned VALUE_NOTE inputs fund two
+// Action 3. One or two independently owned VALUE_NOTE inputs fund two
 // encrypted VALUE_NOTE outputs. An absent second input uses a domain-separated
 // dummy nullifier bound to the first note, with no value contribution, and
 // repeats the first input's shard and root. The input count is a private

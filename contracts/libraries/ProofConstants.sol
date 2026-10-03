@@ -42,8 +42,6 @@ library ProofConstants {
   uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER =
     PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
-  uint8 internal constant PROOF_PURPOSE_SHIELDED_CLAIM_PUBLIC =
-    PROOF_PURPOSE_SHIELDED_ACTION_BASE + 5;
 
   // ---------------------------------------------------------------------------
   // Public-signal length mirrors.
@@ -58,9 +56,8 @@ library ProofConstants {
 
   // Each pool action proves only the inputs it uses, in ShieldedDeepPool._publicSignals order.
   uint256 internal constant SHIELDED_SHIELD_PUBLIC_SIGNALS_LEN = 7;
-  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 16;
+  uint256 internal constant SHIELDED_FUND_PUBLIC_SIGNALS_LEN = 26;
   uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 27;
   uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 12;
   uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 12;
-  uint256 internal constant SHIELDED_CLAIM_PUBLIC_PUBLIC_SIGNALS_LEN = 11;
 }

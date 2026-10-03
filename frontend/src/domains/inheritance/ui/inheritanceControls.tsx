@@ -1,8 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { ethers } from "ethers";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { MODAL_HINT, MODAL_LABEL } from "../../../shared/ui";
-import type { FriendlyError } from "../../../shared/lib/errors";
 
 type ButtonVariant = "primary" | "secondary";
 
@@ -17,15 +15,20 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
 
 export function PanelButton({
   variant = "secondary",
+  size = "default",
   busy = false,
   className = "",
   children,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; busy?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  size?: "default" | "compact";
+  busy?: boolean;
+}) {
   return (
     <button
       type="button"
-      className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold leading-tight transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2 ring-offset-surface disabled:cursor-not-allowed ${BUTTON_VARIANT[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg font-semibold leading-tight transition-colors focus:outline-hidden focus:ring-2 focus:ring-offset-2 ring-offset-surface disabled:cursor-not-allowed ${size === "compact" ? "h-9 px-3 text-xs" : "h-11 px-5 text-sm"} ${BUTTON_VARIANT[variant]} ${className}`}
       aria-busy={busy || undefined}
       {...props}
     >
@@ -87,36 +90,6 @@ export function FieldBlock({
   );
 }
 
-export function IdentityBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-hairline bg-surface-alt/40 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-ink">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-export function StatusLine({ children }: { children: ReactNode }) {
-  return (
-    <p role="status" className="flex items-center gap-2 text-sm text-ink-muted">
-      <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
-      {children}
-    </p>
-  );
-}
-
-export function ErrorNotice({ error }: { error: FriendlyError }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-2.5 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger"
-    >
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>{error.message}</span>
-    </div>
-  );
-}
-
 export function SuccessNotice({ children }: { children: ReactNode }) {
   return (
     <div
@@ -138,47 +111,6 @@ export function WarningNotice({ children }: { children: ReactNode }) {
   );
 }
 
-/** Hashes a result leaves behind, each labelled so none is taken for the inheritance id. */
-export function HashList({ items }: { items: Array<{ label: string; value: string }> }) {
-  return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-2 gap-y-1 text-xs text-ink-muted">
-      {items.map((item) => (
-        <div key={item.label} className="contents">
-          <dt>{item.label}</dt>
-          <dd className="min-w-0 break-all font-mono">{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/** Label/value rows for a summary; values may be long hashes, so they wrap. */
-export function FactList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
-  return (
-    <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
-      {items.map((item) => (
-        <div key={item.label} className="contents">
-          <dt className="text-ink-muted">{item.label}</dt>
-          <dd className="min-w-0 break-all text-ink">{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-/** The 32-byte word InheritanceCreated indexes; set-up and claim must print it alike. */
-export function formatCredential(credential: bigint): string {
-  return ethers.toBeHex(credential, 32);
-}
-
 export function shortHex(value: string, head = 10, tail = 8): string {
   return value.length > head + tail + 1 ? `${value.slice(0, head)}…${value.slice(-tail)}` : value;
-}
-
-export function formatBlockDate(seconds: bigint, locale: string): string {
-  return new Date(Number(seconds) * 1000).toLocaleDateString(locale, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }

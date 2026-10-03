@@ -1,7 +1,11 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { buildShieldedPoolPublicSignals, replayLineageTree } from "@deepfamily/protocol-core";
+import {
+  buildShieldedPoolPublicSignals,
+  encodePublicShieldedBudgetEnvelope,
+  replayLineageTree,
+} from "@deepfamily/protocol-core";
 
 const ciphertext = (byte) => `0x${byte.repeat(512)}`;
 // ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE.
@@ -45,6 +49,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
     relation1: 0n,
     asOf: 0n,
     fundMode: 0n,
+    budgetKind: 0n,
     ...overrides,
   });
 
@@ -260,6 +265,81 @@ describe("ShieldedDeepPool contract boundaries", function () {
       pool,
       "InvalidActionData",
     );
+  });
+
+  it("public addressing uses Fund and the same shielded balance with canonical recovery data", async () => {
+    const { pool, lineage, token } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    await lineage.setRoot(0, 700n);
+    await lineage.setRoot(1, 800n);
+    const root = (await pool.noteShard(0)).root;
+    const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
+    const publicNote = {
+      binding: "identity",
+      rootIdentityCommitment: 111n,
+      rootVersionIndex: 1n,
+      heirIdentityCommitment: 222n,
+      amountPerPeriod: 10n,
+      eligibleFrom: asOf + 7200n,
+      policyCommitment: 333n,
+      enrollmentCommitment: 444n,
+      remaining: 100n,
+      nonce: 555n,
+    };
+    const envelope = hre.ethers.hexlify(encodePublicShieldedBudgetEnvelope(publicNote));
+    const funding = actionData({
+      budgetKind: 1n,
+      inputRoots: [root, root],
+      inputNullifiers: [711n, 712n],
+      outputCommitments: [121n, 122n],
+      outputCiphertexts: [envelope, ciphertext("0c")],
+      relation0: 700n,
+      relation1: 800n,
+      asOf,
+    });
+    const proof = await proofFor(pool, 1, funding);
+    const replaceEnvelope = (bytes) => ({
+      ...funding,
+      outputCiphertexts: [hre.ethers.hexlify(bytes), funding.outputCiphertexts[1]],
+    });
+    for (const offset of [0, 4, 5, 214, 511]) {
+      const bytes = hre.ethers.getBytes(envelope);
+      bytes[offset] ^= 1;
+      await expect(pool.fund(replaceEnvelope(bytes), proof)).to.be.revertedWithCustomError(
+        pool,
+        "InvalidCiphertext",
+      );
+    }
+    const wrongHeir = hre.ethers.hexlify(
+      encodePublicShieldedBudgetEnvelope({ ...publicNote, heirIdentityCommitment: 223n }),
+    );
+    await expect(
+      pool.fund(
+        { ...funding, outputCiphertexts: [wrongHeir, funding.outputCiphertexts[1]] },
+        proof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    await expect(pool.fund({ ...funding, budgetKind: 0n }, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidZKProof",
+    );
+    await expect(pool.fund({ ...funding, budgetKind: 2n }, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
+    await expect(pool.claim(funding, "0x")).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
+    await pool.fund(funding, proof);
+    expect(await pool.totalShielded()).to.equal(100n);
+    expect(await token.balanceOf(await pool.getAddress())).to.equal(100n);
+    const fundedNotes = (await pool.queryFilter(pool.filters.NoteAppended())).slice(2);
+    expect(fundedNotes[0].args.ciphertext).to.equal(envelope);
+    expect(pool.interface.hasFunction("fundPublic")).to.equal(false);
+    expect(pool.interface.hasFunction("claimPublic")).to.equal(false);
+    expect(pool.interface.hasFunction("totalPublicBudget")).to.equal(false);
   });
 
   it("requires single-input actions to repeat their input slot", async () => {

@@ -640,7 +640,7 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress();
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress();
 
-  // All verifier targets must exist before the single adapter fixes its ten routes.
+  // All verifier targets must exist before the single adapter fixes its seven routes.
   const shieldedVerifiers = {};
   for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
     shieldedVerifiers[action] = await deployContract(

@@ -8,6 +8,8 @@ const decimal = (value) => BigInt(value).toString();
 
 export function buildShieldedClaimFixture({
   claimCount = 2,
+  budgetKind = 0,
+  secondBudgetKind = budgetKind,
   remainingPeriods = 3,
   secondRemainingPeriods = 0,
 } = {}) {
@@ -58,11 +60,19 @@ export function buildShieldedClaimFixture({
     eligibleFrom,
     enrollmentSalt,
   ]);
+  const termsCommitment = poseidon6([
+    1029n,
+    rootIdentityCommitment,
+    BigInt(lineage.rootVersionIndex),
+    heirIdentityCommitment,
+    eligibleFrom,
+    rate,
+  ]);
   const inputBudget = poseidon8([
-    1015n,
+    budgetKind === 0 ? 1015n : 1030n,
     policy,
     enrollment,
-    ownerCommitment,
+    budgetKind === 0 ? ownerCommitment : termsCommitment,
     rate,
     remaining,
     budgetNonce,
@@ -74,10 +84,10 @@ export function buildShieldedClaimFixture({
   const secondBudgetNonce = hasSecondInput ? 22222n : 0n;
   const secondBudgetCiphertextHash = hasSecondInput ? 11111n : 0n;
   const secondBudget = poseidon8([
-    1015n,
+    secondBudgetKind === 0 ? 1015n : 1030n,
     policy,
     enrollment,
-    ownerCommitment,
+    secondBudgetKind === 0 ? ownerCommitment : termsCommitment,
     rate,
     secondRemaining,
     secondBudgetNonce,
@@ -94,11 +104,12 @@ export function buildShieldedClaimFixture({
       : poseidon4([1019n, ownerSecret, inputBudget, BigInt(slot)]),
   );
   const payout = rate * claimCountBigInt;
+  const requiresOpening = budgetKind === 0 || (hasSecondInput && secondBudgetKind === 0);
   const budgetOutput = poseidon8([
-    1015n,
+    requiresOpening ? 1015n : 1030n,
     policy,
     enrollment,
-    ownerCommitment,
+    requiresOpening ? ownerCommitment : termsCommitment,
     rate,
     remaining + secondRemaining - payout,
     newBudgetNonce,
@@ -152,9 +163,13 @@ export function buildShieldedClaimFixture({
     trustedDepth: lineage.trustedDepth,
     trustedIndex: lineage.trustedIndex,
     trustedSiblings: lineage.trustedSiblings,
-    policySalt: decimal(policySalt),
-    allocationKeyCommitment: decimal(allocationKeyCommitment),
-    enrollmentSalt: decimal(enrollmentSalt),
+    budgetKind: decimal(budgetKind),
+    secondBudgetKind: hasSecondInput ? decimal(secondBudgetKind) : "0",
+    policyCommitmentInput: decimal(policy),
+    enrollmentCommitmentInput: decimal(enrollment),
+    policySalt: requiresOpening ? decimal(policySalt) : "0",
+    allocationKeyCommitment: requiresOpening ? decimal(allocationKeyCommitment) : "0",
+    enrollmentSalt: requiresOpening ? decimal(enrollmentSalt) : "0",
     eligibleFrom: decimal(eligibleFrom),
     rate: decimal(rate),
     remaining: decimal(remaining),

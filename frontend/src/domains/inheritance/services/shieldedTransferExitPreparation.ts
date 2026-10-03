@@ -20,10 +20,10 @@ import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import {
-  getRecoveredShieldedNoteProof,
   listUnspentRecoveredShieldedNotes,
   type LocalShieldedWalletSnapshot,
 } from "./shieldedWalletRecovery";
+import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -68,7 +68,7 @@ type OpenedValueInput = {
   hpkeIkm: string;
   ciphertextHashField: bigint;
   nullifier: bigint;
-  path: ReturnType<typeof getRecoveredShieldedNoteProof>;
+  path: ReturnType<typeof getLocalShieldedNoteProof>;
 };
 
 function uint128(value: BigNumberish, label: string): bigint {
@@ -150,7 +150,7 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
   });
   if (wallet.spentNullifiers.has(nullifier))
     throw new Error("Input value note has already been spent");
-  const path = getRecoveredShieldedNoteProof(wallet, commitment);
+  const path = getLocalShieldedNoteProof(wallet, commitment);
   return {
     note,
     ownerSecret: keys.ownerSecret,
@@ -218,6 +218,7 @@ function actionData(
 ): ShieldedPoolActionData {
   return {
     fundMode: 0n,
+    budgetKind: 0n,
     inputShardIds: [paths[0].path.shardId, paths[1].path.shardId],
     inputRoots: [paths[0].path.root, paths[1].path.root],
     inputNullifiers: nullifiers,
@@ -243,6 +244,7 @@ function publicInputs(
     chainId: ctx.chainId,
     poolAddress: ctx.poolAddress,
     fundMode: 0n,
+    budgetKind: 0n,
     inputShardIds: [...data.inputShardIds],
     inputRoots: [...data.inputRoots],
     inputNullifiers: [...data.inputNullifiers],

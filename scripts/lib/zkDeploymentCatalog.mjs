@@ -6,14 +6,13 @@ export const SHIELDED_ACTIONS = Object.freeze([
   "claim",
   "privateTransfer",
   "unshield",
-  "claimPublic",
 ]);
 
 /** ProofConstants.sol routes pool actions after person relation (0) and disclosure (1). */
 export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
 
 /**
- * The same six pool action verifiers and action order are deployed in every environment.
+ * The same five pool action verifiers and action order are deployed in every environment.
  * The receive-code circuit is verified in the browser and is never deployed.
  */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(

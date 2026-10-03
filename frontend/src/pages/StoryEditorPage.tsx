@@ -40,7 +40,7 @@ function StoryEditorScreen() {
 
   return (
     <>
-      <div data-story-editor-page className="flex w-full flex-col gap-7 py-8">
+      <div data-story-editor-page className="flex w-full flex-col gap-7">
         <StoryEditorHeader editor={editor} />
         {editor.accessMessage && (
           <div

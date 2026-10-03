@@ -12,7 +12,6 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   shield: "shielded_shield",
   fund: "shielded_fund",
   claim: "shielded_claim",
-  claimPublic: "shielded_claim_public",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
 });
@@ -25,7 +24,6 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
-  claimPublic: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.ClaimPublic],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
   unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],
 };

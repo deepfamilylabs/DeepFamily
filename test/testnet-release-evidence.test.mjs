@@ -82,14 +82,10 @@ const SHIELDED_ZKEY_SHA256 = "46".repeat(32);
 const SHIELDED_VERIFICATION_KEY_SHA256 = "47".repeat(32);
 const SHIELDED_PROOF_SHA256 = "48".repeat(32);
 const SHIELDED_ACTION_TRANSACTION_LABELS = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)
-  .filter((action) => !["claim", "claimPublic"].includes(action))
+  .filter((action) => action !== "claim")
   .map((action) => `shielded-action-${action}`);
 const SHIELDED_TRANSACTION_RECEIPTS = Object.fromEntries(
-  [
-    ...SHIELDED_ACTION_TRANSACTION_LABELS,
-    "public-budget-fund",
-    "public-budget-fund-additional",
-  ].map((label, index) => [
+  [...SHIELDED_ACTION_TRANSACTION_LABELS, "shielded-action-fund-identity"].map((label, index) => [
     label,
     {
       hash: `0x${(index + 1).toString(16).padStart(64, "0")}`,
@@ -319,13 +315,6 @@ const shieldedProofs = (chainId) =>
       // asOf closes the fund and claim inputs.
       if (action === "fund") signals[signals.length - 1] = "1000";
       if (action === "claim") signals[signals.length - 1] = String(8200 + 12 * 2_592_000);
-      if (action === "claimPublic") {
-        signals[2] = "1";
-        signals[3] = "123";
-        signals[4] = "0";
-        signals[5] = "12";
-        signals[6] = "1200";
-      }
       return [
         action,
         {
@@ -338,14 +327,47 @@ const shieldedProofs = (chainId) =>
           proofSha256: SHIELDED_PROOF_SHA256,
           publicSignals: signals,
           publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-          execution: ["claim", "claimPublic"].includes(action) ? "verifier-call" : "transaction",
-          ...(["claim", "claimPublic"].includes(action)
+          execution: action === "claim" ? "verifier-call" : "transaction",
+          ...(action === "claim"
             ? { claimCount: 12 }
             : { transactionLabel: `shielded-action-${action}` }),
         },
       ];
     }),
   );
+
+const identityBudgetEvidence = (chainId) => {
+  const baseline = shieldedProofs(chainId);
+  const fundProof = structuredClone(baseline.fund);
+  const signals = fundProof.publicSignals;
+  signals[2] = "1";
+  signals[3] = "1";
+  signals[4] = "122";
+  signals[5] = "1";
+  signals[6] = "123";
+  signals[7] = "100";
+  signals[8] = "8200";
+  signals[9] = "124";
+  signals[10] = "125";
+  signals[11] = "1500";
+  signals[12] = "126";
+  signals[19] = "127";
+  signals[signals.length - 1] = "0";
+  fundProof.publicSignalsSha256 = createHash("sha256")
+    .update(JSON.stringify(signals))
+    .digest("hex");
+  fundProof.transactionLabel = "shielded-action-fund-identity";
+  return {
+    fundingLabel: "shielded-action-fund-identity",
+    budgetCommitment: "127",
+    heirPersonHash: keccak256(toBeHex(123n, 32)),
+    amountPerPeriod: "100",
+    eligibleFrom: "8200",
+    remaining: "1500",
+    fundProof,
+    claimProof: structuredClone(baseline.claim),
+  };
+};
 
 const validReportTemplate = () => ({
   schemaVersion: TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
@@ -455,10 +477,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: 9,
+    circuitCount: 8,
     shielded: {
       status: "passed",
-      circuitCount: 7,
+      circuitCount: 6,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -478,19 +500,7 @@ const validReportTemplate = () => ({
     manifestSha256: SHIELDED_MANIFEST_SHA256,
     proofs: shieldedProofs(CHAIN_ID),
     scenario: {
-      publicBudget: {
-        fundingLabel: "public-budget-fund",
-        additionalFundingLabel: "public-budget-fund-additional",
-        budgetId: "1",
-        heirPersonHash: keccak256(toBeHex(123n, 32)),
-        amountPerPeriod: "100",
-        eligibleFrom: "8200",
-        remaining: "1500",
-        nextPeriod: "0",
-        fundingTimestamp: "1000",
-        claimExecution: "verifier-call",
-        claimCount: 12,
-      },
+      identityBudget: identityBudgetEvidence(CHAIN_ID),
       fundLabel: "shielded-action-fund",
       claimExecution: "verifier-call",
       claimCount: 12,
@@ -757,18 +767,15 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(7);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(6);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 6,
+      proofCount: 5,
       claimCount: 12,
       lineageDepth: 1,
       noteDepth: 1,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal([
-      "claim",
-      "claimPublic",
-    ]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
@@ -899,7 +906,11 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     report.network.chainId = String(sepoliaChainId);
     report.terminalGovernanceState.safe.chainId = String(sepoliaChainId);
     report.shielded.receipts.chainId = sepoliaChainId;
-    for (const proof of Object.values(report.shielded.proofs)) {
+    for (const proof of [
+      ...Object.values(report.shielded.proofs),
+      report.shielded.scenario.identityBudget.fundProof,
+      report.shielded.scenario.identityBudget.claimProof,
+    ]) {
       proof.publicSignals[0] = String(sepoliaChainId);
       proof.publicSignalsSha256 = createHash("sha256")
         .update(JSON.stringify(proof.publicSignals))
@@ -1489,7 +1500,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all seven public proof assets and the claim verifier call to the selected chain", async function () {
+  it("binds all six public proof assets and the claim verifier call to the selected chain", async function () {
     const cases = [
       [
         (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),
@@ -1538,40 +1549,36 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       [(report) => (report.shielded.scenario.claimCount = 11), /shielded\.scenario\.claimCount/iu],
       [
-        (report) => (report.shielded.proofs.claimPublic.execution = "transaction"),
-        /shielded\.proofs\.claimPublic\.execution/iu,
+        (report) => (report.shielded.scenario.identityBudget.claimProof.execution = "transaction"),
+        /shielded\.proofs\.claim\.execution/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.budgetId = "2"),
-        /claimPublic budget ID/iu,
+        (report) => (report.shielded.scenario.identityBudget.budgetCommitment = "128"),
+        /identityBudget budget commitment/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.heirPersonHash = address(999)),
-        /public budget heirPersonHash/iu,
+        (report) => (report.shielded.scenario.identityBudget.heirPersonHash = address(999)),
+        /identityBudget heirPersonHash/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.amountPerPeriod = "101"),
-        /claimPublic amount/iu,
+        (report) => (report.shielded.scenario.identityBudget.amountPerPeriod = "101"),
+        /identityBudget\.amountPerPeriod/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.remaining = "1100"),
-        /cannot cover twelve periods/iu,
+        (report) => (report.shielded.scenario.identityBudget.remaining = "1100"),
+        /identityBudget\.remaining/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.eligibleFrom = "8201"),
-        /publicBudget\.eligibleFrom/iu,
+        (report) => (report.shielded.scenario.identityBudget.eligibleFrom = "8201"),
+        /identityBudget\.eligibleFrom/iu,
       ],
       [
-        (report) => (report.shielded.scenario.publicBudget.nextPeriod = "1"),
-        /publicBudget\.nextPeriod/iu,
-      ],
-      [
-        (report) => delete report.transactions["public-budget-fund"],
-        /public-budget-fund|finality/iu,
+        (report) => delete report.transactions["shielded-action-fund-identity"],
+        /shielded-action-fund-identity|finality/iu,
       ],
       [
         (report) => (report.shielded.scenario.eligibleFrom = "8201"),
-        /shielded\.scenario\.eligibleFrom/iu,
+        /identityBudget\.eligibleFrom/iu,
       ],
     ];
     for (const [mutate, pattern] of cases) {

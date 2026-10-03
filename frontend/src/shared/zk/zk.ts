@@ -2,7 +2,6 @@ import { concat, keccak256, solidityPacked, toBeHex, toUtf8Bytes, zeroPadValue }
 import { poseidon4 } from "poseidon-lite";
 import { canonicalizeFullName } from "@deepfamily/protocol-core";
 import {
-  DEFAULT_PROOF_ENCODING_ID as CODEC_DEFAULT_PROOF_ENCODING_ID,
   packGroth16ProofEnvelope,
   type ProofEnvelope as CodecProofEnvelope,
 } from "@deepfamily/proof-core";
@@ -22,7 +21,6 @@ export type Groth16Proof = {
 export const SNARK_FIELD =
   21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 export const DEFAULT_IDENTITY_SUITE_ID = 1;
-export const DEFAULT_PROOF_ENCODING_ID = CODEC_DEFAULT_PROOF_ENCODING_ID;
 export const DOMAIN_NAME_PREHASH = "deepfamily:name-prehash:v1";
 export const DOMAIN_SUITE = 1000n;
 export const DOMAIN_NAME_SECRET = 1001n;
@@ -187,8 +185,4 @@ export function formatGroth16ProofForContract(
   options: { circuitId: number; proofEncodingId?: number },
 ): ProofEnvelope {
   return packGroth16ProofEnvelope(proof, options);
-}
-
-export function toBigIntArray(values: Array<string | number | bigint>): bigint[] {
-  return values.map(toBigInt);
 }

@@ -65,6 +65,19 @@ export const classifyProtocolPassphraseRisk = (value: string): ProtocolPassphras
   return isUnicodeWhiteSpaceOnly(normalized) ? "unicode-whitespace" : "ordinary";
 };
 
+export type FundingPassphraseErrorCode = "passphraseRequired" | "passphraseDisallowed";
+
+/**
+ * Financial credentials require a nonempty passphrase before local derivation.
+ * This client policy does not change the identity protocol's public-tree mode.
+ */
+export function getFundingPassphraseError(passphrase: string): FundingPassphraseErrorCode | null {
+  const risk = classifyProtocolPassphraseRisk(passphrase);
+  if (risk === "disallowed") return "passphraseDisallowed";
+  if (risk === "empty" || risk === "unicode-whitespace") return "passphraseRequired";
+  return null;
+}
+
 /**
  * Passphrase strength result
  */

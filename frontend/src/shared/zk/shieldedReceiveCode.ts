@@ -15,7 +15,7 @@ import {
 import { hexlify } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
-import { classifyProtocolPassphraseRisk } from "../crypto/passphraseStrength";
+import { getFundingPassphraseError } from "../crypto/passphraseStrength";
 import { generateShieldedProof, SHIELDED_RECEIVE_CODE_VERIFICATION_KEY } from "./shieldedZk";
 
 /** The identity material a receive-code proof needs; it stays inside the ZK worker. */
@@ -82,9 +82,8 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
   identity: IdentityFields;
   rawPassphrase: string;
 }) {
-  if (classifyProtocolPassphraseRisk(input.rawPassphrase) === "disallowed") {
-    throw new Error("Recipient passphrase is disallowed");
-  }
+  const passphraseError = getFundingPassphraseError(input.rawPassphrase);
+  if (passphraseError) throw new Error(`Funding passphrase rejected: ${passphraseError}`);
   let material;
   try {
     material = await deriveIdentityMaterial({

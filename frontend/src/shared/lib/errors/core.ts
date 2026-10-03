@@ -276,18 +276,9 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0x8da6a6a4": "UnknownVersion",
   "0x1355713d": "EndorsementNotIndexed",
   "0x32c967da": "InvalidConstructorAddress",
-  "0xcaa03ea5": "InvalidCredential",
   "0x2c5211c6": "InvalidAmount",
-  "0x625206c4": "InheritanceNotFound",
   "0x9c8d2cd2": "InvalidRecipient",
   "0x75bf2941": "UnknownLineageRoot",
-  "0x861b1200": "InvalidEligibility",
-  "0x969bf728": "NothingToClaim",
-  "0x06de8b10": "UnknownPublicBudget",
-  "0x1a943f13": "InvalidPublicBudgetData",
-  "0xc64b4c47": "IneligiblePublicBeneficiary",
-  "0x6a35c33f": "PublicBudgetNotMature",
-  "0x06de783b": "InsufficientPublicBudget",
   "0x9d511603": "InvalidActionData",
   "0x3ae4ed6b": "InvalidFieldElement",
   "0x989a539a": "InvalidCiphertext",
@@ -402,10 +393,8 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   UnknownVersion: "The lineage index has no record of this version.",
   EndorsementNotIndexed: "The lineage index has no record of this endorsement.",
   InvalidConstructorAddress: "A constructor address is invalid.",
-  InvalidCredential: "Inheritance credential is invalid.",
   InvalidAmount:
     "Amounts must be greater than zero, and the per-period amount must fit the contract limit.",
-  InheritanceNotFound: "No inheritance exists with this id.",
   InvalidRecipient: "Recipient address is invalid.",
   UnknownLineageRoot:
     "The proof used lineage records that are too old or unknown. Search again and retry.",
@@ -413,17 +402,6 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   UnknownNoteRoot: "The private note proof used an unknown pool root. Refresh the pool and retry.",
   InvalidClaimTime: "The private proof timestamp expired. Generate a new proof and retry.",
   NullifierAlreadySpent: "This private note or claim period was already used.",
-  InvalidEligibility: "The proof's first claimable period is not valid for this inheritance.",
-  NothingToClaim: "Nothing is claimable right now.",
-  UnknownPublicBudget:
-    "This public arrangement was not found. Refresh balances and select it again.",
-  InvalidPublicBudgetData:
-    "The public arrangement details or period count are invalid. Check them and try again.",
-  IneligiblePublicBeneficiary:
-    "The current family records do not confirm this recipient as an eligible direct child.",
-  PublicBudgetNotMature: "This public arrangement's next period is not due yet.",
-  InsufficientPublicBudget:
-    "This public arrangement has too little money for the requested periods. Refresh balances before trying again.",
   Error: "Contract reverted.",
   rejected: "Transaction was cancelled by user.",
   EVM_PANIC: "Contract execution hit a Solidity panic.",

@@ -8,7 +8,6 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SHIELDED_POOL_PUBLIC_INPUTS } from "@deepfamily/protocol-core";
-import { buildShieldedPublicClaimFixture } from "../circuits/test/generate_shielded_claim_public_input.mjs";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
@@ -22,7 +21,6 @@ const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).dige
 const fixtures = {
   fund: () => buildShieldedFundingFixtures().initial,
   claim: () => buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 }).witness,
-  claimPublic: () => buildShieldedPublicClaimFixture({ claimCount: 12 }).witness,
 };
 const sources = Object.fromEntries(
   Object.keys(fixtures).map((action) => [action, SHIELDED_CIRCUITS[action]]),
@@ -42,7 +40,7 @@ function runSnarkjs(args) {
   });
 }
 
-/** Check every selected development artifact against the complete seven-circuit manifest. */
+/** Check every selected development artifact against the complete six-circuit manifest. */
 export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUITS)) {
   const manifestPath = path.join(root, "circuits/shielded-development-manifest.json");
   if (!fs.existsSync(manifestPath)) {
@@ -55,7 +53,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
   assert.deepEqual(
     Object.keys(manifest.circuits ?? {}).sort(),
     Object.keys(SHIELDED_CIRCUITS).sort(),
-    "Development manifest must cover all seven shielded circuits",
+    "Development manifest must cover all six shielded circuits",
   );
   for (const action of actions) {
     const source = SHIELDED_CIRCUITS[action];

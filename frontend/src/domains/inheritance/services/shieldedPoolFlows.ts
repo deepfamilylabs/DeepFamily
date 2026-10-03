@@ -17,6 +17,7 @@ import type { ShieldedCircuitName, ShieldedWitness } from "../../../shared/zk/sh
 /** All private values stay in the caller's memory and the local ZK worker. */
 export type ShieldedPoolActionData = {
   fundMode: BigNumberish;
+  budgetKind: BigNumberish;
   inputShardIds: readonly [BigNumberish, BigNumberish];
   inputRoots: readonly [BigNumberish, BigNumberish];
   inputNullifiers: readonly [BigNumberish, BigNumberish];
@@ -30,6 +31,7 @@ export type ShieldedPoolActionData = {
 
 type ContractActionData = {
   fundMode: bigint;
+  budgetKind: bigint;
   inputShardIds: [bigint, bigint];
   inputRoots: [bigint, bigint];
   inputNullifiers: [bigint, bigint];
@@ -104,6 +106,7 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   }
   return {
     fundMode: getBigInt(data.fundMode),
+    budgetKind: getBigInt(data.budgetKind),
     inputShardIds: copyPair(data.inputShardIds),
     inputRoots: copyPair(data.inputRoots),
     inputNullifiers: copyPair(data.inputNullifiers),
@@ -177,6 +180,7 @@ async function submitAction(
   const expectedSignals = buildShieldedPoolPublicSignals({
     action: id,
     fundMode: data.fundMode,
+    budgetKind: data.budgetKind,
     chainId: expectedChainId,
     poolAddress,
     inputShardIds: data.inputShardIds,

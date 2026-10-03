@@ -3,14 +3,13 @@ import {
   buildLineageMerkleProof,
   buildShieldedPoolPublicInputs,
   computeIdentityFromDerivedSecret,
-  computeShieldedBudgetNoteCommitment,
+  computeShieldedNoteCommitmentFromPayload,
+  getShieldedBudgetCommitments,
   computeShieldedCiphertextHashField,
   computeShieldedClaimBatch,
   computeShieldedDummyInputNullifier,
   computeShieldedDummyPeriodNullifier,
-  computeShieldedEnrollmentCommitment,
   computeShieldedPeriodNullifier,
-  computeShieldedPolicyCommitment,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
@@ -29,10 +28,8 @@ import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWor
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import { findHeirLegitimacy, type HeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
-import {
-  getRecoveredShieldedNoteProof,
-  type LocalShieldedWalletSnapshot,
-} from "./shieldedWalletRecovery";
+import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
+import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
@@ -200,32 +197,24 @@ export async function prepareShieldedClaim(
   const budget = owned.note;
   if (
     budget.heirIdentityCommitment !== material.identityCommitment ||
-    budget.heirOwnerCommitment !== keys.ownerCommitment
+    (budget.binding !== "identity" && budget.heirOwnerCommitment !== keys.ownerCommitment)
   ) {
     throw new Error("Budget note belongs to another heir");
   }
   const budgetCiphertextHash = computeShieldedCiphertextHashField(owned.ciphertext);
-  const policyCommitment = computeShieldedPolicyCommitment(budget);
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: budget.heirIdentityCommitment,
-    eligibleFrom: budget.eligibleFrom,
-    enrollmentSalt: budget.enrollmentSalt,
-  });
-  if (
-    budgetCiphertextHash !== owned.ciphertextHashField ||
-    computeShieldedBudgetNoteCommitment({
-      policyCommitment,
-      enrollmentCommitment,
-      heirOwnerCommitment: budget.heirOwnerCommitment,
-      amountPerPeriod: budget.amountPerPeriod,
-      remaining: budget.remaining,
-      nonce: budget.nonce,
-      ciphertextHashField: budgetCiphertextHash,
-    }) !== budgetCommitment
-  ) {
-    throw new Error("Budget note does not match its public ciphertext and commitment");
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(budget);
+  const budgetPayload = encodeShieldedBudgetNotePayload(budget);
+  try {
+    verifyShieldedNotePayload({
+      payload: budgetPayload,
+      ciphertext: owned.ciphertext,
+      noteCommitment: budgetCommitment,
+    });
+  } finally {
+    budgetPayload.fill(0);
   }
+  if (budgetCiphertextHash !== owned.ciphertextHashField)
+    throw new Error("Budget note does not match its public ciphertext and commitment");
   const spend = computeShieldedSpendNullifier({
     ownerSecret: keys.ownerSecret,
     noteCommitment: budgetCommitment,
@@ -250,22 +239,26 @@ export async function prepareShieldedClaim(
   const secondBudget = secondOwned?.note.kind === "budget" ? secondOwned.note : undefined;
   let secondSpend: bigint | undefined;
   let secondHash = 0n;
-  let secondPath: ReturnType<typeof getRecoveredShieldedNoteProof> | undefined;
+  let secondPath: ReturnType<typeof getLocalShieldedNoteProof> | undefined;
   if (secondBudget && secondOwned && secondCommitment !== undefined) {
     for (const field of [
       "rootIdentityCommitment",
       "rootVersionIndex",
-      "policySalt",
-      "allocationKeyCommitment",
       "heirIdentityCommitment",
       "eligibleFrom",
-      "enrollmentSalt",
-      "heirOwnerCommitment",
       "amountPerPeriod",
     ] as const) {
       if (secondBudget[field] !== budget[field])
         throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
     }
+    const secondRule = getShieldedBudgetCommitments(secondBudget);
+    if (
+      secondRule.policyCommitment !== policyCommitment ||
+      secondRule.enrollmentCommitment !== enrollmentCommitment ||
+      (secondBudget.binding !== "identity" &&
+        secondBudget.heirOwnerCommitment !== keys.ownerCommitment)
+    )
+      throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
     const payload = encodeShieldedBudgetNotePayload(secondBudget);
     try {
       verifyShieldedNotePayload({
@@ -285,7 +278,7 @@ export async function prepareShieldedClaim(
     });
     if (input.wallet.spentNullifiers.has(secondSpend))
       throw new Error("Second budget note has already been spent");
-    secondPath = getRecoveredShieldedNoteProof(input.wallet, secondCommitment);
+    secondPath = getLocalShieldedNoteProof(input.wallet, secondCommitment);
   }
   const combinedRemaining = budget.remaining + (secondBudget?.remaining ?? 0n);
   if (combinedRemaining / budget.amountPerPeriod > MAX_UINT64)
@@ -330,17 +323,15 @@ export async function prepareShieldedClaim(
   if (endorsement.root === 0n || trusted.root === 0n) {
     throw new Error("Both current lineage roots must be nonzero");
   }
-  const path = getRecoveredShieldedNoteProof(input.wallet, budgetCommitment);
+  const path = getLocalShieldedNoteProof(input.wallet, budgetCommitment);
+  const ownerBudget =
+    budget.binding !== "identity"
+      ? budget
+      : secondBudget?.binding !== "identity"
+        ? secondBudget
+        : undefined;
   const budgetOutput: ShieldedBudgetNotePayload = {
-    rootIdentityCommitment: budget.rootIdentityCommitment,
-    rootVersionIndex: budget.rootVersionIndex,
-    policySalt: budget.policySalt,
-    allocationKeyCommitment: budget.allocationKeyCommitment,
-    heirIdentityCommitment: budget.heirIdentityCommitment,
-    eligibleFrom: budget.eligibleFrom,
-    enrollmentSalt: budget.enrollmentSalt,
-    heirOwnerCommitment: budget.heirOwnerCommitment,
-    amountPerPeriod: budget.amountPerPeriod,
+    ...(ownerBudget ?? budget),
     remaining: batch.remaining,
     nonce: generateShieldedRandomField(),
   };
@@ -354,16 +345,15 @@ export async function prepareShieldedClaim(
     encryptOwnOutput(
       budgetOutput,
       encodeShieldedBudgetNotePayload,
-      (ciphertextHashField) =>
-        computeShieldedBudgetNoteCommitment({
-          policyCommitment,
-          enrollmentCommitment,
-          heirOwnerCommitment: keys.ownerCommitment,
-          amountPerPeriod: budget.amountPerPeriod,
-          remaining: batch.remaining,
-          nonce: budgetOutput.nonce,
-          ciphertextHashField,
-        }),
+      (ciphertextHashField) => {
+        const payload = encodeShieldedBudgetNotePayload(budgetOutput);
+        try {
+          return computeShieldedNoteCommitmentFromPayload({ payload, ciphertextHashField })
+            .noteCommitment;
+        } finally {
+          payload.fill(0);
+        }
+      },
       viewingKey,
       keys.hpkeIkm,
       chainId,
@@ -385,6 +375,7 @@ export async function prepareShieldedClaim(
   ])) as [ClaimOutput<ShieldedBudgetNotePayload>, ClaimOutput<ShieldedValueNotePayload>];
   const data = {
     fundMode: 0n,
+    budgetKind: 0n,
     inputShardIds: [path.shardId, secondPath?.shardId ?? path.shardId],
     inputRoots: [path.root, secondPath?.root ?? path.root],
     inputNullifiers: [spend, secondSpend ?? dummySpend],
@@ -404,6 +395,10 @@ export async function prepareShieldedClaim(
   const decimal = (values: readonly bigint[]) => values.map(String);
   const witness: ShieldedWitness = {
     ...publicInputs,
+    budgetKind: budget.binding === "identity" ? "1" : "0",
+    secondBudgetKind: secondBudget?.binding === "identity" ? "1" : "0",
+    policyCommitmentInput: String(policyCommitment),
+    enrollmentCommitmentInput: String(enrollmentCommitment),
     hasSecondInput: secondBudget ? "1" : "0",
     secondRemaining: String(secondBudget?.remaining ?? 0n),
     secondRemainingPeriods: String(
@@ -435,9 +430,9 @@ export async function prepareShieldedClaim(
     trustedDepth: trusted.depth,
     trustedIndex: String(trusted.index),
     trustedSiblings: decimal(trusted.siblings),
-    policySalt: String(budget.policySalt),
-    allocationKeyCommitment: String(budget.allocationKeyCommitment),
-    enrollmentSalt: String(budget.enrollmentSalt),
+    policySalt: String(ownerBudget?.policySalt ?? 0n),
+    allocationKeyCommitment: String(ownerBudget?.allocationKeyCommitment ?? 0n),
+    enrollmentSalt: String(ownerBudget?.enrollmentSalt ?? 0n),
     eligibleFrom: String(budget.eligibleFrom),
     rate: String(budget.amountPerPeriod),
     remaining: String(budget.remaining),

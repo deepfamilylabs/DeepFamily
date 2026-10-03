@@ -89,6 +89,7 @@ async function setup() {
     ),
     spentNullifiers: new Set(),
     walletOwnerCommitment: donorKeys.ownerCommitment,
+    walletIdentityCommitment: rootIdentity,
   };
   const policy = createShieldedPolicyDescriptor({
     rootIdentityCommitment: rootIdentity,
@@ -229,6 +230,64 @@ async function recordFunding(
 }
 
 describe("local unified funding preparation", () => {
+  it.each([0, 1] as const)(
+    "rejects an initial budget for another parent in visibility mode %s",
+    async (budgetKind) => {
+      const fixture = await setup();
+      await expect(
+        prepareShieldedFund({
+          ...fixture.common,
+          wallet: { ...fixture.common.wallet, walletIdentityCommitment: rootIdentity + 1n },
+          fundMode: 0,
+          budgetKind,
+          policy: fixture.policy,
+          lineageIndex: fixture.lineageIndex,
+          lineage: fixture.lineage,
+          budgetPeriods: 1n,
+        }),
+      ).rejects.toThrow("another parent identity");
+    },
+  );
+
+  it("requires the current parent's identity when preparing funding", async () => {
+    const fixture = await setup();
+    await expect(
+      prepareShieldedFund({
+        ...fixture.common,
+        wallet: { ...fixture.common.wallet, walletIdentityCommitment: undefined },
+        fundMode: 0,
+        policy: fixture.policy,
+        lineageIndex: fixture.lineageIndex,
+        lineage: fixture.lineage,
+        budgetPeriods: 1n,
+      }),
+    ).rejects.toThrow("wallet recovered with the parent's identity");
+  });
+
+  it("rejects additional funding against a different parent's template", async () => {
+    const fixture = await setup();
+    const initial = await prepareShieldedFund({
+      ...fixture.common,
+      fundMode: 0,
+      policy: fixture.policy,
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+      budgetPeriods: 1n,
+    });
+    await expect(
+      prepareShieldedFund({
+        ...fixture.common,
+        fundMode: 1,
+        budget: {
+          ...initial.outputs[0],
+          note: { ...initial.outputs[0].note, rootIdentityCommitment: rootIdentity + 1n },
+          shardId: 0n,
+        },
+        budgetPeriods: 1n,
+      }),
+    ).rejects.toThrow("another parent identity");
+  });
+
   it("builds the funding's named public inputs, a direct-child witness, and a child-decryptable budget", async () => {
     const fixture = await setup();
     const prepared = await prepareShieldedFund({
@@ -463,7 +522,7 @@ describe("local unified funding preparation", () => {
         budget: { ...initialFunding.outputs[0], shardId: 0n },
         budgetPeriods: 1n,
       }),
-    ).rejects.toThrow("does not belong to this receive code's recipient");
+    ).rejects.toThrow("does not belong to this recipient");
   });
 
   it("rejects insufficient funds, stale lineage, and a substituted template", async () => {

@@ -10,6 +10,8 @@ template ShieldedFund() {
     signal input chainId;
     signal input pool;
     signal input fundMode;
+    signal input budgetKind;
+    signal input publicBudget[9];
     signal input inputShardIds[2];
     signal input inputRoots[2];
     signal input inputNullifiers[2];
@@ -50,6 +52,8 @@ template ShieldedFund() {
     signal input trustedIndex;
     signal input trustedSiblings[64];
 
+    signal input oldBudgetKind;
+    signal input oldHeirOwnerCommitment;
     signal input oldBudgetRemaining;
     signal input oldBudgetRemainingPeriods;
     signal input oldBudgetNonce;
@@ -68,6 +72,8 @@ template ShieldedFund() {
     poolBits.in <== pool;
     fundMode * (1 - fundMode) === 0;
     signal initial <== 1 - fundMode;
+    budgetKind * (1 - budgetKind) === 0;
+    oldBudgetKind * (1 - oldBudgetKind) === 0;
     component shardBits[2];
     for (var i = 0; i < 2; i++) {
         shardBits[i] = Num2Bits(128);
@@ -109,7 +115,8 @@ template ShieldedFund() {
     heirNotZero.out === 0;
     component ownerNotZero = IsZero();
     ownerNotZero.in <== heirOwnerCommitment;
-    ownerNotZero.out === 0;
+    (1 - budgetKind) * ownerNotZero.out === 0;
+    budgetKind * heirOwnerCommitment === 0;
 
     // Canonical inactive witnesses prevent continuation from accidentally
     // depending on current lineage or on the allocator's private key.
@@ -158,6 +165,22 @@ template ShieldedFund() {
     enrollment.eligibleFrom <== eligibleFrom;
     enrollment.enrollmentSalt <== enrollmentSalt;
 
+    component terms = ShieldedIdentityBudgetTerms();
+    terms.rootIdentityCommitment <== rootIdentityCommitment;
+    terms.rootVersionIndex <== rootVersionIndex;
+    terms.heirIdentityCommitment <== heirIdentityCommitment;
+    terms.eligibleFrom <== eligibleFrom;
+    terms.rate <== rate;
+
+    initial * oldBudgetKind === 0;
+    initial * oldHeirOwnerCommitment === 0;
+    oldBudgetKind * oldHeirOwnerCommitment === 0;
+    component oldOwnerNotZero = IsZero();
+    oldOwnerNotZero.in <== oldHeirOwnerCommitment;
+    signal oldPrivate <== fundMode * (1 - oldBudgetKind);
+    oldPrivate * oldOwnerNotZero.out === 0;
+    signal privateContinuation <== oldPrivate * (1 - budgetKind);
+    privateContinuation * (heirOwnerCommitment - oldHeirOwnerCommitment) === 0;
     initial * oldBudgetRemaining === 0;
     initial * oldBudgetRemainingPeriods === 0;
     initial * oldBudgetNonce === 0;
@@ -174,15 +197,16 @@ template ShieldedFund() {
     component oldNonceNotZero = IsZero();
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
-    component oldBudget = Poseidon(8);
-    oldBudget.inputs[0] <== 1015;
-    oldBudget.inputs[1] <== policy.commitment;
-    oldBudget.inputs[2] <== enrollment.commitment;
-    oldBudget.inputs[3] <== heirOwnerCommitment;
-    oldBudget.inputs[4] <== rate;
-    oldBudget.inputs[5] <== oldBudgetRemaining;
-    oldBudget.inputs[6] <== oldBudgetNonce;
-    oldBudget.inputs[7] <== oldBudgetCiphertextHash;
+    component oldBudget = ShieldedBoundBudgetCommitment();
+    oldBudget.budgetKind <== oldBudgetKind;
+    oldBudget.policyCommitment <== policy.commitment;
+    oldBudget.enrollmentCommitment <== enrollment.commitment;
+    oldBudget.termsCommitment <== terms.commitment;
+    oldBudget.ownerCommitment <== oldHeirOwnerCommitment;
+    oldBudget.rate <== rate;
+    oldBudget.remaining <== oldBudgetRemaining;
+    oldBudget.nonce <== oldBudgetNonce;
+    oldBudget.ciphertextHash <== oldBudgetCiphertextHash;
     component oldDepthBits = Num2Bits(6);
     oldDepthBits.in <== oldBudgetDepth;
     component oldDepthOk = LessEqThan(6);
@@ -190,7 +214,7 @@ template ShieldedFund() {
     oldDepthOk.in[1] <== 32;
     oldDepthOk.out === 1;
     component oldMembership = BinaryMerkleRoot(32);
-    oldMembership.leaf <== oldBudget.out;
+    oldMembership.leaf <== oldBudget.commitment;
     oldMembership.depth <== oldBudgetDepth;
     oldMembership.index <== oldBudgetIndex;
     oldMembership.siblings <== oldBudgetSiblings;
@@ -201,7 +225,7 @@ template ShieldedFund() {
     component useTag = Poseidon(4);
     useTag.inputs[0] <== 1026;
     useTag.inputs[1] <== policySalt;
-    useTag.inputs[2] <== oldBudget.out;
+    useTag.inputs[2] <== oldBudget.commitment;
     useTag.inputs[3] <== budgetUseNonce;
     component enrollmentTag = Poseidon(4);
     enrollmentTag.inputs[0] <== 1027;
@@ -210,16 +234,38 @@ template ShieldedFund() {
     enrollmentTag.inputs[3] <== heirIdentityCommitment;
     inputNullifiers[1] === enrollmentTag.out + fundMode * (useTag.out - enrollmentTag.out);
 
-    component budget = ShieldedBudgetOutput();
+    component periodsBits = Num2Bits(64);
+    periodsBits.in <== budgetPeriods;
+    component periodsNotZero = IsZero();
+    periodsNotZero.in <== budgetPeriods;
+    periodsNotZero.out === 0;
+    signal budgetAmount <== rate * budgetPeriods;
+    component amountBits = Num2Bits(128);
+    amountBits.in <== budgetAmount;
+    component budgetNonceNotZero = IsZero();
+    budgetNonceNotZero.in <== budgetNonce;
+    budgetNonceNotZero.out === 0;
+    component budget = ShieldedBoundBudgetCommitment();
+    budget.budgetKind <== budgetKind;
     budget.policyCommitment <== policy.commitment;
     budget.enrollmentCommitment <== enrollment.commitment;
-    budget.heirOwnerCommitment <== heirOwnerCommitment;
+    budget.termsCommitment <== terms.commitment;
+    budget.ownerCommitment <== heirOwnerCommitment;
     budget.rate <== rate;
-    budget.periods <== budgetPeriods;
+    budget.remaining <== budgetAmount;
     budget.nonce <== budgetNonce;
     budget.ciphertextHash <== ciphertextHashes[0];
-    budget.noteCommitment === outputCommitments[0];
-    signal changeAmount <== donorAmount - budget.amount;
+    budget.commitment === outputCommitments[0];
+    publicBudget[0] === budgetKind * rootIdentityCommitment;
+    publicBudget[1] === budgetKind * rootVersionIndex;
+    publicBudget[2] === budgetKind * heirIdentityCommitment;
+    publicBudget[3] === budgetKind * rate;
+    publicBudget[4] === budgetKind * eligibleFrom;
+    publicBudget[5] === budgetKind * policy.commitment;
+    publicBudget[6] === budgetKind * enrollment.commitment;
+    publicBudget[7] === budgetKind * budgetAmount;
+    publicBudget[8] === budgetKind * budgetNonce;
+    signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
     change.ownerCommitment <== donor.ownerCommitment;
     change.amount <== changeAmount;
@@ -229,6 +275,6 @@ template ShieldedFund() {
 }
 
 component main {
-    public [chainId, pool, fundMode, inputShardIds, inputRoots, inputNullifiers,
+    public [chainId, pool, fundMode, budgetKind, publicBudget, inputShardIds, inputRoots, inputNullifiers,
         outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf]
 } = ShieldedFund();

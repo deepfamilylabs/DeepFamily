@@ -218,6 +218,10 @@ interface PersonHashCalculatorProps {
   };
   identitySuiteId?: number;
   requirePassphraseConfirmation?: boolean;
+  /** Disable live hash computation when the enclosing action derives the identity itself. */
+  computeHash?: boolean;
+  /** Hide explanatory passphrase help and strength details in focused action forms. */
+  showPassphraseGuidance?: boolean;
 }
 
 export type PersonHashCalculatorHandle = {
@@ -246,6 +250,8 @@ export const PersonHashCalculator = forwardRef<
       initialValues,
       identitySuiteId = 1,
       requirePassphraseConfirmation = false,
+      computeHash = true,
+      showPassphraseGuidance = true,
     },
     ref,
   ) => {
@@ -482,6 +488,12 @@ export const PersonHashCalculator = forwardRef<
     }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision]);
 
     useEffect(() => {
+      // Any edited field invalidates the previously computed hash immediately.
+      setComputedHash("");
+      if (!computeHash) {
+        setIsComputingHash(false);
+        return;
+      }
       const transformedData = buildTransformedData({
         fullName,
         isBirthBC,
@@ -490,8 +502,6 @@ export const PersonHashCalculator = forwardRef<
         birthDay,
         gender: Number(gender || 0),
       });
-      // Any edited field invalidates the previously computed hash immediately.
-      setComputedHash("");
       if (!transformedData.fullName.length || isPassphraseDisallowed) {
         setIsComputingHash(false);
         return;
@@ -543,6 +553,7 @@ export const PersonHashCalculator = forwardRef<
       passphraseRevision,
       isPassphraseDisallowed,
       identitySuiteId,
+      computeHash,
     ]);
 
     const content = (
@@ -650,124 +661,136 @@ export const PersonHashCalculator = forwardRef<
           </div>
           <div className="w-full mt-2">
             <div className="flex items-center gap-2 mb-1">
-              <label htmlFor={passphraseInputId} className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-ink-muted whitespace-normal sm:whitespace-nowrap leading-tight">
+              <label
+                htmlFor={passphraseInputId}
+                className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-normal sm:tracking-wide text-ink-muted whitespace-normal sm:whitespace-nowrap leading-tight"
+              >
                 {t("search.hashCalculator.passphrase", "Identity passphrase")}
               </label>
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
-                  className="text-ink-subtle hover:text-primary transition-colors"
-                  aria-label={t(
-                    "search.hashCalculator.passphraseHelp.buttonAriaLabel",
-                    "Identity passphrase help",
-                  )}
-                >
-                  <Info size={14} />
-                </button>
-                <ModalShell
-                  isOpen={showPassphraseHelp}
-                  onClose={() => setShowPassphraseHelp(false)}
-                  ariaLabelledBy={passphraseHelpTitleId}
-                  ariaDescribedBy={passphraseHelpDescriptionId}
-                  closeLabel={t("common.close", "Close")}
-                  bare
-                  zIndex={OVERLAY_Z_INDEX.nestedModal}
-                >
-                  <div
-                    className={`fixed ${OVERLAY_Z_INDEX.nestedModal} top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-surface border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl`}
-                    onClick={(event) => event.stopPropagation()}
+              {showPassphraseGuidance ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPassphraseHelp(!showPassphraseHelp)}
+                    className="text-ink-subtle hover:text-primary transition-colors"
+                    aria-label={t(
+                      "search.hashCalculator.passphraseHelp.buttonAriaLabel",
+                      "Identity passphrase help",
+                    )}
                   >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div id={passphraseHelpTitleId} className="font-semibold text-ink">
-                          {t(
-                            "search.hashCalculator.passphraseHelp.title",
-                            "Passphrase Information",
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowPassphraseHelp(false)}
-                          className="w-6 h-6 flex items-center justify-center text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 hover:bg-surface-muted rounded-sm"
-                          aria-label={t("common.close", "Close")}
-                        >
-                          ×
-                        </button>
-                      </div>
-
-                      <div id={passphraseHelpDescriptionId} className="space-y-3 text-sm">
-                        <div className="text-ink-muted">
-                          <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
+                    <Info size={14} />
+                  </button>
+                  <ModalShell
+                    isOpen={showPassphraseHelp}
+                    onClose={() => setShowPassphraseHelp(false)}
+                    ariaLabelledBy={passphraseHelpTitleId}
+                    ariaDescribedBy={passphraseHelpDescriptionId}
+                    closeLabel={t("common.close", "Close")}
+                    bare
+                    zIndex={OVERLAY_Z_INDEX.nestedModal}
+                  >
+                    <div
+                      className={`fixed ${OVERLAY_Z_INDEX.nestedModal} top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 max-w-[90vw] p-4 bg-surface border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div id={passphraseHelpTitleId} className="font-semibold text-ink">
                             {t(
-                              "search.hashCalculator.passphraseHelp.privacy",
-                              "Privacy Protection",
+                              "search.hashCalculator.passphraseHelp.title",
+                              "Passphrase Information",
                             )}
                           </div>
-                          <div className="text-xs leading-relaxed">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.privacyDesc",
-                              "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-ink-muted">
-                          <div className="mb-1 font-medium text-green-600 dark:text-green-400">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.optional",
-                              "Completely Optional",
-                            )}
-                          </div>
-                          <div className="text-xs leading-relaxed">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.optionalDesc",
-                              "Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.",
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowPassphraseHelp(false)}
+                            className="w-6 h-6 flex items-center justify-center text-ink-subtle hover:text-gray-600 dark:hover:text-gray-300 hover:bg-surface-muted rounded-sm"
+                            aria-label={t("common.close", "Close")}
+                          >
+                            ×
+                          </button>
                         </div>
 
-                        <div className="text-ink-muted">
-                          <div className="mb-1 font-medium text-primary">
-                            {t("search.hashCalculator.passphraseHelp.remember", "Please Remember")}
+                        <div id={passphraseHelpDescriptionId} className="space-y-3 text-sm">
+                          <div className="text-ink-muted">
+                            <div className="mb-1 font-medium text-blue-600 dark:text-blue-400">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.privacy",
+                                "Privacy Protection",
+                              )}
+                            </div>
+                            <div className="text-xs leading-relaxed">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.privacyDesc",
+                                "Adds an extra protection layer to your identity hash, preventing others from guessing your identity through name and birth date.",
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs leading-relaxed">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.rememberDesc",
-                              "Passphrases cannot be recovered. Forgetting it will generate a different identity hash.",
-                            )}
-                          </div>
-                        </div>
 
-                        <div className="text-ink-muted">
-                          <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.privacyNoteTitle",
-                              "Local Only",
-                            )}
+                          <div className="text-ink-muted">
+                            <div className="mb-1 font-medium text-green-600 dark:text-green-400">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.optional",
+                                "Completely Optional",
+                              )}
+                            </div>
+                            <div className="text-xs leading-relaxed">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.optionalDesc",
+                                "Can be left blank, but using longer family mottos, poems, or emoji combinations is recommended for enhanced privacy.",
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs leading-relaxed text-ink-muted dark:text-gray-300">
-                            {t(
-                              "search.hashCalculator.passphraseHelp.privacyNote",
-                              "The passphrase is hashed locally only; nothing is uploaded or stored.",
-                            )}
+
+                          <div className="text-ink-muted">
+                            <div className="mb-1 font-medium text-primary">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.remember",
+                                "Please Remember",
+                              )}
+                            </div>
+                            <div className="text-xs leading-relaxed">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.rememberDesc",
+                                "Passphrases cannot be recovered. Forgetting it will generate a different identity hash.",
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-ink-muted">
+                            <div className="mb-1 font-medium text-indigo-600 dark:text-indigo-400">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.privacyNoteTitle",
+                                "Local Only",
+                              )}
+                            </div>
+                            <div className="text-xs leading-relaxed text-ink-muted dark:text-gray-300">
+                              {t(
+                                "search.hashCalculator.passphraseHelp.privacyNote",
+                                "The passphrase is hashed locally only; nothing is uploaded or stored.",
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </ModalShell>
-              </div>
+                  </ModalShell>
+                </div>
+              ) : null}
             </div>
             <div className="relative">
               <input
                 id={passphraseInputId}
                 type={showPassphrase ? "text" : "password"}
                 className={`${MODAL_FIELD_SM} pr-10`}
-                placeholder={t(
-                  "search.hashCalculator.passphrasePlaceholder",
-                  "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
-                )}
+                placeholder={
+                  showPassphraseGuidance
+                    ? t(
+                        "search.hashCalculator.passphrasePlaceholder",
+                        "Enter any characters—family mottos or secret phrases. 15+ characters with mixed symbols recommended",
+                      )
+                    : t("search.hashCalculator.passphrase", "Identity passphrase")
+                }
                 inputMode="text"
                 autoCapitalize="none"
                 autoComplete="new-password"
@@ -847,7 +870,7 @@ export const PersonHashCalculator = forwardRef<
               </div>
             ) : null}
 
-            {hasPassphrase && (
+            {showPassphraseGuidance && hasPassphrase && (
               <div className="mt-1 text-[11px] text-ink-muted">
                 {t("search.hashCalculator.passphraseCharCount", {
                   count: passphraseGraphemeLength,
@@ -856,7 +879,7 @@ export const PersonHashCalculator = forwardRef<
             )}
 
             {/* Password strength indicator */}
-            {hasPassphrase && (
+            {showPassphraseGuidance && hasPassphrase && (
               <div className="mt-1 space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1 flex-1">
@@ -952,7 +975,7 @@ export const PersonHashCalculator = forwardRef<
             )}
           </div>
         </div>
-        {(computedHash || isComputingHash) && (
+        {computeHash && (computedHash || isComputingHash) && (
           <div className="space-y-2">
             {/* Local calculation result */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:overflow-hidden">

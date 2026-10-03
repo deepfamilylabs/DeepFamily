@@ -1286,7 +1286,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       );
   }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
-  requireExact(ceremony.circuitCount, 9, "zkCeremonyVerification.circuitCount");
+  requireExact(ceremony.circuitCount, 8, "zkCeremonyVerification.circuitCount");
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
     !Array.isArray(ceremony.circuits) ||
@@ -1300,7 +1300,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["status", "manifestSha256", "circuitCount", "ptau"],
   );
   requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
-  requireExact(shieldedCeremony.circuitCount, 7, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(shieldedCeremony.circuitCount, 6, "zkCeremonyVerification.shielded.circuitCount");
   requireExact(
     shieldedCeremony.manifestSha256,
     inspected.manifestSha256,
@@ -1321,16 +1321,16 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   const proofs = requireExactRecordKeys(evidence.proofs, "shielded.proofs", actions);
   const transactions = requireRecord(report.transactions, "transactions");
   if (
-    ["shielded-action-claim", "shielded-action-claimPublic"].some((label) =>
+    ["shielded-action-claim", "shielded-action-claim-identity"].some((label) =>
       Object.hasOwn(transactions, label),
     )
   ) {
     throw new Error("Future-maturity claim must not claim an executed pool transaction");
   }
-  for (const action of actions) {
+  const validateProof = (action, value, label = `shielded-action-${action}`) => {
     const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
     const item = inspected.manifest.circuits[action];
-    const proof = requireRecord(proofs[action], `shielded.proofs.${action}`);
+    const proof = requireRecord(value, `shielded.proofs.${action}`);
     requireExact(proof.source, spec.source, `shielded.proofs.${action}.source`);
     requireExact(proof.verified, true, `shielded.proofs.${action}.verified`);
     requireSameAddress(
@@ -1368,14 +1368,13 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       report.addresses.shieldedDeepPool,
       `shielded.proofs.${action} contract`,
     );
-    if (action === "claim" || action === "claimPublic") {
+    if (action === "claim") {
       requireExact(proof.execution, "verifier-call", `shielded.proofs.${action}.execution`);
       requireExact(proof.claimCount, 12, `shielded.proofs.${action}.claimCount`);
       if (Object.hasOwn(proof, "transactionLabel"))
         throw new Error("Future-maturity claim proof must not claim an executed pool transaction");
     } else {
       requireExact(proof.execution, "transaction", `shielded.proofs.${action}.execution`);
-      const label = `shielded-action-${action}`;
       requireExact(proof.transactionLabel, label, `shielded.proofs.${action}.transactionLabel`);
       requireExact(
         requireRecord(transactions[label], `transactions.${label}`).status,
@@ -1383,76 +1382,63 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
         `transactions.${label}.status`,
       );
     }
-  }
+  };
+  for (const action of actions) validateProof(action, proofs[action]);
   const scenario = requireRecord(evidence.scenario, "shielded.scenario");
   requireExact(scenario.fundLabel, "shielded-action-fund", "shielded.scenario.fundLabel");
   requireExact(scenario.claimExecution, "verifier-call", "shielded.scenario.claimExecution");
   requireExact(scenario.claimCount, 12, "shielded.scenario.claimCount");
-  const publicBudget = requireRecord(scenario.publicBudget, "shielded.scenario.publicBudget");
-  for (const [field, label] of [
-    ["fundingLabel", "public-budget-fund"],
-    ["additionalFundingLabel", "public-budget-fund-additional"],
-  ]) {
-    requireExact(publicBudget[field], label, `shielded.scenario.publicBudget.${field}`);
-    requireExact(
-      requireRecord(transactions[label], `transactions.${label}`).status,
-      1,
-      `transactions.${label}.status`,
-    );
-  }
+  const identityBudget = requireRecord(scenario.identityBudget, "shielded.scenario.identityBudget");
   requireExact(
-    publicBudget.claimExecution,
-    "verifier-call",
-    "shielded.scenario.publicBudget.claimExecution",
+    identityBudget.fundingLabel,
+    "shielded-action-fund-identity",
+    "shielded.scenario.identityBudget.fundingLabel",
   );
-  requireExact(publicBudget.claimCount, 12, "shielded.scenario.publicBudget.claimCount");
-  const publicValues = {};
-  for (const field of [
-    "budgetId",
-    "amountPerPeriod",
-    "eligibleFrom",
-    "remaining",
-    "nextPeriod",
-    "fundingTimestamp",
+  validateProof("fund", identityBudget.fundProof, identityBudget.fundingLabel);
+  validateProof("claim", identityBudget.claimProof);
+  const identityFundSignals = identityBudget.fundProof.publicSignals;
+  const identityClaimSignals = identityBudget.claimProof.publicSignals;
+  requireExact(identityFundSignals[2], "1", "identityBudget additional fund mode");
+  requireExact(identityFundSignals[3], "1", "identityBudget identity binding");
+  requireExact(
+    identityFundSignals[19],
+    identityBudget.budgetCommitment,
+    "identityBudget budget commitment",
+  );
+  requireExact(
+    requireHash32(identityBudget.heirPersonHash, "identityBudget heirPersonHash"),
+    keccak256(toBeHex(BigInt(identityFundSignals[6]), 32)),
+    "identityBudget heir identity",
+  );
+  for (const [name, index] of [
+    ["amountPerPeriod", 7],
+    ["eligibleFrom", 8],
+    ["remaining", 11],
   ]) {
-    const value = publicBudget[field];
+    const value = identityBudget[name];
     if (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(value))
-      throw new Error(`shielded.scenario.publicBudget.${field} must be a canonical decimal`);
-    publicValues[field] = BigInt(value);
+      throw new Error(`shielded.scenario.identityBudget.${name} must be a canonical decimal`);
+    requireExact(identityFundSignals[index], value, `identityBudget.${name}`);
   }
+  const identityRate = BigInt(identityBudget.amountPerPeriod);
   if (
-    publicValues.budgetId === 0n ||
-    publicValues.budgetId >= 1n << 64n ||
-    publicValues.amountPerPeriod === 0n ||
-    publicValues.amountPerPeriod >= 1n << 128n
+    identityRate === 0n ||
+    identityRate >= 1n << 128n ||
+    BigInt(identityBudget.remaining) < identityRate * 12n
   )
-    throw new Error("shielded.scenario.publicBudget has invalid budget ID or rate");
-  const publicSignals = proofs.claimPublic.publicSignals;
-  requireExact(publicSignals[2], publicBudget.budgetId, "shielded.proofs.claimPublic budget ID");
+    throw new Error("identityBudget cannot cover twelve periods");
+  requireExact(identityBudget.eligibleFrom, scenario.eligibleFrom, "identityBudget.eligibleFrom");
   requireExact(
-    requireHash32(publicBudget.heirPersonHash, "public budget heirPersonHash"),
-    keccak256(toBeHex(BigInt(publicSignals[3]), 32)),
-    "shielded.proofs.claimPublic heir identity",
+    identityClaimSignals.at(-1),
+    proofs.claim.publicSignals.at(-1),
+    "identityBudget claim maturity",
   );
-  requireExact(publicBudget.nextPeriod, "0", "shielded.scenario.publicBudget.nextPeriod");
-  requireExact(
-    publicSignals[4],
-    publicBudget.nextPeriod,
-    "shielded.proofs.claimPublic first period",
-  );
-  requireExact(publicSignals[5], "12", "shielded.proofs.claimPublic claim count");
-  requireExact(
-    publicSignals[6],
-    (publicValues.amountPerPeriod * 12n).toString(),
-    "shielded.proofs.claimPublic amount",
-  );
-  requireExact(
-    publicBudget.eligibleFrom,
-    (publicValues.fundingTimestamp + 7200n).toString(),
-    "shielded.scenario.publicBudget.eligibleFrom",
-  );
-  if (publicValues.remaining < publicValues.amountPerPeriod * 12n)
-    throw new Error("shielded.scenario.publicBudget cannot cover twelve periods");
+  for (let index = 8; index < 20; index++)
+    requireExact(
+      identityClaimSignals[index],
+      proofs.claim.publicSignals[index],
+      "identityBudget shared period nullifier",
+    );
   const receiveCode = requireExactRecordKeys(
     scenario.receiveCode,
     "shielded.scenario.receiveCode",

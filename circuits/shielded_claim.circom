@@ -5,6 +5,7 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 include "lib/identity.circom";
+include "shielded_funding_common.circom";
 
 // Claim consumes one or two distinct budgets with one policy/enrollment/owner.
 // An absent second input repeats the first root and has a bound dummy nullifier.
@@ -50,6 +51,10 @@ template ShieldedClaim() {
 
     // The policy and enrollment are private. Initial allocation must separately
     // prove that eligibleFrom was valid at its block and that value was conserved.
+    signal input budgetKind;
+    signal input secondBudgetKind;
+    signal input policyCommitmentInput;
+    signal input enrollmentCommitmentInput;
     signal input policySalt;
     signal input allocationKeyCommitment;
     signal input enrollmentSalt;
@@ -87,6 +92,21 @@ template ShieldedClaim() {
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
     hasSecondInput * (1 - hasSecondInput) === 0;
+    budgetKind * (1 - budgetKind) === 0;
+    secondBudgetKind * (1 - secondBudgetKind) === 0;
+    (1 - hasSecondInput) * secondBudgetKind === 0;
+    signal secondPrivate <== hasSecondInput * (1 - secondBudgetKind);
+    signal requiresOpening <== 1 - budgetKind + budgetKind * secondPrivate;
+    signal remainderKind <== 1 - requiresOpening;
+    (1 - requiresOpening) * policySalt === 0;
+    (1 - requiresOpening) * allocationKeyCommitment === 0;
+    (1 - requiresOpening) * enrollmentSalt === 0;
+    component policyCommitmentNotZero = IsZero();
+    policyCommitmentNotZero.in <== policyCommitmentInput;
+    policyCommitmentNotZero.out === 0;
+    component enrollmentCommitmentNotZero = IsZero();
+    enrollmentCommitmentNotZero.in <== enrollmentCommitmentInput;
+    enrollmentCommitmentNotZero.out === 0;
     (1 - hasSecondInput) * (inputShardIds[1] - inputShardIds[0]) === 0;
     (1 - hasSecondInput) * (inputRoots[1] - inputRoots[0]) === 0;
     component rootVersionBits = Num2Bits(64);
@@ -162,10 +182,10 @@ template ShieldedClaim() {
     derivedSecretNotZero.out === 0;
     component policySaltNotZero = IsZero();
     policySaltNotZero.in <== policySalt;
-    policySaltNotZero.out === 0;
+    requiresOpening * policySaltNotZero.out === 0;
     component enrollmentSaltNotZero = IsZero();
     enrollmentSaltNotZero.in <== enrollmentSalt;
-    enrollmentSaltNotZero.out === 0;
+    requiresOpening * enrollmentSaltNotZero.out === 0;
     component budgetNonceNotZero = IsZero();
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;
@@ -190,7 +210,7 @@ template ShieldedClaim() {
 
     component allocationKeyCommitmentNotZero = IsZero();
     allocationKeyCommitmentNotZero.in <== allocationKeyCommitment;
-    allocationKeyCommitmentNotZero.out === 0;
+    requiresOpening * allocationKeyCommitmentNotZero.out === 0;
     component policy = Poseidon(6);
     policy.inputs[0] <== 1010;
     policy.inputs[1] <== rootIdentityCommitment;
@@ -204,6 +224,14 @@ template ShieldedClaim() {
     enrollment.inputs[2] <== heir.identityCommitment;
     enrollment.inputs[3] <== eligibleFrom;
     enrollment.inputs[4] <== enrollmentSalt;
+    requiresOpening * (policy.out - policyCommitmentInput) === 0;
+    requiresOpening * (enrollment.out - enrollmentCommitmentInput) === 0;
+    component terms = ShieldedIdentityBudgetTerms();
+    terms.rootIdentityCommitment <== rootIdentityCommitment;
+    terms.rootVersionIndex <== rootVersionIndex;
+    terms.heirIdentityCommitment <== heir.identityCommitment;
+    terms.eligibleFrom <== eligibleFrom;
+    terms.rate <== rate;
     component ownerSecret = Poseidon(2);
     ownerSecret.inputs[0] <== 1012;
     ownerSecret.inputs[1] <== derivedSecretField;
@@ -211,15 +239,16 @@ template ShieldedClaim() {
     ownerCommitment.inputs[0] <== 1013;
     ownerCommitment.inputs[1] <== ownerSecret.out;
 
-    component oldBudget = Poseidon(8);
-    oldBudget.inputs[0] <== 1015;
-    oldBudget.inputs[1] <== policy.out;
-    oldBudget.inputs[2] <== enrollment.out;
-    oldBudget.inputs[3] <== ownerCommitment.out;
-    oldBudget.inputs[4] <== rate;
-    oldBudget.inputs[5] <== remaining;
-    oldBudget.inputs[6] <== budgetNonce;
-    oldBudget.inputs[7] <== budgetCiphertextHash;
+    component oldBudget = ShieldedBoundBudgetCommitment();
+    oldBudget.budgetKind <== budgetKind;
+    oldBudget.policyCommitment <== policyCommitmentInput;
+    oldBudget.enrollmentCommitment <== enrollmentCommitmentInput;
+    oldBudget.termsCommitment <== terms.commitment;
+    oldBudget.ownerCommitment <== ownerCommitment.out;
+    oldBudget.rate <== rate;
+    oldBudget.remaining <== remaining;
+    oldBudget.nonce <== budgetNonce;
+    oldBudget.ciphertextHash <== budgetCiphertextHash;
 
     component noteDepthBits = Num2Bits(6);
     noteDepthBits.in <== noteDepth;
@@ -228,7 +257,7 @@ template ShieldedClaim() {
     noteDepthOk.in[1] <== 32;
     noteDepthOk.out === 1;
     component noteMerkle = BinaryMerkleRoot(32);
-    noteMerkle.leaf <== oldBudget.out;
+    noteMerkle.leaf <== oldBudget.commitment;
     noteMerkle.depth <== noteDepth;
     noteMerkle.index <== noteIndex;
     noteMerkle.siblings <== noteSiblings;
@@ -237,12 +266,12 @@ template ShieldedClaim() {
     component spend = Poseidon(3);
     spend.inputs[0] <== 1016;
     spend.inputs[1] <== ownerSecret.out;
-    spend.inputs[2] <== oldBudget.out;
+    spend.inputs[2] <== oldBudget.commitment;
     spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
     dummySpend.inputs[0] <== 1021;
     dummySpend.inputs[1] <== ownerSecret.out;
-    dummySpend.inputs[2] <== oldBudget.out;
+    dummySpend.inputs[2] <== oldBudget.commitment;
     // The optional second budget uses the same policy, enrollment and owner.
     // Its value is counted only when its membership and spend are proved.
     (1 - hasSecondInput) * secondRemaining === 0;
@@ -260,15 +289,17 @@ template ShieldedClaim() {
     component secondNonceNotZero = IsZero();
     secondNonceNotZero.in <== secondBudgetNonce;
     hasSecondInput * secondNonceNotZero.out === 0;
-    component secondBudget = Poseidon(8);
-    secondBudget.inputs[0] <== 1015;
-    secondBudget.inputs[1] <== policy.out;
-    secondBudget.inputs[2] <== enrollment.out;
-    secondBudget.inputs[3] <== ownerCommitment.out;
-    secondBudget.inputs[4] <== rate;
-    secondBudget.inputs[5] <== secondRemaining;
-    secondBudget.inputs[6] <== secondBudgetNonce;
-    secondBudget.inputs[7] <== secondBudgetCiphertextHash;
+    component secondBudget = ShieldedBoundBudgetCommitment();
+    secondBudget.budgetKind <== secondBudgetKind;
+    secondBudget.policyCommitment <== policyCommitmentInput;
+    secondBudget.enrollmentCommitment <== enrollmentCommitmentInput;
+    secondBudget.termsCommitment <== terms.commitment;
+    secondBudget.ownerCommitment <== ownerCommitment.out;
+    secondBudget.rate <== rate;
+    secondBudget.remaining <== secondRemaining;
+    secondBudget.nonce <== secondBudgetNonce;
+    secondBudget.ciphertextHash <== secondBudgetCiphertextHash;
+
     component secondDepthBits = Num2Bits(6);
     secondDepthBits.in <== secondNoteDepth;
     component secondDepthOk = LessEqThan(6);
@@ -276,19 +307,19 @@ template ShieldedClaim() {
     secondDepthOk.in[1] <== 32;
     secondDepthOk.out === 1;
     component secondMembership = BinaryMerkleRoot(32);
-    secondMembership.leaf <== secondBudget.out;
+    secondMembership.leaf <== secondBudget.commitment;
     secondMembership.depth <== secondNoteDepth;
     secondMembership.index <== secondNoteIndex;
     secondMembership.siblings <== secondNoteSiblings;
     hasSecondInput * (secondMembership.out - inputRoots[1]) === 0;
     component distinctBudgets = IsEqual();
-    distinctBudgets.in[0] <== oldBudget.out;
-    distinctBudgets.in[1] <== secondBudget.out;
+    distinctBudgets.in[0] <== oldBudget.commitment;
+    distinctBudgets.in[1] <== secondBudget.commitment;
     hasSecondInput * distinctBudgets.out === 0;
     component secondSpend = Poseidon(3);
     secondSpend.inputs[0] <== 1016;
     secondSpend.inputs[1] <== ownerSecret.out;
-    secondSpend.inputs[2] <== secondBudget.out;
+    secondSpend.inputs[2] <== secondBudget.commitment;
     inputNullifiers[1] === dummySpend.out + hasSecondInput * (secondSpend.out - dummySpend.out);
     signal totalRemaining <== remaining + secondRemaining;
     component totalAmountBits = Num2Bits(128);
@@ -337,12 +368,12 @@ template ShieldedClaim() {
         realPeriod[i] = Poseidon(4);
         realPeriod[i].inputs[0] <== 1017;
         realPeriod[i].inputs[1] <== derivedSecretField;
-        realPeriod[i].inputs[2] <== policy.out;
+        realPeriod[i].inputs[2] <== policyCommitmentInput;
         realPeriod[i].inputs[3] <== periodIndices[i];
         dummyPeriod[i] = Poseidon(4);
         dummyPeriod[i].inputs[0] <== 1019;
         dummyPeriod[i].inputs[1] <== ownerSecret.out;
-        dummyPeriod[i].inputs[2] <== oldBudget.out;
+        dummyPeriod[i].inputs[2] <== oldBudget.commitment;
         dummyPeriod[i].inputs[3] <== i;
         periodNullifiers[i] ===
             dummyPeriod[i].out + active[i].out * (realPeriod[i].out - dummyPeriod[i].out);
@@ -359,16 +390,17 @@ template ShieldedClaim() {
     newRemainingPeriodsBits.in <== newRemainingPeriods;
     newRemaining === rate * newRemainingPeriods;
 
-    component nextBudget = Poseidon(8);
-    nextBudget.inputs[0] <== 1015;
-    nextBudget.inputs[1] <== policy.out;
-    nextBudget.inputs[2] <== enrollment.out;
-    nextBudget.inputs[3] <== ownerCommitment.out;
-    nextBudget.inputs[4] <== rate;
-    nextBudget.inputs[5] <== newRemaining;
-    nextBudget.inputs[6] <== newBudgetNonce;
-    nextBudget.inputs[7] <== ciphertextHashes[0];
-    nextBudget.out === outputCommitments[0];
+    component nextBudget = ShieldedBoundBudgetCommitment();
+    nextBudget.budgetKind <== remainderKind;
+    nextBudget.policyCommitment <== policyCommitmentInput;
+    nextBudget.enrollmentCommitment <== enrollmentCommitmentInput;
+    nextBudget.termsCommitment <== terms.commitment;
+    nextBudget.ownerCommitment <== ownerCommitment.out;
+    nextBudget.rate <== rate;
+    nextBudget.remaining <== newRemaining;
+    nextBudget.nonce <== newBudgetNonce;
+    nextBudget.ciphertextHash <== ciphertextHashes[0];
+    nextBudget.commitment === outputCommitments[0];
 
     component payoutNote = Poseidon(5);
     payoutNote.inputs[0] <== 1014;

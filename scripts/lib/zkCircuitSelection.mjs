@@ -5,7 +5,6 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   claim: "shielded_claim",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
-  claimPublic: "shielded_claim_public",
 });
 
 /**

@@ -4,8 +4,10 @@ import {
   type IdentityFields,
 } from "@deepfamily/protocol-core";
 import { getBigInt } from "ethers";
+import { getFundingPassphraseError } from "../../../shared/crypto/passphraseStrength";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
+import { InheritanceError } from "../model/inheritanceErrors";
 
 declare const verifiedRecipient: unique symbol;
 
@@ -95,6 +97,8 @@ export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
 }): Promise<string> {
+  const passphraseError = getFundingPassphraseError(credentials.rawPassphrase);
+  if (passphraseError) throw new InheritanceError(passphraseError);
   const { code } = await zkWorkerCall("createShieldedReceiveCodeFromCredentials", credentials, {
     timeoutMs: RECEIVE_CODE_TIMEOUT_MS,
   });

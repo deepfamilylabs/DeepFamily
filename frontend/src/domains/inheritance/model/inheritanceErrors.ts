@@ -1,8 +1,10 @@
 export type InheritanceErrorCode =
   | "nameRequired"
+  | "passphraseRequired"
   | "passphraseDisallowed"
-  | "rootVersionNotFound"
-  | "snapshotMismatch";
+  | "snapshotMismatch"
+  | "amountInvalid"
+  | "periodsInvalid";
 
 /** A failure the flow recognises and explains in its own words. */
 export class InheritanceError extends Error {

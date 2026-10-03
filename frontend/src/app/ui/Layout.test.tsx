@@ -5,12 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Layout from "./Layout";
 
-vi.mock("../../shared/ui", () => ({
-  PageContainer: ({ children, className }: any) => (
-    <div data-testid="page-container" data-class-name={className}>
-      {children}
-    </div>
-  ),
+vi.mock("../../shared/ui", async () => ({
+  PageContainer: (await import("../../shared/ui/PageContainer")).default,
 }));
 
 vi.mock("./SiteHeader", () => ({
@@ -37,9 +33,11 @@ function renderLayout(initialEntry: string) {
           <Route path="/" element={<div data-testid="page-content">home-content</div>} />
           <Route path="/create" element={<div data-testid="page-content">create-content</div>} />
           <Route
-            path="/family"
-            element={<div data-testid="page-content">tree-content</div>}
+            path="/inheritance"
+            element={<div data-testid="page-content">inheritance-content</div>}
           />
+          <Route path="/people" element={<div data-testid="page-content">people-content</div>} />
+          <Route path="/family" element={<div data-testid="page-content">tree-content</div>} />
           <Route
             path="/genealogyBook"
             element={<div data-testid="page-content">genealogy-content</div>}
@@ -55,43 +53,48 @@ describe("Layout", () => {
     cleanup();
   });
 
-  it("renders home as a full-width page shell", () => {
-    renderLayout("/");
+  it.each([
+    ["/create", "create-content"],
+    ["/inheritance", "inheritance-content"],
+  ])("gives %s the same content width, page spacing and rail offset", (route, content) => {
+    const { container } = renderLayout(route);
+    const main = container.querySelector("main");
+    const pageContainer = main?.firstElementChild;
 
+    expect(screen.getByTestId("page-content").textContent).toBe(content);
+    expect(screen.getByTestId("page-content").parentElement).toBe(pageContainer);
+    expect(main?.classList.contains("md:pl-16")).toBe(true);
+    expect(main?.querySelectorAll(".max-w-7xl")).toHaveLength(1);
+    for (const className of [
+      "max-w-7xl",
+      "mx-auto",
+      "px-4",
+      "sm:px-6",
+      "lg:px-8",
+      "pt-10",
+      "pb-[calc(var(--app-statusbar-h)+1rem)]",
+    ]) {
+      expect(pageContainer?.classList.contains(className)).toBe(true);
+    }
+  });
+
+  it.each([
+    ["/", "home-content"],
+    ["/people", "people-content"],
+    ["/family", "tree-content"],
+    ["/genealogyBook", "genealogy-content"],
+  ])("keeps %s full-width behind the shared rail", (route, content) => {
+    const { container } = renderLayout(route);
+    const main = container.querySelector("main");
+
+    expect(screen.getByTestId("page-content").textContent).toBe(content);
+    expect(screen.getByTestId("page-content").parentElement).toBe(main);
+    expect(main?.querySelector(".max-w-7xl")).toBeNull();
+    expect(main?.classList.contains("md:pl-16")).toBe(true);
     expect(screen.getByTestId("site-header")).toBeTruthy();
     expect(screen.getByTestId("global-sidebar")).toBeTruthy();
-    expect(screen.getByTestId("page-content").textContent).toBe("home-content");
-    expect(screen.queryByTestId("page-container")).toBeNull();
-    // The sidebar's Create entry leads to /create; nothing floats over the page.
     expect(screen.queryByTestId("floating-action-button")).toBeNull();
     expect(screen.getByTestId("status-bar")).toBeTruthy();
-  });
-
-  it("wraps non-full-width pages in PageContainer and keeps the rail offset", () => {
-    const { container } = renderLayout("/create");
-
-    expect(screen.getByTestId("page-container")).toBeTruthy();
-    expect(screen.getByTestId("page-content").textContent).toBe("create-content");
-
-    const main = container.querySelector("main");
-    expect(main?.className).toContain("md:pl-16");
-  });
-
-  it("keeps tree route full-width behind the same rail offset", () => {
-    const { container } = renderLayout("/family");
-
-    expect(screen.getByTestId("page-content").textContent).toBe("tree-content");
-    expect(screen.queryByTestId("page-container")).toBeNull();
-
-    const main = container.querySelector("main");
-    expect(main?.className).toContain("md:pl-16");
-  });
-
-  it("keeps genealogy book route full-width for the paper preview surface", () => {
-    renderLayout("/genealogyBook");
-
-    expect(screen.getByTestId("page-content").textContent).toBe("genealogy-content");
-    expect(screen.queryByTestId("page-container")).toBeNull();
   });
 
   it("keeps the status bar on every route — it replaced the landing-page footer", () => {

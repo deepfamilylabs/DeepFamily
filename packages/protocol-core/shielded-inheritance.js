@@ -28,6 +28,8 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   budgetUseNullifier: 1026n,
   enrollmentNullifier: 1027n,
   allocationKeyCommitment: 1028n,
+  identityBudgetTerms: 1029n,
+  identityBudgetNote: 1030n,
 });
 
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
@@ -196,6 +198,70 @@ export function computeShieldedBudgetNoteCommitment(input) {
     nonzeroField(input.nonce, "nonce"),
     field(input.ciphertextHashField, "ciphertextHashField"),
   ]);
+}
+
+/** Public addressing binds the recipient and terms without revealing private rule openings. */
+export function computeShieldedIdentityBudgetTermsCommitment(input) {
+  return poseidon6([
+    SHIELDED_INHERITANCE_DOMAINS.identityBudgetTerms,
+    nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
+    uint64(input.rootVersionIndex, "rootVersionIndex"),
+    nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
+    uint64(input.eligibleFrom, "eligibleFrom"),
+    nonzeroAmount(input.amountPerPeriod, "amountPerPeriod"),
+  ]);
+}
+
+/** An identity-bound budget is domain-separated from the unchanged owner-bound budget. */
+export function computeShieldedIdentityBudgetNoteCommitment(input) {
+  const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
+  const remaining = uint128(input.remaining, "remaining");
+  protocolAssert(
+    remaining % rate === 0n,
+    "FRACTIONAL_SHIELDED_BUDGET",
+    "remaining must be a whole number of periods",
+  );
+  protocolAssert(
+    remaining / rate <= MAX_UINT64,
+    "SHIELDED_PERIOD_COUNT_OVERFLOW",
+    "remaining exceeds the circuit's 64-bit period count",
+  );
+  return poseidon8([
+    SHIELDED_INHERITANCE_DOMAINS.identityBudgetNote,
+    nonzeroField(input.policyCommitment, "policyCommitment"),
+    nonzeroField(input.enrollmentCommitment, "enrollmentCommitment"),
+    nonzeroField(input.termsCommitment, "termsCommitment"),
+    rate,
+    remaining,
+    nonzeroField(input.nonce, "nonce"),
+    field(input.ciphertextHashField, "ciphertextHashField"),
+  ]);
+}
+
+/** Recover common policy/enrollment commitments without opening an identity budget's rule. */
+export function getShieldedBudgetCommitments(note) {
+  if (note.binding === "identity") {
+    return {
+      policyCommitment: nonzeroField(note.policyCommitment, "policyCommitment"),
+      enrollmentCommitment: nonzeroField(note.enrollmentCommitment, "enrollmentCommitment"),
+      termsCommitment: computeShieldedIdentityBudgetTermsCommitment(note),
+    };
+  }
+  protocolAssert(
+    note.binding === undefined || note.binding === "owner",
+    "INVALID_SHIELDED_BUDGET_BINDING",
+    "Unsupported budget binding",
+  );
+  const policyCommitment = computeShieldedPolicyCommitment(note);
+  return {
+    policyCommitment,
+    enrollmentCommitment: computeShieldedEnrollmentCommitment({
+      policyCommitment,
+      heirIdentityCommitment: note.heirIdentityCommitment,
+      eligibleFrom: note.eligibleFrom,
+      enrollmentSalt: note.enrollmentSalt,
+    }),
+  };
 }
 
 /** The note issuer cannot derive this from note preimages without ownerSecret. */
