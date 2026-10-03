@@ -34,6 +34,7 @@ import { deriveIdentityFromForm } from "../services/inheritanceIdentity";
 import {
   getShieldedFundingFamilyOptions,
   listShieldedFundingChildren,
+  listShieldedFundingParentVersions,
 } from "../services/shieldedFundingFamily";
 import {
   nextClaimPeriods,
@@ -713,6 +714,29 @@ export function ShieldedInheritancePanel({
   const selectedPolicy = policySelection
     ? available.policies.find((policy) => fundingPolicyKey(policy) === policySelection)
     : undefined;
+  const fundingParentVersions = useMemo(() => {
+    if (action !== "fund" || !currentLineage || !identity) return [];
+    return listShieldedFundingParentVersions({
+      snapshot: currentLineage.snapshot,
+      parentIdentityCommitment: identity.identityCommitment,
+    });
+  }, [action, currentLineage, identity]);
+  const explicitFundingVersion = fundingFamilyVersionSelection
+    ? Number(fundingFamilyVersionSelection)
+    : undefined;
+  const fundingRoot = useMemo(
+    () =>
+      selectedPolicy ??
+      (identity &&
+      explicitFundingVersion !== undefined &&
+      fundingParentVersions.includes(explicitFundingVersion)
+        ? {
+            rootIdentityCommitment: BigInt(identity.identityCommitment),
+            rootVersionIndex: BigInt(explicitFundingVersion),
+          }
+        : undefined),
+    [selectedPolicy, identity, explicitFundingVersion, fundingParentVersions],
+  );
   const fundingParent = useMemo(() => {
     if (action !== "fund" || !currentLineage || !identity || !heirPersonHash.trim())
       return undefined;
@@ -723,22 +747,7 @@ export function ShieldedInheritancePanel({
     }).parents.find((parent) => parent.identityCommitment === BigInt(identity.identityCommitment));
   }, [action, currentLineage, heirPersonHash, identity]);
   const fundingFamilyVersion = fundingParent?.versions.find(
-    (version) =>
-      version.versionIndex ===
-      (fundingFamilyVersionSelection
-        ? Number(fundingFamilyVersionSelection)
-        : fundingParent.latestVersionIndex),
-  );
-  const fundingRoot =
-    selectedPolicy ??
-    (fundingParent && fundingFamilyVersion?.eligible
-      ? {
-          rootIdentityCommitment: fundingParent.identityCommitment,
-          rootVersionIndex: BigInt(fundingFamilyVersion.versionIndex),
-        }
-      : undefined);
-  const hasFundingHistory = fundingParent?.versions.some(
-    (version) => version.versionIndex !== fundingParent.latestVersionIndex && version.eligible,
+    (version) => BigInt(version.versionIndex) === fundingRoot?.rootVersionIndex,
   );
   const fundingFamilyHash = fundingRoot
     ? wrapIdentityCommitmentAsPersonHash(fundingRoot.rootIdentityCommitment)
@@ -746,7 +755,7 @@ export function ShieldedInheritancePanel({
   const fundingFamilyRelation = fundingParent?.relation;
   const childOptions = useMemo<ShieldedRecipientOption[]>(() => {
     const candidates: ShieldedRecipientOption[] = [];
-    if (action !== "fund" || !identity) return candidates;
+    if (action !== "fund" || !identity || !fundingRoot) return candidates;
     if (selectedPolicy) {
       const policyCommitment = computeShieldedPolicyCommitment({
         ...selectedPolicy,
@@ -767,44 +776,37 @@ export function ShieldedInheritancePanel({
         }
       }
     }
-    if (
-      !currentLineage ||
-      (selectedPolicy && selectedPolicy.rootVersionIndex > BigInt(Number.MAX_SAFE_INTEGER))
-    )
+    if (!currentLineage || fundingRoot.rootVersionIndex > BigInt(Number.MAX_SAFE_INTEGER))
       return candidates;
     for (const candidate of listShieldedFundingChildren({
       snapshot: currentLineage.snapshot,
       asOf: currentLineage.asOf,
       parentIdentityCommitment: identity.identityCommitment,
+      rootVersionIndex: Number(fundingRoot.rootVersionIndex),
     })) {
       if (
         !selectedPolicy &&
         candidate.personHash.toLowerCase() === identity?.personHash.toLowerCase()
       )
         continue;
-      const eligible = selectedPolicy
-        ? findHeirLegitimacy({
-            snapshot: currentLineage.snapshot,
-            heir: {
-              personHash: candidate.personHash,
-              identityCommitment:
-                currentLineage.snapshot.versions.get(candidate.personHash)?.[0]
-                  .identityCommitment ?? 0n,
-            },
-            root: { identityCommitment: selectedPolicy.rootIdentityCommitment },
-            rootVersionIndex: Number(selectedPolicy.rootVersionIndex),
-          }).some((source) => source.writtenAt <= currentLineage.asOf)
-        : candidate.eligible;
       if (!candidates.some((existing) => existing.personHash === candidate.personHash)) {
         candidates.push({
           ...candidate,
           label: localRecipientLabels.get(candidate.personHash.toLowerCase()),
-          eligible,
+          eligible: candidate.eligible,
         });
       }
     }
     return candidates;
-  }, [action, currentLineage, selectedPolicy, identity, available.templates, localRecipientLabels]);
+  }, [
+    action,
+    currentLineage,
+    selectedPolicy,
+    identity,
+    available.templates,
+    localRecipientLabels,
+    fundingRoot,
+  ]);
 
   async function refreshWallet(identity: IdentityMaterialV1Result) {
     const previous = walletCache.current;
@@ -1199,6 +1201,9 @@ export function ShieldedInheritancePanel({
           return note;
         };
         if (action === "fund") {
+          if (!policySelection && !fundingRoot) {
+            throw new Error(t("shielded.fundingVersionRequired"));
+          }
           const budgetPeriods = parsePositivePeriods(periods);
           const childError = validateShieldedRecipientSelection({
             value: heirPersonHash,
@@ -1817,6 +1822,9 @@ export function ShieldedInheritancePanel({
                       setPolicySelection(event.target.value);
                       setHeirPersonHash("");
                       setFundingFamilyVersionSelection("");
+                      changeRecipientCode("");
+                      recipientCredentialsFormRef.current?.clearSecretInputs();
+                      setError("");
                     }}
                   >
                     <option value="">{t("shielded.newFundingRule")}</option>
@@ -1841,67 +1849,63 @@ export function ShieldedInheritancePanel({
                   </select>
                 </FieldBlock>
               ) : null}
+              <FieldBlock label={t("shielded.fields.familyVersion")}>
+                {selectedPolicy ? (
+                  <p className="text-sm text-ink" role="status">
+                    {t("shielded.fundingVersionOption", {
+                      version: selectedPolicy.rootVersionIndex.toString(),
+                    })}
+                  </p>
+                ) : (
+                  <select
+                    aria-label={t("shielded.fields.familyVersion")}
+                    className={INPUT_CLASS}
+                    disabled={busy || !currentLineage || fundingParentVersions.length === 0}
+                    value={fundingFamilyVersionSelection}
+                    onChange={(event) => {
+                      setFundingFamilyVersionSelection(event.target.value);
+                      setHeirPersonHash("");
+                      changeRecipientCode("");
+                      recipientCredentialsFormRef.current?.clearSecretInputs();
+                      setError("");
+                    }}
+                  >
+                    <option value="">{t("shielded.fundingVersionPlaceholder")}</option>
+                    {fundingFamilyVersionSelection &&
+                    !fundingParentVersions.includes(Number(fundingFamilyVersionSelection)) ? (
+                      <option value={fundingFamilyVersionSelection} disabled>
+                        {t("shielded.fundingVersionOption", {
+                          version: fundingFamilyVersionSelection,
+                        })}
+                      </option>
+                    ) : null}
+                    {fundingParentVersions.map((version) => (
+                      <option key={version} value={version.toString()}>
+                        {t("shielded.fundingVersionOption", { version })}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FieldBlock>
               <ShieldedRecipientPicker
                 label={t("shielded.fields.heirPersonHash")}
                 value={heirPersonHash}
                 onChange={(value) => {
                   setHeirPersonHash(value);
-                  setFundingFamilyVersionSelection("");
+                  changeRecipientCode("");
+                  recipientCredentialsFormRef.current?.clearSecretInputs();
                   setError("");
                 }}
                 options={childOptions}
                 loading={!currentLineage && !lineageError && childOptions.length === 0}
+                disabled={!fundingRoot}
+                placeholder={!fundingRoot ? t("shielded.fundingVersionRequired") : undefined}
               />
-              {heirPersonHash.trim() && !selectedPolicy ? (
-                <>
-                  {hasFundingHistory && fundingParent ? (
-                    <details className="space-y-2 text-sm text-ink-muted">
-                      <summary className="cursor-pointer">
-                        {t("shielded.fundingHistoryToggle")}
-                      </summary>
-                      <FieldBlock
-                        label={t("shielded.fields.familyVersion")}
-                        hint={t("shielded.fundingHistoryHint")}
-                      >
-                        <select
-                          aria-label={t("shielded.fields.familyVersion")}
-                          className={INPUT_CLASS}
-                          disabled={busy}
-                          value={fundingFamilyVersionSelection}
-                          onChange={(event) => {
-                            setFundingFamilyVersionSelection(event.target.value);
-                            setError("");
-                          }}
-                        >
-                          <option value="">
-                            {t("shielded.fundingLatestVersionOption", {
-                              version: fundingParent.latestVersionIndex,
-                            })}
-                          </option>
-                          {fundingParent.versions
-                            .filter(
-                              (version) =>
-                                version.versionIndex !== fundingParent.latestVersionIndex,
-                            )
-                            .map((version) => (
-                              <option
-                                key={version.versionIndex}
-                                value={version.versionIndex.toString()}
-                                disabled={!version.eligible}
-                              >
-                                {t("shielded.fundingVersionOption", {
-                                  version: version.versionIndex,
-                                })}
-                              </option>
-                            ))}
-                        </select>
-                      </FieldBlock>
-                    </details>
-                  ) : null}
-                  {currentLineage && !fundingRoot ? (
-                    <WarningNotice>{t("shielded.fundingFamilyUnavailable")}</WarningNotice>
-                  ) : null}
-                </>
+              {heirPersonHash.trim() &&
+              !selectedPolicy &&
+              currentLineage &&
+              !fundingFamilyVersion?.eligible ? (
+                <WarningNotice>{t("shielded.fundingFamilyUnavailable")}</WarningNotice>
               ) : null}
               {heirPersonHash.trim() && fundingRoot && fundingFamilyHash ? (
                 <p role="status" className="text-xs text-ink-muted">
@@ -2280,7 +2284,7 @@ export function ShieldedInheritancePanel({
               (recipientNeedsConfirmation && !recipientConfirmed) ||
               (action === "privateTransfer" && selectedValueCommitments.length === 0) ||
               (action === "unshield" && !withdrawalSelectionAvailable) ||
-              (action === "fund" && fundingNeedsDeposit) ||
+              (action === "fund" && (fundingNeedsDeposit || !fundingRoot)) ||
               (action === "claim" && !claimSelectionAvailable)
             }
             onClick={() => void submitSelected()}

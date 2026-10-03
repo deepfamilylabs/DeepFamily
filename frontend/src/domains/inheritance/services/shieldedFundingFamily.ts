@@ -94,15 +94,40 @@ export function getShieldedFundingFamilyOptions({
   };
 }
 
-/** Only confirmed direct children of this parent can be funding candidates. */
+/** The unlocked parent's own versions, newest first, without choosing one. */
+export function listShieldedFundingParentVersions({
+  snapshot,
+  parentIdentityCommitment,
+}: {
+  snapshot: LineageSnapshot;
+  parentIdentityCommitment: string | bigint;
+}): number[] {
+  const parentIdentity = BigInt(parentIdentityCommitment);
+  const versionIndices = new Set<number>();
+  for (const versions of snapshot.versions.values()) {
+    for (const version of versions) {
+      if (version.identityCommitment === parentIdentity) {
+        versionIndices.add(version.versionIndex);
+      }
+    }
+  }
+  return [...versionIndices].sort((a, b) => b - a);
+}
+
+/**
+ * Only confirmed direct children of this parent can be funding candidates.
+ * Eligibility always uses the selected parent's exact root version.
+ */
 export function listShieldedFundingChildren({
   snapshot,
   asOf,
   parentIdentityCommitment,
+  rootVersionIndex,
 }: {
   snapshot: LineageSnapshot;
   asOf: bigint;
   parentIdentityCommitment: string | bigint;
+  rootVersionIndex: number;
 }): ShieldedRecipientOption[] {
   const parentIdentity = BigInt(parentIdentityCommitment);
   const candidates: ShieldedRecipientOption[] = [];
@@ -126,7 +151,11 @@ export function listShieldedFundingChildren({
     if (!scopedParents.length) continue;
     candidates.push({
       personHash,
-      eligible: scopedParents.some((parent) => parent.versions.some((version) => version.eligible)),
+      eligible: scopedParents.some((parent) =>
+        parent.versions.some(
+          (version) => version.eligible && version.versionIndex === rootVersionIndex,
+        ),
+      ),
     });
   }
   return candidates.sort((a, b) => a.personHash.localeCompare(b.personHash));

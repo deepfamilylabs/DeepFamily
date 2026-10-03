@@ -11,12 +11,16 @@ export function ShieldedRecipientPicker({
   onChange,
   options,
   loading,
+  disabled = false,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: readonly ShieldedRecipientOption[];
   loading: boolean;
+  disabled?: boolean;
+  placeholder?: string;
 }) {
   const { t } = useTranslation();
   const visible = options.filter((option) => option.eligible);
@@ -31,16 +35,17 @@ export function ShieldedRecipientPicker({
           className={INPUT_CLASS}
           value={selected?.personHash ?? ""}
           onChange={(event) => onChange(event.target.value)}
-          disabled={loading}
+          disabled={loading || disabled}
         >
           <option value="">
             {loading
               ? t("shielded.recipientPicker.loading")
-              : t(
+              : (placeholder ??
+                t(
                   visible.length
                     ? "shielded.recipientPicker.placeholder"
                     : "shielded.recipientPicker.emptyChildren",
-                )}
+                ))}
           </option>
           {visible.map((option, index) => (
             <option key={option.personHash.toLowerCase()} value={option.personHash}>
