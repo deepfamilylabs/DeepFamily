@@ -412,15 +412,15 @@ export function useAddVersionModalController({
   const cacheConfirmedAfterTransaction = useCallback(
     (node: Parameters<typeof cacheConfirmedPersonVersion>[0]) => {
       // Public anchors were verified immediately before this callback. The
-      // synchronous projection/upsert may still throw, but a local durability
-      // failure must not turn a confirmed chain transaction into a failed flow.
+      // cache reports projection, reconciliation and durability failures as a
+      // rejected promise, preserving the confirmed chain transaction's result.
       const persistence = cacheConfirmedPersonVersion(
         node,
         confirmedCacheRevisionRef.current ?? -1,
       );
       void persistence.catch((error: unknown) => {
         if (isDevMode()) {
-          console.warn("Confirmed person-version cache persistence failed", {
+          console.warn("Confirmed person-version cache update failed", {
             errorType: error instanceof Error ? error.name : typeof error,
           });
         }
@@ -564,7 +564,8 @@ export function useAddVersionModalController({
             id: "proof",
             label: t("transaction.stepProof", "Generate zero-knowledge proof"),
             // Says what the label cannot: how long, and what it needs from you.
-            detail: commitmentProof.proofStep === "verifying"
+            detail:
+              commitmentProof.proofStep === "verifying"
                 ? t("addVersion.verifyingProof", "Verifying proof...")
                 : t(
                     "transaction.proofDuration",

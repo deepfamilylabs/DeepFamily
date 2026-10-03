@@ -17,7 +17,8 @@ import {
   wrapIdentityCommitmentAsPersonHash,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
-import type { Signer } from "ethers";
+import { Interface, type Signer } from "ethers";
+import enLocale from "../../../locales/en/index.json";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { InheritanceError } from "../model/inheritanceErrors";
@@ -42,6 +43,9 @@ const mocks = vi.hoisted(() => ({
   prepareShieldedShield: vi.fn(),
   submitShield: vi.fn(),
   tokenAllowance: vi.fn(),
+  tokenBalanceOf: vi.fn(),
+  tokenConnect: vi.fn(),
+  tokenApprove: vi.fn(),
   prepareShieldedPrivateTransfer: vi.fn(),
   prepareShieldedUnshield: vi.fn(),
   submitPrivateTransfer: vi.fn(),
@@ -59,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   getBlock: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  walletChangedMessage: null as string | null,
 }));
 
 vi.mock("react-i18next", () => {
@@ -71,6 +76,7 @@ vi.mock("react-i18next", () => {
       relation?: string;
       version?: number;
       amount?: string;
+      balance?: string;
       index?: number;
       count?: number;
       hash?: string;
@@ -78,6 +84,9 @@ vi.mock("react-i18next", () => {
       periods?: number;
     },
   ) => {
+    if (key === "shielded.walletChanged" && mocks.walletChangedMessage) {
+      return mocks.walletChangedMessage;
+    }
     if (key === "shielded.confirmedRefreshFailed") {
       return `Transaction confirmed; balances refresh failed: ${options?.detail}`;
     }
@@ -92,6 +101,9 @@ vi.mock("react-i18next", () => {
     }
     if (key === "shielded.fundingBalanceInsufficient") {
       return `Missing private balance: ${options?.amount}`;
+    }
+    if (key === "shielded.depositBalanceInsufficient") {
+      return `Deposit requires ${options?.amount} DEEP; wallet balance is ${options?.balance} DEEP`;
     }
     if (key === "shielded.valueOption") {
       return `Balance ${options?.index}: ${options?.amount} DEEP`;
@@ -492,7 +504,11 @@ function renderPanel() {
     chainId: 31337n,
     poolAddress,
     pool: {},
-    token: { allowance: mocks.tokenAllowance },
+    token: {
+      allowance: mocks.tokenAllowance,
+      balanceOf: mocks.tokenBalanceOf,
+      connect: mocks.tokenConnect,
+    },
     tokenDecimals: 0,
     provider: { getBlock: mocks.getBlock },
     lineageIndex: {},
@@ -625,6 +641,7 @@ function deferred<T>() {
 describe("ShieldedInheritancePanel unlocked account", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.walletChangedMessage = null;
     mocks.deriveIdentityFromForm.mockResolvedValue(identity);
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot());
     mocks.verifyShieldedReceiveCode.mockRejectedValue(new ShieldedReceiveCodeError("malformed"));
@@ -640,6 +657,12 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     mocks.prepareShieldedShield.mockResolvedValue({ data: {}, witness: {} });
     mocks.submitShield.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
     mocks.tokenAllowance.mockResolvedValue(1_000n);
+    mocks.tokenBalanceOf.mockResolvedValue(1_000_000_000n);
+    mocks.tokenConnect.mockReturnValue({ approve: mocks.tokenApprove });
+    mocks.tokenApprove.mockResolvedValue({
+      hash: transactionHash,
+      wait: async () => ({ status: 1 }),
+    });
     mocks.prepareShieldedClaim.mockResolvedValue({ data: {}, witness: {} });
     mocks.submitClaimWithFreshLineage.mockImplementation(
       async ({ prepare }: { prepare: () => Promise<unknown> }) => {
@@ -715,11 +738,208 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         expect(screen.getByRole("alert").textContent).toContain("inheritance.errors.amountInvalid"),
       );
       expect(mocks.prepareShieldedShield).not.toHaveBeenCalled();
+      expect(mocks.tokenBalanceOf).not.toHaveBeenCalled();
       expect(mocks.tokenAllowance).not.toHaveBeenCalled();
       expect(mocks.submitShield).not.toHaveBeenCalled();
       expect(screen.queryByText("shielded.done")).toBeNull();
     },
   );
+
+  it("does not use private VALUE notes to cover an ordinary-wallet deposit", async () => {
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 10_000n)]));
+    mocks.tokenBalanceOf.mockResolvedValue(0n);
+    mocks.tokenAllowance.mockResolvedValue(0n);
+    renderPanel();
+    await unlock();
+    chooseAction("shield");
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Deposit requires 1000 DEEP; wallet balance is 0 DEEP",
+      ),
+    );
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledWith(account);
+    expect(mocks.tokenBalanceOf).not.toHaveBeenCalledWith(identity.personHash);
+    expect(mocks.prepareShieldedShield).not.toHaveBeenCalled();
+    expect(mocks.tokenAllowance).not.toHaveBeenCalled();
+    expect(mocks.tokenConnect).not.toHaveBeenCalled();
+    expect(mocks.tokenApprove).not.toHaveBeenCalled();
+    expect(mocks.submitShield).not.toHaveBeenCalled();
+    expect(screen.getByText("shielded.balanceAmount").closest("div")?.textContent).toContain(
+      "10000",
+    );
+    expect(screen.queryByText("shielded.done")).toBeNull();
+  });
+
+  it("reports a nonzero ordinary-wallet balance that cannot cover the deposit", async () => {
+    mocks.tokenBalanceOf.mockResolvedValue(999n);
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Deposit requires 1000 DEEP; wallet balance is 999 DEEP",
+      ),
+    );
+    expect(mocks.prepareShieldedShield).not.toHaveBeenCalled();
+    expect(mocks.tokenApprove).not.toHaveBeenCalled();
+    expect(mocks.submitShield).not.toHaveBeenCalled();
+  });
+
+  it("allows a deposit equal to the fresh ordinary-wallet balance", async () => {
+    mocks.tokenBalanceOf.mockResolvedValue(1000n);
+    mocks.tokenAllowance.mockResolvedValue(0n);
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledWith(account);
+    expect(mocks.prepareShieldedShield).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 1000n }),
+    );
+    expect(mocks.tokenApprove).toHaveBeenCalledWith(poolAddress, 1000n);
+    expect(mocks.submitShield).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("reads the wallet balance again after the preceding deposit spends it", async () => {
+    mocks.tokenBalanceOf.mockResolvedValueOnce(1000n).mockResolvedValue(0n);
+    mocks.tokenAllowance.mockResolvedValue(0n);
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Deposit requires 1000 DEEP; wallet balance is 0 DEEP",
+      ),
+    );
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledTimes(2);
+    expect(mocks.tokenBalanceOf.mock.calls.map(([address]) => address)).toEqual([account, account]);
+    expect(mocks.prepareShieldedShield).toHaveBeenCalledOnce();
+    expect(mocks.tokenAllowance).toHaveBeenCalledOnce();
+    expect(mocks.tokenApprove).toHaveBeenCalledOnce();
+    expect(mocks.submitShield).toHaveBeenCalledOnce();
+  });
+
+  it("checks the selected transaction wallet instead of the unlocked identity's hash", async () => {
+    const otherAccount = "0x00000000000000000000000000000000000000dd";
+    const otherSigner = {
+      provider: { getNetwork: async () => ({ chainId: 31337n }) },
+      getAddress: async () => otherAccount,
+    } as unknown as Signer;
+    mocks.tokenBalanceOf.mockImplementation(async (address: string) =>
+      address === otherAccount ? 1000n : 0n,
+    );
+    const panel = renderPanel();
+    await unlock();
+    panel.rerenderAccount(otherAccount, otherSigner);
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledOnce();
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledWith(otherAccount);
+    expect(mocks.tokenAllowance).toHaveBeenCalledWith(otherAccount, poolAddress);
+    expect(mocks.submitShield).toHaveBeenCalledWith(
+      expect.objectContaining({ signer: otherSigner }),
+    );
+    expect(mocks.deriveIdentityFromForm).toHaveBeenCalledOnce();
+    expect(screen.getByText(identity.personHash)).toBeTruthy();
+  });
+
+  it.each([
+    { change: "account", english: false, name: "account" },
+    { change: "network", english: false, name: "network" },
+    { change: "account", english: true, name: "account with real English guidance" },
+  ] as const)(
+    "stops a deposit if the transaction wallet's $name changes during its balance read",
+    async ({ change, english }) => {
+      if (english) mocks.walletChangedMessage = enLocale.shielded.walletChanged;
+      const balanceRead = deferred<bigint>();
+      mocks.tokenBalanceOf.mockReturnValueOnce(balanceRead.promise);
+      const panel = renderPanel();
+      await unlock();
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+        target: { value: "1000" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await waitFor(() => expect(mocks.tokenBalanceOf).toHaveBeenCalledWith(account));
+      const otherAccount =
+        change === "account" ? "0x00000000000000000000000000000000000000dd" : account;
+      panel.rerenderAccount(otherAccount, {
+        provider: { getNetwork: async () => ({ chainId: change === "network" ? 71n : 31337n }) },
+        getAddress: async () => otherAccount,
+      } as unknown as Signer);
+      await act(async () => {
+        balanceRead.resolve(1000n);
+      });
+
+      expect(screen.getByRole("alert").textContent).toBe(
+        english ? enLocale.shielded.walletChanged : "shielded.walletChanged",
+      );
+      expect(screen.getByRole("alert").textContent).not.toContain(
+        "errors.contractError.NETWORK_ERROR",
+      );
+      expect(mocks.prepareShieldedShield).not.toHaveBeenCalled();
+      expect(mocks.tokenAllowance).not.toHaveBeenCalled();
+      expect(mocks.tokenApprove).not.toHaveBeenCalled();
+      expect(mocks.submitShield).not.toHaveBeenCalled();
+    },
+  );
+
+  it("localizes an ERC20 balance revert after a successful deposit preflight", async () => {
+    const tokenInterface = new Interface([
+      "error ERC20InsufficientBalance(address sender, uint256 balance, uint256 needed)",
+    ]);
+    const data = tokenInterface.encodeErrorResult("ERC20InsufficientBalance", [account, 0n, 1000n]);
+    const rawMessage = `execution reverted (unknown custom error), raw-rpc-deposit-error ${data}`;
+    mocks.tokenBalanceOf.mockResolvedValue(1000n);
+    mocks.submitShield.mockRejectedValue(
+      Object.assign(new Error(rawMessage), {
+        code: "CALL_EXCEPTION",
+        action: "estimateGas",
+        info: { error: { code: -32603, data } },
+      }),
+    );
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe(
+        "errors.contractError.ERC20InsufficientBalance",
+      ),
+    );
+    expect(mocks.tokenBalanceOf).toHaveBeenCalledWith(account);
+    expect(mocks.prepareShieldedShield).toHaveBeenCalledOnce();
+    expect(mocks.submitShield).toHaveBeenCalledOnce();
+    expect(screen.getByRole("alert").textContent).not.toContain("0xe450d38c");
+    expect(screen.getByRole("alert").textContent).not.toContain("raw-rpc-deposit-error");
+    expect(screen.queryByText("shielded.done")).toBeNull();
+  });
 
   it("localizes an invalid funding period count before preparing a transaction", async () => {
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));

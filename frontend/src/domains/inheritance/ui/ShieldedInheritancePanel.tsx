@@ -1084,6 +1084,16 @@ export function ShieldedInheritancePanel({
         shouldRefreshWallet = false;
       } else if (action === "shield") {
         const amount = parsePositiveTokenAmount(shieldAmount, modules.tokenDecimals);
+        const walletBalance = BigInt(await modules.token.balanceOf(account));
+        assertCurrentOperation();
+        if (walletBalance < amount) {
+          throw new Error(
+            t("shielded.depositBalanceInsufficient", {
+              balance: formatUnits(walletBalance, modules.tokenDecimals),
+              amount: formatUnits(amount, modules.tokenDecimals),
+            }),
+          );
+        }
         const prepared = await prepareShieldedShield({
           chainId: modules.chainId,
           poolAddress: modules.poolAddress,
@@ -1439,7 +1449,15 @@ export function ShieldedInheritancePanel({
           ? t(`inheritance.errors.${cause.code}`)
           : cause instanceof ShieldedReceiveCodeError
             ? t(`shielded.receiveCodeErrors.${cause.reason}`)
-            : errorReason === "LOCAL_NONCE_TOO_HIGH" || errorReason === "NONCE_TOO_HIGH"
+            : errorReason &&
+                [
+                  "ERC20InsufficientBalance",
+                  "ERC20InsufficientAllowance",
+                  "LOCAL_NONCE_TOO_LOW",
+                  "NONCE_EXPIRED",
+                  "LOCAL_NONCE_TOO_HIGH",
+                  "NONCE_TOO_HIGH",
+                ].includes(errorReason)
               ? getFriendlyError(cause, t).message
               : cause instanceof Error
                 ? cause.message
