@@ -102,6 +102,9 @@ vi.mock("react-i18next", () => {
     if (key === "shielded.fundingFamilySummary") {
       return `Funding family: ${options?.relation} ${options?.parent}, version ${options?.version}`;
     }
+    if (key === "shielded.fundingVersionOption") {
+      return `Parent version ${options?.version}`;
+    }
     if (key === "shielded.fundingBalanceInsufficient") {
       return `Missing private balance: ${options?.amount}`;
     }
@@ -599,7 +602,21 @@ function spendClaimPeriod(snapshot: LocalShieldedWalletSnapshot, note: Note, ind
   );
 }
 
-async function selectFundingChild(commitment: bigint) {
+async function selectFundingParentVersion(version?: number) {
+  const picker = screen.queryByRole("combobox", {
+    name: "shielded.fields.familyVersion",
+  }) as HTMLSelectElement | null;
+  if (!picker) return;
+  await waitFor(() => expect(picker.options.length).toBeGreaterThan(1));
+  if (version !== undefined || !picker.value) {
+    const selectedVersion =
+      version ?? Math.max(...Array.from(picker.options, (option) => Number(option.value)));
+    fireEvent.change(picker, { target: { value: selectedVersion.toString() } });
+  }
+}
+
+async function selectFundingChild(commitment: bigint, parentVersion?: number) {
+  await selectFundingParentVersion(parentVersion);
   const hash = wrapIdentityCommitmentAsPersonHash(commitment);
   await waitFor(() =>
     expect(
@@ -613,8 +630,8 @@ async function selectFundingChild(commitment: bigint) {
   });
 }
 
-async function fillFundingRecipient(commitment: bigint) {
-  await selectFundingChild(commitment);
+async function fillFundingRecipient(commitment: bigint, parentVersion?: number) {
+  await selectFundingChild(commitment, parentVersion);
   fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
     target: { value: receiveCodeFor(commitment) },
   });
@@ -963,6 +980,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     renderPanel();
     await unlock();
     chooseAction("fund");
+    await selectFundingParentVersion(7);
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.periods" }), {
       target: { value: "1.5" },
     });
@@ -2326,13 +2344,179 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(screen.queryByRole("checkbox", { name: "Period 1: 10 DEEP" })).toBeNull();
   });
 
-  it("creates consecutive private arrangements with latest and explicit parent versions when no rule is recovered", async () => {
+  it.each([
+    { mode: "private", versions: [7, 3] },
+    { mode: "public", versions: [7, 3] },
+    { mode: "private", versions: [3] },
+    { mode: "public", versions: [3] },
+  ])(
+    "requires choosing a parent version for a new $mode budget with $versions",
+    async ({ mode, versions }) => {
+      mocks.loadLineageSnapshot.mockResolvedValue(
+        familySnapshot({ fatherVersions: versions, mother: 0n }),
+      );
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      renderPanel();
+      await unlock();
+      chooseAction("fund");
+      if (mode === "public") {
+        fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+      }
+      const version = screen.getByRole("combobox", {
+        name: "shielded.fields.familyVersion",
+      }) as HTMLSelectElement;
+      await waitFor(() => expect(version.options.length).toBe(versions.length + 1));
+      expect(version.value).toBe("");
+      expect(Array.from(version.options, (option) => option.value)).toEqual([
+        "",
+        ...versions.map(String),
+      ]);
+      expect(version.options[0].text).toBe("shielded.fundingVersionPlaceholder");
+      const child = screen.getByRole("combobox", {
+        name: "shielded.fields.heirPersonHash",
+      }) as HTMLSelectElement;
+      expect(Array.from(child.options, (option) => option.value)).toEqual([""]);
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+        target: { value: "10" },
+      });
+      const submit = screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      fireEvent.click(submit);
+      expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
+      expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Funding family:/)).toBeNull();
+    },
+  );
+
+  it.each(["private", "public"])(
+    "filters children by the chosen parent version and clears the recipient when it changes during %s funding",
+    async (mode) => {
+      mocks.loadLineageSnapshot.mockResolvedValue(
+        familySnapshot({
+          fatherVersions: [2, 1],
+          mother: 0n,
+          extraChildren: [{ identityCommitment: 100n, fatherIdentityCommitment: 777n }],
+        }),
+      );
+      mocks.findHeirLegitimacy.mockImplementation(
+        ({
+          heir,
+          rootVersionIndex,
+        }: {
+          heir: { identityCommitment: bigint };
+          rootVersionIndex: number;
+        }) =>
+          (rootVersionIndex === 1 && heir.identityCommitment === 99n) ||
+          (rootVersionIndex === 2 && heir.identityCommitment === 100n)
+            ? [{ writtenAt: 0n }]
+            : [],
+      );
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(100n));
+      renderPanel();
+      await unlock();
+      chooseAction("fund");
+      if (mode === "public") {
+        fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
+      }
+      await selectFundingChild(99n, 1);
+      const child = screen.getByRole("combobox", {
+        name: "shielded.fields.heirPersonHash",
+      }) as HTMLSelectElement;
+      expect(Array.from(child.options, (option) => option.value)).toEqual([
+        "",
+        wrapIdentityCommitmentAsPersonHash(99n),
+      ]);
+      if (mode === "private") {
+        fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+          target: { value: receiveCodeFor(99n) },
+        });
+      }
+      await selectFundingParentVersion(2);
+      expect(child.value).toBe("");
+      expect(Array.from(child.options, (option) => option.value)).toEqual([
+        "",
+        wrapIdentityCommitmentAsPersonHash(100n),
+      ]);
+      if (mode === "private") {
+        expect(
+          (
+            screen.getByRole("textbox", {
+              name: "shielded.receiveCodeInputLabel",
+            }) as HTMLTextAreaElement
+          ).value,
+        ).toBe("");
+        await fillFundingRecipient(100n, 2);
+      } else {
+        await selectFundingChild(100n, 2);
+      }
+      expect(
+        (
+          screen.getByRole("combobox", {
+            name: "shielded.fields.familyVersion",
+          }) as HTMLSelectElement
+        ).value,
+      ).toBe("2");
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+        target: { value: "10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await screen.findByText("shielded.done");
+      expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith({
+        rootIdentityCommitment: 777n,
+        rootVersionIndex: 2n,
+        amountPerPeriod: 10n,
+        periodDays: 30n,
+      });
+      expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
+        expect.objectContaining({ policy: expect.objectContaining({ rootVersionIndex: 2n }) }),
+      );
+    },
+  );
+
+  it("requires selecting a parent version again if the selected version disappears after refresh", async () => {
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+    renderPanel();
+    await unlock();
+    chooseAction("fund");
+    await fillFundingRecipient(99n, 3);
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+      target: { value: "10" },
+    });
+    mocks.loadLineageSnapshot.mockResolvedValue(familySnapshot({ fatherVersions: [7] }));
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
+    const version = screen.getByRole("combobox", {
+      name: "shielded.fields.familyVersion",
+    }) as HTMLSelectElement;
+    await waitFor(() =>
+      expect((version.querySelector('option[value="3"]') as HTMLOptionElement).disabled).toBe(true),
+    );
+    expect(version.value).toBe("3");
+    expect(
+      (
+        screen.getByRole("combobox", {
+          name: "shielded.fields.heirPersonHash",
+        }) as HTMLSelectElement
+      ).value,
+    ).toBe("");
+    expect(
+      (screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(screen.queryByText(/Funding family:.*version 7/)).toBeNull();
+    expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
+    await selectFundingChild(99n, 7);
+    expect(screen.getByText(/Funding family:.*version 7/)).toBeTruthy();
+  });
+
+  it("creates consecutive private arrangements using each explicitly selected parent version", async () => {
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
     mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
     renderPanel();
     await unlock();
     fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
-    await fillFundingRecipient(99n);
+    await fillFundingRecipient(99n, 7);
     expect(screen.queryByRole("combobox", { name: "shielded.fields.fundingRule" })).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
       target: { value: "10" },
@@ -2356,11 +2540,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.submitFundWithFreshLineage).toHaveBeenCalledTimes(1);
     expect(mocks.submitPrivateTransfer).not.toHaveBeenCalled();
     expect(screen.queryByRole("combobox", { name: "shielded.fields.fundingRule" })).toBeNull();
-    await fillFundingRecipient(99n);
-    openOptions("shielded.fundingHistoryToggle");
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.familyVersion" }), {
-      target: { value: "3" },
-    });
+    await fillFundingRecipient(99n, 3);
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await waitFor(() => expect(mocks.prepareShieldedFund).toHaveBeenCalledTimes(2));
     await screen.findByText("shielded.done");
@@ -2428,7 +2608,11 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
         target: { value: "10" },
       });
-      mocks.loadLineageSnapshot.mockResolvedValue(familySnapshot({ father: 444n, mother: 0n }));
+      mocks.findHeirLegitimacy.mockImplementation(
+        ({ root }: { root: { identityCommitment: bigint } }) =>
+          root.identityCommitment === 777n ? [] : [{ writtenAt: 0n }],
+      );
+      mocks.loadLineageSnapshot.mockResolvedValue(familySnapshot());
       mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
       fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
       await waitFor(() =>
@@ -2512,7 +2696,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
 
-  it("requires explicit historical selection instead of switching to the other eligible parent", async () => {
+  it("requires selecting the eligible parent version instead of using another eligible parent", async () => {
     mocks.findHeirLegitimacy.mockImplementation(
       ({
         root,
@@ -2528,10 +2712,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await unlock();
     fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
     chooseAction("fund");
-    await fillFundingRecipient(99n);
+    await selectFundingParentVersion(7);
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
       target: { value: "10" },
     });
+    expect(
+      screen
+        .getByRole("combobox", { name: "shielded.fields.heirPersonHash" })
+        .querySelector(`option[value="${wrapIdentityCommitmentAsPersonHash(99n)}"]`),
+    ).toBeNull();
     expect(
       screen.queryByRole("combobox", { name: "shielded.fields.eligibilityParent" }),
     ).toBeNull();
@@ -2539,12 +2728,11 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
 
-    openOptions("shielded.fundingHistoryToggle");
     const version = screen.getByRole("combobox", {
       name: "shielded.fields.familyVersion",
     }) as HTMLSelectElement;
-    expect(version.value).toBe("");
-    fireEvent.change(version, { target: { value: "3" } });
+    expect(version.value).toBe("7");
+    await fillFundingRecipient(99n, 3);
     expect(screen.getByText(/Funding family:.*version 3/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
@@ -2721,10 +2909,19 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     useRecoveredRule();
     mocks.loadLineageSnapshot.mockResolvedValue(
       familySnapshot({
-        fatherVersions: [3],
+        fatherVersions: [7, 3],
         mother: 0n,
         extraChildren: [{ identityCommitment: 222n, fatherIdentityCommitment: 444n }],
       }),
+    );
+    mocks.findHeirLegitimacy.mockImplementation(
+      ({
+        root,
+        rootVersionIndex,
+      }: {
+        root: { identityCommitment: bigint };
+        rootVersionIndex: number;
+      }) => (root.identityCommitment === 777n && rootVersionIndex === 3 ? [{ writtenAt: 0n }] : []),
     );
     mocks.recoverLocalShieldedWallet.mockResolvedValue(
       walletSnapshot([valueNote(1n, 3n), valueNote(2n, 25n)]),
@@ -3385,17 +3582,8 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
     expect(screen.queryByRole("textbox", { name: "shielded.receiveCodeInputLabel" })).toBeNull();
     expect(screen.queryByRole("combobox", { name: "shielded.fields.fundingRule" })).toBeNull();
+    await selectFundingChild(99n);
     const child = wrapIdentityCommitmentAsPersonHash(99n);
-    await waitFor(() =>
-      expect(
-        screen
-          .getByRole("combobox", { name: "shielded.fields.heirPersonHash" })
-          .querySelector(`option[value="${child}"]`),
-      ).toBeTruthy(),
-    );
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.heirPersonHash" }), {
-      target: { value: child },
-    });
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
       target: { value: "10" },
     });
