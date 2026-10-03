@@ -27,11 +27,6 @@ vi.mock("../domains/wallet", () => ({
 }));
 
 vi.mock("../shared/ui", () => ({
-  PageContainer: ({ children, className }: any) => (
-    <div data-testid="page-container" data-class-name={className}>
-      {children}
-    </div>
-  ),
   PageHead: ({ title, subtitle }: any) => (
     <div>
       <h1>{title}</h1>

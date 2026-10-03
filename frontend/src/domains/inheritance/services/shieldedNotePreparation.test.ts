@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeShieldedCiphertextHashField,
-  decodeShieldedNotePayload,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   verifyShieldedNotePayload,
@@ -13,21 +12,6 @@ const chainId = 1030n;
 const poolAddress = "0x1111111111111111111111111111111111111111";
 const derivedSecretField = 7654321n;
 const identity = { chainId, poolAddress, derivedSecretField };
-
-async function open(ciphertext: Uint8Array, secret = derivedSecretField) {
-  const keys = deriveShieldedHeirKeyMaterial(secret);
-  const payload = await decryptShieldedNote({
-    hpkeIkm: getBytes(keys.hpkeIkm),
-    ciphertext,
-    chainId,
-    poolAddress,
-  });
-  try {
-    return decodeShieldedNotePayload(payload);
-  } finally {
-    payload.fill(0);
-  }
-}
 
 describe("local shield preparation", () => {
   it("encrypts both shield outputs, including the zero-value dummy, under the one identity key", async () => {

@@ -76,6 +76,91 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
     };
     const fixture = buildShieldedFundingFixtures();
 
+    await t.test(
+      "public initial and all continuation binding pairs satisfy the same circuit",
+      async () => {
+        for (const budgetKind of [0, 1]) {
+          await valid("fund", buildShieldedFundingFixtures({ budgetKind }).initial);
+          for (const oldBudgetKind of [0, 1]) {
+            await valid(
+              "fund",
+              buildShieldedFundingFixtures({ budgetKind, oldBudgetKind }).continuation,
+            );
+          }
+        }
+      },
+    );
+    await t.test("public addressing preserves enrollment uniqueness across binding modes", () => {
+      const publicFixture = buildShieldedFundingFixtures({ budgetKind: 1 });
+      assert.equal(publicFixture.initial.inputNullifiers[1], fixture.initial.inputNullifiers[1]);
+    });
+    await t.test("public funding binds every disclosed field and hides rule openings", async () => {
+      const witness = buildShieldedFundingFixtures({ budgetKind: 1 }).initial;
+      assert.equal(witness.heirOwnerCommitment, "0");
+      assert.equal(witness.publicBudget.length, 9);
+      for (let field = 0; field < 9; field++) {
+        await invalid(
+          "fund",
+          mutate(witness, (w) => {
+            w.publicBudget[field] = String(BigInt(w.publicBudget[field]) + 1n);
+          }),
+        );
+      }
+      await invalid(
+        "fund",
+        mutate(witness, (w) => {
+          w.heirOwnerCommitment = "123";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(witness, (w) => {
+          w.budgetKind = "2";
+        }),
+      );
+      await invalid(
+        "fund",
+        mutate(fixture.initial, (w) => {
+          w.publicBudget[2] = w.heirIdentityCommitment;
+        }),
+      );
+    });
+    await t.test(
+      "continuation cannot reinterpret a private template or change its private owner",
+      async () => {
+        await invalid(
+          "fund",
+          mutate(fixture.continuation, (w) => {
+            w.oldBudgetKind = "1";
+            w.oldHeirOwnerCommitment = "0";
+          }),
+        );
+        await invalid(
+          "fund",
+          mutate(fixture.continuation, (w) => {
+            w.heirOwnerCommitment = "123";
+            w.outputCommitments[0] = poseidon8([
+              1015n,
+              fixture.policy,
+              fixture.enrollment,
+              123n,
+              BigInt(w.rate),
+              BigInt(w.rate) * BigInt(w.budgetPeriods),
+              BigInt(w.budgetNonce),
+              BigInt(w.ciphertextHashes[0]),
+            ]).toString();
+          }),
+        );
+        const identity = buildShieldedFundingFixtures({ budgetKind: 1 });
+        await invalid(
+          "fund",
+          mutate(identity.continuation, (w) => {
+            w.oldBudgetKind = "0";
+          }),
+        );
+      },
+    );
+
     await t.test("first eligibility is exactly two hours after the proof timestamp", () => {
       assert.equal(BigInt(fixture.initial.eligibleFrom), BigInt(fixture.initial.asOf) + 7200n);
     });

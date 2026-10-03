@@ -25,7 +25,7 @@ import {
   encodeShieldedBudgetNotePayload,
   encryptShieldedNote,
   verifyShieldedNotePayload,
-  type ShieldedBudgetNotePayload,
+  type ShieldedOwnerBudgetNotePayload,
 } from "@deepfamily/protocol-core";
 import { getBytes } from "ethers";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
@@ -130,7 +130,7 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n) {
     amountPerPeriod,
     remaining,
     nonce: 555n,
-  } satisfies ShieldedBudgetNotePayload;
+  } satisfies ShieldedOwnerBudgetNotePayload;
   const policyCommitment = computeShieldedPolicyCommitment(note);
   const enrollmentCommitment = computeShieldedEnrollmentCommitment({
     policyCommitment,
@@ -198,10 +198,11 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n) {
 
 async function addSecondBudget(
   input: Awaited<ReturnType<typeof fixture>>,
-  overrides: Partial<ShieldedBudgetNotePayload> = {},
+  overrides: Partial<ShieldedOwnerBudgetNotePayload> = {},
 ) {
   const first = input.wallet.ownedNotes.get(input.budgetCommitment)!;
   if (first.note.kind !== "budget") throw new Error("Fixture budget missing");
+  if (first.note.binding === "identity") throw new Error("Expected owner fixture");
   const note = { ...first.note, remaining: 100n, nonce: 556n, ...overrides };
   const payload = encodeShieldedBudgetNotePayload(note);
   const ciphertext = await encryptShieldedNote({
@@ -287,7 +288,9 @@ describe("local shielded claim preparation", () => {
     });
     expect(prepared.amount).toBe(200n);
     expect(prepared.outputs[0].note.remaining).toBe(0n);
-    expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
+    expect(prepared.outputs[0].note.binding).not.toBe("identity");
+    if (prepared.outputs[0].note.binding !== "identity")
+      expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
     expect(prepared.witness.hasSecondInput).toBe("1");
     expect(prepared.witness.secondRemainingPeriods).toBe("1");
     expect(prepared.data.inputNullifiers[1]).toBe(
@@ -335,7 +338,9 @@ describe("local shielded claim preparation", () => {
     expect(prepared.amount).toBe(1_200n);
     expect(prepared.outputs[0].note.remaining).toBe(0n);
     expect(prepared.outputs[0].note.eligibleFrom).toBe(eligibleFrom);
-    expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
+    expect(prepared.outputs[0].note.binding).not.toBe("identity");
+    if (prepared.outputs[0].note.binding !== "identity")
+      expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
     expect(prepared.outputs[1].note.amount).toBe(1_200n);
     expect(prepared.data.periodNullifiers[0]).toBe(
       computeShieldedPeriodNullifier({

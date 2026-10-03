@@ -13,14 +13,12 @@ import {
   encryptShieldedNote,
 } from "@deepfamily/protocol-core";
 import {
-  assessShieldedGasWallet,
-  getRecoveredFundingTemplate,
-  getRecoveredShieldedNoteProof,
   listRecoveredFundingTemplates,
   listRecoveredShieldedPolicies,
   listUnspentRecoveredShieldedNotes,
   recoverLocalShieldedWallet,
 } from "./shieldedWalletRecovery";
+import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 const ABI = [
   "event NoteAppended(uint256 indexed shardId,uint256 indexed leafIndex,uint256 commitment,uint256 root,bytes ciphertext)",
@@ -221,14 +219,12 @@ describe("local shielded wallet recovery", () => {
         allocationKey: 41n,
       },
     ]);
-    expect(getRecoveredFundingTemplate(restored, budgetCommitment)).toMatchObject({
+    expect(restored.fundingTemplates?.get(budgetCommitment)).toMatchObject({
       commitment: budgetCommitment,
       shardId: 0n,
       note: budget,
     });
-    expect(getRecoveredFundingTemplate(restored, budgetCommitment).ciphertext).toEqual(
-      budgetCiphertext,
-    );
+    expect(restored.fundingTemplates?.get(budgetCommitment)?.ciphertext).toEqual(budgetCiphertext);
     await expect(recoverLocalShieldedWallet(pool, 14n, { fromBlock: 1 })).resolves.toMatchObject({
       fundingTemplates: new Map(),
     });
@@ -293,9 +289,7 @@ describe("local shielded wallet recovery", () => {
     const forgedRecovery = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...forgedRecovery.ownedNotes.keys()]).toEqual([forgedCommitment]);
     expect(listRecoveredFundingTemplates(forgedRecovery)).toHaveLength(0);
-    expect(() => getRecoveredFundingTemplate(forgedRecovery, budgetCommitment)).toThrow(
-      "not recoverable",
-    );
+    expect(forgedRecovery.fundingTemplates?.has(budgetCommitment)).toBe(false);
   });
 
   it("decrypts every public event locally, verifies commitments, and builds an owned path", async () => {
@@ -311,12 +305,12 @@ describe("local shielded wallet recovery", () => {
       remaining: 1_200n,
     });
     expect(snapshot.shards.get(0n)?.sizeBigInt).toBe(5n);
-    expect(getRecoveredShieldedNoteProof(snapshot, commitments[0])).toMatchObject({
+    expect(getLocalShieldedNoteProof(snapshot, commitments[0])).toMatchObject({
       shardId: 0n,
       root,
       proofIndex: 0n,
     });
-    expect(getRecoveredShieldedNoteProof(snapshot, commitments[0]).siblings).toHaveLength(32);
+    expect(getLocalShieldedNoteProof(snapshot, commitments[0]).siblings).toHaveLength(32);
     expect(
       listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField).map(
         (n) => n.commitment,
@@ -339,38 +333,5 @@ describe("local shielded wallet recovery", () => {
       "another identity",
     );
     expect(() => listUnspentRecoveredShieldedNotes(correct, 15n)).toThrow("another identity");
-  });
-
-  it("reports gas and linkage risks without assuming a fixed CFX fee", () => {
-    expect(
-      assessShieldedGasWallet({
-        gasBalanceDrip: 3n,
-        estimatedMaxFeeDrip: 4n,
-        directlyFundedFromPublicWallet: true,
-        reusedForPublicActivity: true,
-        withdrawingImmediately: true,
-        distinctiveWithdrawalAmount: true,
-      }),
-    ).toEqual({
-      canSubmit: false,
-      issues: [
-        "insufficientGas",
-        "directPublicWalletFunding",
-        "reusedPublicWallet",
-        "immediateWithdrawal",
-        "distinctiveWithdrawalAmount",
-      ],
-    });
-    expect(assessShieldedGasWallet({ gasBalanceDrip: 4n, estimatedMaxFeeDrip: 4n })).toEqual({
-      canSubmit: true,
-      issues: [],
-    });
-    expect(
-      assessShieldedGasWallet({
-        gasBalanceDrip: 4n,
-        estimatedMaxFeeDrip: 4n,
-        directlyFundedFromPublicWallet: true,
-      }),
-    ).toEqual({ canSubmit: false, issues: ["directPublicWalletFunding"] });
   });
 });

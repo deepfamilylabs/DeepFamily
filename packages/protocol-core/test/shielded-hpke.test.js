@@ -9,7 +9,6 @@ import {
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encryptShieldedNote,
-  joinShieldedViewPublicKey,
   splitShieldedViewPublicKey,
 } from "../index.js";
 
@@ -29,7 +28,6 @@ test("existing identity secret deterministically derives an X25519 public key", 
     viewKeyHi: 266675278854608699523136467037752259906n,
     viewKeyLo: 149002525805011638159125817198076961390n,
   });
-  assert.deepEqual(joinShieldedViewPublicKey(limbs), key);
   assert.notDeepEqual(
     key,
     await deriveShieldedViewPublicKey(deriveShieldedHeirKeyMaterial(14n).hpkeIkm),

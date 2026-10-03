@@ -12,7 +12,7 @@ import {
 } from "../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../shared/clients/providerRegistry";
 import { getShieldedPoolAddress } from "../shared/config/env";
-import { EmptyState, PageContainer, PageHead } from "../shared/ui";
+import { EmptyState, PageHead } from "../shared/ui";
 
 type ModulesState =
   | { status: "loading" }
@@ -109,11 +109,11 @@ export default function InheritancePage() {
       BigInt(wallet.chainId) !== state.modules.chainId,
     [state, wallet.chainId],
   );
-  const head = <PageHead title={t("shielded.title")} subtitle={t("shielded.subtitle")} />;
+  const head = <PageHead title={t("shielded.title")} />;
 
   if (!wallet.address) {
     return (
-      <PageContainer size="narrow" className="space-y-6 py-10">
+      <div className="space-y-6">
         {head}
         <EmptyState
           size="page"
@@ -122,12 +122,12 @@ export default function InheritancePage() {
           description={t("shielded.connectWallet")}
           action={<WalletConnectButton className="mx-auto" alwaysShowLabel />}
         />
-      </PageContainer>
+      </div>
     );
   }
 
   return (
-    <PageContainer size="narrow" className="space-y-6 py-10">
+    <div className="space-y-6">
       {head}
       {state.status === "loading" ? <p role="status">{t("shielded.loading")}</p> : null}
       {state.status === "unavailable" ? (
@@ -162,6 +162,6 @@ export default function InheritancePage() {
           publicActivityAddresses={publicActivityAddresses.current}
         />
       ) : null}
-    </PageContainer>
+    </div>
   );
 }

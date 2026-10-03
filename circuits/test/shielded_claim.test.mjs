@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon3, poseidon4, poseidon5 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
 import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedClaimBatch,
@@ -80,6 +80,115 @@ test("shielded claim constraints", async (t) => {
       change(copy);
       return copy;
     };
+
+    await t.test("identity-only and mixed-budget claims preserve hidden input types", async () => {
+      for (const budgetKind of [0, 1]) {
+        await valid(buildShieldedClaimFixture({ budgetKind }).witness);
+        for (const secondBudgetKind of [0, 1]) {
+          await valid(
+            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 })
+              .witness,
+          );
+        }
+      }
+    });
+    await t.test("public and private budgets share real period nullifiers", () => {
+      const privateWitness = buildShieldedClaimFixture().witness;
+      const publicWitness = buildShieldedClaimFixture({ budgetKind: 1 }).witness;
+      assert.deepEqual(
+        privateWitness.periodNullifiers.slice(0, 2),
+        publicWitness.periodNullifiers.slice(0, 2),
+      );
+      assert.equal(publicWitness.policySalt, "0");
+      assert.equal(publicWitness.enrollmentSalt, "0");
+      assert.equal(publicWitness.allocationKeyCommitment, "0");
+    });
+    await t.test(
+      "public claim requires identity and binds terms, opaque commitments and note kind",
+      async () => {
+        const witness = buildShieldedClaimFixture({ budgetKind: 1 }).witness;
+        for (const field of [
+          "derivedSecretField",
+          "rootVersionIndex",
+          "eligibleFrom",
+          "rate",
+          "policyCommitmentInput",
+          "enrollmentCommitmentInput",
+        ]) {
+          await invalid(
+            mutate(witness, (w) => {
+              w[field] = String(BigInt(w[field]) + 1n);
+            }),
+          );
+        }
+        await invalid(
+          mutate(witness, (w) => {
+            w.budgetKind = "2";
+          }),
+        );
+        await invalid(
+          mutate(witness, (w) => {
+            w.budgetKind = "0";
+          }),
+        );
+        await invalid(
+          mutate(witness, (w) => {
+            w.secondBudgetKind = "1";
+          }),
+        );
+        for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
+          await invalid(
+            mutate(witness, (w) => {
+              w[field] = "1";
+            }),
+          );
+        }
+      },
+    );
+    await t.test(
+      "private input cannot bypass its opening or become an identity-bound remainder",
+      async () => {
+        for (const budgetKind of [0, 1]) {
+          const fixture = buildShieldedClaimFixture({
+            budgetKind,
+            secondBudgetKind: 0,
+            secondRemainingPeriods: 2,
+          });
+          const { witness } = fixture;
+          for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
+            await invalid(
+              mutate(witness, (w) => {
+                w[field] = "0";
+              }),
+            );
+          }
+          await invalid(
+            mutate(witness, (w) => {
+              const terms = poseidon6([
+                1029n,
+                BigInt(w.fatherIdentityCommitment),
+                BigInt(w.rootVersionIndex),
+                fixture.heirIdentityCommitment,
+                BigInt(w.eligibleFrom),
+                BigInt(w.rate),
+              ]);
+              w.outputCommitments[0] = poseidon8([
+                1030n,
+                fixture.policy,
+                fixture.enrollment,
+                terms,
+                BigInt(w.rate),
+                BigInt(w.remaining) +
+                  BigInt(w.secondRemaining) -
+                  BigInt(w.claimCount) * BigInt(w.rate),
+                BigInt(w.newBudgetNonce),
+                BigInt(w.ciphertextHashes[0]),
+              ]).toString();
+            }),
+          );
+        }
+      },
+    );
 
     await t.test("witness formulas match protocol-core", () => {
       const fixture = buildShieldedClaimFixture();

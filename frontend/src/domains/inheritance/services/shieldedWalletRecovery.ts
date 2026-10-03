@@ -5,16 +5,18 @@ import {
   deriveShieldedHeirKeyMaterial,
   computeShieldedSpendNullifier,
   computeShieldedAllocationKeyCommitment,
-  computeShieldedPolicyCommitment,
+  getShieldedBudgetCommitments,
+  decodePublicShieldedBudgetEnvelope,
+  isPublicShieldedBudgetEnvelope,
   encodeShieldedBudgetNotePayload,
   verifyShieldedNotePayload,
   type DecodedShieldedNotePayload,
   type ShieldedBudgetNotePayload,
+  type ShieldedBudgetRuleOpening,
   type ShieldedPolicyDescriptor,
 } from "@deepfamily/protocol-core";
 import { getBytes, getBigInt, type BigNumberish, type Contract } from "ethers";
 import {
-  getLocalShieldedNoteProof,
   loadShieldedPoolSnapshot,
   type OwnedShieldedNote,
   type PublicShieldedNote,
@@ -40,6 +42,7 @@ export type RecoveredFundingTemplate = {
   commitment: bigint;
   ciphertext: Uint8Array;
   shardId: bigint;
+  ruleOpening?: ShieldedBudgetRuleOpening;
 };
 
 export type ShieldedWalletRecoveryOptions = {
@@ -96,16 +99,25 @@ export async function recoverLocalShieldedWallet(
         precedingPublicNote = event;
         let payload: Uint8Array;
         try {
-          payload = await decryptShieldedNote({
-            hpkeIkm,
-            ciphertext: event.ciphertext,
-            chainId,
-            poolAddress,
-          });
-        } catch (error) {
-          if (error instanceof ProtocolError && error.code === "SHIELDED_DECRYPTION_FAILED") {
-            return null;
+          if (isPublicShieldedBudgetEnvelope(event.ciphertext)) {
+            const publicBudget = decodePublicShieldedBudgetEnvelope(event.ciphertext);
+            if (
+              !publicBudget ||
+              expectedIdentityCommitment === undefined ||
+              publicBudget.heirIdentityCommitment !== expectedIdentityCommitment
+            )
+              return null;
+            payload = encodeShieldedBudgetNotePayload(publicBudget);
+          } else {
+            payload = await decryptShieldedNote({
+              hpkeIkm,
+              ciphertext: event.ciphertext,
+              chainId,
+              poolAddress,
+            });
           }
+        } catch (error) {
+          if (error instanceof ProtocolError) return null;
           throw error;
         }
         try {
@@ -118,7 +130,7 @@ export async function recoverLocalShieldedWallet(
           if (
             (note.kind === "value" && note.ownerCommitment !== keys.ownerCommitment) ||
             (note.kind === "budget" &&
-              (note.heirOwnerCommitment !== keys.ownerCommitment ||
+              ((note.binding !== "identity" && note.heirOwnerCommitment !== keys.ownerCommitment) ||
                 (expectedIdentityCommitment !== undefined &&
                   note.heirIdentityCommitment !== expectedIdentityCommitment)))
           ) {
@@ -144,19 +156,24 @@ export async function recoverLocalShieldedWallet(
                 commitment: previousPublicNote.commitment,
                 ciphertext: previousPublicNote.ciphertext,
                 shardId: previousPublicNote.shardId,
+                ...(note.fundingMemo.ruleOpening
+                  ? { ruleOpening: note.fundingMemo.ruleOpening }
+                  : {}),
               });
               const allocationKey = note.fundingMemo.allocationKey;
+              const budget = note.fundingMemo.budgetNote;
+              const opening = budget.binding === "identity" ? note.fundingMemo.ruleOpening : budget;
               if (
                 allocationKey !== undefined &&
+                opening &&
                 computeShieldedAllocationKeyCommitment(allocationKey) ===
-                  note.fundingMemo.budgetNote.allocationKeyCommitment
+                  opening.allocationKeyCommitment
               ) {
-                const budget = note.fundingMemo.budgetNote;
-                shieldedPolicies.set(computeShieldedPolicyCommitment(budget), {
+                shieldedPolicies.set(getShieldedBudgetCommitments(budget).policyCommitment, {
                   rootIdentityCommitment: budget.rootIdentityCommitment,
                   rootVersionIndex: budget.rootVersionIndex,
                   amountPerPeriod: budget.amountPerPeriod,
-                  policySalt: budget.policySalt,
+                  policySalt: opening.policySalt,
                   allocationKey,
                 });
               }
@@ -199,16 +216,6 @@ export function listRecoveredFundingTemplates(
   return [...(snapshot.fundingTemplates?.values() ?? [])];
 }
 
-export function getRecoveredFundingTemplate(
-  snapshot: LocalShieldedWalletSnapshot,
-  commitment: bigint,
-): RecoveredFundingTemplate {
-  if (snapshot.invalidated) throw new Error("Shielded wallet snapshot is invalid");
-  const template = snapshot.fundingTemplates?.get(commitment);
-  if (!template) throw new Error("Funding template is not recoverable from this wallet");
-  return template;
-}
-
 /** Recovered from all donor change notes, including spent and zero-value notes. */
 export function listRecoveredShieldedPolicies(
   snapshot: LocalShieldedWalletSnapshot,
@@ -236,46 +243,4 @@ export function listUnspentRecoveredShieldedNotes(
         }),
       ),
   );
-}
-
-/** Uses the locally replayed shard; no leaf-index or recipient RPC request. */
-export function getRecoveredShieldedNoteProof(
-  snapshot: LocalShieldedWalletSnapshot,
-  commitment: bigint,
-) {
-  return getLocalShieldedNoteProof(snapshot, commitment);
-}
-
-export type ShieldedGasWalletIssue =
-  | "insufficientGas"
-  | "directPublicWalletFunding"
-  | "reusedPublicWallet"
-  | "immediateWithdrawal"
-  | "distinctiveWithdrawalAmount";
-
-/**
- * Inputs about wallet history are supplied by the caller; this helper cannot
- * infer them from a CFX balance. It returns UI-independent risk codes.
- */
-export function assessShieldedGasWallet(input: {
-  gasBalanceDrip: bigint;
-  estimatedMaxFeeDrip: bigint;
-  directlyFundedFromPublicWallet?: boolean;
-  reusedForPublicActivity?: boolean;
-  withdrawingImmediately?: boolean;
-  distinctiveWithdrawalAmount?: boolean;
-}): { canSubmit: boolean; issues: ShieldedGasWalletIssue[] } {
-  if (input.gasBalanceDrip < 0n || input.estimatedMaxFeeDrip < 0n) {
-    throw new Error("Gas balance and estimated fee must be nonnegative");
-  }
-  const issues: ShieldedGasWalletIssue[] = [];
-  const gasSufficient = input.gasBalanceDrip >= input.estimatedMaxFeeDrip;
-  const canSubmit =
-    gasSufficient && !input.directlyFundedFromPublicWallet && !input.reusedForPublicActivity;
-  if (!gasSufficient) issues.push("insufficientGas");
-  if (input.directlyFundedFromPublicWallet) issues.push("directPublicWalletFunding");
-  if (input.reusedForPublicActivity) issues.push("reusedPublicWallet");
-  if (input.withdrawingImmediately) issues.push("immediateWithdrawal");
-  if (input.distinctiveWithdrawalAmount) issues.push("distinctiveWithdrawalAmount");
-  return { canSubmit, issues };
 }

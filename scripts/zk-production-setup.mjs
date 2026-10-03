@@ -18,7 +18,7 @@ const usage = () => {
 Optional: --shielded-release-criteria <committed-json-path> records the six reviewed
 release thresholds. These thresholds are checked by release:preflight.
 
-Creates all nine production Groth16 proving keys with:
+Creates all eight production Groth16 proving keys with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
   - canonical R1CS/WASM hashes checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;

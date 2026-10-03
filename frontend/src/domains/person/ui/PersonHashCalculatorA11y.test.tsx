@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../../../shared/ui";
 import { createRef } from "react";
@@ -34,10 +34,63 @@ vi.mock("react-i18next", () => ({
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   workerCall.mockClear();
 });
 
 describe("PersonHashCalculator accessibility", () => {
+  it("reads identity credentials without automatically calculating a hash when disabled", async () => {
+    vi.useFakeTimers();
+    const ref = createRef<PersonHashCalculatorHandle>();
+    render(
+      <ToastProvider>
+        <PersonHashCalculator
+          ref={ref}
+          showTitle={false}
+          computeHash={false}
+          showPassphraseGuidance={false}
+          initialValues={{ fullName: "Alice" }}
+        />
+      </ToastProvider>,
+    );
+    fireEvent.change(screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder"), {
+      target: { value: "Bob" },
+    });
+    const passphrase = screen.getByLabelText("Identity passphrase") as HTMLInputElement;
+    fireEvent.change(passphrase, {
+      target: { value: "  x  " },
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+
+    expect(ref.current?.getPublicFormData()).toMatchObject({
+      fullName: "Bob",
+      hasPassphrase: true,
+    });
+    expect(ref.current?.getSecretInputs()).toEqual({ passphrase: "  x  " });
+    expect(workerCall).not.toHaveBeenCalled();
+    expect(screen.queryByText("Computing identity hash...")).toBeNull();
+    expect(screen.queryByText("search.hashCalculator.calculatedHash:")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Identity passphrase help" })).toBeNull();
+    expect(screen.queryByText(/Characters after normalization/)).toBeNull();
+    expect(screen.queryByText("Weak")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show identity passphrase" }));
+    expect(passphrase.type).toBe("text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide identity passphrase" }));
+    expect(passphrase.type).toBe("password");
+    fireEvent.change(passphrase, { target: { value: `x${String.fromCharCode(9)}` } });
+    const error = screen.getByRole("alert");
+    expect(error.textContent).toContain("character the protocol does not accept");
+    expect(passphrase.getAttribute("aria-invalid")).toBe("true");
+    expect(passphrase.getAttribute("aria-describedby")).toBe(error.id);
+
+    act(() => ref.current?.clearSecretInputs());
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(ref.current?.getSecretInputs()).toEqual({ passphrase: "" });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(workerCall).not.toHaveBeenCalled();
+  });
+
   it("cancels outdated identity jobs on input changes and unmount", async () => {
     const { unmount } = render(
       <ToastProvider>
@@ -175,7 +228,9 @@ describe("PersonHashCalculator accessibility", () => {
 
     await waitFor(() => expect(onComputedHashChange).toHaveBeenLastCalledWith(hash));
     const passphraseInput = screen.getByLabelText("Identity passphrase");
-    fireEvent.change(passphraseInput, { target: { value: `family${String.fromCharCode(9)}motto` } });
+    fireEvent.change(passphraseInput, {
+      target: { value: `family${String.fromCharCode(9)}motto` },
+    });
 
     const error = screen.getByRole("alert");
     expect(error.textContent).toContain("character the protocol does not accept");

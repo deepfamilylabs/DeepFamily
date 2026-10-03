@@ -4,6 +4,10 @@ import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { computeShieldedCiphertextHashField } from "./shielded-inheritance.js";
 import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
+import {
+  decodePublicShieldedBudgetEnvelope,
+  getShieldedPublicBudgetFields,
+} from "./shielded-note-codec.js";
 
 export const SHIELDED_POOL_ACTION = Object.freeze({
   Shield: 0,
@@ -11,7 +15,6 @@ export const SHIELDED_POOL_ACTION = Object.freeze({
   Claim: 2,
   PrivateTransfer: 3,
   Unshield: 4,
-  ClaimPublic: 5,
 });
 
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
@@ -34,6 +37,8 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Fund]: Object.freeze([
     ...CONTEXT,
     "fundMode",
+    "budgetKind",
+    "publicBudget",
     ...TWO_INPUTS,
     ...OUTPUTS,
     ...LINEAGE,
@@ -53,21 +58,14 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
     "amount",
     "recipient",
   ]),
-  [SHIELDED_POOL_ACTION.ClaimPublic]: Object.freeze([
-    ...CONTEXT,
-    "budgetId",
-    "heirIdentityCommitment",
-    "firstPeriod",
-    "claimCount",
-    "amount",
-    ...OUTPUTS,
-  ]),
 });
 
 const INPUT_WIDTHS = Object.freeze({
   chainId: 1,
   pool: 1,
   fundMode: 1,
+  budgetKind: 1,
+  publicBudget: 9,
   inputShardId: 1,
   inputRoot: 1,
   inputShardIds: 2,
@@ -81,10 +79,6 @@ const INPUT_WIDTHS = Object.freeze({
   endorsementRoot: 1,
   trustedRoot: 1,
   asOf: 1,
-  budgetId: 1,
-  heirIdentityCommitment: 1,
-  firstPeriod: 1,
-  claimCount: 1,
 });
 
 /** Mirrors the per-purpose lengths in ProofConstants.sol. */
@@ -131,10 +125,32 @@ export function buildShieldedPoolPublicInputs(input) {
     "INVALID_SHIELDED_SIGNAL_SHAPE",
     "outputCiphertexts must have 2 values",
   );
+  const budgetKind = bigintFrom(input.budgetKind ?? 0n, "budgetKind", 1n);
+  if (action !== SHIELDED_POOL_ACTION.Fund) unused(budgetKind === 0n, "budgetKind");
+  let publicBudget = Array(9).fill(0n);
+  if (budgetKind === 1n) {
+    const note = decodePublicShieldedBudgetEnvelope(input.outputCiphertexts[0]);
+    protocolAssert(
+      note !== null,
+      "INVALID_SHIELDED_PUBLIC_BUDGET",
+      "Public funding requires a canonical identity-budget envelope in output zero",
+    );
+    publicBudget = getShieldedPublicBudgetFields(note);
+  }
+  if (input.publicBudget !== undefined) {
+    const provided = values(input.publicBudget, 9, "publicBudget");
+    protocolAssert(
+      provided.every((value, index) => value === publicBudget[index]),
+      "INVALID_SHIELDED_PUBLIC_BUDGET",
+      "Public budget fields must equal the envelope, or zero for private funding",
+    );
+  }
   const available = {
     chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
     pool: [BigInt(getAddress(input.poolAddress))],
     fundMode: [bigintFrom(input.fundMode ?? 0n, "fundMode", 1n)],
+    budgetKind: [budgetKind],
+    publicBudget,
     inputShardId: [inputShardIds[0]],
     inputRoot: [inputRoots[0]],
     inputShardIds,
@@ -179,6 +195,8 @@ export function buildShieldedPoolPublicInputs(input) {
   for (const name of [
     "periodNullifiers",
     "fundMode",
+    "budgetKind",
+    "publicBudget",
     "amount",
     "recipient",
     "endorsementRoot",
@@ -205,51 +223,6 @@ export function buildShieldedPoolPublicInputs(input) {
 /** The ordered verifier input for one pool action. */
 export function buildShieldedPoolPublicSignals(input) {
   return buildShieldedPoolPublicInputs(input).signals;
-}
-
-/** Public budget claims have their own calldata shape and no note inputs. */
-export function buildShieldedPublicClaimPublicInputs(input) {
-  const budgetId = bigintFrom(input.budgetId, "budgetId", MAX_UINT64);
-  const identity = field(input.heirIdentityCommitment, "heirIdentityCommitment");
-  const firstPeriod = bigintFrom(input.firstPeriod, "firstPeriod", MAX_UINT64);
-  const claimCount = bigintFrom(input.claimCount, "claimCount", 12n);
-  const amount = bigintFrom(input.amount, "amount", MAX_UINT128);
-  const outputCommitments = values(input.outputCommitments, 2, "outputCommitments");
-  protocolAssert(
-    budgetId > 0n &&
-      identity > 0n &&
-      claimCount > 0n &&
-      amount > 0n &&
-      firstPeriod + claimCount <= MAX_UINT64 &&
-      outputCommitments.every((value) => value > 0n) &&
-      outputCommitments[0] !== outputCommitments[1],
-    "INVALID_SHIELDED_PUBLIC_CLAIM",
-    "Public claim needs a budget, identity, mature period range and distinct outputs",
-  );
-  protocolAssert(
-    Array.isArray(input.outputCiphertexts) && input.outputCiphertexts.length === 2,
-    "INVALID_SHIELDED_SIGNAL_SHAPE",
-    "outputCiphertexts must have 2 values",
-  );
-  const available = {
-    chainId: [bigintFrom(input.chainId, "chainId", MAX_UINT64)],
-    pool: [BigInt(getAddress(input.poolAddress))],
-    budgetId: [budgetId],
-    heirIdentityCommitment: [identity],
-    firstPeriod: [firstPeriod],
-    claimCount: [claimCount],
-    amount: [amount],
-    outputCommitments,
-    ciphertextHashes: input.outputCiphertexts.map(computeShieldedCiphertextHashField),
-  };
-  const signals = [];
-  const witness = {};
-  for (const name of SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.ClaimPublic]) {
-    signals.push(...available[name]);
-    witness[name] =
-      INPUT_WIDTHS[name] === 1 ? available[name][0].toString() : available[name].map(String);
-  }
-  return { signals, witness };
 }
 
 /**

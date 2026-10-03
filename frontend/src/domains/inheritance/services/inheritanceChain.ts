@@ -7,7 +7,7 @@ import {
 } from "@deepfamily/protocol-core";
 import type { ethers } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
-import { InheritanceError, type InheritanceErrorCode } from "../model/inheritanceErrors";
+import { InheritanceError } from "../model/inheritanceErrors";
 
 export const ENDORSEMENT_TREE = 0;
 export const TRUSTED_TREE = 1;
@@ -32,17 +32,13 @@ export type IndexedVersion = {
 
 type LatestEndorsement = { versionIndex: number; timestamp: bigint };
 
-/** Versions and recommended sources, enough to check a root before setting it up. */
-export type RootRegistry = {
+/** Everything funding and claiming need, rebuilt from events and checked against the chain. */
+export type LineageSnapshot = {
   blockNumber: number;
   /** Lowercase person hash → that person's versions. */
   versions: Map<string, IndexedVersion[]>;
   /** `${personHash}:${versionIndex}` → current trusted endorsers, lowercase. */
   trustedEndorsers: Map<string, Set<string>>;
-};
-
-/** Everything a claim needs, rebuilt from events and checked against the chain. */
-export type LineageSnapshot = RootRegistry & {
   endorsementTree: LineageTree;
   trustedTree: LineageTree;
   /** Lowercase person hash → endorser → that endorser's latest endorsement of the person. */
@@ -136,29 +132,6 @@ function collectTrustedEndorsers(events: ScannedEvent[]): Map<string, Set<string
   return trusted;
 }
 
-/** Versions and recommended sources only; it builds no trees, so it is the cheaper scan. */
-export async function loadRootRegistry(
-  lineageIndex: ethers.Contract,
-  deepFamily: ethers.Contract,
-  options: ScanOptions = {},
-): Promise<RootRegistry> {
-  const blockNumber = await providerOf(lineageIndex).getBlockNumber();
-  const [indexEvents, familyEvents] = await Promise.all([
-    scanEvents(lineageIndex, ["VersionIndexed"], blockNumber, options),
-    scanEvents(
-      deepFamily,
-      ["TrustedEndorserAdded", "TrustedEndorserRemoved"],
-      blockNumber,
-      options,
-    ),
-  ]);
-  return {
-    blockNumber,
-    versions: collectVersions(indexEvents),
-    trustedEndorsers: collectTrustedEndorsers(familyEvents),
-  };
-}
-
 /**
  * Rebuilds both lineage trees from `LeafWritten`, the versions from `VersionIndexed`, and each
  * endorser's latest endorsement from DeepFamily, all up to one block, then checks the rebuilt
@@ -224,37 +197,6 @@ export async function loadLineageSnapshot(
     trustedTree,
     endorsements,
   };
-}
-
-/**
- * Throws `code` unless DeepFamily holds a version under this identity. A wrong passphrase gives
- * a different identity, so this is also how a mistyped passphrase shows up.
- */
-export function assertIdentityKnown(
-  registry: RootRegistry,
-  identity: { personHash: string },
-  code: InheritanceErrorCode,
-): void {
-  if (!registry.versions.has(lower(identity.personHash))) throw new InheritanceError(code);
-}
-
-export function assertVersionKnown(
-  registry: RootRegistry,
-  personHash: string,
-  versionIndex: number,
-): void {
-  const versions = registry.versions.get(lower(personHash)) ?? [];
-  if (!versions.some((version) => version.versionIndex === versionIndex)) {
-    throw new InheritanceError("rootVersionNotFound");
-  }
-}
-
-export function countTrustedEndorsers(
-  registry: RootRegistry,
-  personHash: string,
-  versionIndex: number,
-): number {
-  return registry.trustedEndorsers.get(trustedKey(personHash, versionIndex))?.size ?? 0;
 }
 
 /** One way the heir is a legit child of the root: an endorsement by a trusted endorser. */
@@ -336,11 +278,4 @@ export function findHeirLegitimacy({
     });
   }
   return found.sort((left, right) => Number(left.writtenAt - right.writtenAt));
-}
-
-/** Time of the latest block; accrual is measured against it, not the local clock. */
-export async function latestBlockTime(provider: ethers.Provider): Promise<bigint> {
-  const block = await provider.getBlock("latest");
-  if (!block) throw new Error("Latest block unavailable");
-  return BigInt(block.timestamp);
 }

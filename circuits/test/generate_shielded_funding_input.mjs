@@ -7,6 +7,8 @@ const zeroes = () => Array(32).fill("0");
 
 export function buildShieldedFundingFixtures({
   donorAmount = 1000n,
+  budgetKind = 0,
+  oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
 } = {}) {
   const heir = buildShieldedClaimFixture();
@@ -38,7 +40,8 @@ export function buildShieldedFundingFixtures({
     allocationKeyCommitment,
   ]);
   const heirIdentityCommitment = heir.heirIdentityCommitment;
-  const heirOwnerCommitment = heir.ownerCommitment;
+  const heirOwnerCommitment = budgetKind === 0 ? heir.ownerCommitment : 0n;
+  const oldHeirOwnerCommitment = oldBudgetKind === 0 ? heir.ownerCommitment : 0n;
   const eligibleFrom = BigInt(heir.witness.eligibleFrom);
   const enrollmentSalt = 66666n;
   const enrollment = poseidon5([
@@ -48,15 +51,23 @@ export function buildShieldedFundingFixtures({
     eligibleFrom,
     enrollmentSalt,
   ]);
+  const termsCommitment = poseidon6([
+    1029n,
+    rootIdentityCommitment,
+    rootVersionIndex,
+    heirIdentityCommitment,
+    eligibleFrom,
+    rate,
+  ]);
   const budgetPeriods = 4n;
   const fundedAmount = rate * budgetPeriods;
   const budgetNonce = 107n;
   const budgetCiphertextHash = 108n;
   const outputBudget = poseidon8([
-    1015n,
+    budgetKind === 0 ? 1015n : 1030n,
     policy,
     enrollment,
-    heirOwnerCommitment,
+    budgetKind === 0 ? heirOwnerCommitment : termsCommitment,
     rate,
     fundedAmount,
     budgetNonce,
@@ -77,10 +88,10 @@ export function buildShieldedFundingFixtures({
   const oldBudgetNonce = 112n;
   const oldBudgetCiphertextHash = 113n;
   const oldBudget = poseidon8([
-    1015n,
+    oldBudgetKind === 0 ? 1015n : 1030n,
     policy,
     enrollment,
-    heirOwnerCommitment,
+    oldBudgetKind === 0 ? oldHeirOwnerCommitment : termsCommitment,
     rate,
     oldBudgetRemaining,
     oldBudgetNonce,
@@ -110,6 +121,21 @@ export function buildShieldedFundingFixtures({
     budgetNonce: decimal(budgetNonce),
   };
   const commonPublicInputs = {
+    budgetKind: decimal(budgetKind),
+    publicBudget:
+      budgetKind === 1
+        ? [
+            rootIdentityCommitment,
+            rootVersionIndex,
+            heirIdentityCommitment,
+            rate,
+            eligibleFrom,
+            policy,
+            enrollment,
+            fundedAmount,
+            budgetNonce,
+          ].map(decimal)
+        : Array(9).fill("0"),
     chainId: "1030",
     pool: decimal(pool),
     inputShardIds: ["0", "0"],
@@ -133,6 +159,8 @@ export function buildShieldedFundingFixtures({
     trustedSiblings: heir.witness.trustedSiblings,
   };
   const oldFields = {
+    oldBudgetKind: decimal(oldBudgetKind),
+    oldHeirOwnerCommitment: decimal(oldHeirOwnerCommitment),
     oldBudgetRemaining: decimal(oldBudgetRemaining),
     oldBudgetRemainingPeriods: decimal(oldBudgetRemainingPeriods),
     oldBudgetNonce: decimal(oldBudgetNonce),

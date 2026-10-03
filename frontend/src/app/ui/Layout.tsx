@@ -43,7 +43,9 @@ export default function Layout() {
         {isFullWidthPage ? (
           <Outlet />
         ) : (
-          <PageContainer className="pt-10 pb-12">
+          // Ordinary pages share this content boundary and outer spacing.
+          // Their components only lay out the content inside it.
+          <PageContainer className="pt-10 pb-[calc(var(--app-statusbar-h)+1rem)]">
             <Outlet />
           </PageContainer>
         )}

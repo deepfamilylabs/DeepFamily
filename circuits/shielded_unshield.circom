@@ -5,7 +5,7 @@ include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Action 7 of ShieldedDeepPool. One real input note is spent; the second
+// Action 4 of ShieldedDeepPool. One real input note is spent; the second
 // nullifier is a domain-separated dummy tag bound to that same note. The pool
 // requires the input's shard and root to fill both of its input slots. The
 // output slots contain private change and an encrypted zero-value dummy.

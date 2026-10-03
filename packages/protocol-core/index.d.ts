@@ -628,6 +628,8 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   budgetUseNullifier: bigint;
   enrollmentNullifier: bigint;
   allocationKeyCommitment: bigint;
+  identityBudgetTerms: bigint;
+  identityBudgetNote: bigint;
 }>;
 export const SHIELDED_MAX_BATCH_PERIODS: 12;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
@@ -679,6 +681,32 @@ export function computeShieldedBudgetNoteCommitment(input: {
   nonce: BigNumberish;
   ciphertextHashField: BigNumberish;
 }): bigint;
+export function computeShieldedIdentityBudgetTermsCommitment(input: {
+  rootIdentityCommitment: BigNumberish;
+  rootVersionIndex: BigNumberish;
+  heirIdentityCommitment: BigNumberish;
+  eligibleFrom: BigNumberish;
+  amountPerPeriod: BigNumberish;
+}): bigint;
+export function computeShieldedIdentityBudgetNoteCommitment(input: {
+  policyCommitment: BigNumberish;
+  enrollmentCommitment: BigNumberish;
+  termsCommitment: BigNumberish;
+  amountPerPeriod: BigNumberish;
+  remaining: BigNumberish;
+  nonce: BigNumberish;
+  ciphertextHashField: BigNumberish;
+}): bigint;
+export function getShieldedBudgetCommitments(note: ShieldedIdentityBudgetNotePayload): {
+  policyCommitment: bigint;
+  enrollmentCommitment: bigint;
+  termsCommitment: bigint;
+};
+export function getShieldedBudgetCommitments(note: ShieldedBudgetNotePayload): {
+  policyCommitment: bigint;
+  enrollmentCommitment: bigint;
+  termsCommitment?: bigint;
+};
 export function computeShieldedSpendNullifier(input: {
   ownerSecret: BigNumberish;
   noteCommitment: BigNumberish;
@@ -705,7 +733,6 @@ export function computeShieldedClaimBatch(input: {
   periodIndices: BigNumberish[];
 }): { periodIndices: bigint[]; amount: bigint; remaining: bigint };
 
-export const SHIELDED_HPKE_SUITE: "DHKEM(X25519,HKDF-SHA256)/HKDF-SHA256/AES-128-GCM";
 export const SHIELDED_HPKE_ENCAPSULATED_BYTES: 32;
 export const SHIELDED_HPKE_PLAINTEXT_BYTES: 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES: 461;
@@ -714,10 +741,6 @@ export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyHi: bigint;
   viewKeyLo: bigint;
 };
-export function joinShieldedViewPublicKey(input: {
-  viewKeyHi: BigNumberish;
-  viewKeyLo: BigNumberish;
-}): Uint8Array;
 export function deriveShieldedViewPublicKey(hpkeIkm: BytesLike): Promise<Uint8Array>;
 export function buildShieldedHpkeAad(input: {
   chainId: BigNumberish;
@@ -741,8 +764,12 @@ export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND: 4;
+export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND: 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
 export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 302;
+export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES: 214;
+export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES: 428;
+export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES: 460;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 420;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 452;
 export interface ShieldedValueNotePayload {
@@ -753,10 +780,12 @@ export interface ShieldedValueNotePayload {
   fundingMemo?: {
     budgetCommitment: BigNumberish;
     budgetNote: ShieldedBudgetNotePayload;
+    ruleOpening?: ShieldedBudgetRuleOpening;
     allocationKey?: BigNumberish;
   };
 }
-export interface ShieldedBudgetNotePayload {
+export interface ShieldedOwnerBudgetNotePayload {
+  binding?: "owner";
   rootIdentityCommitment: BigNumberish;
   rootVersionIndex: BigNumberish;
   policySalt: BigNumberish;
@@ -769,6 +798,35 @@ export interface ShieldedBudgetNotePayload {
   remaining: BigNumberish;
   nonce: BigNumberish;
 }
+export interface ShieldedIdentityBudgetNotePayload {
+  binding: "identity";
+  rootIdentityCommitment: BigNumberish;
+  rootVersionIndex: BigNumberish;
+  heirIdentityCommitment: BigNumberish;
+  amountPerPeriod: BigNumberish;
+  eligibleFrom: BigNumberish;
+  policyCommitment: BigNumberish;
+  enrollmentCommitment: BigNumberish;
+  remaining: BigNumberish;
+  nonce: BigNumberish;
+}
+export type ShieldedBudgetNotePayload =
+  | ShieldedOwnerBudgetNotePayload
+  | ShieldedIdentityBudgetNotePayload;
+export interface ShieldedBudgetRuleOpening {
+  policySalt: BigNumberish;
+  allocationKeyCommitment: BigNumberish;
+  enrollmentSalt: BigNumberish;
+}
+export type DecodedShieldedOwnerBudgetNotePayload = {
+  [K in Exclude<keyof ShieldedOwnerBudgetNotePayload, "binding">]: bigint;
+} & { binding?: "owner" };
+export type DecodedShieldedIdentityBudgetNotePayload = {
+  [K in Exclude<keyof ShieldedIdentityBudgetNotePayload, "binding">]: bigint;
+} & { binding: "identity" };
+export type DecodedShieldedBudgetNotePayload =
+  | DecodedShieldedOwnerBudgetNotePayload
+  | DecodedShieldedIdentityBudgetNotePayload;
 export interface ShieldedPolicyDescriptor {
   rootIdentityCommitment: bigint;
   rootVersionIndex: bigint;
@@ -784,14 +842,23 @@ export type DecodedShieldedNotePayload =
       nonce: bigint;
       fundingMemo?: {
         budgetCommitment: bigint;
-        budgetNote: { [K in keyof ShieldedBudgetNotePayload]: bigint };
+        budgetNote: DecodedShieldedBudgetNotePayload;
+        ruleOpening?: { [K in keyof ShieldedBudgetRuleOpening]: bigint };
         allocationKey?: bigint;
       };
     }
-  | ({ kind: "budget" } & { [K in keyof ShieldedBudgetNotePayload]: bigint });
+  | ({ kind: "budget" } & DecodedShieldedBudgetNotePayload);
 export function encodeShieldedValueNotePayload(note: ShieldedValueNotePayload): Uint8Array;
 export function encodeShieldedBudgetNotePayload(note: ShieldedBudgetNotePayload): Uint8Array;
 export function decodeShieldedNotePayload(payload: BytesLike): DecodedShieldedNotePayload;
+export function encodePublicShieldedBudgetEnvelope(
+  note: ShieldedIdentityBudgetNotePayload,
+): Uint8Array;
+export function isPublicShieldedBudgetEnvelope(envelope: BytesLike): boolean;
+export function decodePublicShieldedBudgetEnvelope(
+  envelope: BytesLike,
+): ({ kind: "budget" } & DecodedShieldedIdentityBudgetNotePayload) | null;
+export function getShieldedPublicBudgetFields(note: ShieldedIdentityBudgetNotePayload): bigint[];
 export function computeShieldedNoteCommitmentFromPayload(input: {
   payload: BytesLike;
   ciphertextHashField: BigNumberish;
@@ -800,6 +867,7 @@ export function computeShieldedNoteCommitmentFromPayload(input: {
   noteCommitment: bigint;
   policyCommitment?: bigint;
   enrollmentCommitment?: bigint;
+  termsCommitment?: bigint;
 };
 export function verifyShieldedNotePayload(input: {
   payload: BytesLike;
@@ -810,6 +878,7 @@ export function verifyShieldedNotePayload(input: {
   noteCommitment: bigint;
   policyCommitment?: bigint;
   enrollmentCommitment?: bigint;
+  termsCommitment?: bigint;
 };
 
 export const SHIELDED_POOL_ACTION: Readonly<{
@@ -818,12 +887,13 @@ export const SHIELDED_POOL_ACTION: Readonly<{
   Claim: 2;
   PrivateTransfer: 3;
   Unshield: 4;
-  ClaimPublic: 5;
 }>;
 export type ShieldedPoolPublicInputName =
   | "chainId"
   | "pool"
   | "fundMode"
+  | "budgetKind"
+  | "publicBudget"
   | "inputShardId"
   | "inputRoot"
   | "inputShardIds"
@@ -836,11 +906,7 @@ export type ShieldedPoolPublicInputName =
   | "recipient"
   | "endorsementRoot"
   | "trustedRoot"
-  | "asOf"
-  | "budgetId"
-  | "heirIdentityCommitment"
-  | "firstPeriod"
-  | "claimCount";
+  | "asOf";
 /** Each pool action circuit's named public inputs, in verifier order. */
 export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
@@ -849,6 +915,9 @@ export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>
 export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 4;
 export interface ShieldedPoolPublicSignalInput {
   fundMode?: BigNumberish;
+  budgetKind?: BigNumberish;
+  /** Optional cross-check; otherwise the nine fields are read from the public output envelope. */
+  publicBudget?: readonly BigNumberish[];
   action: BigNumberish;
   chainId: BigNumberish;
   poolAddress: string;
@@ -870,20 +939,6 @@ export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInp
   witness: Record<string, string | string[]>;
 };
 export function buildShieldedPoolPublicSignals(input: ShieldedPoolPublicSignalInput): bigint[];
-export function buildShieldedPublicClaimPublicInputs(input: {
-  chainId: BigNumberish;
-  poolAddress: string;
-  budgetId: BigNumberish;
-  heirIdentityCommitment: BigNumberish;
-  firstPeriod: BigNumberish;
-  claimCount: BigNumberish;
-  amount: BigNumberish;
-  outputCommitments: readonly [BigNumberish, BigNumberish];
-  outputCiphertexts: readonly [BytesLike, BytesLike];
-}): {
-  signals: bigint[];
-  witness: Record<string, string | string[]>;
-};
 export function buildShieldedReceiveCodePublicSignals(input: {
   identityCommitment: BigNumberish;
   ownerCommitment: BigNumberish;

@@ -1,11 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-import { renameZkVerifierSource } from "../rename-zk-verifier.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "./shieldedProductionSetup.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
@@ -49,7 +46,7 @@ export function currentShieldedCandidateManifest({ root = DEFAULT_ROOT } = {}) {
 }
 
 /**
- * Accepts the seven pinned public artifact sets and the named contract verifiers of the six
+ * Accepts the six pinned public artifact sets and the named contract verifiers of the five
  * pool actions. The receive-code circuit is verified in the browser and has no contract.
  */
 export function loadCandidateArtifacts({
@@ -79,7 +76,7 @@ export function loadCandidateArtifacts({
       .sort()
       .join(",") !== expectedActions.join(",")
   ) {
-    throw new Error("Candidate manifest must contain exactly the seven shielded circuits");
+    throw new Error("Candidate manifest must contain exactly the six shielded circuits");
   }
   const circuits = {};
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
@@ -137,93 +134,4 @@ export function loadCandidateArtifacts({
     manifest,
     circuits,
   };
-}
-
-/** Check that candidate Solidity and verification keys were actually exported from the candidate zkeys. */
-export function verifyCandidateDerivation(candidate, { root = DEFAULT_ROOT } = {}) {
-  const snarkjs = checkedFile(
-    path.resolve(root),
-    "node_modules/snarkjs/build/cli.cjs",
-    "snarkjs CLI",
-  );
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-testnet-"));
-  try {
-    for (const [action, entry] of Object.entries(candidate.circuits)) {
-      const exportedVerifier = path.join(temporary, `${action}.sol`);
-      const exportedVkey = path.join(temporary, `${action}.vkey.json`);
-      if (entry.verifier) {
-        execFileSync(
-          process.execPath,
-          [snarkjs, "zkey", "export", "solidityverifier", entry.zkey, exportedVerifier],
-          {
-            cwd: root,
-            stdio: "pipe",
-          },
-        );
-        const generated = fs.readFileSync(exportedVerifier, "utf8");
-        const expected = renameZkVerifierSource(generated, entry.contractName);
-        if (expected !== fs.readFileSync(entry.verifier, "utf8")) {
-          throw new Error(`${action} candidate verifier is not derived from its zkey`);
-        }
-      }
-      execFileSync(
-        process.execPath,
-        [snarkjs, "zkey", "export", "verificationkey", entry.zkey, exportedVkey],
-        {
-          cwd: root,
-          stdio: "pipe",
-        },
-      );
-      if (
-        JSON.stringify(JSON.parse(fs.readFileSync(exportedVkey, "utf8"))) !==
-        JSON.stringify(JSON.parse(fs.readFileSync(entry.vkey, "utf8")))
-      ) {
-        throw new Error(`${action} candidate verification key is not derived from its zkey`);
-      }
-    }
-  } finally {
-    fs.rmSync(temporary, { recursive: true, force: true });
-  }
-}
-
-/** Compiles the six pool action verifiers; the receive code has none. */
-export async function compileCandidateVerifiers(candidate, { root = DEFAULT_ROOT } = {}) {
-  const hardhatCompiler = path.join(
-    root,
-    "node_modules/hardhat/dist/src/internal/builtin-plugins/solidity/build-system/compiler/index.js",
-  );
-  const { getCompiler } = await import(pathToFileURL(hardhatCompiler).href);
-  const compiler = await getCompiler("0.8.28", { preferWasm: false });
-  const withVerifiers = Object.entries(candidate.circuits).filter(([, entry]) => entry.verifier);
-  const sources = Object.fromEntries(
-    withVerifiers.map(([action, entry]) => [
-      `${action}.sol`,
-      { content: fs.readFileSync(entry.verifier, "utf8") },
-    ]),
-  );
-  const output = await compiler.compile({
-    language: "Solidity",
-    sources,
-    settings: {
-      optimizer: { enabled: true, runs: 1 },
-      viaIR: true,
-      evmVersion: "cancun",
-      outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } },
-    },
-  });
-  const errors = output.errors?.filter((entry) => entry.severity === "error") ?? [];
-  if (errors.length > 0) {
-    throw new Error(
-      `Candidate verifier Solidity compilation failed: ${errors[0].formattedMessage}`,
-    );
-  }
-  return Object.fromEntries(
-    withVerifiers.map(([action, entry]) => {
-      const artifact = output.contracts?.[`${action}.sol`]?.[entry.contractName];
-      if (!artifact?.evm?.bytecode?.object || !artifact.abi) {
-        throw new Error(`${action} compiled verifier contract is missing`);
-      }
-      return [action, artifact];
-    }),
-  );
 }

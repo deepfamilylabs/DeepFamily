@@ -1,43 +1,78 @@
 // @vitest-environment jsdom
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ToastProvider } from "../../../shared/ui";
 import {
   ShieldedRecipientCredentialsForm,
   type ShieldedRecipientCredentialsFormHandle,
 } from "./ShieldedRecipientCredentialsForm";
 
+const workerCall = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({ cryptoWorkerCall: workerCall }));
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, fallbackOrOptions?: string | Record<string, unknown>) =>
+      typeof fallbackOrOptions === "string" ? fallbackOrOptions : key,
+    i18n: { language: "en" },
+  }),
 }));
 
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  workerCall.mockClear();
+});
+
+function renderForm() {
+  const ref = createRef<ShieldedRecipientCredentialsFormHandle>();
+  render(
+    <ToastProvider>
+      <ShieldedRecipientCredentialsForm ref={ref} />
+    </ToastProvider>,
+  );
+  return ref;
+}
+
+function changeName(fullName: string) {
+  const input = screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder");
+  fireEvent.change(input, { target: { value: fullName } });
+  return input as HTMLInputElement;
+}
+
+function changePassphrase(rawPassphrase: string) {
+  const input = screen.getByLabelText("Identity passphrase");
+  fireEvent.change(input, { target: { value: rawPassphrase } });
+  return input as HTMLInputElement;
+}
+
+function chooseOption(currentLabel: string, nextLabel: string) {
+  fireEvent.click(screen.getByRole("button", { name: currentLabel }));
+  fireEvent.click(screen.getByRole("option", { name: nextLabel }));
+}
+
 describe("ShieldedRecipientCredentialsForm", () => {
-  it("reads every identity field and clears the passphrase immediately", () => {
-    const ref = createRef<ShieldedRecipientCredentialsFormHandle>();
-    render(<ShieldedRecipientCredentialsForm ref={ref} />);
+  it("reads the shared identity fields and clears the unchanged raw passphrase immediately", () => {
+    const ref = renderForm();
+    changeName("张三");
+    chooseOption(
+      "search.hashCalculator.genderOptions.unknown",
+      "search.hashCalculator.genderOptions.male",
+    );
+    chooseOption("search.hashCalculator.bcOptions.ad", "search.hashCalculator.bcOptions.bc");
+    const [year, month, day] = screen.getAllByRole("spinbutton");
+    fireEvent.change(year, { target: { value: "35" } });
+    fireEvent.change(month, { target: { value: "2" } });
+    fireEvent.change(day, { target: { value: "14" } });
+    const rawPassphrase = "  child identity secret\u00a0";
+    const password = changePassphrase(rawPassphrase);
 
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.name"), {
-      target: { value: "张三" },
+    let credentials;
+    act(() => {
+      credentials = ref.current?.readAndClear();
     });
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.gender"), {
-      target: { value: "1" },
-    });
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.isBirthBC"), {
-      target: { value: "bc" },
-    });
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.birthYearLabel"), {
-      target: { value: "35" },
-    });
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.birthMonthLabel"), {
-      target: { value: "2" },
-    });
-    fireEvent.change(screen.getByLabelText("search.hashCalculator.birthDayLabel"), {
-      target: { value: "14" },
-    });
-    const password = screen.getByLabelText("search.hashCalculator.passphrase") as HTMLInputElement;
-    fireEvent.change(password, { target: { value: "child identity secret" } });
-
-    expect(ref.current?.readAndClear()).toEqual({
+    expect(credentials).toEqual({
       identity: {
         fullName: "张三",
         gender: 1,
@@ -46,15 +81,50 @@ describe("ShieldedRecipientCredentialsForm", () => {
         birthMonth: 2,
         birthDay: 14,
       },
-      rawPassphrase: "child identity secret",
+      rawPassphrase,
     });
     expect(password.value).toBe("");
+  });
 
-    fireEvent.change(password, { target: { value: "another secret" } });
-    ref.current?.clearSecretInputs();
+  it("preserves public fields while clearing secrets and maps unknown dates to zero", () => {
+    const ref = renderForm();
+    const name = changeName("  Ａlice  ");
+    const password = changePassphrase("recipient secret");
+    act(() => ref.current?.clearSecretInputs());
     expect(password.value).toBe("");
-    expect((screen.getByLabelText("search.hashCalculator.name") as HTMLInputElement).value).toBe(
-      "张三",
-    );
+    expect(name.value).toBe("  Ａlice  ");
+
+    changePassphrase("x");
+    expect(screen.queryByRole("button", { name: "Identity passphrase help" })).toBeNull();
+    expect(screen.queryByText("Weak")).toBeNull();
+    let credentials;
+    act(() => {
+      credentials = ref.current?.readAndClear();
+    });
+    expect(credentials).toEqual({
+      identity: {
+        fullName: "Alice",
+        gender: 0,
+        isBirthBC: false,
+        birthYear: 0,
+        birthMonth: 0,
+        birthDay: 0,
+      },
+      rawPassphrase: "x",
+    });
+    expect(password.value).toBe("");
+  });
+
+  it("keeps recipient edits out of automatic identity-hash worker calls", async () => {
+    vi.useFakeTimers();
+    const ref = renderForm();
+    changeName("Recipient");
+    changePassphrase("recipient identity secret");
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(workerCall).not.toHaveBeenCalled();
+    expect(screen.queryByText("search.hashCalculator.calculatedHash")).toBeNull();
+    act(() => ref.current?.clearSecretInputs());
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(workerCall).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,9 @@ import {
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
   computeShieldedAllocationKeyCommitment,
-  computeShieldedBudgetNoteCommitment,
+  computeShieldedNoteCommitmentFromPayload,
+  getShieldedBudgetCommitments,
+  encodePublicShieldedBudgetEnvelope,
   computeShieldedCiphertextHashField,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
@@ -23,6 +25,8 @@ import {
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
   type ShieldedBudgetNotePayload,
+  type ShieldedBudgetRuleOpening,
+  type ShieldedIdentityBudgetNotePayload,
   type ShieldedPolicyDescriptor,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
@@ -31,10 +35,8 @@ import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import { findHeirLegitimacy, type LineageSnapshot } from "./inheritanceChain";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
-import {
-  getRecoveredShieldedNoteProof,
-  type LocalShieldedWalletSnapshot,
-} from "./shieldedWalletRecovery";
+import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
+import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -47,6 +49,7 @@ export type SavedTemplate<T> = {
   commitment: BigNumberish;
   ciphertext: Uint8Array;
   shardId: BigNumberish;
+  ruleOpening?: ShieldedBudgetRuleOpening;
 };
 
 type CommonFundingInput = {
@@ -55,7 +58,10 @@ type CommonFundingInput = {
   donorDerivedSecretField: BigNumberish;
   donorCommitment: BigNumberish;
   /** Verified before preparation; its keys receive the new budget. */
-  recipient: VerifiedShieldedRecipient;
+  recipient?: VerifiedShieldedRecipient;
+  budgetKind?: 0 | 1;
+  publicRecipientPersonHash?: string;
+  lineageIndex?: Contract;
 };
 
 export type PreparedFundingOutput<T> = {
@@ -119,6 +125,8 @@ export function createShieldedPolicyDescriptor(input: {
 }
 
 const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
+  oldBudgetKind: "0",
+  oldHeirOwnerCommitment: "0",
   oldBudgetRemaining: "0",
   oldBudgetRemainingPeriods: "0",
   oldBudgetNonce: "0",
@@ -147,6 +155,8 @@ const ZERO_LINEAGE_WITNESS: ShieldedWitness = {
 export function prepareShieldedFund(
   input: PrepareShieldedFundInput,
 ): Promise<PreparedShieldedFunding> {
+  if (input.budgetKind !== undefined && input.budgetKind !== 0 && input.budgetKind !== 1)
+    throw new Error("Budget visibility must be private or public");
   if (input.fundMode === 0) return prepareInitialFunding(input);
   if (input.fundMode === 1) return prepareContinuationFunding(input);
   throw new Error("Fund mode must be initial or continuation");
@@ -214,7 +224,30 @@ async function currentContext(input: CommonFundingInput) {
   if (input.wallet.walletOwnerCommitment !== keys.ownerCommitment) {
     throw new Error("Donor wallet belongs to another identity");
   }
-  const heir = input.recipient;
+  let heir: {
+    personHash: string;
+    identityCommitment: bigint;
+    ownerCommitment: bigint;
+    viewingKey?: string;
+  };
+  if (input.budgetKind === 1) {
+    if (!input.lineageIndex || !input.publicRecipientPersonHash)
+      throw new Error("Public funding requires a selected family identity");
+    if (
+      getAddress(await input.pool.LINEAGE_INDEX()) !==
+      getAddress(await input.lineageIndex.getAddress())
+    )
+      throw new Error("Lineage index does not belong to this shielded pool");
+    const identityCommitment = getBigInt(
+      await input.lineageIndex.identityCommitmentOf(input.publicRecipientPersonHash),
+    );
+    if (identityCommitment === 0n) throw new Error("Recipient identity is unknown");
+    heir = { personHash: input.publicRecipientPersonHash, identityCommitment, ownerCommitment: 0n };
+  } else {
+    if (!input.recipient || input.recipient.ownerCommitment === 0n)
+      throw new Error("Private funding requires a verified receive code");
+    heir = input.recipient;
+  }
   if (
     wrapIdentityCommitmentAsPersonHash(heir.identityCommitment).toLowerCase() !==
     heir.personHash.toLowerCase()
@@ -242,7 +275,7 @@ function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
   const nullifier = computeShieldedSpendNullifier({ ownerSecret, noteCommitment: commitment });
   if (input.wallet.spentNullifiers.has(nullifier))
     throw new Error("Donor value note has already been spent");
-  const path = getRecoveredShieldedNoteProof(input.wallet, commitment);
+  const path = getLocalShieldedNoteProof(input.wallet, commitment);
   return { note, hash, nullifier, path };
 }
 
@@ -309,7 +342,9 @@ async function fundingOutputs(input: {
   budget: ShieldedBudgetNotePayload;
   donorOwnerCommitment: bigint;
   donorChangeAmount: bigint;
-  heirViewingKey: Uint8Array;
+  heirViewingKey?: Uint8Array;
+  publicDelivery: boolean;
+  ruleOpening?: ShieldedBudgetRuleOpening;
   donorViewIkm: string;
   chainId: bigint;
   poolAddress: string;
@@ -317,26 +352,29 @@ async function fundingOutputs(input: {
   enrollmentCommitment: bigint;
   allocationKey?: bigint;
 }) {
-  const encryptedBudget = await encryptOutput(
-    input.budget,
-    encodeShieldedBudgetNotePayload,
-    (ciphertextHashField) =>
-      computeShieldedBudgetNoteCommitment({
-        policyCommitment: input.policyCommitment,
-        enrollmentCommitment: input.enrollmentCommitment,
-        heirOwnerCommitment: input.budget.heirOwnerCommitment,
-        amountPerPeriod: input.budget.amountPerPeriod,
-        remaining: input.budget.remaining,
-        nonce: input.budget.nonce,
-        ciphertextHashField,
-      }),
-    input.heirViewingKey,
-    input.chainId,
-    input.poolAddress,
-  );
-  // The child budget is addressed only to the child. An encrypted copy of its
-  // private template in the donor's change note makes future funding recoverable
-  // from public events after the donor clears local storage.
+  const payload = encodeShieldedBudgetNotePayload(input.budget);
+  let encryptedBudget: PreparedFundingOutput<ShieldedBudgetNotePayload>;
+  try {
+    const ciphertext = input.publicDelivery
+      ? encodePublicShieldedBudgetEnvelope(input.budget as ShieldedIdentityBudgetNotePayload)
+      : await encryptShieldedNote({
+          recipientPublicKey: input.heirViewingKey!,
+          payload,
+          chainId: input.chainId,
+          poolAddress: input.poolAddress,
+        });
+    const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
+    const { noteCommitment: commitment } = computeShieldedNoteCommitmentFromPayload({
+      payload,
+      ciphertextHashField,
+    });
+    encryptedBudget = { note: input.budget, ciphertext, ciphertextHashField, commitment };
+  } finally {
+    payload.fill(0);
+  }
+  // The donor's encrypted change backs up the budget and its private rule opening.
+  // Public delivery never includes that opening; reloading the donor wallet can
+  // still restore both the funding template and the original local policy.
   const change: ShieldedValueNotePayload = {
     ownerCommitment: input.donorOwnerCommitment,
     amount: input.donorChangeAmount,
@@ -344,6 +382,7 @@ async function fundingOutputs(input: {
     fundingMemo: {
       budgetCommitment: encryptedBudget.commitment,
       budgetNote: input.budget,
+      ...(input.ruleOpening ? { ruleOpening: input.ruleOpening } : {}),
       ...(input.allocationKey === undefined ? {} : { allocationKey: input.allocationKey }),
     },
   };
@@ -361,6 +400,7 @@ async function fundingOutputs(input: {
 
 function actionData(input: {
   fundMode: 0 | 1;
+  budgetKind: 0 | 1;
   donor: ReturnType<typeof donorInput>;
   template?: ReturnType<typeof templatePath>;
   useNullifier: bigint;
@@ -374,6 +414,7 @@ function actionData(input: {
 }): ShieldedPoolActionData {
   return {
     fundMode: BigInt(input.fundMode),
+    budgetKind: BigInt(input.budgetKind),
     inputShardIds: [input.donor.path.shardId, input.template?.shardId ?? input.donor.path.shardId],
     inputRoots: [input.donor.path.root, input.template?.root ?? input.donor.path.root],
     inputNullifiers: [input.donor.nullifier, input.useNullifier],
@@ -396,6 +437,7 @@ function publicInputs(
   return buildShieldedPoolPublicInputs({
     action,
     fundMode: data.fundMode,
+    budgetKind: data.budgetKind,
     chainId,
     poolAddress,
     inputShardIds: [...data.inputShardIds],
@@ -411,8 +453,19 @@ function publicInputs(
   }).witness;
 }
 
-/** Fund a first budget for one heir under a private rule. */
+/** Client funding rules use the identity recovered alongside the parent's VALUE. */
+function assertFundingParent(wallet: LocalShieldedWalletSnapshot, rootIdentity: BigNumberish) {
+  if (wallet.walletIdentityCommitment === undefined) {
+    throw new Error("Funding requires a wallet recovered with the parent's identity");
+  }
+  if (getBigInt(rootIdentity) !== wallet.walletIdentityCommitment) {
+    throw new Error("Funding rule belongs to another parent identity");
+  }
+}
+
+/** Fund a first budget for one heir under the parent's rule. */
 async function prepareInitialFunding(input: InitialFundingInput): Promise<PreparedShieldedFunding> {
+  assertFundingParent(input.wallet, input.policy.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const expectedIndex = getAddress(await input.pool.LINEAGE_INDEX());
   if (expectedIndex.toLowerCase() !== (await input.lineageIndex.getAddress()).toLowerCase()) {
@@ -498,24 +551,43 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     eligibleFrom,
     enrollmentSalt,
   });
-  const budget: ShieldedBudgetNotePayload = {
-    rootIdentityCommitment: policy.rootIdentityCommitment,
-    rootVersionIndex: policy.rootVersionIndex,
-    policySalt: policy.policySalt,
+  const ruleOpening = {
+    policySalt: getBigInt(policy.policySalt),
     allocationKeyCommitment,
-    heirIdentityCommitment: heir.identityCommitment,
-    eligibleFrom,
     enrollmentSalt,
-    heirOwnerCommitment: heir.ownerCommitment,
-    amountPerPeriod: policy.amountPerPeriod,
-    remaining: amount,
-    nonce: generateShieldedRandomField(),
   };
+  const budget: ShieldedBudgetNotePayload =
+    input.budgetKind === 1
+      ? {
+          binding: "identity",
+          rootIdentityCommitment: policy.rootIdentityCommitment,
+          rootVersionIndex: policy.rootVersionIndex,
+          heirIdentityCommitment: heir.identityCommitment,
+          amountPerPeriod: policy.amountPerPeriod,
+          eligibleFrom,
+          policyCommitment,
+          enrollmentCommitment,
+          remaining: amount,
+          nonce: generateShieldedRandomField(),
+        }
+      : {
+          rootIdentityCommitment: policy.rootIdentityCommitment,
+          rootVersionIndex: policy.rootVersionIndex,
+          ...ruleOpening,
+          heirIdentityCommitment: heir.identityCommitment,
+          eligibleFrom,
+          heirOwnerCommitment: heir.ownerCommitment,
+          amountPerPeriod: policy.amountPerPeriod,
+          remaining: amount,
+          nonce: generateShieldedRandomField(),
+        };
   const outputs = await fundingOutputs({
     budget,
     donorOwnerCommitment: ctx.keys.ownerCommitment,
     donorChangeAmount: donor.note.amount - amount,
-    heirViewingKey: getBytes(heir.viewingKey),
+    heirViewingKey: heir.viewingKey ? getBytes(heir.viewingKey) : undefined,
+    publicDelivery: input.budgetKind === 1,
+    ...(budget.binding === "identity" ? { ruleOpening } : {}),
     donorViewIkm: ctx.keys.hpkeIkm,
     chainId: ctx.chainId,
     poolAddress: ctx.poolAddress,
@@ -525,6 +597,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   });
   const data = actionData({
     fundMode: 0,
+    budgetKind: input.budgetKind ?? 0,
     donor,
     useNullifier: enrollmentNullifier,
     outputs,
@@ -581,6 +654,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
 async function prepareContinuationFunding(
   input: ContinuationFundingInput,
 ): Promise<PreparedShieldedFunding> {
+  assertFundingParent(input.wallet, input.budget.note.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const donor = donorInput(input, ctx.keys.ownerSecret);
   const template = templatePath(input.wallet, input.budget, encodeShieldedBudgetNotePayload);
@@ -588,9 +662,20 @@ async function prepareContinuationFunding(
   const heir = ctx.heir;
   if (
     getBigInt(old.heirIdentityCommitment) !== heir.identityCommitment ||
-    getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment
+    (input.budgetKind !== 1 &&
+      old.binding !== "identity" &&
+      getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment)
   )
-    throw new Error("Budget template does not belong to this receive code's recipient");
+    throw new Error("Budget template does not belong to this recipient");
+  const ruleOpening =
+    old.binding === "identity"
+      ? input.budget.ruleOpening
+      : {
+          policySalt: getBigInt(old.policySalt),
+          allocationKeyCommitment: getBigInt(old.allocationKeyCommitment),
+          enrollmentSalt: getBigInt(old.enrollmentSalt),
+        };
+  if (!ruleOpening) throw new Error("Identity budget funding needs its donor rule opening");
   const rate = uint128(old.amountPerPeriod, "rate");
   const oldRemaining = uint128(old.remaining, "old remaining budget");
   if (rate === 0n || oldRemaining % rate !== 0n)
@@ -598,38 +683,55 @@ async function prepareContinuationFunding(
   const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
   if (donor.note.amount < amount)
     throw new Error("Donor value note cannot fund the full additional amount");
-  const policyCommitment = computeShieldedPolicyCommitment(old);
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: old.heirIdentityCommitment,
-    eligibleFrom: old.eligibleFrom,
-    enrollmentSalt: old.enrollmentSalt,
-  });
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(old);
+  if (
+    computeShieldedPolicyCommitment({ ...old, ...ruleOpening }) !== policyCommitment ||
+    computeShieldedEnrollmentCommitment({ ...old, ...ruleOpening, policyCommitment }) !==
+      enrollmentCommitment
+  )
+    throw new Error("Funding rule opening does not match this budget");
   const budgetUseNonce = generateShieldedRandomField();
   const useNullifier = computeShieldedBudgetUseNullifier({
-    policySalt: old.policySalt,
+    policySalt: ruleOpening.policySalt,
     budgetNoteCommitment: template.commitment,
     useNonce: budgetUseNonce,
   });
   if (input.wallet.spentNullifiers.has(useNullifier))
     throw new Error("Funding authorization was already used");
-  const budget: ShieldedBudgetNotePayload = {
-    ...old,
+  const commonBudget = {
+    rootIdentityCommitment: old.rootIdentityCommitment,
+    rootVersionIndex: old.rootVersionIndex,
+    heirIdentityCommitment: old.heirIdentityCommitment,
+    amountPerPeriod: old.amountPerPeriod,
+    eligibleFrom: old.eligibleFrom,
     remaining: amount,
     nonce: generateShieldedRandomField(),
   };
+  const budget: ShieldedBudgetNotePayload =
+    input.budgetKind === 1
+      ? { ...commonBudget, binding: "identity", policyCommitment, enrollmentCommitment }
+      : { ...commonBudget, ...ruleOpening, heirOwnerCommitment: heir.ownerCommitment };
   const outputs = await fundingOutputs({
     budget,
     donorOwnerCommitment: ctx.keys.ownerCommitment,
     donorChangeAmount: donor.note.amount - amount,
-    heirViewingKey: getBytes(heir.viewingKey),
+    heirViewingKey: heir.viewingKey ? getBytes(heir.viewingKey) : undefined,
+    publicDelivery: input.budgetKind === 1,
+    ...(budget.binding === "identity" ? { ruleOpening } : {}),
     donorViewIkm: ctx.keys.hpkeIkm,
     chainId: ctx.chainId,
     poolAddress: ctx.poolAddress,
     policyCommitment,
     enrollmentCommitment,
   });
-  const data = actionData({ fundMode: 1, donor, template, useNullifier, outputs });
+  const data = actionData({
+    fundMode: 1,
+    budgetKind: input.budgetKind ?? 0,
+    donor,
+    template,
+    useNullifier,
+    outputs,
+  });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
     ...ZERO_LINEAGE_WITNESS,
@@ -643,12 +745,14 @@ async function prepareContinuationFunding(
     rootIdentityCommitment: String(old.rootIdentityCommitment),
     rootVersionIndex: String(old.rootVersionIndex),
     rate: String(rate),
-    policySalt: String(old.policySalt),
-    allocationKeyCommitment: String(old.allocationKeyCommitment),
+    policySalt: String(ruleOpening.policySalt),
+    allocationKeyCommitment: String(ruleOpening.allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
     eligibleFrom: String(old.eligibleFrom),
-    enrollmentSalt: String(old.enrollmentSalt),
+    enrollmentSalt: String(ruleOpening.enrollmentSalt),
+    oldBudgetKind: old.binding === "identity" ? "1" : "0",
+    oldHeirOwnerCommitment: old.binding === "identity" ? "0" : String(old.heirOwnerCommitment),
     oldBudgetRemaining: String(oldRemaining),
     oldBudgetRemainingPeriods: String(oldRemaining / rate),
     oldBudgetNonce: String(old.nonce),

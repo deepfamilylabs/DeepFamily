@@ -184,7 +184,7 @@ describe("shielded production setup artifacts", function () {
     fs.rmSync(fixture.stageRoot, { recursive: true, force: true });
   });
 
-  it("records all seven independently generated keys without requiring release thresholds", async function () {
+  it("records all six independently generated keys without requiring release thresholds", async function () {
     const records = await fixture.createRecords();
     expect(Object.keys(records.manifest.circuits).sort()).to.deep.equal(
       Object.keys(SHIELDED_SETUP_CIRCUITS).sort(),
@@ -194,7 +194,7 @@ describe("shielded production setup artifacts", function () {
     expect(records.manifest.toolchain.snarkjsRuntimeSha256).to.equal(fixture.runtimeSha256);
     expect(
       new Set(Object.values(records.manifest.circuits).map(({ zkeySha256 }) => zkeySha256)).size,
-    ).to.equal(7);
+    ).to.equal(6);
     for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
       const item = records.manifest.circuits[action];
       expect(item.source).to.equal(spec.source);
@@ -206,7 +206,7 @@ describe("shielded production setup artifacts", function () {
     }
     fixture.install(records);
     const inspected = inspectShieldedProductionArtifacts({ root: fixture.root });
-    expect(Object.keys(inspected.artifacts)).to.have.length(7);
+    expect(Object.keys(inspected.artifacts)).to.have.length(6);
   });
 
   it("inspects production artifacts using an external pinned pTau selected by ZK_PTAU_PATH", async function () {
@@ -218,7 +218,7 @@ describe("shielded production setup artifacts", function () {
     });
     expect(inspected.ptauPath).to.equal(external);
     expect(inspected.manifest.phase1.path).to.equal(PRODUCTION_PTAU_RELATIVE_PATH);
-    expect(Object.keys(inspected.artifacts)).to.have.length(7);
+    expect(Object.keys(inspected.artifacts)).to.have.length(6);
     expect(fs.existsSync(path.join(fixture.root, PRODUCTION_PTAU_RELATIVE_PATH))).to.equal(false);
   });
 
@@ -330,10 +330,10 @@ describe("shielded production setup artifacts", function () {
           };
         },
       });
-      expect(result).to.include({ status: "passed", circuitCount: 7 });
+      expect(result).to.include({ status: "passed", circuitCount: 6 });
       expect(result.ptau.path).to.equal(external);
       // The receive code exports a verification key but no Solidity verifier.
-      expect(calls).to.have.length(28);
+      expect(calls).to.have.length(24);
     }
   });
 
@@ -364,7 +364,7 @@ describe("shielded production setup artifacts", function () {
     expect(new Set(destinations).size).to.equal(destinations.length);
     expect(
       destinations.filter((name) => name.startsWith("frontend/public/zk/shielded/")),
-    ).to.have.length(21);
+    ).to.have.length(18);
     for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
       expect(
         plan.find(
@@ -374,7 +374,7 @@ describe("shielded production setup artifacts", function () {
       ).to.equal(fixture.finalized[action].finalZkey);
       if (spec.verifierPath) expect(destinations).to.include(spec.verifierPath);
     }
-    expect(destinations.filter((name) => name.startsWith("contracts/"))).to.have.length(6);
+    expect(destinations.filter((name) => name.startsWith("contracts/"))).to.have.length(5);
     expect(destinations.at(-1)).to.equal(SHIELDED_PRODUCTION_MANIFEST_PATH);
   });
 
@@ -389,7 +389,7 @@ describe("shielded production setup artifacts", function () {
       });
     }
     const inspected = inspectShieldedProductionArtifacts({ root: fixture.root });
-    expect(Object.keys(inspected.artifacts)).to.have.length(7);
+    expect(Object.keys(inspected.artifacts)).to.have.length(6);
     for (const artifact of Object.values(inspected.artifacts)) {
       expect(artifact.zkey).to.include(path.join("frontend", "public", "zk", "shielded"));
       expect(artifact.vkey).to.include(path.join("frontend", "public", "zk", "shielded"));
@@ -413,7 +413,7 @@ describe("shielded production setup artifacts", function () {
     delete records.manifest.circuits.claim;
     writeJson(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH, records.manifest);
     expect(() => inspectShieldedProductionArtifacts({ root: fixture.root })).to.throw(
-      "must cover all seven circuits",
+      "must cover all six circuits",
     );
     records.manifest.circuits.claim = originalClaim;
     writeJson(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH, records.manifest);
@@ -451,12 +451,12 @@ describe("shielded production setup artifacts", function () {
       Object.keys(
         snapshotShieldedCompilation({ root: fixture.root, stageBuild: fixture.stageBuild }),
       ),
-    ).to.have.length(7);
+    ).to.have.length(6);
     delete fixture.initialManifest.circuits.claim;
     writeJson(fixture.root, "circuits/shielded-development-manifest.json", fixture.initialManifest);
     expect(() =>
       snapshotShieldedCompilation({ root: fixture.root, stageBuild: fixture.stageBuild }),
-    ).to.throw("compilation baseline must cover all seven circuits");
+    ).to.throw("compilation baseline must cover all six circuits");
   });
 
   it("allows reviewed runtime rotation across source and lock changes while preserving artifact checks", async function () {
@@ -473,7 +473,7 @@ describe("shielded production setup artifacts", function () {
       "source bundle SHA-256 mismatch",
     );
     const options = { root: fixture.root, expectedSnarkjsRuntimeSha256 };
-    expect(Object.keys(inspectShieldedProductionArtifacts(options).artifacts)).to.have.length(7);
+    expect(Object.keys(inspectShieldedProductionArtifacts(options).artifacts)).to.have.length(6);
     fs.appendFileSync(
       path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_final.zkey"),
       "modified key\n",

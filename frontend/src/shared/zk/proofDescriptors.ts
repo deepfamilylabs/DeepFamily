@@ -46,23 +46,10 @@ export const DISCLOSURE_BINDING_PROOF_DESCRIPTOR = defineBrowserDescriptor(
   },
 );
 
-export const PROOF_DESCRIPTORS = Object.freeze({
-  [PERSON_RELATION_PROOF_DESCRIPTOR.key]: PERSON_RELATION_PROOF_DESCRIPTOR,
-  [DISCLOSURE_BINDING_PROOF_DESCRIPTOR.key]: DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
-});
-
 export const PROOF_DESCRIPTORS_BY_PURPOSE = Object.freeze({
   [PERSON_RELATION_PROOF_DESCRIPTOR.purpose]: PERSON_RELATION_PROOF_DESCRIPTOR,
   [DISCLOSURE_BINDING_PROOF_DESCRIPTOR.purpose]: DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
 });
-
-export function getProofDescriptor(key: string): ProofDescriptor {
-  const descriptor = PROOF_DESCRIPTORS[key];
-  if (!descriptor) {
-    throw new Error(`Unknown proof descriptor: ${key}`);
-  }
-  return descriptor;
-}
 
 export function getProofDescriptorByPurpose(purpose: string): ProofDescriptor {
   const descriptor = PROOF_DESCRIPTORS_BY_PURPOSE[purpose];

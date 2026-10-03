@@ -1,11 +1,15 @@
 import {
   computeShieldedPeriodNullifier,
-  computeShieldedPolicyCommitment,
+  getShieldedBudgetCommitments,
   INHERITANCE_PERIOD_SECONDS,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { BigNumberish } from "ethers";
-import { selectClaimBudget, type ShieldedSelectableBudgetNote } from "./shieldedActionSelection";
+import {
+  getShieldedClaimBudgetKey,
+  selectClaimBudget,
+  type ShieldedSelectableBudgetNote,
+} from "./shieldedActionSelection";
 import type { OwnedShieldedNote } from "./shieldedPoolChain";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -54,6 +58,46 @@ function validBudget(note: Note): note is ShieldedSelectableBudgetNote {
     eligibleFrom >= 0n &&
     eligibleFrom <= MAX_UINT64
   );
+}
+
+/** Group recovered, eligible budgets by the same compatibility rule as automatic claims. */
+export function listShieldedClaimBudgetOptions(
+  notes: readonly Note[],
+  wallet: PeriodWallet,
+  derivedSecretField: BigNumberish,
+  now: bigint,
+): {
+  key: string;
+  notes: ShieldedSelectableBudgetNote[];
+  overview: ShieldedClaimOverview;
+}[] {
+  if (now < 0n || now > MAX_UINT64) throw new RangeError("Claim timestamp must fit in uint64");
+  const budgets = [
+    ...new Map(
+      notes
+        .filter(
+          (note): note is ShieldedSelectableBudgetNote =>
+            validBudget(note) && note.note.remaining > 0n,
+        )
+        .map((note) => [note.commitment, note]),
+    ).values(),
+  ].sort((first, second) => {
+    if (first.note.eligibleFrom !== second.note.eligibleFrom)
+      return first.note.eligibleFrom < second.note.eligibleFrom ? -1 : 1;
+    return first.commitment < second.commitment ? -1 : first.commitment > second.commitment ? 1 : 0;
+  });
+  const groups = new Map<string, ShieldedSelectableBudgetNote[]>();
+  for (const note of budgets) {
+    const key = getShieldedClaimBudgetKey(note.note);
+    const group = groups.get(key);
+    if (group) group.push(note);
+    else groups.set(key, [note]);
+  }
+  return [...groups].map(([key, groupedNotes]) => ({
+    key,
+    notes: groupedNotes,
+    overview: getShieldedClaimOverview(groupedNotes, wallet, derivedSecretField, now),
+  }));
 }
 
 function futureFundedPeriod(
@@ -122,7 +166,7 @@ export function getShieldedClaimOverview(
   const policies = new Map<bigint, PolicyFunding>();
   for (const budget of budgets) {
     if (budget.note.remaining === 0n) continue;
-    const policyCommitment = computeShieldedPolicyCommitment(budget.note);
+    const policyCommitment = getShieldedBudgetCommitments(budget.note).policyCommitment;
     const previous = policies.get(policyCommitment);
     policies.set(policyCommitment, {
       policyCommitment,

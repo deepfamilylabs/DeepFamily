@@ -83,9 +83,7 @@ describe("shielded receive codes", () => {
       reason: "malformed",
     });
     mocks.zkWorkerCall.mockResolvedValueOnce({ ok: false, reason: "invalid" });
-    await expect(verifyShieldedReceiveCode(code)).rejects.toBeInstanceOf(
-      ShieldedReceiveCodeError,
-    );
+    await expect(verifyShieldedReceiveCode(code)).rejects.toBeInstanceOf(ShieldedReceiveCodeError);
     mocks.zkWorkerCall.mockResolvedValueOnce({
       ok: true,
       identityCommitment: fixture.identityCommitment.toString(),
@@ -125,14 +123,51 @@ describe("shielded receive codes", () => {
   });
 
   it("returns only the code when creating one from a recipient's credentials", async () => {
+    const rawPassphrase = "  Tr0ub4dor&3-xkcd-horse\u00a0a\u030a ";
     mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
-    await expect(
-      createShieldedReceiveCodeForRecipient({ identity, rawPassphrase: "secret phrase" }),
-    ).resolves.toBe(code);
+    await expect(createShieldedReceiveCodeForRecipient({ identity, rawPassphrase })).resolves.toBe(
+      code,
+    );
     expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
       "createShieldedReceiveCodeFromCredentials",
-      { identity, rawPassphrase: "secret phrase" },
+      { identity, rawPassphrase },
       expect.any(Object),
     );
   });
+
+  it.each([
+    ["empty", "", "passphraseRequired"],
+    ["ASCII spaces", "   ", "passphraseRequired"],
+    ["Unicode spaces", "\u00a0\u3000", "passphraseRequired"],
+    ["control character", "\t", "passphraseDisallowed"],
+  ])(
+    "rejects recipient credentials with %s before invoking the ZK worker",
+    async (_label, rawPassphrase, code) => {
+      await expect(
+        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase }),
+      ).rejects.toMatchObject({ name: "InheritanceError", code });
+      expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["weak", "password"],
+    ["medium", "M7!kP2@vZ8#s"],
+    ["repeated", "A".repeat(32)],
+    ["sequential", "1234567890123456"],
+    ["strong Chinese", "家族秘密要够长才安全一二三"],
+  ])(
+    "allows %s nonempty recipient credentials without changing the passphrase",
+    async (_label, rawPassphrase) => {
+      mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
+      await expect(
+        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase }),
+      ).resolves.toBe(code);
+      expect(mocks.zkWorkerCall).toHaveBeenCalledExactlyOnceWith(
+        "createShieldedReceiveCodeFromCredentials",
+        { identity, rawPassphrase },
+        expect.any(Object),
+      );
+    },
+  );
 });

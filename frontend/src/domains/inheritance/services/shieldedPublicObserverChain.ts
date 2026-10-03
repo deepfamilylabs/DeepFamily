@@ -1,11 +1,11 @@
-import { createLineageTree, type LineageTree } from "@deepfamily/protocol-core";
+import { SHIELDED_POOL_ACTION, createLineageTree, type LineageTree } from "@deepfamily/protocol-core";
 import { getBytes, type Contract, type Log } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 import type { PublicPoolActionObservation } from "./shieldedPublicObserverAudit";
 
 const MAX_SHARD_LEAVES = 1n << 32n;
 const CIPHERTEXT_BYTES = 512;
-const MAX_ACTION = 5;
+const POOL_ACTIONS = new Set<number>(Object.values(SHIELDED_POOL_ACTION));
 
 export type PublicPoolObservationSnapshot = {
   poolAddress: string;
@@ -110,14 +110,8 @@ export async function loadPublicPoolActionObservations(
       if (parsed.name === "ActionExecuted") {
         if (pending) throw new Error("Pool action boundary appeared before two output notes");
         const rawAction = Number(parsed.args.action);
-        if (!Number.isInteger(rawAction) || rawAction < 0 || rawAction > MAX_ACTION) {
+        if (!Number.isInteger(rawAction) || !POOL_ACTIONS.has(rawAction)) {
           throw new Error("Pool action event has an unknown action code");
-        }
-        if (
-          rawAction === 5 &&
-          (BigInt(parsed.args.inputShardId0) !== 0n || BigInt(parsed.args.inputShardId1) !== 0n)
-        ) {
-          throw new Error("Public budget claim must have empty shielded input slots");
         }
         pending = {
           txHash,

@@ -5,7 +5,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseCircuitArguments, selectCircuitNames } from "./lib/zkCircuitSelection.mjs";
+import {
+  parseCircuitArguments,
+  selectCircuitNames,
+  SHIELDED_CIRCUIT_NAMES,
+} from "./lib/zkCircuitSelection.mjs";
 
 const PERSON_SUBMITTER = "0x1234567890123456789012345678901234567890";
 const CHECKS = Object.freeze({
@@ -102,7 +106,7 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
               cwd: resolvedRoot,
             }),
           ]
-        : shielded.length === 7
+        : shielded.length === SHIELDED_CIRCUIT_NAMES.length
           ? [
               Object.freeze({
                 circuit: "shielded",
@@ -116,7 +120,7 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
             ]
           : shielded.map((name) => {
               const action = name.slice("shielded:".length);
-              const hasProofFixture = ["fund", "claim", "claimPublic"].includes(action);
+              const hasProofFixture = ["fund", "claim"].includes(action);
               return Object.freeze({
                 circuit: name,
                 check: hasProofFixture ? "development-proof-smoke" : "development-artifacts",
@@ -152,7 +156,7 @@ const printUsage = () => {
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
-all seven development artifact sets and proves fund/claim/claimPublic when no production manifest exists;
+all seven development artifact sets and proves fund/claim when no production manifest exists;
 with a production manifest it verifies production artifacts and ceremony. Default: --circuit all.`);
 };
 

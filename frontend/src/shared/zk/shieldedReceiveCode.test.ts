@@ -14,12 +14,19 @@ import {
 import { hexlify } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createShieldedReceiveCode,
+  createShieldedReceiveCodeFromCredentials,
   isInG2Subgroup,
   verifyShieldedReceiveCode,
 } from "./shieldedReceiveCode";
+
+const mocks = vi.hoisted(() => ({ deriveIdentityMaterial: vi.fn() }));
+vi.mock("@deepfamily/protocol-core", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@deepfamily/protocol-core")>()),
+  deriveIdentityMaterial: mocks.deriveIdentityMaterial,
+}));
 
 const PUBLIC_DIRECTORY = fileURLToPath(new URL("../../../public", import.meta.url));
 
@@ -41,6 +48,47 @@ function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
   payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 1 + wordIndex * 32);
   return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
 }
+
+describe("recipient empty-passphrase protection inside the ZK worker", () => {
+  beforeEach(() => mocks.deriveIdentityMaterial.mockReset());
+
+  it.each([
+    ["empty", "", "passphraseRequired"],
+    ["ASCII spaces", "   ", "passphraseRequired"],
+    ["Unicode spaces", "\u00a0\u3000", "passphraseRequired"],
+    ["control character", "\t", "passphraseDisallowed"],
+  ])("rejects %s before deriving identity material", async (_label, rawPassphrase, code) => {
+    await expect(
+      createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase }),
+    ).rejects.toThrow(code);
+    expect(mocks.deriveIdentityMaterial).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["weak", "password"],
+    ["medium", "M7!kP2@vZ8#s"],
+    ["repeated", "A".repeat(32)],
+    ["sequential", "1234567890123456"],
+    ["strong ASCII with spaces", "  Tr0ub4dor&3-xkcd-horse\u00a0a\u030a "],
+    ["strong Chinese", "家族秘密要够长才安全一二三"],
+  ])(
+    "accepts %s nonempty credentials and preserves the original passphrase",
+    async (_label, rawPassphrase) => {
+      mocks.deriveIdentityMaterial.mockRejectedValueOnce(new Error("KDF unavailable"));
+      await expect(
+        createShieldedReceiveCodeFromCredentials({
+          identity: { ...identity.identity, fullName: "\u3000Ａｄａ\u0085Example\u00a0" },
+          rawPassphrase,
+        }),
+      ).rejects.toThrow("KDF unavailable");
+      expect(mocks.deriveIdentityMaterial).toHaveBeenCalledExactlyOnceWith({
+        identity: identity.identity,
+        rawPassphrase,
+        identitySuiteId: 1,
+      });
+    },
+  );
+});
 
 describe("receive code proofs", () => {
   let code = "";

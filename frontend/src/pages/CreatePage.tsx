@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus, Image, Star, Wallet } from "lucide-react";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
 import { AddVersionModal, EndorseModal, MintNFTModal } from "../domains/transactions";
-import { ActionCard, EmptyState, PageContainer, PageHead } from "../shared/ui";
+import { ActionCard, EmptyState, PageHead } from "../shared/ui";
 import type { ActionCardTone } from "../shared/ui";
 
 type ActionTab = "add-version" | "mint-nft" | "endorse";
@@ -153,7 +153,7 @@ export default function CreatePage() {
     ];
 
     return (
-      <PageContainer className="py-12">
+      <div>
         <EmptyState
           size="page"
           icon={<Wallet className="h-7 w-7" strokeWidth={1.5} />}
@@ -181,12 +181,12 @@ export default function CreatePage() {
             </div>
           }
         />
-      </PageContainer>
+      </div>
     );
   }
 
   return (
-    <PageContainer className="py-10">
+    <div>
       <PageHead
         title={t("actions.title", "Create")}
         subtitle={t(
@@ -212,45 +212,45 @@ export default function CreatePage() {
         })}
       </div>
 
-        {/* Modals - Simplified navigation logic:
+      {/* Modals - Simplified navigation logic:
             1. Parent component only controls open/close and passes initial data
             2. Modal internal state is fully self-contained and auto-resets on close
             3. When navigating: close current modal → open target modal (with data)
         */}
-        <AddVersionModal
-          isOpen={addVersionModal.isOpen}
-          onClose={() => setAddVersionModal({ isOpen: false })}
-          onSuccess={(result) => console.log("Version added:", result)}
-          onEndorse={(personHash, versionIndex) => {
-            setAddVersionModal({ isOpen: false });
-            setEndorseModal({ isOpen: true, personHash, versionIndex });
-          }}
-          initialPersonData={addVersionModal.existingPersonData}
-        />
+      <AddVersionModal
+        isOpen={addVersionModal.isOpen}
+        onClose={() => setAddVersionModal({ isOpen: false })}
+        onSuccess={(result) => console.log("Version added:", result)}
+        onEndorse={(personHash, versionIndex) => {
+          setAddVersionModal({ isOpen: false });
+          setEndorseModal({ isOpen: true, personHash, versionIndex });
+        }}
+        initialPersonData={addVersionModal.existingPersonData}
+      />
 
-        <MintNFTModal
-          isOpen={mintNFTModal.isOpen}
-          onClose={() => setMintNFTModal({ isOpen: false })}
-          onSuccess={(tokenId) => console.log("NFT minted:", tokenId)}
-          onGoEndorse={(personHash, versionIndex) => {
-            setMintNFTModal({ isOpen: false });
-            setEndorseModal({ isOpen: true, personHash, versionIndex });
-          }}
-          initialPersonHash={mintNFTModal.personHash}
-          initialVersionIndex={mintNFTModal.versionIndex}
-        />
+      <MintNFTModal
+        isOpen={mintNFTModal.isOpen}
+        onClose={() => setMintNFTModal({ isOpen: false })}
+        onSuccess={(tokenId) => console.log("NFT minted:", tokenId)}
+        onGoEndorse={(personHash, versionIndex) => {
+          setMintNFTModal({ isOpen: false });
+          setEndorseModal({ isOpen: true, personHash, versionIndex });
+        }}
+        initialPersonHash={mintNFTModal.personHash}
+        initialVersionIndex={mintNFTModal.versionIndex}
+      />
 
-        <EndorseModal
-          isOpen={endorseModal.isOpen}
-          onClose={() => setEndorseModal({ isOpen: false })}
-          onSuccess={(result) => console.log("Endorsement submitted:", result)}
-          onMintNFT={(personHash, versionIndex) => {
-            setEndorseModal({ isOpen: false });
-            setMintNFTModal({ isOpen: true, personHash, versionIndex });
-          }}
-          initialPersonHash={endorseModal.personHash}
-          initialVersionIndex={endorseModal.versionIndex}
-        />
-    </PageContainer>
+      <EndorseModal
+        isOpen={endorseModal.isOpen}
+        onClose={() => setEndorseModal({ isOpen: false })}
+        onSuccess={(result) => console.log("Endorsement submitted:", result)}
+        onMintNFT={(personHash, versionIndex) => {
+          setEndorseModal({ isOpen: false });
+          setMintNFTModal({ isOpen: true, personHash, versionIndex });
+        }}
+        initialPersonHash={endorseModal.personHash}
+        initialVersionIndex={endorseModal.versionIndex}
+      />
+    </div>
   );
 }

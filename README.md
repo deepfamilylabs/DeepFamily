@@ -58,7 +58,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ### Family Inheritance
 
 - A public `shield` deposit places DEEP in a shared pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
-- Public `fundPublic` sends ordinary-wallet DEEP into that same pool and records a budget for the child's `personHash`, without a receive code or key registration. Identity, arrangement terms, deposits and claims are public. `claimPublic` checks the identity proof and current family eligibility, then moves matured budget value into the child's private balance.
+- The same `fund` action supports private receive-code delivery and public personHash addressing. Both spend donor VALUE and create BUDGET notes in the same tree. Public addressing discloses its recipient and budget terms without exposing private rule openings; `claim` keeps the input format hidden and encrypts the remainder and payout. Existing private owner binding remains intact.
 - A child proves current lineage eligibility and claims 1–12 complete 30-day periods from one or two compatible budgets into a private note. The remaining budgets are consolidated by that claim. Private transfers and a later public exit are separate transactions. Insufficient budgets do not consume a period.
 - Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. This feature distributes DEEP utility points and has no legal effect.
 
@@ -111,7 +111,7 @@ npm run setup           # Install dependencies
 npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
-npm run dev:deploy      # Check all 9 circuit artifacts and deploy the complete system
+npm run dev:deploy      # Check all 8 circuit artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts
@@ -145,24 +145,24 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers the two identity/disclosure circuits and all seven shielded circuits:
+The same `zk:*` workflow covers the two identity/disclosure circuits and all six shielded circuits:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:build`             | Compile all 9 circuits                                             |
-| `npm run zk:development:setup` | Generate development keys and verifiers for all 9 circuits         |
-| `npm run zk:production:setup`  | Generate production keys and verifiers for all 9 circuits          |
-| `npm run zk:check`             | Check all 9 circuit artifacts and available proof fixtures         |
-| `npm run zk:artifacts:check`   | Rebuild and validate all 9 circuit artifacts                       |
-| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 9 circuits            |
+| `npm run zk:build`             | Compile all 8 circuits                                             |
+| `npm run zk:development:setup` | Generate development keys and verifiers for all 8 circuits         |
+| `npm run zk:production:setup`  | Generate production keys and verifiers for all 8 circuits          |
+| `npm run zk:check`             | Check all 8 circuit artifacts and available proof fixtures         |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 8 circuit artifacts                       |
+| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 8 circuits            |
 
 Each Groth16 circuit has its own proving and verification keys. The unified production setup
-performs the required circuit-specific setup for all 9 circuits; it does not reuse another
+performs the required circuit-specific setup for all 8 circuits; it does not reuse another
 circuit's `.zkey`. Both development and production setup install shielded browser files under
 `frontend/public/zk/shielded/` and generated verifiers under `contracts/`, using the same static
 asset flow as identity/disclosure. Development artifacts remain explicitly marked as such;
-`npm run release:preflight` requires production evidence for all 9 circuits.
+`npm run release:preflight` requires production evidence for all 8 circuits.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -221,7 +221,7 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all 9 circuits,
+`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all 8 circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for

@@ -55,12 +55,12 @@ function writeFixture(root, { production = false } = {}) {
 }
 
 describe("current public shielded artifacts", function () {
-  it("checks the six candidate verifier files and all seven proof-artifact digests", function () {
+  it("checks the five candidate verifier files and all six proof-artifact digests", function () {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-rehearsal-test-"));
     try {
       const options = writeFixture(root);
       const candidate = loadCandidateArtifacts({ root, ...options });
-      assert.equal(Object.keys(candidate.circuits).length, 7);
+      assert.equal(Object.keys(candidate.circuits).length, 6);
       assert.equal(candidate.candidateClass, "development-only");
       for (const [action, entry] of Object.entries(candidate.circuits)) {
         assert.ok(entry.zkey.includes(path.join("frontend", "public", "zk", "shielded")));
@@ -140,7 +140,7 @@ describe("current public shielded artifacts", function () {
         });
         assert.equal(builds, 1);
         assert.equal(result.regenerated, false);
-        assert.equal(Object.keys(result.artifacts.circuits).length, 7);
+        assert.equal(Object.keys(result.artifacts.circuits).length, 6);
         assert.deepEqual(
           Object.values(result.artifacts.circuits).map((entry) =>
             sha256(fs.readFileSync(entry.zkey)),
