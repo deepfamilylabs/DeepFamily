@@ -13,7 +13,8 @@ import {
   getShieldedBudgetCommitments,
   deriveShieldedHeirKeyMaterial,
   encodeShieldedReceiveCode,
-  INHERITANCE_PERIOD_SECONDS,
+  DEFAULT_SHIELDED_PERIOD_DAYS,
+  SECONDS_PER_DAY,
   wrapIdentityCommitmentAsPersonHash,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
@@ -82,6 +83,8 @@ vi.mock("react-i18next", () => {
       hash?: string;
       period?: number;
       periods?: number;
+      days?: number | string;
+      date?: string;
     },
   ) => {
     if (key === "shielded.walletChanged" && mocks.walletChangedMessage) {
@@ -119,6 +122,18 @@ vi.mock("react-i18next", () => {
     }
     if (key === "shielded.claimOverview.claimable") {
       return `Claimable: ${options?.amount} DEEP / ${options?.periods} periods`;
+    }
+    if (key === "shielded.periodDaysSummary") {
+      return `Every ${options?.days} days`;
+    }
+    if (key === "shielded.claimPeriodDue") {
+      return `Due: ${options?.date}`;
+    }
+    if (key === "shielded.claimOverview.nextDue") {
+      return `Next due: ${options?.date}`;
+    }
+    if (key === "shielded.budgetOption") {
+      return `Budget ${options?.index}: ${options?.amount} DEEP / Every ${options?.days} days`;
     }
     return key;
   };
@@ -420,6 +435,7 @@ function budgetNote(commitment: bigint, overrides: Partial<BudgetPayload> = {}):
       heirOwnerCommitment: deriveShieldedHeirKeyMaterial(identity.derivedSecretField)
         .ownerCommitment,
       amountPerPeriod: 10n,
+      periodDays: 30n,
       remaining: 20n,
       nonce: commitment,
       ...overrides,
@@ -434,6 +450,7 @@ function policyDescriptor() {
     policySalt: 222n,
     allocationKey: 444n,
     amountPerPeriod: 10n,
+    periodDays: 30n,
   };
 }
 
@@ -696,7 +713,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     mocks.submitUnshield.mockResolvedValue({ receipt: { status: 1 }, transactionHash });
     mocks.findHeirLegitimacy.mockReturnValue([{ writtenAt: 0n }]);
     mocks.getBlock.mockResolvedValue({
-      timestamp: Number(1_000n + 2n * INHERITANCE_PERIOD_SECONDS),
+      timestamp: Number(1_000n + 2n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY)),
     });
   });
 
@@ -2027,7 +2044,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
   });
 
   it("automatically skips immature, underfunded, and revoked budgets when claiming inheritance", async () => {
-    const timestamp = Number(1_000n + 2n * INHERITANCE_PERIOD_SECONDS);
+    const timestamp = Number(1_000n + 2n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY));
     const recovered = walletSnapshot([
       budgetNote(1n, { eligibleFrom: BigInt(timestamp) }),
       budgetNote(2n, { remaining: 9n }),
@@ -2059,6 +2076,256 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
 
+  it.each([1, 7, 14, 21, 30, 90, 180, 365])(
+    "creates a first budget using the %s-day shortcut",
+    async (days) => {
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+      renderPanel();
+      await unlock();
+      fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+      await fillFundingRecipient(99n);
+      const interval = screen.getByRole("combobox", {
+        name: "shielded.fields.periodDays",
+      }) as HTMLSelectElement;
+      expect(interval.value).toBe("30");
+      expect(Array.from(interval.options, (option) => option.value)).toEqual([
+        "1",
+        "7",
+        "14",
+        "21",
+        "30",
+        "90",
+        "180",
+        "365",
+        "custom",
+      ]);
+      fireEvent.change(interval, { target: { value: days.toString() } });
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+        target: { value: "10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await screen.findByText("shielded.done");
+      expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+        expect.objectContaining({ periodDays: BigInt(days), amountPerPeriod: 10n }),
+      );
+      expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
+        expect.objectContaining({ policy: expect.objectContaining({ periodDays: BigInt(days) }) }),
+      );
+    },
+  );
+
+  it.each(["366", "4294967295"])(
+    "creates a budget with custom %s days without a one-year limit",
+    async (days) => {
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+      renderPanel();
+      await unlock();
+      fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+      await fillFundingRecipient(99n);
+      fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.periodDays" }), {
+        target: { value: "custom" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.customPeriodDays" }), {
+        target: { value: days },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+        target: { value: "10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await screen.findByText("shielded.done");
+      expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+        expect.objectContaining({ periodDays: BigInt(days) }),
+      );
+    },
+  );
+
+  it.each(["", "0", "-1", "1.5", "4294967296", "9007199254740993"])(
+    "rejects unsupported custom days %s before budget preparation",
+    async (days) => {
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+      renderPanel();
+      await unlock();
+      fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+      await fillFundingRecipient(99n);
+      fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.periodDays" }), {
+        target: { value: "custom" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.customPeriodDays" }), {
+        target: { value: days },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+        target: { value: "10" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await waitFor(() =>
+        expect(screen.getByRole("alert").textContent).toContain(
+          "inheritance.errors.periodDaysInvalid",
+        ),
+      );
+      expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
+      expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
+      expect(mocks.submitFundWithFreshLineage).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { draft: "shortcut", choice: "7", input: undefined, switchIdentity: false },
+    { draft: "custom", choice: "custom", input: "7", switchIdentity: true },
+    { draft: "invalid custom", choice: "custom", input: "0", switchIdentity: true },
+  ])("restores the default period after locking a $draft cycle draft", async (scenario) => {
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+    mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+    renderPanel();
+    await unlock();
+    chooseAction("fund");
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.periodDays" }), {
+      target: { value: scenario.choice },
+    });
+    if (scenario.input !== undefined) {
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.customPeriodDays" }), {
+        target: { value: scenario.input },
+      });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
+    expect(screen.queryByRole("combobox", { name: "shielded.fields.periodDays" })).toBeNull();
+
+    const nextIdentity = scenario.switchIdentity
+      ? {
+          ...identity,
+          derivedSecretField: "987",
+          identityCommitment: "654",
+          personHash: wrapIdentityCommitmentAsPersonHash(654n),
+        }
+      : identity;
+    const nextValue = valueNote(2n, 30n);
+    if (nextValue.note.kind !== "value") throw new Error("Value missing");
+    nextValue.note.ownerCommitment = deriveShieldedHeirKeyMaterial(
+      nextIdentity.derivedSecretField,
+    ).ownerCommitment;
+    mocks.deriveIdentityFromForm.mockResolvedValue(nextIdentity);
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([nextValue], nextIdentity));
+    mocks.loadLineageSnapshot.mockResolvedValue(
+      familySnapshot({ father: BigInt(nextIdentity.identityCommitment) }),
+    );
+    await unlock();
+    chooseAction("fund");
+    expect(
+      (screen.getByRole("combobox", { name: "shielded.fields.periodDays" }) as HTMLSelectElement)
+        .value,
+    ).toBe("30");
+    expect(screen.queryByRole("textbox", { name: "shielded.fields.customPeriodDays" })).toBeNull();
+    await fillFundingRecipient(99n);
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rootIdentityCommitment: BigInt(nextIdentity.identityCommitment),
+        periodDays: 30n,
+      }),
+    );
+    expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
+      expect.objectContaining({ policy: expect.objectContaining({ periodDays: 30n }) }),
+    );
+  });
+
+  it("shows the recovered arrangement's cycle as fixed during additional funding", async () => {
+    const policy = { ...policyDescriptor(), periodDays: 7n };
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+    mocks.listRecoveredShieldedPolicies.mockReturnValue([policy]);
+    mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+    renderPanel();
+    await unlock();
+    fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
+      target: {
+        value: computeShieldedPolicyCommitment({
+          ...policy,
+          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
+        }).toString(),
+      },
+    });
+    await fillFundingRecipient(99n);
+    expect(screen.getByText("Every 7 days")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "shielded.fields.periodDays" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "shielded.fields.customPeriodDays" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.createShieldedPolicyDescriptor).not.toHaveBeenCalled();
+    expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
+      expect.objectContaining({ policy: expect.objectContaining({ periodDays: 7n }) }),
+    );
+  });
+
+  it.each([1n, 7n, 365n])(
+    "shows due periods using a %s-day budget instead of a fixed 30-day period",
+    async (periodDays) => {
+      const start = 1_000n;
+      const dueAt = start + periodDays * SECONDS_PER_DAY;
+      mocks.getBlock.mockResolvedValue({ timestamp: Number(dueAt) });
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(
+        walletSnapshot([budgetNote(1n, { periodDays, remaining: 30n })]),
+      );
+      renderPanel();
+      await unlock();
+      const first = await screen.findByRole("checkbox", { name: "Period 1: 10 DEEP" });
+      expect(screen.queryByRole("checkbox", { name: "Period 2: 10 DEEP" })).toBeNull();
+      expect(first.closest("label")?.textContent).toContain(
+        new Date(Number(dueAt * 1000n)).toLocaleDateString(),
+      );
+      expect(
+        screen.getByText(
+          `Next due: ${new Date(Number((start + 2n * periodDays * SECONDS_PER_DAY) * 1000n)).toLocaleString()}`,
+        ),
+      ).toBeTruthy();
+    },
+  );
+
+  it("lists different claim intervals as distinct budgets with their own period choices", async () => {
+    mocks.getBlock.mockResolvedValue({ timestamp: Number(1_000n + 7n * SECONDS_PER_DAY) });
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(
+      walletSnapshot([
+        budgetNote(1n, { periodDays: 1n, remaining: 30n }),
+        budgetNote(2n, { periodDays: 7n, remaining: 20n }),
+      ]),
+    );
+    renderPanel();
+    await unlock();
+    await screen.findByRole("checkbox", { name: "Period 3: 10 DEEP" });
+    const budgets = screen.getByRole("combobox", {
+      name: "shielded.fields.budgetNote",
+    }) as HTMLSelectElement;
+    expect(Array.from(budgets.options, (option) => option.text)).toEqual([
+      "Budget 1: 30 DEEP / Every 1 days",
+      "Budget 2: 20 DEEP / Every 7 days",
+    ]);
+    fireEvent.change(budgets, { target: { value: budgets.options[1].value } });
+    expect(screen.getByRole("checkbox", { name: "Period 1: 10 DEEP" })).toBeTruthy();
+    expect(screen.queryByRole("checkbox", { name: "Period 2: 10 DEEP" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.prepareShieldedClaim).toHaveBeenCalledWith(
+      expect.objectContaining({ budgetCommitment: 2n, periodIndices: [0n] }),
+    );
+  });
+
+  it("renders an unavailable date label for long valid claim cycles", async () => {
+    mocks.getBlock.mockResolvedValue({ timestamp: 1_000 });
+    mocks.recoverLocalShieldedWallet.mockResolvedValue(
+      walletSnapshot([budgetNote(1n, { periodDays: 4_294_967_295n })]),
+    );
+    renderPanel();
+    await unlock();
+    await screen.findByText("Next due: shielded.dateOutOfRange");
+    expect(document.body.textContent).not.toContain("Invalid Date");
+    expect(screen.queryByRole("checkbox", { name: "Period 1: 10 DEEP" })).toBeNull();
+  });
+
   it("creates consecutive private arrangements with latest and explicit parent versions when no rule is recovered", async () => {
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
     mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
@@ -2076,6 +2343,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       rootVersionIndex: 7n,
       rootIdentityCommitment: 777n,
       amountPerPeriod: 10n,
+      periodDays: 30n,
     });
     expect(mocks.prepareShieldedFund).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -2100,6 +2368,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       rootVersionIndex: 3n,
       rootIdentityCommitment: 777n,
       amountPerPeriod: 10n,
+      periodDays: 30n,
     });
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
@@ -2134,7 +2403,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
   });
 
   it.each(["private", "public"])(
-    "rejects a manually pasted child from another family during %s funding",
+    "rejects a selected child whose eligibility is lost after refreshing during %s funding",
     async (mode) => {
       mocks.loadLineageSnapshot.mockResolvedValue(
         familySnapshot({
@@ -2142,7 +2411,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         }),
       );
       mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
-      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(222n));
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
       renderPanel();
       await unlock();
       fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
@@ -2151,21 +2420,29 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         fireEvent.click(screen.getByRole("radio", { name: "shielded.fundingModes.public" }));
       }
       await selectFundingChild(99n);
-      openOptions("shielded.recipientPicker.manual");
-      fireEvent.change(
-        screen.getByRole("textbox", { name: "shielded.recipientPicker.manualLabel" }),
-        {
-          target: { value: wrapIdentityCommitmentAsPersonHash(222n) },
-        },
-      );
       if (mode === "private") {
         fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
-          target: { value: receiveCodeFor(222n) },
+          target: { value: receiveCodeFor(99n) },
         });
       }
       fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
         target: { value: "10" },
       });
+      mocks.loadLineageSnapshot.mockResolvedValue(familySnapshot({ father: 444n, mother: 0n }));
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 30n)]));
+      fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
+      await waitFor(() =>
+        expect(
+          screen
+            .getByRole("combobox", { name: "shielded.fields.heirPersonHash" })
+            .querySelector(`option[value="${wrapIdentityCommitmentAsPersonHash(99n)}"]`),
+        ).toBeNull(),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "shielded.actions.recover" }).hasAttribute("disabled"),
+        ).toBe(false),
+      );
       fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
       await waitFor(() =>
         expect(screen.getByRole("alert").textContent).toContain(
@@ -2205,6 +2482,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       rootIdentityCommitment: 777n,
       rootVersionIndex: 7n,
       amountPerPeriod: 10n,
+      periodDays: 30n,
     });
     expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
       expect.objectContaining({ donorDerivedSecretField: identity.derivedSecretField }),
@@ -2274,6 +2552,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       rootIdentityCommitment: 777n,
       rootVersionIndex: 3n,
       amountPerPeriod: 10n,
+      periodDays: 30n,
     });
   });
 
@@ -2426,21 +2705,12 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         (option) => option.value,
       ),
     ).toEqual(["", wrapIdentityCommitmentAsPersonHash(99n)]);
-    openOptions("shielded.recipientPicker.manual");
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "shielded.recipientPicker.manualLabel" }),
-      {
-        target: { value: wrapIdentityCommitmentAsPersonHash(222n) },
-      },
-    );
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
       target: { value: receiveCodeFor(222n) },
     });
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain(
-        "shielded.recipientPicker.errors.notEligibleChild",
-      ),
+      expect(screen.getByRole("alert").textContent).toContain("shielded.recipientMismatch"),
     );
     expect(mocks.prepareShieldedFund).not.toHaveBeenCalled();
     expect(mocks.submitFund).not.toHaveBeenCalled();
@@ -2633,7 +2903,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
   it("claims the checked periods in increasing order and shows their selected amount", async () => {
     const recovered = walletSnapshot([budgetNote(1n, { remaining: 40n })]);
     mocks.getBlock.mockResolvedValue({
-      timestamp: Number(1_000n + 4n * INHERITANCE_PERIOD_SECONDS),
+      timestamp: Number(1_000n + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY)),
     });
     mocks.recoverLocalShieldedWallet.mockResolvedValue(recovered);
     renderPanel();
@@ -2689,7 +2959,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     const recovered = walletSnapshot([note]);
     spendClaimPeriod(recovered, note, 1n);
     mocks.getBlock.mockResolvedValue({
-      timestamp: Number(1_000n + 20n * INHERITANCE_PERIOD_SECONDS),
+      timestamp: Number(1_000n + 20n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY)),
     });
     mocks.recoverLocalShieldedWallet.mockResolvedValue(recovered);
     renderPanel();
@@ -2719,6 +2989,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     const second = budgetNote(2n, {
       policySalt: 223n,
       amountPerPeriod: 25n,
+      periodDays: 30n,
       remaining: 50n,
     });
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([first, second]));
@@ -2773,7 +3044,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     const claimable = budgetNote(1n);
     const immature = budgetNote(2n, {
       policySalt: 223n,
-      eligibleFrom: 1_000n + 2n * INHERITANCE_PERIOD_SECONDS,
+      eligibleFrom: 1_000n + 2n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
     });
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([claimable, immature]));
     renderPanel();
@@ -3072,7 +3343,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     renderPanel();
     await unlock();
     expect(await screen.findByText("Claimable: 20 DEEP / 2 periods")).toBeTruthy();
-    expect(screen.getByText("shielded.claimOverview.nextDue")).toBeTruthy();
+    expect(screen.getByText(/^Next due:/)).toBeTruthy();
     expect(screen.queryByRole("combobox", { name: "shielded.fields.budgetNote" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "shielded.fields.claimIndices" })).toBeNull();
     expect(screen.queryByText("shielded.claimOptions", { selector: "summary" })).toBeNull();
@@ -3084,7 +3355,10 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     mocks.recoverLocalShieldedWallet.mockResolvedValue(
       walletSnapshot([
         valueNote(1n, 0n),
-        budgetNote(2n, { remaining: 9n, eligibleFrom: 3n * INHERITANCE_PERIOD_SECONDS }),
+        budgetNote(2n, {
+          remaining: 9n,
+          eligibleFrom: 3n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
+        }),
       ]),
     );
     renderPanel();
@@ -3161,6 +3435,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         rootVersionIndex: privateNote.note.rootVersionIndex,
         heirIdentityCommitment: privateNote.note.heirIdentityCommitment,
         amountPerPeriod: privateNote.note.amountPerPeriod,
+        periodDays: 30n,
         eligibleFrom: privateNote.note.eligibleFrom,
         remaining: 30n,
         nonce: 1n,

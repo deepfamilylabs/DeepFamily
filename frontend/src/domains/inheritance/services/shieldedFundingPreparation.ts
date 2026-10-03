@@ -39,6 +39,7 @@ import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
+const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const PROOF_LIFETIME = 7200n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
@@ -112,11 +113,13 @@ export function createShieldedPolicyDescriptor(input: {
   rootIdentityCommitment: BigNumberish;
   rootVersionIndex: BigNumberish;
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
 }): ShieldedPolicyDescriptor {
   const policy = {
     rootIdentityCommitment: getBigInt(input.rootIdentityCommitment),
     rootVersionIndex: uint64(input.rootVersionIndex, "rootVersionIndex"),
     amountPerPeriod: uint128(input.amountPerPeriod, "amountPerPeriod"),
+    periodDays: positiveUint32(input.periodDays, "periodDays"),
     policySalt: generateShieldedRandomField(),
     allocationKey: generateShieldedRandomField(),
   };
@@ -165,6 +168,12 @@ export function prepareShieldedFund(
 function uint64(value: BigNumberish, name: string): bigint {
   const parsed = getBigInt(value);
   if (parsed < 0n || parsed > MAX_UINT64) throw new Error(`${name} must fit in uint64`);
+  return parsed;
+}
+
+function positiveUint32(value: BigNumberish, name: string): bigint {
+  const parsed = getBigInt(value);
+  if (parsed <= 0n || parsed > MAX_UINT32) throw new Error(`${name} must be a positive uint32`);
   return parsed;
 }
 
@@ -564,6 +573,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
           rootVersionIndex: policy.rootVersionIndex,
           heirIdentityCommitment: heir.identityCommitment,
           amountPerPeriod: policy.amountPerPeriod,
+          periodDays: policy.periodDays,
           eligibleFrom,
           policyCommitment,
           enrollmentCommitment,
@@ -578,6 +588,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
           eligibleFrom,
           heirOwnerCommitment: heir.ownerCommitment,
           amountPerPeriod: policy.amountPerPeriod,
+          periodDays: policy.periodDays,
           remaining: amount,
           nonce: generateShieldedRandomField(),
         };
@@ -618,6 +629,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     rootIdentityCommitment: String(policy.rootIdentityCommitment),
     rootVersionIndex: String(policy.rootVersionIndex),
     rate: String(policy.amountPerPeriod),
+    periodDays: String(policy.periodDays),
     policySalt: String(policy.policySalt),
     allocationKey: String(policy.allocationKey),
     allocationKeyCommitment: String(allocationKeyCommitment),
@@ -677,6 +689,7 @@ async function prepareContinuationFunding(
         };
   if (!ruleOpening) throw new Error("Identity budget funding needs its donor rule opening");
   const rate = uint128(old.amountPerPeriod, "rate");
+  const periodDays = positiveUint32(old.periodDays, "periodDays");
   const oldRemaining = uint128(old.remaining, "old remaining budget");
   if (rate === 0n || oldRemaining % rate !== 0n)
     throw new Error("Template budget has fractional periods");
@@ -703,6 +716,7 @@ async function prepareContinuationFunding(
     rootVersionIndex: old.rootVersionIndex,
     heirIdentityCommitment: old.heirIdentityCommitment,
     amountPerPeriod: old.amountPerPeriod,
+    periodDays,
     eligibleFrom: old.eligibleFrom,
     remaining: amount,
     nonce: generateShieldedRandomField(),
@@ -745,6 +759,7 @@ async function prepareContinuationFunding(
     rootIdentityCommitment: String(old.rootIdentityCommitment),
     rootVersionIndex: String(old.rootVersionIndex),
     rate: String(rate),
+    periodDays: String(periodDays),
     policySalt: String(ruleOpening.policySalt),
     allocationKeyCommitment: String(ruleOpening.allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),

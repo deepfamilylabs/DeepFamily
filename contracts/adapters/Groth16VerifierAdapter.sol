@@ -50,17 +50,7 @@ interface IGroth16Verifier12 {
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the twenty-six-signal funding circuit. */
-interface IGroth16Verifier26 {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[26] calldata publicSignals
-  ) external view returns (bool);
-}
-
-/** @dev Generated verifier interface for the twenty-seven-signal claim circuit. */
+/** @dev Generated verifier interface shared by the funding and claim circuits. */
 interface IGroth16Verifier27 {
   function verifyProof(
     uint256[2] calldata a,
@@ -206,11 +196,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       uint256[12] memory signals12;
       for (uint256 i = 0; i < length; ++i) signals12[i] = publicSignals[i];
       return IGroth16Verifier12(verifier).verifyProof(a, b, c, signals12);
-    }
-    if (length == 26) {
-      uint256[26] memory signals26;
-      for (uint256 i = 0; i < length; ++i) signals26[i] = publicSignals[i];
-      return IGroth16Verifier26(verifier).verifyProof(a, b, c, signals26);
     }
     uint256[27] memory signals27;
     for (uint256 i = 0; i < length; ++i) signals27[i] = publicSignals[i];

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedClaimBatch,
@@ -81,6 +81,90 @@ test("shielded claim constraints", async (t) => {
       return copy;
     };
 
+    await t.test(
+      "private and public claims mature exactly at each configured day cycle",
+      async () => {
+        for (const periodDays of [1n, 7n, 365n, (1n << 32n) - 1n]) {
+          for (const budgetKind of [0, 1]) {
+            const { witness } = buildShieldedClaimFixture({ periodDays, budgetKind });
+            assert.equal(
+              BigInt(witness.asOf) - BigInt(witness.eligibleFrom),
+              2n * periodDays * 86400n,
+            );
+            await valid(witness);
+            await invalid(
+              mutate(witness, (w) => {
+                w.asOf = (BigInt(w.asOf) - 1n).toString();
+              }),
+            );
+          }
+        }
+      },
+    );
+    await t.test(
+      "claim rejects zero, negative and overflowing cycles with matching commitments",
+      async () => {
+        for (const periodDays of [0n, -1n, 1n << 32n]) {
+          for (const budgetKind of [0, 1]) {
+            await invalid(buildShieldedClaimFixture({ periodDays, budgetKind }).witness);
+          }
+        }
+      },
+    );
+    await t.test("claim cannot shorten the cycle of either budget binding", async () => {
+      for (const budgetKind of [0, 1]) {
+        await invalid(
+          mutate(buildShieldedClaimFixture({ periodDays: 30n, budgetKind }).witness, (w) => {
+            w.periodDays = "1";
+          }),
+        );
+      }
+    });
+    await t.test(
+      "different cycles cannot be combined in either private or public input pair",
+      async () => {
+        for (const budgetKind of [0, 1]) {
+          for (const secondBudgetKind of [0, 1]) {
+            await invalid(
+              buildShieldedClaimFixture({
+                budgetKind,
+                secondBudgetKind,
+                periodDays: 30n,
+                secondPeriodDays: 7n,
+                secondRemainingPeriods: 2,
+              }).witness,
+            );
+          }
+        }
+      },
+    );
+    await t.test(
+      "the maximum uint64 index and uint32 cycle cannot wrap maturity into the past",
+      async () => {
+        const periodDays = (1n << 32n) - 1n;
+        const periodIndex = (1n << 64n) - 1n;
+        for (const budgetKind of [0, 1]) {
+          const { witness, policy } = buildShieldedClaimFixture({
+            claimCount: 1,
+            periodDays,
+            budgetKind,
+          });
+          const maturity = BigInt(witness.eligibleFrom) + (periodIndex + 1n) * periodDays * 86400n;
+          assert.ok(maturity > (1n << 64n) - 1n);
+          assert.ok(maturity < 1n << 113n);
+          witness.periodIndices[0] = periodIndex.toString();
+          witness.periodNullifiers[0] = poseidon4([
+            1017n,
+            BigInt(witness.derivedSecretField),
+            policy,
+            periodIndex,
+          ]).toString();
+          witness.asOf = ((1n << 64n) - 1n).toString();
+          await invalid(witness);
+        }
+      },
+    );
+
     await t.test("identity-only and mixed-budget claims preserve hidden input types", async () => {
       for (const budgetKind of [0, 1]) {
         await valid(buildShieldedClaimFixture({ budgetKind }).witness);
@@ -112,6 +196,7 @@ test("shielded claim constraints", async (t) => {
           "rootVersionIndex",
           "eligibleFrom",
           "rate",
+          "periodDays",
           "policyCommitmentInput",
           "enrollmentCommitmentInput",
         ]) {
@@ -164,13 +249,14 @@ test("shielded claim constraints", async (t) => {
           }
           await invalid(
             mutate(witness, (w) => {
-              const terms = poseidon6([
+              const terms = poseidon7([
                 1029n,
                 BigInt(w.fatherIdentityCommitment),
                 BigInt(w.rootVersionIndex),
                 fixture.heirIdentityCommitment,
                 BigInt(w.eligibleFrom),
                 BigInt(w.rate),
+                BigInt(w.periodDays),
               ]);
               w.outputCommitments[0] = poseidon8([
                 1030n,
@@ -201,6 +287,7 @@ test("shielded claim constraints", async (t) => {
           rootIdentityCommitment: witness.fatherIdentityCommitment,
           rootVersionIndex: witness.rootVersionIndex,
           amountPerPeriod: witness.rate,
+          periodDays: witness.periodDays,
           policySalt: witness.policySalt,
           allocationKeyCommitment: witness.allocationKeyCommitment,
         }),
@@ -256,6 +343,7 @@ test("shielded claim constraints", async (t) => {
           amountPerPeriod: witness.rate,
           remaining: witness.remaining,
           eligibleFrom: witness.eligibleFrom,
+          periodDays: witness.periodDays,
           now: witness.asOf,
           periodIndices: witness.periodIndices.slice(0, Number(witness.claimCount)),
         }),
@@ -508,6 +596,7 @@ test("shielded claim constraints", async (t) => {
             rootIdentityCommitment: w.fatherIdentityCommitment,
             rootVersionIndex: w.rootVersionIndex,
             amountPerPeriod: w.rate,
+            periodDays: w.periodDays,
             policySalt: w.policySalt,
             allocationKeyCommitment: w.allocationKeyCommitment,
           });

@@ -60,6 +60,7 @@ template ShieldedClaim() {
     signal input enrollmentSalt;
     signal input eligibleFrom;
     signal input rate;
+    signal input periodDays;
     signal input remaining;
     signal input remainingPeriods;
     signal input budgetNonce;
@@ -200,6 +201,11 @@ template ShieldedClaim() {
     component rateNotZero = IsZero();
     rateNotZero.in <== rate;
     rateNotZero.out === 0;
+    component periodDaysBits = Num2Bits(32);
+    periodDaysBits.in <== periodDays;
+    component periodDaysNotZero = IsZero();
+    periodDaysNotZero.in <== periodDays;
+    periodDaysNotZero.out === 0;
     component remainingBits = Num2Bits(128);
     remainingBits.in <== remaining;
     component remainingPeriodsBits = Num2Bits(64);
@@ -211,13 +217,14 @@ template ShieldedClaim() {
     component allocationKeyCommitmentNotZero = IsZero();
     allocationKeyCommitmentNotZero.in <== allocationKeyCommitment;
     requiresOpening * allocationKeyCommitmentNotZero.out === 0;
-    component policy = Poseidon(6);
+    component policy = Poseidon(7);
     policy.inputs[0] <== 1010;
     policy.inputs[1] <== rootIdentityCommitment;
     policy.inputs[2] <== rootVersionIndex;
     policy.inputs[3] <== rate;
     policy.inputs[4] <== policySalt;
     policy.inputs[5] <== allocationKeyCommitment;
+    policy.inputs[6] <== periodDays;
     component enrollment = Poseidon(5);
     enrollment.inputs[0] <== 1011;
     enrollment.inputs[1] <== policy.out;
@@ -232,6 +239,7 @@ template ShieldedClaim() {
     terms.heirIdentityCommitment <== heir.identityCommitment;
     terms.eligibleFrom <== eligibleFrom;
     terms.rate <== rate;
+    terms.periodDays <== periodDays;
     component ownerSecret = Poseidon(2);
     ownerSecret.inputs[0] <== 1012;
     ownerSecret.inputs[1] <== derivedSecretField;
@@ -353,10 +361,12 @@ template ShieldedClaim() {
         epochBits[i] = Num2Bits(64);
         epochBits[i].in <== periodIndices[i];
         (1 - active[i].out) * periodIndices[i] === 0;
-        // Period 0 matures exactly 30 days after the private qualification
-        // start; period k matures at eligibleFrom + (k + 1) * 30 days.
-        epochMature[i] = LessEqThan(87);
-        epochMature[i].in[0] <== eligibleFrom + (periodIndices[i] + 1) * 2592000;
+        // The 64-bit index plus one is at most 2^64; the positive uint32
+        // periodDays and 86400 seconds/day keep maturity below 2^113,
+        // including the uint64 eligibility start. This comparison therefore
+        // cannot wrap in the field or truncate a distant future maturity.
+        epochMature[i] = LessEqThan(113);
+        epochMature[i].in[0] <== eligibleFrom + (periodIndices[i] + 1) * periodDays * 86400;
         epochMature[i].in[1] <== asOf;
         active[i].out * (1 - epochMature[i].out) === 0;
         if (i > 0) {

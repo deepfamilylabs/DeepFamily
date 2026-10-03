@@ -142,7 +142,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
 
   /**
    * @notice Produces shielded output notes only; no ordinary wallet receives DEEP here.
-   * @dev The Claim circuit uses complete 30-day periods from the per-heir eligibility start.
+   * @dev The Claim circuit uses complete policy-bound day periods from each heir's eligibility start.
    *      The start is a private witness but is derivable from the initial fund's public asOf.
    *      The one-time initial enrollment tag prevents competing starts for a policy and heir.
    */
@@ -353,7 +353,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       6 +
         (inputs == 0 ? 0 : 2 * inputs + 2) +
         (isClaim ? 12 : 0) +
-        (action == Action.Fund ? 11 : 0) +
+        (action == Action.Fund ? 12 : 0) +
         (hasAmount ? 1 : 0) +
         (hasRecipient ? 1 : 0) +
         (hasLineage ? 3 : 0)
@@ -364,9 +364,9 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     if (action == Action.Fund) {
       signals[n++] = data.fundMode;
       signals[n++] = data.budgetKind;
-      uint256[9] memory budget = data.budgetKind == 1
+      uint256[10] memory budget = data.budgetKind == 1
         ? _publicBudgetFields(data.outputCiphertexts[0])
-        : [uint256(0), 0, 0, 0, 0, 0, 0, 0, 0];
+        : [uint256(0), 0, 0, 0, 0, 0, 0, 0, 0, 0];
       for (uint256 i = 0; i < budget.length; ++i) signals[n++] = budget[i];
     }
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputShardIds[i];
@@ -398,14 +398,14 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
    */
   function _publicBudgetFields(
     bytes calldata envelope
-  ) private pure returns (uint256[9] memory fields) {
+  ) private pure returns (uint256[10] memory fields) {
     if (
       envelope.length != CIPHERTEXT_BYTES ||
       bytes4(envelope[:4]) != 0x4446534e ||
       uint8(envelope[4]) != 1 ||
       uint8(envelope[5]) != 5
     ) revert InvalidCiphertext();
-    uint256[9] memory widths = [uint256(32), 8, 32, 16, 8, 32, 32, 16, 32];
+    uint256[10] memory widths = [uint256(32), 8, 32, 16, 8, 32, 32, 16, 32, 4];
     uint256 offset = 6;
     for (uint256 i = 0; i < fields.length; ++i) {
       uint256 value;
@@ -425,7 +425,8 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
       fields[5] == 0 ||
       fields[6] == 0 ||
       fields[7] == 0 ||
-      fields[8] == 0
+      fields[8] == 0 ||
+      fields[9] == 0
     ) revert InvalidFieldElement();
   }
 

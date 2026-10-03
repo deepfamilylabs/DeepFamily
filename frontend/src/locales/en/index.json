@@ -1097,7 +1097,8 @@
       "passphraseDisallowed": "The passphrase contains unsupported characters. Remove control or invisible characters.",
       "snapshotMismatch": "Family record verification failed. Refresh and try again.",
       "amountInvalid": "Enter a positive DEEP amount within the supported decimal precision.",
-      "periodsInvalid": "Enter a positive whole number of periods to fund."
+      "periodsInvalid": "Enter a positive whole number of periods to fund.",
+      "periodDaysInvalid": "Enter a whole number of days from 1 to 4294967295."
     }
   },
   "addVersion": {
@@ -1597,12 +1598,14 @@
       "valueNote": "Select balances",
       "budgetNote": "Select budget",
       "familyVersion": "Family record",
-      "rate": "Period allowance (DEEP / 30 days)",
+      "rate": "Period allowance (DEEP)",
       "heirPersonHash": "Select child",
       "periods": "Periods to fund",
       "transferAmount": "Amount (DEEP)",
       "exitRecipient": "Recipient wallet address",
-      "fundingRule": "Budget arrangement"
+      "fundingRule": "Budget arrangement",
+      "periodDays": "Claim interval",
+      "customPeriodDays": "Custom days"
     },
     "publicDepositHint": "The wallet address, amount and time are public.",
     "publicExitHint": "The recipient address and withdrawal amount are public.",
@@ -1678,10 +1681,10 @@
       "submitting": "Confirm the transaction in your wallet…",
       "confirming": "Waiting for transaction confirmation…"
     },
-    "fundingPreview": "{{amount}} DEEP · {{periods}} periods · {{rate}} DEEP each",
+    "fundingPreview": "{{amount}} DEEP · {{periods}} periods · {{rate}} DEEP every {{days}} days",
     "valueOption": "Balance {{index}} · {{amount}} DEEP",
-    "budgetOption": "Budget {{index}} · {{amount}} DEEP remaining",
-    "policyOption": "Arrangement {{index}} · {{identity}} · {{amount}} DEEP every 30 days",
+    "budgetOption": "Budget {{index}} · {{amount}} DEEP remaining · Every {{days}} days",
+    "policyOption": "Arrangement {{index}} · {{identity}} · {{amount}} DEEP every {{days}} days",
     "walletNotReady": "The wallet is not ready. Try again shortly.",
     "switchWalletPrompt": "Using the deposit wallet to pay later fees may link private actions. You can use another fee wallet.",
     "claimOverview": {
@@ -1700,12 +1703,11 @@
       "placeholder": "Select child",
       "emptyChildren": "No eligible children found",
       "childFallback": "Child {{index}}",
-      "manual": "Enter person hash manually",
-      "manualLabel": "Person hash",
+      "identityHash": "Person hash",
       "errors": {
         "loading": "Checking family records. Please wait.",
         "empty": "Choose a child.",
-        "invalidHash": "Enter a complete person hash.",
+        "invalidHash": "The child’s person hash is invalid. Choose again.",
         "notEligibleChild": "This identity does not meet this arrangement’s direct-child requirement."
       }
     },
@@ -1734,6 +1736,9 @@
     "singleValueSelectionHint": "Choose one balance that covers the amount.",
     "singleValueSelectionSummary": "Selected balance: {{amount}} DEEP",
     "singleSelectedValueUnavailable": "The selected balance is unavailable. Select another balance.",
-    "clearValueSelection": "Clear selection"
+    "clearValueSelection": "Clear selection",
+    "periodDaysSummary": "Every {{days}} days",
+    "customPeriodDays": "Custom days",
+    "dateOutOfRange": "Due date exceeds the display range"
   }
 }

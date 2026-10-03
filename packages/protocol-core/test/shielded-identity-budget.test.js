@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { keccak256 } from "ethers";
 import {
+  MAX_UINT32,
   SHIELDED_HPKE_MAX_PAYLOAD_BYTES,
   SHIELDED_POOL_ACTION,
   SNARK_SCALAR_FIELD,
@@ -39,6 +40,7 @@ const common = {
   rootVersionIndex: 2n,
   heirIdentityCommitment: 19n,
   amountPerPeriod: 100n,
+  periodDays: 30n,
   eligibleFrom: 2592001n,
   remaining: 1200n,
   nonce: 31n,
@@ -53,21 +55,21 @@ const budget = { binding: "identity", ...common, policyCommitment, enrollmentCom
 const privateBudget = { ...common, ...ruleOpening, heirOwnerCommitment: keys.ownerCommitment };
 const value = { ownerCommitment: keys.ownerCommitment, amount: 300n, nonce: 29n };
 
-test("new identity schema is compact and leaves the exact private encoding unchanged", () => {
+test("budget schemas include the period and compact owner version indices", () => {
   const payload = encodeShieldedBudgetNotePayload(budget);
-  assert.equal(payload.length, 214);
+  assert.equal(payload.length, 218);
   assert.equal(payload[5], 5);
   assert.equal(
     keccak256(payload),
-    "0x016d1329f89d488c439464ea528a2636c45a7d0b57770787c0c681fcd1d3dbff",
+    "0xca18ff8a190533df40d7bef048a5261358d22aaf6cfba67a496207f583036287",
   );
   assert.deepEqual(decodeShieldedNotePayload(payload), { kind: "budget", ...budget });
   const original = encodeShieldedBudgetNotePayload(privateBudget);
-  assert.equal(original.length, 302);
+  assert.equal(original.length, 282);
   assert.equal(original[5], 2);
   assert.equal(
     keccak256(original),
-    "0xb284504956b131aac51597f48425209c2abd3a7c699e06eda0ae574b1186aff6",
+    "0x9283dea34328c787f758ead88c5857da2ae17e90cef95447919a150533d7f779",
   );
   assert.deepEqual(
     encodeShieldedBudgetNotePayload({ ...privateBudget, binding: "owner" }),
@@ -79,14 +81,14 @@ test("new identity schema is compact and leaves the exact private encoding uncha
   });
   assert.equal(
     getShieldedBudgetCommitments(budget).termsCommitment,
-    9980545081748734662767974432142644277902528624697066622707057929322913558581n,
+    18664411621994028567957442538570721866363805221596590848676420505412992603713n,
   );
 });
 
 test("public envelope has no private opening or authorization fields and requires canonical padding", () => {
   const envelope = encodePublicShieldedBudgetEnvelope(budget);
   assert.equal(envelope.length, 512);
-  assert.ok(envelope.subarray(214).every((byte) => byte === 0));
+  assert.ok(envelope.subarray(218).every((byte) => byte === 0));
   assert.ok(isPublicShieldedBudgetEnvelope(envelope));
   assert.deepEqual(decodePublicShieldedBudgetEnvelope(envelope), { kind: "budget", ...budget });
   for (const field of [
@@ -135,7 +137,7 @@ test("identity commitment binds recipient, every term, amount and opaque rule co
   const result = computeShieldedNoteCommitmentFromPayload({ payload, ciphertextHashField });
   assert.equal(
     result.noteCommitment,
-    9262915699632282721577147844082196561357613697609114593894190525331603550321n,
+    8158071871983205273213242483776552632987958780144609461282783187639957943268n,
   );
   assert.deepEqual(
     verifyShieldedNotePayload({
@@ -150,6 +152,7 @@ test("identity commitment binds recipient, every term, amount and opaque rule co
     "rootVersionIndex",
     "heirIdentityCommitment",
     "amountPerPeriod",
+    "periodDays",
     "eligibleFrom",
     "policyCommitment",
     "enrollmentCommitment",
@@ -185,6 +188,9 @@ test("identity commitment binds recipient, every term, amount and opaque rule co
     result.noteCommitment,
   );
   for (const changed of [
+    { periodDays: undefined },
+    { periodDays: 0n },
+    { periodDays: MAX_UINT32 + 1n },
     { rootVersionIndex: 1n << 64n },
     { policyCommitment: SNARK_SCALAR_FIELD },
     { enrollmentCommitment: 0n },
@@ -207,19 +213,20 @@ test("identity budgets and donor backups fit HPKE and private openings stay in d
     };
     const memo = { ...value, fundingMemo };
     const payload = encodeShieldedValueNotePayload(memo);
-    assert.equal(payload.length, allocationKey === undefined ? 428 : 460);
+    assert.equal(payload.length, allocationKey === undefined ? 400 : 432);
     assert.ok(payload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
     assert.deepEqual(decodeShieldedNotePayload(payload), { kind: "value", ...memo });
     const ciphertext = await encryptShieldedNote({ recipientPublicKey, payload, ...context });
+    assert.equal(ciphertext.length, 512);
     const recovered = await decryptShieldedNote({ hpkeIkm: keys.hpkeIkm, ciphertext, ...context });
     assert.deepEqual(recovered, payload);
     assert.equal(decodePublicShieldedBudgetEnvelope(ciphertext), null);
     const badOpening = payload.slice();
-    badOpening.fill(0, 332, 364);
+    badOpening.fill(0, 304, 336);
     assert.deepEqual(decodeShieldedNotePayload(badOpening), { kind: "value", ...value });
     if (allocationKey !== undefined) {
       const badKey = payload.slice();
-      badKey.fill(255, 428);
+      badKey.fill(255, 400);
       assert.deepEqual(decodeShieldedNotePayload(badKey), {
         kind: "value",
         ...value,
@@ -263,6 +270,61 @@ test("identity budgets and donor backups fit HPKE and private openings stay in d
   );
 });
 
+test("compact identity donor memos recompute policy and reject changed rules against enrollment", () => {
+  const memo = {
+    ...value,
+    fundingMemo: { budgetCommitment: 71n, budgetNote: budget, ruleOpening, allocationKey: 41n },
+  };
+  const payload = encodeShieldedValueNotePayload(memo);
+  const recovered = decodeShieldedNotePayload(payload);
+  assert.equal(recovered.fundingMemo.budgetNote.policyCommitment, policyCommitment);
+  assert.equal(recovered.fundingMemo.budgetNote.enrollmentCommitment, enrollmentCommitment);
+  assert.equal(recovered.fundingMemo.budgetNote.periodDays, 30n);
+  assert.equal(payload.length, 432);
+
+  // Compact embedded schema omits policy; enrollment is the stored integrity anchor.
+  const budgetStart = 86 + 32;
+  const compactBudgetLength = 218 - 32;
+  for (const [offset, description] of [
+    [budgetStart + 6 + 31, "parent"],
+    [budgetStart + 6 + 32 + 7, "parent version"],
+    [budgetStart + 6 + 32 + 8 + 31, "child"],
+    [budgetStart + 6 + 32 + 8 + 32 + 15, "rate"],
+    [budgetStart + 6 + 32 + 8 + 32 + 16 + 7, "eligibility start"],
+    [budgetStart + compactBudgetLength - 1, "period days"],
+    [budgetStart + compactBudgetLength + 31, "policy salt"],
+    [budgetStart + compactBudgetLength + 32 + 31, "allocation key commitment"],
+    [budgetStart + compactBudgetLength + 64 + 31, "enrollment salt"],
+  ]) {
+    const changed = payload.slice();
+    changed[offset] ^= 1;
+    assert.deepEqual(decodeShieldedNotePayload(changed), { kind: "value", ...value }, description);
+  }
+  assert.throws(
+    () =>
+      encodeShieldedValueNotePayload({
+        ...memo,
+        fundingMemo: { ...memo.fundingMemo, budgetNote: { ...budget, periodDays: 1n } },
+      }),
+    (error) => error.code === "INVALID_SHIELDED_RULE_OPENING",
+  );
+});
+
+test("public budget envelope encodes the full uint32 period and rejects old payloads", () => {
+  const maximum = { ...budget, periodDays: MAX_UINT32 };
+  const envelope = encodePublicShieldedBudgetEnvelope(maximum);
+  assert.equal(envelope.length, 512);
+  assert.deepEqual(Array.from(envelope.subarray(214, 218)), [255, 255, 255, 255]);
+  assert.equal(getShieldedPublicBudgetFields(maximum)[9], MAX_UINT32);
+  assert.deepEqual(decodePublicShieldedBudgetEnvelope(envelope), { kind: "budget", ...maximum });
+  const old = envelope.slice();
+  old.fill(0, 214);
+  assert.throws(
+    () => decodePublicShieldedBudgetEnvelope(old),
+    (error) => error.code === "INVALID_SHIELDED_PERIOD",
+  );
+});
+
 test("public fund signal fields come from the canonical output while claim exposes no recipient or binding kind", () => {
   const envelope = encodePublicShieldedBudgetEnvelope(budget);
   const privateEnvelope = new Uint8Array(512).fill(0x22);
@@ -283,8 +345,8 @@ test("public fund signal fields come from the canonical output while claim expos
   };
   const { signals, witness } = buildShieldedPoolPublicInputs(base);
   const publicBudget = getShieldedPublicBudgetFields(budget);
-  assert.equal(signals.length, 26);
-  assert.deepEqual(signals.slice(0, 13), [1030n, 1n, 0n, 1n, ...publicBudget]);
+  assert.equal(signals.length, 27);
+  assert.deepEqual(signals.slice(0, 14), [1030n, 1n, 0n, 1n, ...publicBudget]);
   assert.deepEqual(witness.publicBudget, publicBudget.map(String));
   assert.throws(
     () => buildShieldedPoolPublicInputs({ ...base, publicBudget: [12n, ...publicBudget.slice(1)] }),

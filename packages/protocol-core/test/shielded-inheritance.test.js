@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  INHERITANCE_PERIOD_SECONDS,
+  SECONDS_PER_DAY,
+  MAX_UINT32,
   MAX_UINT64,
   MAX_UINT128,
   SHIELDED_CIPHERTEXT_BYTES,
@@ -24,7 +25,7 @@ import {
   generateShieldedRandomField,
 } from "../index.js";
 
-const P = INHERITANCE_PERIOD_SECONDS;
+const P = 30n * SECONDS_PER_DAY;
 const VECTOR_CIPHERTEXT = Uint8Array.from(
   { length: SHIELDED_CIPHERTEXT_BYTES },
   (_, index) => index & 255,
@@ -33,6 +34,7 @@ const policyInput = {
   rootIdentityCommitment: 11n,
   rootVersionIndex: 2n,
   amountPerPeriod: 100n,
+  periodDays: 30n,
   policySalt: 17n,
   allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n),
 };
@@ -83,11 +85,11 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
   );
   assert.equal(
     policyCommitment,
-    3897603553801422502043273171212827981912817414838535884542698774635475729990n,
+    19310841630603058484626458080449091643568779900304409563120868079775335987259n,
   );
   assert.equal(
     enrollmentCommitment,
-    1380203662798740573717870298545608105264465180351902836614265303100706701352n,
+    13747024855232904791225134773475486823701232574736745555382372597611173108911n,
   );
   assert.equal(
     valueNoteCommitment,
@@ -95,18 +97,18 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
   );
   assert.equal(
     budgetNoteCommitment,
-    19008509772000430992374370852921226317546218683189672857676162528366963759743n,
+    11489898753023386408650495576199234495025162531856392102048405137345752250676n,
   );
   assert.equal(
     computeShieldedSpendNullifier({
       ownerSecret: heir.ownerSecret,
       noteCommitment: budgetNoteCommitment,
     }),
-    9810254550271033599037501490165978434486073542269983724071702968983219012048n,
+    18054125844079294789351217663986402439494306560621950192468921510084785192514n,
   );
   assert.equal(
     computeShieldedPeriodNullifier({ derivedSecretField: 13n, policyCommitment, periodIndex: 4n }),
-    279178691955842504004116408907273125440019011800873272327166639580190000285n,
+    10121477007367674691819576106516151898893253406057278698084852191158785426676n,
   );
   assert.equal(
     computeShieldedDummyPeriodNullifier({
@@ -114,14 +116,14 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
       budgetNoteCommitment,
       slotIndex: 3n,
     }),
-    15486008269977869799066835044280556734625411998813900587497219572121352148138n,
+    20822359478869110524760714230431351480200856502910265011836758239763442378015n,
   );
   assert.equal(
     computeShieldedDummyInputNullifier({
       ownerSecret: heir.ownerSecret,
       noteCommitment: budgetNoteCommitment,
     }),
-    11547919785056721174303655617424566607719897835308992206915797098888494272232n,
+    16808997284876111345611160341347153695904743151047682072112147658006572974467n,
   );
   assert.equal(
     computeShieldedEnrollmentNullifier({
@@ -129,7 +131,7 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
       policyCommitment,
       heirIdentityCommitment: 19n,
     }),
-    12001897392482960812365406448463074777459291847217290518247189554253528529057n,
+    18663827911999272209578867059178806550412831640623847370024908588102964586674n,
   );
 });
 
@@ -221,7 +223,7 @@ test("funding uniqueness and read-only use tags keep separate purposes", () => {
 
 test("only full 30-day periods from private eligibility count and batches are all-or-nothing", () => {
   assert.equal(SHIELDED_MAX_BATCH_PERIODS, 12);
-  const base = { amountPerPeriod: 100n, remaining: 1200n, eligibleFrom: P + 1n };
+  const base = { amountPerPeriod: 100n, periodDays: 30n, remaining: 1200n, eligibleFrom: P + 1n };
   assert.deepEqual(computeShieldedClaimBatch({ ...base, now: 2n * P + 1n, periodIndices: [0n] }), {
     periodIndices: [0n],
     amount: 100n,
@@ -262,6 +264,78 @@ test("only full 30-day periods from private eligibility count and batches are al
         periodIndices: [0n, 1n],
       }),
     (error) => error.code === "INSUFFICIENT_SHIELDED_BUDGET",
+  );
+});
+
+test("each explicit day interval binds the policy and the per-heir period nullifier", () => {
+  const policies = new Set();
+  const nullifiers = new Set();
+  for (const periodDays of [1n, 2n, 3n, 7n, 14n, 21n, 30n, 365n, MAX_UINT32]) {
+    const policyCommitment = computeShieldedPolicyCommitment({ ...policyInput, periodDays });
+    policies.add(policyCommitment);
+    nullifiers.add(
+      computeShieldedPeriodNullifier({
+        derivedSecretField: 13n,
+        policyCommitment,
+        periodIndex: 0n,
+      }),
+    );
+    const duration = periodDays * SECONDS_PER_DAY;
+    const batch = {
+      amountPerPeriod: 100n,
+      remaining: 300n,
+      periodDays,
+      eligibleFrom: 7200n,
+      periodIndices: [0n],
+    };
+    assert.throws(
+      () => computeShieldedClaimBatch({ ...batch, now: batch.eligibleFrom + duration - 1n }),
+      (error) => error.code === "SHIELDED_PERIOD_NOT_DUE",
+    );
+    assert.deepEqual(computeShieldedClaimBatch({ ...batch, now: batch.eligibleFrom + duration }), {
+      periodIndices: [0n],
+      amount: 100n,
+      remaining: 200n,
+    });
+  }
+  assert.equal(policies.size, 9);
+  assert.equal(nullifiers.size, 9);
+});
+
+test("periods require explicit positive uint32 days and maturity never wraps uint64 time", () => {
+  const batch = {
+    amountPerPeriod: 100n,
+    remaining: 100n,
+    eligibleFrom: 0n,
+    now: MAX_UINT64,
+    periodIndices: [0n],
+  };
+  for (const periodDays of [undefined, 0n, -1n, 1.5, MAX_UINT32 + 1n]) {
+    assert.throws(() => computeShieldedPolicyCommitment({ ...policyInput, periodDays }));
+    assert.throws(() => computeShieldedClaimBatch({ ...batch, periodDays }));
+  }
+  const duration = MAX_UINT32 * SECONDS_PER_DAY;
+  assert.equal(
+    computeShieldedClaimBatch({
+      ...batch,
+      periodDays: MAX_UINT32,
+      eligibleFrom: MAX_UINT64 - duration,
+    }).amount,
+    100n,
+  );
+  assert.throws(
+    () =>
+      computeShieldedClaimBatch({
+        ...batch,
+        periodDays: MAX_UINT32,
+        eligibleFrom: MAX_UINT64 - duration + 1n,
+      }),
+    (error) => error.code === "SHIELDED_PERIOD_NOT_DUE",
+  );
+  assert.throws(
+    () =>
+      computeShieldedClaimBatch({ ...batch, periodDays: MAX_UINT32, periodIndices: [MAX_UINT64] }),
+    (error) => error.code === "SHIELDED_PERIOD_NOT_DUE",
   );
 });
 
@@ -323,6 +397,7 @@ test("field, uint128, randomness, and whole-period budget bounds are enforced", 
     () =>
       computeShieldedClaimBatch({
         amountPerPeriod: MAX_UINT128,
+        periodDays: 30n,
         remaining: MAX_UINT128,
         eligibleFrom: 0n,
         now: 2n * P,

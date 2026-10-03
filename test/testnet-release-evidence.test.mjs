@@ -351,7 +351,8 @@ const identityBudgetEvidence = (chainId) => {
   signals[10] = "125";
   signals[11] = "1500";
   signals[12] = "126";
-  signals[19] = "127";
+  signals[13] = "30";
+  signals[20] = "127";
   signals[signals.length - 1] = "0";
   fundProof.publicSignalsSha256 = createHash("sha256")
     .update(JSON.stringify(signals))
@@ -362,6 +363,7 @@ const identityBudgetEvidence = (chainId) => {
     budgetCommitment: "127",
     heirPersonHash: keccak256(toBeHex(123n, 32)),
     amountPerPeriod: "100",
+    periodDays: "30",
     eligibleFrom: "8200",
     remaining: "1500",
     fundProof,
@@ -514,6 +516,7 @@ const validReportTemplate = () => ({
       lineageDepth: 1,
       noteDepth: 1,
       eligibleFrom: "8200",
+      periodDays: "30",
       claimAsOf: String(8200 + 12 * 2_592_000),
     },
     receipts: {
@@ -1564,6 +1567,11 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         (report) => (report.shielded.scenario.identityBudget.amountPerPeriod = "101"),
         /identityBudget\.amountPerPeriod/iu,
       ],
+      [
+        (report) => (report.shielded.scenario.identityBudget.periodDays = "1"),
+        /identityBudget\.periodDays/iu,
+      ],
+      [(report) => (report.shielded.scenario.periodDays = "1"), /identityBudget\.periodDays/iu],
       [
         (report) => (report.shielded.scenario.identityBudget.remaining = "1100"),
         /identityBudget\.remaining/iu,

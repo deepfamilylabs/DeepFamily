@@ -247,6 +247,7 @@ export async function prepareShieldedClaim(
       "heirIdentityCommitment",
       "eligibleFrom",
       "amountPerPeriod",
+      "periodDays",
     ] as const) {
       if (secondBudget[field] !== budget[field])
         throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
@@ -285,6 +286,7 @@ export async function prepareShieldedClaim(
     throw new Error("Combined budget exceeds the period limit");
   const batch = computeShieldedClaimBatch({
     amountPerPeriod: budget.amountPerPeriod,
+    periodDays: budget.periodDays,
     remaining: combinedRemaining,
     eligibleFrom: budget.eligibleFrom,
     now: asOf,
@@ -435,6 +437,7 @@ export async function prepareShieldedClaim(
     enrollmentSalt: String(ownerBudget?.enrollmentSalt ?? 0n),
     eligibleFrom: String(budget.eligibleFrom),
     rate: String(budget.amountPerPeriod),
+    periodDays: String(budget.periodDays),
     remaining: String(budget.remaining),
     remainingPeriods: String(budget.remaining / budget.amountPerPeriod),
     budgetNonce: String(budget.nonce),

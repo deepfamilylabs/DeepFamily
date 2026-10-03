@@ -23,7 +23,7 @@ describe("shielded proof public inputs", () => {
     for (const [circuit, count] of [
       ["receiveCode", 4],
       ["shield", 7],
-      ["fund", 26],
+      ["fund", 27],
       ["claim", 27],
     ] as const) {
       expect(() =>

@@ -281,6 +281,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       rootVersionIndex: 1n,
       heirIdentityCommitment: 222n,
       amountPerPeriod: 10n,
+      periodDays: 7n,
       eligibleFrom: asOf + 7200n,
       policyCommitment: 333n,
       enrollmentCommitment: 444n,
@@ -303,7 +304,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       ...funding,
       outputCiphertexts: [hre.ethers.hexlify(bytes), funding.outputCiphertexts[1]],
     });
-    for (const offset of [0, 4, 5, 214, 511]) {
+    for (const offset of [0, 4, 5, 218, 511]) {
       const bytes = hre.ethers.getBytes(envelope);
       bytes[offset] ^= 1;
       await expect(pool.fund(replaceEnvelope(bytes), proof)).to.be.revertedWithCustomError(
@@ -314,6 +315,21 @@ describe("ShieldedDeepPool contract boundaries", function () {
     const wrongHeir = hre.ethers.hexlify(
       encodePublicShieldedBudgetEnvelope({ ...publicNote, heirIdentityCommitment: 223n }),
     );
+    const zeroPeriodBytes = hre.ethers.getBytes(envelope);
+    zeroPeriodBytes.fill(0, 214, 218);
+    await expect(pool.fund(replaceEnvelope(zeroPeriodBytes), proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidFieldElement",
+    );
+    const wrongPeriod = hre.ethers.hexlify(
+      encodePublicShieldedBudgetEnvelope({ ...publicNote, periodDays: 1n }),
+    );
+    await expect(
+      pool.fund(
+        { ...funding, outputCiphertexts: [wrongPeriod, funding.outputCiphertexts[1]] },
+        proof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
     await expect(
       pool.fund(
         { ...funding, outputCiphertexts: [wrongHeir, funding.outputCiphertexts[1]] },

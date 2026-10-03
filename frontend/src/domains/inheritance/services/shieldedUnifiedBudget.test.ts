@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { Interface, getBigInt, hexlify, type Contract } from "ethers";
 import {
-  INHERITANCE_PERIOD_SECONDS,
+  SECONDS_PER_DAY,
   computeIdentityFromDerivedSecret,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
@@ -91,7 +91,7 @@ function childIdentity(): IdentityMaterialV1Result {
   };
 }
 
-async function fixture() {
+async function fixture(periodDays = 30n) {
   const identity = childIdentity();
   const childIC = BigInt(identity.identityCommitment);
   const rootHash = wrapIdentityCommitmentAsPersonHash(rootIC).toLowerCase();
@@ -234,6 +234,7 @@ async function fixture() {
     rootIdentityCommitment: rootIC,
     rootVersionIndex: 1n,
     amountPerPeriod: 10n,
+    periodDays,
   });
   const childKeys = deriveShieldedHeirKeyMaterial(childSecret);
   const recipient = {
@@ -261,7 +262,7 @@ async function fixture() {
     record,
     getLogs,
     mature() {
-      now = initialTime + 7200n + 4n * INHERITANCE_PERIOD_SECONDS;
+      now = initialTime + 7200n + 4n * periodDays * SECONDS_PER_DAY;
     },
     get now() {
       return now;
@@ -270,103 +271,112 @@ async function fixture() {
 }
 
 describe("unified budget recovery and claims", () => {
-  it("funds an identity without a receive code, recovers it locally, claims privately and refills from donor backup", async () => {
-    const f = await fixture();
-    const funded = await prepareShieldedFund({
-      ...f.common,
-      fundMode: 0,
-      budgetKind: 1,
-      policy: f.policy,
-      lineage: f.lineage,
-      budgetPeriods: 5n,
-    });
-    checkWitness("fund", funded.witness);
-    expect(funded.data.budgetKind).toBe(1n);
-    expect(funded.witness.publicBudget).toHaveLength(9);
-    expect(funded.witness.heirOwnerCommitment).toBe("0");
-    expect(isPublicShieldedBudgetEnvelope(funded.outputs[0].ciphertext)).toBe(true);
-    expect(funded.outputs[0].note).not.toHaveProperty("policySalt");
-    f.record(funded);
-    const donor = await recoverLocalShieldedWallet(f.pool, {
-      derivedSecretField: donorSecret,
-      identityCommitment: rootIC,
-    });
-    const template = listRecoveredFundingTemplates(donor)[0];
-    expect(template.ruleOpening?.policySalt).toBe(f.policy.policySalt);
-    expect(listRecoveredShieldedPolicies(donor)).toEqual([f.policy]);
-    expect(donor.ownedNotes.has(funded.outputs[0].commitment)).toBe(false);
-    const child = await recoverLocalShieldedWallet(f.pool, f.identity);
-    expect(child.ownedNotes.has(funded.outputs[0].commitment)).toBe(true);
-    const wrongChild = await recoverLocalShieldedWallet(f.pool, {
-      derivedSecretField: 889n,
-      identityCommitment: 123n,
-    });
-    expect(wrongChild.ownedNotes.size).toBe(0);
-    for (const [filter] of f.getLogs.mock.calls as unknown as Array<[Record<string, unknown>]>) {
-      expect((filter.topics as unknown[]).length).toBe(1);
-      expect(filter).not.toHaveProperty("recipient");
-    }
-    f.mature();
-    const claimed = await prepareShieldedClaim({
-      chainId,
-      poolAddress,
-      identity: f.identity,
-      wallet: child,
-      lineage: f.lineage,
-      budgetCommitment: funded.outputs[0].commitment,
-      asOf: f.now,
-      periodIndices: [0n, 1n],
-    });
-    checkWitness("claim", claimed.witness);
-    expect(claimed.witness.budgetKind).toBe("1");
-    for (const name of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"])
-      expect(claimed.witness[name]).toBe("0");
-    expect(claimed.outputs[0].note.binding).toBe("identity");
-    expect(isPublicShieldedBudgetEnvelope(claimed.outputs[0].ciphertext)).toBe(false);
-    expect(claimed.outputs[1].note.ownerCommitment).toBe(f.childKeys.ownerCommitment);
-    f.record(claimed);
-    const afterClaim = await recoverLocalShieldedWallet(f.pool, f.identity);
-    const live = listUnspentRecoveredShieldedNotes(afterClaim, childSecret);
-    expect(live.find((entry) => entry.note.kind === "value")?.note).toMatchObject({ amount: 20n });
-    const recoveredDonor = await recoverLocalShieldedWallet(f.pool, {
-      derivedSecretField: donorSecret,
-      identityCommitment: rootIC,
-    });
-    const refill = await prepareShieldedFund({
-      ...f.common,
-      wallet: recoveredDonor,
-      donorCommitment: funded.outputs[1].commitment,
-      fundMode: 1,
-      budgetKind: 1,
-      budget: listRecoveredFundingTemplates(recoveredDonor)[0],
-      budgetPeriods: 3n,
-    });
-    checkWitness("fund", refill.witness);
-    expect(getShieldedBudgetCommitments(refill.outputs[0].note)).toEqual(
-      getShieldedBudgetCommitments(funded.outputs[0].note),
-    );
-    f.record(refill);
-    const replenished = await recoverLocalShieldedWallet(f.pool, f.identity);
-    const choice = selectClaimBudget(
-      listUnspentRecoveredShieldedNotes(replenished, childSecret),
-      replenished,
-      childSecret,
-      f.now,
-    );
-    expect(choice?.periodIndices).toEqual([2n, 3n]);
-    await expect(
-      prepareShieldedClaim({
+  it.each([1n, 7n, 365n])(
+    "funds a %s-day identity budget without a receive code, recovers it, claims privately and refills from donor backup",
+    async (periodDays) => {
+      const f = await fixture(periodDays);
+      const funded = await prepareShieldedFund({
+        ...f.common,
+        fundMode: 0,
+        budgetKind: 1,
+        policy: f.policy,
+        lineage: f.lineage,
+        budgetPeriods: 5n,
+      });
+      checkWitness("fund", funded.witness);
+      expect(funded.data.budgetKind).toBe(1n);
+      expect(funded.witness.publicBudget).toHaveLength(10);
+      expect((funded.witness.publicBudget as string[])[9]).toBe(periodDays.toString());
+      expect(funded.outputs[0].note.periodDays).toBe(periodDays);
+      expect(funded.witness.heirOwnerCommitment).toBe("0");
+      expect(isPublicShieldedBudgetEnvelope(funded.outputs[0].ciphertext)).toBe(true);
+      expect(funded.outputs[0].note).not.toHaveProperty("policySalt");
+      f.record(funded);
+      const donor = await recoverLocalShieldedWallet(f.pool, {
+        derivedSecretField: donorSecret,
+        identityCommitment: rootIC,
+      });
+      const template = listRecoveredFundingTemplates(donor)[0];
+      expect(template.ruleOpening?.policySalt).toBe(f.policy.policySalt);
+      expect(listRecoveredShieldedPolicies(donor)).toEqual([f.policy]);
+      expect(donor.ownedNotes.has(funded.outputs[0].commitment)).toBe(false);
+      const child = await recoverLocalShieldedWallet(f.pool, f.identity);
+      expect(child.ownedNotes.has(funded.outputs[0].commitment)).toBe(true);
+      const wrongChild = await recoverLocalShieldedWallet(f.pool, {
+        derivedSecretField: 889n,
+        identityCommitment: 123n,
+      });
+      expect(wrongChild.ownedNotes.size).toBe(0);
+      for (const [filter] of f.getLogs.mock.calls as unknown as Array<[Record<string, unknown>]>) {
+        expect((filter.topics as unknown[]).length).toBe(1);
+        expect(filter).not.toHaveProperty("recipient");
+      }
+      f.mature();
+      const claimed = await prepareShieldedClaim({
         chainId,
         poolAddress,
         identity: f.identity,
-        wallet: replenished,
+        wallet: child,
         lineage: f.lineage,
-        budgetCommitment: claimed.outputs[0].commitment,
+        budgetCommitment: funded.outputs[0].commitment,
         asOf: f.now,
-        periodIndices: [0n],
-      }),
-    ).rejects.toThrow("already");
-  });
+        periodIndices: [0n, 1n],
+      });
+      checkWitness("claim", claimed.witness);
+      expect(claimed.witness.budgetKind).toBe("1");
+      expect(claimed.witness.periodDays).toBe(periodDays.toString());
+      for (const name of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"])
+        expect(claimed.witness[name]).toBe("0");
+      expect(claimed.outputs[0].note.binding).toBe("identity");
+      expect(isPublicShieldedBudgetEnvelope(claimed.outputs[0].ciphertext)).toBe(false);
+      expect(claimed.outputs[1].note.ownerCommitment).toBe(f.childKeys.ownerCommitment);
+      f.record(claimed);
+      const afterClaim = await recoverLocalShieldedWallet(f.pool, f.identity);
+      const live = listUnspentRecoveredShieldedNotes(afterClaim, childSecret);
+      expect(live.find((entry) => entry.note.kind === "value")?.note).toMatchObject({
+        amount: 20n,
+      });
+      const recoveredDonor = await recoverLocalShieldedWallet(f.pool, {
+        derivedSecretField: donorSecret,
+        identityCommitment: rootIC,
+      });
+      const refill = await prepareShieldedFund({
+        ...f.common,
+        wallet: recoveredDonor,
+        donorCommitment: funded.outputs[1].commitment,
+        fundMode: 1,
+        budgetKind: 1,
+        budget: listRecoveredFundingTemplates(recoveredDonor)[0],
+        budgetPeriods: 3n,
+      });
+      checkWitness("fund", refill.witness);
+      expect(refill.outputs[0].note.periodDays).toBe(periodDays);
+      expect(getShieldedBudgetCommitments(refill.outputs[0].note)).toEqual(
+        getShieldedBudgetCommitments(funded.outputs[0].note),
+      );
+      f.record(refill);
+      const replenished = await recoverLocalShieldedWallet(f.pool, f.identity);
+      const choice = selectClaimBudget(
+        listUnspentRecoveredShieldedNotes(replenished, childSecret),
+        replenished,
+        childSecret,
+        f.now,
+      );
+      expect(choice?.periodIndices).toEqual([2n, 3n]);
+      await expect(
+        prepareShieldedClaim({
+          chainId,
+          poolAddress,
+          identity: f.identity,
+          wallet: replenished,
+          lineage: f.lineage,
+          budgetCommitment: claimed.outputs[0].commitment,
+          asOf: f.now,
+          periodIndices: [0n],
+        }),
+      ).rejects.toThrow("already");
+    },
+  );
 
   it("preserves receive-code authorization and owner-bound remainder in a mixed claim", async () => {
     const f = await fixture();
@@ -387,7 +397,7 @@ describe("unified budget recovery and claims", () => {
       lineage: f.lineage,
       budgetPeriods: 1n,
     });
-    expect(privateFund.witness.publicBudget).toEqual(Array(9).fill("0"));
+    expect(privateFund.witness.publicBudget).toEqual(Array(10).fill("0"));
     expect(isPublicShieldedBudgetEnvelope(privateFund.outputs[0].ciphertext)).toBe(false);
     f.record(privateFund);
     const donor = await recoverLocalShieldedWallet(f.pool, {

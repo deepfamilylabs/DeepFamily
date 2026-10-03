@@ -76,6 +76,72 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
     };
     const fixture = buildShieldedFundingFixtures();
 
+    await t.test("both funding modes bind arbitrary positive uint32 day periods", async () => {
+      for (const periodDays of [1n, 7n, 365n, (1n << 32n) - 1n]) {
+        for (const budgetKind of [0, 1]) {
+          const dayFixture = buildShieldedFundingFixtures({ periodDays, budgetKind });
+          await valid("fund", dayFixture.initial);
+          await valid("fund", dayFixture.continuation);
+          assert.equal(dayFixture.initial.periodDays, String(periodDays));
+          assert.equal(
+            dayFixture.initial.publicBudget[9],
+            budgetKind === 1 ? String(periodDays) : "0",
+          );
+        }
+      }
+    });
+    await t.test(
+      "fund rejects zero, negative and overflowing day periods with matching notes",
+      async () => {
+        for (const periodDays of [0n, -1n, 1n << 32n]) {
+          for (const budgetKind of [0, 1]) {
+            const dayFixture = buildShieldedFundingFixtures({ periodDays, budgetKind });
+            await invalid("fund", dayFixture.initial);
+            await invalid("fund", dayFixture.continuation);
+          }
+        }
+      },
+    );
+    await t.test(
+      "private funding keeps every recovery field, including its cycle, hidden",
+      async () => {
+        const witness = buildShieldedFundingFixtures({ periodDays: 7n }).initial;
+        assert.deepEqual(witness.publicBudget, Array(10).fill("0"));
+        for (let field = 0; field < witness.publicBudget.length; field += 1) {
+          await invalid(
+            "fund",
+            mutate(witness, (w) => {
+              w.publicBudget[field] = "1";
+            }),
+          );
+        }
+      },
+    );
+    await t.test(
+      "continuation cannot shorten a historical budget cycle even with matching new outputs",
+      async () => {
+        for (const oldBudgetKind of [0, 1]) {
+          for (const budgetKind of [0, 1]) {
+            const original = buildShieldedFundingFixtures({ periodDays: 30n, oldBudgetKind });
+            const changed = buildShieldedFundingFixtures({
+              periodDays: 7n,
+              budgetKind,
+              oldBudgetKind,
+            });
+            const attempted = changed.continuation;
+            attempted.inputRoots[1] = original.oldBudget.toString();
+            attempted.inputNullifiers[1] = poseidon4([
+              1026n,
+              BigInt(attempted.policySalt),
+              original.oldBudget,
+              BigInt(attempted.budgetUseNonce),
+            ]).toString();
+            await invalid("fund", attempted);
+          }
+        }
+      },
+    );
+
     await t.test(
       "public initial and all continuation binding pairs satisfy the same circuit",
       async () => {
@@ -97,8 +163,8 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
     await t.test("public funding binds every disclosed field and hides rule openings", async () => {
       const witness = buildShieldedFundingFixtures({ budgetKind: 1 }).initial;
       assert.equal(witness.heirOwnerCommitment, "0");
-      assert.equal(witness.publicBudget.length, 9);
-      for (let field = 0; field < 9; field++) {
+      assert.equal(witness.publicBudget.length, 10);
+      for (let field = 0; field < 10; field++) {
         await invalid(
           "fund",
           mutate(witness, (w) => {
@@ -393,7 +459,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       await invalid(
         "fund",
         mutate(fixture.continuation, (w) => {
-          w.eligibleFrom = (BigInt(w.eligibleFrom) - 2_592_000n).toString();
+          w.eligibleFrom = (BigInt(w.eligibleFrom) - BigInt(w.periodDays) * 86400n).toString();
         }),
       );
     });

@@ -11,7 +11,7 @@ template ShieldedFund() {
     signal input pool;
     signal input fundMode;
     signal input budgetKind;
-    signal input publicBudget[9];
+    signal input publicBudget[10];
     signal input inputShardIds[2];
     signal input inputRoots[2];
     signal input inputNullifiers[2];
@@ -31,6 +31,7 @@ template ShieldedFund() {
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input rate;
+    signal input periodDays;
     signal input policySalt;
     signal input allocationKey;
     signal input allocationKeyCommitment;
@@ -101,6 +102,7 @@ template ShieldedFund() {
     policy.rate <== rate;
     policy.policySalt <== policySalt;
     policy.allocationKeyCommitment <== allocationKeyCommitment;
+    policy.periodDays <== periodDays;
     component keyNotZero = IsZero();
     keyNotZero.in <== allocationKey;
     initial * keyNotZero.out === 0;
@@ -171,6 +173,7 @@ template ShieldedFund() {
     terms.heirIdentityCommitment <== heirIdentityCommitment;
     terms.eligibleFrom <== eligibleFrom;
     terms.rate <== rate;
+    terms.periodDays <== periodDays;
 
     initial * oldBudgetKind === 0;
     initial * oldHeirOwnerCommitment === 0;
@@ -265,6 +268,7 @@ template ShieldedFund() {
     publicBudget[6] === budgetKind * enrollment.commitment;
     publicBudget[7] === budgetKind * budgetAmount;
     publicBudget[8] === budgetKind * budgetNonce;
+    publicBudget[9] === budgetKind * periodDays;
     signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
     change.ownerCommitment <== donor.ownerCommitment;

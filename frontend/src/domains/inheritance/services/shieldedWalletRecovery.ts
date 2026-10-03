@@ -173,6 +173,7 @@ export async function recoverLocalShieldedWallet(
                   rootIdentityCommitment: budget.rootIdentityCommitment,
                   rootVersionIndex: budget.rootVersionIndex,
                   amountPerPeriod: budget.amountPerPeriod,
+                  periodDays: budget.periodDays,
                   policySalt: opening.policySalt,
                   allocationKey,
                 });

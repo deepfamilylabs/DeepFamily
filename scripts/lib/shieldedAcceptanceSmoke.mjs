@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAddress, getBytes, hexlify } from "ethers";
 import {
+  SECONDS_PER_DAY,
   buildShieldedPoolPublicInputs,
   buildShieldedReceiveCodePublicSignals,
   computeLineageEndorsementLeaf,
@@ -46,7 +47,8 @@ import { loadCandidateArtifacts } from "./shieldedArtifacts.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const PERIOD = 2_592_000n;
+const PERIOD_DAYS = 7n;
+const PERIOD = PERIOD_DAYS * SECONDS_PER_DAY;
 const ACTION_IDS = Object.fromEntries(
   Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [action, spec.actionId]),
 );
@@ -534,6 +536,7 @@ export async function runShieldedAcceptanceSmoke({
       rootIdentityCommitment,
       rootVersionIndex: 1n,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       policySalt,
       allocationKeyCommitment,
     };
@@ -593,6 +596,7 @@ export async function runShieldedAcceptanceSmoke({
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
       rate: String(rate),
+      periodDays: String(PERIOD_DAYS),
       policySalt: String(policySalt),
       heirIdentityCommitment: String(heirIdentityCommitment),
       heirOwnerCommitment: String(heirOwnerCommitment),
@@ -709,6 +713,7 @@ export async function runShieldedAcceptanceSmoke({
       rootVersionIndex: 1n,
       heirIdentityCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       eligibleFrom,
       policyCommitment,
       enrollmentCommitment,
@@ -860,6 +865,7 @@ export async function runShieldedAcceptanceSmoke({
         enrollmentSalt: String(enrollmentSalt),
         eligibleFrom: String(eligibleFrom),
         rate: String(rate),
+        periodDays: String(PERIOD_DAYS),
         hasSecondInput: "1",
         remaining: "1200",
         remainingPeriods: "12",
@@ -933,6 +939,7 @@ export async function runShieldedAcceptanceSmoke({
         enrollmentSalt: "0",
         eligibleFrom: String(eligibleFrom),
         rate: String(rate),
+        periodDays: String(PERIOD_DAYS),
         hasSecondInput: "0",
         remaining: "1500",
         remainingPeriods: "15",
@@ -1090,6 +1097,7 @@ export async function runShieldedAcceptanceSmoke({
         claimExecution: "verifier-call",
         claimCount: 12,
         claimAsOf: String(claimAsOf),
+        periodDays: String(PERIOD_DAYS),
         eligibleFrom: String(eligibleFrom),
         lineageDepth: Math.max(Number(endorsement.depth), Number(trusted.depth)),
         endorsementDepth: Number(endorsement.depth),
@@ -1101,6 +1109,7 @@ export async function runShieldedAcceptanceSmoke({
           budgetCommitment: String(publicBudget.commitment),
           heirPersonHash: childMaterial.personHash,
           amountPerPeriod: String(rate),
+          periodDays: String(PERIOD_DAYS),
           eligibleFrom: String(eligibleFrom),
           remaining: String(publicBudget.remaining),
           fundProof: publicFundProof.evidence,

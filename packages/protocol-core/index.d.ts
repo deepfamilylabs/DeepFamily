@@ -194,7 +194,8 @@ export const DOMAIN_LINEAGE_PARENTS: 1009n;
 export const LINEAGE_ENDORSEMENT_TREE_ID: 0;
 export const LINEAGE_TRUSTED_TREE_ID: 1;
 export const LINEAGE_TREE_MAX_DEPTH: 64;
-export const INHERITANCE_PERIOD_SECONDS: bigint;
+export const SECONDS_PER_DAY: bigint;
+export const DEFAULT_SHIELDED_PERIOD_DAYS: bigint;
 export const SNARK_SCALAR_FIELD: bigint;
 export const MAX_UINT8: bigint;
 export const MAX_UINT16: bigint;
@@ -639,6 +640,7 @@ export function computeShieldedPolicyCommitment(input: {
   rootIdentityCommitment: BigNumberish;
   rootVersionIndex: BigNumberish;
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
   policySalt: BigNumberish;
   allocationKeyCommitment: BigNumberish;
 }): bigint;
@@ -687,6 +689,7 @@ export function computeShieldedIdentityBudgetTermsCommitment(input: {
   heirIdentityCommitment: BigNumberish;
   eligibleFrom: BigNumberish;
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
 }): bigint;
 export function computeShieldedIdentityBudgetNoteCommitment(input: {
   policyCommitment: BigNumberish;
@@ -727,6 +730,7 @@ export function computeShieldedDummyInputNullifier(input: {
 }): bigint;
 export function computeShieldedClaimBatch(input: {
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
   remaining: BigNumberish;
   eligibleFrom: BigNumberish;
   now: BigNumberish;
@@ -766,12 +770,12 @@ export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND: 4;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND: 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
-export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 302;
-export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES: 214;
-export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES: 428;
-export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES: 460;
-export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 420;
-export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 452;
+export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 282;
+export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES: 218;
+export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES: 400;
+export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES: 432;
+export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 400;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 432;
 export interface ShieldedValueNotePayload {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
@@ -795,6 +799,7 @@ export interface ShieldedOwnerBudgetNotePayload {
   enrollmentSalt: BigNumberish;
   heirOwnerCommitment: BigNumberish;
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
   remaining: BigNumberish;
   nonce: BigNumberish;
 }
@@ -804,6 +809,7 @@ export interface ShieldedIdentityBudgetNotePayload {
   rootVersionIndex: BigNumberish;
   heirIdentityCommitment: BigNumberish;
   amountPerPeriod: BigNumberish;
+  periodDays: BigNumberish;
   eligibleFrom: BigNumberish;
   policyCommitment: BigNumberish;
   enrollmentCommitment: BigNumberish;
@@ -831,6 +837,7 @@ export interface ShieldedPolicyDescriptor {
   rootIdentityCommitment: bigint;
   rootVersionIndex: bigint;
   amountPerPeriod: bigint;
+  periodDays: bigint;
   policySalt: bigint;
   allocationKey: bigint;
 }

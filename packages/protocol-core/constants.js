@@ -58,7 +58,9 @@ export const DOMAIN_LINEAGE_PARENTS = 1009n;
 export const LINEAGE_ENDORSEMENT_TREE_ID = 0;
 export const LINEAGE_TRUSTED_TREE_ID = 1;
 export const LINEAGE_TREE_MAX_DEPTH = 64;
-export const INHERITANCE_PERIOD_SECONDS = 2_592_000n;
+export const SECONDS_PER_DAY = 86_400n;
+/** Initial UI selection only; every budget must explicitly specify its period. */
+export const DEFAULT_SHIELDED_PERIOD_DAYS = 30n;
 
 export const SNARK_SCALAR_FIELD = BigInt(
   "21888242871839275222246405745257275088548364400416034343698204186575808495617",

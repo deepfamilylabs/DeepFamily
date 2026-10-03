@@ -1,5 +1,5 @@
 // Shared positive fixtures for initial and continuation Fund modes.
-import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 
 const decimal = (value) => BigInt(value).toString();
@@ -7,11 +7,13 @@ const zeroes = () => Array(32).fill("0");
 
 export function buildShieldedFundingFixtures({
   donorAmount = 1000n,
+  periodDays = 30n,
   budgetKind = 0,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
 } = {}) {
-  const heir = buildShieldedClaimFixture();
+  periodDays = BigInt(periodDays);
+  const heir = buildShieldedClaimFixture({ periodDays });
   const donorOwnerSecret = 424242n;
   const donorOwnerCommitment = poseidon2([1013n, donorOwnerSecret]);
   donorAmount = BigInt(donorAmount);
@@ -31,13 +33,14 @@ export function buildShieldedFundingFixtures({
   const policySalt = 55555n;
   const allocationKey = 131313n;
   const allocationKeyCommitment = poseidon2([1028n, allocationKey]);
-  const policy = poseidon6([
+  const policy = poseidon7([
     1010n,
     rootIdentityCommitment,
     rootVersionIndex,
     rate,
     policySalt,
     allocationKeyCommitment,
+    periodDays,
   ]);
   const heirIdentityCommitment = heir.heirIdentityCommitment;
   const heirOwnerCommitment = budgetKind === 0 ? heir.ownerCommitment : 0n;
@@ -51,13 +54,14 @@ export function buildShieldedFundingFixtures({
     eligibleFrom,
     enrollmentSalt,
   ]);
-  const termsCommitment = poseidon6([
+  const termsCommitment = poseidon7([
     1029n,
     rootIdentityCommitment,
     rootVersionIndex,
     heirIdentityCommitment,
     eligibleFrom,
     rate,
+    periodDays,
   ]);
   const budgetPeriods = 4n;
   const fundedAmount = rate * budgetPeriods;
@@ -110,6 +114,7 @@ export function buildShieldedFundingFixtures({
     rootIdentityCommitment: decimal(rootIdentityCommitment),
     rootVersionIndex: decimal(rootVersionIndex),
     rate: decimal(rate),
+    periodDays: decimal(periodDays),
     policySalt: decimal(policySalt),
     allocationKeyCommitment: decimal(allocationKeyCommitment),
     heirIdentityCommitment: decimal(heirIdentityCommitment),
@@ -134,8 +139,9 @@ export function buildShieldedFundingFixtures({
             enrollment,
             fundedAmount,
             budgetNonce,
+            periodDays,
           ].map(decimal)
-        : Array(9).fill("0"),
+        : Array(10).fill("0"),
     chainId: "1030",
     pool: decimal(pool),
     inputShardIds: ["0", "0"],
