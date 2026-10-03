@@ -65,7 +65,7 @@ const INPUT_WIDTHS = Object.freeze({
   pool: 1,
   fundMode: 1,
   budgetKind: 1,
-  publicBudget: 9,
+  publicBudget: 10,
   inputShardId: 1,
   inputRoot: 1,
   inputShardIds: 2,
@@ -127,7 +127,7 @@ export function buildShieldedPoolPublicInputs(input) {
   );
   const budgetKind = bigintFrom(input.budgetKind ?? 0n, "budgetKind", 1n);
   if (action !== SHIELDED_POOL_ACTION.Fund) unused(budgetKind === 0n, "budgetKind");
-  let publicBudget = Array(9).fill(0n);
+  let publicBudget = Array(10).fill(0n);
   if (budgetKind === 1n) {
     const note = decodePublicShieldedBudgetEnvelope(input.outputCiphertexts[0]);
     protocolAssert(
@@ -138,7 +138,7 @@ export function buildShieldedPoolPublicInputs(input) {
     publicBudget = getShieldedPublicBudgetFields(note);
   }
   if (input.publicBudget !== undefined) {
-    const provided = values(input.publicBudget, 9, "publicBudget");
+    const provided = values(input.publicBudget, 10, "publicBudget");
     protocolAssert(
       provided.every((value, index) => value === publicBudget[index]),
       "INVALID_SHIELDED_PUBLIC_BUDGET",

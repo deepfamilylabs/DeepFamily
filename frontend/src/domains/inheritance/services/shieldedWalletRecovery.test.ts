@@ -50,6 +50,7 @@ async function fixture() {
     enrollmentSalt: 23n,
     heirOwnerCommitment: keys.ownerCommitment,
     amountPerPeriod: 100n,
+    periodDays: 30n,
     remaining: 1_200n,
     nonce: 31n,
   });
@@ -137,6 +138,7 @@ describe("local shielded wallet recovery", () => {
       enrollmentSalt: 23n,
       heirOwnerCommitment: heir.ownerCommitment,
       amountPerPeriod: 100n,
+      periodDays: 30n,
       remaining: 1_200n,
       nonce: 31n,
     };
@@ -215,6 +217,7 @@ describe("local shielded wallet recovery", () => {
         rootIdentityCommitment: budget.rootIdentityCommitment,
         rootVersionIndex: budget.rootVersionIndex,
         amountPerPeriod: budget.amountPerPeriod,
+        periodDays: 30n,
         policySalt: budget.policySalt,
         allocationKey: 41n,
       },

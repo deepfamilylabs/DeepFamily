@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   computeShieldedPeriodNullifier,
   getShieldedBudgetCommitments,
-  INHERITANCE_PERIOD_SECONDS,
+  DEFAULT_SHIELDED_PERIOD_DAYS,
+  SECONDS_PER_DAY,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import {
@@ -54,6 +55,7 @@ function budget(
       enrollmentSalt: 555n,
       heirOwnerCommitment: 666n,
       amountPerPeriod: 100n,
+      periodDays: 30n,
       remaining: 1_200n,
       nonce: commitment,
       ...overrides,
@@ -130,13 +132,28 @@ describe("automatic shielded claim selection", () => {
     const note = budget(1n, { remaining: 300n });
     const wallet = { spentNullifiers: new Set<bigint>() };
     expect(
-      selectClaimBudget([note], wallet, secret, eligibleFrom + INHERITANCE_PERIOD_SECONDS - 1n),
+      selectClaimBudget(
+        [note],
+        wallet,
+        secret,
+        eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY - 1n,
+      ),
     ).toBeUndefined();
     expect(
-      nextClaimPeriods(wallet, secret, note.note, eligibleFrom + INHERITANCE_PERIOD_SECONDS),
+      nextClaimPeriods(
+        wallet,
+        secret,
+        note.note,
+        eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY,
+      ),
     ).toEqual([0n]);
     expect(
-      nextClaimPeriods(wallet, secret, note.note, eligibleFrom + 5n * INHERITANCE_PERIOD_SECONDS),
+      nextClaimPeriods(
+        wallet,
+        secret,
+        note.note,
+        eligibleFrom + 5n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
+      ),
     ).toEqual([0n, 1n, 2n]);
   });
 
@@ -150,7 +167,7 @@ describe("automatic shielded claim selection", () => {
       [note],
       wallet,
       secret,
-      eligibleFrom + 5n * INHERITANCE_PERIOD_SECONDS,
+      eligibleFrom + 5n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
     );
     expect(selected?.budget).toBe(note);
     expect(selected?.periodIndices).toEqual([1n, 3n, 4n]);
@@ -164,7 +181,7 @@ describe("automatic shielded claim selection", () => {
       [first, second],
       { spentNullifiers: new Set() },
       secret,
-      eligibleFrom + 4n * INHERITANCE_PERIOD_SECONDS,
+      eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
     );
     expect(selected?.budget).toBe(first);
     expect(selected?.secondBudget).toBe(second);
@@ -174,7 +191,7 @@ describe("automatic shielded claim selection", () => {
         [first, second],
         { spentNullifiers: new Set() },
         secret,
-        eligibleFrom + INHERITANCE_PERIOD_SECONDS,
+        eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY,
       )?.secondBudget,
     ).toBeUndefined();
     expect(
@@ -182,7 +199,7 @@ describe("automatic shielded claim selection", () => {
         [first, budget(2n, { remaining: 200n, enrollmentSalt: 999n })],
         { spentNullifiers: new Set() },
         secret,
-        eligibleFrom + 4n * INHERITANCE_PERIOD_SECONDS,
+        eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
       )?.secondBudget,
     ).toBeUndefined();
   });
@@ -194,13 +211,13 @@ describe("automatic shielded claim selection", () => {
         { spentNullifiers: new Set() },
         secret,
         note.note,
-        eligibleFrom + 50n * INHERITANCE_PERIOD_SECONDS,
+        eligibleFrom + 50n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
       ),
     ).toEqual(Array.from({ length: 12 }, (_, index) => BigInt(index)));
   });
 
   it("finds a payable rule after exhausted, immature and fully claimed budgets", () => {
-    const now = eligibleFrom + 2n * INHERITANCE_PERIOD_SECONDS;
+    const now = eligibleFrom + 2n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY);
     const claimed = budget(2n, { policySalt: 999n, eligibleFrom: eligibleFrom - 1n });
     const payable = budget(4n);
     const wallet = {
@@ -220,7 +237,7 @@ describe("automatic shielded claim selection", () => {
   it("reports no payable selection when every due period is spent and explains manual failures", () => {
     const note = budget(1n);
     const wallet = { spentNullifiers: new Set([spentPeriod(note.note, 0n)]) };
-    const now = eligibleFrom + INHERITANCE_PERIOD_SECONDS;
+    const now = eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY;
     expect(selectClaimBudget([note], wallet, secret, now)).toBeUndefined();
     expect(() => nextClaimPeriods(wallet, secret, note.note, now)).toThrow(
       "No unclaimed due period",

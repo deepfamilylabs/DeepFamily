@@ -11,6 +11,7 @@ import hre from "hardhat";
 import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
 import { poseidon2, poseidon8 } from "poseidon-lite";
 import {
+  SECONDS_PER_DAY,
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_INPUTS,
   buildShieldedPoolPublicInputs,
@@ -51,7 +52,8 @@ import { SHIELDED_SETUP_CIRCUITS } from "../scripts/lib/shieldedProductionSetup.
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PUBLIC_ARTIFACTS = path.join(ROOT, "frontend", "public", "zk", "shielded");
 const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
-const PERIOD = 2_592_000n;
+const PERIOD_DAYS = 7n;
+const PERIOD = PERIOD_DAYS * SECONDS_PER_DAY;
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const zeroData = () => ({
   inputShardIds: [0n, 0n],
@@ -334,8 +336,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await pool.waitForDeployment();
     const poolAddress = await pool.getAddress();
     const chainId = (await hre.ethers.provider.getNetwork()).chainId;
-    const fixture = buildShieldedFundingFixtures({ budgetKind: 1 });
-    const claimant = buildShieldedClaimFixture({ budgetKind: 1, claimCount: 1 });
+    const fixture = buildShieldedFundingFixtures({ periodDays: PERIOD_DAYS, budgetKind: 1 });
+    const claimant = buildShieldedClaimFixture({
+      periodDays: PERIOD_DAYS,
+      budgetKind: 1,
+      claimCount: 1,
+    });
     const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
     const donorOwner = computeShieldedOwnerCommitment(donorSecret);
     const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x9876", 32));
@@ -390,6 +396,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
       heirIdentityCommitment: claimant.heirIdentityCommitment,
       amountPerPeriod: 100n,
+      periodDays: PERIOD_DAYS,
       eligibleFrom,
     };
     const opening = {
@@ -479,8 +486,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
             }),
       };
       const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
-      assert.equal(inputs.signals.length, 26);
+      assert.equal(inputs.signals.length, 27);
       const base = buildShieldedFundingFixtures({
+        periodDays: PERIOD_DAYS,
         budgetKind: kind,
         oldBudgetKind: template?.kind ?? kind,
       });
@@ -569,6 +577,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
       assert.equal(inputs.signals.length, 27);
       const base = buildShieldedClaimFixture({
+        periodDays: PERIOD_DAYS,
         budgetKind: first.kind,
         secondBudgetKind: second?.kind ?? 0,
         claimCount: 1,
@@ -722,6 +731,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       this.skip();
     }
     const { witness, inputBudget, heirIdentityCommitment } = buildShieldedClaimFixture({
+      periodDays: PERIOD_DAYS,
       claimCount: 12,
       remainingPeriods: 12,
     });
@@ -1038,9 +1048,16 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await token.approve(poolAddress, 2000n);
     await (await pool.shield(2000n, shieldData, shieldProof)).wait();
 
-    const fundingFixture = buildShieldedFundingFixtures({ donorAmount: 2000n });
+    const fundingFixture = buildShieldedFundingFixtures({
+      periodDays: PERIOD_DAYS,
+      donorAmount: 2000n,
+    });
     const allocationWitness = fundingFixture.initial;
-    const claimFixture = buildShieldedClaimFixture({ claimCount: 12, remainingPeriods: 12 });
+    const claimFixture = buildShieldedClaimFixture({
+      periodDays: PERIOD_DAYS,
+      claimCount: 12,
+      remainingPeriods: 12,
+    });
     const heirKeys = deriveShieldedHeirKeyMaterial(claimFixture.witness.derivedSecretField);
     assert.equal(heirKeys.ownerCommitment, BigInt(allocationWitness.heirOwnerCommitment));
     const heirViewingKey = await deriveShieldedViewPublicKey(heirKeys.hpkeIkm);
@@ -1054,6 +1071,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       rootIdentityCommitment,
       rootVersionIndex,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       policySalt,
       allocationKeyCommitment,
     });
@@ -1084,6 +1102,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentSalt,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 1200n,
       nonce: budgetNonce,
     });
@@ -1096,6 +1115,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentCommitment,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 1200n,
       nonce: budgetNonce,
       ciphertextHashField: encryptedBudget.ciphertextHashField,
@@ -1175,6 +1195,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentSalt,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 300n,
       nonce: additionalFundingBudgetNonce,
     });
@@ -1187,6 +1208,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentCommitment,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 300n,
       nonce: additionalFundingBudgetNonce,
       ciphertextHashField: encryptedAdditionalFundingBudget.ciphertextHashField,
@@ -1329,6 +1351,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         enrollmentSalt,
         heirOwnerCommitment,
         amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
         remaining,
         nonce: nextBudgetNonce,
       });
@@ -1341,6 +1364,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         enrollmentCommitment,
         heirOwnerCommitment,
         amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
         remaining,
         nonce: nextBudgetNonce,
         ciphertextHashField: nextBudgetCiphertext.ciphertextHashField,
@@ -1393,6 +1417,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         ...claimData,
       });
       const baseWitness = buildShieldedClaimFixture({
+        periodDays: PERIOD_DAYS,
         claimCount: count,
         remainingPeriods: 12,
         secondRemainingPeriods: useSecond ? 3 : 0,
@@ -1477,6 +1502,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentSalt,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 100n,
       nonce: 221n,
     });
@@ -1489,6 +1515,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       enrollmentCommitment,
       heirOwnerCommitment,
       amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
       remaining: 100n,
       nonce: 221n,
       ciphertextHashField: continuedBudget.ciphertextHashField,
@@ -1774,9 +1801,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       pool,
       "NullifierAlreadySpent",
     );
-    expect(() => buildShieldedClaimFixture({ claimCount: 13, remainingPeriods: 13 })).to.throw(
-      RangeError,
-    );
+    expect(() =>
+      buildShieldedClaimFixture({ periodDays: PERIOD_DAYS, claimCount: 13, remainingPeriods: 13 }),
+    ).to.throw(RangeError);
     console.log(
       `local Hardhat gas (not release evidence): fundInitial=${fundReceipt.gasUsed} fundContinuation=${additionalFundingReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
     );

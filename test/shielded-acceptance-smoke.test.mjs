@@ -75,12 +75,15 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.receiveCode.verified, true);
     assert.equal(result.proofs.claim.execution, "verifier-call");
     assert.equal(result.scenario.claimCount, 12);
+    assert.equal(result.scenario.periodDays, "7");
     assert.equal(result.scenario.recoveredNotes, result.scenario.recoveryEventCount);
     assert.equal(result.scenario.totalShieldedAfter, "3400");
     assert.equal(result.scenario.poolTokenAfter, "3400");
     assert.equal(result.scenario.identityBudget.claimProof.execution, "verifier-call");
     assert.equal(result.scenario.identityBudget.fundingLabel, "shielded-action-fund-identity");
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[3], "1");
+    assert.equal(result.scenario.identityBudget.periodDays, "7");
+    assert.equal(result.scenario.identityBudget.fundProof.publicSignals[13], "7");
     assert.deepEqual(
       result.scenario.identityBudget.claimProof.publicSignals.slice(8, 20),
       result.proofs.claim.publicSignals.slice(8, 20),

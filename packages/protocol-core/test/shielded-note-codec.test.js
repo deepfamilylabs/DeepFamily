@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  MAX_UINT32,
+  MAX_UINT64,
   SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES,
   SHIELDED_HPKE_MAX_PAYLOAD_BYTES,
   SHIELDED_VALUE_NOTE_PAYLOAD_BYTES,
@@ -32,6 +34,7 @@ const budget = {
   enrollmentSalt: 23n,
   heirOwnerCommitment: keys.ownerCommitment,
   amountPerPeriod: 100n,
+  periodDays: 30n,
   remaining: 1200n,
   nonce: 31n,
 };
@@ -170,10 +173,36 @@ test("budget codec rejects zero rates, fractional periods and oversized counts",
   );
 });
 
+test("budget payloads require explicit day periods and uint64 version indices", () => {
+  for (const periodDays of [undefined, 0n, -1n, 1.5, MAX_UINT32 + 1n]) {
+    assert.throws(() => encodeShieldedBudgetNotePayload({ ...budget, periodDays }));
+  }
+  const largest = { ...budget, periodDays: MAX_UINT32, rootVersionIndex: MAX_UINT64 };
+  const payload = encodeShieldedBudgetNotePayload(largest);
+  assert.deepEqual(decodeShieldedNotePayload(payload), { kind: "budget", ...largest });
+  assert.throws(
+    () => encodeShieldedBudgetNotePayload({ ...budget, rootVersionIndex: MAX_UINT64 + 1n }),
+    (error) => error.code === "INTEGER_OUT_OF_RANGE",
+  );
+  const missingPeriod = payload.slice();
+  missingPeriod.fill(0, payload.length - 4);
+  assert.throws(
+    () => decodeShieldedNotePayload(missingPeriod),
+    (error) => error.code === "INVALID_SHIELDED_PERIOD",
+  );
+  // The retired 302-byte budget has neither the compact version field nor the day period.
+  const oldLength = new Uint8Array(302);
+  oldLength.set(payload);
+  assert.throws(
+    () => decodeShieldedNotePayload(oldLength),
+    (error) => error.code === "INVALID_SHIELDED_NOTE_LENGTH",
+  );
+});
+
 test("donor-only rule backup fits the fixed envelope and never becomes a note", () => {
   const ruleMemo = { ...memoValue, fundingMemo: { ...memoValue.fundingMemo, allocationKey: 41n } };
   const payload = encodeShieldedValueNotePayload(ruleMemo);
-  assert.equal(payload.length, 452);
+  assert.equal(payload.length, 432);
   assert.ok(payload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
   assert.deepEqual(decodeShieldedNotePayload(payload), { kind: "value", ...ruleMemo });
   const malformedKey = payload.slice();

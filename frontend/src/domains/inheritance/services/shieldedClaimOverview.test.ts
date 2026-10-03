@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   computeShieldedPeriodNullifier,
   getShieldedBudgetCommitments,
-  INHERITANCE_PERIOD_SECONDS,
+  DEFAULT_SHIELDED_PERIOD_DAYS,
+  SECONDS_PER_DAY,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { ShieldedSelectableBudgetNote } from "./shieldedActionSelection";
@@ -11,7 +12,7 @@ import { getShieldedClaimOverview, listShieldedClaimBudgetOptions } from "./shie
 type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget"; binding?: "owner" }>;
 const secret = "987654321";
 const start = 1_000n;
-const period = INHERITANCE_PERIOD_SECONDS;
+const period = DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY;
 
 function budget(
   commitment: bigint,
@@ -37,6 +38,7 @@ function budget(
       enrollmentSalt: 555n,
       heirOwnerCommitment: 666n,
       amountPerPeriod: 100n,
+      periodDays: 30n,
       remaining: 300n,
       nonce: commitment,
       ...overrides,
@@ -56,6 +58,62 @@ function spent(
 }
 
 describe("shielded claim overview", () => {
+  it.each([1n, 7n, 365n])(
+    "uses a %s-day note for due periods and the next funded date",
+    (periodDays) => {
+      const note = budget(1n, { periodDays });
+      const wallet = { spentNullifiers: new Set<bigint>() };
+      const seconds = periodDays * SECONDS_PER_DAY;
+      const before = getShieldedClaimOverview([note], wallet, secret, start + seconds - 1n);
+      expect(before.status).toBe("notDue");
+      expect(before.nextDueAt).toBe(start + seconds);
+      const firstDue = getShieldedClaimOverview([note], wallet, secret, start + seconds);
+      expect(firstDue.claim?.periodIndices).toEqual([0n]);
+      expect(firstDue.nextDueAt).toBe(start + 2n * seconds);
+    },
+  );
+
+  it("keeps different day intervals in separate budget groups", () => {
+    const wallet = { spentNullifiers: new Set<bigint>() };
+    const notes = [budget(1n, { periodDays: 1n }), budget(2n, { periodDays: 7n })];
+    const groups = listShieldedClaimBudgetOptions(
+      notes,
+      wallet,
+      secret,
+      start + 7n * SECONDS_PER_DAY,
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups[0].overview.claim?.periodIndices).toEqual([0n, 1n, 2n]);
+    expect(groups[1].overview.claim?.periodIndices).toEqual([0n]);
+  });
+
+  it("keeps a valid long cycle's due timestamp exact even beyond browser date limits", () => {
+    const periodDays = 4_294_967_295n;
+    const overview = getShieldedClaimOverview(
+      [budget(1n, { periodDays })],
+      { spentNullifiers: new Set() },
+      secret,
+      start,
+    );
+    expect(overview.status).toBe("notDue");
+    expect(overview.nextDueAt).toBe(start + periodDays * SECONDS_PER_DAY);
+  });
+
+  it.each([0n, -1n, 4_294_967_296n, undefined])(
+    "does not silently recover unsupported cycle %s as 30 days",
+    (periodDays) => {
+      const malformed = budget(1n, { periodDays } as Partial<BudgetPayload>);
+      expect(
+        getShieldedClaimOverview(
+          [malformed],
+          { spentNullifiers: new Set() },
+          secret,
+          start + period,
+        ).status,
+      ).toBe("noFunds");
+    },
+  );
+
   it("shows the first future due date without counting funds as claimable early", () => {
     const note = budget(1n);
     const result = getShieldedClaimOverview(
@@ -223,6 +281,7 @@ describe("shielded claim budget options", () => {
         heirIdentityCommitment: privateNote.note.heirIdentityCommitment,
         eligibleFrom: privateNote.note.eligibleFrom,
         amountPerPeriod: privateNote.note.amountPerPeriod,
+        periodDays: 30n,
         remaining: 100n,
         nonce: 2n,
       },

@@ -81,6 +81,7 @@ template ShieldedPrivatePolicy() {
     signal input rate;
     signal input policySalt;
     signal input allocationKeyCommitment;
+    signal input periodDays;
     signal output commitment;
 
     component rootNotZero = IsZero();
@@ -99,13 +100,19 @@ template ShieldedPrivatePolicy() {
     component keyCommitmentNotZero = IsZero();
     keyCommitmentNotZero.in <== allocationKeyCommitment;
     keyCommitmentNotZero.out === 0;
-    component policy = Poseidon(6);
+    component periodDaysBits = Num2Bits(32);
+    periodDaysBits.in <== periodDays;
+    component periodDaysNotZero = IsZero();
+    periodDaysNotZero.in <== periodDays;
+    periodDaysNotZero.out === 0;
+    component policy = Poseidon(7);
     policy.inputs[0] <== 1010;
     policy.inputs[1] <== rootIdentityCommitment;
     policy.inputs[2] <== rootVersionIndex;
     policy.inputs[3] <== rate;
     policy.inputs[4] <== policySalt;
     policy.inputs[5] <== allocationKeyCommitment;
+    policy.inputs[6] <== periodDays;
     commitment <== policy.out;
 }
 
@@ -152,7 +159,7 @@ template ShieldedDonorChange() {
 }
 
 // The binding selector is committed in the domain and the third binding field.
-// Private kind 0 preserves the exact historical owner-bound note preimage.
+// Private kind 0 binds the owner's spending commitment and private policy.
 // Identity kind 1 binds all public terms without exposing private openings.
 template ShieldedBoundBudgetCommitment() {
     signal input budgetKind;
@@ -185,13 +192,15 @@ template ShieldedIdentityBudgetTerms() {
     signal input heirIdentityCommitment;
     signal input eligibleFrom;
     signal input rate;
+    signal input periodDays;
     signal output commitment;
-    component terms = Poseidon(6);
+    component terms = Poseidon(7);
     terms.inputs[0] <== 1029;
     terms.inputs[1] <== rootIdentityCommitment;
     terms.inputs[2] <== rootVersionIndex;
     terms.inputs[3] <== heirIdentityCommitment;
     terms.inputs[4] <== eligibleFrom;
     terms.inputs[5] <== rate;
+    terms.inputs[6] <== periodDays;
     commitment <== terms.out;
 }

@@ -115,7 +115,7 @@ function lineage(identity: IdentityMaterialV1Result): LineageSnapshot {
   };
 }
 
-async function fixture(remaining = 1_200n, amountPerPeriod = 100n) {
+async function fixture(remaining = 1_200n, amountPerPeriod = 100n, periodDays = 30n) {
   const identity = identityMaterial();
   const keys = deriveShieldedHeirKeyMaterial(derivedSecretField);
   const note = {
@@ -128,6 +128,7 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n) {
     enrollmentSalt: 444n,
     heirOwnerCommitment: keys.ownerCommitment,
     amountPerPeriod,
+    periodDays,
     remaining,
     nonce: 555n,
   } satisfies ShieldedOwnerBudgetNotePayload;
@@ -231,6 +232,28 @@ async function addSecondBudget(
 }
 
 describe("local shielded claim preparation", () => {
+  it.each([1n, 7n, 365n])(
+    "claims on a %s-day schedule only when a complete period has elapsed",
+    async (periodDays) => {
+      const input = await fixture(1_200n, 100n, periodDays);
+      const dueAt = eligibleFrom + periodDays * 86_400n;
+      await expect(prepareShieldedClaim({ ...input, asOf: dueAt - 1n })).rejects.toThrow();
+      const prepared = await prepareShieldedClaim({ ...input, asOf: dueAt });
+      expect(prepared.amount).toBe(100n);
+      expect(prepared.witness.periodDays).toBe(periodDays.toString());
+      expect(prepared.outputs[0].note.periodDays).toBe(periodDays);
+      expect(prepared.outputs[0].note.eligibleFrom).toBe(eligibleFrom);
+    },
+  );
+
+  it("does not combine budgets with different claim intervals", async () => {
+    const input = await fixture(1_200n, 100n, 7n);
+    const secondBudgetCommitment = await addSecondBudget(input, { periodDays: 1n });
+    await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
+      "must share policy",
+    );
+  });
+
   it("builds exact fixed public inputs and encrypted continuation/payout notes", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedClaim(input);

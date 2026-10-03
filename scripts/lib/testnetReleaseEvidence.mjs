@@ -5,7 +5,11 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { keccak256, toBeHex } from "ethers";
 
-import { SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS } from "@deepfamily/protocol-core";
+import {
+  SECONDS_PER_DAY,
+  MAX_UINT32,
+  SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
+} from "@deepfamily/protocol-core";
 import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 import {
   MINIMUM_MULTI_PARTY_CONTRIBUTORS,
@@ -1401,7 +1405,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(identityFundSignals[2], "1", "identityBudget additional fund mode");
   requireExact(identityFundSignals[3], "1", "identityBudget identity binding");
   requireExact(
-    identityFundSignals[19],
+    identityFundSignals[20],
     identityBudget.budgetCommitment,
     "identityBudget budget commitment",
   );
@@ -1414,6 +1418,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["amountPerPeriod", 7],
     ["eligibleFrom", 8],
     ["remaining", 11],
+    ["periodDays", 13],
   ]) {
     const value = identityBudget[name];
     if (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(value))
@@ -1428,6 +1433,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   )
     throw new Error("identityBudget cannot cover twelve periods");
   requireExact(identityBudget.eligibleFrom, scenario.eligibleFrom, "identityBudget.eligibleFrom");
+  requireExact(identityBudget.periodDays, scenario.periodDays, "identityBudget.periodDays");
   requireExact(
     identityClaimSignals.at(-1),
     proofs.claim.publicSignals.at(-1),
@@ -1482,7 +1488,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     proofs.claim.publicSignals.at(-1),
     "shielded.scenario.claimAsOf",
   );
-  if (BigInt(scenario.claimAsOf) < eligibleFrom + 12n * 2592000n)
+  if (typeof scenario.periodDays !== "string" || !/^[1-9][0-9]*$/u.test(scenario.periodDays))
+    throw new Error("shielded.scenario.periodDays must be a positive canonical decimal");
+  const periodDays = BigInt(scenario.periodDays);
+  if (periodDays > MAX_UINT32) throw new Error("shielded.scenario.periodDays must fit in uint32");
+  if (BigInt(scenario.claimAsOf) < eligibleFrom + 12n * periodDays * SECONDS_PER_DAY)
     throw new Error("shielded claim proof does not mature twelve periods");
   const receipts = requireRecord(evidence.receipts, "shielded.receipts");
   requireExact(receipts.rpcChecks, "passed", "shielded.receipts.rpcChecks");

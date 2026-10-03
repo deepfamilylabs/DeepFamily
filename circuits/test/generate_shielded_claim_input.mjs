@@ -1,13 +1,15 @@
 // Isolated fixture for shielded_claim.circom. It deliberately does not modify
 // the reviewed production ZK artifact manifest or verifier assets.
-import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
 
-const PERIOD = 2_592_000n;
+const SECONDS_PER_DAY = 86400n;
 const decimal = (value) => BigInt(value).toString();
 
 export function buildShieldedClaimFixture({
   claimCount = 2,
+  periodDays = 30n,
+  secondPeriodDays = periodDays,
   budgetKind = 0,
   secondBudgetKind = budgetKind,
   remainingPeriods = 3,
@@ -16,6 +18,8 @@ export function buildShieldedClaimFixture({
   if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 12) {
     throw new RangeError("claimCount fixture must be 1..12");
   }
+  periodDays = BigInt(periodDays);
+  secondPeriodDays = BigInt(secondPeriodDays);
   const lineage = buildLineageFixture().witness;
   const derivedSecret = BigInt(lineage.derivedSecretField);
   const ownerSecret = poseidon2([1012n, derivedSecret]);
@@ -45,13 +49,14 @@ export function buildShieldedClaimFixture({
   const payoutNonce = 123456n;
   const budgetOutputCiphertextHash = 44444n;
   const payoutOutputCiphertextHash = 33333n;
-  const policy = poseidon6([
+  const policy = poseidon7([
     1010n,
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     rate,
     policySalt,
     allocationKeyCommitment,
+    periodDays,
   ]);
   const enrollment = poseidon5([
     1011n,
@@ -60,13 +65,14 @@ export function buildShieldedClaimFixture({
     eligibleFrom,
     enrollmentSalt,
   ]);
-  const termsCommitment = poseidon6([
+  const termsCommitment = poseidon7([
     1029n,
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     heirIdentityCommitment,
     eligibleFrom,
     rate,
+    periodDays,
   ]);
   const inputBudget = poseidon8([
     budgetKind === 0 ? 1015n : 1030n,
@@ -83,11 +89,36 @@ export function buildShieldedClaimFixture({
   const secondRemaining = rate * secondPeriodCount;
   const secondBudgetNonce = hasSecondInput ? 22222n : 0n;
   const secondBudgetCiphertextHash = hasSecondInput ? 11111n : 0n;
+  const secondPolicy = poseidon7([
+    1010n,
+    rootIdentityCommitment,
+    BigInt(lineage.rootVersionIndex),
+    rate,
+    policySalt,
+    allocationKeyCommitment,
+    secondPeriodDays,
+  ]);
+  const secondEnrollment = poseidon5([
+    1011n,
+    secondPolicy,
+    heirIdentityCommitment,
+    eligibleFrom,
+    enrollmentSalt,
+  ]);
+  const secondTermsCommitment = poseidon7([
+    1029n,
+    rootIdentityCommitment,
+    BigInt(lineage.rootVersionIndex),
+    heirIdentityCommitment,
+    eligibleFrom,
+    rate,
+    secondPeriodDays,
+  ]);
   const secondBudget = poseidon8([
     secondBudgetKind === 0 ? 1015n : 1030n,
-    policy,
-    enrollment,
-    secondBudgetKind === 0 ? ownerCommitment : termsCommitment,
+    secondPolicy,
+    secondEnrollment,
+    secondBudgetKind === 0 ? ownerCommitment : secondTermsCommitment,
     rate,
     secondRemaining,
     secondBudgetNonce,
@@ -97,7 +128,7 @@ export function buildShieldedClaimFixture({
   const periodIndices = Array.from({ length: 12 }, (_, slot) =>
     slot < claimCount ? BigInt(slot) : 0n,
   );
-  const asOf = eligibleFrom + claimCountBigInt * PERIOD;
+  const asOf = eligibleFrom + claimCountBigInt * periodDays * SECONDS_PER_DAY;
   const periodNullifiers = periodIndices.map((index, slot) =>
     slot < claimCount
       ? poseidon4([1017n, derivedSecret, policy, index])
@@ -172,6 +203,7 @@ export function buildShieldedClaimFixture({
     enrollmentSalt: requiresOpening ? decimal(enrollmentSalt) : "0",
     eligibleFrom: decimal(eligibleFrom),
     rate: decimal(rate),
+    periodDays: decimal(periodDays),
     remaining: decimal(remaining),
     remainingPeriods: decimal(remainingPeriodCount),
     budgetNonce: decimal(budgetNonce),

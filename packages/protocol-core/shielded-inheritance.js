@@ -1,8 +1,9 @@
 import { keccak256, toBeHex, zeroPadValue } from "ethers";
-import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon6, poseidon8 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { asUint8Array, bigintFrom, bytesToHex } from "./bytes.js";
 import {
-  INHERITANCE_PERIOD_SECONDS,
+  SECONDS_PER_DAY,
+  MAX_UINT32,
   MAX_UINT64,
   MAX_UINT128,
   SNARK_SCALAR_FIELD,
@@ -43,6 +44,12 @@ function nonzeroField(value, label) {
   const result = field(value, label);
   protocolAssert(result !== 0n, "ZERO_SHIELDED_SECRET", `${label} must be nonzero`);
   return result;
+}
+
+function periodDays(value) {
+  const days = bigintFrom(value, "periodDays", MAX_UINT32);
+  protocolAssert(days !== 0n, "INVALID_SHIELDED_PERIOD", "periodDays must be a positive integer");
+  return days;
 }
 
 function nonzeroAmount(value, label) {
@@ -87,13 +94,14 @@ export function computeShieldedCiphertextHashField(ciphertext) {
 
 /** One unpredictable policy salt separates policies with the same public family/rate. */
 export function computeShieldedPolicyCommitment(input) {
-  return poseidon6([
+  return poseidon7([
     SHIELDED_INHERITANCE_DOMAINS.policy,
     nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
     uint64(input.rootVersionIndex, "rootVersionIndex"),
     nonzeroAmount(input.amountPerPeriod, "amountPerPeriod"),
     nonzeroField(input.policySalt, "policySalt"),
     nonzeroField(input.allocationKeyCommitment, "allocationKeyCommitment"),
+    periodDays(input.periodDays),
   ]);
 }
 
@@ -202,17 +210,18 @@ export function computeShieldedBudgetNoteCommitment(input) {
 
 /** Public addressing binds the recipient and terms without revealing private rule openings. */
 export function computeShieldedIdentityBudgetTermsCommitment(input) {
-  return poseidon6([
+  return poseidon7([
     SHIELDED_INHERITANCE_DOMAINS.identityBudgetTerms,
     nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
     uint64(input.rootVersionIndex, "rootVersionIndex"),
     nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
     uint64(input.eligibleFrom, "eligibleFrom"),
     nonzeroAmount(input.amountPerPeriod, "amountPerPeriod"),
+    periodDays(input.periodDays),
   ]);
 }
 
-/** An identity-bound budget is domain-separated from the unchanged owner-bound budget. */
+/** An identity-bound budget uses a distinct domain from owner-bound budgets. */
 export function computeShieldedIdentityBudgetNoteCommitment(input) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   const remaining = uint128(input.remaining, "remaining");
@@ -320,6 +329,7 @@ export function computeShieldedClaimBatch(input) {
     "SHIELDED_PERIOD_COUNT_OVERFLOW",
     "remaining exceeds the circuit's 64-bit period count",
   );
+  const duration = periodDays(input.periodDays) * SECONDS_PER_DAY;
   const now = uint64(input.now, "now");
   const eligibleFrom = uint64(input.eligibleFrom, "eligibleFrom");
   protocolAssert(
@@ -334,7 +344,7 @@ export function computeShieldedClaimBatch(input) {
   );
   for (let index = 0; index < periods.length; index += 1) {
     protocolAssert(
-      eligibleFrom + (periods[index] + 1n) * INHERITANCE_PERIOD_SECONDS <= now,
+      eligibleFrom + (periods[index] + 1n) * duration <= now,
       "SHIELDED_PERIOD_NOT_DUE",
       "Claim period is not yet due",
     );

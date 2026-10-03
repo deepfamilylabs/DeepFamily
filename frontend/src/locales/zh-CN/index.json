@@ -1097,7 +1097,8 @@
       "passphraseDisallowed": "口令包含不支持的字符，请移除控制字符或不可见字符。",
       "snapshotMismatch": "家族记录校验失败，请刷新后重试。",
       "amountInvalid": "请输入大于 0 且符合 DEEP 小数精度的金额。",
-      "periodsInvalid": "存入期数须为正整数。"
+      "periodsInvalid": "存入期数须为正整数。",
+      "periodDaysInvalid": "领取周期须为 1 至 4294967295 的整数天数。"
     }
   },
   "addVersion": {
@@ -1597,12 +1598,14 @@
       "valueNote": "选择余额",
       "budgetNote": "选择预算",
       "familyVersion": "家族记录",
-      "rate": "每期额度（DEEP / 30 天）",
+      "rate": "每期额度（DEEP）",
       "heirPersonHash": "选择子女",
       "periods": "存入期数",
       "transferAmount": "金额（DEEP）",
       "exitRecipient": "收款钱包地址",
-      "fundingRule": "预算安排"
+      "fundingRule": "预算安排",
+      "periodDays": "领取周期",
+      "customPeriodDays": "自定义天数"
     },
     "publicDepositHint": "钱包地址、金额和时间会公开。",
     "publicExitHint": "收款地址和转出金额会公开。",
@@ -1678,10 +1681,10 @@
       "submitting": "请在钱包中确认交易…",
       "confirming": "正在等待交易确认…"
     },
-    "fundingPreview": "存入 {{amount}} DEEP · {{periods}} 期 · 每期 {{rate}} DEEP",
+    "fundingPreview": "{{amount}} DEEP · {{periods}} 期 · 每 {{days}} 天 {{rate}} DEEP",
     "valueOption": "第 {{index}} 笔余额 · {{amount}} DEEP",
-    "budgetOption": "预算 {{index}} · 余额 {{amount}} DEEP",
-    "policyOption": "安排 {{index}} · {{identity}} · 每 30 天 {{amount}} DEEP",
+    "budgetOption": "预算 {{index}} · 剩余 {{amount}} DEEP · 每 {{days}} 天",
+    "policyOption": "安排 {{index}} · {{identity}} · 每 {{days}} 天 {{amount}} DEEP",
     "walletNotReady": "钱包尚未就绪，请稍后重试。",
     "switchWalletPrompt": "使用同一钱包转入和支付后续手续费，可能关联私密操作。可更换手续费钱包。",
     "claimOverview": {
@@ -1700,12 +1703,11 @@
       "placeholder": "选择子女",
       "emptyChildren": "没有符合条件的子女",
       "childFallback": "子女 {{index}}",
-      "manual": "手动输入身份哈希",
-      "manualLabel": "身份哈希",
+      "identityHash": "身份哈希",
       "errors": {
         "loading": "正在核对家族记录，请稍后。",
         "empty": "请选择子女。",
-        "invalidHash": "请输入完整的身份哈希。",
+        "invalidHash": "子女身份哈希无效，请重新选择。",
         "notEligibleChild": "该身份不符合本安排的直接子女条件。"
       }
     },
@@ -1734,6 +1736,9 @@
     "singleValueSelectionHint": "请选择一笔足额余额。",
     "singleValueSelectionSummary": "所选余额：{{amount}} DEEP",
     "singleSelectedValueUnavailable": "所选余额已不可用，请重新选择。",
-    "clearValueSelection": "清除选择"
+    "clearValueSelection": "清除选择",
+    "periodDaysSummary": "每 {{days}} 天",
+    "customPeriodDays": "自定义天数",
+    "dateOutOfRange": "到期时间超出可显示范围"
   }
 }

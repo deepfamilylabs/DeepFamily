@@ -14,7 +14,8 @@ import {
   computeShieldedPolicyCommitment,
   getShieldedBudgetCommitments,
   deriveShieldedHeirKeyMaterial,
-  INHERITANCE_PERIOD_SECONDS,
+  DEFAULT_SHIELDED_PERIOD_DAYS,
+  SECONDS_PER_DAY,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { formatUnits, getAddress, getBigInt, parseUnits, type Signer } from "ethers";
@@ -22,6 +23,7 @@ import { PersonHashCalculator, type PersonHashCalculatorHandle } from "../../per
 import { useTreeGraphData } from "../../tree/context";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { InheritanceError } from "../model/inheritanceErrors";
+import { formatShieldedTimestamp, parseShieldedPeriodDays } from "../model/shieldedBudgetPeriod";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import {
   findHeirLegitimacy,
@@ -117,6 +119,7 @@ type RecipientInputMethod = "receiveCode" | "credentials";
 type BudgetPrivacy = "private" | "public";
 type ClaimSelection = NonNullable<ShieldedClaimOverview["claim"]> & { key: string };
 const TASK_GROUPS: readonly TaskGroup[] = ["wallet", "inheritance", "receive"];
+const PERIOD_DAY_PRESETS = [1, 7, 14, 21, 30, 90, 180, 365] as const;
 const TASK_ACTIONS: Record<TaskGroup, readonly Action[]> = {
   wallet: ["shield", "privateTransfer", "unshield", "receiveCode"],
   inheritance: ["fund"],
@@ -440,6 +443,8 @@ export function ShieldedInheritancePanel({
   const [ownReceiveCode, setOwnReceiveCode] = useState("");
   const [shieldAmount, setShieldAmount] = useState("");
   const [rate, setRate] = useState("");
+  const [periodDaysChoice, setPeriodDaysChoice] = useState(DEFAULT_SHIELDED_PERIOD_DAYS.toString());
+  const [periodDaysInput, setPeriodDaysInput] = useState(DEFAULT_SHIELDED_PERIOD_DAYS.toString());
   const [fundingFamilyVersionSelection, setFundingFamilyVersionSelection] = useState("");
   const [heirPersonHash, setHeirPersonHash] = useState("");
   // A receive code is shareable, so it may live in page state; the recipient's
@@ -501,6 +506,8 @@ export function ShieldedInheritancePanel({
     setSelectedValueCommitments([]);
     setBudgetSelection("");
     setPolicySelection("");
+    setPeriodDaysChoice(DEFAULT_SHIELDED_PERIOD_DAYS.toString());
+    setPeriodDaysInput(DEFAULT_SHIELDED_PERIOD_DAYS.toString());
     setFundingMode("private");
     setHeirPersonHash("");
     setClaimSelection(null);
@@ -1222,6 +1229,7 @@ export function ShieldedInheritancePanel({
               rootIdentityCommitment: fundingRoot.rootIdentityCommitment,
               rootVersionIndex: fundingRoot.rootVersionIndex,
               amountPerPeriod: parsePositiveTokenAmount(rate, modules.tokenDecimals),
+              periodDays: parseShieldedPeriodDays(periodDaysInput),
             });
           }
           if (getBigInt(policy.rootIdentityCommitment) !== BigInt(identity.identityCommitment)) {
@@ -1555,6 +1563,14 @@ export function ShieldedInheritancePanel({
           ? "privateTransfer"
           : "shield";
   let fundingRate = selectedPolicy?.amountPerPeriod;
+  let fundingPeriodDays = selectedPolicy?.periodDays;
+  if (fundingPeriodDays === undefined) {
+    try {
+      fundingPeriodDays = parseShieldedPeriodDays(periodDaysInput);
+    } catch {
+      // Show a preview only after a custom period has become a valid integer.
+    }
+  }
   if (fundingRate === undefined && action === "fund" && rate.trim()) {
     try {
       fundingRate = parsePositiveTokenAmount(rate, modules.tokenDecimals);
@@ -1818,6 +1834,7 @@ export function ShieldedInheritancePanel({
                               wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment),
                             ),
                           amount: formatUnits(policy.amountPerPeriod, modules.tokenDecimals),
+                          days: policy.periodDays.toString(),
                         })}
                       </option>
                     ))}
@@ -1923,6 +1940,51 @@ export function ShieldedInheritancePanel({
                   />
                 </FieldBlock>
               ) : null}
+              <FieldBlock label={t("shielded.fields.periodDays")}>
+                {selectedPolicy ? (
+                  <p className="text-sm text-ink" role="status">
+                    {t("shielded.periodDaysSummary", {
+                      days: selectedPolicy.periodDays.toString(),
+                    })}
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <select
+                      aria-label={t("shielded.fields.periodDays")}
+                      className={`${INPUT_CLASS} min-w-0`}
+                      disabled={busy}
+                      value={periodDaysChoice}
+                      onChange={(event) => {
+                        const choice = event.target.value;
+                        setPeriodDaysChoice(choice);
+                        setPeriodDaysInput(choice === "custom" ? "" : choice);
+                        setError("");
+                      }}
+                    >
+                      {PERIOD_DAY_PRESETS.map((days) => (
+                        <option key={days} value={days.toString()}>
+                          {t("shielded.periodDaysSummary", { days })}
+                        </option>
+                      ))}
+                      <option value="custom">{t("shielded.customPeriodDays")}</option>
+                    </select>
+                    {periodDaysChoice === "custom" ? (
+                      <input
+                        aria-label={t("shielded.fields.customPeriodDays")}
+                        className={`${INPUT_CLASS} min-w-0`}
+                        inputMode="numeric"
+                        disabled={busy}
+                        value={periodDaysInput}
+                        onChange={(event) => {
+                          setPeriodDaysInput(event.target.value);
+                          setError("");
+                        }}
+                        placeholder="30"
+                      />
+                    ) : null}
+                  </div>
+                )}
+              </FieldBlock>
               <FieldBlock label={t("shielded.fields.periods")}>
                 <input
                   aria-label={t("shielded.fields.periods")}
@@ -1932,7 +1994,10 @@ export function ShieldedInheritancePanel({
                   onChange={(event) => setPeriods(event.target.value)}
                 />
               </FieldBlock>
-              {fundingRate !== undefined && fundingRate > 0n && fundingPeriods !== undefined ? (
+              {fundingRate !== undefined &&
+              fundingRate > 0n &&
+              fundingPeriods !== undefined &&
+              fundingPeriodDays !== undefined ? (
                 <p
                   role="status"
                   className="rounded-xl bg-primary/5 p-3 text-sm leading-relaxed text-ink"
@@ -1941,6 +2006,7 @@ export function ShieldedInheritancePanel({
                     amount: formatUnits(fundingRate * fundingPeriods, modules.tokenDecimals),
                     periods: fundingPeriods.toString(),
                     rate: formatUnits(fundingRate, modules.tokenDecimals),
+                    days: fundingPeriodDays.toString(),
                   })}
                 </p>
               ) : null}
@@ -1978,6 +2044,7 @@ export function ShieldedInheritancePanel({
                             option.overview.totalRemaining,
                             modules.tokenDecimals,
                           ),
+                          days: option.notes[0].note.periodDays.toString(),
                         })}
                       </option>
                     ))}
@@ -2014,7 +2081,9 @@ export function ShieldedInheritancePanel({
                 {claimOverview?.nextDueAt !== undefined ? (
                   <p className="text-xs text-ink-muted">
                     {t("shielded.claimOverview.nextDue", {
-                      date: new Date(Number(claimOverview.nextDueAt) * 1000).toLocaleString(),
+                      date:
+                        formatShieldedTimestamp(claimOverview.nextDueAt) ??
+                        t("shielded.dateOutOfRange"),
                     })}
                   </p>
                 ) : null}
@@ -2047,7 +2116,7 @@ export function ShieldedInheritancePanel({
                     });
                     const dueAt =
                       claimBatch.budget.note.eligibleFrom +
-                      (index + 1n) * INHERITANCE_PERIOD_SECONDS;
+                      (index + 1n) * claimBatch.budget.note.periodDays * SECONDS_PER_DAY;
                     return (
                       <label
                         key={index.toString()}
@@ -2064,7 +2133,9 @@ export function ShieldedInheritancePanel({
                           <span>{label}</span>
                           <span className="mt-0.5 block text-xs text-ink-muted">
                             {t("shielded.claimPeriodDue", {
-                              date: new Date(Number(dueAt) * 1000).toLocaleDateString(),
+                              date:
+                                formatShieldedTimestamp(dueAt, "date") ??
+                                t("shielded.dateOutOfRange"),
                             })}
                           </span>
                         </span>

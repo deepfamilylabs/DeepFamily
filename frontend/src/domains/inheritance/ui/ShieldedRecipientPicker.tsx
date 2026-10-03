@@ -52,19 +52,9 @@ export function ShieldedRecipientPicker({
       </FieldBlock>
       {value.trim() ? (
         <p className="break-all text-xs text-ink-muted">
-          {t("shielded.recipientPicker.manualLabel")}: <code>{value.trim()}</code>
+          {t("shielded.recipientPicker.identityHash")}: <code>{value.trim()}</code>
         </p>
       ) : null}
-      <details className="text-xs text-ink-muted">
-        <summary className="cursor-pointer">{t("shielded.recipientPicker.manual")}</summary>
-        <input
-          aria-label={t("shielded.recipientPicker.manualLabel")}
-          className={`${INPUT_CLASS} mt-2`}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="0x…"
-        />
-      </details>
     </div>
   );
 }

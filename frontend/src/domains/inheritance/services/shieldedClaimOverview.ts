@@ -1,7 +1,7 @@
 import {
   computeShieldedPeriodNullifier,
   getShieldedBudgetCommitments,
-  INHERITANCE_PERIOD_SECONDS,
+  SECONDS_PER_DAY,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { BigNumberish } from "ethers";
@@ -34,6 +34,7 @@ export type ShieldedClaimOverview = {
 };
 
 const MAX_UINT64 = (1n << 64n) - 1n;
+const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 // Match nextClaimPeriods' automatic search; dates beyond it must stay unknown.
 export const SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT = 100_000n;
@@ -41,16 +42,20 @@ export const SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT = 100_000n;
 type PolicyFunding = {
   policyCommitment: bigint;
   eligibleFrom: bigint;
+  periodDays: bigint;
   fundedPeriods: bigint;
   mixedStartTimes: boolean;
 };
 
 function validBudget(note: Note): note is ShieldedSelectableBudgetNote {
   if (note.note.kind !== "budget") return false;
-  const { amountPerPeriod, remaining, eligibleFrom } = note.note;
+  const { amountPerPeriod, remaining, eligibleFrom, periodDays } = note.note;
   return (
     amountPerPeriod > 0n &&
     amountPerPeriod <= MAX_UINT128 &&
+    typeof periodDays === "bigint" &&
+    periodDays > 0n &&
+    periodDays <= MAX_UINT32 &&
     remaining >= 0n &&
     remaining <= MAX_UINT128 &&
     remaining % amountPerPeriod === 0n &&
@@ -107,7 +112,8 @@ function futureFundedPeriod(
   now: bigint,
 ): { nextDueAt?: bigint; scanLimited: boolean } {
   const elapsed = now - funding.eligibleFrom;
-  const dueCount = elapsed > 0n ? elapsed / INHERITANCE_PERIOD_SECONDS : 0n;
+  const periodSeconds = funding.periodDays * SECONDS_PER_DAY;
+  const dueCount = elapsed > 0n ? elapsed / periodSeconds : 0n;
   // Every spent period needs its own nullifier. This lower bound avoids walking
   // huge old clocks when all remaining funds are already needed by due periods.
   if (dueCount - BigInt(wallet.spentNullifiers.size) >= funding.fundedPeriods) {
@@ -116,7 +122,7 @@ function futureFundedPeriod(
 
   let unpaidDuePeriods = 0n;
   for (let index = 0n; index < SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT; index += 1n) {
-    const dueAt = funding.eligibleFrom + (index + 1n) * INHERITANCE_PERIOD_SECONDS;
+    const dueAt = funding.eligibleFrom + (index + 1n) * periodSeconds;
     if (dueAt > MAX_UINT64) return { scanLimited: false };
     const nullifier = computeShieldedPeriodNullifier({
       derivedSecretField,
@@ -171,6 +177,7 @@ export function getShieldedClaimOverview(
     policies.set(policyCommitment, {
       policyCommitment,
       eligibleFrom: previous?.eligibleFrom ?? budget.note.eligibleFrom,
+      periodDays: budget.note.periodDays,
       fundedPeriods:
         (previous?.fundedPeriods ?? 0n) + budget.note.remaining / budget.note.amountPerPeriod,
       mixedStartTimes:

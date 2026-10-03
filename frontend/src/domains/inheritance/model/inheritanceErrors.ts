@@ -4,7 +4,8 @@ export type InheritanceErrorCode =
   | "passphraseDisallowed"
   | "snapshotMismatch"
   | "amountInvalid"
-  | "periodsInvalid";
+  | "periodsInvalid"
+  | "periodDaysInvalid";
 
 /** A failure the flow recognises and explains in its own words. */
 export class InheritanceError extends Error {

@@ -1,7 +1,7 @@
 import {
   computeShieldedPeriodNullifier,
   getShieldedBudgetCommitments,
-  INHERITANCE_PERIOD_SECONDS,
+  SECONDS_PER_DAY,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { BigNumberish } from "ethers";
@@ -18,6 +18,7 @@ export type ShieldedSelectableValueNote = OwnedShieldedNote<
 export type ShieldedSelectableBudgetNote = OwnedShieldedNote<BudgetPayload>;
 
 const MAX_UINT64 = (1n << 64n) - 1n;
+const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
 const MAX_AUTOMATIC_PERIOD_SCAN = 100_000n;
 
@@ -104,6 +105,7 @@ export function getShieldedClaimBudgetKey(note: BudgetPayload): string {
     note.heirIdentityCommitment,
     note.eligibleFrom,
     note.amountPerPeriod,
+    note.periodDays,
   ]
     .map(String)
     .join(":");
@@ -116,11 +118,18 @@ function findClaimPeriods(
   now: bigint,
 ): bigint[] {
   const elapsed = now - budget.eligibleFrom;
-  if (elapsed < INHERITANCE_PERIOD_SECONDS || budget.amountPerPeriod <= 0n) return [];
+  if (
+    typeof budget.periodDays !== "bigint" ||
+    budget.periodDays < 1n ||
+    budget.periodDays > MAX_UINT32
+  )
+    return [];
+  const periodSeconds = budget.periodDays * SECONDS_PER_DAY;
+  if (elapsed < periodSeconds || budget.amountPerPeriod <= 0n) return [];
   const fundedCount = budget.remaining / budget.amountPerPeriod;
   const target = Number(fundedCount < 12n ? fundedCount : 12n);
   if (target < 1) return [];
-  const dueCount = elapsed / INHERITANCE_PERIOD_SECONDS;
+  const dueCount = elapsed / periodSeconds;
   const policyCommitment = getShieldedBudgetCommitments(budget).policyCommitment;
   const result: bigint[] = [];
   const scanLimit = dueCount < MAX_AUTOMATIC_PERIOD_SCAN ? dueCount : MAX_AUTOMATIC_PERIOD_SCAN;
@@ -142,7 +151,14 @@ export function nextClaimPeriods(
   budget: BudgetPayload,
   now: bigint,
 ): bigint[] {
-  if (now - budget.eligibleFrom < INHERITANCE_PERIOD_SECONDS) {
+  if (
+    typeof budget.periodDays !== "bigint" ||
+    budget.periodDays < 1n ||
+    budget.periodDays > MAX_UINT32
+  ) {
+    throw new Error("Budget period days must be a positive uint32");
+  }
+  if (now - budget.eligibleFrom < budget.periodDays * SECONDS_PER_DAY) {
     throw new Error("No whole period is due yet");
   }
   if (budget.amountPerPeriod <= 0n || budget.remaining < budget.amountPerPeriod) {

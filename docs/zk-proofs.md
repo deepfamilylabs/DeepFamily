@@ -301,11 +301,11 @@ intentionally public NFT data.
 
 `circuits/shielded_receive_code.circom` backs a recipient's receive code. The proof shows that whoever knows the identity secret behind `identityCommitment` derived `ownerCommitment` from that secret and chose the X25519 viewing key. Its four public signals are `[identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi]`. The payer's browser verifies the proof with the verification key built into the app, plus a BN254 G2 subgroup check. There is no on-chain verifier or registry. A receive code does not prove that the identity exists in DeepFamily; initial `fund` proves the intended recipient's lineage eligibility.
 
-Five pool action circuits prove ownership and value conservation for `shield`, `fund`, `claim`, `privateTransfer`, and `unshield`. Together with the receive-code circuit there are six shielded circuits; identity and disclosure bring the build catalog to eight. Pool public inputs range from 7 (`shield`) to 27 (`claim`), with 26 for `fund`; see [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout.
+Five pool action circuits prove ownership and value conservation for `shield`, `fund`, `claim`, `privateTransfer`, and `unshield`. Together with the receive-code circuit there are six shielded circuits; identity and disclosure bring the build catalog to eight. Pool public inputs range from 7 (`shield`) to 27 (`fund` and `claim`); see [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout. Each budget commits a positive uint32 `periodDays`. Fund publishes it only for publicly addressed budgets; claim proves maturity with the committed duration as a private witness, retaining 12 public period-nullifier slots.
 
-Public and private budget funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. `fundMode` selects initial enrollment or additional funding. Independently, `budgetKind` selects an encrypted owner-bound private budget or a publicly delivered identity-bound budget. Public addressing needs only the selected child's existing `personHash`; the client resolves its identity commitment and proves the same lineage eligibility. It publishes the new budget's nine canonical recovery fields, while private funding publishes nine zeros. Both modes prove the donor VALUE spend, conservation, private rule/enrollment openings and the same initial-enrollment uniqueness tag.
+Public and private budget funding share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. `fundMode` selects initial enrollment or additional funding. Independently, `budgetKind` selects an encrypted owner-bound private budget or a publicly delivered identity-bound budget. Public addressing needs only the selected child's existing `personHash`; the client resolves its identity commitment and proves the same lineage eligibility. It publishes the new budget's ten canonical recovery fields, ending with periodDays, while private funding publishes ten zeros. Both modes prove the donor VALUE spend, conservation, private rule/enrollment openings and the same initial-enrollment uniqueness tag.
 
-The original private budget preimage and domain 1015 remain unchanged. Identity budgets use terms domain 1029 and note domain 1030, binding the recipient, parent/version, rate and eligibility start to opaque policy/enrollment commitments. The public kind-5 payload is 214 bytes padded with zeros to a 512-byte envelope; it excludes owner, rule salts and allocation-key material. The fund proof binds the parsed fields to the actual output. Donor rule openings stay in encrypted change memos.
+Private budgets use domain 1015 and a policy commitment that binds periodDays. Identity budgets use terms domain 1029 and note domain 1030, binding the recipient, parent/version, rate, eligibility start and periodDays to opaque policy/enrollment commitments. The public kind-5 payload is 218 bytes padded with zeros to a 512-byte envelope; it excludes owner, rule salts and allocation-key material. The fund proof binds the parsed fields to the actual output. Donor rule openings stay in encrypted change memos. Both donor backup formats fit 400/432-byte payloads within the unchanged fixed HPKE envelope.
 
 `claim` spends one or two compatible budgets, including a mixed pair, and proves the identity secret, current direct-child endorsement, trusted source, complete mature periods and sufficient funds. Input binding selectors are private witnesses committed by the note domains; they cannot bypass private owner or rule-opening checks. Any active owner-bound input forces an owner-bound remainder. Pure identity inputs retain their format; both remainder and VALUE are encrypted to the claimant. The 27 public signals expose neither input identity nor binding kind. Period nullifiers depend on the same identity secret, policy commitment and period index across both formats, so additional funding and format changes cannot reset allowances.
 
@@ -332,9 +332,13 @@ struct ProofEnvelope {
   not interpret business fields or read DeepFamily state.
 - `setCircuitVerifier(purpose,circuitId,adapter)` rejects ID zero, zero/no-code adapters, and any
   already populated route. There is no replace, clear, active, or latest operation.
-- Existing and new IDs under the same purpose may coexist indefinitely, provided each keeps that
-  purpose's frozen public-signal ABI. A signal-count/order change requires a new purpose/entrypoint
-  and protocol generation; it cannot be installed behind an old route contract ABI.
+- Within a deployed protocol generation, existing and new IDs under the same purpose may coexist
+  indefinitely, provided each keeps that purpose's frozen public-signal ABI. Changing the signal
+  count or order of a published deployment requires a new purpose/entrypoint and protocol
+  generation; it cannot be installed behind an old route contract ABI. Before initial publication,
+  the contracts, circuits, verifiers, artifacts and client can instead be replaced together and
+  redeployed with the new ABI. The current unpublished fund protocol uses purpose 3 with 27 signals
+  and does not retain the previous development ABI.
 - A `circuitId` is not stored in `PersonVersion`, included in `personHash`, or used to infer any
   identity suite. Callers choose the route needed for each operation.
 
@@ -438,7 +442,9 @@ installation, and optional multi-party setup details.
 - File-KDF parameter upgrades may append a selector within a compatible envelope format. A new
   cipher, KDF algorithm, or incompatible envelope layout needs a new nonzero `formatVersion` while
   preserving the 20-byte common prefix if it is to use the same DeepFamily entrypoint.
-- A public-signal ABI change requires a new purpose/entrypoint and protocol generation.
+- A public-signal ABI change on a published deployment requires a new purpose/entrypoint and
+  protocol generation. Unpublished development deployments follow the complete-replacement rule
+  described above.
 
 ## Security Properties and Limits
 

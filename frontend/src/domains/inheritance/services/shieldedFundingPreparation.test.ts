@@ -50,7 +50,7 @@ async function open(ciphertext: Uint8Array, secret: bigint) {
   }
 }
 
-async function setup() {
+async function setup(periodDays = 30n) {
   const donorKeys = deriveShieldedHeirKeyMaterial(donorSecret);
   const heirKeys = deriveShieldedHeirKeyMaterial(heirSecret);
   const shield = await prepareShieldedShield({
@@ -95,6 +95,7 @@ async function setup() {
     rootIdentityCommitment: rootIdentity,
     rootVersionIndex: 0n,
     amountPerPeriod: 10n,
+    periodDays,
   });
   const noteTree = firstTree;
   const wallet: LocalShieldedWalletSnapshot = {
@@ -230,6 +231,53 @@ async function recordFunding(
 }
 
 describe("local unified funding preparation", () => {
+  it.each([1n, 7n, 365n])(
+    "binds %s days to the initial budget and preserves it on additional funding",
+    async (periodDays) => {
+      const fixture = await setup(periodDays);
+      const initial = await prepareShieldedFund({
+        ...fixture.common,
+        fundMode: 0,
+        policy: fixture.policy,
+        lineageIndex: fixture.lineageIndex,
+        lineage: fixture.lineage,
+        budgetPeriods: 1n,
+      });
+      const initialNote = await open(initial.outputs[0].ciphertext, heirSecret);
+      expect(initialNote.kind).toBe("budget");
+      if (initialNote.kind !== "budget") throw new Error("Budget missing");
+      expect(initialNote.periodDays).toBe(periodDays);
+      expect(initial.witness.periodDays).toBe(periodDays.toString());
+      await recordFunding(fixture, initial);
+      const additional = await prepareShieldedFund({
+        ...fixture.common,
+        fundMode: 1,
+        budget: {
+          note: initial.outputs[0].note,
+          commitment: initial.outputs[0].commitment,
+          ciphertext: initial.outputs[0].ciphertext,
+          shardId: 0n,
+        },
+        budgetPeriods: 2n,
+      });
+      expect(additional.outputs[0].note.periodDays).toBe(periodDays);
+      expect(additional.outputs[0].note.eligibleFrom).toBe(initial.outputs[0].note.eligibleFrom);
+      expect(additional.witness.periodDays).toBe(periodDays.toString());
+      expect(additional.policyCommitment).toBe(initial.policyCommitment);
+    },
+  );
+
+  it.each([0n, -1n, 4_294_967_296n])("rejects out-of-range period days %s", (periodDays) => {
+    expect(() =>
+      createShieldedPolicyDescriptor({
+        rootIdentityCommitment: rootIdentity,
+        rootVersionIndex: 1n,
+        amountPerPeriod: 10n,
+        periodDays,
+      }),
+    ).toThrow("positive uint32");
+  });
+
   it.each([0, 1] as const)(
     "rejects an initial budget for another parent in visibility mode %s",
     async (budgetKind) => {
