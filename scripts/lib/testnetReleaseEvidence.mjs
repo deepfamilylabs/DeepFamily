@@ -689,7 +689,9 @@ const requireTerminalGovernanceEvidence = ({
       "poseidonT6",
       "deepFamilyLineageIndex",
       "shieldedVerifiers",
-      "shieldedDeepPool",
+      "shieldedErc20Pool",
+      "shieldedNativePool",
+      "shieldedPoolFactory",
     ],
   );
   requireExact(terminal.status, "passed", "terminalGovernanceState.status");
@@ -1369,7 +1371,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     requireExact(signals[0], String(expectedChainId), `shielded.proofs.${action} chain ID`);
     requireSameAddress(
       `0x${BigInt(signals[1]).toString(16).padStart(40, "0")}`,
-      report.addresses.shieldedDeepPool,
+      report.addresses.shieldedErc20Pool,
       `shielded.proofs.${action} contract`,
     );
     if (action === "claim") {
@@ -1499,7 +1501,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   requireExact(receipts.chainId, expectedChainId, "shielded.receipts.chainId");
   requireSameAddress(
     receipts.poolAddress,
-    report.addresses.shieldedDeepPool,
+    report.addresses.shieldedErc20Pool,
     "shielded.receipts.poolAddress",
   );
   const observation = requireExactRecordKeys(

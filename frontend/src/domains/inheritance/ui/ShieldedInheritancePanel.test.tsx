@@ -31,6 +31,7 @@ import type { OwnedShieldedNote } from "../services/shieldedPoolChain";
 import type { LocalShieldedWalletSnapshot } from "../services/shieldedWalletRecovery";
 import type { IndexedVersion, LineageSnapshot } from "../services/inheritanceChain";
 import { ShieldedInheritancePanel } from "./ShieldedInheritancePanel";
+import { ShieldedIdentitySessionProvider } from "./ShieldedIdentitySessionContext";
 
 const mocks = vi.hoisted(() => ({
   deriveIdentityFromForm: vi.fn(),
@@ -65,6 +66,7 @@ const mocks = vi.hoisted(() => ({
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   walletChangedMessage: null as string | null,
+  translationRevision: 0,
 }));
 
 vi.mock("react-i18next", () => {
@@ -77,6 +79,7 @@ vi.mock("react-i18next", () => {
       relation?: string;
       version?: number;
       amount?: string;
+      symbol?: string;
       balance?: string;
       index?: number;
       count?: number;
@@ -109,7 +112,7 @@ vi.mock("react-i18next", () => {
       return `Missing private balance: ${options?.amount}`;
     }
     if (key === "shielded.depositBalanceInsufficient") {
-      return `Deposit requires ${options?.amount} DEEP; wallet balance is ${options?.balance} DEEP`;
+      return `Deposit requires ${options?.amount} ${options?.symbol}; wallet balance is ${options?.balance} ${options?.symbol}`;
     }
     if (key === "shielded.valueOption") {
       return `Balance ${options?.index}: ${options?.amount} DEEP`;
@@ -140,7 +143,17 @@ vi.mock("react-i18next", () => {
     }
     return key;
   };
-  return { useTranslation: () => ({ t }) };
+  let revision = -1;
+  let translated = t;
+  return {
+    useTranslation: () => {
+      if (revision !== mocks.translationRevision) {
+        revision = mocks.translationRevision;
+        translated = (...args: Parameters<typeof t>) => t(...args);
+      }
+      return { t: translated };
+    },
+  };
 });
 vi.mock("../../person", async () => {
   const React = await import("react");
@@ -263,9 +276,6 @@ vi.mock("../services/inheritanceChain", () => ({
   loadLineageSnapshot: mocks.loadLineageSnapshot,
   findHeirLegitimacy: mocks.findHeirLegitimacy,
 }));
-vi.mock("../../../shared/config/env", () => ({
-  getShieldedPoolDeploymentBlock: () => 0,
-}));
 vi.mock("../../../shared/ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../../shared/ui")>()),
   useToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
@@ -277,6 +287,7 @@ type Note = OwnedShieldedNote<DecodedShieldedNotePayload>;
 type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget"; binding?: "owner" }>;
 const account = "0x00000000000000000000000000000000000000aa";
 const poolAddress = "0x00000000000000000000000000000000000000bb";
+const scope = { chainId: 31337n, poolAddress };
 const transactionHash = `0x${"ab".repeat(32)}`;
 const identity: IdentityMaterialV1Result = {
   identitySuiteId: 1,
@@ -519,11 +530,16 @@ function fillTransfer(
   if (choice) fireEvent.click(balanceChoice(choice.index, choice.amount));
 }
 
-function renderPanel() {
-  const modules = {
+function renderPanel(overrides: Partial<ShieldedPageModules> = {}) {
+  let modules = {
     chainId: 31337n,
     poolAddress,
     pool: {},
+    factory: {},
+    assetKind: "erc20",
+    assetSymbol: "DEEP",
+    assetAddress: "0x00000000000000000000000000000000000000cc",
+    poolDeploymentBlock: 0,
     token: {
       allowance: mocks.tokenAllowance,
       balanceOf: mocks.tokenBalanceOf,
@@ -533,25 +549,35 @@ function renderPanel() {
     provider: { getBlock: mocks.getBlock },
     lineageIndex: {},
     deepFamily: {},
+    ...overrides,
   } as unknown as ShieldedPageModules;
+  let panelKey = "initial";
   const signer = {
     provider: { getNetwork: async () => ({ chainId: 31337n }) },
     getAddress: async () => account,
   } as unknown as Signer;
   const publicActivityAddresses = new Set<string>();
   const view = (transactionAccount: string, transactionSigner: Signer | null = signer) => (
-    <ShieldedInheritancePanel
-      modules={modules}
-      signer={transactionSigner}
-      account={transactionAccount}
-      publicActivityAddresses={publicActivityAddresses}
-    />
+    <ShieldedIdentitySessionProvider scope={`${modules.chainId}:factory:protocol-v2`}>
+      <ShieldedInheritancePanel
+        key={panelKey}
+        modules={modules}
+        signer={transactionSigner}
+        account={transactionAccount}
+        publicActivityAddresses={publicActivityAddresses}
+      />
+    </ShieldedIdentitySessionProvider>
   );
   const rendered = render(view(account));
   return {
     ...rendered,
     rerenderAccount: (transactionAccount: string, transactionSigner: Signer | null = signer) =>
       rendered.rerender(view(transactionAccount, transactionSigner)),
+    rerenderModules: (overrides: Partial<ShieldedPageModules>, remount = false) => {
+      modules = { ...modules, ...overrides };
+      if (remount) panelKey = `${modules.chainId}:${modules.poolAddress}`;
+      rendered.rerender(view(account));
+    },
   };
 }
 
@@ -594,11 +620,14 @@ function claimPeriodChoice(period: number, amount = 10): HTMLInputElement {
 function spendClaimPeriod(snapshot: LocalShieldedWalletSnapshot, note: Note, index: bigint) {
   if (note.note.kind !== "budget") throw new Error("Expected budget");
   snapshot.spentNullifiers.add(
-    computeShieldedPeriodNullifier({
-      derivedSecretField: identity.derivedSecretField,
-      policyCommitment: getShieldedBudgetCommitments(note.note).policyCommitment,
-      periodIndex: index,
-    }),
+    computeShieldedPeriodNullifier(
+      {
+        derivedSecretField: identity.derivedSecretField,
+        policyCommitment: getShieldedBudgetCommitments(note.note, scope).policyCommitment,
+        periodIndex: index,
+      },
+      scope,
+    ),
   );
 }
 
@@ -666,16 +695,19 @@ function enterRecipientCredentials(passphrase = "child identity passphrase") {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 describe("ShieldedInheritancePanel unlocked account", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.walletChangedMessage = null;
+    mocks.translationRevision = 0;
     mocks.deriveIdentityFromForm.mockResolvedValue(identity);
     mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot());
     mocks.verifyShieldedReceiveCode.mockRejectedValue(new ShieldedReceiveCodeError("malformed"));
@@ -871,6 +903,52 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(mocks.tokenAllowance).toHaveBeenCalledOnce();
     expect(mocks.tokenApprove).toHaveBeenCalledOnce();
     expect(mocks.submitShield).toHaveBeenCalledOnce();
+  });
+
+  it("resets an insufficient nonzero allowance before approving the selected ERC-20 amount", async () => {
+    mocks.tokenAllowance.mockResolvedValue(500n);
+    renderPanel();
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1000" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(mocks.tokenApprove.mock.calls).toEqual([
+      [poolAddress, 0n],
+      [poolAddress, 1000n],
+    ]);
+    expect(mocks.submitShield).toHaveBeenCalledWith(
+      expect.objectContaining({ assetKind: "erc20", amount: 1000n }),
+    );
+  });
+
+  it("deposits native assets using the wallet's native balance and skips ERC-20 approval", async () => {
+    const getBalance = vi.fn(async () => 10n ** 19n);
+    renderPanel({
+      assetKind: "native",
+      assetSymbol: "CFX",
+      assetAddress: "0x0000000000000000000000000000000000000000",
+      token: null,
+      tokenDecimals: 18,
+      provider: {
+        getBlock: mocks.getBlock,
+        getBalance,
+      } as unknown as ShieldedPageModules["provider"],
+    });
+    await unlock();
+    fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+    await screen.findByText("shielded.done");
+    expect(getBalance).toHaveBeenCalledWith(account);
+    expect(mocks.tokenBalanceOf).not.toHaveBeenCalled();
+    expect(mocks.tokenAllowance).not.toHaveBeenCalled();
+    expect(mocks.tokenApprove).not.toHaveBeenCalled();
+    expect(mocks.submitShield).toHaveBeenCalledWith(
+      expect.objectContaining({ assetKind: "native", amount: 10n ** 18n }),
+    );
   });
 
   it("checks the selected transaction wallet instead of the unlocked identity's hash", async () => {
@@ -1748,7 +1826,10 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       if (change === "spent") {
         const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
         refreshed.spentNullifiers.add(
-          computeShieldedSpendNullifier({ ownerSecret: keys.ownerSecret, noteCommitment: 1n }),
+          computeShieldedSpendNullifier(
+            { ownerSecret: keys.ownerSecret, noteCommitment: 1n },
+            scope,
+          ),
         );
         const recovery = await vi.importActual<typeof import("../services/shieldedWalletRecovery")>(
           "../services/shieldedWalletRecovery",
@@ -1871,7 +1952,10 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       if (change === "spent") {
         const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
         refreshed.spentNullifiers.add(
-          computeShieldedSpendNullifier({ ownerSecret: keys.ownerSecret, noteCommitment: 1n }),
+          computeShieldedSpendNullifier(
+            { ownerSecret: keys.ownerSecret, noteCommitment: 1n },
+            scope,
+          ),
         );
         const recovery = await vi.importActual<typeof import("../services/shieldedWalletRecovery")>(
           "../services/shieldedWalletRecovery",
@@ -2126,6 +2210,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       await screen.findByText("shielded.done");
       expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
         expect.objectContaining({ periodDays: BigInt(days), amountPerPeriod: 10n }),
+        expect.objectContaining(scope),
       );
       expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
         expect.objectContaining({ policy: expect.objectContaining({ periodDays: BigInt(days) }) }),
@@ -2155,6 +2240,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       await screen.findByText("shielded.done");
       expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
         expect.objectContaining({ periodDays: BigInt(days) }),
+        expect.objectContaining(scope),
       );
     },
   );
@@ -2246,6 +2332,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         rootIdentityCommitment: BigInt(nextIdentity.identityCommitment),
         periodDays: 30n,
       }),
+      expect.objectContaining(scope),
     );
     expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
       expect.objectContaining({ policy: expect.objectContaining({ periodDays: 30n }) }),
@@ -2262,10 +2349,16 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.click(screen.getByRole("tab", { name: "shielded.groups.inheritance" }));
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policy,
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policy,
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
+              policy.allocationKey,
+              scope,
+            ),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -2462,12 +2555,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       });
       fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
       await screen.findByText("shielded.done");
-      expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith({
-        rootIdentityCommitment: 777n,
-        rootVersionIndex: 2n,
-        amountPerPeriod: 10n,
-        periodDays: 30n,
-      });
+      expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+        {
+          rootIdentityCommitment: 777n,
+          rootVersionIndex: 2n,
+          amountPerPeriod: 10n,
+          periodDays: 30n,
+        },
+        expect.objectContaining(scope),
+      );
       expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
         expect.objectContaining({ policy: expect.objectContaining({ rootVersionIndex: 2n }) }),
       );
@@ -2523,12 +2619,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
-    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenLastCalledWith({
-      rootVersionIndex: 7n,
-      rootIdentityCommitment: 777n,
-      amountPerPeriod: 10n,
-      periodDays: 30n,
-    });
+    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenLastCalledWith(
+      {
+        rootVersionIndex: 7n,
+        rootIdentityCommitment: 777n,
+        amountPerPeriod: 10n,
+        periodDays: 30n,
+      },
+      expect.objectContaining(scope),
+    );
     expect(mocks.prepareShieldedFund).toHaveBeenLastCalledWith(
       expect.objectContaining({
         fundMode: 0,
@@ -2544,12 +2643,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await waitFor(() => expect(mocks.prepareShieldedFund).toHaveBeenCalledTimes(2));
     await screen.findByText("shielded.done");
-    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenLastCalledWith({
-      rootVersionIndex: 3n,
-      rootIdentityCommitment: 777n,
-      amountPerPeriod: 10n,
-      periodDays: 30n,
-    });
+    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenLastCalledWith(
+      {
+        rootVersionIndex: 3n,
+        rootIdentityCommitment: 777n,
+        amountPerPeriod: 10n,
+        periodDays: 30n,
+      },
+      expect.objectContaining(scope),
+    );
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
   });
 
@@ -2662,12 +2764,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     ).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
-    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith({
-      rootIdentityCommitment: 777n,
-      rootVersionIndex: 7n,
-      amountPerPeriod: 10n,
-      periodDays: 30n,
-    });
+    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+      {
+        rootIdentityCommitment: 777n,
+        rootVersionIndex: 7n,
+        amountPerPeriod: 10n,
+        periodDays: 30n,
+      },
+      expect.objectContaining(scope),
+    );
     expect(mocks.prepareShieldedFund).toHaveBeenCalledWith(
       expect.objectContaining({ donorDerivedSecretField: identity.derivedSecretField }),
     );
@@ -2676,10 +2781,13 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     );
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policyDescriptor(),
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policyDescriptor(),
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -2736,12 +2844,15 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(screen.getByText(/Funding family:.*version 3/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
     await screen.findByText("shielded.done");
-    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith({
-      rootIdentityCommitment: 777n,
-      rootVersionIndex: 3n,
-      amountPerPeriod: 10n,
-      periodDays: 30n,
-    });
+    expect(mocks.createShieldedPolicyDescriptor).toHaveBeenCalledWith(
+      {
+        rootIdentityCommitment: 777n,
+        rootVersionIndex: 3n,
+        amountPerPeriod: 10n,
+        periodDays: 30n,
+      },
+      expect.objectContaining(scope),
+    );
   });
 
   it("rejects funding when the unlocked parent's eligibility changes instead of switching parents", async () => {
@@ -2843,14 +2954,20 @@ describe("ShieldedInheritancePanel unlocked account", () => {
       rootIdentityCommitment: 111n,
       rootVersionIndex: 1n,
     };
-    const ownPolicyCommitment = computeShieldedPolicyCommitment({
-      ...ownPolicy,
-      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-    }).toString();
-    const foreignPolicyCommitment = computeShieldedPolicyCommitment({
-      ...foreignPolicy,
-      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-    }).toString();
+    const ownPolicyCommitment = computeShieldedPolicyCommitment(
+      {
+        ...ownPolicy,
+        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+      },
+      scope,
+    ).toString();
+    const foreignPolicyCommitment = computeShieldedPolicyCommitment(
+      {
+        ...foreignPolicy,
+        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+      },
+      scope,
+    ).toString();
     const recovered = walletSnapshot([valueNote(1n, 30n)]);
     recovered.fundingTemplates?.set(3n, {
       note: budgetNote(3n, {
@@ -2858,7 +2975,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         rootVersionIndex: 1n,
         heirIdentityCommitment: 222n,
         heirOwnerCommitment: 98n,
-        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
+        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
       }).note as BudgetPayload,
       commitment: 3n,
       ciphertext: new Uint8Array(),
@@ -2932,10 +3049,13 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     chooseAction("fund");
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policyDescriptor(),
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policyDescriptor(),
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -2993,10 +3113,13 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     chooseAction("fund");
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policyDescriptor(),
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policyDescriptor(),
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -3028,7 +3151,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
         rootIdentityCommitment: 777n,
         heirIdentityCommitment: 99n,
         heirOwnerCommitment: 98n,
-        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
+        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
         eligibleFrom: 123n,
       }).note as BudgetPayload,
       commitment: 3n,
@@ -3045,10 +3168,13 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     chooseAction("fund");
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policyDescriptor(),
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policyDescriptor(),
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -3368,10 +3494,13 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     chooseAction("fund");
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), {
       target: {
-        value: computeShieldedPolicyCommitment({
-          ...policyDescriptor(),
-          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n),
-        }).toString(),
+        value: computeShieldedPolicyCommitment(
+          {
+            ...policyDescriptor(),
+            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(444n, scope),
+          },
+          scope,
+        ).toString(),
       },
     });
     await fillFundingRecipient(99n);
@@ -3478,6 +3607,11 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(screen.queryAllByRole("tab")).toHaveLength(0);
     expect(screen.queryByText("shielded.balanceAmount")).toBeNull();
     expect(mocks.recoverLocalShieldedWallet).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+    await unlock();
+    expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(2);
   });
 
   it("keeps an unlocked identity and draft across transaction wallet changes", async () => {
@@ -3509,6 +3643,280 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     expect(balanceChoice(1, 20).checked).toBe(true);
     expect(screen.getByText(identity.personHash)).toBeTruthy();
   });
+
+  it.each([false, true])(
+    "keeps identity, clears old pool choices, and automatically recovers a new pool (remount=%s)",
+    async (remount) => {
+      const nextPoolAddress = "0x00000000000000000000000000000000000000ee";
+      const nextPool = { address: nextPoolAddress } as unknown as ShieldedPageModules["pool"];
+      const first = walletSnapshot([valueNote(1n, 20n)]);
+      const second = { ...walletSnapshot([valueNote(2n, 6n)]), poolAddress: nextPoolAddress };
+      mocks.recoverLocalShieldedWallet.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+      const panel = renderPanel();
+      await unlock();
+      fillTransfer(receiveCodeFor(99n), "5", { index: 1, amount: 20 });
+      expect(balanceChoice(1, 20).checked).toBe(true);
+
+      panel.rerenderModules({ poolAddress: nextPoolAddress, pool: nextPool }, remount);
+      await waitFor(() => expect(balanceChoice(1, 6)).toBeTruthy());
+      expect(screen.queryByRole("button", { name: "shielded.unlock" })).toBeNull();
+      expect(screen.getByText(identity.personHash)).toBeTruthy();
+      expect(mocks.deriveIdentityFromForm).toHaveBeenCalledOnce();
+      expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledTimes(2);
+      expect(mocks.recoverLocalShieldedWallet.mock.calls[1][0]).toBe(nextPool);
+      expect(mocks.recoverLocalShieldedWallet.mock.calls[1][2].previous).toBeUndefined();
+      expect(screen.queryByRole("checkbox", { name: "Balance 1: 20 DEEP" })).toBeNull();
+      expect(balanceChoice(1, 6).checked).toBe(false);
+      expect(
+        (
+          screen.getByRole("textbox", {
+            name: "shielded.fields.transferAmount",
+          }) as HTMLInputElement
+        ).value,
+      ).toBe("");
+      expect(
+        (
+          screen.getByRole("textbox", {
+            name: "shielded.receiveCodeInputLabel",
+          }) as HTMLTextAreaElement
+        ).value,
+      ).toBe("");
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.receiveCodeInputLabel" }), {
+        target: { value: receiveCodeFor(99n) },
+      });
+      expect(
+        (screen.getByRole("checkbox", { name: "shielded.recipientConfirm" }) as HTMLInputElement)
+          .checked,
+      ).toBe(false);
+    },
+  );
+
+  it.each([
+    { action: "fund", change: "language" },
+    { action: "fund", change: "modules" },
+    { action: "privateTransfer", change: "language" },
+    { action: "privateTransfer", change: "modules" },
+  ])(
+    "keeps the $action draft without recovering again when $change changes in the same pool",
+    async ({ action, change }) => {
+      mocks.recoverLocalShieldedWallet.mockResolvedValue(walletSnapshot([valueNote(1n, 20n)]));
+      const panel = renderPanel();
+      await unlock();
+      if (action === "fund") {
+        chooseAction("fund");
+        await selectFundingParentVersion(3);
+        fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.rate" }), {
+          target: { value: "4" },
+        });
+        fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.periods" }), {
+          target: { value: "5" },
+        });
+      } else {
+        fillTransfer(receiveCodeFor(99n), "5", { index: 1, amount: 20 });
+      }
+      if (change === "language") {
+        mocks.translationRevision += 1;
+        panel.rerenderAccount(account);
+      } else {
+        panel.rerenderModules({});
+      }
+      await act(async () => {});
+      expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledOnce();
+      expect(mocks.deriveIdentityFromForm).toHaveBeenCalledOnce();
+      if (action === "fund") {
+        expect(screen.getByRole("heading", { name: "shielded.actions.fund" })).toBeTruthy();
+        expect(
+          (screen.getByRole("textbox", { name: "shielded.fields.rate" }) as HTMLInputElement).value,
+        ).toBe("4");
+        expect(
+          (screen.getByRole("textbox", { name: "shielded.fields.periods" }) as HTMLInputElement)
+            .value,
+        ).toBe("5");
+        expect(
+          (
+            screen.getByRole("combobox", {
+              name: "shielded.fields.familyVersion",
+            }) as HTMLSelectElement
+          ).value,
+        ).toBe("3");
+      } else {
+        expect(
+          screen.getByRole("heading", { name: "shielded.actionTitles.privateTransfer" }),
+        ).toBeTruthy();
+        expect(
+          (
+            screen.getByRole("textbox", {
+              name: "shielded.fields.transferAmount",
+            }) as HTMLInputElement
+          ).value,
+        ).toBe("5");
+        expect(balanceChoice(1, 20).checked).toBe(true);
+        expect(
+          (
+            screen.getByRole("textbox", {
+              name: "shielded.receiveCodeInputLabel",
+            }) as HTMLTextAreaElement
+          ).value,
+        ).toBe(receiveCodeFor(99n));
+        expect(
+          (screen.getByRole("checkbox", { name: "shielded.recipientConfirm" }) as HTMLInputElement)
+            .checked,
+        ).toBe(true);
+      }
+    },
+  );
+
+  it.each([
+    { remount: false, failure: false },
+    { remount: false, failure: true },
+    { remount: true, failure: false },
+    { remount: true, failure: true },
+  ])(
+    "ignores a stale pool recovery without releasing the new recovery ($remount, $failure)",
+    async ({ remount, failure }) => {
+      const nextPoolAddress = "0x00000000000000000000000000000000000000ee";
+      const oldRecovery = deferred<LocalShieldedWalletSnapshot>();
+      const nextRecovery = deferred<LocalShieldedWalletSnapshot>();
+      mocks.recoverLocalShieldedWallet
+        .mockResolvedValueOnce(walletSnapshot([valueNote(1n, 20n)]))
+        .mockReturnValueOnce(oldRecovery.promise)
+        .mockReturnValueOnce(nextRecovery.promise);
+      const panel = renderPanel();
+      await unlock();
+      fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
+      await waitFor(() => expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledTimes(2));
+      panel.rerenderModules(
+        { poolAddress: nextPoolAddress, pool: {} as ShieldedPageModules["pool"] },
+        remount,
+      );
+      await waitFor(() => expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledTimes(3));
+
+      await act(async () => {
+        if (failure) oldRecovery.reject(new Error("Old pool RPC failed"));
+        else oldRecovery.resolve(walletSnapshot([valueNote(3n, 99n)]));
+      });
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText("shielded.done")).toBeNull();
+      expect(
+        (screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true);
+      expect(screen.getByRole("status").textContent).toBe("shielded.stages.recovering");
+      await act(async () =>
+        nextRecovery.resolve({
+          ...walletSnapshot([valueNote(2n, 6n)]),
+          poolAddress: nextPoolAddress,
+        }),
+      );
+      expect(balanceChoice(1, 6)).toBeTruthy();
+      expect(screen.queryByRole("checkbox", { name: "Balance 1: 99 DEEP" })).toBeNull();
+      expect(
+        (screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false);
+      expect(mocks.deriveIdentityFromForm).toHaveBeenCalledOnce();
+    },
+  );
+
+  it.each([false, true])(
+    "does not broadcast a former pool's proof after switching assets (remount=%s)",
+    async (remount) => {
+      const nextPoolAddress = "0x00000000000000000000000000000000000000ee";
+      const proving = deferred<void>();
+      const broadcast = vi.fn();
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+      mocks.recoverLocalShieldedWallet
+        .mockResolvedValueOnce(walletSnapshot([valueNote(1n, 20n)]))
+        .mockResolvedValueOnce(walletSnapshot([valueNote(1n, 20n)]))
+        .mockResolvedValueOnce({
+          ...walletSnapshot([valueNote(2n, 6n)]),
+          poolAddress: nextPoolAddress,
+        });
+      mocks.submitPrivateTransfer.mockImplementationOnce(async ({ onStage }) => {
+        onStage("proving");
+        await proving.promise;
+        onStage("submitting");
+        broadcast();
+        return { receipt: { status: 1 }, transactionHash };
+      });
+      const panel = renderPanel();
+      await unlock();
+      fillTransfer(receiveCodeFor(99n), "5", { index: 1, amount: 20 });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await waitFor(() => expect(mocks.submitPrivateTransfer).toHaveBeenCalledOnce());
+      panel.rerenderModules(
+        { poolAddress: nextPoolAddress, pool: {} as ShieldedPageModules["pool"] },
+        remount,
+      );
+      await waitFor(() => expect(balanceChoice(1, 6)).toBeTruthy());
+      await act(async () => proving.resolve());
+      expect(broadcast).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText("shielded.done")).toBeNull();
+      expect(screen.getByText(identity.personHash)).toBeTruthy();
+      expect(balanceChoice(1, 6).checked).toBe(false);
+    },
+  );
+
+  it("does not accept an old panel's pending identity derivation after switching pools", async () => {
+    const derivation = deferred<IdentityMaterialV1Result>();
+    mocks.deriveIdentityFromForm.mockReturnValueOnce(derivation.promise);
+    const panel = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    panel.rerenderModules({ poolAddress: "0x00000000000000000000000000000000000000ee" }, true);
+    await act(async () => derivation.resolve(identity));
+    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+    expect(mocks.recoverLocalShieldedWallet).not.toHaveBeenCalled();
+    await unlock();
+    expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([false, true])(
+    "does not let a former pool's transaction confirmation change the new pool recovery (remount=%s)",
+    async (remount) => {
+      const nextPoolAddress = "0x00000000000000000000000000000000000000ee";
+      const confirmation = deferred<void>();
+      const nextRecovery = deferred<LocalShieldedWalletSnapshot>();
+      mocks.verifyShieldedReceiveCode.mockResolvedValue(verifiedRecipient(99n));
+      mocks.recoverLocalShieldedWallet
+        .mockResolvedValueOnce(walletSnapshot([valueNote(1n, 20n)]))
+        .mockResolvedValueOnce(walletSnapshot([valueNote(1n, 20n)]))
+        .mockReturnValueOnce(nextRecovery.promise);
+      mocks.submitPrivateTransfer.mockImplementationOnce(async ({ onStage }) => {
+        onStage("submitting");
+        await confirmation.promise;
+        onStage("confirming");
+        return { receipt: { status: 1 }, transactionHash };
+      });
+      const panel = renderPanel();
+      await unlock();
+      fillTransfer(receiveCodeFor(99n), "5", { index: 1, amount: 20 });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await waitFor(() => expect(mocks.submitPrivateTransfer).toHaveBeenCalledOnce());
+      panel.rerenderModules(
+        { poolAddress: nextPoolAddress, pool: {} as ShieldedPageModules["pool"] },
+        remount,
+      );
+      await waitFor(() => expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledTimes(3));
+      await act(async () => confirmation.resolve());
+      expect(screen.getByRole("status").textContent).toBe("shielded.stages.recovering");
+      expect(
+        (screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(true);
+      expect(mocks.recoverLocalShieldedWallet).toHaveBeenCalledTimes(3);
+      expect(screen.queryByText(transactionHash)).toBeNull();
+      expect(screen.queryByText("shielded.done")).toBeNull();
+      await act(async () =>
+        nextRecovery.resolve({
+          ...walletSnapshot([valueNote(2n, 6n)]),
+          poolAddress: nextPoolAddress,
+        }),
+      );
+      expect(balanceChoice(1, 6)).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("opens the empty claim state when receiving has no budget and shares the code from the wallet", async () => {
     renderPanel();
@@ -3613,6 +4021,7 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     if (privateNote.note.kind !== "budget") throw new Error("Expected budget");
     const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(
       privateNote.note,
+      scope,
     );
     const note: Note = {
       ...privateNote,

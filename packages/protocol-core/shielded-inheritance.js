@@ -9,6 +9,7 @@ import {
   SNARK_SCALAR_FIELD,
 } from "./constants.js";
 import { protocolAssert } from "./errors.js";
+import { assertAddress } from "./identity.js";
 
 /**
  * Shielded domains are disjoint from identity and lineage domains. They are part of the
@@ -31,14 +32,44 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   allocationKeyCommitment: 1028n,
   identityBudgetTerms: 1029n,
   identityBudgetNote: 1030n,
+  poolScope: 1031n,
+  scopedPurpose: 1032n,
 });
 
+export const SHIELDED_POOL_PROTOCOL_VERSION = 2;
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
 export const SHIELDED_CIPHERTEXT_BYTES = 512;
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 const uint64 = (value, label) => bigintFrom(value, label, MAX_UINT64);
 const uint128 = (value, label) => bigintFrom(value, label, MAX_UINT128);
+
+/** Pool context is mandatory and stays outside encrypted note payloads. */
+export function normalizeShieldedScope(scope) {
+  protocolAssert(
+    scope !== null && typeof scope === "object",
+    "MISSING_SHIELDED_SCOPE",
+    "A chain and pool context is required",
+  );
+  const chainId = uint64(scope.chainId, "chainId");
+  protocolAssert(chainId > 0n, "INVALID_CHAIN_ID", "chainId must be nonzero");
+  const poolAddress = assertAddress(scope.poolAddress, "poolAddress");
+  protocolAssert(BigInt(poolAddress) !== 0n, "INVALID_POOL_ADDRESS", "poolAddress must be nonzero");
+  return { chainId, poolAddress };
+}
+
+export function computeShieldedPoolDomain(scope) {
+  const { chainId, poolAddress } = normalizeShieldedScope(scope);
+  return poseidon3([SHIELDED_INHERITANCE_DOMAINS.poolScope, chainId, BigInt(poolAddress)]);
+}
+
+export function computeShieldedScopedPurpose(purpose, scope) {
+  return poseidon3([
+    SHIELDED_INHERITANCE_DOMAINS.scopedPurpose,
+    computeShieldedPoolDomain(scope),
+    field(purpose, "purpose"),
+  ]);
+}
 
 function nonzeroField(value, label) {
   const result = field(value, label);
@@ -93,9 +124,9 @@ export function computeShieldedCiphertextHashField(ciphertext) {
 }
 
 /** One unpredictable policy salt separates policies with the same public family/rate. */
-export function computeShieldedPolicyCommitment(input) {
+export function computeShieldedPolicyCommitment(input, scope) {
   return poseidon7([
-    SHIELDED_INHERITANCE_DOMAINS.policy,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.policy, scope),
     nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
     uint64(input.rootVersionIndex, "rootVersionIndex"),
     nonzeroAmount(input.amountPerPeriod, "amountPerPeriod"),
@@ -106,17 +137,17 @@ export function computeShieldedPolicyCommitment(input) {
 }
 
 /** Commitment to a policy-specific key kept only by the initial donor. */
-export function computeShieldedAllocationKeyCommitment(allocationKey) {
+export function computeShieldedAllocationKeyCommitment(allocationKey, scope) {
   return poseidon2([
-    SHIELDED_INHERITANCE_DOMAINS.allocationKeyCommitment,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.allocationKeyCommitment, scope),
     nonzeroField(allocationKey, "allocationKey"),
   ]);
 }
 
 /** One initial funding per policy and heir; the key is never in child notes. */
-export function computeShieldedEnrollmentNullifier(input) {
+export function computeShieldedEnrollmentNullifier(input, scope) {
   return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.enrollmentNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.enrollmentNullifier, scope),
     nonzeroField(input.allocationKey, "allocationKey"),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
@@ -124,9 +155,9 @@ export function computeShieldedEnrollmentNullifier(input) {
 }
 
 /** A randomized, one-time read authorization for the original child budget. */
-export function computeShieldedBudgetUseNullifier(input) {
+export function computeShieldedBudgetUseNullifier(input, scope) {
   return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.budgetUseNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.budgetUseNullifier, scope),
     nonzeroField(input.policySalt, "policySalt"),
     nonzeroField(input.budgetNoteCommitment, "budgetNoteCommitment"),
     nonzeroField(input.useNonce, "useNonce"),
@@ -134,9 +165,9 @@ export function computeShieldedBudgetUseNullifier(input) {
 }
 
 /** First enrollment binds the child and their eligibility timestamp privately. */
-export function computeShieldedEnrollmentCommitment(input) {
+export function computeShieldedEnrollmentCommitment(input, scope) {
   return poseidon5([
-    SHIELDED_INHERITANCE_DOMAINS.enrollment,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.enrollment, scope),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
     uint64(input.eligibleFrom, "eligibleFrom"),
@@ -169,9 +200,9 @@ export function computeShieldedOwnerCommitment(ownerSecret) {
 }
 
 /** The caller must independently encrypt the full note to its recipient. */
-export function computeShieldedValueNoteCommitment(input) {
+export function computeShieldedValueNoteCommitment(input, scope) {
   return poseidon5([
-    SHIELDED_INHERITANCE_DOMAINS.valueNote,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.valueNote, scope),
     nonzeroField(input.ownerCommitment, "ownerCommitment"),
     // A zero-value dummy note keeps all private actions at two public outputs.
     uint128(input.amount, "amount"),
@@ -181,7 +212,7 @@ export function computeShieldedValueNoteCommitment(input) {
 }
 
 /** A separate budget note per child allows a private, irreversible funding. */
-export function computeShieldedBudgetNoteCommitment(input) {
+export function computeShieldedBudgetNoteCommitment(input, scope) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   // A claim that exactly exhausts a budget emits a zero-value continuation
   // note, keeping all claim transactions the same public output shape.
@@ -197,7 +228,7 @@ export function computeShieldedBudgetNoteCommitment(input) {
     "remaining exceeds the circuit's 64-bit period count",
   );
   return poseidon8([
-    SHIELDED_INHERITANCE_DOMAINS.budgetNote,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.budgetNote, scope),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.enrollmentCommitment, "enrollmentCommitment"),
     nonzeroField(input.heirOwnerCommitment, "heirOwnerCommitment"),
@@ -209,9 +240,9 @@ export function computeShieldedBudgetNoteCommitment(input) {
 }
 
 /** Public addressing binds the recipient and terms without revealing private rule openings. */
-export function computeShieldedIdentityBudgetTermsCommitment(input) {
+export function computeShieldedIdentityBudgetTermsCommitment(input, scope) {
   return poseidon7([
-    SHIELDED_INHERITANCE_DOMAINS.identityBudgetTerms,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.identityBudgetTerms, scope),
     nonzeroField(input.rootIdentityCommitment, "rootIdentityCommitment"),
     uint64(input.rootVersionIndex, "rootVersionIndex"),
     nonzeroField(input.heirIdentityCommitment, "heirIdentityCommitment"),
@@ -222,7 +253,7 @@ export function computeShieldedIdentityBudgetTermsCommitment(input) {
 }
 
 /** An identity-bound budget uses a distinct domain from owner-bound budgets. */
-export function computeShieldedIdentityBudgetNoteCommitment(input) {
+export function computeShieldedIdentityBudgetNoteCommitment(input, scope) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   const remaining = uint128(input.remaining, "remaining");
   protocolAssert(
@@ -236,7 +267,7 @@ export function computeShieldedIdentityBudgetNoteCommitment(input) {
     "remaining exceeds the circuit's 64-bit period count",
   );
   return poseidon8([
-    SHIELDED_INHERITANCE_DOMAINS.identityBudgetNote,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.identityBudgetNote, scope),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.enrollmentCommitment, "enrollmentCommitment"),
     nonzeroField(input.termsCommitment, "termsCommitment"),
@@ -248,12 +279,12 @@ export function computeShieldedIdentityBudgetNoteCommitment(input) {
 }
 
 /** Recover common policy/enrollment commitments without opening an identity budget's rule. */
-export function getShieldedBudgetCommitments(note) {
+export function getShieldedBudgetCommitments(note, scope) {
   if (note.binding === "identity") {
     return {
       policyCommitment: nonzeroField(note.policyCommitment, "policyCommitment"),
       enrollmentCommitment: nonzeroField(note.enrollmentCommitment, "enrollmentCommitment"),
-      termsCommitment: computeShieldedIdentityBudgetTermsCommitment(note),
+      termsCommitment: computeShieldedIdentityBudgetTermsCommitment(note, scope),
     };
   }
   protocolAssert(
@@ -261,22 +292,25 @@ export function getShieldedBudgetCommitments(note) {
     "INVALID_SHIELDED_BUDGET_BINDING",
     "Unsupported budget binding",
   );
-  const policyCommitment = computeShieldedPolicyCommitment(note);
+  const policyCommitment = computeShieldedPolicyCommitment(note, scope);
   return {
     policyCommitment,
-    enrollmentCommitment: computeShieldedEnrollmentCommitment({
-      policyCommitment,
-      heirIdentityCommitment: note.heirIdentityCommitment,
-      eligibleFrom: note.eligibleFrom,
-      enrollmentSalt: note.enrollmentSalt,
-    }),
+    enrollmentCommitment: computeShieldedEnrollmentCommitment(
+      {
+        policyCommitment,
+        heirIdentityCommitment: note.heirIdentityCommitment,
+        eligibleFrom: note.eligibleFrom,
+        enrollmentSalt: note.enrollmentSalt,
+      },
+      scope,
+    ),
   };
 }
 
 /** The note issuer cannot derive this from note preimages without ownerSecret. */
-export function computeShieldedSpendNullifier(input) {
+export function computeShieldedSpendNullifier(input, scope) {
   return poseidon3([
-    SHIELDED_INHERITANCE_DOMAINS.spendNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.spendNullifier, scope),
     nonzeroField(input.ownerSecret, "ownerSecret"),
     nonzeroField(input.noteCommitment, "noteCommitment"),
   ]);
@@ -286,9 +320,9 @@ export function computeShieldedSpendNullifier(input) {
  * Period indices start at zero from the unique initial funding for a policy
  * and heir. Additional funding carries that enrollment, so the tag cannot reset after refill.
  */
-export function computeShieldedPeriodNullifier(input) {
+export function computeShieldedPeriodNullifier(input, scope) {
   return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.periodNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.periodNullifier, scope),
     nonzeroField(input.derivedSecretField, "derivedSecretField"),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     uint64(input.periodIndex, "periodIndex"),
@@ -296,10 +330,10 @@ export function computeShieldedPeriodNullifier(input) {
 }
 
 /** Fill unused public batch slots without revealing which slots are padding. */
-export function computeShieldedDummyPeriodNullifier(input) {
+export function computeShieldedDummyPeriodNullifier(input, scope) {
   const slotIndex = bigintFrom(input.slotIndex, "slotIndex", 11n);
   return poseidon4([
-    SHIELDED_INHERITANCE_DOMAINS.dummyPeriodNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.dummyPeriodNullifier, scope),
     nonzeroField(input.ownerSecret, "ownerSecret"),
     nonzeroField(input.budgetNoteCommitment, "budgetNoteCommitment"),
     slotIndex,
@@ -307,9 +341,9 @@ export function computeShieldedDummyPeriodNullifier(input) {
 }
 
 /** A distinct nullifier for the absent second input in a fixed-shape claim. */
-export function computeShieldedDummyInputNullifier(input) {
+export function computeShieldedDummyInputNullifier(input, scope) {
   return poseidon3([
-    SHIELDED_INHERITANCE_DOMAINS.dummyInputNullifier,
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.dummyInputNullifier, scope),
     nonzeroField(input.ownerSecret, "ownerSecret"),
     nonzeroField(input.noteCommitment, "noteCommitment"),
   ]);

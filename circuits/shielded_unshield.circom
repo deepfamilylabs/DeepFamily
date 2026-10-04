@@ -3,9 +3,10 @@ pragma circom 2.2.3;
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
+include "shielded_scope_common.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Action 4 of ShieldedDeepPool. One real input note is spent; the second
+// Action 4 of the asset pool. One real input note is spent; the second
 // nullifier is a domain-separated dummy tag bound to that same note. The pool
 // requires the input's shard and root to fill both of its input slots. The
 // output slots contain private change and an encrypted zero-value dummy.
@@ -31,6 +32,19 @@ template ShieldedUnshield() {
     signal input changeAmount;
     signal input changeNonce;
     signal input dummyNonce;
+
+    component valueTag = ShieldedScopedTag();
+    valueTag.chainId <== chainId;
+    valueTag.pool <== pool;
+    valueTag.purpose <== 1014;
+    component spendTag = ShieldedScopedTag();
+    spendTag.chainId <== chainId;
+    spendTag.pool <== pool;
+    spendTag.purpose <== 1016;
+    component dummyInputTag = ShieldedScopedTag();
+    dummyInputTag.chainId <== chainId;
+    dummyInputTag.pool <== pool;
+    dummyInputTag.purpose <== 1021;
 
     component chainBits = Num2Bits(64);
     chainBits.in <== chainId;
@@ -60,7 +74,7 @@ template ShieldedUnshield() {
     inputNonceNotZero.in <== inputNonce;
     inputNonceNotZero.out === 0;
     component inputNote = Poseidon(5);
-    inputNote.inputs[0] <== 1014;
+    inputNote.inputs[0] <== valueTag.tag;
     inputNote.inputs[1] <== owner.out;
     inputNote.inputs[2] <== inputAmount;
     inputNote.inputs[3] <== inputNonce;
@@ -80,12 +94,12 @@ template ShieldedUnshield() {
     membership.out === inputRoot;
 
     component spend = Poseidon(3);
-    spend.inputs[0] <== 1016;
+    spend.inputs[0] <== spendTag.tag;
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== inputNote.out;
     spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
-    dummySpend.inputs[0] <== 1021;
+    dummySpend.inputs[0] <== dummyInputTag.tag;
     dummySpend.inputs[1] <== ownerSecret;
     dummySpend.inputs[2] <== inputNote.out;
     dummySpend.out === inputNullifiers[1];
@@ -101,14 +115,14 @@ template ShieldedUnshield() {
     dummyNonceNotZero.out === 0;
 
     component changeNote = Poseidon(5);
-    changeNote.inputs[0] <== 1014;
+    changeNote.inputs[0] <== valueTag.tag;
     changeNote.inputs[1] <== owner.out;
     changeNote.inputs[2] <== changeAmount;
     changeNote.inputs[3] <== changeNonce;
     changeNote.inputs[4] <== ciphertextHashes[0];
     changeNote.out === outputCommitments[0];
     component dummyNote = Poseidon(5);
-    dummyNote.inputs[0] <== 1014;
+    dummyNote.inputs[0] <== valueTag.tag;
     dummyNote.inputs[1] <== owner.out;
     dummyNote.inputs[2] <== 0;
     dummyNote.inputs[3] <== dummyNonce;

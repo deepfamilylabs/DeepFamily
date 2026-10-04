@@ -288,7 +288,9 @@ const createProductionFixture = () => {
         address(100 + index),
       ]),
     ),
-    shieldedDeepPool: address(301),
+    shieldedErc20Pool: address(301),
+    shieldedNativePool: address(302),
+    shieldedPoolFactory: address(303),
   };
   const shieldedBindings = shieldedDeploymentBindingsFromAddresses(shieldedAddresses);
   Object.assign(
@@ -308,7 +310,12 @@ const createProductionFixture = () => {
         withHashes(record),
       ]),
     ),
-    shieldedDeepPool: withHashes(shieldedBindings.shieldedDeepPool),
+    ...Object.fromEntries(
+      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+        key,
+        withHashes(shieldedBindings[key]),
+      ]),
+    ),
   });
 
   const kdfProfiles = [
@@ -479,10 +486,12 @@ const createProductionFixture = () => {
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
     ),
-    shieldedDeepPool: {
-      artifactSha256: HASHES.adapterArtifact,
-      runtimeSha256: HASHES.adapterRuntime,
-    },
+    ...Object.fromEntries(
+      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+        key,
+        { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
+      ]),
+    ),
     groth16VerifierAdapter: {
       artifactSha256: HASHES.adapterArtifact,
       runtimeSha256: HASHES.adapterRuntime,
@@ -568,7 +577,9 @@ const acceptanceReportForManifest = (manifest) => ({
         "poseidonT6",
         "deepFamilyLineageIndex",
         "shieldedVerifiers",
-        "shieldedDeepPool",
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
     ),
     deepFamily: {
@@ -1426,14 +1437,14 @@ describe("production protocol release manifest evidence", function () {
     [
       "a pool using a different token",
       (deployments) => {
-        deployments.shieldedDeepPool.tokenImmutable = address(900);
+        deployments.shieldedErc20Pool.tokenImmutable = address(900);
       },
       /declared token, lineage and common verifier adapter/,
     ],
     [
       "a pool using another common adapter",
       (deployments) => {
-        deployments.shieldedDeepPool.verifierAdapterImmutable =
+        deployments.shieldedErc20Pool.verifierAdapterImmutable =
           deployments.shieldedVerifiers.claim.address;
       },
       /common verifier adapter/,

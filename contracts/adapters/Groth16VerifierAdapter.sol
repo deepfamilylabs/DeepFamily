@@ -87,7 +87,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable unshieldVerifier;
 
   /**
-   * @param shieldedVerifiers The five ShieldedDeepPool actions in Action enum order. A zero
+   * @param shieldedVerifiers The five ShieldedPoolCore actions in Action enum order. A zero
    *                          address explicitly disables a route.
    */
   constructor(

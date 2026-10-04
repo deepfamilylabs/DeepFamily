@@ -100,14 +100,17 @@ export async function recoverLocalShieldedWallet(
         let payload: Uint8Array;
         try {
           if (isPublicShieldedBudgetEnvelope(event.ciphertext)) {
-            const publicBudget = decodePublicShieldedBudgetEnvelope(event.ciphertext);
+            const publicBudget = decodePublicShieldedBudgetEnvelope(event.ciphertext, {
+              chainId,
+              poolAddress,
+            });
             if (
               !publicBudget ||
               expectedIdentityCommitment === undefined ||
               publicBudget.heirIdentityCommitment !== expectedIdentityCommitment
             )
               return null;
-            payload = encodeShieldedBudgetNotePayload(publicBudget);
+            payload = encodeShieldedBudgetNotePayload(publicBudget, { chainId, poolAddress });
           } else {
             payload = await decryptShieldedNote({
               hpkeIkm,
@@ -121,11 +124,14 @@ export async function recoverLocalShieldedWallet(
           throw error;
         }
         try {
-          const opened = verifyShieldedNotePayload({
-            payload,
-            ciphertext: event.ciphertext,
-            noteCommitment: event.commitment,
-          });
+          const opened = verifyShieldedNotePayload(
+            {
+              payload,
+              ciphertext: event.ciphertext,
+              noteCommitment: event.commitment,
+            },
+            { chainId, poolAddress },
+          );
           const note = opened.note;
           if (
             (note.kind === "value" && note.ownerCommitment !== keys.ownerCommitment) ||
@@ -144,13 +150,19 @@ export async function recoverLocalShieldedWallet(
             // Fund appends the child's budget directly before the
             // donor's change note. Match and validate it from the public scan;
             // no recipient or note-index query reaches the RPC.
-            const budgetPayload = encodeShieldedBudgetNotePayload(note.fundingMemo.budgetNote);
+            const budgetPayload = encodeShieldedBudgetNotePayload(note.fundingMemo.budgetNote, {
+              chainId,
+              poolAddress,
+            });
             try {
-              verifyShieldedNotePayload({
-                payload: budgetPayload,
-                ciphertext: previousPublicNote.ciphertext,
-                noteCommitment: previousPublicNote.commitment,
-              });
+              verifyShieldedNotePayload(
+                {
+                  payload: budgetPayload,
+                  ciphertext: previousPublicNote.ciphertext,
+                  noteCommitment: previousPublicNote.commitment,
+                },
+                { chainId, poolAddress },
+              );
               fundingTemplates.set(previousPublicNote.commitment, {
                 note: note.fundingMemo.budgetNote,
                 commitment: previousPublicNote.commitment,
@@ -166,17 +178,20 @@ export async function recoverLocalShieldedWallet(
               if (
                 allocationKey !== undefined &&
                 opening &&
-                computeShieldedAllocationKeyCommitment(allocationKey) ===
+                computeShieldedAllocationKeyCommitment(allocationKey, { chainId, poolAddress }) ===
                   opening.allocationKeyCommitment
               ) {
-                shieldedPolicies.set(getShieldedBudgetCommitments(budget).policyCommitment, {
-                  rootIdentityCommitment: budget.rootIdentityCommitment,
-                  rootVersionIndex: budget.rootVersionIndex,
-                  amountPerPeriod: budget.amountPerPeriod,
-                  periodDays: budget.periodDays,
-                  policySalt: opening.policySalt,
-                  allocationKey,
-                });
+                shieldedPolicies.set(
+                  getShieldedBudgetCommitments(budget, { chainId, poolAddress }).policyCommitment,
+                  {
+                    rootIdentityCommitment: budget.rootIdentityCommitment,
+                    rootVersionIndex: budget.rootVersionIndex,
+                    amountPerPeriod: budget.amountPerPeriod,
+                    periodDays: budget.periodDays,
+                    policySalt: opening.policySalt,
+                    allocationKey,
+                  },
+                );
               }
             } catch (error) {
               // A sender can put arbitrary encrypted memos in a value note.
@@ -238,10 +253,13 @@ export function listUnspentRecoveredShieldedNotes(
   return [...snapshot.ownedNotes.values()].filter(
     (event) =>
       !snapshot.spentNullifiers.has(
-        computeShieldedSpendNullifier({
-          ownerSecret: keys.ownerSecret,
-          noteCommitment: event.commitment,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: keys.ownerSecret,
+            noteCommitment: event.commitment,
+          },
+          snapshot,
+        ),
       ),
   );
 }

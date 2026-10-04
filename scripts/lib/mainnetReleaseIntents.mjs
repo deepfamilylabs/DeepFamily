@@ -119,7 +119,9 @@ export const buildMainnetReleaseIntents = async ({
     "PoseidonT6",
     "DeepFamilyLineageIndex",
     ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierContractName),
-    "ShieldedDeepPool",
+    "ShieldedErc20Pool",
+    "ShieldedNativePool",
+    "ShieldedPoolFactory",
   ];
   const artifactList = await Promise.all(names.map((name) => artifacts.readArtifact(name)));
   const artifact = Object.fromEntries(names.map((name, index) => [name, artifactList[index]]));
@@ -135,6 +137,10 @@ export const buildMainnetReleaseIntents = async ({
         .map(([label, offset]) => [label, addressAt(offset)]),
     ),
     deepFamilyProxy: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.deepFamily),
+    shieldedErc20Pool: ethers.getCreateAddress({
+      from: addressAt(MAINNET_DEPLOYMENT_NONCE_OFFSETS.shieldedPoolFactory),
+      nonce: 1,
+    }),
   });
 
   const deployData = async (name, args = [], bytecode = artifact[name].bytecode) => {
@@ -274,16 +280,32 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
-  const poolBytecode = linkBytecode({
+  const nativePoolBytecode = linkBytecode({
     ethers,
-    artifact: artifact.ShieldedDeepPool,
+    artifact: artifact.ShieldedNativePool,
     libraries: { PoseidonT3: addresses.poseidonT3 },
   });
   await pushDeployment(
-    "shieldedDeepPool",
-    "ShieldedDeepPool",
-    [addresses.deepFamilyToken, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
-    poolBytecode,
+    "shieldedNativePool",
+    "ShieldedNativePool",
+    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+    nativePoolBytecode,
+  );
+  const factoryBytecode = linkBytecode({
+    ethers,
+    artifact: artifact.ShieldedPoolFactory,
+    libraries: { PoseidonT3: addresses.poseidonT3 },
+  });
+  await pushDeployment(
+    "shieldedPoolFactory",
+    "ShieldedPoolFactory",
+    [
+      addresses.deepFamilyToken,
+      addresses.deepFamilyLineageIndex,
+      addresses.groth16VerifierAdapter,
+      addresses.shieldedNativePool,
+    ],
+    factoryBytecode,
   );
   pushCall(
     "transferDeepFamilyOwnership",

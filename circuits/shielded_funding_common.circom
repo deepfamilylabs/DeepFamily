@@ -3,9 +3,10 @@ pragma circom 2.2.3;
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
+include "shielded_scope_common.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
-// Compact LeanIMT membership, matching ShieldedDeepPool's note shards. A
+// Compact LeanIMT membership, matching the asset pool's note shards. A
 // missing right sibling is absent from this path, not hash(leaf,0).
 template ShieldedMembership32() {
     signal input leaf;
@@ -31,6 +32,8 @@ template ShieldedMembership32() {
 // A spendable donor VALUE note. Both source and change commitments bind the
 // exact ciphertext hash supplied by the pool as a public signal.
 template ShieldedDonorValueInput() {
+    signal input chainId;
+    signal input pool;
     signal input ownerSecret;
     signal input amount;
     signal input nonce;
@@ -55,8 +58,12 @@ template ShieldedDonorValueInput() {
     owner.inputs[0] <== 1013;
     owner.inputs[1] <== ownerSecret;
     ownerCommitment <== owner.out;
+    component noteTag = ShieldedScopedTag();
+    noteTag.chainId <== chainId;
+    noteTag.pool <== pool;
+    noteTag.purpose <== 1014;
     component note = Poseidon(5);
-    note.inputs[0] <== 1014;
+    note.inputs[0] <== noteTag.tag;
     note.inputs[1] <== ownerCommitment;
     note.inputs[2] <== amount;
     note.inputs[3] <== nonce;
@@ -68,14 +75,20 @@ template ShieldedDonorValueInput() {
     membership.depth <== depth;
     membership.index <== index;
     membership.siblings <== siblings;
+    component spendTag = ShieldedScopedTag();
+    spendTag.chainId <== chainId;
+    spendTag.pool <== pool;
+    spendTag.purpose <== 1016;
     component spend = Poseidon(3);
-    spend.inputs[0] <== 1016;
+    spend.inputs[0] <== spendTag.tag;
     spend.inputs[1] <== ownerSecret;
     spend.inputs[2] <== noteCommitment;
     spendNullifier <== spend.out;
 }
 
 template ShieldedPrivatePolicy() {
+    signal input chainId;
+    signal input pool;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input rate;
@@ -105,8 +118,12 @@ template ShieldedPrivatePolicy() {
     component periodDaysNotZero = IsZero();
     periodDaysNotZero.in <== periodDays;
     periodDaysNotZero.out === 0;
+    component policyTag = ShieldedScopedTag();
+    policyTag.chainId <== chainId;
+    policyTag.pool <== pool;
+    policyTag.purpose <== 1010;
     component policy = Poseidon(7);
-    policy.inputs[0] <== 1010;
+    policy.inputs[0] <== policyTag.tag;
     policy.inputs[1] <== rootIdentityCommitment;
     policy.inputs[2] <== rootVersionIndex;
     policy.inputs[3] <== rate;
@@ -117,6 +134,8 @@ template ShieldedPrivatePolicy() {
 }
 
 template ShieldedPrivateEnrollment() {
+    signal input chainId;
+    signal input pool;
     signal input policyCommitment;
     signal input heirIdentityCommitment;
     signal input eligibleFrom;
@@ -128,8 +147,12 @@ template ShieldedPrivateEnrollment() {
     component saltNotZero = IsZero();
     saltNotZero.in <== enrollmentSalt;
     saltNotZero.out === 0;
+    component enrollmentTag = ShieldedScopedTag();
+    enrollmentTag.chainId <== chainId;
+    enrollmentTag.pool <== pool;
+    enrollmentTag.purpose <== 1011;
     component enrollment = Poseidon(5);
-    enrollment.inputs[0] <== 1011;
+    enrollment.inputs[0] <== enrollmentTag.tag;
     enrollment.inputs[1] <== policyCommitment;
     enrollment.inputs[2] <== heirIdentityCommitment;
     enrollment.inputs[3] <== eligibleFrom;
@@ -138,6 +161,8 @@ template ShieldedPrivateEnrollment() {
 }
 
 template ShieldedDonorChange() {
+    signal input chainId;
+    signal input pool;
     signal input ownerCommitment;
     signal input amount;
     signal input nonce;
@@ -149,8 +174,12 @@ template ShieldedDonorChange() {
     component nonceNotZero = IsZero();
     nonceNotZero.in <== nonce;
     nonceNotZero.out === 0;
+    component noteTag = ShieldedScopedTag();
+    noteTag.chainId <== chainId;
+    noteTag.pool <== pool;
+    noteTag.purpose <== 1014;
     component note = Poseidon(5);
-    note.inputs[0] <== 1014;
+    note.inputs[0] <== noteTag.tag;
     note.inputs[1] <== ownerCommitment;
     note.inputs[2] <== amount;
     note.inputs[3] <== nonce;
@@ -162,6 +191,8 @@ template ShieldedDonorChange() {
 // Private kind 0 binds the owner's spending commitment and private policy.
 // Identity kind 1 binds all public terms without exposing private openings.
 template ShieldedBoundBudgetCommitment() {
+    signal input chainId;
+    signal input pool;
     signal input budgetKind;
     signal input policyCommitment;
     signal input enrollmentCommitment;
@@ -174,8 +205,12 @@ template ShieldedBoundBudgetCommitment() {
     signal output commitment;
 
     budgetKind * (1 - budgetKind) === 0;
+    component noteTag = ShieldedScopedTag();
+    noteTag.chainId <== chainId;
+    noteTag.pool <== pool;
+    noteTag.purpose <== 1015 + 15 * budgetKind;
     component note = Poseidon(8);
-    note.inputs[0] <== 1015 + 15 * budgetKind;
+    note.inputs[0] <== noteTag.tag;
     note.inputs[1] <== policyCommitment;
     note.inputs[2] <== enrollmentCommitment;
     note.inputs[3] <== ownerCommitment + budgetKind * (termsCommitment - ownerCommitment);
@@ -187,6 +222,8 @@ template ShieldedBoundBudgetCommitment() {
 }
 
 template ShieldedIdentityBudgetTerms() {
+    signal input chainId;
+    signal input pool;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input heirIdentityCommitment;
@@ -194,8 +231,12 @@ template ShieldedIdentityBudgetTerms() {
     signal input rate;
     signal input periodDays;
     signal output commitment;
+    component termsTag = ShieldedScopedTag();
+    termsTag.chainId <== chainId;
+    termsTag.pool <== pool;
+    termsTag.purpose <== 1029;
     component terms = Poseidon(7);
-    terms.inputs[0] <== 1029;
+    terms.inputs[0] <== termsTag.tag;
     terms.inputs[1] <== rootIdentityCommitment;
     terms.inputs[2] <== rootVersionIndex;
     terms.inputs[3] <== heirIdentityCommitment;

@@ -109,7 +109,10 @@ const SHIELDED_ADDRESSES = Object.fromEntries(
     (record) =>
       record.transactionLabel.startsWith("shielded") ||
       ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
-  ).map((record, index) => [record.transactionLabel, address(200 + index)]),
+  ).map((record, index) => [
+    record.property === "shieldedErc20Pool" ? "shieldedErc20Pool" : record.transactionLabel,
+    address(200 + index),
+  ]),
 );
 const ADAPTER_BINDINGS = groth16VerifierAdapterBindingsFromAddresses({
   groth16VerifierAdapter: VERIFIER_ADAPTER,
@@ -129,10 +132,12 @@ const SHIELDED_DEPLOYMENT_ARTIFACTS = {
       { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
     ]),
   ),
-  shieldedDeepPool: {
-    artifactSha256: SHIELDED_ARTIFACT_SHA256,
-    runtimeSha256: SHIELDED_RUNTIME_SHA256,
-  },
+  ...Object.fromEntries(
+    ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+      key,
+      { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
+    ]),
+  ),
 };
 const SHIELDED_DEPLOYMENT_EVIDENCE = shieldedDeploymentEvidence(
   SHIELDED_BINDINGS,
@@ -254,7 +259,9 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         deepFamilyArchive: { artifactSha256: ARCHIVE_ARTIFACT_SHA256 },
         deepFamilyReader: { artifactSha256: READER_ARTIFACT_SHA256 },
         shieldedVerifiers: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedVerifiers,
-        shieldedDeepPool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedDeepPool,
+        shieldedErc20Pool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedErc20Pool,
+        shieldedNativePool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedNativePool,
+        shieldedPoolFactory: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedPoolFactory,
       },
     },
   };
@@ -311,7 +318,7 @@ const shieldedProofs = (chainId) =>
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
       const signals = Array(SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
       signals[0] = String(chainId);
-      signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedDeepPool).toString();
+      signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
       if (action === "fund") signals[signals.length - 1] = "1000";
       if (action === "claim") signals[signals.length - 1] = String(8200 + 12 * 2_592_000);
@@ -522,7 +529,7 @@ const validReportTemplate = () => ({
     receipts: {
       rpcChecks: "passed",
       chainId: CHAIN_ID,
-      poolAddress: SHIELDED_ADDRESSES.shieldedDeepPool,
+      poolAddress: SHIELDED_ADDRESSES.shieldedErc20Pool,
       transactions: {
         fund: {
           txHash: SHIELDED_TRANSACTION_RECEIPTS["shielded-action-fund"].hash,
@@ -1617,13 +1624,15 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /verifierAdapter\.fundVerifier/iu,
       ],
       [
-        (report) => (report.terminalGovernanceState.shieldedDeepPool.tokenImmutable = address(999)),
-        /ShieldedDeepPool must bind the declared token, lineage and common verifier adapter/iu,
+        (report) =>
+          (report.terminalGovernanceState.shieldedErc20Pool.tokenImmutable = address(999)),
+        /ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter/iu,
       ],
       [
         (report) =>
-          (report.terminalGovernanceState.shieldedDeepPool.verifierAdapterImmutable = address(999)),
-        /ShieldedDeepPool must bind the declared token, lineage and common verifier adapter/iu,
+          (report.terminalGovernanceState.shieldedErc20Pool.verifierAdapterImmutable =
+            address(999)),
+        /ShieldedErc20Pool must bind the declared token, lineage and common verifier adapter/iu,
       ],
       [
         (report) => (report.shielded.scenario.receiveCode.verified = false),
@@ -1635,8 +1644,8 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       ],
       [
         (report) =>
-          (report.terminalGovernanceState.shieldedDeepPool.runtimeSha256 = "ff".repeat(32)),
-        /ShieldedDeepPool runtimeSha256/iu,
+          (report.terminalGovernanceState.shieldedErc20Pool.runtimeSha256 = "ff".repeat(32)),
+        /ShieldedErc20Pool runtimeSha256/iu,
       ],
     ];
     for (const [mutate, pattern] of cases) {

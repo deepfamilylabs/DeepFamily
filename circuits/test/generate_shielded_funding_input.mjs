@@ -2,39 +2,51 @@
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 
+import {
+  DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
+  DEFAULT_SHIELDED_FIXTURE_POOL,
+  shieldedFixtureTag,
+} from "./shielded_scope_fixture.mjs";
+
 const decimal = (value) => BigInt(value).toString();
 const zeroes = () => Array(32).fill("0");
 
 export function buildShieldedFundingFixtures({
   donorAmount = 1000n,
   periodDays = 30n,
+  chainId = DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
+  pool = DEFAULT_SHIELDED_FIXTURE_POOL,
+  poolAddress,
   budgetKind = 0,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
 } = {}) {
+  chainId = BigInt(chainId);
+  pool = BigInt(poolAddress ?? pool);
+  const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
-  const heir = buildShieldedClaimFixture({ periodDays });
+  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool });
   const donorOwnerSecret = 424242n;
   const donorOwnerCommitment = poseidon2([1013n, donorOwnerSecret]);
   donorAmount = BigInt(donorAmount);
   const donorNonce = 101n;
   const donorCiphertextHash = 102n;
   const donorNote = poseidon5([
-    1014n,
+    scoped(1014n),
     donorOwnerCommitment,
     donorAmount,
     donorNonce,
     donorCiphertextHash,
   ]);
-  const donorSpend = poseidon3([1016n, donorOwnerSecret, donorNote]);
+  const donorSpend = poseidon3([scoped(1016n), donorOwnerSecret, donorNote]);
   const rate = 100n;
   const rootIdentityCommitment = BigInt(heir.witness.fatherIdentityCommitment);
   const rootVersionIndex = BigInt(heir.witness.rootVersionIndex);
   const policySalt = 55555n;
   const allocationKey = 131313n;
-  const allocationKeyCommitment = poseidon2([1028n, allocationKey]);
+  const allocationKeyCommitment = poseidon2([scoped(1028n), allocationKey]);
   const policy = poseidon7([
-    1010n,
+    scoped(1010n),
     rootIdentityCommitment,
     rootVersionIndex,
     rate,
@@ -48,14 +60,14 @@ export function buildShieldedFundingFixtures({
   const eligibleFrom = BigInt(heir.witness.eligibleFrom);
   const enrollmentSalt = 66666n;
   const enrollment = poseidon5([
-    1011n,
+    scoped(1011n),
     policy,
     heirIdentityCommitment,
     eligibleFrom,
     enrollmentSalt,
   ]);
   const termsCommitment = poseidon7([
-    1029n,
+    scoped(1029n),
     rootIdentityCommitment,
     rootVersionIndex,
     heirIdentityCommitment,
@@ -68,7 +80,7 @@ export function buildShieldedFundingFixtures({
   const budgetNonce = 107n;
   const budgetCiphertextHash = 108n;
   const outputBudget = poseidon8([
-    budgetKind === 0 ? 1015n : 1030n,
+    scoped(budgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
     budgetKind === 0 ? heirOwnerCommitment : termsCommitment,
@@ -80,19 +92,18 @@ export function buildShieldedFundingFixtures({
   const changeNonce = 109n;
   const changeCiphertextHash = 110n;
   const outputChange = poseidon5([
-    1014n,
+    scoped(1014n),
     donorOwnerCommitment,
     donorAmount - fundedAmount,
     changeNonce,
     changeCiphertextHash,
   ]);
-  const pool = BigInt("0x1111111111111111111111111111111111111111");
   oldBudgetRemainingPeriods = BigInt(oldBudgetRemainingPeriods);
   const oldBudgetRemaining = rate * oldBudgetRemainingPeriods;
   const oldBudgetNonce = 112n;
   const oldBudgetCiphertextHash = 113n;
   const oldBudget = poseidon8([
-    oldBudgetKind === 0 ? 1015n : 1030n,
+    scoped(oldBudgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
     oldBudgetKind === 0 ? oldHeirOwnerCommitment : termsCommitment,
@@ -142,13 +153,13 @@ export function buildShieldedFundingFixtures({
             periodDays,
           ].map(decimal)
         : Array(10).fill("0"),
-    chainId: "1030",
+    chainId: decimal(chainId),
     pool: decimal(pool),
     inputShardIds: ["0", "0"],
     outputCommitments: [outputBudget, outputChange].map(decimal),
     ciphertextHashes: [budgetCiphertextHash, changeCiphertextHash].map(decimal),
   };
-  const enrollmentTag = poseidon4([1027n, allocationKey, policy, heirIdentityCommitment]);
+  const enrollmentTag = poseidon4([scoped(1027n), allocationKey, policy, heirIdentityCommitment]);
 
   const lineageFields = {
     heirVersionIndex: heir.witness.versionIndex,
@@ -203,15 +214,17 @@ export function buildShieldedFundingFixtures({
     ...oldFields,
     fundMode: "1",
     inputRoots: [donorNote, oldBudget].map(decimal),
-    inputNullifiers: [donorSpend, poseidon4([1026n, policySalt, oldBudget, budgetUseNonce])].map(
-      decimal,
-    ),
+    inputNullifiers: [
+      donorSpend,
+      poseidon4([scoped(1026n), policySalt, oldBudget, budgetUseNonce]),
+    ].map(decimal),
     endorsementRoot: "0",
     trustedRoot: "0",
     asOf: "0",
     allocationKey: "0",
   };
   return {
+    scope: { chainId, poolAddress: `0x${pool.toString(16).padStart(40, "0")}` },
     initial,
     continuation,
     policy,

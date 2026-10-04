@@ -309,7 +309,7 @@ Private budgets use domain 1015 and a policy commitment that binds periodDays. I
 
 `claim` spends one or two compatible budgets, including a mixed pair, and proves the identity secret, current direct-child endorsement, trusted source, complete mature periods and sufficient funds. Input binding selectors are private witnesses committed by the note domains; they cannot bypass private owner or rule-opening checks. Any active owner-bound input forces an owner-bound remainder. Pure identity inputs retain their format; both remainder and VALUE are encrypted to the claimant. The 27 public signals expose neither input identity nor binding kind. Period nullifiers depend on the same identity secret, policy commitment and period index across both formats, so additional funding and format changes cannot reset allowances.
 
-`ShieldedDeepPool` maintains the same 32-level note shards and secret-derived spend/period nullifiers for both formats. The lineage trees remain 64 levels deep. `privateTransfer` spends one or two VALUE notes into two VALUE outputs, supporting payments and consolidation; its absent second input uses a secret-bound dummy. Different public roots reveal two real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and fixed proof shapes do not prevent timing, wallet or small-set correlation.
+`ShieldedPoolCore` maintains the same 32-level note shards and secret-derived spend/period nullifiers for both formats. The lineage trees remain 64 levels deep. `privateTransfer` spends one or two VALUE notes into two VALUE outputs, supporting payments and consolidation; its absent second input uses a secret-bound dummy. Different public roots reveal two real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and fixed proof shapes do not prevent timing, wallet or small-set correlation.
 
 `npm run zk:development:setup` prepares all 8 circuits and synchronizes browser artifacts to `frontend/public/zk/`, with the six shielded sets under `shielded/`. Generated Solidity verifiers for the five pool actions live under `contracts/Shielded*Verifier.sol`; the receive code has none. `npm run zk:production:setup` uses the same production workflow for all 8 circuits, generating independent keys for each.
 
@@ -417,7 +417,7 @@ vectors, and deployment/runtime evidence have all been recorded and the release 
 
 `zk:development:setup` records no ceremony evidence and is never a substitute for a production
 ceremony. Both it and production setup use the pinned public Phase-1 pTau committed at
-`circuits/ptau/ppot_0080_16.ptau` or the file selected by `ZK_PTAU_PATH`; both check
+`circuits/ptau/ppot_0080_17.ptau` or the file selected by `ZK_PTAU_PATH`; both check
 its pinned hashes before use, and no command downloads it.
 
 Once the circuits and KDF profiles are frozen, run `npm run zk:production:setup`, review and commit
@@ -465,3 +465,7 @@ installation, and optional multi-party setup details.
 - Every circuit, public-signal spec, verifier, adapter, artifact descriptor, release manifest, and
   documentation update must land together. A mismatch normally manifests as proof rejection,
   incorrect parent linkage, or failed mint disclosure binding.
+
+The multi-asset pool protocol is version 2. `D = Poseidon3(1031, chainId, uint160(poolAddress))` and `S(purpose) = Poseidon3(1032, D, purpose)` replace each original pool-local hash domain (1010, 1011, 1014–1017, 1019, 1021, 1026–1030). The circuits compute this from the contract-supplied public chain/pool signals; commitments, spend/period/enrollment/template-use nullifiers and recursive donor backups require the same explicit scope. Global identity, owner/view keys, receive codes and lineage leaves remain unchanged. Payload and HPKE envelope format version 1 is rejected; new payloads use version 2 with the same fixed lengths. Asset pools cannot share input notes, budget templates or claim markers.
+
+The immutable, non-upgradeable factory registers native currency and a DEEP ERC-20 pool at deployment, and anyone may create another canonical ERC-20 pool without DEEP fees, staking or approvals. Each pool tracks its own note tree and liabilities. ERC-20 entry/exit verifies both sender and recipient deltas and reserves at least totalShielded; native deposits require exact value and native exits revert on failed calls. The factory and pools have no administrator, pause, treasury, surplus withdrawal or governance entrypoint. Token import validates basic interfaces only; unsupported token behavior remains a risk limited to its pool.

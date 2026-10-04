@@ -67,6 +67,19 @@ template ShieldedFund() {
     signal input budgetNonce;
     signal input changeNonce;
 
+    component allocationTag = ShieldedScopedTag();
+    allocationTag.chainId <== chainId;
+    allocationTag.pool <== pool;
+    allocationTag.purpose <== 1028;
+    component budgetUseTag = ShieldedScopedTag();
+    budgetUseTag.chainId <== chainId;
+    budgetUseTag.pool <== pool;
+    budgetUseTag.purpose <== 1026;
+    component initialEnrollmentTag = ShieldedScopedTag();
+    initialEnrollmentTag.chainId <== chainId;
+    initialEnrollmentTag.pool <== pool;
+    initialEnrollmentTag.purpose <== 1027;
+
     component chainBits = Num2Bits(64);
     chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
@@ -86,6 +99,8 @@ template ShieldedFund() {
     asOfBits.in <== asOf;
 
     component donor = ShieldedDonorValueInput();
+    donor.chainId <== chainId;
+    donor.pool <== pool;
     donor.ownerSecret <== donorOwnerSecret;
     donor.amount <== donorAmount;
     donor.nonce <== donorNonce;
@@ -97,6 +112,8 @@ template ShieldedFund() {
     donor.spendNullifier === inputNullifiers[0];
 
     component policy = ShieldedPrivatePolicy();
+    policy.chainId <== chainId;
+    policy.pool <== pool;
     policy.rootIdentityCommitment <== rootIdentityCommitment;
     policy.rootVersionIndex <== rootVersionIndex;
     policy.rate <== rate;
@@ -108,7 +125,7 @@ template ShieldedFund() {
     initial * keyNotZero.out === 0;
     fundMode * allocationKey === 0;
     component keyCommitment = Poseidon(2);
-    keyCommitment.inputs[0] <== 1028;
+    keyCommitment.inputs[0] <== allocationTag.tag;
     keyCommitment.inputs[1] <== allocationKey;
     initial * (keyCommitment.out - allocationKeyCommitment) === 0;
 
@@ -162,12 +179,16 @@ template ShieldedFund() {
     initial * (eligibleFrom - asOf - 7200) === 0;
 
     component enrollment = ShieldedPrivateEnrollment();
+    enrollment.chainId <== chainId;
+    enrollment.pool <== pool;
     enrollment.policyCommitment <== policy.commitment;
     enrollment.heirIdentityCommitment <== heirIdentityCommitment;
     enrollment.eligibleFrom <== eligibleFrom;
     enrollment.enrollmentSalt <== enrollmentSalt;
 
     component terms = ShieldedIdentityBudgetTerms();
+    terms.chainId <== chainId;
+    terms.pool <== pool;
     terms.rootIdentityCommitment <== rootIdentityCommitment;
     terms.rootVersionIndex <== rootVersionIndex;
     terms.heirIdentityCommitment <== heirIdentityCommitment;
@@ -201,6 +222,8 @@ template ShieldedFund() {
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
     component oldBudget = ShieldedBoundBudgetCommitment();
+    oldBudget.chainId <== chainId;
+    oldBudget.pool <== pool;
     oldBudget.budgetKind <== oldBudgetKind;
     oldBudget.policyCommitment <== policy.commitment;
     oldBudget.enrollmentCommitment <== enrollment.commitment;
@@ -226,12 +249,12 @@ template ShieldedFund() {
     useNonceNotZero.in <== budgetUseNonce;
     fundMode * useNonceNotZero.out === 0;
     component useTag = Poseidon(4);
-    useTag.inputs[0] <== 1026;
+    useTag.inputs[0] <== budgetUseTag.tag;
     useTag.inputs[1] <== policySalt;
     useTag.inputs[2] <== oldBudget.commitment;
     useTag.inputs[3] <== budgetUseNonce;
     component enrollmentTag = Poseidon(4);
-    enrollmentTag.inputs[0] <== 1027;
+    enrollmentTag.inputs[0] <== initialEnrollmentTag.tag;
     enrollmentTag.inputs[1] <== allocationKey;
     enrollmentTag.inputs[2] <== policy.commitment;
     enrollmentTag.inputs[3] <== heirIdentityCommitment;
@@ -249,6 +272,8 @@ template ShieldedFund() {
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;
     component budget = ShieldedBoundBudgetCommitment();
+    budget.chainId <== chainId;
+    budget.pool <== pool;
     budget.budgetKind <== budgetKind;
     budget.policyCommitment <== policy.commitment;
     budget.enrollmentCommitment <== enrollment.commitment;
@@ -271,6 +296,8 @@ template ShieldedFund() {
     publicBudget[9] === budgetKind * periodDays;
     signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
+    change.chainId <== chainId;
+    change.pool <== pool;
     change.ownerCommitment <== donor.ownerCommitment;
     change.amount <== changeAmount;
     change.nonce <== changeNonce;

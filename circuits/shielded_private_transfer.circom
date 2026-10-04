@@ -3,6 +3,7 @@ pragma circom 2.2.3;
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
+include "shielded_scope_common.circom";
 include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
 
 // Action 3. One or two independently owned VALUE_NOTE inputs fund two
@@ -31,6 +32,19 @@ template ShieldedPrivateTransfer() {
     signal input outputOwnerCommitments[2];
     signal input outputAmounts[2];
     signal input outputNonces[2];
+
+    component valueTag = ShieldedScopedTag();
+    valueTag.chainId <== chainId;
+    valueTag.pool <== pool;
+    valueTag.purpose <== 1014;
+    component spendTag = ShieldedScopedTag();
+    spendTag.chainId <== chainId;
+    spendTag.pool <== pool;
+    spendTag.purpose <== 1016;
+    component dummyInputTag = ShieldedScopedTag();
+    dummyInputTag.chainId <== chainId;
+    dummyInputTag.pool <== pool;
+    dummyInputTag.purpose <== 1021;
 
     component chainBits = Num2Bits(64);
     chainBits.in <== chainId;
@@ -83,7 +97,7 @@ template ShieldedPrivateTransfer() {
             hasSecondInput * inputNonceNotZero[i].out === 0;
         }
         inputNote[i] = Poseidon(5);
-        inputNote[i].inputs[0] <== 1014;
+        inputNote[i].inputs[0] <== valueTag.tag;
         inputNote[i].inputs[1] <== owner[i].out;
         inputNote[i].inputs[2] <== inputAmounts[i];
         inputNote[i].inputs[3] <== inputNonces[i];
@@ -107,7 +121,7 @@ template ShieldedPrivateTransfer() {
             hasSecondInput * (membership[i].out - inputRoots[1]) === 0;
         }
         spend[i] = Poseidon(3);
-        spend[i].inputs[0] <== 1016;
+        spend[i].inputs[0] <== spendTag.tag;
         spend[i].inputs[1] <== inputOwnerSecrets[i];
         spend[i].inputs[2] <== inputNote[i].out;
         if (i == 0) {
@@ -123,7 +137,7 @@ template ShieldedPrivateTransfer() {
         outputNonceNotZero[i].in <== outputNonces[i];
         outputNonceNotZero[i].out === 0;
         outputNote[i] = Poseidon(5);
-        outputNote[i].inputs[0] <== 1014;
+        outputNote[i].inputs[0] <== valueTag.tag;
         outputNote[i].inputs[1] <== outputOwnerCommitments[i];
         outputNote[i].inputs[2] <== outputAmounts[i];
         outputNote[i].inputs[3] <== outputNonces[i];
@@ -131,7 +145,7 @@ template ShieldedPrivateTransfer() {
         outputNote[i].out === outputCommitments[i];
     }
     component dummySpend = Poseidon(3);
-    dummySpend.inputs[0] <== 1021;
+    dummySpend.inputs[0] <== dummyInputTag.tag;
     dummySpend.inputs[1] <== inputOwnerSecrets[0];
     dummySpend.inputs[2] <== inputNote[0].out;
     inputNullifiers[1] === dummySpend.out + hasSecondInput * (spend[1].out - dummySpend.out);

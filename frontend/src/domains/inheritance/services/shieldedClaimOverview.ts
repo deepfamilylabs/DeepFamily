@@ -14,7 +14,10 @@ import type { OwnedShieldedNote } from "./shieldedPoolChain";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
 type Note = OwnedShieldedNote<DecodedShieldedNotePayload>;
-type PeriodWallet = Pick<LocalShieldedWalletSnapshot, "spentNullifiers">;
+type PeriodWallet = Pick<
+  LocalShieldedWalletSnapshot,
+  "spentNullifiers" | "chainId" | "poolAddress"
+>;
 
 export type ShieldedClaimOverview = {
   status: "claimable" | "notDue" | "exhausted" | "noFunds" | "scanLimited";
@@ -93,7 +96,7 @@ export function listShieldedClaimBudgetOptions(
   });
   const groups = new Map<string, ShieldedSelectableBudgetNote[]>();
   for (const note of budgets) {
-    const key = getShieldedClaimBudgetKey(note.note);
+    const key = getShieldedClaimBudgetKey(note.note, wallet);
     const group = groups.get(key);
     if (group) group.push(note);
     else groups.set(key, [note]);
@@ -124,11 +127,14 @@ function futureFundedPeriod(
   for (let index = 0n; index < SHIELDED_CLAIM_OVERVIEW_SCAN_LIMIT; index += 1n) {
     const dueAt = funding.eligibleFrom + (index + 1n) * periodSeconds;
     if (dueAt > MAX_UINT64) return { scanLimited: false };
-    const nullifier = computeShieldedPeriodNullifier({
-      derivedSecretField,
-      policyCommitment: funding.policyCommitment,
-      periodIndex: index,
-    });
+    const nullifier = computeShieldedPeriodNullifier(
+      {
+        derivedSecretField,
+        policyCommitment: funding.policyCommitment,
+        periodIndex: index,
+      },
+      wallet,
+    );
     if (wallet.spentNullifiers.has(nullifier)) continue;
     if (dueAt > now) return { nextDueAt: dueAt, scanLimited: false };
     unpaidDuePeriods += 1n;
@@ -172,7 +178,7 @@ export function getShieldedClaimOverview(
   const policies = new Map<bigint, PolicyFunding>();
   for (const budget of budgets) {
     if (budget.note.remaining === 0n) continue;
-    const policyCommitment = getShieldedBudgetCommitments(budget.note).policyCommitment;
+    const policyCommitment = getShieldedBudgetCommitments(budget.note, wallet).policyCommitment;
     const previous = policies.get(policyCommitment);
     policies.set(policyCommitment, {
       policyCommitment,

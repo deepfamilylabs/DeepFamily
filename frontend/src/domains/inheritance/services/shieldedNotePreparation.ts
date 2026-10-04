@@ -11,6 +11,7 @@ import {
   encryptShieldedNote,
   generateShieldedRandomField,
   verifyShieldedNotePayload,
+  type ShieldedScope,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
@@ -80,14 +81,14 @@ function context(input: CommonPreparationInput) {
  */
 async function encryptOwnOutput<T extends ShieldedValueNotePayload>(
   note: T,
-  encode: (value: T) => Uint8Array,
+  encode: (value: T, scope: ShieldedScope) => Uint8Array,
   commitment: (ciphertextHashField: bigint) => bigint,
   viewingKey: Uint8Array,
   hpkeIkm: string,
   chainId: bigint,
   poolAddress: string,
 ): Promise<PreparedOutput<T>> {
-  const payload = encode(note);
+  const payload = encode(note, { chainId, poolAddress });
   let opened: Uint8Array | undefined;
   try {
     const ciphertext = await encryptShieldedNote({
@@ -107,7 +108,10 @@ async function encryptOwnOutput<T extends ShieldedValueNotePayload>(
     if (opened.length !== payload.length || opened.some((byte, index) => byte !== payload[index])) {
       throw new Error("Shielded output did not decrypt to its intended note");
     }
-    verifyShieldedNotePayload({ payload: opened, ciphertext, noteCommitment });
+    verifyShieldedNotePayload(
+      { payload: opened, ciphertext, noteCommitment },
+      { chainId, poolAddress },
+    );
     return { note, commitment: noteCommitment, ciphertext, ciphertextHashField };
   } finally {
     payload.fill(0);
@@ -195,7 +199,10 @@ export async function prepareShieldedShield(
         note,
         encodeShieldedValueNotePayload,
         (ciphertextHashField) =>
-          computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }),
+          computeShieldedValueNoteCommitment(
+            { ...note, ciphertextHashField },
+            { chainId, poolAddress },
+          ),
         viewingKey,
         keys.hpkeIkm,
         chainId,

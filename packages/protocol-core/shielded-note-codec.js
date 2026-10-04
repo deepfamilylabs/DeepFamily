@@ -11,10 +11,11 @@ import {
   computeShieldedPolicyCommitment,
   computeShieldedValueNoteCommitment,
   getShieldedBudgetCommitments,
+  normalizeShieldedScope,
   SHIELDED_CIPHERTEXT_BYTES,
 } from "./shielded-inheritance.js";
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION = 1;
+export const SHIELDED_NOTE_PAYLOAD_VERSION = 2;
 export const SHIELDED_VALUE_NOTE_KIND = 1;
 export const SHIELDED_BUDGET_NOTE_KIND = 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 3;
@@ -93,7 +94,7 @@ const IDENTITY_BUDGET_FIELDS = new Set([
   ...identityBudgetSchema.map(([label]) => label),
 ]);
 
-function validateIdentityBudget(note) {
+function validateIdentityBudget(note, scope) {
   protocolAssert(
     note.binding === "identity",
     "INVALID_SHIELDED_BUDGET_BINDING",
@@ -105,28 +106,37 @@ function validateIdentityBudget(note) {
     "PRIVATE_SHIELDED_BUDGET_FIELD",
     "An identity budget must not contain private authorization or rule-opening fields",
   );
-  const commitments = getShieldedBudgetCommitments(note);
-  computeShieldedIdentityBudgetNoteCommitment({ ...note, ...commitments, ciphertextHashField: 0n });
+  const commitments = getShieldedBudgetCommitments(note, scope);
+  computeShieldedIdentityBudgetNoteCommitment(
+    { ...note, ...commitments, ciphertextHashField: 0n },
+    scope,
+  );
   return commitments;
 }
 
-function validateRuleOpening(note, opening) {
+function validateRuleOpening(note, opening, scope) {
   protocolAssert(
     opening !== undefined && opening !== null,
     "MISSING_SHIELDED_RULE_OPENING",
     "An identity-budget donor backup requires the private rule opening",
   );
-  const policyCommitment = computeShieldedPolicyCommitment({
-    ...note,
-    policySalt: opening.policySalt,
-    allocationKeyCommitment: opening.allocationKeyCommitment,
-  });
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: note.heirIdentityCommitment,
-    eligibleFrom: note.eligibleFrom,
-    enrollmentSalt: opening.enrollmentSalt,
-  });
+  const policyCommitment = computeShieldedPolicyCommitment(
+    {
+      ...note,
+      policySalt: opening.policySalt,
+      allocationKeyCommitment: opening.allocationKeyCommitment,
+    },
+    scope,
+  );
+  const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+    {
+      policyCommitment,
+      heirIdentityCommitment: note.heirIdentityCommitment,
+      eligibleFrom: note.eligibleFrom,
+      enrollmentSalt: opening.enrollmentSalt,
+    },
+    scope,
+  );
   protocolAssert(
     policyCommitment === BigInt(note.policyCommitment) &&
       enrollmentCommitment === BigInt(note.enrollmentCommitment),
@@ -179,9 +189,10 @@ function encode(kind, value, schema, expectedLength) {
 }
 
 /** Encode a private fungible-value note, including zero-value dummy outputs. */
-export function encodeShieldedValueNotePayload(note) {
+export function encodeShieldedValueNotePayload(note, scope) {
+  normalizeShieldedScope(scope);
   // Validate nonzero owner/nonce exactly as the commitment helper does.
-  computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: 0n });
+  computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: 0n }, scope);
   if (note.fundingMemo === undefined) {
     return encode(SHIELDED_VALUE_NOTE_KIND, note, valueSchema, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES);
   }
@@ -195,8 +206,8 @@ export function encodeShieldedValueNotePayload(note) {
   const memoBudget = note.fundingMemo.budgetNote;
   const identityBound = memoBudget.binding === "identity";
   if (identityBound) {
-    validateIdentityBudget(memoBudget);
-    validateRuleOpening(memoBudget, note.fundingMemo.ruleOpening);
+    validateIdentityBudget(memoBudget, scope);
+    validateRuleOpening(memoBudget, note.fundingMemo.ruleOpening, scope);
   }
   const budget = identityBound
     ? encode(
@@ -205,7 +216,7 @@ export function encodeShieldedValueNotePayload(note) {
         identityMemoBudgetSchema,
         IDENTITY_MEMO_BUDGET_BYTES,
       )
-    : encodeShieldedBudgetNotePayload(memoBudget);
+    : encodeShieldedBudgetNotePayload(memoBudget, scope);
   const memoBytes = identityBound
     ? SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES
     : SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES;
@@ -249,7 +260,7 @@ export function encodeShieldedValueNotePayload(note) {
         ? note.fundingMemo.ruleOpening.allocationKeyCommitment
         : note.fundingMemo.budgetNote.allocationKeyCommitment;
       protocolAssert(
-        computeShieldedAllocationKeyCommitment(note.fundingMemo.allocationKey) ===
+        computeShieldedAllocationKeyCommitment(note.fundingMemo.allocationKey, scope) ===
           BigInt(allocationKeyCommitment),
         "INVALID_SHIELDED_ALLOCATION_KEY",
         "Memo funding key does not match its budget",
@@ -274,9 +285,10 @@ export function encodeShieldedValueNotePayload(note) {
 }
 
 /** Encode a funded or remaining budget note, including zero remainder. */
-export function encodeShieldedBudgetNotePayload(note) {
+export function encodeShieldedBudgetNotePayload(note, scope) {
+  normalizeShieldedScope(scope);
   if (note.binding === "identity") {
-    validateIdentityBudget(note);
+    validateIdentityBudget(note, scope);
     return encode(
       SHIELDED_IDENTITY_BUDGET_NOTE_KIND,
       note,
@@ -284,23 +296,27 @@ export function encodeShieldedBudgetNotePayload(note) {
       SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES,
     );
   }
-  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note);
-  computeShieldedBudgetNoteCommitment({
-    policyCommitment,
-    enrollmentCommitment,
-    heirOwnerCommitment: note.heirOwnerCommitment,
-    amountPerPeriod: note.amountPerPeriod,
-    remaining: note.remaining,
-    nonce: note.nonce,
-    ciphertextHashField: 0n,
-  });
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note, scope);
+  computeShieldedBudgetNoteCommitment(
+    {
+      policyCommitment,
+      enrollmentCommitment,
+      heirOwnerCommitment: note.heirOwnerCommitment,
+      amountPerPeriod: note.amountPerPeriod,
+      remaining: note.remaining,
+      nonce: note.nonce,
+      ciphertextHashField: 0n,
+    },
+    scope,
+  );
   return encode(SHIELDED_BUDGET_NOTE_KIND, note, budgetSchema, SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES);
 }
 
 /** The clear envelope is limited to the new schema; private rule openings never enter it. */
-export function encodePublicShieldedBudgetEnvelope(note) {
-  validateIdentityBudget(note);
-  const payload = encodeShieldedBudgetNotePayload(note);
+export function encodePublicShieldedBudgetEnvelope(note, scope) {
+  normalizeShieldedScope(scope);
+  validateIdentityBudget(note, scope);
+  const payload = encodeShieldedBudgetNotePayload(note, scope);
   const envelope = new Uint8Array(SHIELDED_CIPHERTEXT_BYTES);
   envelope.set(payload);
   payload.fill(0);
@@ -318,7 +334,8 @@ export function isPublicShieldedBudgetEnvelope(envelope) {
 }
 
 /** Return null for ordinary ciphertexts; recognized malformed public notes throw ProtocolError. */
-export function decodePublicShieldedBudgetEnvelope(envelope) {
+export function decodePublicShieldedBudgetEnvelope(envelope, scope) {
+  normalizeShieldedScope(scope);
   const bytes = asUint8Array(envelope, "public budget envelope");
   if (!isPublicShieldedBudgetEnvelope(bytes)) return null;
   protocolAssert(
@@ -331,17 +348,22 @@ export function decodePublicShieldedBudgetEnvelope(envelope) {
     "INVALID_SHIELDED_PUBLIC_BUDGET_PADDING",
     "Public budget envelope padding must be zero",
   );
-  return decodeShieldedNotePayload(bytes.subarray(0, SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES));
+  return decodeShieldedNotePayload(
+    bytes.subarray(0, SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES),
+    scope,
+  );
 }
 
 /** Ten public fund fields in their circuit/contract order, with canonical integer bounds. */
-export function getShieldedPublicBudgetFields(note) {
-  validateIdentityBudget(note);
+export function getShieldedPublicBudgetFields(note, scope) {
+  normalizeShieldedScope(scope);
+  validateIdentityBudget(note, scope);
   return identityBudgetSchema.map(([label, , maximum]) => bigintFrom(note[label], label, maximum));
 }
 
 /** Decode only exact, versioned, fixed-width payloads; no trailing bytes. */
-export function decodeShieldedNotePayload(payload) {
+export function decodeShieldedNotePayload(payload, scope) {
+  normalizeShieldedScope(scope);
   const input = asUint8Array(payload, "shielded note payload");
   protocolAssert(
     input.length >= HEADER_BYTES,
@@ -433,7 +455,7 @@ export function decodeShieldedNotePayload(payload) {
           budgetOffset += width;
         }
       } else {
-        const budgetNote = decodeShieldedNotePayload(input.subarray(budgetStart, budgetEnd));
+        const budgetNote = decodeShieldedNotePayload(input.subarray(budgetStart, budgetEnd), scope);
         protocolAssert(
           budgetNote.kind === "budget" && budgetNote.binding !== "identity",
           "INVALID_SHIELDED_BUDGET_MEMO",
@@ -450,12 +472,15 @@ export function decodeShieldedNotePayload(payload) {
           fundingMemo.ruleOpening[label] = readFixedUint(input, memoEnd, width, maximum, label);
           memoEnd += width;
         }
-        budgetFields.policyCommitment = computeShieldedPolicyCommitment({
-          ...budgetFields,
-          ...fundingMemo.ruleOpening,
-        });
-        validateIdentityBudget(budgetFields);
-        validateRuleOpening(budgetFields, fundingMemo.ruleOpening);
+        budgetFields.policyCommitment = computeShieldedPolicyCommitment(
+          {
+            ...budgetFields,
+            ...fundingMemo.ruleOpening,
+          },
+          scope,
+        );
+        validateIdentityBudget(budgetFields, scope);
+        validateRuleOpening(budgetFields, fundingMemo.ruleOpening, scope);
       }
       note.fundingMemo = fundingMemo;
       if (kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND) {
@@ -477,19 +502,23 @@ export function decodeShieldedNotePayload(payload) {
     }
   }
   if (isValue) {
-    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: 0n });
+    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: 0n }, scope);
   } else if (kind === SHIELDED_IDENTITY_BUDGET_NOTE_KIND) {
-    validateIdentityBudget(note);
+    validateIdentityBudget(note, scope);
   } else if (kind === SHIELDED_BUDGET_NOTE_KIND) {
-    const commitments = getShieldedBudgetCommitments(note);
-    computeShieldedBudgetNoteCommitment({ ...note, ...commitments, ciphertextHashField: 0n });
+    const commitments = getShieldedBudgetCommitments(note, scope);
+    computeShieldedBudgetNoteCommitment(
+      { ...note, ...commitments, ciphertextHashField: 0n },
+      scope,
+    );
   }
   return note;
 }
 
 /** Recompute a note's commitment from its recovered plaintext and public ciphertext hash. */
-export function computeShieldedNoteCommitmentFromPayload(input) {
-  const note = decodeShieldedNotePayload(input.payload);
+export function computeShieldedNoteCommitmentFromPayload(input, scope) {
+  normalizeShieldedScope(scope);
+  const note = decodeShieldedNotePayload(input.payload, scope);
   const ciphertextHashField = bigintFrom(
     input.ciphertextHashField,
     "ciphertextHashField",
@@ -498,28 +527,38 @@ export function computeShieldedNoteCommitmentFromPayload(input) {
   if (note.kind === "value") {
     return {
       note,
-      noteCommitment: computeShieldedValueNoteCommitment({
-        ...note,
-        ciphertextHashField,
-      }),
+      noteCommitment: computeShieldedValueNoteCommitment(
+        {
+          ...note,
+          ciphertextHashField,
+        },
+        scope,
+      ),
     };
   }
-  const commitments = getShieldedBudgetCommitments(note);
+  const commitments = getShieldedBudgetCommitments(note, scope);
   return {
     note,
     ...commitments,
     noteCommitment: (note.binding === "identity"
       ? computeShieldedIdentityBudgetNoteCommitment
-      : computeShieldedBudgetNoteCommitment)({ ...note, ...commitments, ciphertextHashField }),
+      : computeShieldedBudgetNoteCommitment)(
+      { ...note, ...commitments, ciphertextHashField },
+      scope,
+    ),
   };
 }
 
 /** Validate decrypted note bytes against the exact public ciphertext and event commitment. */
-export function verifyShieldedNotePayload(input) {
-  const result = computeShieldedNoteCommitmentFromPayload({
-    payload: input.payload,
-    ciphertextHashField: computeShieldedCiphertextHashField(input.ciphertext),
-  });
+export function verifyShieldedNotePayload(input, scope) {
+  normalizeShieldedScope(scope);
+  const result = computeShieldedNoteCommitmentFromPayload(
+    {
+      payload: input.payload,
+      ciphertextHashField: computeShieldedCiphertextHashField(input.ciphertext),
+    },
+    scope,
+  );
   const expected = bigintFrom(input.noteCommitment, "noteCommitment", MAX_FIELD);
   if (result.noteCommitment !== expected) {
     throw new ProtocolError(

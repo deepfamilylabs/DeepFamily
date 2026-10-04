@@ -230,12 +230,15 @@ async function fixture(periodDays = 30n) {
     derivedSecretField: donorSecret,
     identityCommitment: rootIC,
   });
-  const policy = createShieldedPolicyDescriptor({
-    rootIdentityCommitment: rootIC,
-    rootVersionIndex: 1n,
-    amountPerPeriod: 10n,
-    periodDays,
-  });
+  const policy = createShieldedPolicyDescriptor(
+    {
+      rootIdentityCommitment: rootIC,
+      rootVersionIndex: 1n,
+      amountPerPeriod: 10n,
+      periodDays,
+    },
+    { chainId, poolAddress },
+  );
   const childKeys = deriveShieldedHeirKeyMaterial(childSecret);
   const recipient = {
     identityCommitment: childIC,
@@ -351,9 +354,9 @@ describe("unified budget recovery and claims", () => {
       });
       checkWitness("fund", refill.witness);
       expect(refill.outputs[0].note.periodDays).toBe(periodDays);
-      expect(getShieldedBudgetCommitments(refill.outputs[0].note)).toEqual(
-        getShieldedBudgetCommitments(funded.outputs[0].note),
-      );
+      expect(
+        getShieldedBudgetCommitments(refill.outputs[0].note, { chainId, poolAddress }),
+      ).toEqual(getShieldedBudgetCommitments(funded.outputs[0].note, { chainId, poolAddress }));
       f.record(refill);
       const replenished = await recoverLocalShieldedWallet(f.pool, f.identity);
       const choice = selectClaimBudget(

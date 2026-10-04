@@ -21,6 +21,7 @@ import {
   generateShieldedRandomField,
   verifyShieldedNotePayload,
   type ShieldedBudgetNotePayload,
+  type ShieldedScope,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
@@ -122,14 +123,14 @@ function currentSource(
 
 async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedValueNotePayload>(
   note: T,
-  encode: (value: T) => Uint8Array,
+  encode: (value: T, scope: ShieldedScope) => Uint8Array,
   commitment: (ciphertextHashField: bigint) => bigint,
   viewingKey: Uint8Array,
   hpkeIkm: string,
   chainId: bigint,
   poolAddress: string,
 ): Promise<ClaimOutput<T>> {
-  const payload = encode(note);
+  const payload = encode(note, { chainId, poolAddress });
   let opened: Uint8Array | undefined;
   try {
     const ciphertext = await encryptShieldedNote({
@@ -146,11 +147,14 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
       chainId,
       poolAddress,
     });
-    const recovered = verifyShieldedNotePayload({
-      payload: opened,
-      ciphertext,
-      noteCommitment,
-    });
+    const recovered = verifyShieldedNotePayload(
+      {
+        payload: opened,
+        ciphertext,
+        noteCommitment,
+      },
+      { chainId, poolAddress },
+    );
     if (recovered.noteCommitment !== noteCommitment) {
       throw new Error("Locally encrypted claim output does not match its commitment");
     }
@@ -202,27 +206,39 @@ export async function prepareShieldedClaim(
     throw new Error("Budget note belongs to another heir");
   }
   const budgetCiphertextHash = computeShieldedCiphertextHashField(owned.ciphertext);
-  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(budget);
-  const budgetPayload = encodeShieldedBudgetNotePayload(budget);
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(budget, {
+    chainId,
+    poolAddress,
+  });
+  const budgetPayload = encodeShieldedBudgetNotePayload(budget, { chainId, poolAddress });
   try {
-    verifyShieldedNotePayload({
-      payload: budgetPayload,
-      ciphertext: owned.ciphertext,
-      noteCommitment: budgetCommitment,
-    });
+    verifyShieldedNotePayload(
+      {
+        payload: budgetPayload,
+        ciphertext: owned.ciphertext,
+        noteCommitment: budgetCommitment,
+      },
+      { chainId, poolAddress },
+    );
   } finally {
     budgetPayload.fill(0);
   }
   if (budgetCiphertextHash !== owned.ciphertextHashField)
     throw new Error("Budget note does not match its public ciphertext and commitment");
-  const spend = computeShieldedSpendNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: budgetCommitment,
-  });
-  const dummySpend = computeShieldedDummyInputNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: budgetCommitment,
-  });
+  const spend = computeShieldedSpendNullifier(
+    {
+      ownerSecret: keys.ownerSecret,
+      noteCommitment: budgetCommitment,
+    },
+    { chainId, poolAddress },
+  );
+  const dummySpend = computeShieldedDummyInputNullifier(
+    {
+      ownerSecret: keys.ownerSecret,
+      noteCommitment: budgetCommitment,
+    },
+    { chainId, poolAddress },
+  );
   if (input.wallet.spentNullifiers.has(spend) || input.wallet.spentNullifiers.has(dummySpend)) {
     throw new Error("Budget note has already been spent");
   }
@@ -252,7 +268,7 @@ export async function prepareShieldedClaim(
       if (secondBudget[field] !== budget[field])
         throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
     }
-    const secondRule = getShieldedBudgetCommitments(secondBudget);
+    const secondRule = getShieldedBudgetCommitments(secondBudget, { chainId, poolAddress });
     if (
       secondRule.policyCommitment !== policyCommitment ||
       secondRule.enrollmentCommitment !== enrollmentCommitment ||
@@ -260,23 +276,29 @@ export async function prepareShieldedClaim(
         secondBudget.heirOwnerCommitment !== keys.ownerCommitment)
     )
       throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
-    const payload = encodeShieldedBudgetNotePayload(secondBudget);
+    const payload = encodeShieldedBudgetNotePayload(secondBudget, { chainId, poolAddress });
     try {
-      verifyShieldedNotePayload({
-        payload,
-        ciphertext: secondOwned.ciphertext,
-        noteCommitment: secondCommitment,
-      });
+      verifyShieldedNotePayload(
+        {
+          payload,
+          ciphertext: secondOwned.ciphertext,
+          noteCommitment: secondCommitment,
+        },
+        { chainId, poolAddress },
+      );
     } finally {
       payload.fill(0);
     }
     secondHash = computeShieldedCiphertextHashField(secondOwned.ciphertext);
     if (secondHash !== secondOwned.ciphertextHashField)
       throw new Error("Second budget does not match its public ciphertext");
-    secondSpend = computeShieldedSpendNullifier({
-      ownerSecret: keys.ownerSecret,
-      noteCommitment: secondCommitment,
-    });
+    secondSpend = computeShieldedSpendNullifier(
+      {
+        ownerSecret: keys.ownerSecret,
+        noteCommitment: secondCommitment,
+      },
+      { chainId, poolAddress },
+    );
     if (input.wallet.spentNullifiers.has(secondSpend))
       throw new Error("Second budget note has already been spent");
     secondPath = getLocalShieldedNoteProof(input.wallet, secondCommitment);
@@ -294,16 +316,22 @@ export async function prepareShieldedClaim(
   });
   const periodNullifiers = ZERO_PERIODS.map((_, slot) =>
     slot < batch.periodIndices.length
-      ? computeShieldedPeriodNullifier({
-          derivedSecretField: material.derivedSecretField,
-          policyCommitment,
-          periodIndex: batch.periodIndices[slot],
-        })
-      : computeShieldedDummyPeriodNullifier({
-          ownerSecret: keys.ownerSecret,
-          budgetNoteCommitment: budgetCommitment,
-          slotIndex: slot,
-        }),
+      ? computeShieldedPeriodNullifier(
+          {
+            derivedSecretField: material.derivedSecretField,
+            policyCommitment,
+            periodIndex: batch.periodIndices[slot],
+          },
+          { chainId, poolAddress },
+        )
+      : computeShieldedDummyPeriodNullifier(
+          {
+            ownerSecret: keys.ownerSecret,
+            budgetNoteCommitment: budgetCommitment,
+            slotIndex: slot,
+          },
+          { chainId, poolAddress },
+        ),
   );
   if (periodNullifiers.some((tag) => input.wallet.spentNullifiers.has(tag))) {
     throw new Error("A requested claim period has already been used");
@@ -348,10 +376,12 @@ export async function prepareShieldedClaim(
       budgetOutput,
       encodeShieldedBudgetNotePayload,
       (ciphertextHashField) => {
-        const payload = encodeShieldedBudgetNotePayload(budgetOutput);
+        const payload = encodeShieldedBudgetNotePayload(budgetOutput, { chainId, poolAddress });
         try {
-          return computeShieldedNoteCommitmentFromPayload({ payload, ciphertextHashField })
-            .noteCommitment;
+          return computeShieldedNoteCommitmentFromPayload(
+            { payload, ciphertextHashField },
+            { chainId, poolAddress },
+          ).noteCommitment;
         } finally {
           payload.fill(0);
         }
@@ -365,10 +395,13 @@ export async function prepareShieldedClaim(
       payoutOutput,
       encodeShieldedValueNotePayload,
       (ciphertextHashField) =>
-        computeShieldedValueNoteCommitment({
-          ...payoutOutput,
-          ciphertextHashField,
-        }),
+        computeShieldedValueNoteCommitment(
+          {
+            ...payoutOutput,
+            ciphertextHashField,
+          },
+          { chainId, poolAddress },
+        ),
       viewingKey,
       keys.hpkeIkm,
       chainId,

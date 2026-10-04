@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
-import {ShieldedDeepPool} from "../ShieldedDeepPool.sol";
+import {ShieldedErc20Pool} from "../ShieldedErc20Pool.sol";
 
 /**
  * @dev Test only. This is deliberately not a ZK verifier and must never secure real funds.
@@ -60,13 +60,111 @@ contract ShieldedPoolFeeTokenMock is ERC20 {
   }
 }
 
+/** @dev Test only: models transfer fees, reverse balance changes and collateral loss. */
+contract ShieldedPoolBehaviorTokenMock is ERC20 {
+  error TokenCallbackFailed();
+  uint8 private immutable _precision;
+  uint8 private _behavior;
+  address private _watchedFrom;
+  address private _watchedTo;
+  address private _callbackTarget;
+  bytes private _callbackData;
+
+  constructor(uint8 precision) ERC20("Behavior asset", "BHV") {
+    _precision = precision;
+  }
+
+  function decimals() public view override returns (uint8) {
+    return _precision;
+  }
+
+  function mint(address recipient, uint256 amount) external {
+    _mint(recipient, amount);
+  }
+
+  function burn(address account, uint256 amount) external {
+    _burn(account, amount);
+  }
+
+  function setBehavior(uint8 behavior, address watchedFrom, address watchedTo) external {
+    _behavior = behavior;
+    _watchedFrom = watchedFrom;
+    _watchedTo = watchedTo;
+  }
+
+  function setCallback(address target, bytes calldata callData) external {
+    _callbackTarget = target;
+    _callbackData = callData;
+  }
+
+  function _update(address from, address to, uint256 amount) internal override {
+    if (
+      from == address(0) ||
+      to == address(0) ||
+      amount == 0 ||
+      (_watchedFrom != address(0) && from != _watchedFrom) ||
+      (_watchedTo != address(0) && to != _watchedTo)
+    ) {
+      super._update(from, to, amount);
+      return;
+    }
+    if (_behavior == 1) {
+      super._update(from, to, amount - 1);
+      super._update(from, address(0), 1);
+      return;
+    }
+    super._update(from, to, amount);
+    if (_behavior == 2) super._update(from, address(0), 1);
+    if (_behavior == 3) super._update(address(0), from, amount * 2);
+    if (_behavior == 4) super._update(to, address(0), amount * 2);
+    if (_behavior == 5) {
+      (bool success, ) = _callbackTarget.call(_callbackData);
+      if (!success) revert TokenCallbackFailed();
+    }
+  }
+}
+
+/** @dev Test only: rejects payment, forwards it, or propagates a blocked reentrant call. */
+contract ShieldedNativeReceiverMock {
+  error ReceiverRejected();
+  uint8 private _mode;
+  address private _target;
+  bytes private _callData;
+
+  function configure(uint8 mode, address target, bytes calldata callData) external {
+    _mode = mode;
+    _target = target;
+    _callData = callData;
+  }
+
+  receive() external payable {
+    if (_mode == 1) revert ReceiverRejected();
+    if (_mode == 2) {
+      (bool success, ) = _target.call(_callData);
+      if (!success) revert ReceiverRejected();
+    } else if (_mode == 3) {
+      (bool success, ) = _target.call{value: msg.value}("");
+      if (!success) revert ReceiverRejected();
+    }
+  }
+}
+
+/** @dev Test only: force a native surplus without calling the pool's shield entry. */
+contract ShieldedForcedNativeMock {
+  constructor() payable {}
+
+  function force(address target) external {
+    selfdestruct(payable(target));
+  }
+}
+
 /** @dev Test only: initializes an otherwise impossible 2^32-leaf boundary state. */
-contract ShieldedPoolRolloverHarness is ShieldedDeepPool {
+contract ShieldedPoolRolloverHarness is ShieldedErc20Pool {
   constructor(
     address token,
     address lineageIndex,
     address verifierAdapter
-  ) ShieldedDeepPool(token, lineageIndex, verifierAdapter) {}
+  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter) {}
 
   function seedFullShard() external {
     Shard storage shard = _shards[0];
@@ -84,12 +182,12 @@ contract ShieldedPoolRolloverHarness is ShieldedDeepPool {
  *      allocating billions of storage slots. It does not establish that a witness
  *      belongs to the synthetic subtree; tests must use a real verifier for that.
  */
-contract ShieldedPoolDepthHarness is ShieldedDeepPool {
+contract ShieldedPoolDepthHarness is ShieldedErc20Pool {
   constructor(
     address token,
     address lineageIndex,
     address verifierAdapter
-  ) ShieldedDeepPool(token, lineageIndex, verifierAdapter) {}
+  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter) {}
 
   function seedSyntheticLeftSubtree(uint256 leftRoot) external {
     Shard storage shard = _shards[0];

@@ -2,6 +2,7 @@ import {
   computeShieldedPeriodNullifier,
   getShieldedBudgetCommitments,
   SECONDS_PER_DAY,
+  type ShieldedScope,
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import type { BigNumberish } from "ethers";
@@ -10,7 +11,10 @@ import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
 type Note = OwnedShieldedNote<DecodedShieldedNotePayload>;
 type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget" }>;
-type PeriodWallet = Pick<LocalShieldedWalletSnapshot, "spentNullifiers">;
+type PeriodWallet = Pick<
+  LocalShieldedWalletSnapshot,
+  "spentNullifiers" | "chainId" | "poolAddress"
+>;
 
 export type ShieldedSelectableValueNote = OwnedShieldedNote<
   Extract<DecodedShieldedNotePayload, { kind: "value" }>
@@ -95,8 +99,8 @@ export function selectValueNotes(
 }
 
 /** Stable key for budget notes that may fund a single claim together. */
-export function getShieldedClaimBudgetKey(note: BudgetPayload): string {
-  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note);
+export function getShieldedClaimBudgetKey(note: BudgetPayload, scope: ShieldedScope): string {
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note, scope);
   return [
     policyCommitment,
     enrollmentCommitment,
@@ -130,15 +134,18 @@ function findClaimPeriods(
   const target = Number(fundedCount < 12n ? fundedCount : 12n);
   if (target < 1) return [];
   const dueCount = elapsed / periodSeconds;
-  const policyCommitment = getShieldedBudgetCommitments(budget).policyCommitment;
+  const policyCommitment = getShieldedBudgetCommitments(budget, wallet).policyCommitment;
   const result: bigint[] = [];
   const scanLimit = dueCount < MAX_AUTOMATIC_PERIOD_SCAN ? dueCount : MAX_AUTOMATIC_PERIOD_SCAN;
   for (let index = 0n; index < scanLimit && result.length < target; index += 1n) {
-    const nullifier = computeShieldedPeriodNullifier({
-      derivedSecretField,
-      policyCommitment,
-      periodIndex: index,
-    });
+    const nullifier = computeShieldedPeriodNullifier(
+      {
+        derivedSecretField,
+        policyCommitment,
+        periodIndex: index,
+      },
+      wallet,
+    );
     if (!wallet.spentNullifiers.has(nullifier)) result.push(index);
   }
   return result;
@@ -199,7 +206,8 @@ export function selectClaimBudget(
         if (
           secondBudget.commitment === budget.commitment ||
           secondBudget.note.remaining <= 0n ||
-          getShieldedClaimBudgetKey(secondBudget.note) !== getShieldedClaimBudgetKey(budget.note)
+          getShieldedClaimBudgetKey(secondBudget.note, wallet) !==
+            getShieldedClaimBudgetKey(budget.note, wallet)
         )
           continue;
         const remaining = budget.note.remaining + secondBudget.note.remaining;

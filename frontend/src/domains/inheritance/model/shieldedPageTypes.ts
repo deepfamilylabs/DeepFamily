@@ -5,8 +5,13 @@ export type ShieldedPageModules = {
   provider: JsonRpcProvider;
   deepFamily: Contract;
   lineageIndex: Contract;
-  token: Contract;
+  token: Contract | null;
+  assetAddress: string;
+  assetKind: "erc20" | "native";
+  assetSymbol: string;
+  factory: Contract;
   pool: Contract;
   poolAddress: string;
+  poolDeploymentBlock: number;
   tokenDecimals: number;
 };

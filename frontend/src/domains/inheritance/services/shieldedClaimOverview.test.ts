@@ -9,6 +9,8 @@ import {
 import type { ShieldedSelectableBudgetNote } from "./shieldedActionSelection";
 import { getShieldedClaimOverview, listShieldedClaimBudgetOptions } from "./shieldedClaimOverview";
 
+const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
+
 type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget"; binding?: "owner" }>;
 const secret = "987654321";
 const start = 1_000n;
@@ -50,11 +52,14 @@ function spent(
   note: Extract<DecodedShieldedNotePayload, { kind: "budget" }>,
   index: bigint,
 ): bigint {
-  return computeShieldedPeriodNullifier({
-    derivedSecretField: secret,
-    policyCommitment: getShieldedBudgetCommitments(note).policyCommitment,
-    periodIndex: index,
-  });
+  return computeShieldedPeriodNullifier(
+    {
+      derivedSecretField: secret,
+      policyCommitment: getShieldedBudgetCommitments(note, scope).policyCommitment,
+      periodIndex: index,
+    },
+    scope,
+  );
 }
 
 describe("shielded claim overview", () => {
@@ -62,7 +67,7 @@ describe("shielded claim overview", () => {
     "uses a %s-day note for due periods and the next funded date",
     (periodDays) => {
       const note = budget(1n, { periodDays });
-      const wallet = { spentNullifiers: new Set<bigint>() };
+      const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
       const seconds = periodDays * SECONDS_PER_DAY;
       const before = getShieldedClaimOverview([note], wallet, secret, start + seconds - 1n);
       expect(before.status).toBe("notDue");
@@ -74,7 +79,7 @@ describe("shielded claim overview", () => {
   );
 
   it("keeps different day intervals in separate budget groups", () => {
-    const wallet = { spentNullifiers: new Set<bigint>() };
+    const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
     const notes = [budget(1n, { periodDays: 1n }), budget(2n, { periodDays: 7n })];
     const groups = listShieldedClaimBudgetOptions(
       notes,
@@ -91,7 +96,7 @@ describe("shielded claim overview", () => {
     const periodDays = 4_294_967_295n;
     const overview = getShieldedClaimOverview(
       [budget(1n, { periodDays })],
-      { spentNullifiers: new Set() },
+      { ...scope, spentNullifiers: new Set() },
       secret,
       start,
     );
@@ -106,7 +111,7 @@ describe("shielded claim overview", () => {
       expect(
         getShieldedClaimOverview(
           [malformed],
-          { spentNullifiers: new Set() },
+          { ...scope, spentNullifiers: new Set() },
           secret,
           start + period,
         ).status,
@@ -118,7 +123,7 @@ describe("shielded claim overview", () => {
     const note = budget(1n);
     const result = getShieldedClaimOverview(
       [note],
-      { spentNullifiers: new Set() },
+      { ...scope, spentNullifiers: new Set() },
       secret,
       start + period - 1n,
     );
@@ -132,7 +137,7 @@ describe("shielded claim overview", () => {
     const note = budget(1n);
     const result = getShieldedClaimOverview(
       [note],
-      { spentNullifiers: new Set() },
+      { ...scope, spentNullifiers: new Set() },
       secret,
       start + 2n * period,
     );
@@ -143,7 +148,7 @@ describe("shielded claim overview", () => {
   it("skips paid periods shared across budgets and deduplicates budget commitments", () => {
     const first = budget(1n, { remaining: 100n });
     const second = budget(2n, { remaining: 100n });
-    const wallet = { spentNullifiers: new Set([spent(first.note, 0n)]) };
+    const wallet = { ...scope, spentNullifiers: new Set([spent(first.note, 0n)]) };
     const result = getShieldedClaimOverview(
       [first, { ...first }, second],
       wallet,
@@ -158,7 +163,7 @@ describe("shielded claim overview", () => {
   it("does not invent a next date when allocations sharing a policy started on different days", () => {
     const first = budget(1n, { remaining: 100n });
     const later = budget(2n, { remaining: 100n, eligibleFrom: start + 10n * period });
-    const wallet = { spentNullifiers: new Set([spent(first.note, 0n)]) };
+    const wallet = { ...scope, spentNullifiers: new Set([spent(first.note, 0n)]) };
     const result = getShieldedClaimOverview([first, later], wallet, secret, start + 2n * period);
     expect(result.status).toBe("claimable");
     expect(result.scanLimited).toBe(true);
@@ -166,7 +171,7 @@ describe("shielded claim overview", () => {
   });
 
   it("keeps no funds, exhausted funds, and invalid budgets distinct", () => {
-    const wallet = { spentNullifiers: new Set<bigint>() };
+    const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
     expect(getShieldedClaimOverview([], wallet, secret, start).status).toBe("noFunds");
     expect(
       getShieldedClaimOverview([budget(1n, { remaining: 0n })], wallet, secret, start).status,
@@ -183,7 +188,7 @@ describe("shielded claim budget options", () => {
     const compatible = budget(3n, { remaining: 200n });
     const otherRule = budget(1n, { policySalt: 223n });
     const later = budget(4n, { eligibleFrom: start + period });
-    const wallet = { spentNullifiers: new Set<bigint>() };
+    const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
     const now = start + 3n * period;
     const result = listShieldedClaimBudgetOptions(
       [later, compatible, otherRule, first],
@@ -232,7 +237,7 @@ describe("shielded claim budget options", () => {
         budget(5n, { remaining: 99n }),
         budget(6n, { amountPerPeriod: 0n }),
       ],
-      { spentNullifiers: new Set() },
+      { ...scope, spentNullifiers: new Set() },
       secret,
       start + 20n * period,
     );
@@ -252,7 +257,7 @@ describe("shielded claim budget options", () => {
     const note = budget(1n, { remaining: 400n });
     const result = listShieldedClaimBudgetOptions(
       [note],
-      { spentNullifiers: new Set([spent(note.note, 0n), spent(note.note, 2n)]) },
+      { ...scope, spentNullifiers: new Set([spent(note.note, 0n), spent(note.note, 2n)]) },
       secret,
       start + 4n * period,
     );
@@ -268,6 +273,7 @@ describe("shielded claim budget options", () => {
     const privateNote = budget(1n, { remaining: 100n });
     const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(
       privateNote.note,
+      scope,
     );
     const publicNote: ShieldedSelectableBudgetNote = {
       ...budget(2n),
@@ -286,7 +292,7 @@ describe("shielded claim budget options", () => {
         nonce: 2n,
       },
     };
-    const wallet = { spentNullifiers: new Set<bigint>() };
+    const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
     const now = start + 2n * period;
     const result = listShieldedClaimBudgetOptions([publicNote, privateNote], wallet, secret, now);
 

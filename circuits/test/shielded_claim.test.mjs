@@ -21,6 +21,8 @@ import {
 } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 
+import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
 function fullSyntheticPath(leaf, depth, index, siblingSeed) {
@@ -80,6 +82,38 @@ test("shielded claim constraints", async (t) => {
       change(copy);
       return copy;
     };
+
+    await t.test("private, public and mixed claims enforce chain and pool domains", async () => {
+      for (const budgetKind of [0, 1]) {
+        for (const secondRemainingPeriods of [0, 2]) {
+          const options = { budgetKind, secondBudgetKind: 1 - budgetKind, secondRemainingPeriods };
+          const base = buildShieldedClaimFixture(options);
+          for (const context of [
+            { chainId: 71n },
+            { poolAddress: "0x2222222222222222222222222222222222222222" },
+          ]) {
+            const changed = buildShieldedClaimFixture({ ...options, ...context });
+            await valid(changed.witness);
+            assert.notEqual(changed.policy, base.policy);
+            assert.notEqual(changed.enrollment, base.enrollment);
+            assert.notEqual(changed.inputBudget, base.inputBudget);
+            assert.notDeepEqual(changed.witness.inputNullifiers, base.witness.inputNullifiers);
+            assert.notDeepEqual(changed.witness.periodNullifiers, base.witness.periodNullifiers);
+            assert.equal(changed.ownerSecret, base.ownerSecret);
+            assert.equal(changed.ownerCommitment, base.ownerCommitment);
+            assert.equal(changed.heirIdentityCommitment, base.heirIdentityCommitment);
+            assert.equal(changed.witness.endorsementRoot, base.witness.endorsementRoot);
+            assert.equal(changed.witness.trustedRoot, base.witness.trustedRoot);
+            await invalid(
+              mutate(base.witness, (w) => {
+                w.chainId = changed.witness.chainId;
+                w.pool = changed.witness.pool;
+              }),
+            );
+          }
+        }
+      }
+    });
 
     await t.test(
       "private and public claims mature exactly at each configured day cycle",
@@ -154,7 +188,7 @@ test("shielded claim constraints", async (t) => {
           assert.ok(maturity < 1n << 113n);
           witness.periodIndices[0] = periodIndex.toString();
           witness.periodNullifiers[0] = poseidon4([
-            1017n,
+            shieldedFixtureTag(1017n, 1030n, 0x1111111111111111111111111111111111111111n),
             BigInt(witness.derivedSecretField),
             policy,
             periodIndex,
@@ -250,7 +284,7 @@ test("shielded claim constraints", async (t) => {
           await invalid(
             mutate(witness, (w) => {
               const terms = poseidon7([
-                1029n,
+                shieldedFixtureTag(1029n, 1030n, 0x1111111111111111111111111111111111111111n),
                 BigInt(w.fatherIdentityCommitment),
                 BigInt(w.rootVersionIndex),
                 fixture.heirIdentityCommitment,
@@ -259,7 +293,7 @@ test("shielded claim constraints", async (t) => {
                 BigInt(w.periodDays),
               ]);
               w.outputCommitments[0] = poseidon8([
-                1030n,
+                shieldedFixtureTag(1030n, 1030n, 0x1111111111111111111111111111111111111111n),
                 fixture.policy,
                 fixture.enrollment,
                 terms,
@@ -283,59 +317,77 @@ test("shielded claim constraints", async (t) => {
       assert.equal(keys.ownerSecret, fixture.ownerSecret);
       assert.equal(keys.ownerCommitment, fixture.ownerCommitment);
       assert.equal(
-        computeShieldedPolicyCommitment({
-          rootIdentityCommitment: witness.fatherIdentityCommitment,
-          rootVersionIndex: witness.rootVersionIndex,
-          amountPerPeriod: witness.rate,
-          periodDays: witness.periodDays,
-          policySalt: witness.policySalt,
-          allocationKeyCommitment: witness.allocationKeyCommitment,
-        }),
+        computeShieldedPolicyCommitment(
+          {
+            rootIdentityCommitment: witness.fatherIdentityCommitment,
+            rootVersionIndex: witness.rootVersionIndex,
+            amountPerPeriod: witness.rate,
+            periodDays: witness.periodDays,
+            policySalt: witness.policySalt,
+            allocationKeyCommitment: witness.allocationKeyCommitment,
+          },
+          shieldedFixtureScope(witness),
+        ),
         policy,
       );
       assert.equal(
-        computeShieldedEnrollmentCommitment({
-          policyCommitment: policy,
-          heirIdentityCommitment,
-          eligibleFrom: witness.eligibleFrom,
-          enrollmentSalt: witness.enrollmentSalt,
-        }),
+        computeShieldedEnrollmentCommitment(
+          {
+            policyCommitment: policy,
+            heirIdentityCommitment,
+            eligibleFrom: witness.eligibleFrom,
+            enrollmentSalt: witness.enrollmentSalt,
+          },
+          shieldedFixtureScope(witness),
+        ),
         enrollment,
       );
       assert.equal(
-        computeShieldedBudgetNoteCommitment({
-          policyCommitment: policy,
-          enrollmentCommitment: enrollment,
-          heirOwnerCommitment: fixture.ownerCommitment,
-          amountPerPeriod: witness.rate,
-          remaining: witness.remaining,
-          nonce: witness.budgetNonce,
-          ciphertextHashField: witness.budgetCiphertextHash,
-        }),
+        computeShieldedBudgetNoteCommitment(
+          {
+            policyCommitment: policy,
+            enrollmentCommitment: enrollment,
+            heirOwnerCommitment: fixture.ownerCommitment,
+            amountPerPeriod: witness.rate,
+            remaining: witness.remaining,
+            nonce: witness.budgetNonce,
+            ciphertextHashField: witness.budgetCiphertextHash,
+          },
+          shieldedFixtureScope(witness),
+        ),
         inputBudget,
       );
       assert.equal(
-        computeShieldedDummyInputNullifier({
-          ownerSecret: keys.ownerSecret,
-          noteCommitment: inputBudget,
-        }).toString(),
+        computeShieldedDummyInputNullifier(
+          {
+            ownerSecret: keys.ownerSecret,
+            noteCommitment: inputBudget,
+          },
+          shieldedFixtureScope(witness),
+        ).toString(),
         witness.inputNullifiers[1],
       );
       assert.equal(
-        computeShieldedPeriodNullifier({
-          derivedSecretField: witness.derivedSecretField,
-          policyCommitment: policy,
-          periodIndex: witness.periodIndices[0],
-        }).toString(),
+        computeShieldedPeriodNullifier(
+          {
+            derivedSecretField: witness.derivedSecretField,
+            policyCommitment: policy,
+            periodIndex: witness.periodIndices[0],
+          },
+          shieldedFixtureScope(witness),
+        ).toString(),
         witness.periodNullifiers[0],
       );
       assert.equal(witness.periodNullifiers.length, 12);
       assert.equal(
-        computeShieldedDummyPeriodNullifier({
-          ownerSecret: keys.ownerSecret,
-          budgetNoteCommitment: inputBudget,
-          slotIndex: 2,
-        }).toString(),
+        computeShieldedDummyPeriodNullifier(
+          {
+            ownerSecret: keys.ownerSecret,
+            budgetNoteCommitment: inputBudget,
+            slotIndex: 2,
+          },
+          shieldedFixtureScope(witness),
+        ).toString(),
         witness.periodNullifiers[2],
       );
       assert.deepEqual(
@@ -427,26 +479,32 @@ test("shielded claim constraints", async (t) => {
             w.inputNullifiers[1] = w.inputNullifiers[0];
             // Balance the attempted double spend so only note distinctness
             // rejects it, rather than an unrelated output-value mismatch.
-            w.outputCommitments[0] = computeShieldedBudgetNoteCommitment({
-              policyCommitment: fixture.policy,
-              enrollmentCommitment: fixture.enrollment,
-              heirOwnerCommitment: fixture.ownerCommitment,
-              amountPerPeriod: w.rate,
-              remaining: 2n * BigInt(w.remaining) - BigInt(w.claimCount) * BigInt(w.rate),
-              nonce: w.newBudgetNonce,
-              ciphertextHashField: w.ciphertextHashes[0],
-            }).toString();
+            w.outputCommitments[0] = computeShieldedBudgetNoteCommitment(
+              {
+                policyCommitment: fixture.policy,
+                enrollmentCommitment: fixture.enrollment,
+                heirOwnerCommitment: fixture.ownerCommitment,
+                amountPerPeriod: w.rate,
+                remaining: 2n * BigInt(w.remaining) - BigInt(w.claimCount) * BigInt(w.rate),
+                nonce: w.newBudgetNonce,
+                ciphertextHashField: w.ciphertextHashes[0],
+              },
+              shieldedFixtureScope(w),
+            ).toString();
           }),
         );
-        const wrongEnrollmentBudget = computeShieldedBudgetNoteCommitment({
-          policyCommitment: fixture.policy,
-          enrollmentCommitment: fixture.enrollment + 1n,
-          heirOwnerCommitment: fixture.ownerCommitment,
-          amountPerPeriod: fixture.witness.rate,
-          remaining: fixture.witness.secondRemaining,
-          nonce: fixture.witness.secondBudgetNonce,
-          ciphertextHashField: fixture.witness.secondBudgetCiphertextHash,
-        });
+        const wrongEnrollmentBudget = computeShieldedBudgetNoteCommitment(
+          {
+            policyCommitment: fixture.policy,
+            enrollmentCommitment: fixture.enrollment + 1n,
+            heirOwnerCommitment: fixture.ownerCommitment,
+            amountPerPeriod: fixture.witness.rate,
+            remaining: fixture.witness.secondRemaining,
+            nonce: fixture.witness.secondBudgetNonce,
+            ciphertextHashField: fixture.witness.secondBudgetCiphertextHash,
+          },
+          shieldedFixtureScope(fixture.witness),
+        );
         await invalid(
           mutate(fixture.witness, (w) => {
             w.inputRoots[1] = String(wrongEnrollmentBudget);
@@ -592,24 +650,33 @@ test("shielded claim constraints", async (t) => {
         mutate(base, (w) => {
           w.periodIndices[0] = "2";
           w.periodIndices[1] = "3";
-          const policy = computeShieldedPolicyCommitment({
-            rootIdentityCommitment: w.fatherIdentityCommitment,
-            rootVersionIndex: w.rootVersionIndex,
-            amountPerPeriod: w.rate,
-            periodDays: w.periodDays,
-            policySalt: w.policySalt,
-            allocationKeyCommitment: w.allocationKeyCommitment,
-          });
-          w.periodNullifiers[0] = computeShieldedPeriodNullifier({
-            derivedSecretField: w.derivedSecretField,
-            policyCommitment: policy,
-            periodIndex: 2n,
-          }).toString();
-          w.periodNullifiers[1] = computeShieldedPeriodNullifier({
-            derivedSecretField: w.derivedSecretField,
-            policyCommitment: policy,
-            periodIndex: 3n,
-          }).toString();
+          const policy = computeShieldedPolicyCommitment(
+            {
+              rootIdentityCommitment: w.fatherIdentityCommitment,
+              rootVersionIndex: w.rootVersionIndex,
+              amountPerPeriod: w.rate,
+              periodDays: w.periodDays,
+              policySalt: w.policySalt,
+              allocationKeyCommitment: w.allocationKeyCommitment,
+            },
+            shieldedFixtureScope(w),
+          );
+          w.periodNullifiers[0] = computeShieldedPeriodNullifier(
+            {
+              derivedSecretField: w.derivedSecretField,
+              policyCommitment: policy,
+              periodIndex: 2n,
+            },
+            shieldedFixtureScope(w),
+          ).toString();
+          w.periodNullifiers[1] = computeShieldedPeriodNullifier(
+            {
+              derivedSecretField: w.derivedSecretField,
+              policyCommitment: policy,
+              periodIndex: 3n,
+            },
+            shieldedFixtureScope(w),
+          ).toString();
         }),
       );
     });

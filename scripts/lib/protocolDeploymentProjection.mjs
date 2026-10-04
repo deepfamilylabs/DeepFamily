@@ -16,14 +16,16 @@ const MAINNET_DEPLOYMENT_ADDRESS_LABELS = Object.freeze({
   timelock: "governanceTimelock",
   deepFamilyImplementation: "deepFamilyImplementation",
   ...Object.fromEntries(
-    INTEGRATED_DEPLOYMENT_RECORDS.map((record) => [
-      record.transactionLabel === "deepFamilyToken"
-        ? "token"
-        : record.transactionLabel === "deepFamilyProxy"
-          ? "deepFamily"
-          : record.transactionLabel,
-      record.transactionLabel,
-    ]),
+    INTEGRATED_DEPLOYMENT_RECORDS.filter((record) => record.property !== "shieldedErc20Pool").map(
+      (record) => [
+        record.transactionLabel === "deepFamilyToken"
+          ? "token"
+          : record.transactionLabel === "deepFamilyProxy"
+            ? "deepFamily"
+            : record.transactionLabel,
+        record.transactionLabel,
+      ],
+    ),
   ),
 });
 
@@ -58,14 +60,16 @@ export const deriveMainnetPlannedAddresses = ({ ethers, deployer, startingNonce 
     throw new Error("planned deployment starting nonce must be a non-negative safe integer");
   }
   const normalizedDeployer = ethers.getAddress(deployer);
-  return Object.freeze(
-    Object.fromEntries(
-      Object.entries(MAINNET_DEPLOYMENT_NONCE_OFFSETS).map(([label, offset]) => [
-        label,
-        ethers.getCreateAddress({ from: normalizedDeployer, nonce: startingNonce + offset }),
-      ]),
-    ),
+  const direct = Object.fromEntries(
+    Object.entries(MAINNET_DEPLOYMENT_NONCE_OFFSETS).map(([label, offset]) => [
+      label,
+      ethers.getCreateAddress({ from: normalizedDeployer, nonce: startingNonce + offset }),
+    ]),
   );
+  return Object.freeze({
+    ...direct,
+    shieldedErc20Pool: ethers.getCreateAddress({ from: direct.shieldedPoolFactory, nonce: 1 }),
+  });
 };
 
 export const buildPlannedProtocolDeploymentEvidence = ({
@@ -110,7 +114,18 @@ export const buildPlannedProtocolDeploymentEvidence = ({
         ]),
       ),
     ),
-    shieldedDeepPool: withHashes(deploymentBindings.shieldedDeepPool, artifacts?.shieldedDeepPool),
+    shieldedErc20Pool: withHashes(
+      deploymentBindings.shieldedErc20Pool,
+      artifacts?.shieldedErc20Pool,
+    ),
+    shieldedNativePool: withHashes(
+      deploymentBindings.shieldedNativePool,
+      artifacts?.shieldedNativePool,
+    ),
+    shieldedPoolFactory: withHashes(
+      deploymentBindings.shieldedPoolFactory,
+      artifacts?.shieldedPoolFactory,
+    ),
     status: "production",
     chainId: normalizeChainId(chainId),
     deepFamilyProxy: plannedAddresses?.deepFamily,
@@ -189,7 +204,21 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
     ]),
-    ["ShieldedDeepPool", plannedAddresses?.shieldedDeepPool, deploymentArtifacts?.shieldedDeepPool],
+    [
+      "ShieldedErc20Pool",
+      plannedAddresses?.shieldedErc20Pool,
+      deploymentArtifacts?.shieldedErc20Pool,
+    ],
+    [
+      "ShieldedNativePool",
+      plannedAddresses?.shieldedNativePool,
+      deploymentArtifacts?.shieldedNativePool,
+    ],
+    [
+      "ShieldedPoolFactory",
+      plannedAddresses?.shieldedPoolFactory,
+      deploymentArtifacts?.shieldedPoolFactory,
+    ],
   ];
   for (const [label, address, artifact] of checks) {
     const onChain = await provider.getCode(address);

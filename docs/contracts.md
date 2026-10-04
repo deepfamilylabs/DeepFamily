@@ -527,7 +527,8 @@ Token
 → proxy.setCircuitVerifier(purpose,circuitId,adapter) for each permanent route
 → PoseidonT3/T4/T6 libraries, then DeepFamilyLineageIndex(proxy) linked to T3–T6
 → proxy.setLineageIndex(index) exactly once
-→ ShieldedDeepPool(token, lineage index, shared verifier adapter)
+→ ShieldedNativePool(lineage index, shared verifier adapter)
+→ ShieldedPoolFactory(DEEP token, lineage index, adapter, native pool), creating ShieldedErc20Pool for DEEP
 → transfer DeepFamily ownership to the validated governance Timelock on live networks
 → verify proxy/implementation slot, Archive reverse binding, Reader immutables, routes,
   parameterized runtimes, and release-manifest hashes
@@ -1224,7 +1225,7 @@ Anyone holding a receive code can link the identity to those payment keys, so th
 
 A receive code does not prove that the identity already exists in DeepFamily. Initial `fund` proves the recipient is a direct child with a current endorsement by a trusted source. Additional `fund` proves membership of an existing budget bound to that heir, preserves its enrollment and start time, and does not consume or count its balance. A spent or zero-value budget can still be a read-only template.
 
-`ShieldedDeepPool` holds pooled DEEP and a global sequence of note commitments in 32-level shards. Its five actions are `shield`, `fund`, `claim`, `privateTransfer` and `unshield`; each appends two fixed-size envelopes and commitments. Public and private addressing share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Funding always spends donor VALUE; it does not directly transfer ordinary-wallet tokens. Only `shield` increases `totalShielded` and custody, and only `unshield` decreases them. Internal funding, claims and transfers conserve both. The lineage trees remain 64 levels deep.
+`ShieldedErc20Pool` and `ShieldedNativePool` each hold one asset using `ShieldedPoolCore` and a global sequence of note commitments in 32-level shards. Its five actions are `shield`, `fund`, `claim`, `privateTransfer` and `unshield`; each appends two fixed-size envelopes and commitments. Public and private addressing share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Funding always spends donor VALUE; it does not directly transfer ordinary-wallet tokens. Only `shield` increases `totalShielded` and custody, and only `unshield` decreases them. Internal funding, claims and transfers conserve both. The lineage trees remain 64 levels deep.
 
 Private budget funding verifies a receive code in the browser and delivers an owner-bound BUDGET with HPKE. Public addressing resolves the selected child's existing `personHash` to its identity commitment, needs no receive code or payment-key registration, and publishes an identity-bound BUDGET's own recovery fields. Both modes prove current lineage on initial funding and the same initial-enrollment uniqueness. Public funding reveals the chosen parent/child identities and terms; claims do not reveal which budget format or identity they spend.
 
@@ -1341,3 +1342,7 @@ error TokenContractNotSet();
 - **Event-Driven Architecture**: Frontend synchronization via indexed blockchain events
 - **Field-Native Public Signals**: Current ZK flows expose full field-element commitments instead of limb pairs
 - **Batch-Ready Design**: Functions designed for future batch operation implementations
+
+The multi-asset pool protocol is version 2. `D = Poseidon3(1031, chainId, uint160(poolAddress))` and `S(purpose) = Poseidon3(1032, D, purpose)` replace each original pool-local hash domain (1010, 1011, 1014–1017, 1019, 1021, 1026–1030). The circuits compute this from the contract-supplied public chain/pool signals; commitments, spend/period/enrollment/template-use nullifiers and recursive donor backups require the same explicit scope. Global identity, owner/view keys, receive codes and lineage leaves remain unchanged. Payload and HPKE envelope format version 1 is rejected; new payloads use version 2 with the same fixed lengths. Asset pools cannot share input notes, budget templates or claim markers.
+
+The immutable, non-upgradeable factory registers native currency and a DEEP ERC-20 pool at deployment, and anyone may create another canonical ERC-20 pool without DEEP fees, staking or approvals. Each pool tracks its own note tree and liabilities. ERC-20 entry/exit verifies both sender and recipient deltas and reserves at least totalShielded; native deposits require exact value and native exits revert on failed calls. The factory and pools have no administrator, pause, treasury, surplus withdrawal or governance entrypoint. Token import validates basic interfaces only; unsupported token behavior remains a risk limited to its pool.

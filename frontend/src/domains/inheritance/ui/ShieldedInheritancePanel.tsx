@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -54,7 +55,7 @@ import {
   validateShieldedRecipientSelection,
   type ShieldedRecipientOption,
 } from "../services/shieldedRecipientOptions";
-import { useShieldedIdentitySession } from "./useShieldedIdentitySession";
+import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { ShieldedRecipientPicker } from "./ShieldedRecipientPicker";
 import {
   ShieldedRecipientCredentialsForm,
@@ -84,7 +85,7 @@ import {
   submitUnshield,
   type ShieldedPoolFlowStage,
 } from "../services/shieldedPoolFlows";
-import { getShieldedPoolDeploymentBlock } from "../../../shared/config/env";
+import { MAX_UINT128, type ShieldedScope } from "@deepfamily/protocol-core";
 import {
   prepareShieldedPrivateTransfer,
   prepareShieldedValueConsolidation,
@@ -132,11 +133,20 @@ const INPUT_CLASS =
 
 type Note = ReturnType<typeof listUnspentRecoveredShieldedNotes>[number];
 
-function fundingPolicyKey(policy: ReturnType<typeof createShieldedPolicyDescriptor>): string {
-  return computeShieldedPolicyCommitment({
-    ...policy,
-    allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
-  }).toString();
+function fundingPolicyKey(
+  policy: ReturnType<typeof createShieldedPolicyDescriptor>,
+  poolScope: ShieldedScope,
+): string {
+  return computeShieldedPolicyCommitment(
+    {
+      ...policy,
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
+        policy.allocationKey,
+        poolScope,
+      ),
+    },
+    poolScope,
+  ).toString();
 }
 
 function parsePositiveTokenAmount(value: string, decimals: number): bigint {
@@ -146,7 +156,7 @@ function parsePositiveTokenAmount(value: string, decimals: number): bigint {
   } catch {
     throw new InheritanceError("amountInvalid");
   }
-  if (amount <= 0n) throw new InheritanceError("amountInvalid");
+  if (amount <= 0n || amount > MAX_UINT128) throw new InheritanceError("amountInvalid");
   return amount;
 }
 
@@ -178,11 +188,11 @@ function claimSelectionIsAvailable(
       : undefined;
   if (
     budget?.note.kind !== "budget" ||
-    getShieldedClaimBudgetKey(budget.note) !== selection.key ||
+    getShieldedClaimBudgetKey(budget.note, wallet) !== selection.key ||
     (selection.secondBudget &&
       (second?.note.kind !== "budget" ||
         second.commitment === budget.commitment ||
-        getShieldedClaimBudgetKey(second.note) !== selection.key))
+        getShieldedClaimBudgetKey(second.note, wallet) !== selection.key))
   )
     return false;
   try {
@@ -212,6 +222,7 @@ function ValueNotePicker({
   onChange,
   maxInputs,
   decimals,
+  symbol,
   busy,
 }: {
   notes: readonly Note[];
@@ -219,6 +230,7 @@ function ValueNotePicker({
   onChange: (commitments: string[]) => void;
   maxInputs: 1 | 2;
   decimals: number;
+  symbol: string;
   busy: boolean;
 }) {
   const { t } = useTranslation();
@@ -248,14 +260,16 @@ function ValueNotePicker({
       role={singleChoice ? "radiogroup" : undefined}
       className="min-w-0 space-y-3"
     >
-      <legend className="text-sm font-medium text-ink">{t("shielded.fields.valueNote")}</legend>
+      <legend className="text-sm font-medium text-ink">
+        {t("shielded.fields.valueNote", { symbol })}
+      </legend>
       <p className="text-xs text-ink-muted">
         {singleChoice
-          ? t("shielded.singleValueSelectionHint")
-          : t("shielded.valueSelectionHint", { count: maxInputs })}
+          ? t("shielded.singleValueSelectionHint", { symbol })
+          : t("shielded.valueSelectionHint", { symbol, count: maxInputs })}
       </p>
       {values.length === 0 && missing.length === 0 ? (
-        <p className="text-sm text-ink-muted">{t("shielded.noRecoveredNote")}</p>
+        <p className="text-sm text-ink-muted">{t("shielded.noRecoveredNote", { symbol })}</p>
       ) : null}
       {values.map((item, index) => {
         const commitment = item.commitment.toString();
@@ -273,6 +287,7 @@ function ValueNotePicker({
             />
             <span className="min-w-0 break-words">
               {t("shielded.valueOption", {
+                symbol,
                 index: index + 1,
                 amount: formatUnits(item.note.amount, decimals),
               })}
@@ -289,11 +304,11 @@ function ValueNotePicker({
               value={commitment}
               checked
               disabled
-              aria-label={t("shielded.singleSelectedValueUnavailable")}
+              aria-label={t("shielded.singleSelectedValueUnavailable", { symbol })}
               className="shrink-0"
             />
             <span className="min-w-0 flex-1 break-words">
-              {t("shielded.singleSelectedValueUnavailable")}
+              {t("shielded.singleSelectedValueUnavailable", { symbol })}
             </span>
             <button
               type="button"
@@ -301,13 +316,13 @@ function ValueNotePicker({
               className="shrink-0 text-primary hover:underline"
               onClick={() => onChange([])}
             >
-              {t("shielded.clearValueSelection")}
+              {t("shielded.clearValueSelection", { symbol })}
             </button>
           </div>
         ) : (
           <label key={commitment} className="flex items-center gap-3 text-sm text-danger">
             <input type="checkbox" checked onChange={() => toggle(commitment, false)} />
-            <span>{t("shielded.selectedValueUnavailable")}</span>
+            <span>{t("shielded.selectedValueUnavailable", { symbol })}</span>
           </label>
         ),
       )}
@@ -317,10 +332,7 @@ function ValueNotePicker({
             singleChoice
               ? "shielded.singleValueSelectionSummary"
               : "shielded.valueSelectionSummary",
-            {
-              count: selectedCommitments.length,
-              amount: formatUnits(total, decimals),
-            },
+            { symbol, count: selectedCommitments.length, amount: formatUnits(total, decimals) },
           )}
         </p>
       ) : null}
@@ -427,13 +439,13 @@ export function ShieldedInheritancePanel({
   const transactionWallet = useRef({ account, signer });
   transactionWallet.current = { account, signer };
   const transactionEpoch = useRef(0);
-  const session = useShieldedIdentitySession({
-    scope,
-    busy,
-  });
+  const session = useShieldedPageIdentitySession();
   const identity = session.identity;
+  const latestIdentity = useRef(identity);
+  latestIdentity.current = identity;
   const activeIdentity = useRef(identity);
   activeIdentity.current = identity;
+  const mounted = useRef(false);
   const operationEpoch = useRef(0);
   const previousScope = useRef(scope);
   const [stage, setStage] = useState("");
@@ -477,33 +489,56 @@ export function ShieldedInheritancePanel({
     transactionEpoch.current += 1;
   }, [account, signer]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (previousScope.current !== scope) {
       previousScope.current = scope;
       operationEpoch.current += 1;
+      walletCache.current = null;
     }
   }, [scope]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    mounted.current = true;
+    activeIdentity.current = latestIdentity.current;
     const invalidate = () => {
       operationEpoch.current += 1;
       activeIdentity.current = null;
       walletCache.current = null;
       recipientCredentialsFormRef.current?.clearSecretInputs();
+      if (mounted.current) {
+        running.current = false;
+        setBusy(false);
+        setStage("");
+      }
     };
     window.addEventListener("pagehide", invalidate);
     return () => {
+      mounted.current = false;
       window.removeEventListener("pagehide", invalidate);
       invalidate();
     };
   }, []);
 
+  useLayoutEffect(() => {
+    session.setBusy(busy);
+    return () => session.setBusy(false);
+  }, [busy, session.setBusy]);
+
   useEffect(() => {
-    if (identity) return;
     walletCache.current = null;
+    running.current = false;
+    setBusy(false);
     setWalletSnapshot(null);
     setUnspentNotes([]);
+    setAction("shield");
+    setTaskGroup("wallet");
     setOwnReceiveCode("");
+    setShieldAmount("");
+    setRate("");
+    setPeriods("1");
+    setTransferAmount("");
+    setExitAmount("");
+    setExitRecipient("");
     setSelectedValueCommitments([]);
     setBudgetSelection("");
     setPolicySelection("");
@@ -522,10 +557,15 @@ export function ShieldedInheritancePanel({
     setError("");
     setLineageContext(null);
     setLineageError("");
-  }, [identity]);
+  }, [identity, scope]);
 
   const available = useMemo(() => {
-    if (!walletSnapshot || walletSnapshot.invalidated) {
+    if (
+      !walletSnapshot ||
+      walletSnapshot.invalidated ||
+      walletSnapshot.chainId !== modules.chainId ||
+      walletSnapshot.poolAddress.toLowerCase() !== modules.poolAddress.toLowerCase()
+    ) {
       return {
         values: [] as Note[],
         budgets: [] as ShieldedSelectableBudgetNote[],
@@ -551,7 +591,7 @@ export function ShieldedInheritancePanel({
         (template) => template.note.rootIdentityCommitment === parentIdentityCommitment,
       ),
     };
-  }, [walletSnapshot, unspentNotes, identity]);
+  }, [walletSnapshot, unspentNotes, identity, modules.chainId, modules.poolAddress]);
   const withdrawalSelectionAvailable =
     selectedValueCommitments.length === 1 &&
     available.values.some(
@@ -563,20 +603,27 @@ export function ShieldedInheritancePanel({
 
   const labels = useMemo<Record<Action, string>>(
     () => ({
-      recover: t("shielded.actions.recover"),
-      receiveCode: t("shielded.actions.receiveCode"),
-      shield: t("shielded.actions.shield"),
-      fund: t("shielded.actions.fund"),
-      claim: t("shielded.actions.claim"),
-      privateTransfer: t("shielded.actions.privateTransfer"),
-      unshield: t("shielded.actions.unshield"),
+      recover: t("shielded.actions.recover", { symbol: modules.assetSymbol }),
+      receiveCode: t("shielded.actions.receiveCode", { symbol: modules.assetSymbol }),
+      shield: t("shielded.actions.shield", { symbol: modules.assetSymbol }),
+      fund: t("shielded.actions.fund", { symbol: modules.assetSymbol }),
+      claim: t("shielded.actions.claim", { symbol: modules.assetSymbol }),
+      privateTransfer: t("shielded.actions.privateTransfer", { symbol: modules.assetSymbol }),
+      unshield: t("shielded.actions.unshield", { symbol: modules.assetSymbol }),
     }),
-    [t],
+    [t, modules.assetSymbol],
   );
 
   useEffect(() => {
     if (!identity || taskGroup === "wallet") return;
     let cancelled = false;
+    const epoch = operationEpoch.current;
+    const isCurrent = () =>
+      !cancelled &&
+      mounted.current &&
+      epoch === operationEpoch.current &&
+      activeIdentity.current === identity &&
+      currentScope.current === scope;
     setLineageContext(null);
     setLineageError("");
     void Promise.all([
@@ -584,9 +631,9 @@ export function ShieldedInheritancePanel({
       modules.provider.getBlock("latest"),
     ])
       .then(([snapshot, block]) => {
-        if (cancelled || activeIdentity.current !== identity || currentScope.current !== scope)
-          return;
-        if (!block) throw new Error(t("shielded.familyRecordsUnavailable"));
+        if (!isCurrent()) return;
+        if (!block)
+          throw new Error(t("shielded.familyRecordsUnavailable", { symbol: modules.assetSymbol }));
         setLineageContext({
           scope,
           identity,
@@ -596,9 +643,11 @@ export function ShieldedInheritancePanel({
         });
       })
       .catch((cause: unknown) => {
-        if (cancelled || activeIdentity.current !== identity) return;
+        if (!isCurrent()) return;
         setLineageError(
-          cause instanceof Error ? cause.message : t("shielded.familyRecordsUnavailable"),
+          cause instanceof Error
+            ? cause.message
+            : t("shielded.familyRecordsUnavailable", { symbol: modules.assetSymbol }),
         );
       });
     return () => {
@@ -712,7 +761,7 @@ export function ShieldedInheritancePanel({
     setRecipientInputMethod(method);
   };
   const selectedPolicy = policySelection
-    ? available.policies.find((policy) => fundingPolicyKey(policy) === policySelection)
+    ? available.policies.find((policy) => fundingPolicyKey(policy, modules) === policySelection)
     : undefined;
   const fundingParentVersions = useMemo(() => {
     if (action !== "fund" || !currentLineage || !identity) return [];
@@ -757,14 +806,20 @@ export function ShieldedInheritancePanel({
     const candidates: ShieldedRecipientOption[] = [];
     if (action !== "fund" || !identity || !fundingRoot) return candidates;
     if (selectedPolicy) {
-      const policyCommitment = computeShieldedPolicyCommitment({
-        ...selectedPolicy,
-        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
-          selectedPolicy.allocationKey,
-        ),
-      });
+      const policyCommitment = computeShieldedPolicyCommitment(
+        {
+          ...selectedPolicy,
+          allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
+            selectedPolicy.allocationKey,
+            modules,
+          ),
+        },
+        modules,
+      );
       for (const template of available.templates) {
-        if (getShieldedBudgetCommitments(template.note).policyCommitment !== policyCommitment)
+        if (
+          getShieldedBudgetCommitments(template.note, modules).policyCommitment !== policyCommitment
+        )
           continue;
         const personHash = wrapIdentityCommitmentAsPersonHash(template.note.heirIdentityCommitment);
         if (!candidates.some((candidate) => candidate.personHash === personHash)) {
@@ -808,54 +863,124 @@ export function ShieldedInheritancePanel({
     fundingRoot,
   ]);
 
-  async function refreshWallet(identity: IdentityMaterialV1Result) {
-    const previous = walletCache.current;
-    const ownerCommitment = deriveShieldedHeirKeyMaterial(
-      identity.derivedSecretField,
-    ).ownerCommitment;
-    const reusable =
-      previous &&
-      !previous.invalidated &&
-      previous.walletOwnerCommitment === ownerCommitment &&
-      previous.walletIdentityCommitment === BigInt(identity.identityCommitment)
-        ? previous
-        : undefined;
-    try {
-      const snapshot = await recoverLocalShieldedWallet(
-        modules.pool,
-        {
-          derivedSecretField: identity.derivedSecretField,
-          identityCommitment: identity.identityCommitment,
-        },
-        {
-          fromBlock: getShieldedPoolDeploymentBlock(Number(modules.chainId)),
-          previous: reusable,
-        },
-      );
-      if (activeIdentity.current === identity) {
-        walletCache.current = snapshot;
-        setWalletSnapshot(snapshot);
-        setUnspentNotes(listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField));
-        setPolicySelection((selection) =>
-          listRecoveredShieldedPolicies(snapshot).some(
-            (policy) =>
-              policy.rootIdentityCommitment === BigInt(identity.identityCommitment) &&
-              fundingPolicyKey(policy) === selection,
-          )
-            ? selection
-            : "",
+  const refreshWallet = useCallback(
+    async (identity: IdentityMaterialV1Result) => {
+      const epoch = operationEpoch.current;
+      const isCurrent = () =>
+        mounted.current &&
+        operationEpoch.current === epoch &&
+        currentScope.current === scope &&
+        activeIdentity.current === identity;
+      const previous = walletCache.current;
+      const ownerCommitment = deriveShieldedHeirKeyMaterial(
+        identity.derivedSecretField,
+      ).ownerCommitment;
+      const reusable =
+        previous &&
+        !previous.invalidated &&
+        previous.chainId === modules.chainId &&
+        previous.poolAddress.toLowerCase() === modules.poolAddress.toLowerCase() &&
+        previous.walletOwnerCommitment === ownerCommitment &&
+        previous.walletIdentityCommitment === BigInt(identity.identityCommitment)
+          ? previous
+          : undefined;
+      try {
+        const snapshot = await recoverLocalShieldedWallet(
+          modules.pool,
+          {
+            derivedSecretField: identity.derivedSecretField,
+            identityCommitment: identity.identityCommitment,
+          },
+          {
+            fromBlock: modules.poolDeploymentBlock,
+            previous: reusable,
+          },
         );
+        if (isCurrent()) {
+          walletCache.current = snapshot;
+          setWalletSnapshot(snapshot);
+          setUnspentNotes(listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField));
+          setPolicySelection((selection) =>
+            listRecoveredShieldedPolicies(snapshot).some(
+              (policy) =>
+                policy.rootIdentityCommitment === BigInt(identity.identityCommitment) &&
+                fundingPolicyKey(policy, modules) === selection,
+            )
+              ? selection
+              : "",
+          );
+        }
+        return snapshot;
+      } catch (cause) {
+        if (isCurrent()) {
+          walletCache.current = null;
+          setWalletSnapshot(null);
+          setUnspentNotes([]);
+        }
+        throw cause;
       }
-      return snapshot;
-    } catch (cause) {
-      if (activeIdentity.current === identity) {
-        walletCache.current = null;
-        setWalletSnapshot(null);
-        setUnspentNotes([]);
-      }
-      throw cause;
-    }
-  }
+    },
+    [modules, scope],
+  );
+  const latestRecovery = useRef(refreshWallet);
+  latestRecovery.current = refreshWallet;
+  const latestTranslation = useRef(t);
+  latestTranslation.current = t;
+
+  useEffect(() => {
+    if (!identity) return;
+    let cancelled = false;
+    const epoch = operationEpoch.current;
+    const isCurrent = () =>
+      !cancelled &&
+      mounted.current &&
+      operationEpoch.current === epoch &&
+      currentScope.current === scope &&
+      activeIdentity.current === identity;
+    running.current = true;
+    setBusy(true);
+    setStage(latestTranslation.current("shielded.stages.recovering"));
+    void latestRecovery
+      .current(identity)
+      .then((snapshot) => {
+        if (!isCurrent()) return;
+        const notes = listUnspentRecoveredShieldedNotes(snapshot, identity.derivedSecretField);
+        const hasBudgets = notes.some(
+          (item) =>
+            item.note.kind === "budget" &&
+            item.note.amountPerPeriod > 0n &&
+            item.note.remaining >= item.note.amountPerPeriod,
+        );
+        setTaskGroup(hasBudgets ? "receive" : "wallet");
+        setAction(
+          hasBudgets
+            ? "claim"
+            : notes.some((item) => item.note.kind === "value" && item.note.amount > 0n)
+              ? "privateTransfer"
+              : "shield",
+        );
+      })
+      .catch((cause: unknown) => {
+        if (!isCurrent()) return;
+        setError(
+          latestTranslation.current("shielded.refreshFailed", {
+            detail:
+              cause instanceof Error
+                ? cause.message
+                : latestTranslation.current("shielded.unknownError"),
+          }),
+        );
+      })
+      .finally(() => {
+        if (!isCurrent()) return;
+        running.current = false;
+        setBusy(false);
+        setStage("");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [identity, scope]);
 
   function chooseAction(next: Action, preferredGroup?: TaskGroup) {
     recipientCredentialsFormRef.current?.clearSecretInputs();
@@ -928,44 +1053,14 @@ export function ShieldedInheritancePanel({
     setStage(t("shielded.stages.deriving"));
     try {
       const material = await deriveIdentityFromForm(identityForm.current);
-      if (epoch !== operationEpoch.current || currentScope.current !== scope) return;
-      activeIdentity.current = material;
+      if (!mounted.current || epoch !== operationEpoch.current || currentScope.current !== scope)
+        return;
       session.unlock(material);
       identityForm.current?.clearSecretInputs();
-      setStage(t("shielded.stages.recovering"));
-      const [recovery] = await Promise.allSettled([refreshWallet(material)]);
-      if (activeIdentity.current !== material) return;
-      if (recovery.status === "fulfilled") {
-        const notes = listUnspentRecoveredShieldedNotes(
-          recovery.value,
-          material.derivedSecretField,
-        );
-        const hasBudgets = notes.some(
-          (item) =>
-            item.note.kind === "budget" &&
-            item.note.amountPerPeriod > 0n &&
-            item.note.remaining >= item.note.amountPerPeriod,
-        );
-        setTaskGroup(hasBudgets ? "receive" : "wallet");
-        setAction(
-          hasBudgets
-            ? "claim"
-            : notes.some((item) => item.note.kind === "value" && item.note.amount > 0n)
-              ? "privateTransfer"
-              : "shield",
-        );
-      }
-      if (recovery.status === "rejected") {
-        const cause = recovery.reason;
-        setError(
-          t("shielded.refreshFailed", {
-            detail: cause instanceof Error ? cause.message : t("shielded.unknownError"),
-          }),
-        );
-      }
       setStage("");
     } catch (cause) {
-      if (epoch !== operationEpoch.current || currentScope.current !== scope) return;
+      if (!mounted.current || epoch !== operationEpoch.current || currentScope.current !== scope)
+        return;
       setError(
         cause instanceof InheritanceError
           ? t(`inheritance.errors.${cause.code}`)
@@ -976,8 +1071,10 @@ export function ShieldedInheritancePanel({
       setStage("");
     } finally {
       identityForm.current?.clearSecretInputs();
-      running.current = false;
-      setBusy(false);
+      if (mounted.current && epoch === operationEpoch.current && currentScope.current === scope) {
+        running.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -992,13 +1089,15 @@ export function ShieldedInheritancePanel({
     setStage(t("shielded.stages.receiveCode"));
     try {
       const code = await createShieldedReceiveCodeForRecipient(form.readAndClear());
-      if (epoch !== operationEpoch.current) return;
+      if (!mounted.current || epoch !== operationEpoch.current || currentScope.current !== scope)
+        return;
       setRecipientCode(code);
       setRecipientConfirmed(false);
       setRecipientInputMethod("receiveCode");
       setStage("");
     } catch (cause) {
-      if (epoch !== operationEpoch.current) return;
+      if (!mounted.current || epoch !== operationEpoch.current || currentScope.current !== scope)
+        return;
       setError(
         cause instanceof InheritanceError
           ? t(`inheritance.errors.${cause.code}`)
@@ -1009,14 +1108,23 @@ export function ShieldedInheritancePanel({
       setStage("");
     } finally {
       form.clearSecretInputs();
-      running.current = false;
-      setBusy(false);
+      if (mounted.current && epoch === operationEpoch.current && currentScope.current === scope) {
+        running.current = false;
+        setBusy(false);
+      }
     }
   }
 
   async function submitSelected(requestedAction: Action = action) {
     if (running.current) return;
     const action = requestedAction;
+    const epoch = operationEpoch.current;
+    const operationIdentity = session.identity;
+    const isCurrent = () =>
+      mounted.current &&
+      epoch === operationEpoch.current &&
+      currentScope.current === scope &&
+      activeIdentity.current === operationIdentity;
     const chosenValueCommitments = [...selectedValueCommitments];
     running.current = true;
     let hash = "";
@@ -1033,7 +1141,7 @@ export function ShieldedInheritancePanel({
         session.touch();
         setStage(t("shielded.stages.receiveCode"));
         const code = await createOwnShieldedReceiveCode(identity);
-        if (activeIdentity.current !== identity) throw new Error(t("shielded.unlockRequired"));
+        if (!isCurrent()) throw new Error(t("shielded.unlockRequired"));
         setOwnReceiveCode(code);
         setStage("");
         return;
@@ -1056,7 +1164,7 @@ export function ShieldedInheritancePanel({
       }
       const walletEpoch = transactionEpoch.current;
       const assertCurrentOperation = () => {
-        if (activeIdentity.current !== identity) throw new Error(t("shielded.unlockRequired"));
+        if (!isCurrent()) throw new Error(t("shielded.unlockRequired"));
         if (
           walletEpoch !== transactionEpoch.current ||
           transactionWallet.current.account !== account ||
@@ -1067,6 +1175,7 @@ export function ShieldedInheritancePanel({
       };
       const onStage = (next: ShieldedPoolFlowStage) => {
         if (next !== "confirming") assertCurrentOperation();
+        else if (!isCurrent()) return;
         setStage(t(`shielded.stages.${next}`));
       };
       // Private delivery uses a verified receive code; public budgets use the selected family identity.
@@ -1093,11 +1202,15 @@ export function ShieldedInheritancePanel({
         shouldRefreshWallet = false;
       } else if (action === "shield") {
         const amount = parsePositiveTokenAmount(shieldAmount, modules.tokenDecimals);
-        const walletBalance = BigInt(await modules.token.balanceOf(account));
+        const walletBalance =
+          modules.assetKind === "native"
+            ? await modules.provider.getBalance(account)
+            : BigInt(await modules.token!.balanceOf(account));
         assertCurrentOperation();
         if (walletBalance < amount) {
           throw new Error(
             t("shielded.depositBalanceInsufficient", {
+              symbol: modules.assetSymbol,
               balance: formatUnits(walletBalance, modules.tokenDecimals),
               amount: formatUnits(amount, modules.tokenDecimals),
             }),
@@ -1109,17 +1222,27 @@ export function ShieldedInheritancePanel({
           derivedSecretField: identity.derivedSecretField,
           amount,
         });
-        const allowance = BigInt(await modules.token.allowance(account, modules.poolAddress));
-        if (allowance < amount) {
-          assertCurrentOperation();
-          setStage(t("shielded.stages.approving"));
-          const token = modules.token.connect(signer) as typeof modules.token;
-          const approval = await token.approve(modules.poolAddress, amount);
-          const receipt = await approval.wait();
-          checkReceipt(receipt?.status ?? null, approval.hash, t);
+        if (modules.assetKind === "erc20") {
+          const token = modules.token!.connect(signer) as NonNullable<typeof modules.token>;
+          const allowance = BigInt(await modules.token!.allowance(account, modules.poolAddress));
+          if (allowance < amount) {
+            assertCurrentOperation();
+            setStage(t("shielded.stages.approving", { symbol: modules.assetSymbol }));
+            // Some ordinary ERC-20s require resetting a nonzero allowance first.
+            if (allowance > 0n) {
+              const reset = await token.approve(modules.poolAddress, 0n);
+              const receipt = await reset.wait();
+              checkReceipt(receipt?.status ?? null, reset.hash, t);
+              assertCurrentOperation();
+            }
+            const approval = await token.approve(modules.poolAddress, amount);
+            const receipt = await approval.wait();
+            checkReceipt(receipt?.status ?? null, approval.hash, t);
+          }
         }
         assertCurrentOperation();
         const result = await submitShield({
+          assetKind: modules.assetKind,
           pool: modules.pool,
           signer,
           expectedChainId: modules.chainId,
@@ -1134,7 +1257,7 @@ export function ShieldedInheritancePanel({
       } else {
         setStage(t("shielded.stages.recovering"));
         let recovered = await refreshWallet(identity);
-        if (activeIdentity.current !== identity) throw new Error(t("shielded.unlockRequired"));
+        assertCurrentOperation();
         let values = availableFromSnapshot(recovered, identity.derivedSecretField, "value");
         const manualValues = (maxInputs: 1 | 2): ShieldedSelectableValueNote[] => {
           if (chosenValueCommitments.length === 0)
@@ -1220,7 +1343,7 @@ export function ShieldedInheritancePanel({
           }
           let policy = policySelection
             ? listRecoveredShieldedPolicies(recovered).find(
-                (candidate) => fundingPolicyKey(candidate) === policySelection,
+                (candidate) => fundingPolicyKey(candidate, modules) === policySelection,
               )
             : undefined;
           if (policySelection && !policy) throw new Error(t("shielded.noFundingRule"));
@@ -1230,23 +1353,33 @@ export function ShieldedInheritancePanel({
             }
             // Use the record displayed for confirmation. Fresh-lineage preparation
             // verifies this exact rule instead of silently switching its parent/version.
-            policy = createShieldedPolicyDescriptor({
-              rootIdentityCommitment: fundingRoot.rootIdentityCommitment,
-              rootVersionIndex: fundingRoot.rootVersionIndex,
-              amountPerPeriod: parsePositiveTokenAmount(rate, modules.tokenDecimals),
-              periodDays: parseShieldedPeriodDays(periodDaysInput),
-            });
+            policy = createShieldedPolicyDescriptor(
+              {
+                rootIdentityCommitment: fundingRoot.rootIdentityCommitment,
+                rootVersionIndex: fundingRoot.rootVersionIndex,
+                amountPerPeriod: parsePositiveTokenAmount(rate, modules.tokenDecimals),
+                periodDays: parseShieldedPeriodDays(periodDaysInput),
+              },
+              modules,
+            );
           }
           if (getBigInt(policy.rootIdentityCommitment) !== BigInt(identity.identityCommitment)) {
             throw new Error(t("shielded.noFundingRule"));
           }
-          const policyCommitment = computeShieldedPolicyCommitment({
-            ...policy,
-            allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
-          });
+          const policyCommitment = computeShieldedPolicyCommitment(
+            {
+              ...policy,
+              allocationKeyCommitment: computeShieldedAllocationKeyCommitment(
+                policy.allocationKey,
+                modules,
+              ),
+            },
+            modules,
+          );
           const template = listRecoveredFundingTemplates(recovered).find(
             (candidate) =>
-              getShieldedBudgetCommitments(candidate.note).policyCommitment === policyCommitment &&
+              getShieldedBudgetCommitments(candidate.note, modules).policyCommitment ===
+                policyCommitment &&
               wrapIdentityCommitmentAsPersonHash(
                 candidate.note.heirIdentityCommitment,
               ).toLowerCase() === heirPersonHash.trim().toLowerCase(),
@@ -1433,13 +1566,15 @@ export function ShieldedInheritancePanel({
           hash = result.transactionHash;
         }
       }
+      if (!isCurrent()) return;
       if (shouldRefreshWallet) {
         setStage(t("shielded.stages.recovering"));
         const refreshed = await refreshWallet(identity);
+        if (!isCurrent()) return;
         if (fundedPolicyCommitment) {
           setPolicySelection(
             listRecoveredShieldedPolicies(refreshed).some(
-              (policy) => fundingPolicyKey(policy) === fundedPolicyCommitment,
+              (policy) => fundingPolicyKey(policy, modules) === fundedPolicyCommitment,
             )
               ? fundedPolicyCommitment
               : "",
@@ -1456,6 +1591,7 @@ export function ShieldedInheritancePanel({
         setClaimSelection(null);
       }
     } catch (cause) {
+      if (!isCurrent()) return;
       const errorReason = resolveErrorReason(cause);
       const detail =
         cause instanceof InheritanceError
@@ -1486,8 +1622,10 @@ export function ShieldedInheritancePanel({
       }
     } finally {
       recipientCredentialsFormRef.current?.clearSecretInputs();
-      running.current = false;
-      setBusy(false);
+      if (isCurrent()) {
+        running.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -1508,9 +1646,9 @@ export function ShieldedInheritancePanel({
           ) : null}
         </p>
       ) : null}
-      {!busy && !error && stage === t("shielded.done") ? (
+      {!busy && !error && stage === t("shielded.done", { symbol: modules.assetSymbol }) ? (
         <SuccessNotice>
-          <p>{t("shielded.done")}</p>
+          <p>{t("shielded.done", { symbol: modules.assetSymbol })}</p>
           {transactionHash ? (
             <p className="break-all font-mono text-xs">{transactionHash}</p>
           ) : null}
@@ -1523,8 +1661,8 @@ export function ShieldedInheritancePanel({
     return (
       <div className="space-y-6 break-normal">
         <PanelShell
-          title={t("shielded.identityTitle")}
-          description={t("shielded.identityDescription")}
+          title={t("shielded.identityTitle", { symbol: modules.assetSymbol })}
+          description={t("shielded.identityDescription", { symbol: modules.assetSymbol })}
         >
           <PersonHashCalculator
             ref={identityForm}
@@ -1540,7 +1678,7 @@ export function ShieldedInheritancePanel({
             disabled={busy}
             onClick={() => void unlockIdentity()}
           >
-            {t("shielded.unlock")}
+            {t("shielded.unlock", { symbol: modules.assetSymbol })}
           </PanelButton>
           {feedback}
         </PanelShell>
@@ -1599,7 +1737,7 @@ export function ShieldedInheritancePanel({
   return (
     <div className="space-y-4 break-normal">
       <section
-        aria-label={t("shielded.balanceTitle")}
+        aria-label={t("shielded.balanceTitle", { symbol: modules.assetSymbol })}
         className="space-y-2 rounded-xl border border-hairline bg-surface px-4 py-3"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1611,11 +1749,13 @@ export function ShieldedInheritancePanel({
                 { label: "budgetAmount", amount: totalBudget },
               ].map(({ label, amount }) => (
                 <div key={label} className="flex flex-wrap items-baseline gap-x-2">
-                  <dt className="text-xs text-ink-muted">{t(`shielded.${label}`)}</dt>
+                  <dt className="text-xs text-ink-muted">
+                    {t(`shielded.${label}`, { symbol: modules.assetSymbol })}
+                  </dt>
                   <dd className="break-all text-sm font-semibold tabular-nums text-ink">
                     {walletSnapshot ? formatUnits(amount, modules.tokenDecimals) : "—"}
                     <span className="ml-1 whitespace-nowrap text-xs font-normal text-ink-muted">
-                      DEEP
+                      {modules.assetSymbol}
                     </span>
                   </dd>
                 </div>
@@ -1628,30 +1768,30 @@ export function ShieldedInheritancePanel({
               disabled={busy}
               onClick={() => void submitSelected("recover")}
             >
-              {t("shielded.actions.recover")}
+              {t("shielded.actions.recover", { symbol: modules.assetSymbol })}
             </PanelButton>
             <PanelButton size="compact" disabled={busy} onClick={lockIdentity}>
-              {t("shielded.lock")}
+              {t("shielded.lock", { symbol: modules.assetSymbol })}
             </PanelButton>
           </div>
         </div>
         <div className="flex min-w-0 items-start gap-2 text-xs">
           <span className="shrink-0 whitespace-nowrap py-1 text-ink-muted">
-            {t("shielded.identityHash")}
+            {t("shielded.identityHash", { symbol: modules.assetSymbol })}
           </span>
           <code className="min-w-0 break-all py-1 font-mono text-ink-muted">
             {identity.personHash}
           </code>
           <CopyIconButton
             size="xs"
-            label={t("shielded.copyIdentityHash")}
+            label={t("shielded.copyIdentityHash", { symbol: modules.assetSymbol })}
             onClick={() => void copyIdentityHash()}
           />
         </div>
       </section>
       <div
         role="tablist"
-        aria-label={t("shielded.actionsTitle")}
+        aria-label={t("shielded.actionsTitle", { symbol: modules.assetSymbol })}
         className="flex flex-wrap gap-x-5 border-b border-hairline"
       >
         {TASK_GROUPS.map((group) => (
@@ -1689,7 +1829,7 @@ export function ShieldedInheritancePanel({
                 : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
-            {t(`shielded.groups.${group}`)}
+            {t(`shielded.groups.${group}`, { symbol: modules.assetSymbol })}
           </button>
         ))}
       </div>
@@ -1715,22 +1855,22 @@ export function ShieldedInheritancePanel({
         <PanelShell
           title={
             action === "shield" || action === "privateTransfer" || action === "unshield"
-              ? t(`shielded.actionTitles.${action}`)
+              ? t(`shielded.actionTitles.${action}`, { symbol: modules.assetSymbol })
               : labels[action]
           }
           description={
             action === "fund" || action === "claim" || action === "receiveCode"
-              ? t(`shielded.descriptions.${action}`)
+              ? t(`shielded.descriptions.${action}`, { symbol: modules.assetSymbol })
               : undefined
           }
         >
           {action === "receiveCode" && ownReceiveCode ? (
             <FieldBlock
-              label={t("shielded.receiveCodeLabel")}
-              hint={t("shielded.receiveCodeShareHint")}
+              label={t("shielded.receiveCodeLabel", { symbol: modules.assetSymbol })}
+              hint={t("shielded.receiveCodeShareHint", { symbol: modules.assetSymbol })}
             >
               <textarea
-                aria-label={t("shielded.receiveCodeLabel")}
+                aria-label={t("shielded.receiveCodeLabel", { symbol: modules.assetSymbol })}
                 className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
                 readOnly
                 value={ownReceiveCode}
@@ -1740,9 +1880,12 @@ export function ShieldedInheritancePanel({
           ) : null}
 
           {action === "shield" ? (
-            <FieldBlock label={t("shielded.fields.amount")} hint={t("shielded.publicDepositHint")}>
+            <FieldBlock
+              label={t("shielded.fields.amount", { symbol: modules.assetSymbol })}
+              hint={t("shielded.publicDepositHint", { symbol: modules.assetSymbol })}
+            >
               <input
-                aria-label={t("shielded.fields.amount")}
+                aria-label={t("shielded.fields.amount", { symbol: modules.assetSymbol })}
                 className={INPUT_CLASS}
                 inputMode="decimal"
                 value={shieldAmount}
@@ -1756,7 +1899,7 @@ export function ShieldedInheritancePanel({
             <>
               <fieldset className="space-y-2" disabled={busy}>
                 <legend className="text-sm font-medium text-ink">
-                  {t("shielded.fundingModeLabel")}
+                  {t("shielded.fundingModeLabel", { symbol: modules.assetSymbol })}
                 </legend>
                 <div className="flex flex-wrap gap-4">
                   {(["private", "public"] as const).map((mode) => (
@@ -1778,21 +1921,24 @@ export function ShieldedInheritancePanel({
                           setError("");
                         }}
                       />
-                      {t(`shielded.fundingModes.${mode}`)}
+                      {t(`shielded.fundingModes.${mode}`, { symbol: modules.assetSymbol })}
                     </label>
                   ))}
                 </div>
               </fieldset>
               {fundingMode === "public" ? (
-                <WarningNotice>{t("shielded.publicFundingVisibility")}</WarningNotice>
+                <WarningNotice>
+                  {t("shielded.publicFundingVisibility", { symbol: modules.assetSymbol })}
+                </WarningNotice>
               ) : null}
 
               {fundingNeedsDeposit ? (
                 <div className="space-y-3">
                   <WarningNotice>
                     {totalValue === 0n
-                      ? t("shielded.fundingNoBalance")
+                      ? t("shielded.fundingNoBalance", { symbol: modules.assetSymbol })
                       : t("shielded.fundingBalanceInsufficient", {
+                          symbol: modules.assetSymbol,
                           amount: formatUnits(fundingDeficit!, modules.tokenDecimals),
                         })}
                   </WarningNotice>
@@ -1805,17 +1951,17 @@ export function ShieldedInheritancePanel({
                       }
                     }}
                   >
-                    {t("shielded.fundingDepositAction")}
+                    {t("shielded.fundingDepositAction", { symbol: modules.assetSymbol })}
                   </PanelButton>
                 </div>
               ) : null}
               {available.policies.length > 0 ? (
                 <FieldBlock
-                  label={t("shielded.fields.fundingRule")}
-                  hint={t("shielded.fundingRuleHint")}
+                  label={t("shielded.fields.fundingRule", { symbol: modules.assetSymbol })}
+                  hint={t("shielded.fundingRuleHint", { symbol: modules.assetSymbol })}
                 >
                   <select
-                    aria-label={t("shielded.fields.fundingRule")}
+                    aria-label={t("shielded.fields.fundingRule", { symbol: modules.assetSymbol })}
                     className={INPUT_CLASS}
                     value={policySelection}
                     onChange={(event) => {
@@ -1827,10 +1973,16 @@ export function ShieldedInheritancePanel({
                       setError("");
                     }}
                   >
-                    <option value="">{t("shielded.newFundingRule")}</option>
+                    <option value="">
+                      {t("shielded.newFundingRule", { symbol: modules.assetSymbol })}
+                    </option>
                     {available.policies.map((policy, index) => (
-                      <option key={fundingPolicyKey(policy)} value={fundingPolicyKey(policy)}>
+                      <option
+                        key={fundingPolicyKey(policy, modules)}
+                        value={fundingPolicyKey(policy, modules)}
+                      >
                         {t("shielded.policyOption", {
+                          symbol: modules.assetSymbol,
                           index: index + 1,
                           identity:
                             localRecipientLabels.get(
@@ -1849,16 +2001,19 @@ export function ShieldedInheritancePanel({
                   </select>
                 </FieldBlock>
               ) : null}
-              <FieldBlock label={t("shielded.fields.familyVersion")}>
+              <FieldBlock
+                label={t("shielded.fields.familyVersion", { symbol: modules.assetSymbol })}
+              >
                 {selectedPolicy ? (
                   <p className="text-sm text-ink" role="status">
                     {t("shielded.fundingVersionOption", {
+                      symbol: modules.assetSymbol,
                       version: selectedPolicy.rootVersionIndex.toString(),
                     })}
                   </p>
                 ) : (
                   <select
-                    aria-label={t("shielded.fields.familyVersion")}
+                    aria-label={t("shielded.fields.familyVersion", { symbol: modules.assetSymbol })}
                     className={INPUT_CLASS}
                     disabled={busy || !currentLineage || fundingParentVersions.length === 0}
                     value={fundingFamilyVersionSelection}
@@ -1870,25 +2025,31 @@ export function ShieldedInheritancePanel({
                       setError("");
                     }}
                   >
-                    <option value="">{t("shielded.fundingVersionPlaceholder")}</option>
+                    <option value="">
+                      {t("shielded.fundingVersionPlaceholder", { symbol: modules.assetSymbol })}
+                    </option>
                     {fundingFamilyVersionSelection &&
                     !fundingParentVersions.includes(Number(fundingFamilyVersionSelection)) ? (
                       <option value={fundingFamilyVersionSelection} disabled>
                         {t("shielded.fundingVersionOption", {
+                          symbol: modules.assetSymbol,
                           version: fundingFamilyVersionSelection,
                         })}
                       </option>
                     ) : null}
                     {fundingParentVersions.map((version) => (
                       <option key={version} value={version.toString()}>
-                        {t("shielded.fundingVersionOption", { version })}
+                        {t("shielded.fundingVersionOption", {
+                          symbol: modules.assetSymbol,
+                          version,
+                        })}
                       </option>
                     ))}
                   </select>
                 )}
               </FieldBlock>
               <ShieldedRecipientPicker
-                label={t("shielded.fields.heirPersonHash")}
+                label={t("shielded.fields.heirPersonHash", { symbol: modules.assetSymbol })}
                 value={heirPersonHash}
                 onChange={(value) => {
                   setHeirPersonHash(value);
@@ -1899,22 +2060,31 @@ export function ShieldedInheritancePanel({
                 options={childOptions}
                 loading={!currentLineage && !lineageError && childOptions.length === 0}
                 disabled={!fundingRoot}
-                placeholder={!fundingRoot ? t("shielded.fundingVersionRequired") : undefined}
+                placeholder={
+                  !fundingRoot
+                    ? t("shielded.fundingVersionRequired", { symbol: modules.assetSymbol })
+                    : undefined
+                }
               />
               {heirPersonHash.trim() &&
               !selectedPolicy &&
               currentLineage &&
               !fundingFamilyVersion?.eligible ? (
-                <WarningNotice>{t("shielded.fundingFamilyUnavailable")}</WarningNotice>
+                <WarningNotice>
+                  {t("shielded.fundingFamilyUnavailable", { symbol: modules.assetSymbol })}
+                </WarningNotice>
               ) : null}
               {heirPersonHash.trim() && fundingRoot && fundingFamilyHash ? (
                 <p role="status" className="text-xs text-ink-muted">
                   {t("shielded.fundingFamilySummary", {
+                    symbol: modules.assetSymbol,
                     parent:
                       localRecipientLabels.get(fundingFamilyHash.toLowerCase()) ??
                       shortHex(fundingFamilyHash),
                     relation: fundingFamilyRelation
-                      ? t(`shielded.fundingParentRoles.${fundingFamilyRelation}`)
+                      ? t(`shielded.fundingParentRoles.${fundingFamilyRelation}`, {
+                          symbol: modules.assetSymbol,
+                        })
                       : "",
                     version: fundingRoot.rootVersionIndex.toString(),
                   })}
@@ -1925,7 +2095,7 @@ export function ShieldedInheritancePanel({
                   method={recipientInputMethod}
                   onMethodChange={changeRecipientInputMethod}
                   code={recipientCode}
-                  codeHint={t("shielded.receiveCodeInputHint")}
+                  codeHint={t("shielded.receiveCodeInputHint", { symbol: modules.assetSymbol })}
                   onCodeChange={changeRecipientCode}
                   credentialsFormRef={recipientCredentialsFormRef}
                   onGenerateCode={() => void generateRecipientCode()}
@@ -1933,9 +2103,9 @@ export function ShieldedInheritancePanel({
                 />
               ) : null}
               {!selectedPolicy ? (
-                <FieldBlock label={t("shielded.fields.rate")}>
+                <FieldBlock label={t("shielded.fields.rate", { symbol: modules.assetSymbol })}>
                   <input
-                    aria-label={t("shielded.fields.rate")}
+                    aria-label={t("shielded.fields.rate", { symbol: modules.assetSymbol })}
                     className={INPUT_CLASS}
                     inputMode="decimal"
                     value={rate}
@@ -1944,17 +2114,18 @@ export function ShieldedInheritancePanel({
                   />
                 </FieldBlock>
               ) : null}
-              <FieldBlock label={t("shielded.fields.periodDays")}>
+              <FieldBlock label={t("shielded.fields.periodDays", { symbol: modules.assetSymbol })}>
                 {selectedPolicy ? (
                   <p className="text-sm text-ink" role="status">
                     {t("shielded.periodDaysSummary", {
+                      symbol: modules.assetSymbol,
                       days: selectedPolicy.periodDays.toString(),
                     })}
                   </p>
                 ) : (
                   <div className="flex items-center gap-2">
                     <select
-                      aria-label={t("shielded.fields.periodDays")}
+                      aria-label={t("shielded.fields.periodDays", { symbol: modules.assetSymbol })}
                       className={`${INPUT_CLASS} min-w-0`}
                       disabled={busy}
                       value={periodDaysChoice}
@@ -1967,14 +2138,18 @@ export function ShieldedInheritancePanel({
                     >
                       {PERIOD_DAY_PRESETS.map((days) => (
                         <option key={days} value={days.toString()}>
-                          {t("shielded.periodDaysSummary", { days })}
+                          {t("shielded.periodDaysSummary", { symbol: modules.assetSymbol, days })}
                         </option>
                       ))}
-                      <option value="custom">{t("shielded.customPeriodDays")}</option>
+                      <option value="custom">
+                        {t("shielded.customPeriodDays", { symbol: modules.assetSymbol })}
+                      </option>
                     </select>
                     {periodDaysChoice === "custom" ? (
                       <input
-                        aria-label={t("shielded.fields.customPeriodDays")}
+                        aria-label={t("shielded.fields.customPeriodDays", {
+                          symbol: modules.assetSymbol,
+                        })}
                         className={`${INPUT_CLASS} min-w-0`}
                         inputMode="numeric"
                         disabled={busy}
@@ -1989,9 +2164,9 @@ export function ShieldedInheritancePanel({
                   </div>
                 )}
               </FieldBlock>
-              <FieldBlock label={t("shielded.fields.periods")}>
+              <FieldBlock label={t("shielded.fields.periods", { symbol: modules.assetSymbol })}>
                 <input
-                  aria-label={t("shielded.fields.periods")}
+                  aria-label={t("shielded.fields.periods", { symbol: modules.assetSymbol })}
                   className={INPUT_CLASS}
                   inputMode="numeric"
                   value={periods}
@@ -2007,6 +2182,7 @@ export function ShieldedInheritancePanel({
                   className="rounded-xl bg-primary/5 p-3 text-sm leading-relaxed text-ink"
                 >
                   {t("shielded.fundingPreview", {
+                    symbol: modules.assetSymbol,
                     amount: formatUnits(fundingRate * fundingPeriods, modules.tokenDecimals),
                     periods: fundingPeriods.toString(),
                     rate: formatUnits(fundingRate, modules.tokenDecimals),
@@ -2020,9 +2196,11 @@ export function ShieldedInheritancePanel({
           {action === "claim" ? (
             <>
               {claimBudgetOptions.length > 1 ? (
-                <FieldBlock label={t("shielded.fields.budgetNote")}>
+                <FieldBlock
+                  label={t("shielded.fields.budgetNote", { symbol: modules.assetSymbol })}
+                >
                   <select
-                    aria-label={t("shielded.fields.budgetNote")}
+                    aria-label={t("shielded.fields.budgetNote", { symbol: modules.assetSymbol })}
                     className={INPUT_CLASS}
                     disabled={busy}
                     value={budgetSelection || claimBudgetOption?.key || ""}
@@ -2037,12 +2215,13 @@ export function ShieldedInheritancePanel({
                   >
                     {budgetSelection && !claimBudgetOption ? (
                       <option value={budgetSelection} disabled>
-                        {t("shielded.unavailableBudget")}
+                        {t("shielded.unavailableBudget", { symbol: modules.assetSymbol })}
                       </option>
                     ) : null}
                     {claimBudgetOptions.map((option, index) => (
                       <option key={option.key} value={option.key}>
                         {t("shielded.budgetOption", {
+                          symbol: modules.assetSymbol,
                           index: index + 1,
                           amount: formatUnits(
                             option.overview.totalRemaining,
@@ -2061,15 +2240,16 @@ export function ShieldedInheritancePanel({
               >
                 <p>
                   {available.budgets.length === 0
-                    ? t("shielded.claimOverview.noFunds")
+                    ? t("shielded.claimOverview.noFunds", { symbol: modules.assetSymbol })
                     : lineageError
-                      ? t("shielded.claimOverview.unavailable")
+                      ? t("shielded.claimOverview.unavailable", { symbol: modules.assetSymbol })
                       : !currentLineage
-                        ? t("shielded.claimOverview.checking")
+                        ? t("shielded.claimOverview.checking", { symbol: modules.assetSymbol })
                         : eligibleClaimBudgets.length === 0
-                          ? t("shielded.claimOverview.ineligible")
+                          ? t("shielded.claimOverview.ineligible", { symbol: modules.assetSymbol })
                           : claimOverview?.claim
                             ? t("shielded.claimOverview.claimable", {
+                                symbol: modules.assetSymbol,
                                 amount: formatUnits(
                                   chosenClaim?.amount ?? claimOverview.claim.amount,
                                   modules.tokenDecimals,
@@ -2080,14 +2260,16 @@ export function ShieldedInheritancePanel({
                               })
                             : t(
                                 `shielded.claimOverview.${claimOverview?.status ?? emptyClaimStatus}`,
+                                { symbol: modules.assetSymbol },
                               )}
                 </p>
                 {claimOverview?.nextDueAt !== undefined ? (
                   <p className="text-xs text-ink-muted">
                     {t("shielded.claimOverview.nextDue", {
+                      symbol: modules.assetSymbol,
                       date:
                         formatShieldedTimestamp(claimOverview.nextDueAt) ??
-                        t("shielded.dateOutOfRange"),
+                        t("shielded.dateOutOfRange", { symbol: modules.assetSymbol }),
                     })}
                   </p>
                 ) : null}
@@ -2098,20 +2280,21 @@ export function ShieldedInheritancePanel({
               {claimBatch ? (
                 <fieldset disabled={busy} className="min-w-0 space-y-2">
                   <legend className="mb-2 text-sm font-medium text-ink">
-                    {t("shielded.claimPeriodsLabel")}
+                    {t("shielded.claimPeriodsLabel", { symbol: modules.assetSymbol })}
                   </legend>
                   <div className="flex items-center justify-between gap-3 text-xs text-ink-muted">
-                    <span>{t("shielded.claimPeriodsHint")}</span>
+                    <span>{t("shielded.claimPeriodsHint", { symbol: modules.assetSymbol })}</span>
                     <button
                       type="button"
                       className="shrink-0 text-primary hover:underline"
                       onClick={() => setClaimSelection(null)}
                     >
-                      {t("shielded.selectAllClaimPeriods")}
+                      {t("shielded.selectAllClaimPeriods", { symbol: modules.assetSymbol })}
                     </button>
                   </div>
                   {claimBatch.periodIndices.map((index) => {
                     const label = t("shielded.claimPeriodOption", {
+                      symbol: modules.assetSymbol,
                       period: (index + 1n).toString(),
                       amount: formatUnits(
                         claimBatch.budget.note.amountPerPeriod,
@@ -2137,9 +2320,10 @@ export function ShieldedInheritancePanel({
                           <span>{label}</span>
                           <span className="mt-0.5 block text-xs text-ink-muted">
                             {t("shielded.claimPeriodDue", {
+                              symbol: modules.assetSymbol,
                               date:
                                 formatShieldedTimestamp(dueAt, "date") ??
-                                t("shielded.dateOutOfRange"),
+                                t("shielded.dateOutOfRange", { symbol: modules.assetSymbol }),
                             })}
                           </span>
                         </span>
@@ -2152,10 +2336,12 @@ export function ShieldedInheritancePanel({
               ((claimSelection && !claimSelectionAvailable) ||
                 (budgetSelection && !claimBudgetOption)) ? (
                 claimSelection?.periodIndices.length === 0 ? (
-                  <p className="text-sm text-ink-muted">{t("shielded.claimSelectionRequired")}</p>
+                  <p className="text-sm text-ink-muted">
+                    {t("shielded.claimSelectionRequired", { symbol: modules.assetSymbol })}
+                  </p>
                 ) : (
                   <WarningNotice>
-                    {t("shielded.claimSelectionUnavailable")}
+                    {t("shielded.claimSelectionUnavailable", { symbol: modules.assetSymbol })}
                     <button
                       type="button"
                       disabled={busy}
@@ -2165,7 +2351,7 @@ export function ShieldedInheritancePanel({
                         setClaimSelection(null);
                       }}
                     >
-                      {t("shielded.reselectClaim")}
+                      {t("shielded.reselectClaim", { symbol: modules.assetSymbol })}
                     </button>
                   </WarningNotice>
                 )
@@ -2188,6 +2374,7 @@ export function ShieldedInheritancePanel({
                 <div className="space-y-2 break-all rounded-xl bg-surface-alt p-3 text-sm text-ink">
                   <p>
                     {t("shielded.recipientTarget", {
+                      symbol: modules.assetSymbol,
                       identity: recipientTargetName ?? recipientTargetHash,
                     })}
                     {recipientTargetName ? (
@@ -2199,7 +2386,7 @@ export function ShieldedInheritancePanel({
                   {recipientNeedsConfirmation ? (
                     <>
                       <p className="text-xs text-warning">
-                        {t("shielded.recipientTargetUnverified")}
+                        {t("shielded.recipientTargetUnverified", { symbol: modules.assetSymbol })}
                       </p>
                       <label className="flex items-start gap-3 break-normal">
                         <input
@@ -2209,15 +2396,19 @@ export function ShieldedInheritancePanel({
                           disabled={busy}
                           onChange={(event) => setRecipientConfirmed(event.target.checked)}
                         />
-                        <span>{t("shielded.recipientConfirm")}</span>
+                        <span>
+                          {t("shielded.recipientConfirm", { symbol: modules.assetSymbol })}
+                        </span>
                       </label>
                     </>
                   ) : null}
                 </div>
               ) : null}
-              <FieldBlock label={t("shielded.fields.transferAmount")}>
+              <FieldBlock
+                label={t("shielded.fields.transferAmount", { symbol: modules.assetSymbol })}
+              >
                 <input
-                  aria-label={t("shielded.fields.transferAmount")}
+                  aria-label={t("shielded.fields.transferAmount", { symbol: modules.assetSymbol })}
                   className={INPUT_CLASS}
                   inputMode="decimal"
                   value={transferAmount}
@@ -2230,6 +2421,7 @@ export function ShieldedInheritancePanel({
                 onChange={setSelectedValueCommitments}
                 maxInputs={2}
                 decimals={modules.tokenDecimals}
+                symbol={modules.assetSymbol}
                 busy={busy}
               />
             </>
@@ -2237,9 +2429,9 @@ export function ShieldedInheritancePanel({
 
           {action === "unshield" ? (
             <>
-              <FieldBlock label={t("shielded.fields.amount")}>
+              <FieldBlock label={t("shielded.fields.amount", { symbol: modules.assetSymbol })}>
                 <input
-                  aria-label={t("shielded.fields.amount")}
+                  aria-label={t("shielded.fields.amount", { symbol: modules.assetSymbol })}
                   className={INPUT_CLASS}
                   inputMode="decimal"
                   value={exitAmount}
@@ -2247,11 +2439,11 @@ export function ShieldedInheritancePanel({
                 />
               </FieldBlock>
               <FieldBlock
-                label={t("shielded.fields.exitRecipient")}
-                hint={t("shielded.publicExitHint")}
+                label={t("shielded.fields.exitRecipient", { symbol: modules.assetSymbol })}
+                hint={t("shielded.publicExitHint", { symbol: modules.assetSymbol })}
               >
                 <input
-                  aria-label={t("shielded.fields.exitRecipient")}
+                  aria-label={t("shielded.fields.exitRecipient", { symbol: modules.assetSymbol })}
                   className={INPUT_CLASS}
                   value={exitRecipient}
                   onChange={(event) => setExitRecipient(event.target.value)}
@@ -2264,16 +2456,21 @@ export function ShieldedInheritancePanel({
                 onChange={setSelectedValueCommitments}
                 maxInputs={1}
                 decimals={modules.tokenDecimals}
+                symbol={modules.assetSymbol}
                 busy={busy}
               />
             </>
           ) : null}
 
           {isPrivate && publicActivityAddresses.has(account.toLowerCase()) ? (
-            <WarningNotice>{t("shielded.switchWalletPrompt")}</WarningNotice>
+            <WarningNotice>
+              {t("shielded.switchWalletPrompt", { symbol: modules.assetSymbol })}
+            </WarningNotice>
           ) : null}
           {!signer && action !== "receiveCode" ? (
-            <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice>
+            <WarningNotice>
+              {t("shielded.walletNotReady", { symbol: modules.assetSymbol })}
+            </WarningNotice>
           ) : null}
           <PanelButton
             variant="primary"
@@ -2289,7 +2486,7 @@ export function ShieldedInheritancePanel({
             }
             onClick={() => void submitSelected()}
           >
-            {t("shielded.submit", { action: labels[action] })}
+            {t("shielded.submit", { symbol: modules.assetSymbol, action: labels[action] })}
           </PanelButton>
           {feedback}
         </PanelShell>

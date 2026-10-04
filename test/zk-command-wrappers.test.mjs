@@ -37,6 +37,7 @@ describe("public ZK command surface", function () {
     expect(Object.keys(packageJson.scripts).filter((name) => name.startsWith("zk:"))).to.deep.equal(
       [
         "zk:fetch",
+        "zk:ptau:fetch",
         "zk:build",
         "zk:development:setup",
         "zk:production:setup",

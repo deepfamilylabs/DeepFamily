@@ -11,8 +11,8 @@ const ciphertext = (byte) => `0x${byte.repeat(512)}`;
 // ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE.
 const ACTION_PURPOSE_BASE = 2;
 
-describe("ShieldedDeepPool contract boundaries", function () {
-  async function setup(poolContractName = "ShieldedDeepPool") {
+describe("ShieldedErc20Pool contract boundaries", function () {
+  async function setup(poolContractName = "ShieldedErc20Pool") {
     const [depositor, recipient] = await hre.ethers.getSigners();
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
@@ -288,7 +288,11 @@ describe("ShieldedDeepPool contract boundaries", function () {
       remaining: 100n,
       nonce: 555n,
     };
-    const envelope = hre.ethers.hexlify(encodePublicShieldedBudgetEnvelope(publicNote));
+    const scope = {
+      chainId: (await hre.ethers.provider.getNetwork()).chainId,
+      poolAddress: await pool.getAddress(),
+    };
+    const envelope = hre.ethers.hexlify(encodePublicShieldedBudgetEnvelope(publicNote, scope));
     const funding = actionData({
       budgetKind: 1n,
       inputRoots: [root, root],
@@ -313,7 +317,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       );
     }
     const wrongHeir = hre.ethers.hexlify(
-      encodePublicShieldedBudgetEnvelope({ ...publicNote, heirIdentityCommitment: 223n }),
+      encodePublicShieldedBudgetEnvelope({ ...publicNote, heirIdentityCommitment: 223n }, scope),
     );
     const zeroPeriodBytes = hre.ethers.getBytes(envelope);
     zeroPeriodBytes.fill(0, 214, 218);
@@ -322,7 +326,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
       "InvalidFieldElement",
     );
     const wrongPeriod = hre.ethers.hexlify(
-      encodePublicShieldedBudgetEnvelope({ ...publicNote, periodDays: 1n }),
+      encodePublicShieldedBudgetEnvelope({ ...publicNote, periodDays: 1n }, scope),
     );
     await expect(
       pool.fund(
@@ -442,7 +446,7 @@ describe("ShieldedDeepPool contract boundaries", function () {
   it("measures synthetic 32-level append costs for funding and 12-slot claim", async () => {
     async function runCase(syntheticDepth32) {
       const { pool, lineage } = await setup(
-        syntheticDepth32 ? "ShieldedPoolDepthHarness" : "ShieldedDeepPool",
+        syntheticDepth32 ? "ShieldedPoolDepthHarness" : "ShieldedErc20Pool",
       );
       if (syntheticDepth32) {
         await pool.seedSyntheticLeftSubtree(777n);

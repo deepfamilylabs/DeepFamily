@@ -35,35 +35,44 @@ async function fixture() {
   const ownViewKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const otherKeys = deriveShieldedHeirKeyMaterial(14n);
   const otherViewKey = await deriveShieldedViewPublicKey(otherKeys.hpkeIkm);
-  const valuePayload = encodeShieldedValueNotePayload({
-    ownerCommitment: keys.ownerCommitment,
-    amount: 300n,
-    nonce: 29n,
-  });
-  const budgetPayload = encodeShieldedBudgetNotePayload({
-    rootIdentityCommitment: 11n,
-    rootVersionIndex: 2n,
-    policySalt: 17n,
-    allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n),
-    heirIdentityCommitment: identity.identityCommitment,
-    eligibleFrom: 2_592_001n,
-    enrollmentSalt: 23n,
-    heirOwnerCommitment: keys.ownerCommitment,
-    amountPerPeriod: 100n,
-    periodDays: 30n,
-    remaining: 1_200n,
-    nonce: 31n,
-  });
+  const valuePayload = encodeShieldedValueNotePayload(
+    {
+      ownerCommitment: keys.ownerCommitment,
+      amount: 300n,
+      nonce: 29n,
+    },
+    context,
+  );
+  const budgetPayload = encodeShieldedBudgetNotePayload(
+    {
+      rootIdentityCommitment: 11n,
+      rootVersionIndex: 2n,
+      policySalt: 17n,
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, context),
+      heirIdentityCommitment: identity.identityCommitment,
+      eligibleFrom: 2_592_001n,
+      enrollmentSalt: 23n,
+      heirOwnerCommitment: keys.ownerCommitment,
+      amountPerPeriod: 100n,
+      periodDays: 30n,
+      remaining: 1_200n,
+      nonce: 31n,
+    },
+    context,
+  );
   const notes = [
     { payload: valuePayload, recipientPublicKey: ownViewKey },
     { payload: budgetPayload, recipientPublicKey: ownViewKey },
     { payload: valuePayload, recipientPublicKey: otherViewKey },
     {
-      payload: encodeShieldedValueNotePayload({
-        ownerCommitment: otherKeys.ownerCommitment,
-        amount: 17n,
-        nonce: 37n,
-      }),
+      payload: encodeShieldedValueNotePayload(
+        {
+          ownerCommitment: otherKeys.ownerCommitment,
+          amount: 17n,
+          nonce: 37n,
+        },
+        context,
+      ),
       recipientPublicKey: ownViewKey,
     },
     { payload: Uint8Array.of(1, 2, 3), recipientPublicKey: ownViewKey },
@@ -83,10 +92,13 @@ async function fixture() {
     const commitment =
       index === 4
         ? 999n
-        : computeShieldedNoteCommitmentFromPayload({
-            payload: note.payload,
-            ciphertextHashField: computeShieldedCiphertextHashField(ciphertext),
-          }).noteCommitment;
+        : computeShieldedNoteCommitmentFromPayload(
+            {
+              payload: note.payload,
+              ciphertextHashField: computeShieldedCiphertextHashField(ciphertext),
+            },
+            context,
+          ).noteCommitment;
     commitments.push(commitment);
     tree.insert(commitment);
     const event = iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
@@ -98,10 +110,13 @@ async function fixture() {
     ]);
     logs.push({ ...event, address: context.poolAddress, blockNumber: 1, index });
   }
-  const spent = computeShieldedSpendNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: commitments[0],
-  });
+  const spent = computeShieldedSpendNullifier(
+    {
+      ownerSecret: keys.ownerSecret,
+      noteCommitment: commitments[0],
+    },
+    context,
+  );
   const spentEvent = iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]);
   logs.push({ ...spentEvent, address: context.poolAddress, blockNumber: 1, index: notes.length });
   const logFilters: Array<Record<string, unknown>> = [];
@@ -132,7 +147,7 @@ describe("local shielded wallet recovery", () => {
       rootIdentityCommitment: 11n,
       rootVersionIndex: 2n,
       policySalt: 17n,
-      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n),
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, context),
       heirIdentityCommitment: 19n,
       eligibleFrom: 2_592_001n,
       enrollmentSalt: 23n,
@@ -142,31 +157,40 @@ describe("local shielded wallet recovery", () => {
       remaining: 1_200n,
       nonce: 31n,
     };
-    const budgetPayload = encodeShieldedBudgetNotePayload(budget);
+    const budgetPayload = encodeShieldedBudgetNotePayload(budget, context);
     const budgetCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(heir.hpkeIkm),
       payload: budgetPayload,
       ...context,
     });
-    const budgetCommitment = computeShieldedNoteCommitmentFromPayload({
-      payload: budgetPayload,
-      ciphertextHashField: computeShieldedCiphertextHashField(budgetCiphertext),
-    }).noteCommitment;
-    const changePayload = encodeShieldedValueNotePayload({
-      ownerCommitment: donor.ownerCommitment,
-      amount: 0n,
-      nonce: 37n,
-      fundingMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
-    });
+    const budgetCommitment = computeShieldedNoteCommitmentFromPayload(
+      {
+        payload: budgetPayload,
+        ciphertextHashField: computeShieldedCiphertextHashField(budgetCiphertext),
+      },
+      context,
+    ).noteCommitment;
+    const changePayload = encodeShieldedValueNotePayload(
+      {
+        ownerCommitment: donor.ownerCommitment,
+        amount: 0n,
+        nonce: 37n,
+        fundingMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
+      },
+      context,
+    );
     const changeCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
       payload: changePayload,
       ...context,
     });
-    const changeCommitment = computeShieldedNoteCommitmentFromPayload({
-      payload: changePayload,
-      ciphertextHashField: computeShieldedCiphertextHashField(changeCiphertext),
-    }).noteCommitment;
+    const changeCommitment = computeShieldedNoteCommitmentFromPayload(
+      {
+        payload: changePayload,
+        ciphertextHashField: computeShieldedCiphertextHashField(changeCiphertext),
+      },
+      context,
+    ).noteCommitment;
     const iface = new Interface(ABI);
     const tree = createLineageTree();
     const logs = [budgetCiphertext, changeCiphertext].map((ciphertext, index) => {
@@ -198,10 +222,13 @@ describe("local shielded wallet recovery", () => {
       currentShardId: async () => 0n,
       noteShard: async () => ({ size: 2n, root: tree.root }),
     } as unknown as Contract;
-    const spent = computeShieldedSpendNullifier({
-      ownerSecret: donor.ownerSecret,
-      noteCommitment: changeCommitment,
-    });
+    const spent = computeShieldedSpendNullifier(
+      {
+        ownerSecret: donor.ownerSecret,
+        noteCommitment: changeCommitment,
+      },
+      context,
+    );
     logs.push({
       ...iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]),
       address: context.poolAddress,
@@ -239,10 +266,13 @@ describe("local shielded wallet recovery", () => {
       payload: badKeyPayload,
       ...context,
     });
-    const badKeyCommitment = computeShieldedNoteCommitmentFromPayload({
-      payload: badKeyPayload,
-      ciphertextHashField: computeShieldedCiphertextHashField(badKeyCiphertext),
-    }).noteCommitment;
+    const badKeyCommitment = computeShieldedNoteCommitmentFromPayload(
+      {
+        payload: badKeyPayload,
+        ciphertextHashField: computeShieldedCiphertextHashField(badKeyCiphertext),
+      },
+      context,
+    ).noteCommitment;
     tree.update(1n, badKeyCommitment);
     logs[1] = {
       ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
@@ -261,21 +291,27 @@ describe("local shielded wallet recovery", () => {
     expect(listRecoveredFundingTemplates(badKeyRecovery)).toHaveLength(1);
     expect(listRecoveredShieldedPolicies(badKeyRecovery)).toEqual([]);
 
-    const forgedPayload = encodeShieldedValueNotePayload({
-      ownerCommitment: donor.ownerCommitment,
-      amount: 300n,
-      nonce: 38n,
-      fundingMemo: { budgetCommitment: budgetCommitment + 1n, budgetNote: budget },
-    });
+    const forgedPayload = encodeShieldedValueNotePayload(
+      {
+        ownerCommitment: donor.ownerCommitment,
+        amount: 300n,
+        nonce: 38n,
+        fundingMemo: { budgetCommitment: budgetCommitment + 1n, budgetNote: budget },
+      },
+      context,
+    );
     const forgedCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
       payload: forgedPayload,
       ...context,
     });
-    const forgedCommitment = computeShieldedNoteCommitmentFromPayload({
-      payload: forgedPayload,
-      ciphertextHashField: computeShieldedCiphertextHashField(forgedCiphertext),
-    }).noteCommitment;
+    const forgedCommitment = computeShieldedNoteCommitmentFromPayload(
+      {
+        payload: forgedPayload,
+        ciphertextHashField: computeShieldedCiphertextHashField(forgedCiphertext),
+      },
+      context,
+    ).noteCommitment;
     tree.update(1n, forgedCommitment);
     logs[1] = {
       ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [

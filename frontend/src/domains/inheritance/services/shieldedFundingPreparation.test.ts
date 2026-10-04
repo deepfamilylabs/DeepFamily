@@ -44,7 +44,7 @@ async function open(ciphertext: Uint8Array, secret: bigint) {
     poolAddress,
   });
   try {
-    return decodeShieldedNotePayload(payload);
+    return decodeShieldedNotePayload(payload, { chainId, poolAddress });
   } finally {
     payload.fill(0);
   }
@@ -91,12 +91,15 @@ async function setup(periodDays = 30n) {
     walletOwnerCommitment: donorKeys.ownerCommitment,
     walletIdentityCommitment: rootIdentity,
   };
-  const policy = createShieldedPolicyDescriptor({
-    rootIdentityCommitment: rootIdentity,
-    rootVersionIndex: 0n,
-    amountPerPeriod: 10n,
-    periodDays,
-  });
+  const policy = createShieldedPolicyDescriptor(
+    {
+      rootIdentityCommitment: rootIdentity,
+      rootVersionIndex: 0n,
+      amountPerPeriod: 10n,
+      periodDays,
+    },
+    { chainId, poolAddress },
+  );
   const noteTree = firstTree;
   const wallet: LocalShieldedWalletSnapshot = {
     ...preliminaryWallet,
@@ -269,12 +272,15 @@ describe("local unified funding preparation", () => {
 
   it.each([0n, -1n, 4_294_967_296n])("rejects out-of-range period days %s", (periodDays) => {
     expect(() =>
-      createShieldedPolicyDescriptor({
-        rootIdentityCommitment: rootIdentity,
-        rootVersionIndex: 1n,
-        amountPerPeriod: 10n,
-        periodDays,
-      }),
+      createShieldedPolicyDescriptor(
+        {
+          rootIdentityCommitment: rootIdentity,
+          rootVersionIndex: 1n,
+          amountPerPeriod: 10n,
+          periodDays,
+        },
+        { chainId, poolAddress },
+      ),
     ).toThrow("positive uint32");
   });
 
@@ -387,11 +393,14 @@ describe("local unified funding preparation", () => {
     });
     try {
       expect(
-        verifyShieldedNotePayload({
-          payload,
-          ciphertext: prepared.outputs[0].ciphertext,
-          noteCommitment: prepared.outputs[0].commitment,
-        }).note.kind,
+        verifyShieldedNotePayload(
+          {
+            payload,
+            ciphertext: prepared.outputs[0].ciphertext,
+            noteCommitment: prepared.outputs[0].commitment,
+          },
+          { chainId, poolAddress },
+        ).note.kind,
       ).toBe("budget");
     } finally {
       payload.fill(0);

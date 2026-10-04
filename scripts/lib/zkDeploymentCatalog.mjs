@@ -55,7 +55,9 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
     ["PoseidonT4", "poseidonT4", "poseidonT4"],
     ["PoseidonT6", "poseidonT6", "poseidonT6"],
     ["DeepFamilyLineageIndex", "lineageIndex", "deepFamilyLineageIndex"],
-    ["ShieldedDeepPool", "shieldedDeepPool", "shieldedDeepPool"],
+    ["ShieldedNativePool", "shieldedNativePool", "shieldedNativePool"],
+    ["ShieldedPoolFactory", "shieldedPoolFactory", "shieldedPoolFactory"],
+    ["ShieldedErc20Pool", "shieldedErc20Pool", "shieldedPoolFactory"],
   ].map(([deploymentName, property, transactionLabel, contractName = deploymentName]) =>
     Object.freeze({ deploymentName, property, transactionLabel, contractName }),
   ),
@@ -71,11 +73,13 @@ export async function integratedDeploymentAddresses(deployed) {
     if (!contract?.getAddress)
       throw new Error(`Integrated deployment is missing ${record.deploymentName}`);
     const key =
-      record.transactionLabel === "deepFamilyProxy"
-        ? "deepFamily"
-        : record.transactionLabel === "deepFamilyToken"
-          ? "token"
-          : record.transactionLabel;
+      record.property === "shieldedErc20Pool"
+        ? "shieldedErc20Pool"
+        : record.transactionLabel === "deepFamilyProxy"
+          ? "deepFamily"
+          : record.transactionLabel === "deepFamilyToken"
+            ? "token"
+            : record.transactionLabel;
     addresses[key] = await contract.getAddress();
   }
   addresses.deepFamilyImplementation = deployed.deepFamilyImplementationAddress;

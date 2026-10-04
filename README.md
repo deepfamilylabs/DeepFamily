@@ -57,10 +57,10 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Family Inheritance
 
-- A public `shield` deposit places DEEP in a shared pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
+- A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
 - The same `fund` action supports private receive-code delivery and public personHash addressing. Both spend donor VALUE and create BUDGET notes in the same tree. Public addressing discloses its recipient and budget terms without exposing private rule openings; `claim` keeps the input format hidden and encrypts the remainder and payout. Existing private owner binding remains intact.
 - A child proves current lineage eligibility and claims 1–12 complete 30-day periods from one or two compatible budgets into a private note. The remaining budgets are consolidated by that claim. Private transfers and a later public exit are separate transactions. Insufficient budgets do not consume a period.
-- Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. This feature distributes DEEP utility points and has no legal effect.
+- Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. Each asset has its own balances, budgets and anonymity set.
 
 ## Technology Stack
 
@@ -81,7 +81,10 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 | **PersonCommitmentVerifier.sol**  | ZK verifier for person identity and parent commitment proofs                                                        |
 | **DisclosureBindingVerifier.sol** | ZK verifier for NFT mint disclosure-binding proofs                                                                  |
 | **DeepFamilyLineageIndex.sol**    | Immutable Poseidon Merkle mirror of endorsements and recommended sources, written by the DeepFamily proxy           |
-| **ShieldedDeepPool.sol**          | Shared DEEP pool with encrypted note commitments, private and public budgets, claims, transfers, and public exits   |
+| **ShieldedPoolCore.sol**          | Common multi-asset pool protocol with private/public budgets, claims, transfers, and exits                          |
+| **ShieldedErc20Pool.sol**         | One immutable ERC-20 pool with exact sender/recipient transfer checks                                               |
+| **ShieldedNativePool.sol**        | Direct native-currency pool with exact deposit value and reverting payouts                                          |
+| **ShieldedPoolFactory.sol**       | Permissionless canonical pool creation for gas only, with no administrator                                          |
 
 ## Quick Start
 
@@ -221,14 +224,14 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-`zk:development:setup` verifies the committed Phase 1 pTau, then compiles all 8 circuits,
+Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 8 circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
 production.
 
-Production setup uses the pinned public Phase 1 pTau committed at
-`circuits/ptau/ppot_0080_16.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
+Production setup uses the pinned public Phase 1 pTau locally installed at
+`circuits/ptau/ppot_0080_17.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
 command that reads it checks its byte length and both pinned hashes first; none downloads it.
 
 Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
@@ -277,7 +280,7 @@ Production release is blocked until the development Groth16 keys have been repla
 `npm run zk:production:setup`, the generated artifacts have been reviewed and committed together,
 `npm run release:preflight` passes from that clean commit, and the exact release commit produces an
 eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default setup reuses the
-pinned public power-16 pTau and records one local Phase 2 contributor under the explicit
+pinned public power-17 pTau and records one local Phase 2 contributor under the explicit
 `single-operator` trust model; an independent multi-party ceremony is an optional enhancement, not
 a three-person requirement. See the [production ZK setup runbook](docs/zk-ceremony.md).
 A successful, self-validated rehearsal automatically publishes the exact schema-v1 evidence to the

@@ -42,6 +42,14 @@ function actionData(roots: CurrentLineageRoots): ShieldedPoolActionData {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 function fixture() {
   let roots = { endorsement: 10n, trusted: 20n };
   let configuredIndex = LINEAGE_ADDRESS;
@@ -68,9 +76,12 @@ function fixture() {
     getFeeData: vi.fn(async () => ({ maxFeePerGas: 1_000_000_000n, gasPrice: null })),
   };
   const signer = { provider, getAddress: vi.fn(async () => WALLET_ADDRESS) } as unknown as Signer;
+  const lineageRoot = vi.fn(async (kind: number) =>
+    kind === 0 ? roots.endorsement : roots.trusted,
+  );
   const lineageIndex = {
     getAddress: vi.fn(async () => LINEAGE_ADDRESS),
-    root: vi.fn(async (kind: number) => (kind === 0 ? roots.endorsement : roots.trusted)),
+    root: lineageRoot,
   } as unknown as Contract;
   const pool = {
     getAddress: vi.fn(async () => POOL_ADDRESS),
@@ -89,6 +100,7 @@ function fixture() {
     claim,
     estimateGas,
     lineageIndex,
+    lineageRoot,
     provider,
     setRoots: (endorsement: bigint, trusted: bigint) => {
       roots = { endorsement, trusted };
@@ -170,6 +182,108 @@ describe("fresh lineage proof self-submit", () => {
     );
     expect(f.prepare).toHaveBeenCalledOnce();
     expect(f.fund).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["fund", submitFundWithFreshLineage],
+    ["claim", submitClaimWithFreshLineage],
+  ] as const)(
+    "does not request %s after the operation becomes stale during the final roots RPC",
+    async (action, submit) => {
+      const f = fixture();
+      const rootsRead = deferred<bigint>();
+      let submitting = false;
+      let waitingForRoots = false;
+      let current = true;
+      f.lineageRoot.mockImplementation(async (kind: number) => {
+        if (submitting && kind === 0) {
+          waitingForRoots = true;
+          return rootsRead.promise;
+        }
+        return kind === 0 ? 10n : 20n;
+      });
+      const onStage = vi.fn((stage: string) => {
+        if (stage === "submitting") {
+          submitting = true;
+          if (!current) throw new Error("Operation scope or wallet changed");
+        }
+      });
+      const pending = submit({ ...f.common, onStage }).catch((error: unknown) => error);
+      await vi.waitFor(() => expect(waitingForRoots).toBe(true));
+      current = false;
+      rootsRead.resolve(10n);
+      expect(await pending).toMatchObject({
+        name: "ShieldedLineageSubmissionError",
+        cause: expect.objectContaining({ message: "Operation scope or wallet changed" }),
+      });
+      expect(onStage.mock.calls.filter(([stage]) => stage === "submitting")).toHaveLength(2);
+      expect(f.prepare).toHaveBeenCalledOnce();
+      expect(f[action]).not.toHaveBeenCalled();
+    },
+  );
+
+  it("checks the wallet network after the final roots RPC before requesting a transaction", async () => {
+    const f = fixture();
+    const rootsRead = deferred<bigint>();
+    let submitting = false;
+    let waitingForRoots = false;
+    f.lineageRoot.mockImplementation(async (kind: number) => {
+      if (submitting && kind === 0) {
+        waitingForRoots = true;
+        return rootsRead.promise;
+      }
+      return kind === 0 ? 10n : 20n;
+    });
+    const pending = submitFundWithFreshLineage({
+      ...f.common,
+      onStage: (stage) => {
+        if (stage === "submitting") submitting = true;
+      },
+    }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(waitingForRoots).toBe(true));
+    f.provider.getNetwork.mockResolvedValue({ chainId: 72n });
+    rootsRead.resolve(10n);
+    expect(await pending).toMatchObject({
+      name: "ShieldedLineageSubmissionError",
+      cause: expect.objectContaining({
+        message: "Transaction wallet is connected to the wrong network",
+      }),
+    });
+    expect(f.prepare).toHaveBeenCalledOnce();
+    expect(f.fund).not.toHaveBeenCalled();
+  });
+
+  it("checks the current operation again after the final network RPC", async () => {
+    const f = fixture();
+    const networkRead = deferred<{ chainId: bigint }>();
+    let submitting = false;
+    let waitingForNetwork = false;
+    let current = true;
+    f.provider.getNetwork.mockImplementation(async () => {
+      if (submitting) {
+        waitingForNetwork = true;
+        return networkRead.promise;
+      }
+      return { chainId: 71n };
+    });
+    const pending = submitClaimWithFreshLineage({
+      ...f.common,
+      onStage: (stage) => {
+        if (stage === "submitting") {
+          submitting = true;
+          if (!current) throw new Error("Identity locked");
+        }
+      },
+    }).catch((error: unknown) => error);
+    await vi.waitFor(() => expect(waitingForNetwork).toBe(true));
+    current = false;
+    networkRead.resolve({ chainId: 71n });
+    expect(await pending).toMatchObject({
+      name: "ShieldedLineageSubmissionError",
+      cause: expect.objectContaining({ message: "Identity locked" }),
+    });
+    expect(f.prepare).toHaveBeenCalledOnce();
+    expect(f.claim).not.toHaveBeenCalled();
   });
 
   it("stops after the bounded number of stale proofs without broadcasting", async () => {

@@ -235,7 +235,7 @@ describe("shielded production ceremony verification snapshots", function () {
       env: { ZK_PTAU_PATH: fixture.ptau },
     });
     expect(result.ptau.path).to.equal(fixture.ptau);
-    expect(fs.existsSync(path.join(fixture.root, "circuits/ptau/ppot_0080_16.ptau"))).to.equal(
+    expect(fs.existsSync(path.join(fixture.root, "circuits/ptau/ppot_0080_17.ptau"))).to.equal(
       false,
     );
   });

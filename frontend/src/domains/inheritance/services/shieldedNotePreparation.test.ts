@@ -36,11 +36,14 @@ describe("local shield preparation", () => {
       });
       try {
         expect(
-          verifyShieldedNotePayload({
-            payload,
-            ciphertext: output.ciphertext,
-            noteCommitment: output.commitment,
-          }).note.kind,
+          verifyShieldedNotePayload(
+            {
+              payload,
+              ciphertext: output.ciphertext,
+              noteCommitment: output.commitment,
+            },
+            { chainId, poolAddress },
+          ).note.kind,
         ).toBe("value");
       } finally {
         payload.fill(0);

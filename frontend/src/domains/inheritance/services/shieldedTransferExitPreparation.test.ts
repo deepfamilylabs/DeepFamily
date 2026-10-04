@@ -124,7 +124,10 @@ async function openedValue(ciphertext: Uint8Array, secret: bigint, commitment: b
     poolAddress,
   });
   try {
-    return verifyShieldedNotePayload({ payload, ciphertext, noteCommitment: commitment }).note;
+    return verifyShieldedNotePayload(
+      { payload, ciphertext, noteCommitment: commitment },
+      { chainId, poolAddress },
+    ).note;
   } finally {
     payload.fill(0);
   }
@@ -312,8 +315,14 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.data.inputShardIds[1]).toBe(prepared.data.inputShardIds[0]);
     expect(prepared.data.inputRoots[1]).toBe(prepared.data.inputRoots[0]);
     expect(prepared.data.inputNullifiers).toEqual([
-      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: commitment }),
-      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: commitment }),
+      computeShieldedSpendNullifier(
+        { ownerSecret, noteCommitment: commitment },
+        { chainId, poolAddress },
+      ),
+      computeShieldedDummyInputNullifier(
+        { ownerSecret, noteCommitment: commitment },
+        { chainId, poolAddress },
+      ),
     ]);
     expect(
       await openedValue(
@@ -387,8 +396,14 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.witness.inputRoot).toBe(String(prepared.data.inputRoots[0]));
     expect(prepared.data.inputRoots[0]).toBe(prepared.data.inputRoots[1]);
     expect(prepared.data.inputNullifiers).toEqual([
-      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: input0.commitment }),
-      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: input0.commitment }),
+      computeShieldedSpendNullifier(
+        { ownerSecret, noteCommitment: input0.commitment },
+        { chainId, poolAddress },
+      ),
+      computeShieldedDummyInputNullifier(
+        { ownerSecret, noteCommitment: input0.commitment },
+        { chainId, poolAddress },
+      ),
     ]);
     expect(prepared.witness.changeAmount).toBe("40");
     expect(
@@ -432,10 +447,13 @@ describe("local private transfer and unshield preparation", () => {
     ).rejects.toThrow("must equal");
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
     input0.wallet.spentNullifiers.add(
-      computeShieldedSpendNullifier({
-        ownerSecret,
-        noteCommitment: input0.commitment,
-      }),
+      computeShieldedSpendNullifier(
+        {
+          ownerSecret,
+          noteCommitment: input0.commitment,
+        },
+        { chainId, poolAddress },
+      ),
     );
     await expect(prepareShieldedPrivateTransfer(base)).rejects.toThrow("already been spent");
     input0.wallet.spentNullifiers.clear();
@@ -498,10 +516,13 @@ describe("local private transfer and unshield preparation", () => {
     ).rejects.toThrow("must be nonzero");
     const ownerSecret = deriveShieldedHeirKeyMaterial(senderSecret).ownerSecret;
     input0.wallet.spentNullifiers.add(
-      computeShieldedDummyInputNullifier({
-        ownerSecret,
-        noteCommitment: input0.commitment,
-      }),
+      computeShieldedDummyInputNullifier(
+        {
+          ownerSecret,
+          noteCommitment: input0.commitment,
+        },
+        { chainId, poolAddress },
+      ),
     );
     await expect(prepareShieldedUnshield({ ...base, amount: 30n })).rejects.toThrow(
       "already been spent",

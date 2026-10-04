@@ -317,10 +317,20 @@ const buildFingerprint = ({
       deepFamilyArchive: [plannedAddresses.deepFamily],
       deepFamilyArchiveBinding: plannedAddresses.deepFamilyArchive,
       deepFamilyReader: [plannedAddresses.deepFamily],
-      shieldedDeepPool: [
+      shieldedErc20Pool: [
         plannedAddresses.token,
         plannedAddresses.deepFamilyLineageIndex,
         plannedAddresses.groth16VerifierAdapter,
+      ],
+      shieldedNativePool: [
+        plannedAddresses.deepFamilyLineageIndex,
+        plannedAddresses.groth16VerifierAdapter,
+      ],
+      shieldedPoolFactory: [
+        plannedAddresses.token,
+        plannedAddresses.deepFamilyLineageIndex,
+        plannedAddresses.groth16VerifierAdapter,
+        plannedAddresses.shieldedNativePool,
       ],
     },
   },
@@ -558,11 +568,11 @@ const assertProtocolTerminalState = async ({
       addresses[spec.verifierLabel],
       { needsLibraries: false },
     ]),
-    [
-      "ShieldedDeepPool",
-      addresses.shieldedDeepPool,
+    ...["ShieldedErc20Pool", "ShieldedNativePool", "ShieldedPoolFactory"].map((name) => [
+      name,
+      addresses[name[0].toLowerCase() + name.slice(1)],
       { libraries: { PoseidonT3: addresses.poseidonT3 } },
-    ],
+    ]),
   ];
   for (const [contractName, address, spec] of artifactChecks) {
     await assertImplementationMatchesArtifact({
@@ -657,7 +667,18 @@ const assertProtocolTerminalState = async ({
     deployed: {
       ...deployed,
       lineageIndex,
-      shieldedDeepPool: await ethers.getContractAt("ShieldedDeepPool", addresses.shieldedDeepPool),
+      shieldedErc20Pool: await ethers.getContractAt(
+        "ShieldedErc20Pool",
+        addresses.shieldedErc20Pool,
+      ),
+      shieldedNativePool: await ethers.getContractAt(
+        "ShieldedNativePool",
+        addresses.shieldedNativePool,
+      ),
+      shieldedPoolFactory: await ethers.getContractAt(
+        "ShieldedPoolFactory",
+        addresses.shieldedPoolFactory,
+      ),
     },
     addresses,
   });
@@ -1505,9 +1526,28 @@ export const main = async (chainProfile) => {
       )),
       await verificationEntry(
         hre.artifacts,
-        "ShieldedDeepPool",
-        addresses.shieldedDeepPool,
+        "ShieldedErc20Pool",
+        addresses.shieldedErc20Pool,
         [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedNativePool",
+        addresses.shieldedNativePool,
+        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedPoolFactory",
+        addresses.shieldedPoolFactory,
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.shieldedNativePool,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
     ];

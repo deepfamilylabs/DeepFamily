@@ -86,6 +86,35 @@ template ShieldedClaim() {
     signal input newBudgetNonce;
     signal input payoutNonce;
 
+    component policyTag = ShieldedScopedTag();
+    policyTag.chainId <== chainId;
+    policyTag.pool <== pool;
+    policyTag.purpose <== 1010;
+    component enrollmentTag = ShieldedScopedTag();
+    enrollmentTag.chainId <== chainId;
+    enrollmentTag.pool <== pool;
+    enrollmentTag.purpose <== 1011;
+    component spendTag = ShieldedScopedTag();
+    spendTag.chainId <== chainId;
+    spendTag.pool <== pool;
+    spendTag.purpose <== 1016;
+    component dummyInputTag = ShieldedScopedTag();
+    dummyInputTag.chainId <== chainId;
+    dummyInputTag.pool <== pool;
+    dummyInputTag.purpose <== 1021;
+    component periodTag = ShieldedScopedTag();
+    periodTag.chainId <== chainId;
+    periodTag.pool <== pool;
+    periodTag.purpose <== 1017;
+    component dummyPeriodTag = ShieldedScopedTag();
+    dummyPeriodTag.chainId <== chainId;
+    dummyPeriodTag.pool <== pool;
+    dummyPeriodTag.purpose <== 1019;
+    component valueTag = ShieldedScopedTag();
+    valueTag.chainId <== chainId;
+    valueTag.pool <== pool;
+    valueTag.purpose <== 1014;
+
     component chainBits = Num2Bits(64);
     chainBits.in <== chainId;
     component poolBits = Num2Bits(160);
@@ -218,7 +247,7 @@ template ShieldedClaim() {
     allocationKeyCommitmentNotZero.in <== allocationKeyCommitment;
     requiresOpening * allocationKeyCommitmentNotZero.out === 0;
     component policy = Poseidon(7);
-    policy.inputs[0] <== 1010;
+    policy.inputs[0] <== policyTag.tag;
     policy.inputs[1] <== rootIdentityCommitment;
     policy.inputs[2] <== rootVersionIndex;
     policy.inputs[3] <== rate;
@@ -226,7 +255,7 @@ template ShieldedClaim() {
     policy.inputs[5] <== allocationKeyCommitment;
     policy.inputs[6] <== periodDays;
     component enrollment = Poseidon(5);
-    enrollment.inputs[0] <== 1011;
+    enrollment.inputs[0] <== enrollmentTag.tag;
     enrollment.inputs[1] <== policy.out;
     enrollment.inputs[2] <== heir.identityCommitment;
     enrollment.inputs[3] <== eligibleFrom;
@@ -234,6 +263,8 @@ template ShieldedClaim() {
     requiresOpening * (policy.out - policyCommitmentInput) === 0;
     requiresOpening * (enrollment.out - enrollmentCommitmentInput) === 0;
     component terms = ShieldedIdentityBudgetTerms();
+    terms.chainId <== chainId;
+    terms.pool <== pool;
     terms.rootIdentityCommitment <== rootIdentityCommitment;
     terms.rootVersionIndex <== rootVersionIndex;
     terms.heirIdentityCommitment <== heir.identityCommitment;
@@ -248,6 +279,8 @@ template ShieldedClaim() {
     ownerCommitment.inputs[1] <== ownerSecret.out;
 
     component oldBudget = ShieldedBoundBudgetCommitment();
+    oldBudget.chainId <== chainId;
+    oldBudget.pool <== pool;
     oldBudget.budgetKind <== budgetKind;
     oldBudget.policyCommitment <== policyCommitmentInput;
     oldBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -272,12 +305,12 @@ template ShieldedClaim() {
     noteMerkle.out === inputRoots[0];
 
     component spend = Poseidon(3);
-    spend.inputs[0] <== 1016;
+    spend.inputs[0] <== spendTag.tag;
     spend.inputs[1] <== ownerSecret.out;
     spend.inputs[2] <== oldBudget.commitment;
     spend.out === inputNullifiers[0];
     component dummySpend = Poseidon(3);
-    dummySpend.inputs[0] <== 1021;
+    dummySpend.inputs[0] <== dummyInputTag.tag;
     dummySpend.inputs[1] <== ownerSecret.out;
     dummySpend.inputs[2] <== oldBudget.commitment;
     // The optional second budget uses the same policy, enrollment and owner.
@@ -298,6 +331,8 @@ template ShieldedClaim() {
     secondNonceNotZero.in <== secondBudgetNonce;
     hasSecondInput * secondNonceNotZero.out === 0;
     component secondBudget = ShieldedBoundBudgetCommitment();
+    secondBudget.chainId <== chainId;
+    secondBudget.pool <== pool;
     secondBudget.budgetKind <== secondBudgetKind;
     secondBudget.policyCommitment <== policyCommitmentInput;
     secondBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -325,7 +360,7 @@ template ShieldedClaim() {
     distinctBudgets.in[1] <== secondBudget.commitment;
     hasSecondInput * distinctBudgets.out === 0;
     component secondSpend = Poseidon(3);
-    secondSpend.inputs[0] <== 1016;
+    secondSpend.inputs[0] <== spendTag.tag;
     secondSpend.inputs[1] <== ownerSecret.out;
     secondSpend.inputs[2] <== secondBudget.commitment;
     inputNullifiers[1] === dummySpend.out + hasSecondInput * (secondSpend.out - dummySpend.out);
@@ -376,12 +411,12 @@ template ShieldedClaim() {
             active[i].out * (1 - ascending[i - 1].out) === 0;
         }
         realPeriod[i] = Poseidon(4);
-        realPeriod[i].inputs[0] <== 1017;
+        realPeriod[i].inputs[0] <== periodTag.tag;
         realPeriod[i].inputs[1] <== derivedSecretField;
         realPeriod[i].inputs[2] <== policyCommitmentInput;
         realPeriod[i].inputs[3] <== periodIndices[i];
         dummyPeriod[i] = Poseidon(4);
-        dummyPeriod[i].inputs[0] <== 1019;
+        dummyPeriod[i].inputs[0] <== dummyPeriodTag.tag;
         dummyPeriod[i].inputs[1] <== ownerSecret.out;
         dummyPeriod[i].inputs[2] <== oldBudget.commitment;
         dummyPeriod[i].inputs[3] <== i;
@@ -401,6 +436,8 @@ template ShieldedClaim() {
     newRemaining === rate * newRemainingPeriods;
 
     component nextBudget = ShieldedBoundBudgetCommitment();
+    nextBudget.chainId <== chainId;
+    nextBudget.pool <== pool;
     nextBudget.budgetKind <== remainderKind;
     nextBudget.policyCommitment <== policyCommitmentInput;
     nextBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -413,7 +450,7 @@ template ShieldedClaim() {
     nextBudget.commitment === outputCommitments[0];
 
     component payoutNote = Poseidon(5);
-    payoutNote.inputs[0] <== 1014;
+    payoutNote.inputs[0] <== valueTag.tag;
     payoutNote.inputs[1] <== ownerCommitment.out;
     payoutNote.inputs[2] <== payout;
     payoutNote.inputs[3] <== payoutNonce;

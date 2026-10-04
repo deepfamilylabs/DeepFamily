@@ -28,6 +28,7 @@ import {
   type ShieldedBudgetRuleOpening,
   type ShieldedIdentityBudgetNotePayload,
   type ShieldedPolicyDescriptor,
+  type ShieldedScope,
   type ShieldedValueNotePayload,
 } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish, type Contract } from "ethers";
@@ -101,20 +102,29 @@ export type PrepareShieldedFundInput = CommonFundingInput &
 type InitialFundingInput = Extract<PrepareShieldedFundInput, { fundMode: 0 }>;
 type ContinuationFundingInput = Extract<PrepareShieldedFundInput, { fundMode: 1 }>;
 
-export function shieldedPolicyCommitment(policy: ShieldedPolicyDescriptor): bigint {
-  return computeShieldedPolicyCommitment({
-    ...policy,
-    allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey),
-  });
+export function shieldedPolicyCommitment(
+  policy: ShieldedPolicyDescriptor,
+  scope: ShieldedScope,
+): bigint {
+  return computeShieldedPolicyCommitment(
+    {
+      ...policy,
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(policy.allocationKey, scope),
+    },
+    scope,
+  );
 }
 
 /** A draft is local until its first funding transaction backs it up in encrypted change. */
-export function createShieldedPolicyDescriptor(input: {
-  rootIdentityCommitment: BigNumberish;
-  rootVersionIndex: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  periodDays: BigNumberish;
-}): ShieldedPolicyDescriptor {
+export function createShieldedPolicyDescriptor(
+  input: {
+    rootIdentityCommitment: BigNumberish;
+    rootVersionIndex: BigNumberish;
+    amountPerPeriod: BigNumberish;
+    periodDays: BigNumberish;
+  },
+  scope: ShieldedScope,
+): ShieldedPolicyDescriptor {
   const policy = {
     rootIdentityCommitment: getBigInt(input.rootIdentityCommitment),
     rootVersionIndex: uint64(input.rootVersionIndex, "rootVersionIndex"),
@@ -123,7 +133,7 @@ export function createShieldedPolicyDescriptor(input: {
     policySalt: generateShieldedRandomField(),
     allocationKey: generateShieldedRandomField(),
   };
-  shieldedPolicyCommitment(policy);
+  shieldedPolicyCommitment(policy, scope);
   return policy;
 }
 
@@ -278,10 +288,14 @@ function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
   const hash = computeShieldedCiphertextHashField(owned.ciphertext);
   if (
     hash !== owned.ciphertextHashField ||
-    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: hash }) !== commitment
+    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField: hash }, input.wallet) !==
+      commitment
   )
     throw new Error("Donor note does not match its public ciphertext and commitment");
-  const nullifier = computeShieldedSpendNullifier({ ownerSecret, noteCommitment: commitment });
+  const nullifier = computeShieldedSpendNullifier(
+    { ownerSecret, noteCommitment: commitment },
+    input.wallet,
+  );
   if (input.wallet.spentNullifiers.has(nullifier))
     throw new Error("Donor value note has already been spent");
   const path = getLocalShieldedNoteProof(input.wallet, commitment);
@@ -291,17 +305,20 @@ function donorInput(input: CommonFundingInput, ownerSecret: bigint) {
 function templatePath<T extends ShieldedBudgetNotePayload>(
   wallet: LocalShieldedWalletSnapshot,
   saved: SavedTemplate<T>,
-  encode: (note: T) => Uint8Array,
+  encode: (note: T, scope: ShieldedScope) => Uint8Array,
 ) {
   const commitment = getBigInt(saved.commitment);
   const shardId = getBigInt(saved.shardId);
-  const payload = encode(saved.note);
+  const payload = encode(saved.note, wallet);
   try {
-    verifyShieldedNotePayload({
-      payload,
-      ciphertext: saved.ciphertext,
-      noteCommitment: commitment,
-    });
+    verifyShieldedNotePayload(
+      {
+        payload,
+        ciphertext: saved.ciphertext,
+        noteCommitment: commitment,
+      },
+      wallet,
+    );
   } finally {
     payload.fill(0);
   }
@@ -326,13 +343,13 @@ function templatePath<T extends ShieldedBudgetNotePayload>(
 
 async function encryptOutput<T extends ShieldedBudgetNotePayload | ShieldedValueNotePayload>(
   note: T,
-  encode: (note: T) => Uint8Array,
+  encode: (note: T, scope: ShieldedScope) => Uint8Array,
   commit: (ciphertextHashField: bigint) => bigint,
   recipientPublicKey: Uint8Array,
   chainId: bigint,
   poolAddress: string,
 ): Promise<PreparedFundingOutput<T>> {
-  const payload = encode(note);
+  const payload = encode(note, { chainId, poolAddress });
   try {
     const ciphertext = await encryptShieldedNote({
       recipientPublicKey,
@@ -361,11 +378,11 @@ async function fundingOutputs(input: {
   enrollmentCommitment: bigint;
   allocationKey?: bigint;
 }) {
-  const payload = encodeShieldedBudgetNotePayload(input.budget);
+  const payload = encodeShieldedBudgetNotePayload(input.budget, input);
   let encryptedBudget: PreparedFundingOutput<ShieldedBudgetNotePayload>;
   try {
     const ciphertext = input.publicDelivery
-      ? encodePublicShieldedBudgetEnvelope(input.budget as ShieldedIdentityBudgetNotePayload)
+      ? encodePublicShieldedBudgetEnvelope(input.budget as ShieldedIdentityBudgetNotePayload, input)
       : await encryptShieldedNote({
           recipientPublicKey: input.heirViewingKey!,
           payload,
@@ -373,10 +390,13 @@ async function fundingOutputs(input: {
           poolAddress: input.poolAddress,
         });
     const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
-    const { noteCommitment: commitment } = computeShieldedNoteCommitmentFromPayload({
-      payload,
-      ciphertextHashField,
-    });
+    const { noteCommitment: commitment } = computeShieldedNoteCommitmentFromPayload(
+      {
+        payload,
+        ciphertextHashField,
+      },
+      input,
+    );
     encryptedBudget = { note: input.budget, ciphertext, ciphertextHashField, commitment };
   } finally {
     payload.fill(0);
@@ -399,7 +419,8 @@ async function fundingOutputs(input: {
   const encryptedChange = await encryptOutput(
     change,
     encodeShieldedValueNotePayload,
-    (ciphertextHashField) => computeShieldedValueNoteCommitment({ ...change, ciphertextHashField }),
+    (ciphertextHashField) =>
+      computeShieldedValueNoteCommitment({ ...change, ciphertextHashField }, input),
     donorViewingKey,
     input.chainId,
     input.poolAddress,
@@ -482,8 +503,8 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   }
   const donor = donorInput(input, ctx.keys.ownerSecret);
   const policy = input.policy;
-  const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey);
-  const policyCommitment = shieldedPolicyCommitment(policy);
+  const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey, ctx);
+  const policyCommitment = shieldedPolicyCommitment(policy, ctx);
   const { periods, amount } = fundingAmount(
     uint128(policy.amountPerPeriod, "rate"),
     input.budgetPeriods,
@@ -491,11 +512,14 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   if (donor.note.amount < amount)
     throw new Error("Donor value note cannot fund the whole child budget");
   const heir = ctx.heir;
-  const enrollmentNullifier = computeShieldedEnrollmentNullifier({
-    allocationKey: policy.allocationKey,
-    policyCommitment,
-    heirIdentityCommitment: heir.identityCommitment,
-  });
+  const enrollmentNullifier = computeShieldedEnrollmentNullifier(
+    {
+      allocationKey: policy.allocationKey,
+      policyCommitment,
+      heirIdentityCommitment: heir.identityCommitment,
+    },
+    ctx,
+  );
   if (input.wallet.spentNullifiers.has(enrollmentNullifier))
     throw new Error("This child is already enrolled under this policy");
   const latestBlock = ctx.latestBlock;
@@ -554,12 +578,15 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   )
     throw new Error("Lineage proof does not match active endorsement and trust leaves");
   const enrollmentSalt = generateShieldedRandomField();
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: heir.identityCommitment,
-    eligibleFrom,
-    enrollmentSalt,
-  });
+  const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+    {
+      policyCommitment,
+      heirIdentityCommitment: heir.identityCommitment,
+      eligibleFrom,
+      enrollmentSalt,
+    },
+    ctx,
+  );
   const ruleOpening = {
     policySalt: getBigInt(policy.policySalt),
     allocationKeyCommitment,
@@ -696,19 +723,22 @@ async function prepareContinuationFunding(
   const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
   if (donor.note.amount < amount)
     throw new Error("Donor value note cannot fund the full additional amount");
-  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(old);
+  const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(old, ctx);
   if (
-    computeShieldedPolicyCommitment({ ...old, ...ruleOpening }) !== policyCommitment ||
-    computeShieldedEnrollmentCommitment({ ...old, ...ruleOpening, policyCommitment }) !==
+    computeShieldedPolicyCommitment({ ...old, ...ruleOpening }, ctx) !== policyCommitment ||
+    computeShieldedEnrollmentCommitment({ ...old, ...ruleOpening, policyCommitment }, ctx) !==
       enrollmentCommitment
   )
     throw new Error("Funding rule opening does not match this budget");
   const budgetUseNonce = generateShieldedRandomField();
-  const useNullifier = computeShieldedBudgetUseNullifier({
-    policySalt: ruleOpening.policySalt,
-    budgetNoteCommitment: template.commitment,
-    useNonce: budgetUseNonce,
-  });
+  const useNullifier = computeShieldedBudgetUseNullifier(
+    {
+      policySalt: ruleOpening.policySalt,
+      budgetNoteCommitment: template.commitment,
+      useNonce: budgetUseNonce,
+    },
+    ctx,
+  );
   if (input.wallet.spentNullifiers.has(useNullifier))
     throw new Error("Funding authorization was already used");
   const commonBudget = {

@@ -3,17 +3,19 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export const PRODUCTION_PTAU_FILE_NAME = "ppot_0080_16.ptau";
+// Fresh setup for all eight circuits uses this pinned Phase 1. Pool domain separation raises claim above 2^16.
+export const PRODUCTION_PTAU_POWER = 17;
+export const PRODUCTION_PTAU_FILE_NAME = "ppot_0080_17.ptau";
 export const PRODUCTION_PTAU_RELATIVE_PATH = `circuits/ptau/${PRODUCTION_PTAU_FILE_NAME}`;
 // Ceremony provenance only. The production workflow never downloads from this URL.
 export const PRODUCTION_PTAU_URL =
-  "https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_16.ptau";
-export const PRODUCTION_PTAU_BYTES = 75_590_802;
+  "https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_17.ptau";
+export const PRODUCTION_PTAU_BYTES = 151_088_274;
 export const PRODUCTION_PTAU_SHA256 =
-  "ed3622a7c79b0b49aadd134ebbc5b77df8c8c59bccebdfd0d9bf2c1a51561cf9";
+  "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c";
 export const PRODUCTION_PTAU_BLAKE2B512 =
-  "9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0" +
-  "d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3";
+  "3010cec42bdd1583bb4477dfa1b11853a67e8611feaa39cd7b3311a353b3e1d8b" +
+  "3f318509d75208078dc6887500b61f3f46bc72c61abbb624bec3bad5ef16012";
 
 export const PRODUCTION_PTAU_EVIDENCE = Object.freeze({
   bytes: PRODUCTION_PTAU_BYTES,

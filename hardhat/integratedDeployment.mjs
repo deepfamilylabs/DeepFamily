@@ -461,16 +461,48 @@ const assertExistingLineageWiring = async ({ deepFamily, lineageIndex }) => {
 };
 
 export const assertIntegratedShieldedWiring = async (deployed) => {
-  const { token, lineageIndex, shieldedDeepPool: pool, groth16VerifierAdapter: adapter } = deployed;
-  const [tokenAddress, lineageAddress, adapterAddress] = await Promise.all([
-    token.getAddress(),
-    lineageIndex.getAddress(),
-    adapter.getAddress(),
-  ]);
+  const {
+    token,
+    lineageIndex,
+    shieldedErc20Pool,
+    shieldedNativePool,
+    shieldedPoolFactory,
+    groth16VerifierAdapter: adapter,
+  } = deployed;
+  const [tokenAddress, lineageAddress, adapterAddress, nativeAddress, deepPoolAddress] =
+    await Promise.all([
+      token.getAddress(),
+      lineageIndex.getAddress(),
+      adapter.getAddress(),
+      shieldedNativePool.getAddress(),
+      shieldedErc20Pool.getAddress(),
+    ]);
+  for (const [pool, kind, label] of [
+    [shieldedErc20Pool, 0n, "ERC20 pool"],
+    [shieldedNativePool, 1n, "native pool"],
+  ]) {
+    for (const [value, expected, field] of [
+      [await pool.LINEAGE_INDEX(), lineageAddress, "lineage index"],
+      [await pool.VERIFIER(), adapterAddress, "verifier adapter"],
+    ]) {
+      if (!sameAddress(value, expected))
+        throw new Error(`Integrated deployment ${label} ${field} binding mismatch`);
+    }
+    if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 2n)
+      throw new Error(`Integrated deployment ${label} kind/version mismatch`);
+  }
   for (const [value, expected, label] of [
-    [await pool.TOKEN(), tokenAddress, "pool token"],
-    [await pool.LINEAGE_INDEX(), lineageAddress, "pool lineage index"],
-    [await pool.VERIFIER(), adapterAddress, "pool verifier adapter"],
+    [await shieldedErc20Pool.TOKEN(), tokenAddress, "pool token"],
+    [await shieldedPoolFactory.DEEP_TOKEN(), tokenAddress, "factory DEEP token"],
+    [await shieldedPoolFactory.LINEAGE_INDEX(), lineageAddress, "factory lineage"],
+    [await shieldedPoolFactory.VERIFIER(), adapterAddress, "factory verifier"],
+    [await shieldedPoolFactory.NATIVE_POOL(), nativeAddress, "factory native pool"],
+    [await shieldedPoolFactory.poolFor(tokenAddress), deepPoolAddress, "factory DEEP pool"],
+    [
+      await shieldedPoolFactory.poolFor("0x0000000000000000000000000000000000000000"),
+      nativeAddress,
+      "factory native registry",
+    ],
   ]) {
     if (!sameAddress(value, expected))
       throw new Error(`Integrated deployment ${label} binding mismatch`);
@@ -809,18 +841,34 @@ export const deployIntegratedSystem = async (
     );
   }
 
-  const ShieldedPool = await ethers.getContractFactory("ShieldedDeepPool", {
+  const ShieldedNativePool = await ethers.getContractFactory("ShieldedNativePool", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
   });
-  const shieldedDeepPool = await deployContract("shieldedDeepPool", ShieldedPool, [
-    tokenAddress,
+  const shieldedNativePool = await deployContract("shieldedNativePool", ShieldedNativePool, [
     lineageIndexAddress,
     groth16VerifierAdapterAddress,
   ]);
+  const ShieldedPoolFactory = await ethers.getContractFactory("ShieldedPoolFactory", {
+    signer: deployer,
+    libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
+  });
+  const shieldedPoolFactory = await deployContract("shieldedPoolFactory", ShieldedPoolFactory, [
+    tokenAddress,
+    lineageIndexAddress,
+    groth16VerifierAdapterAddress,
+    await shieldedNativePool.getAddress(),
+  ]);
+  const shieldedErc20Pool = await ethers.getContractAt(
+    "ShieldedErc20Pool",
+    await shieldedPoolFactory.poolFor(tokenAddress),
+    deployer,
+  );
   const shielded = {
     shieldedVerifiers,
-    shieldedDeepPool,
+    shieldedNativePool,
+    shieldedPoolFactory,
+    shieldedErc20Pool,
   };
   await assertIntegratedShieldedWiring({
     token,
@@ -1009,7 +1057,7 @@ export const ensureIntegratedSystem = async (
   { writeDeployments, artifacts: artifactReader, allowNewDeployment = false } = {},
 ) => {
   const connection = await resolveConnection(hreOrConnection);
-  if (connection.__deepfamilyIntegrated?.shieldedDeepPool) {
+  if (connection.__deepfamilyIntegrated?.shieldedErc20Pool) {
     return connection.__deepfamilyIntegrated;
   }
   const { ethers } = connection;
@@ -1087,7 +1135,9 @@ export const ensureIntegratedSystem = async (
               spec:
                 record.contractName === "DeepFamilyLineageIndex"
                   ? { libraries }
-                  : record.contractName === "ShieldedDeepPool"
+                  : ["ShieldedErc20Pool", "ShieldedNativePool", "ShieldedPoolFactory"].includes(
+                        record.contractName,
+                      )
                     ? { libraries: { PoseidonT3: libraries.PoseidonT3 } }
                     : {
                         needsLibraries: false,

@@ -113,7 +113,7 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
   const ciphertextHashField = computeShieldedCiphertextHashField(owned.ciphertext);
   if (
     owned.ciphertextHashField !== ciphertextHashField ||
-    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }) !== commitment
+    computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }, ctx) !== commitment
   )
     throw new Error("Input note does not match its public ciphertext and commitment");
 
@@ -127,11 +127,14 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
       chainId: ctx.chainId,
       poolAddress: ctx.poolAddress,
     });
-    const reopened = verifyShieldedNotePayload({
-      payload,
-      ciphertext: owned.ciphertext,
-      noteCommitment: commitment,
-    }).note;
+    const reopened = verifyShieldedNotePayload(
+      {
+        payload,
+        ciphertext: owned.ciphertext,
+        noteCommitment: commitment,
+      },
+      ctx,
+    ).note;
     if (
       reopened.kind !== "value" ||
       reopened.ownerCommitment !== note.ownerCommitment ||
@@ -144,10 +147,13 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
     hpkeIkm.fill(0);
   }
 
-  const nullifier = computeShieldedSpendNullifier({
-    ownerSecret: keys.ownerSecret,
-    noteCommitment: commitment,
-  });
+  const nullifier = computeShieldedSpendNullifier(
+    {
+      ownerSecret: keys.ownerSecret,
+      noteCommitment: commitment,
+    },
+    ctx,
+  );
   if (wallet.spentNullifiers.has(nullifier))
     throw new Error("Input value note has already been spent");
   const path = getLocalShieldedNoteProof(wallet, commitment);
@@ -168,7 +174,7 @@ async function encryptValueOutput(
   ctx: Context,
   selfHpkeIkm?: string,
 ): Promise<PreparedShieldedValueOutput> {
-  const payload = encodeShieldedValueNotePayload(note);
+  const payload = encodeShieldedValueNotePayload(note, ctx);
   let reopened: Uint8Array | undefined;
   try {
     const ciphertext = await encryptShieldedNote({
@@ -178,7 +184,7 @@ async function encryptValueOutput(
       poolAddress: ctx.poolAddress,
     });
     const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
-    const commitment = computeShieldedValueNoteCommitment({ ...note, ciphertextHashField });
+    const commitment = computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }, ctx);
     if (selfHpkeIkm !== undefined) {
       const ikm = getBytes(selfHpkeIkm);
       try {
@@ -191,11 +197,14 @@ async function encryptValueOutput(
       } finally {
         ikm.fill(0);
       }
-      const recovered = verifyShieldedNotePayload({
-        payload: reopened,
-        ciphertext,
-        noteCommitment: commitment,
-      }).note;
+      const recovered = verifyShieldedNotePayload(
+        {
+          payload: reopened,
+          ciphertext,
+          noteCommitment: commitment,
+        },
+        ctx,
+      ).note;
       if (
         recovered.kind !== "value" ||
         recovered.ownerCommitment !== note.ownerCommitment ||
@@ -332,10 +341,13 @@ export async function prepareShieldedPrivateTransfer(input: {
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
   const secondNullifier =
     second?.nullifier ??
-    computeShieldedDummyInputNullifier({
-      ownerSecret: first.ownerSecret,
-      noteCommitment: getBigInt(input.inputs[0].commitment),
-    });
+    computeShieldedDummyInputNullifier(
+      {
+        ownerSecret: first.ownerSecret,
+        noteCommitment: getBigInt(input.inputs[0].commitment),
+      },
+      ctx,
+    );
   if (!second && input.inputs[0].wallet.spentNullifiers.has(secondNullifier)) {
     throw new Error("Input value note has already been spent");
   }
@@ -378,10 +390,13 @@ export async function prepareShieldedUnshield(input: {
   if (BigInt(recipient) === 0n) throw new Error("Unshield recipient must be nonzero");
   const opened = await openValueInput(input.input, ctx);
   if (amount > opened.note.amount) throw new Error("Unshield amount exceeds the input note");
-  const dummyNullifier = computeShieldedDummyInputNullifier({
-    ownerSecret: opened.ownerSecret,
-    noteCommitment: getBigInt(input.input.commitment),
-  });
+  const dummyNullifier = computeShieldedDummyInputNullifier(
+    {
+      ownerSecret: opened.ownerSecret,
+      noteCommitment: getBigInt(input.input.commitment),
+    },
+    ctx,
+  );
   if (input.input.wallet.spentNullifiers.has(dummyNullifier)) {
     throw new Error("Input value note has already been spent");
   }

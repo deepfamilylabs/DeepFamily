@@ -7,12 +7,15 @@ import {
   type DecodedShieldedNotePayload,
 } from "@deepfamily/protocol-core";
 import {
+  getShieldedClaimBudgetKey,
   nextClaimPeriods,
   selectClaimBudget,
   selectValueNotes,
   type ShieldedSelectableBudgetNote,
   type ShieldedSelectableValueNote,
 } from "./shieldedActionSelection";
+
+const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
 
 type BudgetPayload = Extract<DecodedShieldedNotePayload, { kind: "budget"; binding?: "owner" }>;
 const secret = "987654321";
@@ -67,11 +70,14 @@ function spentPeriod(
   note: Extract<DecodedShieldedNotePayload, { kind: "budget" }>,
   periodIndex: bigint,
 ): bigint {
-  return computeShieldedPeriodNullifier({
-    derivedSecretField: secret,
-    policyCommitment: getShieldedBudgetCommitments(note).policyCommitment,
-    periodIndex,
-  });
+  return computeShieldedPeriodNullifier(
+    {
+      derivedSecretField: secret,
+      policyCommitment: getShieldedBudgetCommitments(note, scope).policyCommitment,
+      periodIndex,
+    },
+    scope,
+  );
 }
 
 describe("automatic shielded value note selection", () => {
@@ -128,9 +134,27 @@ describe("automatic shielded value note selection", () => {
 });
 
 describe("automatic shielded claim selection", () => {
+  it("uses the wallet's chain and pool for rule keys and already claimed periods", () => {
+    const note = budget(1n, { remaining: 100n });
+    const now = eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY;
+    const spentNullifiers = new Set([spentPeriod(note.note, 0n)]);
+    expect(selectClaimBudget([note], { ...scope, spentNullifiers }, secret, now)).toBeUndefined();
+    for (const alternative of [
+      { ...scope, chainId: 71n },
+      { ...scope, poolAddress: "0x0000000000000000000000000000000000000002" },
+    ]) {
+      expect(getShieldedClaimBudgetKey(note.note, alternative)).not.toBe(
+        getShieldedClaimBudgetKey(note.note, scope),
+      );
+      expect(
+        selectClaimBudget([note], { ...alternative, spentNullifiers }, secret, now)?.periodIndices,
+      ).toEqual([0n]);
+    }
+  });
+
   it("selects only whole due periods and caps a claim at the funded whole periods", () => {
     const note = budget(1n, { remaining: 300n });
-    const wallet = { spentNullifiers: new Set<bigint>() };
+    const wallet = { ...scope, spentNullifiers: new Set<bigint>() };
     expect(
       selectClaimBudget(
         [note],
@@ -160,6 +184,7 @@ describe("automatic shielded claim selection", () => {
   it("skips previously claimed period nullifiers without changing the wallet", () => {
     const note = budget(1n, { remaining: 300n });
     const wallet = {
+      ...scope,
       spentNullifiers: new Set([spentPeriod(note.note, 0n), spentPeriod(note.note, 2n)]),
     };
     const original = new Set(wallet.spentNullifiers);
@@ -179,7 +204,7 @@ describe("automatic shielded claim selection", () => {
     const second = budget(2n, { remaining: 200n });
     const selected = selectClaimBudget(
       [first, second],
-      { spentNullifiers: new Set() },
+      { ...scope, spentNullifiers: new Set() },
       secret,
       eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
     );
@@ -189,7 +214,7 @@ describe("automatic shielded claim selection", () => {
     expect(
       selectClaimBudget(
         [first, second],
-        { spentNullifiers: new Set() },
+        { ...scope, spentNullifiers: new Set() },
         secret,
         eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY,
       )?.secondBudget,
@@ -197,7 +222,7 @@ describe("automatic shielded claim selection", () => {
     expect(
       selectClaimBudget(
         [first, budget(2n, { remaining: 200n, enrollmentSalt: 999n })],
-        { spentNullifiers: new Set() },
+        { ...scope, spentNullifiers: new Set() },
         secret,
         eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
       )?.secondBudget,
@@ -208,7 +233,7 @@ describe("automatic shielded claim selection", () => {
     const note = budget(1n, { remaining: 5_000n });
     expect(
       nextClaimPeriods(
-        { spentNullifiers: new Set() },
+        { ...scope, spentNullifiers: new Set() },
         secret,
         note.note,
         eligibleFrom + 50n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
@@ -221,6 +246,7 @@ describe("automatic shielded claim selection", () => {
     const claimed = budget(2n, { policySalt: 999n, eligibleFrom: eligibleFrom - 1n });
     const payable = budget(4n);
     const wallet = {
+      ...scope,
       spentNullifiers: new Set([spentPeriod(claimed.note, 0n), spentPeriod(claimed.note, 1n)]),
     };
     const notes = [
@@ -236,7 +262,7 @@ describe("automatic shielded claim selection", () => {
 
   it("reports no payable selection when every due period is spent and explains manual failures", () => {
     const note = budget(1n);
-    const wallet = { spentNullifiers: new Set([spentPeriod(note.note, 0n)]) };
+    const wallet = { ...scope, spentNullifiers: new Set([spentPeriod(note.note, 0n)]) };
     const now = eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY;
     expect(selectClaimBudget([note], wallet, secret, now)).toBeUndefined();
     expect(() => nextClaimPeriods(wallet, secret, note.note, now)).toThrow(

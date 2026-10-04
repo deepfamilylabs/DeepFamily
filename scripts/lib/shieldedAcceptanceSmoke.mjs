@@ -152,8 +152,9 @@ export async function runShieldedAcceptanceSmoke({
   const family = deployed.deepFamily.connect(signer);
   const lineage = deployed.lineageIndex;
   const token = deployed.token.connect(signer);
-  const pool = deployed.shieldedDeepPool.connect(signer);
+  const pool = deployed.shieldedErc20Pool.connect(signer);
   const poolAddress = await pool.getAddress();
+  const scope = { chainId, poolAddress };
   const proofs = {};
   let receiveCode;
   const materials = [];
@@ -261,7 +262,7 @@ export async function runShieldedAcceptanceSmoke({
     return decoded;
   };
   const encrypt = async (keys, note, encode, commitment) => {
-    const payload = encode(note);
+    const payload = encode(note, scope);
     let opened;
     try {
       const ciphertext = await encryptShieldedNote({
@@ -279,7 +280,7 @@ export async function runShieldedAcceptanceSmoke({
         poolAddress,
       });
       assert.deepEqual(opened, payload, "Encrypted note did not round trip");
-      verifyShieldedNotePayload({ payload: opened, ciphertext, noteCommitment });
+      verifyShieldedNotePayload({ payload: opened, ciphertext, noteCommitment }, scope);
       return {
         ...note,
         ciphertext,
@@ -300,7 +301,7 @@ export async function runShieldedAcceptanceSmoke({
       nonce: generateShieldedRandomField(),
     };
     return encrypt(keys, note, encodeShieldedValueNotePayload, (ciphertextHashField) =>
-      computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }),
+      computeShieldedValueNoteCommitment({ ...note, ciphertextHashField }, scope),
     );
   };
   const outputs = (notes) => ({
@@ -308,15 +309,21 @@ export async function runShieldedAcceptanceSmoke({
     outputCiphertexts: notes.map((note) => note.ciphertextHex),
   });
   const spend = (note) =>
-    computeShieldedSpendNullifier({
-      ownerSecret: note.keys.ownerSecret,
-      noteCommitment: note.commitment,
-    });
+    computeShieldedSpendNullifier(
+      {
+        ownerSecret: note.keys.ownerSecret,
+        noteCommitment: note.commitment,
+      },
+      scope,
+    );
   const dummySpend = (note) =>
-    computeShieldedDummyInputNullifier({
-      ownerSecret: note.keys.ownerSecret,
-      noteCommitment: note.commitment,
-    });
+    computeShieldedDummyInputNullifier(
+      {
+        ownerSecret: note.keys.ownerSecret,
+        noteCommitment: note.commitment,
+      },
+      scope,
+    );
   const submit = async (
     action,
     data,
@@ -531,7 +538,7 @@ export async function runShieldedAcceptanceSmoke({
     const rootIdentityCommitment = fatherMaterial.identityCommitment;
     const policySalt = generateShieldedRandomField();
     const allocationKey = generateShieldedRandomField();
-    const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(allocationKey);
+    const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(allocationKey, scope);
     const policyFields = {
       rootIdentityCommitment,
       rootVersionIndex: 1n,
@@ -540,18 +547,21 @@ export async function runShieldedAcceptanceSmoke({
       policySalt,
       allocationKeyCommitment,
     };
-    const policyCommitment = computeShieldedPolicyCommitment(policyFields);
+    const policyCommitment = computeShieldedPolicyCommitment(policyFields, scope);
     const asOf = BigInt((await provider.getBlock("latest")).timestamp);
     const eligibleFrom = asOf + 7200n;
     const enrollmentSalt = generateShieldedRandomField();
     const heirIdentityCommitment = recipient.identityCommitment;
     const heirOwnerCommitment = recipient.ownerCommitment;
-    const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-      policyCommitment,
-      heirIdentityCommitment,
-      eligibleFrom,
-      enrollmentSalt,
-    });
+    const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+      {
+        policyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+      },
+      scope,
+    );
     const budgetFields = {
       ...policyFields,
       heirIdentityCommitment,
@@ -562,12 +572,15 @@ export async function runShieldedAcceptanceSmoke({
     const budgetNote = (remaining) => {
       const note = { ...budgetFields, remaining, nonce: generateShieldedRandomField() };
       return encrypt(heirKeys, note, encodeShieldedBudgetNotePayload, (ciphertextHashField) =>
-        computeShieldedBudgetNoteCommitment({
-          policyCommitment,
-          enrollmentCommitment,
-          ...note,
-          ciphertextHashField,
-        }),
+        computeShieldedBudgetNoteCommitment(
+          {
+            policyCommitment,
+            enrollmentCommitment,
+            ...note,
+            ciphertextHashField,
+          },
+          scope,
+        ),
       );
     };
     const budget = await budgetNote(1200n);
@@ -579,11 +592,14 @@ export async function runShieldedAcceptanceSmoke({
         [initialPath, initialPath],
         [
           spend(initial[0]),
-          computeShieldedEnrollmentNullifier({
-            allocationKey,
-            policyCommitment,
-            heirIdentityCommitment,
-          }),
+          computeShieldedEnrollmentNullifier(
+            {
+              allocationKey,
+              policyCommitment,
+              heirIdentityCommitment,
+            },
+            scope,
+          ),
         ],
       ),
       ...outputs([budget, fundChange]),
@@ -644,11 +660,14 @@ export async function runShieldedAcceptanceSmoke({
         [changePath, budgetPath],
         [
           spend(fundChange),
-          computeShieldedBudgetUseNullifier({
-            policySalt,
-            budgetNoteCommitment: budget.commitment,
-            useNonce,
-          }),
+          computeShieldedBudgetUseNullifier(
+            {
+              policySalt,
+              budgetNoteCommitment: budget.commitment,
+              useNonce,
+            },
+            scope,
+          ),
         ],
       ),
       ...outputs([additionalFundingBudget, additionalFundingChange]),
@@ -720,23 +739,29 @@ export async function runShieldedAcceptanceSmoke({
     };
     const identityBudgetNote = async (remaining, clear = false) => {
       const note = { ...identityBudgetFields, remaining, nonce: generateShieldedRandomField() };
-      const termsCommitment = computeShieldedIdentityBudgetTermsCommitment(note);
+      const termsCommitment = computeShieldedIdentityBudgetTermsCommitment(note, scope);
       if (!clear) {
         return encrypt(heirKeys, note, encodeShieldedBudgetNotePayload, (ciphertextHashField) =>
-          computeShieldedIdentityBudgetNoteCommitment({
-            ...note,
-            termsCommitment,
-            ciphertextHashField,
-          }),
+          computeShieldedIdentityBudgetNoteCommitment(
+            {
+              ...note,
+              termsCommitment,
+              ciphertextHashField,
+            },
+            scope,
+          ),
         );
       }
-      const ciphertext = encodePublicShieldedBudgetEnvelope(note);
+      const ciphertext = encodePublicShieldedBudgetEnvelope(note, scope);
       const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
-      const commitment = computeShieldedIdentityBudgetNoteCommitment({
-        ...note,
-        termsCommitment,
-        ciphertextHashField,
-      });
+      const commitment = computeShieldedIdentityBudgetNoteCommitment(
+        {
+          ...note,
+          termsCommitment,
+          ciphertextHashField,
+        },
+        scope,
+      );
       return {
         ...note,
         ciphertext,
@@ -759,11 +784,14 @@ export async function runShieldedAcceptanceSmoke({
         [publicDonorPath, publicTemplatePath],
         [
           spend(additionalFundingChange),
-          computeShieldedBudgetUseNullifier({
-            policySalt,
-            budgetNoteCommitment: budget.commitment,
-            useNonce: publicUseNonce,
-          }),
+          computeShieldedBudgetUseNullifier(
+            {
+              policySalt,
+              budgetNoteCommitment: budget.commitment,
+              useNonce: publicUseNonce,
+            },
+            scope,
+          ),
         ],
       ),
       ...outputs([publicBudget, publicFundChange]),
@@ -830,11 +858,14 @@ export async function runShieldedAcceptanceSmoke({
       ...zeroData(),
       ...inputs(claimPaths, [spend(budget), spend(additionalFundingBudget)]),
       periodNullifiers: Array.from({ length: 12 }, (_, periodIndex) =>
-        computeShieldedPeriodNullifier({
-          derivedSecretField: childMaterial.derivedSecretField,
-          policyCommitment,
-          periodIndex,
-        }),
+        computeShieldedPeriodNullifier(
+          {
+            derivedSecretField: childMaterial.derivedSecretField,
+            policyCommitment,
+            periodIndex,
+          },
+          scope,
+        ),
       ),
       ...outputs([remainingBudget, payout]),
       relation0: endorsement.root,
@@ -1061,20 +1092,26 @@ export async function runShieldedAcceptanceSmoke({
       if (!local) continue;
       let recovered;
       try {
-        const publicNote = decodePublicShieldedBudgetEnvelope(getBytes(event.args.ciphertext));
+        const publicNote = decodePublicShieldedBudgetEnvelope(
+          getBytes(event.args.ciphertext),
+          scope,
+        );
         recovered = publicNote
-          ? encodeShieldedBudgetNotePayload(publicNote)
+          ? encodeShieldedBudgetNotePayload(publicNote, scope)
           : await decryptShieldedNote({
               ciphertext: getBytes(event.args.ciphertext),
               hpkeIkm: local.keys.hpkeIkm,
               chainId,
               poolAddress,
             });
-        verifyShieldedNotePayload({
-          payload: recovered,
-          ciphertext: event.args.ciphertext,
-          noteCommitment: event.args.commitment,
-        });
+        verifyShieldedNotePayload(
+          {
+            payload: recovered,
+            ciphertext: event.args.ciphertext,
+            noteCommitment: event.args.commitment,
+          },
+          scope,
+        );
         recoveredNotes += 1;
       } finally {
         wipeBytes(recovered);

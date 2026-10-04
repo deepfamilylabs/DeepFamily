@@ -927,14 +927,20 @@
         "activeBinding": "DEEP_FAMILY.archive() == address(this)",
         "metadata": {
           "authorization": "msg.sender == DEEP_FAMILY",
-          "key": ["personHash", "versionIndex"],
+          "key": [
+            "personHash",
+            "versionIndex"
+          ],
           "writeOnce": true
         },
         "story": {
           "authorization": "msg.sender == DEEP_FAMILY.ownerOf(tokenId)",
           "schema": "nonzero opaque bytes; reserved biography schema rejected by ordinary append",
           "expectedPayloadHash": "mandatory keccak256(payload)",
-          "concurrency": ["expectedIndex == totalRecords", "expectedHead == recordsHead"],
+          "concurrency": [
+            "expectedIndex == totalRecords",
+            "expectedHead == recordsHead"
+          ],
           "initialHead": "0x0000000000000000000000000000000000000000000000000000000000000000",
           "recordHash": "keccak256(abi.encode(STORY_RECORD_DOMAIN, uint256(chainId), address(archive), uint256(tokenId), uint64(index), bytes32(schemaId), bytes32(payloadHash), uint64(payloadLength), address(author), uint64(timestamp)))",
           "newHead": "keccak256(abi.encode(STORY_HEAD_DOMAIN, bytes32(previousHead), bytes32(recordHash)))",
@@ -970,7 +976,10 @@
             },
             "originalHash": "keccak256(complete canonical story JSON bytes)",
             "biographyType": 0,
-            "editableTypes": [1, 19]
+            "editableTypes": [
+              1,
+              19
+            ]
           }
         },
         "blob": {
@@ -1593,13 +1602,30 @@
         "runtimeSha256": null
       }
     },
-    "shieldedDeepPool": {
+    "shieldedErc20Pool": {
       "address": null,
       "tokenImmutable": null,
       "lineageIndexImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
       "verifierAdapterImmutable": null
+    },
+    "shieldedNativePool": {
+      "address": null,
+      "lineageIndexImmutable": null,
+      "verifierAdapterImmutable": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "shieldedPoolFactory": {
+      "address": null,
+      "deepTokenImmutable": null,
+      "lineageIndexImmutable": null,
+      "verifierAdapterImmutable": null,
+      "nativePoolImmutable": null,
+      "deepPool": null,
+      "artifactSha256": null,
+      "runtimeSha256": null
     }
   },
   "goldenVectors": {

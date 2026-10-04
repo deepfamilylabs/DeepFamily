@@ -19,15 +19,22 @@ const hash = (byte) =>
   computeShieldedCiphertextHashField(Uint8Array.from({ length: 512 }, () => byte));
 const strs = (values) => values.map((value) => BigInt(value).toString());
 const owner = (secret) => poseidon2([1013n, secret]);
-const valueNote = (ownerCommitment, amount, nonce, ciphertextHashField) =>
-  computeShieldedValueNoteCommitment({ ownerCommitment, amount, nonce, ciphertextHashField });
+const defaultScope = {
+  chainId: 31337n,
+  poolAddress: "0x0000000000000000000000000000000000001234",
+};
+const valueNote = (ownerCommitment, amount, nonce, ciphertextHashField, scope = defaultScope) =>
+  computeShieldedValueNoteCommitment(
+    { ownerCommitment, amount, nonce, ciphertextHashField },
+    scope,
+  );
 const mutate = (source, change) => {
   const copy = structuredClone(source);
   change(copy);
   return copy;
 };
 
-function privateTransferFixture() {
+function privateTransferFixture(scope = defaultScope) {
   const inputOwnerSecrets = [5001n, 5002n];
   const inputAmounts = [70n, 30n];
   const inputNonces = [3301n, 3302n];
@@ -37,21 +44,21 @@ function privateTransferFixture() {
   const outputNonces = [4401n, 4402n];
   const outputHashes = [hash(6), hash(7)];
   const inputs = inputAmounts.map((amount, i) =>
-    valueNote(owner(inputOwnerSecrets[i]), amount, inputNonces[i], inputCiphertextHashes[i]),
+    valueNote(owner(inputOwnerSecrets[i]), amount, inputNonces[i], inputCiphertextHashes[i], scope),
   );
   return {
-    chainId: "31337",
-    pool: String(0x1234n),
+    chainId: String(scope.chainId),
+    pool: String(BigInt(scope.poolAddress)),
     inputShardIds: ["0", "1"],
     inputRoots: strs(inputs),
     inputNullifiers: strs(
       inputs.map((noteCommitment, i) =>
-        computeShieldedSpendNullifier({ ownerSecret: inputOwnerSecrets[i], noteCommitment }),
+        computeShieldedSpendNullifier({ ownerSecret: inputOwnerSecrets[i], noteCommitment }, scope),
       ),
     ),
     outputCommitments: strs(
       outputAmounts.map((amount, i) =>
-        valueNote(outputOwnerCommitments[i], amount, outputNonces[i], outputHashes[i]),
+        valueNote(outputOwnerCommitments[i], amount, outputNonces[i], outputHashes[i], scope),
       ),
     ),
     ciphertextHashes: strs(outputHashes),
@@ -69,22 +76,26 @@ function privateTransferFixture() {
   };
 }
 
-function singleInputPrivateTransferFixture() {
-  const witness = privateTransferFixture();
+function singleInputPrivateTransferFixture(scope = defaultScope) {
+  const witness = privateTransferFixture(scope);
   const ownerSecret = BigInt(witness.inputOwnerSecrets[0]);
   const firstCommitment = BigInt(witness.inputRoots[0]);
   witness.inputShardIds[1] = witness.inputShardIds[0];
   witness.inputRoots[1] = witness.inputRoots[0];
-  witness.inputNullifiers[1] = computeShieldedDummyInputNullifier({
-    ownerSecret,
-    noteCommitment: firstCommitment,
-  }).toString();
+  witness.inputNullifiers[1] = computeShieldedDummyInputNullifier(
+    {
+      ownerSecret,
+      noteCommitment: firstCommitment,
+    },
+    scope,
+  ).toString();
   const secondOutputAmount = 10n;
   witness.outputCommitments[1] = valueNote(
     BigInt(witness.outputOwnerCommitments[1]),
     secondOutputAmount,
     BigInt(witness.outputNonces[1]),
     BigInt(witness.ciphertextHashes[1]),
+    scope,
   ).toString();
   witness.hasSecondInput = "0";
   witness.inputOwnerSecrets[1] = "0";
@@ -161,12 +172,32 @@ test("private transfer circuit", async (t) => {
     const transfer = await compile(directory, "shielded_private_transfer");
     const validTransfer = privateTransferFixture();
     const validSingleTransfer = singleInputPrivateTransferFixture();
-    await t.test("private transfer conserves DEEP across independent owners", async () => {
+    await t.test(
+      "private transfer binds all notes and nullifiers to the chain and pool",
+      async () => {
+        for (const scope of [
+          { ...defaultScope, chainId: 1030n },
+          { ...defaultScope, poolAddress: "0x0000000000000000000000000000000000005678" },
+        ]) {
+          await transfer.valid(privateTransferFixture(scope));
+          await transfer.valid(singleInputPrivateTransferFixture(scope));
+          for (const witness of [validTransfer, validSingleTransfer]) {
+            await transfer.invalid(
+              mutate(witness, (w) => {
+                w.chainId = String(scope.chainId);
+                w.pool = String(BigInt(scope.poolAddress));
+              }),
+            );
+          }
+        }
+      },
+    );
+    await t.test("private transfer conserves asset amounts across independent owners", async () => {
       await transfer.valid(validTransfer);
       transfer.checkR1cs(validTransfer);
     });
     await t.test(
-      "single-note private transfer conserves DEEP with a bound dummy input",
+      "single-note private transfer conserves asset amounts with a bound dummy input",
       async () => {
         await transfer.valid(validSingleTransfer);
         transfer.checkR1cs(validSingleTransfer);

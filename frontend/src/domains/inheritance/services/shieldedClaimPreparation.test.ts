@@ -132,30 +132,36 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n, periodDays = 
     remaining,
     nonce: 555n,
   } satisfies ShieldedOwnerBudgetNotePayload;
-  const policyCommitment = computeShieldedPolicyCommitment(note);
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: note.heirIdentityCommitment,
-    eligibleFrom,
-    enrollmentSalt: note.enrollmentSalt,
-  });
+  const policyCommitment = computeShieldedPolicyCommitment(note, { chainId, poolAddress });
+  const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+    {
+      policyCommitment,
+      heirIdentityCommitment: note.heirIdentityCommitment,
+      eligibleFrom,
+      enrollmentSalt: note.enrollmentSalt,
+    },
+    { chainId, poolAddress },
+  );
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const ciphertext = await encryptShieldedNote({
     recipientPublicKey: viewingKey,
-    payload: encodeShieldedBudgetNotePayload(note),
+    payload: encodeShieldedBudgetNotePayload(note, { chainId, poolAddress }),
     chainId,
     poolAddress,
   });
   const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
-  const budgetCommitment = computeShieldedBudgetNoteCommitment({
-    policyCommitment,
-    enrollmentCommitment,
-    heirOwnerCommitment: note.heirOwnerCommitment,
-    amountPerPeriod: note.amountPerPeriod,
-    remaining: note.remaining,
-    nonce: note.nonce,
-    ciphertextHashField,
-  });
+  const budgetCommitment = computeShieldedBudgetNoteCommitment(
+    {
+      policyCommitment,
+      enrollmentCommitment,
+      heirOwnerCommitment: note.heirOwnerCommitment,
+      amountPerPeriod: note.amountPerPeriod,
+      remaining: note.remaining,
+      nonce: note.nonce,
+      ciphertextHashField,
+    },
+    { chainId, poolAddress },
+  );
   const tree = createLineageTree([budgetCommitment, 999n]);
   const wallet: LocalShieldedWalletSnapshot = {
     poolAddress: poolAddress.toLowerCase(),
@@ -205,7 +211,7 @@ async function addSecondBudget(
   if (first.note.kind !== "budget") throw new Error("Fixture budget missing");
   if (first.note.binding === "identity") throw new Error("Expected owner fixture");
   const note = { ...first.note, remaining: 100n, nonce: 556n, ...overrides };
-  const payload = encodeShieldedBudgetNotePayload(note);
+  const payload = encodeShieldedBudgetNotePayload(note, { chainId, poolAddress });
   const ciphertext = await encryptShieldedNote({
     payload,
     recipientPublicKey: await deriveShieldedViewPublicKey(input.keys.hpkeIkm),
@@ -213,10 +219,13 @@ async function addSecondBudget(
     poolAddress,
   });
   const ciphertextHashField = computeShieldedCiphertextHashField(ciphertext);
-  const commitment = computeShieldedNoteCommitmentFromPayload({
-    payload,
-    ciphertextHashField,
-  }).noteCommitment;
+  const commitment = computeShieldedNoteCommitmentFromPayload(
+    {
+      payload,
+      ciphertextHashField,
+    },
+    { chainId, poolAddress },
+  ).noteCommitment;
   const tree = input.wallet.shards.get(0n)!;
   const leafIndex = tree.sizeBigInt;
   tree.insert(commitment);
@@ -289,11 +298,14 @@ describe("local shielded claim preparation", () => {
       });
       try {
         expect(
-          verifyShieldedNotePayload({
-            payload: opened,
-            ciphertext: output.ciphertext,
-            noteCommitment: output.commitment,
-          }).noteCommitment,
+          verifyShieldedNotePayload(
+            {
+              payload: opened,
+              ciphertext: output.ciphertext,
+              noteCommitment: output.commitment,
+            },
+            { chainId, poolAddress },
+          ).noteCommitment,
         ).toBe(output.commitment);
       } finally {
         opened.fill(0);
@@ -317,17 +329,23 @@ describe("local shielded claim preparation", () => {
     expect(prepared.witness.hasSecondInput).toBe("1");
     expect(prepared.witness.secondRemainingPeriods).toBe("1");
     expect(prepared.data.inputNullifiers[1]).toBe(
-      computeShieldedSpendNullifier({
-        ownerSecret: input.keys.ownerSecret,
-        noteCommitment: secondBudgetCommitment,
-      }),
+      computeShieldedSpendNullifier(
+        {
+          ownerSecret: input.keys.ownerSecret,
+          noteCommitment: secondBudgetCommitment,
+        },
+        { chainId, poolAddress },
+      ),
     );
     expect(prepared.data.periodNullifiers[1]).toBe(
-      computeShieldedPeriodNullifier({
-        derivedSecretField,
-        policyCommitment: input.policyCommitment,
-        periodIndex: 1n,
-      }),
+      computeShieldedPeriodNullifier(
+        {
+          derivedSecretField,
+          policyCommitment: input.policyCommitment,
+          periodIndex: 1n,
+        },
+        { chainId, poolAddress },
+      ),
     );
     await expect(
       prepareShieldedClaim({ ...input, secondBudgetCommitment: input.budgetCommitment }),
@@ -366,18 +384,24 @@ describe("local shielded claim preparation", () => {
       expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
     expect(prepared.outputs[1].note.amount).toBe(1_200n);
     expect(prepared.data.periodNullifiers[0]).toBe(
-      computeShieldedPeriodNullifier({
-        derivedSecretField,
-        policyCommitment: input.policyCommitment,
-        periodIndex: 0n,
-      }),
+      computeShieldedPeriodNullifier(
+        {
+          derivedSecretField,
+          policyCommitment: input.policyCommitment,
+          periodIndex: 0n,
+        },
+        { chainId, poolAddress },
+      ),
     );
     expect(prepared.data.periodNullifiers[11]).toBe(
-      computeShieldedPeriodNullifier({
-        derivedSecretField,
-        policyCommitment: input.policyCommitment,
-        periodIndex: 11n,
-      }),
+      computeShieldedPeriodNullifier(
+        {
+          derivedSecretField,
+          policyCommitment: input.policyCommitment,
+          periodIndex: 11n,
+        },
+        { chainId, poolAddress },
+      ),
     );
   });
 
@@ -459,11 +483,14 @@ describe("local shielded claim preparation", () => {
       "exceeds uint128",
     );
     input.wallet.spentNullifiers.add(
-      computeShieldedPeriodNullifier({
-        derivedSecretField,
-        policyCommitment: input.policyCommitment,
-        periodIndex: 0n,
-      }),
+      computeShieldedPeriodNullifier(
+        {
+          derivedSecretField,
+          policyCommitment: input.policyCommitment,
+          periodIndex: 0n,
+        },
+        { chainId, poolAddress },
+      ),
     );
     await expect(prepareShieldedClaim(input)).rejects.toThrow("already been used");
   });

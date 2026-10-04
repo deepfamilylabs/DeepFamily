@@ -131,6 +131,13 @@ function guardedPool<T extends PreparedLineageAction>(
               "Lineage roots changed as submission began; no transaction was sent by this call. Prepare a new proof.",
             );
           }
+          const network = await input.signer.provider?.getNetwork();
+          if (!network || network.chainId !== input.expectedChainId) {
+            throw new Error("Transaction wallet is connected to the wrong network");
+          }
+          // The final RPC reads can outlive an asset, identity, or wallet change.
+          // Run the caller's synchronous guard immediately before requesting a transaction.
+          input.onStage?.("submitting");
           const tx = await original(...args);
           setBroadcastHash(tx.hash);
           return tx;

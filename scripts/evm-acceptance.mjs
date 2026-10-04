@@ -376,9 +376,19 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       manifest.deployments.shieldedVerifiers[action],
     ]),
     [
-      "ShieldedDeepPool",
-      terminalProjection.contracts.shieldedDeepPool,
-      manifest.deployments.shieldedDeepPool,
+      "ShieldedErc20Pool",
+      terminalProjection.contracts.shieldedErc20Pool,
+      manifest.deployments.shieldedErc20Pool,
+    ],
+    [
+      "ShieldedNativePool",
+      terminalProjection.contracts.shieldedNativePool,
+      manifest.deployments.shieldedNativePool,
+    ],
+    [
+      "ShieldedPoolFactory",
+      terminalProjection.contracts.shieldedPoolFactory,
+      manifest.deployments.shieldedPoolFactory,
     ],
   ]) {
     assertCondition(
@@ -1745,11 +1755,13 @@ export const main = async (chainProfile) => {
       INTEGRATED_DEPLOYMENT_RECORDS.map((record) => [
         record.deploymentName,
         addresses[
-          record.transactionLabel === "deepFamilyProxy"
-            ? "deepFamily"
-            : record.transactionLabel === "deepFamilyToken"
-              ? "token"
-              : record.transactionLabel
+          record.property === "shieldedErc20Pool"
+            ? "shieldedErc20Pool"
+            : record.transactionLabel === "deepFamilyProxy"
+              ? "deepFamily"
+              : record.transactionLabel === "deepFamilyToken"
+                ? "token"
+                : record.transactionLabel
         ],
       ]),
     );
@@ -1944,9 +1956,30 @@ export const main = async (chainProfile) => {
     initialVerificationEntries.push(
       await verificationEntry(
         hre.artifacts,
-        "ShieldedDeepPool",
-        addresses.shieldedDeepPool,
+        "ShieldedErc20Pool",
+        addresses.shieldedErc20Pool,
         [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
+    );
+    initialVerificationEntries.push(
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedNativePool",
+        addresses.shieldedNativePool,
+        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        { PoseidonT3: addresses.poseidonT3 },
+      ),
+      await verificationEntry(
+        hre.artifacts,
+        "ShieldedPoolFactory",
+        addresses.shieldedPoolFactory,
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.shieldedNativePool,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
     );
@@ -2515,7 +2548,7 @@ export const main = async (chainProfile) => {
     report.shielded.receipts = await verifyShieldedReceipts({
       provider,
       expectedChainId: EXPECTED_CHAIN_ID,
-      poolAddress: addresses.shieldedDeepPool,
+      poolAddress: addresses.shieldedErc20Pool,
       fundTxHash: report.transactions["shielded-action-fund"].hash,
     });
     await addStep("real-zk-shielded-business", report.shielded);
@@ -3602,7 +3635,9 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
+        shieldedErc20Pool: terminalProtocolDeployment.shieldedErc20Pool,
+        shieldedNativePool: terminalProtocolDeployment.shieldedNativePool,
+        shieldedPoolFactory: terminalProtocolDeployment.shieldedPoolFactory,
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
       };
     } else {
@@ -3724,7 +3759,9 @@ export const main = async (chainProfile) => {
         poseidonT6: terminalProtocolDeployment.poseidonT6,
         deepFamilyLineageIndex: terminalProtocolDeployment.deepFamilyLineageIndex,
         shieldedVerifiers: terminalProtocolDeployment.shieldedVerifiers,
-        shieldedDeepPool: terminalProtocolDeployment.shieldedDeepPool,
+        shieldedErc20Pool: terminalProtocolDeployment.shieldedErc20Pool,
+        shieldedNativePool: terminalProtocolDeployment.shieldedNativePool,
+        shieldedPoolFactory: terminalProtocolDeployment.shieldedPoolFactory,
       };
     }
     const terminalDeploymentEvidenceSha256 = protocolDeploymentEvidenceSha256(

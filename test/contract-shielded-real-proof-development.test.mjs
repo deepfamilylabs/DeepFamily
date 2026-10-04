@@ -27,6 +27,7 @@ import {
   computeShieldedOwnerCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
+  computeShieldedScopedPurpose,
   computeShieldedSpendNullifier,
   computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
@@ -219,18 +220,24 @@ async function encryptPayloadNote(input, payload) {
 }
 
 async function encryptValueNote(input) {
-  const payload = encodeShieldedValueNotePayload({
-    ownerCommitment: input.ownerCommitment,
-    amount: input.amount,
-    nonce: input.nonce,
-  });
+  const payload = encodeShieldedValueNotePayload(
+    {
+      ownerCommitment: input.ownerCommitment,
+      amount: input.amount,
+      nonce: input.nonce,
+    },
+    input,
+  );
   const encrypted = await encryptPayloadNote(input, payload);
-  const commitment = computeShieldedValueNoteCommitment({
-    ownerCommitment: input.ownerCommitment,
-    amount: input.amount,
-    nonce: input.nonce,
-    ciphertextHashField: encrypted.ciphertextHashField,
-  });
+  const commitment = computeShieldedValueNoteCommitment(
+    {
+      ownerCommitment: input.ownerCommitment,
+      amount: input.amount,
+      nonce: input.nonce,
+      ciphertextHashField: encrypted.ciphertextHashField,
+    },
+    input,
+  );
   return { amount: input.amount, nonce: input.nonce, ...encrypted, commitment };
 }
 
@@ -314,413 +321,484 @@ function assertInvalidCircuitWitness(action, witness, expectedFailure) {
 describe("Shielded pool real Groth16 current public artifact integration", function () {
   this.timeout(1_200_000);
 
-  it("funds identity budgets through VALUE, claims them privately and shares quotas with owner budgets", async function () {
-    const actions = ["shield", "fund", "claim", "unshield"];
-    const artifacts = checkedCurrentArtifacts(actions);
-    if (artifacts.missing) this.skip();
-    const [depositor, recipient] = await hre.ethers.getSigners();
-    const generated = await deployCurrentGeneratedVerifiers(actions, depositor);
-    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
-    const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
-    const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
-    const poseidon = await hre.ethers.deployContract("PoseidonT3");
-    await Promise.all([token, lineage, poseidon].map((c) => c.waitForDeployment()));
-    const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
-      libraries: { PoseidonT3: await poseidon.getAddress() },
-    });
-    const pool = await Pool.deploy(
-      await token.getAddress(),
-      await lineage.getAddress(),
-      await adapter.getAddress(),
-    );
-    await pool.waitForDeployment();
-    const poolAddress = await pool.getAddress();
-    const chainId = (await hre.ethers.provider.getNetwork()).chainId;
-    const fixture = buildShieldedFundingFixtures({ periodDays: PERIOD_DAYS, budgetKind: 1 });
-    const claimant = buildShieldedClaimFixture({
-      periodDays: PERIOD_DAYS,
-      budgetKind: 1,
-      claimCount: 1,
-    });
-    const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
-    const donorOwner = computeShieldedOwnerCommitment(donorSecret);
-    const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x9876", 32));
-    const donorView = await deriveShieldedViewPublicKey(donorIkm);
-    const keys = deriveShieldedHeirKeyMaterial(claimant.witness.derivedSecretField);
-    const heirView = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-    const donorContext = {
-      ownerCommitment: donorOwner,
-      viewingKey: donorView,
-      chainId,
-      poolAddress,
-    };
-    const heirContext = {
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey: heirView,
-      chainId,
-      poolAddress,
-    };
-    let donor = await encryptValueNote({ ...donorContext, amount: 1000n, nonce: 101n });
-    const dummy = await encryptValueNote({ ...donorContext, amount: 0n, nonce: 102n });
-    const shieldData = {
-      ...zeroData(),
-      outputCommitments: [donor.commitment, dummy.commitment],
-      outputCiphertexts: [donor.ciphertextHex, dummy.ciphertextHex],
-    };
-    const shieldInputs = buildShieldedPoolPublicInputs({
-      action: 0,
-      chainId,
-      poolAddress,
-      ...shieldData,
-      amount: 1000n,
-    });
-    const shieldProof = await prove(
-      "shield",
-      {
-        ...shieldInputs.witness,
-        ownerSecret: String(donorSecret),
-        outputAmounts: ["1000", "0"],
-        outputNonces: ["101", "102"],
-      },
-      shieldInputs.signals,
-    );
-    await token.mint(depositor.address, 1000n);
-    await token.approve(poolAddress, 1000n);
-    await pool.shield(1000n, shieldData, shieldProof);
-    await lineage.setRoot(0, claimant.witness.endorsementRoot);
-    await lineage.setRoot(1, claimant.witness.trustedRoot);
-    const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
-    const eligibleFrom = asOf + 7200n;
-    const common = {
-      rootIdentityCommitment: BigInt(fixture.initial.rootIdentityCommitment),
-      rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
-      heirIdentityCommitment: claimant.heirIdentityCommitment,
-      amountPerPeriod: 100n,
-      periodDays: PERIOD_DAYS,
-      eligibleFrom,
-    };
-    const opening = {
-      policySalt: BigInt(fixture.initial.policySalt),
-      allocationKeyCommitment: BigInt(fixture.initial.allocationKeyCommitment),
-      enrollmentSalt: BigInt(fixture.initial.enrollmentSalt),
-    };
-    const policyCommitment = fixture.policy;
-    const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-      ...common,
-      ...opening,
-      policyCommitment,
-    });
-    const spend = (secret, note) =>
-      computeShieldedSpendNullifier({ ownerSecret: secret, noteCommitment: note.commitment });
-    const makeBudget = async (kind, remaining, nonce, clear = false) => {
-      const note =
-        kind === 1
-          ? {
-              ...common,
-              binding: "identity",
-              policyCommitment,
-              enrollmentCommitment,
-              remaining,
-              nonce,
-            }
-          : { ...common, ...opening, heirOwnerCommitment: keys.ownerCommitment, remaining, nonce };
-      const encoded = clear
-        ? (() => {
-            const ciphertext = encodePublicShieldedBudgetEnvelope(note);
-            const ciphertextHex = hre.ethers.hexlify(ciphertext);
-            return {
-              ciphertext,
-              ciphertextHex,
-              ciphertextHashField: BigInt(hre.ethers.keccak256(ciphertextHex)) % FIELD,
-            };
-          })()
-        : await encryptPayloadNote(heirContext, encodeShieldedBudgetNotePayload(note));
-      const commitments = getShieldedBudgetCommitments(note);
-      const hash =
-        kind === 1
-          ? computeShieldedIdentityBudgetNoteCommitment
-          : computeShieldedBudgetNoteCommitment;
-      const commitment = hash({
-        ...note,
-        ...commitments,
-        ciphertextHashField: encoded.ciphertextHashField,
-      });
-      return { kind, note, ...encoded, commitment };
-    };
-    let donorLeaf = 0;
-    const fund = async (kind, periods, nonce, template) => {
-      const budget = await makeBudget(kind, BigInt(periods) * 100n, nonce, kind === 1);
-      const change = await encryptValueNote({
-        ...donorContext,
-        amount: donor.amount - BigInt(periods) * 100n,
-        nonce: nonce + 1n,
-      });
-      const root = (await pool.noteShard(0)).root;
-      const membership = compactMembership(await pool.getNoteMerkleProof(0, donorLeaf));
-      const templatePath = template
-        ? compactMembership(await pool.getNoteMerkleProof(0, template.leaf))
-        : null;
-      const data = {
-        ...zeroData(),
-        fundMode: template ? 1n : 0n,
-        budgetKind: BigInt(kind),
-        inputRoots: [root, root],
-        inputNullifiers: [
-          spend(donorSecret, donor),
-          template
-            ? computeShieldedBudgetUseNullifier({
-                policySalt: opening.policySalt,
-                budgetNoteCommitment: template.commitment,
-                useNonce: nonce + 2n,
-              })
-            : BigInt(fixture.initial.inputNullifiers[1]),
-        ],
-        outputCommitments: [budget.commitment, change.commitment],
-        outputCiphertexts: [budget.ciphertextHex, change.ciphertextHex],
-        ...(template
-          ? {}
-          : {
-              relation0: BigInt(claimant.witness.endorsementRoot),
-              relation1: BigInt(claimant.witness.trustedRoot),
-              asOf,
-            }),
-      };
-      const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
-      assert.equal(inputs.signals.length, 27);
-      const base = buildShieldedFundingFixtures({
-        periodDays: PERIOD_DAYS,
-        budgetKind: kind,
-        oldBudgetKind: template?.kind ?? kind,
-      });
-      const witness = {
-        ...(template ? base.continuation : base.initial),
-        ...inputs.witness,
-        donorAmount: String(donor.amount),
-        donorNonce: String(donor.nonce),
-        donorCiphertextHash: String(donor.ciphertextHashField),
-        donorDepth: membership.depth,
-        donorIndex: membership.index,
-        donorSiblings: membership.siblings,
-        eligibleFrom: String(eligibleFrom),
-        budgetPeriods: String(periods),
-        budgetNonce: String(nonce),
-        changeNonce: String(nonce + 1n),
-        ...(template
-          ? {
-              oldBudgetRemaining: String(template.note.remaining),
-              oldBudgetRemainingPeriods: String(template.note.remaining / 100n),
-              oldBudgetNonce: String(template.note.nonce),
-              oldBudgetCiphertextHash: String(template.ciphertextHashField),
-              oldBudgetDepth: templatePath.depth,
-              oldBudgetIndex: templatePath.index,
-              oldBudgetSiblings: templatePath.siblings,
-              budgetUseNonce: String(nonce + 2n),
-            }
-          : {}),
-      };
-      const proof = await prove("fund", witness, inputs.signals);
-      const leaf = Number((await pool.noteShard(0)).size);
-      await pool.fund(data, proof);
-      donor = change;
-      donorLeaf = leaf + 1;
-      expect(await pool.totalShielded()).to.equal(1000n);
-      expect(await token.balanceOf(poolAddress)).to.equal(1000n);
-      return { ...budget, leaf };
-    };
-    const initial = await fund(1, 4, 107n);
-    const secondPublic = await fund(1, 1, 117n, initial);
-    const privateBudget = await fund(0, 2, 127n, initial);
-    const makeClaim = async (first, second, nonce) => {
-      const remainderKind = first.kind === 0 || second?.kind === 0 ? 0 : 1;
-      const remainder = await makeBudget(
-        remainderKind,
-        first.note.remaining + (second?.note.remaining ?? 0n) - 100n,
-        nonce,
+  for (const assetKind of ["erc20", "native"]) {
+    it(`funds identity budgets through VALUE, claims them privately and shares quotas with owner budgets (${assetKind})`, async function () {
+      const actions = ["shield", "fund", "claim", "unshield"];
+      const artifacts = checkedCurrentArtifacts(actions);
+      if (artifacts.missing) this.skip();
+      const [depositor, recipient] = await hre.ethers.getSigners();
+      const generated = await deployCurrentGeneratedVerifiers(actions, depositor);
+      const adapter = await deployUnifiedVerifierAdapter(hre, generated);
+      const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
+      const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
+      const poseidon = await hre.ethers.deployContract("PoseidonT3");
+      await Promise.all([token, lineage, poseidon].map((c) => c.waitForDeployment()));
+      const native = assetKind === "native";
+      const Pool = await hre.ethers.getContractFactory(
+        native ? "ShieldedNativePool" : "ShieldedErc20Pool",
+        {
+          libraries: { PoseidonT3: await poseidon.getAddress() },
+        },
       );
-      const payout = await encryptValueNote({ ...heirContext, amount: 100n, nonce: nonce + 1n });
+      const pool = await Pool.deploy(
+        ...(native ? [] : [await token.getAddress()]),
+        await lineage.getAddress(),
+        await adapter.getAddress(),
+      );
+      await pool.waitForDeployment();
+      const poolAddress = await pool.getAddress();
+      const chainId = (await hre.ethers.provider.getNetwork()).chainId;
+      const fixture = buildShieldedFundingFixtures({
+        chainId,
+        poolAddress,
+        periodDays: PERIOD_DAYS,
+        budgetKind: 1,
+      });
+      const claimant = buildShieldedClaimFixture({
+        chainId,
+        poolAddress,
+        periodDays: PERIOD_DAYS,
+        budgetKind: 1,
+        claimCount: 1,
+      });
+      const donorSecret = BigInt(fixture.initial.donorOwnerSecret);
+      const donorOwner = computeShieldedOwnerCommitment(donorSecret);
+      const donorIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue("0x9876", 32));
+      const donorView = await deriveShieldedViewPublicKey(donorIkm);
+      const keys = deriveShieldedHeirKeyMaterial(claimant.witness.derivedSecretField);
+      const heirView = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+      const donorContext = {
+        ownerCommitment: donorOwner,
+        viewingKey: donorView,
+        chainId,
+        poolAddress,
+      };
+      const heirContext = {
+        ownerCommitment: keys.ownerCommitment,
+        viewingKey: heirView,
+        chainId,
+        poolAddress,
+      };
+      let donor = await encryptValueNote({ ...donorContext, amount: 1000n, nonce: 101n });
+      const dummy = await encryptValueNote({ ...donorContext, amount: 0n, nonce: 102n });
+      const shieldData = {
+        ...zeroData(),
+        outputCommitments: [donor.commitment, dummy.commitment],
+        outputCiphertexts: [donor.ciphertextHex, dummy.ciphertextHex],
+      };
+      const shieldInputs = buildShieldedPoolPublicInputs({
+        action: 0,
+        chainId,
+        poolAddress,
+        ...shieldData,
+        amount: 1000n,
+      });
+      const shieldProof = await prove(
+        "shield",
+        {
+          ...shieldInputs.witness,
+          ownerSecret: String(donorSecret),
+          outputAmounts: ["1000", "0"],
+          outputNonces: ["101", "102"],
+        },
+        shieldInputs.signals,
+      );
+      if (!native) {
+        await token.mint(depositor.address, 1000n);
+        await token.approve(poolAddress, 1000n);
+      }
+      await pool.shield(1000n, shieldData, shieldProof, native ? { value: 1000n } : {});
+      await lineage.setRoot(0, claimant.witness.endorsementRoot);
+      await lineage.setRoot(1, claimant.witness.trustedRoot);
+      const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
+      const eligibleFrom = asOf + 7200n;
+      const common = {
+        rootIdentityCommitment: BigInt(fixture.initial.rootIdentityCommitment),
+        rootVersionIndex: BigInt(fixture.initial.rootVersionIndex),
+        heirIdentityCommitment: claimant.heirIdentityCommitment,
+        amountPerPeriod: 100n,
+        periodDays: PERIOD_DAYS,
+        eligibleFrom,
+      };
+      const opening = {
+        policySalt: BigInt(fixture.initial.policySalt),
+        allocationKeyCommitment: BigInt(fixture.initial.allocationKeyCommitment),
+        enrollmentSalt: BigInt(fixture.initial.enrollmentSalt),
+      };
+      const policyCommitment = fixture.policy;
+      const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+        {
+          ...common,
+          ...opening,
+          policyCommitment,
+        },
+        { chainId, poolAddress },
+      );
+      const spend = (secret, note) =>
+        computeShieldedSpendNullifier(
+          { ownerSecret: secret, noteCommitment: note.commitment },
+          { chainId, poolAddress },
+        );
+      const makeBudget = async (kind, remaining, nonce, clear = false) => {
+        const note =
+          kind === 1
+            ? {
+                ...common,
+                binding: "identity",
+                policyCommitment,
+                enrollmentCommitment,
+                remaining,
+                nonce,
+              }
+            : {
+                ...common,
+                ...opening,
+                heirOwnerCommitment: keys.ownerCommitment,
+                remaining,
+                nonce,
+              };
+        const encoded = clear
+          ? (() => {
+              const ciphertext = encodePublicShieldedBudgetEnvelope(note, { chainId, poolAddress });
+              const ciphertextHex = hre.ethers.hexlify(ciphertext);
+              return {
+                ciphertext,
+                ciphertextHex,
+                ciphertextHashField: BigInt(hre.ethers.keccak256(ciphertextHex)) % FIELD,
+              };
+            })()
+          : await encryptPayloadNote(
+              heirContext,
+              encodeShieldedBudgetNotePayload(note, { chainId, poolAddress }),
+            );
+        const commitments = getShieldedBudgetCommitments(note, { chainId, poolAddress });
+        const hash =
+          kind === 1
+            ? computeShieldedIdentityBudgetNoteCommitment
+            : computeShieldedBudgetNoteCommitment;
+        const commitment = hash(
+          {
+            ...note,
+            ...commitments,
+            ciphertextHashField: encoded.ciphertextHashField,
+          },
+          { chainId, poolAddress },
+        );
+        return { kind, note, ...encoded, commitment };
+      };
+      let donorLeaf = 0;
+      const fund = async (kind, periods, nonce, template) => {
+        const budget = await makeBudget(kind, BigInt(periods) * 100n, nonce, kind === 1);
+        const change = await encryptValueNote({
+          ...donorContext,
+          amount: donor.amount - BigInt(periods) * 100n,
+          nonce: nonce + 1n,
+        });
+        const root = (await pool.noteShard(0)).root;
+        const membership = compactMembership(await pool.getNoteMerkleProof(0, donorLeaf));
+        const templatePath = template
+          ? compactMembership(await pool.getNoteMerkleProof(0, template.leaf))
+          : null;
+        const data = {
+          ...zeroData(),
+          fundMode: template ? 1n : 0n,
+          budgetKind: BigInt(kind),
+          inputRoots: [root, root],
+          inputNullifiers: [
+            spend(donorSecret, donor),
+            template
+              ? computeShieldedBudgetUseNullifier(
+                  {
+                    policySalt: opening.policySalt,
+                    budgetNoteCommitment: template.commitment,
+                    useNonce: nonce + 2n,
+                  },
+                  { chainId, poolAddress },
+                )
+              : BigInt(fixture.initial.inputNullifiers[1]),
+          ],
+          outputCommitments: [budget.commitment, change.commitment],
+          outputCiphertexts: [budget.ciphertextHex, change.ciphertextHex],
+          ...(template
+            ? {}
+            : {
+                relation0: BigInt(claimant.witness.endorsementRoot),
+                relation1: BigInt(claimant.witness.trustedRoot),
+                asOf,
+              }),
+        };
+        const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
+        assert.equal(inputs.signals.length, 27);
+        const base = buildShieldedFundingFixtures({
+          chainId,
+          poolAddress,
+          periodDays: PERIOD_DAYS,
+          budgetKind: kind,
+          oldBudgetKind: template?.kind ?? kind,
+        });
+        const witness = {
+          ...(template ? base.continuation : base.initial),
+          ...inputs.witness,
+          donorAmount: String(donor.amount),
+          donorNonce: String(donor.nonce),
+          donorCiphertextHash: String(donor.ciphertextHashField),
+          donorDepth: membership.depth,
+          donorIndex: membership.index,
+          donorSiblings: membership.siblings,
+          eligibleFrom: String(eligibleFrom),
+          budgetPeriods: String(periods),
+          budgetNonce: String(nonce),
+          changeNonce: String(nonce + 1n),
+          ...(template
+            ? {
+                oldBudgetRemaining: String(template.note.remaining),
+                oldBudgetRemainingPeriods: String(template.note.remaining / 100n),
+                oldBudgetNonce: String(template.note.nonce),
+                oldBudgetCiphertextHash: String(template.ciphertextHashField),
+                oldBudgetDepth: templatePath.depth,
+                oldBudgetIndex: templatePath.index,
+                oldBudgetSiblings: templatePath.siblings,
+                budgetUseNonce: String(nonce + 2n),
+              }
+            : {}),
+        };
+        const proof = await prove("fund", witness, inputs.signals);
+        const leaf = Number((await pool.noteShard(0)).size);
+        await pool.fund(data, proof);
+        donor = change;
+        donorLeaf = leaf + 1;
+        expect(await pool.totalShielded()).to.equal(1000n);
+        expect(
+          await (native
+            ? hre.ethers.provider.getBalance(poolAddress)
+            : token.balanceOf(poolAddress)),
+        ).to.equal(1000n);
+        return { ...budget, leaf };
+      };
+      const initial = await fund(1, 4, 107n);
+      const secondPublic = await fund(1, 1, 117n, initial);
+      const privateBudget = await fund(0, 2, 127n, initial);
+      const makeClaim = async (first, second, nonce) => {
+        const remainderKind = first.kind === 0 || second?.kind === 0 ? 0 : 1;
+        const remainder = await makeBudget(
+          remainderKind,
+          first.note.remaining + (second?.note.remaining ?? 0n) - 100n,
+          nonce,
+        );
+        const payout = await encryptValueNote({ ...heirContext, amount: 100n, nonce: nonce + 1n });
+        const root = (await pool.noteShard(0)).root;
+        const firstPath = compactMembership(await pool.getNoteMerkleProof(0, first.leaf));
+        const secondPath = second
+          ? compactMembership(await pool.getNoteMerkleProof(0, second.leaf))
+          : null;
+        const data = {
+          ...zeroData(),
+          inputRoots: [root, root],
+          inputNullifiers: [
+            spend(keys.ownerSecret, first),
+            second
+              ? spend(keys.ownerSecret, second)
+              : computeShieldedDummyInputNullifier(
+                  {
+                    ownerSecret: keys.ownerSecret,
+                    noteCommitment: first.commitment,
+                  },
+                  { chainId, poolAddress },
+                ),
+          ],
+          periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
+            slot === 0
+              ? computeShieldedPeriodNullifier(
+                  {
+                    derivedSecretField: claimant.witness.derivedSecretField,
+                    policyCommitment,
+                    periodIndex: 0,
+                  },
+                  { chainId, poolAddress },
+                )
+              : computeShieldedDummyPeriodNullifier(
+                  {
+                    ownerSecret: keys.ownerSecret,
+                    budgetNoteCommitment: first.commitment,
+                    slotIndex: slot,
+                  },
+                  { chainId, poolAddress },
+                ),
+          ),
+          outputCommitments: [remainder.commitment, payout.commitment],
+          outputCiphertexts: [remainder.ciphertextHex, payout.ciphertextHex],
+          relation0: BigInt(claimant.witness.endorsementRoot),
+          relation1: BigInt(claimant.witness.trustedRoot),
+          asOf: eligibleFrom + PERIOD,
+        };
+        const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
+        assert.equal(inputs.signals.length, 27);
+        const base = buildShieldedClaimFixture({
+          chainId,
+          poolAddress,
+          periodDays: PERIOD_DAYS,
+          budgetKind: first.kind,
+          secondBudgetKind: second?.kind ?? 0,
+          claimCount: 1,
+          remainingPeriods: Number(first.note.remaining / 100n),
+          secondRemainingPeriods: Number((second?.note.remaining ?? 0n) / 100n),
+        });
+        const witness = {
+          ...base.witness,
+          ...inputs.witness,
+          policyCommitmentInput: String(policyCommitment),
+          enrollmentCommitmentInput: String(enrollmentCommitment),
+          eligibleFrom: String(eligibleFrom),
+          budgetNonce: String(first.note.nonce),
+          budgetCiphertextHash: String(first.ciphertextHashField),
+          noteDepth: firstPath.depth,
+          noteIndex: firstPath.index,
+          noteSiblings: firstPath.siblings,
+          newBudgetNonce: String(nonce),
+          payoutNonce: String(nonce + 1n),
+          ...(second
+            ? {
+                secondBudgetNonce: String(second.note.nonce),
+                secondBudgetCiphertextHash: String(second.ciphertextHashField),
+                secondNoteDepth: secondPath.depth,
+                secondNoteIndex: secondPath.index,
+                secondNoteSiblings: secondPath.siblings,
+              }
+            : {}),
+        };
+        return { data, inputs, witness, remainder, payout };
+      };
+      const snapshot = await hre.networkHelpers.takeSnapshot();
+      const pure = await makeClaim(initial, null, 207n);
+      const pureProof = await prove("claim", pure.witness, pure.inputs.signals);
+      assert.equal(pure.witness.policySalt, "0");
+      assertInvalidCircuitWitness(
+        "claim",
+        {
+          ...pure.witness,
+          derivedSecretField: String(BigInt(pure.witness.derivedSecretField) + 1n),
+        },
+        /Assert Failed/u,
+      );
+      assertInvalidCircuitWitness("claim", { ...pure.witness, budgetKind: "0" }, /Assert Failed/u);
+      await hre.networkHelpers.time.increaseTo(Number(pure.data.asOf));
+      await pool.claim(pure.data, pureProof);
+      const recovered = await decryptShieldedNote({
+        ciphertext: pure.remainder.ciphertext,
+        hpkeIkm: keys.hpkeIkm,
+        chainId,
+        poolAddress,
+      });
+      expect(
+        verifyShieldedNotePayload(
+          {
+            payload: recovered,
+            ciphertext: pure.remainder.ciphertext,
+            noteCommitment: pure.remainder.commitment,
+          },
+          { chainId, poolAddress },
+        ).note.binding,
+      ).to.equal("identity");
+      const repeated = await makeClaim(secondPublic, null, 217n);
+      const repeatedProof = await prove("claim", repeated.witness, repeated.inputs.signals);
+      await expect(pool.claim(repeated.data, repeatedProof)).to.be.revertedWithCustomError(
+        pool,
+        "NullifierAlreadySpent",
+      );
+      const crossMode = await makeClaim(privateBudget, null, 227n);
+      const crossModeProof = await prove("claim", crossMode.witness, crossMode.inputs.signals);
+      await expect(pool.claim(crossMode.data, crossModeProof)).to.be.revertedWithCustomError(
+        pool,
+        "NullifierAlreadySpent",
+      );
+      // A publicly funded budget's payout has the same secret-owner authorization as every VALUE.
+      const payoutLeaf = Number((await pool.noteShard(0)).size) - 1;
+      const payoutPath = compactMembership(await pool.getNoteMerkleProof(0, payoutLeaf));
       const root = (await pool.noteShard(0)).root;
-      const firstPath = compactMembership(await pool.getNoteMerkleProof(0, first.leaf));
-      const secondPath = second
-        ? compactMembership(await pool.getNoteMerkleProof(0, second.leaf))
-        : null;
-      const data = {
+      const exitChange = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 307n });
+      const exitDummy = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 308n });
+      const exitData = {
         ...zeroData(),
         inputRoots: [root, root],
         inputNullifiers: [
-          spend(keys.ownerSecret, first),
-          second
-            ? spend(keys.ownerSecret, second)
-            : computeShieldedDummyInputNullifier({
-                ownerSecret: keys.ownerSecret,
-                noteCommitment: first.commitment,
-              }),
+          spend(keys.ownerSecret, pure.payout),
+          computeShieldedDummyInputNullifier(
+            {
+              ownerSecret: keys.ownerSecret,
+              noteCommitment: pure.payout.commitment,
+            },
+            { chainId, poolAddress },
+          ),
         ],
-        periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
-          slot === 0
-            ? computeShieldedPeriodNullifier({
-                derivedSecretField: claimant.witness.derivedSecretField,
-                policyCommitment,
-                periodIndex: 0,
-              })
-            : computeShieldedDummyPeriodNullifier({
-                ownerSecret: keys.ownerSecret,
-                budgetNoteCommitment: first.commitment,
-                slotIndex: slot,
-              }),
-        ),
-        outputCommitments: [remainder.commitment, payout.commitment],
-        outputCiphertexts: [remainder.ciphertextHex, payout.ciphertextHex],
-        relation0: BigInt(claimant.witness.endorsementRoot),
-        relation1: BigInt(claimant.witness.trustedRoot),
-        asOf: eligibleFrom + PERIOD,
+        outputCommitments: [exitChange.commitment, exitDummy.commitment],
+        outputCiphertexts: [exitChange.ciphertextHex, exitDummy.ciphertextHex],
       };
-      const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
-      assert.equal(inputs.signals.length, 27);
-      const base = buildShieldedClaimFixture({
-        periodDays: PERIOD_DAYS,
-        budgetKind: first.kind,
-        secondBudgetKind: second?.kind ?? 0,
-        claimCount: 1,
-        remainingPeriods: Number(first.note.remaining / 100n),
-        secondRemainingPeriods: Number((second?.note.remaining ?? 0n) / 100n),
+      const exitInputs = buildShieldedPoolPublicInputs({
+        action: 4,
+        chainId,
+        poolAddress,
+        ...exitData,
+        amount: 100n,
+        recipient: recipient.address,
       });
-      const witness = {
-        ...base.witness,
-        ...inputs.witness,
-        policyCommitmentInput: String(policyCommitment),
-        enrollmentCommitmentInput: String(enrollmentCommitment),
-        eligibleFrom: String(eligibleFrom),
-        budgetNonce: String(first.note.nonce),
-        budgetCiphertextHash: String(first.ciphertextHashField),
-        noteDepth: firstPath.depth,
-        noteIndex: firstPath.index,
-        noteSiblings: firstPath.siblings,
-        newBudgetNonce: String(nonce),
-        payoutNonce: String(nonce + 1n),
-        ...(second
-          ? {
-              secondBudgetNonce: String(second.note.nonce),
-              secondBudgetCiphertextHash: String(second.ciphertextHashField),
-              secondNoteDepth: secondPath.depth,
-              secondNoteIndex: secondPath.index,
-              secondNoteSiblings: secondPath.siblings,
-            }
-          : {}),
-      };
-      return { data, inputs, witness, remainder, payout };
-    };
-    const snapshot = await hre.networkHelpers.takeSnapshot();
-    const pure = await makeClaim(initial, null, 207n);
-    const pureProof = await prove("claim", pure.witness, pure.inputs.signals);
-    assert.equal(pure.witness.policySalt, "0");
-    assertInvalidCircuitWitness(
-      "claim",
-      { ...pure.witness, derivedSecretField: String(BigInt(pure.witness.derivedSecretField) + 1n) },
-      /Assert Failed/u,
-    );
-    assertInvalidCircuitWitness("claim", { ...pure.witness, budgetKind: "0" }, /Assert Failed/u);
-    await hre.networkHelpers.time.increaseTo(Number(pure.data.asOf));
-    await pool.claim(pure.data, pureProof);
-    const recovered = await decryptShieldedNote({
-      ciphertext: pure.remainder.ciphertext,
-      hpkeIkm: keys.hpkeIkm,
-      chainId,
-      poolAddress,
+      const exitProof = await prove(
+        "unshield",
+        {
+          ...exitInputs.witness,
+          ownerSecret: String(keys.ownerSecret),
+          inputAmount: "100",
+          inputNonce: String(pure.payout.nonce),
+          inputCiphertextHash: String(pure.payout.ciphertextHashField),
+          noteDepth: payoutPath.depth,
+          noteIndex: payoutPath.index,
+          noteSiblings: payoutPath.siblings,
+          changeAmount: "0",
+          changeNonce: "307",
+          dummyNonce: "308",
+        },
+        exitInputs.signals,
+      );
+      const recipientBefore = native
+        ? await hre.ethers.provider.getBalance(recipient.address)
+        : await token.balanceOf(recipient.address);
+      await pool.unshield(recipient.address, 100n, exitData, exitProof);
+      const recipientAfter = native
+        ? await hre.ethers.provider.getBalance(recipient.address)
+        : await token.balanceOf(recipient.address);
+      expect(recipientAfter - recipientBefore).to.equal(100n);
+      expect(await pool.totalShielded()).to.equal(900n);
+      await snapshot.restore();
+      const mixed = await makeClaim(initial, privateBudget, 407n);
+      const mixedProof = await prove("claim", mixed.witness, mixed.inputs.signals);
+      assertInvalidCircuitWitness(
+        "claim",
+        { ...mixed.witness, policySalt: "0", enrollmentSalt: "0", allocationKeyCommitment: "0" },
+        /Assert Failed/u,
+      );
+      await hre.networkHelpers.time.increaseTo(Number(mixed.data.asOf));
+      await pool.claim(mixed.data, mixedProof);
+      const privateRemainder = await decryptShieldedNote({
+        ciphertext: mixed.remainder.ciphertext,
+        hpkeIkm: keys.hpkeIkm,
+        chainId,
+        poolAddress,
+      });
+      const recoveredPrivate = verifyShieldedNotePayload(
+        {
+          payload: privateRemainder,
+          ciphertext: mixed.remainder.ciphertext,
+          noteCommitment: mixed.remainder.commitment,
+        },
+        { chainId, poolAddress },
+      ).note;
+      expect(recoveredPrivate.binding).not.to.equal("identity");
+      expect(recoveredPrivate.heirOwnerCommitment).to.equal(keys.ownerCommitment);
+      expect(recoveredPrivate.remaining).to.equal(500n);
+      expect(await pool.nullifierSpent(mixed.data.inputNullifiers[0])).to.equal(true);
+      expect(await pool.nullifierSpent(mixed.data.inputNullifiers[1])).to.equal(true);
+      expect(await pool.totalShielded()).to.equal(1000n);
     });
-    expect(
-      verifyShieldedNotePayload({
-        payload: recovered,
-        ciphertext: pure.remainder.ciphertext,
-        noteCommitment: pure.remainder.commitment,
-      }).note.binding,
-    ).to.equal("identity");
-    const repeated = await makeClaim(secondPublic, null, 217n);
-    const repeatedProof = await prove("claim", repeated.witness, repeated.inputs.signals);
-    await expect(pool.claim(repeated.data, repeatedProof)).to.be.revertedWithCustomError(
-      pool,
-      "NullifierAlreadySpent",
-    );
-    const crossMode = await makeClaim(privateBudget, null, 227n);
-    const crossModeProof = await prove("claim", crossMode.witness, crossMode.inputs.signals);
-    await expect(pool.claim(crossMode.data, crossModeProof)).to.be.revertedWithCustomError(
-      pool,
-      "NullifierAlreadySpent",
-    );
-    // A publicly funded budget's payout has the same secret-owner authorization as every VALUE.
-    const payoutLeaf = Number((await pool.noteShard(0)).size) - 1;
-    const payoutPath = compactMembership(await pool.getNoteMerkleProof(0, payoutLeaf));
-    const root = (await pool.noteShard(0)).root;
-    const exitChange = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 307n });
-    const exitDummy = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 308n });
-    const exitData = {
-      ...zeroData(),
-      inputRoots: [root, root],
-      inputNullifiers: [
-        spend(keys.ownerSecret, pure.payout),
-        computeShieldedDummyInputNullifier({
-          ownerSecret: keys.ownerSecret,
-          noteCommitment: pure.payout.commitment,
-        }),
-      ],
-      outputCommitments: [exitChange.commitment, exitDummy.commitment],
-      outputCiphertexts: [exitChange.ciphertextHex, exitDummy.ciphertextHex],
-    };
-    const exitInputs = buildShieldedPoolPublicInputs({
-      action: 4,
-      chainId,
-      poolAddress,
-      ...exitData,
-      amount: 100n,
-      recipient: recipient.address,
-    });
-    const exitProof = await prove(
-      "unshield",
-      {
-        ...exitInputs.witness,
-        ownerSecret: String(keys.ownerSecret),
-        inputAmount: "100",
-        inputNonce: String(pure.payout.nonce),
-        inputCiphertextHash: String(pure.payout.ciphertextHashField),
-        noteDepth: payoutPath.depth,
-        noteIndex: payoutPath.index,
-        noteSiblings: payoutPath.siblings,
-        changeAmount: "0",
-        changeNonce: "307",
-        dummyNonce: "308",
-      },
-      exitInputs.signals,
-    );
-    await pool.unshield(recipient.address, 100n, exitData, exitProof);
-    expect(await token.balanceOf(recipient.address)).to.equal(100n);
-    expect(await pool.totalShielded()).to.equal(900n);
-    await snapshot.restore();
-    const mixed = await makeClaim(initial, privateBudget, 407n);
-    const mixedProof = await prove("claim", mixed.witness, mixed.inputs.signals);
-    assertInvalidCircuitWitness(
-      "claim",
-      { ...mixed.witness, policySalt: "0", enrollmentSalt: "0", allocationKeyCommitment: "0" },
-      /Assert Failed/u,
-    );
-    await hre.networkHelpers.time.increaseTo(Number(mixed.data.asOf));
-    await pool.claim(mixed.data, mixedProof);
-    const privateRemainder = await decryptShieldedNote({
-      ciphertext: mixed.remainder.ciphertext,
-      hpkeIkm: keys.hpkeIkm,
-      chainId,
-      poolAddress,
-    });
-    const recoveredPrivate = verifyShieldedNotePayload({
-      payload: privateRemainder,
-      ciphertext: mixed.remainder.ciphertext,
-      noteCommitment: mixed.remainder.commitment,
-    }).note;
-    expect(recoveredPrivate.binding).not.to.equal("identity");
-    expect(recoveredPrivate.heirOwnerCommitment).to.equal(keys.ownerCommitment);
-    expect(recoveredPrivate.remaining).to.equal(500n);
-    expect(await pool.nullifierSpent(mixed.data.inputNullifiers[0])).to.equal(true);
-    expect(await pool.nullifierSpent(mixed.data.inputNullifiers[1])).to.equal(true);
-    expect(await pool.totalShielded()).to.equal(1000n);
-  });
+  }
 
   it("proves one synthetic full 64/32 path and twelve periods with current public keys", async function () {
     const artifacts = checkedCurrentArtifacts(["claim"]);
@@ -813,7 +891,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await Promise.all(
       [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
     );
-    const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
+    const Pool = await hre.ethers.getContractFactory("ShieldedErc20Pool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
     });
     const pool = await Pool.deploy(
@@ -889,24 +967,33 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: recovered,
-        ciphertext: initialNotes[0].ciphertext,
-        noteCommitment: initialNotes[0].commitment,
-      }).note.amount,
+      verifyShieldedNotePayload(
+        {
+          payload: recovered,
+          ciphertext: initialNotes[0].ciphertext,
+          noteCommitment: initialNotes[0].commitment,
+        },
+        { chainId, poolAddress },
+      ).note.amount,
     ).to.equal(100n);
 
     const root = (await pool.noteShard(0)).root;
     const pathProof = await pool.getNoteMerkleProof(0, 0);
     expect(pathProof.proofDepth).to.equal(1n);
-    const spendNullifier = computeShieldedSpendNullifier({
-      ownerSecret,
-      noteCommitment: initialNotes[0].commitment,
-    });
-    const dummyNullifier = computeShieldedDummyInputNullifier({
-      ownerSecret,
-      noteCommitment: initialNotes[0].commitment,
-    });
+    const spendNullifier = computeShieldedSpendNullifier(
+      {
+        ownerSecret,
+        noteCommitment: initialNotes[0].commitment,
+      },
+      { chainId, poolAddress },
+    );
+    const dummyNullifier = computeShieldedDummyInputNullifier(
+      {
+        ownerSecret,
+        noteCommitment: initialNotes[0].commitment,
+      },
+      { chainId, poolAddress },
+    );
     const changeNotes = await Promise.all([
       encryptValueNote({ ...noteInput, amount: 70n, nonce: 13n }),
       encryptValueNote({ ...noteInput, amount: 0n, nonce: 14n }),
@@ -988,7 +1075,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await Promise.all(
       [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
     );
-    const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
+    const Pool = await hre.ethers.getContractFactory("ShieldedErc20Pool", {
       libraries: { PoseidonT3: await poseidon.getAddress() },
     });
     const pool = await Pool.deploy(
@@ -1049,11 +1136,15 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     await (await pool.shield(2000n, shieldData, shieldProof)).wait();
 
     const fundingFixture = buildShieldedFundingFixtures({
+      chainId,
+      poolAddress,
       periodDays: PERIOD_DAYS,
       donorAmount: 2000n,
     });
     const allocationWitness = fundingFixture.initial;
     const claimFixture = buildShieldedClaimFixture({
+      chainId,
+      poolAddress,
       periodDays: PERIOD_DAYS,
       claimCount: 12,
       remainingPeriods: 12,
@@ -1066,15 +1157,21 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const rate = 100n;
     const policySalt = BigInt(allocationWitness.policySalt);
     const allocationKey = BigInt(allocationWitness.allocationKey);
-    const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(allocationKey);
-    const policyCommitment = computeShieldedPolicyCommitment({
-      rootIdentityCommitment,
-      rootVersionIndex,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      policySalt,
-      allocationKeyCommitment,
+    const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(allocationKey, {
+      chainId,
+      poolAddress,
     });
+    const policyCommitment = computeShieldedPolicyCommitment(
+      {
+        rootIdentityCommitment,
+        rootVersionIndex,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        policySalt,
+        allocationKeyCommitment,
+      },
+      { chainId, poolAddress },
+    );
     const heirIdentityCommitment = BigInt(allocationWitness.heirIdentityCommitment);
     const heirOwnerCommitment = BigInt(allocationWitness.heirOwnerCommitment);
     const endorsementRoot = BigInt(claimFixture.witness.endorsementRoot);
@@ -1085,41 +1182,50 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
     const eligibleFrom = asOf + 7200n;
     const enrollmentSalt = BigInt(allocationWitness.enrollmentSalt);
-    const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-      policyCommitment,
-      heirIdentityCommitment,
-      eligibleFrom,
-      enrollmentSalt,
-    });
+    const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+      {
+        policyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+      },
+      { chainId, poolAddress },
+    );
     const budgetNonce = 107n;
-    const initialBudgetPayload = encodeShieldedBudgetNotePayload({
-      rootIdentityCommitment,
-      rootVersionIndex,
-      policySalt,
-      allocationKeyCommitment,
-      heirIdentityCommitment,
-      eligibleFrom,
-      enrollmentSalt,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 1200n,
-      nonce: budgetNonce,
-    });
+    const initialBudgetPayload = encodeShieldedBudgetNotePayload(
+      {
+        rootIdentityCommitment,
+        rootVersionIndex,
+        policySalt,
+        allocationKeyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 1200n,
+        nonce: budgetNonce,
+      },
+      { chainId, poolAddress },
+    );
     const encryptedBudget = await encryptPayloadNote(
       { viewingKey: heirViewingKey, chainId, poolAddress },
       initialBudgetPayload,
     );
-    const budgetCommitment = computeShieldedBudgetNoteCommitment({
-      policyCommitment,
-      enrollmentCommitment,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 1200n,
-      nonce: budgetNonce,
-      ciphertextHashField: encryptedBudget.ciphertextHashField,
-    });
+    const budgetCommitment = computeShieldedBudgetNoteCommitment(
+      {
+        policyCommitment,
+        enrollmentCommitment,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 1200n,
+        nonce: budgetNonce,
+        ciphertextHashField: encryptedBudget.ciphertextHashField,
+      },
+      { chainId, poolAddress },
+    );
     const donorChange = await encryptValueNote({
       ...donorNoteInput,
       amount: 800n,
@@ -1132,15 +1238,21 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       ...zeroData(),
       inputRoots: [preAllocationRoot, preAllocationRoot],
       inputNullifiers: [
-        computeShieldedSpendNullifier({
-          ownerSecret: donorOwnerSecret,
-          noteCommitment: firstDonorNote.commitment,
-        }),
-        computeShieldedEnrollmentNullifier({
-          allocationKey,
-          policyCommitment,
-          heirIdentityCommitment,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: donorOwnerSecret,
+            noteCommitment: firstDonorNote.commitment,
+          },
+          { chainId, poolAddress },
+        ),
+        computeShieldedEnrollmentNullifier(
+          {
+            allocationKey,
+            policyCommitment,
+            heirIdentityCommitment,
+          },
+          { chainId, poolAddress },
+        ),
       ],
       outputCommitments: [budgetCommitment, donorChange.commitment],
       outputCiphertexts: [encryptedBudget.ciphertextHex, donorChange.ciphertextHex],
@@ -1185,34 +1297,40 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const additionalFundingUseNonce = 114n;
     const additionalFundingBudgetNonce = 111n;
     const additionalFundingChangeNonce = 113n;
-    const additionalFundingBudgetPayload = encodeShieldedBudgetNotePayload({
-      rootIdentityCommitment,
-      rootVersionIndex,
-      policySalt,
-      allocationKeyCommitment,
-      heirIdentityCommitment,
-      eligibleFrom,
-      enrollmentSalt,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 300n,
-      nonce: additionalFundingBudgetNonce,
-    });
+    const additionalFundingBudgetPayload = encodeShieldedBudgetNotePayload(
+      {
+        rootIdentityCommitment,
+        rootVersionIndex,
+        policySalt,
+        allocationKeyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 300n,
+        nonce: additionalFundingBudgetNonce,
+      },
+      { chainId, poolAddress },
+    );
     const encryptedAdditionalFundingBudget = await encryptPayloadNote(
       { viewingKey: heirViewingKey, chainId, poolAddress },
       additionalFundingBudgetPayload,
     );
-    const additionalFundingBudgetCommitment = computeShieldedBudgetNoteCommitment({
-      policyCommitment,
-      enrollmentCommitment,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 300n,
-      nonce: additionalFundingBudgetNonce,
-      ciphertextHashField: encryptedAdditionalFundingBudget.ciphertextHashField,
-    });
+    const additionalFundingBudgetCommitment = computeShieldedBudgetNoteCommitment(
+      {
+        policyCommitment,
+        enrollmentCommitment,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 300n,
+        nonce: additionalFundingBudgetNonce,
+        ciphertextHashField: encryptedAdditionalFundingBudget.ciphertextHashField,
+      },
+      { chainId, poolAddress },
+    );
     const additionalFundingDonorChange = await encryptValueNote({
       ...donorNoteInput,
       amount: 500n,
@@ -1228,15 +1346,21 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       fundMode: 1n,
       inputRoots: [preAdditionalFundingRoot, preAdditionalFundingRoot],
       inputNullifiers: [
-        computeShieldedSpendNullifier({
-          ownerSecret: donorOwnerSecret,
-          noteCommitment: donorChange.commitment,
-        }),
-        computeShieldedBudgetUseNullifier({
-          policySalt,
-          budgetNoteCommitment: budgetCommitment,
-          useNonce: additionalFundingUseNonce,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: donorOwnerSecret,
+            noteCommitment: donorChange.commitment,
+          },
+          { chainId, poolAddress },
+        ),
+        computeShieldedBudgetUseNullifier(
+          {
+            policySalt,
+            budgetNoteCommitment: budgetCommitment,
+            useNonce: additionalFundingUseNonce,
+          },
+          { chainId, poolAddress },
+        ),
       ],
       outputCommitments: [
         additionalFundingBudgetCommitment,
@@ -1298,10 +1422,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     expect(await pool.nullifierSpent(additionalFundingData.inputNullifiers[1])).to.equal(true);
     expect(
       await pool.nullifierSpent(
-        computeShieldedSpendNullifier({
-          ownerSecret: heirKeys.ownerSecret,
-          noteCommitment: budgetCommitment,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: heirKeys.ownerSecret,
+            noteCommitment: budgetCommitment,
+          },
+          { chainId, poolAddress },
+        ),
       ),
     ).to.equal(false);
     expect(await pool.commitmentExists(budgetCommitment)).to.equal(true);
@@ -1314,11 +1441,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: recoveredAdditionalFundingPayload,
-        ciphertext: encryptedAdditionalFundingBudget.ciphertext,
-        noteCommitment: additionalFundingBudgetCommitment,
-      }).note.remaining,
+      verifyShieldedNotePayload(
+        {
+          payload: recoveredAdditionalFundingPayload,
+          ciphertext: encryptedAdditionalFundingBudget.ciphertext,
+          noteCommitment: additionalFundingBudgetCommitment,
+        },
+        { chainId, poolAddress },
+      ).note.remaining,
     ).to.equal(300n);
     await expect(
       pool.fund(additionalFundingData, additionalFundingProof),
@@ -1327,48 +1457,60 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const preClaimRoot = (await pool.noteShard(0)).root;
     const budgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 2));
     assert.equal(budgetMembership.depth, "3");
-    const spendBudgetTag = computeShieldedSpendNullifier({
-      ownerSecret: heirKeys.ownerSecret,
-      noteCommitment: budgetCommitment,
-    });
-    const dummyBudgetTag = computeShieldedDummyInputNullifier({
-      ownerSecret: heirKeys.ownerSecret,
-      noteCommitment: budgetCommitment,
-    });
+    const spendBudgetTag = computeShieldedSpendNullifier(
+      {
+        ownerSecret: heirKeys.ownerSecret,
+        noteCommitment: budgetCommitment,
+      },
+      { chainId, poolAddress },
+    );
+    const dummyBudgetTag = computeShieldedDummyInputNullifier(
+      {
+        ownerSecret: heirKeys.ownerSecret,
+        noteCommitment: budgetCommitment,
+      },
+      { chainId, poolAddress },
+    );
     const secondBudgetMembership = compactMembership(await pool.getNoteMerkleProof(0, 4));
     const makeClaim = async (count, useSecond = false) => {
       const claimAsOf = eligibleFrom + BigInt(count) * PERIOD;
       const remaining = 1200n + (useSecond ? 300n : 0n) - BigInt(count) * rate;
       const nextBudgetNonce = 99999n;
       const payoutNonce = 123456n;
-      const nextBudgetPayload = encodeShieldedBudgetNotePayload({
-        rootIdentityCommitment,
-        rootVersionIndex,
-        policySalt,
-        allocationKeyCommitment,
-        heirIdentityCommitment,
-        eligibleFrom,
-        enrollmentSalt,
-        heirOwnerCommitment,
-        amountPerPeriod: rate,
-        periodDays: PERIOD_DAYS,
-        remaining,
-        nonce: nextBudgetNonce,
-      });
+      const nextBudgetPayload = encodeShieldedBudgetNotePayload(
+        {
+          rootIdentityCommitment,
+          rootVersionIndex,
+          policySalt,
+          allocationKeyCommitment,
+          heirIdentityCommitment,
+          eligibleFrom,
+          enrollmentSalt,
+          heirOwnerCommitment,
+          amountPerPeriod: rate,
+          periodDays: PERIOD_DAYS,
+          remaining,
+          nonce: nextBudgetNonce,
+        },
+        { chainId, poolAddress },
+      );
       const nextBudgetCiphertext = await encryptPayloadNote(
         { viewingKey: heirViewingKey, chainId, poolAddress },
         nextBudgetPayload,
       );
-      const nextBudgetCommitment = computeShieldedBudgetNoteCommitment({
-        policyCommitment,
-        enrollmentCommitment,
-        heirOwnerCommitment,
-        amountPerPeriod: rate,
-        periodDays: PERIOD_DAYS,
-        remaining,
-        nonce: nextBudgetNonce,
-        ciphertextHashField: nextBudgetCiphertext.ciphertextHashField,
-      });
+      const nextBudgetCommitment = computeShieldedBudgetNoteCommitment(
+        {
+          policyCommitment,
+          enrollmentCommitment,
+          heirOwnerCommitment,
+          amountPerPeriod: rate,
+          periodDays: PERIOD_DAYS,
+          remaining,
+          nonce: nextBudgetNonce,
+          ciphertextHashField: nextBudgetCiphertext.ciphertextHashField,
+        },
+        { chainId, poolAddress },
+      );
       const payoutNote = await encryptValueNote({
         ownerCommitment: heirOwnerCommitment,
         viewingKey: heirViewingKey,
@@ -1379,16 +1521,22 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       });
       const periodNullifiers = Array.from({ length: 12 }, (_, slot) =>
         slot < count
-          ? computeShieldedPeriodNullifier({
-              derivedSecretField: claimFixture.witness.derivedSecretField,
-              policyCommitment,
-              periodIndex: slot,
-            })
-          : computeShieldedDummyPeriodNullifier({
-              ownerSecret: heirKeys.ownerSecret,
-              budgetNoteCommitment: budgetCommitment,
-              slotIndex: slot,
-            }),
+          ? computeShieldedPeriodNullifier(
+              {
+                derivedSecretField: claimFixture.witness.derivedSecretField,
+                policyCommitment,
+                periodIndex: slot,
+              },
+              { chainId, poolAddress },
+            )
+          : computeShieldedDummyPeriodNullifier(
+              {
+                ownerSecret: heirKeys.ownerSecret,
+                budgetNoteCommitment: budgetCommitment,
+                slotIndex: slot,
+              },
+              { chainId, poolAddress },
+            ),
       );
       assert.equal(new Set(periodNullifiers.map(String)).size, 12);
       const claimData = {
@@ -1397,10 +1545,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         inputNullifiers: [
           spendBudgetTag,
           useSecond
-            ? computeShieldedSpendNullifier({
-                ownerSecret: heirKeys.ownerSecret,
-                noteCommitment: additionalFundingBudgetCommitment,
-              })
+            ? computeShieldedSpendNullifier(
+                {
+                  ownerSecret: heirKeys.ownerSecret,
+                  noteCommitment: additionalFundingBudgetCommitment,
+                },
+                { chainId, poolAddress },
+              )
             : dummyBudgetTag,
         ],
         periodNullifiers,
@@ -1417,6 +1568,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         ...claimData,
       });
       const baseWitness = buildShieldedClaimFixture({
+        chainId,
+        poolAddress,
         periodDays: PERIOD_DAYS,
         claimCount: count,
         remainingPeriods: 12,
@@ -1476,11 +1629,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: mergedRemainder,
-        ciphertext: mergedClaim.nextBudgetCiphertext.ciphertext,
-        noteCommitment: mergedClaim.nextBudgetCommitment,
-      }).note.remaining,
+      verifyShieldedNotePayload(
+        {
+          payload: mergedRemainder,
+          ciphertext: mergedClaim.nextBudgetCiphertext.ciphertext,
+          noteCommitment: mergedClaim.nextBudgetCommitment,
+        },
+        { chainId, poolAddress },
+      ).note.remaining,
     ).to.equal(300n);
     await expect(pool.claim(mergedClaim.claimData, mergedProof)).to.be.revertedWithCustomError(
       pool,
@@ -1492,34 +1648,40 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const historicalBudget = compactMembership(await pool.getNoteMerkleProof(0, 2));
     const continuingDonor = compactMembership(await pool.getNoteMerkleProof(0, 5));
     const continuingRoot = (await pool.noteShard(0)).root;
-    const continuedPayload = encodeShieldedBudgetNotePayload({
-      rootIdentityCommitment,
-      rootVersionIndex,
-      policySalt,
-      allocationKeyCommitment,
-      heirIdentityCommitment,
-      eligibleFrom,
-      enrollmentSalt,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 100n,
-      nonce: 221n,
-    });
+    const continuedPayload = encodeShieldedBudgetNotePayload(
+      {
+        rootIdentityCommitment,
+        rootVersionIndex,
+        policySalt,
+        allocationKeyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 100n,
+        nonce: 221n,
+      },
+      { chainId, poolAddress },
+    );
     const continuedBudget = await encryptPayloadNote(
       { viewingKey: heirViewingKey, chainId, poolAddress },
       continuedPayload,
     );
-    const continuedBudgetCommitment = computeShieldedBudgetNoteCommitment({
-      policyCommitment,
-      enrollmentCommitment,
-      heirOwnerCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      remaining: 100n,
-      nonce: 221n,
-      ciphertextHashField: continuedBudget.ciphertextHashField,
-    });
+    const continuedBudgetCommitment = computeShieldedBudgetNoteCommitment(
+      {
+        policyCommitment,
+        enrollmentCommitment,
+        heirOwnerCommitment,
+        amountPerPeriod: rate,
+        periodDays: PERIOD_DAYS,
+        remaining: 100n,
+        nonce: 221n,
+        ciphertextHashField: continuedBudget.ciphertextHashField,
+      },
+      { chainId, poolAddress },
+    );
     const continuedChange = await encryptValueNote({
       ...donorNoteInput,
       amount: 400n,
@@ -1530,15 +1692,21 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       fundMode: 1n,
       inputRoots: [continuingRoot, continuingRoot],
       inputNullifiers: [
-        computeShieldedSpendNullifier({
-          ownerSecret: donorOwnerSecret,
-          noteCommitment: additionalFundingDonorChange.commitment,
-        }),
-        computeShieldedBudgetUseNullifier({
-          policySalt,
-          budgetNoteCommitment: budgetCommitment,
-          useNonce: 224n,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: donorOwnerSecret,
+            noteCommitment: additionalFundingDonorChange.commitment,
+          },
+          { chainId, poolAddress },
+        ),
+        computeShieldedBudgetUseNullifier(
+          {
+            policySalt,
+            budgetNoteCommitment: budgetCommitment,
+            useNonce: 224n,
+          },
+          { chainId, poolAddress },
+        ),
       ],
       outputCommitments: [continuedBudgetCommitment, continuedChange.commitment],
       outputCiphertexts: [continuedBudget.ciphertextHex, continuedChange.ciphertextHex],
@@ -1673,11 +1841,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: onePayoutPayload,
-        ciphertext: onePeriod.payoutNote.ciphertext,
-        noteCommitment: onePeriod.payoutNote.commitment,
-      }).note.amount,
+      verifyShieldedNotePayload(
+        {
+          payload: onePayoutPayload,
+          ciphertext: onePeriod.payoutNote.ciphertext,
+          noteCommitment: onePeriod.payoutNote.commitment,
+        },
+        { chainId, poolAddress },
+      ).note.amount,
     ).to.equal(100n);
     const oneRemainingPayload = await decryptShieldedNote({
       ciphertext: onePeriod.nextBudgetCiphertext.ciphertext,
@@ -1686,11 +1857,14 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: oneRemainingPayload,
-        ciphertext: onePeriod.nextBudgetCiphertext.ciphertext,
-        noteCommitment: onePeriod.nextBudgetCommitment,
-      }).note.remaining,
+      verifyShieldedNotePayload(
+        {
+          payload: oneRemainingPayload,
+          ciphertext: onePeriod.nextBudgetCiphertext.ciphertext,
+          noteCommitment: onePeriod.nextBudgetCommitment,
+        },
+        { chainId, poolAddress },
+      ).note.remaining,
     ).to.equal(1100n);
     await branch.restore();
 
@@ -1701,30 +1875,39 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const underfundedClaimData = {
       ...fourPeriods.claimData,
       inputNullifiers: [
-        computeShieldedSpendNullifier({
-          ownerSecret: heirKeys.ownerSecret,
-          noteCommitment: additionalFundingBudgetCommitment,
-        }),
-        computeShieldedDummyInputNullifier({
-          ownerSecret: heirKeys.ownerSecret,
-          noteCommitment: additionalFundingBudgetCommitment,
-        }),
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: heirKeys.ownerSecret,
+            noteCommitment: additionalFundingBudgetCommitment,
+          },
+          { chainId, poolAddress },
+        ),
+        computeShieldedDummyInputNullifier(
+          {
+            ownerSecret: heirKeys.ownerSecret,
+            noteCommitment: additionalFundingBudgetCommitment,
+          },
+          { chainId, poolAddress },
+        ),
       ],
       periodNullifiers: Array.from({ length: 12 }, (_, slot) =>
         slot < 4
           ? fourPeriods.claimData.periodNullifiers[slot]
-          : computeShieldedDummyPeriodNullifier({
-              ownerSecret: heirKeys.ownerSecret,
-              budgetNoteCommitment: additionalFundingBudgetCommitment,
-              slotIndex: slot,
-            }),
+          : computeShieldedDummyPeriodNullifier(
+              {
+                ownerSecret: heirKeys.ownerSecret,
+                budgetNoteCommitment: additionalFundingBudgetCommitment,
+                slotIndex: slot,
+              },
+              { chainId, poolAddress },
+            ),
       ),
       // Match the field arithmetic the circuit would perform without its
       // uint128/uint64 range checks. This isolates the underflow guard: all
       // input membership, note ownership, and output hashes still line up.
       outputCommitments: [
         poseidon8([
-          1015n,
+          computeShieldedScopedPurpose(1015n, { chainId, poolAddress }),
           policyCommitment,
           enrollmentCommitment,
           heirOwnerCommitment,
@@ -1791,311 +1974,355 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       poolAddress,
     });
     expect(
-      verifyShieldedNotePayload({
-        payload: payoutPayload,
-        ciphertext: twelvePeriods.payoutNote.ciphertext,
-        noteCommitment: twelvePeriods.payoutNote.commitment,
-      }).note.amount,
+      verifyShieldedNotePayload(
+        {
+          payload: payoutPayload,
+          ciphertext: twelvePeriods.payoutNote.ciphertext,
+          noteCommitment: twelvePeriods.payoutNote.commitment,
+        },
+        { chainId, poolAddress },
+      ).note.amount,
     ).to.equal(1200n);
     await expect(pool.claim(twelvePeriods.claimData, twelveProof)).to.be.revertedWithCustomError(
       pool,
       "NullifierAlreadySpent",
     );
     expect(() =>
-      buildShieldedClaimFixture({ periodDays: PERIOD_DAYS, claimCount: 13, remainingPeriods: 13 }),
+      buildShieldedClaimFixture({
+        chainId,
+        poolAddress,
+        periodDays: PERIOD_DAYS,
+        claimCount: 13,
+        remainingPeriods: 13,
+      }),
     ).to.throw(RangeError);
     console.log(
       `local Hardhat gas (not release evidence): fundInitial=${fundReceipt.gasUsed} fundContinuation=${additionalFundingReceipt.gasUsed} claim1=${oneReceipt.gasUsed} claim12=${twelveReceipt.gasUsed}`,
     );
   });
 
-  it("privately transfers two owners' notes through a real proof without changing pool assets", async function () {
-    const artifacts = checkedCurrentArtifacts(["shield", "privateTransfer"]);
-    if (artifacts.missing) {
-      console.log(
-        `Skipping local private transfer proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
-      );
-      this.skip();
-    }
+  for (const assetKind of ["erc20", "native"]) {
+    it(`privately transfers two owners' notes through a real proof without changing pool assets (${assetKind})`, async function () {
+      const artifacts = checkedCurrentArtifacts(["shield", "privateTransfer"]);
+      if (artifacts.missing) {
+        console.log(
+          `Skipping local private transfer proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+        );
+        this.skip();
+      }
 
-    const [depositor] = await hre.ethers.getSigners();
-    const generated = await deployCurrentGeneratedVerifiers(
-      ["shield", "privateTransfer"],
-      depositor,
-    );
-    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
-    const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
-    const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
-    const poseidon = await hre.ethers.deployContract("PoseidonT3");
-    await Promise.all(
-      [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
-    );
-    const Pool = await hre.ethers.getContractFactory("ShieldedDeepPool", {
-      libraries: { PoseidonT3: await poseidon.getAddress() },
-    });
-    const pool = await Pool.deploy(
-      await token.getAddress(),
-      await lineage.getAddress(),
-      await adapter.getAddress(),
-    );
-    await pool.waitForDeployment();
-    const poolAddress = await pool.getAddress();
-    const chainId = (await hre.ethers.provider.getNetwork()).chainId;
-
-    const sourceOwners = [1101n, 2202n];
-    const sourceAmounts = [70n, 30n];
-    const sourceNonces = [11n, 21n];
-    const sourceNotes = [];
-    await token.mint(depositor.address, 100n);
-    await token.approve(poolAddress, 100n);
-    for (let index = 0; index < 2; index += 1) {
-      const ownerSecret = sourceOwners[index];
-      const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
-      const hpkeIkm = hre.ethers.getBytes(
-        hre.ethers.zeroPadValue(index === 0 ? "0x1111" : "0x2222", 32),
+      const [depositor] = await hre.ethers.getSigners();
+      const generated = await deployCurrentGeneratedVerifiers(
+        ["shield", "privateTransfer"],
+        depositor,
       );
-      const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-      const noteInput = { ownerCommitment, viewingKey, chainId, poolAddress };
-      const realNote = await encryptValueNote({
-        ...noteInput,
-        amount: sourceAmounts[index],
-        nonce: sourceNonces[index],
-      });
-      const dummyNote = await encryptValueNote({
-        ...noteInput,
-        amount: 0n,
-        nonce: sourceNonces[index] + 1n,
-      });
-      const shieldData = {
-        ...zeroData(),
-        outputCommitments: [realNote.commitment, dummyNote.commitment],
-        outputCiphertexts: [realNote.ciphertextHex, dummyNote.ciphertextHex],
-      };
-      const { signals: shieldSignals, witness: shieldPublicInputs } = buildShieldedPoolPublicInputs(
+      const adapter = await deployUnifiedVerifierAdapter(hre, generated);
+      const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
+      const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
+      const poseidon = await hre.ethers.deployContract("PoseidonT3");
+      await Promise.all(
+        [adapter, token, lineage, poseidon].map((contract) => contract.waitForDeployment()),
+      );
+      const native = assetKind === "native";
+      const Pool = await hre.ethers.getContractFactory(
+        native ? "ShieldedNativePool" : "ShieldedErc20Pool",
         {
-          action: 0,
-          chainId,
-          poolAddress,
-          ...shieldData,
+          libraries: { PoseidonT3: await poseidon.getAddress() },
+        },
+      );
+      const pool = await Pool.deploy(
+        ...(native ? [] : [await token.getAddress()]),
+        await lineage.getAddress(),
+        await adapter.getAddress(),
+      );
+      await pool.waitForDeployment();
+      const poolAddress = await pool.getAddress();
+      const chainId = (await hre.ethers.provider.getNetwork()).chainId;
+
+      const sourceOwners = [1101n, 2202n];
+      const sourceAmounts = [70n, 30n];
+      const sourceNonces = [11n, 21n];
+      const sourceNotes = [];
+      if (!native) {
+        await token.mint(depositor.address, 100n);
+        await token.approve(poolAddress, 100n);
+      }
+      for (let index = 0; index < 2; index += 1) {
+        const ownerSecret = sourceOwners[index];
+        const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
+        const hpkeIkm = hre.ethers.getBytes(
+          hre.ethers.zeroPadValue(index === 0 ? "0x1111" : "0x2222", 32),
+        );
+        const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+        const noteInput = { ownerCommitment, viewingKey, chainId, poolAddress };
+        const realNote = await encryptValueNote({
+          ...noteInput,
           amount: sourceAmounts[index],
-        },
-      );
-      const shieldProof = await prove(
-        "shield",
-        {
-          ...shieldPublicInputs,
-          ownerSecret: String(ownerSecret),
-          outputAmounts: [String(sourceAmounts[index]), "0"],
-          outputNonces: [String(sourceNonces[index]), String(sourceNonces[index] + 1n)],
-        },
-        shieldSignals,
-      );
-      await (await pool.shield(sourceAmounts[index], shieldData, shieldProof)).wait();
-      sourceNotes.push(realNote);
-    }
-
-    const sourceRoot = (await pool.noteShard(0)).root;
-    const sourceMemberships = [0, 2].map(async (leafIndex) =>
-      compactMembership(await pool.getNoteMerkleProof(0, leafIndex)),
-    );
-    const memberships = await Promise.all(sourceMemberships);
-    const recipients = await Promise.all(
-      [
-        { ownerSecret: 3303n, amount: 40n, nonce: 31n, hpkeIkm: "0x3333" },
-        { ownerSecret: 4404n, amount: 60n, nonce: 32n, hpkeIkm: "0x4444" },
-      ].map(async (recipient) => {
-        const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(recipient.hpkeIkm, 32));
-        const ownerCommitment = computeShieldedOwnerCommitment(recipient.ownerSecret);
-        const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-        const note = await encryptValueNote({
-          ownerCommitment,
-          viewingKey,
-          chainId,
-          poolAddress,
-          amount: recipient.amount,
-          nonce: recipient.nonce,
+          nonce: sourceNonces[index],
         });
-        return { ...recipient, hpkeIkm, ownerCommitment, note };
-      }),
-    );
-    const inputNullifiers = sourceNotes.map((note, index) =>
-      computeShieldedSpendNullifier({
-        ownerSecret: sourceOwners[index],
-        noteCommitment: note.commitment,
-      }),
-    );
-    const transferData = {
-      ...zeroData(),
-      inputRoots: [sourceRoot, sourceRoot],
-      inputNullifiers,
-      outputCommitments: recipients.map(({ note }) => note.commitment),
-      outputCiphertexts: recipients.map(({ note }) => note.ciphertextHex),
-    };
-    const { signals: transferSignals, witness: transferPublicInputs } =
-      buildShieldedPoolPublicInputs({
-        action: 3,
-        chainId,
-        poolAddress,
-        ...transferData,
-      });
-    const transferProof = await prove(
-      "privateTransfer",
-      {
-        ...transferPublicInputs,
-        hasSecondInput: "1",
-        inputOwnerSecrets: sourceOwners.map(String),
-        inputAmounts: sourceAmounts.map(String),
-        inputNonces: sourceNonces.map(String),
-        inputCiphertextHashes: sourceNotes.map((note) => String(note.ciphertextHashField)),
-        inputDepths: memberships.map((proof) => proof.depth),
-        inputIndices: memberships.map((proof) => proof.index),
-        inputSiblings: memberships.map((proof) => proof.siblings),
-        outputOwnerCommitments: recipients.map(({ ownerCommitment }) => String(ownerCommitment)),
-        outputAmounts: recipients.map(({ amount }) => String(amount)),
-        outputNonces: recipients.map(({ nonce }) => String(nonce)),
-      },
-      transferSignals,
-    );
-    expect(await adapter.verifyProof(5, 1, transferProof, transferSignals)).to.equal(true);
-    const tampered = {
-      ...transferData,
-      outputCiphertexts: [
-        `${transferData.outputCiphertexts[0].slice(0, -2)}${(
-          Number.parseInt(transferData.outputCiphertexts[0].slice(-2), 16) ^ 1
-        )
-          .toString(16)
-          .padStart(2, "0")}`,
-        transferData.outputCiphertexts[1],
-      ],
-    };
-    await expect(pool.privateTransfer(tampered, transferProof)).to.be.revertedWithCustomError(
-      pool,
-      "InvalidZKProof",
-    );
-    const receipt = await (await pool.privateTransfer(transferData, transferProof)).wait();
-    for (const nullifier of inputNullifiers) {
-      expect(await pool.nullifierSpent(nullifier)).to.equal(true);
-    }
-    for (const recipient of recipients) {
-      expect(await pool.commitmentExists(recipient.note.commitment)).to.equal(true);
-      const payload = await decryptShieldedNote({
-        ciphertext: recipient.note.ciphertext,
-        hpkeIkm: recipient.hpkeIkm,
-        chainId,
-        poolAddress,
-      });
-      const recovered = verifyShieldedNotePayload({
-        payload,
-        ciphertext: recipient.note.ciphertext,
-        noteCommitment: recipient.note.commitment,
-      });
-      expect(recovered.note.amount).to.equal(recipient.amount);
-      expect(recovered.note.ownerCommitment).to.equal(recipient.ownerCommitment);
-    }
-    expect(await pool.totalShielded()).to.equal(100n);
-    expect(await token.balanceOf(poolAddress)).to.equal(100n);
-    await expect(pool.privateTransfer(transferData, transferProof)).to.be.revertedWithCustomError(
-      pool,
-      "NullifierAlreadySpent",
-    );
-
-    // The first recipient owns only this payout note. It can immediately make
-    // a private transfer without waiting for another claim or a zero-value note.
-    const singleSource = recipients[0];
-    const singleRoot = (await pool.noteShard(0)).root;
-    const singlePath = compactMembership(await pool.getNoteMerkleProof(0, 4));
-    const singleDestinations = await Promise.all(
-      [
-        { ownerSecret: 5505n, amount: 25n, nonce: 41n, hpkeIkm: "0x5555" },
-        { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
-      ].map(async (destination) => {
-        const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
-        const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
-        const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
-        const note = await encryptValueNote({
-          ownerCommitment,
-          viewingKey,
-          chainId,
-          poolAddress,
-          amount: destination.amount,
-          nonce: destination.nonce,
+        const dummyNote = await encryptValueNote({
+          ...noteInput,
+          amount: 0n,
+          nonce: sourceNonces[index] + 1n,
         });
-        return { ...destination, hpkeIkm, ownerCommitment, note };
-      }),
-    );
-    const singleNullifiers = [
-      computeShieldedSpendNullifier({
-        ownerSecret: singleSource.ownerSecret,
-        noteCommitment: singleSource.note.commitment,
-      }),
-      computeShieldedDummyInputNullifier({
-        ownerSecret: singleSource.ownerSecret,
-        noteCommitment: singleSource.note.commitment,
-      }),
-    ];
-    const singleData = {
-      ...zeroData(),
-      inputRoots: [singleRoot, singleRoot],
-      inputNullifiers: singleNullifiers,
-      outputCommitments: singleDestinations.map(({ note }) => note.commitment),
-      outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
-    };
-    const { signals: singleSignals, witness: singlePublicInputs } = buildShieldedPoolPublicInputs({
-      action: 3,
-      chainId,
-      poolAddress,
-      ...singleData,
-    });
-    const singleProof = await prove(
-      "privateTransfer",
-      {
-        ...singlePublicInputs,
-        hasSecondInput: "0",
-        inputOwnerSecrets: [String(singleSource.ownerSecret), "0"],
-        inputAmounts: [String(singleSource.amount), "0"],
-        inputNonces: [String(singleSource.nonce), "0"],
-        inputCiphertextHashes: [String(singleSource.note.ciphertextHashField), "0"],
-        inputDepths: [singlePath.depth, "0"],
-        inputIndices: [singlePath.index, "0"],
-        inputSiblings: [singlePath.siblings, Array(32).fill("0")],
-        outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) =>
-          String(ownerCommitment),
+        const shieldData = {
+          ...zeroData(),
+          outputCommitments: [realNote.commitment, dummyNote.commitment],
+          outputCiphertexts: [realNote.ciphertextHex, dummyNote.ciphertextHex],
+        };
+        const { signals: shieldSignals, witness: shieldPublicInputs } =
+          buildShieldedPoolPublicInputs({
+            action: 0,
+            chainId,
+            poolAddress,
+            ...shieldData,
+            amount: sourceAmounts[index],
+          });
+        const shieldProof = await prove(
+          "shield",
+          {
+            ...shieldPublicInputs,
+            ownerSecret: String(ownerSecret),
+            outputAmounts: [String(sourceAmounts[index]), "0"],
+            outputNonces: [String(sourceNonces[index]), String(sourceNonces[index] + 1n)],
+          },
+          shieldSignals,
+        );
+        await (
+          await pool.shield(
+            sourceAmounts[index],
+            shieldData,
+            shieldProof,
+            native ? { value: sourceAmounts[index] } : {},
+          )
+        ).wait();
+        sourceNotes.push(realNote);
+      }
+
+      const sourceRoot = (await pool.noteShard(0)).root;
+      const sourceMemberships = [0, 2].map(async (leafIndex) =>
+        compactMembership(await pool.getNoteMerkleProof(0, leafIndex)),
+      );
+      const memberships = await Promise.all(sourceMemberships);
+      const recipients = await Promise.all(
+        [
+          { ownerSecret: 3303n, amount: 40n, nonce: 31n, hpkeIkm: "0x3333" },
+          { ownerSecret: 4404n, amount: 60n, nonce: 32n, hpkeIkm: "0x4444" },
+        ].map(async (recipient) => {
+          const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(recipient.hpkeIkm, 32));
+          const ownerCommitment = computeShieldedOwnerCommitment(recipient.ownerSecret);
+          const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+          const note = await encryptValueNote({
+            ownerCommitment,
+            viewingKey,
+            chainId,
+            poolAddress,
+            amount: recipient.amount,
+            nonce: recipient.nonce,
+          });
+          return { ...recipient, hpkeIkm, ownerCommitment, note };
+        }),
+      );
+      const inputNullifiers = sourceNotes.map((note, index) =>
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: sourceOwners[index],
+            noteCommitment: note.commitment,
+          },
+          { chainId, poolAddress },
         ),
-        outputAmounts: singleDestinations.map(({ amount }) => String(amount)),
-        outputNonces: singleDestinations.map(({ nonce }) => String(nonce)),
-      },
-      singleSignals,
-    );
-    expect(await adapter.verifyProof(5, 1, singleProof, singleSignals)).to.equal(true);
-    await expect(
-      pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
-    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
-    const singleReceipt = await (await pool.privateTransfer(singleData, singleProof)).wait();
-    for (const nullifier of singleNullifiers) {
-      expect(await pool.nullifierSpent(nullifier)).to.equal(true);
-    }
-    for (const destination of singleDestinations) {
-      const payload = await decryptShieldedNote({
-        ciphertext: destination.note.ciphertext,
-        hpkeIkm: destination.hpkeIkm,
-        chainId,
-        poolAddress,
-      });
-      const recovered = verifyShieldedNotePayload({
-        payload,
-        ciphertext: destination.note.ciphertext,
-        noteCommitment: destination.note.commitment,
-      });
-      expect(recovered.note.amount).to.equal(destination.amount);
-    }
-    expect(await pool.totalShielded()).to.equal(100n);
-    expect(await token.balanceOf(poolAddress)).to.equal(100n);
-    await expect(pool.privateTransfer(singleData, singleProof)).to.be.revertedWithCustomError(
-      pool,
-      "NullifierAlreadySpent",
-    );
-    console.log(
-      `local Hardhat gas (not release evidence): privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`,
-    );
-  });
+      );
+      const transferData = {
+        ...zeroData(),
+        inputRoots: [sourceRoot, sourceRoot],
+        inputNullifiers,
+        outputCommitments: recipients.map(({ note }) => note.commitment),
+        outputCiphertexts: recipients.map(({ note }) => note.ciphertextHex),
+      };
+      const { signals: transferSignals, witness: transferPublicInputs } =
+        buildShieldedPoolPublicInputs({
+          action: 3,
+          chainId,
+          poolAddress,
+          ...transferData,
+        });
+      const transferProof = await prove(
+        "privateTransfer",
+        {
+          ...transferPublicInputs,
+          hasSecondInput: "1",
+          inputOwnerSecrets: sourceOwners.map(String),
+          inputAmounts: sourceAmounts.map(String),
+          inputNonces: sourceNonces.map(String),
+          inputCiphertextHashes: sourceNotes.map((note) => String(note.ciphertextHashField)),
+          inputDepths: memberships.map((proof) => proof.depth),
+          inputIndices: memberships.map((proof) => proof.index),
+          inputSiblings: memberships.map((proof) => proof.siblings),
+          outputOwnerCommitments: recipients.map(({ ownerCommitment }) => String(ownerCommitment)),
+          outputAmounts: recipients.map(({ amount }) => String(amount)),
+          outputNonces: recipients.map(({ nonce }) => String(nonce)),
+        },
+        transferSignals,
+      );
+      expect(await adapter.verifyProof(5, 1, transferProof, transferSignals)).to.equal(true);
+      const tampered = {
+        ...transferData,
+        outputCiphertexts: [
+          `${transferData.outputCiphertexts[0].slice(0, -2)}${(
+            Number.parseInt(transferData.outputCiphertexts[0].slice(-2), 16) ^ 1
+          )
+            .toString(16)
+            .padStart(2, "0")}`,
+          transferData.outputCiphertexts[1],
+        ],
+      };
+      await expect(pool.privateTransfer(tampered, transferProof)).to.be.revertedWithCustomError(
+        pool,
+        "InvalidZKProof",
+      );
+      const receipt = await (await pool.privateTransfer(transferData, transferProof)).wait();
+      for (const nullifier of inputNullifiers) {
+        expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+      }
+      for (const recipient of recipients) {
+        expect(await pool.commitmentExists(recipient.note.commitment)).to.equal(true);
+        const payload = await decryptShieldedNote({
+          ciphertext: recipient.note.ciphertext,
+          hpkeIkm: recipient.hpkeIkm,
+          chainId,
+          poolAddress,
+        });
+        const recovered = verifyShieldedNotePayload(
+          {
+            payload,
+            ciphertext: recipient.note.ciphertext,
+            noteCommitment: recipient.note.commitment,
+          },
+          { chainId, poolAddress },
+        );
+        expect(recovered.note.amount).to.equal(recipient.amount);
+        expect(recovered.note.ownerCommitment).to.equal(recipient.ownerCommitment);
+      }
+      expect(await pool.totalShielded()).to.equal(100n);
+      expect(
+        await (native ? hre.ethers.provider.getBalance(poolAddress) : token.balanceOf(poolAddress)),
+      ).to.equal(100n);
+      await expect(pool.privateTransfer(transferData, transferProof)).to.be.revertedWithCustomError(
+        pool,
+        "NullifierAlreadySpent",
+      );
+
+      // The first recipient owns only this payout note. It can immediately make
+      // a private transfer without waiting for another claim or a zero-value note.
+      const singleSource = recipients[0];
+      const singleRoot = (await pool.noteShard(0)).root;
+      const singlePath = compactMembership(await pool.getNoteMerkleProof(0, 4));
+      const singleDestinations = await Promise.all(
+        [
+          { ownerSecret: 5505n, amount: 25n, nonce: 41n, hpkeIkm: "0x5555" },
+          { ownerSecret: 3303n, amount: 15n, nonce: 42n, hpkeIkm: "0x3333" },
+        ].map(async (destination) => {
+          const hpkeIkm = hre.ethers.getBytes(hre.ethers.zeroPadValue(destination.hpkeIkm, 32));
+          const ownerCommitment = computeShieldedOwnerCommitment(destination.ownerSecret);
+          const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
+          const note = await encryptValueNote({
+            ownerCommitment,
+            viewingKey,
+            chainId,
+            poolAddress,
+            amount: destination.amount,
+            nonce: destination.nonce,
+          });
+          return { ...destination, hpkeIkm, ownerCommitment, note };
+        }),
+      );
+      const singleNullifiers = [
+        computeShieldedSpendNullifier(
+          {
+            ownerSecret: singleSource.ownerSecret,
+            noteCommitment: singleSource.note.commitment,
+          },
+          { chainId, poolAddress },
+        ),
+        computeShieldedDummyInputNullifier(
+          {
+            ownerSecret: singleSource.ownerSecret,
+            noteCommitment: singleSource.note.commitment,
+          },
+          { chainId, poolAddress },
+        ),
+      ];
+      const singleData = {
+        ...zeroData(),
+        inputRoots: [singleRoot, singleRoot],
+        inputNullifiers: singleNullifiers,
+        outputCommitments: singleDestinations.map(({ note }) => note.commitment),
+        outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
+      };
+      const { signals: singleSignals, witness: singlePublicInputs } = buildShieldedPoolPublicInputs(
+        {
+          action: 3,
+          chainId,
+          poolAddress,
+          ...singleData,
+        },
+      );
+      const singleProof = await prove(
+        "privateTransfer",
+        {
+          ...singlePublicInputs,
+          hasSecondInput: "0",
+          inputOwnerSecrets: [String(singleSource.ownerSecret), "0"],
+          inputAmounts: [String(singleSource.amount), "0"],
+          inputNonces: [String(singleSource.nonce), "0"],
+          inputCiphertextHashes: [String(singleSource.note.ciphertextHashField), "0"],
+          inputDepths: [singlePath.depth, "0"],
+          inputIndices: [singlePath.index, "0"],
+          inputSiblings: [singlePath.siblings, Array(32).fill("0")],
+          outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) =>
+            String(ownerCommitment),
+          ),
+          outputAmounts: singleDestinations.map(({ amount }) => String(amount)),
+          outputNonces: singleDestinations.map(({ nonce }) => String(nonce)),
+        },
+        singleSignals,
+      );
+      expect(await adapter.verifyProof(5, 1, singleProof, singleSignals)).to.equal(true);
+      await expect(
+        pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
+      ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+      const singleReceipt = await (await pool.privateTransfer(singleData, singleProof)).wait();
+      for (const nullifier of singleNullifiers) {
+        expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+      }
+      for (const destination of singleDestinations) {
+        const payload = await decryptShieldedNote({
+          ciphertext: destination.note.ciphertext,
+          hpkeIkm: destination.hpkeIkm,
+          chainId,
+          poolAddress,
+        });
+        const recovered = verifyShieldedNotePayload(
+          {
+            payload,
+            ciphertext: destination.note.ciphertext,
+            noteCommitment: destination.note.commitment,
+          },
+          { chainId, poolAddress },
+        );
+        expect(recovered.note.amount).to.equal(destination.amount);
+      }
+      expect(await pool.totalShielded()).to.equal(100n);
+      expect(
+        await (native ? hre.ethers.provider.getBalance(poolAddress) : token.balanceOf(poolAddress)),
+      ).to.equal(100n);
+      await expect(pool.privateTransfer(singleData, singleProof)).to.be.revertedWithCustomError(
+        pool,
+        "NullifierAlreadySpent",
+      );
+      console.log(
+        `local Hardhat gas (not release evidence): privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`,
+      );
+    });
+  }
 });

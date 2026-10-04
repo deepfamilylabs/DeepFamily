@@ -16,9 +16,9 @@ import { SHIELDED_CIPHERTEXT_BYTES } from "./shielded-inheritance.js";
 export const SHIELDED_HPKE_ENCAPSULATED_BYTES = 32;
 export const SHIELDED_HPKE_PLAINTEXT_BYTES = 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES = SHIELDED_HPKE_PLAINTEXT_BYTES - 3;
-export const SHIELDED_HPKE_ENVELOPE_VERSION = 1;
+export const SHIELDED_HPKE_ENVELOPE_VERSION = 2;
 
-const AAD_DOMAIN = keccak256(toUtf8Bytes("DeepFamily:ShieldedNoteHPKE:v1"));
+const AAD_DOMAIN = keccak256(toUtf8Bytes("DeepFamily:ShieldedNoteHPKE:v2"));
 const suite = new CipherSuite({
   kem: new DhkemX25519HkdfSha256(),
   kdf: new HkdfSha256(),

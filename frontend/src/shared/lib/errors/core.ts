@@ -289,6 +289,13 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0xb3db6a76": "SingleLeafNoteRoot",
   "0x1221b97b": "InvalidClaimTime",
   "0xd5543840": "UnexpectedTokenTransfer",
+  "0xe0aeda7d": "UnexpectedNativeValue",
+  "0xf4b3b1bc": "NativeTransferFailed",
+  "0x3a23d825": "InsufficientCollateral",
+  "0xc1ab6dc1": "InvalidToken",
+  "0x17c66763": "InvalidNativePool",
+  "0x859602dc": "TokenCallbackFailed",
+  "0xaf82a072": "ReceiverRejected",
   "0xbaa3de5f": "InvalidVerifier",
   "0x08c379a0": "Error",
 };
@@ -397,6 +404,14 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   InvalidAmount:
     "Amounts must be greater than zero, and the per-period amount must fit the contract limit.",
   InvalidRecipient: "Recipient address is invalid.",
+  UnexpectedTokenTransfer: "The token's actual transfer amount differs from the requested amount.",
+  UnexpectedNativeValue: "The transaction value must equal the native deposit amount.",
+  NativeTransferFailed: "The recipient could not accept the native payment. No funds were spent.",
+  InsufficientCollateral: "The pool's actual asset balance is below its note liabilities.",
+  InvalidToken: "The token address must be a nonzero contract address.",
+  InvalidNativePool: "The native pool does not match the factory's fixed configuration.",
+  TokenCallbackFailed: "The token callback failed.",
+  ReceiverRejected: "The recipient refused the payment.",
   UnknownLineageRoot:
     "The proof used lineage records that are too old or unknown. Search again and retry.",
   SingleLeafNoteRoot: "Wait for more pool activity before spending a note from this shard.",

@@ -46,30 +46,30 @@ All 8 circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
-ppot_0080_16.ptau
+ppot_0080_17.ptau
 
 Published provenance recorded in the manifest:
-https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_16.ptau
+https://pse-trusted-setup-ppot.s3.eu-central-1.amazonaws.com/pot28_0080/ppot_0080_17.ptau
 
 Capacity:
-2^16 constraints
+2^17 constraints
 
 Bytes:
-75,590,802
+151,088,274
 
 SHA-256:
-ed3622a7c79b0b49aadd134ebbc5b77df8c8c59bccebdfd0d9bf2c1a51561cf9
+f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c
 
 BLAKE2b-512:
-9532c6c04a21335577713724b6d46c266a93aa621b78882b8b64b26f3080a8f0d974aded00c4d781adbdf493a45c51db455108f7aeedb49971569d57a56971c3
+3010cec42bdd1583bb4477dfa1b11853a67e8611feaa39cd7b3311a353b3e1d8b3f318509d75208078dc6887500b61f3f46bc72c61abbb624bec3bad5ef16012
 ```
 
 The unified production command performs a separate circuit-specific Phase 2 for each circuit.
 
-The exact file is committed at:
+Install the exact file with `npm run zk:ptau:fetch`. The explicit developer/CI download verifies the byte length and both pinned hashes before publishing it locally. The 151 MB file is Git-ignored and stored at:
 
 ```text
-circuits/ptau/ppot_0080_16.ptau
+circuits/ptau/ppot_0080_17.ptau
 ```
 
 The [PSE Perpetual Powers of Tau repository](https://github.com/privacy-ethereum/perpetualpowersoftau)
@@ -261,7 +261,7 @@ Internally the command:
 
 1. validates the clean release commit and development manifest, or the explicitly hash-bound
    production baseline in rotation mode;
-2. reads the pinned public power-16 pTau and checks both pinned digests;
+2. reads the pinned public power-17 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles every circuit there
    with explicit `--O2 --sanity_check 2`;

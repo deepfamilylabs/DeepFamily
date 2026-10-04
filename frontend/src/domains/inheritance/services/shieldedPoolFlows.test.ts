@@ -79,6 +79,7 @@ function fixture() {
     connect: vi.fn(() => methods),
   } as unknown as Contract;
   const common = {
+    assetKind: "erc20" as const,
     pool,
     signer,
     expectedChainId: 71n,
@@ -108,6 +109,28 @@ beforeEach(() => {
 });
 
 describe("shielded pool local proof and self-submit flows", () => {
+  it("sends the native deposit amount for both estimation and submission", async () => {
+    const f = fixture();
+    const amount = 10n ** 17n;
+    await submitShield({ ...f.common, assetKind: "native", amount });
+    expect(f.estimateGas.mock.calls[0][f.estimateGas.mock.calls[0].length - 1]).toEqual({
+      value: amount,
+    });
+    expect(f.methods.shield.mock.calls[0][f.methods.shield.mock.calls[0].length - 1]).toEqual({
+      value: amount,
+      gasLimit: 120_000n,
+    });
+  });
+
+  it("requires native balance to cover the deposit and the full gas limit", async () => {
+    const f = fixture();
+    const amount = 10n ** 17n;
+    f.setBalance(amount + 120_000n * 1_000_000_000n - 1n);
+    await expect(submitShield({ ...f.common, assetKind: "native", amount })).rejects.toThrow(
+      "deposit and gas",
+    );
+    expect(f.methods.shield).not.toHaveBeenCalled();
+  });
   it("proves the public deposit locally, checks CFX gas, and signs the exact shield call", async () => {
     const f = fixture();
     const stages: string[] = [];
@@ -194,7 +217,7 @@ describe("shielded pool local proof and self-submit flows", () => {
   it("refuses to send when the gas wallet cannot pay the estimated CFX fee", async () => {
     const f = fixture();
     f.setBalance(1n);
-    await expect(submitClaim(f.common)).rejects.toThrow("CFX transaction wallet needs at least");
+    await expect(submitClaim(f.common)).rejects.toThrow("Transaction wallet needs at least");
     expect(f.methods.claim).not.toHaveBeenCalled();
   });
 

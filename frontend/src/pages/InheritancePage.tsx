@@ -1,22 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Wallet } from "lucide-react";
 import { useConfig } from "../domains/config";
-import { ShieldedInheritancePanel, type ShieldedPageModules } from "../domains/inheritance";
+import {
+  ShieldedInheritancePanel,
+  ShieldedIdentitySessionProvider,
+  ShieldedAssetToolbar,
+  readShieldedAsset,
+  resolveShieldedAssetPool,
+  type ShieldedAsset,
+  type ShieldedPageModules,
+} from "../domains/inheritance";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
 import {
   createDeepFamilyContract,
-  createDeepTokenContract,
+  createShieldedPoolFactoryContract,
   createLineageIndexContract,
-  createShieldedPoolContract,
 } from "../shared/clients/contractFactory";
 import { getReadonlyProvider } from "../shared/clients/providerRegistry";
-import { getShieldedPoolAddress } from "../shared/config/env";
+import { getShieldedPoolFactoryAddress } from "../shared/config/env";
+import { getAddress, ZeroAddress } from "ethers";
+import { SUPPORTED_NETWORKS } from "../shared/config/networks";
 import { EmptyState, PageHead } from "../shared/ui";
 
 type ModulesState =
   | { status: "loading" }
   | { status: "unavailable"; message: string }
+  | { status: "missingPool"; asset: ShieldedAsset }
   | { status: "ready"; modules: ShieldedPageModules };
 
 function sameAddress(a: string, b: string): boolean {
@@ -24,21 +34,77 @@ function sameAddress(a: string, b: string): boolean {
 }
 
 export default function InheritancePage() {
+  const config = useConfig();
+  const wallet = useWallet();
+  const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
+  const scope = `${config.chainId}:${factoryAddress}:${config.contractAddress}`;
+  const enabled =
+    Boolean(wallet.address) && (wallet.chainId === null || wallet.chainId === config.chainId);
+  return (
+    <ShieldedIdentitySessionProvider key={scope} scope={scope} enabled={enabled}>
+      <InheritanceContent />
+    </ShieldedIdentitySessionProvider>
+  );
+}
+
+function InheritanceContent() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
-  const poolAddress = getShieldedPoolAddress(config.chainId);
+  const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
+  const [selectedAddress, setSelectedAddress] = useState(config.tokenAddress);
+  const [importAddress, setImportAddress] = useState("");
+  const [importedAssets, setImportedAssets] = useState<ShieldedAsset[]>([]);
+  const [creatingPool, setCreatingPool] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [assetError, setAssetError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const nativeSymbol = SUPPORTED_NETWORKS[config.chainId]?.nativeCurrency.symbol ?? "Native";
+  useEffect(() => {
+    setSelectedAddress(config.tokenAddress);
+    setImportedAssets([]);
+    setImportAddress("");
+    setImporting(false);
+    setAssetError("");
+  }, [config.chainId, config.tokenAddress, factoryAddress]);
   const configurationMissing = t("shielded.configurationMissing");
   const configurationMismatch = t("shielded.configurationMismatch");
-  const invalidDecimals = t("shielded.invalidDecimals");
   const unreachable = t("shielded.unreachable");
   const [state, setState] = useState<ModulesState>({ status: "loading" });
   // Remember deposits across wallet switches during this page visit so the
   // panel can explain the privacy implications of reusing a deposit wallet.
   const publicActivityAddresses = useRef(new Set<string>());
+  const assetContext = `${config.chainId}:${factoryAddress}`;
+  const currentAssetContext = useRef(assetContext);
+  currentAssetContext.current = assetContext;
+  const currentPoolOperation = useRef({
+    assetContext,
+    selectedAddress,
+    signer: wallet.signer,
+    account: wallet.address,
+  });
+  currentPoolOperation.current = {
+    assetContext,
+    selectedAddress,
+    signer: wallet.signer,
+    account: wallet.address,
+  };
+  const poolCreationEpoch = useRef(0);
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      poolCreationEpoch.current += 1;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    poolCreationEpoch.current += 1;
+    setCreatingPool(false);
+  }, [assetContext, selectedAddress, wallet.signer, wallet.address]);
 
   useEffect(() => {
-    if (!config.rpcUrl || !config.contractAddress || !config.tokenAddress || !poolAddress) {
+    if (!config.rpcUrl || !config.contractAddress || !config.tokenAddress || !factoryAddress) {
       setState({ status: "unavailable", message: configurationMissing });
       return;
     }
@@ -47,22 +113,25 @@ export default function InheritancePage() {
     const load = async () => {
       const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
       const deepFamily = createDeepFamilyContract(config.contractAddress, provider);
-      const token = createDeepTokenContract(config.tokenAddress, provider);
-      const pool = createShieldedPoolContract(poolAddress, provider);
-      const [network, familyIndex, poolIndex, poolToken, decimals] = await Promise.all([
+      const factory = createShieldedPoolFactoryContract(factoryAddress, provider);
+      const [network, familyIndex, deepToken, asset] = await Promise.all([
         provider.getNetwork(),
         deepFamily.lineageIndex() as Promise<string>,
-        pool.LINEAGE_INDEX() as Promise<string>,
-        pool.TOKEN() as Promise<string>,
-        token.decimals() as Promise<bigint>,
+        factory.DEEP_TOKEN() as Promise<string>,
+        readShieldedAsset(selectedAddress, provider, nativeSymbol),
       ]);
-      if (!sameAddress(familyIndex, poolIndex) || !sameAddress(poolToken, config.tokenAddress)) {
+      if (
+        network.chainId !== BigInt(config.chainId) ||
+        !sameAddress(deepToken, config.tokenAddress)
+      ) {
         throw new Error(configurationMismatch);
       }
-      const tokenDecimals = Number(decimals);
-      if (!Number.isSafeInteger(tokenDecimals) || tokenDecimals < 0 || tokenDecimals > 36) {
-        throw new Error(invalidDecimals);
+      const resolved = await resolveShieldedAssetPool(factory, asset, provider, familyIndex);
+      if (!resolved) {
+        if (!cancelled) setState({ status: "missingPool", asset });
+        return;
       }
+      const { pool, poolAddress, poolDeploymentBlock } = resolved;
       if (!cancelled) {
         setState({
           status: "ready",
@@ -71,10 +140,15 @@ export default function InheritancePage() {
             provider,
             deepFamily,
             lineageIndex: createLineageIndexContract(familyIndex, provider),
-            token,
+            token: asset.token,
+            assetAddress: asset.address,
+            assetKind: asset.kind,
+            assetSymbol: asset.symbol,
+            factory,
             pool,
             poolAddress,
-            tokenDecimals,
+            tokenDecimals: asset.decimals,
+            poolDeploymentBlock,
           },
         });
       }
@@ -95,20 +169,87 @@ export default function InheritancePage() {
     config.chainId,
     config.contractAddress,
     config.tokenAddress,
-    poolAddress,
+    factoryAddress,
+    selectedAddress,
+    nativeSymbol,
+    revision,
     configurationMissing,
     configurationMismatch,
-    invalidDecimals,
     unreachable,
   ]);
 
   const wrongNetwork = useMemo(
-    () =>
-      state.status === "ready" &&
-      wallet.chainId !== null &&
-      BigInt(wallet.chainId) !== state.modules.chainId,
-    [state, wallet.chainId],
+    () => wallet.chainId !== null && wallet.chainId !== config.chainId,
+    [config.chainId, wallet.chainId],
   );
+  const importAsset = async () => {
+    if (importing) return;
+    setImporting(true);
+    setAssetError("");
+    const importingContext = assetContext;
+    try {
+      const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
+      const asset = await readShieldedAsset(
+        getAddress(importAddress.trim()),
+        provider,
+        nativeSymbol,
+      );
+      if (!mounted.current || currentAssetContext.current !== importingContext) return;
+      setImportedAssets((assets) =>
+        assets.some((item) => sameAddress(item.address, asset.address))
+          ? assets
+          : [...assets, asset],
+      );
+      setSelectedAddress(asset.address);
+      setImportAddress("");
+    } catch (error) {
+      if (mounted.current && currentAssetContext.current === importingContext)
+        setAssetError(error instanceof Error ? error.message : unreachable);
+    } finally {
+      if (mounted.current && currentAssetContext.current === importingContext) setImporting(false);
+    }
+  };
+  const createPool = async () => {
+    if (state.status !== "missingPool" || !wallet.signer || wrongNetwork || !factoryAddress) return;
+    const signer = wallet.signer;
+    const asset = state.asset;
+    const context = currentPoolOperation.current;
+    const epoch = poolCreationEpoch.current;
+    const isCurrent = () =>
+      mounted.current &&
+      poolCreationEpoch.current === epoch &&
+      currentPoolOperation.current.assetContext === context.assetContext &&
+      currentPoolOperation.current.selectedAddress === asset.address &&
+      currentPoolOperation.current.signer === signer &&
+      currentPoolOperation.current.account === context.account;
+    setCreatingPool(true);
+    setAssetError("");
+    try {
+      const [network, signerAddress] = await Promise.all([
+        signer.provider?.getNetwork(),
+        signer.getAddress(),
+      ]);
+      if (
+        !isCurrent() ||
+        network?.chainId !== BigInt(config.chainId) ||
+        !context.account ||
+        !sameAddress(signerAddress, context.account)
+      ) {
+        throw new Error(t("shielded.walletChanged"));
+      }
+      const factory = createShieldedPoolFactoryContract(factoryAddress, signer);
+      const tx = await factory.createPool(asset.address);
+      const receipt = await tx.wait();
+      if (receipt?.status !== 1)
+        throw new Error(t("shielded.transactionFailed", { hash: tx.hash }));
+      // Re-read the canonical mapping after confirmation, including a concurrent creation.
+      if (isCurrent()) setRevision((value) => value + 1);
+    } catch (error) {
+      if (isCurrent()) setAssetError(error instanceof Error ? error.message : unreachable);
+    } finally {
+      if (isCurrent()) setCreatingPool(false);
+    }
+  };
   const head = <PageHead title={t("shielded.title")} />;
 
   if (!wallet.address) {
@@ -129,6 +270,42 @@ export default function InheritancePage() {
   return (
     <div className="space-y-6">
       {head}
+      <ShieldedAssetToolbar
+        selectedAddress={selectedAddress}
+        deepTokenAddress={config.tokenAddress}
+        nativeSymbol={nativeSymbol}
+        importedAssets={importedAssets}
+        disabled={creatingPool}
+        importing={importing}
+        importAddress={importAddress}
+        onImportAddressChange={setImportAddress}
+        onImport={() => void importAsset()}
+        onSelect={(address) => {
+          setSelectedAddress(address);
+          setAssetError("");
+        }}
+      />
+      {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
+        <p className="text-xs text-ink-muted">{t("shielded.assets.importWarning")}</p>
+      ) : null}
+      {assetError ? (
+        <p role="alert" className="text-sm text-danger">
+          {assetError}
+        </p>
+      ) : null}
+      {state.status === "missingPool" ? (
+        <div className="space-y-2">
+          <p className="text-sm text-ink-muted">{t("shielded.assets.noPool")}</p>
+          <button
+            type="button"
+            disabled={creatingPool || wrongNetwork || !wallet.signer}
+            className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary"
+            onClick={() => void createPool()}
+          >
+            {t(creatingPool ? "shielded.assets.creating" : "shielded.assets.create")}
+          </button>
+        </div>
+      ) : null}
       {state.status === "loading" ? <p role="status">{t("shielded.loading")}</p> : null}
       {state.status === "unavailable" ? (
         <p
@@ -138,22 +315,24 @@ export default function InheritancePage() {
           {state.message}
         </p>
       ) : null}
-      {wrongNetwork && state.status === "ready" ? (
+      {wrongNetwork ? (
         <div
           role="alert"
           className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
         >
-          <p>{t("shielded.wrongNetwork", { chainId: String(state.modules.chainId) })}</p>
+          <p>{t("shielded.wrongNetwork", { chainId: String(config.chainId) })}</p>
           <button
             type="button"
             className="mt-3 rounded-lg border border-hairline px-4 py-2"
-            onClick={() => void wallet.switchOrAddChain(Number(state.modules.chainId))}
+            onClick={() => void wallet.switchOrAddChain(config.chainId)}
           >
             {t("inheritance.gate.switchNetwork")}
           </button>
         </div>
       ) : null}
-      {state.status === "ready" && !wrongNetwork ? (
+      {state.status === "ready" &&
+      !wrongNetwork &&
+      sameAddress(selectedAddress, state.modules.assetAddress) ? (
         <ShieldedInheritancePanel
           key={`${state.modules.chainId}:${state.modules.poolAddress}`}
           modules={state.modules}

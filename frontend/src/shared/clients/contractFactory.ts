@@ -3,7 +3,9 @@ import DeepFamily from "../../abi/DeepFamily.json";
 import DeepFamilyArchive from "../../abi/DeepFamilyArchive.json";
 import DeepFamilyReader from "../../abi/DeepFamilyReader.json";
 import DeepFamilyLineageIndex from "../../abi/DeepFamilyLineageIndex.json";
-import ShieldedDeepPool from "../../abi/ShieldedDeepPool.json";
+import ShieldedErc20Pool from "../../abi/ShieldedErc20Pool.json";
+import ShieldedNativePool from "../../abi/ShieldedNativePool.json";
+import ShieldedPoolFactory from "../../abi/ShieldedPoolFactory.json";
 
 export const DEEP_TOKEN_ABI = [
   "function recentReward() view returns (uint256)",
@@ -49,11 +51,25 @@ export function createLineageIndexContract(
   return new ethers.Contract(lineageIndexAddress, DeepFamilyLineageIndex.abi, runner);
 }
 
-export function createShieldedPoolContract(
+export function createShieldedErc20PoolContract(
   poolAddress: string,
   runner: ethers.ContractRunner,
 ): ethers.Contract {
-  return new ethers.Contract(poolAddress, ShieldedDeepPool.abi, runner);
+  return new ethers.Contract(poolAddress, ShieldedErc20Pool.abi, runner);
+}
+
+export function createShieldedNativePoolContract(
+  poolAddress: string,
+  runner: ethers.ContractRunner,
+): ethers.Contract {
+  return new ethers.Contract(poolAddress, ShieldedNativePool.abi, runner);
+}
+
+export function createShieldedPoolFactoryContract(
+  factoryAddress: string,
+  runner: ethers.ContractRunner,
+): ethers.Contract {
+  return new ethers.Contract(factoryAddress, ShieldedPoolFactory.abi, runner);
 }
 
 export function createDeepFamilyInterface(): ethers.Interface {

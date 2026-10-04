@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
@@ -10,19 +8,17 @@ import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
 
 /**
- * @title ShieldedDeepPool
- * @notice Append-only, sharded Poseidon note tree and one-time nullifier registry for DEEP.
+ * @title ShieldedPoolCore
+ * @notice Append-only, sharded Poseidon note tree and one-time nullifier registry for one asset.
  *         Private note actions keep inheritance identifiers and policy balances hidden.
  *         Public funding publishes its identity-bound budget opening in the same note tree.
  * @dev One immutable shared adapter selects the matching circuit for each action. The circuits
  *      enforce input ownership, value conservation, permitted note transitions and binding of
- *      notes to ciphertext hashes. On-chain token conservation at shield/unshield boundaries
+ *      notes to ciphertext hashes. On-chain asset conservation at shield/unshield boundaries
  *      relies on those private constraints for all internal transitions. Recipients share
  *      self-authenticating receive codes off-chain; the pool keeps no key registry.
  */
-contract ShieldedDeepPool is ReentrancyGuardTransient {
-  using SafeERC20 for IERC20;
-
+abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   error InvalidConstructorAddress();
   error InvalidAmount();
   error InvalidRecipient();
@@ -37,6 +33,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   error InvalidClaimTime();
   error InvalidZKProof();
   error UnexpectedTokenTransfer();
+  error InsufficientCollateral();
   error InvalidLeafIndex();
 
   enum Action {
@@ -85,10 +82,11 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   uint256 public constant SNARK_SCALAR_FIELD =
     21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
-  IERC20 public immutable TOKEN;
   IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
   IProofVerifierAdapter public immutable VERIFIER;
 
+  // Assigned once so recovery can include deposits made before factory registration.
+  uint256 public creationBlock;
   uint256 public currentShardId;
   uint256 public totalShielded;
   mapping(uint256 shardId => Shard shard) internal _shards;
@@ -109,30 +107,31 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   /**
    * @param verifier The shared Groth16 adapter configured with all five pool action verifiers.
    */
-  constructor(address token, address lineageIndex, address verifier) {
-    if (token.code.length == 0 || lineageIndex.code.length == 0 || verifier.code.length == 0) {
+  constructor(address lineageIndex, address verifier) {
+    if (lineageIndex.code.length == 0 || verifier.code.length == 0) {
       revert InvalidConstructorAddress();
     }
-    TOKEN = IERC20(token);
     LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
     VERIFIER = IProofVerifierAdapter(verifier);
+    creationBlock = block.number;
   }
 
-  /** @notice Publicly deposit exactly `amount` tokens and mint two privately owned notes. */
-  function shield(
-    uint256 amount,
-    ActionData calldata data,
-    bytes calldata proof
-  ) external nonReentrant {
-    if (amount == 0 || amount >= SNARK_SCALAR_FIELD) revert InvalidAmount();
-    _execute(Action.Shield, data, proof, amount, address(0));
-    uint256 beforeBalance = TOKEN.balanceOf(address(this));
-    TOKEN.safeTransferFrom(msg.sender, address(this), amount);
-    if (TOKEN.balanceOf(address(this)) - beforeBalance != amount) {
-      revert UnexpectedTokenTransfer();
-    }
-    totalShielded += amount;
-    _appendOutputs(Action.Shield, data);
+  function assetKind() external pure virtual returns (uint8);
+
+  function protocolVersion() external pure returns (uint256) {
+    return 2;
+  }
+
+  function _validateAmount(uint256 amount) internal pure {
+    if (amount == 0 || amount > type(uint128).max) revert InvalidAmount();
+  }
+
+  function _assetBalance() internal view virtual returns (uint256);
+
+  function _pay(address recipient, uint256 amount) internal virtual;
+
+  function _assertCollateral() internal view {
+    if (_assetBalance() < totalShielded) revert InsufficientCollateral();
   }
 
   /** @dev Initial Fund enforces eligibleFrom == asOf + ACTION_PROOF_LIFETIME. */
@@ -141,7 +140,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
   }
 
   /**
-   * @notice Produces shielded output notes only; no ordinary wallet receives DEEP here.
+   * @notice Produces shielded output notes only; no ordinary wallet receives the asset here.
    * @dev The Claim circuit uses complete policy-bound day periods from each heir's eligibility start.
    *      The start is a private witness but is derivable from the initial fund's public asOf.
    *      The one-time initial enrollment tag prevents competing starts for a policy and heir.
@@ -161,17 +160,14 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     ActionData calldata data,
     bytes calldata proof
   ) external nonReentrant {
-    if (recipient == address(0)) revert InvalidRecipient();
-    if (amount == 0 || amount >= SNARK_SCALAR_FIELD) revert InvalidAmount();
+    if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient();
+    _validateAmount(amount);
     _execute(Action.Unshield, data, proof, amount, recipient);
     _spendInputs(data, false);
     _appendOutputs(Action.Unshield, data);
     totalShielded -= amount;
-    uint256 beforeBalance = TOKEN.balanceOf(address(this));
-    TOKEN.safeTransfer(recipient, amount);
-    if (beforeBalance - TOKEN.balanceOf(address(this)) != amount) {
-      revert UnexpectedTokenTransfer();
-    }
+    _pay(recipient, amount);
+    _assertCollateral();
   }
 
   function noteShard(
@@ -247,7 +243,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     bytes calldata proof,
     uint256 amount,
     address recipient
-  ) private view {
+  ) internal view {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
@@ -402,7 +398,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     if (
       envelope.length != CIPHERTEXT_BYTES ||
       bytes4(envelope[:4]) != 0x4446534e ||
-      uint8(envelope[4]) != 1 ||
+      uint8(envelope[4]) != 2 ||
       uint8(envelope[5]) != 5
     ) revert InvalidCiphertext();
     uint256[10] memory widths = [uint256(32), 8, 32, 16, 8, 32, 32, 16, 32, 4];
@@ -439,7 +435,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     return 2;
   }
 
-  function _spendInputs(ActionData calldata data, bool isClaim) private {
+  function _spendInputs(ActionData calldata data, bool isClaim) internal {
     _spendNullifier(data.inputNullifiers[0]);
     _spendNullifier(data.inputNullifiers[1]);
     if (isClaim) {
@@ -455,7 +451,7 @@ contract ShieldedDeepPool is ReentrancyGuardTransient {
     emit NullifierSpent(nullifier);
   }
 
-  function _appendOutputs(Action action, ActionData calldata data) private {
+  function _appendOutputs(Action action, ActionData calldata data) internal {
     emit ActionExecuted(uint8(action), data.inputShardIds[0], data.inputShardIds[1]);
     for (uint256 i = 0; i < 2; ++i) {
       uint256 commitment = data.outputCommitments[i];

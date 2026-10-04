@@ -11,6 +11,8 @@ import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon8 } from "poseidon-
 import { computeShieldedEnrollmentNullifier } from "@deepfamily/protocol-core";
 import { buildShieldedFundingFixtures } from "./generate_shielded_funding_input.mjs";
 
+import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
 function fullSyntheticPath(leaf, depth, index, siblingSeed) {
@@ -76,6 +78,35 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
     };
     const fixture = buildShieldedFundingFixtures();
 
+    await t.test("both funding bindings and modes enforce the public chain and pool", async () => {
+      for (const budgetKind of [0, 1]) {
+        const base = buildShieldedFundingFixtures({ budgetKind });
+        for (const context of [
+          { chainId: 71n },
+          { poolAddress: "0x2222222222222222222222222222222222222222" },
+        ]) {
+          const changed = buildShieldedFundingFixtures({ budgetKind, ...context });
+          assert.notEqual(changed.policy, base.policy);
+          assert.notEqual(changed.enrollment, base.enrollment);
+          for (const mode of ["initial", "continuation"]) {
+            await valid("fund", changed[mode]);
+            assert.notDeepEqual(changed[mode].inputNullifiers, base[mode].inputNullifiers);
+            await invalid(
+              "fund",
+              mutate(base[mode], (w) => {
+                w.chainId = changed[mode].chainId;
+                w.pool = changed[mode].pool;
+              }),
+            );
+          }
+          assert.equal(changed.initial.heirOwnerCommitment, base.initial.heirOwnerCommitment);
+          assert.equal(changed.initial.heirIdentityCommitment, base.initial.heirIdentityCommitment);
+          assert.equal(changed.initial.endorsementRoot, base.initial.endorsementRoot);
+          assert.equal(changed.initial.trustedRoot, base.initial.trustedRoot);
+        }
+      }
+    });
+
     await t.test("both funding modes bind arbitrary positive uint32 day periods", async () => {
       for (const periodDays of [1n, 7n, 365n, (1n << 32n) - 1n]) {
         for (const budgetKind of [0, 1]) {
@@ -131,7 +162,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             const attempted = changed.continuation;
             attempted.inputRoots[1] = original.oldBudget.toString();
             attempted.inputNullifiers[1] = poseidon4([
-              1026n,
+              shieldedFixtureTag(1026n, 1030n, 0x1111111111111111111111111111111111111111n),
               BigInt(attempted.policySalt),
               original.oldBudget,
               BigInt(attempted.budgetUseNonce),
@@ -206,7 +237,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
           mutate(fixture.continuation, (w) => {
             w.heirOwnerCommitment = "123";
             w.outputCommitments[0] = poseidon8([
-              1015n,
+              shieldedFixtureTag(1015n, 1030n, 0x1111111111111111111111111111111111111111n),
               fixture.policy,
               fixture.enrollment,
               123n,
@@ -240,11 +271,14 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       );
       assert.equal(
         fixture.initial.inputNullifiers[1],
-        computeShieldedEnrollmentNullifier({
-          allocationKey: fixture.initial.allocationKey,
-          policyCommitment: fixture.policy,
-          heirIdentityCommitment: fixture.initial.heirIdentityCommitment,
-        }).toString(),
+        computeShieldedEnrollmentNullifier(
+          {
+            allocationKey: fixture.initial.allocationKey,
+            policyCommitment: fixture.policy,
+            heirIdentityCommitment: fixture.initial.heirIdentityCommitment,
+          },
+          shieldedFixtureScope(fixture.initial),
+        ).toString(),
       );
     });
 
@@ -413,7 +447,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         mutate(initial, (w) => {
           w.heirOwnerCommitment = owner.toString();
           w.outputCommitments[0] = poseidon8([
-            1015n,
+            shieldedFixtureTag(1015n, 1030n, 0x1111111111111111111111111111111111111111n),
             policy,
             enrollment,
             owner,
@@ -468,7 +502,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       const attempted = mutate(continuation, (w) => {
         w.budgetPeriods = "7";
         w.outputCommitments[0] = poseidon8([
-          1015n,
+          shieldedFixtureTag(1015n, 1030n, 0x1111111111111111111111111111111111111111n),
           policy,
           enrollment,
           BigInt(w.heirOwnerCommitment),

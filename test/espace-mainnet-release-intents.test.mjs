@@ -30,7 +30,9 @@ const artifactPaths = {
       `artifacts/contracts/${spec.verifierContractName}.sol/${spec.verifierContractName}.json`,
     ]),
   ),
-  ShieldedDeepPool: "artifacts/contracts/ShieldedDeepPool.sol/ShieldedDeepPool.json",
+  ShieldedNativePool: "artifacts/contracts/ShieldedNativePool.sol/ShieldedNativePool.json",
+  ShieldedPoolFactory: "artifacts/contracts/ShieldedPoolFactory.sol/ShieldedPoolFactory.json",
+  ShieldedErc20Pool: "artifacts/contracts/ShieldedErc20Pool.sol/ShieldedErc20Pool.json",
   GovernanceTimelock:
     "artifacts/contracts/governance/GovernanceTimelock.sol/GovernanceTimelock.json",
   DeepFamilyToken: "artifacts/contracts/DeepFamilyToken.sol/DeepFamilyToken.json",
@@ -88,11 +90,15 @@ describe("eSpace Mainnet release transaction intents", function () {
       ).map((record) => [
         record.deploymentName,
         addresses[
-          record.transactionLabel === "deepFamilyToken" ? "token" : record.transactionLabel
+          record.property === "shieldedErc20Pool"
+            ? "shieldedErc20Pool"
+            : record.transactionLabel === "deepFamilyToken"
+              ? "token"
+              : record.transactionLabel
         ],
       ]),
     ].map(([label, address]) => ({ label, address, status: "passed" }));
-    expect(contracts).to.have.length(21);
+    expect(contracts).to.have.length(23);
     expect(() => assertCompleteMainnetSourceVerification({ contracts, addresses })).not.to.throw();
 
     const wrongAdapter = contracts.map((contract) => ({ ...contract }));
@@ -108,11 +114,11 @@ describe("eSpace Mainnet release transaction intents", function () {
     ).to.throw(/incomplete source verification/);
   });
 
-  it("reconstructs all twenty-one deployments and six calls in nonce order", async function () {
+  it("reconstructs all twenty-two deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(27);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(21);
+    expect(intents).to.have.length(28);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(22);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -165,13 +171,23 @@ describe("eSpace Mainnet release transaction intents", function () {
         (spec) => byLabel[spec.verifierLabel].predictedAddress,
       ),
     );
-    const poolArgs = decodeConstructor("shieldedDeepPool", "ShieldedDeepPool", [
+    const poolArgs = decodeConstructor("shieldedPoolFactory", "ShieldedPoolFactory", [
+      "address",
       "address",
       "address",
       "address",
     ]);
     expect([...poolArgs]).to.deep.equal([
       byLabel.deepFamilyToken.predictedAddress,
+      byLabel.deepFamilyLineageIndex.predictedAddress,
+      byLabel.groth16VerifierAdapter.predictedAddress,
+      byLabel.shieldedNativePool.predictedAddress,
+    ]);
+    const nativeArgs = decodeConstructor("shieldedNativePool", "ShieldedNativePool", [
+      "address",
+      "address",
+    ]);
+    expect([...nativeArgs]).to.deep.equal([
       byLabel.deepFamilyLineageIndex.predictedAddress,
       byLabel.groth16VerifierAdapter.predictedAddress,
     ]);

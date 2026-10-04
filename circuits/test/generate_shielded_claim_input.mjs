@@ -3,12 +3,21 @@
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
 
+import {
+  DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
+  DEFAULT_SHIELDED_FIXTURE_POOL,
+  shieldedFixtureTag,
+} from "./shielded_scope_fixture.mjs";
+
 const SECONDS_PER_DAY = 86400n;
 const decimal = (value) => BigInt(value).toString();
 
 export function buildShieldedClaimFixture({
   claimCount = 2,
   periodDays = 30n,
+  chainId = DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
+  pool = DEFAULT_SHIELDED_FIXTURE_POOL,
+  poolAddress,
   secondPeriodDays = periodDays,
   budgetKind = 0,
   secondBudgetKind = budgetKind,
@@ -18,6 +27,9 @@ export function buildShieldedClaimFixture({
   if (!Number.isInteger(claimCount) || claimCount < 1 || claimCount > 12) {
     throw new RangeError("claimCount fixture must be 1..12");
   }
+  chainId = BigInt(chainId);
+  pool = BigInt(poolAddress ?? pool);
+  const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
   secondPeriodDays = BigInt(secondPeriodDays);
   const lineage = buildLineageFixture().witness;
@@ -40,7 +52,7 @@ export function buildShieldedClaimFixture({
   const remaining = rate * remainingPeriodCount;
   const policySalt = 55555n;
   const allocationKey = 131313n;
-  const allocationKeyCommitment = poseidon2([1028n, allocationKey]);
+  const allocationKeyCommitment = poseidon2([scoped(1028n), allocationKey]);
   const enrollmentSalt = 66666n;
   const eligibleFrom = BigInt(lineage.eligibleFrom);
   const budgetNonce = 77777n;
@@ -50,7 +62,7 @@ export function buildShieldedClaimFixture({
   const budgetOutputCiphertextHash = 44444n;
   const payoutOutputCiphertextHash = 33333n;
   const policy = poseidon7([
-    1010n,
+    scoped(1010n),
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     rate,
@@ -59,14 +71,14 @@ export function buildShieldedClaimFixture({
     periodDays,
   ]);
   const enrollment = poseidon5([
-    1011n,
+    scoped(1011n),
     policy,
     heirIdentityCommitment,
     eligibleFrom,
     enrollmentSalt,
   ]);
   const termsCommitment = poseidon7([
-    1029n,
+    scoped(1029n),
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     heirIdentityCommitment,
@@ -75,7 +87,7 @@ export function buildShieldedClaimFixture({
     periodDays,
   ]);
   const inputBudget = poseidon8([
-    budgetKind === 0 ? 1015n : 1030n,
+    scoped(budgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
     budgetKind === 0 ? ownerCommitment : termsCommitment,
@@ -90,7 +102,7 @@ export function buildShieldedClaimFixture({
   const secondBudgetNonce = hasSecondInput ? 22222n : 0n;
   const secondBudgetCiphertextHash = hasSecondInput ? 11111n : 0n;
   const secondPolicy = poseidon7([
-    1010n,
+    scoped(1010n),
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     rate,
@@ -99,14 +111,14 @@ export function buildShieldedClaimFixture({
     secondPeriodDays,
   ]);
   const secondEnrollment = poseidon5([
-    1011n,
+    scoped(1011n),
     secondPolicy,
     heirIdentityCommitment,
     eligibleFrom,
     enrollmentSalt,
   ]);
   const secondTermsCommitment = poseidon7([
-    1029n,
+    scoped(1029n),
     rootIdentityCommitment,
     BigInt(lineage.rootVersionIndex),
     heirIdentityCommitment,
@@ -115,7 +127,7 @@ export function buildShieldedClaimFixture({
     secondPeriodDays,
   ]);
   const secondBudget = poseidon8([
-    secondBudgetKind === 0 ? 1015n : 1030n,
+    scoped(secondBudgetKind === 0 ? 1015n : 1030n),
     secondPolicy,
     secondEnrollment,
     secondBudgetKind === 0 ? ownerCommitment : secondTermsCommitment,
@@ -131,13 +143,13 @@ export function buildShieldedClaimFixture({
   const asOf = eligibleFrom + claimCountBigInt * periodDays * SECONDS_PER_DAY;
   const periodNullifiers = periodIndices.map((index, slot) =>
     slot < claimCount
-      ? poseidon4([1017n, derivedSecret, policy, index])
-      : poseidon4([1019n, ownerSecret, inputBudget, BigInt(slot)]),
+      ? poseidon4([scoped(1017n), derivedSecret, policy, index])
+      : poseidon4([scoped(1019n), ownerSecret, inputBudget, BigInt(slot)]),
   );
   const payout = rate * claimCountBigInt;
   const requiresOpening = budgetKind === 0 || (hasSecondInput && secondBudgetKind === 0);
   const budgetOutput = poseidon8([
-    requiresOpening ? 1015n : 1030n,
+    scoped(requiresOpening ? 1015n : 1030n),
     policy,
     enrollment,
     requiresOpening ? ownerCommitment : termsCommitment,
@@ -147,22 +159,22 @@ export function buildShieldedClaimFixture({
     budgetOutputCiphertextHash,
   ]);
   const payoutOutput = poseidon5([
-    1014n,
+    scoped(1014n),
     ownerCommitment,
     payout,
     payoutNonce,
     payoutOutputCiphertextHash,
   ]);
   const publicInputs = {
-    chainId: "1030",
-    pool: decimal(BigInt("0x1111111111111111111111111111111111111111")),
+    chainId: decimal(chainId),
+    pool: decimal(pool),
     inputShardIds: ["0", "0"],
     inputRoots: [inputBudget, hasSecondInput ? secondBudget : inputBudget].map(decimal),
     inputNullifiers: [
-      poseidon3([1016n, ownerSecret, inputBudget]),
+      poseidon3([scoped(1016n), ownerSecret, inputBudget]),
       hasSecondInput
-        ? poseidon3([1016n, ownerSecret, secondBudget])
-        : poseidon3([1021n, ownerSecret, inputBudget]),
+        ? poseidon3([scoped(1016n), ownerSecret, secondBudget])
+        : poseidon3([scoped(1021n), ownerSecret, inputBudget]),
     ].map(decimal),
     periodNullifiers: periodNullifiers.map(decimal),
     outputCommitments: [budgetOutput, payoutOutput].map(decimal),
@@ -225,6 +237,7 @@ export function buildShieldedClaimFixture({
     payoutNonce: decimal(payoutNonce),
   };
   return {
+    scope: { chainId, poolAddress: `0x${pool.toString(16).padStart(40, "0")}` },
     witness,
     policy,
     enrollment,

@@ -3,8 +3,9 @@ pragma circom 2.2.3;
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
+include "shielded_scope_common.circom";
 
-// Action 0 of ShieldedDeepPool. The deposited ERC20 amount is public; the two
+// Action 0 of the asset pool. The deposited asset amount is public; the two
 // output amounts and their owner are private. Both outputs, including a
 // zero-value dummy, must carry distinct encrypted note ciphertexts whose exact
 // hashes are public inputs. Shielding consumes no old notes.
@@ -18,6 +19,11 @@ template ShieldedShield() {
     signal input ownerSecret;
     signal input outputAmounts[2];
     signal input outputNonces[2];
+
+    component valueTag = ShieldedScopedTag();
+    valueTag.chainId <== chainId;
+    valueTag.pool <== pool;
+    valueTag.purpose <== 1014;
 
     component chainBits = Num2Bits(64);
     chainBits.in <== chainId;
@@ -47,7 +53,7 @@ template ShieldedShield() {
         outputNonceNotZero[i].in <== outputNonces[i];
         outputNonceNotZero[i].out === 0;
         notes[i] = Poseidon(5);
-        notes[i].inputs[0] <== 1014;
+        notes[i].inputs[0] <== valueTag.tag;
         notes[i].inputs[1] <== owner.out;
         notes[i].inputs[2] <== outputAmounts[i];
         notes[i].inputs[3] <== outputNonces[i];

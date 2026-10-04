@@ -1,27 +1,26 @@
 import { getAddress } from "ethers";
 import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
-import { GROTH16_ADAPTER_VERIFIER_BINDINGS } from "./protocolReleaseManifest.mjs";
+import {
+  GROTH16_ADAPTER_VERIFIER_BINDINGS,
+  shieldedDeploymentBindingsFromAddresses,
+} from "./protocolReleaseManifest.mjs";
 
 export function shieldedDeploymentBindings(addresses) {
-  const address = (name) => getAddress(addresses[name]);
-  return {
-    token: address("token"),
-    poseidonT3: address("poseidonT3"),
-    poseidonT6: address("poseidonT6"),
-    deepFamilyLineageIndex: address("deepFamilyLineageIndex"),
-    shieldedVerifiers: Object.fromEntries(
-      Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
-        action,
-        { address: address(spec.verifierLabel) },
-      ]),
+  return shieldedDeploymentBindingsFromAddresses(
+    Object.fromEntries(
+      [
+        "token",
+        "poseidonT3",
+        "poseidonT6",
+        "deepFamilyLineageIndex",
+        "groth16VerifierAdapter",
+        "shieldedErc20Pool",
+        "shieldedNativePool",
+        "shieldedPoolFactory",
+        ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
+      ].map((name) => [name, getAddress(addresses[name])]),
     ),
-    shieldedDeepPool: {
-      address: address("shieldedDeepPool"),
-      tokenImmutable: address("token"),
-      lineageIndexImmutable: address("deepFamilyLineageIndex"),
-      verifierAdapterImmutable: address("groth16VerifierAdapter"),
-    },
-  };
+  );
 }
 
 /** Reads every deployed immutable; an adapter or lineage index from another pool fails before proofs. */
@@ -46,13 +45,46 @@ export async function assertShieldedDeploymentBindings({
     same(verifier, addresses[label], `adapter ${getter}`);
     same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
   }
-  const pool = deployed.shieldedDeepPool;
+  for (const [pool, key, kind] of [
+    [deployed.shieldedErc20Pool, "shieldedErc20Pool", 0n],
+    [deployed.shieldedNativePool, "shieldedNativePool", 1n],
+  ]) {
+    for (const [method, expected] of [
+      ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
+      ["VERIFIER", bindings[key].verifierAdapterImmutable],
+    ])
+      same(await read(`${key} ${method}`, () => pool[method]()), expected, `${key} ${method}`);
+    if (
+      BigInt(await read(`${key} assetKind`, () => pool.assetKind())) !== kind ||
+      BigInt(await read(`${key} protocolVersion`, () => pool.protocolVersion())) !== 2n
+    )
+      throw new Error(`${key} asset kind/protocol version differs from the integrated deployment`);
+  }
+  same(
+    await read("pool TOKEN", () => deployed.shieldedErc20Pool.TOKEN()),
+    bindings.token,
+    "pool TOKEN",
+  );
+  const factory = deployed.shieldedPoolFactory;
   for (const [method, expected] of [
-    ["TOKEN", bindings.token],
+    ["DEEP_TOKEN", bindings.token],
     ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
-    ["VERIFIER", bindings.shieldedDeepPool.verifierAdapterImmutable],
+    ["VERIFIER", bindings.shieldedPoolFactory.verifierAdapterImmutable],
+    ["NATIVE_POOL", bindings.shieldedNativePool.address],
   ])
-    same(await read(`pool ${method}`, () => pool[method]()), expected, `pool ${method}`);
+    same(await read(`factory ${method}`, () => factory[method]()), expected, `factory ${method}`);
+  same(
+    await read("factory DEEP pool", () => factory.poolFor(bindings.token)),
+    bindings.shieldedErc20Pool.address,
+    "factory DEEP pool",
+  );
+  same(
+    await read("factory native pool", () =>
+      factory.poolFor("0x0000000000000000000000000000000000000000"),
+    ),
+    bindings.shieldedNativePool.address,
+    "factory native pool",
+  );
   same(
     await read("lineage family", () => deployed.lineageIndex.DEEP_FAMILY()),
     addresses.deepFamily,
@@ -73,7 +105,9 @@ export function shieldedArtifactEntries(bindings, artifacts) {
       bindings.shieldedVerifiers[action],
       artifacts.shieldedVerifiers[action],
     ]),
-    ["ShieldedDeepPool", bindings.shieldedDeepPool, artifacts.shieldedDeepPool],
+    ["ShieldedErc20Pool", bindings.shieldedErc20Pool, artifacts.shieldedErc20Pool],
+    ["ShieldedNativePool", bindings.shieldedNativePool, artifacts.shieldedNativePool],
+    ["ShieldedPoolFactory", bindings.shieldedPoolFactory, artifacts.shieldedPoolFactory],
   ];
 }
 
@@ -85,7 +119,8 @@ export function shieldedDeploymentEvidence(bindings, artifacts) {
   });
   for (const action of Object.keys(evidence.shieldedVerifiers))
     Object.assign(evidence.shieldedVerifiers[action], hashes(artifacts.shieldedVerifiers[action]));
-  Object.assign(evidence.shieldedDeepPool, hashes(artifacts.shieldedDeepPool));
+  for (const key of ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"])
+    Object.assign(evidence[key], hashes(artifacts[key]));
   delete evidence.token;
   return evidence;
 }

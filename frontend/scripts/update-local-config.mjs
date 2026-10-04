@@ -122,7 +122,9 @@ async function updateLocalConfig() {
 
     const deepFamilyPath = path.join(DEPLOYMENTS_DIR, "DeepFamily.json");
     const readerPath = path.join(DEPLOYMENTS_DIR, "DeepFamilyReader.json");
-    const poolPath = path.join(DEPLOYMENTS_DIR, "ShieldedDeepPool.json");
+    const factoryPath = path.join(DEPLOYMENTS_DIR, "ShieldedPoolFactory.json");
+    const nativePoolPath = path.join(DEPLOYMENTS_DIR, "ShieldedNativePool.json");
+    const poolPath = path.join(DEPLOYMENTS_DIR, "ShieldedErc20Pool.json");
     if (!fs.existsSync(deepFamilyPath)) {
       console.log("DeepFamily contract not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
@@ -131,7 +133,7 @@ async function updateLocalConfig() {
       console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
-    if (!fs.existsSync(poolPath)) {
+    if (![poolPath, nativePoolPath, factoryPath].every((file) => fs.existsSync(file))) {
       console.log("Shielded pool not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
@@ -139,16 +141,20 @@ async function updateLocalConfig() {
     const deepFamilyDeployment = JSON.parse(fs.readFileSync(deepFamilyPath, "utf8"));
     const readerDeployment = JSON.parse(fs.readFileSync(readerPath, "utf8"));
     const poolDeployment = JSON.parse(fs.readFileSync(poolPath, "utf8"));
+    const nativeDeployment = JSON.parse(fs.readFileSync(nativePoolPath, "utf8"));
+    const factoryDeployment = JSON.parse(fs.readFileSync(factoryPath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
     const poolAddress = ethers.getAddress(poolDeployment.address);
-    if (!Number.isSafeInteger(poolDeployment.deploymentBlock)) {
+    const factoryAddress = ethers.getAddress(factoryDeployment.address);
+    const nativePoolAddress = ethers.getAddress(nativeDeployment.address);
+    if (!Number.isSafeInteger(factoryDeployment.deploymentBlock)) {
       throw new Error("Local integrated deployment metadata is incomplete");
     }
 
     console.log(`Found DeepFamily contract at: ${contractAddress}`);
     console.log(`Found DeepFamilyReader contract at: ${readerAddress}`);
-    console.log(`Found local shielded pool at: ${poolAddress}`);
+    console.log(`Found local shielded pool factory at: ${factoryAddress}`);
 
     const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
 
@@ -163,23 +169,76 @@ async function updateLocalConfig() {
 
     const deepFamily = new ethers.Contract(contractAddress, deepFamilyDeployment.abi, provider);
 
-    const [localChain, poolCode] = await Promise.all([
+    const [localChain, poolCode, nativeCode, factoryCode] = await Promise.all([
       provider.getNetwork(),
       provider.getCode(poolAddress),
+      provider.getCode(nativePoolAddress),
+      provider.getCode(factoryAddress),
     ]);
-    if (localChain.chainId !== BigInt(LOCAL_CHAIN_ID) || poolCode === "0x") {
+    if (
+      localChain.chainId !== BigInt(LOCAL_CHAIN_ID) ||
+      [poolCode, nativeCode, factoryCode].includes("0x")
+    ) {
       throw new Error("Local shielded deployment is missing or belongs to another chain");
     }
     const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
-    const [familyToken, familyLineage, poolToken, poolLineage] = await Promise.all([
+    const nativePool = new ethers.Contract(nativePoolAddress, nativeDeployment.abi, provider);
+    const factory = new ethers.Contract(factoryAddress, factoryDeployment.abi, provider);
+    const [
+      familyToken,
+      familyLineage,
+      poolToken,
+      poolLineage,
+      factoryToken,
+      factoryLineage,
+      factoryNative,
+      registeredDeep,
+      registeredNative,
+      poolVersion,
+      nativeVersion,
+      poolKind,
+      nativeKind,
+      familyVerifier,
+      poolVerifier,
+      nativeVerifier,
+      factoryVerifier,
+      nativeLineage,
+    ] = await Promise.all([
       deepFamily.DEEP_FAMILY_TOKEN_CONTRACT(),
       deepFamily.lineageIndex(),
       pool.TOKEN(),
       pool.LINEAGE_INDEX(),
+      factory.DEEP_TOKEN(),
+      factory.LINEAGE_INDEX(),
+      factory.NATIVE_POOL(),
+      factory.poolFor(await deepFamily.DEEP_FAMILY_TOKEN_CONTRACT()),
+      factory.poolFor(ethers.ZeroAddress),
+      pool.protocolVersion(),
+      nativePool.protocolVersion(),
+      pool.assetKind(),
+      nativePool.assetKind(),
+      deepFamily.verifierRegistry(0, 1),
+      pool.VERIFIER(),
+      nativePool.VERIFIER(),
+      factory.VERIFIER(),
+      nativePool.LINEAGE_INDEX(),
     ]);
     if (
       ethers.getAddress(familyToken) !== ethers.getAddress(poolToken) ||
-      ethers.getAddress(familyLineage) !== ethers.getAddress(poolLineage)
+      ethers.getAddress(familyLineage) !== ethers.getAddress(poolLineage) ||
+      ethers.getAddress(factoryToken) !== ethers.getAddress(familyToken) ||
+      ethers.getAddress(factoryLineage) !== ethers.getAddress(familyLineage) ||
+      ethers.getAddress(nativeLineage) !== ethers.getAddress(familyLineage) ||
+      [poolVerifier, nativeVerifier, factoryVerifier].some(
+        (address) => ethers.getAddress(address) !== ethers.getAddress(familyVerifier),
+      ) ||
+      ethers.getAddress(factoryNative) !== nativePoolAddress ||
+      ethers.getAddress(registeredNative) !== nativePoolAddress ||
+      ethers.getAddress(registeredDeep) !== poolAddress ||
+      BigInt(poolVersion) !== 2n ||
+      BigInt(nativeVersion) !== 2n ||
+      BigInt(poolKind) !== 0n ||
+      BigInt(nativeKind) !== 1n
     ) {
       throw new Error("Local shielded pool is not bound to this DeepFamily");
     }
@@ -237,16 +296,16 @@ async function updateLocalConfig() {
 
     const updates = {
       VITE_RPC_URL: "http://127.0.0.1:8545",
-      // Person/tree modules are resolved through this reader. The shielded
-      // pool is a separate immutable contract.
+      // Person/tree modules use this reader; asset pools are resolved through the factory.
       VITE_READER_ADDRESS: readerAddress,
       // Keyed by chain, so switching networks in the app can find its way back
       // here without the reader having to be retyped.
       [`VITE_READER_ADDRESS_${LOCAL_CHAIN_ID}`]: readerAddress,
-      VITE_SHIELDED_POOL_ADDRESS: poolAddress,
-      [`VITE_SHIELDED_POOL_ADDRESS_${LOCAL_CHAIN_ID}`]: poolAddress,
-      VITE_SHIELDED_POOL_FROM_BLOCK: poolDeployment.deploymentBlock,
-      [`VITE_SHIELDED_POOL_FROM_BLOCK_${LOCAL_CHAIN_ID}`]: poolDeployment.deploymentBlock,
+      VITE_SHIELDED_POOL_FACTORY_ADDRESS: factoryAddress,
+      [`VITE_SHIELDED_POOL_FACTORY_ADDRESS_${LOCAL_CHAIN_ID}`]: factoryAddress,
+      VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK: factoryDeployment.deploymentBlock,
+      [`VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK_${LOCAL_CHAIN_ID}`]:
+        factoryDeployment.deploymentBlock,
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };
@@ -257,7 +316,10 @@ async function updateLocalConfig() {
       updates[`VITE_ROOT_VERSION_INDEX_${suffix}`] = entry.versionIndex;
     }
 
-    let updatedContent = envContent;
+    let updatedContent = envContent.replace(
+      /^#?\s*VITE_SHIELDED_POOL_(?:ADDRESS|FROM_BLOCK)(?:_\d+)?=.*(?:\r?\n|$)/gm,
+      "",
+    );
     for (const [key, value] of Object.entries(updates)) {
       const regex = new RegExp(`^${key}=.*$`, "m");
       const commentedRegex = new RegExp(`^#\\s*${key}=.*$`, "m");

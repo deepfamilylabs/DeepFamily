@@ -65,8 +65,8 @@ describe("Upgrade tooling & governance deploy path", function () {
         },
       });
 
-      expect(Object.keys(deployed.transactionReceipts)).to.have.length(25);
-      expect(observed.size).to.equal(25);
+      expect(Object.keys(deployed.transactionReceipts)).to.have.length(26);
+      expect(observed.size).to.equal(26);
       for (const [label, receipt] of Object.entries(deployed.transactionReceipts)) {
         expect(observed.get(label)).to.equal(receipt.hash);
       }
@@ -84,7 +84,7 @@ describe("Upgrade tooling & governance deploy path", function () {
           deploymentDirectory,
         });
         const files = (await fs.readdir(deploymentDirectory)).sort();
-        expect(files).to.have.length(19);
+        expect(files).to.have.length(21);
         expect(files).to.include.members([
           "DeepFamilyArchive.json",
           "DeepFamilyReader.json",
@@ -92,7 +92,9 @@ describe("Upgrade tooling & governance deploy path", function () {
           "PoseidonT3.json",
           "PoseidonT4.json",
           "PoseidonT6.json",
-          "ShieldedDeepPool.json",
+          "ShieldedErc20Pool.json",
+          "ShieldedNativePool.json",
+          "ShieldedPoolFactory.json",
           "ShieldedFundVerifier.json",
           "ShieldedClaimVerifier.json",
           "Groth16VerifierAdapter.json",
@@ -106,7 +108,9 @@ describe("Upgrade tooling & governance deploy path", function () {
         );
         expect(deepFamilyMetadata.abi).to.be.an("array").that.is.not.empty;
         for (const [name, contract, label] of [
-          ["ShieldedDeepPool", deployed.shieldedDeepPool, "shieldedDeepPool"],
+          ["ShieldedErc20Pool", deployed.shieldedErc20Pool, "shieldedPoolFactory"],
+          ["ShieldedNativePool", deployed.shieldedNativePool, "shieldedNativePool"],
+          ["ShieldedPoolFactory", deployed.shieldedPoolFactory, "shieldedPoolFactory"],
         ]) {
           const metadata = JSON.parse(
             await fs.readFile(path.join(deploymentDirectory, `${name}.json`), "utf8"),

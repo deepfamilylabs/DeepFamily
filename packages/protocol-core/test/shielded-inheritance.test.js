@@ -25,6 +25,8 @@ import {
   generateShieldedRandomField,
 } from "../index.js";
 
+const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
+
 const P = 30n * SECONDS_PER_DAY;
 const VECTOR_CIPHERTEXT = Uint8Array.from(
   { length: SHIELDED_CIPHERTEXT_BYTES },
@@ -36,34 +38,43 @@ const policyInput = {
   amountPerPeriod: 100n,
   periodDays: 30n,
   policySalt: 17n,
-  allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n),
+  allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, scope),
 };
 
-test("shielded v1 commitments and nullifiers match pinned protocol vectors", () => {
+test("shielded v2 commitments and nullifiers match pinned protocol vectors", () => {
   const ciphertextHashField = computeShieldedCiphertextHashField(VECTOR_CIPHERTEXT);
   const heir = deriveShieldedHeirKeyMaterial(13n);
-  const policyCommitment = computeShieldedPolicyCommitment(policyInput);
-  const enrollmentCommitment = computeShieldedEnrollmentCommitment({
-    policyCommitment,
-    heirIdentityCommitment: 19n,
-    eligibleFrom: P + 1n,
-    enrollmentSalt: 23n,
-  });
-  const valueNoteCommitment = computeShieldedValueNoteCommitment({
-    ownerCommitment: heir.ownerCommitment,
-    amount: 500n,
-    nonce: 29n,
-    ciphertextHashField,
-  });
-  const budgetNoteCommitment = computeShieldedBudgetNoteCommitment({
-    policyCommitment,
-    enrollmentCommitment,
-    heirOwnerCommitment: heir.ownerCommitment,
-    amountPerPeriod: 100n,
-    remaining: 1200n,
-    nonce: 31n,
-    ciphertextHashField,
-  });
+  const policyCommitment = computeShieldedPolicyCommitment(policyInput, scope);
+  const enrollmentCommitment = computeShieldedEnrollmentCommitment(
+    {
+      policyCommitment,
+      heirIdentityCommitment: 19n,
+      eligibleFrom: P + 1n,
+      enrollmentSalt: 23n,
+    },
+    scope,
+  );
+  const valueNoteCommitment = computeShieldedValueNoteCommitment(
+    {
+      ownerCommitment: heir.ownerCommitment,
+      amount: 500n,
+      nonce: 29n,
+      ciphertextHashField,
+    },
+    scope,
+  );
+  const budgetNoteCommitment = computeShieldedBudgetNoteCommitment(
+    {
+      policyCommitment,
+      enrollmentCommitment,
+      heirOwnerCommitment: heir.ownerCommitment,
+      amountPerPeriod: 100n,
+      remaining: 1200n,
+      nonce: 31n,
+      ciphertextHashField,
+    },
+    scope,
+  );
 
   assert.equal(
     ciphertextHashField,
@@ -81,57 +92,72 @@ test("shielded v1 commitments and nullifiers match pinned protocol vectors", () 
   assert.equal(computeShieldedOwnerCommitment(heir.ownerSecret), heir.ownerCommitment);
   assert.equal(
     policyInput.allocationKeyCommitment,
-    17051948607816588678695458510812716073234775117834920922105799600721151339295n,
+    13565185201466706826903641226190273730791109400029070642139868358510035421522n,
   );
   assert.equal(
     policyCommitment,
-    19310841630603058484626458080449091643568779900304409563120868079775335987259n,
+    15195353102923857434410468916077917792434331779035158411897955527962029507629n,
   );
   assert.equal(
     enrollmentCommitment,
-    13747024855232904791225134773475486823701232574736745555382372597611173108911n,
+    20508963248435514309386571443994790409687044199202670932951254963350632042176n,
   );
   assert.equal(
     valueNoteCommitment,
-    8259827521509372735162531367617764762139076004185761408324764441316243602719n,
+    11297815152918883114131069901940861434432712006674856921608643853076739654866n,
   );
   assert.equal(
     budgetNoteCommitment,
-    11489898753023386408650495576199234495025162531856392102048405137345752250676n,
+    15538536284803352181630799605217510147146393088737665375262172703091388874976n,
   );
   assert.equal(
-    computeShieldedSpendNullifier({
-      ownerSecret: heir.ownerSecret,
-      noteCommitment: budgetNoteCommitment,
-    }),
-    18054125844079294789351217663986402439494306560621950192468921510084785192514n,
+    computeShieldedSpendNullifier(
+      {
+        ownerSecret: heir.ownerSecret,
+        noteCommitment: budgetNoteCommitment,
+      },
+      scope,
+    ),
+    12058675099107207040936045154807807712607613245140232397345922626423010899421n,
   );
   assert.equal(
-    computeShieldedPeriodNullifier({ derivedSecretField: 13n, policyCommitment, periodIndex: 4n }),
-    10121477007367674691819576106516151898893253406057278698084852191158785426676n,
+    computeShieldedPeriodNullifier(
+      { derivedSecretField: 13n, policyCommitment, periodIndex: 4n },
+      scope,
+    ),
+    12560014951606227083010766328180301499225236889841161126345577472494393432211n,
   );
   assert.equal(
-    computeShieldedDummyPeriodNullifier({
-      ownerSecret: heir.ownerSecret,
-      budgetNoteCommitment,
-      slotIndex: 3n,
-    }),
-    20822359478869110524760714230431351480200856502910265011836758239763442378015n,
+    computeShieldedDummyPeriodNullifier(
+      {
+        ownerSecret: heir.ownerSecret,
+        budgetNoteCommitment,
+        slotIndex: 3n,
+      },
+      scope,
+    ),
+    4442166310674407092058968690743819055444256024889628116654081983254408210671n,
   );
   assert.equal(
-    computeShieldedDummyInputNullifier({
-      ownerSecret: heir.ownerSecret,
-      noteCommitment: budgetNoteCommitment,
-    }),
-    16808997284876111345611160341347153695904743151047682072112147658006572974467n,
+    computeShieldedDummyInputNullifier(
+      {
+        ownerSecret: heir.ownerSecret,
+        noteCommitment: budgetNoteCommitment,
+      },
+      scope,
+    ),
+    14354711988027963829883735112993219536923628317085474137449423572780741601292n,
   );
   assert.equal(
-    computeShieldedEnrollmentNullifier({
-      allocationKey: 41n,
-      policyCommitment,
-      heirIdentityCommitment: 19n,
-    }),
-    18663827911999272209578867059178806550412831640623847370024908588102964586674n,
+    computeShieldedEnrollmentNullifier(
+      {
+        allocationKey: 41n,
+        policyCommitment,
+        heirIdentityCommitment: 19n,
+      },
+      scope,
+    ),
+    414924515634325907623951108529001984667259738198999084891912434623548420973n,
   );
 });
 
@@ -143,81 +169,108 @@ test("ciphertext bytes, note nonce, and owner secret bind outputs independently"
     nonce: 29n,
     ciphertextHashField: computeShieldedCiphertextHashField(VECTOR_CIPHERTEXT),
   };
-  const note = computeShieldedValueNoteCommitment(base);
+  const note = computeShieldedValueNoteCommitment(base, scope);
   assert.notEqual(
     note,
-    computeShieldedValueNoteCommitment({
-      ...base,
-      ciphertextHashField: computeShieldedCiphertextHashField(
-        Uint8Array.from(VECTOR_CIPHERTEXT, (byte, index) => (index === 0 ? byte ^ 1 : byte)),
-      ),
-    }),
+    computeShieldedValueNoteCommitment(
+      {
+        ...base,
+        ciphertextHashField: computeShieldedCiphertextHashField(
+          Uint8Array.from(VECTOR_CIPHERTEXT, (byte, index) => (index === 0 ? byte ^ 1 : byte)),
+        ),
+      },
+      scope,
+    ),
   );
-  assert.notEqual(note, computeShieldedValueNoteCommitment({ ...base, nonce: 30n }));
-  assert.ok(computeShieldedValueNoteCommitment({ ...base, amount: 0n }) > 0n);
+  assert.notEqual(note, computeShieldedValueNoteCommitment({ ...base, nonce: 30n }, scope));
+  assert.ok(computeShieldedValueNoteCommitment({ ...base, amount: 0n }, scope) > 0n);
   assert.notEqual(
-    computeShieldedSpendNullifier({ ownerSecret: heir.ownerSecret, noteCommitment: note }),
-    computeShieldedSpendNullifier({ ownerSecret: 14n, noteCommitment: note }),
+    computeShieldedSpendNullifier({ ownerSecret: heir.ownerSecret, noteCommitment: note }, scope),
+    computeShieldedSpendNullifier({ ownerSecret: 14n, noteCommitment: note }, scope),
   );
   assert.notEqual(
-    computeShieldedPeriodNullifier({
-      derivedSecretField: 13n,
-      policyCommitment: computeShieldedPolicyCommitment(policyInput),
-      periodIndex: 4n,
-    }),
-    computeShieldedPeriodNullifier({
-      derivedSecretField: 13n,
-      policyCommitment: computeShieldedPolicyCommitment(policyInput),
-      periodIndex: 5n,
-    }),
+    computeShieldedPeriodNullifier(
+      {
+        derivedSecretField: 13n,
+        policyCommitment: computeShieldedPolicyCommitment(policyInput, scope),
+        periodIndex: 4n,
+      },
+      scope,
+    ),
+    computeShieldedPeriodNullifier(
+      {
+        derivedSecretField: 13n,
+        policyCommitment: computeShieldedPolicyCommitment(policyInput, scope),
+        periodIndex: 5n,
+      },
+      scope,
+    ),
   );
 });
 
 test("funding uniqueness and read-only use tags keep separate purposes", () => {
-  const policyCommitment = computeShieldedPolicyCommitment(policyInput);
-  const enrollmentTag = computeShieldedEnrollmentNullifier({
-    allocationKey: 41n,
-    policyCommitment,
-    heirIdentityCommitment: 19n,
-  });
-  assert.notEqual(
-    enrollmentTag,
-    computeShieldedEnrollmentNullifier({
+  const policyCommitment = computeShieldedPolicyCommitment(policyInput, scope);
+  const enrollmentTag = computeShieldedEnrollmentNullifier(
+    {
       allocationKey: 41n,
       policyCommitment,
-      heirIdentityCommitment: 20n,
-    }),
+      heirIdentityCommitment: 19n,
+    },
+    scope,
   );
   assert.notEqual(
     enrollmentTag,
-    computeShieldedEnrollmentNullifier({
-      allocationKey: 42n,
-      policyCommitment,
-      heirIdentityCommitment: 19n,
-    }),
+    computeShieldedEnrollmentNullifier(
+      {
+        allocationKey: 41n,
+        policyCommitment,
+        heirIdentityCommitment: 20n,
+      },
+      scope,
+    ),
   );
   assert.notEqual(
     enrollmentTag,
-    computeShieldedEnrollmentNullifier({
-      allocationKey: 41n,
-      policyCommitment: 1n,
-      heirIdentityCommitment: 19n,
-    }),
+    computeShieldedEnrollmentNullifier(
+      {
+        allocationKey: 42n,
+        policyCommitment,
+        heirIdentityCommitment: 19n,
+      },
+      scope,
+    ),
+  );
+  assert.notEqual(
+    enrollmentTag,
+    computeShieldedEnrollmentNullifier(
+      {
+        allocationKey: 41n,
+        policyCommitment: 1n,
+        heirIdentityCommitment: 19n,
+      },
+      scope,
+    ),
   );
   assert.notEqual(
     policyCommitment,
-    computeShieldedPolicyCommitment({
-      ...policyInput,
-      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(42n),
-    }),
+    computeShieldedPolicyCommitment(
+      {
+        ...policyInput,
+        allocationKeyCommitment: computeShieldedAllocationKeyCommitment(42n, scope),
+      },
+      scope,
+    ),
   );
   assert.notEqual(
     enrollmentTag,
-    computeShieldedBudgetUseNullifier({
-      policySalt: policyInput.policySalt,
-      budgetNoteCommitment: 47n,
-      useNonce: 43n,
-    }),
+    computeShieldedBudgetUseNullifier(
+      {
+        policySalt: policyInput.policySalt,
+        budgetNoteCommitment: 47n,
+        useNonce: 43n,
+      },
+      scope,
+    ),
   );
 });
 
@@ -271,14 +324,17 @@ test("each explicit day interval binds the policy and the per-heir period nullif
   const policies = new Set();
   const nullifiers = new Set();
   for (const periodDays of [1n, 2n, 3n, 7n, 14n, 21n, 30n, 365n, MAX_UINT32]) {
-    const policyCommitment = computeShieldedPolicyCommitment({ ...policyInput, periodDays });
+    const policyCommitment = computeShieldedPolicyCommitment({ ...policyInput, periodDays }, scope);
     policies.add(policyCommitment);
     nullifiers.add(
-      computeShieldedPeriodNullifier({
-        derivedSecretField: 13n,
-        policyCommitment,
-        periodIndex: 0n,
-      }),
+      computeShieldedPeriodNullifier(
+        {
+          derivedSecretField: 13n,
+          policyCommitment,
+          periodIndex: 0n,
+        },
+        scope,
+      ),
     );
     const duration = periodDays * SECONDS_PER_DAY;
     const batch = {
@@ -311,7 +367,7 @@ test("periods require explicit positive uint32 days and maturity never wraps uin
     periodIndices: [0n],
   };
   for (const periodDays of [undefined, 0n, -1n, 1.5, MAX_UINT32 + 1n]) {
-    assert.throws(() => computeShieldedPolicyCommitment({ ...policyInput, periodDays }));
+    assert.throws(() => computeShieldedPolicyCommitment({ ...policyInput, periodDays }, scope));
     assert.throws(() => computeShieldedClaimBatch({ ...batch, periodDays }));
   }
   const duration = MAX_UINT32 * SECONDS_PER_DAY;
@@ -340,58 +396,73 @@ test("periods require explicit positive uint32 days and maturity never wraps uin
 });
 
 test("field, uint128, randomness, and whole-period budget bounds are enforced", () => {
-  assert.ok(computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 }) > 0n);
+  assert.ok(
+    computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 }, scope) > 0n,
+  );
   assert.throws(
-    () => computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 + 1n }),
+    () =>
+      computeShieldedPolicyCommitment({ ...policyInput, rootVersionIndex: MAX_UINT64 + 1n }, scope),
     (error) => error.code === "INTEGER_OUT_OF_RANGE",
   );
   assert.throws(
-    () => computeShieldedPolicyCommitment({ ...policyInput, policySalt: 0n }),
+    () => computeShieldedPolicyCommitment({ ...policyInput, policySalt: 0n }, scope),
     (error) => error.code === "ZERO_SHIELDED_SECRET",
   );
   assert.throws(
     () =>
-      computeShieldedValueNoteCommitment({
-        ownerCommitment: 1n,
-        amount: 1n,
-        nonce: 0n,
-        ciphertextHashField: 1n,
-      }),
+      computeShieldedValueNoteCommitment(
+        {
+          ownerCommitment: 1n,
+          amount: 1n,
+          nonce: 0n,
+          ciphertextHashField: 1n,
+        },
+        scope,
+      ),
     (error) => error.code === "ZERO_SHIELDED_SECRET",
   );
   assert.throws(
     () =>
-      computeShieldedValueNoteCommitment({
-        ownerCommitment: 1n,
-        amount: MAX_UINT128 + 1n,
-        nonce: 1n,
-        ciphertextHashField: 1n,
-      }),
+      computeShieldedValueNoteCommitment(
+        {
+          ownerCommitment: 1n,
+          amount: MAX_UINT128 + 1n,
+          nonce: 1n,
+          ciphertextHashField: 1n,
+        },
+        scope,
+      ),
     (error) => error.code === "INTEGER_OUT_OF_RANGE",
   );
   assert.throws(
     () =>
-      computeShieldedBudgetNoteCommitment({
+      computeShieldedBudgetNoteCommitment(
+        {
+          policyCommitment: 1n,
+          enrollmentCommitment: 2n,
+          heirOwnerCommitment: 3n,
+          amountPerPeriod: 100n,
+          remaining: 150n,
+          nonce: 4n,
+          ciphertextHashField: 5n,
+        },
+        scope,
+      ),
+    (error) => error.code === "FRACTIONAL_SHIELDED_BUDGET",
+  );
+  assert.ok(
+    computeShieldedBudgetNoteCommitment(
+      {
         policyCommitment: 1n,
         enrollmentCommitment: 2n,
         heirOwnerCommitment: 3n,
         amountPerPeriod: 100n,
-        remaining: 150n,
+        remaining: 0n,
         nonce: 4n,
         ciphertextHashField: 5n,
-      }),
-    (error) => error.code === "FRACTIONAL_SHIELDED_BUDGET",
-  );
-  assert.ok(
-    computeShieldedBudgetNoteCommitment({
-      policyCommitment: 1n,
-      enrollmentCommitment: 2n,
-      heirOwnerCommitment: 3n,
-      amountPerPeriod: 100n,
-      remaining: 0n,
-      nonce: 4n,
-      ciphertextHashField: 5n,
-    }) > 0n,
+      },
+      scope,
+    ) > 0n,
   );
   assert.throws(
     () =>
@@ -407,15 +478,18 @@ test("field, uint128, randomness, and whole-period budget bounds are enforced", 
   );
   assert.throws(
     () =>
-      computeShieldedBudgetNoteCommitment({
-        policyCommitment: 1n,
-        enrollmentCommitment: 2n,
-        heirOwnerCommitment: 3n,
-        amountPerPeriod: 1n,
-        remaining: 1n << 64n,
-        nonce: 4n,
-        ciphertextHashField: 5n,
-      }),
+      computeShieldedBudgetNoteCommitment(
+        {
+          policyCommitment: 1n,
+          enrollmentCommitment: 2n,
+          heirOwnerCommitment: 3n,
+          amountPerPeriod: 1n,
+          remaining: 1n << 64n,
+          nonce: 4n,
+          ciphertextHashField: 5n,
+        },
+        scope,
+      ),
     (error) => error.code === "SHIELDED_PERIOD_COUNT_OVERFLOW",
   );
   assert.throws(

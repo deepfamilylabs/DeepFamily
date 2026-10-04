@@ -28,7 +28,7 @@ const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
- * ShieldedDeepPool._publicSignals builds the same sequence. Single-input actions
+ * ShieldedPoolCore._publicSignals builds the same sequence. Single-input actions
  * repeat their first input shard and root in ActionData's second slot; only the
  * first pair is a public input.
  */
@@ -107,7 +107,7 @@ function unused(condition, label) {
 }
 
 /**
- * Build one action's proof inputs from ShieldedDeepPool.ActionData plus the
+ * Build one action's proof inputs from ShieldedPoolCore.ActionData plus the
  * external amount and recipient. `signals` is the ordered verifier input;
  * `witness` holds the same values under the circuit's named inputs.
  * Data the action does not use must be zero, as the pool requires.
@@ -129,13 +129,14 @@ export function buildShieldedPoolPublicInputs(input) {
   if (action !== SHIELDED_POOL_ACTION.Fund) unused(budgetKind === 0n, "budgetKind");
   let publicBudget = Array(10).fill(0n);
   if (budgetKind === 1n) {
-    const note = decodePublicShieldedBudgetEnvelope(input.outputCiphertexts[0]);
+    const scope = { chainId: input.chainId, poolAddress: input.poolAddress };
+    const note = decodePublicShieldedBudgetEnvelope(input.outputCiphertexts[0], scope);
     protocolAssert(
       note !== null,
       "INVALID_SHIELDED_PUBLIC_BUDGET",
       "Public funding requires a canonical identity-budget envelope in output zero",
     );
-    publicBudget = getShieldedPublicBudgetFields(note);
+    publicBudget = getShieldedPublicBudgetFields(note, scope);
   }
   if (input.publicBudget !== undefined) {
     const provided = values(input.publicBudget, 10, "publicBudget");

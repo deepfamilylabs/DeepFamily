@@ -57,7 +57,9 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
         artifact(SHIELDED_DEPLOYMENT_CIRCUITS[action].verifierContractName, record),
       ]),
     ),
-    shieldedDeepPool: artifact("ShieldedDeepPool", deployments.shieldedDeepPool),
+    shieldedErc20Pool: artifact("ShieldedErc20Pool", deployments.shieldedErc20Pool),
+    shieldedNativePool: artifact("ShieldedNativePool", deployments.shieldedNativePool),
+    shieldedPoolFactory: artifact("ShieldedPoolFactory", deployments.shieldedPoolFactory),
     groth16VerifierAdapter: artifact("Groth16VerifierAdapter", deployments.groth16VerifierAdapter),
     deepFamilyArchive: artifact("DeepFamilyArchive", {
       deepFamily: deployments.deepFamilyArchive.deepFamilyImmutable,
@@ -105,7 +107,13 @@ describe("planned production protocol deployment projection", function () {
       deployer: DEPLOYER,
       startingNonce: STARTING_NONCE,
     });
-    expect(Object.keys(addresses)).to.deep.equal(Object.keys(MAINNET_DEPLOYMENT_NONCE_OFFSETS));
+    expect(Object.keys(addresses)).to.deep.equal([
+      ...Object.keys(MAINNET_DEPLOYMENT_NONCE_OFFSETS),
+      "shieldedErc20Pool",
+    ]);
+    expect(addresses.shieldedErc20Pool).to.equal(
+      ethers.getCreateAddress({ from: addresses.shieldedPoolFactory, nonce: 1 }),
+    );
     for (const [label, offset] of Object.entries(MAINNET_DEPLOYMENT_NONCE_OFFSETS)) {
       expect(addresses[label]).to.equal(
         ethers.getCreateAddress({ from: DEPLOYER, nonce: STARTING_NONCE + offset }),
@@ -127,8 +135,12 @@ describe("planned production protocol deployment projection", function () {
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
       Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS),
     );
-    expect(contracts.shieldedDeepPool.tokenImmutable).to.equal(contracts.token);
-    expect(contracts.shieldedDeepPool.verifierAdapterImmutable).to.equal(
+    expect(contracts.shieldedErc20Pool.tokenImmutable).to.equal(contracts.token);
+    expect(contracts.shieldedPoolFactory.deepPool).to.equal(contracts.shieldedErc20Pool.address);
+    expect(contracts.shieldedPoolFactory.nativePoolImmutable).to.equal(
+      contracts.shieldedNativePool.address,
+    );
+    expect(contracts.shieldedErc20Pool.verifierAdapterImmutable).to.equal(
       contracts.groth16VerifierAdapter.address,
     );
     for (const action of Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS)) {
@@ -150,13 +162,13 @@ describe("planned production protocol deployment projection", function () {
       manifest: baseManifest(),
     });
     expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(5);
-    expect(inspected.artifacts.shieldedDeepPool.runtimeBytecode).to.include(
+    expect(inspected.artifacts.shieldedErc20Pool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );
-    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedDeepPool.libraryFields).to.deep.equal([
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedErc20Pool.libraryFields).to.deep.equal([
       "PoseidonT3",
     ]);
-    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedDeepPool.immutableFields).to.deep.equal([
+    expect(PROTOCOL_DEPLOYMENT_ARTIFACTS.shieldedErc20Pool.immutableFields).to.deep.equal([
       "TOKEN",
       "LINEAGE_INDEX",
       "VERIFIER",
@@ -224,7 +236,7 @@ describe("planned production protocol deployment projection", function () {
           (action) => (manifest) =>
             (manifest.deployments.groth16VerifierAdapter[`${action}VerifierImmutable`] = DEPLOYER),
         ),
-        (manifest) => (manifest.deployments.shieldedDeepPool.verifierAdapterImmutable = DEPLOYER),
+        (manifest) => (manifest.deployments.shieldedErc20Pool.verifierAdapterImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.address = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyArchive.deepFamilyImmutable = DEPLOYER),
         (manifest) => (manifest.deployments.deepFamilyReader.address = DEPLOYER),
@@ -260,8 +272,16 @@ describe("planned production protocol deployment projection", function () {
         fixture.planned.artifacts.shieldedVerifiers[action].runtimeBytecode,
       ]),
       [
-        fixture.plannedAddresses.shieldedDeepPool.toLowerCase(),
-        fixture.planned.artifacts.shieldedDeepPool.runtimeBytecode,
+        fixture.plannedAddresses.shieldedErc20Pool.toLowerCase(),
+        fixture.planned.artifacts.shieldedErc20Pool.runtimeBytecode,
+      ],
+      [
+        fixture.plannedAddresses.shieldedNativePool.toLowerCase(),
+        fixture.planned.artifacts.shieldedNativePool.runtimeBytecode,
+      ],
+      [
+        fixture.plannedAddresses.shieldedPoolFactory.toLowerCase(),
+        fixture.planned.artifacts.shieldedPoolFactory.runtimeBytecode,
       ],
       [
         fixture.plannedAddresses.groth16VerifierAdapter.toLowerCase(),

@@ -56,7 +56,10 @@ type BaseFlowInput = {
   proofTimeoutMs?: number;
 };
 
-export type ShieldFlowInput = BaseFlowInput & { amount: BigNumberish };
+export type ShieldFlowInput = BaseFlowInput & {
+  amount: BigNumberish;
+  assetKind: "erc20" | "native";
+};
 export type UnshieldFlowInput = BaseFlowInput & {
   amount: BigNumberish;
   recipient: string;
@@ -122,7 +125,7 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
 async function assertSignerNetwork(signer: Signer, expectedChainId: bigint): Promise<void> {
   const actual = await signer.provider?.getNetwork();
   if (!actual || actual.chainId !== expectedChainId) {
-    throw new Error("CFX transaction wallet is connected to the wrong network");
+    throw new Error("Transaction wallet is connected to the wrong network");
   }
 }
 
@@ -137,25 +140,26 @@ function assertExpectedSignals(actual: readonly string[], expected: readonly str
   }
 }
 
-/** The user pays eSpace gas directly, so the submitting wallet needs CFX. */
+/** Reserve native currency for gas and any public native deposit. */
 async function assertTransactionGas(
   signer: Signer,
   signerAddress: string,
   estimate: bigint,
+  value: bigint,
 ): Promise<bigint> {
   const provider = signer.provider;
-  if (!provider) throw new Error("CFX transaction wallet has no provider");
+  if (!provider) throw new Error("Transaction wallet has no provider");
   const feeData = await provider.getFeeData();
   const maximumGasPrice = feeData.maxFeePerGas ?? feeData.gasPrice;
   if (maximumGasPrice === null || maximumGasPrice <= 0n) {
-    throw new Error("Unable to determine the eSpace gas price");
+    throw new Error("Unable to determine the network gas price");
   }
   // Leave room for ordinary estimate variance while making the balance check conservative.
   const gasLimit = (estimate * 120n + 99n) / 100n;
   const balance = await provider.getBalance(signerAddress);
-  const required = gasLimit * maximumGasPrice;
+  const required = gasLimit * maximumGasPrice + value;
   if (balance < required) {
-    throw new Error(`CFX transaction wallet needs at least ${required} wei for gas`);
+    throw new Error(`Transaction wallet needs at least ${required} wei for the deposit and gas`);
   }
   return gasLimit;
 }
@@ -165,14 +169,15 @@ async function submitAction(
   input: BaseFlowInput,
   publicAmount = 0n,
   publicRecipient?: string,
+  transactionValue = 0n,
 ): Promise<ShieldedPoolFlowResult> {
   const { pool, signer, expectedChainId, witness, onStage } = input;
   await assertSignerNetwork(signer, expectedChainId);
   const provider = signer.provider;
-  if (!provider) throw new Error("CFX transaction wallet has no provider");
+  if (!provider) throw new Error("Transaction wallet has no provider");
   const signerAddress = await signer.getAddress();
   if ((await provider.getBalance(signerAddress)) === 0n) {
-    throw new Error("CFX transaction wallet has no gas balance");
+    throw new Error("Transaction wallet has no gas balance");
   }
   const data = copyActionData(input.data);
   const poolAddress = await pool.getAddress();
@@ -217,22 +222,29 @@ async function submitAction(
         ? [publicRecipient, publicAmount, data, proof]
         : [data, proof];
   onStage?.("checkingGas");
-  const gasEstimate = await method.estimateGas(...args);
-  const gasLimit = await assertTransactionGas(signer, signerAddress, gasEstimate);
+  const valueOverrides = transactionValue > 0n ? { value: transactionValue } : {};
+  const gasEstimate = await method.estimateGas(...args, valueOverrides);
+  const gasLimit = await assertTransactionGas(signer, signerAddress, gasEstimate, transactionValue);
   await assertSignerNetwork(signer, expectedChainId);
   onStage?.("submitting");
-  const tx = await method(...args, { gasLimit });
+  const tx = await method(...args, { ...valueOverrides, gasLimit });
   onStage?.("confirming");
   const receipt = await tx.wait();
   if (!receipt) throw new Error("Shielded pool transaction has no receipt");
   return { transactionHash: tx.hash, receipt, gasEstimate, gasLimit };
 }
 
-/** DEEP allowance for this public deposit must be approved by the same wallet first. */
+/** ERC-20 deposits require allowance; native deposits send the proven amount as value. */
 export function submitShield(input: ShieldFlowInput): Promise<ShieldedPoolFlowResult> {
   const amount = getBigInt(input.amount);
   if (amount <= 0n) throw new Error("Shield amount must be positive");
-  return submitAction("shield", input, amount);
+  return submitAction(
+    "shield",
+    input,
+    amount,
+    undefined,
+    input.assetKind === "native" ? amount : 0n,
+  );
 }
 
 export function submitFund(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {

@@ -613,7 +613,15 @@ export function buildLineageMerkleProof(
   leafIndex: BigNumberish,
 ): LineageMerkleProof;
 export function buildLineageMerkleProofFromPath(input: LineageMerklePathInput): LineageMerkleProof;
-/** Shielded inheritance v1 Poseidon domains. */
+export type ShieldedScope = { chainId: BigNumberish; poolAddress: string };
+export const SHIELDED_POOL_PROTOCOL_VERSION: 2;
+export function normalizeShieldedScope(scope: ShieldedScope): {
+  chainId: bigint;
+  poolAddress: string;
+};
+export function computeShieldedPoolDomain(scope: ShieldedScope): bigint;
+export function computeShieldedScopedPurpose(purpose: BigNumberish, scope: ShieldedScope): bigint;
+/** Shielded inheritance v2 Poseidon domains. */
 export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   policy: bigint;
   enrollment: bigint;
@@ -631,36 +639,53 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   allocationKeyCommitment: bigint;
   identityBudgetTerms: bigint;
   identityBudgetNote: bigint;
+  poolScope: bigint;
+  scopedPurpose: bigint;
 }>;
 export const SHIELDED_MAX_BATCH_PERIODS: 12;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
 export function generateShieldedRandomField(): bigint;
 export function computeShieldedCiphertextHashField(ciphertext: BytesLike): bigint;
-export function computeShieldedPolicyCommitment(input: {
-  rootIdentityCommitment: BigNumberish;
-  rootVersionIndex: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  periodDays: BigNumberish;
-  policySalt: BigNumberish;
-  allocationKeyCommitment: BigNumberish;
-}): bigint;
-export function computeShieldedAllocationKeyCommitment(allocationKey: BigNumberish): bigint;
-export function computeShieldedEnrollmentNullifier(input: {
-  allocationKey: BigNumberish;
-  policyCommitment: BigNumberish;
-  heirIdentityCommitment: BigNumberish;
-}): bigint;
-export function computeShieldedBudgetUseNullifier(input: {
-  policySalt: BigNumberish;
-  budgetNoteCommitment: BigNumberish;
-  useNonce: BigNumberish;
-}): bigint;
-export function computeShieldedEnrollmentCommitment(input: {
-  policyCommitment: BigNumberish;
-  heirIdentityCommitment: BigNumberish;
-  eligibleFrom: BigNumberish;
-  enrollmentSalt: BigNumberish;
-}): bigint;
+export function computeShieldedPolicyCommitment(
+  input: {
+    rootIdentityCommitment: BigNumberish;
+    rootVersionIndex: BigNumberish;
+    amountPerPeriod: BigNumberish;
+    periodDays: BigNumberish;
+    policySalt: BigNumberish;
+    allocationKeyCommitment: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedAllocationKeyCommitment(
+  allocationKey: BigNumberish,
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedEnrollmentNullifier(
+  input: {
+    allocationKey: BigNumberish;
+    policyCommitment: BigNumberish;
+    heirIdentityCommitment: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedBudgetUseNullifier(
+  input: {
+    policySalt: BigNumberish;
+    budgetNoteCommitment: BigNumberish;
+    useNonce: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedEnrollmentCommitment(
+  input: {
+    policyCommitment: BigNumberish;
+    heirIdentityCommitment: BigNumberish;
+    eligibleFrom: BigNumberish;
+    enrollmentSalt: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
 /** hpkeIkm is RFC 9180 DeriveKeyPair input material, not an HPKE private key. */
 export function deriveShieldedHeirKeyMaterial(derivedSecretField: BigNumberish): {
   ownerSecret: bigint;
@@ -668,66 +693,96 @@ export function deriveShieldedHeirKeyMaterial(derivedSecretField: BigNumberish):
   hpkeIkm: string;
 };
 export function computeShieldedOwnerCommitment(ownerSecret: BigNumberish): bigint;
-export function computeShieldedValueNoteCommitment(input: {
-  ownerCommitment: BigNumberish;
-  amount: BigNumberish;
-  nonce: BigNumberish;
-  ciphertextHashField: BigNumberish;
-}): bigint;
-export function computeShieldedBudgetNoteCommitment(input: {
-  policyCommitment: BigNumberish;
-  enrollmentCommitment: BigNumberish;
-  heirOwnerCommitment: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  remaining: BigNumberish;
-  nonce: BigNumberish;
-  ciphertextHashField: BigNumberish;
-}): bigint;
-export function computeShieldedIdentityBudgetTermsCommitment(input: {
-  rootIdentityCommitment: BigNumberish;
-  rootVersionIndex: BigNumberish;
-  heirIdentityCommitment: BigNumberish;
-  eligibleFrom: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  periodDays: BigNumberish;
-}): bigint;
-export function computeShieldedIdentityBudgetNoteCommitment(input: {
-  policyCommitment: BigNumberish;
-  enrollmentCommitment: BigNumberish;
-  termsCommitment: BigNumberish;
-  amountPerPeriod: BigNumberish;
-  remaining: BigNumberish;
-  nonce: BigNumberish;
-  ciphertextHashField: BigNumberish;
-}): bigint;
-export function getShieldedBudgetCommitments(note: ShieldedIdentityBudgetNotePayload): {
+export function computeShieldedValueNoteCommitment(
+  input: {
+    ownerCommitment: BigNumberish;
+    amount: BigNumberish;
+    nonce: BigNumberish;
+    ciphertextHashField: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedBudgetNoteCommitment(
+  input: {
+    policyCommitment: BigNumberish;
+    enrollmentCommitment: BigNumberish;
+    heirOwnerCommitment: BigNumberish;
+    amountPerPeriod: BigNumberish;
+    remaining: BigNumberish;
+    nonce: BigNumberish;
+    ciphertextHashField: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedIdentityBudgetTermsCommitment(
+  input: {
+    rootIdentityCommitment: BigNumberish;
+    rootVersionIndex: BigNumberish;
+    heirIdentityCommitment: BigNumberish;
+    eligibleFrom: BigNumberish;
+    amountPerPeriod: BigNumberish;
+    periodDays: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedIdentityBudgetNoteCommitment(
+  input: {
+    policyCommitment: BigNumberish;
+    enrollmentCommitment: BigNumberish;
+    termsCommitment: BigNumberish;
+    amountPerPeriod: BigNumberish;
+    remaining: BigNumberish;
+    nonce: BigNumberish;
+    ciphertextHashField: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function getShieldedBudgetCommitments(
+  note: ShieldedIdentityBudgetNotePayload,
+  scope: ShieldedScope,
+): {
   policyCommitment: bigint;
   enrollmentCommitment: bigint;
   termsCommitment: bigint;
 };
-export function getShieldedBudgetCommitments(note: ShieldedBudgetNotePayload): {
+export function getShieldedBudgetCommitments(
+  note: ShieldedBudgetNotePayload,
+  scope: ShieldedScope,
+): {
   policyCommitment: bigint;
   enrollmentCommitment: bigint;
   termsCommitment?: bigint;
 };
-export function computeShieldedSpendNullifier(input: {
-  ownerSecret: BigNumberish;
-  noteCommitment: BigNumberish;
-}): bigint;
-export function computeShieldedPeriodNullifier(input: {
-  derivedSecretField: BigNumberish;
-  policyCommitment: BigNumberish;
-  periodIndex: BigNumberish;
-}): bigint;
-export function computeShieldedDummyPeriodNullifier(input: {
-  ownerSecret: BigNumberish;
-  budgetNoteCommitment: BigNumberish;
-  slotIndex: BigNumberish;
-}): bigint;
-export function computeShieldedDummyInputNullifier(input: {
-  ownerSecret: BigNumberish;
-  noteCommitment: BigNumberish;
-}): bigint;
+export function computeShieldedSpendNullifier(
+  input: {
+    ownerSecret: BigNumberish;
+    noteCommitment: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedPeriodNullifier(
+  input: {
+    derivedSecretField: BigNumberish;
+    policyCommitment: BigNumberish;
+    periodIndex: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedDummyPeriodNullifier(
+  input: {
+    ownerSecret: BigNumberish;
+    budgetNoteCommitment: BigNumberish;
+    slotIndex: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
+export function computeShieldedDummyInputNullifier(
+  input: {
+    ownerSecret: BigNumberish;
+    noteCommitment: BigNumberish;
+  },
+  scope: ShieldedScope,
+): bigint;
 export function computeShieldedClaimBatch(input: {
   amountPerPeriod: BigNumberish;
   periodDays: BigNumberish;
@@ -740,7 +795,7 @@ export function computeShieldedClaimBatch(input: {
 export const SHIELDED_HPKE_ENCAPSULATED_BYTES: 32;
 export const SHIELDED_HPKE_PLAINTEXT_BYTES: 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES: 461;
-export const SHIELDED_HPKE_ENVELOPE_VERSION: 1;
+export const SHIELDED_HPKE_ENVELOPE_VERSION: 2;
 export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyHi: bigint;
   viewKeyLo: bigint;
@@ -763,7 +818,7 @@ export function decryptShieldedNote(input: {
   poolAddress: string;
 }): Promise<Uint8Array>;
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION: 1;
+export const SHIELDED_NOTE_PAYLOAD_VERSION: 2;
 export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
@@ -855,32 +910,52 @@ export type DecodedShieldedNotePayload =
       };
     }
   | ({ kind: "budget" } & DecodedShieldedBudgetNotePayload);
-export function encodeShieldedValueNotePayload(note: ShieldedValueNotePayload): Uint8Array;
-export function encodeShieldedBudgetNotePayload(note: ShieldedBudgetNotePayload): Uint8Array;
-export function decodeShieldedNotePayload(payload: BytesLike): DecodedShieldedNotePayload;
+export function encodeShieldedValueNotePayload(
+  note: ShieldedValueNotePayload,
+  scope: ShieldedScope,
+): Uint8Array;
+export function encodeShieldedBudgetNotePayload(
+  note: ShieldedBudgetNotePayload,
+  scope: ShieldedScope,
+): Uint8Array;
+export function decodeShieldedNotePayload(
+  payload: BytesLike,
+  scope: ShieldedScope,
+): DecodedShieldedNotePayload;
 export function encodePublicShieldedBudgetEnvelope(
   note: ShieldedIdentityBudgetNotePayload,
+  scope: ShieldedScope,
 ): Uint8Array;
 export function isPublicShieldedBudgetEnvelope(envelope: BytesLike): boolean;
 export function decodePublicShieldedBudgetEnvelope(
   envelope: BytesLike,
+  scope: ShieldedScope,
 ): ({ kind: "budget" } & DecodedShieldedIdentityBudgetNotePayload) | null;
-export function getShieldedPublicBudgetFields(note: ShieldedIdentityBudgetNotePayload): bigint[];
-export function computeShieldedNoteCommitmentFromPayload(input: {
-  payload: BytesLike;
-  ciphertextHashField: BigNumberish;
-}): {
+export function getShieldedPublicBudgetFields(
+  note: ShieldedIdentityBudgetNotePayload,
+  scope: ShieldedScope,
+): bigint[];
+export function computeShieldedNoteCommitmentFromPayload(
+  input: {
+    payload: BytesLike;
+    ciphertextHashField: BigNumberish;
+  },
+  scope: ShieldedScope,
+): {
   note: DecodedShieldedNotePayload;
   noteCommitment: bigint;
   policyCommitment?: bigint;
   enrollmentCommitment?: bigint;
   termsCommitment?: bigint;
 };
-export function verifyShieldedNotePayload(input: {
-  payload: BytesLike;
-  ciphertext: BytesLike;
-  noteCommitment: BigNumberish;
-}): {
+export function verifyShieldedNotePayload(
+  input: {
+    payload: BytesLike;
+    ciphertext: BytesLike;
+    noteCommitment: BigNumberish;
+  },
+  scope: ShieldedScope,
+): {
   note: DecodedShieldedNotePayload;
   noteCommitment: bigint;
   policyCommitment?: bigint;

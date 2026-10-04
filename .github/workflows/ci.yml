@@ -35,6 +35,9 @@ jobs:
       - name: Install Circom compiler
         run: npm run zk:fetch
 
+      - name: Install pinned Powers of Tau
+        run: npm run zk:ptau:fetch
+
       - name: Check ZK artifacts and proofs
         run: npm run zk:artifacts:check && npm run zk:check
 
@@ -149,6 +152,9 @@ jobs:
 
       - name: Install native and canonical Circom compilers
         run: npm run zk:fetch
+
+      - name: Install pinned Powers of Tau
+        run: npm run zk:ptau:fetch
 
       - name: Check native ZK artifacts and real proofs
         run: npm run zk:artifacts:check && npm run zk:check

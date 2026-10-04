@@ -37,7 +37,8 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
-  "shieldedDeepPool",
+  "shieldedNativePool",
+  "shieldedPoolFactory",
   "transferDeepFamilyOwnership",
 ]);
 
@@ -51,7 +52,11 @@ export const assertCompleteMainnetSourceVerification = ({ contracts, addresses }
       (record) => [
         record.deploymentName,
         addresses?.[
-          record.transactionLabel === "deepFamilyToken" ? "token" : record.transactionLabel
+          record.transactionLabel === "deepFamilyToken"
+            ? "token"
+            : record.property === "shieldedErc20Pool"
+              ? "shieldedErc20Pool"
+              : record.transactionLabel
         ],
       ],
     ),

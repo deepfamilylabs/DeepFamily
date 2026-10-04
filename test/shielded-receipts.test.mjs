@@ -113,7 +113,7 @@ const input = (provider, expectedChainId = 71) => ({
 
 describe("shielded receipt observer", function () {
   it("uses the pool's actual fund and claim ABI selectors", async function () {
-    const artifact = await hre.artifacts.readArtifact("ShieldedDeepPool");
+    const artifact = await hre.artifacts.readArtifact("ShieldedErc20Pool");
     const abi = new Interface(artifact.abi);
     assert.equal(FUND_SELECTOR, abi.getFunction("fund").selector);
     assert.equal(CLAIM_SELECTOR, abi.getFunction("claim").selector);

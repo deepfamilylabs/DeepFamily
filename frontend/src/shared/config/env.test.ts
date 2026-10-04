@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   getChainEntryReaderAddress,
   getDefaultReaderAddress,
-  getShieldedPoolAddress,
-  getShieldedPoolDeploymentBlock,
+  getShieldedPoolFactoryAddress,
+  getShieldedPoolFactoryDeploymentBlock,
   readBooleanEnv,
   readListEnv,
   readNumberEnv,
@@ -18,14 +18,14 @@ afterEach(() => {
 describe("shielded module addresses", () => {
   it("uses the selected chain's addresses and falls back to the default", () => {
     const pool = "0x" + "2".repeat(40);
-    vi.stubEnv("VITE_SHIELDED_POOL_ADDRESS", READER);
-    vi.stubEnv("VITE_SHIELDED_POOL_ADDRESS_31337", pool);
-    vi.stubEnv("VITE_SHIELDED_POOL_FROM_BLOCK", "40");
-    vi.stubEnv("VITE_SHIELDED_POOL_FROM_BLOCK_31337", "42");
-    expect(getShieldedPoolAddress(31337)).toBe(pool);
-    expect(getShieldedPoolAddress(71)).toBe(READER);
-    expect(getShieldedPoolDeploymentBlock(31337)).toBe(42);
-    expect(getShieldedPoolDeploymentBlock(71)).toBe(40);
+    vi.stubEnv("VITE_SHIELDED_POOL_FACTORY_ADDRESS", READER);
+    vi.stubEnv("VITE_SHIELDED_POOL_FACTORY_ADDRESS_31337", pool);
+    vi.stubEnv("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK", "40");
+    vi.stubEnv("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK_31337", "42");
+    expect(getShieldedPoolFactoryAddress(31337)).toBe(pool);
+    expect(getShieldedPoolFactoryAddress(71)).toBe(READER);
+    expect(getShieldedPoolFactoryDeploymentBlock(31337)).toBe(42);
+    expect(getShieldedPoolFactoryDeploymentBlock(71)).toBe(40);
   });
 });
 

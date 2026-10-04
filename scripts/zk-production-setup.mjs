@@ -26,7 +26,7 @@ Creates all eight production Groth16 proving keys with:
   - one finalization beacon generated only after every contribution;
   - schema-validated identity and shielded transcripts and production manifests.
 
-The Phase 1 file is read from circuits/ptau/ppot_0080_16.ptau, or from
+The Phase 1 file is read from circuits/ptau/ppot_0080_17.ptau, or from
 ZK_PTAU_PATH when set. Neither form downloads it.
 
 The command requires an identity/disclosure development manifest. It refuses to overwrite

@@ -139,9 +139,9 @@ function getModuleAddress(key: string, chainId: number): string {
   return perChain.trim() || getStringEnv(key).trim();
 }
 
-/** Address of the shared shielded DEEP pool for the selected chain. */
-export function getShieldedPoolAddress(chainId: number): string {
-  return getModuleAddress("VITE_SHIELDED_POOL_ADDRESS", chainId);
+/** Address of the immutable shielded asset factory for the selected chain. */
+export function getShieldedPoolFactoryAddress(chainId: number): string {
+  return getModuleAddress("VITE_SHIELDED_POOL_FACTORY_ADDRESS", chainId);
 }
 
 function getShieldedDeploymentBlock(key: string, chainId: number): number {
@@ -153,8 +153,8 @@ function getShieldedDeploymentBlock(key: string, chainId: number): number {
   return Number.isSafeInteger(block) && block >= 0 ? block : 0;
 }
 
-export function getShieldedPoolDeploymentBlock(chainId: number): number {
-  return getShieldedDeploymentBlock("VITE_SHIELDED_POOL_FROM_BLOCK", chainId);
+export function getShieldedPoolFactoryDeploymentBlock(chainId: number): number {
+  return getShieldedDeploymentBlock("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK", chainId);
 }
 
 export function getDefaultRootHash(): string {

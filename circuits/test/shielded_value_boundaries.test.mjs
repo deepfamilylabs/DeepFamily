@@ -16,6 +16,7 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
+import { shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const field = (bytes) =>
@@ -23,23 +24,30 @@ const field = (bytes) =>
 const asStrings = (values) => values.map((value) => BigInt(value).toString());
 const ownerSecret = 5001n;
 const ownerCommitment = poseidon2([1013n, ownerSecret]);
-const valueNote = (amount, nonce, ciphertextHashField) =>
-  computeShieldedValueNoteCommitment({
-    ownerCommitment,
-    amount,
-    nonce,
-    ciphertextHashField,
-  });
+const defaultScope = {
+  chainId: 31337n,
+  poolAddress: "0x0000000000000000000000000000000000001234",
+};
+const valueNote = (amount, nonce, ciphertextHashField, scope = defaultScope) =>
+  computeShieldedValueNoteCommitment(
+    {
+      ownerCommitment,
+      amount,
+      nonce,
+      ciphertextHashField,
+    },
+    scope,
+  );
 
-function shieldFixture() {
+function shieldFixture(scope = defaultScope) {
   const outputAmounts = [70n, 30n];
   const outputNonces = [4001n, 4002n];
   const hashes = [field(1), field(2)];
   return {
-    chainId: "31337",
-    pool: String(0x1234n),
+    chainId: String(scope.chainId),
+    pool: String(BigInt(scope.poolAddress)),
     outputCommitments: asStrings(
-      outputAmounts.map((amount, i) => valueNote(amount, outputNonces[i], hashes[i])),
+      outputAmounts.map((amount, i) => valueNote(amount, outputNonces[i], hashes[i], scope)),
     ),
     ciphertextHashes: asStrings(hashes),
     amount: "100",
@@ -49,28 +57,28 @@ function shieldFixture() {
   };
 }
 
-function unshieldFixture() {
+function unshieldFixture(scope = defaultScope) {
   const inputAmount = 100n;
   const inputNonce = 3301n;
   const inputCiphertextHash = field(3);
-  const inputCommitment = valueNote(inputAmount, inputNonce, inputCiphertextHash);
+  const inputCommitment = valueNote(inputAmount, inputNonce, inputCiphertextHash, scope);
   const changeAmount = 70n;
   const changeNonce = 4401n;
   const dummyNonce = 4402n;
   const changeHash = field(4);
   const dummyHash = field(5);
   return {
-    chainId: "31337",
-    pool: String(0x1234n),
+    chainId: String(scope.chainId),
+    pool: String(BigInt(scope.poolAddress)),
     inputShardId: "0",
     inputRoot: inputCommitment.toString(),
     inputNullifiers: asStrings([
-      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }),
-      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: inputCommitment }),
+      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope),
+      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope),
     ]),
     outputCommitments: asStrings([
-      valueNote(changeAmount, changeNonce, changeHash),
-      valueNote(0n, dummyNonce, dummyHash),
+      valueNote(changeAmount, changeNonce, changeHash, scope),
+      valueNote(0n, dummyNonce, dummyHash, scope),
     ]),
     ciphertextHashes: asStrings([changeHash, dummyHash]),
     amount: "30",
@@ -165,6 +173,43 @@ test("shield and unshield boundary circuits", async (t) => {
     const deposit = shieldFixture();
     const withdrawal = unshieldFixture();
 
+    await t.test("shield and unshield bind their notes to the public chain and pool", async () => {
+      for (const scope of [
+        { ...defaultScope, chainId: 1030n },
+        { ...defaultScope, poolAddress: "0x0000000000000000000000000000000000005678" },
+      ]) {
+        const scopedDeposit = shieldFixture(scope);
+        const scopedWithdrawal = unshieldFixture(scope);
+        await shield.valid(scopedDeposit);
+        await unshield.valid(scopedWithdrawal);
+        assert.notDeepEqual(scopedDeposit.outputCommitments, deposit.outputCommitments);
+        assert.notDeepEqual(scopedWithdrawal.inputNullifiers, withdrawal.inputNullifiers);
+        for (const [circuit, witness] of [
+          [shield, deposit],
+          [unshield, withdrawal],
+        ]) {
+          await circuit.invalid(
+            mutated(witness, (w) => {
+              w.chainId = String(scope.chainId);
+              w.pool = String(BigInt(scope.poolAddress));
+            }),
+          );
+        }
+      }
+      for (const [circuit, witness] of [
+        [shield, deposit],
+        [unshield, withdrawal],
+      ]) {
+        for (const field of ["chainId", "pool"]) {
+          await circuit.invalid(
+            mutated(witness, (w) => {
+              w[field] = "0";
+            }),
+          );
+        }
+      }
+    });
+
     await t.test("valid shield witness satisfies R1CS", async () => {
       await shield.valid(deposit);
       shield.r1csCheck(deposit);
@@ -207,7 +252,7 @@ test("shield and unshield boundary circuits", async (t) => {
       wrapped.outputCommitments = asStrings(
         amounts.map((amount, i) =>
           poseidon5([
-            1014n,
+            shieldedFixtureTag(1014n, defaultScope.chainId, defaultScope.poolAddress),
             ownerCommitment,
             amount,
             BigInt(wrapped.outputNonces[i]),
@@ -270,7 +315,7 @@ test("shield and unshield boundary circuits", async (t) => {
       );
       wrapped.outputCommitments[0] = String(
         poseidon5([
-          1014n,
+          shieldedFixtureTag(1014n, defaultScope.chainId, defaultScope.poolAddress),
           ownerCommitment,
           BigInt(wrapped.changeAmount),
           BigInt(wrapped.changeNonce),
