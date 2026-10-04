@@ -90,6 +90,9 @@ template ShieldedClaim() {
     sharedScope.chainId <== chainId;
     sharedScope.pool <== pool;
 
+    component budgetTags = ShieldedBudgetNoteTags();
+    budgetTags.poolDomain <== sharedScope.domain;
+
     component policyTag = ShieldedScopedTag();
     policyTag.poolDomain <== sharedScope.domain;
     policyTag.purpose <== 1010;
@@ -259,7 +262,8 @@ template ShieldedClaim() {
     ownerCommitment.inputs[1] <== ownerSecret.out;
 
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.poolDomain <== sharedScope.domain;
+    oldBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    oldBudget.identityNoteTag <== budgetTags.identityNoteTag;
     oldBudget.budgetKind <== budgetKind;
     oldBudget.policyCommitment <== policyCommitmentInput;
     oldBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -304,7 +308,8 @@ template ShieldedClaim() {
     secondNonceNotZero.in <== secondBudgetNonce;
     hasSecondInput * secondNonceNotZero.out === 0;
     component secondBudget = ShieldedBoundBudgetCommitment();
-    secondBudget.poolDomain <== sharedScope.domain;
+    secondBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    secondBudget.identityNoteTag <== budgetTags.identityNoteTag;
     secondBudget.budgetKind <== secondBudgetKind;
     secondBudget.policyCommitment <== policyCommitmentInput;
     secondBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -402,7 +407,8 @@ template ShieldedClaim() {
     newRemaining === rate * newRemainingPeriods;
 
     component nextBudget = ShieldedBoundBudgetCommitment();
-    nextBudget.poolDomain <== sharedScope.domain;
+    nextBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    nextBudget.identityNoteTag <== budgetTags.identityNoteTag;
     nextBudget.budgetKind <== remainderKind;
     nextBudget.policyCommitment <== policyCommitmentInput;
     nextBudget.enrollmentCommitment <== enrollmentCommitmentInput;

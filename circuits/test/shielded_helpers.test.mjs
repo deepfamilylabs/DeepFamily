@@ -8,11 +8,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon3 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon8 } from "poseidon-lite";
 import { shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const purposes = [1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030];
+const fieldPrime = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const field = (value) => ((value % fieldPrime) + fieldPrime) % fieldPrime;
 
 async function compile(directory, name, source) {
   const circuit = path.join(directory, `${name}.circom`);
@@ -76,11 +78,11 @@ template MembershipCheck() {
 component main = MembershipCheck();`;
 }
 
-function fullPath(maxDepth, index) {
+function membershipWitness(maxDepth, index, depth = maxDepth) {
   const leaf = 12345n;
   const siblings = Array.from({ length: maxDepth }, (_, level) => BigInt(1000 + level));
   let root = leaf;
-  for (let level = 0; level < maxDepth; level += 1) {
+  for (let level = 0; level < depth; level += 1) {
     root =
       ((index >> BigInt(level)) & 1n) === 1n
         ? poseidon2([siblings[level], root])
@@ -89,10 +91,77 @@ function fullPath(maxDepth, index) {
   return {
     leaf: String(leaf),
     root: String(root),
-    depth: String(maxDepth),
+    depth: String(depth),
     index: String(index),
     siblings: siblings.map(String),
   };
+}
+
+function budgetBindingSource() {
+  return `pragma circom 2.2.3;
+include "shielded_funding_common.circom";
+template BudgetBindingCheck() {
+    signal input chainId;
+    signal input pool;
+    signal input budgetKind;
+    signal input policyCommitment;
+    signal input enrollmentCommitment;
+    signal input termsCommitment;
+    signal input ownerCommitment;
+    signal input rate;
+    signal input remaining;
+    signal input nonce;
+    signal input ciphertextHash;
+    signal input expectedCommitment;
+    component scope = ShieldedPoolDomain();
+    scope.chainId <== chainId;
+    scope.pool <== pool;
+    component tags = ShieldedBudgetNoteTags();
+    tags.poolDomain <== scope.domain;
+    component note = ShieldedBoundBudgetCommitment();
+    note.privateNoteTag <== tags.privateNoteTag;
+    note.identityNoteTag <== tags.identityNoteTag;
+    note.budgetKind <== budgetKind;
+    note.policyCommitment <== policyCommitment;
+    note.enrollmentCommitment <== enrollmentCommitment;
+    note.termsCommitment <== termsCommitment;
+    note.ownerCommitment <== ownerCommitment;
+    note.rate <== rate;
+    note.remaining <== remaining;
+    note.nonce <== nonce;
+    note.ciphertextHash <== ciphertextHash;
+    note.commitment === expectedCommitment;
+}
+component main = BudgetBindingCheck();`;
+}
+
+function budgetBindingWitness(budgetKind) {
+  const witness = {
+    chainId: "31337",
+    pool: String(0x1111111111111111111111111111111111111111n),
+    budgetKind: String(budgetKind),
+    policyCommitment: "2100",
+    enrollmentCommitment: "2101",
+    termsCommitment: "2102",
+    ownerCommitment: "2103",
+    rate: "100",
+    remaining: "300",
+    nonce: "2104",
+    ciphertextHash: "2105",
+  };
+  witness.expectedCommitment = String(
+    poseidon8([
+      shieldedFixtureTag(budgetKind === 0 ? 1015 : 1030, witness.chainId, witness.pool),
+      BigInt(witness.policyCommitment),
+      BigInt(witness.enrollmentCommitment),
+      BigInt(budgetKind === 0 ? witness.ownerCommitment : witness.termsCommitment),
+      BigInt(witness.rate),
+      BigInt(witness.remaining),
+      BigInt(witness.nonce),
+      BigInt(witness.ciphertextHash),
+    ]),
+  );
+  return witness;
 }
 
 test("shielded shared domain and Merkle constraints", async (t) => {
@@ -149,6 +218,48 @@ component main = DomainCheck();`,
         }
       },
     );
+    const budget = await compile(directory, "budget_binding", budgetBindingSource());
+    await t.test(
+      "shared budget tags retain distinct private owner and public terms bindings",
+      async () => {
+        for (const budgetKind of [0, 1]) {
+          const witness = budgetBindingWitness(budgetKind);
+          await budget.valid(witness);
+          const binding = budgetKind === 0 ? "ownerCommitment" : "termsCommitment";
+          const unusedBinding = budgetKind === 0 ? "termsCommitment" : "ownerCommitment";
+          await budget.invalid({ ...witness, [binding]: String(BigInt(witness[binding]) + 1n) });
+          await budget.valid({
+            ...witness,
+            [unusedBinding]: String(BigInt(witness[unusedBinding]) + 1n),
+          });
+          await budget.invalid({ ...witness, budgetKind: String(1 - budgetKind) });
+          for (const invalidKind of ["2", "-1"]) {
+            // A matching interpolated note isolates the Boolean guard instead
+            // of failing merely because expectedCommitment became stale.
+            const selector = BigInt(invalidKind);
+            const privateTag = shieldedFixtureTag(1015, witness.chainId, witness.pool);
+            const identityTag = shieldedFixtureTag(1030, witness.chainId, witness.pool);
+            const owner = BigInt(witness.ownerCommitment);
+            await budget.invalid({
+              ...witness,
+              budgetKind: invalidKind,
+              expectedCommitment: String(
+                poseidon8([
+                  field(privateTag + selector * (identityTag - privateTag)),
+                  BigInt(witness.policyCommitment),
+                  BigInt(witness.enrollmentCommitment),
+                  field(owner + selector * (BigInt(witness.termsCommitment) - owner)),
+                  BigInt(witness.rate),
+                  BigInt(witness.remaining),
+                  BigInt(witness.nonce),
+                  BigInt(witness.ciphertextHash),
+                ]),
+              ),
+            });
+          }
+        }
+      },
+    );
     for (const maxDepth of [32, 64]) {
       const merkle = await compile(directory, `membership_${maxDepth}`, merkleSource(maxDepth));
       await t.test(
@@ -181,7 +292,7 @@ component main = DomainCheck();`,
       await t.test(
         `${maxDepth}-level helper accepts its exact limit and binds every sibling`,
         async () => {
-          const witness = fullPath(maxDepth, (1n << BigInt(maxDepth)) - 1n);
+          const witness = membershipWitness(maxDepth, (1n << BigInt(maxDepth)) - 1n);
           await merkle.valid(witness);
           const forged = structuredClone(witness);
           forged.siblings[maxDepth - 1] = String(BigInt(forged.siblings[maxDepth - 1]) + 1n);
@@ -189,20 +300,54 @@ component main = DomainCheck();`,
         },
       );
       await t.test(
-        `${maxDepth}-level helper rejects overflow returning a zero library root`,
+        `${maxDepth}-level helper matches an independent root at every legal depth`,
         async () => {
-          for (const depth of [maxDepth + 1, -1]) {
-            await merkle.invalid({
-              leaf: "123",
-              root: "0",
-              depth: String(depth),
-              index: "0",
-              siblings: Array(maxDepth).fill("0"),
-            });
+          const alternating = BigInt(`0b${"10".repeat(maxDepth / 2)}`);
+          for (let depth = 0; depth <= maxDepth; depth += 1) {
+            await merkle.valid(membershipWitness(maxDepth, alternating, depth));
           }
-          const overflowIndex = fullPath(maxDepth, 0n);
-          overflowIndex.index = String(1n << BigInt(maxDepth));
-          await merkle.invalid(overflowIndex);
+        },
+      );
+      await t.test(
+        `${maxDepth}-level helper matches independent roots across dynamic depths and directions`,
+        async () => {
+          const alternating = BigInt(`0b${"10".repeat(maxDepth / 2)}`);
+          for (const depth of [0, 1, 2, 7, maxDepth - 1, maxDepth]) {
+            for (const index of [0n, (1n << BigInt(maxDepth)) - 1n, alternating]) {
+              const witness = membershipWitness(maxDepth, index, depth);
+              await merkle.valid(witness);
+              await merkle.invalid({ ...witness, root: String(BigInt(witness.root) + 1n) });
+              if (depth > 0) {
+                await merkle.invalid({ ...witness, index: String(index ^ 1n) });
+                const changedSibling = structuredClone(witness);
+                changedSibling.siblings[depth - 1] = String(
+                  BigInt(changedSibling.siblings[depth - 1]) + 1n,
+                );
+                await merkle.invalid(changedSibling);
+              }
+              if (depth < maxDepth) {
+                const changedUnused = structuredClone(witness);
+                changedUnused.index = String(index ^ (1n << BigInt(depth)));
+                for (let level = depth; level < maxDepth; level += 1) {
+                  changedUnused.siblings[level] = String(BigInt(9000 + level));
+                }
+                await merkle.valid(changedUnused);
+              }
+            }
+          }
+        },
+      );
+      await t.test(
+        `${maxDepth}-level helper rejects depth and index outside supported ranges`,
+        async () => {
+          const witness = membershipWitness(maxDepth, 0n);
+          // Positive depths above the limit still fit the depth bit width.
+          // Without the upper-bound constraint the mux selects this maximum-
+          // depth root, so a stale root cannot mask a missing range check.
+          for (const depth of [maxDepth + 1, 2 * maxDepth - 1, -1]) {
+            await merkle.invalid({ ...witness, depth: String(depth) });
+          }
+          await merkle.invalid({ ...witness, index: String(1n << BigInt(maxDepth)) });
         },
       );
     }

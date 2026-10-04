@@ -71,6 +71,9 @@ template ShieldedFund() {
     sharedScope.chainId <== chainId;
     sharedScope.pool <== pool;
 
+    component budgetTags = ShieldedBudgetNoteTags();
+    budgetTags.poolDomain <== sharedScope.domain;
+
     component allocationTag = ShieldedScopedTag();
     allocationTag.poolDomain <== sharedScope.domain;
     allocationTag.purpose <== 1028;
@@ -215,7 +218,8 @@ template ShieldedFund() {
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.poolDomain <== sharedScope.domain;
+    oldBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    oldBudget.identityNoteTag <== budgetTags.identityNoteTag;
     oldBudget.budgetKind <== oldBudgetKind;
     oldBudget.policyCommitment <== policy.commitment;
     oldBudget.enrollmentCommitment <== enrollment.commitment;
@@ -258,7 +262,8 @@ template ShieldedFund() {
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;
     component budget = ShieldedBoundBudgetCommitment();
-    budget.poolDomain <== sharedScope.domain;
+    budget.privateNoteTag <== budgetTags.privateNoteTag;
+    budget.identityNoteTag <== budgetTags.identityNoteTag;
     budget.budgetKind <== budgetKind;
     budget.policyCommitment <== policy.commitment;
     budget.enrollmentCommitment <== enrollment.commitment;
@@ -281,7 +286,7 @@ template ShieldedFund() {
     publicBudget[9] === budgetKind * periodDays;
     signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
-    change.poolDomain <== sharedScope.domain;
+    change.valueNoteTag <== donor.valueNoteTag;
     change.ownerCommitment <== donor.ownerCommitment;
     change.amount <== changeAmount;
     change.nonce <== changeNonce;

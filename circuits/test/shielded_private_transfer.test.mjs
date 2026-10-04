@@ -13,6 +13,7 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
+import { shieldedFixtureScope } from "./shielded_scope_fixture.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const hash = (byte) =>
@@ -239,7 +240,31 @@ test("private transfer circuit", async (t) => {
         }),
       );
     });
-    await t.test("private transfer rejects inflation and foreign-note spending", async () => {
+    await t.test(
+      "private transfer rejects amount imbalance with matching commitments",
+      async () => {
+        for (const source of [validTransfer, validSingleTransfer]) {
+          for (const outputIndex of [0, 1]) {
+            for (const delta of [-1n, 1n]) {
+              await transfer.invalid(
+                mutate(source, (w) => {
+                  const amount = BigInt(w.outputAmounts[outputIndex]) + delta;
+                  w.outputAmounts[outputIndex] = amount.toString();
+                  w.outputCommitments[outputIndex] = valueNote(
+                    BigInt(w.outputOwnerCommitments[outputIndex]),
+                    amount,
+                    BigInt(w.outputNonces[outputIndex]),
+                    BigInt(w.ciphertextHashes[outputIndex]),
+                    shieldedFixtureScope(w),
+                  ).toString();
+                }),
+              );
+            }
+          }
+        }
+      },
+    );
+    await t.test("private transfer rejects mismatched note openings and membership", async () => {
       await transfer.invalid(
         mutate(validTransfer, (w) => {
           w.outputAmounts[0] = "61";

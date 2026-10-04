@@ -20,6 +20,7 @@ template ShieldedDonorValueInput() {
     signal input depth;
     signal input index;
     signal input siblings[32];
+    signal output valueNoteTag;
     signal output ownerCommitment;
     signal output noteCommitment;
     signal output spendNullifier;
@@ -39,6 +40,7 @@ template ShieldedDonorValueInput() {
     component noteTag = ShieldedScopedTag();
     noteTag.poolDomain <== poolDomain;
     noteTag.purpose <== 1014;
+    valueNoteTag <== noteTag.tag;
     component note = Poseidon(5);
     note.inputs[0] <== noteTag.tag;
     note.inputs[1] <== ownerCommitment;
@@ -136,10 +138,10 @@ template ShieldedPrivateEnrollment() {
     commitment <== enrollment.out;
 }
 
-// Internal poolDomain must come from the enclosing action's constrained
-// ShieldedPoolDomain over its real public chainId and pool.
+// Internal valueNoteTag must come from the constrained donor input in the
+// enclosing action, which fixes its purpose to 1014 and binds the real pool.
 template ShieldedDonorChange() {
-    signal input poolDomain;
+    signal input valueNoteTag;
     signal input ownerCommitment;
     signal input amount;
     signal input nonce;
@@ -151,11 +153,8 @@ template ShieldedDonorChange() {
     component nonceNotZero = IsZero();
     nonceNotZero.in <== nonce;
     nonceNotZero.out === 0;
-    component noteTag = ShieldedScopedTag();
-    noteTag.poolDomain <== poolDomain;
-    noteTag.purpose <== 1014;
     component note = Poseidon(5);
-    note.inputs[0] <== noteTag.tag;
+    note.inputs[0] <== valueNoteTag;
     note.inputs[1] <== ownerCommitment;
     note.inputs[2] <== amount;
     note.inputs[3] <== nonce;
@@ -163,13 +162,33 @@ template ShieldedDonorChange() {
     noteCommitment <== note.out;
 }
 
-// The binding selector is committed in the domain and the third binding field.
+// Both budget formats use fixed purposes from the same constrained pool domain.
+// Compute this pair once per action; it is internal wiring, not witness input.
+template ShieldedBudgetNoteTags() {
+    signal input poolDomain;
+    signal output privateNoteTag;
+    signal output identityNoteTag;
+
+    component privateTag = ShieldedScopedTag();
+    privateTag.poolDomain <== poolDomain;
+    privateTag.purpose <== 1015;
+    privateNoteTag <== privateTag.tag;
+
+    component identityTag = ShieldedScopedTag();
+    identityTag.poolDomain <== poolDomain;
+    identityTag.purpose <== 1030;
+    identityNoteTag <== identityTag.tag;
+}
+
+// The binding selector is committed in the note tag and owner/terms slot.
 // Private kind 0 binds the owner's spending commitment and private policy.
 // Identity kind 1 binds all public terms without exposing private openings.
-// Internal poolDomain must come from the enclosing action's constrained
-// ShieldedPoolDomain over its real public chainId and pool.
+// Internal note tags must come from ShieldedBudgetNoteTags, whose poolDomain
+// comes from the enclosing action's ShieldedPoolDomain over its public inputs.
+// They are circuit wiring, never caller-supplied witness values.
 template ShieldedBoundBudgetCommitment() {
-    signal input poolDomain;
+    signal input privateNoteTag;
+    signal input identityNoteTag;
     signal input budgetKind;
     signal input policyCommitment;
     signal input enrollmentCommitment;
@@ -182,11 +201,9 @@ template ShieldedBoundBudgetCommitment() {
     signal output commitment;
 
     budgetKind * (1 - budgetKind) === 0;
-    component noteTag = ShieldedScopedTag();
-    noteTag.poolDomain <== poolDomain;
-    noteTag.purpose <== 1015 + 15 * budgetKind;
+    signal noteTag <== privateNoteTag + budgetKind * (identityNoteTag - privateNoteTag);
     component note = Poseidon(8);
-    note.inputs[0] <== noteTag.tag;
+    note.inputs[0] <== noteTag;
     note.inputs[1] <== policyCommitment;
     note.inputs[2] <== enrollmentCommitment;
     note.inputs[3] <== ownerCommitment + budgetKind * (termsCommitment - ownerCommitment);
