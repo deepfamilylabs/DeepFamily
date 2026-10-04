@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,7 +50,7 @@ import {
   type ShieldedClaimOverview,
 } from "../services/shieldedClaimOverview";
 import { getFriendlyError, resolveErrorReason } from "../../../shared/lib/errors";
-import { CopyIconButton, useToast } from "../../../shared/ui";
+import { useToast } from "../../../shared/ui";
 import {
   getShieldedLocalRecipientLabels,
   validateShieldedRecipientSelection,
@@ -57,6 +58,7 @@ import {
 } from "../services/shieldedRecipientOptions";
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { ShieldedRecipientPicker } from "./ShieldedRecipientPicker";
+import { ShieldedAssetOverview } from "./ShieldedAssetOverview";
 import {
   ShieldedRecipientCredentialsForm,
   type ShieldedRecipientCredentialsFormHandle,
@@ -414,11 +416,13 @@ export function ShieldedInheritancePanel({
   signer,
   account,
   publicActivityAddresses,
+  assetControls,
 }: {
   modules: ShieldedPageModules;
   signer: Signer | null;
   account: string;
   publicActivityAddresses: Set<string>;
+  assetControls?: ReactNode;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -1736,59 +1740,18 @@ export function ShieldedInheritancePanel({
 
   return (
     <div className="space-y-4 break-normal">
-      <section
-        aria-label={t("shielded.balanceTitle", { symbol: modules.assetSymbol })}
-        className="space-y-2 rounded-xl border border-hairline bg-surface px-4 py-3"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
-            <p className="break-words text-sm font-medium text-ink">{identity.identity.fullName}</p>
-            <dl className="flex flex-wrap gap-x-6 gap-y-2">
-              {[
-                { label: "balanceAmount", amount: totalValue },
-                { label: "budgetAmount", amount: totalBudget },
-              ].map(({ label, amount }) => (
-                <div key={label} className="flex flex-wrap items-baseline gap-x-2">
-                  <dt className="text-xs text-ink-muted">
-                    {t(`shielded.${label}`, { symbol: modules.assetSymbol })}
-                  </dt>
-                  <dd className="break-all text-sm font-semibold tabular-nums text-ink">
-                    {walletSnapshot ? formatUnits(amount, modules.tokenDecimals) : "—"}
-                    <span className="ml-1 whitespace-nowrap text-xs font-normal text-ink-muted">
-                      {modules.assetSymbol}
-                    </span>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <PanelButton
-              size="compact"
-              disabled={busy}
-              onClick={() => void submitSelected("recover")}
-            >
-              {t("shielded.actions.recover", { symbol: modules.assetSymbol })}
-            </PanelButton>
-            <PanelButton size="compact" disabled={busy} onClick={lockIdentity}>
-              {t("shielded.lock", { symbol: modules.assetSymbol })}
-            </PanelButton>
-          </div>
-        </div>
-        <div className="flex min-w-0 items-start gap-2 text-xs">
-          <span className="shrink-0 whitespace-nowrap py-1 text-ink-muted">
-            {t("shielded.identityHash", { symbol: modules.assetSymbol })}
-          </span>
-          <code className="min-w-0 break-all py-1 font-mono text-ink-muted">
-            {identity.personHash}
-          </code>
-          <CopyIconButton
-            size="xs"
-            label={t("shielded.copyIdentityHash", { symbol: modules.assetSymbol })}
-            onClick={() => void copyIdentityHash()}
-          />
-        </div>
-      </section>
+      <ShieldedAssetOverview
+        assetControls={assetControls}
+        fullName={identity.identity.fullName}
+        personHash={identity.personHash}
+        symbol={modules.assetSymbol}
+        availableBalance={walletSnapshot ? formatUnits(totalValue, modules.tokenDecimals) : "—"}
+        budgetBalance={walletSnapshot ? formatUnits(totalBudget, modules.tokenDecimals) : "—"}
+        busy={busy}
+        onRecover={() => void submitSelected("recover")}
+        onLock={lockIdentity}
+        onCopyIdentityHash={() => void copyIdentityHash()}
+      />
       <div
         role="tablist"
         aria-label={t("shielded.actionsTitle", { symbol: modules.assetSymbol })}

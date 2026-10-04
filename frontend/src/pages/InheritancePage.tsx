@@ -5,6 +5,7 @@ import { useConfig } from "../domains/config";
 import {
   ShieldedInheritancePanel,
   ShieldedIdentitySessionProvider,
+  useShieldedPageIdentitySession,
   ShieldedAssetToolbar,
   readShieldedAsset,
   resolveShieldedAssetPool,
@@ -51,8 +52,11 @@ function InheritanceContent() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
+  const { identity } = useShieldedPageIdentitySession();
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
-  const [selectedAddress, setSelectedAddress] = useState(config.tokenAddress);
+  const [selectedAssetAddress, setSelectedAddress] = useState(config.tokenAddress);
+  // Keep the unlock entry reachable even if a selected pool is missing or unavailable.
+  const selectedAddress = identity ? selectedAssetAddress : config.tokenAddress;
   const [importAddress, setImportAddress] = useState("");
   const [importedAssets, setImportedAssets] = useState<ShieldedAsset[]>([]);
   const [creatingPool, setCreatingPool] = useState(false);
@@ -251,6 +255,34 @@ function InheritanceContent() {
     }
   };
   const head = <PageHead title={t("shielded.title")} />;
+  const readyModules =
+    state.status === "ready" &&
+    !wrongNetwork &&
+    sameAddress(selectedAddress, state.modules.assetAddress)
+      ? state.modules
+      : null;
+  const assetControls = identity ? (
+    <div className="min-w-0 space-y-2">
+      <ShieldedAssetToolbar
+        selectedAddress={selectedAddress}
+        deepTokenAddress={config.tokenAddress}
+        nativeSymbol={nativeSymbol}
+        importedAssets={importedAssets}
+        disabled={creatingPool}
+        importing={importing}
+        importAddress={importAddress}
+        onImportAddressChange={setImportAddress}
+        onImport={() => void importAsset()}
+        onSelect={(address) => {
+          setSelectedAddress(address);
+          setAssetError("");
+        }}
+      />
+      {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
+        <p className="text-xs leading-relaxed text-ink-muted">{t("shielded.assets.importWarning")}</p>
+      ) : null}
+    </div>
+  ) : null;
 
   if (!wallet.address) {
     return (
@@ -270,23 +302,10 @@ function InheritanceContent() {
   return (
     <div className="space-y-6">
       {head}
-      <ShieldedAssetToolbar
-        selectedAddress={selectedAddress}
-        deepTokenAddress={config.tokenAddress}
-        nativeSymbol={nativeSymbol}
-        importedAssets={importedAssets}
-        disabled={creatingPool}
-        importing={importing}
-        importAddress={importAddress}
-        onImportAddressChange={setImportAddress}
-        onImport={() => void importAsset()}
-        onSelect={(address) => {
-          setSelectedAddress(address);
-          setAssetError("");
-        }}
-      />
-      {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
-        <p className="text-xs text-ink-muted">{t("shielded.assets.importWarning")}</p>
+      {assetControls && !readyModules ? (
+        <div className="min-w-0 rounded-xl border border-hairline bg-surface px-4 py-3 sm:px-5">
+          {assetControls}
+        </div>
       ) : null}
       {assetError ? (
         <p role="alert" className="text-sm text-danger">
@@ -330,15 +349,14 @@ function InheritanceContent() {
           </button>
         </div>
       ) : null}
-      {state.status === "ready" &&
-      !wrongNetwork &&
-      sameAddress(selectedAddress, state.modules.assetAddress) ? (
+      {readyModules ? (
         <ShieldedInheritancePanel
-          key={`${state.modules.chainId}:${state.modules.poolAddress}`}
-          modules={state.modules}
+          key={`${readyModules.chainId}:${readyModules.poolAddress}`}
+          modules={readyModules}
           signer={wallet.signer}
           account={wallet.address}
           publicActivityAddresses={publicActivityAddresses.current}
+          assetControls={assetControls}
         />
       ) : null}
     </div>

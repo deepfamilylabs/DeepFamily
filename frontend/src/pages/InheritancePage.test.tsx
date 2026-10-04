@@ -90,9 +90,11 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
     account,
     signer,
     modules,
+    assetControls,
   }: {
     account: string;
     signer: unknown;
+    assetControls?: React.ReactNode;
     modules: {
       assetKind: string;
       assetSymbol: string;
@@ -110,6 +112,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
     }, []);
     return (
       <div data-testid="shielded-panel">
+        {assetControls}
         <span data-testid="shielded-session-state">{session.identity ? "unlocked" : "locked"}</span>
         <span data-testid="shielded-identity">{session.identity?.identityCommitment ?? ""}</span>
         <span data-testid="shielded-signer-state">{signer ? "ready" : "reconnecting"}</span>
@@ -348,6 +351,7 @@ describe("InheritancePage private pool entry", () => {
   it("keeps token-address entry collapsed until explicitly adding an asset", async () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     expect(screen.queryByRole("textbox", { name: "shielded.assets.tokenAddress" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "shielded.assets.add" }));
     expect(screen.getByRole("textbox", { name: "shielded.assets.tokenAddress" })).toBeTruthy();
@@ -451,6 +455,7 @@ describe("InheritancePage private pool entry", () => {
     mocks.assetPrecision = 6;
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     const address = "0x0000000000000000000000000000000000000030";
     fireEvent.click(screen.getByRole("button", { name: "shielded.assets.add" }));
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.assets.tokenAddress" }), {
@@ -469,6 +474,7 @@ describe("InheritancePage private pool entry", () => {
   it("reports unusable imported precision without replacing the existing private workflow", async () => {
     render(<InheritancePage />);
     const panel = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     mocks.readShieldedAsset.mockRejectedValueOnce(
       new Error("Token decimals must be an integer between 0 and 36"),
     );

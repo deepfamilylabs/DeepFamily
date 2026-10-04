@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { ZeroAddress } from "ethers";
 import { useTranslation } from "react-i18next";
 import type { ShieldedAsset } from "../services/shieldedAssetRegistry";
@@ -57,13 +57,13 @@ export function ShieldedAssetToolbar({
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <label htmlFor={selectId} className="shrink-0 text-sm text-ink-muted">
+        <label htmlFor={selectId} className="shrink-0 text-xs text-ink-muted">
           {t("shielded.assets.label")}
         </label>
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+        <div className="relative min-w-0 flex-1 sm:max-w-48">
           <select
             id={selectId}
-            className="h-9 w-full min-w-0 appearance-none rounded-lg border border-hairline bg-surface pl-3 pr-9 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            className="h-9 w-full min-w-0 appearance-none rounded-lg border border-hairline-strong bg-surface pl-3 pr-9 text-sm font-medium text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
             value={selectedValue ?? selectedAddress}
             disabled={controlsDisabled}
             onChange={(event) => onSelect(event.target.value)}
@@ -83,7 +83,7 @@ export function ShieldedAssetToolbar({
         </div>
         <button
           type="button"
-          className="h-9 shrink-0 rounded-md px-2 text-sm text-ink-muted hover:text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-alt hover:text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
           aria-expanded={expanded}
           aria-controls={expanded ? importId : undefined}
           disabled={controlsDisabled}
@@ -92,6 +92,11 @@ export function ShieldedAssetToolbar({
             setExpanded((current) => !current);
           }}
         >
+          {expanded ? (
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
           {t(expanded ? "shielded.assets.cancel" : "shielded.assets.add")}
         </button>
       </div>
