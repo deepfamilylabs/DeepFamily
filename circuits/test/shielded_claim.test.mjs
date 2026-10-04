@@ -560,6 +560,23 @@ test("shielded claim constraints", async (t) => {
       witness.inputRoots = [root.toString(), root.toString()];
       await valid(witness);
     });
+    await t.test("mixed claim binds the second full-depth budget path", async () => {
+      const { witness } = buildShieldedClaimFixture({
+        secondRemainingPeriods: 2,
+        secondBudgetKind: 1,
+      });
+      const proof = fullSyntheticPath(BigInt(witness.inputRoots[1]), 32, (1n << 31n) | 5n, 1800);
+      witness.secondNoteDepth = proof.depth;
+      witness.secondNoteIndex = proof.index;
+      witness.secondNoteSiblings = proof.siblings;
+      witness.inputRoots[1] = proof.root.toString();
+      await valid(witness);
+      await invalid(
+        mutate(witness, (w) => {
+          w.secondNoteSiblings[31] = String(BigInt(w.secondNoteSiblings[31]) + 1n);
+        }),
+      );
+    });
     await t.test("full 64-level endorsement and trusted paths verify the child", async () => {
       const { witness, heirIdentityCommitment } = buildShieldedClaimFixture();
       const parents = poseidon3([

@@ -67,23 +67,20 @@ template ShieldedFund() {
     signal input budgetNonce;
     signal input changeNonce;
 
+    component sharedScope = ShieldedPoolDomain();
+    sharedScope.chainId <== chainId;
+    sharedScope.pool <== pool;
+
     component allocationTag = ShieldedScopedTag();
-    allocationTag.chainId <== chainId;
-    allocationTag.pool <== pool;
+    allocationTag.poolDomain <== sharedScope.domain;
     allocationTag.purpose <== 1028;
     component budgetUseTag = ShieldedScopedTag();
-    budgetUseTag.chainId <== chainId;
-    budgetUseTag.pool <== pool;
+    budgetUseTag.poolDomain <== sharedScope.domain;
     budgetUseTag.purpose <== 1026;
     component initialEnrollmentTag = ShieldedScopedTag();
-    initialEnrollmentTag.chainId <== chainId;
-    initialEnrollmentTag.pool <== pool;
+    initialEnrollmentTag.poolDomain <== sharedScope.domain;
     initialEnrollmentTag.purpose <== 1027;
 
-    component chainBits = Num2Bits(64);
-    chainBits.in <== chainId;
-    component poolBits = Num2Bits(160);
-    poolBits.in <== pool;
     fundMode * (1 - fundMode) === 0;
     signal initial <== 1 - fundMode;
     budgetKind * (1 - budgetKind) === 0;
@@ -99,8 +96,7 @@ template ShieldedFund() {
     asOfBits.in <== asOf;
 
     component donor = ShieldedDonorValueInput();
-    donor.chainId <== chainId;
-    donor.pool <== pool;
+    donor.poolDomain <== sharedScope.domain;
     donor.ownerSecret <== donorOwnerSecret;
     donor.amount <== donorAmount;
     donor.nonce <== donorNonce;
@@ -112,8 +108,7 @@ template ShieldedFund() {
     donor.spendNullifier === inputNullifiers[0];
 
     component policy = ShieldedPrivatePolicy();
-    policy.chainId <== chainId;
-    policy.pool <== pool;
+    policy.poolDomain <== sharedScope.domain;
     policy.rootIdentityCommitment <== rootIdentityCommitment;
     policy.rootVersionIndex <== rootVersionIndex;
     policy.rate <== rate;
@@ -179,16 +174,14 @@ template ShieldedFund() {
     initial * (eligibleFrom - asOf - 7200) === 0;
 
     component enrollment = ShieldedPrivateEnrollment();
-    enrollment.chainId <== chainId;
-    enrollment.pool <== pool;
+    enrollment.poolDomain <== sharedScope.domain;
     enrollment.policyCommitment <== policy.commitment;
     enrollment.heirIdentityCommitment <== heirIdentityCommitment;
     enrollment.eligibleFrom <== eligibleFrom;
     enrollment.enrollmentSalt <== enrollmentSalt;
 
     component terms = ShieldedIdentityBudgetTerms();
-    terms.chainId <== chainId;
-    terms.pool <== pool;
+    terms.poolDomain <== sharedScope.domain;
     terms.rootIdentityCommitment <== rootIdentityCommitment;
     terms.rootVersionIndex <== rootVersionIndex;
     terms.heirIdentityCommitment <== heirIdentityCommitment;
@@ -222,8 +215,7 @@ template ShieldedFund() {
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.chainId <== chainId;
-    oldBudget.pool <== pool;
+    oldBudget.poolDomain <== sharedScope.domain;
     oldBudget.budgetKind <== oldBudgetKind;
     oldBudget.policyCommitment <== policy.commitment;
     oldBudget.enrollmentCommitment <== enrollment.commitment;
@@ -233,13 +225,7 @@ template ShieldedFund() {
     oldBudget.remaining <== oldBudgetRemaining;
     oldBudget.nonce <== oldBudgetNonce;
     oldBudget.ciphertextHash <== oldBudgetCiphertextHash;
-    component oldDepthBits = Num2Bits(6);
-    oldDepthBits.in <== oldBudgetDepth;
-    component oldDepthOk = LessEqThan(6);
-    oldDepthOk.in[0] <== oldBudgetDepth;
-    oldDepthOk.in[1] <== 32;
-    oldDepthOk.out === 1;
-    component oldMembership = BinaryMerkleRoot(32);
+    component oldMembership = ShieldedMerkleRoot(32);
     oldMembership.leaf <== oldBudget.commitment;
     oldMembership.depth <== oldBudgetDepth;
     oldMembership.index <== oldBudgetIndex;
@@ -272,8 +258,7 @@ template ShieldedFund() {
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;
     component budget = ShieldedBoundBudgetCommitment();
-    budget.chainId <== chainId;
-    budget.pool <== pool;
+    budget.poolDomain <== sharedScope.domain;
     budget.budgetKind <== budgetKind;
     budget.policyCommitment <== policy.commitment;
     budget.enrollmentCommitment <== enrollment.commitment;
@@ -296,8 +281,7 @@ template ShieldedFund() {
     publicBudget[9] === budgetKind * periodDays;
     signal changeAmount <== donorAmount - budgetAmount;
     component change = ShieldedDonorChange();
-    change.chainId <== chainId;
-    change.pool <== pool;
+    change.poolDomain <== sharedScope.domain;
     change.ownerCommitment <== donor.ownerCommitment;
     change.amount <== changeAmount;
     change.nonce <== changeNonce;

@@ -4,7 +4,7 @@ include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "shielded_scope_common.circom";
-include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
+include "shielded_merkle_common.circom";
 
 // Action 4 of the asset pool. One real input note is spent; the second
 // nullifier is a domain-separated dummy tag bound to that same note. The pool
@@ -33,23 +33,19 @@ template ShieldedUnshield() {
     signal input changeNonce;
     signal input dummyNonce;
 
+    component sharedScope = ShieldedPoolDomain();
+    sharedScope.chainId <== chainId;
+    sharedScope.pool <== pool;
+
     component valueTag = ShieldedScopedTag();
-    valueTag.chainId <== chainId;
-    valueTag.pool <== pool;
+    valueTag.poolDomain <== sharedScope.domain;
     valueTag.purpose <== 1014;
     component spendTag = ShieldedScopedTag();
-    spendTag.chainId <== chainId;
-    spendTag.pool <== pool;
+    spendTag.poolDomain <== sharedScope.domain;
     spendTag.purpose <== 1016;
     component dummyInputTag = ShieldedScopedTag();
-    dummyInputTag.chainId <== chainId;
-    dummyInputTag.pool <== pool;
+    dummyInputTag.poolDomain <== sharedScope.domain;
     dummyInputTag.purpose <== 1021;
-
-    component chainBits = Num2Bits(64);
-    chainBits.in <== chainId;
-    component poolBits = Num2Bits(160);
-    poolBits.in <== pool;
 
     component amountBits = Num2Bits(128);
     amountBits.in <== amount;
@@ -80,13 +76,7 @@ template ShieldedUnshield() {
     inputNote.inputs[3] <== inputNonce;
     inputNote.inputs[4] <== inputCiphertextHash;
 
-    component depthBits = Num2Bits(6);
-    depthBits.in <== noteDepth;
-    component depthOk = LessEqThan(6);
-    depthOk.in[0] <== noteDepth;
-    depthOk.in[1] <== 32;
-    depthOk.out === 1;
-    component membership = BinaryMerkleRoot(32);
+    component membership = ShieldedMerkleRoot(32);
     membership.leaf <== inputNote.out;
     membership.depth <== noteDepth;
     membership.index <== noteIndex;

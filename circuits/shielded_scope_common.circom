@@ -29,18 +29,15 @@ template ShieldedPoolDomain() {
     domain <== scope.out;
 }
 
+// Internal helper: the enclosing asset action must constrain poolDomain once
+// with ShieldedPoolDomain using its public chainId and pool inputs.
 template ShieldedScopedTag() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input purpose;
     signal output tag;
-
-    component scope = ShieldedPoolDomain();
-    scope.chainId <== chainId;
-    scope.pool <== pool;
     component purposeTag = Poseidon(3);
     purposeTag.inputs[0] <== 1032;
-    purposeTag.inputs[1] <== scope.domain;
+    purposeTag.inputs[1] <== poolDomain;
     purposeTag.inputs[2] <== purpose;
     tag <== purposeTag.out;
 }

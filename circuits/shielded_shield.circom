@@ -20,15 +20,13 @@ template ShieldedShield() {
     signal input outputAmounts[2];
     signal input outputNonces[2];
 
-    component valueTag = ShieldedScopedTag();
-    valueTag.chainId <== chainId;
-    valueTag.pool <== pool;
-    valueTag.purpose <== 1014;
+    component sharedScope = ShieldedPoolDomain();
+    sharedScope.chainId <== chainId;
+    sharedScope.pool <== pool;
 
-    component chainBits = Num2Bits(64);
-    chainBits.in <== chainId;
-    component poolBits = Num2Bits(160);
-    poolBits.in <== pool;
+    component valueTag = ShieldedScopedTag();
+    valueTag.poolDomain <== sharedScope.domain;
+    valueTag.purpose <== 1014;
 
     component amountBits = Num2Bits(128);
     amountBits.in <== amount;

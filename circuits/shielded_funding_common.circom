@@ -4,36 +4,14 @@ include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "shielded_scope_common.circom";
-include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
-
-// Compact LeanIMT membership, matching the asset pool's note shards. A
-// missing right sibling is absent from this path, not hash(leaf,0).
-template ShieldedMembership32() {
-    signal input leaf;
-    signal input root;
-    signal input depth;
-    signal input index;
-    signal input siblings[32];
-
-    component depthBits = Num2Bits(6);
-    depthBits.in <== depth;
-    component depthOk = LessEqThan(6);
-    depthOk.in[0] <== depth;
-    depthOk.in[1] <== 32;
-    depthOk.out === 1;
-    component merkle = BinaryMerkleRoot(32);
-    merkle.leaf <== leaf;
-    merkle.depth <== depth;
-    merkle.index <== index;
-    merkle.siblings <== siblings;
-    merkle.out === root;
-}
+include "shielded_merkle_common.circom";
 
 // A spendable donor VALUE note. Both source and change commitments bind the
 // exact ciphertext hash supplied by the pool as a public signal.
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedDonorValueInput() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input ownerSecret;
     signal input amount;
     signal input nonce;
@@ -59,8 +37,7 @@ template ShieldedDonorValueInput() {
     owner.inputs[1] <== ownerSecret;
     ownerCommitment <== owner.out;
     component noteTag = ShieldedScopedTag();
-    noteTag.chainId <== chainId;
-    noteTag.pool <== pool;
+    noteTag.poolDomain <== poolDomain;
     noteTag.purpose <== 1014;
     component note = Poseidon(5);
     note.inputs[0] <== noteTag.tag;
@@ -69,15 +46,14 @@ template ShieldedDonorValueInput() {
     note.inputs[3] <== nonce;
     note.inputs[4] <== ciphertextHash;
     noteCommitment <== note.out;
-    component membership = ShieldedMembership32();
+    component membership = ShieldedMerkleRoot(32);
     membership.leaf <== noteCommitment;
-    membership.root <== shardRoot;
     membership.depth <== depth;
     membership.index <== index;
     membership.siblings <== siblings;
+    membership.out === shardRoot;
     component spendTag = ShieldedScopedTag();
-    spendTag.chainId <== chainId;
-    spendTag.pool <== pool;
+    spendTag.poolDomain <== poolDomain;
     spendTag.purpose <== 1016;
     component spend = Poseidon(3);
     spend.inputs[0] <== spendTag.tag;
@@ -86,9 +62,10 @@ template ShieldedDonorValueInput() {
     spendNullifier <== spend.out;
 }
 
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedPrivatePolicy() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input rate;
@@ -119,8 +96,7 @@ template ShieldedPrivatePolicy() {
     periodDaysNotZero.in <== periodDays;
     periodDaysNotZero.out === 0;
     component policyTag = ShieldedScopedTag();
-    policyTag.chainId <== chainId;
-    policyTag.pool <== pool;
+    policyTag.poolDomain <== poolDomain;
     policyTag.purpose <== 1010;
     component policy = Poseidon(7);
     policy.inputs[0] <== policyTag.tag;
@@ -133,9 +109,10 @@ template ShieldedPrivatePolicy() {
     commitment <== policy.out;
 }
 
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedPrivateEnrollment() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input policyCommitment;
     signal input heirIdentityCommitment;
     signal input eligibleFrom;
@@ -148,8 +125,7 @@ template ShieldedPrivateEnrollment() {
     saltNotZero.in <== enrollmentSalt;
     saltNotZero.out === 0;
     component enrollmentTag = ShieldedScopedTag();
-    enrollmentTag.chainId <== chainId;
-    enrollmentTag.pool <== pool;
+    enrollmentTag.poolDomain <== poolDomain;
     enrollmentTag.purpose <== 1011;
     component enrollment = Poseidon(5);
     enrollment.inputs[0] <== enrollmentTag.tag;
@@ -160,9 +136,10 @@ template ShieldedPrivateEnrollment() {
     commitment <== enrollment.out;
 }
 
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedDonorChange() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input ownerCommitment;
     signal input amount;
     signal input nonce;
@@ -175,8 +152,7 @@ template ShieldedDonorChange() {
     nonceNotZero.in <== nonce;
     nonceNotZero.out === 0;
     component noteTag = ShieldedScopedTag();
-    noteTag.chainId <== chainId;
-    noteTag.pool <== pool;
+    noteTag.poolDomain <== poolDomain;
     noteTag.purpose <== 1014;
     component note = Poseidon(5);
     note.inputs[0] <== noteTag.tag;
@@ -190,9 +166,10 @@ template ShieldedDonorChange() {
 // The binding selector is committed in the domain and the third binding field.
 // Private kind 0 binds the owner's spending commitment and private policy.
 // Identity kind 1 binds all public terms without exposing private openings.
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedBoundBudgetCommitment() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input budgetKind;
     signal input policyCommitment;
     signal input enrollmentCommitment;
@@ -206,8 +183,7 @@ template ShieldedBoundBudgetCommitment() {
 
     budgetKind * (1 - budgetKind) === 0;
     component noteTag = ShieldedScopedTag();
-    noteTag.chainId <== chainId;
-    noteTag.pool <== pool;
+    noteTag.poolDomain <== poolDomain;
     noteTag.purpose <== 1015 + 15 * budgetKind;
     component note = Poseidon(8);
     note.inputs[0] <== noteTag.tag;
@@ -221,9 +197,10 @@ template ShieldedBoundBudgetCommitment() {
     commitment <== note.out;
 }
 
+// Internal poolDomain must come from the enclosing action's constrained
+// ShieldedPoolDomain over its real public chainId and pool.
 template ShieldedIdentityBudgetTerms() {
-    signal input chainId;
-    signal input pool;
+    signal input poolDomain;
     signal input rootIdentityCommitment;
     signal input rootVersionIndex;
     signal input heirIdentityCommitment;
@@ -232,8 +209,7 @@ template ShieldedIdentityBudgetTerms() {
     signal input periodDays;
     signal output commitment;
     component termsTag = ShieldedScopedTag();
-    termsTag.chainId <== chainId;
-    termsTag.pool <== pool;
+    termsTag.poolDomain <== poolDomain;
     termsTag.purpose <== 1029;
     component terms = Poseidon(7);
     terms.inputs[0] <== termsTag.tag;

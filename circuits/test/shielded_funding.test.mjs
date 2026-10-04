@@ -331,6 +331,24 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       initial.inputRoots = [proof.root, proof.root].map(String);
       await valid("fund", initial);
     });
+    await t.test(
+      "continuation Fund verifies a full-depth historical template with inactive lineage",
+      async () => {
+        const { continuation, oldBudget } = buildShieldedFundingFixtures();
+        const proof = fullSyntheticPath(oldBudget, 32, (1n << 31n) | 5n, 1300);
+        continuation.oldBudgetDepth = proof.depth;
+        continuation.oldBudgetIndex = proof.index;
+        continuation.oldBudgetSiblings = proof.siblings;
+        continuation.inputRoots[1] = proof.root.toString();
+        await valid("fund", continuation);
+        await invalid(
+          "fund",
+          mutate(continuation, (w) => {
+            w.oldBudgetSiblings[31] = String(BigInt(w.oldBudgetSiblings[31]) + 1n);
+          }),
+        );
+      },
+    );
     await t.test("initial Fund accepts full 64-level endorsement and trusted paths", async () => {
       const { initial } = buildShieldedFundingFixtures();
       const parents = poseidon3([

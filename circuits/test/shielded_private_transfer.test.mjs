@@ -203,6 +203,42 @@ test("private transfer circuit", async (t) => {
         transfer.checkR1cs(validSingleTransfer);
       },
     );
+    await t.test("full-depth single-note transfer keeps the absent second path gated", async () => {
+      const witness = structuredClone(validSingleTransfer);
+      let root = BigInt(witness.inputRoots[0]);
+      for (let level = 0; level < 32; level += 1) {
+        const sibling = BigInt(1000 + level);
+        witness.inputSiblings[0][level] = sibling.toString();
+        root = poseidon2([sibling, root]);
+      }
+      witness.inputDepths[0] = "32";
+      witness.inputIndices[0] = ((1n << 32n) - 1n).toString();
+      witness.inputRoots = [root.toString(), root.toString()];
+      await transfer.valid(witness);
+      await transfer.invalid(
+        mutate(witness, (w) => {
+          w.inputSiblings[1][0] = "1";
+        }),
+      );
+    });
+    await t.test("two-note transfer binds the second full-depth membership path", async () => {
+      const witness = structuredClone(validTransfer);
+      let root = BigInt(witness.inputRoots[1]);
+      for (let level = 0; level < 32; level += 1) {
+        const sibling = BigInt(2000 + level);
+        witness.inputSiblings[1][level] = sibling.toString();
+        root = poseidon2([sibling, root]);
+      }
+      witness.inputDepths[1] = "32";
+      witness.inputIndices[1] = ((1n << 32n) - 1n).toString();
+      witness.inputRoots[1] = root.toString();
+      await transfer.valid(witness);
+      await transfer.invalid(
+        mutate(witness, (w) => {
+          w.inputSiblings[1][31] = String(BigInt(w.inputSiblings[1][31]) + 1n);
+        }),
+      );
+    });
     await t.test("private transfer rejects inflation and foreign-note spending", async () => {
       await transfer.invalid(
         mutate(validTransfer, (w) => {

@@ -3,7 +3,7 @@ pragma circom 2.2.3;
 include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
-include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
+include "shielded_merkle_common.circom";
 include "lib/identity.circom";
 include "shielded_funding_common.circom";
 
@@ -86,39 +86,32 @@ template ShieldedClaim() {
     signal input newBudgetNonce;
     signal input payoutNonce;
 
+    component sharedScope = ShieldedPoolDomain();
+    sharedScope.chainId <== chainId;
+    sharedScope.pool <== pool;
+
     component policyTag = ShieldedScopedTag();
-    policyTag.chainId <== chainId;
-    policyTag.pool <== pool;
+    policyTag.poolDomain <== sharedScope.domain;
     policyTag.purpose <== 1010;
     component enrollmentTag = ShieldedScopedTag();
-    enrollmentTag.chainId <== chainId;
-    enrollmentTag.pool <== pool;
+    enrollmentTag.poolDomain <== sharedScope.domain;
     enrollmentTag.purpose <== 1011;
     component spendTag = ShieldedScopedTag();
-    spendTag.chainId <== chainId;
-    spendTag.pool <== pool;
+    spendTag.poolDomain <== sharedScope.domain;
     spendTag.purpose <== 1016;
     component dummyInputTag = ShieldedScopedTag();
-    dummyInputTag.chainId <== chainId;
-    dummyInputTag.pool <== pool;
+    dummyInputTag.poolDomain <== sharedScope.domain;
     dummyInputTag.purpose <== 1021;
     component periodTag = ShieldedScopedTag();
-    periodTag.chainId <== chainId;
-    periodTag.pool <== pool;
+    periodTag.poolDomain <== sharedScope.domain;
     periodTag.purpose <== 1017;
     component dummyPeriodTag = ShieldedScopedTag();
-    dummyPeriodTag.chainId <== chainId;
-    dummyPeriodTag.pool <== pool;
+    dummyPeriodTag.poolDomain <== sharedScope.domain;
     dummyPeriodTag.purpose <== 1019;
     component valueTag = ShieldedScopedTag();
-    valueTag.chainId <== chainId;
-    valueTag.pool <== pool;
+    valueTag.poolDomain <== sharedScope.domain;
     valueTag.purpose <== 1014;
 
-    component chainBits = Num2Bits(64);
-    chainBits.in <== chainId;
-    component poolBits = Num2Bits(160);
-    poolBits.in <== pool;
     component asOfBits = Num2Bits(64);
     asOfBits.in <== asOf;
     hasSecondInput * (1 - hasSecondInput) === 0;
@@ -182,25 +175,13 @@ template ShieldedClaim() {
     trustedLeaf.inputs[2] <== rootVersionIndex;
     trustedLeaf.inputs[3] <== endorser;
 
-    component endorsementDepthBits = Num2Bits(7);
-    endorsementDepthBits.in <== endorsementDepth;
-    component trustedDepthBits = Num2Bits(7);
-    trustedDepthBits.in <== trustedDepth;
-    component endorsementDepthOk = LessEqThan(7);
-    endorsementDepthOk.in[0] <== endorsementDepth;
-    endorsementDepthOk.in[1] <== 64;
-    endorsementDepthOk.out === 1;
-    component trustedDepthOk = LessEqThan(7);
-    trustedDepthOk.in[0] <== trustedDepth;
-    trustedDepthOk.in[1] <== 64;
-    trustedDepthOk.out === 1;
-    component endorsementMerkle = BinaryMerkleRoot(64);
+    component endorsementMerkle = ShieldedMerkleRoot(64);
     endorsementMerkle.leaf <== endorsementLeaf.out;
     endorsementMerkle.depth <== endorsementDepth;
     endorsementMerkle.index <== endorsementIndex;
     endorsementMerkle.siblings <== endorsementSiblings;
     endorsementMerkle.out === endorsementRoot;
-    component trustedMerkle = BinaryMerkleRoot(64);
+    component trustedMerkle = ShieldedMerkleRoot(64);
     trustedMerkle.leaf <== trustedLeaf.out;
     trustedMerkle.depth <== trustedDepth;
     trustedMerkle.index <== trustedIndex;
@@ -263,8 +244,7 @@ template ShieldedClaim() {
     requiresOpening * (policy.out - policyCommitmentInput) === 0;
     requiresOpening * (enrollment.out - enrollmentCommitmentInput) === 0;
     component terms = ShieldedIdentityBudgetTerms();
-    terms.chainId <== chainId;
-    terms.pool <== pool;
+    terms.poolDomain <== sharedScope.domain;
     terms.rootIdentityCommitment <== rootIdentityCommitment;
     terms.rootVersionIndex <== rootVersionIndex;
     terms.heirIdentityCommitment <== heir.identityCommitment;
@@ -279,8 +259,7 @@ template ShieldedClaim() {
     ownerCommitment.inputs[1] <== ownerSecret.out;
 
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.chainId <== chainId;
-    oldBudget.pool <== pool;
+    oldBudget.poolDomain <== sharedScope.domain;
     oldBudget.budgetKind <== budgetKind;
     oldBudget.policyCommitment <== policyCommitmentInput;
     oldBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -291,13 +270,7 @@ template ShieldedClaim() {
     oldBudget.nonce <== budgetNonce;
     oldBudget.ciphertextHash <== budgetCiphertextHash;
 
-    component noteDepthBits = Num2Bits(6);
-    noteDepthBits.in <== noteDepth;
-    component noteDepthOk = LessEqThan(6);
-    noteDepthOk.in[0] <== noteDepth;
-    noteDepthOk.in[1] <== 32;
-    noteDepthOk.out === 1;
-    component noteMerkle = BinaryMerkleRoot(32);
+    component noteMerkle = ShieldedMerkleRoot(32);
     noteMerkle.leaf <== oldBudget.commitment;
     noteMerkle.depth <== noteDepth;
     noteMerkle.index <== noteIndex;
@@ -331,8 +304,7 @@ template ShieldedClaim() {
     secondNonceNotZero.in <== secondBudgetNonce;
     hasSecondInput * secondNonceNotZero.out === 0;
     component secondBudget = ShieldedBoundBudgetCommitment();
-    secondBudget.chainId <== chainId;
-    secondBudget.pool <== pool;
+    secondBudget.poolDomain <== sharedScope.domain;
     secondBudget.budgetKind <== secondBudgetKind;
     secondBudget.policyCommitment <== policyCommitmentInput;
     secondBudget.enrollmentCommitment <== enrollmentCommitmentInput;
@@ -343,13 +315,7 @@ template ShieldedClaim() {
     secondBudget.nonce <== secondBudgetNonce;
     secondBudget.ciphertextHash <== secondBudgetCiphertextHash;
 
-    component secondDepthBits = Num2Bits(6);
-    secondDepthBits.in <== secondNoteDepth;
-    component secondDepthOk = LessEqThan(6);
-    secondDepthOk.in[0] <== secondNoteDepth;
-    secondDepthOk.in[1] <== 32;
-    secondDepthOk.out === 1;
-    component secondMembership = BinaryMerkleRoot(32);
+    component secondMembership = ShieldedMerkleRoot(32);
     secondMembership.leaf <== secondBudget.commitment;
     secondMembership.depth <== secondNoteDepth;
     secondMembership.index <== secondNoteIndex;
@@ -436,8 +402,7 @@ template ShieldedClaim() {
     newRemaining === rate * newRemainingPeriods;
 
     component nextBudget = ShieldedBoundBudgetCommitment();
-    nextBudget.chainId <== chainId;
-    nextBudget.pool <== pool;
+    nextBudget.poolDomain <== sharedScope.domain;
     nextBudget.budgetKind <== remainderKind;
     nextBudget.policyCommitment <== policyCommitmentInput;
     nextBudget.enrollmentCommitment <== enrollmentCommitmentInput;

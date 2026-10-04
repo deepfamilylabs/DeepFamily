@@ -4,7 +4,7 @@ include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/poseidon.circom";
 include "shielded_scope_common.circom";
-include "@zk-kit/binary-merkle-root.circom/src/binary-merkle-root.circom";
+include "shielded_merkle_common.circom";
 
 // Action 3. One or two independently owned VALUE_NOTE inputs fund two
 // encrypted VALUE_NOTE outputs. An absent second input uses a domain-separated
@@ -33,23 +33,20 @@ template ShieldedPrivateTransfer() {
     signal input outputAmounts[2];
     signal input outputNonces[2];
 
+    component sharedScope = ShieldedPoolDomain();
+    sharedScope.chainId <== chainId;
+    sharedScope.pool <== pool;
+
     component valueTag = ShieldedScopedTag();
-    valueTag.chainId <== chainId;
-    valueTag.pool <== pool;
+    valueTag.poolDomain <== sharedScope.domain;
     valueTag.purpose <== 1014;
     component spendTag = ShieldedScopedTag();
-    spendTag.chainId <== chainId;
-    spendTag.pool <== pool;
+    spendTag.poolDomain <== sharedScope.domain;
     spendTag.purpose <== 1016;
     component dummyInputTag = ShieldedScopedTag();
-    dummyInputTag.chainId <== chainId;
-    dummyInputTag.pool <== pool;
+    dummyInputTag.poolDomain <== sharedScope.domain;
     dummyInputTag.purpose <== 1021;
 
-    component chainBits = Num2Bits(64);
-    chainBits.in <== chainId;
-    component poolBits = Num2Bits(160);
-    poolBits.in <== pool;
     hasSecondInput * (hasSecondInput - 1) === 0;
     (1 - hasSecondInput) * (inputShardIds[1] - inputShardIds[0]) === 0;
     (1 - hasSecondInput) * (inputRoots[1] - inputRoots[0]) === 0;
@@ -59,8 +56,6 @@ template ShieldedPrivateTransfer() {
     component inputAmountBits[2];
     component inputNonceNotZero[2];
     component inputNote[2];
-    component depthBits[2];
-    component depthOk[2];
     component membership[2];
     component spend[2];
     component outputOwnerNotZero[2];
@@ -102,13 +97,7 @@ template ShieldedPrivateTransfer() {
         inputNote[i].inputs[2] <== inputAmounts[i];
         inputNote[i].inputs[3] <== inputNonces[i];
         inputNote[i].inputs[4] <== inputCiphertextHashes[i];
-        depthBits[i] = Num2Bits(6);
-        depthBits[i].in <== inputDepths[i];
-        depthOk[i] = LessEqThan(6);
-        depthOk[i].in[0] <== inputDepths[i];
-        depthOk[i].in[1] <== 32;
-        depthOk[i].out === 1;
-        membership[i] = BinaryMerkleRoot(32);
+        membership[i] = ShieldedMerkleRoot(32);
         membership[i].leaf <== inputNote[i].out;
         membership[i].depth <== inputDepths[i];
         membership[i].index <== inputIndices[i];
