@@ -11,6 +11,8 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
+  useCallback,
   useMemo,
   forwardRef,
   useImperativeHandle,
@@ -264,6 +266,8 @@ export const PersonHashCalculator = forwardRef<
     const toast = useToast();
     const passphraseInputRef = useRef<HTMLInputElement | null>(null);
     const confirmPassphraseInputRef = useRef<HTMLInputElement | null>(null);
+    const hashJobRef = useRef<AbortController | null>(null);
+    const pageHiddenRef = useRef(false);
     const passphraseHelpTitleId = useId();
     const passphraseHelpDescriptionId = useId();
     const passphraseInputId = useId();
@@ -374,26 +378,28 @@ export const PersonHashCalculator = forwardRef<
     const birthDay = watch("birthDay");
     const gender = watch("gender");
 
-    const normalizedPassphrase = useMemo(
-      () => normalizePassphraseForHash(passphraseInputRef.current?.value ?? ""),
-      [passphraseRevision],
-    );
-    const passphraseRisk = useMemo(
-      () => classifyProtocolPassphraseRisk(passphraseInputRef.current?.value ?? ""),
-      [passphraseRevision],
-    );
+    // Cache only display metadata. Neither hook values nor dependency arrays
+    // may retain a raw or normalized copy of the identity passphrase.
+    const {
+      risk: passphraseRisk,
+      graphemeLength: passphraseGraphemeLength,
+      hasPassphrase,
+      strength: passwordStrength,
+    } = useMemo(() => {
+      const rawPassphrase = passphraseInputRef.current?.value ?? "";
+      const normalized = normalizePassphraseForHash(rawPassphrase);
+      return {
+        risk: classifyProtocolPassphraseRisk(rawPassphrase),
+        graphemeLength: getGraphemeLength(normalized),
+        hasPassphrase: normalized.length > 0,
+        strength: validatePassphraseStrength(normalized, false),
+      };
+    }, [passphraseRevision]);
     const isPassphraseDisallowed = passphraseRisk === "disallowed";
-    const passphraseGraphemeLength = useMemo(
-      () => getGraphemeLength(normalizedPassphrase),
-      [normalizedPassphrase],
-    );
-    const hasPassphrase = normalizedPassphrase.length > 0;
-    // Calculate password strength
-    const passwordStrength = useMemo(() => {
-      return validatePassphraseStrength(normalizedPassphrase, false);
-    }, [normalizedPassphrase]);
 
-    const buildTransformedData = (values?: Partial<HashFormInput>): HashForm => {
+    const buildTransformedData = (
+      values?: Partial<HashFormInput>,
+    ): Omit<HashForm, "passphrase"> => {
       const snapshot = values ?? getValues();
       return {
         fullName: safeCanonicalizeFullName(snapshot.fullName || ""),
@@ -411,12 +417,55 @@ export const PersonHashCalculator = forwardRef<
             ? 0
             : Number(snapshot.birthDay),
         gender: Number(snapshot.gender || 0),
-        passphrase: passphraseInputRef.current?.value ?? "",
       };
     };
 
     const [computedHash, setComputedHash] = useState("");
     const [isComputingHash, setIsComputingHash] = useState(false);
+
+    const clearSecretInputs = useCallback(() => {
+      hashJobRef.current?.abort();
+      if (passphraseInputRef.current) passphraseInputRef.current.value = "";
+      if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
+      setShowPassphrase(false);
+      setShowConfirmPassphrase(false);
+      setComputedHash("");
+      setIsComputingHash(false);
+      setPassphraseRevision((revision) => revision + 1);
+    }, []);
+
+    useLayoutEffect(() => {
+      // Keep the elements for cleanup: React detaches their refs on unmount.
+      const passphraseInput = passphraseInputRef.current;
+      const confirmPassphraseInput = confirmPassphraseInputRef.current;
+      const hidePassphrases = () => {
+        setShowPassphrase(false);
+        setShowConfirmPassphrase(false);
+      };
+      const pageHide = () => {
+        pageHiddenRef.current = true;
+        clearSecretInputs();
+      };
+      const pageShow = () => {
+        pageHiddenRef.current = false;
+      };
+      const visibilityChanged = () => {
+        if (document.visibilityState === "hidden") hidePassphrases();
+      };
+      window.addEventListener("pagehide", pageHide);
+      window.addEventListener("pageshow", pageShow);
+      window.addEventListener("blur", hidePassphrases);
+      document.addEventListener("visibilitychange", visibilityChanged);
+      return () => {
+        window.removeEventListener("pagehide", pageHide);
+        window.removeEventListener("pageshow", pageShow);
+        window.removeEventListener("blur", hidePassphrases);
+        document.removeEventListener("visibilitychange", visibilityChanged);
+        hashJobRef.current?.abort();
+        if (passphraseInput) passphraseInput.value = "";
+        if (confirmPassphraseInput) confirmPassphraseInput.value = "";
+      };
+    }, [clearSecretInputs]);
 
     const onComputedHashChangeRef = useRef(onComputedHashChange);
     useEffect(() => {
@@ -436,9 +485,11 @@ export const PersonHashCalculator = forwardRef<
       ref,
       () => ({
         getPublicFormData: () => {
-          const data = buildTransformedData();
-          const { passphrase: _passphrase, ...rest } = data;
-          return { ...rest, hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0 };
+          return {
+            ...buildTransformedData(),
+            hasPassphrase:
+              normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
+          };
         },
         getSecretInputs: () => ({
           passphrase: passphraseInputRef.current?.value ?? "",
@@ -462,13 +513,9 @@ export const PersonHashCalculator = forwardRef<
           }
           return normalizePassphraseForHash(first) === normalizePassphraseForHash(second);
         },
-        clearSecretInputs: () => {
-          if (passphraseInputRef.current) passphraseInputRef.current.value = "";
-          if (confirmPassphraseInputRef.current) confirmPassphraseInputRef.current.value = "";
-          setPassphraseRevision((revision) => revision + 1);
-        },
+        clearSecretInputs,
       }),
-      [getValues, passphraseRevision, requirePassphraseConfirmation],
+      [getValues, passphraseRevision, requirePassphraseConfirmation, clearSecretInputs],
     );
 
     useEffect(() => {
@@ -480,17 +527,16 @@ export const PersonHashCalculator = forwardRef<
         birthDay,
         gender: Number(gender || 0),
       });
-      const { passphrase: _passphrase, ...rest } = transformedData;
       onPublicFormChangeRef.current?.({
-        ...rest,
-        hasPassphrase: normalizePassphraseForHash(_passphrase).length > 0,
+        ...transformedData,
+        hasPassphrase,
       });
     }, [fullName, isBirthBC, birthYear, birthMonth, birthDay, gender, passphraseRevision]);
 
     useEffect(() => {
       // Any edited field invalidates the previously computed hash immediately.
       setComputedHash("");
-      if (!computeHash) {
+      if (!computeHash || pageHiddenRef.current) {
         setIsComputingHash(false);
         return;
       }
@@ -509,28 +555,35 @@ export const PersonHashCalculator = forwardRef<
 
       let cancelled = false;
       const controller = new AbortController();
+      hashJobRef.current = controller;
       const timer = window.setTimeout(
         () => {
           setIsComputingHash(true);
           cryptoWorkerCall(
             "computeIdentityHash",
             {
-              input: { ...transformedData, identitySuiteId },
+              // Read only when dispatching; the debounce closure is public.
+              input: {
+                ...transformedData,
+                passphrase: passphraseInputRef.current?.value ?? "",
+                identitySuiteId,
+              },
             },
             { timeoutMs: 180_000, signal: controller.signal },
           )
             .then(({ identityHash }) => {
-              if (!cancelled) {
+              if (!cancelled && !controller.signal.aborted) {
                 setComputedHash(identityHash);
               }
             })
             .catch(() => {
-              if (!cancelled) {
+              if (!cancelled && !controller.signal.aborted) {
                 setComputedHash("");
               }
             })
             .finally(() => {
-              if (!cancelled) {
+              if (hashJobRef.current === controller) hashJobRef.current = null;
+              if (!cancelled && !controller.signal.aborted) {
                 setIsComputingHash(false);
               }
             });
@@ -542,6 +595,7 @@ export const PersonHashCalculator = forwardRef<
         cancelled = true;
         window.clearTimeout(timer);
         controller.abort();
+        if (hashJobRef.current === controller) hashJobRef.current = null;
       };
     }, [
       fullName,

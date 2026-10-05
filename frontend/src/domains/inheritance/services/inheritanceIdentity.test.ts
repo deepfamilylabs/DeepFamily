@@ -109,4 +109,31 @@ describe("funding identity empty-passphrase protection", () => {
     expect(form.getSecretInputs).not.toHaveBeenCalled();
     expect(mocks.cryptoWorkerCall).not.toHaveBeenCalled();
   });
+
+  it("clears the input before a pending KDF starts and passes cancellation to the worker", async () => {
+    let inputValue = "Tr0ub4dor&3-xkcd-horse";
+    const controller = new AbortController();
+    const form = {
+      getPublicFormData: () => publicIdentity,
+      getSecretInputs: vi.fn(() => ({ passphrase: inputValue })),
+      clearSecretInputs: vi.fn(() => {
+        inputValue = "";
+      }),
+    };
+    let finish!: (value: IdentityMaterialV1Result) => void;
+    mocks.cryptoWorkerCall.mockImplementationOnce((_method, params, options) => {
+      expect(inputValue).toBe("");
+      expect(params.rawPassphrase).toBe("Tr0ub4dor&3-xkcd-horse");
+      expect(options.signal).toBe(controller.signal);
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+
+    const derivation = deriveIdentityFromForm(form, { signal: controller.signal });
+    expect(form.clearSecretInputs).toHaveBeenCalledOnce();
+    expect(form.getSecretInputs).toHaveBeenCalledOnce();
+    finish(identityMaterial);
+    await expect(derivation).resolves.toBe(identityMaterial);
+  });
 });

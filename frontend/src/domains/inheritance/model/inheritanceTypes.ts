@@ -9,4 +9,5 @@ export interface IdentityFormHandle {
     isBirthBC: boolean;
   };
   getSecretInputs: () => { passphrase: string };
+  clearSecretInputs?: () => void;
 }

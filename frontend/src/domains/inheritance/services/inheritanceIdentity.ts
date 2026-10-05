@@ -19,6 +19,7 @@ const DERIVE_TIMEOUT_MS = 240_000;
  */
 export async function deriveIdentityFromForm(
   form: IdentityFormHandle | null,
+  options?: { signal?: AbortSignal },
 ): Promise<IdentityMaterialV1Result> {
   if (!form) throw new InheritanceError("nameRequired");
   const data = form.getPublicFormData();
@@ -31,23 +32,30 @@ export async function deriveIdentityFromForm(
     }
     throw error;
   }
-  const rawPassphrase = form.getSecretInputs().passphrase;
-  const passphraseError = getFundingPassphraseError(rawPassphrase);
-  if (passphraseError) throw new InheritanceError(passphraseError);
-  return cryptoWorkerCall(
-    "deriveIdentityMaterialV1",
-    {
-      identity: {
-        fullName,
-        gender: Number(data.gender),
-        birthYear: Number(data.birthYear),
-        birthMonth: Number(data.birthMonth),
-        birthDay: Number(data.birthDay),
-        isBirthBC: Boolean(data.isBirthBC),
+  let rawPassphrase = form.getSecretInputs().passphrase;
+  try {
+    // Clear the DOM before the potentially long KDF, including rejected input.
+    form.clearSecretInputs?.();
+    const passphraseError = getFundingPassphraseError(rawPassphrase);
+    if (passphraseError) throw new InheritanceError(passphraseError);
+    return cryptoWorkerCall(
+      "deriveIdentityMaterialV1",
+      {
+        identity: {
+          fullName,
+          gender: Number(data.gender),
+          birthYear: Number(data.birthYear),
+          birthMonth: Number(data.birthMonth),
+          birthDay: Number(data.birthDay),
+          isBirthBC: Boolean(data.isBirthBC),
+        },
+        rawPassphrase,
+        identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
       },
-      rawPassphrase,
-      identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
-    },
-    { timeoutMs: DERIVE_TIMEOUT_MS },
-  );
+      { timeoutMs: DERIVE_TIMEOUT_MS, ...(options?.signal ? { signal: options.signal } : {}) },
+    );
+  } finally {
+    // Strings cannot be wiped; stop retaining this local reference after dispatch.
+    rawPassphrase = "";
+  }
 }

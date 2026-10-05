@@ -202,9 +202,34 @@ describe("MetadataUnlockCoordinator", () => {
       cacheValidatedPersonVersion: vi.fn(),
     });
 
-    expect(report.failures[0]?.message).toBe("wrong [REDACTED]");
+    expect(report.failures[0]?.message).toBe("Local cryptographic operation failed");
     expect(JSON.stringify(report)).not.toContain(rawPassphrase);
     expect(JSON.stringify(report)).not.toContain(normalizedPassphrase);
+  });
+
+  it("does not include encoded credentials, exception names or codes in failure reports", async () => {
+    const rawPassphrase = "a\u030a-report-secret-9R!";
+    const encoded = encodeURIComponent(normalizePassphrase(rawPassphrase));
+    const coordinator = new MetadataUnlockCoordinator();
+    const report = await coordinator.run({
+      nodes: [node(1)],
+      chainId: 71,
+      deepFamilyProxy: `0x${"11".repeat(20)}`,
+      getCode: async () => "0x",
+      rawPassphrase,
+      unlockNode: async () => {
+        throw Object.assign(new Error(encoded), { name: rawPassphrase, code: encoded });
+      },
+      cacheValidatedPersonVersion: vi.fn(),
+    });
+
+    expect(report.failures).toEqual([
+      {
+        nodeId: node(1).id,
+        name: "MetadataUnlockError",
+        message: "Local cryptographic operation failed",
+      },
+    ]);
   });
 
   it("cancels the current job and preserves successes already committed", async () => {

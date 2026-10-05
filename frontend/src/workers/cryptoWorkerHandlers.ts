@@ -4,13 +4,13 @@ import {
   decryptPersonVersionEnvelope,
   deriveIdentityMaterial,
   encryptPersonVersionEnvelope,
-  normalizePassphrase,
   roundTripPersonVersionEnvelope,
   wipeBytes,
   wipePreparedPersonVersionContent,
 } from "@deepfamily/protocol-core";
 import { computeIdentityHash } from "../shared/crypto/identityHash";
 import { preflightPersonVersionEnvelopeSizeV1 } from "../shared/metadata/personVersionEnvelopePreflight";
+import { serializeWorkerError } from "../shared/workers/workerErrors";
 import type {
   CryptoWorkerCallMap,
   ValidatedPersonVersionV1Result,
@@ -32,49 +32,7 @@ export type CryptoWorkerResponse =
   | { id: number; ok: true; result: any }
   | { id: number; ok: false; error: { message: string; name?: string; code?: string } };
 
-const redactPassphrase = (message: string, rawPassphrase: unknown): string => {
-  if (typeof rawPassphrase !== "string" || rawPassphrase.length === 0) return message;
-  const candidates = new Set([rawPassphrase]);
-  try {
-    candidates.add(normalizePassphrase(rawPassphrase));
-  } catch {
-    // Keep the raw candidate even when protocol normalization rejects malformed
-    // input; serialization must never turn an error path into a secret leak.
-  }
-  let redacted = message;
-  for (const candidate of candidates) {
-    if (candidate.length > 0) redacted = redacted.split(candidate).join("[REDACTED]");
-  }
-  return redacted;
-};
-
-export const serializeCryptoWorkerError = (
-  error: unknown,
-  rawPassphrase?: unknown,
-): { message: string; name?: string; code?: string } => {
-  if (error && typeof error === "object") {
-    const record = error as Record<string, unknown>;
-    if (typeof record.message === "string") {
-      return {
-        message: redactPassphrase(record.message, rawPassphrase),
-        name: typeof record.name === "string" ? record.name : undefined,
-        code: typeof record.code === "string" ? record.code : undefined,
-      };
-    }
-  }
-  return { message: redactPassphrase(String(error), rawPassphrase) };
-};
-
-const requestPassphrase = (params: unknown): unknown => {
-  if (!params || typeof params !== "object") return undefined;
-  const value = params as Record<string, unknown>;
-  if (typeof value.rawPassphrase === "string") return value.rawPassphrase;
-  if (value.input && typeof value.input === "object") {
-    const nested = value.input as Record<string, unknown>;
-    if (typeof nested.passphrase === "string") return nested.passphrase;
-  }
-  return undefined;
-};
+export { serializeWorkerError as serializeCryptoWorkerError };
 
 const serializeValidatedPersonVersion = (result: {
   metadata: any;
@@ -215,7 +173,7 @@ export async function handleCryptoWorkerRequest(
     post({
       id,
       ok: false,
-      error: serializeCryptoWorkerError(error, requestPassphrase(request.params)),
+      error: serializeWorkerError(error),
     });
   } finally {
     // JavaScript strings cannot be zeroed. Bound the structured-clone lifetime

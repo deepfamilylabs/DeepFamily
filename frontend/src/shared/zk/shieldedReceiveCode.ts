@@ -91,16 +91,14 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
       rawPassphrase: input.rawPassphrase,
       identitySuiteId: IDENTITY_SUITE_CANDIDATE_1,
     });
+    // The remaining proof needs the derived material, never the raw credential.
+    input.rawPassphrase = "";
     return await createShieldedReceiveCode(material);
-  } catch (cause) {
-    // Keep the passphrase out of messages that return to the page.
-    const message = cause instanceof Error ? cause.message : "";
-    throw new Error(
-      message && !message.includes(input.rawPassphrase)
-        ? message
-        : "Receive code could not be created",
-    );
+  } catch {
+    // Library failures can embed normalized/encoded credentials or witnesses.
+    throw new Error("Receive code could not be created");
   } finally {
+    input.rawPassphrase = "";
     wipeBytes(material?.identitySalt);
     wipeBytes(material?.derivedSecretBytes);
   }

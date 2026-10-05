@@ -1,4 +1,5 @@
 import type { Groth16Proof } from "../zk/zk";
+import { serializeWorkerError } from "./workerErrors";
 import type { ShieldedCircuitName, ShieldedWitness } from "../zk/shieldedZk";
 import type {
   ShieldedReceiveCodeCheck,
@@ -103,6 +104,7 @@ const ensureWorker = (): Worker => {
   });
   workerSingleton = worker;
   worker.addEventListener("message", (event: MessageEvent<ZkWorkerResponse>) => {
+    if (workerSingleton !== worker) return;
     const msg = event.data;
     const entry = pending.get(msg.id);
     if (!entry) return;
@@ -115,6 +117,9 @@ const ensureWorker = (): Worker => {
           name: msg.error?.name,
         }),
       );
+    // Keep an immediately chained proof working; otherwise release private
+    // witnesses and any library/Wasm working memory as soon as the queue drains.
+    queueMicrotask(() => terminateZkWorkerIfIdle());
   });
   worker.addEventListener("error", () => {
     if (workerSingleton !== worker) return;
@@ -147,12 +152,14 @@ export function zkWorkerCall<M extends keyof ZkWorkerCallMap>(
     } catch (error) {
       pending.delete(id);
       if (entry.timeoutId !== undefined) clearTimeout(entry.timeoutId);
-      reject(error instanceof Error ? error : new Error(String(error)));
+      const diagnostic = serializeWorkerError(error);
+      reject(Object.assign(new Error(diagnostic.message), diagnostic));
     } finally {
       // The Worker receives a structured clone. Clear the main-thread request
       // envelope immediately so role witnesses and digest limbs cannot linger
       // in an instrumentation/message buffer after dispatch.
       request.params = undefined;
+      terminateZkWorkerIfIdle();
     }
   });
 }

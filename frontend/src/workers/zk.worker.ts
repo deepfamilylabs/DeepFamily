@@ -1,4 +1,5 @@
 import type { Groth16Proof } from "../shared/zk/zk";
+import { serializeWorkerError } from "../shared/workers/workerErrors";
 import {
   generateShieldedProof,
   type ShieldedCircuitName,
@@ -68,21 +69,7 @@ type ZkWorkerResponse =
   | { id: number; ok: true; result: any }
   | { id: number; ok: false; error: { message: string; name?: string } };
 
-const getErrorShape = (err: unknown): { message: string; name?: string } => {
-  if (err && typeof err === "object") {
-    const anyErr = err as any;
-    if (typeof anyErr.message === "string")
-      return {
-        message: anyErr.message,
-        name: typeof anyErr.name === "string" ? anyErr.name : undefined,
-      };
-  }
-  return { message: String(err) };
-};
-
-function assertDescriptorPurpose(
-  purpose: "PersonRelation" | "DisclosureBinding",
-) {
+function assertDescriptorPurpose(purpose: "PersonRelation" | "DisclosureBinding") {
   return getProofDescriptorByPurpose(purpose);
 }
 
@@ -129,7 +116,7 @@ self.addEventListener("message", async (event: MessageEvent<ZkWorkerRequest>) =>
     const result = await handler(request.params);
     post({ id, ok: true, result });
   } catch (err) {
-    post({ id, ok: false, error: getErrorShape(err) });
+    post({ id, ok: false, error: serializeWorkerError(err) });
   } finally {
     // Bound private witness lifetime to this job. Strings cannot be zeroed, so
     // cancellation terminates this realm and normal completion severs the

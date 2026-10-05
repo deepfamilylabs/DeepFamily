@@ -432,6 +432,7 @@ export function ShieldedInheritancePanel({
     [nodesData],
   );
   const identityForm = useRef<PersonHashCalculatorHandle>(null);
+  const identityDerivation = useRef<AbortController | null>(null);
   const walletCache = useRef<LocalShieldedWalletSnapshot | null>(null);
   const running = useRef(false);
   const [action, setAction] = useState<Action>("shield");
@@ -498,6 +499,8 @@ export function ShieldedInheritancePanel({
       previousScope.current = scope;
       operationEpoch.current += 1;
       walletCache.current = null;
+      identityDerivation.current?.abort();
+      identityForm.current?.clearSecretInputs();
     }
   }, [scope]);
 
@@ -508,6 +511,8 @@ export function ShieldedInheritancePanel({
       operationEpoch.current += 1;
       activeIdentity.current = null;
       walletCache.current = null;
+      identityDerivation.current?.abort();
+      identityForm.current?.clearSecretInputs();
       recipientCredentialsFormRef.current?.clearSecretInputs();
       if (mounted.current) {
         running.current = false;
@@ -1040,6 +1045,7 @@ export function ShieldedInheritancePanel({
 
   function lockIdentity() {
     operationEpoch.current += 1;
+    identityDerivation.current?.abort();
     activeIdentity.current = null;
     recipientCredentialsFormRef.current?.clearSecretInputs();
     session.lock();
@@ -1052,11 +1058,15 @@ export function ShieldedInheritancePanel({
     if (running.current) return;
     running.current = true;
     const epoch = operationEpoch.current;
+    const controller = new AbortController();
+    identityDerivation.current = controller;
     setBusy(true);
     setError("");
     setStage(t("shielded.stages.deriving"));
     try {
-      const material = await deriveIdentityFromForm(identityForm.current);
+      const material = await deriveIdentityFromForm(identityForm.current, {
+        signal: controller.signal,
+      });
       if (!mounted.current || epoch !== operationEpoch.current || currentScope.current !== scope)
         return;
       session.unlock(material);
@@ -1074,7 +1084,11 @@ export function ShieldedInheritancePanel({
       );
       setStage("");
     } finally {
-      identityForm.current?.clearSecretInputs();
+      if (identityDerivation.current === controller) {
+        identityDerivation.current = null;
+        if (mounted.current && epoch === operationEpoch.current && currentScope.current === scope)
+          identityForm.current?.clearSecretInputs();
+      }
       if (mounted.current && epoch === operationEpoch.current && currentScope.current === scope) {
         running.current = false;
         setBusy(false);
@@ -1674,7 +1688,7 @@ export function ShieldedInheritancePanel({
             ref={identityForm}
             showTitle={false}
             collapsible={false}
-            computeHash={false}
+            computeHash={!busy}
             showPassphraseGuidance={false}
             className="border-0 bg-transparent p-0 shadow-none"
           />

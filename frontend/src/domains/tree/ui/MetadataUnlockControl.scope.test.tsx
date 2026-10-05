@@ -279,6 +279,32 @@ describe("MetadataUnlockControl selection and scope", () => {
     expect(unlockButton().textContent).toBe("Unlock 1 selected version(s)");
   });
 
+  it.each([false, true])(
+    "clears and remasks the input on pagehide persisted=%s",
+    async (persisted) => {
+      render(<MetadataUnlockControl open target={target} />);
+      const input = await enterPassphrase("metadata-pagehide-secret-9Q!");
+      fireEvent.click(screen.getByRole("button", { name: "Show identity passphrase" }));
+      expect(input.type).toBe("text");
+      mocks.coordinatorCancel.mockClear();
+
+      act(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted })));
+
+      expect(input.value).toBe("");
+      expect(input.type).toBe("password");
+      expect(mocks.coordinatorCancel).toHaveBeenCalled();
+    },
+  );
+
+  it("clears the detached password element when the dialog unmounts", async () => {
+    const { unmount } = render(<MetadataUnlockControl open target={target} />);
+    const input = await enterPassphrase("metadata-unmount-secret-4K!");
+
+    unmount();
+
+    expect(input.value).toBe("");
+  });
+
   it("swaps in a separate cancel button, so a second click cannot stop the batch it started", async () => {
     mocks.coordinatorRun.mockImplementation((options) => {
       options.onProgress(report({ status: "running", processed: 0, succeeded: 0 }));

@@ -1,4 +1,5 @@
-import { normalizePassphrase, type BigNumberish } from "@deepfamily/protocol-core";
+import type { BigNumberish } from "@deepfamily/protocol-core";
+import { serializeWorkerError } from "../workers/workerErrors";
 import type { NodeData } from "../model/graph";
 import { isMetadataUnlockUsable, rebaseValidatedMetadataUnlock } from "../model/metadataUnlock";
 import {
@@ -74,35 +75,9 @@ interface ActiveRun {
 
 const defaultUnlockNode: MetadataNodeUnlocker = (input) => unlockPersonVersionNode(input);
 
-const redactSecret = (message: string, rawPassphrase: string): string => {
-  let redacted = message;
-  const candidates = new Set([rawPassphrase]);
-  try {
-    candidates.add(normalizePassphrase(rawPassphrase));
-  } catch {
-    // Raw input remains a redaction candidate when normalization rejects a
-    // malformed programmatic string.
-  }
-  for (const candidate of candidates) {
-    if (candidate.length > 0) redacted = redacted.split(candidate).join("[REDACTED]");
-  }
-  return redacted.slice(0, 500);
-};
-
-const safeFailure = (
-  nodeId: string,
-  error: unknown,
-  rawPassphrase: string,
-): MetadataUnlockFailure => {
-  const record =
-    error && typeof error === "object" ? (error as Record<string, unknown>) : undefined;
-  const name = typeof record?.name === "string" ? record.name : "MetadataUnlockError";
-  const code = typeof record?.code === "string" ? record.code : undefined;
-  const rawMessage =
-    typeof record?.message === "string"
-      ? record.message
-      : "This metadata version could not be unlocked";
-  return { nodeId, name, code, message: redactSecret(rawMessage, rawPassphrase) };
+const safeFailure = (nodeId: string, error: unknown): MetadataUnlockFailure => {
+  const diagnostic = serializeWorkerError(error);
+  return { nodeId, ...diagnostic, name: diagnostic.name ?? "MetadataUnlockError" };
 };
 
 const isCancellation = (error: unknown): boolean =>
@@ -196,7 +171,7 @@ export class MetadataUnlockCoordinator {
             try {
               await options.persistUnlocked(committed);
             } catch (error) {
-              const failure = safeFailure(node.id, error, options.rawPassphrase);
+              const failure = safeFailure(node.id, error);
               persistenceFailures.push(failure);
               progress.persistenceFailed += 1;
               options.onPersistenceError?.(failure);
@@ -208,7 +183,7 @@ export class MetadataUnlockCoordinator {
             active.controller.abort();
             break;
           }
-          failures.push(safeFailure(node.id, error, options.rawPassphrase));
+          failures.push(safeFailure(node.id, error));
           progress.failed += 1;
           progress.processed += 1;
           emit();

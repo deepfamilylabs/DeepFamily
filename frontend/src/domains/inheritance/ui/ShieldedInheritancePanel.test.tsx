@@ -3648,8 +3648,11 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     renderPanel();
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
     expect(mocks.deriveIdentityFromForm).toHaveBeenCalledTimes(1);
+    const signal = mocks.deriveIdentityFromForm.mock.calls[0][1].signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
 
     act(() => window.dispatchEvent(new Event("pagehide")));
+    expect(signal.aborted).toBe(true);
     await act(async () => derivation.resolve(identity));
 
     expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();

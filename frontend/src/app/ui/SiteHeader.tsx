@@ -106,7 +106,7 @@ const SiteHeader = memo(() => {
         <form
           role="search"
           onSubmit={handleSearchSubmit}
-          className="hidden md:flex h-9 min-w-0 flex-1 max-w-xs lg:max-w-sm items-center gap-2 rounded-full border border-hairline bg-surface-alt px-3.5 transition-colors focus-within:border-hairline-strong"
+          className="hidden md:flex h-9 min-w-0 flex-1 max-w-[39rem] items-center gap-2 rounded-full border border-hairline bg-surface-alt px-3.5 transition-colors focus-within:border-hairline-strong"
         >
           <Search className="w-4 h-4 shrink-0 text-ink-subtle" aria-hidden="true" />
           <input

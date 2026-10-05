@@ -50,6 +50,32 @@ describe("ZK worker lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not return credentials from a failed structured clone", async () => {
+    const secret = "zk-dispatch-secret-8Q!";
+    const post = vi.spyOn(FakeWorker.prototype, "postMessage").mockImplementationOnce((request) => {
+      const passphrase = request.params.rawPassphrase;
+      throw Object.assign(new Error(encodeURIComponent(passphrase)), { name: passphrase });
+    });
+    try {
+      await expect(
+        zkWorkerCall("createShieldedReceiveCodeFromCredentials", {
+          identity: {
+            fullName: "Alice",
+            gender: 0,
+            birthYear: 2000,
+            birthMonth: 1,
+            birthDay: 1,
+            isBirthBC: false,
+          },
+          rawPassphrase: secret,
+        }),
+      ).rejects.toThrow("Local cryptographic operation failed");
+      expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
+    } finally {
+      post.mockRestore();
+    }
+  });
+
   it("only performs an idle cleanup when no proof call is pending and recreates after termination", async () => {
     const witnessSentinel = 918273645546372819n;
     const digestLoSentinel = "717273747576777879";
@@ -120,6 +146,7 @@ describe("ZK worker lifecycle", () => {
     secondWorker.emit("message", { id: request.id, ok: true, result: { ok: true } });
 
     await expect(secondCall).resolves.toEqual({ ok: true });
+    expect(secondWorker.terminate).toHaveBeenCalledOnce();
     expect(terminateZkWorkerIfIdle()).toBe(true);
     expect(secondWorker.terminate).toHaveBeenCalledOnce();
     expect(secondWorker.deliveredMessages).toEqual([]);

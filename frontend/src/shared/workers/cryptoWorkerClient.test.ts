@@ -100,6 +100,37 @@ describe("crypto worker lifecycle", () => {
     complete(worker);
     await third;
     expect(FakeWorker.instances).toHaveLength(1);
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(worker.deliveredMessages).toEqual([]);
+  });
+
+  it("does not expose credentials when dispatch throws before structured cloning", async () => {
+    const secret = "dispatch-private-secret-7P!";
+    const post = vi.spyOn(FakeWorker.prototype, "postMessage").mockImplementationOnce((request) => {
+      const passphrase = request.params.input.passphrase;
+      throw Object.assign(new Error(encodeURIComponent(passphrase)), {
+        name: passphrase,
+        code: passphrase,
+      });
+    });
+    try {
+      await expect(
+        cryptoWorkerCall("computeIdentityHash", {
+          input: {
+            fullName: "Alice",
+            gender: 0,
+            birthYear: 2000,
+            birthMonth: 1,
+            birthDay: 1,
+            isBirthBC: false,
+            passphrase: secret,
+          },
+        }),
+      ).rejects.toThrow("Local cryptographic operation failed");
+      expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();
+    } finally {
+      post.mockRestore();
+    }
   });
 
   it("preempts an active background job and dispatches foreground before queued background", async () => {

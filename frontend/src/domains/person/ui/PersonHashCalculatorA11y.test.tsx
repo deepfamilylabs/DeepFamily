@@ -113,6 +113,93 @@ describe("PersonHashCalculator accessibility", () => {
     expect(nextSignal?.aborted).toBe(true);
   });
 
+  it.each([false, true])(
+    "clears both passphrases and cancels hashing on pagehide persisted=%s",
+    async (persisted) => {
+      vi.useFakeTimers();
+      render(
+        <ToastProvider>
+          <PersonHashCalculator
+            showTitle={false}
+            requirePassphraseConfirmation
+            initialValues={{ fullName: "Alice" }}
+          />
+        </ToastProvider>,
+      );
+      const passphrase = screen.getByLabelText("Identity passphrase") as HTMLInputElement;
+      const confirmation = screen.getByPlaceholderText(
+        "Repeat the identity passphrase (empty is allowed)",
+      ) as HTMLInputElement;
+      fireEvent.change(passphrase, { target: { value: "pagehide-secret-7aQ!" } });
+      fireEvent.change(confirmation, { target: { value: "pagehide-secret-7aQ!" } });
+      fireEvent.click(screen.getByRole("button", { name: "Show identity passphrase" }));
+      fireEvent.click(screen.getByRole("button", { name: "Show passphrase" }));
+      await act(async () => vi.advanceTimersByTimeAsync(300));
+      const signal = workerCall.mock.calls[workerCall.mock.calls.length - 1]?.[2]?.signal;
+      expect(signal?.aborted).toBe(false);
+      const callCount = workerCall.mock.calls.length;
+
+      act(() => window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted })));
+
+      expect(passphrase.value).toBe("");
+      expect(confirmation.value).toBe("");
+      expect(passphrase.type).toBe("password");
+      expect(confirmation.type).toBe("password");
+      expect(signal?.aborted).toBe(true);
+      await act(async () => vi.advanceTimersByTimeAsync(500));
+      expect(workerCall).toHaveBeenCalledTimes(callCount);
+    },
+  );
+
+  it("keeps credentials out of public callbacks and clears detached inputs on unmount", () => {
+    const onPublicFormChange = vi.fn();
+    const { unmount } = render(
+      <ToastProvider>
+        <PersonHashCalculator
+          computeHash={false}
+          requirePassphraseConfirmation
+          onPublicFormChange={onPublicFormChange}
+        />
+      </ToastProvider>,
+    );
+    const passphrase = screen.getByLabelText("Identity passphrase") as HTMLInputElement;
+    const confirmation = screen.getByPlaceholderText(
+      "Repeat the identity passphrase (empty is allowed)",
+    ) as HTMLInputElement;
+    const secret = "unmount-secret-a\u030a-8kP!";
+    fireEvent.change(passphrase, { target: { value: secret } });
+    fireEvent.change(confirmation, { target: { value: secret } });
+
+    expect(onPublicFormChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ hasPassphrase: true }),
+    );
+    expect(JSON.stringify(onPublicFormChange.mock.calls)).not.toContain(secret);
+    expect(onPublicFormChange.mock.calls.every(([data]) => !("passphrase" in data))).toBe(true);
+    expect(passphrase.getAttribute("value")).toBeNull();
+    expect(confirmation.getAttribute("value")).toBeNull();
+    unmount();
+
+    expect(passphrase.value).toBe("");
+    expect(confirmation.value).toBe("");
+  });
+
+  it("remasks a revealed passphrase when the browser loses focus", () => {
+    render(
+      <ToastProvider>
+        <PersonHashCalculator computeHash={false} />
+      </ToastProvider>,
+    );
+    const passphrase = screen.getByLabelText("Identity passphrase") as HTMLInputElement;
+    fireEvent.change(passphrase, { target: { value: "focus-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show identity passphrase" }));
+    expect(passphrase.type).toBe("text");
+
+    act(() => window.dispatchEvent(new Event("blur")));
+
+    expect(passphrase.type).toBe("password");
+    expect(passphrase.value).toBe("focus-secret");
+  });
+
   it("exposes local themed selects as keyboard listboxes", () => {
     render(
       <ToastProvider>

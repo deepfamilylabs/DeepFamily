@@ -75,12 +75,14 @@ describe("recipient empty-passphrase protection inside the ZK worker", () => {
     "accepts %s nonempty credentials and preserves the original passphrase",
     async (_label, rawPassphrase) => {
       mocks.deriveIdentityMaterial.mockRejectedValueOnce(new Error("KDF unavailable"));
-      await expect(
-        createShieldedReceiveCodeFromCredentials({
-          identity: { ...identity.identity, fullName: "\u3000Ａｄａ\u0085Example\u00a0" },
-          rawPassphrase,
-        }),
-      ).rejects.toThrow("KDF unavailable");
+      const credentials = {
+        identity: { ...identity.identity, fullName: "\u3000Ａｄａ\u0085Example\u00a0" },
+        rawPassphrase,
+      };
+      await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow(
+        "Receive code could not be created",
+      );
+      expect(credentials.rawPassphrase).toBe("");
       expect(mocks.deriveIdentityMaterial).toHaveBeenCalledExactlyOnceWith({
         identity: identity.identity,
         rawPassphrase,

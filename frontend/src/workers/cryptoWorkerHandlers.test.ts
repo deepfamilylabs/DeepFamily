@@ -230,9 +230,8 @@ describe("production crypto worker handlers", () => {
         Object.assign(new Error(`failed for ${rawPassphrase.normalize("NFC")}`), {
           code: "KDF_FAILED",
         }),
-        rawPassphrase,
       ),
-    ).toMatchObject({ message: "failed for [REDACTED]", code: "KDF_FAILED" });
+    ).toMatchObject({ message: "Identity key derivation failed", code: "KDF_FAILED" });
   });
 
   it("redacts nested shared-identity passphrases from Worker errors", async () => {
@@ -255,7 +254,7 @@ describe("production crypto worker handlers", () => {
     expect(responses[0]).toMatchObject({
       id: 43,
       ok: false,
-      error: { message: "derive failed for [REDACTED]", code: "KDF_FAILED" },
+      error: { message: "Identity key derivation failed", code: "KDF_FAILED" },
     });
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase.normalize("NFC"));
@@ -281,7 +280,7 @@ describe("production crypto worker handlers", () => {
     expect(responses[0]).toMatchObject({
       id: 44,
       ok: false,
-      error: { message: "derive failed for [REDACTED]" },
+      error: { message: "Local cryptographic operation failed" },
     });
     expect(JSON.stringify(responses)).not.toContain(rawPassphrase);
     expect(JSON.stringify(responses)).not.toContain(normalizedPassphrase);

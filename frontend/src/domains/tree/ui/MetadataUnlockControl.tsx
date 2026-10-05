@@ -229,7 +229,13 @@ export function MetadataUnlockControl({
   const coordinatorRef = useRef(new MetadataUnlockCoordinator());
   const nodesDataRef = useRef(nodesData);
   nodesDataRef.current = nodesData;
-  const passphraseRef = useRef<HTMLInputElement>(null);
+  const passphraseRef = useRef<HTMLInputElement | null>(null);
+  const bindPassphraseInput = useCallback((input: HTMLInputElement | null) => {
+    if (passphraseRef.current && passphraseRef.current !== input) {
+      passphraseRef.current.value = "";
+    }
+    passphraseRef.current = input;
+  }, []);
   const preflightGenerationRef = useRef(0);
   const attemptGenerationRef = useRef(0);
   const [localOpen, setLocalOpen] = useState(false);
@@ -348,6 +354,25 @@ export function MetadataUnlockControl({
     setProgress(null);
     setError("");
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const hidePassphrase = () => setShowPassphrase(false);
+    const visibilityChanged = () => {
+      if (document.visibilityState === "hidden") hidePassphrase();
+    };
+    const pageShow = () => setPreflightRetry((revision) => revision + 1);
+    window.addEventListener("pagehide", clearAttemptState);
+    window.addEventListener("pageshow", pageShow);
+    window.addEventListener("blur", hidePassphrase);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => {
+      window.removeEventListener("pagehide", clearAttemptState);
+      window.removeEventListener("pageshow", pageShow);
+      window.removeEventListener("blur", hidePassphrase);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+  }, [open, clearAttemptState]);
 
   useEffect(
     () => () => {
@@ -519,7 +544,6 @@ export function MetadataUnlockControl({
       coordinatorRef.current.cancel();
       throw new Error("Metadata unlock scope changed");
     };
-    const rawPassphrase = passphraseRef.current?.value ?? "";
     const pending = preparedNodes.filter(
       (node) =>
         viewScopeRef.current.nodeIds.has(node.id) &&
@@ -536,7 +560,7 @@ export function MetadataUnlockControl({
       chainId,
       deepFamilyProxy: contractAddress,
       getCode: (pointer, blockTag) => provider.getCode(pointer, blockTag),
-      rawPassphrase,
+      rawPassphrase: passphraseRef.current?.value ?? "",
       getCurrentNode: (nodeId) => {
         assertCurrent();
         return nodesDataRef.current[nodeId];
@@ -1127,7 +1151,7 @@ export function MetadataUnlockControl({
               <div className="relative min-w-0 flex-1">
                 <input
                   id={passphraseId}
-                  ref={passphraseRef}
+                  ref={bindPassphraseInput}
                   type={showPassphrase ? "text" : "password"}
                   autoComplete="off"
                   autoCapitalize="none"

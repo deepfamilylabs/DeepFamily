@@ -4,6 +4,7 @@ import type {
   PersonVersionMetadataInput,
 } from "@deepfamily/protocol-core";
 import type { IdentityHashInput } from "../crypto/identityHash";
+import { serializeWorkerError } from "./workerErrors";
 
 export interface IdentityMaterialV1Result {
   identitySuiteId: number;
@@ -275,13 +276,17 @@ const dispatchNext = (): void => {
       }
       worker.postMessage(request);
     } catch (error) {
-      removePending(request.id)?.reject(error instanceof Error ? error : new Error(String(error)));
+      const diagnostic = serializeWorkerError(error);
+      removePending(request.id)?.reject(Object.assign(new Error(diagnostic.message), diagnostic));
     } finally {
       // postMessage performs a synchronous structured clone. Do not retain
       // secrets in caller-realm request objects after dispatch.
       request.params = undefined;
     }
   }
+  // Release the worker's JS/Wasm memory after the final job, including KDF
+  // implementation buffers that application-level wiping cannot reach.
+  if (activeId === null && pending.size === 0) stopWorker();
 };
 
 const abortError = (): Error =>
