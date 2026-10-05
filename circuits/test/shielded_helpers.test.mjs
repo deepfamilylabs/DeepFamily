@@ -59,7 +59,7 @@ async function compile(directory, name, source) {
   };
 }
 
-function merkleSource(maxDepth) {
+function merkleSource(maxDepth, gated = false) {
   return `pragma circom 2.2.3;
 include "shielded_merkle_common.circom";
 template MembershipCheck() {
@@ -68,12 +68,13 @@ template MembershipCheck() {
     signal input depth;
     signal input index;
     signal input siblings[${maxDepth}];
+    ${gated ? "signal input enabled;\n    enabled * (enabled - 1) === 0;" : ""}
     component membership = ShieldedMerkleRoot(${maxDepth});
     membership.leaf <== leaf;
     membership.depth <== depth;
     membership.index <== index;
     membership.siblings <== siblings;
-    membership.out === root;
+    ${gated ? "enabled * (membership.out - root) === 0;" : "membership.out === root;"}
 }
 component main = MembershipCheck();`;
 }
@@ -341,13 +342,42 @@ component main = DomainCheck();`,
         `${maxDepth}-level helper rejects depth and index outside supported ranges`,
         async () => {
           const witness = membershipWitness(maxDepth, 0n);
-          // Positive depths above the limit still fit the depth bit width.
-          // Without the upper-bound constraint the mux selects this maximum-
-          // depth root, so a stale root cannot mask a missing range check.
+          // The library selects root zero outside its supported depths.
+          // Match that value so a stale root cannot mask a missing range check.
           for (const depth of [maxDepth + 1, 2 * maxDepth - 1, -1]) {
-            await merkle.invalid({ ...witness, depth: String(depth) });
+            await merkle.invalid({ ...witness, root: "0", depth: String(depth) });
           }
           await merkle.invalid({ ...witness, index: String(1n << BigInt(maxDepth)) });
+        },
+      );
+      const gatedMerkle = await compile(
+        directory,
+        `gated_membership_${maxDepth}`,
+        merkleSource(maxDepth, true),
+      );
+      await t.test(
+        `${maxDepth}-level helper gates only root equality with a Boolean enable`,
+        async () => {
+          const witness = membershipWitness(maxDepth, 0n);
+          const wrongRoot = String(BigInt(witness.root) + 1n);
+          await gatedMerkle.valid({ ...witness, enabled: "1" });
+          await gatedMerkle.invalid({ ...witness, root: wrongRoot, enabled: "1" });
+          await gatedMerkle.valid({ ...witness, root: wrongRoot, enabled: "0" });
+          for (const enabled of ["2", "-1"]) {
+            await gatedMerkle.invalid({ ...witness, enabled });
+          }
+        },
+      );
+      await t.test(
+        `${maxDepth}-level helper keeps depth and index bounds when root checking is disabled`,
+        async () => {
+          const witness = { ...membershipWitness(maxDepth, 0n), root: "0", enabled: "0" };
+          for (const depth of [maxDepth + 1, 2 * maxDepth - 1, -1]) {
+            await gatedMerkle.invalid({ ...witness, depth: String(depth) });
+          }
+          for (const index of [String(1n << BigInt(maxDepth)), "-1"]) {
+            await gatedMerkle.invalid({ ...witness, index });
+          }
         },
       );
     }
