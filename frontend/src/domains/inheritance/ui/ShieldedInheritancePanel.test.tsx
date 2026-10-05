@@ -923,6 +923,55 @@ describe("ShieldedInheritancePanel unlocked account", () => {
     );
   });
 
+  it.each(["approval", "deposit"])(
+    "stops after wallet rejection during %s and permits an explicit retry without repeating a confirmed approval",
+    async (rejectedStage) => {
+      const rejection = Object.assign(
+        new Error(
+          'user rejected action (action="sendTransaction", reason="rejected", payload={"method":"eth_sendTransaction"})',
+        ),
+        {
+          code: "ACTION_REJECTED",
+          reason: "rejected",
+          info: { error: { code: 4001, message: "ethers-user-denied: [UserRejected 4001]" } },
+        },
+      );
+      mocks.tokenAllowance.mockResolvedValue(0n);
+      mocks.tokenApprove.mockImplementation(async (_pool: string, amount: bigint) => ({
+        hash: transactionHash,
+        wait: async () => {
+          mocks.tokenAllowance.mockResolvedValue(amount);
+          return { status: 1 };
+        },
+      }));
+      if (rejectedStage === "approval") mocks.tokenApprove.mockRejectedValueOnce(rejection);
+      else mocks.submitShield.mockRejectedValueOnce(rejection);
+      renderPanel();
+      await unlock();
+      fireEvent.change(screen.getByRole("textbox", { name: "shielded.fields.amount" }), {
+        target: { value: "1000" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+
+      expect((await screen.findByRole("alert")).textContent).toBe("errors.contractError.rejected");
+      expect(mocks.tokenApprove).toHaveBeenCalledOnce();
+      expect(mocks.submitShield).toHaveBeenCalledTimes(rejectedStage === "approval" ? 0 : 1);
+      expect(screen.queryByText("shielded.done")).toBeNull();
+      expect(screen.getByText(identity.identity.fullName)).toBeTruthy();
+      expect(
+        (screen.getByRole("textbox", { name: "shielded.fields.amount" }) as HTMLInputElement).value,
+      ).toBe("1000");
+      expect(
+        (screen.getByRole("button", { name: "shielded.submit" }) as HTMLButtonElement).disabled,
+      ).toBe(false);
+
+      fireEvent.click(screen.getByRole("button", { name: "shielded.submit" }));
+      await screen.findByText("shielded.done");
+      expect(mocks.tokenApprove).toHaveBeenCalledTimes(rejectedStage === "approval" ? 2 : 1);
+      expect(mocks.submitShield).toHaveBeenCalledTimes(rejectedStage === "approval" ? 1 : 2);
+    },
+  );
+
   it("deposits native assets using the wallet's native balance and skips ERC-20 approval", async () => {
     const getBalance = vi.fn(async () => 10n ** 19n);
     renderPanel({

@@ -1604,6 +1604,8 @@ export function ShieldedInheritancePanel({
             ? t(`shielded.receiveCodeErrors.${cause.reason}`)
             : errorReason &&
                 [
+                  "USER_REJECTED",
+                  "rejected",
                   "ERC20InsufficientBalance",
                   "ERC20InsufficientAllowance",
                   "LOCAL_NONCE_TOO_LOW",
