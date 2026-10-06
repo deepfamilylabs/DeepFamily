@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { Search, Menu } from "lucide-react";
 import HeaderControls from "./HeaderControls";
 import Logo from "./Logo";
-import { getBadgeConfig } from "../config/brandBadge";
 import { useActivePath, useSidebar } from "../context";
 
 /**
@@ -24,20 +23,6 @@ import { useActivePath, useSidebar } from "../context";
  * the wordmark step aside for the mark alone, and the wallet slot is the one
  * that gives way, so the header never runs off the edge.
  */
-
-/** The environment badge (TESTNET, DEMO, …) stays visible at every breakpoint. */
-function BrandBadge({ className = "" }: { className?: string }) {
-  const badgeConfig = getBadgeConfig();
-  if (!badgeConfig) return null;
-
-  return (
-    <span
-      className={`text-[9px] font-bold px-1.5 py-1 rounded-sm ${badgeConfig.className} ${badgeConfig.colorClasses} whitespace-nowrap leading-none tracking-wider pointer-events-none ${className}`}
-    >
-      {badgeConfig.text}
-    </span>
-  );
-}
 
 const SiteHeader = memo(() => {
   const { t } = useTranslation();
@@ -92,17 +77,13 @@ const SiteHeader = memo(() => {
             onClick={() => handleNavClick("/")}
           >
             <Logo className="w-7 h-7 shrink-0 text-orange-500 transition-transform duration-300 group-hover:-rotate-90" />
-            <div className="inline-flex items-baseline gap-1 max-[359px]:hidden">
-              <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">
-                Deepfamily
-              </span>
-              <BrandBadge className="hidden sm:inline-flex" />
-            </div>
+            <span className="text-[1.6rem] font-display mt-1 leading-none font-medium bg-linear-to-r from-orange-400 to-red-500 bg-clip-text text-transparent max-[359px]:hidden">
+              Deepfamily
+            </span>
           </NavLink>
         </div>
 
         {/* Desktop: the rail carries the brand, so the slot holds search */}
-        <BrandBadge className="hidden md:inline-flex shrink-0" />
         <form
           role="search"
           onSubmit={handleSearchSubmit}

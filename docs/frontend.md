@@ -55,7 +55,7 @@ frontend/src/
 Use the directory tree for ownership boundaries, and these files as first-read entry points when tracing behavior:
 
 - App shell: `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/AppProviders.tsx`, `frontend/src/app/ui/Layout.tsx`
-- Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/app/config/brandBadge.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
+- Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
 - Wallet connection and local transaction boundary: `frontend/src/domains/wallet/context/WalletContext.tsx`, `frontend/src/domains/wallet/services/walletProvider.ts`
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
@@ -330,7 +330,6 @@ VITE_ROOT_VERSION_INDEX=...
 | `VITE_SHOW_DEBUG`                                                    | Enable debug UI (tree debug panel, etc.)                                   |
 | `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
 | `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                       |
-| `VITE_BRAND_BADGE`                                                   | Show a build/brand badge in the header                                     |
 
 ### Local auto-config
 

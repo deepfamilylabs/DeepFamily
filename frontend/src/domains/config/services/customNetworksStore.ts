@@ -14,15 +14,14 @@ export function loadCustomNetworks(): NetworkOption[] {
           n &&
           typeof n.chainId === "number" &&
           typeof n.name === "string" &&
-          typeof n.rpcUrl === "string",
+          typeof n.rpcUrl === "string" &&
+          typeof n.readerAddress === "string",
       )
       .map((n) => ({
         chainId: n.chainId as number,
         name: n.name as string,
         rpcUrl: n.rpcUrl as string,
-        // Records saved before custom networks carried one load without it; the
-        // switch then falls back the way any unknown chain does.
-        readerAddress: typeof n.readerAddress === "string" ? n.readerAddress : undefined,
+        readerAddress: n.readerAddress as string,
         isCustom: true,
       }));
   } catch {
@@ -36,7 +35,7 @@ export function saveCustomNetworks(list: NetworkOption[]): void {
       chainId,
       name,
       rpcUrl,
-      ...(readerAddress ? { readerAddress } : {}),
+      readerAddress,
     }));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serialized));
   } catch {

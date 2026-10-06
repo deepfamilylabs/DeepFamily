@@ -49,10 +49,6 @@ vi.mock("./Logo", () => ({
   default: (props: any) => <svg data-testid="logo" {...props} />,
 }));
 
-vi.mock("../config/brandBadge", () => ({
-  getBadgeConfig: () => null,
-}));
-
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
@@ -141,7 +137,7 @@ describe("SiteHeader", () => {
     expect(brand?.className).toContain("shrink-0");
     expect(screen.getByText("Deepfamily")).toBeTruthy();
     // The narrowest phones keep the mark and let the wordmark go.
-    expect(screen.getByText("Deepfamily").parentElement?.className).toContain("max-[359px]:hidden");
+    expect(screen.getByText("Deepfamily").className).toContain("max-[359px]:hidden");
 
     const trigger = screen.getByLabelText("Open menu");
     expect(trigger.getAttribute("aria-controls")).toBe("global-sidebar");

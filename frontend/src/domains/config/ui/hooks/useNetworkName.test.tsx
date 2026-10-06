@@ -45,7 +45,14 @@ describe("useNetworkName", () => {
   it("uses a custom network's own name, which nothing else knows", () => {
     localStorage.setItem(
       "ft:customNetworks",
-      JSON.stringify([{ chainId: 31338, name: "My Local", rpcUrl: "http://my-local" }]),
+      JSON.stringify([
+        {
+          chainId: 31338,
+          name: "My Local",
+          rpcUrl: "http://my-local",
+          readerAddress: "0x" + "9".repeat(40),
+        },
+      ]),
     );
     mocks.chainId = 31338;
 

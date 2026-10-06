@@ -102,19 +102,14 @@ export function getIpfsGatewayBaseUrlEnvList(): string[] {
   return readListEnv(getViteEnv().VITE_IPFS_GATEWAY_BASE_URLS);
 }
 
-export function getBrandBadgeEnv(): string {
-  return getStringEnv("VITE_BRAND_BADGE", "none").toLowerCase();
-}
-
 export function getDefaultRpcUrl(): string {
   return getStringEnv("VITE_RPC_URL");
 }
 
 /**
- * The entry reader for the chain `VITE_RPC_URL` points at.
- *
- * The entry reader for person and tree data. The shielded pool has a separate
- * address because it is not a module of DeepFamily.
+ * The entry reader for person and tree data on the chain `VITE_RPC_URL` points
+ * at. Shielded pools are not DeepFamily modules, so they come from the pool
+ * factory below instead.
  */
 export function getDefaultReaderAddress(): string {
   return getStringEnv("VITE_READER_ADDRESS");
@@ -133,28 +128,21 @@ export function getChainEntryReaderAddress(chainId: number): string {
   return getStringEnv(`VITE_READER_ADDRESS_${chainId}`);
 }
 
-function getModuleAddress(key: string, chainId: number): string {
+/** `${key}_${chainId}` when set, otherwise the unsuffixed `key`. */
+function getPerChainEnv(key: string, chainId: number): string {
   const perChain =
-    Number.isSafeInteger(chainId) && chainId > 0 ? getStringEnv(`${key}_${chainId}`) : "";
-  return perChain.trim() || getStringEnv(key).trim();
+    Number.isSafeInteger(chainId) && chainId > 0 ? getStringEnv(`${key}_${chainId}`).trim() : "";
+  return perChain || getStringEnv(key).trim();
 }
 
 /** Address of the immutable shielded asset factory for the selected chain. */
 export function getShieldedPoolFactoryAddress(chainId: number): string {
-  return getModuleAddress("VITE_SHIELDED_POOL_FACTORY_ADDRESS", chainId);
-}
-
-function getShieldedDeploymentBlock(key: string, chainId: number): number {
-  const value =
-    Number.isSafeInteger(chainId) && chainId > 0
-      ? getStringEnv(`${key}_${chainId}`) || getStringEnv(key)
-      : getStringEnv(key);
-  const block = Number(value);
-  return Number.isSafeInteger(block) && block >= 0 ? block : 0;
+  return getPerChainEnv("VITE_SHIELDED_POOL_FACTORY_ADDRESS", chainId);
 }
 
 export function getShieldedPoolFactoryDeploymentBlock(chainId: number): number {
-  return getShieldedDeploymentBlock("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK", chainId);
+  const block = Number(getPerChainEnv("VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK", chainId));
+  return Number.isSafeInteger(block) && block >= 0 ? block : 0;
 }
 
 export function getDefaultRootHash(): string {

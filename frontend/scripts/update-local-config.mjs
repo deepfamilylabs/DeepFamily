@@ -16,24 +16,11 @@ const __dirname = path.dirname(__filename);
 const FRONTEND_DIR = path.dirname(__dirname);
 const PROJECT_ROOT = path.dirname(FRONTEND_DIR);
 const DEPLOYMENTS_DIR = path.join(PROJECT_ROOT, "deployments", "localhost");
-const LOCAL_CHAIN_ID = readDeployedChainId(31337);
+// Hardhat's local chain id, which keys the per-chain variables below. The node's
+// own chain id is checked against it before anything is written.
+const LOCAL_CHAIN_ID = 31337;
 const ENV_LOCAL_PATH = path.join(FRONTEND_DIR, ".env.local");
 const { loadMultiLanguageRoots, checkPersonExists, computePersonHash } = seedHelpers;
-
-/**
- * The chain the local deployment lives on, so the per-chain reader variable
- * below is keyed the way the frontend looks it up. Hardhat writes it beside the
- * artifacts; the default only covers a deployments dir that predates that.
- */
-function readDeployedChainId(fallback) {
-  try {
-    const raw = fs.readFileSync(path.join(DEPLOYMENTS_DIR, ".chainId"), "utf8").trim();
-    const parsed = Number(raw);
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 const LANGUAGE_LABELS = {
   en: "English Root (Kennedy Family)",
@@ -316,10 +303,7 @@ async function updateLocalConfig() {
       updates[`VITE_ROOT_VERSION_INDEX_${suffix}`] = entry.versionIndex;
     }
 
-    let updatedContent = envContent.replace(
-      /^#?\s*VITE_SHIELDED_POOL_(?:ADDRESS|FROM_BLOCK)(?:_\d+)?=.*(?:\r?\n|$)/gm,
-      "",
-    );
+    let updatedContent = envContent;
     for (const [key, value] of Object.entries(updates)) {
       const regex = new RegExp(`^${key}=.*$`, "m");
       const commentedRegex = new RegExp(`^#\\s*${key}=.*$`, "m");
@@ -350,7 +334,9 @@ async function updateLocalConfig() {
     console.log(`   RPC URL: http://127.0.0.1:8545`);
     console.log(`   Reader (VITE_READER_ADDRESS): ${readerAddress}`);
     console.log(`   DeepFamily behind it: ${contractAddress}`);
-    console.log(`   Shielded pool: ${poolAddress} (from block ${poolDeployment.deploymentBlock})`);
+    console.log(
+      `   Shielded pool factory: ${factoryAddress} (from block ${factoryDeployment.deploymentBlock})`,
+    );
     console.log(`   Root Hash [${defaultRoot.lang.toUpperCase()}]: ${defaultRoot.hash}`);
 
     console.log("\nYou can now start the frontend with: npm run dev");
