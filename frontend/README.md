@@ -3,17 +3,21 @@
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
 For local shielded inheritance development, run `npm run dev:all` from the repository root.
-The first run builds missing circuit outputs and reuses the checked-in public keys. It generates
-development proving keys only if they are missing or stale. Key generation can take several minutes.
+The first run builds missing circuit outputs and downloads the manifest-pinned public keys from R2.
+It generates development proving keys only if they are still missing or stale. Key generation can
+take several minutes.
 To regenerate them manually, run
 `npm run zk:development:setup`.
 The local deploy command binds the shielded pool to the same DeepFamily token
 and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
 `.env.local` from the integrated deployment records.
 Both setup commands synchronize browser WASM/zkey/vkey files to `public/zk/shielded/` and generated
-verifiers to `contracts/`, following the identity/disclosure flow. Vite serves the files directly
-at `/zk/shielded/`, including built previews. `zk:artifacts:check` validates all 9 artifact sets;
-`zk:check` and `zk:ceremony:verify` perform the cryptographic checks.
+verifiers to `contracts/`, following the identity/disclosure flow. Only the `.vkey.json` files are
+committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
+The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
+`https://zk.deepfamily.org/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
+circuit manifests. `zk:artifacts:check` validates all 9 artifact sets; `zk:check` and
+`zk:ceremony:verify` perform the cryptographic checks.
 The checked-in keys are development-only. `release:preflight` requires production keys and release
 evidence before publication.
 
@@ -52,13 +56,16 @@ Configure the Pages project as a monorepo build:
 - Build command: `npm run pages:build`
 - Build output directory: `frontend/dist`
 - Environment variable: `SKIP_DEPENDENCY_INSTALL=1`
-- Build watch paths: `frontend/*`, `packages/proof-core/*`, `package.json`, `package-lock.json`
+- Build watch paths: `frontend/*`, `packages/proof-core/*`, `circuits/*`, `lib/zkPublicAssets.js`,
+  `package.json`, `package-lock.json`
 
 `pages:build` performs a clean filtered workspace install for only `deepfamily-frontend` and
 `@deepfamily/proof-core`, so Cloudflare does not install the Hardhat toolchain.
-Cloudflare Pages currently limits each site asset to [25 MiB](https://developers.cloudflare.com/pages/platform/limits/#file-size).
-The production shielded zkeys have not been generated or measured yet. If any exceed this limit,
-the current Pages deployment path cannot serve them and needs a separate asset hosting plan.
+Cloudflare Pages currently limits each site asset to [25 MiB](https://developers.cloudflare.com/pages/platform/limits/#file-size),
+and the shielded claim and fund zkeys exceed it. Proving WASM/zkey files are therefore served from
+the R2 bucket behind `https://zk.deepfamily.org`, whose CORS policy must allow the site origins.
+The build embeds the file digests from the circuit manifests and adds the host to `connect-src`.
+Set `VITE_ZK_ASSET_BASE_URL` to use another host, or to an empty value to load same-origin `/zk/`.
 
 ## Configuration
 

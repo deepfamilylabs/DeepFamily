@@ -370,10 +370,12 @@ npm run zk:check
 ```
 
 Review the large binary assets by comparing their hashes with the manifest rather than attempting
-to render their bytes. Commit the manifest, transcript, verifiers, and frontend proving artifacts
-together:
+to render their bytes. Publish the browser WASM/zkey files to R2, then commit the manifest,
+transcript, verifiers, and verification keys together:
 
 ```bash
+npm run zk:assets:publish
+
 git add \
   circuits/zk-artifacts-manifest.json \
   circuits/zk-ceremony-transcript.json \
@@ -382,7 +384,8 @@ git add \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
   contracts/Shielded*Verifier.sol \
-  frontend/public/zk
+  'frontend/public/zk/*.vkey.json' \
+  'frontend/public/zk/shielded/*.vkey.json'
 
 git commit -m "chore: install production zk artifacts"
 ```
@@ -399,6 +402,7 @@ complete gate:
 ```bash
 npm ci --ignore-scripts --no-audit --no-fund
 npm run zk:fetch
+npm run zk:assets:fetch
 npm run release:preflight
 ```
 

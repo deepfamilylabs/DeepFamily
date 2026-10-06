@@ -153,6 +153,8 @@ The same `zk:*` workflow covers the two identity/disclosure circuits and all six
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
+| `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
+| `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
 | `npm run zk:build`             | Compile all 8 circuits                                             |
 | `npm run zk:development:setup` | Generate development keys and verifiers for all 8 circuits         |
 | `npm run zk:production:setup`  | Generate production keys and verifiers for all 8 circuits          |
@@ -166,6 +168,13 @@ circuit's `.zkey`. Both development and production setup install shielded browse
 `frontend/public/zk/shielded/` and generated verifiers under `contracts/`, using the same static
 asset flow as identity/disclosure. Development artifacts remain explicitly marked as such;
 `npm run release:preflight` requires production evidence for all 8 circuits.
+
+The browser `.wasm` and `.zkey` files are not committed; only their `.vkey.json` files are. The
+circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
+`https://zk.deepfamily.org/<sha256>/<file name>`. `npm run zk:assets:fetch` installs them in a
+fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
+`npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
+`R2_BUCKET` in `.env`) before pushing the new manifests.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it

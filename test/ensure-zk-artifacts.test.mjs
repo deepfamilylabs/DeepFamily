@@ -25,11 +25,34 @@ describe("integrated local ZK artifact preparation", function () {
         calls.push(["check"]);
         return artifacts;
       },
+      fetchAssets: async () => calls.push(["fetch"]),
       setup: async () => calls.push(["setup"]),
       log: () => {},
     });
     expect(calls).to.deep.equal([["build", "all"], ["check"]]);
     expect(result).to.deep.equal({ regenerated: false, artifacts });
+  });
+
+  it("downloads the pinned proving files before regenerating any key", async function () {
+    const calls = [];
+    let downloaded = false;
+    const result = await ensureZkArtifacts({
+      root,
+      build: async () => calls.push("build"),
+      check: async () => {
+        calls.push("check");
+        if (!downloaded) throw new Error("missing public zkey");
+        return { status: "development", circuitCount: 8 };
+      },
+      fetchAssets: async () => {
+        calls.push("fetch");
+        downloaded = true;
+      },
+      setup: async () => calls.push("setup"),
+      log: () => {},
+    });
+    expect(calls).to.deep.equal(["build", "check", "fetch", "check"]);
+    expect(result.regenerated).to.equal(false);
   });
 
   it("regenerates the complete development set after a failed current-artifact check", async function () {
@@ -47,13 +70,14 @@ describe("integrated local ZK artifact preparation", function () {
         if (!ready) throw new Error("missing shielded key");
         return { status: "development", circuitCount: 8 };
       },
+      fetchAssets: async () => calls.push("fetch"),
       setup: async () => {
         calls.push("setup-all");
         ready = true;
       },
       log: () => {},
     });
-    expect(calls).to.deep.equal(["build:all", "check", "setup-all", "check"]);
+    expect(calls).to.deep.equal(["build:all", "check", "fetch", "check", "setup-all", "check"]);
     expect(result.regenerated).to.equal(true);
   });
 
@@ -67,6 +91,7 @@ describe("integrated local ZK artifact preparation", function () {
         check: async () => {
           throw new Error("formal artifact changed");
         },
+        fetchAssets: async () => {},
         setup: async () => {
           setupCalled = true;
         },

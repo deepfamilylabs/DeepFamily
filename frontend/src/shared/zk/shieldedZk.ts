@@ -4,6 +4,7 @@ import {
   SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
 } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "./zk";
+import { fetchZkAsset } from "./zkAssets";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 
@@ -37,7 +38,7 @@ export type ShieldedWitness = Record<string, string | number | Array<string | st
 type Artifacts = { wasm: Uint8Array; zkey: Uint8Array; vkey: unknown };
 const cache = new Map<ShieldedCircuitName, Promise<Artifacts>>();
 
-function sameOriginPath(circuit: ShieldedCircuitName, extension: string) {
+function artifactPath(circuit: ShieldedCircuitName, extension: string) {
   return `/zk/shielded/${SHIELDED_CIRCUIT_NAMES[circuit]}${extension}`;
 }
 
@@ -52,15 +53,11 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
   if (existing) return existing;
   const pending = (async () => {
     const [wasm, zkey, vkey] = await Promise.all([
-      fetchArtifact(sameOriginPath(circuit, ".wasm")),
-      fetchArtifact(sameOriginPath(circuit, "_final.zkey")),
-      fetchArtifact(sameOriginPath(circuit, ".vkey.json")),
+      fetchZkAsset(artifactPath(circuit, ".wasm")),
+      fetchZkAsset(artifactPath(circuit, "_final.zkey")),
+      fetchArtifact(artifactPath(circuit, ".vkey.json")).then((response) => response.json()),
     ]);
-    return {
-      wasm: new Uint8Array(await wasm.arrayBuffer()),
-      zkey: new Uint8Array(await zkey.arrayBuffer()),
-      vkey: await vkey.json(),
-    };
+    return { wasm, zkey, vkey };
   })().catch((error) => {
     cache.delete(circuit);
     throw error;

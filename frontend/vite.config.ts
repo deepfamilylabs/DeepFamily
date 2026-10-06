@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { NETWORK_PRESETS } from './src/shared/config/networks'
 import { IPFS_GATEWAY_BASE_URLS } from './src/shared/ipfs/config'
+import { ZK_ASSET_BASE_URL, listZkPublicAssets } from '../lib/zkPublicAssets.js'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -19,6 +20,11 @@ const shieldedReceiveCodeVerificationKey = JSON.parse(
     fileURLToPath(new URL('./public/zk/shielded/shielded_receive_code.vkey.json', import.meta.url)),
     'utf8'
   )
+)
+
+// Proving WASM/zkey files are not in Git; the browser checks each download against these digests.
+const zkAssetDigests = Object.fromEntries(
+  listZkPublicAssets(fileURLToPath(new URL('..', import.meta.url))).map(asset => [asset.path, asset.sha256])
 )
 
 const parseExtraSources = (value: string | undefined): string[] => {
@@ -201,7 +207,7 @@ const buildCsp = (opts: {
     `report-uri ${CSP_REPORT_PATH}`,
     scriptSrc,
     "script-src-attr 'none'",
-    // Needed for: /zk/* fetch, IPFS gateway fetch, and user-configured RPC URLs.
+    // Needed for: R2 proving files, /zk/* fetch, IPFS gateway fetch, and user-configured RPC URLs.
     // Strict by default; extend at build-time via `DEEP_CSP_CONNECT_SRC`.
     `connect-src ${connectSrc.join(' ')}`,
     // IPFS/metadata often uses data/blob URLs locally.
@@ -241,8 +247,17 @@ export default defineConfig(({ command, mode }) => {
 
   const rpcOrigin = urlToOrigin(getEnv('VITE_RPC_URL') || '')
 
+  // Builds load proving files from R2; the dev server serves the local copies unless
+  // VITE_ZK_ASSET_BASE_URL is set. An empty value keeps builds on same-origin /zk.
+  const zkAssetBaseUrlFromEnv = getEnv('VITE_ZK_ASSET_BASE_URL')
+  const zkAssetBuildBaseUrl = (zkAssetBaseUrlFromEnv ?? ZK_ASSET_BASE_URL).replace(/\/+$/, '')
+  const zkAssetBaseUrl =
+    command === 'build' ? zkAssetBuildBaseUrl : (zkAssetBaseUrlFromEnv ?? '').replace(/\/+$/, '')
+  const zkAssetOrigin = urlToOrigin(zkAssetBuildBaseUrl)
+
   const connectSrcBase = [
     "'self'",
+    ...(zkAssetOrigin ? [zkAssetOrigin] : []),
     ...(rpcOrigin ? [rpcOrigin] : []),
     ...(includeNetworkPresets ? presetRpcOrigins : []),
     ...(includeIpfsGateways ? ipfsGatewayOrigins : []),
@@ -283,6 +298,8 @@ export default defineConfig(({ command, mode }) => {
   return {
     define: {
       __SHIELDED_RECEIVE_CODE_VKEY__: JSON.stringify(shieldedReceiveCodeVerificationKey),
+      __ZK_ASSET_BASE_URL__: JSON.stringify(zkAssetBaseUrl),
+      __ZK_ASSET_DIGESTS__: JSON.stringify(zkAssetDigests),
     },
     plugins: [
       react(),

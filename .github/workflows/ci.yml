@@ -38,6 +38,9 @@ jobs:
       - name: Install pinned Powers of Tau
         run: npm run zk:ptau:fetch
 
+      - name: Fetch pinned browser proving files
+        run: npm run zk:assets:fetch
+
       - name: Check ZK artifacts and proofs
         run: npm run zk:artifacts:check && npm run zk:check
 
@@ -155,6 +158,9 @@ jobs:
 
       - name: Install pinned Powers of Tau
         run: npm run zk:ptau:fetch
+
+      - name: Fetch pinned browser proving files
+        run: npm run zk:assets:fetch
 
       - name: Check native ZK artifacts and real proofs
         run: npm run zk:artifacts:check && npm run zk:check

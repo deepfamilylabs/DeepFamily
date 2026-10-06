@@ -83,6 +83,8 @@
     "check:root": "hardhat --config hardhat.config.mjs run scripts/check-root.mjs --network $npm_config_net",
     "zk:fetch": "node scripts/fetch-circom.mjs",
     "zk:ptau:fetch": "node scripts/fetch-ptau.mjs",
+    "zk:assets:fetch": "node scripts/fetch-zk-assets.mjs",
+    "zk:assets:publish": "node scripts/publish-zk-assets.mjs",
     "zk:build": "node scripts/zk-build.mjs",
     "zk:development:setup": "node scripts/zk-development-setup.mjs",
     "zk:production:setup": "node scripts/zk-production-setup.mjs",

@@ -6,6 +6,10 @@ node_modules/
 artifacts/
 zk-artifacts/
 /circuits/ptau/*.ptau
+# Browser proving files are pinned by the circuit manifests and hosted on R2
+# (npm run zk:assets:fetch / zk:assets:publish); only their .vkey.json stay in Git.
+frontend/public/zk/**/*.wasm
+frontend/public/zk/**/*.zkey
 /cache/
 coverage/
 coverage.json

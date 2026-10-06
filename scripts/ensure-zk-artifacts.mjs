@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkShieldedDevelopmentArtifacts } from "./check-zk-artifacts.mjs";
+import { fetchZkAssets } from "./fetch-zk-assets.mjs";
 import { inspectShieldedProductionArtifacts } from "./lib/shieldedProductionSetup.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { runZkBuild } from "./zk-build.mjs";
@@ -25,11 +26,18 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
   return { status: production ? "production" : "development", circuitCount: 8, core, shielded };
 }
 
+async function reuseCurrentArtifacts({ root, check, log }) {
+  const artifacts = await check({ root });
+  log(`[zk] All ${artifacts.circuitCount} current public artifact sets are ready`);
+  return { regenerated: false, artifacts };
+}
+
 /** Compile all circuits and reuse the current public keys before the integrated local deployment. */
 export async function ensureZkArtifacts({
   root = ROOT,
   build = runZkBuild,
   check = checkCurrentZkArtifacts,
+  fetchAssets = fetchZkAssets,
   setup = runZkDevelopmentSetup,
   log = console.log,
 } = {}) {
@@ -37,9 +45,14 @@ export async function ensureZkArtifacts({
   await build({ root, circuit: "all" });
   let failure;
   try {
-    const artifacts = await check({ root });
-    log(`[zk] All ${artifacts.circuitCount} current public artifact sets are ready`);
-    return { regenerated: false, artifacts };
+    return await reuseCurrentArtifacts({ root, check, log });
+  } catch (error) {
+    failure = error;
+  }
+  // A fresh checkout holds only the manifests; the pinned proving files come from R2.
+  try {
+    await fetchAssets({ root, log });
+    return await reuseCurrentArtifacts({ root, check, log });
   } catch (error) {
     failure = error;
   }

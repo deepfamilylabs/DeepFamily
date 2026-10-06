@@ -18,6 +18,7 @@ import {
   DISCLOSURE_BINDING_PROOF_DESCRIPTOR,
   PERSON_RELATION_PROOF_DESCRIPTOR,
 } from "./proofDescriptors";
+import { fetchZkAsset } from "./zkAssets";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 
@@ -50,22 +51,9 @@ const artifactPromiseCache = new Map<string, Promise<ZkArtifacts>>();
 const vkeyPromiseCache = new Map<string, Promise<unknown>>();
 const UINT160_MAX = (1n << 160n) - 1n;
 
-async function loadArtifacts(wasmUrl: string, zkeyUrl: string): Promise<ZkArtifacts> {
-  const [wasmResponse, zkeyResponse] = await Promise.all([
-    fetch(wasmUrl, { cache: "no-cache" }),
-    fetch(zkeyUrl, { cache: "no-cache" }),
-  ]);
-  if (!wasmResponse.ok) {
-    throw new Error(`Failed to load wasm from ${wasmUrl}: ${wasmResponse.status}`);
-  }
-  if (!zkeyResponse.ok) {
-    throw new Error(`Failed to load zkey from ${zkeyUrl}: ${zkeyResponse.status}`);
-  }
-  const [wasmBuffer, zkeyBuffer] = await Promise.all([
-    wasmResponse.arrayBuffer(),
-    zkeyResponse.arrayBuffer(),
-  ]);
-  return { wasm: new Uint8Array(wasmBuffer), zkey: new Uint8Array(zkeyBuffer) };
+async function loadArtifacts(wasmPath: string, zkeyPath: string): Promise<ZkArtifacts> {
+  const [wasm, zkey] = await Promise.all([fetchZkAsset(wasmPath), fetchZkAsset(zkeyPath)]);
+  return { wasm, zkey };
 }
 
 async function loadJson(url: string): Promise<unknown> {

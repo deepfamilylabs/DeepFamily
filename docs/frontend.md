@@ -393,13 +393,14 @@ Run this after adding or removing i18n keys. Translations live under `frontend/s
 
 ## ZK Artifacts
 
-Proof workflows load public artifacts from `/zk/*` at runtime:
+Proof workflows load public artifacts at runtime:
 
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`
-- Default location: `frontend/public/zk/` (served as `/zk/…`)
+- Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); only `.vkey.json` is committed, `npm run zk:assets:fetch` installs the rest
+- Builds: `.wasm`/`.zkey` come from `https://zk.deepfamily.org/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
-If proof generation or verification fails, first confirm the expected files exist in `public/zk/` and are reachable under `/zk/…` in dev/preview.
+If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.
 
 ## Encrypted Version Metadata
 
