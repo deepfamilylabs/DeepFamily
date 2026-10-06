@@ -33,27 +33,6 @@ export function useRpcNetworkMenu() {
   const [customReader, setCustomReader] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
 
-  const presets = useMemo<NetworkOption[]>(
-    () =>
-      NETWORK_PRESETS.map((n) => ({
-        chainId: n.chainId,
-        name: t(n.nameKey, n.defaultName) || n.defaultName,
-        rpcUrl: n.rpcUrl,
-      })),
-    [t, i18n.language],
-  );
-
-  const allNetworks = useMemo<NetworkOption[]>(
-    () => [...presets, ...customNetworks],
-    [presets, customNetworks],
-  );
-
-  /** `"custom"` when the saved RPC belongs to no known network — an env default, say. */
-  const selected = useMemo<NetworkSelection>(() => {
-    const found = allNetworks.find((n) => n.rpcUrl === rpcUrl);
-    return found ? found.chainId : "custom";
-  }, [allNetworks, rpcUrl]);
-
   /**
    * The entry reader for a chain, derived — never remembered. `""` means the
    * build knows none for it, which the menu shows on the row and `switchTo`
@@ -74,6 +53,34 @@ export function useRpcNetworkMenu() {
     (targetChainId: number): boolean => Boolean(readerFor(targetChainId)),
     [readerFor],
   );
+
+  /**
+   * The built-in networks on offer. The local chain is listed only when the
+   * build knows its reader, or while it is the network in use so the menu still
+   * says what the app is talking to; otherwise it is a row that leads nowhere.
+   */
+  const presets = useMemo<NetworkOption[]>(
+    () =>
+      NETWORK_PRESETS.filter(
+        (n) => !n.isLocal || n.rpcUrl === rpcUrl || isConfigured(n.chainId),
+      ).map((n) => ({
+        chainId: n.chainId,
+        name: t(n.nameKey, n.defaultName) || n.defaultName,
+        rpcUrl: n.rpcUrl,
+      })),
+    [isConfigured, rpcUrl, t, i18n.language],
+  );
+
+  const allNetworks = useMemo<NetworkOption[]>(
+    () => [...presets, ...customNetworks],
+    [presets, customNetworks],
+  );
+
+  /** `"custom"` when the saved RPC belongs to no known network — an env default, say. */
+  const selected = useMemo<NetworkSelection>(() => {
+    const found = allNetworks.find((n) => n.rpcUrl === rpcUrl);
+    return found ? found.chainId : "custom";
+  }, [allNetworks, rpcUrl]);
 
   const switchTo = useCallback(
     (targetRpcUrl: string, targetChainId: number, explicitReader?: string) => {
@@ -140,14 +147,16 @@ export function useRpcNetworkMenu() {
       );
       return false;
     }
-    if (presets.some((n) => n.chainId === idNum)) {
+    // Every built-in network counts, listed or not: a local chain hidden from a
+    // build that cannot reach it is not free to be redefined with a typed-in address.
+    if (NETWORK_PRESETS.some((n) => n.chainId === idNum)) {
       setCustomError(
         t("familyTree.validation.chainIdConflict", "Chain ID already exists in built-in networks"),
       );
       return false;
     }
     const trimmedRpc = customRpc.trim();
-    if (presets.some((n) => n.rpcUrl === trimmedRpc)) {
+    if (NETWORK_PRESETS.some((n) => n.rpcUrl === trimmedRpc)) {
       setCustomError(
         t("familyTree.validation.rpcConflict", "RPC already exists in built-in networks"),
       );
@@ -180,17 +189,7 @@ export function useRpcNetworkMenu() {
     setIsAddOpen(false);
     toast.success(t("familyTree.config.customNetworkAdded", "Custom network added"));
     return true;
-  }, [
-    customChainId,
-    customName,
-    customNetworks,
-    customReader,
-    customRpc,
-    presets,
-    switchTo,
-    t,
-    toast,
-  ]);
+  }, [customChainId, customName, customNetworks, customReader, customRpc, switchTo, t, toast]);
 
   return {
     presets,

@@ -19,6 +19,12 @@ export interface NetworkPreset {
   nameKey: string;
   defaultName: string;
   rpcUrl: string;
+  /**
+   * A chain on the developer's own machine. A build that knows no reader for it
+   * (any build not made from that machine's `.env.local`) leaves it out of the
+   * network menu, since nobody else could ever read through it.
+   */
+  isLocal?: boolean;
 }
 
 export const SUPPORTED_NETWORKS: Record<number, NetworkConfig> = {
@@ -113,6 +119,7 @@ export const NETWORK_PRESETS: NetworkPreset[] = [
     nameKey: "wallet.networks.localDev",
     defaultName: "Localhost",
     rpcUrl: "http://127.0.0.1:8545",
+    isLocal: true,
   },
 ];
 

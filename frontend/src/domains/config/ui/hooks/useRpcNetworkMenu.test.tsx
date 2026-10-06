@@ -42,6 +42,13 @@ vi.mock("../../../../shared/config", () => ({
   NETWORK_PRESETS: [
     { chainId: 1, rpcUrl: "http://preset-1", nameKey: "n.one", defaultName: "Preset One" },
     { chainId: 2, rpcUrl: "http://preset-2", nameKey: "n.two", defaultName: "Preset Two" },
+    {
+      chainId: 31337,
+      rpcUrl: "http://local-node",
+      nameKey: "n.local",
+      defaultName: "Local",
+      isLocal: true,
+    },
   ],
 }));
 
@@ -80,6 +87,58 @@ describe("useRpcNetworkMenu", () => {
     mocks.config.rpcUrl = "http://somewhere-else";
     const { result } = renderHook(() => useRpcNetworkMenu());
     expect(result.current.selected).toBe("custom");
+  });
+
+  it("leaves the local chain out when the build knows no reader for it", () => {
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    expect(result.current.presets.map((n) => n.chainId)).toEqual([1, 2]);
+  });
+
+  it("lists the local chain once the build's address book carries its reader", () => {
+    mocks.env.chainReaders = { 31337: "0x" + "b".repeat(40) };
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    expect(result.current.presets.map((n) => n.chainId)).toEqual([1, 2, 31337]);
+  });
+
+  it("lists the local chain when the unsuffixed env pair describes it", () => {
+    mocks.config.defaults = { chainId: 31337, readerAddress: "0x" + "e".repeat(40) };
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    expect(result.current.presets.map((n) => n.chainId)).toEqual([1, 2, 31337]);
+  });
+
+  it("keeps the local chain listed while it is the network in use", () => {
+    // Picked earlier on a build that knows no reader for it: the menu still
+    // names it, unconfigured, rather than as an anonymous custom RPC.
+    mocks.config.rpcUrl = "http://local-node";
+    mocks.config.chainId = 31337;
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    expect(result.current.presets.map((n) => n.chainId)).toEqual([1, 2, 31337]);
+    expect(result.current.selected).toBe(31337);
+    expect(result.current.isConfigured(31337)).toBe(false);
+  });
+
+  it("still refuses the hidden local chain as a custom network", () => {
+    const { result } = renderHook(() => useRpcNetworkMenu());
+    act(() => {
+      result.current.addForm.setName("Mine");
+      result.current.addForm.setChainId(31337);
+      result.current.addForm.setRpc("http://my-local");
+      result.current.addForm.setReader(CUSTOM_READER);
+    });
+    act(() => {
+      result.current.addForm.submit();
+    });
+    expect(result.current.addForm.error).toMatch(/Chain ID/);
+
+    act(() => {
+      result.current.addForm.setChainId(31338);
+      result.current.addForm.setRpc("http://local-node");
+    });
+    act(() => {
+      result.current.addForm.submit();
+    });
+    expect(result.current.addForm.error).toMatch(/RPC/);
+    expect(localStorage.getItem("ft:customNetworks")).toBeNull();
   });
 
   it("applies a pick straight away, dropping everything tied to the chain being left", () => {
