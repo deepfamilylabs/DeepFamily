@@ -173,6 +173,6 @@
     "poseidon-solidity": "^0.0.5"
   },
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.18.0"
   }
 }

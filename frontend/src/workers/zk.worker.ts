@@ -24,6 +24,10 @@ import {
   generateDisclosureBindingProof,
   verifyDisclosureBindingProof,
 } from "../shared/zk/zkSnark";
+import { installTrustedWorkerUrlPolicy } from "../shared/workers/trustedWorkerUrls";
+
+// snarkjs starts its proving threads from blob: URLs, which Trusted Types route through this policy.
+installTrustedWorkerUrlPolicy();
 
 type ZkWorkerMethods = {
   generatePersonRelationProof: {

@@ -55,7 +55,7 @@ frontend/src/
 Use the directory tree for ownership boundaries, and these files as first-read entry points when tracing behavior:
 
 - App shell: `frontend/src/main.tsx`, `frontend/src/App.tsx`, `frontend/src/app/router.tsx`, `frontend/src/app/AppProviders.tsx`, `frontend/src/app/ui/Layout.tsx`
-- Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`, `frontend/src/shared/ipfs/config.ts`
+- Runtime config: `frontend/src/shared/config/env.ts`, `frontend/src/shared/config/networks.ts`, `frontend/src/domains/tree/config/familyTreeConfig.ts`
 - Wallet connection and local transaction boundary: `frontend/src/domains/wallet/context/WalletContext.tsx`, `frontend/src/domains/wallet/services/walletProvider.ts`
 - Domain gateways: `frontend/src/domains/tree/api/treeReadGateway.ts`, `frontend/src/shared/clients/personReadGateway.ts`, `frontend/src/domains/transactions/api/txGateway.ts`, `frontend/src/domains/transactions/api/invalidationCoordinator.ts`
 - Tree runtime: `frontend/src/domains/tree/context/TreeViewContext.tsx`, `frontend/src/domains/tree/context/useTreeGraphState.ts`, `frontend/src/domains/tree/services/treeTraversalOrchestrator.ts`
@@ -323,7 +323,6 @@ VITE_ROOT_VERSION_INDEX=...
 | Variable                                                             | Purpose                                                                    |
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`     | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
-| `VITE_IPFS_GATEWAY_BASE_URLS`                                        | Override gateways for IPFS NFT/attachment URIs; must match CSP allowlist   |
 | `VITE_DF_HARD_NODE_LIMIT`                                            | Cap tree node count for public/low-budget RPCs                             |
 | `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                       | Query cache tuning                                                         |
 | `VITE_USE_INDEXEDDB_CACHE`                                           | Persist tree caches in IndexedDB                                           |
@@ -396,7 +395,7 @@ Proof workflows load public artifacts at runtime:
 
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`
 - Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); only `.vkey.json` is committed, `npm run zk:assets:fetch` installs the rest
-- Builds: `.wasm`/`.zkey` come from `https://zk.deepfamily.org/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
+- Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.
@@ -500,7 +499,9 @@ that the destination is public. Attachment URIs and NFT token URIs are supported
   persistent storage. Pass them directly to a Worker/service and clear them as soon as possible.
 - Validated unlocked `NodeData` is plaintext in memory. Persist new unlocks only while remembering
   them on this device is enabled (the default); filter session-only nodes at every durable write.
-- CSP is strict in preview/production. Iterate with Report-Only and `csp:scan`, then enforce.
+- CSP is strict in preview/production: `frontend/src/shared/config/contentSecurityPolicy.ts` builds
+  it and always enforces it, and CI fails on any violation `csp:scan` sees. The dev server only
+  reports violations.
 - Security commands (from repo root):
 
   ```bash
@@ -508,7 +509,23 @@ that the destination is public. Attachment URIs and NFT token URIs are supported
   npm run security:xss-scan    # TypeScript AST XSS sink check; symlinks fail closed
   ```
 
-- From `frontend/`: `npm run csp:scan` runs a Playwright-based route scan to collect CSP violations.
+- From `frontend/`: `npm run csp:scan` builds into `.csp-scan/dist` with proving files on the
+  preview origin, serves that build under the production headers, visits every route, and runs the crypto and ZK workers on the
+  golden vector (identity derivation, envelope unlock, a receive-code proof). CI fails on any
+  violation or broken worker flow. It runs the Google Chrome installed on the machine and reads
+  its options from the command line only, never from `.env` files, for example
+  `CSP_SCAN_SKIP_BUILD=1 npm run csp:scan`:
+
+  | Variable                                              | Effect                                                                          |
+  | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+  | `CSP_SCAN_FAIL_ON_REPORT=1`                           | Exit non-zero on any violation (CI sets it)                                     |
+  | `CSP_SCAN_SKIP_BUILD=1`                               | Reuse `.csp-scan/dist`; enough when only the CSP configuration changed          |
+  | `CSP_SCAN_WORKERS=0`                                  | Skip the worker flows, for example without local proving files                  |
+  | `CSP_SCAN_EXECUTABLE_PATH`, `CSP_SCAN_CHROME_CHANNEL` | Another browser binary, or a Playwright channel such as `chromium` or `msedge` |
+  | `CSP_SCAN_HEADLESS=0`                                 | Show the browser window                                                         |
+  | `CSP_SCAN_MODE=dev`                                   | Scan the dev server, whose policy only reports                                  |
+  | `CSP_SCAN_HOST`, `CSP_SCAN_PORT`, `CSP_SCAN_BASE_URL` | Where the scanned server listens                                                |
+  | `CSP_SCAN_STYLE_ATTR_PROBE=1`                         | Set inline styles on purpose to show `style-src-attr` blocks them (debugging)   |
 
 See [frontend-security.md](frontend-security.md) for the threat model, CSP guidance, and detailed handling rules.
 
@@ -531,7 +548,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 
 1. Document it in `frontend/.env.example` with a short comment.
 2. Read it through `shared/config/` — do not sprinkle `import.meta.env` across the codebase.
-3. If it controls an allowlisted origin (RPC, IPFS gateway), update CSP configuration and re-run `csp:scan`.
+3. If it controls an origin the app fetches from (an RPC or asset host), update the CSP configuration and re-run `csp:scan`.
 
 ## Troubleshooting
 

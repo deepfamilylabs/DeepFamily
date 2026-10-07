@@ -4,7 +4,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ZK_ASSET_BASE_URL, fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
+import { loadEnv } from "vite";
+import { fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -18,10 +19,28 @@ async function localDigest(file) {
   }
 }
 
+/**
+ * The host production builds load proving files from, read the way the build reads it: the
+ * environment first (Cloudflare Pages and CI set it there), then frontend/.env* files.
+ */
+export function configuredZkAssetBaseUrl(root = ROOT) {
+  const { VITE_ZK_ASSET_BASE_URL: url } = loadEnv(
+    "production",
+    path.join(root, "frontend"),
+    "VITE_ZK_ASSET_BASE_URL",
+  );
+  if (!url) {
+    throw new Error(
+      "VITE_ZK_ASSET_BASE_URL is not set; set it in frontend/.env.local, or in the environment in CI",
+    );
+  }
+  return url;
+}
+
 /** Installs the manifest-pinned browser WASM/zkey files under frontend/public/zk. */
 export async function fetchZkAssets({
   root = ROOT,
-  baseUrl = process.env.ZK_ASSET_BASE_URL || ZK_ASSET_BASE_URL,
+  baseUrl = configuredZkAssetBaseUrl(root),
   fetchImpl = globalThis.fetch,
   log = console.log,
 } = {}) {

@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main, master, dev]
 
+# Where builds load the browser proving files from and zk:assets:fetch downloads them: a
+# repository variable (Settings > Secrets and variables > Actions > Variables), not a value in
+# this file. Without it the fetch step fails.
+env:
+  VITE_ZK_ASSET_BASE_URL: ${{ vars.VITE_ZK_ASSET_BASE_URL }}
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -55,6 +61,15 @@ jobs:
 
       - name: Frontend checks
         run: npm run frontend:check
+
+      # Builds its own copy (frontend/.csp-scan) with proving files on the preview origin, serves it
+      # under the production headers, visits every route and runs the crypto and ZK workers on the
+      # golden vector. Fails on any CSP violation or broken worker flow. The runner image ships
+      # Google Chrome.
+      - name: Frontend CSP scan
+        run: npm run csp:scan --workspace deepfamily-frontend
+        env:
+          CSP_SCAN_FAIL_ON_REPORT: "1"
 
       - name: Check committed frontend ABIs
         run: git diff --exit-code -- frontend/src/abi

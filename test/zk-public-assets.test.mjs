@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
-import { fetchZkAssets } from "../scripts/fetch-zk-assets.mjs";
+import { configuredZkAssetBaseUrl, fetchZkAssets } from "../scripts/fetch-zk-assets.mjs";
 import { publishZkAssets } from "../scripts/publish-zk-assets.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -133,6 +133,41 @@ describe("ZK public proving assets", function () {
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
     }
+  });
+
+  describe("asset host", function () {
+    let saved;
+    beforeEach(function () {
+      saved = process.env.VITE_ZK_ASSET_BASE_URL;
+      delete process.env.VITE_ZK_ASSET_BASE_URL;
+    });
+    afterEach(function () {
+      if (saved === undefined) delete process.env.VITE_ZK_ASSET_BASE_URL;
+      else process.env.VITE_ZK_ASSET_BASE_URL = saved;
+    });
+
+    it("reads VITE_ZK_ASSET_BASE_URL the way the build does, the environment first", function () {
+      fs.mkdirSync(path.join(root, "frontend"));
+      fs.writeFileSync(
+        path.join(root, "frontend/.env.local"),
+        "VITE_ZK_ASSET_BASE_URL=https://local.example\n",
+      );
+      expect(configuredZkAssetBaseUrl(root)).to.equal("https://local.example");
+
+      process.env.VITE_ZK_ASSET_BASE_URL = "https://ci.example";
+      expect(configuredZkAssetBaseUrl(root)).to.equal("https://ci.example");
+    });
+
+    it("names no host of its own", async function () {
+      expect(() => configuredZkAssetBaseUrl(root)).to.throw(/VITE_ZK_ASSET_BASE_URL is not set/);
+      let error;
+      try {
+        await fetchZkAssets({ root, fetchImpl: async () => expect.fail("nothing to fetch from") });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error?.message).to.match(/VITE_ZK_ASSET_BASE_URL is not set/);
+    });
   });
 
   it("rejects downloaded bytes that differ from the manifest digest", async function () {

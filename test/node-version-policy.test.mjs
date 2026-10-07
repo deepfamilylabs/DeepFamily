@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { expect } from "chai";
 
-const MINIMUM_NODE_VERSION = "22.13.0";
+// 22.18.0 is the first 22.x release that strips TypeScript types by default, which lets tests
+// import TypeScript sources such as functions/__csp-report.ts without a loader.
+const MINIMUM_NODE_VERSION = "22.18.0";
 const CI_NODE_VERSION = "22.23.2";
 const NODE_ENGINE = `>=${MINIMUM_NODE_VERSION}`;
 const MANIFESTS = [
@@ -24,9 +26,10 @@ describe("Node.js version policy", function () {
 
     const packageLock = await readJson("package-lock.json");
     for (const workspacePath of ["", "frontend", "packages/proof-core", "packages/protocol-core"]) {
-      expect(packageLock.packages[workspacePath]?.engines?.node, `lockfile:${workspacePath}`).to.equal(
-        NODE_ENGINE,
-      );
+      expect(
+        packageLock.packages[workspacePath]?.engines?.node,
+        `lockfile:${workspacePath}`,
+      ).to.equal(NODE_ENGINE);
     }
   });
 
@@ -40,10 +43,15 @@ describe("Node.js version policy", function () {
     expect(new Set(nodePins)).to.deep.equal(new Set([CI_NODE_VERSION]));
   });
 
+  it("builds Cloudflare Pages on the CI runtime, whose image defaults to an older Node.js", async function () {
+    expect((await readFile(".node-version", "utf8")).trim()).to.equal(CI_NODE_VERSION);
+  });
+
   it("documents the same minimum in the README", async function () {
     const readme = await readFile("README.md", "utf8");
 
-    expect(readme).to.include("Node.js-22.13+-green");
+    const [major, minor] = MINIMUM_NODE_VERSION.split(".");
+    expect(readme).to.include(`Node.js-${major}.${minor}+-green`);
     expect(readme).to.include(`**Node.js** >= ${MINIMUM_NODE_VERSION}`);
   });
 });

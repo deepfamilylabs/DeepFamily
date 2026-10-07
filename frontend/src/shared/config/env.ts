@@ -29,13 +29,6 @@ export function readBooleanEnv(value: unknown, defaultValue = false): boolean {
   return defaultValue;
 }
 
-export function readListEnv(value: unknown): string[] {
-  return readStringEnv(value)
-    .split(/[\s,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function getStringEnv(key: string, fallback = ""): string {
   return readStringEnv(getViteEnv()[key], fallback);
 }
@@ -96,10 +89,6 @@ export function getCacheTtlEnv() {
     edges: getPositiveNumberEnv("VITE_DF_EDGE_TTL_MS", 120_000),
     story: getPositiveNumberEnv("VITE_DF_STORY_TTL_MS", 300_000),
   } as const;
-}
-
-export function getIpfsGatewayBaseUrlEnvList(): string[] {
-  return readListEnv(getViteEnv().VITE_IPFS_GATEWAY_BASE_URLS);
 }
 
 export function getDefaultRpcUrl(): string {

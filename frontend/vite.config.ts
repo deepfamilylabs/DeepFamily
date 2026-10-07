@@ -1,17 +1,22 @@
 import type { Plugin } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import { NETWORK_PRESETS } from './src/shared/config/networks'
-import { IPFS_GATEWAY_BASE_URLS } from './src/shared/ipfs/config'
-import { ZK_ASSET_BASE_URL, listZkPublicAssets } from '../lib/zkPublicAssets.js'
+import {
+  CSP_REPORT_PATH,
+  buildContentSecurityPolicy,
+  buildSecurityHeaders,
+  cspOriginOf,
+  renderPagesHeaders,
+} from './src/shared/config/contentSecurityPolicy'
+import { handleCspReportRequest } from '../lib/cspReport.js'
+import { listZkPublicAssets } from '../lib/zkPublicAssets.js'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
-const CSP_REPORT_PATH = '/__csp-report'
-const CSP_HEADER = 'Content-Security-Policy'
-const CSP_HEADER_REPORT_ONLY = 'Content-Security-Policy-Report-Only'
-
-const uniq = <T,>(items: T[]): T[] => Array.from(new Set(items))
+const UNICODE_LICENSE_SHA256 = 'e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96'
 
 // Payers verify receive codes in the browser. The verification key is embedded in the bundle
 // so that replacing a file under /zk cannot make a forged receive code verify.
@@ -27,24 +32,14 @@ const zkAssetDigests = Object.fromEntries(
   listZkPublicAssets(fileURLToPath(new URL('..', import.meta.url))).map(asset => [asset.path, asset.sha256])
 )
 
-const parseExtraSources = (value: string | undefined): string[] => {
-  if (!value) return []
-  return value
-    .split(/\s+/)
-    .map(s => s.trim())
-    .filter(Boolean)
-}
-
-const parseList = (value: string | undefined): string[] => {
-  if (!value) return []
-  return value
-    .split(/[\s,]+/)
-    .map(s => s.trim())
-    .filter(Boolean)
-}
-
 const getManualChunk = (id: string): string | undefined => {
   const normalized = id.replace(/\\/g, '/')
+
+  // Zod v4 decides whether to compile a parser with `new Function` as each object schema is
+  // constructed, so the jitless switch must run before any chunk builds one at module scope.
+  // In zod's own chunk it runs as soon as zod loads. Left in the entry chunk it ran only after
+  // every chunk the entry imports, and the CSP blocked zod's eval probe on every page load.
+  if (normalized.endsWith('/src/zodInit.ts')) return 'ui-vendor'
 
   if (
     normalized.includes('/src/domains/person/') ||
@@ -105,60 +100,32 @@ const getManualChunk = (id: string): string | undefined => {
   return undefined
 }
 
-const urlToOrigin = (url: string): string | null => {
-  try {
-    return new URL(url).origin
-  } catch {
-    return null
-  }
-}
-
+// The same handler as the Pages Function (functions/__csp-report.ts), behind Node's req/res.
 const cspReportPlugin = (opts: { reportFile?: string }): Plugin => {
-  const reportFile = opts.reportFile
-  const handler = (req: any, res: any) => {
-    if (req.method !== 'POST') {
-      res.statusCode = 405
-      res.end()
-      return
+  const record = (entry: object) => {
+    console.warn('[csp-report]', entry)
+    if (opts.reportFile) {
+      fs.appendFileSync(opts.reportFile, `${JSON.stringify({ ts: Date.now(), ...entry })}\n`, 'utf8')
     }
-
-    let raw = ''
-    req.setEncoding('utf8')
-    req.on('data', (chunk: string) => {
-      raw += chunk
-      if (raw.length > 64 * 1024) raw = raw.slice(0, 64 * 1024)
-    })
-
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(raw || '{}')
-        const reports = Array.isArray(data) ? data : [data]
-        const safe = reports.map((r: any) => {
-          const reportBody = r?.['csp-report'] ?? r?.body ?? r ?? {}
-          const blocked = typeof reportBody?.['blocked-uri'] === 'string' ? reportBody['blocked-uri'] : undefined
-          const violated = typeof reportBody?.['violated-directive'] === 'string' ? reportBody['violated-directive'] : undefined
-          const effective = typeof reportBody?.['effective-directive'] === 'string' ? reportBody['effective-directive'] : undefined
-          const doc = typeof reportBody?.['document-uri'] === 'string' ? reportBody['document-uri'] : undefined
-          const ref = typeof reportBody?.referrer === 'string' ? reportBody.referrer : undefined
-          const sourceFile = typeof reportBody?.['source-file'] === 'string' ? reportBody['source-file'] : undefined
-          const line = typeof reportBody?.['line-number'] === 'number' ? reportBody['line-number'] : undefined
-          const col = typeof reportBody?.['column-number'] === 'number' ? reportBody['column-number'] : undefined
-          const sample = typeof reportBody?.['script-sample'] === 'string' ? reportBody['script-sample'] : undefined
-          return { violated, effective, blocked, document: doc, referrer: ref, sourceFile, line, col, sample }
-        })
-        console.warn('[csp-report]', safe)
-        if (reportFile) {
-          for (const entry of safe) {
-            fs.appendFileSync(reportFile, `${JSON.stringify({ ts: Date.now(), ...entry })}\n`, 'utf8')
-          }
-        }
-      } catch {
-        console.warn('[csp-report] invalid JSON')
-      } finally {
-        res.statusCode = 204
+  }
+  const handler = (req: IncomingMessage, res: ServerResponse) => {
+    const request = new Request(new URL(CSP_REPORT_PATH, 'http://localhost'), {
+      method: req.method,
+      headers: { 'content-type': req.headers['content-type'] ?? '' },
+      body: req.method === 'POST' ? (Readable.toWeb(req) as ReadableStream) : undefined,
+      duplex: 'half',
+    } as RequestInit)
+    // Connect ignores a returned promise, so a rejection here would end the whole dev server.
+    handleCspReportRequest(request, record, { includeSample: true })
+      .then(async (response) => {
+        res.statusCode = response.status
+        response.headers.forEach((value, name) => res.setHeader(name, value))
+        res.end(await response.text())
+      })
+      .catch(() => {
+        res.statusCode = 500
         res.end()
-      }
-    })
+      })
   }
 
   return {
@@ -172,125 +139,43 @@ const cspReportPlugin = (opts: { reportFile?: string }): Plugin => {
   }
 }
 
-const presetRpcOrigins = uniq(
-  NETWORK_PRESETS
-    .map(p => urlToOrigin(p.rpcUrl))
-    .filter((v): v is string => Boolean(v))
-)
+// What Cloudflare Pages serves next to the bundle: `_headers`, holding the headers `vite preview`
+// sends, and the Unicode notice for the normalization tables @deepfamily/protocol-core bundles.
+// Emitted by the build itself so the headers come from exactly this build's env and mode.
+const pagesOutputPlugin = (headers: Record<string, string>): Plugin => ({
+  name: 'deepfamily:pages-output',
+  apply: 'build',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: '_headers', source: renderPagesHeaders(headers) })
 
-const buildCsp = (opts: {
-  dev: boolean
-  connectSrc: string[]
-  imgSrc: string[]
-  styleAttrNone: boolean
-}): string => {
-  const { dev, connectSrc, imgSrc, styleAttrNone } = opts
-  const scriptSrc = dev
-    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' 'report-sample'"
-    : "script-src 'self' 'wasm-unsafe-eval' 'report-sample'"
-
-  const styleSrc = dev
-    ? "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com"
-    : "style-src 'self' https://fonts.googleapis.com"
-
-  const styleSrcAttr =
-    !dev && styleAttrNone
-      ? "style-src-attr 'none'"
-      : "style-src-attr 'unsafe-inline'"
-
-  return [
-    "default-src 'self'",
-    "base-uri 'none'",
-    "object-src 'none'",
-    "frame-ancestors 'none'",
-    "form-action 'self'",
-    `report-uri ${CSP_REPORT_PATH}`,
-    scriptSrc,
-    "script-src-attr 'none'",
-    // Needed for: R2 proving files, /zk/* fetch, IPFS gateway fetch, and user-configured RPC URLs.
-    // Strict by default; extend at build-time via `DEEP_CSP_CONNECT_SRC`.
-    `connect-src ${connectSrc.join(' ')}`,
-    // IPFS/metadata often uses data/blob URLs locally.
-    `img-src ${imgSrc.join(' ')}`,
-    // Dev server injects inline <style> tags; production build should not need this.
-    styleSrc,
-    // React uses inline style attributes widely; allow by default, but support auditing with `DEEP_CSP_STYLE_ATTR_NONE=1`.
-    styleSrcAttr,
-    "font-src 'self' data: https://fonts.gstatic.com",
-    "worker-src 'self' blob:",
-    "manifest-src 'self'",
-  ].join('; ')
-}
+    const license = fs.readFileSync(
+      fileURLToPath(new URL('../packages/protocol-core/UNICODE-LICENSE.txt', import.meta.url))
+    )
+    if (createHash('sha256').update(license).digest('hex') !== UNICODE_LICENSE_SHA256) {
+      this.error('Unicode license notice differs from the reviewed Unicode-3.0 bytes')
+    }
+    this.emitFile({ type: 'asset', fileName: 'third-party/UNICODE-LICENSE.txt', source: license })
+  }
+})
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const getEnv = (key: string): string | undefined => env[key] ?? process.env[key]
-  const flag = (key: string, defaultValue: boolean): boolean => {
-    const value = getEnv(key)
-    if (value == null) return defaultValue
-    return value !== '0' && value !== 'false'
-  }
 
-  const ipfsGatewayBases = (() => {
-    const fromEnv = parseList(getEnv('VITE_IPFS_GATEWAY_BASE_URLS'))
-    return fromEnv.length > 0 ? fromEnv : [...IPFS_GATEWAY_BASE_URLS]
-  })()
-
-  const ipfsGatewayOrigins = uniq(
-    ipfsGatewayBases
-      .map(urlToOrigin)
-      .filter((v): v is string => Boolean(v))
-  )
-
-  const includeNetworkPresets = flag('DEEP_CSP_INCLUDE_NETWORK_PRESETS', true)
-  const includeIpfsGateways = flag('DEEP_CSP_INCLUDE_IPFS_GATEWAYS', true)
-
-  const rpcOrigin = urlToOrigin(getEnv('VITE_RPC_URL') || '')
-
-  // Builds load proving files from R2; the dev server serves the local copies unless
-  // VITE_ZK_ASSET_BASE_URL is set. An empty value keeps builds on same-origin /zk.
+  // Builds load proving files from VITE_ZK_ASSET_BASE_URL, which Cloudflare Pages and CI set in
+  // their settings and a local build reads from .env.local. There is no default host: a build
+  // without it fails here rather than ship proofs that cannot load. An empty value serves the
+  // files from this site's /zk. The dev server always serves the local copies.
   const zkAssetBaseUrlFromEnv = getEnv('VITE_ZK_ASSET_BASE_URL')
-  const zkAssetBuildBaseUrl = (zkAssetBaseUrlFromEnv ?? ZK_ASSET_BASE_URL).replace(/\/+$/, '')
-  const zkAssetBaseUrl =
-    command === 'build' ? zkAssetBuildBaseUrl : (zkAssetBaseUrlFromEnv ?? '').replace(/\/+$/, '')
-  const zkAssetOrigin = urlToOrigin(zkAssetBuildBaseUrl)
+  if (command === 'build' && zkAssetBaseUrlFromEnv === undefined) {
+    throw new Error('VITE_ZK_ASSET_BASE_URL is not set; see frontend/.env.example')
+  }
+  const zkAssetBuildBaseUrl = (zkAssetBaseUrlFromEnv ?? '').replace(/\/+$/, '')
+  const zkAssetBaseUrl = command === 'build' ? zkAssetBuildBaseUrl : ''
+  const zkAssetOrigin = cspOriginOf('VITE_ZK_ASSET_BASE_URL', zkAssetBuildBaseUrl)
 
-  const connectSrcBase = [
-    "'self'",
-    ...(zkAssetOrigin ? [zkAssetOrigin] : []),
-    ...(rpcOrigin ? [rpcOrigin] : []),
-    ...(includeNetworkPresets ? presetRpcOrigins : []),
-    ...(includeIpfsGateways ? ipfsGatewayOrigins : []),
-    ...parseExtraSources(getEnv('DEEP_CSP_CONNECT_SRC')),
-  ]
-
-  // Dev needs websocket for Vite HMR; preview/prod should avoid allowing websocket by default.
-  const connectSrcDev = uniq([
-    ...connectSrcBase,
-    'ws://localhost:5173',
-    'ws://127.0.0.1:5173',
-  ])
-
-  const connectSrcNonDev = uniq(connectSrcBase)
-
-  const imgSrc = uniq([
-    "'self'",
-    'data:',
-    'blob:',
-    ...(includeIpfsGateways ? ipfsGatewayOrigins : []),
-    ...parseExtraSources(getEnv('DEEP_CSP_IMG_SRC'))
-  ])
-
-  const styleAttrNone = getEnv('DEEP_CSP_STYLE_ATTR_NONE') === '1'
-  const cspDev = buildCsp({ dev: true, connectSrc: connectSrcDev, imgSrc, styleAttrNone })
-  const cspNonDev = buildCsp({ dev: false, connectSrc: connectSrcNonDev, imgSrc, styleAttrNone })
-  const csp = command === 'serve' ? cspDev : cspNonDev
-
-  // Non-dev should default to enforcing CSP; opt out via `DEEP_CSP_ENFORCE=0` / `false`.
-  const enforceNonDevCsp = flag('DEEP_CSP_ENFORCE', true)
-  const previewCspHeaderName = enforceNonDevCsp
-    ? CSP_HEADER
-    : CSP_HEADER_REPORT_ONLY
+  const policyOptions = { env: getEnv, connectOrigins: zkAssetOrigin ? [zkAssetOrigin] : [] }
+  const securityHeaders = buildSecurityHeaders(policyOptions)
 
   const reportFile = getEnv('DEEP_CSP_REPORT_FILE')
   const inquireShimPath = fileURLToPath(new URL('./src/shims/protobufjs-inquire.ts', import.meta.url))
@@ -304,6 +189,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       react(),
       cspReportPlugin({ reportFile }),
+      pagesOutputPlugin(securityHeaders),
     ],
     resolve: {
       alias: {
@@ -316,7 +202,7 @@ export default defineConfig(({ command, mode }) => {
       host: 'localhost',
       port: 5173,
       headers: {
-        [CSP_HEADER_REPORT_ONLY]: csp
+        'Content-Security-Policy-Report-Only': buildContentSecurityPolicy({ ...policyOptions, dev: true })
       },
       // Better error handling
       hmr: {
@@ -324,9 +210,7 @@ export default defineConfig(({ command, mode }) => {
       }
     },
     preview: {
-      headers: {
-        [previewCspHeaderName]: cspNonDev
-      }
+      headers: securityHeaders
     },
     build: {
       rollupOptions: {

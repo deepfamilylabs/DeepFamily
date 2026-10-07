@@ -15,7 +15,7 @@ Both setup commands synchronize browser WASM/zkey/vkey files to `public/zk/shiel
 verifiers to `contracts/`, following the identity/disclosure flow. Only the `.vkey.json` files are
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
-`https://zk.deepfamily.org/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
 circuit manifests. `zk:artifacts:check` validates all 9 artifact sets; `zk:check` and
 `zk:ceremony:verify` perform the cryptographic checks.
 The checked-in keys are development-only. `release:preflight` requires production keys and release
@@ -55,17 +55,26 @@ Configure the Pages project as a monorepo build:
 - Root directory: repository root
 - Build command: `npm run pages:build`
 - Build output directory: `frontend/dist`
-- Environment variable: `SKIP_DEPENDENCY_INSTALL=1`
-- Build watch paths: `frontend/*`, `packages/proof-core/*`, `circuits/*`, `lib/zkPublicAssets.js`,
-  `package.json`, `package-lock.json`
+- Environment variables (Production and Preview, plain text): `SKIP_DEPENDENCY_INSTALL=1`, and
+  `VITE_ZK_ASSET_BASE_URL` set to the proving-file host. The build fails without the second.
+- Build watch paths (include): `frontend/*`, `packages/proof-core/*`, `packages/protocol-core/*`,
+  `circuits/*`, `functions/*`, `lib/zkPublicAssets.js`, `lib/cspReport.js`, `package.json`,
+  `package-lock.json`, `.node-version`. Each directory needs its trailing `*`, and a lone `*`
+  would match every file in the repository.
 
 `pages:build` performs a clean filtered workspace install for only `deepfamily-frontend` and
 `@deepfamily/proof-core`, so Cloudflare does not install the Hardhat toolchain.
+`.node-version` pins the build to the CI runtime; the build image's default Node.js is older than
+the repository's minimum.
+The build writes `dist/_headers` with the same security headers `vite preview` sends. Pages
+reads Functions only from the project's root directory, so the CSP report endpoint lives at the
+repository root in `functions/__csp-report.ts`.
 Cloudflare Pages currently limits each site asset to [25 MiB](https://developers.cloudflare.com/pages/platform/limits/#file-size),
 and the shielded claim and fund zkeys exceed it. Proving WASM/zkey files are therefore served from
-the R2 bucket behind `https://zk.deepfamily.org`, whose CORS policy must allow the site origins.
-The build embeds the file digests from the circuit manifests and adds the host to `connect-src`.
-Set `VITE_ZK_ASSET_BASE_URL` to use another host, or to an empty value to load same-origin `/zk/`.
+the R2 bucket behind `VITE_ZK_ASSET_BASE_URL`, whose CORS policy must allow the site origins. The code names no host: each build reads it from its environment
+(Pages settings, CI, or `.env.local` locally) and fails without it. The build embeds the file
+digests from the circuit manifests and adds the host to `connect-src`; an empty value loads
+same-origin `/zk/`.
 
 ## Configuration
 

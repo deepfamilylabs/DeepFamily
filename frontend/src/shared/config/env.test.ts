@@ -5,7 +5,6 @@ import {
   getShieldedPoolFactoryAddress,
   getShieldedPoolFactoryDeploymentBlock,
   readBooleanEnv,
-  readListEnv,
   readNumberEnv,
   readPositiveNumberEnv,
   shouldShowNodeModeToggle,
@@ -64,14 +63,6 @@ describe("number env readers", () => {
     expect(readPositiveNumberEnv("0", 10)).toBe(10);
     expect(readPositiveNumberEnv("-1", 10)).toBe(10);
     expect(readPositiveNumberEnv("42", 10)).toBe(42);
-  });
-});
-
-describe("readListEnv", () => {
-  it("splits comma and whitespace separated values", () => {
-    expect(
-      readListEnv("https://a.example/ipfs/, https://b.example/ipfs/ https://c.example/ipfs/"),
-    ).toEqual(["https://a.example/ipfs/", "https://b.example/ipfs/", "https://c.example/ipfs/"]);
   });
 });
 

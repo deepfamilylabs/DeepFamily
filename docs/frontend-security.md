@@ -147,9 +147,27 @@ disclosure confirmation.
 ## Content Security Policy
 
 - Keep `script-src` free of `'unsafe-inline'` and keep preview/production free of `'unsafe-eval'`.
-- Restrict `connect-src` to reviewed RPC and other required public-resource origins.
-- Use Report-Only while discovering a necessary source, then move the reviewed policy to enforced
-  mode.
+  Code that probes for eval, such as Zod's JIT, must be switched off before it first runs.
+- Restrict `connect-src` to reviewed RPC and other required public-resource origins, and only to
+  origins the app actually loads. The local chain is allowed only in builds that name its reader.
+- Preview/production block inline style attributes (`style-src-attr 'none'`). React's `style`
+  props go through the CSSOM, which the directive does not govern.
+- Preview and production always enforce the policy. Discover a missing source on the dev server,
+  whose policy is report-only, and with `csp:scan`, which CI runs on every change.
+- Production sends HSTS (`max-age=31536000`) for the site's own host. Without it, the first
+  plain-http request can be intercepted and the CSP stripped along with the rest of the response.
+  `includeSubDomains` and `preload` stay off: they would bind every subdomain, including
+  the proving-file host, and browsers keep either for months after it is withdrawn.
+- `Cross-Origin-Opener-Policy: same-origin-allow-popups` cuts the handle a cross-origin page
+  keeps after opening the site, so it cannot later navigate the tab to a look-alike. Windows the
+  site opens itself keep their handle.
+- Trusted Types run report-only (`require-trusted-types-for 'script'; trusted-types default`).
+  The page and the ZK worker install a `default` policy that admits same-origin script URLs only
+  (`frontend/src/shared/workers/trustedWorkerUrls.ts`), so ordinary use reports nothing; any other
+  string reaching a script or HTML sink is reported. Move the directives into the enforced policy
+  once production reports none.
+- Violation reports go to `functions/__csp-report.ts`, which logs URLs only up to their origin
+  (a document keeps its path): a blocked RPC URL can carry an API key in its path or query.
 - CSP reduces the chance and reach of injection; it does not protect input or IndexedDB plaintext
   after arbitrary same-origin JavaScript executes.
 

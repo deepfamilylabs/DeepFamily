@@ -62,9 +62,10 @@ export async function ensureZkArtifacts({
     (fs.existsSync(coreManifest) &&
       JSON.parse(fs.readFileSync(coreManifest, "utf8")).trustedSetup?.status !== "development")
   ) {
-    throw new Error("Refusing to replace current production ZK artifacts with development keys", {
-      cause: failure,
-    });
+    throw new Error(
+      `Refusing to replace current production ZK artifacts with development keys (${failure.message})`,
+      { cause: failure },
+    );
   }
   log(
     `[zk] Development artifacts missing or stale (${failure.message}); setting up all eight circuits`,

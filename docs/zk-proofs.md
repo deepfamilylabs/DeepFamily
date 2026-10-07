@@ -393,7 +393,7 @@ are published under `frontend/public/zk/`:
 Production shielded artifacts use the same `/zk/shielded/` URLs and are installed in
 `frontend/public/zk/shielded/` by `zk:production:setup` with the production manifest. Only the
 `.vkey.json` files are committed. The WASM/zkey files are pinned by the manifests' `wasmSha256`
-and `zkeySha256` and hosted on R2 at `https://zk.deepfamily.org/<sha256>/<file name>`:
+and `zkeySha256` and hosted on R2 at `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`:
 `zk:assets:publish` uploads new files and `zk:assets:fetch` installs them in a checkout. The Vite
 dev server serves the local copies; builds fetch from R2 and reject any file whose SHA-256 differs
 from the manifest digest embedded at build time. The unified `zk:artifacts:check`

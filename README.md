@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-red?style=for-the-badge&logo=solidity)](https://soliditylang.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Node](https://img.shields.io/badge/Node.js-22.13+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
+[![Node](https://img.shields.io/badge/Node.js-22.18+-green?style=for-the-badge&logo=node.js)](https://nodejs.org/)
 
 **A blockchain-based decentralized digital family tree protocol**
 _Leveraging zero-knowledge proofs and community governance for collaborative family history_
@@ -90,7 +90,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 
 ### Prerequisites
 
-- **Node.js** >= 22.13.0
+- **Node.js** >= 22.18.0
 - **npm** or **yarn**
 - **Git**
 
@@ -102,6 +102,8 @@ cd DeepFamily
 npm run setup    # Install root + frontend dependencies
 cp .env.example .env
 # Set PRIVATE_KEY and HISTORICAL_DATA_FILES in .env before starting dev:all.
+cp frontend/.env.example frontend/.env.local
+# Set VITE_ZK_ASSET_BASE_URL in frontend/.env.local to the proving-file host.
 npm run check    # Frontend checks + contract lint/build/test
 npm run build    # Compile smart contracts
 npm run dev:all  # Start local node + deploy + seed data + frontend
@@ -111,6 +113,7 @@ npm run dev:all  # Start local node + deploy + seed data + frontend
 
 ```bash
 npm run setup           # Install dependencies
+cp frontend/.env.example frontend/.env.local  # Then set VITE_ZK_ASSET_BASE_URL
 npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
@@ -171,8 +174,9 @@ asset flow as identity/disclosure. Development artifacts remain explicitly marke
 
 The browser `.wasm` and `.zkey` files are not committed; only their `.vkey.json` files are. The
 circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
-`https://zk.deepfamily.org/<sha256>/<file name>`. `npm run zk:assets:fetch` installs them in a
-fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`. The repository names no host: set the variable
+in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
+`npm run zk:assets:fetch` installs them in a fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
 `npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
 `R2_BUCKET` in `.env`) before pushing the new manifests.
 

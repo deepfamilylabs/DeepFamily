@@ -4,6 +4,10 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./i18n/index";
+import { installTrustedWorkerUrlPolicy } from "./shared/workers/trustedWorkerUrls";
+
+// Workers start lazily, after this runs.
+installTrustedWorkerUrlPolicy();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
