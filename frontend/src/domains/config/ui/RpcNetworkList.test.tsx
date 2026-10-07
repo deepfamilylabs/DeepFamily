@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     readers: {} as Record<number, string>,
     readerFor: vi.fn(),
     isConfigured: vi.fn(),
+    canAddCustom: true,
     addForm: {
       isOpen: false,
       toggle: vi.fn(),
@@ -34,7 +35,6 @@ const mocks = vi.hoisted(() => ({
       chainId: "" as number | "",
       rpc: "",
       error: null as string | null,
-      showCspHint: false,
       setName: vi.fn(),
       setChainId: vi.fn(),
       setRpc: vi.fn(),
@@ -68,6 +68,7 @@ describe("RpcNetworkList", () => {
     mocks.menu.selected = 1;
     mocks.menu.chainId = 1;
     mocks.menu.rpcUrl = "http://preset-1";
+    mocks.menu.canAddCustom = true;
     mocks.menu.addForm.isOpen = false;
     mocks.menu.readers = {};
     mocks.menu.select.mockReset();
@@ -191,5 +192,15 @@ describe("RpcNetworkList", () => {
     mocks.menu.addForm.isOpen = true;
     rerender(<RpcNetworkList />);
     expect(screen.getByTestId("custom-network-form")).toBeTruthy();
+  });
+
+  it("offers no way to add a network where custom ones cannot be read", () => {
+    mocks.menu.canAddCustom = false;
+    mocks.menu.addForm.isOpen = true;
+    render(<RpcNetworkList />);
+
+    expect(screen.queryByRole("button", { name: "Custom network" })).toBeNull();
+    expect(screen.queryByTestId("custom-network-form")).toBeNull();
+    expect(screen.getAllByRole("radio")).toHaveLength(2);
   });
 });

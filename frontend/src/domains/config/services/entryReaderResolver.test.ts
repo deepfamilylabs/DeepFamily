@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../shared/config/env", () => ({
   getChainEntryReaderAddress: (chainId: number) => mocks.addressBook[chainId] ?? "",
+  isDevMode: () => true,
 }));
 
 import { resolveEntryReaderForChain } from "./entryReaderResolver";

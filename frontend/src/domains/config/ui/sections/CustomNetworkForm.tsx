@@ -9,7 +9,6 @@ export interface CustomNetworkFormProps {
   /** The entry contract on this chain; nothing else knows it for a custom one. */
   reader: string;
   error: string | null;
-  showCspHint: boolean;
   setName: (v: string) => void;
   setChainId: (v: number | "") => void;
   setRpc: (v: string) => void;
@@ -23,7 +22,6 @@ export default function CustomNetworkForm({
   rpc,
   reader,
   error,
-  showCspHint,
   setName,
   setChainId,
   setRpc,
@@ -68,14 +66,6 @@ export default function CustomNetworkForm({
           <span className={CONFIG_HINT}>
             {t("familyTree.config.addCustomNetworkHint", "Fill in and save to reuse later")}
           </span>
-          {showCspHint ? (
-            <span className="text-[11px] leading-relaxed text-warning">
-              {t(
-                "familyTree.config.customNetworkCspHint",
-                "In preview/production, the RPC origin must be allowlisted by CSP (connect-src).",
-              )}
-            </span>
-          ) : null}
         </div>
         <button
           type="button"

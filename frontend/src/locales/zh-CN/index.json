@@ -579,7 +579,6 @@
       "chainId": "链 ID",
       "addCustomNetwork": "保存自定义网络",
       "addCustomNetworkHint": "填写后保存，可重复使用",
-      "customNetworkCspHint": "在 preview/production 环境下，RPC 源必须加入 CSP 的 connect-src 白名单。若连接失败，请在运行 preview/build 时通过 DEEP_CSP_CONNECT_SRC 添加该源。",
       "customNetworkAdded": "已添加自定义网络",
       "customNetworkRemoved": "已删除自定义网络",
       "networkUnconfigured": "无合约",

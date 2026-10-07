@@ -201,6 +201,8 @@ export function useRpcNetworkMenu() {
     remove,
     readerFor,
     isConfigured,
+    // Custom networks exist only on the dev server; see loadCustomNetworks.
+    canAddCustom: isDevMode(),
     addForm: {
       isOpen: isAddOpen,
       toggle: () => {
@@ -212,9 +214,6 @@ export function useRpcNetworkMenu() {
       rpc: customRpc,
       reader: customReader,
       error: customError,
-      // In dev the RPC origin is whatever Vite lets through; a built preview is
-      // where a stray origin gets blocked by CSP, so that is where to warn.
-      showCspHint: !isDevMode(),
       setName: setCustomName,
       setChainId: setCustomChainId,
       setRpc: setCustomRpc,

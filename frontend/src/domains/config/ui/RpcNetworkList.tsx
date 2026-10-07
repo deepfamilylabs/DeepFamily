@@ -18,7 +18,8 @@ const ROW_BASE =
  * Two hosts render it: the desktop status bar, under the chip that reports the
  * RPC's liveness, and the mobile sidebar drawer, where the status bar does not
  * exist. Neither owns the semantics — the config domain does — so this holds
- * the rows and the custom-network form, and the host supplies only its chrome.
+ * the rows and, on the dev server, the custom-network form, and the host
+ * supplies only its chrome.
  *
  * Each row carries the entry contract it would read through, because that is
  * what decides whether picking it leads anywhere: a preset gets its address
@@ -29,8 +30,18 @@ const ROW_BASE =
  */
 export default function RpcNetworkList({ onPicked }: RpcNetworkListProps) {
   const { t } = useTranslation();
-  const { presets, custom, selected, chainId, rpcUrl, select, remove, readerFor, addForm } =
-    useRpcNetworkMenu();
+  const {
+    presets,
+    custom,
+    selected,
+    chainId,
+    rpcUrl,
+    select,
+    remove,
+    readerFor,
+    canAddCustom,
+    addForm,
+  } = useRpcNetworkMenu();
 
   const handleSelect = (id: number) => {
     select(id);
@@ -140,34 +151,37 @@ export default function RpcNetworkList({ onPicked }: RpcNetworkListProps) {
         ) : null}
       </div>
 
-      <div className="my-1 h-px bg-hairline" aria-hidden />
+      {canAddCustom ? (
+        <>
+          <div className="my-1 h-px bg-hairline" aria-hidden />
 
-      <button
-        type="button"
-        onClick={addForm.toggle}
-        aria-expanded={addForm.isOpen}
-        className={`${ROW_BASE} text-ink-muted hover:bg-surface-muted hover:text-ink`}
-      >
-        <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
-        <span className="text-xs font-medium">
-          {t("familyTree.config.customNetwork", "Custom network")}
-        </span>
-      </button>
+          <button
+            type="button"
+            onClick={addForm.toggle}
+            aria-expanded={addForm.isOpen}
+            className={`${ROW_BASE} text-ink-muted hover:bg-surface-muted hover:text-ink`}
+          >
+            <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="text-xs font-medium">
+              {t("familyTree.config.customNetwork", "Custom network")}
+            </span>
+          </button>
 
-      {addForm.isOpen ? (
-        <CustomNetworkForm
-          name={addForm.name}
-          chainId={addForm.chainId}
-          rpc={addForm.rpc}
-          reader={addForm.reader}
-          error={addForm.error}
-          showCspHint={addForm.showCspHint}
-          setName={addForm.setName}
-          setChainId={addForm.setChainId}
-          setRpc={addForm.setRpc}
-          setReader={addForm.setReader}
-          submit={addForm.submit}
-        />
+          {addForm.isOpen ? (
+            <CustomNetworkForm
+              name={addForm.name}
+              chainId={addForm.chainId}
+              rpc={addForm.rpc}
+              reader={addForm.reader}
+              error={addForm.error}
+              setName={addForm.setName}
+              setChainId={addForm.setChainId}
+              setRpc={addForm.setRpc}
+              setReader={addForm.setReader}
+              submit={addForm.submit}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );

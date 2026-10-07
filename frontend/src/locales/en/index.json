@@ -579,7 +579,6 @@
       "chainId": "Chain ID",
       "addCustomNetwork": "Save custom",
       "addCustomNetworkHint": "Fill in and save to reuse later",
-      "customNetworkCspHint": "In preview/production, the RPC origin must be allowlisted by CSP (connect-src). If it fails to connect, add the origin via DEEP_CSP_CONNECT_SRC when running preview/build.",
       "customNetworkAdded": "Custom network added",
       "customNetworkRemoved": "Custom network removed",
       "networkUnconfigured": "No contract",

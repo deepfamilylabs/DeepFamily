@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ isDev: true }));
+
+vi.mock("../../../shared/config/env", () => ({
+  isDevMode: () => mocks.isDev,
+}));
+
 import { loadCustomNetworks, saveCustomNetworks } from "./customNetworksStore";
 
 const STORAGE_KEY = "ft:customNetworks";
@@ -7,6 +14,7 @@ const STORAGE_KEY = "ft:customNetworks";
 describe("customNetworksStore", () => {
   beforeEach(() => {
     localStorage.clear();
+    mocks.isDev = true;
   });
   afterEach(() => {
     localStorage.clear();
@@ -69,5 +77,15 @@ describe("customNetworksStore", () => {
       { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: reader },
     ]);
     expect(loadCustomNetworks()[0].readerAddress).toBe(reader);
+  });
+
+  it("ignores saved networks outside the dev server, where none could be read", () => {
+    const reader = "0x" + "9".repeat(40);
+    saveCustomNetworks([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: reader },
+    ]);
+
+    mocks.isDev = false;
+    expect(loadCustomNetworks()).toEqual([]);
   });
 });

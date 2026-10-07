@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
     success: vi.fn(),
   },
   envFlags: {
-    isDev: false,
+    isDev: true,
   },
 }));
 
@@ -73,7 +73,7 @@ describe("useRpcNetworkMenu", () => {
     mocks.config.defaults = { chainId: 1, readerAddress: "0x" + "e".repeat(40) };
     mocks.config.update.mockReset();
     mocks.toast.success.mockReset();
-    mocks.envFlags.isDev = false;
+    mocks.envFlags.isDev = true;
     mocks.env.chainReaders = {};
   });
 
@@ -365,12 +365,19 @@ describe("useRpcNetworkMenu", () => {
     expect(mocks.toast.success).not.toHaveBeenCalled();
   });
 
-  it("warns about CSP only outside dev, where a stray origin is actually blocked", () => {
-    const { result, rerender } = renderHook(() => useRpcNetworkMenu());
-    expect(result.current.addForm.showCspHint).toBe(true);
+  it("offers custom networks only on the dev server, the one place they can be read", () => {
+    saveCustom([
+      { chainId: 31338, name: "My Local", rpcUrl: "http://my-local", readerAddress: CUSTOM_READER },
+    ]);
+    const dev = renderHook(() => useRpcNetworkMenu());
+    expect(dev.result.current.canAddCustom).toBe(true);
+    expect(dev.result.current.custom.map((n) => n.chainId)).toEqual([31338]);
 
-    mocks.envFlags.isDev = true;
-    rerender();
-    expect(result.current.addForm.showCspHint).toBe(false);
+    // A built site's CSP blocks every RPC but the build's own, so a saved one
+    // is not offered and no new one can be added.
+    mocks.envFlags.isDev = false;
+    const built = renderHook(() => useRpcNetworkMenu());
+    expect(built.result.current.canAddCustom).toBe(false);
+    expect(built.result.current.custom).toEqual([]);
   });
 });
