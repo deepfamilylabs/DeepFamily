@@ -93,7 +93,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     });
     await expect(
       pool.privateTransfer(exposedRootSpend, await proofFor(pool, 3, exposedRootSpend)),
-    ).to.be.revertedWithCustomError(pool, "SingleLeafNoteRoot");
+    ).to.be.revertedWithCustomError(pool, "UnknownNoteRoot");
 
     const firstRoot = (await pool.noteShard(0)).root;
     const transfer = actionData({
@@ -107,6 +107,10 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.totalShielded()).to.equal(100n);
 
     const events = await pool.queryFilter(pool.filters.NoteAppended());
+    // Only completed actions add spendable roots; the root after each first output is never known.
+    for (const [index, { args }] of events.entries()) {
+      expect(await pool.isKnownNoteRoot(0, args.root)).to.equal(index % 2 === 1);
+    }
     const reference = replayLineageTree(
       events.map(({ args }) => ({ leafIndex: args.leafIndex, leaf: args.commitment })),
     );
@@ -431,6 +435,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect((await pool.noteShard(1)).size).to.equal(2n);
     const appended = await pool.queryFilter(pool.filters.NoteAppended());
     expect(appended.map(({ args }) => args.shardId)).to.deep.equal([1n, 1n]);
+    expect(await pool.isKnownNoteRoot(1, appended[0].args.root)).to.equal(false);
     const secondShardRoot = (await pool.noteShard(1)).root;
     const transfer = actionData({
       inputShardIds: [0n, 1n],

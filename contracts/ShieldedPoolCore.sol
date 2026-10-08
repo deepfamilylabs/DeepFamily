@@ -28,7 +28,6 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   error DuplicateCommitment();
   error NullifierAlreadySpent();
   error UnknownNoteRoot();
-  error SingleLeafNoteRoot();
   error UnknownLineageRoot();
   error InvalidClaimTime();
   error InvalidZKProof();
@@ -72,7 +71,6 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 root;
     mapping(uint256 level => mapping(uint256 index => uint256 node)) nodes;
     mapping(uint256 root => bool known) knownRoots;
-    mapping(uint256 root => uint256 size) rootSizes;
   }
 
   uint256 public constant NOTE_TREE_DEPTH = 32;
@@ -177,6 +175,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     return (shard.size, shard.depth, shard.root);
   }
 
+  /// @notice Known roots follow complete actions; an action's first-output root is never known.
   function isKnownNoteRoot(uint256 shardId, uint256 candidate) external view returns (bool) {
     return candidate != 0 && _shards[shardId].knownRoots[candidate];
   }
@@ -260,11 +259,6 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         _requireNonzeroField(data.inputNullifiers[i]);
         if (!_shards[data.inputShardIds[i]].knownRoots[data.inputRoots[i]]) {
           revert UnknownNoteRoot();
-        }
-        // LeanIMT's one-leaf root equals that leaf commitment, so accepting
-        // it would reveal exactly which note a private proof spends.
-        if (_shards[data.inputShardIds[i]].rootSizes[data.inputRoots[i]] < 2) {
-          revert SingleLeafNoteRoot();
         }
         if (nullifierSpent[data.inputNullifiers[i]]) revert NullifierAlreadySpent();
       }
@@ -458,6 +452,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       commitmentExists[commitment] = true;
       _append(commitment, data.outputCiphertexts[i]);
     }
+    // Both outputs land in one shard: shards start empty, every action appends two leaves and
+    // MAX_SHARD_LEAVES is even. Accepting only this completed root keeps a new shard's one-leaf
+    // root, which equals its first commitment, from revealing the note a proof spends.
+    Shard storage shard = _shards[currentShardId];
+    shard.knownRoots[shard.root] = true;
   }
 
   function _append(uint256 commitment, bytes calldata ciphertext) private {
@@ -478,8 +477,6 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 newRoot = _writePath(shard, leafIndex, commitment, newSize, treeDepth);
     if (newRoot == 0) revert InvalidFieldElement();
     shard.root = newRoot;
-    shard.knownRoots[newRoot] = true;
-    shard.rootSizes[newRoot] = newSize;
     emit NoteAppended(shardId, leafIndex, commitment, newRoot, ciphertext);
   }
 

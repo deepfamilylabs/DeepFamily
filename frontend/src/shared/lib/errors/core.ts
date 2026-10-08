@@ -286,7 +286,6 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0xe43a58fa": "DuplicateCommitment",
   "0xb115d857": "NullifierAlreadySpent",
   "0xd361a7b2": "UnknownNoteRoot",
-  "0xb3db6a76": "SingleLeafNoteRoot",
   "0x1221b97b": "InvalidClaimTime",
   "0xd5543840": "UnexpectedTokenTransfer",
   "0xe0aeda7d": "UnexpectedNativeValue",
@@ -414,7 +413,6 @@ export const REASON_FRIENDLY_MAP: Record<string, string> = {
   ReceiverRejected: "The recipient refused the payment.",
   UnknownLineageRoot:
     "The proof used lineage records that are too old or unknown. Search again and retry.",
-  SingleLeafNoteRoot: "Wait for more pool activity before spending a note from this shard.",
   UnknownNoteRoot: "The private note proof used an unknown pool root. Refresh the pool and retry.",
   InvalidClaimTime: "The private proof timestamp expired. Generate a new proof and retry.",
   NullifierAlreadySpent: "This private note or claim period was already used.",

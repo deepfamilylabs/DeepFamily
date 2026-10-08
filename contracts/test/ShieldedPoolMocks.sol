@@ -172,7 +172,6 @@ contract ShieldedPoolRolloverHarness is ShieldedErc20Pool {
     shard.depth = NOTE_TREE_DEPTH;
     shard.root = 1;
     shard.knownRoots[1] = true;
-    shard.rootSizes[1] = MAX_SHARD_LEAVES;
   }
 }
 
@@ -200,6 +199,5 @@ contract ShieldedPoolDepthHarness is ShieldedErc20Pool {
     shard.root = leftRoot;
     shard.nodes[31][0] = leftRoot;
     shard.knownRoots[leftRoot] = true;
-    shard.rootSizes[leftRoot] = size;
   }
 }
