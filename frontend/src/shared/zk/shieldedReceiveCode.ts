@@ -1,6 +1,8 @@
 import {
   IDENTITY_SUITE_CANDIDATE_1,
   buildShieldedReceiveCodePublicSignals,
+  computeShieldedOwnerCommitment,
+  computeShieldedReceiveCodeFingerprint,
   canonicalizeFullName,
   computeIdentityFromDerivedSecret,
   decodeShieldedReceiveCode,
@@ -12,7 +14,7 @@ import {
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
 } from "@deepfamily/protocol-core";
-import { hexlify } from "ethers";
+import { hexlify, getBigInt, getBytes, type BigNumberish } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 import { getFundingPassphraseError } from "../crypto/passphraseStrength";
@@ -23,6 +25,8 @@ export type ShieldedReceiveCodeIdentity = {
   identity: IdentityFields;
   identitySuiteId: number;
   derivedSecretField: string | bigint;
+  keyMode?: 0 | 1;
+  keyMaterial?: { ownerSecret: BigNumberish; ownerCommitment: BigNumberish; hpkeIkm: string };
 };
 
 export type ShieldedReceiveCodeCheck =
@@ -32,18 +36,46 @@ export type ShieldedReceiveCodeCheck =
       ownerCommitment: string;
       viewingKey: string;
       personHash: string;
+      keyMode: 0 | 1;
+      identitySuiteId: number;
+      assetSuiteId: number;
+      assetDerivationVersion: number;
+      fingerprint: string;
     }
   | { ok: false; reason: "malformed" | "invalid" };
 
 /** Derive the payment keys and prove that this identity chose them. */
 export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdentity) {
   const material = computeIdentityFromDerivedSecret(input);
-  const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
+  const legacy = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
+  const keyMode = input.keyMode ?? 0;
+  if (keyMode !== 0 && keyMode !== 1) throw new Error("Unsupported receive authorization mode");
+  if (keyMode === 1 && !input.keyMaterial)
+    throw new Error("Independent receive code requires its original spending material");
+  const supplied = input.keyMaterial ?? legacy;
+  const keys = {
+    ownerSecret: getBigInt(supplied.ownerSecret),
+    ownerCommitment: getBigInt(supplied.ownerCommitment),
+    hpkeIkm: supplied.hpkeIkm,
+  };
+  if (
+    computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment ||
+    getBytes(keys.hpkeIkm).length !== 32
+  )
+    throw new Error("Receive key material is inconsistent");
+  if (
+    keyMode === 0 &&
+    (keys.ownerSecret !== legacy.ownerSecret ||
+      keys.hpkeIkm.toLowerCase() !== legacy.hpkeIkm.toLowerCase())
+  )
+    throw new Error("Identity receive mode requires canonical identity keys");
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const publicSignals = buildShieldedReceiveCodePublicSignals({
     identityCommitment: material.identityCommitment,
     ownerCommitment: keys.ownerCommitment,
     viewingKey,
+    keyMode,
+    identitySuiteId: material.identitySuiteId,
   });
   const { proof } = await generateShieldedProof({
     circuit: "receiveCode",
@@ -52,6 +84,12 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       ownerCommitment: publicSignals[1].toString(),
       viewKeyLo: publicSignals[2].toString(),
       viewKeyHi: publicSignals[3].toString(),
+      keyMode: publicSignals[4].toString(),
+      identitySuiteId: publicSignals[5].toString(),
+      assetSuiteId: publicSignals[6].toString(),
+      assetDerivationVersion: publicSignals[7].toString(),
+      receiveCodeVersion: publicSignals[8].toString(),
+      spendingSecret: keys.ownerSecret.toString(),
       nameField: material.nameField.toString(),
       derivedSecretField: material.derivedSecretField.toString(),
       isBirthBC: Number(material.identity.isBirthBC),
@@ -68,9 +106,18 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       identityCommitment: material.identityCommitment,
       ownerCommitment: keys.ownerCommitment,
       viewingKey,
+      keyMode,
+      identitySuiteId: material.identitySuiteId,
       proof,
     }),
     personHash: material.personHash,
+    fingerprint: computeShieldedReceiveCodeFingerprint({
+      identityCommitment: material.identityCommitment,
+      ownerCommitment: keys.ownerCommitment,
+      viewingKey,
+      keyMode,
+      identitySuiteId: material.identitySuiteId,
+    }),
   };
 }
 
@@ -149,5 +196,10 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
     ownerCommitment: decoded.ownerCommitment.toString(),
     viewingKey: hexlify(decoded.viewingKey),
     personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment),
+    keyMode: decoded.keyMode as 0 | 1,
+    identitySuiteId: decoded.identitySuiteId,
+    assetSuiteId: decoded.assetSuiteId,
+    assetDerivationVersion: decoded.assetDerivationVersion,
+    fingerprint: decoded.fingerprint,
   };
 }

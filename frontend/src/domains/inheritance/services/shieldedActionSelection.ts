@@ -102,6 +102,9 @@ export function selectValueNotes(
 export function getShieldedClaimBudgetKey(note: BudgetPayload, scope: ShieldedScope): string {
   const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note, scope);
   return [
+    note.binding === "identity" ? "identity" : "owner",
+    note.keyMode ?? 0n,
+    note.binding === "identity" ? "identity-derived" : note.heirOwnerCommitment,
     policyCommitment,
     enrollmentCommitment,
     note.rootIdentityCommitment,

@@ -91,7 +91,11 @@ export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
   ),
 );
 
-export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT = 4;
+export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT = 9;
+export const SHIELDED_POOL_CAPACITY_PUBLIC_SIGNAL_COUNTS = Object.freeze({
+  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze({ 2: 12, 8: 30 }),
+  [SHIELDED_POOL_ACTION.Unshield]: Object.freeze({ 1: 12, 8: 32 }),
+});
 
 function values(list, length, label) {
   protocolAssert(
@@ -114,10 +118,31 @@ function unused(condition, label) {
  */
 export function buildShieldedPoolPublicInputs(input) {
   const action = Number(bigintFrom(input.action, "action", 4n));
-  const names = SHIELDED_POOL_PUBLIC_INPUTS[action];
-  const inputShardIds = values(input.inputShardIds, 2, "inputShardIds");
-  const inputRoots = values(input.inputRoots, 2, "inputRoots");
-  const inputNullifiers = values(input.inputNullifiers, 2, "inputNullifiers");
+  const valueAction =
+    action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield;
+  const capacity =
+    input.capacity === undefined
+      ? valueAction && input.inputShardIds?.length === 8
+        ? 8
+        : action === SHIELDED_POOL_ACTION.Unshield
+          ? 1
+          : 2
+      : Number(bigintFrom(input.capacity, "capacity", 8n));
+  protocolAssert(
+    valueAction
+      ? (action === SHIELDED_POOL_ACTION.Unshield ? [1, 8] : [2, 8]).includes(capacity)
+      : capacity === 2,
+    "INVALID_SHIELDED_CAPACITY",
+    "Unsupported capacity for this action",
+  );
+  const width = capacity === 8 ? 8 : 2;
+  const names =
+    action === SHIELDED_POOL_ACTION.Unshield && capacity === 8
+      ? [...CONTEXT, ...TWO_INPUTS, ...OUTPUTS, "amount", "recipient"]
+      : SHIELDED_POOL_PUBLIC_INPUTS[action];
+  const inputShardIds = values(input.inputShardIds, width, "inputShardIds");
+  const inputRoots = values(input.inputRoots, width, "inputRoots");
+  const inputNullifiers = values(input.inputNullifiers, width, "inputNullifiers");
   const periodNullifiers = values(input.periodNullifiers, 12, "periodNullifiers");
   const outputCommitments = values(input.outputCommitments, 2, "outputCommitments");
   protocolAssert(
@@ -244,5 +269,17 @@ export function buildShieldedReceiveCodePublicSignals(input) {
     "ZERO_SHIELDED_VIEW_KEY",
     "view public key must be nonzero",
   );
-  return [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi];
+  const keyMode = bigintFrom(input.keyMode ?? 0n, "keyMode", 1n);
+  const metadata = [
+    input.identitySuiteId ?? 1,
+    input.assetSuiteId ?? 1,
+    input.assetDerivationVersion ?? 1,
+    input.receiveCodeVersion ?? 2,
+  ].map((value, index) => bigintFrom(value, `receiveMetadata[${index}]`, 255n));
+  protocolAssert(
+    metadata[0] === 1n && metadata[1] === 1n && metadata[2] === 1n && metadata[3] === 2n,
+    "UNSUPPORTED_SHIELDED_RECEIVE_SUITE",
+    "Unsupported receive-code suite or version",
+  );
+  return [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, ...metadata];
 }

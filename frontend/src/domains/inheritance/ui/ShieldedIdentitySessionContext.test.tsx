@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
+import type { ShieldedPublicIdentity } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
 } from "./ShieldedIdentitySessionContext";
 import { SHIELDED_IDENTITY_IDLE_TIMEOUT_MS } from "./useShieldedIdentitySession";
 
-const identity = { personHash: "0xabc", derivedSecretField: "123" } as IdentityMaterialV1Result;
+const identity: ShieldedPublicIdentity = {handle: "identity:1", identitySuiteId: 1, identity: {fullName: "Test Person"}, identityCommitment: "777", personHash: "0x" + "00".repeat(32)};
 let currentSession: ReturnType<typeof useShieldedPageIdentitySession>;
 function PoolConsumer() {
   currentSession = useShieldedPageIdentitySession();
@@ -42,7 +42,7 @@ describe("page identity shared across asset pools", () => {
     const { rerender } = render(<Page />);
     act(() => currentSession.unlock(identity));
     rerender(<Page pool="native" />);
-    expect(currentSession.identity).toBe(identity);
+    expect(currentSession.identity).toEqual(identity);
     expect(screen.getByText("unlocked")).toBeTruthy();
     expect(storageWrite).not.toHaveBeenCalled();
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));
@@ -82,7 +82,7 @@ describe("page identity shared across asset pools", () => {
     act(() => currentSession.setBusy(true));
     act(() => oldSetBusy(false));
     act(() => vi.advanceTimersByTime(2 * SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));
-    expect(currentSession.identity).toBe(identity);
+    expect(currentSession.identity).toEqual(identity);
     act(() => currentSession.setBusy(false));
     act(() => oldSetBusy(true));
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));

@@ -1,7 +1,11 @@
 export { ShieldedInheritancePanel } from "./ui/ShieldedInheritancePanel";
 export type { ShieldedPageModules } from "./model/shieldedPageTypes";
-export { readShieldedAsset, resolveShieldedAssetPool } from "./services/shieldedAssetRegistry";
-export type { ShieldedAsset } from "./services/shieldedAssetRegistry";
+export {
+  readShieldedAsset,
+  readRecoveredShieldedAsset,
+  resolveShieldedAssetPool,
+} from "./services/shieldedAssetRegistry";
+export type { ShieldedAsset, RecoveredShieldedAsset } from "./services/shieldedAssetRegistry";
 export {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,

@@ -49,13 +49,13 @@ test("a receive code round-trips its keys, public signals and proof", async () =
   const input = await sample();
   const code = encodeShieldedReceiveCode(input);
   assert.match(code, /^dfrecv1[02-9ac-hj-np-z]+$/u);
-  assert.equal(payloadOf(code).length, 353);
+  assert.equal(payloadOf(code).length, 357);
   const decoded = decodeShieldedReceiveCode(code);
   const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(input.viewingKey);
   assert.equal(decoded.identityCommitment, 19n);
   assert.equal(decoded.ownerCommitment, input.ownerCommitment);
   assert.deepEqual(decoded.viewingKey, input.viewingKey);
-  assert.deepEqual(decoded.publicSignals, [19n, input.ownerCommitment, viewKeyLo, viewKeyHi]);
+  assert.deepEqual(decoded.publicSignals, [19n, input.ownerCommitment, viewKeyLo, viewKeyHi, 0n, 1n, 1n, 1n, 2n]);
   assert.deepEqual(decoded.proof, proof);
 });
 
@@ -82,7 +82,7 @@ test("typos, truncation, other prefixes and versions are encoding errors", async
     encodingError,
   );
   const version = payload.slice();
-  version[0] = 2;
+  version[0] = 1;
   assert.throws(() => decodeShieldedReceiveCode(codeOf(version)), encodingError);
   assert.throws(() => decodeShieldedReceiveCode(codeOf(payload.subarray(0, 352))), encodingError);
   assert.throws(() => decodeShieldedReceiveCode(42), encodingError);
@@ -93,7 +93,7 @@ test("well-formed codes with out-of-range content are rejected", async () => {
   const invalid = (error) => error.code === "INVALID_SHIELDED_RECEIVE_CODE";
   const withWord = (index, value) => {
     const copy = payload.slice();
-    copy.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 1 + index * 32);
+    copy.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 5 + index * 32);
     return codeOf(copy);
   };
   assert.throws(() => decodeShieldedReceiveCode(withWord(0, 0n)), invalid);
@@ -105,7 +105,7 @@ test("well-formed codes with out-of-range content are rejected", async () => {
   // Proof words start after the three key words.
   assert.throws(() => decodeShieldedReceiveCode(withWord(3, BASE_FIELD)), invalid);
   const infinity = payload.slice();
-  infinity.fill(0, 1 + 3 * 32, 1 + 5 * 32);
+  infinity.fill(0, 5 + 3 * 32, 5 + 5 * 32);
   assert.throws(() => decodeShieldedReceiveCode(codeOf(infinity)), invalid);
 });
 

@@ -6,13 +6,15 @@ export const SHIELDED_ACTIONS = Object.freeze([
   "claim",
   "privateTransfer",
   "unshield",
+  "privateTransfer8",
+  "unshield8",
 ]);
 
 /** ProofConstants.sol routes pool actions after person relation (0) and disclosure (1). */
 export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
 
 /**
- * The same five pool action verifiers and action order are deployed in every environment.
+ * The same seven pool verifier routes are deployed in every environment.
  * The receive-code circuit is verified in the browser and is never deployed.
  */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
@@ -26,7 +28,7 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
           source: SHIELDED_CIRCUITS[action],
           verifierContractName: `Shielded${suffix}Verifier`,
           verifierLabel: `shielded${suffix}Verifier`,
-          actionId,
+          actionId: action === "privateTransfer8" ? 3 : action === "unshield8" ? 4 : actionId,
           proofPurpose: SHIELDED_ACTION_PROOF_PURPOSE_BASE + actionId,
           adapterVerifierGetter: `${action}Verifier`,
         }),

@@ -25,6 +25,7 @@ const context = { chainId: 1030n, poolAddress: "0x000000000000000000000000000000
 const keys = deriveShieldedHeirKeyMaterial(13n);
 const value = { ownerCommitment: keys.ownerCommitment, amount: 300n, nonce: 29n };
 const budget = {
+  keyMode: 0n,
   rootIdentityCommitment: 11n,
   rootVersionIndex: 2n,
   policySalt: 17n,
@@ -40,7 +41,7 @@ const budget = {
 };
 const memoValue = {
   ...value,
-  fundingMemo: { budgetCommitment: 71n, budgetNote: budget },
+  fundingMemo: { budgetCommitment: 71n, budgetNote: budget, viewingKey: "0x" + "11".repeat(32) },
 };
 
 test("strict binary value and budget payloads round-trip within HPKE envelope", () => {
@@ -178,7 +179,7 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     (error) => error.code === "ZERO_SHIELDED_BUDGET_COMMITMENT",
   );
   const badMemo = encodeShieldedValueNotePayload(memoValue, context);
-  badMemo[SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32] = 0;
+  badMemo.fill(0, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 64);
   assert.deepEqual(decodeShieldedNotePayload(badMemo, context), { kind: "value", ...value });
 });
 
@@ -214,7 +215,7 @@ test("budget payloads require explicit day periods and uint64 version indices", 
     (error) => error.code === "INTEGER_OUT_OF_RANGE",
   );
   const missingPeriod = payload.slice();
-  missingPeriod.fill(0, payload.length - 4);
+  missingPeriod.fill(0, payload.length - 5, payload.length - 1);
   assert.throws(
     () => decodeShieldedNotePayload(missingPeriod, context),
     (error) => error.code === "INVALID_SHIELDED_PERIOD",
@@ -231,11 +232,11 @@ test("budget payloads require explicit day periods and uint64 version indices", 
 test("donor-only rule backup fits the fixed envelope and never becomes a note", () => {
   const ruleMemo = { ...memoValue, fundingMemo: { ...memoValue.fundingMemo, allocationKey: 41n } };
   const payload = encodeShieldedValueNotePayload(ruleMemo, context);
-  assert.equal(payload.length, 432);
+  assert.equal(payload.length, 459);
   assert.ok(payload.length <= SHIELDED_HPKE_MAX_PAYLOAD_BYTES);
   assert.deepEqual(decodeShieldedNotePayload(payload, context), { kind: "value", ...ruleMemo });
   const malformedKey = payload.slice();
-  malformedKey.fill(255, SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES);
+  malformedKey.fill(255, SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES - 32, SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES);
   assert.deepEqual(decodeShieldedNotePayload(malformedKey, context), {
     kind: "value",
     ...memoValue,

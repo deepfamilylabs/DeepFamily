@@ -68,6 +68,50 @@ function fixture() {
 }
 
 describe("shielded pool public event recovery", () => {
+  it("requires v3 action and complete nullifier history at the fixed recovery block", async () => {
+    const context = fixture();
+    const iface = new Interface([
+      ...ABI,
+      "event ActionExecuted(uint8 action,uint256 inputShardId0,uint256 inputShardId1)",
+    ]);
+    const hash = `0x${"ab".repeat(32)}`;
+    const action = {
+      ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [0, 0n, 0n]),
+      address: ADDRESS,
+      blockNumber: 1,
+      index: 0,
+      transactionHash: hash,
+    };
+    context.logs[0] = {
+      ...context.logs[0],
+      index: 1,
+      transactionHash: hash,
+    } as (typeof context.logs)[0];
+    context.logs.unshift(action);
+    const v3 = {
+      ...context.pool,
+      interface: iface,
+      protocolVersion: async () => 3n,
+      nullifierCount: async () => 1n,
+    } as unknown as Contract;
+    await expect(
+      loadShieldedPoolSnapshot(v3, async () => null, { fromBlock: 1, toBlock: 1 }),
+    ).rejects.toThrow("nullifier history");
+    const complete = {
+      ...v3,
+      nullifierCount: async (overrides: { blockTag: number }) => {
+        expect(overrides.blockTag).toBe(1);
+        return 0n;
+      },
+    } as unknown as Contract;
+    await expect(
+      loadShieldedPoolSnapshot(complete, async () => null, { fromBlock: 1, toBlock: 1 }),
+    ).resolves.toMatchObject({ toBlock: 1 });
+    context.logs.shift();
+    await expect(
+      loadShieldedPoolSnapshot(complete, async () => null, { fromBlock: 1, toBlock: 1 }),
+    ).rejects.toThrow("action history");
+  });
   it("replays every public note, checks roots, and extends only from the last scanned block", async () => {
     const context = fixture();
     const decoder = async (event: { commitment: bigint }) =>

@@ -17,6 +17,11 @@ export type PublicShieldedNote = {
   ciphertextHashField: bigint;
   blockNumber: number;
   logIndex: number;
+  transactionHash?: string;
+  /** Public atomic action boundary, independent of transaction batching. */
+  action?: number;
+  actionLogIndex?: number;
+  outputIndex?: number;
 };
 
 export type OwnedShieldedNote<T> = PublicShieldedNote & { note: T };
@@ -40,6 +45,8 @@ export type ShieldedPoolSnapshot<T> = {
 
 type ScanOptions<T> = {
   fromBlock?: number;
+  /** Fix all reads and event replay to the factory's per-chain recovery anchor. */
+  toBlock?: number;
   blockChunk?: number;
   previous?: ShieldedPoolSnapshot<T>;
 };
@@ -59,7 +66,16 @@ export async function loadShieldedPoolSnapshot<T>(
   if (!provider) throw new Error("Shielded pool has no provider");
   const poolAddress = (await pool.getAddress()).toLowerCase();
   const chainId = (await provider.getNetwork()).chainId;
-  const toBlock = await provider.getBlockNumber();
+  const toBlock = options.toBlock ?? (await provider.getBlockNumber());
+  if (!Number.isSafeInteger(toBlock) || toBlock < 0) throw new Error("Invalid shielded scan block");
+  const anchor = await provider.getBlock(toBlock);
+  if (!anchor?.hash) throw new Error("Shielded pool scan block is unavailable");
+  // Lightweight pre-v3 test doubles have no protocolVersion method. Actual v3
+  // contracts must expose the complete public nullifier count and action ABI.
+  const protocolVersion =
+    typeof pool.protocolVersion === "function"
+      ? Number(await pool.protocolVersion({ blockTag: toBlock }))
+      : undefined;
   const previous = options.previous;
   if (previous?.invalidated)
     throw new Error("Shielded pool snapshot is invalid; replay from deployment block");
@@ -77,18 +93,32 @@ export async function loadShieldedPoolSnapshot<T>(
     ? previous.toBlock + 1
     : Math.max(0, options.fromBlock ?? configured.fromBlock);
   const blockChunk = Math.max(1, options.blockChunk ?? configured.blockChunk);
+  if (!Number.isSafeInteger(fromBlock) || !Number.isSafeInteger(blockChunk))
+    throw new Error("Invalid shielded replay block range");
   const noteEvent = pool.interface.getEvent("NoteAppended");
   const spentEvent = pool.interface.getEvent("NullifierSpent");
+  const actionEvent = pool.interface.getEvent("ActionExecuted");
   if (!noteEvent || !spentEvent) throw new Error("Shielded pool ABI is missing public events");
+  if (protocolVersion === 3 && (!actionEvent || typeof pool.nullifierCount !== "function"))
+    throw new Error("Shielded v3 recovery ABI is incomplete");
 
   const shards = previous?.shards ?? new Map<bigint, LineageTree>();
   const ownedNotes = previous?.ownedNotes ?? new Map<bigint, OwnedShieldedNote<T>>();
   const spentNullifiers = previous?.spentNullifiers ?? new Set<bigint>();
+  let actionBoundary:
+    | { action: number; transactionHash: string; logIndex: number; outputIndex: number }
+    | undefined;
   try {
     for (let start = fromBlock; start <= toBlock; start += blockChunk) {
       const logs = await provider.getLogs({
         address: poolAddress,
-        topics: [[noteEvent.topicHash, spentEvent.topicHash]],
+        topics: [
+          [
+            noteEvent.topicHash,
+            spentEvent.topicHash,
+            ...(actionEvent ? [actionEvent.topicHash] : []),
+          ],
+        ],
         fromBlock: start,
         toBlock: Math.min(toBlock, start + blockChunk - 1),
       });
@@ -96,6 +126,18 @@ export async function loadShieldedPoolSnapshot<T>(
       for (const log of logs) {
         const parsed = pool.interface.parseLog(log);
         if (!parsed) throw new Error("Unrecognized shielded pool log");
+        if (parsed.name === "ActionExecuted") {
+          const action = Number(parsed.args.action);
+          if (!Number.isInteger(action) || action < 0 || action > 4 || !log.transactionHash)
+            throw new Error("Invalid shielded action boundary");
+          actionBoundary = {
+            action,
+            transactionHash: log.transactionHash,
+            logIndex: log.index,
+            outputIndex: 0,
+          };
+          continue;
+        }
         if (parsed.name === "NullifierSpent") {
           const nullifier = BigInt(parsed.args.nullifier);
           if (spentNullifiers.has(nullifier)) throw new Error("Repeated shielded nullifier event");
@@ -103,6 +145,14 @@ export async function loadShieldedPoolSnapshot<T>(
           continue;
         }
         if (parsed.name !== "NoteAppended") throw new Error("Unexpected shielded pool log");
+        const boundary =
+          actionBoundary &&
+          actionBoundary.transactionHash === log.transactionHash &&
+          actionBoundary.outputIndex < 2
+            ? actionBoundary
+            : undefined;
+        if (protocolVersion === 3 && !boundary)
+          throw new Error("Shielded pool action history is incomplete");
         const shardId = BigInt(parsed.args.shardId);
         const leafIndex = BigInt(parsed.args.leafIndex);
         const commitment = BigInt(parsed.args.commitment);
@@ -133,6 +183,14 @@ export async function loadShieldedPoolSnapshot<T>(
           ciphertextHashField: computeShieldedCiphertextHashField(ciphertext),
           blockNumber: log.blockNumber,
           logIndex: log.index,
+          transactionHash: log.transactionHash,
+          ...(boundary
+            ? {
+                action: boundary.action,
+                actionLogIndex: boundary.logIndex,
+                outputIndex: boundary.outputIndex++,
+              }
+            : {}),
         };
         const opened = await decode(event);
         if (opened) {
@@ -161,8 +219,14 @@ export async function loadShieldedPoolSnapshot<T>(
         throw new Error(`Shielded pool shard ${shardId} does not match chain state`);
       }
     }
+    if (
+      protocolVersion === 3 &&
+      BigInt(await pool.nullifierCount({ blockTag: toBlock })) !== BigInt(spentNullifiers.size)
+    )
+      throw new Error("Shielded pool nullifier history is incomplete");
     const block = await provider.getBlock(toBlock);
-    if (!block?.hash) throw new Error("Shielded pool scan block is unavailable");
+    if (!block?.hash || block.hash !== anchor.hash)
+      throw new Error("Shielded pool scan block was reorganized");
     // Replaying in place avoids copying every tree node and note. The prior
     // snapshot's block metadata is now stale, so it must never be reused.
     if (previous) previous.invalidated = true;

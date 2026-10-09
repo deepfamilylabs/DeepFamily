@@ -3,7 +3,8 @@ pragma circom 2.2.3;
 include "lib/identity.circom";
 
 // A receive code proves that the holder of identityCommitment chose these payment
-// keys: ownerCommitment derives from the same private identity secret, and the
+// keys: mode 0 derives spending material from identity, mode 1 proves independent
+// spending-secret possession, and the
 // X25519 viewing key is bound to the proof so it cannot be replaced in transit.
 // Payers verify the proof in the browser; there is no on-chain verifier or registry.
 // Neither key depends on the chain or pool, so one code serves every deployment.
@@ -14,6 +15,12 @@ template ShieldedReceiveCode() {
     signal input ownerCommitment;
     signal input viewKeyLo;
     signal input viewKeyHi;
+    signal input keyMode;
+    signal input identitySuiteId;
+    signal input assetSuiteId;
+    signal input assetDerivationVersion;
+    signal input receiveCodeVersion;
+    signal input spendingSecret;
 
     signal input nameField;
     signal input derivedSecretField;
@@ -26,6 +33,11 @@ template ShieldedReceiveCode() {
 
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
+    identitySuiteId === suiteId;
+    assetSuiteId === 1;
+    assetDerivationVersion === 1;
+    receiveCodeVersion === 2;
+    keyMode * (1 - keyMode) === 0;
 
     component identity = IdentityCommitmentCore();
     identity.nameField <== nameField;
@@ -46,9 +58,13 @@ template ShieldedReceiveCode() {
     ownerSecret.inputs[0] <== 1012;
     ownerSecret.inputs[1] <== derivedSecretField;
 
+    (1 - keyMode) * (spendingSecret - ownerSecret.out) === 0;
+    component spendNonzero = IsZero();
+    spendNonzero.in <== spendingSecret;
+    spendNonzero.out === 0;
     component owner = Poseidon(2);
     owner.inputs[0] <== 1013;
-    owner.inputs[1] <== ownerSecret.out;
+    owner.inputs[1] <== spendingSecret;
     owner.out === ownerCommitment;
 
     component viewLoBits = Num2Bits(128);
@@ -61,5 +77,5 @@ template ShieldedReceiveCode() {
 }
 
 component main {
-    public [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi]
+    public [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, identitySuiteId, assetSuiteId, assetDerivationVersion, receiveCodeVersion]
 } = ShieldedReceiveCode();

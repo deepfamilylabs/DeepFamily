@@ -36,6 +36,7 @@ const ruleOpening = {
   enrollmentSalt: 23n,
 };
 const common = {
+  keyMode: 0n,
   rootIdentityCommitment: 11n,
   rootVersionIndex: 2n,
   heirIdentityCommitment: 19n,
@@ -64,15 +65,15 @@ test("budget schemas include the period and compact owner version indices", () =
   assert.equal(payload[5], 5);
   assert.equal(
     keccak256(payload),
-    "0x6edf3bd13803bbaf8062b25623b58b2cd51afa02aa8e17ba007dfb1b5dd42427",
+    "0x6f47a912ae715f16984877816e36057ad304648fbd772ccccf38d0d3e75803a6",
   );
   assert.deepEqual(decodeShieldedNotePayload(payload, context), { kind: "budget", ...budget });
   const original = encodeShieldedBudgetNotePayload(privateBudget, context);
-  assert.equal(original.length, 282);
+  assert.equal(original.length, 283);
   assert.equal(original[5], 2);
   assert.equal(
     keccak256(original),
-    "0x119ec8840e75688c039a8e4ed284d5e17f5bbb77459613313195a0bfe84e39ec",
+    "0xe160105216e5df1d7316b1dea41cd33b82d1f8d86651da207ffe67d852bd1904",
   );
   assert.deepEqual(
     encodeShieldedBudgetNotePayload({ ...privateBudget, binding: "owner" }, context),
@@ -146,7 +147,7 @@ test("identity commitment binds recipient, every term, amount and opaque rule co
   );
   assert.equal(
     result.noteCommitment,
-    4089165799506468016018487715914044651327406474881393502347253006308777135489n,
+    9935951475805404990614914969960552200307540421592346160217758862880639714701n,
   );
   assert.deepEqual(
     verifyShieldedNotePayload(

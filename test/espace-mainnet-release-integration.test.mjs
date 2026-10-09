@@ -39,7 +39,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(26);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(28);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -219,7 +219,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       address("groth16VerifierAdapter"),
       address("shieldedNativePool"),
     );
-    expect(Object.keys(requests)).to.have.length(28);
+    expect(Object.keys(requests)).to.have.length(30);
 
     for (const intent of intents) {
       const request = requests[intent.label];

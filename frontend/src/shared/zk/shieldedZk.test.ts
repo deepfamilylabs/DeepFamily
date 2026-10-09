@@ -21,7 +21,7 @@ describe("shielded proof public inputs", () => {
 
   it("checks each circuit against its own public-signal count", () => {
     for (const [circuit, count] of [
-      ["receiveCode", 4],
+      ["receiveCode", 9],
       ["shield", 7],
       ["fund", 27],
       ["claim", 27],

@@ -1,19 +1,20 @@
 import { bech32m } from "@scure/base";
-import { toBeHex, zeroPadValue, getBytes } from "ethers";
+import { toBeHex, zeroPadValue, getBytes, sha256, concat, toUtf8Bytes } from "ethers";
 import { bytesToHex } from "./bytes.js";
 import { SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { buildShieldedReceiveCodePublicSignals } from "./shielded-signals.js";
 
 export const SHIELDED_RECEIVE_CODE_PREFIX = "dfrecv";
-export const SHIELDED_RECEIVE_CODE_VERSION = 1;
+export const SHIELDED_RECEIVE_CODE_VERSION = 2;
 
 /** Proof coordinates are canonical elements of the BN254 base field. */
 const BN254_BASE_FIELD =
   21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const WORD_BYTES = 32;
 const PROOF_WORDS = 8;
-const PAYLOAD_BYTES = 1 + 3 * WORD_BYTES + PROOF_WORDS * WORD_BYTES;
+const HEADER_BYTES = 5;
+const PAYLOAD_BYTES = HEADER_BYTES + 3 * WORD_BYTES + PROOF_WORDS * WORD_BYTES;
 
 const word = (value) => getBytes(zeroPadValue(toBeHex(value), WORD_BYTES));
 
@@ -71,14 +72,29 @@ function snarkjsProof(words) {
 
 /** Encode the recipient's payment keys and the snarkjs proof that binds them. */
 export function encodeShieldedReceiveCode(input) {
-  const [identityCommitment, ownerCommitment] = buildShieldedReceiveCodePublicSignals(input);
+  const [
+    identityCommitment,
+    ownerCommitment,
+    ,
+    ,
+    keyMode,
+    identitySuiteId,
+    assetSuiteId,
+    assetDerivationVersion,
+  ] = buildShieldedReceiveCodePublicSignals(input);
   const payload = new Uint8Array(PAYLOAD_BYTES);
-  payload[0] = SHIELDED_RECEIVE_CODE_VERSION;
-  payload.set(word(identityCommitment), 1);
-  payload.set(word(ownerCommitment), 1 + WORD_BYTES);
-  payload.set(getBytes(input.viewingKey), 1 + 2 * WORD_BYTES);
+  payload.set([
+    SHIELDED_RECEIVE_CODE_VERSION,
+    Number(keyMode),
+    Number(identitySuiteId),
+    Number(assetSuiteId),
+    Number(assetDerivationVersion),
+  ]);
+  payload.set(word(identityCommitment), HEADER_BYTES);
+  payload.set(word(ownerCommitment), HEADER_BYTES + WORD_BYTES);
+  payload.set(getBytes(input.viewingKey), HEADER_BYTES + 2 * WORD_BYTES);
   proofWords(input.proof).forEach((value, index) =>
-    payload.set(word(value), 1 + (3 + index) * WORD_BYTES),
+    payload.set(word(value), HEADER_BYTES + (3 + index) * WORD_BYTES),
   );
   return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
 }
@@ -108,14 +124,21 @@ export function decodeShieldedReceiveCode(code) {
     "Receive code is incomplete or mistyped",
   );
   const read = (offset) => BigInt(bytesToHex(payload.subarray(offset, offset + WORD_BYTES)));
-  const identityCommitment = read(1);
-  const ownerCommitment = read(1 + WORD_BYTES);
+  const identityCommitment = read(HEADER_BYTES);
+  const metadata = {
+    keyMode: payload[1],
+    identitySuiteId: payload[2],
+    assetSuiteId: payload[3],
+    assetDerivationVersion: payload[4],
+    receiveCodeVersion: payload[0],
+  };
+  const ownerCommitment = read(HEADER_BYTES + WORD_BYTES);
   for (const value of [identityCommitment, ownerCommitment]) {
     invalid(value > 0n && value < SNARK_SCALAR_FIELD, "Receive code commitment is out of range");
   }
-  const viewingKey = payload.slice(1 + 2 * WORD_BYTES, 1 + 3 * WORD_BYTES);
+  const viewingKey = payload.slice(HEADER_BYTES + 2 * WORD_BYTES, HEADER_BYTES + 3 * WORD_BYTES);
   const words = Array.from({ length: PROOF_WORDS }, (_, index) =>
-    read(1 + (3 + index) * WORD_BYTES),
+    read(HEADER_BYTES + (3 + index) * WORD_BYTES),
   );
   const proof = snarkjsProof(words);
   proofWords(proof);
@@ -123,11 +146,26 @@ export function decodeShieldedReceiveCode(code) {
     identityCommitment,
     ownerCommitment,
     viewingKey,
+    ...metadata,
+    fingerprint: computeShieldedReceiveCodeFingerprint({
+      identityCommitment,
+      ownerCommitment,
+      viewingKey,
+      ...metadata,
+    }),
     publicSignals: buildShieldedReceiveCodePublicSignals({
       identityCommitment,
       ownerCommitment,
       viewingKey,
+      ...metadata,
     }),
     proof,
   };
+}
+
+/** Fingerprint only the canonical, proved payment statement, never randomized proof bytes. */
+export function computeShieldedReceiveCodeFingerprint(input) {
+  const signals = buildShieldedReceiveCodePublicSignals(input);
+  const publicFields = concat(signals.map(word));
+  return sha256(concat([toUtf8Bytes("DeepFamily:ReceiveCodeFingerprint:v2"), publicFields]));
 }

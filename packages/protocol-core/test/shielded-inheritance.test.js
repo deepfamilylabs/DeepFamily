@@ -41,7 +41,7 @@ const policyInput = {
   allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, scope),
 };
 
-test("shielded v2 commitments and nullifiers match pinned protocol vectors", () => {
+test("shielded v3 commitments and nullifiers match pinned protocol vectors", () => {
   const ciphertextHashField = computeShieldedCiphertextHashField(VECTOR_CIPHERTEXT);
   const heir = deriveShieldedHeirKeyMaterial(13n);
   const policyCommitment = computeShieldedPolicyCommitment(policyInput, scope);
@@ -108,7 +108,7 @@ test("shielded v2 commitments and nullifiers match pinned protocol vectors", () 
   );
   assert.equal(
     budgetNoteCommitment,
-    15538536284803352181630799605217510147146393088737665375262172703091388874976n,
+    5347599895760436060338338506938845085749347444235421046400909311362806853045n,
   );
   assert.equal(
     computeShieldedSpendNullifier(
@@ -118,7 +118,7 @@ test("shielded v2 commitments and nullifiers match pinned protocol vectors", () 
       },
       scope,
     ),
-    12058675099107207040936045154807807712607613245140232397345922626423010899421n,
+    7844082452355350277252491886078821271073756696331124077899025380648126590105n,
   );
   assert.equal(
     computeShieldedPeriodNullifier(
@@ -136,7 +136,7 @@ test("shielded v2 commitments and nullifiers match pinned protocol vectors", () 
       },
       scope,
     ),
-    4442166310674407092058968690743819055444256024889628116654081983254408210671n,
+    8773002232470207682159429712790465852446147794052231683689378023286765941125n,
   );
   assert.equal(
     computeShieldedDummyInputNullifier(
@@ -146,7 +146,7 @@ test("shielded v2 commitments and nullifiers match pinned protocol vectors", () 
       },
       scope,
     ),
-    14354711988027963829883735112993219536923628317085474137449423572780741601292n,
+    11208185864999592450706829322714951182004295485039812429452113385134410021499n,
   );
   assert.equal(
     computeShieldedEnrollmentNullifier(

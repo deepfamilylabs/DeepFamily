@@ -95,10 +95,11 @@ const spawnFrontendServer = async () => {
   return runVite(['preview', '--outDir', outDir, '--host', host, '--port', String(port), '--strictPort'], env)
 }
 
-// First paint never starts the crypto or ZK worker, yet they hold the code the policy is most
+// First paint never starts the crypto, ZK or asset worker, yet they hold the code the policy is most
 // likely to break: WebAssembly, blob: threads and fetched proving files. Drive the built bundles
 // with the committed golden vector: derive its identity material and unlock its envelope, then
-// create and verify a shielded receive code, which is a real Groth16 proof. Receive codes refuse
+// create and verify shielded receive codes in both proving workers, using real Groth16 proofs.
+// The asset flow also checks that its unlocked session only returns the public DTO. Codes refuse
 // an empty passphrase, which is what the vector uses, so that step takes a fixed one instead.
 const RECEIVE_CODE_PASSPHRASE = 'csp-scan receive code'
 
@@ -118,6 +119,7 @@ const runWorkerFlows = async (page) => {
   const input = {
     cryptoUrl: workerUrl('crypto'),
     zkUrl: workerUrl('zk'),
+    assetUrl: workerUrl('shieldedAsset'),
     identity: { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC },
     rawPassphrase: vector.identity.rawPassphrase,
     receivePassphrase: RECEIVE_CODE_PASSPHRASE,
@@ -140,7 +142,7 @@ const runWorkerFlows = async (page) => {
   await page.waitForTimeout(1000)
   let timer
   const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('worker flows timed out')), 120_000)
+    timer = setTimeout(() => reject(new Error('worker flows timed out')), 240_000)
   })
   const flows = page.evaluate(async (input) => {
     const call = (worker, method, params) => new Promise((resolve, reject) => {
@@ -154,10 +156,25 @@ const runWorkerFlows = async (page) => {
       context[key] = BigInt(context[key])
     }
     const { identity, rawPassphrase, receivePassphrase, identitySuiteId } = input
-    const crypto = new Worker(input.cryptoUrl, { type: 'module' })
-    const zk = new Worker(input.zkUrl, { type: 'module' })
+    const workers = []
+    const startWorker = (url) => {
+      const worker = new Worker(url, { type: 'module' })
+      workers.push(worker)
+      return worker
+    }
+    const assertPublicFields = (value, fields, label) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        Object.keys(value).some(key => !fields.includes(key)) ||
+        fields.some(key => !Object.hasOwn(value, key))) {
+        // Never serialize an unexpected DTO: it might contain the very secret under test.
+        throw new Error(`${label} is not the expected public DTO`)
+      }
+    }
     const lower = (value) => String(value).toLowerCase()
     try {
+      const crypto = startWorker(input.cryptoUrl)
+      const zk = startWorker(input.zkUrl)
+      const asset = startWorker(input.assetUrl)
       const material = await call(crypto, 'deriveIdentityMaterialV1', { identity, rawPassphrase, identitySuiteId })
       const unlocked = await call(crypto, 'decryptPersonVersionEnvelopeV1', {
         envelopeHex: input.envelopeHex,
@@ -174,6 +191,29 @@ const runWorkerFlows = async (page) => {
         rawPassphrase: receivePassphrase,
       })
       const check = await call(zk, 'verifyShieldedReceiveCode', { code: created.code })
+      const assetState = await call(asset, 'unlockIdentity', {
+        identity,
+        rawPassphrase: receivePassphrase,
+      })
+      assertPublicFields(assetState, ['identity', 'funds'], 'asset session')
+      assertPublicFields(assetState.identity, [
+        'handle', 'identitySuiteId', 'identityCommitment', 'personHash', 'identity',
+      ], 'asset identity')
+      assertPublicFields(assetState.identity.identity, ['fullName'], 'asset identity display')
+      if (assetState.funds !== null || typeof assetState.identity.handle !== 'string' ||
+        typeof assetState.identity.identityCommitment !== 'string' ||
+        typeof assetState.identity.personHash !== 'string' ||
+        typeof assetState.identity.identitySuiteId !== 'number' ||
+        typeof assetState.identity.identity.fullName !== 'string') {
+        throw new Error('asset session returned invalid public field types or created a funds root')
+      }
+      const assetCreated = await call(asset, 'receiveCode', { slot: 'identity' })
+      assertPublicFields(assetCreated, ['code', 'fingerprint'], 'asset receive code')
+      if (typeof assetCreated.code !== 'string' ||
+        !/^0x[0-9a-f]{64}$/u.test(assetCreated.fingerprint)) {
+        throw new Error('asset receive code returned invalid public field types')
+      }
+      const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
       return {
         personHash: lower(material.personHash),
         unlockValidated: unlocked.metadataUnlockValidated,
@@ -182,10 +222,19 @@ const runWorkerFlows = async (page) => {
         createdPersonHash: lower(created.personHash),
         checkedPersonHash: lower(check.personHash),
         receiveCodeVerified: check.ok,
+        assetPersonHash: lower(assetState.identity.personHash),
+        assetIdentityCommitment: assetState.identity.identityCommitment,
+        assetIdentitySuiteId: assetState.identity.identitySuiteId,
+        assetCheckedPersonHash: lower(assetCheck.personHash),
+        assetCheckedIdentityCommitment: assetCheck.identityCommitment,
+        assetReceiveCodeVerified: assetCheck.ok,
+        assetKeyMode: assetCheck.keyMode,
+        assetFingerprintMatches: assetCheck.fingerprint === assetCreated.fingerprint &&
+          assetCreated.fingerprint === check.fingerprint,
+        assetPublicDtoValidated: true,
       }
     } finally {
-      crypto.terminate()
-      zk.terminate()
+      for (const worker of workers) worker.terminate()
     }
   }, input)
   const result = await Promise.race([flows, timeout]).finally(() => clearTimeout(timer))
@@ -199,6 +248,16 @@ const runWorkerFlows = async (page) => {
       'both workers derive the same receiving identity',
       result.createdPersonHash === result.receiverPersonHash && result.checkedPersonHash === result.receiverPersonHash,
     ],
+    ['the asset worker returns only public session/code DTOs', result.assetPublicDtoValidated === true],
+    ['the asset receive code verifies in the ZK worker', result.assetReceiveCodeVerified === true],
+    [
+      'the asset session and verified code match the original identity and mode',
+      result.assetPersonHash === result.receiverPersonHash &&
+      result.assetCheckedPersonHash === result.receiverPersonHash &&
+      result.assetIdentityCommitment === result.assetCheckedIdentityCommitment &&
+      result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
+    ],
+    ['both proving workers bind the same receiving keys', result.assetFingerprintMatches === true],
   ]
   const broken = checks.find(([, ok]) => !ok)
   if (broken) throw new Error(`worker flows: ${broken[0]} failed (${JSON.stringify(result)})`)
@@ -475,7 +534,7 @@ const main = async () => {
         try {
           await runWorkerFlows(page)
           const seconds = ((Date.now() - started) / 1000).toFixed(1)
-          console.log(`[csp-scan] workers: identity derived, envelope unlocked, receive code proved and verified (${seconds}s)`)
+          console.log(`[csp-scan] workers: identity derived, envelope unlocked, ZK + asset receive codes proved and verified, asset DTO public-only, all workers terminated (${seconds}s)`)
         } catch (err) {
           workerFailure = err
         }

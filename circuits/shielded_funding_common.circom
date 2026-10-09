@@ -168,6 +168,7 @@ template ShieldedBudgetNoteTags() {
     signal input poolDomain;
     signal output privateNoteTag;
     signal output identityNoteTag;
+    signal output authorizationTag;
 
     component privateTag = ShieldedScopedTag();
     privateTag.poolDomain <== poolDomain;
@@ -178,6 +179,10 @@ template ShieldedBudgetNoteTags() {
     identityTag.poolDomain <== poolDomain;
     identityTag.purpose <== 1030;
     identityNoteTag <== identityTag.tag;
+    component authorization = ShieldedScopedTag();
+    authorization.poolDomain <== poolDomain;
+    authorization.purpose <== 1033;
+    authorizationTag <== authorization.tag;
 }
 
 // The binding selector is committed in the note tag and owner/terms slot.
@@ -190,6 +195,8 @@ template ShieldedBoundBudgetCommitment() {
     signal input privateNoteTag;
     signal input identityNoteTag;
     signal input budgetKind;
+    signal input keyMode;
+    signal input authorizationTag;
     signal input policyCommitment;
     signal input enrollmentCommitment;
     signal input termsCommitment;
@@ -201,12 +208,18 @@ template ShieldedBoundBudgetCommitment() {
     signal output commitment;
 
     budgetKind * (1 - budgetKind) === 0;
+    keyMode * (1 - keyMode) === 0;
+    budgetKind * keyMode === 0;
+    component ownerAuthorization = Poseidon(3);
+    ownerAuthorization.inputs[0] <== authorizationTag;
+    ownerAuthorization.inputs[1] <== ownerCommitment;
+    ownerAuthorization.inputs[2] <== keyMode;
     signal noteTag <== privateNoteTag + budgetKind * (identityNoteTag - privateNoteTag);
     component note = Poseidon(8);
     note.inputs[0] <== noteTag;
     note.inputs[1] <== policyCommitment;
     note.inputs[2] <== enrollmentCommitment;
-    note.inputs[3] <== ownerCommitment + budgetKind * (termsCommitment - ownerCommitment);
+    note.inputs[3] <== ownerAuthorization.out + budgetKind * (termsCommitment - ownerAuthorization.out);
     note.inputs[4] <== rate;
     note.inputs[5] <== remaining;
     note.inputs[6] <== nonce;

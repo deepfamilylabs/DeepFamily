@@ -233,7 +233,7 @@ export async function checkShieldedRelease({ root = DEFAULT_ROOT } = {}) {
         (fs.existsSync(developmentManifest)
           ? "The existing development-only shielded keys are explicitly forbidden for release. "
           : "") +
-        "Run npm run zk:production:setup to prepare production artifacts for all eight circuits.",
+        "Run npm run zk:production:setup to prepare production artifacts for all ten circuits.",
     );
   }
   const { manifest, manifestSha256, artifacts } = inspectShieldedProductionArtifacts({ root });

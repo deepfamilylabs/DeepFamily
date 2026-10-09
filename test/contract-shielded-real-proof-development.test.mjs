@@ -322,7 +322,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
   this.timeout(1_200_000);
 
   for (const assetKind of ["erc20", "native"]) {
-    it(`funds identity budgets through VALUE, claims them privately and shares quotas with owner budgets (${assetKind})`, async function () {
+    it(`funds identity budgets through VALUE, claims compatible pairs and rejects mixed structures (${assetKind})`, async function () {
       const actions = ["shield", "fund", "claim", "unshield"];
       const artifacts = checkedCurrentArtifacts(actions);
       if (artifacts.missing) this.skip();
@@ -577,9 +577,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       };
       const initial = await fund(1, 4, 107n);
       const secondPublic = await fund(1, 1, 117n, initial);
-      const privateBudget = await fund(0, 2, 127n, initial);
+      const privateBudget = { ...(await makeBudget(0, 200n, 127n)), leaf: initial.leaf };
       const makeClaim = async (first, second, nonce) => {
-        const remainderKind = first.kind === 0 || second?.kind === 0 ? 0 : 1;
+        const remainderKind = first.kind;
         const remainder = await makeBudget(
           remainderKind,
           first.note.remaining + (second?.note.remaining ?? 0n) - 100n,
@@ -705,12 +705,6 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         pool,
         "NullifierAlreadySpent",
       );
-      const crossMode = await makeClaim(privateBudget, null, 227n);
-      const crossModeProof = await prove("claim", crossMode.witness, crossMode.inputs.signals);
-      await expect(pool.claim(crossMode.data, crossModeProof)).to.be.revertedWithCustomError(
-        pool,
-        "NullifierAlreadySpent",
-      );
       // A publicly funded budget's payout has the same secret-owner authorization as every VALUE.
       const payoutLeaf = Number((await pool.noteShard(0)).size) - 1;
       const payoutPath = compactMembership(await pool.getNoteMerkleProof(0, payoutLeaf));
@@ -769,33 +763,29 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       expect(await pool.totalShielded()).to.equal(900n);
       await snapshot.restore();
       const mixed = await makeClaim(initial, privateBudget, 407n);
-      const mixedProof = await prove("claim", mixed.witness, mixed.inputs.signals);
-      assertInvalidCircuitWitness(
-        "claim",
-        { ...mixed.witness, policySalt: "0", enrollmentSalt: "0", allocationKeyCommitment: "0" },
-        /Assert Failed/u,
-      );
-      await hre.networkHelpers.time.increaseTo(Number(mixed.data.asOf));
-      await pool.claim(mixed.data, mixedProof);
-      const privateRemainder = await decryptShieldedNote({
-        ciphertext: mixed.remainder.ciphertext,
+      assertInvalidCircuitWitness("claim", mixed.witness, /Assert Failed/u);
+      const pair = await makeClaim(initial, secondPublic, 417n);
+      const pairProof = await prove("claim", pair.witness, pair.inputs.signals);
+      await hre.networkHelpers.time.increaseTo(Number(pair.data.asOf));
+      await pool.claim(pair.data, pairProof);
+      const remainderPayload = await decryptShieldedNote({
+        ciphertext: pair.remainder.ciphertext,
         hpkeIkm: keys.hpkeIkm,
         chainId,
         poolAddress,
       });
-      const recoveredPrivate = verifyShieldedNotePayload(
+      const recoveredPair = verifyShieldedNotePayload(
         {
-          payload: privateRemainder,
-          ciphertext: mixed.remainder.ciphertext,
-          noteCommitment: mixed.remainder.commitment,
+          payload: remainderPayload,
+          ciphertext: pair.remainder.ciphertext,
+          noteCommitment: pair.remainder.commitment,
         },
         { chainId, poolAddress },
       ).note;
-      expect(recoveredPrivate.binding).not.to.equal("identity");
-      expect(recoveredPrivate.heirOwnerCommitment).to.equal(keys.ownerCommitment);
-      expect(recoveredPrivate.remaining).to.equal(500n);
-      expect(await pool.nullifierSpent(mixed.data.inputNullifiers[0])).to.equal(true);
-      expect(await pool.nullifierSpent(mixed.data.inputNullifiers[1])).to.equal(true);
+      expect(recoveredPair.binding).to.equal("identity");
+      expect(recoveredPair.remaining).to.equal(400n);
+      expect(await pool.nullifierSpent(pair.data.inputNullifiers[0])).to.equal(true);
+      expect(await pool.nullifierSpent(pair.data.inputNullifiers[1])).to.equal(true);
       expect(await pool.totalShielded()).to.equal(1000n);
     });
   }
@@ -2002,7 +1992,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
   });
 
   for (const assetKind of ["erc20", "native"]) {
-    it(`privately transfers two owners' notes through a real proof without changing pool assets (${assetKind})`, async function () {
+    it(`privately transfers one owner's notes through a real proof without changing pool assets (${assetKind})`, async function () {
       const artifacts = checkedCurrentArtifacts(["shield", "privateTransfer"]);
       if (artifacts.missing) {
         console.log(
@@ -2039,7 +2029,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const poolAddress = await pool.getAddress();
       const chainId = (await hre.ethers.provider.getNetwork()).chainId;
 
-      const sourceOwners = [1101n, 2202n];
+      const sourceOwners = [1101n, 1101n];
       const sourceAmounts = [70n, 30n];
       const sourceNonces = [11n, 21n];
       const sourceNotes = [];

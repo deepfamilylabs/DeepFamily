@@ -240,7 +240,7 @@ test("receive code signals bind the identity, owner and exact HPKE key limbs", a
       ownerCommitment: keys.ownerCommitment,
       viewingKey,
     }),
-    [19n, keys.ownerCommitment, viewKeyLo, viewKeyHi],
+    [19n, keys.ownerCommitment, viewKeyLo, viewKeyHi, 0n, 1n, 1n, 1n, 2n],
   );
   assert.throws(
     () =>

@@ -3,6 +3,7 @@ import {
   buildShieldedHpkeAad,
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
+  computeShieldedOwnerCommitment,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
@@ -26,7 +27,8 @@ type CommonPreparationInput = {
   chainId: BigNumberish;
   poolAddress: string;
   /** Existing identity secret, derived on this device from the one identity passphrase. */
-  derivedSecretField: BigNumberish;
+  derivedSecretField?: BigNumberish;
+  keyMaterial?: { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string };
 };
 
 type PreparedOutput<T> = {
@@ -71,7 +73,13 @@ function context(input: CommonPreparationInput) {
   const chainId = assertUint64(input.chainId, "chainId");
   const poolAddress = getAddress(input.poolAddress);
   buildShieldedHpkeAad({ chainId, poolAddress });
-  const keys = deriveShieldedHeirKeyMaterial(input.derivedSecretField);
+  if (!input.keyMaterial && input.derivedSecretField === undefined) {
+    throw new Error("Shielding requires an unlocked funds key");
+  }
+  const keys = input.keyMaterial ?? deriveShieldedHeirKeyMaterial(input.derivedSecretField!);
+  if (computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment) {
+    throw new Error("Shield funds key does not match its owner");
+  }
   return { chainId, poolAddress, keys };
 }
 

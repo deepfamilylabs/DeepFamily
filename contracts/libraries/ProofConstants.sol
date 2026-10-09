@@ -42,6 +42,8 @@ library ProofConstants {
   uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER =
     PROOF_PURPOSE_SHIELDED_ACTION_BASE + 3;
   uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD = PROOF_PURPOSE_SHIELDED_ACTION_BASE + 4;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER_8 = 7;
+  uint8 internal constant PROOF_PURPOSE_SHIELDED_UNSHIELD_8 = 8;
 
   // ---------------------------------------------------------------------------
   // Public-signal length mirrors.
@@ -60,4 +62,6 @@ library ProofConstants {
   uint256 internal constant SHIELDED_CLAIM_PUBLIC_SIGNALS_LEN = 27;
   uint256 internal constant SHIELDED_PRIVATE_TRANSFER_PUBLIC_SIGNALS_LEN = 12;
   uint256 internal constant SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN = 12;
+  uint256 internal constant SHIELDED_PRIVATE_TRANSFER_8_PUBLIC_SIGNALS_LEN = 30;
+  uint256 internal constant SHIELDED_UNSHIELD_8_PUBLIC_SIGNALS_LEN = 32;
 }

@@ -7,6 +7,7 @@ import {
   computeShieldedAllocationKeyCommitment,
   computeShieldedNoteCommitmentFromPayload,
   getShieldedBudgetCommitments,
+  normalizeShieldedKeyMode,
   encodePublicShieldedBudgetEnvelope,
   computeShieldedCiphertextHashField,
   computeShieldedEnrollmentCommitment,
@@ -16,7 +17,6 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
-  deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
@@ -39,6 +39,8 @@ import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
+import { resolveShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -52,12 +54,14 @@ export type SavedTemplate<T> = {
   ciphertext: Uint8Array;
   shardId: BigNumberish;
   ruleOpening?: ShieldedBudgetRuleOpening;
+  viewingKey?: string;
 };
 
 type CommonFundingInput = {
   pool: Contract;
   wallet: LocalShieldedWalletSnapshot;
-  donorDerivedSecretField: BigNumberish;
+  donorDerivedSecretField?: BigNumberish;
+  keyMaterial?: ShieldedKeyMaterial;
   donorCommitment: BigNumberish;
   /** Verified before preparation; its keys receive the new budget. */
   recipient?: VerifiedShieldedRecipient;
@@ -139,6 +143,7 @@ export function createShieldedPolicyDescriptor(
 
 const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
   oldBudgetKind: "0",
+  oldKeyMode: "0",
   oldHeirOwnerCommitment: "0",
   oldBudgetRemaining: "0",
   oldBudgetRemainingPeriods: "0",
@@ -239,7 +244,10 @@ async function currentContext(input: CommonFundingInput) {
     throw new Error("Funding snapshot belongs to another chain or contract");
   }
   assertSnapshotBlock(input.wallet, walletBlock, "Wallet");
-  const keys = deriveShieldedHeirKeyMaterial(input.donorDerivedSecretField);
+  const keys = resolveShieldedKeyMaterial({
+    keyMaterial: input.keyMaterial,
+    derivedSecretField: input.donorDerivedSecretField,
+  });
   if (input.wallet.walletOwnerCommitment !== keys.ownerCommitment) {
     throw new Error("Donor wallet belongs to another identity");
   }
@@ -248,6 +256,7 @@ async function currentContext(input: CommonFundingInput) {
     identityCommitment: bigint;
     ownerCommitment: bigint;
     viewingKey?: string;
+    keyMode: bigint;
   };
   if (input.budgetKind === 1) {
     if (!input.lineageIndex || !input.publicRecipientPersonHash)
@@ -261,11 +270,33 @@ async function currentContext(input: CommonFundingInput) {
       await input.lineageIndex.identityCommitmentOf(input.publicRecipientPersonHash),
     );
     if (identityCommitment === 0n) throw new Error("Recipient identity is unknown");
-    heir = { personHash: input.publicRecipientPersonHash, identityCommitment, ownerCommitment: 0n };
+    heir = {
+      personHash: input.publicRecipientPersonHash,
+      identityCommitment,
+      ownerCommitment: 0n,
+      keyMode: 0n,
+    };
   } else {
-    if (!input.recipient || input.recipient.ownerCommitment === 0n)
-      throw new Error("Private funding requires a verified receive code");
-    heir = input.recipient;
+    const continuation = input as ContinuationFundingInput;
+    if (input.recipient && input.recipient.ownerCommitment !== 0n) {
+      heir = { ...input.recipient, keyMode: normalizeShieldedKeyMode(input.recipient.keyMode) };
+    } else if (
+      continuation.fundMode === 1 &&
+      continuation.budget.note.binding !== "identity" &&
+      continuation.budget.viewingKey
+    ) {
+      const saved = continuation.budget.note;
+      heir = {
+        identityCommitment: getBigInt(saved.heirIdentityCommitment),
+        ownerCommitment: getBigInt(saved.heirOwnerCommitment),
+        viewingKey: continuation.budget.viewingKey,
+        keyMode: normalizeShieldedKeyMode(saved.keyMode),
+        personHash: wrapIdentityCommitmentAsPersonHash(saved.heirIdentityCommitment),
+      };
+    } else
+      throw new Error(
+        "Private funding requires a verified code or the original funding template viewing material",
+      );
   }
   if (
     wrapIdentityCommitmentAsPersonHash(heir.identityCommitment).toLowerCase() !==
@@ -412,6 +443,7 @@ async function fundingOutputs(input: {
       budgetCommitment: encryptedBudget.commitment,
       budgetNote: input.budget,
       ...(input.ruleOpening ? { ruleOpening: input.ruleOpening } : {}),
+      ...(input.publicDelivery ? {} : { viewingKey: input.heirViewingKey! }),
       ...(input.allocationKey === undefined ? {} : { allocationKey: input.allocationKey }),
     },
   };
@@ -596,6 +628,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     input.budgetKind === 1
       ? {
           binding: "identity",
+          keyMode: 0n,
           rootIdentityCommitment: policy.rootIdentityCommitment,
           rootVersionIndex: policy.rootVersionIndex,
           heirIdentityCommitment: heir.identityCommitment,
@@ -614,6 +647,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
           heirIdentityCommitment: heir.identityCommitment,
           eligibleFrom,
           heirOwnerCommitment: heir.ownerCommitment,
+          keyMode: heir.keyMode,
           amountPerPeriod: policy.amountPerPeriod,
           periodDays: policy.periodDays,
           remaining: amount,
@@ -662,6 +696,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     allocationKeyCommitment: String(allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
+    keyMode: String(heir.keyMode),
     heirVersionIndex: String(legitimacy.versionIndex),
     fatherIdentityCommitment: String(legitimacy.fatherIdentityCommitment),
     motherIdentityCommitment: String(legitimacy.motherIdentityCommitment),
@@ -693,6 +728,10 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
 async function prepareContinuationFunding(
   input: ContinuationFundingInput,
 ): Promise<PreparedShieldedFunding> {
+  const oldKind = input.budget.note.binding === "identity" ? 1 : 0;
+  if (input.budgetKind !== undefined && input.budgetKind !== oldKind)
+    throw new Error("Continuation cannot change budget binding");
+  input = { ...input, budgetKind: oldKind };
   assertFundingParent(input.wallet, input.budget.note.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const donor = donorInput(input, ctx.keys.ownerSecret);
@@ -700,12 +739,19 @@ async function prepareContinuationFunding(
   const old = input.budget.note;
   const heir = ctx.heir;
   if (
+    normalizeShieldedKeyMode(old.keyMode, old.binding) !== heir.keyMode ||
     getBigInt(old.heirIdentityCommitment) !== heir.identityCommitment ||
     (input.budgetKind !== 1 &&
       old.binding !== "identity" &&
       getBigInt(old.heirOwnerCommitment) !== heir.ownerCommitment)
   )
     throw new Error("Budget template does not belong to this recipient");
+  if (
+    old.binding !== "identity" &&
+    (!input.budget.viewingKey ||
+      input.budget.viewingKey.toLowerCase() !== heir.viewingKey?.toLowerCase())
+  )
+    throw new Error("Continuation cannot change recipient viewing material");
   const ruleOpening =
     old.binding === "identity"
       ? input.budget.ruleOpening
@@ -742,6 +788,7 @@ async function prepareContinuationFunding(
   if (input.wallet.spentNullifiers.has(useNullifier))
     throw new Error("Funding authorization was already used");
   const commonBudget = {
+    keyMode: normalizeShieldedKeyMode(old.keyMode, old.binding),
     rootIdentityCommitment: old.rootIdentityCommitment,
     rootVersionIndex: old.rootVersionIndex,
     heirIdentityCommitment: old.heirIdentityCommitment,
@@ -794,9 +841,11 @@ async function prepareContinuationFunding(
     allocationKeyCommitment: String(ruleOpening.allocationKeyCommitment),
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
+    keyMode: String(heir.keyMode),
     eligibleFrom: String(old.eligibleFrom),
     enrollmentSalt: String(ruleOpening.enrollmentSalt),
     oldBudgetKind: old.binding === "identity" ? "1" : "0",
+    oldKeyMode: String(normalizeShieldedKeyMode(old.keyMode, old.binding)),
     oldHeirOwnerCommitment: old.binding === "identity" ? "0" : String(old.heirOwnerCommitment),
     oldBudgetRemaining: String(oldRemaining),
     oldBudgetRemainingPeriods: String(oldRemaining / rate),

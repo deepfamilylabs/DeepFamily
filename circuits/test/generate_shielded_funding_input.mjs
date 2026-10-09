@@ -18,6 +18,8 @@ export function buildShieldedFundingFixtures({
   pool = DEFAULT_SHIELDED_FIXTURE_POOL,
   poolAddress,
   budgetKind = 0,
+  keyMode = 0,
+  oldKeyMode = keyMode,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
 } = {}) {
@@ -25,7 +27,7 @@ export function buildShieldedFundingFixtures({
   pool = BigInt(poolAddress ?? pool);
   const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
-  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool });
+  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool, keyMode });
   const donorOwnerSecret = 424242n;
   const donorOwnerCommitment = poseidon2([1013n, donorOwnerSecret]);
   donorAmount = BigInt(donorAmount);
@@ -83,7 +85,7 @@ export function buildShieldedFundingFixtures({
     scoped(budgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
-    budgetKind === 0 ? heirOwnerCommitment : termsCommitment,
+    budgetKind === 0 ? poseidon3([scoped(1033n), heirOwnerCommitment, BigInt(keyMode)]) : termsCommitment,
     rate,
     fundedAmount,
     budgetNonce,
@@ -106,7 +108,7 @@ export function buildShieldedFundingFixtures({
     scoped(oldBudgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
-    oldBudgetKind === 0 ? oldHeirOwnerCommitment : termsCommitment,
+    oldBudgetKind === 0 ? poseidon3([scoped(1033n), oldHeirOwnerCommitment, BigInt(oldKeyMode)]) : termsCommitment,
     rate,
     oldBudgetRemaining,
     oldBudgetNonce,
@@ -130,6 +132,7 @@ export function buildShieldedFundingFixtures({
     allocationKeyCommitment: decimal(allocationKeyCommitment),
     heirIdentityCommitment: decimal(heirIdentityCommitment),
     heirOwnerCommitment: decimal(heirOwnerCommitment),
+    keyMode: decimal(keyMode),
     eligibleFrom: decimal(eligibleFrom),
     enrollmentSalt: decimal(enrollmentSalt),
     changeNonce: decimal(changeNonce),
@@ -177,6 +180,7 @@ export function buildShieldedFundingFixtures({
   };
   const oldFields = {
     oldBudgetKind: decimal(oldBudgetKind),
+    oldKeyMode: decimal(oldKeyMode),
     oldHeirOwnerCommitment: decimal(oldHeirOwnerCommitment),
     oldBudgetRemaining: decimal(oldBudgetRemaining),
     oldBudgetRemainingPeriods: decimal(oldBudgetRemainingPeriods),

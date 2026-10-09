@@ -230,7 +230,7 @@ export async function verifyShieldedCeremonyArtifacts({
       const { item, ceremony } = artifact;
       if (
         !/^[A-Za-z][A-Za-z0-9]*$/u.test(action) ||
-        !/^shielded_[a-z_]+$/u.test(item?.source ?? "")
+        !/^shielded_[a-z0-9_]+$/u.test(item?.source ?? "")
       ) {
         throw new Error("Shielded ceremony circuit identity is invalid");
       }

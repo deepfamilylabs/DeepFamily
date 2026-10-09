@@ -20,6 +20,9 @@ export function buildShieldedClaimFixture({
   poolAddress,
   secondPeriodDays = periodDays,
   budgetKind = 0,
+  keyMode = 0,
+  secondKeyMode = keyMode,
+  ownerSecret: suppliedOwnerSecret,
   secondBudgetKind = budgetKind,
   remainingPeriods = 3,
   secondRemainingPeriods = 0,
@@ -34,7 +37,7 @@ export function buildShieldedClaimFixture({
   secondPeriodDays = BigInt(secondPeriodDays);
   const lineage = buildLineageFixture().witness;
   const derivedSecret = BigInt(lineage.derivedSecretField);
-  const ownerSecret = poseidon2([1012n, derivedSecret]);
+  const ownerSecret = suppliedOwnerSecret === undefined ? (keyMode === 1 ? 123456789n : poseidon2([1012n, derivedSecret])) : BigInt(suppliedOwnerSecret);
   const ownerCommitment = poseidon2([1013n, ownerSecret]);
   const rootIdentityCommitment = BigInt(lineage.fatherIdentityCommitment);
   const heirIdentityCommitment = poseidon4([
@@ -90,7 +93,7 @@ export function buildShieldedClaimFixture({
     scoped(budgetKind === 0 ? 1015n : 1030n),
     policy,
     enrollment,
-    budgetKind === 0 ? ownerCommitment : termsCommitment,
+    budgetKind === 0 ? poseidon3([scoped(1033n), ownerCommitment, BigInt(keyMode)]) : termsCommitment,
     rate,
     remaining,
     budgetNonce,
@@ -130,7 +133,7 @@ export function buildShieldedClaimFixture({
     scoped(secondBudgetKind === 0 ? 1015n : 1030n),
     secondPolicy,
     secondEnrollment,
-    secondBudgetKind === 0 ? ownerCommitment : secondTermsCommitment,
+    secondBudgetKind === 0 ? poseidon3([scoped(1033n), ownerCommitment, BigInt(secondKeyMode)]) : secondTermsCommitment,
     rate,
     secondRemaining,
     secondBudgetNonce,
@@ -147,12 +150,12 @@ export function buildShieldedClaimFixture({
       : poseidon4([scoped(1019n), ownerSecret, inputBudget, BigInt(slot)]),
   );
   const payout = rate * claimCountBigInt;
-  const requiresOpening = budgetKind === 0 || (hasSecondInput && secondBudgetKind === 0);
+  const requiresOpening = budgetKind === 0;
   const budgetOutput = poseidon8([
     scoped(requiresOpening ? 1015n : 1030n),
     policy,
     enrollment,
-    requiresOpening ? ownerCommitment : termsCommitment,
+    requiresOpening ? poseidon3([scoped(1033n), ownerCommitment, BigInt(keyMode)]) : termsCommitment,
     rate,
     remaining + secondRemaining - payout,
     newBudgetNonce,
@@ -207,6 +210,9 @@ export function buildShieldedClaimFixture({
     trustedIndex: lineage.trustedIndex,
     trustedSiblings: lineage.trustedSiblings,
     budgetKind: decimal(budgetKind),
+    keyMode: decimal(keyMode),
+    secondKeyMode: hasSecondInput ? decimal(secondKeyMode) : "0",
+    ownerSecret: decimal(ownerSecret),
     secondBudgetKind: hasSecondInput ? decimal(secondBudgetKind) : "0",
     policyCommitmentInput: decimal(policy),
     enrollmentCommitmentInput: decimal(enrollment),

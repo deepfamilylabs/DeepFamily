@@ -48,12 +48,14 @@ template ShieldedPrivateTransfer() {
     dummyInputTag.purpose <== 1021;
 
     hasSecondInput * (hasSecondInput - 1) === 0;
+    hasSecondInput * (inputOwnerSecrets[1] - inputOwnerSecrets[0]) === 0;
     (1 - hasSecondInput) * (inputShardIds[1] - inputShardIds[0]) === 0;
     (1 - hasSecondInput) * (inputRoots[1] - inputRoots[0]) === 0;
 
     component ownerNotZero[2];
     component owner[2];
     component inputAmountBits[2];
+    component inputAmountZero[2];
     component inputNonceNotZero[2];
     component inputNote[2];
     component membership[2];
@@ -84,6 +86,13 @@ template ShieldedPrivateTransfer() {
         owner[i].inputs[1] <== inputOwnerSecrets[i];
         inputAmountBits[i] = Num2Bits(128);
         inputAmountBits[i].in <== inputAmounts[i];
+        inputAmountZero[i] = IsZero();
+        inputAmountZero[i].in <== inputAmounts[i];
+        if (i == 0) {
+            inputAmountZero[i].out === 0;
+        } else {
+            hasSecondInput * inputAmountZero[i].out === 0;
+        }
         inputNonceNotZero[i] = IsZero();
         inputNonceNotZero[i].in <== inputNonces[i];
         if (i == 0) {

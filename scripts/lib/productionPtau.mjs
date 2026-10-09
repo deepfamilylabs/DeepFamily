@@ -3,7 +3,7 @@ import { createReadStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-// Fresh setup for all eight circuits uses this pinned Phase 1. Pool domain separation raises claim above 2^16.
+// Fresh setup for all ten circuits uses this pinned Phase 1. Pool domain separation raises claim above 2^16.
 export const PRODUCTION_PTAU_POWER = 17;
 export const PRODUCTION_PTAU_FILE_NAME = "ppot_0080_17.ptau";
 export const PRODUCTION_PTAU_RELATIVE_PATH = `circuits/ptau/${PRODUCTION_PTAU_FILE_NAME}`;

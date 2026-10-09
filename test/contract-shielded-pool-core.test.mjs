@@ -68,9 +68,37 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     // It proves wiring, not soundness of any shielded note transition.
     return hre.ethers.AbiCoder.defaultAbiCoder().encode(
       ["uint8", "uint256[]"],
-      [ACTION_PURPOSE_BASE + action, signals],
+      [data.inputNullifiers.length === 8 ? action === 3 ? 7 : 8 : ACTION_PURPOSE_BASE + action, signals],
     );
   }
+
+  it("routes eight-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
+    const { pool, recipient } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool,0,deposit,100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = actionData({inputShardIds:Array(8).fill(0n),inputRoots:Array(8).fill(root),
+      inputNullifiers:Array.from({length:8},(_,i)=>BigInt(501+i)),outputCommitments:[5031n,5032n]});
+    const proof = await proofFor(pool,3,transfer);
+    const wrongPurpose = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint8","uint256[]"],
+      [5,buildShieldedPoolPublicSignals({action:3,chainId:(await hre.ethers.provider.getNetwork()).chainId,poolAddress:await pool.getAddress(),...transfer})]);
+    await expect(pool.privateTransfer(transfer,wrongPurpose)).to.be.revertedWithCustomError(pool,"InvalidZKProof");
+    const duplicate = {...transfer,inputNullifiers:[...transfer.inputNullifiers]};
+    duplicate.inputNullifiers[7]=duplicate.inputNullifiers[6];
+    await expect(pool.privateTransfer(duplicate,proof)).to.be.revertedWithCustomError(pool,"NullifierAlreadySpent");
+    await expect(pool.fund(transfer,proof)).to.be.revertedWithCustomError(pool,"InvalidActionData");
+    await pool.privateTransfer(transfer,proof);
+    expect(await pool.nullifierCount()).to.equal(8n);
+    for(const nullifier of transfer.inputNullifiers) expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+    expect(await pool.totalShielded()).to.equal(100n);
+    const nextRoot=(await pool.noteShard(0)).root;
+    const withdrawal=actionData({inputShardIds:Array(8).fill(0n),inputRoots:Array(8).fill(nextRoot),
+      inputNullifiers:Array.from({length:8},(_,i)=>BigInt(601+i)),outputCommitments:[6031n,6032n]});
+    await pool.unshield(recipient.address,30n,withdrawal,await proofFor(pool,4,withdrawal,30n,recipient.address));
+    expect(await pool.nullifierCount()).to.equal(16n);
+    for(const nullifier of withdrawal.inputNullifiers) expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+    expect(await pool.totalShielded()).to.equal(70n);
+  });
 
   it("binds shield amount and outputs, mirrors LeanIMT paths, and keeps tokens escrowed", async () => {
     const { pool, token, depositor, recipient } = await setup();

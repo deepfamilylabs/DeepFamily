@@ -2,7 +2,18 @@ import React, { createContext, useCallback, useContext, useMemo, useRef, useStat
 import type { FriendlyError } from "../../../shared/lib/errors";
 import type { TransactionPhase } from "../ui/shared/transactionPhase";
 
-export type TransactionKind = "addVersion" | "endorse" | "mint";
+export type TransactionKind = "addVersion" | "endorse" | "mint" | "shielded";
+
+/** Public submission data needed to resume receipt tracking after navigation. */
+export type ShieldedSubmissionContext = {
+  chainId: string;
+  poolAddress: string;
+  kind: "action" | "approval";
+  nonce?: number;
+  signerAddress?: string;
+  fromBlock?: number;
+  outputCommitments?: string[];
+};
 
 export type TransactionRecord = {
   id: string;
@@ -11,13 +22,14 @@ export type TransactionRecord = {
   label: string;
   phase: TransactionPhase;
   transactionHash?: string;
+  shieldedSubmission?: ShieldedSubmissionContext;
   error?: FriendlyError | null;
   startedAt: number;
   updatedAt: number;
 };
 
 export type TransactionUpsert = Pick<TransactionRecord, "id" | "kind" | "label" | "phase"> &
-  Partial<Pick<TransactionRecord, "transactionHash" | "error">>;
+  Partial<Pick<TransactionRecord, "transactionHash" | "error" | "shieldedSubmission">>;
 
 type TransactionCenterValue = {
   records: TransactionRecord[];

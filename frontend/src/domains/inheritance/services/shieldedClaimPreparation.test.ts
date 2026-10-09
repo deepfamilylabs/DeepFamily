@@ -21,6 +21,7 @@ import {
   createLineageTree,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedAssetKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encryptShieldedNote,
@@ -115,10 +116,16 @@ function lineage(identity: IdentityMaterialV1Result): LineageSnapshot {
   };
 }
 
-async function fixture(remaining = 1_200n, amountPerPeriod = 100n, periodDays = 30n) {
+async function fixture(
+  remaining = 1_200n,
+  amountPerPeriod = 100n,
+  periodDays = 30n,
+  keyMaterial?: { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string },
+) {
   const identity = identityMaterial();
-  const keys = deriveShieldedHeirKeyMaterial(derivedSecretField);
+  const keys = keyMaterial ?? deriveShieldedHeirKeyMaterial(derivedSecretField);
   const note = {
+    keyMode: keyMaterial ? 1n : 0n,
     rootIdentityCommitment,
     rootVersionIndex,
     policySalt: 222n,
@@ -155,6 +162,7 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n, periodDays = 
       policyCommitment,
       enrollmentCommitment,
       heirOwnerCommitment: note.heirOwnerCommitment,
+      keyMode: note.keyMode,
       amountPerPeriod: note.amountPerPeriod,
       remaining: note.remaining,
       nonce: note.nonce,
@@ -190,6 +198,7 @@ async function fixture(remaining = 1_200n, amountPerPeriod = 100n, periodDays = 
     walletIdentityCommitment: BigInt(identity.identityCommitment),
   };
   return {
+    keyMaterial,
     chainId,
     poolAddress,
     identity,
@@ -241,6 +250,48 @@ async function addSecondBudget(
 }
 
 describe("local shielded claim preparation", () => {
+  it("independent budgets claim to their original root and reject identity fallback", async () => {
+    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(9));
+    const input = await fixture(1_200n, 100n, 30n, keys);
+    const prepared = await prepareShieldedClaim(input);
+    expect(prepared.outputs[0].note.keyMode).toBe(1n);
+    expect(prepared.outputs[1].note.ownerCommitment).toBe(keys.ownerCommitment);
+    expect(prepared.witness.ownerSecret).toBe(keys.ownerSecret.toString());
+    await expect(prepareShieldedClaim({ ...input, keyMaterial: undefined })).rejects.toThrow(
+      "original key material",
+    );
+    await expect(
+      prepareShieldedClaim({
+        ...input,
+        keyMaterial: deriveShieldedHeirKeyMaterial(derivedSecretField),
+      }),
+    ).rejects.toThrow();
+    const legacy = await fixture();
+    await expect(prepareShieldedClaim({ ...legacy, keyMaterial: keys })).rejects.toThrow(
+      "canonical identity keys",
+    );
+  });
+  it("does not combine mode-0 and mode-1 budgets even when their actual owner is identical", async () => {
+    const input = await fixture(100n);
+    const secondBudgetCommitment = await addSecondBudget(input, { keyMode: 1n });
+    await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
+      "same binding and key mode",
+    );
+    const independent = await fixture(
+      100n,
+      100n,
+      30n,
+      deriveShieldedHeirKeyMaterial(derivedSecretField),
+    );
+    const matchingSecond = await addSecondBudget(independent);
+    const result = await prepareShieldedClaim({
+      ...independent,
+      secondBudgetCommitment: matchingSecond,
+      periodIndices: [0n, 1n],
+    });
+    expect(result.witness.keyMode).toBe("1");
+    expect(result.witness.secondKeyMode).toBe("1");
+  });
   it.each([1n, 7n, 365n])(
     "claims on a %s-day schedule only when a complete period has elapsed",
     async (periodDays) => {
@@ -541,8 +592,17 @@ describe("local shielded claim preparation", () => {
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
         const publicPath = path.join(temporary, "public.json");
-        for (const useSecond of [false, true]) {
-          const input = await fixture(useSecond ? 600n : 1_200n);
+        for (const [keyMode, useSecond] of [
+          [0, false],
+          [0, true],
+          [1, false],
+          [1, true],
+        ] as const) {
+          const keys =
+            keyMode === 1
+              ? await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(9))
+              : undefined;
+          const input = await fixture(useSecond ? 600n : 1_200n, 100n, 30n, keys);
           const secondBudgetCommitment = useSecond
             ? await addSecondBudget(input, { remaining: 600n })
             : undefined;

@@ -2,25 +2,14 @@
 import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { IdentityMaterialV1Result } from "../shared/workers/cryptoWorkerClient";
+import type { ShieldedPublicIdentity } from "../shared/workers/shieldedAssetWorkerTypes";
 import { useShieldedPageIdentitySession } from "../domains/inheritance";
 import InheritancePage from "./InheritancePage";
 
-const identity: IdentityMaterialV1Result = {
+const identity: ShieldedPublicIdentity = {
+  handle: "identity:1",
   identitySuiteId: 1,
-  identity: {
-    fullName: "Parent",
-    gender: 1,
-    birthYear: 2000,
-    birthMonth: 1,
-    birthDay: 1,
-    isBirthBC: false,
-  },
-  derivedSecretField: "123",
-  nameField: "456",
-  packedBirthGenderField: "789",
-  suiteCommitment: "12",
-  nameSecretCommitment: "34",
+  identity: { fullName: "Test Person" },
   identityCommitment: "777",
   personHash: "0x" + "00".repeat(32),
 };
@@ -42,8 +31,8 @@ const mocks = vi.hoisted(() => ({
   poolAddress: "0x0000000000000000000000000000000000000004",
   nativePoolAddress: "0x0000000000000000000000000000000000000008",
   factoryToken: "0x0000000000000000000000000000000000000003",
-  assetPrecision: 18,
-  readShieldedAsset: vi.fn(),
+  assetPrecision: 18 as number | null,
+  readRecoveredShieldedAsset: vi.fn(),
   resolveShieldedAssetPool: vi.fn(),
   createPool: vi.fn(),
   familyIndex: "0x0000000000000000000000000000000000000006",
@@ -71,6 +60,7 @@ vi.mock("../shared/config/env", () => ({
 vi.mock("../shared/clients/providerRegistry", () => ({
   getReadonlyProvider: () => ({
     getNetwork: async () => ({ chainId: BigInt(mocks.config.chainId) }),
+    getBlockNumber: async () => 20,
   }),
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
@@ -82,7 +72,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
   createLineageIndexContract: () => ({}),
 }));
 vi.mock("../domains/inheritance/services/shieldedAssetRegistry", () => ({
-  readShieldedAsset: mocks.readShieldedAsset,
+  readRecoveredShieldedAsset: mocks.readRecoveredShieldedAsset,
   resolveShieldedAssetPool: mocks.resolveShieldedAssetPool,
 }));
 vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
@@ -99,7 +89,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
       assetKind: string;
       assetSymbol: string;
       poolAddress: string;
-      tokenDecimals: number;
+      tokenDecimals: number | null;
       poolDeploymentBlock: number;
       token: unknown;
     };
@@ -118,13 +108,31 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         <span data-testid="shielded-signer-state">{signer ? "ready" : "reconnecting"}</span>
         <span data-testid="shielded-account">{account}</span>
         <span data-testid="shielded-asset">
-          {modules.assetKind}:{modules.assetSymbol}:{modules.tokenDecimals}
+          {modules.assetKind}:{modules.assetSymbol}:{modules.tokenDecimals ?? "raw"}
         </span>
         <span data-testid="shielded-pool">{modules.poolAddress}</span>
         <span data-testid="shielded-deployment-block">{modules.poolDeploymentBlock}</span>
         <span data-testid="shielded-token">{modules.token ? "erc20" : "native"}</span>
         <button type="button" onClick={() => session.unlock(identity)}>
           unlock-test-session
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            session.update({
+              identity: null,
+              funds: {
+                ownerCommitment: "123",
+                viewingKey: `0x${"12".repeat(32)}`,
+                fundsFingerprint: `0x${"34".repeat(32)}`,
+                rootSource: "random",
+                recoveryVerified: true,
+                recoveryPath: "file",
+              },
+            })
+          }
+        >
+          unlock-root-only
         </button>
         <input
           aria-label="private-workflow-draft"
@@ -149,6 +157,7 @@ describe("InheritancePage private pool entry", () => {
     mocks.wallet.address = "0x00000000000000000000000000000000000000aa";
     mocks.wallet.chainId = 31337;
     mocks.config.chainId = 31337;
+    mocks.config.rpcUrl = "http://127.0.0.1:8545";
     mocks.config.contractAddress = "0x0000000000000000000000000000000000000002";
     mocks.wallet.signer = {
       provider: { getNetwork: async () => ({ chainId: 31337n }) },
@@ -157,7 +166,7 @@ describe("InheritancePage private pool entry", () => {
     mocks.factoryAddress = "0x0000000000000000000000000000000000000007";
     mocks.factoryToken = mocks.config.tokenAddress;
     mocks.assetPrecision = 18;
-    mocks.readShieldedAsset
+    mocks.readRecoveredShieldedAsset
       .mockReset()
       .mockImplementation(async (address: string, _provider: unknown, nativeSymbol: string) => ({
         address,
@@ -238,7 +247,7 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
   });
 
-  it("remounts pool-local drafts and preserves the unlocked identity when switching assets", async () => {
+  it("locks secrets and remounts pool-local drafts while preserving the selected pool", async () => {
     render(<InheritancePage />);
     const original = await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
@@ -252,17 +261,20 @@ describe("InheritancePage private pool entry", () => {
       expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.nativePoolAddress),
     );
     expect(screen.getByTestId("shielded-panel")).not.toBe(original);
-    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
-    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
+    expect(screen.getByTestId("shielded-identity").textContent).toBe("");
     expect(screen.getByTestId("shielded-token").textContent).toBe("native");
     expect(screen.getByTestId("shielded-deployment-block").textContent).toBe("5");
     expect(
       (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
     ).toBe("");
     expect(mocks.panelUnmounted).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+    expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.nativePoolAddress);
   });
 
-  it("keeps identity available while loading another pool and ignores that pool's late response after switching back", async () => {
+  it("locks during pool changes and ignores late responses after selecting the previous pool", async () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
@@ -284,8 +296,8 @@ describe("InheritancePage private pool entry", () => {
       target: { value: mocks.config.tokenAddress },
     });
     const restoredPanel = await screen.findByTestId("shielded-panel");
-    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
-    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
+    expect(screen.getByTestId("shielded-identity").textContent).toBe("");
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
     await act(async () => {
       pendingNative.resolve({
         pool: {},
@@ -295,11 +307,11 @@ describe("InheritancePage private pool entry", () => {
     });
     expect(screen.getByTestId("shielded-panel")).toBe(restoredPanel);
     expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.poolAddress);
-    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+    expect(screen.getByTestId("shielded-identity").textContent).toBe("");
   });
 
   it.each(["missing", "failed"])(
-    "retains identity when visiting a %s pool and then returning",
+    "keeps asset navigation available when a %s pool has locked the identity",
     async (result) => {
       render(<InheritancePage />);
       await screen.findByTestId("shielded-panel");
@@ -322,12 +334,12 @@ describe("InheritancePage private pool entry", () => {
         target: { value: mocks.config.tokenAddress },
       });
       await screen.findByTestId("shielded-panel");
-      expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
-      expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
+      expect(screen.getByTestId("shielded-identity").textContent).toBe("");
+      expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
     },
   );
 
-  it.each(["chain", "factory", "family"])(
+  it.each(["chain", "factory", "family", "rpc"])(
     "locks identity when the protocol %s scope changes",
     async (changed) => {
       const { rerender } = render(<InheritancePage />);
@@ -338,8 +350,10 @@ describe("InheritancePage private pool entry", () => {
         mocks.wallet.chainId = 1;
       } else if (changed === "factory") {
         mocks.factoryAddress = "0x0000000000000000000000000000000000000009";
-      } else {
+      } else if (changed === "family") {
         mocks.config.contractAddress = "0x0000000000000000000000000000000000000020";
+      } else {
+        mocks.config.rpcUrl = "http://127.0.0.1:9545";
       }
       rerender(<InheritancePage />);
       await screen.findByTestId("shielded-panel");
@@ -471,27 +485,36 @@ describe("InheritancePage private pool entry", () => {
     expect(mocks.config.tokenAddress).toBe("0x0000000000000000000000000000000000000003");
   });
 
-  it("reports unusable imported precision without replacing the existing private workflow", async () => {
+  it("keeps an imported pool selectable with unknown precision using raw integer units", async () => {
     render(<InheritancePage />);
-    const panel = await screen.findByTestId("shielded-panel");
+    await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
-    mocks.readShieldedAsset.mockRejectedValueOnce(
-      new Error("Token decimals must be an integer between 0 and 36"),
-    );
+    mocks.assetPrecision = null;
     fireEvent.click(screen.getByRole("button", { name: "shielded.assets.add" }));
     fireEvent.change(screen.getByRole("textbox", { name: "shielded.assets.tokenAddress" }), {
       target: { value: "0x0000000000000000000000000000000000000030" },
     });
     fireEvent.click(screen.getByRole("button", { name: "shielded.assets.import" }));
     await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain(
-        "Token decimals must be an integer between 0 and 36",
-      ),
+      expect(screen.getByTestId("shielded-asset").textContent).toBe("erc20:TEST:raw"),
     );
-    expect(screen.getByTestId("shielded-panel")).toBe(panel);
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(
       (screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement).value,
-    ).toBe(mocks.config.tokenAddress);
+    ).toBe("0x0000000000000000000000000000000000000030");
+  });
+
+  it("exposes asset selection and root-only recovery without unlocking identity credentials", async () => {
+    render(<InheritancePage />);
+    await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-root-only" }));
+    expect(screen.getByTestId("shielded-identity").textContent).toBe("");
+    fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
+      target: { value: "0x0000000000000000000000000000000000000000" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("shielded-asset").textContent).toContain("native:"),
+    );
   });
 
   it("offers a network switch and hides the actions on the wrong chain", async () => {

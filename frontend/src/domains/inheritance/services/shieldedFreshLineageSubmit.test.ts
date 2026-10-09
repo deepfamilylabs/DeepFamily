@@ -145,7 +145,12 @@ describe("fresh lineage proof self-submit", () => {
       expect(f[action]).toHaveBeenCalledWith(
         expect.objectContaining({ relation0: 11n, relation1: 21n }),
         expect.any(String),
-        { gasLimit: 120_000n },
+        {
+          chainId: 71n,
+          gasLimit: 120_000n,
+          maxFeePerGas: 1_000_000_000n,
+          maxPriorityFeePerGas: 0n,
+        },
       );
       expect(f.lineageIndex.root).toHaveBeenCalledWith(0, { blockTag: 100 });
       expect(f.lineageIndex.root).toHaveBeenCalledWith(1, { blockTag: 100 });

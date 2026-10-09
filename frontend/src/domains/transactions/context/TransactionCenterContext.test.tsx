@@ -2,7 +2,11 @@
 import { act, cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import React from "react";
-import { TransactionCenterProvider, useTransactionCenter } from "./TransactionCenterContext";
+import {
+  TransactionCenterProvider,
+  useTransactionCenter,
+  type ShieldedSubmissionContext,
+} from "./TransactionCenterContext";
 import { useTransactionCenterEntry } from "../ui/shared/useTransactionCenterEntry";
 import type { TransactionPhase } from "../ui/shared/transactionPhase";
 
@@ -62,6 +66,42 @@ describe("transaction centre", () => {
     });
 
     expect(result.current!.records.map((record) => record.id)).toEqual(["a"]);
+  });
+
+  it("preserves public shielded submission context across hash and phase updates", () => {
+    const { result } = renderHook(() => useTransactionCenter(), { wrapper });
+    const shieldedSubmission: ShieldedSubmissionContext = {
+      chainId: "31337",
+      poolAddress: `0x${"12".repeat(20)}`,
+      kind: "action",
+      nonce: 7,
+      signerAddress: `0x${"34".repeat(20)}`,
+      fromBlock: 42,
+      outputCommitments: ["123", "456"],
+    };
+    const entry = { id: "shielded-action", kind: "shielded", label: "Private transfer" } as const;
+
+    act(() => {
+      result.current!.upsert({ ...entry, phase: "busy", shieldedSubmission });
+    });
+    act(() => {
+      result.current!.upsert({ ...entry, phase: "busy", transactionHash: "0xsubmitted" });
+    });
+
+    expect(result.current!.records[0].shieldedSubmission).toEqual(shieldedSubmission);
+    expect(result.current!.pendingCount).toBe(1);
+
+    act(() => {
+      result.current!.upsert({ ...entry, phase: "done" });
+    });
+
+    expect(result.current!.records).toHaveLength(1);
+    expect(result.current!.records[0]).toMatchObject({
+      phase: "done",
+      transactionHash: "0xsubmitted",
+      shieldedSubmission,
+    });
+    expect(result.current!.pendingCount).toBe(0);
   });
 });
 

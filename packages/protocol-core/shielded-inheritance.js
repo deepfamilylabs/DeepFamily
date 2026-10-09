@@ -34,9 +34,10 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   identityBudgetNote: 1030n,
   poolScope: 1031n,
   scopedPurpose: 1032n,
+  ownerBudgetAuthorization: 1033n,
 });
 
-export const SHIELDED_POOL_PROTOCOL_VERSION = 2;
+export const SHIELDED_POOL_PROTOCOL_VERSION = 3;
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
 export const SHIELDED_CIPHERTEXT_BYTES = 512;
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
@@ -211,6 +212,24 @@ export function computeShieldedValueNoteCommitment(input, scope) {
   ]);
 }
 
+export const SHIELDED_KEY_MODE = Object.freeze({ identityDerived: 0, assetRootDerived: 1 });
+export function normalizeShieldedKeyMode(value = 0n, binding = "owner") {
+  const mode = bigintFrom(value, "keyMode", 1n);
+  protocolAssert(
+    binding !== "identity" || mode === 0n,
+    "INVALID_SHIELDED_KEY_MODE",
+    "Identity budgets require identity-derived authorization",
+  );
+  return mode;
+}
+export function computeShieldedBudgetOwnerAuthorization(input, scope) {
+  return poseidon3([
+    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.ownerBudgetAuthorization, scope),
+    nonzeroField(input.heirOwnerCommitment, "heirOwnerCommitment"),
+    normalizeShieldedKeyMode(input.keyMode),
+  ]);
+}
+
 /** A separate budget note per child allows a private, irreversible funding. */
 export function computeShieldedBudgetNoteCommitment(input, scope) {
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
@@ -231,7 +250,7 @@ export function computeShieldedBudgetNoteCommitment(input, scope) {
     computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.budgetNote, scope),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.enrollmentCommitment, "enrollmentCommitment"),
-    nonzeroField(input.heirOwnerCommitment, "heirOwnerCommitment"),
+    computeShieldedBudgetOwnerAuthorization(input, scope),
     rate,
     remaining,
     nonzeroField(input.nonce, "nonce"),
@@ -254,6 +273,7 @@ export function computeShieldedIdentityBudgetTermsCommitment(input, scope) {
 
 /** An identity-bound budget uses a distinct domain from owner-bound budgets. */
 export function computeShieldedIdentityBudgetNoteCommitment(input, scope) {
+  normalizeShieldedKeyMode(input.keyMode, "identity");
   const rate = nonzeroAmount(input.amountPerPeriod, "amountPerPeriod");
   const remaining = uint128(input.remaining, "remaining");
   protocolAssert(
@@ -280,6 +300,7 @@ export function computeShieldedIdentityBudgetNoteCommitment(input, scope) {
 
 /** Recover common policy/enrollment commitments without opening an identity budget's rule. */
 export function getShieldedBudgetCommitments(note, scope) {
+  normalizeShieldedKeyMode(note.keyMode, note.binding);
   if (note.binding === "identity") {
     return {
       policyCommitment: nonzeroField(note.policyCommitment, "policyCommitment"),

@@ -151,26 +151,28 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers the two identity/disclosure circuits and all six shielded circuits:
+The same `zk:*` workflow covers the two identity/disclosure circuits and all eight protocol-v3 shielded circuits:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
-| `npm run zk:build`             | Compile all 8 circuits                                             |
-| `npm run zk:development:setup` | Generate development keys and verifiers for all 8 circuits         |
-| `npm run zk:production:setup`  | Generate production keys and verifiers for all 8 circuits          |
-| `npm run zk:check`             | Check all 8 circuit artifacts and available proof fixtures         |
-| `npm run zk:artifacts:check`   | Rebuild and validate all 8 circuit artifacts                       |
-| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 8 circuits            |
+| `npm run zk:build`             | Compile all 10 circuits                                            |
+| `npm run zk:development:setup` | Generate development keys and verifiers for all 10 circuits        |
+| `npm run zk:production:setup`  | Generate production keys and verifiers for all 10 circuits         |
+| `npm run zk:check`             | Check all 10 circuit artifacts and available proof fixtures        |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 10 circuit artifacts                      |
+| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 10 circuits           |
 
 Each Groth16 circuit has its own proving and verification keys. The unified production setup
-performs the required circuit-specific setup for all 8 circuits; it does not reuse another
+performs the required circuit-specific setup for all 10 circuits; it does not reuse another
 circuit's `.zkey`. Both development and production setup install shielded browser files under
 `frontend/public/zk/shielded/` and generated verifiers under `contracts/`, using the same static
 asset flow as identity/disclosure. Development artifacts remain explicitly marked as such;
-`npm run release:preflight` requires production evidence for all 8 circuits.
+`npm run release:preflight` requires production evidence for all 10 circuits. The pool deploys
+seven verifier routes, including transfer capacities 2/8 and withdrawal capacities 1/8;
+receive-code proofs are verified locally.
 
 The browser `.wasm` and `.zkey` files are not committed; only their `.vkey.json` files are. The
 circuit manifests pin each file's SHA-256, and the files are hosted on R2 at

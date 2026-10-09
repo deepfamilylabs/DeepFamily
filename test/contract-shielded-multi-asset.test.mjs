@@ -94,7 +94,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
       const { pool, token, recipient, shield, withdrawal } = await setup({ precision });
       expect(await token.decimals()).to.equal(BigInt(precision));
       expect(await pool.assetKind()).to.equal(0n);
-      expect(await pool.protocolVersion()).to.equal(2n);
+      expect(await pool.protocolVersion()).to.equal(3n);
       expect(await pool.creationBlock()).to.equal(
         BigInt((await pool.deploymentTransaction().wait()).blockNumber),
       );
@@ -229,7 +229,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     const data = dataFor();
     const proof = await proofFor(pool, 0, data, 100n);
     expect(await pool.assetKind()).to.equal(1n);
-    expect(await pool.protocolVersion()).to.equal(2n);
+    expect(await pool.protocolVersion()).to.equal(3n);
     expect(pool.interface.hasFunction("TOKEN")).to.equal(false);
     for (const value of [0n, 99n, 101n]) {
       await expect(pool.shield(100n, data, proof, { value })).to.be.revertedWithCustomError(
@@ -340,6 +340,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     expect(await nativePool.creationBlock()).to.equal(BigInt(nativeReceipt.blockNumber));
     expect(await nativePool.creationBlock()).to.be.lessThan(BigInt(factoryReceipt.blockNumber));
     expect(await factory.poolFor(hre.ethers.ZeroAddress)).to.equal(await nativePool.getAddress());
+    expect(await factory.poolCount()).to.equal(2n);
     const deepPoolAddress = await factory.poolFor(await token.getAddress());
     expect(deepPoolAddress).to.equal(
       hre.ethers.getCreateAddress({ from: factoryAddress, nonce: 1 }),
@@ -350,7 +351,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     expect(await deepPool.LINEAGE_INDEX()).to.equal(await lineage.getAddress());
     expect(await deepPool.VERIFIER()).to.equal(await verifier.getAddress());
     expect(await deepPool.assetKind()).to.equal(0n);
-    expect(await deepPool.protocolVersion()).to.equal(2n);
+    expect(await deepPool.protocolVersion()).to.equal(3n);
     const extra = await hre.ethers.deployContract("ShieldedPoolBehaviorTokenMock", [6]);
     await extra.waitForDeployment();
     const extraAddress = await extra.getAddress();
@@ -368,10 +369,12 @@ describe("immutable multi-asset shielded pool boundaries", function () {
         .filter((event) => event?.name === "PoolCreated"),
     );
     expect(createdEvents).to.have.length(1);
+    expect(await factory.poolCount()).to.equal(3n);
     const poolAddress = await factory.poolFor(extraAddress);
     expect(createdEvents[0].args.pool).to.equal(poolAddress);
     expect(await factory.createPool.staticCall(extraAddress)).to.deep.equal([poolAddress, false]);
     await expect(factory.createPool(extraAddress)).not.to.emit(factory, "PoolCreated");
+    expect(await factory.poolCount()).to.equal(3n);
     expect(await token.balanceOf(recipient.address)).to.equal(balance);
     expect(await token.balanceOf(factoryAddress)).to.equal(0n);
     const registered = await hre.ethers.getContractAt("ShieldedErc20Pool", poolAddress);

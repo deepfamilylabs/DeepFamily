@@ -18,3 +18,7 @@ export * from "./metadata.js";
 export * from "./unicode-normalization.js";
 export * from "./precis.js";
 export * from "./story.js";
+
+export * from "./shielded-asset-keys.js";
+export * from "./shielded-asset-vault.js";
+export * from "./shielded-value-capacity.js";

@@ -14,6 +14,7 @@ import {
   decodeShieldedNotePayload,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedAssetKeyMaterial,
   deriveShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
@@ -234,6 +235,47 @@ async function recordFunding(
 }
 
 describe("local unified funding preparation", () => {
+  it("private independent funding retains owner, mode and viewing material on refill", async () => {
+    const fixture = await setup();
+    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(10));
+    fixture.common.recipient = {
+      ...fixture.common.recipient,
+      keyMode: 1,
+      ownerCommitment: keys.ownerCommitment,
+      viewingKey: hexlify(keys.viewPublicKey),
+    };
+    const initial = await prepareShieldedFund({
+      ...fixture.common,
+      fundMode: 0,
+      policy: fixture.policy,
+      lineageIndex: fixture.lineageIndex,
+      lineage: fixture.lineage,
+      budgetPeriods: 1n,
+    });
+    expect(initial.outputs[0].note.keyMode).toBe(1n);
+    expect(initial.witness.keyMode).toBe("1");
+    await recordFunding(fixture, initial);
+    const budget = {
+      ...initial.outputs[0],
+      shardId: 0n,
+      viewingKey: fixture.common.recipient.viewingKey,
+    };
+    const input = { ...fixture.common, fundMode: 1 as const, budget, budgetPeriods: 1n };
+    const refill = await prepareShieldedFund({ ...input, recipient: undefined });
+    expect(refill.outputs[0].note.keyMode).toBe(1n);
+    expect(refill.witness.oldKeyMode).toBe("1");
+    await expect(
+      prepareShieldedFund({ ...input, recipient: { ...fixture.common.recipient, keyMode: 0 } }),
+    ).rejects.toThrow("recipient");
+    await expect(prepareShieldedFund({ ...input, budgetKind: 1 })).rejects.toThrow("binding");
+    await expect(
+      prepareShieldedFund({
+        ...input,
+        recipient: { ...fixture.common.recipient, viewingKey: "0x" + "11".repeat(32) },
+      }),
+    ).rejects.toThrow("viewing material");
+  });
+
   it.each([1n, 7n, 365n])(
     "binds %s days to the initial budget and preserves it on additional funding",
     async (periodDays) => {
@@ -260,6 +302,7 @@ describe("local unified funding preparation", () => {
           commitment: initial.outputs[0].commitment,
           ciphertext: initial.outputs[0].ciphertext,
           shardId: 0n,
+          viewingKey: fixture.common.recipient.viewingKey,
         },
         budgetPeriods: 2n,
       });
@@ -336,6 +379,7 @@ describe("local unified funding preparation", () => {
           ...initial.outputs[0],
           note: { ...initial.outputs[0].note, rootIdentityCommitment: rootIdentity + 1n },
           shardId: 0n,
+          viewingKey: fixture.common.recipient.viewingKey,
         },
         budgetPeriods: 1n,
       }),
@@ -421,7 +465,11 @@ describe("local unified funding preparation", () => {
     const additionalFunding = await prepareShieldedFund({
       fundMode: 1,
       ...fixture.common,
-      budget: { ...initialFunding.outputs[0], shardId: 0n },
+      budget: {
+        ...initialFunding.outputs[0],
+        shardId: 0n,
+        viewingKey: fixture.common.recipient.viewingKey,
+      },
       budgetPeriods: 3n,
     });
     // Continuation funding keeps the original enrollment and uses canonical zero lineage inputs.
@@ -523,7 +571,11 @@ describe("local unified funding preparation", () => {
     const additionalFunding = await prepareShieldedFund({
       fundMode: 1,
       ...fixture.common,
-      budget: { ...initialFunding.outputs[0], shardId: 0n },
+      budget: {
+        ...initialFunding.outputs[0],
+        shardId: 0n,
+        viewingKey: fixture.common.recipient.viewingKey,
+      },
       budgetPeriods: 1n,
     });
     expect(additionalFunding.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
@@ -576,7 +628,11 @@ describe("local unified funding preparation", () => {
           ...fixture.recipient,
           ownerCommitment: fixture.recipient.ownerCommitment + 1n,
         },
-        budget: { ...initialFunding.outputs[0], shardId: 0n },
+        budget: {
+          ...initialFunding.outputs[0],
+          shardId: 0n,
+          viewingKey: fixture.common.recipient.viewingKey,
+        },
         budgetPeriods: 1n,
       }),
     ).rejects.toThrow("does not belong to this recipient");
@@ -645,10 +701,19 @@ describe("local unified funding preparation", () => {
 
   // Test-only opt-in for real proofs using the same public artifacts as the app.
   // eslint-disable-next-line no-restricted-syntax
-  it.skipIf(process.env.SHIELDED_FUNDING_PROOF !== "1")(
-    "verifies both funding modes with current public Groth16 keys",
-    async () => {
+  it.skipIf(process.env.SHIELDED_FUNDING_PROOF !== "1").each([0, 1] as const)(
+    "verifies initial and continuation mode-%s budgets with current public Groth16 keys",
+    async (keyMode) => {
       const fixture = await setup();
+      if (keyMode === 1) {
+        const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(10));
+        fixture.common.recipient = {
+          ...fixture.common.recipient,
+          keyMode,
+          ownerCommitment: keys.ownerCommitment,
+          viewingKey: hexlify(keys.viewPublicKey),
+        };
+      }
       const initialFunding = await prepareShieldedFund({
         ...fixture.common,
         fundMode: 0 as const,
@@ -661,7 +726,11 @@ describe("local unified funding preparation", () => {
       const additionalFunding = await prepareShieldedFund({
         fundMode: 1,
         ...fixture.common,
-        budget: { ...initialFunding.outputs[0], shardId: 0n },
+        budget: {
+          ...initialFunding.outputs[0],
+          shardId: 0n,
+          viewingKey: fixture.common.recipient.viewingKey,
+        },
         budgetPeriods: 3n,
       });
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-funding-prep-"));

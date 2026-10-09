@@ -16,6 +16,7 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
   address public immutable VERIFIER;
   address public immutable NATIVE_POOL;
   mapping(address asset => address pool) public poolFor;
+  uint256 public poolCount;
 
   event PoolCreated(address indexed asset, address indexed pool);
 
@@ -27,7 +28,7 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
     IShieldedPoolConfiguration nativeConfiguration = IShieldedPoolConfiguration(nativePool);
     if (
       nativeConfiguration.assetKind() != 1 ||
-      nativeConfiguration.protocolVersion() != 2 ||
+      nativeConfiguration.protocolVersion() != 3 ||
       nativeConfiguration.LINEAGE_INDEX() != lineageIndex ||
       nativeConfiguration.VERIFIER() != verifier
     ) revert InvalidNativePool();
@@ -36,6 +37,7 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
     VERIFIER = verifier;
     NATIVE_POOL = nativePool;
     poolFor[address(0)] = nativePool;
+    poolCount = 1;
     emit PoolCreated(address(0), nativePool);
     _createPool(deepToken);
   }
@@ -50,6 +52,7 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
   function _createPool(address token) private returns (address pool) {
     pool = address(new ShieldedErc20Pool(token, LINEAGE_INDEX, VERIFIER));
     poolFor[token] = pool;
+    ++poolCount;
     emit PoolCreated(token, pool);
   }
 }

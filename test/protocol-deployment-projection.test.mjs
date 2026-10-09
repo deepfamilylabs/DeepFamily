@@ -129,7 +129,7 @@ describe("planned production protocol deployment projection", function () {
     ).to.throw("non-negative safe integer");
   });
 
-  it("includes all five shielded verifiers behind the common seven-route adapter", function () {
+  it("includes all seven shielded verifiers behind the common nine-route adapter", function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const contracts = fixture.planned.projection.contracts;
     expect(Object.keys(contracts.shieldedVerifiers)).to.deep.equal(
@@ -161,7 +161,7 @@ describe("planned production protocol deployment projection", function () {
       plannedAddresses,
       manifest: baseManifest(),
     });
-    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(5);
+    expect(Object.keys(inspected.artifacts.shieldedVerifiers)).to.have.length(7);
     expect(inspected.artifacts.shieldedErc20Pool.runtimeBytecode).to.include(
       plannedAddresses.poseidonT3.slice(2).toLowerCase(),
     );

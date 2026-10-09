@@ -11,6 +11,7 @@ template ShieldedFund() {
     signal input pool;
     signal input fundMode;
     signal input budgetKind;
+    signal input keyMode;
     signal input publicBudget[10];
     signal input inputShardIds[2];
     signal input inputRoots[2];
@@ -54,6 +55,7 @@ template ShieldedFund() {
     signal input trustedSiblings[64];
 
     signal input oldBudgetKind;
+    signal input oldKeyMode;
     signal input oldHeirOwnerCommitment;
     signal input oldBudgetRemaining;
     signal input oldBudgetRemainingPeriods;
@@ -88,6 +90,13 @@ template ShieldedFund() {
     signal initial <== 1 - fundMode;
     budgetKind * (1 - budgetKind) === 0;
     oldBudgetKind * (1 - oldBudgetKind) === 0;
+    keyMode * (1 - keyMode) === 0;
+    oldKeyMode * (1 - oldKeyMode) === 0;
+    budgetKind * keyMode === 0;
+    oldBudgetKind * oldKeyMode === 0;
+    initial * oldKeyMode === 0;
+    fundMode * (budgetKind - oldBudgetKind) === 0;
+    fundMode * (keyMode - oldKeyMode) === 0;
     component shardBits[2];
     for (var i = 0; i < 2; i++) {
         shardBits[i] = Num2Bits(128);
@@ -221,6 +230,8 @@ template ShieldedFund() {
     oldBudget.privateNoteTag <== budgetTags.privateNoteTag;
     oldBudget.identityNoteTag <== budgetTags.identityNoteTag;
     oldBudget.budgetKind <== oldBudgetKind;
+    oldBudget.keyMode <== oldKeyMode;
+    oldBudget.authorizationTag <== budgetTags.authorizationTag;
     oldBudget.policyCommitment <== policy.commitment;
     oldBudget.enrollmentCommitment <== enrollment.commitment;
     oldBudget.termsCommitment <== terms.commitment;
@@ -265,6 +276,8 @@ template ShieldedFund() {
     budget.privateNoteTag <== budgetTags.privateNoteTag;
     budget.identityNoteTag <== budgetTags.identityNoteTag;
     budget.budgetKind <== budgetKind;
+    budget.keyMode <== keyMode;
+    budget.authorizationTag <== budgetTags.authorizationTag;
     budget.policyCommitment <== policy.commitment;
     budget.enrollmentCommitment <== enrollment.commitment;
     budget.termsCommitment <== terms.commitment;

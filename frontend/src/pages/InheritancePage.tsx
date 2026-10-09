@@ -7,9 +7,9 @@ import {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
   ShieldedAssetToolbar,
-  readShieldedAsset,
+  readRecoveredShieldedAsset,
   resolveShieldedAssetPool,
-  type ShieldedAsset,
+  type RecoveredShieldedAsset,
   type ShieldedPageModules,
 } from "../domains/inheritance";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
@@ -27,7 +27,7 @@ import { EmptyState, PageHead } from "../shared/ui";
 type ModulesState =
   | { status: "loading" }
   | { status: "unavailable"; message: string }
-  | { status: "missingPool"; asset: ShieldedAsset }
+  | { status: "missingPool"; asset: RecoveredShieldedAsset }
   | { status: "ready"; modules: ShieldedPageModules };
 
 function sameAddress(a: string, b: string): boolean {
@@ -38,7 +38,7 @@ export default function InheritancePage() {
   const config = useConfig();
   const wallet = useWallet();
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
-  const scope = `${config.chainId}:${factoryAddress}:${config.contractAddress}`;
+  const scope = `${config.chainId}:${factoryAddress}:${config.contractAddress}:${config.rpcUrl}`;
   const enabled =
     Boolean(wallet.address) && (wallet.chainId === null || wallet.chainId === config.chainId);
   return (
@@ -52,13 +52,13 @@ function InheritanceContent() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
-  const { identity } = useShieldedPageIdentitySession();
+  const { lock } = useShieldedPageIdentitySession();
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
   const [selectedAssetAddress, setSelectedAddress] = useState(config.tokenAddress);
-  // Keep the unlock entry reachable even if a selected pool is missing or unavailable.
-  const selectedAddress = identity ? selectedAssetAddress : config.tokenAddress;
+  // Selection stays public when locking; the selected pool provides its own unlock entry.
+  const selectedAddress = selectedAssetAddress;
   const [importAddress, setImportAddress] = useState("");
-  const [importedAssets, setImportedAssets] = useState<ShieldedAsset[]>([]);
+  const [importedAssets, setImportedAssets] = useState<RecoveredShieldedAsset[]>([]);
   const [creatingPool, setCreatingPool] = useState(false);
   const [importing, setImporting] = useState(false);
   const [assetError, setAssetError] = useState("");
@@ -118,11 +118,12 @@ function InheritanceContent() {
       const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
       const deepFamily = createDeepFamilyContract(config.contractAddress, provider);
       const factory = createShieldedPoolFactoryContract(factoryAddress, provider);
+      const toBlock = await provider.getBlockNumber();
       const [network, familyIndex, deepToken, asset] = await Promise.all([
         provider.getNetwork(),
         deepFamily.lineageIndex() as Promise<string>,
         factory.DEEP_TOKEN() as Promise<string>,
-        readShieldedAsset(selectedAddress, provider, nativeSymbol),
+        readRecoveredShieldedAsset(selectedAddress, provider, nativeSymbol, { blockTag: toBlock }),
       ]);
       if (
         network.chainId !== BigInt(config.chainId) ||
@@ -130,7 +131,9 @@ function InheritanceContent() {
       ) {
         throw new Error(configurationMismatch);
       }
-      const resolved = await resolveShieldedAssetPool(factory, asset, provider, familyIndex);
+      const resolved = await resolveShieldedAssetPool(factory, asset, provider, familyIndex, {
+        blockTag: toBlock,
+      });
       if (!resolved) {
         if (!cancelled) setState({ status: "missingPool", asset });
         return;
@@ -193,10 +196,11 @@ function InheritanceContent() {
     const importingContext = assetContext;
     try {
       const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
-      const asset = await readShieldedAsset(
+      const asset = await readRecoveredShieldedAsset(
         getAddress(importAddress.trim()),
         provider,
         nativeSymbol,
+        { blockTag: await provider.getBlockNumber() },
       );
       if (!mounted.current || currentAssetContext.current !== importingContext) return;
       setImportedAssets((assets) =>
@@ -204,6 +208,7 @@ function InheritanceContent() {
           ? assets
           : [...assets, asset],
       );
+      lock();
       setSelectedAddress(asset.address);
       setImportAddress("");
     } catch (error) {
@@ -261,7 +266,7 @@ function InheritanceContent() {
     sameAddress(selectedAddress, state.modules.assetAddress)
       ? state.modules
       : null;
-  const assetControls = identity ? (
+  const assetControls = (
     <div className="min-w-0 space-y-2">
       <ShieldedAssetToolbar
         selectedAddress={selectedAddress}
@@ -274,15 +279,18 @@ function InheritanceContent() {
         onImportAddressChange={setImportAddress}
         onImport={() => void importAsset()}
         onSelect={(address) => {
+          if (!sameAddress(address, selectedAddress)) lock();
           setSelectedAddress(address);
           setAssetError("");
         }}
       />
       {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
-        <p className="text-xs leading-relaxed text-ink-muted">{t("shielded.assets.importWarning")}</p>
+        <p className="text-xs leading-relaxed text-ink-muted">
+          {t("shielded.assets.importWarning")}
+        </p>
       ) : null}
     </div>
-  ) : null;
+  );
 
   if (!wallet.address) {
     return (

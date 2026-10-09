@@ -269,7 +269,7 @@ describe("shielded claim budget options", () => {
     });
   });
 
-  it("groups public and private notes with the same claim arrangement", () => {
+  it("separates public and private authorizations even with the same policy", () => {
     const privateNote = budget(1n, { remaining: 100n });
     const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(
       privateNote.note,
@@ -296,16 +296,11 @@ describe("shielded claim budget options", () => {
     const now = start + 2n * period;
     const result = listShieldedClaimBudgetOptions([publicNote, privateNote], wallet, secret, now);
 
-    expect(result).toHaveLength(1);
-    expect(result[0].notes).toEqual([privateNote, publicNote]);
-    expect(result[0].key).toBe(
-      listShieldedClaimBudgetOptions([publicNote], wallet, secret, now)[0].key,
-    );
-    expect(result[0].overview.claim).toEqual({
-      budget: privateNote,
-      secondBudget: publicNote,
-      periodIndices: [0n, 1n],
-      amount: 200n,
-    });
+    expect(result).toHaveLength(2);
+    expect(result[0].notes).toEqual([privateNote]);
+    expect(result[1].notes).toEqual([publicNote]);
+    expect(result[0].key).not.toBe(result[1].key);
+    expect(result[0].overview.claim).toEqual({ budget: privateNote, periodIndices: [0n], amount: 100n });
+    expect(result[1].overview.claim).toEqual({ budget: publicNote, periodIndices: [0n], amount: 100n });
   });
 });

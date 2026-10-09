@@ -36,7 +36,7 @@ const mutate = (source, change) => {
 };
 
 function privateTransferFixture(scope = defaultScope) {
-  const inputOwnerSecrets = [5001n, 5002n];
+  const inputOwnerSecrets = [5001n, 5001n];
   const inputAmounts = [70n, 30n];
   const inputNonces = [3301n, 3302n];
   const inputCiphertextHashes = [hash(4), hash(5)];
@@ -193,7 +193,7 @@ test("private transfer circuit", async (t) => {
         }
       },
     );
-    await t.test("private transfer conserves asset amounts across independent owners", async () => {
+    await t.test("private transfer conserves asset amounts for one input owner", async () => {
       await transfer.valid(validTransfer);
       transfer.checkR1cs(validTransfer);
     });
@@ -272,7 +272,7 @@ test("private transfer circuit", async (t) => {
       );
       await transfer.invalid(
         mutate(validTransfer, (w) => {
-          w.inputOwnerSecrets[1] = "5001";
+          w.inputOwnerSecrets[1] = "5002";
         }),
       );
       await transfer.invalid(

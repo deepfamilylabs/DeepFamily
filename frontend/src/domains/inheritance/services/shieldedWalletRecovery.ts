@@ -3,6 +3,7 @@ import {
   buildShieldedHpkeAad,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
+  computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedAllocationKeyCommitment,
   getShieldedBudgetCommitments,
@@ -15,7 +16,7 @@ import {
   type ShieldedBudgetRuleOpening,
   type ShieldedPolicyDescriptor,
 } from "@deepfamily/protocol-core";
-import { getBytes, getBigInt, type BigNumberish, type Contract } from "ethers";
+import { getBytes, getBigInt, hexlify, type BigNumberish, type Contract } from "ethers";
 import {
   loadShieldedPoolSnapshot,
   type OwnedShieldedNote,
@@ -28,10 +29,28 @@ type ShieldedIdentityMaterial = {
   identityCommitment?: BigNumberish;
 };
 
+export type ShieldedWalletKeyMaterial = {
+  ownerSecret: BigNumberish;
+  ownerCommitment: BigNumberish;
+  hpkeIkm: string | Uint8Array;
+  keyMode?: 0 | 1;
+};
+
+export type ShieldedWalletRecoveryInput =
+  | BigNumberish
+  | ShieldedIdentityMaterial
+  | {
+      keyMaterial: ShieldedWalletKeyMaterial;
+      identityCommitment?: BigNumberish;
+    };
+
 export type LocalShieldedWalletSnapshot = ShieldedPoolSnapshot<DecodedShieldedNotePayload> & {
   /** Prevents an incremental scan from reusing notes decrypted for another identity. */
   walletOwnerCommitment: bigint;
   walletIdentityCommitment?: bigint;
+  walletKeyMode?: 0 | 1;
+  /** Opened independent budgets whose identity has not yet been authenticated. */
+  pendingIdentityBudgets?: Map<bigint, OwnedShieldedNote<DecodedShieldedNotePayload>>;
   /** Donor-readable copies of child budget templates carried by change notes. */
   fundingTemplates?: Map<bigint, RecoveredFundingTemplate>;
   shieldedPolicies?: Map<bigint, ShieldedPolicyDescriptor>;
@@ -43,10 +62,13 @@ export type RecoveredFundingTemplate = {
   ciphertext: Uint8Array;
   shardId: bigint;
   ruleOpening?: ShieldedBudgetRuleOpening;
+  /** Preserve the original recipient view key for private continuation funding. */
+  viewingKey?: string;
 };
 
 export type ShieldedWalletRecoveryOptions = {
   fromBlock?: number;
+  toBlock?: number;
   blockChunk?: number;
   previous?: LocalShieldedWalletSnapshot;
 };
@@ -57,6 +79,35 @@ function identityFields(input: BigNumberish | ShieldedIdentityMaterial): Shielde
     : { derivedSecretField: input };
 }
 
+function recoveryMaterial(input: ShieldedWalletRecoveryInput) {
+  if (typeof input === "object" && input !== null && "keyMaterial" in input) {
+    const keys = input.keyMaterial;
+    const ownerSecret = getBigInt(keys.ownerSecret);
+    const ownerCommitment = getBigInt(keys.ownerCommitment);
+    if (
+      computeShieldedOwnerCommitment(ownerSecret) !== ownerCommitment ||
+      getBytes(keys.hpkeIkm).length !== 32 ||
+      (keys.keyMode !== 0 && keys.keyMode !== 1)
+    )
+      throw new Error("Invalid explicit shielded wallet key material");
+    return {
+      keys: { ...keys, ownerSecret, ownerCommitment },
+      keyMode: keys.keyMode,
+      identityCommitment:
+        input.identityCommitment === undefined ? undefined : getBigInt(input.identityCommitment),
+    };
+  }
+  const identity = identityFields(input);
+  return {
+    keys: deriveShieldedHeirKeyMaterial(identity.derivedSecretField),
+    keyMode: 0 as const,
+    identityCommitment:
+      identity.identityCommitment === undefined
+        ? undefined
+        : getBigInt(identity.identityCommitment),
+  };
+}
+
 /**
  * Rebuild the public note trees from unfiltered logs and open each ciphertext
  * locally. A decryption failure or an invalid note addressed to this viewing
@@ -65,19 +116,21 @@ function identityFields(input: BigNumberish | ShieldedIdentityMaterial): Shielde
  */
 export async function recoverLocalShieldedWallet(
   pool: Contract,
-  identity: BigNumberish | ShieldedIdentityMaterial,
+  identity: ShieldedWalletRecoveryInput,
   options: ShieldedWalletRecoveryOptions = {},
 ): Promise<LocalShieldedWalletSnapshot> {
   const provider = pool.runner?.provider;
   if (!provider) throw new Error("Shielded pool has no provider");
-  const material = identityFields(identity);
-  const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
-  const expectedIdentityCommitment =
-    material.identityCommitment === undefined ? undefined : getBigInt(material.identityCommitment);
+  const {
+    keys,
+    keyMode,
+    identityCommitment: expectedIdentityCommitment,
+  } = recoveryMaterial(identity);
   if (
     options.previous &&
     (options.previous.walletOwnerCommitment !== keys.ownerCommitment ||
-      options.previous.walletIdentityCommitment !== expectedIdentityCommitment)
+      options.previous.walletIdentityCommitment !== expectedIdentityCommitment ||
+      (options.previous.walletKeyMode ?? 0) !== keyMode)
   ) {
     throw new Error("Shielded wallet snapshot belongs to another identity");
   }
@@ -87,6 +140,9 @@ export async function recoverLocalShieldedWallet(
     options.previous?.fundingTemplates ?? new Map<bigint, RecoveredFundingTemplate>();
   const shieldedPolicies =
     options.previous?.shieldedPolicies ?? new Map<bigint, ShieldedPolicyDescriptor>();
+  const pendingIdentityBudgets =
+    options.previous?.pendingIdentityBudgets ??
+    new Map<bigint, OwnedShieldedNote<DecodedShieldedNotePayload>>();
   let precedingPublicNote: PublicShieldedNote | undefined;
   try {
     const chainId = (await provider.getNetwork()).chainId;
@@ -106,6 +162,7 @@ export async function recoverLocalShieldedWallet(
             });
             if (
               !publicBudget ||
+              keyMode !== 0 ||
               expectedIdentityCommitment === undefined ||
               publicBudget.heirIdentityCommitment !== expectedIdentityCommitment
             )
@@ -134,6 +191,11 @@ export async function recoverLocalShieldedWallet(
           );
           const note = opened.note;
           if (
+            note.kind === "budget" &&
+            (note.binding === "identity" ? 0n : getBigInt(note.keyMode ?? 0)) !== BigInt(keyMode)
+          )
+            return null;
+          if (
             (note.kind === "value" && note.ownerCommitment !== keys.ownerCommitment) ||
             (note.kind === "budget" &&
               ((note.binding !== "identity" && note.heirOwnerCommitment !== keys.ownerCommitment) ||
@@ -142,10 +204,23 @@ export async function recoverLocalShieldedWallet(
           ) {
             return null;
           }
+          if (note.kind === "budget" && expectedIdentityCommitment === undefined) {
+            pendingIdentityBudgets.set(event.commitment, { ...event, note });
+            return null;
+          }
           if (
             note.kind === "value" &&
             note.fundingMemo &&
-            previousPublicNote?.commitment === note.fundingMemo.budgetCommitment
+            previousPublicNote?.commitment === note.fundingMemo.budgetCommitment &&
+            previousPublicNote.transactionHash !== undefined &&
+            previousPublicNote.transactionHash === event.transactionHash &&
+            previousPublicNote.blockNumber === event.blockNumber &&
+            previousPublicNote.logIndex < event.logIndex &&
+            event.action === 1 &&
+            previousPublicNote.action === 1 &&
+            event.actionLogIndex === previousPublicNote.actionLogIndex &&
+            previousPublicNote.outputIndex === 0 &&
+            event.outputIndex === 1
           ) {
             // Fund appends the child's budget directly before the
             // donor's change note. Match and validate it from the public scan;
@@ -170,6 +245,9 @@ export async function recoverLocalShieldedWallet(
                 shardId: previousPublicNote.shardId,
                 ...(note.fundingMemo.ruleOpening
                   ? { ruleOpening: note.fundingMemo.ruleOpening }
+                  : {}),
+                ...(note.fundingMemo.viewingKey
+                  ? { viewingKey: hexlify(note.fundingMemo.viewingKey) }
                   : {}),
               });
               const allocationKey = note.fundingMemo.allocationKey;
@@ -217,6 +295,8 @@ export async function recoverLocalShieldedWallet(
       ...snapshot,
       walletOwnerCommitment: keys.ownerCommitment,
       walletIdentityCommitment: expectedIdentityCommitment,
+      walletKeyMode: keyMode,
+      pendingIdentityBudgets,
       fundingTemplates,
       shieldedPolicies,
     };
@@ -243,10 +323,20 @@ export function listRecoveredShieldedPolicies(
 /** Nullifiers are computed only on the device from the holder's secret. */
 export function listUnspentRecoveredShieldedNotes(
   snapshot: LocalShieldedWalletSnapshot,
-  derivedSecretField: BigNumberish,
+  derivedSecretField: BigNumberish | ShieldedWalletKeyMaterial,
 ): OwnedShieldedNote<DecodedShieldedNotePayload>[] {
   if (snapshot.invalidated) throw new Error("Shielded pool snapshot is invalid");
-  const keys = deriveShieldedHeirKeyMaterial(derivedSecretField);
+  const keys =
+    typeof derivedSecretField === "object" &&
+    derivedSecretField !== null &&
+    "ownerSecret" in derivedSecretField
+      ? {
+          ownerSecret: getBigInt(derivedSecretField.ownerSecret),
+          ownerCommitment: getBigInt(derivedSecretField.ownerCommitment),
+        }
+      : deriveShieldedHeirKeyMaterial(derivedSecretField);
+  if (computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment)
+    throw new Error("Invalid shielded wallet owner material");
   if (keys.ownerCommitment !== snapshot.walletOwnerCommitment) {
     throw new Error("Shielded wallet snapshot belongs to another identity");
   }

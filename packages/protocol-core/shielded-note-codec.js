@@ -1,4 +1,4 @@
-import { asUint8Array, bigintFrom } from "./bytes.js";
+import { asUint8Array, bigintFrom, bytesToHex } from "./bytes.js";
 import { MAX_UINT32, MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { ProtocolError, protocolAssert } from "./errors.js";
 import { SHIELDED_HPKE_MAX_PAYLOAD_BYTES } from "./shielded-hpke.js";
@@ -12,22 +12,23 @@ import {
   computeShieldedValueNoteCommitment,
   getShieldedBudgetCommitments,
   normalizeShieldedScope,
+  normalizeShieldedKeyMode,
   SHIELDED_CIPHERTEXT_BYTES,
 } from "./shielded-inheritance.js";
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION = 2;
+export const SHIELDED_NOTE_PAYLOAD_VERSION = 3;
 export const SHIELDED_VALUE_NOTE_KIND = 1;
 export const SHIELDED_BUDGET_NOTE_KIND = 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND = 4;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND = 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES = 86;
-export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES = 282;
+export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES = 283;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES = 218;
 export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES = 400;
 export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES = 432;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES =
-  SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32 + SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES;
+  SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32 + SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES - 6 + 32;
 
 export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES =
   SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES + 32;
@@ -53,6 +54,7 @@ const budgetSchema = [
   ["remaining", 16, MAX_UINT128],
   ["nonce", 32, MAX_FIELD],
   ["periodDays", 4, MAX_UINT32],
+  ["keyMode", 1, 1n],
 ];
 const identityBudgetSchema = [
   ["rootIdentityCommitment", 32, MAX_FIELD],
@@ -91,10 +93,12 @@ const PRIVATE_BUDGET_FIELDS = [
 const IDENTITY_BUDGET_FIELDS = new Set([
   "binding",
   "kind",
+  "keyMode",
   ...identityBudgetSchema.map(([label]) => label),
 ]);
 
 function validateIdentityBudget(note, scope) {
+  normalizeShieldedKeyMode(note.keyMode, "identity");
   protocolAssert(
     note.binding === "identity",
     "INVALID_SHIELDED_BUDGET_BINDING",
@@ -241,7 +245,10 @@ export function encodeShieldedValueNotePayload(note, scope) {
       MAX_FIELD,
       "budgetCommitment",
     );
-    output.set(budget, SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32);
+    output.set(
+      identityBound ? budget : budget.subarray(HEADER_BYTES),
+      SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32,
+    );
     if (identityBound) {
       let offset = SHIELDED_VALUE_NOTE_PAYLOAD_BYTES + 32 + budget.length;
       for (const [label, width, maximum] of ruleOpeningSchema) {
@@ -255,6 +262,15 @@ export function encodeShieldedValueNotePayload(note, scope) {
         "An owner-bound budget already contains its rule opening",
       );
     }
+    if (!identityBound) {
+      const viewingKey = asUint8Array(note.fundingMemo.viewingKey, "viewingKey");
+      protocolAssert(
+        viewingKey.length === 32 && viewingKey.some(Boolean),
+        "INVALID_SHIELDED_VIEW_KEY",
+        "A private funding memo requires the original recipient viewing key",
+      );
+      output.set(viewingKey, output.length - 32);
+    }
     if (hasAllocationKey) {
       const allocationKeyCommitment = identityBound
         ? note.fundingMemo.ruleOpening.allocationKeyCommitment
@@ -267,7 +283,7 @@ export function encodeShieldedValueNotePayload(note, scope) {
       );
       writeFixedUint(
         output,
-        memoBytes,
+        identityBound ? memoBytes : memoBytes - 32,
         note.fundingMemo.allocationKey,
         32,
         MAX_FIELD,
@@ -296,12 +312,19 @@ export function encodeShieldedBudgetNotePayload(note, scope) {
       SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES,
     );
   }
+  const allowed = new Set(["binding", "kind", ...budgetSchema.map(([label]) => label)]);
+  protocolAssert(
+    Object.keys(note).every((label) => allowed.has(label)),
+    "UNEXPECTED_SHIELDED_NOTE_FIELD",
+    "Owner budget contains an unsupported field",
+  );
   const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note, scope);
   computeShieldedBudgetNoteCommitment(
     {
       policyCommitment,
       enrollmentCommitment,
       heirOwnerCommitment: note.heirOwnerCommitment,
+      keyMode: note.keyMode,
       amountPerPeriod: note.amountPerPeriod,
       remaining: note.remaining,
       nonce: note.nonce,
@@ -309,7 +332,12 @@ export function encodeShieldedBudgetNotePayload(note, scope) {
     },
     scope,
   );
-  return encode(SHIELDED_BUDGET_NOTE_KIND, note, budgetSchema, SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES);
+  return encode(
+    SHIELDED_BUDGET_NOTE_KIND,
+    { ...note, keyMode: normalizeShieldedKeyMode(note.keyMode) },
+    budgetSchema,
+    SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES,
+  );
 }
 
 /** The clear envelope is limited to the new schema; private rule openings never enter it. */
@@ -416,7 +444,10 @@ export function decodeShieldedNotePayload(payload, scope) {
     "Note payload has invalid length",
   );
   const note = { kind: isValue ? "value" : "budget" };
-  if (kind === SHIELDED_IDENTITY_BUDGET_NOTE_KIND) note.binding = "identity";
+  if (kind === SHIELDED_IDENTITY_BUDGET_NOTE_KIND) {
+    note.binding = "identity";
+    note.keyMode = 0n;
+  }
   let offset = HEADER_BYTES;
   for (const [label, width, maximum] of schema) {
     note[label] = readFixedUint(input, offset, width, maximum, label);
@@ -436,10 +467,16 @@ export function decodeShieldedNotePayload(payload, scope) {
         "Memo budget commitment must be nonzero",
       );
       const budgetStart = offset + 32;
-      const identityMemo = input[budgetStart + 5] === SHIELDED_IDENTITY_BUDGET_NOTE_KIND;
+      const identityMemo =
+        input.length ===
+        (kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND
+          ? SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES
+          : SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES);
       const budgetEnd =
         budgetStart +
-        (identityMemo ? IDENTITY_MEMO_BUDGET_BYTES : SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES);
+        (identityMemo
+          ? IDENTITY_MEMO_BUDGET_BYTES
+          : SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES - HEADER_BYTES);
       let budgetFields;
       if (identityMemo) {
         protocolAssert(
@@ -448,14 +485,24 @@ export function decodeShieldedNotePayload(payload, scope) {
           "INVALID_SHIELDED_BUDGET_MEMO",
           "Compact identity memo has an invalid header",
         );
-        budgetFields = { binding: "identity" };
+        budgetFields = { binding: "identity", keyMode: 0n };
         let budgetOffset = budgetStart + HEADER_BYTES;
         for (const [label, width, maximum] of identityMemoBudgetSchema) {
           budgetFields[label] = readFixedUint(input, budgetOffset, width, maximum, label);
           budgetOffset += width;
         }
       } else {
-        const budgetNote = decodeShieldedNotePayload(input.subarray(budgetStart, budgetEnd), scope);
+        const privatePayload = new Uint8Array(SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES);
+        privatePayload.set(MAGIC);
+        privatePayload[4] = SHIELDED_NOTE_PAYLOAD_VERSION;
+        privatePayload[5] = SHIELDED_BUDGET_NOTE_KIND;
+        privatePayload.set(input.subarray(budgetStart, budgetEnd), HEADER_BYTES);
+        let budgetNote;
+        try {
+          budgetNote = decodeShieldedNotePayload(privatePayload, scope);
+        } finally {
+          privatePayload.fill(0);
+        }
         protocolAssert(
           budgetNote.kind === "budget" && budgetNote.binding !== "identity",
           "INVALID_SHIELDED_BUDGET_MEMO",
@@ -481,6 +528,15 @@ export function decodeShieldedNotePayload(payload, scope) {
         );
         validateIdentityBudget(budgetFields, scope);
         validateRuleOpening(budgetFields, fundingMemo.ruleOpening, scope);
+      }
+      if (!identityMemo) {
+        const viewingKey = input.slice(input.length - 32);
+        protocolAssert(
+          viewingKey.some(Boolean),
+          "INVALID_SHIELDED_VIEW_KEY",
+          "Private funding memo viewing key is zero",
+        );
+        fundingMemo.viewingKey = bytesToHex(viewingKey);
       }
       note.fundingMemo = fundingMemo;
       if (kind === SHIELDED_VALUE_WITH_RULE_MEMO_KIND) {

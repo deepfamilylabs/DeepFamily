@@ -21,6 +21,11 @@ export type VerifiedShieldedRecipient = {
   readonly ownerCommitment: bigint;
   readonly viewingKey: string;
   readonly personHash: string;
+  readonly keyMode: 0 | 1;
+  readonly identitySuiteId: number;
+  readonly assetSuiteId: number;
+  readonly assetDerivationVersion: number;
+  readonly fingerprint: string;
   readonly [verifiedRecipient]: true;
 };
 
@@ -57,6 +62,11 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     ownerCommitment: getBigInt(result.ownerCommitment),
     viewingKey: result.viewingKey,
     personHash: result.personHash,
+    keyMode: result.keyMode,
+    identitySuiteId: result.identitySuiteId,
+    assetSuiteId: result.assetSuiteId,
+    assetDerivationVersion: result.assetDerivationVersion,
+    fingerprint: result.fingerprint,
   } as VerifiedShieldedRecipient;
 }
 

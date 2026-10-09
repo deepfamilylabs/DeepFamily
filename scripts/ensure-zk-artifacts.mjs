@@ -20,10 +20,10 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
     : checkShieldedDevelopmentArtifacts({ root });
   if ((core.trustedSetupStatus === "production") !== production) {
     throw new Error(
-      "All eight circuits must use the same development or production artifact status",
+      "All ten circuits must use the same development or production artifact status",
     );
   }
-  return { status: production ? "production" : "development", circuitCount: 8, core, shielded };
+  return { status: production ? "production" : "development", circuitCount: 10, core, shielded };
 }
 
 async function reuseCurrentArtifacts({ root, check, log }) {
@@ -68,7 +68,7 @@ export async function ensureZkArtifacts({
     );
   }
   log(
-    `[zk] Development artifacts missing or stale (${failure.message}); setting up all eight circuits`,
+    `[zk] Development artifacts missing or stale (${failure.message}); setting up all ten circuits`,
   );
   await setup({ root });
   const artifacts = await check({ root });

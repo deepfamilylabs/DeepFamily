@@ -13,28 +13,18 @@ import {
 } from "ethers";
 import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
 import type { ShieldedCircuitName, ShieldedWitness } from "../../../shared/zk/shieldedZk";
+import type { Groth16Proof } from "../../../shared/zk/zk";
 
 /** All private values stay in the caller's memory and the local ZK worker. */
-export type ShieldedPoolActionData = {
-  fundMode: BigNumberish;
-  budgetKind: BigNumberish;
-  inputShardIds: readonly [BigNumberish, BigNumberish];
-  inputRoots: readonly [BigNumberish, BigNumberish];
-  inputNullifiers: readonly [BigNumberish, BigNumberish];
-  periodNullifiers: ReadonlyArray<BigNumberish>;
-  outputCommitments: readonly [BigNumberish, BigNumberish];
-  outputCiphertexts: readonly [BytesLike, BytesLike];
-  relation0: BigNumberish;
-  relation1: BigNumberish;
-  asOf: BigNumberish;
-};
+export type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
+import type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
 
 type ContractActionData = {
   fundMode: bigint;
   budgetKind: bigint;
-  inputShardIds: [bigint, bigint];
-  inputRoots: [bigint, bigint];
-  inputNullifiers: [bigint, bigint];
+  inputShardIds: bigint[];
+  inputRoots: bigint[];
+  inputNullifiers: bigint[];
   periodNullifiers: bigint[];
   outputCommitments: [bigint, bigint];
   outputCiphertexts: [string, string];
@@ -44,14 +34,33 @@ type ContractActionData = {
 };
 
 export type ShieldedPoolFlowStage = "proving" | "checkingGas" | "submitting" | "confirming";
+export type ShieldedGasReview = {
+  gasEstimate: bigint;
+  gasLimit: bigint;
+  maximumGasPrice: bigint;
+  maximumGasFee: bigint;
+};
+
+export type ShieldedSubmissionAnchor = {
+  nonce: number;
+  fromBlock: number;
+  signerAddress: string;
+};
 
 type BaseFlowInput = {
   pool: Contract;
   signer: Signer;
   expectedChainId: bigint;
   data: ShieldedPoolActionData;
-  witness: ShieldedWitness;
+  witness?: ShieldedWitness;
+  /** Already verified in the asset worker; the main thread receives no private witness. */
+  preparedProof?: Groth16Proof;
   onStage?: (stage: ShieldedPoolFlowStage) => void;
+  onBroadcast?: (transactionHash: string) => void;
+  /** Record this exact transaction slot before asking the wallet to submit it. */
+  onSubmitting?: (anchor: ShieldedSubmissionAnchor) => void;
+  /** Pause before requesting the wallet transaction so the user can review this step's fee. */
+  onGasEstimate?: (review: ShieldedGasReview) => Promise<void> | void;
   /** Large lineage proofs can take longer than the default worker timeout. */
   proofTimeoutMs?: number;
 };
@@ -94,6 +103,14 @@ function copyPair(pair: readonly [BigNumberish, BigNumberish]): [bigint, bigint]
 
 /** Snapshot caller-owned arrays so ciphertexts cannot change after proof generation. */
 function copyActionData(data: ShieldedPoolActionData): ContractActionData {
+  const capacity = data.inputNullifiers.length;
+  if (
+    (capacity !== 2 && capacity !== 8) ||
+    data.inputShardIds.length !== capacity ||
+    data.inputRoots.length !== capacity
+  ) {
+    throw new Error("Shielded action needs two or eight matching input slots");
+  }
   if (data.periodNullifiers.length !== 12) {
     throw new Error("Shielded action needs exactly 12 period nullifier slots");
   }
@@ -110,9 +127,9 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   return {
     fundMode: getBigInt(data.fundMode),
     budgetKind: getBigInt(data.budgetKind),
-    inputShardIds: copyPair(data.inputShardIds),
-    inputRoots: copyPair(data.inputRoots),
-    inputNullifiers: copyPair(data.inputNullifiers),
+    inputShardIds: data.inputShardIds.map((value) => getBigInt(value)),
+    inputRoots: data.inputRoots.map((value) => getBigInt(value)),
+    inputNullifiers: data.inputNullifiers.map((value) => getBigInt(value)),
     periodNullifiers: data.periodNullifiers.map((value) => getBigInt(value)),
     outputCommitments: copyPair(data.outputCommitments),
     outputCiphertexts,
@@ -146,7 +163,7 @@ async function assertTransactionGas(
   signerAddress: string,
   estimate: bigint,
   value: bigint,
-): Promise<bigint> {
+): Promise<{ review: ShieldedGasReview; feeOverrides: Record<string, bigint> }> {
   const provider = signer.provider;
   if (!provider) throw new Error("Transaction wallet has no provider");
   const feeData = await provider.getFeeData();
@@ -161,7 +178,21 @@ async function assertTransactionGas(
   if (balance < required) {
     throw new Error(`Transaction wallet needs at least ${required} wei for the deposit and gas`);
   }
-  return gasLimit;
+  return {
+    review: {
+      gasEstimate: estimate,
+      gasLimit,
+      maximumGasPrice,
+      maximumGasFee: gasLimit * maximumGasPrice,
+    },
+    feeOverrides:
+      feeData.maxFeePerGas !== null
+        ? {
+            maxFeePerGas: maximumGasPrice,
+            maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? 0n,
+          }
+        : { gasPrice: maximumGasPrice },
+  };
 }
 
 async function submitAction(
@@ -181,7 +212,16 @@ async function submitAction(
   }
   const data = copyActionData(input.data);
   const poolAddress = await pool.getAddress();
-  const { circuit, id } = ACTIONS[action];
+  const { id } = ACTIONS[action];
+  const large = data.inputNullifiers.length === 8;
+  if (large && action !== "privateTransfer" && action !== "unshield") {
+    throw new Error("Only VALUE transfer and unshield support eight inputs");
+  }
+  const circuit: ShieldedCircuitName = large
+    ? action === "privateTransfer"
+      ? "privateTransfer8"
+      : "unshield8"
+    : ACTIONS[action].circuit;
   const expectedSignals = buildShieldedPoolPublicSignals({
     action: id,
     fundMode: data.fundMode,
@@ -200,15 +240,22 @@ async function submitAction(
     relation1: data.relation1,
     asOf: data.asOf,
   }).map(String);
-  onStage?.("proving");
-  const generated = await zkWorkerCall(
-    "generateShieldedProof",
-    { circuit, witness, expectedPublicSignals: expectedSignals },
-    { timeoutMs: input.proofTimeoutMs ?? 1_200_000 },
-  );
-  // The worker verifies the proof locally. Repeat this check at the transaction boundary.
-  assertExpectedSignals(generated.publicSignals, expectedSignals);
-  const proof = encodeGroth16AbcProofData(normalizeGroth16Proof(generated.proof));
+  let groth16Proof = input.preparedProof;
+  if (groth16Proof) {
+    if (witness !== undefined)
+      throw new Error("Prepared proof submission must not include a witness");
+  } else {
+    if (!witness) throw new Error("Shielded action needs a prepared proof or a private witness");
+    onStage?.("proving");
+    const generated = await zkWorkerCall(
+      "generateShieldedProof",
+      { circuit, witness, expectedPublicSignals: expectedSignals },
+      { timeoutMs: input.proofTimeoutMs ?? 1_200_000 },
+    );
+    assertExpectedSignals(generated.publicSignals, expectedSignals);
+    groth16Proof = generated.proof;
+  }
+  const proof = encodeGroth16AbcProofData(normalizeGroth16Proof(groth16Proof));
   await assertSignerNetwork(signer, expectedChainId);
   const connected = pool.connect(signer) as unknown as Record<PoolAction, PoolTransactionMethod>;
   const method = connected[action];
@@ -224,10 +271,42 @@ async function submitAction(
   onStage?.("checkingGas");
   const valueOverrides = transactionValue > 0n ? { value: transactionValue } : {};
   const gasEstimate = await method.estimateGas(...args, valueOverrides);
-  const gasLimit = await assertTransactionGas(signer, signerAddress, gasEstimate, transactionValue);
+  const { review: gasReview, feeOverrides } = await assertTransactionGas(
+    signer,
+    signerAddress,
+    gasEstimate,
+    transactionValue,
+  );
+  const { gasLimit } = gasReview;
+  await input.onGasEstimate?.(gasReview);
   await assertSignerNetwork(signer, expectedChainId);
+  let submission: ShieldedSubmissionAnchor | undefined;
+  if (input.onSubmitting) {
+    const [nonce, fromBlock] = await Promise.all([
+      provider.getTransactionCount(signerAddress, "pending"),
+      provider.getBlockNumber(),
+    ]);
+    if (
+      !Number.isSafeInteger(nonce) ||
+      nonce < 0 ||
+      !Number.isSafeInteger(fromBlock) ||
+      fromBlock < 0
+    )
+      throw new Error("Transaction submission anchor is invalid");
+    submission = { nonce, fromBlock, signerAddress };
+  }
+  // This synchronous boundary lets the caller recheck lock/context state after
+  // every preparatory RPC read, before recording an unknown broadcast attempt.
   onStage?.("submitting");
-  const tx = await method(...args, { ...valueOverrides, gasLimit });
+  if (submission) input.onSubmitting?.(submission);
+  const tx = await method(...args, {
+    ...valueOverrides,
+    chainId: expectedChainId,
+    gasLimit,
+    ...feeOverrides,
+    ...(submission ? { nonce: submission.nonce } : {}),
+  });
+  input.onBroadcast?.(tx.hash);
   onStage?.("confirming");
   const receipt = await tx.wait();
   if (!receipt) throw new Error("Shielded pool transaction has no receipt");

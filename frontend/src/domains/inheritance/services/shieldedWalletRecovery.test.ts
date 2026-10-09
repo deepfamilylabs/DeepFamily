@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Interface, type Contract } from "ethers";
+import { Interface, hexlify, type Contract } from "ethers";
 import {
   computeShieldedCiphertextHashField,
   computeShieldedAllocationKeyCommitment,
@@ -7,10 +7,13 @@ import {
   computeShieldedSpendNullifier,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedAssetKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
+  encodePublicShieldedBudgetEnvelope,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
+  getShieldedBudgetCommitments,
 } from "@deepfamily/protocol-core";
 import {
   listRecoveredFundingTemplates,
@@ -23,12 +26,56 @@ import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 const ABI = [
   "event NoteAppended(uint256 indexed shardId,uint256 indexed leafIndex,uint256 commitment,uint256 root,bytes ciphertext)",
   "event NullifierSpent(uint256 nullifier)",
+  "event ActionExecuted(uint8 action,uint256 inputShardId0,uint256 inputShardId1)",
 ];
 const context = {
   chainId: 1030n,
   poolAddress: "0x1111111111111111111111111111111111111111",
 };
 const identity = { derivedSecretField: 13n, identityCommitment: 19n };
+
+async function poolFromCiphertexts(
+  records: Array<{ payload: Uint8Array; ciphertext: Uint8Array }>,
+) {
+  const iface = new Interface(ABI);
+  const tree = createLineageTree();
+  const commitments: bigint[] = [];
+  const logs = records.map(({ payload, ciphertext }, index) => {
+    const commitment = computeShieldedNoteCommitmentFromPayload(
+      { payload, ciphertextHashField: computeShieldedCiphertextHashField(ciphertext) },
+      context,
+    ).noteCommitment;
+    commitments.push(commitment);
+    tree.insert(commitment);
+    return {
+      ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
+        0n,
+        BigInt(index),
+        commitment,
+        tree.root,
+        ciphertext,
+      ]),
+      address: context.poolAddress,
+      blockNumber: 1,
+      index,
+      transactionHash: `0x${"01".repeat(32)}`,
+    };
+  });
+  const provider = {
+    getNetwork: async () => ({ chainId: context.chainId }),
+    getBlockNumber: async () => 99,
+    getBlock: async () => ({ hash: `0x${"aa".repeat(32)}` }),
+    getLogs: async () => logs,
+  };
+  const pool = {
+    interface: iface,
+    runner: { provider },
+    getAddress: async () => context.poolAddress,
+    currentShardId: async () => 0n,
+    noteShard: async () => ({ size: BigInt(records.length), root: tree.root }),
+  } as unknown as Contract;
+  return { pool, commitments };
+}
 
 async function fixture() {
   const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
@@ -140,6 +187,135 @@ async function fixture() {
 }
 
 describe("local shielded wallet recovery", () => {
+  it("recovers root-only VALUE and keeps budgets pending a matching identity, without mixing modes", async () => {
+    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(41));
+    const budget = {
+      keyMode: 1n,
+      rootIdentityCommitment: 11n,
+      rootVersionIndex: 2n,
+      policySalt: 17n,
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, context),
+      heirIdentityCommitment: 19n,
+      eligibleFrom: 2_592_001n,
+      enrollmentSalt: 23n,
+      heirOwnerCommitment: keys.ownerCommitment,
+      amountPerPeriod: 100n,
+      periodDays: 30n,
+      remaining: 1_200n,
+      nonce: 31n,
+    };
+    const payloads = [
+      encodeShieldedValueNotePayload(
+        { ownerCommitment: keys.ownerCommitment, amount: 300n, nonce: 29n },
+        context,
+      ),
+      encodeShieldedBudgetNotePayload(budget, context),
+      encodeShieldedBudgetNotePayload(
+        { ...budget, nonce: 32n, heirIdentityCommitment: 99n },
+        context,
+      ),
+      encodeShieldedBudgetNotePayload({ ...budget, nonce: 33n, keyMode: 0n }, context),
+    ];
+    const records = await Promise.all(
+      payloads.map(async (payload) => ({
+        payload,
+        ciphertext: await encryptShieldedNote({
+          payload,
+          recipientPublicKey: keys.viewPublicKey,
+          ...context,
+        }),
+      })),
+    );
+    const { pool, commitments } = await poolFromCiphertexts(records);
+    const pending = await recoverLocalShieldedWallet(
+      pool,
+      { keyMaterial: keys },
+      { fromBlock: 1, toBlock: 1 },
+    );
+    expect([...pending.ownedNotes.keys()]).toEqual([commitments[0]]);
+    expect([...pending.pendingIdentityBudgets!.keys()]).toEqual(commitments.slice(1, 3));
+    expect(listUnspentRecoveredShieldedNotes(pending, keys).map((note) => note.commitment)).toEqual(
+      [commitments[0]],
+    );
+    const authenticated = await recoverLocalShieldedWallet(
+      pool,
+      { keyMaterial: keys, identityCommitment: 19n },
+      { fromBlock: 1, toBlock: 1 },
+    );
+    expect([...authenticated.ownedNotes.keys()]).toEqual(commitments.slice(0, 2));
+    expect(authenticated.pendingIdentityBudgets?.size).toBe(0);
+    await expect(
+      recoverLocalShieldedWallet(
+        pool,
+        { keyMaterial: keys, identityCommitment: 19n },
+        { previous: pending, toBlock: 1 },
+      ),
+    ).rejects.toThrow("another identity");
+    await expect(
+      recoverLocalShieldedWallet(pool, {
+        keyMaterial: { ...keys, ownerCommitment: keys.ownerCommitment + 1n },
+      }),
+    ).rejects.toThrow("Invalid explicit");
+  });
+
+  it("recovers public clear and encrypted identity remainders without an independent slot", async () => {
+    const keys = deriveShieldedHeirKeyMaterial(identity.derivedSecretField);
+    const privateOpening = {
+      policySalt: 17n,
+      allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, context),
+      enrollmentSalt: 23n,
+    };
+    const common = {
+      rootIdentityCommitment: 11n,
+      rootVersionIndex: 2n,
+      heirIdentityCommitment: 19n,
+      eligibleFrom: 2_592_001n,
+      amountPerPeriod: 100n,
+      periodDays: 30n,
+      remaining: 1_200n,
+      nonce: 31n,
+    };
+    const ownerBudget = { ...common, ...privateOpening, heirOwnerCommitment: keys.ownerCommitment };
+    const commitments = getShieldedBudgetCommitments(ownerBudget, context);
+    const publicBudget = {
+      binding: "identity" as const,
+      keyMode: 0n,
+      ...common,
+      policyCommitment: commitments.policyCommitment,
+      enrollmentCommitment: commitments.enrollmentCommitment,
+    };
+    const first = encodeShieldedBudgetNotePayload(publicBudget, context);
+    const remainder = encodeShieldedBudgetNotePayload(
+      { ...publicBudget, remaining: 600n, nonce: 37n },
+      context,
+    );
+    const { pool, commitments: notes } = await poolFromCiphertexts([
+      { payload: first, ciphertext: encodePublicShieldedBudgetEnvelope(publicBudget, context) },
+      {
+        payload: remainder,
+        ciphertext: await encryptShieldedNote({
+          payload: remainder,
+          recipientPublicKey: await deriveShieldedViewPublicKey(keys.hpkeIkm),
+          ...context,
+        }),
+      },
+    ]);
+    const restored = await recoverLocalShieldedWallet(pool, identity, { fromBlock: 1, toBlock: 1 });
+    expect([...restored.ownedNotes.keys()]).toEqual(notes);
+    expect(
+      [...restored.ownedNotes.values()].every(
+        (event) => event.note.kind === "budget" && event.note.binding === "identity",
+      ),
+    ).toBe(true);
+    const independent = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(42));
+    const wrongSlot = await recoverLocalShieldedWallet(
+      pool,
+      { keyMaterial: independent, identityCommitment: 19n },
+      { fromBlock: 1, toBlock: 1 },
+    );
+    expect(wrongSlot.ownedNotes.size).toBe(0);
+  });
+
   it("restores a donor's child budget template from an encrypted change memo", async () => {
     const donor = deriveShieldedHeirKeyMaterial(13n);
     const heir = deriveShieldedHeirKeyMaterial(14n);
@@ -175,7 +351,12 @@ describe("local shielded wallet recovery", () => {
         ownerCommitment: donor.ownerCommitment,
         amount: 0n,
         nonce: 37n,
-        fundingMemo: { budgetCommitment, budgetNote: budget, allocationKey: 41n },
+        fundingMemo: {
+          budgetCommitment,
+          budgetNote: budget,
+          allocationKey: 41n,
+          viewingKey: await deriveShieldedViewPublicKey(heir.hpkeIkm),
+        },
       },
       context,
     );
@@ -206,8 +387,16 @@ describe("local shielded wallet recovery", () => {
         ]),
         address: context.poolAddress,
         blockNumber: 1,
-        index,
+        index: index + 1,
+        transactionHash: `0x${"01".repeat(32)}`,
       };
+    });
+    logs.unshift({
+      ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [1, 0n, 0n]),
+      address: context.poolAddress,
+      blockNumber: 1,
+      index: 0,
+      transactionHash: `0x${"01".repeat(32)}`,
     });
     const provider = {
       getNetwork: async () => ({ chainId: context.chainId }),
@@ -233,7 +422,8 @@ describe("local shielded wallet recovery", () => {
       ...iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]),
       address: context.poolAddress,
       blockNumber: 1,
-      index: 2,
+      index: 3,
+      transactionHash: `0x${"01".repeat(32)}`,
     });
     const restored = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...restored.ownedNotes.keys()]).toEqual([changeCommitment]);
@@ -255,12 +445,30 @@ describe("local shielded wallet recovery", () => {
       note: budget,
     });
     expect(restored.fundingTemplates?.get(budgetCommitment)?.ciphertext).toEqual(budgetCiphertext);
+    expect(restored.fundingTemplates?.get(budgetCommitment)?.viewingKey).toBe(
+      hexlify(await deriveShieldedViewPublicKey(heir.hpkeIkm)),
+    );
     await expect(recoverLocalShieldedWallet(pool, 14n, { fromBlock: 1 })).resolves.toMatchObject({
       fundingTemplates: new Map(),
     });
+    const originalBoundary = logs[0];
+    logs[0] = {
+      ...originalBoundary,
+      ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [2, 0n, 0n]),
+    };
+    const claimMemo = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
+    expect(claimMemo.ownedNotes.has(changeCommitment)).toBe(true);
+    expect(listRecoveredFundingTemplates(claimMemo)).toEqual([]);
+    logs[0] = originalBoundary;
+    const originalChange = logs[2];
+    logs[2] = { ...originalChange, transactionHash: `0x${"02".repeat(32)}` };
+    expect(
+      listRecoveredFundingTemplates(await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 })),
+    ).toEqual([]);
+    logs[2] = originalChange;
     // An attacker can encrypt a valid value note with a deliberately bad rule backup.
     const badKeyPayload = changePayload.slice();
-    badKeyPayload[badKeyPayload.length - 1] ^= 1;
+    badKeyPayload[badKeyPayload.length - 33] ^= 1;
     const badKeyCiphertext = await encryptShieldedNote({
       recipientPublicKey: await deriveShieldedViewPublicKey(donor.hpkeIkm),
       payload: badKeyPayload,
@@ -274,7 +482,7 @@ describe("local shielded wallet recovery", () => {
       context,
     ).noteCommitment;
     tree.update(1n, badKeyCommitment);
-    logs[1] = {
+    logs[2] = {
       ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
         0n,
         1n,
@@ -284,7 +492,8 @@ describe("local shielded wallet recovery", () => {
       ]),
       address: context.poolAddress,
       blockNumber: 1,
-      index: 1,
+      index: 2,
+      transactionHash: `0x${"01".repeat(32)}`,
     };
     const badKeyRecovery = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...badKeyRecovery.ownedNotes.keys()]).toEqual([badKeyCommitment]);
@@ -296,7 +505,11 @@ describe("local shielded wallet recovery", () => {
         ownerCommitment: donor.ownerCommitment,
         amount: 300n,
         nonce: 38n,
-        fundingMemo: { budgetCommitment: budgetCommitment + 1n, budgetNote: budget },
+        fundingMemo: {
+          budgetCommitment: budgetCommitment + 1n,
+          budgetNote: budget,
+          viewingKey: await deriveShieldedViewPublicKey(heir.hpkeIkm),
+        },
       },
       context,
     );
@@ -313,7 +526,7 @@ describe("local shielded wallet recovery", () => {
       context,
     ).noteCommitment;
     tree.update(1n, forgedCommitment);
-    logs[1] = {
+    logs[2] = {
       ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
         0n,
         1n,
@@ -323,7 +536,8 @@ describe("local shielded wallet recovery", () => {
       ]),
       address: context.poolAddress,
       blockNumber: 1,
-      index: 1,
+      index: 2,
+      transactionHash: `0x${"01".repeat(32)}`,
     };
     const forgedRecovery = await recoverLocalShieldedWallet(pool, 13n, { fromBlock: 1 });
     expect([...forgedRecovery.ownedNotes.keys()]).toEqual([forgedCommitment]);

@@ -7,6 +7,7 @@ import {
   computeIdentityFromDerivedSecret,
   decodeShieldedReceiveCode,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedAssetKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
@@ -45,7 +46,7 @@ const identity = {
 
 function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
   const payload = bech32m.fromWords(bech32m.decode(code as `${string}1${string}`, false).words);
-  payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 1 + wordIndex * 32);
+  payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 5 + wordIndex * 32);
   return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
 }
 
@@ -118,8 +119,38 @@ describe("receive code proofs", () => {
       ownerCommitment: keys.ownerCommitment.toString(),
       viewingKey: hexlify(viewingKey),
       personHash: wrapIdentityCommitmentAsPersonHash(material.identityCommitment),
+      keyMode: 0,
+      identitySuiteId: 1,
+      assetSuiteId: 1,
+      assetDerivationVersion: 1,
+      fingerprint: decodeShieldedReceiveCode(code).fingerprint,
     });
   }, 60_000);
+
+  it("proves independent root keys and rejects a mode downgrade using the same proof", async () => {
+    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(23));
+    const independent = await createShieldedReceiveCode({
+      ...identity,
+      keyMode: 1,
+      keyMaterial: keys,
+    });
+    await expect(verifyShieldedReceiveCode(independent.code)).resolves.toMatchObject({
+      ok: true,
+      keyMode: 1,
+      ownerCommitment: String(keys.ownerCommitment),
+      viewingKey: hexlify(keys.viewPublicKey),
+      fingerprint: independent.fingerprint,
+    });
+    const decoded = decodeShieldedReceiveCode(independent.code);
+    const downgraded = encodeShieldedReceiveCode({ ...decoded, keyMode: 0 });
+    await expect(verifyShieldedReceiveCode(downgraded)).resolves.toEqual({
+      ok: false,
+      reason: "invalid",
+    });
+    await expect(
+      createShieldedReceiveCode({ ...identity, keyMode: 0, keyMaterial: keys }),
+    ).rejects.toThrow();
+  }, 120_000);
 
   it("rejects a well-formed code whose identity was swapped", async () => {
     const decoded = decodeShieldedReceiveCode(code);

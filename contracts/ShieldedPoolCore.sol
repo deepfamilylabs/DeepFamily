@@ -44,14 +44,15 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   /**
-   * @notice All actions use two output slots and two input slots. Initial Fund and
+   * @notice All actions use two output slots. VALUE actions route by two or eight input slots.
+   *         The other actions use two input slots. Initial Fund and
    *         single-input Claim/PrivateTransfer repeat the first shard and root;
    *         Unshield has one proved input and repeats its shard and root.
    */
   struct ActionData {
-    uint256[2] inputShardIds;
-    uint256[2] inputRoots;
-    uint256[2] inputNullifiers;
+    uint256[] inputShardIds;
+    uint256[] inputRoots;
+    uint256[] inputNullifiers;
     uint256[12] periodNullifiers;
     uint256[2] outputCommitments;
     bytes[2] outputCiphertexts;
@@ -87,6 +88,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   uint256 public creationBlock;
   uint256 public currentShardId;
   uint256 public totalShielded;
+  /// @notice Total emitted nullifiers, including placeholders and claim-period slots.
+  uint256 public nullifierCount;
   mapping(uint256 shardId => Shard shard) internal _shards;
   mapping(uint256 nullifier => bool spent) public nullifierSpent;
   mapping(uint256 commitment => bool exists) public commitmentExists;
@@ -117,7 +120,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   function assetKind() external pure virtual returns (uint8);
 
   function protocolVersion() external pure returns (uint256) {
-    return 2;
+    return 3;
   }
 
   function _validateAmount(uint256 amount) internal pure {
@@ -246,10 +249,17 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
+    uint256 capacity = data.inputNullifiers.length;
+    if (
+      data.inputShardIds.length != capacity ||
+      data.inputRoots.length != capacity ||
+      (capacity != 2 && capacity != 8) ||
+      (capacity == 8 && action != Action.PrivateTransfer && action != Action.Unshield)
+    ) revert InvalidActionData();
     if (action == Action.Fund) {
       if (data.fundMode > 1 || data.budgetKind > 1) revert InvalidActionData();
     } else if (data.fundMode != 0 || data.budgetKind != 0) revert InvalidActionData();
-    for (uint256 i = 0; i < 2; ++i) {
+    for (uint256 i = 0; i < capacity; ++i) {
       if (isShield) {
         if (data.inputShardIds[i] != 0 || data.inputRoots[i] != 0 || data.inputNullifiers[i] != 0)
           revert InvalidActionData();
@@ -261,7 +271,12 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
           revert UnknownNoteRoot();
         }
         if (nullifierSpent[data.inputNullifiers[i]]) revert NullifierAlreadySpent();
+        for (uint256 j = 0; j < i; ++j) {
+          if (data.inputNullifiers[i] == data.inputNullifiers[j]) revert NullifierAlreadySpent();
+        }
       }
+    }
+    for (uint256 i = 0; i < 2; ++i) {
       _requireNonzeroField(data.outputCommitments[i]);
       if (commitmentExists[data.outputCommitments[i]]) revert DuplicateCommitment();
       if (data.outputCiphertexts[i].length != CIPHERTEXT_BYTES) {
@@ -275,7 +290,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       revert NullifierAlreadySpent();
     }
     if (
-      (_inputCount(action) == 1 || isInitialFund) &&
+      (_inputCount(action, capacity) == 1 || isInitialFund) &&
       (data.inputShardIds[1] != data.inputShardIds[0] || data.inputRoots[1] != data.inputRoots[0])
     ) revert InvalidActionData();
 
@@ -315,7 +330,13 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     }
     if (
       !VERIFIER.verifyProof(
-        ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
+        capacity == 8
+          ? (
+            action == Action.PrivateTransfer
+              ? ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER_8
+              : ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD_8
+          )
+          : ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
         ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
         proof,
         signals
@@ -334,14 +355,14 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 amount,
     address recipient
   ) private view returns (uint256[] memory signals) {
-    uint256 inputs = _inputCount(action);
+    uint256 inputs = _inputCount(action, data.inputNullifiers.length);
     bool isClaim = action == Action.Claim;
     bool hasLineage = isClaim || action == Action.Fund;
     bool hasAmount = action == Action.Shield || action == Action.Unshield;
     bool hasRecipient = action == Action.Unshield;
     signals = new uint256[](
       6 +
-        (inputs == 0 ? 0 : 2 * inputs + 2) +
+        (inputs == 0 ? 0 : 2 * inputs + data.inputNullifiers.length) +
         (isClaim ? 12 : 0) +
         (action == Action.Fund ? 12 : 0) +
         (hasAmount ? 1 : 0) +
@@ -362,8 +383,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputShardIds[i];
     for (uint256 i = 0; i < inputs; ++i) signals[n++] = data.inputRoots[i];
     if (inputs != 0) {
-      signals[n++] = data.inputNullifiers[0];
-      signals[n++] = data.inputNullifiers[1];
+      for (uint256 i = 0; i < data.inputNullifiers.length; ++i) {
+        signals[n++] = data.inputNullifiers[i];
+      }
     }
     if (isClaim) {
       for (uint256 i = 0; i < 12; ++i) signals[n++] = data.periodNullifiers[i];
@@ -392,7 +414,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (
       envelope.length != CIPHERTEXT_BYTES ||
       bytes4(envelope[:4]) != 0x4446534e ||
-      uint8(envelope[4]) != 2 ||
+      uint8(envelope[4]) != 3 ||
       uint8(envelope[5]) != 5
     ) revert InvalidCiphertext();
     uint256[10] memory widths = [uint256(32), 8, 32, 16, 8, 32, 32, 16, 32, 4];
@@ -421,8 +443,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   /** @dev Fund/Claim prove two root slots; only Unshield has one public input root. */
-  function _inputCount(Action action) private pure returns (uint256) {
+  function _inputCount(Action action, uint256 capacity) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
+    if (capacity == 8) return 8;
     if (action == Action.Unshield) {
       return 1;
     }
@@ -430,8 +453,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   function _spendInputs(ActionData calldata data, bool isClaim) internal {
-    _spendNullifier(data.inputNullifiers[0]);
-    _spendNullifier(data.inputNullifiers[1]);
+    for (uint256 i = 0; i < data.inputNullifiers.length; ++i) {
+      _spendNullifier(data.inputNullifiers[i]);
+    }
     if (isClaim) {
       for (uint256 i = 0; i < 12; ++i) {
         _spendNullifier(data.periodNullifiers[i]);
@@ -442,6 +466,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   function _spendNullifier(uint256 nullifier) private {
     if (nullifierSpent[nullifier]) revert NullifierAlreadySpent();
     nullifierSpent[nullifier] = true;
+    ++nullifierCount;
     emit NullifierSpent(nullifier);
   }
 

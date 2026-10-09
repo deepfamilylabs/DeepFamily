@@ -15,6 +15,8 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   claim: "shielded_claim",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
+  privateTransfer8: "shielded_private_transfer_8",
+  unshield8: "shielded_unshield_8",
 });
 
 export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
@@ -27,6 +29,8 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
   unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],
+  privateTransfer8: 30,
+  unshield8: 32,
 };
 
 /**

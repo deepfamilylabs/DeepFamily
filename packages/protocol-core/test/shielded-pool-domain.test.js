@@ -199,11 +199,16 @@ test("a donor backup uses the same scope for its nested rule and allocation key"
   const payload = encodeShieldedValueNotePayload(
     {
       ...value,
-      fundingMemo: { budgetCommitment: 61n, budgetNote: privateBudget, allocationKey: 53n },
+      fundingMemo: {
+        viewingKey: new Uint8Array(32).fill(7),
+        budgetCommitment: 61n,
+        budgetNote: privateBudget,
+        allocationKey: 53n,
+      },
     },
     scope,
   );
-  assert.equal(payload.length, 432);
+  assert.equal(payload.length, 459);
   assert.equal(decodeShieldedNotePayload(payload, scope).fundingMemo.allocationKey, 53n);
   for (const alternative of alternatives) {
     assert.throws(

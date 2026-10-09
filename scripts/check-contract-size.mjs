@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./lib/zkDeploymentCatalog.mjs";
 
 // Keep the stricter Ethereum EIP-170 ceiling so one artifact remains deployable on every
 // supported network. Conflux eSpace currently permits up to 49,152 deployed bytes.
@@ -7,6 +8,10 @@ const CROSS_CHAIN_MAX_DEPLOYED_BYTES = 24_576;
 const MAX_SEGMENT_RUNTIME_BYTES = 16_385;
 const MAX_MANIFEST_RUNTIME_BYTES = 20_566;
 const ARTIFACTS = [
+  ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map(({ verifierContractName }) => [
+    verifierContractName,
+    `artifacts/contracts/${verifierContractName}.sol/${verifierContractName}.json`,
+  ]),
   ["DeepFamily", "artifacts/contracts/DeepFamily.sol/DeepFamily.json"],
   ["DeepFamilyArchive", "artifacts/contracts/DeepFamilyArchive.sol/DeepFamilyArchive.json"],
   ["ArchiveData", "artifacts/contracts/DeepFamilyArchive.sol/ArchiveData.json"],

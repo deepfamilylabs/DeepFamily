@@ -13,5 +13,5 @@ export type ShieldedPageModules = {
   pool: Contract;
   poolAddress: string;
   poolDeploymentBlock: number;
-  tokenDecimals: number;
+  tokenDecimals: number | null;
 };

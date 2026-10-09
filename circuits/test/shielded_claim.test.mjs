@@ -83,10 +83,10 @@ test("shielded claim constraints", async (t) => {
       return copy;
     };
 
-    await t.test("private, public and mixed claims enforce chain and pool domains", async () => {
+    await t.test("same-binding claims enforce chain and pool domains", async () => {
       for (const budgetKind of [0, 1]) {
         for (const secondRemainingPeriods of [0, 2]) {
-          const options = { budgetKind, secondBudgetKind: 1 - budgetKind, secondRemainingPeriods };
+          const options = { budgetKind, secondBudgetKind: budgetKind, secondRemainingPeriods };
           const base = buildShieldedClaimFixture(options);
           for (const context of [
             { chainId: 71n },
@@ -199,16 +199,25 @@ test("shielded claim constraints", async (t) => {
       },
     );
 
-    await t.test("identity-only and mixed-budget claims preserve hidden input types", async () => {
+    await t.test("claims reject mixed binding inputs", async () => {
       for (const budgetKind of [0, 1]) {
         await valid(buildShieldedClaimFixture({ budgetKind }).witness);
         for (const secondBudgetKind of [0, 1]) {
-          await valid(
-            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 })
-              .witness,
+          await (budgetKind === secondBudgetKind ? valid : invalid)(
+            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 }).witness,
           );
         }
       }
+    });
+    await t.test("independent authorization requires its owner and preserves identity period history", async () => {
+      const independent = buildShieldedClaimFixture({ keyMode: 1, secondRemainingPeriods: 2 });
+      await valid(independent.witness);
+      const legacy = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
+      assert.deepEqual(independent.witness.periodNullifiers.slice(0, 2), legacy.witness.periodNullifiers.slice(0, 2));
+      await invalid({ ...independent.witness, ownerSecret: legacy.ownerSecret.toString() });
+      await invalid({ ...independent.witness, keyMode: "0" });
+      await invalid(buildShieldedClaimFixture({ keyMode: 1, secondKeyMode: 0, secondRemainingPeriods: 2 }).witness);
+      await invalid(buildShieldedClaimFixture({ budgetKind: 1, keyMode: 1 }).witness);
     });
     await t.test("public and private budgets share real period nullifiers", () => {
       const privateWitness = buildShieldedClaimFixture().witness;
@@ -560,10 +569,10 @@ test("shielded claim constraints", async (t) => {
       witness.inputRoots = [root.toString(), root.toString()];
       await valid(witness);
     });
-    await t.test("mixed claim binds the second full-depth budget path", async () => {
+    await t.test("compatible claim binds the second full-depth budget path", async () => {
       const { witness } = buildShieldedClaimFixture({
         secondRemainingPeriods: 2,
-        secondBudgetKind: 1,
+        secondBudgetKind: 0,
       });
       const proof = fullSyntheticPath(BigInt(witness.inputRoots[1]), 32, (1n << 31n) | 5n, 1800);
       witness.secondNoteDepth = proof.depth;

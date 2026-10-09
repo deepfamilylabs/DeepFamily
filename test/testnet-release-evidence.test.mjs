@@ -316,7 +316,7 @@ const bindDeploymentEvidence = (report) => {
 const shieldedProofs = (chainId) =>
   Object.fromEntries(
     Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => {
-      const signals = Array(SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
+      const signals = Array(action === "privateTransfer8" ? 30 : action === "unshield8" ? 32 : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]).fill("0");
       signals[0] = String(chainId);
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
@@ -486,10 +486,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: 8,
+    circuitCount: 10,
     shielded: {
       status: "passed",
-      circuitCount: 6,
+      circuitCount: 8,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -777,16 +777,16 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(6);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(8);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 5,
+      proofCount: 7,
       claimCount: 12,
       lineageDepth: 1,
       noteDepth: 1,
     });
     expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
-    expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
+    expect(result.publicSummary.shielded.transactionActions).to.have.length(6);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);
     expect(Object.isFrozen(result.publicSummary)).to.equal(true);
@@ -1510,7 +1510,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all six public proof assets and the claim verifier call to the selected chain", async function () {
+  it("binds all eight public proof assets and the claim verifier call to the selected chain", async function () {
     const cases = [
       [
         (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),

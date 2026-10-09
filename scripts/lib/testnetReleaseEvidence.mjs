@@ -1292,7 +1292,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       );
   }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
-  requireExact(ceremony.circuitCount, 8, "zkCeremonyVerification.circuitCount");
+  requireExact(ceremony.circuitCount, 10, "zkCeremonyVerification.circuitCount");
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
     !Array.isArray(ceremony.circuits) ||
@@ -1306,7 +1306,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["status", "manifestSha256", "circuitCount", "ptau"],
   );
   requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
-  requireExact(shieldedCeremony.circuitCount, 6, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(shieldedCeremony.circuitCount, 8, "zkCeremonyVerification.shielded.circuitCount");
   requireExact(
     shieldedCeremony.manifestSha256,
     inspected.manifestSha256,
@@ -1353,7 +1353,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     requireSha256(proof.proofSha256, `shielded.proofs.${action}.proofSha256`);
     if (
       !Array.isArray(proof.publicSignals) ||
-      proof.publicSignals.length !== SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId] ||
+      proof.publicSignals.length !== (action === "privateTransfer8" ? 30 : action === "unshield8" ? 32 : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[spec.actionId]) ||
       proof.publicSignals.some(
         (signal) => typeof signal !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(signal),
       )

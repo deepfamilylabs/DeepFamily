@@ -40,7 +40,7 @@ function runSnarkjs(args) {
   });
 }
 
-/** Check every selected development artifact against the complete six-circuit manifest. */
+/** Check every selected development artifact against the complete eight-circuit manifest. */
 export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUITS)) {
   const manifestPath = path.join(root, "circuits/shielded-development-manifest.json");
   if (!fs.existsSync(manifestPath)) {
@@ -53,7 +53,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
   assert.deepEqual(
     Object.keys(manifest.circuits ?? {}).sort(),
     Object.keys(SHIELDED_CIRCUITS).sort(),
-    "Development manifest must cover all six shielded circuits",
+    "Development manifest must cover all eight shielded circuits",
   );
   for (const action of actions) {
     const source = SHIELDED_CIRCUITS[action];

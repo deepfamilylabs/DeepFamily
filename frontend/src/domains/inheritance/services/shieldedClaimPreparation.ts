@@ -5,6 +5,7 @@ import {
   computeIdentityFromDerivedSecret,
   computeShieldedNoteCommitmentFromPayload,
   getShieldedBudgetCommitments,
+  normalizeShieldedKeyMode,
   computeShieldedCiphertextHashField,
   computeShieldedClaimBatch,
   computeShieldedDummyInputNullifier,
@@ -13,7 +14,6 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
-  deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
@@ -32,6 +32,8 @@ import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
+import { resolveShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
 
@@ -47,6 +49,7 @@ export type PrepareShieldedClaimInput = {
   chainId: BigNumberish;
   poolAddress: string;
   identity: IdentityMaterialV1Result;
+  keyMaterial?: ShieldedKeyMaterial;
   wallet: LocalShieldedWalletSnapshot;
   /** Reconstructed from unfiltered public events; refresh roots before submission. */
   lineage: LineageSnapshot;
@@ -191,14 +194,18 @@ export async function prepareShieldedClaim(
   ) {
     throw new Error("Identity material does not match the passphrase-derived secret");
   }
-  const keys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
-  sameWallet(input.wallet, chainId, poolAddress, keys.ownerCommitment, material.identityCommitment);
   const budgetCommitment = getBigInt(input.budgetCommitment);
   const owned = input.wallet.ownedNotes.get(budgetCommitment);
   if (!owned || owned.note.kind !== "budget") {
     throw new Error("Input must be a locally recovered budget note");
   }
   const budget = owned.note;
+  const keyMode = normalizeShieldedKeyMode(budget.keyMode, budget.binding);
+  const keys = resolveShieldedKeyMaterial(
+    { keyMaterial: input.keyMaterial, derivedSecretField: material.derivedSecretField },
+    keyMode,
+  );
+  sameWallet(input.wallet, chainId, poolAddress, keys.ownerCommitment, material.identityCommitment);
   if (
     budget.heirIdentityCommitment !== material.identityCommitment ||
     (budget.binding !== "identity" && budget.heirOwnerCommitment !== keys.ownerCommitment)
@@ -257,6 +264,11 @@ export async function prepareShieldedClaim(
   let secondHash = 0n;
   let secondPath: ReturnType<typeof getLocalShieldedNoteProof> | undefined;
   if (secondBudget && secondOwned && secondCommitment !== undefined) {
+    if (
+      (secondBudget.binding === "identity") !== (budget.binding === "identity") ||
+      normalizeShieldedKeyMode(secondBudget.keyMode, secondBudget.binding) !== keyMode
+    )
+      throw new Error("Claim budgets must retain the same binding and key mode");
     for (const field of [
       "rootIdentityCommitment",
       "rootVersionIndex",
@@ -354,14 +366,9 @@ export async function prepareShieldedClaim(
     throw new Error("Both current lineage roots must be nonzero");
   }
   const path = getLocalShieldedNoteProof(input.wallet, budgetCommitment);
-  const ownerBudget =
-    budget.binding !== "identity"
-      ? budget
-      : secondBudget?.binding !== "identity"
-        ? secondBudget
-        : undefined;
+  const ownerBudget = budget.binding !== "identity" ? budget : undefined;
   const budgetOutput: ShieldedBudgetNotePayload = {
-    ...(ownerBudget ?? budget),
+    ...budget,
     remaining: batch.remaining,
     nonce: generateShieldedRandomField(),
   };
@@ -431,6 +438,9 @@ export async function prepareShieldedClaim(
   const witness: ShieldedWitness = {
     ...publicInputs,
     budgetKind: budget.binding === "identity" ? "1" : "0",
+    keyMode: String(keyMode),
+    ownerSecret: String(keys.ownerSecret),
+    secondKeyMode: secondBudget ? String(keyMode) : "0",
     secondBudgetKind: secondBudget?.binding === "identity" ? "1" : "0",
     policyCommitmentInput: String(policyCommitment),
     enrollmentCommitmentInput: String(enrollmentCommitment),

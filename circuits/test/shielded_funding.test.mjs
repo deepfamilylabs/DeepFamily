@@ -174,12 +174,12 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
     );
 
     await t.test(
-      "public initial and all continuation binding pairs satisfy the same circuit",
+      "continuation preserves binding and rejects cross-binding pairs",
       async () => {
         for (const budgetKind of [0, 1]) {
           await valid("fund", buildShieldedFundingFixtures({ budgetKind }).initial);
           for (const oldBudgetKind of [0, 1]) {
-            await valid(
+            await (budgetKind === oldBudgetKind ? valid : invalid)(
               "fund",
               buildShieldedFundingFixtures({ budgetKind, oldBudgetKind }).continuation,
             );
@@ -187,6 +187,14 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         }
       },
     );
+    await t.test("independent funding preserves mode and rejects authorization downgrade", async () => {
+      const independent = buildShieldedFundingFixtures({ keyMode: 1 });
+      await valid("fund", independent.initial);
+      await valid("fund", independent.continuation);
+      await invalid("fund", buildShieldedFundingFixtures({ keyMode: 1, oldKeyMode: 0 }).continuation);
+      await invalid("fund", buildShieldedFundingFixtures({ budgetKind: 1, keyMode: 1 }).initial);
+      assert.equal(independent.initial.inputNullifiers[1], fixture.initial.inputNullifiers[1]);
+    });
     await t.test("public addressing preserves enrollment uniqueness across binding modes", () => {
       const publicFixture = buildShieldedFundingFixtures({ budgetKind: 1 });
       assert.equal(publicFixture.initial.inputNullifiers[1], fixture.initial.inputNullifiers[1]);
@@ -468,7 +476,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             shieldedFixtureTag(1015n, 1030n, 0x1111111111111111111111111111111111111111n),
             policy,
             enrollment,
-            owner,
+            poseidon3([shieldedFixtureTag(1033n, 1030n, 0x1111111111111111111111111111111111111111n), owner, BigInt(w.keyMode)]),
             BigInt(w.rate),
             BigInt(w.rate) * BigInt(w.budgetPeriods),
             BigInt(w.budgetNonce),

@@ -40,19 +40,33 @@ export function ShieldedIdentitySessionProvider({
       return next;
     });
   }, []);
-  const { identity, unlock, lock, touch } = session;
+  const { identity, funds, unlock, update, lock, touch } = session;
   const guardedUnlock = useCallback<typeof unlock>(
     (material) => {
       if (enabledRef.current) unlock(material);
     },
     [unlock],
   );
+  const guardedUpdate = useCallback<typeof update>(
+    (state) => {
+      if (enabledRef.current) update(state);
+    },
+    [update],
+  );
   useLayoutEffect(() => {
     if (!enabled) lock();
   }, [enabled, lock]);
   const value = useMemo(
-    () => ({ identity: enabled ? identity : null, unlock: guardedUnlock, lock, touch, setBusyFor }),
-    [enabled, identity, guardedUnlock, lock, touch, setBusyFor],
+    () => ({
+      identity: enabled ? identity : null,
+      funds: enabled ? funds : null,
+      unlock: guardedUnlock,
+      update: guardedUpdate,
+      lock,
+      touch,
+      setBusyFor,
+    }),
+    [enabled, identity, funds, guardedUnlock, guardedUpdate, lock, touch, setBusyFor],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -65,7 +79,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
   const owner = useId();
   const mounted = useRef(false);
   if (!session) throw new Error("Shielded identity session provider is missing");
-  const { setBusyFor, identity, unlock, lock, touch } = session;
+  const { setBusyFor, identity, funds, unlock, update, lock, touch } = session;
   const setBusy = useCallback(
     (busy: boolean) => {
       if (mounted.current) setBusyFor(owner, busy);
@@ -80,7 +94,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
     };
   }, [owner, setBusyFor]);
   return useMemo(
-    () => ({ identity, unlock, lock, touch, setBusy }),
-    [identity, unlock, lock, touch, setBusy],
+    () => ({ identity, funds, unlock, update, lock, touch, setBusy }),
+    [identity, funds, unlock, update, lock, touch, setBusy],
   );
 }

@@ -488,7 +488,7 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
       if (!sameAddress(value, expected))
         throw new Error(`Integrated deployment ${label} ${field} binding mismatch`);
     }
-    if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 2n)
+    if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 3n)
       throw new Error(`Integrated deployment ${label} kind/version mismatch`);
   }
   for (const [value, expected, label] of [
@@ -672,7 +672,7 @@ export const deployIntegratedSystem = async (
   const personCommitmentVerifierAddress = await personCommitmentVerifier.getAddress();
   const nameDisclosureVerifierAddress = await nameDisclosureVerifier.getAddress();
 
-  // All verifier targets must exist before the single adapter fixes its seven routes.
+  // All verifier targets must exist before the single adapter fixes its nine routes.
   const shieldedVerifiers = {};
   for (const [action, spec] of Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS)) {
     shieldedVerifiers[action] = await deployContract(

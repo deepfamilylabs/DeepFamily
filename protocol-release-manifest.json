@@ -1554,6 +1554,8 @@
       "claimVerifierImmutable": null,
       "privateTransferVerifierImmutable": null,
       "unshieldVerifierImmutable": null,
+      "privateTransfer8VerifierImmutable": null,
+      "unshield8VerifierImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
       "fundVerifierImmutable": null
@@ -1592,6 +1594,16 @@
         "runtimeSha256": null
       },
       "unshield": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "privateTransfer8": {
+        "address": null,
+        "artifactSha256": null,
+        "runtimeSha256": null
+      },
+      "unshield8": {
         "address": null,
         "artifactSha256": null,
         "runtimeSha256": null

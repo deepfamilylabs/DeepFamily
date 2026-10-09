@@ -2,30 +2,13 @@
 import { StrictMode } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
+import type { ShieldedPublicIdentity } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import {
   SHIELDED_IDENTITY_IDLE_TIMEOUT_MS,
   useShieldedIdentitySession,
 } from "./useShieldedIdentitySession";
 
-const identity: IdentityMaterialV1Result = {
-  identitySuiteId: 1,
-  identity: {
-    fullName: "Test Person",
-    gender: 1,
-    birthYear: 2000,
-    birthMonth: 1,
-    birthDay: 1,
-    isBirthBC: false,
-  },
-  derivedSecretField: "123",
-  nameField: "456",
-  packedBirthGenderField: "789",
-  suiteCommitment: "12",
-  nameSecretCommitment: "34",
-  identityCommitment: "56",
-  personHash: `0x${"ab".repeat(32)}`,
-};
+const identity: ShieldedPublicIdentity = {handle: "identity:1", identitySuiteId: 1, identity: {fullName: "Test Person"}, identityCommitment: "777", personHash: "0x" + "00".repeat(32)};
 
 describe("useShieldedIdentitySession", () => {
   beforeEach(() => vi.useFakeTimers());
@@ -40,7 +23,7 @@ describe("useShieldedIdentitySession", () => {
     expect(result.current.identity).toBeNull();
     act(() => result.current.unlock(identity));
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     act(() => vi.advanceTimersByTime(1));
     expect(result.current.identity).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
@@ -55,7 +38,7 @@ describe("useShieldedIdentitySession", () => {
       else window.dispatchEvent(new Event(activity));
     });
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     act(() => vi.advanceTimersByTime(1));
     expect(result.current.identity).toBeNull();
   });
@@ -69,11 +52,11 @@ describe("useShieldedIdentitySession", () => {
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
     rerender({ busy: true });
     act(() => vi.advanceTimersByTime(3 * SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     expect(vi.getTimerCount()).toBe(0);
     rerender({ busy: false });
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     act(() => vi.advanceTimersByTime(1));
     expect(result.current.identity).toBeNull();
   });
@@ -84,7 +67,7 @@ describe("useShieldedIdentitySession", () => {
       { initialProps: { busy: true } },
     );
     act(() => result.current.unlock(identity));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     expect(vi.getTimerCount()).toBe(0);
     act(() => result.current.lock());
     rerender({ busy: false });
@@ -93,7 +76,7 @@ describe("useShieldedIdentitySession", () => {
   });
 
   it("never exposes a former scope's identity and rejects its delayed unlock callback", () => {
-    const observed: Array<{ scope: string; identity: IdentityMaterialV1Result | null }> = [];
+    const observed: Array<{ scope: string; identity: ShieldedPublicIdentity | null }> = [];
     const { result, rerender } = renderHook(
       ({ scope }) => {
         const session = useShieldedIdentitySession({ scope, busy: true });
@@ -115,7 +98,7 @@ describe("useShieldedIdentitySession", () => {
     act(() => oldUnlock(identity));
     expect(result.current.identity).toBeNull();
     act(() => result.current.unlock(identity));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     rerender({ scope: "wallet-a" });
     act(() => oldUnlock(identity));
     expect(result.current.identity).toBeNull();
@@ -150,7 +133,7 @@ describe("useShieldedIdentitySession", () => {
       act(() => pendingUnlock(identity));
       expect(result.current.identity).toBeNull();
       act(() => result.current.unlock(identity));
-      expect(result.current.identity).toBe(identity);
+      expect(result.current.identity).toEqual(identity);
     },
   );
 
@@ -178,7 +161,7 @@ describe("useShieldedIdentitySession", () => {
       wrapper: StrictMode,
     });
     act(() => result.current.unlock(identity));
-    expect(result.current.identity).toBe(identity);
+    expect(result.current.identity).toEqual(identity);
     expect(vi.getTimerCount()).toBe(1);
     expect(localWrite).not.toHaveBeenCalled();
     act(() => result.current.lock());

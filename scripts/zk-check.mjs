@@ -156,7 +156,7 @@ const printUsage = () => {
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
-all seven development artifact sets and proves fund/claim when no production manifest exists;
+all eight development artifact sets and proves fund/claim when no production manifest exists;
 with a production manifest it verifies production artifacts and ceremony. Default: --circuit all.`);
 };
 

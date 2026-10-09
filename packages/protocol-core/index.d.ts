@@ -614,7 +614,7 @@ export function buildLineageMerkleProof(
 ): LineageMerkleProof;
 export function buildLineageMerkleProofFromPath(input: LineageMerklePathInput): LineageMerkleProof;
 export type ShieldedScope = { chainId: BigNumberish; poolAddress: string };
-export const SHIELDED_POOL_PROTOCOL_VERSION: 2;
+export const SHIELDED_POOL_PROTOCOL_VERSION: 3;
 export function normalizeShieldedScope(scope: ShieldedScope): {
   chainId: bigint;
   poolAddress: string;
@@ -641,6 +641,7 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   identityBudgetNote: bigint;
   poolScope: bigint;
   scopedPurpose: bigint;
+  ownerBudgetAuthorization: bigint;
 }>;
 export const SHIELDED_MAX_BATCH_PERIODS: 12;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
@@ -707,6 +708,7 @@ export function computeShieldedBudgetNoteCommitment(
     policyCommitment: BigNumberish;
     enrollmentCommitment: BigNumberish;
     heirOwnerCommitment: BigNumberish;
+    keyMode?: BigNumberish;
     amountPerPeriod: BigNumberish;
     remaining: BigNumberish;
     nonce: BigNumberish;
@@ -818,19 +820,19 @@ export function decryptShieldedNote(input: {
   poolAddress: string;
 }): Promise<Uint8Array>;
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION: 2;
+export const SHIELDED_NOTE_PAYLOAD_VERSION: 3;
 export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND: 4;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND: 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
-export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 282;
+export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 283;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES: 218;
 export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES: 400;
 export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES: 432;
-export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 400;
-export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 432;
+export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 427;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 459;
 export interface ShieldedValueNotePayload {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
@@ -841,6 +843,7 @@ export interface ShieldedValueNotePayload {
     budgetNote: ShieldedBudgetNotePayload;
     ruleOpening?: ShieldedBudgetRuleOpening;
     allocationKey?: BigNumberish;
+    viewingKey?: BytesLike;
   };
 }
 export interface ShieldedOwnerBudgetNotePayload {
@@ -853,6 +856,7 @@ export interface ShieldedOwnerBudgetNotePayload {
   eligibleFrom: BigNumberish;
   enrollmentSalt: BigNumberish;
   heirOwnerCommitment: BigNumberish;
+  keyMode?: BigNumberish;
   amountPerPeriod: BigNumberish;
   periodDays: BigNumberish;
   remaining: BigNumberish;
@@ -860,6 +864,7 @@ export interface ShieldedOwnerBudgetNotePayload {
 }
 export interface ShieldedIdentityBudgetNotePayload {
   binding: "identity";
+  keyMode?: BigNumberish;
   rootIdentityCommitment: BigNumberish;
   rootVersionIndex: BigNumberish;
   heirIdentityCommitment: BigNumberish;
@@ -880,11 +885,11 @@ export interface ShieldedBudgetRuleOpening {
   enrollmentSalt: BigNumberish;
 }
 export type DecodedShieldedOwnerBudgetNotePayload = {
-  [K in Exclude<keyof ShieldedOwnerBudgetNotePayload, "binding">]: bigint;
-} & { binding?: "owner" };
+  [K in Exclude<keyof ShieldedOwnerBudgetNotePayload, "binding" | "keyMode">]: bigint;
+} & { binding?: "owner"; keyMode?: bigint };
 export type DecodedShieldedIdentityBudgetNotePayload = {
-  [K in Exclude<keyof ShieldedIdentityBudgetNotePayload, "binding">]: bigint;
-} & { binding: "identity" };
+  [K in Exclude<keyof ShieldedIdentityBudgetNotePayload, "binding" | "keyMode">]: bigint;
+} & { binding: "identity"; keyMode?: bigint };
 export type DecodedShieldedBudgetNotePayload =
   | DecodedShieldedOwnerBudgetNotePayload
   | DecodedShieldedIdentityBudgetNotePayload;
@@ -907,6 +912,7 @@ export type DecodedShieldedNotePayload =
         budgetNote: DecodedShieldedBudgetNotePayload;
         ruleOpening?: { [K in keyof ShieldedBudgetRuleOpening]: bigint };
         allocationKey?: bigint;
+        viewingKey?: string;
       };
     }
   | ({ kind: "budget" } & DecodedShieldedBudgetNotePayload);
@@ -994,18 +1000,19 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
 >;
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
-export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 4;
+export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 9;
 export interface ShieldedPoolPublicSignalInput {
   fundMode?: BigNumberish;
   budgetKind?: BigNumberish;
+  capacity?: 1 | 2 | 8;
   /** Optional cross-check; otherwise the nine fields are read from the public output envelope. */
   publicBudget?: readonly BigNumberish[];
   action: BigNumberish;
   chainId: BigNumberish;
   poolAddress: string;
-  inputShardIds: readonly [BigNumberish, BigNumberish];
-  inputRoots: readonly [BigNumberish, BigNumberish];
-  inputNullifiers: readonly [BigNumberish, BigNumberish];
+  inputShardIds: ReadonlyArray<BigNumberish>;
+  inputRoots: ReadonlyArray<BigNumberish>;
+  inputNullifiers: ReadonlyArray<BigNumberish>;
   periodNullifiers: readonly BigNumberish[];
   outputCommitments: readonly [BigNumberish, BigNumberish];
   outputCiphertexts: readonly [BytesLike, BytesLike];
@@ -1021,14 +1028,23 @@ export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInp
   witness: Record<string, string | string[]>;
 };
 export function buildShieldedPoolPublicSignals(input: ShieldedPoolPublicSignalInput): bigint[];
-export function buildShieldedReceiveCodePublicSignals(input: {
+export interface ShieldedReceiveCodeStatement {
   identityCommitment: BigNumberish;
   ownerCommitment: BigNumberish;
   viewingKey: BytesLike;
-}): [bigint, bigint, bigint, bigint];
+  keyMode?: BigNumberish;
+  identitySuiteId?: BigNumberish;
+  assetSuiteId?: BigNumberish;
+  assetDerivationVersion?: BigNumberish;
+  receiveCodeVersion?: BigNumberish;
+}
+export function buildShieldedReceiveCodePublicSignals(
+  input: ShieldedReceiveCodeStatement,
+): [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
+export function computeShieldedReceiveCodeFingerprint(input: ShieldedReceiveCodeStatement): string;
 
 export const SHIELDED_RECEIVE_CODE_PREFIX: "dfrecv";
-export const SHIELDED_RECEIVE_CODE_VERSION: 1;
+export const SHIELDED_RECEIVE_CODE_VERSION: 2;
 export interface ShieldedReceiveCodeProof {
   pi_a: [string, string, string];
   pi_b: [[string, string], [string, string], [string, string]];
@@ -1036,21 +1052,162 @@ export interface ShieldedReceiveCodeProof {
   protocol: "groth16";
   curve: "bn128";
 }
-export function encodeShieldedReceiveCode(input: {
-  identityCommitment: BigNumberish;
-  ownerCommitment: BigNumberish;
-  viewingKey: BytesLike;
-  proof: {
-    pi_a: ReadonlyArray<BigNumberish>;
-    pi_b: ReadonlyArray<ReadonlyArray<BigNumberish>>;
-    pi_c: ReadonlyArray<BigNumberish>;
-  };
-}): string;
+export function encodeShieldedReceiveCode(
+  input: ShieldedReceiveCodeStatement & {
+    proof: {
+      pi_a: ReadonlyArray<BigNumberish>;
+      pi_b: ReadonlyArray<ReadonlyArray<BigNumberish>>;
+      pi_c: ReadonlyArray<BigNumberish>;
+    };
+  },
+): string;
 /** Parses and range-checks a code; the caller must still verify its proof. */
 export function decodeShieldedReceiveCode(code: string): {
   identityCommitment: bigint;
   ownerCommitment: bigint;
   viewingKey: Uint8Array;
-  publicSignals: [bigint, bigint, bigint, bigint];
+  keyMode: number;
+  identitySuiteId: number;
+  assetSuiteId: number;
+  assetDerivationVersion: number;
+  receiveCodeVersion: number;
+  fingerprint: string;
+  publicSignals: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
   proof: ShieldedReceiveCodeProof;
 };
+
+export const SHIELDED_KEY_MODE: Readonly<{ identityDerived: 0; assetRootDerived: 1 }>;
+export function normalizeShieldedKeyMode(value?: BigNumberish, binding?: string): bigint;
+export function computeShieldedBudgetOwnerAuthorization(
+  input: { heirOwnerCommitment: BigNumberish; keyMode?: BigNumberish },
+  scope: ShieldedScope,
+): bigint;
+
+export const SHIELDED_POOL_CAPACITY_PUBLIC_SIGNAL_COUNTS: Readonly<
+  Record<number, Readonly<Record<number, number>>>
+>;
+
+export function computeShieldedDummyInputNullifierForSlot(
+  ownerSecret: BigNumberish,
+  firstCommitment: BigNumberish,
+  slot: number,
+  scope: ShieldedScope,
+): bigint;
+export interface ShieldedValueSpendCandidate {
+  commitment: BigNumberish;
+  amount: BigNumberish;
+  ownerCommitment?: BigNumberish;
+  chainId?: BigNumberish;
+  poolAddress?: string;
+}
+export interface ShieldedValueSpendStep {
+  kind: "merge" | "spend";
+  capacity: 2 | 8;
+  inputCommitments: string[];
+  inputAmount: bigint;
+  outputAmounts: [bigint, bigint];
+  outputCommitments: [string, string];
+}
+export interface ShieldedValueSpendPlan {
+  amount: bigint;
+  maxInputs: 1 | 2 | 8;
+  steps: ShieldedValueSpendStep[];
+  selectedCommitments: string[];
+}
+export function planShieldedValueSpend(input: {
+  notes: readonly ShieldedValueSpendCandidate[];
+  candidateCommitments?: readonly BigNumberish[];
+  amount: BigNumberish;
+  maxInputs?: 1 | 2 | 8;
+}): ShieldedValueSpendPlan;
+
+export const SHIELDED_ASSET_KEY_VERSION: 1;
+export const SHIELDED_ASSET_SUITE: 1;
+export const SHIELDED_ASSET_BRANCH_VERSION: 1;
+export interface ShieldedAssetSignatureMetadata {
+  signerAddress: string;
+  message: string;
+  messageHash: string;
+  messageVersion: 1;
+  signatureVersion: 1;
+  rootKdfVersion: 1;
+  method: "personal_sign";
+}
+export interface ShieldedAssetKeyMaterial {
+  ownerSecret: bigint;
+  ownerCommitment: bigint;
+  hpkeIkm: string;
+  viewPublicKey: Uint8Array;
+  fundsFingerprint: string;
+  keyMode: 1;
+  assetSuite: 1;
+  branchVersion: 1;
+}
+export function buildShieldedAssetSigningMessage(address: string): string;
+export function normalizeShieldedAssetSignature(input: {
+  signerAddress: string;
+  signature: string;
+}): Uint8Array;
+export function deriveShieldedAssetRootFromSignature(input: {
+  signerAddress: string;
+  signature: string;
+}): Promise<{ assetRoot: Uint8Array; sourceMetadata: ShieldedAssetSignatureMetadata }>;
+export function createShieldedAssetRoot(input: {
+  intent: "create";
+  rootSource?: "random";
+}): Uint8Array;
+export function deriveShieldedAssetKeyMaterial(
+  assetRoot: BytesLike,
+): Promise<ShieldedAssetKeyMaterial>;
+export function computeShieldedAssetFingerprint(input: {
+  ownerCommitment: BigNumberish;
+  viewPublicKey: BytesLike;
+  assetSuite?: 1;
+  branchVersion?: 1;
+}): string;
+export const SHIELDED_ASSET_VAULT_VERSION: 1;
+export const SHIELDED_ASSET_VAULT_MAX_BYTES: 65536;
+export const SHIELDED_ASSET_VAULT_KDF: Readonly<{
+  memoryKiB: 65536;
+  iterations: 3;
+  parallelism: 1;
+}>;
+export interface ShieldedAssetDiscovery {
+  chainId: BigNumberish;
+  factoryAddress: string;
+  factoryDeploymentBlock: number;
+  lineageIndexAddress: string;
+  verifierAddress: string;
+  protocolVersion: 3;
+}
+export function normalizeShieldedAssetDiscovery(
+  input: ShieldedAssetDiscovery[],
+): Array<Omit<ShieldedAssetDiscovery, "chainId"> & { chainId: string }>;
+export function generateShieldedVaultUnlockCredential(): string;
+export interface ShieldedAssetVaultInput {
+  assetRoot: BytesLike;
+  rootSource: "random" | "walletSignature";
+  signatureMetadata?: ShieldedAssetSignatureMetadata;
+  discovery: ShieldedAssetDiscovery[];
+  unlockCredential: string;
+  assetSuite?: 1;
+  branchVersion?: 1;
+  rootGenerationVersion?: 1;
+  fundsFingerprint?: string;
+}
+export function encryptShieldedAssetVault(input: ShieldedAssetVaultInput): Promise<Uint8Array>;
+export function decryptShieldedAssetVault(input: {
+  file: BytesLike;
+  unlockCredential: string;
+  expectedFingerprint?: string;
+}): Promise<{
+  assetRoot: Uint8Array;
+  rootSource: "random" | "walletSignature";
+  signatureMetadata?: ShieldedAssetSignatureMetadata;
+  discovery: Array<Omit<ShieldedAssetDiscovery, "chainId"> & { chainId: string }>;
+  keyMaterial: ShieldedAssetKeyMaterial;
+  verifiedPath: "file";
+  fundsFingerprint: string;
+  assetSuite: 1;
+  branchVersion: 1;
+}>;

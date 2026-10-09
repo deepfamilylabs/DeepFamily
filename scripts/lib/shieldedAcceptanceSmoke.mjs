@@ -19,6 +19,7 @@ import {
   computeShieldedIdentityBudgetTermsCommitment,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
+  computeShieldedDummyInputNullifierForSlot,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
   computeShieldedPeriodNullifier,
@@ -231,6 +232,7 @@ export async function runShieldedAcceptanceSmoke({
         ownerCommitment: String(signals[1]),
         viewKeyLo: String(signals[2]),
         viewKeyHi: String(signals[3]),
+        keyMode: String(signals[4]), identitySuiteId: String(signals[5]), assetSuiteId: String(signals[6]), assetDerivationVersion: String(signals[7]), receiveCodeVersion: String(signals[8]), spendingSecret: String(keys.ownerSecret),
         nameField: String(material.nameField),
         derivedSecretField: String(material.derivedSecretField),
         isBirthBC: Number(material.identity.isBirthBC),
@@ -332,13 +334,14 @@ export async function runShieldedAcceptanceSmoke({
     external = {},
     label = `shielded-action-${action}`,
   ) => {
+    const method = action === "privateTransfer8" ? "privateTransfer" : action === "unshield8" ? "unshield" : action;
     const args =
-      action === "shield"
+      method === "shield"
         ? [external.amount, data, generated.encoded]
-        : action === "unshield"
+        : method === "unshield"
           ? [external.recipient, external.amount, data, generated.encoded]
           : [data, generated.encoded];
-    const receipt = await record(label, await pool[action](...args));
+    const receipt = await record(label, await pool[method](...args));
     if (action === "shield") firstShieldBlock = receipt.blockNumber;
     const events = receipt.logs
       .filter((log) => getAddress(log.address) === getAddress(poolAddress))
@@ -563,6 +566,7 @@ export async function runShieldedAcceptanceSmoke({
       scope,
     );
     const budgetFields = {
+      keyMode: 0n,
       ...policyFields,
       heirIdentityCommitment,
       eligibleFrom,
@@ -609,6 +613,7 @@ export async function runShieldedAcceptanceSmoke({
     };
     const fundInputs = publicInputsFor("fund", fundData);
     const commonFunding = {
+      keyMode: "0",
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
       rate: String(rate),
@@ -628,6 +633,7 @@ export async function runShieldedAcceptanceSmoke({
         ...fundInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
         oldBudgetKind: "0",
+        oldKeyMode: "0",
         oldHeirOwnerCommitment: "0",
         oldBudgetRemaining: "0",
         oldBudgetRemainingPeriods: "0",
@@ -681,6 +687,7 @@ export async function runShieldedAcceptanceSmoke({
         ...additionalFundingInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
         oldBudgetKind: "0",
+        oldKeyMode: "0",
         oldHeirOwnerCommitment: String(heirOwnerCommitment),
         oldBudgetRemaining: "1200",
         oldBudgetRemainingPeriods: "12",
@@ -726,16 +733,16 @@ export async function runShieldedAcceptanceSmoke({
 
     // Public addressing creates a note in the same tree, spending donor VALUE.
     // Only this identity note's fields are public; private rule openings stay local.
+    const publicPolicySalt = generateShieldedRandomField();
+    const publicAllocationKey = generateShieldedRandomField();
+    const publicAllocationKeyCommitment = computeShieldedAllocationKeyCommitment(publicAllocationKey, scope);
+    const publicPolicyCommitment = computeShieldedPolicyCommitment({ ...policyFields, policySalt: publicPolicySalt, allocationKeyCommitment: publicAllocationKeyCommitment }, scope);
+    const publicEnrollmentCommitment = computeShieldedEnrollmentCommitment({ policyCommitment: publicPolicyCommitment, heirIdentityCommitment, eligibleFrom, enrollmentSalt }, scope);
     const identityBudgetFields = {
-      binding: "identity",
-      rootIdentityCommitment,
-      rootVersionIndex: 1n,
-      heirIdentityCommitment,
-      amountPerPeriod: rate,
-      periodDays: PERIOD_DAYS,
-      eligibleFrom,
-      policyCommitment,
-      enrollmentCommitment,
+      binding: "identity", keyMode: 0n,
+      rootIdentityCommitment, rootVersionIndex: 1n, heirIdentityCommitment,
+      amountPerPeriod: rate, periodDays: PERIOD_DAYS, eligibleFrom,
+      policyCommitment: publicPolicyCommitment, enrollmentCommitment: publicEnrollmentCommitment,
     };
     const identityBudgetNote = async (remaining, clear = false) => {
       const note = { ...identityBudgetFields, remaining, nonce: generateShieldedRandomField() };
@@ -774,67 +781,18 @@ export async function runShieldedAcceptanceSmoke({
     const publicBudget = await identityBudgetNote(1500n, true);
     const publicFundChange = await valueNote(donorKeys, 500n);
     const publicDonorPath = await notePath(additionalFundingChange);
-    const publicTemplatePath = await notePath(budget);
-    const publicUseNonce = generateShieldedRandomField();
     const publicFundData = {
-      ...zeroData(),
-      fundMode: 1n,
-      budgetKind: 1n,
-      ...inputs(
-        [publicDonorPath, publicTemplatePath],
-        [
-          spend(additionalFundingChange),
-          computeShieldedBudgetUseNullifier(
-            {
-              policySalt,
-              budgetNoteCommitment: budget.commitment,
-              useNonce: publicUseNonce,
-            },
-            scope,
-          ),
-        ],
-      ),
-      ...outputs([publicBudget, publicFundChange]),
+      ...zeroData(), fundMode: 0n, budgetKind: 1n,
+      ...inputs([publicDonorPath, publicDonorPath], [spend(additionalFundingChange), computeShieldedEnrollmentNullifier({ allocationKey: publicAllocationKey, policyCommitment: publicPolicyCommitment, heirIdentityCommitment }, scope)]),
+      ...outputs([publicBudget, publicFundChange]), relation0: endorsement.root, relation1: trusted.root, asOf,
     };
     const publicFundInputs = publicInputsFor("fund", publicFundData);
-    const publicFundProof = await prove(
-      "fund",
-      {
-        ...commonFunding,
-        ...donorWitness(additionalFundingChange, publicDonorPath),
-        ...publicFundInputs.witness,
-        heirOwnerCommitment: "0",
-        allocationKeyCommitment: String(allocationKeyCommitment),
-        oldBudgetKind: "0",
-        oldHeirOwnerCommitment: String(heirOwnerCommitment),
-        oldBudgetRemaining: "1200",
-        oldBudgetRemainingPeriods: "12",
-        oldBudgetNonce: String(budget.nonce),
-        oldBudgetCiphertextHash: String(budget.ciphertextHashField),
-        oldBudgetDepth: publicTemplatePath.depth,
-        oldBudgetIndex: publicTemplatePath.index,
-        oldBudgetSiblings: publicTemplatePath.siblings,
-        budgetUseNonce: String(publicUseNonce),
-        allocationKey: "0",
-        heirVersionIndex: "0",
-        fatherIdentityCommitment: "0",
-        motherIdentityCommitment: "0",
-        rootIsMother: "0",
-        endorser: "0",
-        writtenAt: "0",
-        endorsementDepth: "0",
-        endorsementIndex: "0",
-        endorsementSiblings: Array(64).fill("0"),
-        trustedDepth: "0",
-        trustedIndex: "0",
-        trustedSiblings: Array(64).fill("0"),
-        budgetPeriods: "15",
-        budgetNonce: String(publicBudget.nonce),
-        changeNonce: String(publicFundChange.nonce),
-      },
-      publicFundInputs.signals,
-      { label: "shielded-action-fund-identity" },
-    );
+    const publicFundProof = await prove("fund", {
+      ...commonFunding, ...lineageWitness, ...donorWitness(additionalFundingChange, publicDonorPath), ...publicFundInputs.witness,
+      heirOwnerCommitment: "0", keyMode: "0", policySalt: String(publicPolicySalt), allocationKeyCommitment: String(publicAllocationKeyCommitment), allocationKey: String(publicAllocationKey),
+      oldBudgetKind: "0", oldKeyMode: "0", oldHeirOwnerCommitment: "0", oldBudgetRemaining: "0", oldBudgetRemainingPeriods: "0", oldBudgetNonce: "0", oldBudgetCiphertextHash: "0", oldBudgetDepth: "0", oldBudgetIndex: "0", oldBudgetSiblings: Array(32).fill("0"), budgetUseNonce: "0",
+      heirVersionIndex: "1", budgetPeriods: "15", budgetNonce: String(publicBudget.nonce), changeNonce: String(publicFundChange.nonce),
+    }, publicFundInputs.signals, { label: "shielded-action-fund-identity" });
     await submit(
       "fund",
       publicFundData,
@@ -889,6 +847,7 @@ export async function runShieldedAcceptanceSmoke({
         versionIndex: "1",
         budgetKind: "0",
         secondBudgetKind: "0",
+        keyMode: "0", secondKeyMode: "0", ownerSecret: String(childKeys.ownerSecret),
         policyCommitmentInput: String(policyCommitment),
         enrollmentCommitmentInput: String(enrollmentCommitment),
         policySalt: String(policySalt),
@@ -940,7 +899,7 @@ export async function runShieldedAcceptanceSmoke({
         [publicClaimPath, publicClaimPath],
         [spend(publicBudget), dummySpend(publicBudget)],
       ),
-      periodNullifiers: claimData.periodNullifiers,
+      periodNullifiers: Array.from({ length: 12 }, (_, index) => computeShieldedPeriodNullifier({ derivedSecretField: childMaterial.derivedSecretField, policyCommitment: publicPolicyCommitment, periodIndex: BigInt(index) }, scope)),
       ...outputs([identityRemainder, identityPayout]),
       relation0: endorsement.root,
       relation1: trusted.root,
@@ -963,8 +922,9 @@ export async function runShieldedAcceptanceSmoke({
         versionIndex: "1",
         budgetKind: "1",
         secondBudgetKind: "0",
-        policyCommitmentInput: String(policyCommitment),
-        enrollmentCommitmentInput: String(enrollmentCommitment),
+        keyMode: "0", secondKeyMode: "0", ownerSecret: String(childKeys.ownerSecret),
+        policyCommitmentInput: String(publicPolicyCommitment),
+        enrollmentCommitmentInput: String(publicEnrollmentCommitment),
         policySalt: "0",
         allocationKeyCommitment: "0",
         enrollmentSalt: "0",
@@ -1071,12 +1031,55 @@ export async function runShieldedAcceptanceSmoke({
       recipient: signerAddress,
     });
 
+    // Exercise both large-capacity routes as actual pool transactions. The public array
+    // shape fixes the verifier route even when this fixture enables only one real note.
+    const largePrivateInputs = (source, path) => ({
+      inputEnabled: ["1", ...Array(7).fill("0")],
+      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(7).fill("0")],
+      inputAmounts: [String(source.amount), ...Array(7).fill("0")],
+      inputNonces: [String(source.nonce), ...Array(7).fill("0")],
+      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(7).fill("0")],
+      inputDepths: [path.depth, ...Array(7).fill("0")],
+      inputIndices: [path.index, ...Array(7).fill("0")],
+      inputSiblings: [path.siblings, ...Array.from({length:7},()=>Array(32).fill("0"))],
+    });
+    const largeData = (source,path,outputNotes) => ({
+      ...zeroData(),
+      inputShardIds:Array(8).fill(path.shardId),
+      inputRoots:Array(8).fill(path.root),
+      inputNullifiers:Array.from({length:8},(_,index)=>index===0 ? spend(source) :
+        computeShieldedDummyInputNullifierForSlot(source.keys.ownerSecret,source.commitment,index,scope)),
+      ...outputs(outputNotes),
+    });
+    const largeTransferSource = unshieldOutputs[0];
+    const largeTransferPath = await notePath(largeTransferSource);
+    const largeTransferOutputs = await Promise.all([valueNote(childKeys,300n),valueNote(childKeys,0n)]);
+    const largeTransferData = largeData(largeTransferSource,largeTransferPath,largeTransferOutputs);
+    const largeTransferPublic = publicInputsFor("privateTransfer8",largeTransferData);
+    const largeTransferProof = await prove("privateTransfer8",{
+      ...largeTransferPublic.witness,...largePrivateInputs(largeTransferSource,largeTransferPath),
+      outputOwnerCommitments:decimals(largeTransferOutputs.map((note)=>note.ownerCommitment)),
+      outputAmounts:decimals(largeTransferOutputs.map((note)=>note.amount)),
+      outputNonces:decimals(largeTransferOutputs.map((note)=>note.nonce)),
+    },largeTransferPublic.signals);
+    await submit("privateTransfer8",largeTransferData,largeTransferProof,largeTransferOutputs);
+    const largeExitSource = largeTransferOutputs[0];
+    const largeExitPath = await notePath(largeExitSource);
+    const largeExitOutputs = await Promise.all([valueNote(childKeys,200n),valueNote(childKeys,0n)]);
+    const largeExitData = largeData(largeExitSource,largeExitPath,largeExitOutputs);
+    const largeExitPublic = publicInputsFor("unshield8",largeExitData,{amount:unshieldedAmount,recipient:signerAddress});
+    const largeExitProof = await prove("unshield8",{
+      ...largeExitPublic.witness,...largePrivateInputs(largeExitSource,largeExitPath),
+      changeAmount:"200",changeNonce:String(largeExitOutputs[0].nonce),dummyNonce:String(largeExitOutputs[1].nonce),
+    },largeExitPublic.signals);
+    await submit("unshield8",largeExitData,largeExitProof,largeExitOutputs,{amount:unshieldedAmount,recipient:signerAddress});
+
     const totalShieldedAfter = await pool.totalShielded();
     const poolTokenAfter = await token.balanceOf(poolAddress);
     const signerTokenAfter = await token.balanceOf(signerAddress);
-    assert.equal(totalShieldedAfter - totalShieldedBefore, shieldedAmount - unshieldedAmount);
-    assert.equal(poolTokenAfter - poolTokenBefore, shieldedAmount - unshieldedAmount);
-    assert.equal(signerTokenBefore - signerTokenAfter, shieldedAmount - unshieldedAmount);
+    assert.equal(totalShieldedAfter - totalShieldedBefore, shieldedAmount - 2n * unshieldedAmount);
+    assert.equal(poolTokenAfter - poolTokenBefore, shieldedAmount - 2n * unshieldedAmount);
+    assert.equal(signerTokenBefore - signerTokenAfter, shieldedAmount - 2n * unshieldedAmount);
     assert.ok(
       poolTokenAfter >= totalShieldedAfter,
       "Pool custody does not cover shielded liabilities",
@@ -1153,7 +1156,7 @@ export async function runShieldedAcceptanceSmoke({
           claimProof: identityClaimProof.evidence,
         },
         shieldedAmount: String(shieldedAmount),
-        unshieldedAmount: String(unshieldedAmount),
+        unshieldedAmount: String(2n * unshieldedAmount),
         totalShieldedBefore: String(totalShieldedBefore),
         totalShieldedAfter: String(totalShieldedAfter),
         poolTokenBefore: String(poolTokenBefore),

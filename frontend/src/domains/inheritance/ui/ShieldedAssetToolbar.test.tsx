@@ -28,6 +28,16 @@ const propsFor = (
 });
 
 describe("ShieldedAssetToolbar", () => {
+  it("keeps an asset selectable when its token precision is unavailable", () => {
+    const props = propsFor({
+      importedAssets: [
+        { address: TOKEN, kind: "erc20", symbol: "TOKEN", decimals: null, token: null },
+      ],
+    });
+    render(<ShieldedAssetToolbar {...props} />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: TOKEN } });
+    expect(props.onSelect).toHaveBeenCalledWith(TOKEN);
+  });
   it("shows one compact asset selector and hides token import until requested", () => {
     render(<ShieldedAssetToolbar {...propsFor()} />);
     expect(screen.getByRole("combobox", { name: "shielded.assets.label" })).toBeTruthy();

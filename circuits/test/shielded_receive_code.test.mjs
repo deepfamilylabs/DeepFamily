@@ -8,6 +8,7 @@ import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import {
   buildShieldedReceiveCodePublicSignals,
+  computeShieldedOwnerCommitment,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
 } from "@deepfamily/protocol-core";
@@ -56,6 +57,7 @@ test("a receive code proves the identity holder chose the owner and viewing keys
       ownerCommitment: String(publicSignals[1]),
       viewKeyLo: String(publicSignals[2]),
       viewKeyHi: String(publicSignals[3]),
+      keyMode: "0", identitySuiteId: "1", assetSuiteId: "1", assetDerivationVersion: "1", receiveCodeVersion: "2", spendingSecret: String(keys.ownerSecret),
       nameField: lineage.nameField,
       derivedSecretField: lineage.derivedSecretField,
       isBirthBC: lineage.isBirthBC,
@@ -67,7 +69,7 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     };
     const wires = await calculator.calculateWitness(witness, 1);
     assert.equal(wires[0], 1n);
-    assert.deepEqual(wires.slice(1, 5), publicSignals);
+    assert.deepEqual(wires.slice(1, 10), publicSignals);
     const invalid = async (change) => {
       const changed = { ...witness, ...change };
       const originalError = console.error;
@@ -85,6 +87,19 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     await invalid({ ownerCommitment: String(keys.ownerCommitment + 1n) });
     await invalid({ viewKeyLo: "0", viewKeyHi: "0" });
     await invalid({ viewKeyHi: String(1n << 128n) });
+    const independent = { ...witness, keyMode: "1", spendingSecret: "987654321", ownerCommitment: String(computeShieldedOwnerCommitment(987654321n)) };
+    assert.equal((await calculator.calculateWitness(independent, 1))[0], 1n);
+    const independentInvalid = async (change) => {
+      const originalError = console.error; console.error = () => {};
+      try { await assert.rejects(() => calculator.calculateWitness({ ...independent, ...change }, 1)); } finally { console.error = originalError; }
+    };
+    await independentInvalid({ keyMode: "0" });
+    await independentInvalid({ keyMode: "2" });
+    await independentInvalid({ spendingSecret: "0" });
+    await independentInvalid({ assetSuiteId: "2" });
+    await independentInvalid({ assetDerivationVersion: "2" });
+    await independentInvalid({ receiveCodeVersion: "1" });
+    await independentInvalid({ identitySuiteId: "2" });
   } finally {
     fs.rmSync(output, { recursive: true, force: true });
   }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Contract, Signer } from "ethers";
+import type { Groth16Proof } from "../../../shared/zk/zk";
 import {
   submitFund,
   submitClaim,
@@ -7,6 +8,7 @@ import {
   submitShield,
   submitUnshield,
   type ShieldedPoolActionData,
+  type ShieldedSubmissionAnchor,
 } from "./shieldedPoolFlows";
 
 const mocks = vi.hoisted(() => ({ zkWorkerCall: vi.fn() }));
@@ -68,6 +70,8 @@ function fixture() {
   const provider = {
     getNetwork: vi.fn(async () => ({ chainId })),
     getBalance: vi.fn(async () => gasBalance),
+    getTransactionCount: vi.fn(async () => 9),
+    getBlockNumber: vi.fn(async () => 77),
     getFeeData: vi.fn(async () => ({ maxFeePerGas: 1_000_000_000n, gasPrice: null })),
   };
   const signer = {
@@ -109,6 +113,172 @@ beforeEach(() => {
 });
 
 describe("shielded pool local proof and self-submit flows", () => {
+  it("waits for fee review before sending and rechecks the chain afterwards", async () => {
+    const f = fixture();
+    let continueReview!: () => void;
+    const onGasEstimate = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          continueReview = resolve;
+        }),
+    );
+    const pending = submitPrivateTransfer({ ...f.common, onGasEstimate });
+    while (!onGasEstimate.mock.calls.length) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onGasEstimate).toHaveBeenCalledWith({
+      gasEstimate: 100_000n,
+      gasLimit: 120_000n,
+      maximumGasPrice: 1_000_000_000n,
+      maximumGasFee: 120_000_000_000_000n,
+    });
+    expect(f.methods.privateTransfer).not.toHaveBeenCalled();
+    f.setChainId(1n);
+    const rejected = expect(pending).rejects.toThrow("wrong network");
+    continueReview();
+    await rejected;
+    expect(f.methods.privateTransfer).not.toHaveBeenCalled();
+  });
+
+  it("records a fixed pending nonce after fee approval and sends it with the reviewed fee caps", async () => {
+    const f = fixture();
+    let approve!: () => void;
+    const order: string[] = [];
+    const onGasEstimate = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          approve = resolve;
+        }),
+    );
+    const onSubmitting = vi.fn((anchor: ShieldedSubmissionAnchor) => {
+      order.push("anchor");
+      expect(anchor).toEqual({ nonce: 9, fromBlock: 77, signerAddress: WALLET_ADDRESS });
+      expect(f.methods.privateTransfer).not.toHaveBeenCalled();
+    });
+    const pending = submitPrivateTransfer({
+      ...f.common,
+      onGasEstimate,
+      onSubmitting,
+      onStage: (stage) => {
+        if (stage === "submitting") order.push("current");
+      },
+    });
+    await vi.waitFor(() => expect(onGasEstimate).toHaveBeenCalledOnce());
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
+    expect(onSubmitting).not.toHaveBeenCalled();
+    approve();
+    await pending;
+    expect(f.provider.getTransactionCount).toHaveBeenCalledWith(WALLET_ADDRESS, "pending");
+    expect(f.provider.getBlockNumber).toHaveBeenCalledOnce();
+    expect(order).toEqual(["current", "anchor"]);
+    expect(
+      f.methods.privateTransfer.mock.calls[0][f.methods.privateTransfer.mock.calls[0].length - 1],
+    ).toEqual({
+      nonce: 9,
+      chainId: 71n,
+      gasLimit: 120_000n,
+      maxFeePerGas: 1_000_000_000n,
+      maxPriorityFeePerGas: 0n,
+    });
+  });
+
+  it("rechecks caller state after pending-nonce reads before marking or sending a transaction", async () => {
+    const f = fixture();
+    let release!: (nonce: number) => void;
+    f.provider.getTransactionCount.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    let locked = false;
+    const onSubmitting = vi.fn();
+    const pending = submitPrivateTransfer({
+      ...f.common,
+      onSubmitting,
+      onStage: (stage) => {
+        if (stage === "submitting" && locked)
+          throw new Error("Locked while reading the transaction nonce");
+      },
+    });
+    await vi.waitFor(() => expect(f.provider.getTransactionCount).toHaveBeenCalledOnce());
+    locked = true;
+    const rejection = expect(pending).rejects.toThrow("Locked while reading");
+    release(9);
+    await rejection;
+    expect(onSubmitting).not.toHaveBeenCalled();
+    expect(f.methods.privateTransfer).not.toHaveBeenCalled();
+  });
+
+  it("binds a native deposit to the reviewed chain even if the wallet switches during nonce lookup", async () => {
+    const f = fixture();
+    f.provider.getTransactionCount.mockImplementationOnce(async () => {
+      f.setChainId(72n);
+      return 9;
+    });
+    await submitShield({ ...f.common, assetKind: "native", amount: 100n, onSubmitting: vi.fn() });
+    const overrides = f.methods.shield.mock.calls[0][f.methods.shield.mock.calls[0].length - 1];
+    expect(overrides).toMatchObject({ chainId: 71n, nonce: 9, value: 100n });
+  });
+
+  it("leaves nonce choice unchanged when submission tracking is not requested", async () => {
+    const f = fixture();
+    await submitPrivateTransfer(f.common);
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
+    expect(
+      f.methods.privateTransfer.mock.calls[0][f.methods.privateTransfer.mock.calls[0].length - 1],
+    ).not.toHaveProperty("nonce");
+  });
+
+  it("retains the submission anchor when the wallet's broadcast result is unknown", async () => {
+    const f = fixture();
+    const onSubmitting = vi.fn(),
+      onBroadcast = vi.fn();
+    f.methods.privateTransfer.mockRejectedValueOnce(
+      new Error("Wallet disconnected before returning a hash"),
+    );
+    await expect(submitPrivateTransfer({ ...f.common, onSubmitting, onBroadcast })).rejects.toThrow(
+      "disconnected",
+    );
+    expect(onSubmitting).toHaveBeenCalledOnce();
+    expect(onSubmitting).toHaveBeenCalledWith({
+      nonce: 9,
+      fromBlock: 77,
+      signerAddress: WALLET_ADDRESS,
+    });
+    expect(onBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("submits an asset-worker proof without a main-thread witness and reports broadcast immediately", async () => {
+    const f = fixture();
+    const onBroadcast = vi.fn();
+    const preparedProof = { ...PROOF, protocol: "groth16", curve: "bn128" } as Groth16Proof;
+    await submitPrivateTransfer({ ...f.common, witness: undefined, preparedProof, onBroadcast });
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
+    expect(onBroadcast).toHaveBeenCalledWith("0xprivateTransfer");
+    await expect(submitPrivateTransfer({ ...f.common, preparedProof })).rejects.toThrow(
+      "must not include a witness",
+    );
+  });
+
+  it("selects eight-input keys while preserving the transfer and exit contract methods", async () => {
+    for (const action of ["privateTransfer", "unshield"] as const) {
+      const f = fixture();
+      const data = {
+        ...f.common.data,
+        inputShardIds: Array(8).fill(0n),
+        inputRoots: Array(8).fill(123n),
+        inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(i + 1)),
+      };
+      if (action === "privateTransfer") await submitPrivateTransfer({ ...f.common, data });
+      else await submitUnshield({ ...f.common, data, recipient: RECIPIENT, amount: 75n });
+      expect(mocks.zkWorkerCall.mock.lastCall?.[1].circuit).toBe(`${action}8`);
+      expect(mocks.zkWorkerCall.mock.lastCall?.[1].expectedPublicSignals).toHaveLength(
+        action === "privateTransfer" ? 30 : 32,
+      );
+      expect(f.methods[action]).toHaveBeenCalledOnce();
+    }
+  });
   it("sends the native deposit amount for both estimation and submission", async () => {
     const f = fixture();
     const amount = 10n ** 17n;
@@ -118,7 +288,10 @@ describe("shielded pool local proof and self-submit flows", () => {
     });
     expect(f.methods.shield.mock.calls[0][f.methods.shield.mock.calls[0].length - 1]).toEqual({
       value: amount,
+      chainId: 71n,
       gasLimit: 120_000n,
+      maxFeePerGas: 1_000_000_000n,
+      maxPriorityFeePerGas: 0n,
     });
   });
 
@@ -163,7 +336,7 @@ describe("shielded pool local proof and self-submit flows", () => {
       100n,
       expect.objectContaining({ outputCommitments: [123n, 456n] }),
       expect.stringMatching(/^0x[0-9a-f]{512}$/),
-      { gasLimit: 120_000n },
+      { chainId: 71n, gasLimit: 120_000n, maxFeePerGas: 1_000_000_000n, maxPriorityFeePerGas: 0n },
     );
     expect(f.common.pool.connect).toHaveBeenCalledWith(f.common.signer);
     expect(f.provider.getBalance).toHaveBeenCalledWith(WALLET_ADDRESS);
