@@ -120,7 +120,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   function assetKind() external pure virtual returns (uint8);
 
   function protocolVersion() external pure returns (uint256) {
-    return 3;
+    return 1;
   }
 
   function _validateAmount(uint256 amount) internal pure {
@@ -414,7 +414,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (
       envelope.length != CIPHERTEXT_BYTES ||
       bytes4(envelope[:4]) != 0x4446534e ||
-      uint8(envelope[4]) != 3 ||
+      uint8(envelope[4]) != 1 ||
       uint8(envelope[5]) != 5
     ) revert InvalidCiphertext();
     uint256[10] memory widths = [uint256(32), 8, 32, 16, 8, 32, 32, 16, 32, 4];

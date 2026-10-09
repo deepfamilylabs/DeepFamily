@@ -35,6 +35,20 @@ const identity = {
   birthDay: 1,
   isBirthBC: false,
 };
+const context = {
+  rpcUrl: "http://localhost:8545",
+  chainId: "31337",
+  factoryAddress: "0x1111111111111111111111111111111111111111",
+  factoryDeploymentBlock: 1,
+  familyAddress: "0x2222222222222222222222222222222222222222",
+  lineageIndexAddress: "0x3333333333333333333333333333333333333333",
+  poolAddress: "0x4444444444444444444444444444444444444444",
+  poolDeploymentBlock: 2,
+  assetKind: "native" as const,
+};
+function respond(worker: FakeWorker, result: unknown) {
+  worker.emit("message", { id: worker.clones[worker.clones.length - 1].id, ok: true, result });
+}
 describe("asset Worker secret lifetime", () => {
   beforeEach(() => {
     terminateShieldedAssetWorker();
@@ -121,5 +135,129 @@ describe("asset Worker secret lifetime", () => {
     expect(listener).toHaveBeenCalledOnce();
     expect(getShieldedAssetWorkerGeneration()).toBeGreaterThan(before);
     unsubscribe();
+  });
+  it("keeps the new-wallet backup challenge across realm destruction until manual restore", async () => {
+    const fingerprint = `0x${"ab".repeat(32)}`;
+    const created = shieldedAssetWorkerCall("createFunds", {
+      intent: "create",
+      rootSource: "random",
+      context,
+    });
+    respond(FakeWorker.instances[0], {
+      funds: { fundsFingerprint: fingerprint, backupRequired: true },
+    });
+    await created;
+    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toContain(fingerprint);
+    terminateShieldedAssetWorker();
+
+    const restored = shieldedAssetWorkerCall("restoreSignature", {
+      signerAddress: context.familyAddress,
+      signature: "signature-secret",
+      expectedFingerprint: fingerprint,
+      context,
+    });
+    const signatureWorker = FakeWorker.instances[1];
+    expect(signatureWorker.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
+    expect(signatureWorker.requests[0].params).toBeUndefined();
+    respond(signatureWorker, {
+      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+    });
+    await restored;
+    terminateShieldedAssetWorker();
+
+    const imported = shieldedAssetWorkerCall("importRecoveryMaterial", {
+      format: "shieldedKey",
+      material: "manual-root-secret",
+      expectedFingerprint: fingerprint,
+      context,
+    });
+    const importWorker = FakeWorker.instances[2];
+    expect(importWorker.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
+    expect(importWorker.requests[0].params).toBeUndefined();
+    expect(importWorker.clones[0].params.material).toBe("manual-root-secret");
+    respond(importWorker, {
+      funds: { fundsFingerprint: fingerprint, backupRequired: false, recoveryVerified: true },
+    });
+    await imported;
+    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1") ?? "").not.toContain(
+      fingerprint,
+    );
+    terminateShieldedAssetWorker();
+
+    const reopened = shieldedAssetWorkerCall("restoreSignature", {
+      signerAddress: context.familyAddress,
+      signature: "other-signature-secret",
+      expectedFingerprint: fingerprint,
+      context,
+    });
+    const next = FakeWorker.instances[3];
+    expect(next.clones[0].params.pendingBackupFingerprints).not.toContain(fingerprint);
+    respond(next, { identity: null, funds: null });
+    await reopened;
+  });
+  it("does not clear the backup challenge after an unverified material import", async () => {
+    const fingerprint = `0x${"cd".repeat(32)}`;
+    const created = shieldedAssetWorkerCall("createFunds", {
+      intent: "create",
+      rootSource: "random",
+      context,
+    });
+    respond(FakeWorker.instances[0], {
+      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+    });
+    await created;
+    terminateShieldedAssetWorker();
+    const candidate = shieldedAssetWorkerCall("importRecoveryMaterial", {
+      format: "mnemonic",
+      material: "candidate words",
+      context,
+    });
+    const next = FakeWorker.instances[1];
+    expect(next.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
+    respond(next, {
+      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+    });
+    await candidate;
+    terminateShieldedAssetWorker();
+    const restored = shieldedAssetWorkerCall("restoreSignature", {
+      signerAddress: context.familyAddress,
+      signature: "candidate-signature-secret",
+      context,
+    });
+    const last = FakeWorker.instances[2];
+    expect(last.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
+    respond(last, { identity: null, funds: null });
+    await restored;
+  });
+  it("reloads only public pending fingerprints for a new client instance", async () => {
+    const fingerprint = `0x${"ef".repeat(32)}`;
+    sessionStorage.setItem(
+      "deepfamily:pending-funds-backups:v1",
+      JSON.stringify([fingerprint, "not-a-fingerprint"]),
+    );
+    vi.resetModules();
+    const reloaded = await import("./shieldedAssetWorkerClient");
+    try {
+      const candidate = reloaded.shieldedAssetWorkerCall("restoreSignature", {
+        signerAddress: context.familyAddress,
+        signature: "reload-signature-secret",
+        context,
+      });
+      const next = FakeWorker.instances[0];
+      expect(next.clones[0].params.pendingBackupFingerprints).toEqual([fingerprint]);
+      respond(next, {
+        funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+      });
+      await candidate;
+      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toBe(
+        JSON.stringify([fingerprint]),
+      );
+      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).not.toContain(
+        "reload-signature-secret",
+      );
+    } finally {
+      reloaded.terminateShieldedAssetWorker();
+      sessionStorage.clear();
+    }
   });
 });

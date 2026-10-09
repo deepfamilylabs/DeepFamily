@@ -55,7 +55,7 @@ test("a receive code round-trips its keys, public signals and proof", async () =
   assert.equal(decoded.identityCommitment, 19n);
   assert.equal(decoded.ownerCommitment, input.ownerCommitment);
   assert.deepEqual(decoded.viewingKey, input.viewingKey);
-  assert.deepEqual(decoded.publicSignals, [19n, input.ownerCommitment, viewKeyLo, viewKeyHi, 0n, 1n, 1n, 1n, 2n]);
+  assert.deepEqual(decoded.publicSignals, [19n, input.ownerCommitment, viewKeyLo, viewKeyHi, 0n, 1n, 1n, 1n, 1n]);
   assert.deepEqual(decoded.proof, proof);
 });
 
@@ -82,7 +82,7 @@ test("typos, truncation, other prefixes and versions are encoding errors", async
     encodingError,
   );
   const version = payload.slice();
-  version[0] = 1;
+  version[0] = 2;
   assert.throws(() => decodeShieldedReceiveCode(codeOf(version)), encodingError);
   assert.throws(() => decodeShieldedReceiveCode(codeOf(payload.subarray(0, 352))), encodingError);
   assert.throws(() => decodeShieldedReceiveCode(42), encodingError);

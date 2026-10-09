@@ -614,7 +614,7 @@ export function buildLineageMerkleProof(
 ): LineageMerkleProof;
 export function buildLineageMerkleProofFromPath(input: LineageMerklePathInput): LineageMerkleProof;
 export type ShieldedScope = { chainId: BigNumberish; poolAddress: string };
-export const SHIELDED_POOL_PROTOCOL_VERSION: 3;
+export const SHIELDED_POOL_PROTOCOL_VERSION: 1;
 export function normalizeShieldedScope(scope: ShieldedScope): {
   chainId: bigint;
   poolAddress: string;
@@ -797,7 +797,7 @@ export function computeShieldedClaimBatch(input: {
 export const SHIELDED_HPKE_ENCAPSULATED_BYTES: 32;
 export const SHIELDED_HPKE_PLAINTEXT_BYTES: 464;
 export const SHIELDED_HPKE_MAX_PAYLOAD_BYTES: 461;
-export const SHIELDED_HPKE_ENVELOPE_VERSION: 2;
+export const SHIELDED_HPKE_ENVELOPE_VERSION: 1;
 export function splitShieldedViewPublicKey(publicKey: BytesLike): {
   viewKeyHi: bigint;
   viewKeyLo: bigint;
@@ -820,7 +820,7 @@ export function decryptShieldedNote(input: {
   poolAddress: string;
 }): Promise<Uint8Array>;
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION: 3;
+export const SHIELDED_NOTE_PAYLOAD_VERSION: 1;
 export const SHIELDED_VALUE_NOTE_KIND: 1;
 export const SHIELDED_BUDGET_NOTE_KIND: 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
@@ -1044,7 +1044,7 @@ export function buildShieldedReceiveCodePublicSignals(
 export function computeShieldedReceiveCodeFingerprint(input: ShieldedReceiveCodeStatement): string;
 
 export const SHIELDED_RECEIVE_CODE_PREFIX: "dfrecv";
-export const SHIELDED_RECEIVE_CODE_VERSION: 2;
+export const SHIELDED_RECEIVE_CODE_VERSION: 1;
 export interface ShieldedReceiveCodeProof {
   pi_a: [string, string, string];
   pi_b: [[string, string], [string, string], [string, string]];
@@ -1165,49 +1165,11 @@ export function computeShieldedAssetFingerprint(input: {
   assetSuite?: 1;
   branchVersion?: 1;
 }): string;
-export const SHIELDED_ASSET_VAULT_VERSION: 1;
-export const SHIELDED_ASSET_VAULT_MAX_BYTES: 65536;
-export const SHIELDED_ASSET_VAULT_KDF: Readonly<{
-  memoryKiB: 65536;
-  iterations: 3;
-  parallelism: 1;
-}>;
-export interface ShieldedAssetDiscovery {
-  chainId: BigNumberish;
-  factoryAddress: string;
-  factoryDeploymentBlock: number;
-  lineageIndexAddress: string;
-  verifierAddress: string;
-  protocolVersion: 3;
-}
-export function normalizeShieldedAssetDiscovery(
-  input: ShieldedAssetDiscovery[],
-): Array<Omit<ShieldedAssetDiscovery, "chainId"> & { chainId: string }>;
-export function generateShieldedVaultUnlockCredential(): string;
-export interface ShieldedAssetVaultInput {
-  assetRoot: BytesLike;
-  rootSource: "random" | "walletSignature";
-  signatureMetadata?: ShieldedAssetSignatureMetadata;
-  discovery: ShieldedAssetDiscovery[];
-  unlockCredential: string;
-  assetSuite?: 1;
-  branchVersion?: 1;
-  rootGenerationVersion?: 1;
-  fundsFingerprint?: string;
-}
-export function encryptShieldedAssetVault(input: ShieldedAssetVaultInput): Promise<Uint8Array>;
-export function decryptShieldedAssetVault(input: {
-  file: BytesLike;
-  unlockCredential: string;
-  expectedFingerprint?: string;
-}): Promise<{
-  assetRoot: Uint8Array;
-  rootSource: "random" | "walletSignature";
-  signatureMetadata?: ShieldedAssetSignatureMetadata;
-  discovery: Array<Omit<ShieldedAssetDiscovery, "chainId"> & { chainId: string }>;
-  keyMaterial: ShieldedAssetKeyMaterial;
-  verifiedPath: "file";
-  fundsFingerprint: string;
-  assetSuite: 1;
-  branchVersion: 1;
-}>;
+/** Encode the exact 32-byte asset root as 24 English BIP39 words, without a password. */
+export function encodeShieldedAssetMnemonic(assetRoot: BytesLike): string;
+/** Decode 24 checksum-valid English words to the original root; no seed or wallet derivation. */
+export function decodeShieldedAssetMnemonic(mnemonic: string): Uint8Array;
+/** Canonical 0x-prefixed 64-hex representation of the complete asset root. */
+export function encodeShieldedAssetKey(assetRoot: BytesLike): string;
+/** Import a complete root from exactly 0x + 64 hex characters, not a spend secret. */
+export function decodeShieldedAssetKey(shieldedKey: string): Uint8Array;

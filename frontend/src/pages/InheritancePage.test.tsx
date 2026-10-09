@@ -127,7 +127,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
                 fundsFingerprint: `0x${"34".repeat(32)}`,
                 rootSource: "random",
                 recoveryVerified: true,
-                recoveryPath: "file",
+                recoveryPath: "shieldedKey",
               },
             })
           }

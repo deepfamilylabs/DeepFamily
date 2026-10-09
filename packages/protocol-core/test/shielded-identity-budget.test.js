@@ -65,7 +65,7 @@ test("budget schemas include the period and compact owner version indices", () =
   assert.equal(payload[5], 5);
   assert.equal(
     keccak256(payload),
-    "0x6f47a912ae715f16984877816e36057ad304648fbd772ccccf38d0d3e75803a6",
+    "0x47b6dc0eb49f7c36a173a29e5b30be29923c76406a56a34e2a9ef867e81cf8d8",
   );
   assert.deepEqual(decodeShieldedNotePayload(payload, context), { kind: "budget", ...budget });
   const original = encodeShieldedBudgetNotePayload(privateBudget, context);
@@ -73,7 +73,7 @@ test("budget schemas include the period and compact owner version indices", () =
   assert.equal(original[5], 2);
   assert.equal(
     keccak256(original),
-    "0xe160105216e5df1d7316b1dea41cd33b82d1f8d86651da207ffe67d852bd1904",
+    "0xc15fb61b579c24ff91895d0f5870742f99dfd08d0f787f53d56c7dbb04253025",
   );
   assert.deepEqual(
     encodeShieldedBudgetNotePayload({ ...privateBudget, binding: "owner" }, context),
@@ -129,7 +129,7 @@ test("public envelope has no private opening or authorization fields and require
     (error) => error.code === "INVALID_SHIELDED_CIPHERTEXT_LENGTH",
   );
   const badVersion = envelope.slice();
-  badVersion[4] = 1;
+  badVersion[4] = 2;
   assert.ok(isPublicShieldedBudgetEnvelope(badVersion));
   assert.throws(
     () => decodePublicShieldedBudgetEnvelope(badVersion, context),
@@ -147,7 +147,7 @@ test("identity commitment binds recipient, every term, amount and opaque rule co
   );
   assert.equal(
     result.noteCommitment,
-    9935951475805404990614914969960552200307540421592346160217758862880639714701n,
+    11156407759303466914979571637995996493729495848126185665261000818669625411524n,
   );
   assert.deepEqual(
     verifyShieldedNotePayload(

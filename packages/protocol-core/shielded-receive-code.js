@@ -6,7 +6,7 @@ import { protocolAssert } from "./errors.js";
 import { buildShieldedReceiveCodePublicSignals } from "./shielded-signals.js";
 
 export const SHIELDED_RECEIVE_CODE_PREFIX = "dfrecv";
-export const SHIELDED_RECEIVE_CODE_VERSION = 2;
+export const SHIELDED_RECEIVE_CODE_VERSION = 1;
 
 /** Proof coordinates are canonical elements of the BN254 base field. */
 const BN254_BASE_FIELD =

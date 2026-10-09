@@ -11,7 +11,7 @@
 **A blockchain-based decentralized digital family tree protocol**
 _Leveraging zero-knowledge proofs and community governance for collaborative family history_
 
-[🏗 Architecture](#-architecture) • [🚀 Quick Start](#-quick-start) • [📖 Documentation](#-documentation) • [🤝 Contributing](#-contributing)
+[🏗 Architecture](#architecture) • [🚀 Quick Start](#quick-start) • [📖 Documentation](#documentation) • [🤝 Contributing](#contributing)
 
 </div>
 
@@ -58,8 +58,9 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ### Family Inheritance
 
 - A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
-- The same `fund` action supports private receive-code delivery and public personHash addressing. Both spend donor VALUE and create BUDGET notes in the same tree. Public addressing discloses its recipient and budget terms without exposing private rule openings; `claim` keeps the input format hidden and encrypts the remainder and payout. Existing private owner binding remains intact.
-- A child proves current lineage eligibility and claims 1–12 complete 30-day periods from one or two compatible budgets into a private note. The remaining budgets are consolidated by that claim. Private transfers and a later public exit are separate transactions. Insufficient budgets do not consume a period.
+- Funding offers public identity addressing, private identity-derived receive codes, and private independent-key receive codes. Each spends donor VALUE and creates child BUDGET notes. Public addressing needs only the child's registered person hash and publishes the recipient and budget terms. Private independent funding binds the recipient's independent funds owner; identity credentials alone cannot derive that funds root.
+- A child proves current lineage eligibility and claims 1–12 matured periods from one or two compatible budgets into a private VALUE note. Each budget fixes its period duration in days at initial funding. Claims preserve the remaining budget terms; private transfers and a public exit are separate transactions. Insufficient budgets do not consume a period.
+- Independent funds default to a random 32-byte root, with wallet-signature derivation as an explicit alternative. The same root is backed up as 24 English recovery words or a Shielded Key. Recovery has three entries: words, Shielded Key, and the original signing wallet. Both creation methods require saving words or a Key and actually re-importing them in a fresh session. Identity-derived keys require no backup; independent-budget claims also require the original identity credentials and current eligibility. See [asset keys and recovery](docs/shielded-asset-key-spec.md) for the exact rules.
 - Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. Each asset has its own balances, budgets and anonymity set.
 
 ## Technology Stack
@@ -151,7 +152,7 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers the two identity/disclosure circuits and all eight protocol-v3 shielded circuits:
+The same `zk:*` workflow covers the two identity/disclosure circuits and all eight shielded circuits:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
@@ -239,7 +240,7 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 8 circuits,
+Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 10 circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
@@ -641,6 +642,7 @@ governance task rejects upgrade and ownership-transfer functions. See
 - [Conflux eSpace Mainnet release](docs/espace-mainnet-release.md) - Guarded Safe and release runbook
 - [Ethereum Mainnet release](docs/ethereum-mainnet-release.md) - Guarded Safe and release runbook
 - [Zero-Knowledge Proofs](docs/zk-proofs.md) - ZK proof system and circuit documentation
+- [Shielded Asset Keys and Recovery](docs/shielded-asset-key-spec.md) - Funds-root derivation, recovery words, Shielded Keys, and backup verification
 - [Frontend Integration](docs/frontend.md) - React component and UI development guide
 - [Frontend Security](docs/frontend-security.md) - Passphrase, Archive unlock, and plaintext cache boundaries
 

@@ -272,7 +272,7 @@ describe("canonical multi-asset discovery", () => {
   it.each([
     { TOKEN: async () => ZeroAddress },
     { assetKind: async () => 1n },
-    { protocolVersion: async () => 1n },
+    { protocolVersion: async () => 2n },
     { LINEAGE_INDEX: async () => ZeroAddress },
     { VERIFIER: async () => ZeroAddress },
   ])("rejects a pool with mismatching immutable configuration %s", async (changes) => {

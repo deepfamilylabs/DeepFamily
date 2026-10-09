@@ -52,7 +52,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
   }),
   createShieldedErc20PoolContract: () => ({}),
   createShieldedNativePoolContract: () => ({
-    protocolVersion: async () => 3n,
+    protocolVersion: async () => 1n,
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
     assetKind: async () => 1n,

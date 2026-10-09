@@ -6,11 +6,11 @@
   "circuits": {
     "receiveCode": {
       "source": "shielded_receive_code",
-      "sourceSha256": "35004a0b7aab32a398b969cb524a4319276d5b96b38a688a217642b7847dccf8",
-      "r1csSha256": "3d4655c542661e797e0f9d800333ee000b1c09fc351dc67721527844f7873a68",
-      "wasmSha256": "34ca8382894e60c207355a7b6d832d94ad2c151c4baecf74710896dc7dbd1245",
-      "zkeySha256": "8fd173a8b5e05785804af03a15b42eb68e0bf33005533f0944cd785cb509a98b",
-      "verificationKeySha256": "34bc6199c79087b70593f3df6297089f52f4e9f7f1ab8ba81ea98baa690a66ef"
+      "sourceSha256": "f9dbfc8222406c406627271eb1bf5b7ff17df3e73c84a27dc10d517c5c46ddf0",
+      "r1csSha256": "c56b087f8804442a75f89b3008196f7e7b8ce12bc38c4cccae1a463b53b838f2",
+      "wasmSha256": "f7926344b2e75b5342a0f8cbaa04afa612da0adeb348785c816758e5c35982c4",
+      "zkeySha256": "caca3a50b844525e13b18e6f0a15b8231703c429e14cfce79a5a4be686931c59",
+      "verificationKeySha256": "fc81f5c27ad52283784ffaba713a57be608f039a595773e4fa18934778e6b97e"
     },
     "shield": {
       "source": "shielded_shield",

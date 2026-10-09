@@ -70,7 +70,7 @@ export async function loadShieldedPoolSnapshot<T>(
   if (!Number.isSafeInteger(toBlock) || toBlock < 0) throw new Error("Invalid shielded scan block");
   const anchor = await provider.getBlock(toBlock);
   if (!anchor?.hash) throw new Error("Shielded pool scan block is unavailable");
-  // Lightweight pre-v3 test doubles have no protocolVersion method. Actual v3
+  // Lightweight test doubles have no protocolVersion method. Actual pool
   // contracts must expose the complete public nullifier count and action ABI.
   const protocolVersion =
     typeof pool.protocolVersion === "function"
@@ -99,8 +99,8 @@ export async function loadShieldedPoolSnapshot<T>(
   const spentEvent = pool.interface.getEvent("NullifierSpent");
   const actionEvent = pool.interface.getEvent("ActionExecuted");
   if (!noteEvent || !spentEvent) throw new Error("Shielded pool ABI is missing public events");
-  if (protocolVersion === 3 && (!actionEvent || typeof pool.nullifierCount !== "function"))
-    throw new Error("Shielded v3 recovery ABI is incomplete");
+  if (protocolVersion === 1 && (!actionEvent || typeof pool.nullifierCount !== "function"))
+    throw new Error("Shielded pool recovery ABI is incomplete");
 
   const shards = previous?.shards ?? new Map<bigint, LineageTree>();
   const ownedNotes = previous?.ownedNotes ?? new Map<bigint, OwnedShieldedNote<T>>();
@@ -151,7 +151,7 @@ export async function loadShieldedPoolSnapshot<T>(
           actionBoundary.outputIndex < 2
             ? actionBoundary
             : undefined;
-        if (protocolVersion === 3 && !boundary)
+        if (protocolVersion === 1 && !boundary)
           throw new Error("Shielded pool action history is incomplete");
         const shardId = BigInt(parsed.args.shardId);
         const leafIndex = BigInt(parsed.args.leafIndex);
@@ -220,7 +220,7 @@ export async function loadShieldedPoolSnapshot<T>(
       }
     }
     if (
-      protocolVersion === 3 &&
+      protocolVersion === 1 &&
       BigInt(await pool.nullifierCount({ blockTag: toBlock })) !== BigInt(spentNullifiers.size)
     )
       throw new Error("Shielded pool nullifier history is incomplete");

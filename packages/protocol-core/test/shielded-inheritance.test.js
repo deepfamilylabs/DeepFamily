@@ -41,7 +41,7 @@ const policyInput = {
   allocationKeyCommitment: computeShieldedAllocationKeyCommitment(41n, scope),
 };
 
-test("shielded v3 commitments and nullifiers match pinned protocol vectors", () => {
+test("shielded commitments and nullifiers match pinned protocol vectors", () => {
   const ciphertextHashField = computeShieldedCiphertextHashField(VECTOR_CIPHERTEXT);
   const heir = deriveShieldedHeirKeyMaterial(13n);
   const policyCommitment = computeShieldedPolicyCommitment(policyInput, scope);

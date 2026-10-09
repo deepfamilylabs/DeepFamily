@@ -52,6 +52,7 @@ import { PanelButton, FieldBlock, PanelShell, shortHex } from "./inheritanceCont
 const INPUT =
   "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
 type Action = ShieldedAssetActionRequest["action"];
+type RecoveryFormat = "mnemonic" | "shieldedKey";
 
 /** React keeps public handles and display amounts. Keys and note openings stay in the asset Worker. */
 export function ShieldedInheritancePanel({
@@ -77,9 +78,8 @@ export function ShieldedInheritancePanel({
   const txCenter = useTransactionCenter();
   const identityForm = useRef<PersonHashCalculatorHandle>(null);
   const recipientForm = useRef<ShieldedRecipientCredentialsFormHandle>(null);
-  const vaultCredential = useRef<HTMLInputElement>(null);
-  const exportedCredential = useRef<HTMLTextAreaElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const exportedMaterial = useRef<HTMLTextAreaElement>(null);
+  const recoveryMaterial = useRef<HTMLTextAreaElement>(null);
   const mounted = useRef(false),
     running = useRef(false),
     job = useRef(0),
@@ -116,9 +116,11 @@ export function ShieldedInheritancePanel({
   const [slot, setSlot] = useState<ShieldedKeySlot>("identity");
   const [rootSource, setRootSource] = useState<"random" | "walletSignature">("random");
   const [expectedFingerprint, setExpectedFingerprint] = useState(""),
-    [downloadedFingerprint, setDownloadedFingerprint] = useState("");
+    [exportedFingerprint, setExportedFingerprint] = useState("");
+  const [backupFormat, setBackupFormat] = useState<RecoveryFormat>("mnemonic");
+  const [verificationStarted, setVerificationStarted] = useState(false);
   const [externalSaved, setExternalSaved] = useState(false),
-    [restorePath, setRestorePath] = useState<"file" | "signature">("file");
+    [restorePath, setRestorePath] = useState<RecoveryFormat | "signature">("mnemonic");
   const [wallet, setWallet] = useState<ShieldedWalletSummary | null>(null);
   const [discovery, setDiscovery] = useState<
     ShieldedAssetWorkerCallMap["discover"]["result"] | null
@@ -161,6 +163,7 @@ export function ShieldedInheritancePanel({
   };
   const contextKey = JSON.stringify(context),
     contextRef = useRef(contextKey);
+  const previousContextKey = useRef(contextKey);
   contextRef.current = contextKey;
   const draftKey = JSON.stringify([
     contextKey,
@@ -170,6 +173,8 @@ export function ShieldedInheritancePanel({
     periodDays,
   ]);
   const hasSession = !!(session.identity || session.funds);
+  const recoveryInfoReady = !!(session.funds?.recoveryVerified || session.funds?.backupRequired);
+  const independentBackupPending = !!exportedFingerprint || !!session.funds?.backupRequired;
   const slotReady = slot === "identity" ? !!session.identity : !!session.funds?.recoveryVerified;
   const showAmount = (value: string) => formatUnits(BigInt(value), modules.tokenDecimals ?? 0);
   const values =
@@ -194,8 +199,8 @@ export function ShieldedInheritancePanel({
   function clearSecretInputs() {
     identityForm.current?.clearSecretInputs();
     recipientForm.current?.clearSecretInputs();
-    if (vaultCredential.current) vaultCredential.current.value = "";
-    if (exportedCredential.current) exportedCredential.current.value = "";
+    if (exportedMaterial.current) exportedMaterial.current.value = "";
+    if (recoveryMaterial.current) recoveryMaterial.current.value = "";
   }
   const clearRef = useRef(clearSecretInputs);
   clearRef.current = clearSecretInputs;
@@ -216,7 +221,10 @@ export function ShieldedInheritancePanel({
     const pagehide = () => lockRef.current();
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", pagehide);
-    const unsubscribeLock = subscribeShieldedAssetWorkerLock(() => gasDecision.current?.(false));
+    const unsubscribeLock = subscribeShieldedAssetWorkerLock(() => {
+      clear();
+      gasDecision.current?.(false);
+    });
     return () => {
       mounted.current = false;
       job.current++;
@@ -255,6 +263,7 @@ export function ShieldedInheritancePanel({
     const previous = previousGasWallet.current;
     previousGasWallet.current = { signer, account };
     if (previous.signer === signer && previous.account === account) return;
+    clearSecretInputs();
     job.current++;
     signatureRequest.current++;
     waitingSignatureRequest.current = null;
@@ -268,6 +277,10 @@ export function ShieldedInheritancePanel({
     void cancelShieldedAssetPreview().catch(() => undefined);
   }, [signer, account]);
   useEffect(() => {
+    if (previousContextKey.current !== contextKey) {
+      previousContextKey.current = contextKey;
+      lockRef.current();
+    }
     setWallet(null);
     setDiscovery(null);
     setCandidates([]);
@@ -383,7 +396,7 @@ export function ShieldedInheritancePanel({
     draftPolicy.current = null;
     setDraftPolicyHandle("");
   }
-  async function requestSignature(intent: "create" | "restore", verifyExisting = false) {
+  async function requestSignature(intent: "create" | "restore") {
     await run(async (current) => {
       if (!signer) throw new Error(t("shielded.walletNotReady"));
       const chosen = signer,
@@ -396,9 +409,9 @@ export function ShieldedInheritancePanel({
       )
         return;
       const requestId = ++signatureRequest.current;
-      const expected = verifyExisting
-        ? session.funds?.fundsFingerprint
-        : expectedFingerprint.trim() || undefined;
+      if (intent === "restore" && independentBackupPending)
+        throw new Error(tr("independentBackupRequired"));
+      const expected = expectedFingerprint.trim() || undefined;
       latestSession.current.lock();
       clearSecretInputs();
       let signature = "";
@@ -443,7 +456,13 @@ export function ShieldedInheritancePanel({
         const state = await pending;
         if (current() && requestId === signatureRequest.current) {
           latestSession.current.update(state);
-          setExpectedFingerprint(state.funds?.fundsFingerprint ?? expected ?? "");
+          if (intent === "create" || expected)
+            setExpectedFingerprint(state.funds?.fundsFingerprint ?? expected ?? "");
+          if (intent === "create") {
+            setExportedFingerprint("");
+            setExternalSaved(false);
+            setVerificationStarted(false);
+          }
           setSlot("asset");
         }
       } finally {
@@ -464,60 +483,83 @@ export function ShieldedInheritancePanel({
       if (current()) {
         latestSession.current.update(state);
         setExpectedFingerprint(state.funds!.fundsFingerprint);
-        setDownloadedFingerprint("");
+        setExportedFingerprint("");
         setExternalSaved(false);
+        setVerificationStarted(false);
         setSlot("asset");
       }
     }, tr("creating"));
   }
-  async function exportFunds() {
+  async function exportRecoveryMaterial() {
     await run(async (current) => {
-      const result = await shieldedAssetWorkerCall("exportFunds", { context });
-      if (!current()) return;
-      const url = URL.createObjectURL(
-        new Blob([result.file.slice().buffer], { type: "application/octet-stream" }),
-      );
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `deepfamily-funds-${result.fundsFingerprint.slice(2, 14)}.dfvault`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      if (exportedCredential.current) exportedCredential.current.value = result.unlockCredential;
-      result.unlockCredential = "";
-      setDownloadedFingerprint(result.fundsFingerprint);
-      setExternalSaved(false);
+      clearSecretInputs();
+      const result = await shieldedAssetWorkerCall("exportRecoveryMaterial", {
+        format: backupFormat,
+        context,
+      });
+      try {
+        if (!current()) return;
+        if (exportedMaterial.current) exportedMaterial.current.value = result.material;
+        setExportedFingerprint(result.fundsFingerprint);
+        setExternalSaved(false);
+        setVerificationStarted(false);
+      } finally {
+        result.material = "";
+      }
     }, tr("exporting"));
   }
-  async function importFunds() {
+  async function importRecoveryMaterial() {
+    if (restorePath === "signature") return;
+    const format = restorePath;
     await run(async (current) => {
-      const file = fileInput.current?.files?.[0];
-      if (!file || file.size > 65_536) throw new Error(tr("fileRequired"));
-      let credential = vaultCredential.current?.value ?? "";
-      if (vaultCredential.current) vaultCredential.current.value = "";
-      if (downloadedFingerprint && !externalSaved) throw new Error(tr("saveExternalFirst"));
-      const fingerprint = downloadedFingerprint || expectedFingerprint.trim() || undefined;
+      if (exportedFingerprint && (!externalSaved || !verificationStarted))
+        throw new Error(tr("saveExternalFirst"));
+      let material = recoveryMaterial.current?.value ?? "";
+      const fingerprint = exportedFingerprint || expectedFingerprint.trim() || undefined;
       latestSession.current.lock();
       clearSecretInputs();
       try {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        if (!current()) return;
-        const pending = shieldedAssetWorkerCall("importFunds", {
-          file: bytes,
-          unlockCredential: credential,
+        const pending = shieldedAssetWorkerCall("importRecoveryMaterial", {
+          format,
+          material,
           expectedFingerprint: fingerprint,
           context,
         });
-        credential = "";
+        material = "";
         const state = await pending;
         if (current()) {
           latestSession.current.update(state);
           setSlot("asset");
-          setDownloadedFingerprint("");
+          if (fingerprint) setExpectedFingerprint(fingerprint);
+          setExportedFingerprint("");
+          setExternalSaved(false);
+          setVerificationStarted(false);
         }
       } finally {
-        credential = "";
+        material = "";
       }
     }, tr("importing"));
+  }
+  function downloadRecoveryInfo() {
+    if (!recoveryInfoReady || !session.funds) return;
+    const fingerprint = session.funds.fundsFingerprint;
+    const info = {
+      format: "DeepFamily funds recovery information",
+      version: 1,
+      fundsFingerprint: fingerprint,
+      chainId: context.chainId,
+      factoryAddress: context.factoryAddress,
+      factoryDeploymentBlock: context.factoryDeploymentBlock,
+      lineageIndexAddress: context.lineageIndexAddress,
+    };
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(info, null, 2)], { type: "application/json" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `deepfamily-recovery-info-${fingerprint.slice(2, 14)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
   async function recover(all = false) {
     await run(async (current) => {
@@ -1003,25 +1045,40 @@ export function ShieldedInheritancePanel({
               {tr("fundsFingerprint")}: {session.funds.fundsFingerprint}
             </p>
             <p className="text-xs">
-              {tr(session.funds.rootSource === "random" ? "randomSource" : "signatureSource")} ·{" "}
-              {tr(session.funds.recoveryVerified ? "verified" : "needsVerification")}
+              {tr(
+                session.funds.rootSource === "random"
+                  ? "randomSource"
+                  : session.funds.rootSource === "walletSignature"
+                    ? "signatureSource"
+                    : "importedSource",
+              )}{" "}
+              · {tr(session.funds.recoveryVerified ? "verified" : "needsVerification")}
             </p>
             {session.funds.signerAddress ? (
               <p className="break-all text-xs">
                 {tr("sourceWallet")}: {session.funds.signerAddress}
               </p>
             ) : null}
-            <p className="text-xs text-ink-muted">
-              {tr(
-                session.funds.rootSource === "random"
-                  ? "randomBackupGate"
-                  : "signatureRecoveryGate",
-              )}
-            </p>
-            {button("export", () => void exportFunds())}
-            {session.funds.rootSource === "walletSignature"
-              ? button("verifyResign", () => void requestSignature("restore", true))
-              : null}
+            <p className="text-xs text-ink-muted">{tr("independentBackupGate")}</p>
+            <FieldBlock label={tr("backupFormat")} htmlFor={`${formId}-backupFormat`}>
+              <select
+                id={`${formId}-backupFormat`}
+                className={INPUT}
+                value={backupFormat}
+                disabled={busy}
+                onChange={(event) => {
+                  clearSecretInputs();
+                  setBackupFormat(event.target.value as RecoveryFormat);
+                  setExportedFingerprint("");
+                  setExternalSaved(false);
+                  setVerificationStarted(false);
+                }}
+              >
+                <option value="mnemonic">{tr("mnemonicFormat")}</option>
+                <option value="shieldedKey">{tr("shieldedKeyFormat")}</option>
+              </select>
+            </FieldBlock>
+            {button("exportRecovery", () => void exportRecoveryMaterial(), !recoveryInfoReady)}
           </div>
         ) : (
           <div className="space-y-3">
@@ -1042,22 +1099,27 @@ export function ShieldedInheritancePanel({
           </div>
         )}
         <div className="space-y-3 border-t border-hairline pt-4">
+          <p className="text-xs text-ink-muted">{tr("recoveryFormatsExplanation")}</p>
+          <p className="text-xs text-ink-muted">{tr("recoveryAuthority")}</p>
           <label className="block text-sm">
-            {tr("backupCredential")}
+            {tr("exportedRecoveryMaterial")}
             <textarea
-              ref={exportedCredential}
+              ref={exportedMaterial}
               readOnly
+              spellCheck={false}
+              autoComplete="off"
               className="mt-1 w-full rounded-lg border border-hairline p-3 font-mono text-xs"
-              aria-label={tr("backupCredential")}
+              aria-label={tr("exportedRecoveryMaterial")}
             />
           </label>
-          <p className="text-xs text-ink-muted">{tr("credentialSeparate")}</p>
-          {downloadedFingerprint ? (
+          <p className="text-xs text-ink-muted">{tr("recoveryMaterialSecret")}</p>
+          {exportedFingerprint ? (
             <>
               <label className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={externalSaved}
+                  disabled={verificationStarted}
                   onChange={(event) => setExternalSaved(event.target.checked)}
                 />
                 {tr("savedExternal")}
@@ -1065,51 +1127,62 @@ export function ShieldedInheritancePanel({
               {button(
                 "beginIndependentImport",
                 () => {
-                  clearSecretInputs();
-                  latestSession.current.lock();
-                  setRestorePath("file");
+                  lock();
+                  setRestorePath(backupFormat);
+                  setVerificationStarted(true);
                 },
-                !externalSaved,
+                !externalSaved || verificationStarted,
               )}
+              {verificationStarted ? (
+                <p role="status" className="text-xs">
+                  {tr("reenterBackup")}
+                </p>
+              ) : null}
             </>
           ) : null}
+          {button("downloadRecoveryInfo", downloadRecoveryInfo, !recoveryInfoReady)}
+          <p className="text-xs text-ink-muted">{tr("recoveryInfoPublic")}</p>
           <FieldBlock label={tr("restorePath")} htmlFor={`${formId}-restorePath`}>
             <select
               id={`${formId}-restorePath`}
               className={INPUT}
               value={restorePath}
               disabled={busy}
-              onChange={(event) => setRestorePath(event.target.value as typeof restorePath)}
+              onChange={(event) => {
+                clearSecretInputs();
+                setRestorePath(event.target.value as typeof restorePath);
+              }}
             >
-              <option value="file">{tr("fileRestore")}</option>
-              <option value="signature">{tr("signatureRestore")}</option>
+              <option value="mnemonic">{tr("mnemonicRestore")}</option>
+              <option value="shieldedKey">{tr("shieldedKeyRestore")}</option>
+              <option value="signature" disabled={independentBackupPending}>
+                {tr("signatureRestore")}
+              </option>
             </select>
           </FieldBlock>
           {field("expectedFingerprint", expectedFingerprint, setExpectedFingerprint)}
-          {restorePath === "file" ? (
+          {restorePath !== "signature" ? (
             <>
               <label className="block text-sm">
-                {tr("file")}
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".dfvault,application/octet-stream"
-                  className="mt-2 block w-full text-sm"
+                {tr(restorePath === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput")}
+                <textarea
+                  key={restorePath}
+                  ref={recoveryMaterial}
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  disabled={busy || (!!exportedFingerprint && !verificationStarted)}
+                  className="mt-1 w-full rounded-lg border border-hairline p-3 font-mono text-xs"
+                  aria-label={tr(restorePath === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput")}
                 />
               </label>
-              <FieldBlock label={tr("unlockCredential")} htmlFor={`${formId}-unlockCredential`}>
-                <input
-                  id={`${formId}-unlockCredential`}
-                  ref={vaultCredential}
-                  type="password"
-                  autoComplete="off"
-                  className={INPUT}
-                />
-              </FieldBlock>
+              <p className="text-xs text-ink-muted">
+                {tr(restorePath === "mnemonic" ? "mnemonicHint" : "shieldedKeyHint")}
+              </p>
               {button(
-                "import",
-                () => void importFunds(),
-                !!downloadedFingerprint && !externalSaved,
+                "importRecovery",
+                () => void importRecoveryMaterial(),
+                !!exportedFingerprint && !verificationStarted,
               )}
             </>
           ) : (
@@ -1118,7 +1191,11 @@ export function ShieldedInheritancePanel({
                 {buildShieldedAssetSigningMessage(account)}
               </pre>
               <p className="text-xs text-ink-muted">{tr("signatureWarning")}</p>
-              {button("restoreSignature", () => void requestSignature("restore"), !signer)}
+              {button(
+                "restoreSignature",
+                () => void requestSignature("restore"),
+                !signer || independentBackupPending,
+              )}
             </>
           )}
         </div>

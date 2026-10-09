@@ -16,7 +16,7 @@ import {
   SHIELDED_CIPHERTEXT_BYTES,
 } from "./shielded-inheritance.js";
 
-export const SHIELDED_NOTE_PAYLOAD_VERSION = 3;
+export const SHIELDED_NOTE_PAYLOAD_VERSION = 1;
 export const SHIELDED_VALUE_NOTE_KIND = 1;
 export const SHIELDED_BUDGET_NOTE_KIND = 2;
 export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 3;

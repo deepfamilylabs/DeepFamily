@@ -28,7 +28,7 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
     IShieldedPoolConfiguration nativeConfiguration = IShieldedPoolConfiguration(nativePool);
     if (
       nativeConfiguration.assetKind() != 1 ||
-      nativeConfiguration.protocolVersion() != 3 ||
+      nativeConfiguration.protocolVersion() != 1 ||
       nativeConfiguration.LINEAGE_INDEX() != lineageIndex ||
       nativeConfiguration.VERIFIER() != verifier
     ) revert InvalidNativePool();

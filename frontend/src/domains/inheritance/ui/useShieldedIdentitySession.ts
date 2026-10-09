@@ -93,6 +93,9 @@ export function useShieldedIdentitySession({
             fundsFingerprint: state.funds.fundsFingerprint,
             rootSource: state.funds.rootSource,
             recoveryVerified: state.funds.recoveryVerified,
+            ...(state.funds.backupRequired === undefined
+              ? {}
+              : { backupRequired: state.funds.backupRequired }),
             ...(state.funds.signerAddress ? { signerAddress: state.funds.signerAddress } : {}),
             ...(state.funds.recoveryPath ? { recoveryPath: state.funds.recoveryPath } : {}),
           }

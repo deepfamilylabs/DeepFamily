@@ -1,4 +1,7 @@
-import type { ShieldedAssetWorkerCallMap } from "./shieldedAssetWorkerTypes";
+import type {
+  ShieldedAssetWorkerCallMap,
+  ShieldedAssetSessionState,
+} from "./shieldedAssetWorkerTypes";
 
 type Pending = {
   resolve: (value: unknown) => void;
@@ -10,6 +13,33 @@ let sequence = 0;
 let generation = 0;
 const pending = new Map<number, Pending>();
 const lockListeners = new Set<() => void>();
+const BACKUP_CHALLENGES_KEY = "deepfamily:pending-funds-backups:v1";
+function readBackupChallenges(): Set<string> {
+  try {
+    const stored: unknown = JSON.parse(sessionStorage.getItem(BACKUP_CHALLENGES_KEY) ?? "[]");
+    if (Array.isArray(stored))
+      return new Set(
+        stored.filter(
+          (value): value is string => typeof value === "string" && /^0x[0-9a-f]{64}$/.test(value),
+        ),
+      );
+  } catch {
+    // Private browsing may disable storage. In-memory protection still applies.
+  }
+  return new Set();
+}
+// Only public fingerprints persist for this tab, including reloads. No key,
+// words, signature, source metadata or secret Worker state is stored here.
+const pendingBackupFingerprints = readBackupChallenges();
+function saveBackupChallenges(): void {
+  try {
+    if (pendingBackupFingerprints.size)
+      sessionStorage.setItem(BACKUP_CHALLENGES_KEY, JSON.stringify([...pendingBackupFingerprints]));
+    else sessionStorage.removeItem(BACKUP_CHALLENGES_KEY);
+  } catch {
+    // A storage failure must not discard the current in-memory challenge.
+  }
+}
 
 export function subscribeShieldedAssetWorkerLock(listener: () => void): () => void {
   lockListeners.add(listener);
@@ -80,6 +110,17 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
     pending.set(id, {
       resolve: (value) => {
         finish();
+        if (
+          method === "createFunds" ||
+          method === "restoreSignature" ||
+          method === "importRecoveryMaterial"
+        ) {
+          const funds = (value as ShieldedAssetSessionState).funds;
+          if (funds?.backupRequired) pendingBackupFingerprints.add(funds.fundsFingerprint);
+          else if (method === "importRecoveryMaterial" && funds?.recoveryVerified)
+            pendingBackupFingerprints.delete(funds.fundsFingerprint);
+          saveBackupChallenges();
+        }
         resolve(value as ShieldedAssetWorkerCallMap[M]["result"]);
       },
       reject: (error) => {
@@ -88,7 +129,14 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
       },
       timer: setTimeout(terminateShieldedAssetWorker, options?.timeoutMs ?? 240_000),
     });
-    const request = { id, method, params: params as unknown };
+    const request = {
+      id,
+      method,
+      params:
+        method === "restoreSignature" || method === "importRecoveryMaterial"
+          ? { ...params, pendingBackupFingerprints: [...pendingBackupFingerprints] }
+          : (params as unknown),
+    };
     try {
       instance.postMessage(request);
     } catch {

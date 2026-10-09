@@ -57,7 +57,7 @@ test("a receive code proves the identity holder chose the owner and viewing keys
       ownerCommitment: String(publicSignals[1]),
       viewKeyLo: String(publicSignals[2]),
       viewKeyHi: String(publicSignals[3]),
-      keyMode: "0", identitySuiteId: "1", assetSuiteId: "1", assetDerivationVersion: "1", receiveCodeVersion: "2", spendingSecret: String(keys.ownerSecret),
+      keyMode: "0", identitySuiteId: "1", assetSuiteId: "1", assetDerivationVersion: "1", receiveCodeVersion: "1", spendingSecret: String(keys.ownerSecret),
       nameField: lineage.nameField,
       derivedSecretField: lineage.derivedSecretField,
       isBirthBC: lineage.isBirthBC,
@@ -98,7 +98,7 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     await independentInvalid({ spendingSecret: "0" });
     await independentInvalid({ assetSuiteId: "2" });
     await independentInvalid({ assetDerivationVersion: "2" });
-    await independentInvalid({ receiveCodeVersion: "1" });
+    await independentInvalid({ receiveCodeVersion: "2" });
     await independentInvalid({ identitySuiteId: "2" });
   } finally {
     fs.rmSync(output, { recursive: true, force: true });

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   receipt: vi.fn(),
   center: null as any,
   busy: vi.fn(),
+  locked: null as (() => void) | null,
 }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("../../config", () => ({ useConfig: () => ({ rpcUrl: "https://rpc.example" }) }));
@@ -27,7 +28,12 @@ vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
   shieldedAssetWorkerCall: mocks.call,
   cancelShieldedAssetPreview: mocks.cancel,
   getShieldedAssetWorkerGeneration: () => mocks.generation,
-  subscribeShieldedAssetWorkerLock: () => () => {},
+  subscribeShieldedAssetWorkerLock: (listener: () => void) => {
+    mocks.locked = listener;
+    return () => {
+      mocks.locked = null;
+    };
+  },
 }));
 vi.mock("./ShieldedIdentitySessionContext", () => ({
   useShieldedPageIdentitySession: () => ({
@@ -142,6 +148,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.funds = null;
     mocks.generation = 0;
     mocks.center = null;
+    mocks.locked = null;
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover" ? emptyWallet : { identity, funds },
     );
@@ -273,20 +280,219 @@ describe("Worker-backed shielded wallet", () => {
     );
     expect(password.value).toBe("");
   });
-  it("failed file import does not invoke root creation", async () => {
-    mocks.call.mockRejectedValue(new Error("bad file"));
+  it("failed Shielded Key import clears its secret without creating a replacement root", async () => {
+    mocks.call.mockRejectedValue(new Error("Invalid funds key"));
     renderPanel();
-    const file = new File(["broken"], "old.dfvault");
-    Object.defineProperty(file, "arrayBuffer", { value: async () => new ArrayBuffer(6) });
-    fireEvent.change(screen.getByLabelText(label("file")), { target: { files: [file] } });
-    fireEvent.change(screen.getByLabelText(label("unlockCredential")), {
-      target: { value: "private-vault-pass" },
+    fireEvent.change(screen.getByLabelText(label("restorePath")), {
+      target: { value: "shieldedKey" },
     });
-    fireEvent.click(screen.getByText(label("import")));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("bad file"));
-    expect(mocks.call).toHaveBeenCalledWith("importFunds", expect.anything());
+    const input = screen.getByLabelText(label("shieldedKeyInput")) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "invalid-private-funds-key" } });
+    fireEvent.click(screen.getByText(label("importRecovery")));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Invalid funds key"));
+    expect(mocks.call).toHaveBeenCalledWith(
+      "importRecoveryMaterial",
+      expect.objectContaining({
+        format: "shieldedKey",
+        material: "invalid-private-funds-key",
+      }),
+    );
     expect(mocks.call.mock.calls.some(([method]) => method === "createFunds")).toBe(false);
-    expect((screen.getByLabelText(label("unlockCredential")) as HTMLInputElement).value).toBe("");
+    expect(input.value).toBe("");
+  });
+  it("offers only words, Shielded Key and signature as normal recovery paths", () => {
+    renderPanel();
+    const select = screen.getByLabelText(label("restorePath")) as HTMLSelectElement;
+    expect(select.value).toBe("mnemonic");
+    expect(Array.from(select.options, (option) => option.value)).toEqual([
+      "mnemonic",
+      "shieldedKey",
+      "signature",
+    ]);
+    expect(screen.queryByText(label("export"))).toBeNull();
+    expect(screen.queryByText(label("verifyResign"))).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+  });
+  it.each(["mnemonic", "shieldedKey"] as const)(
+    "transfers %s directly to the Worker and clears the input before completion",
+    async (format) => {
+      let complete!: (value: any) => void;
+      mocks.call.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      renderPanel();
+      fireEvent.change(screen.getByLabelText(label("restorePath")), { target: { value: format } });
+      const input = screen.getByLabelText(
+        label(format === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput"),
+      ) as HTMLTextAreaElement;
+      fireEvent.change(input, { target: { value: "private-recovery-material" } });
+      fireEvent.click(screen.getByText(label("importRecovery")));
+      await waitFor(() =>
+        expect(mocks.call).toHaveBeenCalledWith(
+          "importRecoveryMaterial",
+          expect.objectContaining({ format, material: "private-recovery-material" }),
+        ),
+      );
+      expect(input.value).toBe("");
+      expect(mocks.lock).toHaveBeenCalled();
+      await act(async () => complete({ identity: null, funds }));
+      expect(mocks.update).toHaveBeenCalled();
+      expect(mocks.call.mock.calls.some(([method]) => method === "createFunds")).toBe(false);
+    },
+  );
+  it("requires an off-device save and manually re-entered backup in a fresh session", async () => {
+    mocks.funds = { ...funds, backupRequired: true };
+    mocks.call.mockImplementation(async (method) =>
+      method === "exportRecoveryMaterial"
+        ? {
+            material: "original-secret-words",
+            format: "mnemonic",
+            version: 1,
+            fundsFingerprint: funds.fundsFingerprint,
+          }
+        : { identity: null, funds: { ...funds, recoveryVerified: true, backupRequired: false } },
+    );
+    renderPanel();
+    fireEvent.click(screen.getByText(label("exportRecovery")));
+    await waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        "exportRecoveryMaterial",
+        expect.objectContaining({ format: "mnemonic" }),
+      ),
+    );
+    const exported = screen.getByLabelText(
+      label("exportedRecoveryMaterial"),
+    ) as HTMLTextAreaElement;
+    const imported = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
+    expect(exported.value).toBe("original-secret-words");
+    expect(imported.value).toBe("");
+    expect((screen.getByText(label("beginIndependentImport")) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByText(label("importRecovery")) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: label("savedExternal") }));
+    fireEvent.click(screen.getByText(label("beginIndependentImport")));
+    expect(mocks.lock).toHaveBeenCalled();
+    expect(exported.value).toBe("");
+    expect(imported.value).toBe("");
+    expect(screen.getByText(label("reenterBackup"))).toBeTruthy();
+    fireEvent.change(imported, { target: { value: "manually-entered-backup" } });
+    fireEvent.click(screen.getByText(label("importRecovery")));
+    await waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith(
+        "importRecoveryMaterial",
+        expect.objectContaining({
+          format: "mnemonic",
+          material: "manually-entered-backup",
+          expectedFingerprint: funds.fundsFingerprint,
+        }),
+      ),
+    );
+    expect(imported.value).toBe("");
+    expect(mocks.call.mock.calls.some(([method]) => method === "restoreSignature")).toBe(false);
+  });
+  it("does not let a newly created signature root replace backup verification by re-signing", () => {
+    mocks.funds = { ...funds, rootSource: "walletSignature", backupRequired: true };
+    renderPanel();
+    const select = screen.getByLabelText(label("restorePath")) as HTMLSelectElement;
+    expect(select.options[2].disabled).toBe(true);
+    expect(screen.queryByText(label("verifyResign"))).toBeNull();
+    expect(screen.getByText(label("exportRecovery"))).toBeTruthy();
+  });
+  it("does not promote a new signature candidate into a trusted original fingerprint", async () => {
+    mocks.call.mockResolvedValue({
+      identity: null,
+      funds: { ...funds, rootSource: "walletSignature" },
+    });
+    renderPanel();
+    fireEvent.change(screen.getByLabelText(label("restorePath")), {
+      target: { value: "signature" },
+    });
+    fireEvent.click(screen.getByText(label("restoreSignature")));
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled());
+    expect((screen.getByLabelText(label("expectedFingerprint")) as HTMLInputElement).value).toBe(
+      "",
+    );
+    expect(mocks.call).toHaveBeenCalledWith(
+      "restoreSignature",
+      expect.objectContaining({
+        expectedFingerprint: undefined,
+      }),
+    );
+  });
+  it("does not export a recovery card for an unverified candidate root", () => {
+    mocks.funds = { ...funds, rootSource: "imported", backupRequired: false };
+    renderPanel();
+    const download = screen.getByText(label("downloadRecoveryInfo")) as HTMLButtonElement;
+    expect(download.disabled).toBe(true);
+    expect((screen.getByText(label("exportRecovery")) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByLabelText(label("expectedFingerprint")) as HTMLInputElement).value).toBe(
+      "",
+    );
+  });
+  it("clears recovery secrets on path changes and manual locking", async () => {
+    mocks.funds = { ...funds, backupRequired: true };
+    mocks.call.mockResolvedValue({
+      material: "secret-root",
+      format: "mnemonic",
+      version: 1,
+      fundsFingerprint: funds.fundsFingerprint,
+    });
+    renderPanel();
+    const input = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "secret-input" } });
+    fireEvent.change(screen.getByLabelText(label("restorePath")), {
+      target: { value: "shieldedKey" },
+    });
+    expect(input.value).toBe("");
+    fireEvent.click(screen.getByText(label("exportRecovery")));
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(label("exportedRecoveryMaterial")) as HTMLTextAreaElement).value,
+      ).toBe("secret-root"),
+    );
+    fireEvent.click(screen.getByText(label("lock")));
+    expect(
+      (screen.getByLabelText(label("exportedRecoveryMaterial")) as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+  it("clears displayed secrets when the Worker is terminated outside this panel", async () => {
+    mocks.funds = { ...funds, backupRequired: true };
+    mocks.call.mockResolvedValue({
+      material: "secret-root",
+      format: "mnemonic",
+      version: 1,
+      fundsFingerprint: funds.fundsFingerprint,
+    });
+    renderPanel();
+    fireEvent.click(screen.getByText(label("exportRecovery")));
+    await waitFor(() =>
+      expect(
+        (screen.getByLabelText(label("exportedRecoveryMaterial")) as HTMLTextAreaElement).value,
+      ).toBe("secret-root"),
+    );
+    act(() => mocks.locked?.());
+    expect(
+      (screen.getByLabelText(label("exportedRecoveryMaterial")) as HTMLTextAreaElement).value,
+    ).toBe("");
+  });
+  it("locks and clears recovery inputs when the selected pool changes", () => {
+    const rendered = renderPanel();
+    const input = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "secret-recovery-input" } });
+    rendered.rerender(
+      <ShieldedInheritancePanel
+        modules={{ ...modules, poolAddress: "0x00000000000000000000000000000000000000bb" }}
+        signer={signer}
+        account={address}
+        publicActivityAddresses={new Set()}
+      />,
+    );
+    expect(mocks.lock).toHaveBeenCalled();
+    expect(input.value).toBe("");
   });
   it("shows failed pool balances as unknown and retains good raw balances", async () => {
     mocks.identity = identity;

@@ -18,11 +18,10 @@ import {
   createShieldedAssetRoot,
   deriveShieldedAssetKeyMaterial,
   deriveShieldedAssetRootFromSignature,
-} from "@deepfamily/protocol-core";
-import {
-  decryptShieldedAssetVault,
-  encryptShieldedAssetVault,
-  generateShieldedVaultUnlockCredential,
+  encodeShieldedAssetMnemonic,
+  decodeShieldedAssetMnemonic,
+  encodeShieldedAssetKey,
+  decodeShieldedAssetKey,
 } from "@deepfamily/protocol-core";
 import { JsonRpcProvider, getAddress, getBigInt, hexlify, type BigNumberish } from "ethers";
 import {
@@ -32,10 +31,7 @@ import {
   createShieldedErc20PoolContract,
   createShieldedNativePoolContract,
 } from "../shared/clients/contractFactory";
-import {
-  getFundingPassphraseError,
-  validatePassphraseStrength,
-} from "../shared/crypto/passphraseStrength";
+import { getFundingPassphraseError } from "../shared/crypto/passphraseStrength";
 import type { IdentityMaterialV1Result } from "../shared/workers/cryptoWorkerClient";
 import type {
   ShieldedAssetWorkerCallMap,
@@ -98,14 +94,6 @@ type Keys = { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string; key
 type SourceMetadata = Awaited<
   ReturnType<typeof deriveShieldedAssetRootFromSignature>
 >["sourceMetadata"];
-type Discovery = {
-  chainId: string;
-  factoryAddress: string;
-  factoryDeploymentBlock: number;
-  lineageIndexAddress: string;
-  verifierAddress: string;
-  protocolVersion: 3;
-};
 type Prepared = {
   data: ShieldedPoolActionData;
   witness: ShieldedWitness;
@@ -116,8 +104,8 @@ const ASSET_METHODS = new Set([
   "unlockIdentity",
   "createFunds",
   "restoreSignature",
-  "exportFunds",
-  "importFunds",
+  "exportRecoveryMaterial",
+  "importRecoveryMaterial",
   "receiveCode",
   "recover",
   "discover",
@@ -151,7 +139,8 @@ export class ShieldedAssetSession {
   private funds: ShieldedPublicFunds | null = null;
   private sourceMetadata: SourceMetadata | undefined;
   private allowHistoryVerification = false;
-  private discovery: Discovery[] = [];
+  private createdHere = false;
+  private knownPendingRoot = false;
   private sequence = 0;
   private scope = "";
   private wallets = new Map<ShieldedKeySlot, LocalShieldedWalletSnapshot>();
@@ -190,10 +179,11 @@ export class ShieldedAssetSession {
     this.funds = null;
     this.sourceMetadata = undefined;
     this.allowHistoryVerification = false;
+    this.createdHere = false;
+    this.knownPendingRoot = false;
     this.wallets.clear();
     this.summary = null;
     this.pending = null;
-    this.discovery = [];
     this.policyDrafts.clear();
     this.scope = "";
   }
@@ -205,7 +195,7 @@ export class ShieldedAssetSession {
     }
     requireValue(
       this.assetKeys && this.funds,
-      "Import the original funds file or restore its signature. A missing root cannot be replaced.",
+      "Restore the original funds mnemonic, Shielded Key or signature. A missing root cannot be replaced.",
     );
     requireValue(
       !requireVerified || this.funds.recoveryVerified,
@@ -292,20 +282,12 @@ export class ShieldedAssetSession {
         getAddress(await factory.poolFor(asset)) === getAddress(ctx.poolAddress),
       "Pool does not belong to the selected protocol.",
     );
-    const discovery: Discovery = {
-      chainId: ctx.chainId,
-      factoryAddress: getAddress(ctx.factoryAddress).toLowerCase(),
-      factoryDeploymentBlock: ctx.factoryDeploymentBlock,
-      lineageIndexAddress: getAddress(ctx.lineageIndexAddress).toLowerCase(),
-      verifierAddress: getAddress(verifierAddress).toLowerCase(),
-      protocolVersion: SHIELDED_POOL_PROTOCOL_VERSION,
-    };
     this.scope = scope;
     return {
       provider,
       factory,
       pool,
-      discovery,
+      verifierAddress: getAddress(verifierAddress).toLowerCase(),
       lineageIndex: createLineageIndexContract(ctx.lineageIndexAddress, provider),
       family,
     };
@@ -313,10 +295,10 @@ export class ShieldedAssetSession {
 
   private async installRoot(
     root: Uint8Array,
-    source: "random" | "walletSignature",
+    source: ShieldedPublicFunds["rootSource"],
     metadata?: SourceMetadata,
     expectedFingerprint?: string,
-    path?: "file" | "signature",
+    path?: "signature" | "mnemonic" | "shieldedKey",
   ) {
     try {
       const keys = await deriveShieldedAssetKeyMaterial(root);
@@ -337,6 +319,8 @@ export class ShieldedAssetSession {
       this.assetKeys = keys;
       this.sourceMetadata = metadata;
       this.allowHistoryVerification = false;
+      this.createdHere = false;
+      this.knownPendingRoot = false;
       this.funds = {
         ownerCommitment: String(keys.ownerCommitment),
         viewingKey: hexlify(keys.viewPublicKey),
@@ -359,7 +343,7 @@ export class ShieldedAssetSession {
       params.intent === "create" && !this.root,
       "Creating a new root requires an explicit new-wallet action and an empty funds slot.",
     );
-    const { discovery } = await this.context(params.context);
+    await this.context(params.context);
     requireValue(
       params.rootSource === "random" || params.rootSource === "walletSignature",
       "Unsupported root source.",
@@ -385,7 +369,8 @@ export class ShieldedAssetSession {
       params.signature = undefined;
       await this.installRoot(generated.assetRoot, "walletSignature", generated.sourceMetadata);
     }
-    this.discovery = [discovery];
+    this.createdHere = true;
+    this.funds!.backupRequired = true;
     return this.state();
   }
 
@@ -394,7 +379,7 @@ export class ShieldedAssetSession {
       !this.root,
       "Clear the original secret session before a real re-sign verification.",
     );
-    const { discovery } = await this.context(params.context);
+    await this.context(params.context);
     const generated = await deriveShieldedAssetRootFromSignature({
       signerAddress: params.signerAddress,
       signature: params.signature,
@@ -407,69 +392,82 @@ export class ShieldedAssetSession {
       params.expectedFingerprint,
       params.expectedFingerprint ? "signature" : undefined,
     );
-    this.allowHistoryVerification = !params.expectedFingerprint;
-    this.discovery = [discovery];
+    const backupRequired = params.pendingBackupFingerprints?.includes(this.funds!.fundsFingerprint);
+    if (backupRequired) {
+      // The client retained this original public fingerprint before locking.
+      // Re-export may resume its backup drill; spending remains gated.
+      this.knownPendingRoot = true;
+      this.funds!.backupRequired = true;
+      this.funds!.recoveryVerified = false;
+      delete this.funds!.recoveryPath;
+    }
+    this.allowHistoryVerification = !params.expectedFingerprint && !backupRequired;
     return this.state();
   }
 
-  async exportFunds(params: ShieldedAssetWorkerCallMap["exportFunds"]["params"]) {
+  async exportRecoveryMaterial(
+    params: ShieldedAssetWorkerCallMap["exportRecoveryMaterial"]["params"],
+  ): Promise<ShieldedAssetWorkerCallMap["exportRecoveryMaterial"]["result"]> {
     requireValue(this.root && this.funds, "Unlock the existing funds root before exporting it.");
     requireValue(
-      !params.unlockCredential || validatePassphraseStrength(params.unlockCredential).isStrong,
-      "Choose a strong separate vault credential, or use the generated random credential.",
+      this.createdHere || this.knownPendingRoot || this.funds.recoveryVerified,
+      "Confirm the original funds fingerprint or owned history before backing up a recovery candidate.",
     );
-    const { discovery } = await this.context(params.context);
-    const contexts = [
-      ...this.discovery.filter(
-        (item) =>
-          !(item.chainId === discovery.chainId && item.factoryAddress === discovery.factoryAddress),
-      ),
-      discovery,
-    ];
-    const unlockCredential = params.unlockCredential || generateShieldedVaultUnlockCredential();
-    const file = await encryptShieldedAssetVault({
-      assetRoot: this.root,
-      rootSource: this.funds.rootSource,
-      signatureMetadata: this.sourceMetadata,
-      discovery: contexts,
-      unlockCredential,
-    });
-    params.unlockCredential = undefined;
-    return { file, unlockCredential, fundsFingerprint: this.funds.fundsFingerprint };
+    requireValue(
+      params.format === "mnemonic" || params.format === "shieldedKey",
+      "Unsupported funds recovery format.",
+    );
+    await this.context(params.context);
+    return {
+      material:
+        params.format === "mnemonic"
+          ? encodeShieldedAssetMnemonic(this.root)
+          : encodeShieldedAssetKey(this.root),
+      format: params.format,
+      version: 1,
+      fundsFingerprint: this.funds.fundsFingerprint,
+    };
   }
 
-  async importFunds(params: ShieldedAssetWorkerCallMap["importFunds"]["params"]) {
-    requireValue(
-      !this.root,
-      "Clear the original secret session before independently importing a funds file.",
-    );
-    const { discovery } = await this.context(params.context);
-    const restored = await decryptShieldedAssetVault({
-      file: params.file,
-      unlockCredential: params.unlockCredential,
-      expectedFingerprint: params.expectedFingerprint,
-    });
-    params.unlockCredential = "";
-    const covered = restored.discovery.some(
-      (item) =>
-        String(item.chainId) === discovery.chainId &&
-        item.factoryAddress.toLowerCase() === discovery.factoryAddress &&
-        item.factoryDeploymentBlock === discovery.factoryDeploymentBlock &&
-        item.lineageIndexAddress.toLowerCase() === discovery.lineageIndexAddress &&
-        item.verifierAddress.toLowerCase() === discovery.verifierAddress &&
-        item.protocolVersion === discovery.protocolVersion,
-    );
-    // A valid old root can be loaded to update its backup. New discovery scope
-    // remains gated until the updated file is independently imported.
-    await this.installRoot(
-      restored.assetRoot,
-      restored.rootSource,
-      restored.signatureMetadata,
-      params.expectedFingerprint,
-      covered ? "file" : undefined,
-    );
-    this.discovery = restored.discovery;
-    return this.state();
+  async importRecoveryMaterial(
+    params: ShieldedAssetWorkerCallMap["importRecoveryMaterial"]["params"],
+  ): Promise<ShieldedAssetSessionState> {
+    let root: Uint8Array | undefined;
+    let material = params.material;
+    params.material = "";
+    try {
+      requireValue(
+        !this.root,
+        "Clear the original secret session before importing recovery material.",
+      );
+      requireValue(
+        params.format === "mnemonic" || params.format === "shieldedKey",
+        "Unsupported funds recovery format.",
+      );
+      root =
+        params.format === "mnemonic"
+          ? decodeShieldedAssetMnemonic(material)
+          : decodeShieldedAssetKey(material);
+      material = "";
+      await this.context(params.context);
+      await this.installRoot(
+        root,
+        "imported",
+        undefined,
+        params.expectedFingerprint,
+        params.expectedFingerprint ? params.format : undefined,
+      );
+      const backupRequired =
+        !params.expectedFingerprint &&
+        params.pendingBackupFingerprints?.includes(this.funds!.fundsFingerprint);
+      this.funds!.backupRequired = !!backupRequired;
+      this.knownPendingRoot = !!backupRequired;
+      this.allowHistoryVerification = !params.expectedFingerprint && !backupRequired;
+      return this.state();
+    } finally {
+      material = "";
+      root?.fill(0);
+    }
   }
 
   async receiveCode(params: ShieldedAssetWorkerCallMap["receiveCode"]["params"]) {
@@ -575,7 +573,13 @@ export class ShieldedAssetSession {
         this.funds &&
         this.allowHistoryVerification &&
         !this.funds.recoveryVerified &&
-        notes.some((event) => event.note.kind === "value" && event.note.amount > 0n)
+        !this.funds.backupRequired &&
+        notes.some(
+          (event) =>
+            event.note.kind === "value" &&
+            event.note.amount > 0n &&
+            event.note.ownerCommitment === this.assetKeys?.ownerCommitment,
+        )
       ) {
         this.funds.recoveryVerified = true;
         this.funds.recoveryPath = "history";
@@ -1134,7 +1138,7 @@ export class ShieldedAssetSession {
     const found = await discoverShieldedFactoryPools(env.factory, env.provider, {
       factoryDeploymentBlock: params.context.factoryDeploymentBlock,
       lineageIndexAddress: params.context.lineageIndexAddress,
-      verifierAddress: env.discovery.verifierAddress,
+      verifierAddress: env.verifierAddress,
       chainId: BigInt(params.context.chainId),
       timeoutMs: 10_000,
     });
@@ -1218,7 +1222,6 @@ export class ShieldedAssetSession {
     } finally {
       if (params && typeof params === "object") {
         if ("rawPassphrase" in params) params.rawPassphrase = "";
-        if ("unlockCredential" in params) params.unlockCredential = "";
         if ("signature" in params) params.signature = "";
       }
     }
@@ -1229,5 +1232,5 @@ export class ShieldedAssetSession {
 export function shieldedAssetErrorMessage(error: unknown): string {
   return error instanceof AssetSessionError
     ? error.message
-    : "Asset operation could not be completed. The original root was not replaced; check the file, credentials, deployment, and chain history.";
+    : "Asset operation could not be completed. The original root was not replaced; check the recovery words, Shielded Key, credentials, deployment, and chain history.";
 }

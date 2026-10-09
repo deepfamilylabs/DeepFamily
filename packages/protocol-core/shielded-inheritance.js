@@ -37,7 +37,7 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   ownerBudgetAuthorization: 1033n,
 });
 
-export const SHIELDED_POOL_PROTOCOL_VERSION = 3;
+export const SHIELDED_POOL_PROTOCOL_VERSION = 1;
 export const SHIELDED_MAX_BATCH_PERIODS = 12;
 export const SHIELDED_CIPHERTEXT_BYTES = 512;
 const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;

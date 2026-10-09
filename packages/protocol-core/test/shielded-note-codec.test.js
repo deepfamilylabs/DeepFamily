@@ -141,7 +141,7 @@ test("payload magic, version, type, length and field ranges are strict", () => {
     (error) => error.code === "INVALID_SHIELDED_NOTE_MAGIC",
   );
   assert.throws(
-    () => decodeShieldedNotePayload(modified(4, 1), context),
+    () => decodeShieldedNotePayload(modified(4, 2), context),
     (error) => error.code === "UNSUPPORTED_SHIELDED_NOTE_VERSION",
   );
   for (const unsupportedKind of [0, 6, 255]) {

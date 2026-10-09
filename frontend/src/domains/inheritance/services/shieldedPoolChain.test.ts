@@ -68,7 +68,7 @@ function fixture() {
 }
 
 describe("shielded pool public event recovery", () => {
-  it("requires v3 action and complete nullifier history at the fixed recovery block", async () => {
+  it("requires action and complete nullifier history at the fixed recovery block", async () => {
     const context = fixture();
     const iface = new Interface([
       ...ABI,
@@ -88,17 +88,17 @@ describe("shielded pool public event recovery", () => {
       transactionHash: hash,
     } as (typeof context.logs)[0];
     context.logs.unshift(action);
-    const v3 = {
+    const versioned = {
       ...context.pool,
       interface: iface,
-      protocolVersion: async () => 3n,
+      protocolVersion: async () => 1n,
       nullifierCount: async () => 1n,
     } as unknown as Contract;
     await expect(
-      loadShieldedPoolSnapshot(v3, async () => null, { fromBlock: 1, toBlock: 1 }),
+      loadShieldedPoolSnapshot(versioned, async () => null, { fromBlock: 1, toBlock: 1 }),
     ).rejects.toThrow("nullifier history");
     const complete = {
-      ...v3,
+      ...versioned,
       nullifierCount: async (overrides: { blockTag: number }) => {
         expect(overrides.blockTag).toBe(1);
         return 0n;

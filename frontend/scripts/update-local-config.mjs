@@ -222,8 +222,8 @@ async function updateLocalConfig() {
       ethers.getAddress(factoryNative) !== nativePoolAddress ||
       ethers.getAddress(registeredNative) !== nativePoolAddress ||
       ethers.getAddress(registeredDeep) !== poolAddress ||
-      BigInt(poolVersion) !== 2n ||
-      BigInt(nativeVersion) !== 2n ||
+      BigInt(poolVersion) !== 1n ||
+      BigInt(nativeVersion) !== 1n ||
       BigInt(poolKind) !== 0n ||
       BigInt(nativeKind) !== 1n
     ) {

@@ -488,7 +488,7 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
       if (!sameAddress(value, expected))
         throw new Error(`Integrated deployment ${label} ${field} binding mismatch`);
     }
-    if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 3n)
+    if (BigInt(await pool.assetKind()) !== kind || BigInt(await pool.protocolVersion()) !== 1n)
       throw new Error(`Integrated deployment ${label} kind/version mismatch`);
   }
   for (const [value, expected, label] of [

@@ -274,10 +274,10 @@ export function buildShieldedReceiveCodePublicSignals(input) {
     input.identitySuiteId ?? 1,
     input.assetSuiteId ?? 1,
     input.assetDerivationVersion ?? 1,
-    input.receiveCodeVersion ?? 2,
+    input.receiveCodeVersion ?? 1,
   ].map((value, index) => bigintFrom(value, `receiveMetadata[${index}]`, 255n));
   protocolAssert(
-    metadata[0] === 1n && metadata[1] === 1n && metadata[2] === 1n && metadata[3] === 2n,
+    metadata[0] === 1n && metadata[1] === 1n && metadata[2] === 1n && metadata[3] === 1n,
     "UNSUPPORTED_SHIELDED_RECEIVE_SUITE",
     "Unsupported receive-code suite or version",
   );

@@ -1,30 +1,53 @@
-# Shielded asset keys and funds vault v1
+# Shielded asset keys and recovery v1
 
 This specification freezes the independent asset-root implementation in
 [shielded-asset-keys.js](../packages/protocol-core/shielded-asset-keys.js) and
-[shielded-asset-vault.js](../packages/protocol-core/shielded-asset-vault.js).
-It describes the supported v1 encoding, rather than a migration format for older
-wallets. Asset suite, branch derivation, root generation and vault versions are
-all `1`; the associated pool protocol version is `3`.
+[shielded-asset-recovery.js](../packages/protocol-core/shielded-asset-recovery.js).
+Recovery uses a 24-word mnemonic, a Shielded Key, or the original signing wallet.
+Backups use the mnemonic or Shielded Key representation of the same root.
+The frontend operation sequence and secret-session lifecycle are documented in
+[Shielded family inheritance](frontend.md#shielded-family-inheritance).
+
+## Protocol and encoding versions
+
+| Format | Version | Definition |
+| --- | --- | --- |
+| Asset suite, branch derivation and root generation | `1` | [Asset keys](../packages/protocol-core/shielded-asset-keys.js) |
+| Pool protocol | `1` | [Shielded inheritance](../packages/protocol-core/shielded-inheritance.js) |
+| Note payload | `1` | [Note codec](../packages/protocol-core/shielded-note-codec.js) |
+| Receive code | `1` | [Receive code codec](../packages/protocol-core/shielded-receive-code.js) |
+| HPKE envelope | `1` | [HPKE codec](../packages/protocol-core/shielded-hpke.js) |
+
+Version fields and domain-separation strings are separate constants. For example,
+the HPKE AAD domain is `DeepFamily:ShieldedNoteHPKE:v2` and the receive-code
+fingerprint domain is `DeepFamily:ReceiveCodeFingerprint:v2`. Their literal bytes
+remain as defined in the code; the `v2` suffix is not a declaration that either
+encoded format has version 2.
 
 ## Slots and root sources
 
 An unlocked asset session has an optional identity-derived slot (`keyMode = 0`)
 and at most one independent funds slot (`keyMode = 1`, `assetRootDerived`). The
 identity slot is reconstructed from the original complete identity credentials
-and the frozen identity specification. It has no backup file or backup state.
-The independent slot uses a 32-byte `assetRoot`, with one local `rootSource`:
+and the frozen identity specification. It requires no backup.
+The independent slot uses a 32-byte `assetRoot`. New roots have one local
+`rootSource`:
 
 - `random`: the default for an explicit new-slot action. Obtain exactly 32 bytes
   from Web Crypto `getRandomValues`. Require `intent: "create"`; missing roots,
-  failed decryption, recovery and failed signatures never invoke creation.
+  failed recovery and failed signatures never invoke creation.
 - `walletSignature`: an explicit alternative, derived from the signature below.
   The application never reads a wallet seed or private key.
 
+An imported mnemonic or Shielded Key contains only the root, not its provenance.
+Record its source as `imported`; do not infer `random` or `walletSignature`, or
+invent signer metadata. Importing a root which was originally signature-derived
+does not itself prove that a particular wallet can reproduce it.
+
 `rootSource` and signature provenance are local recovery metadata, not additional
 receive-code, note or on-chain fields. Both sources use the same spend/view
-branches and fingerprint. Changing a source label does not migrate funds,
-replace an existing owner or inherit a verified recovery state.
+branches and fingerprint. Changing a source label does not change the owner or
+inherit a verified recovery state.
 
 ## Exact signature-derived root
 
@@ -77,8 +100,13 @@ assetRoot = HKDF32(canonicalSignature,
 Low-s normalization removes the equivalent high-s representation. It does not
 make different valid nonce choices identical. A wallet, device or version change
 can produce a different valid signature for the same message. Restoration must
-check the original funds fingerprint; a signature file's source label alone
-does not prove that its root can be reproduced by signing.
+check the original funds fingerprint. Source metadata alone does not prove that
+the root can be reproduced by signing.
+
+Signature restoration is available only for roots originally derived by this
+signature method. Signing cannot restore a randomly generated root. A successful
+re-sign check is a convenience check, not a substitute for an independently
+saved mnemonic or Shielded Key for a newly created funds slot.
 
 Retain only this signature metadata, never the raw signature:
 
@@ -104,7 +132,7 @@ candidate = uint256BE(HKDF32(assetRoot, "DeepFamily:AssetSpend:v1", uint32BE(c))
 ```
 
 The first `0 < candidate < p` is `ownerSecret`; do not reduce modulo `p` or mask
-bits. Counter exhaustion fails. The existing owner commitment is
+bits. Counter exhaustion fails. The owner commitment is
 `Poseidon(1013, ownerSecret)`, as implemented by
 [computeShieldedOwnerCommitment](../packages/protocol-core/shielded-inheritance.js).
 
@@ -133,141 +161,90 @@ binds identity and key-mode/version fields; see
 [shielded-receive-code.js](../packages/protocol-core/shielded-receive-code.js).
 Note commitments and HPKE AAD provide chain/pool binding later.
 
-## Funds vault payload
+## Shielded Key and 24-word mnemonic
 
-The vault contains only independent funds material. It excludes identity
-secrets, original identity records/passphrases, identity-derived slot keys,
-wallet seeds/private keys and raw signatures. Unknown schema fields are
-rejected at the payload, signature-metadata and discovery-context levels.
+**Shielded Key means the complete 32-byte `assetRoot`**, not the ordinary
+Ethereum-wallet private key, the field-valued `ownerSecret`, or the viewing
+branch. Its canonical text form is lowercase `0x` followed by 64 hexadecimal
+digits. The application labels it a DeepFamily Shielded Key (funds master key).
+Both random and signature-derived roots use this same encoding.
 
-The exporter writes UTF-8 `JSON.stringify` output without BOM or a trailing
-newline. Its normalized object has this insertion order:
-
-1. `assetRoot`: lowercase `0x` plus 64 hex digits.
-2. `rootSource`: `"random"` or `"walletSignature"`.
-3. `assetSuite`: number `1`.
-4. `branchVersion`: number `1`.
-5. `rootGenerationVersion`: number `1`.
-6. `fundsFingerprint`: lowercase `0x` plus the 32-byte recomputed digest.
-7. `signatureMetadata`: present only for `walletSignature`, in the field order
-   listed in the signature section. Address/hash are lowercase hex; versions are
-   JSON numbers. Random roots forbid this field.
-8. `discovery`: an ordered array of 1–64 contexts.
-
-Each normalized discovery object has this field order:
-
-| Field | JSON encoding |
-| --- | --- |
-| `chainId` | Canonical decimal string, `1 ≤ chainId ≤ 2^64 - 1` |
-| `factoryAddress` | Lowercase nonzero 20-byte address with `0x` |
-| `factoryDeploymentBlock` | Nonnegative safe-integer JSON number |
-| `lineageIndexAddress` | Lowercase nonzero 20-byte address with `0x` |
-| `verifierAddress` | Lowercase nonzero 20-byte address with `0x` |
-| `protocolVersion` | JSON number `3` |
-
-Reject duplicate `chainId + factoryAddress` contexts. Preserve array order.
-The decoder parses UTF-8 JSON and normalizes the supported schema; whitespace
-and object-key ordering need not match exporter bytes. Missing payload suite,
-branch and root-generation versions default to `1`; exports always include
-them. Unsupported versions fail. Recompute keys and the funds fingerprint from
-the actual root, check any payload fingerprint, then check any independently
-supplied expected fingerprint. Signature metadata must match the exact v1
-message/hash/method; it is provenance metadata, not a stored recovery approval.
-
-## Funds vault binary encoding
-
-All multibyte header integers are big-endian. The entire 51-byte header is AES
-additional authenticated data, including its KDF parameters and payload length.
-
-| Offset | Bytes | Value |
-| --- | --- | --- |
-| 0 | 8 | ASCII `DFAVLT01` (`44 46 41 56 4c 54 30 31`) |
-| 8 | 1 | Vault version `1` |
-| 9 | 1 | Argon2id profile `1` |
-| 10 | 4 | Memory KiB `65536` |
-| 14 | 4 | Iterations `3` |
-| 18 | 1 | Parallelism `1` |
-| 19 | 16 | Fresh random salt |
-| 35 | 12 | Fresh random AES-GCM IV |
-| 47 | 4 | Plaintext UTF-8 byte length `N` |
-| 51 | `N` | AES-256-GCM ciphertext |
-| `51 + N` | 16 | GCM authentication tag |
-
-Require total file length `51 + N + 16 ≤ 65536`. Validate magic, exact supported
-version/KDF profile/parameters and the length relation before running Argon2id.
-There is no weaker-profile fallback. Every export uses a fresh salt and IV.
-
-The unlock credential is independent of identity credentials. Strings are exact
-UTF-8 bytes, with no trimming or identity normalization. The low-level codec
-accepts 16–1024 credential bytes. The frontend requires a strong custom
-credential or defaults to `0x` plus the hex encoding of 16 random bytes (128 bits
-of entropy); preserve the credential separately from the encrypted file.
+The recovery mnemonic encodes those same 32 bytes using the English wordlist
+and entropy/checksum algorithm in [BIP39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki):
 
 ```text
-password = UTF8("DeepFamily:VaultKDF:v1\0") || credentialBytes
-KEK = Argon2id(version=0x13, password, salt[16], memoryKiB=65536, iterations=3,
-               parallelism=1, outputBytes=32)
-AES-256-GCM(key=KEK, iv=header[35:47], aad=header[0:51], tagBits=128)
+entropy = assetRoot[32]                          // 256 bits
+checksum = first 8 bits of SHA256(entropy)
+indices = split(entropy || checksum, 24 groups of 11 bits)
+mnemonic = EnglishWordlist[indices], separated by single spaces
 ```
 
-The KDF domain ends in one NUL byte. Import authenticates before parsing the
-payload, derives the actual root's key material and returns `verifiedPath:
-"file"`. Import neither requests a wallet signature nor grants verified
-re-signing capability. Wrong credentials, malformed files and mismatches fail
-without installing a replacement root.
+Import requires exactly 24 supported English words and a valid checksum. Accept
+at most 1024 ASCII characters; normalize ASCII case and space/tab/LF/VT/FF/CR
+separators, and reject other characters rather than silently changing them. Decode
+their 264 bits, validate the final eight checksum bits, and return the original
+32 entropy bytes as `assetRoot`. The mnemonic and Shielded Key are reversible
+representations of the same secret, not two unrelated wallets.
 
-## Recovery gates and discovery
+`encodeShieldedAssetMnemonic` / `decodeShieldedAssetMnemonic` implement that
+word encoding. `encodeShieldedAssetKey` / `decodeShieldedAssetKey` implement the
+hex representation. Key import requires exactly 66 characters with lowercase
+`0x` prefix and 64 case-insensitive hexadecimal digits; it does not trim input.
+All four functions operate on exactly 32 root bytes, preserve leading zeros,
+and do not apply private-scalar rejection or modulo reduction to the root.
 
-[ShieldedAssetSession](../frontend/src/workers/shieldedAssetSession.ts) holds
-secrets inside one ephemeral Worker. New independent slots start unverified;
-they cannot issue receive codes or prepare funds operations until the relevant
-gate succeeds:
+Do **not** call BIP39 `computeSeed`, PBKDF2, BIP32, or `Wallet.fromMnemonic` to
+restore this root. No mnemonic passphrase is supported, and identity passphrases
+do not enter this codec or the independent key branches. A different decoding
+rule would yield a different owner and would not recover the original funds.
+The 24 words are DeepFamily funds recovery words, not the connected ordinary
+wallet's recovery phrase. Anyone with either complete representation can derive
+both spending and viewing keys.
 
-- **Random creation:** export the real encrypted root file, save it outside the
-  device, destroy the original Worker, then import/decrypt it in a fresh Worker
-  and match the original funds fingerprint. The UI requires acknowledgement of
-  external storage. In-memory round trips and chain history do not satisfy this
-  new-root gate.
-- **Signature creation:** destroy the original Worker, actually sign the exact
-  message again, derive through canonicalization and the frozen source KDF, and
-  match the original fingerprint; alternatively use the external-file path.
-  Repeatable signing in this check is not a lifetime or cross-device guarantee.
-- **Existing signature restoration without an old fingerprint:** keep an
-  unverified candidate. An empty scan is not recovery success. A validated,
-  positive owned VALUE recovered from the selected canonical pool can confirm
-  that candidate. This exception never verifies a newly created random root or
-  an old file missing the selected discovery scope.
+Mnemonic and Shielded Key encode only the root. They contain no source,
+signer metadata, identity, funds fingerprint, network, factory or RPC settings.
+The key suite and branch rules for this recovery format are fixed to v1.
 
-File import and signature restoration require an empty funds slot. A different
-root/source cannot overwrite an unlocked slot; lock first. No recovery failure
-automatically creates random funds, falls back to the identity slot or changes
-the owner. The ordinary transaction/gas wallet `G` is separate from signature
-source `S`; changing `G` does not change the funds root.
+## Recovery API and verification
 
-A root-only import can view and spend recovered VALUE without identity input.
-Owner-bound BUDGETs remain pending identity confirmation and outside claimable
-balances until the original identity is unlocked. Public identity-bound budgets
-remain recoverable by the identity slot even if no independent root is present.
+The asset Worker implements these calls in
+[ShieldedAssetSession](../frontend/src/workers/shieldedAssetSession.ts):
 
-The root alone cannot reconstruct random note openings. Replay unfiltered
-public chain history, including spent change notes and authentic Fund memos,
-to recover notes, rules and the original funding templates. For every recorded
-factory, enumerate all `PoolCreated` events from its deployment block and check
-the pool count at a single block/hash anchor per chain. Later pools under the
-same recorded factory require no new root file. A new chain/factory context
-requires an updated file and independent import for the file recovery path.
-An old valid file may load its root to export that update, but does not mark the
-new context verified. Runtime RPC selection is not stored in the vault.
+| Call | Input | Result |
+| --- | --- | --- |
+| `exportRecoveryMaterial` | `format: "mnemonic" \| "shieldedKey"`, trusted protocol context | Secret `material`, `format`, `version: 1`, public `fundsFingerprint` |
+| `importRecoveryMaterial` | `format`, secret `material`, optional independently known `expectedFingerprint`, trusted protocol context | Public session state; verified import records path `mnemonic` or `shieldedKey` |
+| `restoreSignature` | Signer address, exact-message signature, optional independently known `expectedFingerprint`, trusted protocol context | Public session state; verified re-sign records path `signature` |
 
-Enumeration completeness and each pool's history completeness are separate.
-Validate pool/factory/lineage/verifier/version wiring; isolate pool failures and
-report incomplete scopes. Token metadata failure preserves raw integer amounts
-with unknown decimals rather than assuming 18 or blocking healthy pools. Root,
-note, action and spent-nullifier checks must use the same anchor; v3 checks the
-unique spent-nullifier count against the contract count. See
-[shieldedAssetRegistry.ts](../frontend/src/domains/inheritance/services/shieldedAssetRegistry.ts),
-[shieldedPoolChain.ts](../frontend/src/domains/inheritance/services/shieldedPoolChain.ts)
-and [shieldedWalletRecovery.ts](../frontend/src/domains/inheritance/services/shieldedWalletRecovery.ts).
+Imports require an empty funds slot. Compare any supplied original fingerprint
+against the root's recomputed fingerprint before installing it. No recovery
+failure creates another root, falls back to the identity slot or changes the
+funds owner. An unlocked root/source cannot be silently replaced.
+
+| State | Allowed transition |
+| --- | --- |
+| New random or signature-derived root | Mark `backupRequired`. Export words or Key, destroy the original Worker, then manually import the independently saved material in a fresh Worker and match the original fingerprint. Only this material import completes its backup drill. |
+| Existing root with an independently known original fingerprint | Import the material or re-sign, derive the root and require that fingerprint to match. |
+| Existing root without an original fingerprint | Keep an unverified candidate. A complete selected-pool scan may confirm it only through valid, positive, unspent VALUE under that exact owner. |
+| Reopened root matching a retained new-wallet pending fingerprint | Permit recovery-material re-export to resume the drill; keep `backupRequired`. Re-signing and historical notes cannot complete the pending drill. |
+
+A valid mnemonic checksum, an empty scan, zero-value or already-spent VALUE, and
+BUDGET records alone do not confirm a candidate. Unknown unverified candidates
+cannot export official backups or public recovery descriptions. Client backup
+markers are local workflow guards, not additional cryptographic authorization;
+[the frontend guide](frontend.md#funds-keys-backup-and-recovery) specifies their
+`sessionStorage` and lifecycle boundaries.
+
+A verified root-only session can decrypt and spend its matching VALUE. Claiming
+an independent BUDGET additionally requires the original complete identity
+credentials and the existing family, period and enrollment eligibility. The
+identity slot is reconstructed from those credentials and needs no backup.
+
+The root does not encode random note openings. Recovery also needs the public
+chain ciphertexts and history, using trusted application configuration for the
+current chain and factory. It does not automatically traverse other chain or
+factory scopes. See [frontend discovery](frontend.md#pool-recovery-and-transactions)
+and [historical recovery](../frontend/src/domains/inheritance/services/shieldedWalletRecovery.ts).
 
 ## Frozen vectors and boundary tests
 
@@ -281,12 +258,19 @@ For root `0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f`:
 | `viewPublicKey` | `0x1c383c23be2a8927f7835a83fdcb060b01acfff99661136c658f2d485e5bad56` |
 | `fundsFingerprint` | `0xba9339b546645507471bedc1c78f017ec71d74de4dda220e376401883f02e027` |
 
+The same root's 24 recovery words are:
+
+```text
+abandon amount liar amount expire adjust cage candy arch gather drum bullet absurd math era live bid rhythm alien crouch range attend journey unaware
+```
+
 [Key tests](../packages/protocol-core/test/shielded-asset-keys.test.js) freeze this
 vector, compare signature-root derivation with Node's RFC 5869 implementation,
 and check high-s/v normalization and rejected signatures.
-[Vault tests](../packages/protocol-core/test/shielded-asset-vault.test.js) exercise
-fresh randomized exports, tampering, bounded KDF profiles, schema exclusions and
-restoration without the original signer.
+[Recovery-codec tests](../packages/protocol-core/test/shielded-asset-recovery.test.js)
+check official 256-bit English BIP39 vectors, exact root/word/hex round trips,
+checksum and length rejection, and preservation of the existing funds
+fingerprint.
 [Session tests](../frontend/src/workers/shieldedAssetSession.test.ts) exercise the
-real vault/key KDF, fresh-session gates, source/root replacement rejection,
+key derivation, fresh-session gates, source/root replacement rejection,
 root-only recovery and secret-free DTO/error boundaries.

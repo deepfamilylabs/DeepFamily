@@ -94,7 +94,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
       const { pool, token, recipient, shield, withdrawal } = await setup({ precision });
       expect(await token.decimals()).to.equal(BigInt(precision));
       expect(await pool.assetKind()).to.equal(0n);
-      expect(await pool.protocolVersion()).to.equal(3n);
+      expect(await pool.protocolVersion()).to.equal(1n);
       expect(await pool.creationBlock()).to.equal(
         BigInt((await pool.deploymentTransaction().wait()).blockNumber),
       );
@@ -229,7 +229,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     const data = dataFor();
     const proof = await proofFor(pool, 0, data, 100n);
     expect(await pool.assetKind()).to.equal(1n);
-    expect(await pool.protocolVersion()).to.equal(3n);
+    expect(await pool.protocolVersion()).to.equal(1n);
     expect(pool.interface.hasFunction("TOKEN")).to.equal(false);
     for (const value of [0n, 99n, 101n]) {
       await expect(pool.shield(100n, data, proof, { value })).to.be.revertedWithCustomError(
@@ -351,7 +351,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     expect(await deepPool.LINEAGE_INDEX()).to.equal(await lineage.getAddress());
     expect(await deepPool.VERIFIER()).to.equal(await verifier.getAddress());
     expect(await deepPool.assetKind()).to.equal(0n);
-    expect(await deepPool.protocolVersion()).to.equal(3n);
+    expect(await deepPool.protocolVersion()).to.equal(1n);
     const extra = await hre.ethers.deployContract("ShieldedPoolBehaviorTokenMock", [6]);
     await extra.waitForDeployment();
     const extraAddress = await extra.getAddress();

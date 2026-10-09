@@ -56,7 +56,7 @@ export async function assertShieldedDeploymentBindings({
       same(await read(`${key} ${method}`, () => pool[method]()), expected, `${key} ${method}`);
     if (
       BigInt(await read(`${key} assetKind`, () => pool.assetKind())) !== kind ||
-      BigInt(await read(`${key} protocolVersion`, () => pool.protocolVersion())) !== 3n
+      BigInt(await read(`${key} protocolVersion`, () => pool.protocolVersion())) !== 1n
     )
       throw new Error(`${key} asset kind/protocol version differs from the integrated deployment`);
   }

@@ -15,10 +15,12 @@ export type ShieldedPublicFunds = {
   ownerCommitment: string;
   viewingKey: string;
   fundsFingerprint: string;
-  rootSource: "random" | "walletSignature";
+  rootSource: "random" | "walletSignature" | "imported";
   signerAddress?: string;
   recoveryVerified: boolean;
-  recoveryPath?: "file" | "signature" | "history";
+  recoveryPath?: "signature" | "history" | "mnemonic" | "shieldedKey";
+  /** Public creation challenge; re-signing cannot replace an independent backup. */
+  backupRequired?: boolean;
 };
 export type ShieldedAssetSessionState = {
   identity: ShieldedPublicIdentity | null;
@@ -151,19 +153,27 @@ export type ShieldedAssetWorkerCallMap = {
       signerAddress: string;
       signature: string;
       expectedFingerprint?: string;
+      pendingBackupFingerprints?: readonly string[];
       context: ShieldedWorkerContext;
     };
     result: ShieldedAssetSessionState;
   };
-  exportFunds: {
-    params: { context: ShieldedWorkerContext; unlockCredential?: string };
-    result: { file: Uint8Array; unlockCredential: string; fundsFingerprint: string };
+  /** Explicit secret export. Material must only reach a transient uncontrolled DOM field. */
+  exportRecoveryMaterial: {
+    params: { format: "mnemonic" | "shieldedKey"; context: ShieldedWorkerContext };
+    result: {
+      material: string;
+      format: "mnemonic" | "shieldedKey";
+      version: 1;
+      fundsFingerprint: string;
+    };
   };
-  importFunds: {
+  importRecoveryMaterial: {
     params: {
-      file: Uint8Array;
-      unlockCredential: string;
+      format: "mnemonic" | "shieldedKey";
+      material: string;
       expectedFingerprint?: string;
+      pendingBackupFingerprints?: readonly string[];
       context: ShieldedWorkerContext;
     };
     result: ShieldedAssetSessionState;
