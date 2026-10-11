@@ -1,4 +1,5 @@
 export { ShieldedInheritancePanel } from "./ui/ShieldedInheritancePanel";
+export type { ShieldedPanelNavigation } from "./ui/ShieldedInheritancePanel";
 export type { ShieldedPageModules } from "./model/shieldedPageTypes";
 export {
   readShieldedAsset,

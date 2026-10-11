@@ -106,6 +106,7 @@ const ASSET_METHODS = new Set([
   "restoreSignature",
   "exportRecoveryMaterial",
   "importRecoveryMaterial",
+  "clearFunds",
   "receiveCode",
   "recover",
   "discover",
@@ -142,7 +143,9 @@ export class ShieldedAssetSession {
   private createdHere = false;
   private knownPendingRoot = false;
   private sequence = 0;
-  private scope = "";
+  // Chain, factory, family, lineage and RPC are fixed for a session; the pool may change.
+  private baseScope = "";
+  private poolScope = "";
   private wallets = new Map<ShieldedKeySlot, LocalShieldedWalletSnapshot>();
   private summary: ShieldedWalletSummary | null = null;
   private policyDrafts = new Map<string, ReturnType<typeof createShieldedPolicyDescriptor>>();
@@ -185,7 +188,8 @@ export class ShieldedAssetSession {
     this.summary = null;
     this.pending = null;
     this.policyDrafts.clear();
-    this.scope = "";
+    this.baseScope = "";
+    this.poolScope = "";
   }
 
   private keys(slot: ShieldedKeySlot, requireVerified = true): Keys {
@@ -232,16 +236,16 @@ export class ShieldedAssetSession {
   }
 
   private async context(ctx: ShieldedWorkerContext) {
-    const scope = [
+    const baseScope = [
       ctx.chainId,
       ctx.factoryAddress.toLowerCase(),
       ctx.familyAddress.toLowerCase(),
       ctx.lineageIndexAddress.toLowerCase(),
-      ctx.poolAddress.toLowerCase(),
       ctx.rpcUrl,
     ].join(":");
+    const poolScope = ctx.poolAddress.toLowerCase();
     requireValue(
-      !this.scope || scope === this.scope,
+      !this.baseScope || baseScope === this.baseScope,
       "Protocol context changed. Lock and unlock in the new context.",
     );
     const provider = new JsonRpcProvider(ctx.rpcUrl);
@@ -282,7 +286,16 @@ export class ShieldedAssetSession {
         getAddress(await factory.poolFor(asset)) === getAddress(ctx.poolAddress),
       "Pool does not belong to the selected protocol.",
     );
-    this.scope = scope;
+    if (this.poolScope && poolScope !== this.poolScope) {
+      // Identity and the funds root serve every pool of this factory. History,
+      // prepared witnesses and policy drafts belong to one pool and are dropped.
+      this.wallets.clear();
+      this.summary = null;
+      this.pending = null;
+      this.policyDrafts.clear();
+    }
+    this.baseScope = baseScope;
+    this.poolScope = poolScope;
     return {
       provider,
       factory,
@@ -450,24 +463,67 @@ export class ShieldedAssetSession {
           : decodeShieldedAssetKey(material);
       material = "";
       await this.context(params.context);
+      // Entered words or Key are the backup itself, so their root opens at once and
+      // a new root's manual re-entry completes its drill. A known fingerprint must match.
       await this.installRoot(
         root,
         "imported",
         undefined,
         params.expectedFingerprint,
-        params.expectedFingerprint ? params.format : undefined,
+        params.format,
       );
-      const backupRequired =
-        !params.expectedFingerprint &&
-        params.pendingBackupFingerprints?.includes(this.funds!.fundsFingerprint);
-      this.funds!.backupRequired = !!backupRequired;
-      this.knownPendingRoot = !!backupRequired;
-      this.allowHistoryVerification = !params.expectedFingerprint && !backupRequired;
+      this.funds!.backupRequired = false;
       return this.state();
     } finally {
       material = "";
       root?.fill(0);
     }
+  }
+
+  /**
+   * Removes only the independent funds root and its asset-slot history. An
+   * unlocked identity stays, so a backup drill or another recovery attempt does
+   * not require the identity credentials again. The next import starts empty.
+   */
+  async clearFunds(): Promise<ShieldedAssetSessionState> {
+    this.root?.fill(0);
+    this.root = null;
+    this.assetKeys = null;
+    this.funds = null;
+    this.sourceMetadata = undefined;
+    this.allowHistoryVerification = false;
+    this.createdHere = false;
+    this.knownPendingRoot = false;
+    this.wallets.delete("asset");
+    this.summary = null;
+    this.pending = null;
+    this.policyDrafts.clear();
+    return this.state();
+  }
+
+  /** Positive VALUE, or an independent BUDGET checked against the unlocked identity, under this owner. */
+  private confirmsCandidateRoot(notes: ReturnType<typeof listUnspentRecoveredShieldedNotes>) {
+    const owner = this.assetKeys?.ownerCommitment;
+    const identityCommitment = this.identity?.identityCommitment;
+    return notes.some(({ note }) =>
+      note.kind === "value"
+        ? note.amount > 0n && note.ownerCommitment === owner
+        : identityCommitment !== undefined &&
+          note.binding !== "identity" &&
+          getBigInt(note.keyMode ?? 0) === 1n &&
+          note.remaining > 0n &&
+          note.heirOwnerCommitment === owner &&
+          note.heirIdentityCommitment === identityCommitment,
+    );
+  }
+
+  private historyCandidate(): string | null {
+    return this.funds &&
+      this.allowHistoryVerification &&
+      !this.funds.recoveryVerified &&
+      !this.funds.backupRequired
+      ? this.funds.fundsFingerprint
+      : null;
   }
 
   async receiveCode(params: ShieldedAssetWorkerCallMap["receiveCode"]["params"]) {
@@ -478,7 +534,7 @@ export class ShieldedAssetSession {
       keyMode: keys.keyMode,
       keyMaterial: keys,
     });
-    return { code: result.code, fingerprint: result.fingerprint };
+    return { code: result.code };
   }
 
   async recover(
@@ -506,6 +562,7 @@ export class ShieldedAssetSession {
     const lineage = this.identity
       ? await loadLineageSnapshot(lineageIndex, family).catch(() => null)
       : null;
+    if (this.identity) summary.familyRecordsAvailable = !!lineage;
     const seenNotes = new Set<string>();
     this.wallets.clear();
     for (const slot of ["identity", "asset"] as const) {
@@ -568,21 +625,9 @@ export class ShieldedAssetSession {
           pendingIdentity: true,
         });
       }
-      if (
-        slot === "asset" &&
-        this.funds &&
-        this.allowHistoryVerification &&
-        !this.funds.recoveryVerified &&
-        !this.funds.backupRequired &&
-        notes.some(
-          (event) =>
-            event.note.kind === "value" &&
-            event.note.amount > 0n &&
-            event.note.ownerCommitment === this.assetKeys?.ownerCommitment,
-        )
-      ) {
-        this.funds.recoveryVerified = true;
-        this.funds.recoveryPath = "history";
+      if (slot === "asset" && this.historyCandidate() && this.confirmsCandidateRoot(notes)) {
+        this.funds!.recoveryVerified = true;
+        this.funds!.recoveryPath = "history";
       }
       for (const policy of listRecoveredShieldedPolicies(wallet)) {
         if (
@@ -663,6 +708,8 @@ export class ShieldedAssetSession {
           periodIndices: claim?.periodIndices.map(String) ?? [],
           amount: String(claim?.amount ?? 0n),
           amountPerPeriod: String(option.notes[0].note.amountPerPeriod),
+          totalRemaining: String(option.overview.totalRemaining),
+          periodDays: String(option.notes[0].note.periodDays),
           status: option.overview.status,
           ...(option.overview.nextDueAt === undefined
             ? {}
@@ -695,15 +742,11 @@ export class ShieldedAssetSession {
     return { ok: true as const };
   }
 
-  private async recipient(code: string, fingerprint?: string): Promise<VerifiedShieldedRecipient> {
+  private async recipient(code: string): Promise<VerifiedShieldedRecipient> {
     const result = await verifyShieldedReceiveCode(code);
     requireValue(
       result.ok,
       "The receiving code is incomplete or failed its identity and ownership proof.",
-    );
-    requireValue(
-      fingerprint && result.fingerprint === fingerprint,
-      "Confirm the complete receiving-code fingerprint with the recipient before paying.",
     );
     return {
       ...result,
@@ -735,7 +778,7 @@ export class ShieldedAssetSession {
     // Verify the final destination before any preparatory consolidation spend.
     const transferRecipient =
       request.action === "privateTransfer"
-        ? await this.recipient(request.recipientCode ?? "", request.recipientFingerprint)
+        ? await this.recipient(request.recipientCode ?? "")
         : undefined;
     if (transferRecipient) recipient = transferRecipient.personHash;
     if (request.action === "fund") {
@@ -821,7 +864,7 @@ export class ShieldedAssetSession {
           "Refilling cannot change the original budget's binding or key mode.",
         );
       const verified = request.recipientCode
-        ? await this.recipient(request.recipientCode, request.recipientFingerprint)
+        ? await this.recipient(request.recipientCode)
         : undefined;
       if (kind === 0 && !template)
         requireValue(verified, "Private initial funding requires a verified receiving code.");
@@ -1143,6 +1186,9 @@ export class ShieldedAssetSession {
       timeoutMs: 10_000,
     });
     const pools: ShieldedAssetWorkerCallMap["discover"]["result"]["pools"] = [];
+    // A candidate root may be confirmed by valid history in any verified factory pool.
+    const candidate = this.historyCandidate();
+    let candidateConfirmed = false;
     for (const item of found.pools) {
       if (!item.configurationVerified || !item.pool || item.poolDeploymentBlock === undefined) {
         pools.push({
@@ -1173,7 +1219,10 @@ export class ShieldedAssetSession {
             ),
             10_000,
           );
-          for (const event of listUnspentRecoveredShieldedNotes(wallet, keys)) {
+          const notes = listUnspentRecoveredShieldedNotes(wallet, keys);
+          if (slot === "asset" && candidate && this.confirmsCandidateRoot(notes))
+            candidateConfirmed = true;
+          for (const event of notes) {
             if (seen.has(String(event.commitment))) continue;
             seen.add(String(event.commitment));
             if (event.note.kind === "value") rawValueBalance += event.note.amount;
@@ -1201,10 +1250,15 @@ export class ShieldedAssetSession {
       anchor?.hash === found.blockHash,
       "Discovery block was reorganized. Re-run recovery.",
     );
+    if (candidateConfirmed && this.funds && this.funds.fundsFingerprint === candidate) {
+      this.funds.recoveryVerified = true;
+      this.funds.recoveryPath = "history";
+    }
     return {
       complete: found.enumerationComplete && pools.every((pool) => pool.status === "recovered"),
       pools,
       ...(found.enumerationError ? { error: found.enumerationError } : {}),
+      sessionState: this.state(),
     };
   }
 

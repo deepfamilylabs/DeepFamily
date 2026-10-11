@@ -172,7 +172,8 @@ describe("asset Worker secret lifetime", () => {
       context,
     });
     const importWorker = FakeWorker.instances[2];
-    expect(importWorker.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
+    // Entered material completes the drill, so imports need no pending markers.
+    expect(importWorker.clones[0].params.pendingBackupFingerprints).toBeUndefined();
     expect(importWorker.requests[0].params).toBeUndefined();
     expect(importWorker.clones[0].params.material).toBe("manual-root-secret");
     respond(importWorker, {
@@ -195,7 +196,7 @@ describe("asset Worker secret lifetime", () => {
     respond(next, { identity: null, funds: null });
     await reopened;
   });
-  it("does not clear the backup challenge after an unverified material import", async () => {
+  it("keeps the backup challenge when a material import fails", async () => {
     const fingerprint = `0x${"cd".repeat(32)}`;
     const created = shieldedAssetWorkerCall("createFunds", {
       intent: "create",
@@ -207,17 +208,19 @@ describe("asset Worker secret lifetime", () => {
     });
     await created;
     terminateShieldedAssetWorker();
-    const candidate = shieldedAssetWorkerCall("importRecoveryMaterial", {
+    const failed = shieldedAssetWorkerCall("importRecoveryMaterial", {
       format: "mnemonic",
-      material: "candidate words",
+      material: "other words",
+      expectedFingerprint: fingerprint,
       context,
     });
     const next = FakeWorker.instances[1];
-    expect(next.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
-    respond(next, {
-      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+    next.emit("message", {
+      id: next.clones[0].id,
+      ok: false,
+      error: { message: "Funds fingerprint differs from the original wallet." },
     });
-    await candidate;
+    await expect(failed).rejects.toThrow("fingerprint differs");
     terminateShieldedAssetWorker();
     const restored = shieldedAssetWorkerCall("restoreSignature", {
       signerAddress: context.familyAddress,

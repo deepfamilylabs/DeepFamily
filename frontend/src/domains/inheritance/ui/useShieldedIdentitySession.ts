@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import type { PublicHashForm } from "../../person";
 import type {
   ShieldedAssetSessionState,
   ShieldedPublicIdentity,
@@ -10,6 +11,10 @@ import {
 import { terminateZkWorker } from "../../../shared/workers/zkWorkerClient";
 
 export const SHIELDED_IDENTITY_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+export const SHIELDED_WALLET_REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
+
+/** Public person details used to prefill a re-unlock. Never contains the passphrase. */
+export type ShieldedIdentityDraft = Omit<PublicHashForm, "hasPassphrase">;
 
 interface IdentitySession {
   scope: string;
@@ -31,21 +36,65 @@ export function useShieldedIdentitySession({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const expiresAtRef = useRef(0);
   const generationRef = useRef(0);
+  const scopeGenerationRef = useRef(0);
+  const walletRequestRef = useRef<{
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const [, setRevision] = useState(0);
+  // Survives wallet signing and hidden-page locks, with an idle deadline
+  // independent of the secret session.
+  const identityDraftRef = useRef<{ scope: string; draft: ShieldedIdentityDraft } | null>(null);
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftExpiresAtRef = useRef(0);
   const generation = generationRef.current;
+  const scopeGeneration = scopeGenerationRef.current;
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     timerRef.current = null;
   }, []);
 
+  const clearWalletRequest = useCallback(() => {
+    if (walletRequestRef.current) clearTimeout(walletRequestRef.current.timer);
+    walletRequestRef.current = null;
+  }, []);
+
+  const clearDraftTimer = useCallback(() => {
+    if (draftTimerRef.current !== null) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = null;
+  }, []);
+
+  const forgetIdentityDraft = useCallback(() => {
+    clearDraftTimer();
+    draftExpiresAtRef.current = 0;
+    if (!identityDraftRef.current) return;
+    identityDraftRef.current = null;
+    if (mountedRef.current) setRevision((revision) => revision + 1);
+  }, [clearDraftTimer]);
+
+  const scheduleDraftExpiry = useCallback(() => {
+    clearDraftTimer();
+    if (!mountedRef.current || !identityDraftRef.current || busyRef.current) return;
+    draftTimerRef.current = setTimeout(() => {
+      draftTimerRef.current = null;
+      if (!busyRef.current) forgetIdentityDraft();
+    }, Math.max(0, draftExpiresAtRef.current - Date.now()));
+  }, [clearDraftTimer, forgetIdentityDraft]);
+
+  const touchDraft = useCallback(() => {
+    if (!identityDraftRef.current) return;
+    draftExpiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
+    scheduleDraftExpiry();
+  }, [scheduleDraftExpiry]);
+
   const clearSession = useCallback(() => {
     clearTimer();
+    clearWalletRequest();
     expiresAtRef.current = 0;
     sessionRef.current = null;
     generationRef.current += 1;
     if (mountedRef.current) setRevision((revision) => revision + 1);
-  }, [clearTimer]);
+  }, [clearTimer, clearWalletRequest]);
 
   const lock = useCallback(() => {
     terminateZkWorker();
@@ -59,17 +108,45 @@ export function useShieldedIdentitySession({
     timerRef.current = setTimeout(
       () => {
         timerRef.current = null;
-        if (!busyRef.current) lock();
+        if (busyRef.current) return;
+        forgetIdentityDraft();
+        lock();
       },
       Math.max(0, expiresAtRef.current - Date.now()),
     );
-  }, [clearTimer, lock]);
+  }, [clearTimer, forgetIdentityDraft, lock]);
 
   const touch = useCallback(() => {
-    if (!sessionRef.current) return;
-    expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
-    scheduleIdleLock();
-  }, [scheduleIdleLock]);
+    if (sessionRef.current) {
+      expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
+      scheduleIdleLock();
+    }
+    touchDraft();
+  }, [scheduleIdleLock, touchDraft]);
+
+  const isWalletRequestPending = useCallback(() => walletRequestRef.current !== null, []);
+  const beginWalletRequest = useCallback(() => {
+    if (!mountedRef.current || scopeRef.current !== scope || generationRef.current !== generation)
+      return () => {};
+    clearWalletRequest();
+    // Only an actual wallet transaction request gets this brief exception. A
+    // request's object identity prevents a late release from ending a newer one.
+    const request = {
+      timer: setTimeout(() => {
+        if (walletRequestRef.current === request) lock();
+      }, SHIELDED_WALLET_REQUEST_TIMEOUT_MS),
+    };
+    walletRequestRef.current = request;
+    touch();
+    return () => {
+      if (walletRequestRef.current !== request) return;
+      clearWalletRequest();
+      if (!mountedRef.current || scopeRef.current !== scope || generationRef.current !== generation)
+        return;
+      if (document.visibilityState === "hidden") lock();
+      else touch();
+    };
+  }, [scope, generation, clearWalletRequest, lock, touch]);
 
   const update = useCallback(
     (state: ShieldedAssetSessionState) => {
@@ -103,9 +180,10 @@ export function useShieldedIdentitySession({
       sessionRef.current = { scope, state: { identity, funds } };
       expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
       scheduleIdleLock();
+      touchDraft();
       setRevision((revision) => revision + 1);
     },
-    [scope, generation, scheduleIdleLock],
+    [scope, generation, scheduleIdleLock, touchDraft],
   );
   const unlock = useCallback(
     (identity: ShieldedPublicIdentity) => {
@@ -113,20 +191,54 @@ export function useShieldedIdentitySession({
     },
     [update],
   );
+  const rememberIdentityDraft = useCallback(
+    (draft: ShieldedIdentityDraft | null) => {
+      if (
+        !mountedRef.current ||
+        scopeRef.current !== scope ||
+        scopeGenerationRef.current !== scopeGeneration
+      )
+        return;
+      if (!draft) {
+        forgetIdentityDraft();
+        return;
+      }
+      identityDraftRef.current = {
+        scope,
+        draft: {
+          fullName: draft.fullName,
+          isBirthBC: draft.isBirthBC,
+          birthYear: draft.birthYear,
+          birthMonth: draft.birthMonth,
+          birthDay: draft.birthDay,
+          gender: draft.gender,
+        },
+      };
+      touchDraft();
+      setRevision((revision) => revision + 1);
+    },
+    [scope, scopeGeneration, forgetIdentityDraft, touchDraft],
+  );
 
   useLayoutEffect(() => {
     const wasBusy = busyRef.current;
     busyRef.current = busy;
     if (scopeRef.current !== scope) {
       scopeRef.current = scope;
+      scopeGenerationRef.current += 1;
+      forgetIdentityDraft();
       lock();
     } else if (wasBusy !== busy) {
       // An operation can take longer than the idle window. Give its user a fresh
       // window when it finishes instead of locking halfway through proof/submit.
-      if (!busy) expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
+      if (!busy) {
+        expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
+        draftExpiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
+      }
       scheduleIdleLock();
+      scheduleDraftExpiry();
     }
-  }, [scope, busy, lock, scheduleIdleLock]);
+  }, [scope, busy, forgetIdentityDraft, lock, scheduleIdleLock, scheduleDraftExpiry]);
 
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -134,7 +246,7 @@ export function useShieldedIdentitySession({
     window.addEventListener("keydown", touch, true);
     window.addEventListener("pagehide", lock);
     const visibility = () => {
-      if (document.visibilityState === "hidden") lock();
+      if (document.visibilityState === "hidden" && !walletRequestRef.current) lock();
     };
     document.addEventListener("visibilitychange", visibility);
     const unsubscribe = subscribeShieldedAssetWorkerLock(clearSession);
@@ -146,20 +258,28 @@ export function useShieldedIdentitySession({
       document.removeEventListener("visibilitychange", visibility);
       unsubscribe();
       clearTimer();
+      clearWalletRequest();
+      clearDraftTimer();
       sessionRef.current = null;
       expiresAtRef.current = 0;
+      identityDraftRef.current = null;
+      draftExpiresAtRef.current = 0;
       terminateShieldedAssetWorker();
       terminateZkWorker();
     };
-  }, [touch, lock, clearTimer, clearSession]);
+  }, [touch, lock, clearTimer, clearWalletRequest, clearDraftTimer, clearSession]);
 
   return {
     // Hide an old scope during render, before the layout effect releases it.
     identity: sessionRef.current?.scope === scope ? sessionRef.current.state.identity : null,
     funds: sessionRef.current?.scope === scope ? sessionRef.current.state.funds : null,
+    identityDraft: identityDraftRef.current?.scope === scope ? identityDraftRef.current.draft : null,
+    rememberIdentityDraft,
     unlock,
     update,
     lock,
     touch,
+    beginWalletRequest,
+    isWalletRequestPending,
   };
 }

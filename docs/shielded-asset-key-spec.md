@@ -27,11 +27,33 @@ encoded format has version 2.
 ## Slots and root sources
 
 An unlocked asset session has an optional identity-derived slot (`keyMode = 0`)
-and at most one independent funds slot (`keyMode = 1`, `assetRootDerived`). The
+and at most one asset-root-derived slot (`keyMode = 1`, `assetRootDerived`). The
 identity slot is reconstructed from the original complete identity credentials
 and the frozen identity specification. It requires no backup.
-The independent slot uses a 32-byte `assetRoot`. New roots have one local
-`rootSource`:
+The UI names these choices **Identity credentials** (身份凭据) and **Funds key**
+(资金密钥). The corresponding labels are **Receive code (identity credentials)** /
+**Receive code (funds key)** and **Budgets (identity credentials)** /
+**Budgets (funds key)**. These display names preserve the existing derivation
+mechanisms and protocol fields.
+
+Budget funding uses these entry labels:
+
+| UI entry | Existing authorization and visibility |
+| --- | --- |
+| **Public budget** (公开预算) | Identity-bound budget, `keyMode = 0`; identity commitments and budget terms are public. |
+| **Private (identity credentials)** (私密（身份凭据）) | Owner-bound encrypted budget, `keyMode = 0`; the original identity credentials reconstruct the spending and viewing keys. |
+| **Private (funds key)** (私密（资金密钥）) | Owner-bound encrypted budget, `keyMode = 1`; the independent asset root derives the spending and viewing keys. |
+
+Both private entries use the same HPKE note encryption. The funds choice selects
+the payer's owner separately from the recipient's budget entry. A funds key
+controls its VALUE notes; budget claims also require the original identity
+credentials and existing family, period and enrollment eligibility.
+
+The independent slot uses a 32-byte `assetRoot`. **Unlock funds key** opens its
+recovery flow; **Manage funds key** appears when a root is loaded. A claim whose
+original funds key is missing first offers unlocking that key; the claim action
+appears after recovery and keeps the same identity and eligibility checks.
+New roots have one local `rootSource`:
 
 - `random`: the default for an explicit new-slot action. Obtain exactly 32 bytes
   from Web Crypto `getRandomValues`. Require `intent: "create"`; missing roots,
@@ -213,8 +235,10 @@ The asset Worker implements these calls in
 | Call | Input | Result |
 | --- | --- | --- |
 | `exportRecoveryMaterial` | `format: "mnemonic" \| "shieldedKey"`, trusted protocol context | Secret `material`, `format`, `version: 1`, public `fundsFingerprint` |
-| `importRecoveryMaterial` | `format`, secret `material`, optional independently known `expectedFingerprint`, trusted protocol context | Public session state; verified import records path `mnemonic` or `shieldedKey` |
+| `importRecoveryMaterial` | `format`, secret `material`, optional independently known `expectedFingerprint`, trusted protocol context | Public session state; the import is verified and records path `mnemonic` or `shieldedKey` |
 | `restoreSignature` | Signer address, exact-message signature, optional independently known `expectedFingerprint`, trusted protocol context | Public session state; verified re-sign records path `signature` |
+| `clearFunds` | None | Public session state without a funds slot; the root bytes are wiped and an unlocked identity remains |
+| `discover` | Trusted protocol context | Per-pool raw VALUE and BUDGET totals or an unknown status, enumeration completeness, and public session state |
 
 Imports require an empty funds slot. Compare any supplied original fingerprint
 against the root's recomputed fingerprint before installing it. No recovery
@@ -223,14 +247,17 @@ funds owner. An unlocked root/source cannot be silently replaced.
 
 | State | Allowed transition |
 | --- | --- |
-| New random or signature-derived root | Mark `backupRequired`. Export words or Key, destroy the original Worker, then manually import the independently saved material in a fresh Worker and match the original fingerprint. Only this material import completes its backup drill. |
+| New random or signature-derived root | Mark `backupRequired`. Export words or Key, then remove the root with `clearFunds` and clear the displayed material; an unlocked identity may remain. Manually import the independently saved material, which the Worker decodes again, matching the original fingerprint while the application still holds it. Only a material import completes its backup drill. |
 | Existing root with an independently known original fingerprint | Import the material or re-sign, derive the root and require that fingerprint to match. |
-| Existing root without an original fingerprint | Keep an unverified candidate. A complete selected-pool scan may confirm it only through valid, positive, unspent VALUE under that exact owner. |
-| Reopened root matching a retained new-wallet pending fingerprint | Permit recovery-material re-export to resume the drill; keep `backupRequired`. Re-signing and historical notes cannot complete the pending drill. |
+| Words or Key without a known fingerprint | Install the root as verified: the entered material is its backup. This also completes a pending new-wallet drill. |
+| Re-signed root without a known fingerprint | Keep an unverified candidate. A complete scan of the selected pool, or a `discover` scan of every configuration-verified pool in the configured factory, may confirm it through valid, positive, unspent VALUE under that exact owner, or through an unspent independent BUDGET bound to that owner whose identity matches the unlocked original identity. |
+| Re-signed root matching a retained new-wallet pending fingerprint | Permit recovery-material re-export to resume the drill; keep `backupRequired`. Re-signing and historical notes cannot complete the pending drill; a words or Key import does. |
 
 A valid mnemonic checksum, an empty scan, zero-value or already-spent VALUE, and
-BUDGET records alone do not confirm a candidate. Unknown unverified candidates
-cannot export official backups or public recovery descriptions. Client backup
+BUDGET records not checked against the original unlocked identity do not confirm
+a candidate. Discovery confirms only after its anchor block is rechecked; pools
+whose configuration cannot be verified are never scanned. Unknown unverified candidates
+cannot export official backups. Client backup
 markers are local workflow guards, not additional cryptographic authorization;
 [the frontend guide](frontend.md#funds-keys-backup-and-recovery) specifies their
 `sessionStorage` and lifecycle boundaries.

@@ -71,12 +71,17 @@ export type ShieldedClaimSummary = {
   periodIndices: string[];
   amount: string;
   amountPerPeriod: string;
+  /** Includes future periods, even when there is no currently claimable batch. */
+  totalRemaining?: string;
+  periodDays?: string;
   status: string;
   nextDueAt?: string;
 };
 export type ShieldedWalletSummary = {
   /** Public recovery-gate updates, including a signature candidate confirmed by history. */
   sessionState?: ShieldedAssetSessionState;
+  /** Whether the unlocked identity's family records loaded; omitted in a root-only session. */
+  familyRecordsAvailable?: boolean;
   toBlock: number;
   blockHash: string;
   notes: ShieldedNoteSummary[];
@@ -94,8 +99,6 @@ export type ShieldedAssetActionRequest = {
   amount?: string;
   candidates?: string[];
   recipientCode?: string;
-  /** Confirmed proof-independent receiving-code fingerprint. */
-  recipientFingerprint?: string;
   publicRecipient?: string;
   fundingEntry?: ShieldedFundingEntry;
   rootVersionIndex?: number;
@@ -173,19 +176,25 @@ export type ShieldedAssetWorkerCallMap = {
       format: "mnemonic" | "shieldedKey";
       material: string;
       expectedFingerprint?: string;
-      pendingBackupFingerprints?: readonly string[];
       context: ShieldedWorkerContext;
     };
     result: ShieldedAssetSessionState;
   };
+  /** Removes only the independent funds root; an unlocked identity remains. */
+  clearFunds: { params: Record<string, never>; result: ShieldedAssetSessionState };
   receiveCode: {
     params: { slot: ShieldedKeySlot };
-    result: { code: string; fingerprint: string };
+    result: { code: string };
   };
   recover: { params: { context: ShieldedWorkerContext }; result: ShieldedWalletSummary };
   discover: {
     params: { context: ShieldedWorkerContext };
-    result: { complete: boolean; pools: ShieldedDiscoveredPoolSummary[]; error?: string };
+    result: {
+      complete: boolean;
+      pools: ShieldedDiscoveredPoolSummary[];
+      error?: string;
+      sessionState?: ShieldedAssetSessionState;
+    };
   };
   preview: { params: ShieldedAssetActionRequest; result: ShieldedActionPreview };
   prove: {

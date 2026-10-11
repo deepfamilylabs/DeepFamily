@@ -16,17 +16,27 @@ verifiers to `contracts/`, following the identity/disclosure flow. Only the `.vk
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
 `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
-circuit manifests. `zk:artifacts:check` validates all 9 artifact sets; `zk:check` and
+circuit manifests. `zk:artifacts:check` validates all 10 artifact sets; `zk:check` and
 `zk:ceremony:verify` perform the cryptographic checks.
 The checked-in keys are development-only. `release:preflight` requires production keys and release
 evidence before publication.
 
-The inheritance funding dialog offers private and public funding. Private funding spends the
-parent's private balance and needs the child's verified receive code. Public funding spends
-ordinary-wallet DEEP, needs only the selected child's identity hash, and shows a token approval
-step when required. Its arrangement details are public. Both budget types use the same pool;
-claims create private VALUE balances after identity, current family eligibility, maturity and
-allowance checks. Additional public funding preserves the arrangement's original rate and clock.
+The budget dialog offers **Public budget**, **Private (identity credentials)**, and
+**Private (funds key)**. All three spend donor VALUE from the selected pool; the ordinary wallet
+supplies public `shield` deposits and transaction gas. Public budget needs only the child's
+registered person hash and publishes the recipient and budget terms. Private modes need the
+child's verified receive code of the matching type. Identity credentials recreate their derived
+funds; the funds-key mode uses a separate root that those credentials cannot recreate.
+
+Claims create private VALUE after identity, current family eligibility, maturity and allowance
+checks. Funds-key budgets also require the original funds key. Additional funding preserves the
+arrangement's original rate and clock.
+
+**Unlock funds key** accepts 24 English recovery words or a Shielded Key. New funds keys default
+to a random root, with wallet-signature derivation as an alternative. Both methods require saving
+and re-importing a backup after clearing the in-memory funds key. For signature-derived keys, the
+original signing wallet produces a recovery candidate until matching pool history confirms it. See
+[asset keys and recovery](../docs/shielded-asset-key-spec.md) for the exact rules.
 
 For architecture, domain layout, ABI sync, workers, ZK artifacts, and troubleshooting, see [docs/frontend.md](../docs/frontend.md). For frontend security guidance, see [docs/frontend-security.md](../docs/frontend-security.md).
 

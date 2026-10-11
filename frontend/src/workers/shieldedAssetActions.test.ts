@@ -239,7 +239,7 @@ describe("asset Worker preview and proof boundary", () => {
     release({ proof: {} });
     await expect(pending).rejects.toThrow("replaced or locked");
   });
-  it("checks the current complete receiving-code fingerprint before selecting any fund input", async () => {
+  it("checks the receiving code's child before selecting any fund input", async () => {
     const session = await unlocked();
     mocks.verify.mockResolvedValue({
       ok: true,
@@ -260,12 +260,11 @@ describe("asset Worker preview and proof boundary", () => {
         periods: "1",
         periodDays: "30",
         rootVersionIndex: 1,
-        publicRecipient: `0x${"00".repeat(31)}1f`,
+        publicRecipient: `0x${"00".repeat(31)}2f`,
         recipientCode: "code",
-        recipientFingerprint: "previous-code",
         candidates: ["1"],
       }),
-    ).rejects.toThrow("fingerprint");
+    ).rejects.toThrow("does not match the selected child");
     expect(mocks.proof).not.toHaveBeenCalled();
   });
   it("keeps a fresh funding policy handle stable across consolidation previews and checks input spends locally", async () => {
@@ -302,15 +301,7 @@ describe("asset Worker preview and proof boundary", () => {
   });
   it("rejects the final transfer destination before making a preparatory merge", async () => {
     const session = await unlocked();
-    mocks.verify.mockResolvedValue({
-      ok: true,
-      fingerprint: "current",
-      personHash: `0x${"00".repeat(31)}1f`,
-      identityCommitment: "31",
-      ownerCommitment: "53",
-      keyMode: 1,
-      viewingKey: `0x${"01".repeat(32)}`,
-    });
+    mocks.verify.mockResolvedValue({ ok: false });
     await expect(
       session.call("preview", {
         context,
@@ -319,9 +310,8 @@ describe("asset Worker preview and proof boundary", () => {
         amount: "10",
         candidates: ["1", "2"],
         recipientCode: "new-code",
-        recipientFingerprint: "old",
       }),
-    ).rejects.toThrow("fingerprint");
+    ).rejects.toThrow("receiving code");
     expect(mocks.transfer).not.toHaveBeenCalled();
   });
 });

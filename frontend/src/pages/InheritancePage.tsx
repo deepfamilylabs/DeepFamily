@@ -11,6 +11,7 @@ import {
   resolveShieldedAssetPool,
   type RecoveredShieldedAsset,
   type ShieldedPageModules,
+  type ShieldedPanelNavigation,
 } from "../domains/inheritance";
 import { useWallet, WalletConnectButton } from "../domains/wallet";
 import {
@@ -34,6 +35,14 @@ function sameAddress(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
+const INITIAL_NAVIGATION: ShieldedPanelNavigation = {
+  slot: "identity",
+  action: "shield",
+  walletAction: "shield",
+  receiveSlot: "identity",
+  taskChosen: false,
+};
+
 export default function InheritancePage() {
   const config = useConfig();
   const wallet = useWallet();
@@ -52,10 +61,22 @@ function InheritanceContent() {
   const { t } = useTranslation();
   const config = useConfig();
   const wallet = useWallet();
-  const { lock } = useShieldedPageIdentitySession();
+  const { busy: sessionBusy, identity } = useShieldedPageIdentitySession();
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
   const [selectedAssetAddress, setSelectedAddress] = useState(config.tokenAddress);
-  // Selection stays public when locking; the selected pool provides its own unlock entry.
+  // Each pool remounts its panel; public navigation carries the current task across.
+  const [navigation, setNavigation] = useState<ShieldedPanelNavigation>(INITIAL_NAVIGATION);
+  // Unlocking another person remounts it from the start, so no draft, selection or
+  // task of the previous person carries over. Re-unlocking the same person keeps them.
+  const [person, setPerson] = useState({ commitment: "", epoch: 0 });
+  if (identity && identity.identityCommitment !== person.commitment) {
+    const switched = person.commitment !== "";
+    setPerson({
+      commitment: identity.identityCommitment,
+      epoch: person.epoch + (switched ? 1 : 0),
+    });
+    if (switched) setNavigation(INITIAL_NAVIGATION);
+  }
   const selectedAddress = selectedAssetAddress;
   const [importAddress, setImportAddress] = useState("");
   const [importedAssets, setImportedAssets] = useState<RecoveredShieldedAsset[]>([]);
@@ -208,7 +229,6 @@ function InheritanceContent() {
           ? assets
           : [...assets, asset],
       );
-      lock();
       setSelectedAddress(asset.address);
       setImportAddress("");
     } catch (error) {
@@ -266,6 +286,8 @@ function InheritanceContent() {
     sameAddress(selectedAddress, state.modules.assetAddress)
       ? state.modules
       : null;
+  // Changing pools keeps the unlocked identity and funds root; the Worker drops only
+  // the previous pool's history and prepared work. A running operation finishes first.
   const assetControls = (
     <div className="min-w-0 space-y-2">
       <ShieldedAssetToolbar
@@ -273,13 +295,12 @@ function InheritanceContent() {
         deepTokenAddress={config.tokenAddress}
         nativeSymbol={nativeSymbol}
         importedAssets={importedAssets}
-        disabled={creatingPool}
+        disabled={creatingPool || sessionBusy}
         importing={importing}
         importAddress={importAddress}
         onImportAddressChange={setImportAddress}
         onImport={() => void importAsset()}
         onSelect={(address) => {
-          if (!sameAddress(address, selectedAddress)) lock();
           setSelectedAddress(address);
           setAssetError("");
         }}
@@ -310,7 +331,7 @@ function InheritanceContent() {
   return (
     <div className="space-y-6">
       {head}
-      {assetControls && !readyModules ? (
+      {!readyModules ? (
         <div className="min-w-0 rounded-xl border border-hairline bg-surface px-4 py-3 sm:px-5">
           {assetControls}
         </div>
@@ -359,12 +380,14 @@ function InheritanceContent() {
       ) : null}
       {readyModules ? (
         <ShieldedInheritancePanel
-          key={`${readyModules.chainId}:${readyModules.poolAddress}`}
+          key={`${readyModules.chainId}:${readyModules.poolAddress}:${person.epoch}`}
           modules={readyModules}
           signer={wallet.signer}
           account={wallet.address}
           publicActivityAddresses={publicActivityAddresses.current}
           assetControls={assetControls}
+          navigation={navigation}
+          onNavigationChange={setNavigation}
         />
       ) : null}
     </div>

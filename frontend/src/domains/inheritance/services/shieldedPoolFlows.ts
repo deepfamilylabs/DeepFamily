@@ -59,6 +59,8 @@ type BaseFlowInput = {
   onBroadcast?: (transactionHash: string) => void;
   /** Record this exact transaction slot before asking the wallet to submit it. */
   onSubmitting?: (anchor: ShieldedSubmissionAnchor) => void;
+  /** Keep the unlocked session through a wallet handoff, then release it before receipt tracking. */
+  onWalletRequest?: () => (() => void);
   /** Pause before requesting the wallet transaction so the user can review this step's fee. */
   onGasEstimate?: (review: ShieldedGasReview) => Promise<void> | void;
   /** Large lineage proofs can take longer than the default worker timeout. */
@@ -298,14 +300,20 @@ async function submitAction(
   // This synchronous boundary lets the caller recheck lock/context state after
   // every preparatory RPC read, before recording an unknown broadcast attempt.
   onStage?.("submitting");
-  if (submission) input.onSubmitting?.(submission);
-  const tx = await method(...args, {
-    ...valueOverrides,
-    chainId: expectedChainId,
-    gasLimit,
-    ...feeOverrides,
-    ...(submission ? { nonce: submission.nonce } : {}),
-  });
+  const endWalletRequest = input.onWalletRequest?.();
+  let tx: ContractTransactionResponse;
+  try {
+    if (submission) input.onSubmitting?.(submission);
+    tx = await method(...args, {
+      ...valueOverrides,
+      chainId: expectedChainId,
+      gasLimit,
+      ...feeOverrides,
+      ...(submission ? { nonce: submission.nonce } : {}),
+    });
+  } finally {
+    endWalletRequest?.();
+  }
   input.onBroadcast?.(tx.hash);
   onStage?.("confirming");
   const receipt = await tx.wait();

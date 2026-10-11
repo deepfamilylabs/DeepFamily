@@ -3,7 +3,10 @@ import React from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ShieldedPublicIdentity } from "../shared/workers/shieldedAssetWorkerTypes";
-import { useShieldedPageIdentitySession } from "../domains/inheritance";
+import {
+  useShieldedPageIdentitySession,
+  type ShieldedPanelNavigation,
+} from "../domains/inheritance";
 import InheritancePage from "./InheritancePage";
 
 const identity: ShieldedPublicIdentity = {
@@ -12,6 +15,12 @@ const identity: ShieldedPublicIdentity = {
   identity: { fullName: "Test Person" },
   identityCommitment: "777",
   personHash: "0x" + "00".repeat(32),
+};
+const otherIdentity: ShieldedPublicIdentity = {
+  ...identity,
+  identity: { fullName: "Other Person" },
+  identityCommitment: "888",
+  personHash: "0x" + "01".repeat(32),
 };
 
 const mocks = vi.hoisted(() => ({
@@ -81,10 +90,14 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
     signer,
     modules,
     assetControls,
+    navigation,
+    onNavigationChange,
   }: {
     account: string;
     signer: unknown;
     assetControls?: React.ReactNode;
+    navigation?: ShieldedPanelNavigation;
+    onNavigationChange?: (navigation: ShieldedPanelNavigation) => void;
     modules: {
       assetKind: string;
       assetSymbol: string;
@@ -105,6 +118,19 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         {assetControls}
         <span data-testid="shielded-session-state">{session.identity ? "unlocked" : "locked"}</span>
         <span data-testid="shielded-identity">{session.identity?.identityCommitment ?? ""}</span>
+        <span data-testid="shielded-funds">{session.funds?.fundsFingerprint ?? ""}</span>
+        <span data-testid="shielded-navigation">
+          {navigation ? `${navigation.slot}:${navigation.action}:${navigation.walletAction}` : ""}
+        </span>
+        <span data-testid="shielded-receive-slot">{navigation?.receiveSlot ?? ""}</span>
+        <button type="button" onClick={() => onNavigationChange?.({
+          slot: "asset",
+          action: "claim",
+          walletAction: "privateTransfer",
+          receiveSlot: "asset",
+        })}>
+          select-independent-claim
+        </button>
         <span data-testid="shielded-signer-state">{signer ? "ready" : "reconnecting"}</span>
         <span data-testid="shielded-account">{account}</span>
         <span data-testid="shielded-asset">
@@ -115,6 +141,18 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         <span data-testid="shielded-token">{modules.token ? "erc20" : "native"}</span>
         <button type="button" onClick={() => session.unlock(identity)}>
           unlock-test-session
+        </button>
+        <button type="button" onClick={() => session.unlock(otherIdentity)}>
+          unlock-other-test-session
+        </button>
+        <button type="button" onClick={session.lock}>
+          lock-test-session
+        </button>
+        <button type="button" onClick={() => session.setBusy(true)}>
+          start-busy-test
+        </button>
+        <button type="button" onClick={() => session.setBusy(false)}>
+          stop-busy-test
         </button>
         <button
           type="button"
@@ -221,6 +259,22 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.getByTestId("shielded-deployment-block").textContent).toBe("12");
   });
 
+  it("disables asset changes while a secret operation runs", async () => {
+    render(<InheritancePage />);
+    await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    const selector = () =>
+      screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement;
+    expect(selector().disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "start-busy-test" }));
+    expect(selector().disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "shielded.assets.add" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "stop-busy-test" }));
+    expect(selector().disabled).toBe(false);
+  });
+
   it("does not show actions when the factory is missing", () => {
     mocks.factoryAddress = "";
     render(<InheritancePage />);
@@ -247,10 +301,18 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
   });
 
-  it("locks secrets and remounts pool-local drafts while preserving the selected pool", async () => {
+  it("keeps both secrets but clears pool-local drafts when changing pools, preserving task navigation", async () => {
     render(<InheritancePage />);
     const original = await screen.findByTestId("shielded-panel");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield:shield");
+    expect(screen.getByTestId("shielded-receive-slot").textContent).toBe("identity");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-root-only" }));
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
+    fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim:privateTransfer");
+    expect(screen.getByTestId("shielded-receive-slot").textContent).toBe("asset");
     fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
       target: { value: "old DEEP budget" },
     });
@@ -261,21 +323,50 @@ describe("InheritancePage private pool entry", () => {
       expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.nativePoolAddress),
     );
     expect(screen.getByTestId("shielded-panel")).not.toBe(original);
-    expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
-    expect(screen.getByTestId("shielded-identity").textContent).toBe("");
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
+    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim:privateTransfer");
+    expect(screen.getByTestId("shielded-receive-slot").textContent).toBe("asset");
     expect(screen.getByTestId("shielded-token").textContent).toBe("native");
     expect(screen.getByTestId("shielded-deployment-block").textContent).toBe("5");
     expect(
       (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
     ).toBe("");
     expect(mocks.panelUnmounted).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
-    expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
-    expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.nativePoolAddress);
   });
 
-  it("locks during pool changes and ignores late responses after selecting the previous pool", async () => {
+  it("starts another person from a fresh panel and task, keeping drafts for the same person", async () => {
     render(<InheritancePage />);
+    const original = await screen.findByTestId("shielded-panel");
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
+      target: { value: "first person's budget" },
+    });
+    const draft = () =>
+      (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value;
+    // Re-unlocking the same person after a lock continues where it stopped.
+    fireEvent.click(screen.getByRole("button", { name: "lock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
+    expect(screen.getByTestId("shielded-panel")).toBe(original);
+    expect(draft()).toBe("first person's budget");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim:privateTransfer");
+    // Another person shows nothing of the first one.
+    fireEvent.click(screen.getByRole("button", { name: "lock-test-session" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-other-test-session" }));
+    expect(screen.getByTestId("shielded-identity").textContent).toBe(
+      otherIdentity.identityCommitment,
+    );
+    expect(screen.getByTestId("shielded-panel")).not.toBe(original);
+    expect(mocks.panelUnmounted).toHaveBeenCalledOnce();
+    expect(draft()).toBe("");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield:shield");
+    expect(screen.getByTestId("shielded-receive-slot").textContent).toBe("identity");
+  });
+
+  it("locks during pool loading and ignores late responses after a protocol scope change", async () => {
+    const { rerender } = render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     const pendingNative = deferred<{
@@ -292,9 +383,9 @@ describe("InheritancePage private pool entry", () => {
     });
     await screen.findByText("shielded.loading");
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-      target: { value: mocks.config.tokenAddress },
-    });
+    expect(screen.getByRole("combobox", { name: "shielded.assets.label" })).toBeTruthy();
+    mocks.factoryAddress = "0x0000000000000000000000000000000000000009";
+    rerender(<InheritancePage />);
     const restoredPanel = await screen.findByTestId("shielded-panel");
     expect(screen.getByTestId("shielded-identity").textContent).toBe("");
     expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
@@ -311,7 +402,7 @@ describe("InheritancePage private pool entry", () => {
   });
 
   it.each(["missing", "failed"])(
-    "keeps asset navigation available when a %s pool has locked the identity",
+    "returns from a %s asset pool through asset selection without unlocking again",
     async (result) => {
       render(<InheritancePage />);
       await screen.findByTestId("shielded-panel");
@@ -330,12 +421,13 @@ describe("InheritancePage private pool entry", () => {
       if (result === "missing") await screen.findByText("shielded.assets.noPool");
       else await screen.findByText("Pool temporarily unreachable");
       expect(screen.queryByTestId("shielded-panel")).toBeNull();
+      expect(screen.queryByRole("button", { name: "unlock-test-session" })).toBeNull();
       fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
         target: { value: mocks.config.tokenAddress },
       });
       await screen.findByTestId("shielded-panel");
-      expect(screen.getByTestId("shielded-identity").textContent).toBe("");
-      expect(screen.getByTestId("shielded-session-state").textContent).toBe("locked");
+      expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
+      expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
     },
   );
 
@@ -479,6 +571,7 @@ describe("InheritancePage private pool entry", () => {
     await waitFor(() =>
       expect(screen.getByTestId("shielded-asset").textContent).toBe("erc20:TEST:6"),
     );
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
     expect(
       (screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement).value,
     ).toBe(address);
@@ -499,22 +592,25 @@ describe("InheritancePage private pool entry", () => {
       expect(screen.getByTestId("shielded-asset").textContent).toBe("erc20:TEST:raw"),
     );
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
     expect(
       (screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement).value,
     ).toBe("0x0000000000000000000000000000000000000030");
   });
 
-  it("exposes asset selection and root-only recovery without unlocking identity credentials", async () => {
+  it("keeps a root-only funds session when another pool is selected", async () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-root-only" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe("");
+    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
       target: { value: "0x0000000000000000000000000000000000000000" },
     });
     await waitFor(() =>
       expect(screen.getByTestId("shielded-asset").textContent).toContain("native:"),
     );
+    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
   });
 
   it("offers a network switch and hides the actions on the wrong chain", async () => {

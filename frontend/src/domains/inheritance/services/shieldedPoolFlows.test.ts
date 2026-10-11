@@ -113,6 +113,137 @@ beforeEach(() => {
 });
 
 describe("shielded pool local proof and self-submit flows", () => {
+  it("holds the wallet request guard only until the wallet returns, before broadcasting or waiting for a receipt", async () => {
+    const f = fixture();
+    const order: string[] = [];
+    let releaseWallet!: (transaction: { hash: string; wait: typeof wait }) => void;
+    let releaseReceipt!: (receipt: { status: number }) => void;
+    const wait = vi.fn(() => {
+      order.push("receipt");
+      return new Promise<{ status: number }>((resolve) => {
+        releaseReceipt = resolve;
+      });
+    });
+    const endWalletRequest = vi.fn(() => order.push("end"));
+    const onWalletRequest = vi.fn(() => {
+      order.push("begin");
+      expect(f.methods.shield).not.toHaveBeenCalled();
+      return endWalletRequest;
+    });
+    f.methods.shield.mockImplementationOnce(() => {
+      order.push("wallet");
+      return new Promise((resolve) => {
+        releaseWallet = resolve;
+      });
+    });
+    const pending = submitShield({
+      ...f.common,
+      amount: 100n,
+      onSubmitting: () => order.push("anchor"),
+      onWalletRequest,
+      onBroadcast: () => order.push("broadcast"),
+      onStage: (stage) => {
+        if (stage === "confirming") order.push("confirming");
+      },
+    });
+    await vi.waitFor(() => expect(f.methods.shield).toHaveBeenCalledOnce());
+    expect(order).toEqual(["begin", "anchor", "wallet"]);
+    expect(endWalletRequest).not.toHaveBeenCalled();
+    releaseWallet({ hash: "0xshield", wait });
+    await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
+    expect(order).toEqual(["begin", "anchor", "wallet", "end", "broadcast", "confirming", "receipt"]);
+    expect(onWalletRequest).toHaveBeenCalledOnce();
+    expect(endWalletRequest).toHaveBeenCalledOnce();
+    releaseReceipt({ status: 1 });
+    await pending;
+    expect(endWalletRequest).toHaveBeenCalledOnce();
+  });
+
+  it("ends the wallet request guard when the wallet rejects submission", async () => {
+    const f = fixture();
+    const endWalletRequest = vi.fn();
+    const onWalletRequest = vi.fn(() => endWalletRequest);
+    const onBroadcast = vi.fn();
+    const onStage = vi.fn();
+    const rejection = Object.assign(new Error("User rejected transaction"), { code: 4001 });
+    f.methods.shield.mockRejectedValueOnce(rejection);
+    await expect(
+      submitShield({ ...f.common, amount: 100n, onWalletRequest, onBroadcast, onStage }),
+    ).rejects.toBe(rejection);
+    expect(onWalletRequest).toHaveBeenCalledOnce();
+    expect(endWalletRequest).toHaveBeenCalledOnce();
+    expect(onBroadcast).not.toHaveBeenCalled();
+    expect(onStage).not.toHaveBeenCalledWith("confirming");
+  });
+
+  it.each(["preflight", "network", "gas balance", "fee review", "network after fee review"] as const)(
+    "does not start a wallet request guard when %s fails",
+    async (failure) => {
+      const f = fixture();
+      const onWalletRequest = vi.fn(() => vi.fn());
+      const onGasEstimate = vi.fn();
+      let data = f.common.data;
+      let message: string;
+      switch (failure) {
+        case "preflight":
+          data = { ...data, outputCiphertexts: ["0xab", CIPHERTEXT] };
+          message = "exactly 512 bytes";
+          break;
+        case "network":
+          f.setChainId(1n);
+          message = "wrong network";
+          break;
+        case "gas balance":
+          f.setBalance(1n);
+          message = "Transaction wallet needs at least";
+          break;
+        case "fee review":
+          onGasEstimate.mockRejectedValueOnce(new Error("Fee review canceled"));
+          message = "Fee review canceled";
+          break;
+        case "network after fee review":
+          onGasEstimate.mockImplementationOnce(() => f.setChainId(1n));
+          message = "wrong network";
+          break;
+      }
+      await expect(
+        submitShield({ ...f.common, data, amount: 100n, onGasEstimate, onWalletRequest }),
+      ).rejects.toThrow(message);
+      expect(onWalletRequest).not.toHaveBeenCalled();
+      expect(f.methods.shield).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not send a transaction when the wallet request boundary rejects the caller's state", async () => {
+    const f = fixture();
+    const onSubmitting = vi.fn();
+    const onWalletRequest = vi.fn(() => {
+      throw new Error("Inheritance session locked before the wallet request");
+    });
+    await expect(
+      submitShield({ ...f.common, amount: 100n, onSubmitting, onWalletRequest }),
+    ).rejects.toThrow("Inheritance session locked before the wallet request");
+    expect(onWalletRequest).toHaveBeenCalledOnce();
+    expect(onSubmitting).not.toHaveBeenCalled();
+    expect(f.methods.shield).not.toHaveBeenCalled();
+  });
+
+  it("ends the wallet request guard without sending when recording the submission fails", async () => {
+    const f = fixture();
+    const endWalletRequest = vi.fn();
+    const onWalletRequest = vi.fn(() => endWalletRequest);
+    const onSubmitting = vi.fn(() => {
+      throw new Error("Submission record unavailable");
+    });
+    await expect(
+      submitShield({ ...f.common, amount: 100n, onWalletRequest, onSubmitting }),
+    ).rejects.toThrow("Submission record unavailable");
+    expect(onWalletRequest).toHaveBeenCalledOnce();
+    expect(onSubmitting).toHaveBeenCalledOnce();
+    expect(endWalletRequest).toHaveBeenCalledOnce();
+    expect(f.methods.shield).not.toHaveBeenCalled();
+  });
+
   it("waits for fee review before sending and rechecks the chain afterwards", async () => {
     const f = fixture();
     let continueReview!: () => void;

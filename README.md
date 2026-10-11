@@ -58,9 +58,9 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ### Family Inheritance
 
 - A public `shield` deposit places the selected ERC-20 or native asset in its canonical pool. A unified `fund` action initializes a private rule while funding an eligible direct child, or adds another budget under an existing enrollment. Rules are recovered from encrypted donor memos; they have no standalone asset note.
-- Funding offers public identity addressing, private identity-derived receive codes, and private independent-key receive codes. Each spends donor VALUE and creates child BUDGET notes. Public addressing needs only the child's registered person hash and publishes the recipient and budget terms. Private independent funding binds the recipient's independent funds owner; identity credentials alone cannot derive that funds root.
+- Funding offers **Public budget**, **Private (identity credentials)**, and **Private (funds key)**. Each spends donor VALUE and creates child BUDGET notes. Public budget needs only the child's registered person hash and publishes the recipient and budget terms. Private modes need a verified receive code of the matching type. Private (funds key) binds a separate funds owner; identity credentials alone cannot derive that funds root.
 - A child proves current lineage eligibility and claims 1–12 matured periods from one or two compatible budgets into a private VALUE note. Each budget fixes its period duration in days at initial funding. Claims preserve the remaining budget terms; private transfers and a public exit are separate transactions. Insufficient budgets do not consume a period.
-- Independent funds default to a random 32-byte root, with wallet-signature derivation as an explicit alternative. The same root is backed up as 24 English recovery words or a Shielded Key. Recovery has three entries: words, Shielded Key, and the original signing wallet. Both creation methods require saving words or a Key and actually re-importing them in a fresh session. Identity-derived keys require no backup; independent-budget claims also require the original identity credentials and current eligibility. See [asset keys and recovery](docs/shielded-asset-key-spec.md) for the exact rules.
+- Funds keys default to a random 32-byte root, with wallet-signature derivation as an explicit alternative. The same root is backed up as 24 English recovery words or a Shielded Key. **Unlock funds key** accepts words or a Shielded Key. For signature-derived keys, the original signing wallet produces a recovery candidate that must be confirmed against matching pool history. Both creation methods require saving words or a Key and re-importing that backup after clearing the in-memory funds key. Identity credentials recreate their derived funds without a separate key backup; funds-key budget claims also require the original identity credentials and current eligibility. See [asset keys and recovery](docs/shielded-asset-key-spec.md) for the exact rules.
 - Gas-paying wallets, public deposits, and public exit addresses and amounts remain visible. Privacy depends on avoiding address funding and timing links; the pool does not offer absolute anonymity. Each asset has its own balances, budgets and anonymity set.
 
 ## Technology Stack
@@ -118,7 +118,7 @@ cp frontend/.env.example frontend/.env.local  # Then set VITE_ZK_ASSET_BASE_URL
 npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
-npm run dev:deploy      # Check all 8 circuit artifacts and deploy the complete system
+npm run dev:deploy      # Check all 10 circuit artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts

@@ -13,6 +13,8 @@ import { useShieldedIdentitySession } from "./useShieldedIdentitySession";
 
 type IdentitySession = ReturnType<typeof useShieldedIdentitySession>;
 type SessionContextValue = IdentitySession & {
+  /** A secret operation is running; pool changes wait so no queued work spans two pools. */
+  busy: boolean;
   setBusyFor: (owner: string, busy: boolean) => void;
 };
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -28,7 +30,8 @@ export function ShieldedIdentitySessionProvider({
   children: ReactNode;
 }) {
   const [busyOwners, setBusyOwners] = useState<ReadonlySet<string>>(() => new Set());
-  const session = useShieldedIdentitySession({ scope, busy: busyOwners.size > 0 });
+  const busy = busyOwners.size > 0;
+  const session = useShieldedIdentitySession({ scope, busy });
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
   const setBusyFor = useCallback((owner: string, busy: boolean) => {
@@ -40,7 +43,18 @@ export function ShieldedIdentitySessionProvider({
       return next;
     });
   }, []);
-  const { identity, funds, unlock, update, lock, touch } = session;
+  const {
+    identity,
+    funds,
+    identityDraft,
+    rememberIdentityDraft,
+    unlock,
+    update,
+    lock,
+    touch,
+    beginWalletRequest,
+    isWalletRequestPending,
+  } = session;
   const guardedUnlock = useCallback<typeof unlock>(
     (material) => {
       if (enabledRef.current) unlock(material);
@@ -53,33 +67,72 @@ export function ShieldedIdentitySessionProvider({
     },
     [update],
   );
+  const guardedBeginWalletRequest = useCallback<typeof beginWalletRequest>(
+    () => (enabledRef.current ? beginWalletRequest() : () => {}),
+    [beginWalletRequest],
+  );
   useLayoutEffect(() => {
-    if (!enabled) lock();
-  }, [enabled, lock]);
+    if (enabled) return;
+    rememberIdentityDraft(null);
+    lock();
+  }, [enabled, lock, rememberIdentityDraft]);
   const value = useMemo(
     () => ({
       identity: enabled ? identity : null,
       funds: enabled ? funds : null,
+      identityDraft: enabled ? identityDraft : null,
+      rememberIdentityDraft,
       unlock: guardedUnlock,
       update: guardedUpdate,
       lock,
       touch,
+      beginWalletRequest: guardedBeginWalletRequest,
+      isWalletRequestPending,
+      busy,
       setBusyFor,
     }),
-    [enabled, identity, funds, guardedUnlock, guardedUpdate, lock, touch, setBusyFor],
+    [
+      busy,
+      enabled,
+      identity,
+      funds,
+      identityDraft,
+      rememberIdentityDraft,
+      guardedUnlock,
+      guardedUpdate,
+      lock,
+      touch,
+      guardedBeginWalletRequest,
+      isWalletRequestPending,
+      setBusyFor,
+    ],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 /** Each mounted consumer owns its busy flag so a late old operation cannot release a new one. */
 export function useShieldedPageIdentitySession(): IdentitySession & {
+  busy: boolean;
   setBusy: (busy: boolean) => void;
 } {
   const session = useContext(SessionContext);
   const owner = useId();
   const mounted = useRef(false);
   if (!session) throw new Error("Shielded identity session provider is missing");
-  const { setBusyFor, identity, funds, unlock, update, lock, touch } = session;
+  const {
+    setBusyFor,
+    identity,
+    funds,
+    identityDraft,
+    rememberIdentityDraft,
+    unlock,
+    update,
+    lock,
+    touch,
+    beginWalletRequest,
+    isWalletRequestPending,
+    busy,
+  } = session;
   const setBusy = useCallback(
     (busy: boolean) => {
       if (mounted.current) setBusyFor(owner, busy);
@@ -94,7 +147,33 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
     };
   }, [owner, setBusyFor]);
   return useMemo(
-    () => ({ identity, funds, unlock, update, lock, touch, setBusy }),
-    [identity, funds, unlock, update, lock, touch, setBusy],
+    () => ({
+      identity,
+      funds,
+      identityDraft,
+      rememberIdentityDraft,
+      unlock,
+      update,
+      lock,
+      touch,
+      beginWalletRequest,
+      isWalletRequestPending,
+      busy,
+      setBusy,
+    }),
+    [
+      identity,
+      funds,
+      identityDraft,
+      rememberIdentityDraft,
+      unlock,
+      update,
+      lock,
+      touch,
+      beginWalletRequest,
+      isWalletRequestPending,
+      busy,
+      setBusy,
+    ],
   );
 }

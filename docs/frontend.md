@@ -239,49 +239,56 @@ The tree can hide person versions that aren't vouched for by a root-defined allo
 
 ### Shielded family inheritance
 
-`/inheritance` discovers canonical pools through `ShieldedPoolFactory` and uses `ShieldedErc20Pool` or `ShieldedNativePool`. The asset toolbar remains available while locked and during root-only recovery. Importing an asset or changing pools locks the secret session. Metadata failures preserve verified raw integer amounts with unknown precision; they do not imply zero balance or an 18-decimal token.
+`/inheritance` discovers canonical pools through `ShieldedPoolFactory` and uses `ShieldedErc20Pool` or `ShieldedNativePool`. The entry screen has the identity unlock form (original person details and identity passphrase); beside **Unlock identity**, **Unlock funds key** opens funds with the funds key alone. The application never persists the root, so each fresh funds-key session restores it without requiring identity credentials. Asset selection appears after unlocking, or after a verified funds restoration, in `ShieldedAssetOverview` with the balances; without identity the overview identifies the funds fingerprint and keeps budget eligibility unknown. Changing or importing an asset keeps the unlocked identity and funds root, and is disabled while an operation runs. A missing or unavailable pool shows asset selection directly so the user can switch away or create the pool. Metadata failures preserve verified raw integer amounts with unknown precision; they do not imply zero balance or an 18-decimal token.
 
-The panel has wallet-key controls, recovery controls and one action selector for deposit, funding, claim, private transfer and withdrawal. Every funding entry follows `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`; funding consumes the donor's recovered VALUE, rather than directly spending an ordinary-wallet token balance.
+The workspace has the asset overview and selector, three task tabs and an action bar containing deposit, private transfer, withdrawal, receive code and **Unlock funds key** (or **Manage funds key** when one is already loaded). All five items share the same container and button style; the funds-key item is selected during management, and the original task is selected again after returning. From the workspace, recovery, creation and backup replace only the current task container contents; the overview and task navigation stay mounted. Management adds no restrictions to the surrounding controls; existing operation and eligibility checks still apply. There are no separate return buttons: the existing task navigation switches content, and selecting the current task resumes it without resetting its drafts. Leaving management clears displayed secrets and pauses any unfinished backup verification. Verified recovery automatically returns to the current task, preserving input drafts and funds selections; a new key returns only after its in-memory root has been cleared and its saved backup manually re-imported. The initial entry beside identity unlock remains available. Amount drafts remain separate. Transfers and withdrawals list balance rows as allowed candidates for the 8-input planner. The first identity scan opens budget claims when a budget exists, otherwise transfer when VALUE is available, otherwise deposit. Subsequent unlocks retain the selected task. An unlock without a verified independent root shows **Receive code (identity credentials)**; claims keep their budget filter. The paying funds, the receive-code type and the claim filter are three separate choices, so changing one never changes another. The overview totals all loaded funds; when identity and a verified independent root are both loaded, it also shows each one's share, and deposit, transfer, withdrawal and funding forms start with a funds choice labelled **Identity credentials** or **Funds key** (for a deposit, the receiving funds). These are the display names for the existing identity-derived and asset-root-derived key material. A verified root alone opens its VALUE operations; selecting budget funding, claims or identity-bound receive codes requests the original identity credentials separately.
 
-Initial funding offers three entries:
+Under **Receive code**, recipients choose **Receive code (identity credentials)** or **Receive code (funds key)**. The **Funds key** receiving settings offer restoring the original key before creating a new one; a loaded candidate continues its confirmation, and a verified key offers only backup. New keys are created only here: restoring for a claim or from the entry screen requires the original key. Creation defaults to random bytes, with wallet signing as an explicit alternative. Both require saving and actually verifying a recovery phrase or Shielded Key. Existing budget claims offer only restoration of the original missing key; creating another key cannot change an existing budget's authorization. The budget filter uses **Budgets (identity credentials)** and **Budgets (funds key)** to select the corresponding histories without changing either budget binding. Selecting **Budgets (funds key)** without a verified root shows **Unlock funds key** as the primary action; the claim button appears after recovery and retains the same eligibility checks. A funds key controls its VALUE notes; budget claims also require the original identity credentials and family, period and enrollment eligibility. The page automatically tracks transaction results and displays pending, successful or failed feedback throughout.
 
-- Public identity-bound funding fixes `keyMode = 0` and needs only the registered child's person hash. It publishes identity and budget terms, without asking for the child's credentials, independent root or receive code.
-- Private convenient funding fixes `keyMode = 0` and verifies an identity-derived receive code. Only this entry offers payer-side code generation from the child's complete identity credentials. Anyone possessing those credentials can reconstruct the corresponding spending and viewing keys.
-- Private independent funding fixes `keyMode = 1` and verifies the recipient's identity/ownership receive code. The payer confirms the recipient, mode and full fingerprint; knowing the identity credentials alone cannot reconstruct the independent root.
+The identity and funds root remain separate key material in one Worker. Creating, importing or replacing an independent root keeps the unlocked identity: replacing a loaded root or candidate removes only that root (`clearFunds`). Backup verification also removes only the new root and clears the displayed material, then requires the saved words or Key in an empty input; the Worker decodes them again and requires the original fingerprint before opening the root. Changing task tabs or the displayed receiving type does not lock the session. Changing pools keeps both secrets: the Worker drops only the previous pool's scanned history, prepared witnesses and policy drafts, and the new pool is scanned automatically; public task selection carries across. After a lock the application itself requires (wallet signing, hidden pages outside a pending transaction request), the identity form is prefilled with the last public person details, so only the passphrase is entered again. Unlocking a different person starts the panel over, so no task, draft or selection of the previous person carries across; re-unlocking the same person keeps them. Idle expiry, a disconnected wallet and an explicit exit forget those details; the passphrase is never retained.
 
-The funding parent unlocks their own identity, selects a parent person-version index, and chooses from eligible direct children or their recovered original funding templates. A new policy uses a per-period amount, period duration and funded-period count. An existing policy fixes its original terms. Private refills preserve the original owner, mode and viewing key; public refills preserve the original identity-bound schema. A policy draft's public handle survives preparatory consolidation, so a later funding step does not silently create a different policy. The user can explicitly discard that draft.
+Budget funding exposes three parallel entries and recommends **Private (funds key)**. The entry controls the child's authorization independently of the parent's selected payment owner:
+
+- **Public budget** fixes `keyMode = 0` and needs only the registered child's person hash and budget terms. It publishes identity and terms without asking for child credentials, an independent root or a receive code.
+- **Private (identity credentials)** fixes `keyMode = 0` and verifies an identity-derived receive code. Only this entry offers payer-side code generation from the child's complete identity credentials. Anyone possessing those credentials can reconstruct the corresponding spending and viewing keys.
+- **Private (funds key)** fixes `keyMode = 1` and accepts only the recipient's **Receive code (funds key)**. The payer never chooses the recipient's root source or creates their root.
+
+Both private entries use the same budget note encryption and differ in how the recipient's spending and viewing keys are derived. They check the selected child and code type automatically; payers do not confirm a code fingerprint. Switching entries clears only receiving materials and prepared work; the child, version, rule and amounts stay, as does the selected payment owner. Selecting an original funding template locks the entry and receiving key to that template. Every entry follows `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`; funding consumes the donor's recovered VALUE rather than directly spending an ordinary-wallet token balance.
+
+The funding parent unlocks their own identity, selects a parent person-version index, and chooses from eligible direct children or their recovered original funding templates. Parent-version choices belong to the unlocked funding parent's identity, rather than the unlocked person's parents or their funds key. An empty choice list reports no matching loaded records; it does not establish that no version exists outside the scan scope. A new policy uses a per-period amount, period duration and funded-period count. An existing policy fixes its original terms. Private refills preserve the original owner, mode and viewing key; public refills preserve the original identity-bound schema. A policy draft's public handle survives preparatory consolidation, so a later funding step does not silently create a different policy. Changing the parent version, per-period amount or period length, or leaving the task, discards that draft.
 
 #### Funds keys, backup and recovery
 
-One asset Worker may hold an identity-derived slot and at most one independent
-funds slot. The identity slot is reconstructed from the original complete
-identity fields and passphrase; it needs no backup. Independent funds use a
+One asset Worker may hold an identity-derived slot and at most one asset-root-derived
+slot. The identity slot is reconstructed from the original complete
+identity fields and passphrase; it needs no backup. Funds-key mode uses a
 32-byte `assetRoot`, which derives separate spending and viewing branches.
 **Shielded Key** names that complete root, represented as hexadecimal; the same
 root can be saved as **24 English recovery words**. Neither form uses an extra
 recovery password or the identity passphrase. Exact encodings, derivation and
 version constants belong to the [asset-key specification](shielded-asset-key-spec.md).
 
-Create and verify a new independent funds wallet in this order:
+Create and verify a new funds key in this order:
 
 1. Explicitly create the root. The default uses secure random bytes; wallet
    signing is an explicit alternative. Both sources start with `backupRequired`.
 2. Export and independently save either the 24 words or the Shielded Key.
    Saving both is unnecessary. The Key is a DeepFamily funds master key, not
    the connected ordinary wallet's private key or only the spending branch.
-3. Acknowledge that the material has been saved, then start independent import.
-   This destroys the original Worker and clears secret inputs and the displayed
-   export; the original public funds fingerprint remains available for comparison.
-4. Manually enter the full saved words or Key. A fresh Worker restores the root
+3. Acknowledge that the material has been saved, then start verification. The
+   Worker removes the root and the displayed export and secret inputs are
+   cleared; an unlocked identity stays. The original public funds fingerprint
+   remains available for comparison.
+4. Manually enter the full saved words or Key. The Worker decodes the root again
    and requires its fingerprint to match the original before enabling receive
    codes and funds operations. Re-signing alone cannot complete this drill.
 
-For an existing funds wallet, choose one recovery entry:
+For an existing funds key, choose one recovery entry:
 
-| Entry | Material | Applies to |
-| --- | --- | --- |
-| Recovery words | The full 24-word DeepFamily phrase | Random or signature-derived roots |
-| Shielded Key | The complete DeepFamily funds master key | Random or signature-derived roots |
+| Entry          | Material                                            | Applies to                                             |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------ |
+| Recovery words | The full 24-word DeepFamily phrase                  | Random or signature-derived roots                      |
+| Shielded Key   | The complete DeepFamily funds master key            | Random or signature-derived roots                      |
 | Wallet signing | The original wallet signing the fixed message again | Only roots originally generated by this signing method |
 
 Words and Key directly restore the same root, without deriving an Ethereum
@@ -290,54 +297,64 @@ was generated or which wallet can reproduce it. Signature restoration needs the
 original signature result; wallet software, device or version changes can
 produce a different valid signature and therefore a different root.
 
-Supply an independently known original funds fingerprint when available; a
-mismatch rejects recovery. Otherwise the root remains a candidate until a
-complete scan of the selected canonical pool finds a valid, positive, unspent
-VALUE under that owner. Valid words, an empty scan, zero-value or already-spent
-VALUE, and BUDGET records alone do not confirm it. Unknown candidates cannot
-export official backups or a recovery-description card. Recovery failures never
-create a replacement root, switch sources or fall back to another key mode.
+The restore form has no fingerprint field. Entered words or a Shielded Key are
+the backup itself, so their root opens at once: it can receive, spend and
+export, and a lost receive code can be regenerated. A fingerprint the
+application learned in the current session (a newly created root, or one
+already checked against its fingerprint) is still checked, and a mismatch
+rejects recovery; a lock forgets it so another key can be opened. Re-signing
+proves no durable backup, because other wallet software can sign a different
+root, so a re-signed root remains a candidate until a complete scan of the
+selected canonical pool, or a discovery scan of every configuration-verified
+pool in the configured factory, finds a valid, positive, unspent VALUE under
+that owner, or a matching asset-root-derived BUDGET verified against the original
+unlocked identity. An empty scan, zero-value or already-spent VALUE, and
+budgets pending identity verification do not confirm it; restoring with the
+words or Key does. Unknown candidates cannot export official backups.
+Recovery failures never create a replacement root,
+switch sources or fall back to another key mode.
 
 Only pending new-wallet public fingerprints are retained in `sessionStorage`
 across same-tab reloads when storage is available; storage failure leaves an
 in-memory guard for the current application session. No roots, words, Keys,
-signatures or identity credentials are stored there. A reopened root matching
+signatures or identity credentials are stored there. A root re-signed to match
 its retained pending fingerprint may re-export words or Key to resume the drill,
 but remains `backupRequired`; re-signing and owned history cannot complete it.
-A successful manual words/Key import matching the original fingerprint removes
-that marker. Closing the tab or moving to another device does not transfer this
+Manually entering the saved words or Key completes the drill and removes that
+marker. Closing the tab or moving to another device does not transfer this
 local marker. The drill protects the client workflow: it is not a global
 cryptographic spending condition, and cannot prove where a backup was saved.
 
-After recovery, independent funds have these authorization boundaries:
+After funds-key recovery, authorization requirements are:
 
-| Operation | Required material |
-| --- | --- |
-| Transfer or withdraw matching VALUE | Verified funds root; identity credentials are unnecessary |
-| Claim an independent BUDGET | Funds root plus the original complete identity credentials and existing family, period and enrollment eligibility |
+| Operation                           | Required material                                                                                                 |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Transfer or withdraw matching VALUE | Verified funds root; identity credentials are unnecessary                                                         |
+| Claim a BUDGET in funds-key mode     | Funds root plus the original complete identity credentials and existing family, period and enrollment eligibility |
 
 Root-only recovery can decrypt matching notes. BUDGET records remain pending
 identity confirmation and outside claimable
 balances until the original identity is supplied. Public budgets and
 identity-derived VALUE remain recoverable with identity credentials alone.
-Recovery summaries group by actual owner and pool; changing the selected slot
-locks the session. VALUE has no permanent historical key-mode/source label.
+Recovery summaries group by actual owner and pool. The UI keeps the payment
+source separate from the recipient's budget receiving method. VALUE has no
+permanent historical key-mode/source label.
 
 #### Pool recovery and transactions
 
-The page can scan the selected pool or discover every pool in the currently configured chain and factory; it does not automatically traverse all past factories or other chains. Factory enumeration verifies `PoolCreated` history against `poolCount`. Pool recovery verifies immutable wiring, public trees, action history and `nullifierCount` at a fixed block/hash anchor. Bad pools have independent failure boundaries and unknown balances; healthy pools retain their results. Historical spent and zero-value donor change notes preserve authenticated original Fund templates, private viewing keys, policy openings and allocation keys. Claim remainders cannot replace those templates. Later pools under the same configured factory need no new root backup. To scan another chain/factory scope, use its trusted application configuration. Recovery words and Key do not embed discovery metadata. A separate download produces a public recovery-description JSON containing its format/version, funds fingerprint, chain ID, factory address/deployment block and lineage-index address; it contains no secret and does not replace trusted configuration.
+The page automatically scans only the selected pool after identity unlock, after a transaction, or when returning from confirmed funds recovery. The overview refresh control and the candidate-recovery scan rescan the selected pool and then discover and scan every pool in the currently configured chain and factory, listing each pool's verified raw balances or an unknown balance; this does not traverse past factories or other chains. Factory enumeration verifies `PoolCreated` history against `poolCount`. Pool recovery verifies immutable wiring, public trees, action history and `nullifierCount` at a fixed block/hash anchor. Bad pools have independent failure boundaries and unknown balances; healthy pools retain their results. A failed family-record check preserves recovered VALUE balances and reports that family records are unavailable beside the parent-version field; it is distinct from a confirmed empty version list. Refreshing retries the check and restores version selection after a successful read. Historical spent and zero-value donor change notes preserve authenticated original Fund templates, private viewing keys, policy openings and allocation keys. Claim remainders cannot replace those templates. Later pools under the same configured factory need no new root backup. To scan another chain/factory scope, use its trusted application configuration. Recovery words and Key do not embed discovery metadata.
 
-Funding, transfer and withdrawal expose positive VALUE notes as an allowed candidate range. Selection does not require consuming every candidate. The Worker chooses an adequate subset under one actual owner and pool, using the smallest supported capacity. Transfers use 2/8-input circuits and withdrawals use 1/8-input circuits. If more than eight inputs are necessary, the preview displays the complete consolidation/payment sequence and its actual inputs and outputs. It validates integer conservation and output capacity before the first step. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
+Budget funding automatically supplies the donor’s available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection, including more than eight candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range and does not require consuming every candidate. The Worker chooses an adequate subset under one actual owner and pool, using the smallest supported capacity. Transfers use 2/8-input circuits and withdrawals use 1/8-input circuits. When a payment needs preparatory consolidation, the Worker plans the complete consolidation/payment sequence and validates integer conservation and output capacity before the first step. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
 
-Each confirmation executes only the displayed first step. After generating and locally verifying its proof, the flow estimates gas and pauses for a separate fee review. The transaction explicitly carries the reviewed fee caps, nonce and expected chain ID. Later steps need receipt confirmation, a new scan, a new preview and a new quote; their actual fees are not known in advance. There is no automatic next-step submission, automatic retry or consumption outside the candidate range.
+One confirmation sends the whole sequence, with no separate preview or fee review; the wallet still signs each transaction and shows its fee. Each step is prepared, proved and locally verified, then its gas is estimated and checked before the wallet request, and the transaction carries those fee caps, nonce and expected chain ID. After each receipt the flow scans again and plans the next step only from the original candidate range, minus the spent inputs and plus the positive consolidated outputs; while a multi-step plan runs, the page states how many transactions it contains. It stops when a step does not shorten the plan, the payment details, session or wallet change, or a transaction fails or is rejected. There is no automatic retry or consumption outside the candidate range.
 
-The ordinary wallet `G` supplies deposits and gas; it does not determine either slot's owner. Signature source `S` is needed only for signature-root creation/restoration and may differ from `G`. Changing `G` invalidates prepared work without rederiving funds. ERC-20 approval locks the secret session first, checks the public receipt and allowance, and requires unlocking again before deposit preparation. Public wallets, their funding links, deposit/exit amounts, timing and unusual amounts can associate private activity; the panel explains these limits without claiming complete anonymity.
+The ordinary wallet `G` supplies deposits and gas; it does not determine either slot's owner. Signature source `S` is needed only for signature-root creation/restoration and may differ from `G`. Changing `G` invalidates prepared work without rederiving funds. When ERC-20 allowance is insufficient, the deposit button explicitly approves the selected amount first. Approval checks the public receipt and allowance, keeps the current unlocked task, then offers deposit confirmation; approval itself does not deposit funds. Public wallets, their funding links, deposit/exit amounts, timing and unusual amounts can associate private activity; the panel explains these limits without claiming complete anonymity.
 
-A receive code needs the unlocked identity and selected slot, with independent funds past their recovery gate. Its proof binds identity, owner, viewing key, key mode and suite/derivation versions. The code fingerprint excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the confirmed fingerprint and intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended, so fingerprint confirmation remains necessary. The receive code should be shared privately.
+A receive code needs the unlocked identity and selected slot, with funds-key mode past its recovery gate. Its proof binds identity, owner, viewing key, key mode and suite/derivation versions. The code fingerprint excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended: anyone holding the recipient's identity credentials can produce another valid mode-1 code. Payers do not confirm a fingerprint, so the code must come from the recipient over a trusted channel and should be shared privately.
 
-Secrets, roots, note openings and witnesses remain in `ShieldedAssetSession`; React receives public handles, display amounts and final proofs. Scope includes chain, factory, family, RPC, lineage and selected pool. Locking, slot/pool/chain changes, disconnect, navigation, hidden/pagehide, idle expiry and explicit cancellation terminate secret processing and invalidate stale responses. Busy computation suspends the idle timer; waiting for fee approval allows idle locking. During an external-wallet jump, hiding destroys the secret session but may retain the public signature request ID. A response is accepted only after a visible return with the same current request, expected wallet and protocol context; cancellation, navigation, timeout or wallet changes invalidate it.
+Secrets, roots, note openings and witnesses remain in `ShieldedAssetSession`; React receives public handles, display amounts and final proofs. Scope includes chain, factory, family, RPC, lineage and selected pool. Locking, chain, factory, family, RPC or lineage changes, disconnect, navigation, pagehide, idle expiry and explicit cancellation terminate secret processing and invalidate stale responses. Hiding also locks, except during an explicitly pending wallet transaction request: that request has a two-minute deadline, clears displayed secret inputs, and keeps the in-memory keys across the wallet handoff. The exception ends as soon as the request settles, before receipt tracking; if the page is still hidden then, it locks immediately. Manual locking, pagehide and context changes still lock during the request. A pool change within the same factory keeps the identity and funds root and invalidates only that pool's history, prepared work and stale responses. Replacing an existing independent root removes only that root; the identity stays. Busy computation suspends the idle timer; waiting for fee approval allows idle locking. During a wallet-signature request for independent-root creation or restoration, hiding destroys the secret session but may retain the public signature request ID. A response is accepted only after a visible return with the same current request, expected wallet and protocol context; cancellation, navigation, timeout or wallet changes invalidate it.
 
-Before requesting a wallet transaction, the flow records its public nonce, block and expected outputs. Unknown results block another submission. Public transaction context and receipt tracking live in the in-memory transaction center, survive secret locking and application navigation, and can be reconstructed when returning to the same pool. Receipt checks can locate unknown hashes by replaying unfiltered public output events and checking the original nonce at the same block. Explicit wallet rejection releases the pending guard; ambiguous RPC failures do not. Clearing secrets cannot revoke a wallet request already issued, and returning to the page never automatically resubmits it.
+Before requesting a wallet transaction, the flow records its public nonce, block and expected outputs. Unknown results block another submission and display pending feedback while the page automatically checks the result. Public transaction context and receipt tracking live in the in-memory transaction center, survive secret locking and application navigation, and resume automatically when returning to the same pool. Automatic checks can locate unknown hashes by replaying unfiltered public output events and checking the original nonce at the same block; unresolved checks retry every five seconds. Explicit wallet rejection releases the pending guard; ambiguous RPC failures do not. Clearing secrets cannot revoke a wallet request already issued, and returning to the page never automatically resubmits it.
 
 See the [asset-key specification](shielded-asset-key-spec.md), [contract interfaces](contracts.md#shielded-inheritance-contracts) and [circuit specification](zk-proofs.md#shielded-inheritance-circuits) for precise protocol definitions and their verification boundaries.
 
@@ -398,15 +415,15 @@ VITE_ROOT_VERSION_INDEX=...
 
 **Commonly used optional vars**
 
-| Variable                                                             | Purpose                                                                    |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`     | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
-| `VITE_DF_HARD_NODE_LIMIT`                                            | Cap tree node count for public/low-budget RPCs                             |
-| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                       | Query cache tuning                                                         |
-| `VITE_USE_INDEXEDDB_CACHE`                                           | Persist tree caches in IndexedDB                                           |
-| `VITE_SHOW_DEBUG`                                                    | Enable debug UI (tree debug panel, etc.)                                   |
-| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
-| `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                       |
+| Variable                                                                             | Purpose                                                                    |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `VITE_ROOT_PERSON_HASH_<LANG>`, `VITE_ROOT_VERSION_INDEX_<LANG>`                     | Per-language root overrides (e.g. `_EN`, `_ZH`)                            |
+| `VITE_DF_HARD_NODE_LIMIT`                                                            | Cap tree node count for public/low-budget RPCs                             |
+| `VITE_DF_*_TTL_MS`, `VITE_DF_QUERY_PAGE_LIMIT`                                       | Query cache tuning                                                         |
+| `VITE_USE_INDEXEDDB_CACHE`                                                           | Persist tree caches in IndexedDB                                           |
+| `VITE_SHOW_DEBUG`                                                                    | Enable debug UI (tree debug panel, etc.)                                   |
+| `VITE_SHOW_TRUSTED_SOURCE_FILTER_TOGGLE`                                             | Show trusted-source filter toggle (on by default; `0` forces filtering on) |
+| `VITE_SHIELDED_POOL_FACTORY_ADDRESS`, `VITE_SHIELDED_POOL_FACTORY_ADDRESS_<chainId>` | Canonical multi-asset pool factory for `/inheritance`                      |
 
 ### Local auto-config
 
@@ -595,16 +612,16 @@ that the destination is public. Attachment URIs and NFT token URIs are supported
   its options from the command line only, never from `.env` files, for example
   `CSP_SCAN_SKIP_BUILD=1 npm run csp:scan`:
 
-  | Variable                                              | Effect                                                                          |
-  | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
-  | `CSP_SCAN_FAIL_ON_REPORT=1`                           | Exit non-zero on any violation (CI sets it)                                     |
-  | `CSP_SCAN_SKIP_BUILD=1`                               | Reuse `.csp-scan/dist`; enough when only the CSP configuration changed          |
-  | `CSP_SCAN_WORKERS=0`                                  | Skip the worker flows, for example without local proving files                  |
+  | Variable                                              | Effect                                                                         |
+  | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+  | `CSP_SCAN_FAIL_ON_REPORT=1`                           | Exit non-zero on any violation (CI sets it)                                    |
+  | `CSP_SCAN_SKIP_BUILD=1`                               | Reuse `.csp-scan/dist`; enough when only the CSP configuration changed         |
+  | `CSP_SCAN_WORKERS=0`                                  | Skip the worker flows, for example without local proving files                 |
   | `CSP_SCAN_EXECUTABLE_PATH`, `CSP_SCAN_CHROME_CHANNEL` | Another browser binary, or a Playwright channel such as `chromium` or `msedge` |
-  | `CSP_SCAN_HEADLESS=0`                                 | Show the browser window                                                         |
-  | `CSP_SCAN_MODE=dev`                                   | Scan the dev server, whose policy only reports                                  |
-  | `CSP_SCAN_HOST`, `CSP_SCAN_PORT`, `CSP_SCAN_BASE_URL` | Where the scanned server listens                                                |
-  | `CSP_SCAN_STYLE_ATTR_PROBE=1`                         | Set inline styles on purpose to show `style-src-attr` blocks them (debugging)   |
+  | `CSP_SCAN_HEADLESS=0`                                 | Show the browser window                                                        |
+  | `CSP_SCAN_MODE=dev`                                   | Scan the dev server, whose policy only reports                                 |
+  | `CSP_SCAN_HOST`, `CSP_SCAN_PORT`, `CSP_SCAN_BASE_URL` | Where the scanned server listens                                               |
+  | `CSP_SCAN_STYLE_ATTR_PROBE=1`                         | Set inline styles on purpose to show `style-src-attr` blocks them (debugging)  |
 
 See [frontend-security.md](frontend-security.md) for the threat model, CSP guidance, and detailed handling rules.
 
