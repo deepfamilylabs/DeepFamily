@@ -1,9 +1,47 @@
 import { expect } from "chai";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { ensureZkArtifacts } from "../scripts/ensure-zk-artifacts.mjs";
+import {
+  compiledCircuitsMatchManifests,
+  ensureZkArtifacts,
+} from "../scripts/ensure-zk-artifacts.mjs";
+import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+
+const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+
+/** Writes the ten compiled circuits and development manifests that pin their digests. */
+function writeCompiledCircuits(root) {
+  const compile = (directory, name) => {
+    const output = path.join(root, directory);
+    fs.mkdirSync(path.join(output, `${name}_js`), { recursive: true });
+    fs.writeFileSync(path.join(output, `${name}.r1cs`), `${name} r1cs`);
+    fs.writeFileSync(path.join(output, `${name}_js`, `${name}.wasm`), `${name} wasm`);
+    return { r1csSha256: sha256(`${name} r1cs`), wasmSha256: sha256(`${name} wasm`) };
+  };
+  const core = Object.fromEntries(
+    ["person_commitment", "disclosure_binding"].map((name) => [
+      name,
+      compile("zk-artifacts/circuits", name),
+    ]),
+  );
+  const shielded = Object.fromEntries(
+    Object.entries(SHIELDED_CIRCUITS).map(([action, name]) => [
+      action,
+      { source: name, ...compile("zk-artifacts/shielded", name) },
+    ]),
+  );
+  fs.writeFileSync(
+    path.join(root, "circuits/zk-artifacts-manifest.json"),
+    JSON.stringify({ trustedSetup: { status: "development" }, circuits: core }),
+  );
+  fs.writeFileSync(
+    path.join(root, "circuits/shielded-development-manifest.json"),
+    JSON.stringify({ circuits: shielded }),
+  );
+}
 
 describe("integrated local ZK artifact preparation", function () {
   let root;
@@ -55,7 +93,7 @@ describe("integrated local ZK artifact preparation", function () {
     expect(result.regenerated).to.equal(false);
   });
 
-  it("regenerates the complete development set after a failed current-artifact check", async function () {
+  it("regenerates the complete development set after a circuit change", async function () {
     fs.writeFileSync(
       path.join(root, "circuits/zk-artifacts-manifest.json"),
       JSON.stringify({ trustedSetup: { status: "development" } }),
@@ -75,10 +113,70 @@ describe("integrated local ZK artifact preparation", function () {
         calls.push("setup-all");
         ready = true;
       },
+      circuitsUnchanged: () => false,
       log: () => {},
     });
     expect(calls).to.deep.equal(["build:all", "check", "fetch", "check", "setup-all", "check"]);
     expect(result.regenerated).to.equal(true);
+  });
+
+  it("keeps the committed keys of unchanged circuits when their files cannot be installed", async function () {
+    fs.writeFileSync(
+      path.join(root, "circuits/zk-artifacts-manifest.json"),
+      JSON.stringify({ trustedSetup: { status: "development" } }),
+    );
+    let setupCalled = false;
+    try {
+      await ensureZkArtifacts({
+        root,
+        build: async () => {},
+        check: async () => {
+          throw new Error("missing shielded key");
+        },
+        fetchAssets: async () => {
+          throw new Error("ZK asset download failed: HTTP 404");
+        },
+        setup: async () => {
+          setupCalled = true;
+        },
+        circuitsUnchanged: () => true,
+        log: () => {},
+      });
+      expect.fail("Expected unchanged circuits to keep their committed keys");
+    } catch (error) {
+      expect(error.message).to.contain(
+        "Refusing to replace the committed development keys of unchanged circuits " +
+          "(ZK asset download failed: HTTP 404)",
+      );
+      expect(error.message).to.contain("npm run zk:assets:publish");
+      expect(error.message).to.contain("npm run zk:development:setup");
+    }
+    expect(setupCalled).to.equal(false);
+  });
+
+  it("treats circuits as unchanged only when every compiled R1CS and WASM matches its manifest", function () {
+    writeCompiledCircuits(root);
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(true);
+
+    fs.writeFileSync(path.join(root, "zk-artifacts/shielded/shielded_unshield_8.r1cs"), "edited");
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
+
+    writeCompiledCircuits(root);
+    fs.writeFileSync(
+      path.join(root, "zk-artifacts/circuits/person_commitment_js/person_commitment.wasm"),
+      "edited",
+    );
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
+
+    writeCompiledCircuits(root);
+    const shieldedManifest = path.join(root, "circuits/shielded-development-manifest.json");
+    const manifest = JSON.parse(fs.readFileSync(shieldedManifest, "utf8"));
+    delete manifest.circuits.privateTransfer8;
+    fs.writeFileSync(shieldedManifest, JSON.stringify(manifest));
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
+
+    fs.rmSync(shieldedManifest);
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
   });
 
   it("refuses to overwrite formal keys when an artifact check fails", async function () {

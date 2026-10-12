@@ -181,7 +181,9 @@ circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
 in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
 `npm run zk:assets:fetch` installs them in a fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
 `npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-`R2_BUCKET` in `.env`) before pushing the new manifests.
+`R2_BUCKET` in `.env`) before pushing the new manifests. Development setup draws fresh randomness,
+so `dev:all` generates new keys only after a circuit change; when the circuits are unchanged and
+their pinned files cannot be downloaded, it stops instead of replacing the committed keys.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
