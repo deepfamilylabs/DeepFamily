@@ -23,6 +23,8 @@ export type ShieldedPublicFunds = {
   backupRequired?: boolean;
 };
 export type ShieldedAssetSessionState = {
+  /** Funds credentials remain available even when the identity proof suite is unavailable. */
+  credentials: { handle: string } | null;
   identity: ShieldedPublicIdentity | null;
   funds: ShieldedPublicFunds | null;
 };
@@ -80,7 +82,7 @@ export type ShieldedClaimSummary = {
 export type ShieldedWalletSummary = {
   /** Public recovery-gate updates, including a signature candidate confirmed by history. */
   sessionState?: ShieldedAssetSessionState;
-  /** Whether the unlocked identity's family records loaded; omitted in a root-only session. */
+  /** Whether the unlocked identity's family records loaded; omitted without identity proof capability. */
   familyRecordsAvailable?: boolean;
   toBlock: number;
   blockHash: string;
@@ -138,12 +140,13 @@ export type ShieldedDiscoveredPoolSummary = {
 };
 export type ShieldedAssetWorkerCallMap = {
   unlockIdentity: {
-    params: { identity: IdentityFields; rawPassphrase: string };
+    params: { identity: IdentityFields; rawPassphrase: string; identitySuiteId?: number };
     result: ShieldedAssetSessionState;
   };
   createFunds: {
     params: {
       intent: "create";
+      expectedCredentialsHandle: string;
       rootSource: "random" | "walletSignature";
       signerAddress?: string;
       signature?: string;
@@ -153,6 +156,7 @@ export type ShieldedAssetWorkerCallMap = {
   };
   restoreSignature: {
     params: {
+      expectedCredentialsHandle: string;
       signerAddress: string;
       signature: string;
       expectedFingerprint?: string;
@@ -173,14 +177,17 @@ export type ShieldedAssetWorkerCallMap = {
   };
   importRecoveryMaterial: {
     params: {
+      expectedCredentialsHandle: string;
       format: "mnemonic" | "shieldedKey";
       material: string;
       expectedFingerprint?: string;
+      /** Original public creation challenges retained by this tab across a lock or reload. */
+      pendingBackupFingerprints?: readonly string[];
       context: ShieldedWorkerContext;
     };
     result: ShieldedAssetSessionState;
   };
-  /** Removes only the independent funds root; an unlocked identity remains. */
+  /** Removes the funds root and its branches; credentials and identity capability remain. */
   clearFunds: { params: Record<string, never>; result: ShieldedAssetSessionState };
   receiveCode: {
     params: { slot: ShieldedKeySlot };

@@ -1124,6 +1124,30 @@ export function planShieldedValueSpend(input: {
 export const SHIELDED_ASSET_KEY_VERSION: 1;
 export const SHIELDED_ASSET_SUITE: 1;
 export const SHIELDED_ASSET_BRANCH_VERSION: 1;
+export const SHIELDED_FUNDS_UNICODE_VERSION: "17.0.0";
+export const FUNDS_ARGON2ID_PROFILE: Readonly<{
+  status: "candidate-awaiting-device-benchmark";
+  provisional: true;
+  algorithm: "Argon2id";
+  version: 19;
+  memoryKiB: 65536;
+  iterations: 3;
+  parallelism: 1;
+  outputBytes: 32;
+  saltBytes: 16;
+}>;
+/** Frozen Unicode 17 funds rules, independent of the active identity suite. */
+export function normalizeShieldedFundsIdentity(identity: IdentityFields): CanonicalIdentityFields;
+export function encodeShieldedFundsIdentity(identity: IdentityFields): Uint8Array;
+export function normalizeShieldedFundsPassphrase(rawPassphrase: string): string;
+/** The caller must wipe the returned password bytes after use. */
+export function buildShieldedFundsPasswordBytes(rawPassphrase: string): Uint8Array;
+export function deriveShieldedFundsIdentitySalt(identity: IdentityFields): Uint8Array;
+/** Dedicated asset-Worker derivation; never return this secret in a public DTO. */
+export function deriveShieldedFundsIdentitySecret(input: {
+  identity: IdentityFields;
+  rawPassphrase: string;
+}): Promise<Uint8Array>;
 export interface ShieldedAssetSignatureMetadata {
   signerAddress: string;
   message: string;
@@ -1156,9 +1180,10 @@ export function createShieldedAssetRoot(input: {
   intent: "create";
   rootSource?: "random";
 }): Uint8Array;
-export function deriveShieldedAssetKeyMaterial(
-  assetRoot: BytesLike,
-): Promise<ShieldedAssetKeyMaterial>;
+export function deriveShieldedAssetKeyMaterial(input: {
+  assetRoot: BytesLike;
+  fundsIdentitySecret: BytesLike;
+}): Promise<ShieldedAssetKeyMaterial>;
 export function computeShieldedAssetFingerprint(input: {
   ownerCommitment: BigNumberish;
   viewPublicKey: BytesLike;

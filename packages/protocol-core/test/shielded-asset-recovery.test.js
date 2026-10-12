@@ -12,6 +12,8 @@ import {
   encodeShieldedAssetMnemonic,
 } from "../index.js";
 
+import { fundsVector as vector } from "./shielded-funds.fixture.js";
+
 // Official BIP39 reference vectors: https://github.com/trezor/python-mnemonic/blob/master/vectors.json
 // Only the entropy/words part is used; the reference PBKDF2 seed is not an asset root.
 const vectors = [
@@ -47,15 +49,12 @@ test("mnemonic and Shielded Key restore the frozen branch-v1 owner and fingerpri
     decodeShieldedAssetKey(encodeShieldedAssetKey(frozenRoot)),
   ]) {
     assert.deepEqual(restored, frozenRoot);
-    const keys = await deriveShieldedAssetKeyMaterial(restored);
-    assert.equal(
-      keys.ownerSecret,
-      21163297713406726978733507212238736142897898906436691617414556311477803122818n,
-    );
-    assert.equal(
-      keys.fundsFingerprint,
-      "0xba9339b546645507471bedc1c78f017ec71d74de4dda220e376401883f02e027",
-    );
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: restored,
+      fundsIdentitySecret: vector.fundsIdentitySecret,
+    });
+    assert.equal(keys.ownerSecret, vector.ownerSecret);
+    assert.equal(keys.fundsFingerprint, vector.fundsFingerprint);
   }
 });
 
@@ -69,8 +68,14 @@ test("signature-derived roots have the same mnemonic and key recovery without pr
   const restored = decodeShieldedAssetMnemonic(encodeShieldedAssetMnemonic(assetRoot));
   assert.deepEqual(restored, decodeShieldedAssetKey(encodeShieldedAssetKey(assetRoot)));
   assert.deepEqual(
-    await deriveShieldedAssetKeyMaterial(restored),
-    await deriveShieldedAssetKeyMaterial(assetRoot),
+    await deriveShieldedAssetKeyMaterial({
+      assetRoot: restored,
+      fundsIdentitySecret: vector.fundsIdentitySecret,
+    }),
+    await deriveShieldedAssetKeyMaterial({
+      assetRoot: assetRoot,
+      fundsIdentitySecret: vector.fundsIdentitySecret,
+    }),
   );
 });
 

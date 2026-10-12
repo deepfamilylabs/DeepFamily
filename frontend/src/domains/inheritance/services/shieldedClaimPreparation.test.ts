@@ -251,7 +251,10 @@ async function addSecondBudget(
 
 describe("local shielded claim preparation", () => {
   it("independent budgets claim to their original root and reject identity fallback", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(9));
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: new Uint8Array(32).fill(9),
+      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    });
     const input = await fixture(1_200n, 100n, 30n, keys);
     const prepared = await prepareShieldedClaim(input);
     expect(prepared.outputs[0].note.keyMode).toBe(1n);
@@ -600,7 +603,10 @@ describe("local shielded claim preparation", () => {
         ] as const) {
           const keys =
             keyMode === 1
-              ? await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(9))
+              ? await deriveShieldedAssetKeyMaterial({
+                  assetRoot: new Uint8Array(32).fill(9),
+                  fundsIdentitySecret: new Uint8Array(32).fill(91),
+                })
               : undefined;
           const input = await fixture(useSecond ? 600n : 1_200n, 100n, 30n, keys);
           const secondBudgetCommitment = useSecond

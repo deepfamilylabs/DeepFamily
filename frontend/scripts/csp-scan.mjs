@@ -195,12 +195,13 @@ const runWorkerFlows = async (page) => {
         identity,
         rawPassphrase: receivePassphrase,
       })
-      assertPublicFields(assetState, ['identity', 'funds'], 'asset session')
+      assertPublicFields(assetState, ['credentials', 'identity', 'funds'], 'asset session')
+      assertPublicFields(assetState.credentials, ['handle'], 'funds credentials')
       assertPublicFields(assetState.identity, [
         'handle', 'identitySuiteId', 'identityCommitment', 'personHash', 'identity',
       ], 'asset identity')
       assertPublicFields(assetState.identity.identity, ['fullName'], 'asset identity display')
-      if (assetState.funds !== null || typeof assetState.identity.handle !== 'string' ||
+      if (assetState.funds !== null || typeof assetState.credentials.handle !== 'string' || typeof assetState.identity.handle !== 'string' ||
         typeof assetState.identity.identityCommitment !== 'string' ||
         typeof assetState.identity.personHash !== 'string' ||
         typeof assetState.identity.identitySuiteId !== 'number' ||
@@ -208,9 +209,8 @@ const runWorkerFlows = async (page) => {
         throw new Error('asset session returned invalid public field types or created a funds root')
       }
       const assetCreated = await call(asset, 'receiveCode', { slot: 'identity' })
-      assertPublicFields(assetCreated, ['code', 'fingerprint'], 'asset receive code')
-      if (typeof assetCreated.code !== 'string' ||
-        !/^0x[0-9a-f]{64}$/u.test(assetCreated.fingerprint)) {
+      assertPublicFields(assetCreated, ['code'], 'asset receive code')
+      if (typeof assetCreated.code !== 'string') {
         throw new Error('asset receive code returned invalid public field types')
       }
       const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
@@ -229,8 +229,7 @@ const runWorkerFlows = async (page) => {
         assetCheckedIdentityCommitment: assetCheck.identityCommitment,
         assetReceiveCodeVerified: assetCheck.ok,
         assetKeyMode: assetCheck.keyMode,
-        assetFingerprintMatches: assetCheck.fingerprint === assetCreated.fingerprint &&
-          assetCreated.fingerprint === check.fingerprint,
+        assetFingerprintMatches: assetCheck.fingerprint === check.fingerprint,
         assetPublicDtoValidated: true,
       }
     } finally {

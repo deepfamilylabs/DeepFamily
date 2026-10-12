@@ -58,7 +58,10 @@ test("private modes alter owner authorization while retaining policy and enrollm
 });
 
 test("private funding backup carries the mode and original viewing key within 459 bytes", async () => {
-  const root = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(7));
+  const root = await deriveShieldedAssetKeyMaterial({
+    assetRoot: new Uint8Array(32).fill(7),
+    fundsIdentitySecret: new Uint8Array(32).fill(3),
+  });
   const budgetNote = { ...note, keyMode: 1n, heirOwnerCommitment: root.ownerCommitment };
   const payload = encodeShieldedValueNotePayload(
     {
@@ -85,7 +88,10 @@ test("private funding backup carries the mode and original viewing key within 45
 });
 
 test("receive-code fingerprint binds the proved mode, identity and view but no root source or proof", async () => {
-  const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(8));
+  const keys = await deriveShieldedAssetKeyMaterial({
+    assetRoot: new Uint8Array(32).fill(8),
+    fundsIdentitySecret: new Uint8Array(32).fill(3),
+  });
   const input = {
     identityCommitment: 14n,
     ownerCommitment: keys.ownerCommitment,

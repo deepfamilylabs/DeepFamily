@@ -158,6 +158,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
           type="button"
           onClick={() =>
             session.update({
+              credentials: { handle: "credentials:test" },
               identity: null,
               funds: {
                 ownerCommitment: "123",
@@ -170,7 +171,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
             })
           }
         >
-          unlock-root-only
+          unlock-funds-without-identity-proof
         </button>
         <input
           aria-label="private-workflow-draft"
@@ -306,7 +307,7 @@ describe("InheritancePage private pool entry", () => {
     const original = await screen.findByTestId("shielded-panel");
     expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield:shield");
     expect(screen.getByTestId("shielded-receive-slot").textContent).toBe("identity");
-    fireEvent.click(screen.getByRole("button", { name: "unlock-root-only" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-funds-without-identity-proof" }));
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
     expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
@@ -598,10 +599,10 @@ describe("InheritancePage private pool entry", () => {
     ).toBe("0x0000000000000000000000000000000000000030");
   });
 
-  it("keeps a root-only funds session when another pool is selected", async () => {
+  it("keeps funds credentials without identity proof capability when another pool is selected", async () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
-    fireEvent.click(screen.getByRole("button", { name: "unlock-root-only" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-funds-without-identity-proof" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe("");
     expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
     fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {

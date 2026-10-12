@@ -40,6 +40,10 @@ import {
 } from "../../../shared/crypto/passphraseStrength";
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
+import {
+  normalizeShieldedFundsIdentity,
+  normalizeShieldedFundsPassphrase,
+} from "@deepfamily/protocol-core";
 
 const MAX_FULL_NAME_BYTES = 256;
 
@@ -222,12 +226,16 @@ interface PersonHashCalculatorProps {
   requirePassphraseConfirmation?: boolean;
   /** Disable live hash computation when the enclosing action derives the identity itself. */
   computeHash?: boolean;
+  /** Validate funds credentials with their frozen rules, independently of identity suites. */
+  fundsCredentials?: boolean;
   /** Hide explanatory passphrase help and strength details in focused action forms. */
   showPassphraseGuidance?: boolean;
 }
 
 export type PersonHashCalculatorHandle = {
   getPublicFormData: () => PublicHashForm;
+  /** Original field values, before an identity suite canonicalizes the name. */
+  getRawIdentityFields: () => Omit<PublicHashForm, "hasPassphrase">;
   getSecretInputs: () => SecretHashInputs;
   hasPassphrase: () => boolean;
   passphrasesMatch: () => boolean;
@@ -253,6 +261,7 @@ export const PersonHashCalculator = forwardRef<
       identitySuiteId = 1,
       requirePassphraseConfirmation = false,
       computeHash = true,
+      fundsCredentials = false,
       showPassphraseGuidance = true,
     },
     ref,
@@ -272,6 +281,29 @@ export const PersonHashCalculator = forwardRef<
     const passphraseHelpDescriptionId = useId();
     const passphraseInputId = useId();
     const passphraseErrorId = useId();
+    const canonicalName = (value: string) => {
+      if (!fundsCredentials) return safeCanonicalizeFullName(value);
+      try {
+        return normalizeShieldedFundsIdentity({
+          fullName: value,
+          gender: 0,
+          isBirthBC: false,
+          birthYear: 0,
+          birthMonth: 0,
+          birthDay: 0,
+        }).fullName;
+      } catch {
+        return "";
+      }
+    };
+    const normalizeFormPassphrase = (value: string) => {
+      if (!fundsCredentials) return normalizePassphraseForHash(value);
+      try {
+        return normalizeShieldedFundsPassphrase(value);
+      } catch {
+        return "";
+      }
+    };
 
     // Use external state if provided, otherwise use internal state
     const currentOpen = collapsible ? (onToggle ? isOpen : internalOpen) : true;
@@ -291,15 +323,12 @@ export const PersonHashCalculator = forwardRef<
             fullName: z
               .string()
               .min(1, t("search.validation.required"))
-              .refine((val) => safeCanonicalizeFullName(val).length > 0, {
+              .refine((val) => canonicalName(val).length > 0, {
                 message: t("search.validation.required"),
               })
-              .refine(
-                (val) => getByteLength(safeCanonicalizeFullName(val)) <= MAX_FULL_NAME_BYTES,
-                {
-                  message: t("search.validation.nameTooLong"),
-                },
-              ),
+              .refine((val) => getByteLength(canonicalName(val)) <= MAX_FULL_NAME_BYTES, {
+                message: t("search.validation.nameTooLong"),
+              }),
             isBirthBC: z.boolean(),
             birthYear: z
               .union([
@@ -307,7 +336,7 @@ export const PersonHashCalculator = forwardRef<
                   .number()
                   .int()
                   .min(0, t("search.validation.yearRange"))
-                  .max(9999, t("search.validation.yearRange")),
+                  .max(fundsCredentials ? 65535 : 9999, t("search.validation.yearRange")),
                 z.literal(""),
               ])
               .optional()
@@ -334,12 +363,20 @@ export const PersonHashCalculator = forwardRef<
               ])
               .optional()
               .transform((val) => (val === "" || val === undefined ? 0 : val)),
-            gender: z.number().int().min(0).max(3),
+            gender: z
+              .number()
+              .int()
+              .min(0)
+              .max(fundsCredentials ? 255 : 3),
           })
           .refine(
             (data) => {
               // If AD (Anno Domini), the year must not exceed the current year
-              if (!data.isBirthBC && data.birthYear > new Date().getFullYear()) {
+              if (
+                !fundsCredentials &&
+                !data.isBirthBC &&
+                data.birthYear > new Date().getFullYear()
+              ) {
                 return false;
               }
               return true;
@@ -349,7 +386,7 @@ export const PersonHashCalculator = forwardRef<
               path: ["birthYear"],
             },
           ),
-      [t],
+      [t, fundsCredentials],
     );
 
     const {
@@ -387,14 +424,20 @@ export const PersonHashCalculator = forwardRef<
       strength: passwordStrength,
     } = useMemo(() => {
       const rawPassphrase = passphraseInputRef.current?.value ?? "";
-      const normalized = normalizePassphraseForHash(rawPassphrase);
+      const normalized = normalizeFormPassphrase(rawPassphrase);
       return {
-        risk: classifyProtocolPassphraseRisk(rawPassphrase),
+        risk: fundsCredentials
+          ? ((rawPassphrase === ""
+              ? "empty"
+              : normalized
+                ? "ordinary"
+                : "disallowed") as ProtocolPassphraseRisk)
+          : classifyProtocolPassphraseRisk(rawPassphrase),
         graphemeLength: getGraphemeLength(normalized),
         hasPassphrase: normalized.length > 0,
         strength: validatePassphraseStrength(normalized, false),
       };
-    }, [passphraseRevision]);
+    }, [passphraseRevision, fundsCredentials]);
     const isPassphraseDisallowed = passphraseRisk === "disallowed";
 
     const buildTransformedData = (
@@ -402,7 +445,7 @@ export const PersonHashCalculator = forwardRef<
     ): Omit<HashForm, "passphrase"> => {
       const snapshot = values ?? getValues();
       return {
-        fullName: safeCanonicalizeFullName(snapshot.fullName || ""),
+        fullName: canonicalName(snapshot.fullName || ""),
         isBirthBC: snapshot.isBirthBC || false,
         birthYear:
           snapshot.birthYear === "" || snapshot.birthYear === undefined
@@ -484,11 +527,29 @@ export const PersonHashCalculator = forwardRef<
     useImperativeHandle(
       ref,
       () => ({
+        getRawIdentityFields: () => {
+          const values = getValues();
+          return {
+            fullName: values.fullName,
+            isBirthBC: values.isBirthBC,
+            birthYear:
+              values.birthYear === "" || values.birthYear === undefined
+                ? 0
+                : Number(values.birthYear),
+            birthMonth:
+              values.birthMonth === "" || values.birthMonth === undefined
+                ? 0
+                : Number(values.birthMonth),
+            birthDay:
+              values.birthDay === "" || values.birthDay === undefined ? 0 : Number(values.birthDay),
+            gender: Number(values.gender),
+          };
+        },
         getPublicFormData: () => {
           return {
             ...buildTransformedData(),
             hasPassphrase:
-              normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
+              normalizeFormPassphrase(passphraseInputRef.current?.value ?? "").length > 0,
           };
         },
         getSecretInputs: () => ({
@@ -498,7 +559,7 @@ export const PersonHashCalculator = forwardRef<
             : {}),
         }),
         hasPassphrase: () =>
-          normalizePassphraseForHash(passphraseInputRef.current?.value ?? "").length > 0,
+          normalizeFormPassphrase(passphraseInputRef.current?.value ?? "").length > 0,
         passphrasesMatch: () => {
           if (!requirePassphraseConfirmation) return true;
           const first = passphraseInputRef.current?.value ?? "";
@@ -515,7 +576,13 @@ export const PersonHashCalculator = forwardRef<
         },
         clearSecretInputs,
       }),
-      [getValues, passphraseRevision, requirePassphraseConfirmation, clearSecretInputs],
+      [
+        getValues,
+        passphraseRevision,
+        requirePassphraseConfirmation,
+        clearSecretInputs,
+        fundsCredentials,
+      ],
     );
 
     useEffect(() => {
@@ -548,6 +615,9 @@ export const PersonHashCalculator = forwardRef<
         birthDay,
         gender: Number(gender || 0),
       });
+      // The preview uses the identity suite's own rules. It must not rewrite
+      // the original fields later submitted to the independent funds path.
+      if (fundsCredentials) transformedData.fullName = fullName || "";
       if (!transformedData.fullName.length || isPassphraseDisallowed) {
         setIsComputingHash(false);
         return;
@@ -608,6 +678,7 @@ export const PersonHashCalculator = forwardRef<
       isPassphraseDisallowed,
       identitySuiteId,
       computeHash,
+      fundsCredentials,
     ]);
 
     const content = (
@@ -638,6 +709,12 @@ export const PersonHashCalculator = forwardRef<
                   { value: 1, label: t("search.hashCalculator.genderOptions.male") },
                   { value: 2, label: t("search.hashCalculator.genderOptions.female") },
                   { value: 3, label: t("search.hashCalculator.genderOptions.other") },
+                  ...(fundsCredentials
+                    ? Array.from({ length: 252 }, (_, index) => ({
+                        value: index + 4,
+                        label: String(index + 4),
+                      }))
+                    : []),
                 ]}
               />
               <FieldError message={errors.gender?.message} />
@@ -670,11 +747,18 @@ export const PersonHashCalculator = forwardRef<
                 <input
                   type="number"
                   min="0"
-                  max={isBirthBC ? 9999 : new Date().getFullYear()}
-                  placeholder={isBirthBC ? "<10000" : "<=" + new Date().getFullYear()}
+                  max={fundsCredentials ? 65535 : isBirthBC ? 9999 : new Date().getFullYear()}
+                  placeholder={
+                    fundsCredentials
+                      ? "0–65535"
+                      : isBirthBC
+                        ? "<10000"
+                        : "<=" + new Date().getFullYear()
+                  }
                   className={MODAL_FIELD_SM}
                   {...register("birthYear", {
-                    setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
+                    setValueAs: (v) =>
+                      v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
                   })}
                 />
                 <FieldError message={errors.birthYear?.message} />
@@ -692,7 +776,8 @@ export const PersonHashCalculator = forwardRef<
                 placeholder={t("search.hashCalculator.birthMonth")}
                 className={MODAL_FIELD_SM}
                 {...register("birthMonth", {
-                  setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)),
+                  setValueAs: (v) =>
+                    v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
                 })}
               />
               <FieldError message={errors.birthMonth?.message} />
@@ -708,7 +793,10 @@ export const PersonHashCalculator = forwardRef<
                 max="31"
                 placeholder={t("search.hashCalculator.birthDay")}
                 className={MODAL_FIELD_SM}
-                {...register("birthDay", { setValueAs: (v) => (v === "" ? "" : parseInt(v, 10)) })}
+                {...register("birthDay", {
+                  setValueAs: (v) =>
+                    v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
+                })}
               />
               <FieldError message={errors.birthDay?.message} />
             </div>

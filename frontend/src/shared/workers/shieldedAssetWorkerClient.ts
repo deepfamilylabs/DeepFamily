@@ -133,7 +133,7 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
       id,
       method,
       params:
-        method === "restoreSignature"
+        method === "restoreSignature" || method === "importRecoveryMaterial"
           ? { ...params, pendingBackupFingerprints: [...pendingBackupFingerprints] }
           : (params as unknown),
     };

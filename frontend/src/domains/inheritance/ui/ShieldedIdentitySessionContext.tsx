@@ -44,6 +44,7 @@ export function ShieldedIdentitySessionProvider({
     });
   }, []);
   const {
+    credentials,
     identity,
     funds,
     identityDraft,
@@ -78,6 +79,7 @@ export function ShieldedIdentitySessionProvider({
   }, [enabled, lock, rememberIdentityDraft]);
   const value = useMemo(
     () => ({
+      credentials: enabled ? credentials : null,
       identity: enabled ? identity : null,
       funds: enabled ? funds : null,
       identityDraft: enabled ? identityDraft : null,
@@ -94,6 +96,7 @@ export function ShieldedIdentitySessionProvider({
     [
       busy,
       enabled,
+      credentials,
       identity,
       funds,
       identityDraft,
@@ -121,6 +124,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
   if (!session) throw new Error("Shielded identity session provider is missing");
   const {
     setBusyFor,
+    credentials,
     identity,
     funds,
     identityDraft,
@@ -148,6 +152,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
   }, [owner, setBusyFor]);
   return useMemo(
     () => ({
+      credentials,
       identity,
       funds,
       identityDraft,
@@ -162,6 +167,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
       setBusy,
     }),
     [
+      credentials,
       identity,
       funds,
       identityDraft,

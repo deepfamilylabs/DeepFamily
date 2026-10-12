@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   recover: vi.fn(),
   receive: vi.fn(),
   identity: vi.fn(),
+  fundsIdentity: vi.fn(),
+  assetKeys: vi.fn(),
   discoverPools: vi.fn(),
   loadLineage: vi.fn(),
   lineage: "0x1111111111111111111111111111111111111111",
@@ -43,6 +45,8 @@ vi.mock("ethers", async (importOriginal) => {
 vi.mock("@deepfamily/protocol-core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@deepfamily/protocol-core")>()),
   deriveIdentityMaterial: mocks.identity,
+  deriveShieldedFundsIdentitySecret: mocks.fundsIdentity,
+  deriveShieldedAssetKeyMaterial: mocks.assetKeys,
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: () => ({ lineageIndex: async () => mocks.lineage }),
@@ -105,15 +109,23 @@ const identityParams = () => ({
   rawPassphrase: "private-identity-sentinel",
 });
 const fixedRoot = new Uint8Array(32).fill(41);
+const fundsIdentitySecret = new Uint8Array(32).fill(3);
 // Keep recovery/proof setup deterministic under parallel frontend test workers.
 vi.setConfig({ testTimeout: 30_000 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.fundsIdentity.mockReset().mockImplementation(async () => fundsIdentitySecret.slice());
+  mocks.assetKeys.mockReset().mockImplementation(async (params) => {
+    const actual = await vi.importActual<typeof import("@deepfamily/protocol-core")>(
+      "@deepfamily/protocol-core",
+    );
+    return actual.deriveShieldedAssetKeyMaterial(params);
+  });
   mocks.loadLineage.mockReset().mockResolvedValue(null);
   mocks.canonicalPool = mocks.pool;
   mocks.receive.mockResolvedValue({ code: "public-code", fingerprint: "public-fingerprint" });
-  mocks.identity.mockImplementation(async ({ identity }: { identity: object }) => ({
+  mocks.identity.mockReset().mockImplementation(async ({ identity }: { identity: object }) => ({
     identity,
     identitySuiteId: 1,
     derivedSecretField: 13n,
@@ -143,6 +155,18 @@ beforeEach(() => {
   }));
 });
 
+function fundsParams(session: ShieldedAssetSession) {
+  return {
+    expectedCredentialsHandle: session.state().credentials?.handle ?? "missing-credentials",
+  };
+}
+async function unlockedSession() {
+  const session = new ShieldedAssetSession();
+  mocks.identity.mockRejectedValueOnce(new Error("Identity proof suite unavailable"));
+  await session.call("unlockIdentity", identityParams());
+  return session;
+}
+
 function assertPublic(value: unknown) {
   const json = JSON.stringify(value);
   for (const forbidden of [
@@ -152,6 +176,7 @@ function assertPublic(value: unknown) {
     "derivedSecretField",
     "derivedSecretBytes",
     "identitySalt",
+    "fundsIdentitySecret",
     "rawPassphrase",
     "private-identity-sentinel",
     "policySalt",
@@ -297,38 +322,547 @@ async function authenticatedBudgetHistory(
   return commitment;
 }
 
-/** Words or Key open at once; only a re-signed root can remain an unconfirmed candidate. */
+/** Every source remains a candidate until a trusted fingerprint or owned history confirms it. */
 async function signatureCandidate(session: ShieldedAssetSession) {
   const wallet = new Wallet(`0x${"11".repeat(32)}`);
   const signature = await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address));
-  await session.call("restoreSignature", { signerAddress: wallet.address, signature, context });
+  await session.call(
+    "restoreSignature",
+    Object.assign({ signerAddress: wallet.address, signature, context }, fundsParams(session)),
+  );
   const { assetRoot } = await deriveShieldedAssetRootFromSignature({
     signerAddress: wallet.address,
     signature,
   });
-  return { root: assetRoot, keys: await deriveShieldedAssetKeyMaterial(assetRoot.slice()) };
+  return {
+    root: assetRoot,
+    keys: await deriveShieldedAssetKeyMaterial({
+      assetRoot: assetRoot.slice(),
+      fundsIdentitySecret,
+    }),
+  };
 }
+
+describe("funds credentials and async installation boundary", () => {
+  it("requires credentials for random, signature and backup sources", async () => {
+    const session = new ShieldedAssetSession();
+    const expectedCredentialsHandle = "credentials:missing";
+    await expect(
+      session.call("createFunds", {
+        expectedCredentialsHandle,
+        intent: "create" as const,
+        rootSource: "random" as const,
+        context,
+      }),
+    ).rejects.toThrow("credentials first");
+    const signature = {
+      expectedCredentialsHandle,
+      signerAddress: mocks.lineage,
+      signature: "private-signature",
+      context,
+    };
+    await expect(session.call("restoreSignature", signature)).rejects.toThrow("credentials first");
+    expect(signature.signature).toBe("");
+    const backup = {
+      expectedCredentialsHandle,
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(fixedRoot),
+      context,
+    };
+    await expect(session.call("importRecoveryMaterial", backup)).rejects.toThrow(
+      "credentials first",
+    );
+    expect(backup.material).toBe("");
+    expect(mocks.assetKeys).not.toHaveBeenCalled();
+    expect(session.state()).toEqual({ credentials: null, identity: null, funds: null });
+  });
+
+  it("keeps funds credentials independent of unavailable identity proof material and passes original input", async () => {
+    const session = new ShieldedAssetSession();
+    const params = identityParams();
+    params.identity.fullName = "  Ｃhild  Example  ";
+    const original = structuredClone(params);
+    mocks.identity.mockRejectedValueOnce(new Error("Unsupported identity suite"));
+    const state = await session.call("unlockIdentity", { ...params, identitySuiteId: 999 });
+    expect(state.credentials?.handle).toMatch(/^credentials:/);
+    expect(state.identity).toBeNull();
+    expect(mocks.fundsIdentity).toHaveBeenCalledWith(original);
+    expect(mocks.fundsIdentity.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.identity.mock.invocationCallOrder[0],
+    );
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(fixedRoot),
+      expectedFingerprint: keys.fundsFingerprint,
+      context,
+    });
+    await expect(session.call("receiveCode", { slot: "asset" })).rejects.toThrow(
+      "Identity credentials",
+    );
+    const preview = await session.call("preview", {
+      context,
+      slot: "asset",
+      action: "shield",
+      amount: "100",
+    });
+    expect(preview.slot).toBe("asset");
+    assertPublic(session.state());
+    assertPublic(preview);
+  });
+
+  it("clears both secret paths on replacement, and a failed funds KDF establishes no session", async () => {
+    const session = new ShieldedAssetSession();
+    const first = await session.call("unlockIdentity", identityParams());
+    const internals = session as unknown as {
+      fundsIdentitySecret: Uint8Array;
+      identity: { derivedSecretBytes: Uint8Array; identitySalt: Uint8Array };
+    };
+    const fundsSecret = internals.fundsIdentitySecret;
+    const identitySecret = internals.identity.derivedSecretBytes;
+    const identitySalt = internals.identity.identitySalt;
+    await session.call("createFunds", {
+      ...fundsParams(session),
+      intent: "create" as const,
+      rootSource: "random" as const,
+      context,
+    });
+    mocks.fundsIdentity.mockRejectedValueOnce(new Error("private-KDF-error"));
+    const params = identityParams();
+    await expect(session.call("unlockIdentity", params)).rejects.toThrow("private-KDF-error");
+    expect(params.rawPassphrase).toBe("");
+    for (const bytes of [fundsSecret, identitySecret, identitySalt])
+      expect(bytes.every((byte) => byte === 0)).toBe(true);
+    expect(session.state()).toEqual({ credentials: null, identity: null, funds: null });
+    expect(mocks.identity).toHaveBeenCalledTimes(1);
+    const next = await session.call("unlockIdentity", identityParams());
+    expect(next.credentials?.handle).not.toBe(first.credentials?.handle);
+  });
+
+  it("keeps the credentials handle and both secrets across a real funds-only backup drill", async () => {
+    const session = new ShieldedAssetSession();
+    const opened = await session.call("unlockIdentity", identityParams());
+    const internals = session as unknown as {
+      fundsIdentitySecret: Uint8Array;
+      identity: { derivedSecretBytes: Uint8Array };
+      root: Uint8Array;
+    };
+    const fundsSecret = internals.fundsIdentitySecret;
+    const identitySecret = internals.identity.derivedSecretBytes;
+    const created = await session.call("createFunds", {
+      ...fundsParams(session),
+      intent: "create" as const,
+      rootSource: "random" as const,
+      context,
+    });
+    const backup = await session.call("exportRecoveryMaterial", {
+      format: "shieldedKey" as const,
+      context,
+    });
+    const root = internals.root;
+    const cleared = await session.call("clearFunds", {});
+    expect(cleared.credentials).toEqual(opened.credentials);
+    expect(cleared.identity).toEqual(opened.identity);
+    expect(root.every((byte) => byte === 0)).toBe(true);
+    expect(fundsSecret).toEqual(fundsIdentitySecret);
+    expect(identitySecret).toEqual(new Uint8Array(32).fill(2));
+    const restored = await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: backup.material,
+      expectedFingerprint: created.funds!.fundsFingerprint,
+      context,
+    });
+    expect(restored.funds?.recoveryVerified).toBe(true);
+    expect(mocks.fundsIdentity).toHaveBeenCalledOnce();
+    session.clear();
+    expect(fundsSecret.every((byte) => byte === 0)).toBe(true);
+    expect(identitySecret.every((byte) => byte === 0)).toBe(true);
+  });
+
+  it("rejects missing or obsolete handles before deriving an asset root", async () => {
+    const session = await unlockedSession();
+    const oldHandle = session.state().credentials!.handle;
+    await session.call("unlockIdentity", identityParams());
+    await expect(
+      session.call("createFunds", {
+        expectedCredentialsHandle: oldHandle,
+        intent: "create" as const,
+        rootSource: "random" as const,
+        context,
+      }),
+    ).rejects.toThrow("replaced or locked");
+    await expect(
+      session.call("importRecoveryMaterial", {
+        expectedCredentialsHandle: "",
+        format: "shieldedKey" as const,
+        material: encodeShieldedAssetKey(fixedRoot),
+        context,
+      }),
+    ).rejects.toThrow("handle is required");
+    expect(mocks.assetKeys).not.toHaveBeenCalled();
+    expect(session.state().funds).toBeNull();
+  });
+
+  it("never accepts a previous Worker's credentials handle even if its counters restart", async () => {
+    const previous = await unlockedSession();
+    const handle = previous.state().credentials!.handle;
+    previous.clear();
+    const replacement = await unlockedSession();
+    expect(replacement.state().credentials!.handle).not.toBe(handle);
+    await expect(
+      replacement.call("createFunds", {
+        expectedCredentialsHandle: handle,
+        intent: "create" as const,
+        rootSource: "random" as const,
+        context,
+      }),
+    ).rejects.toThrow("replaced or locked");
+  });
+
+  it("checks credentials again when accessing an already installed funds key", async () => {
+    const session = await unlockedSession();
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(fixedRoot),
+      expectedFingerprint: keys.fundsFingerprint,
+      context,
+    });
+    const internals = session as unknown as { fundsIdentitySecret: Uint8Array | null };
+    internals.fundsIdentitySecret!.fill(0);
+    internals.fundsIdentitySecret = null;
+    await expect(
+      session.call("preview", {
+        context,
+        slot: "asset",
+        action: "shield",
+        amount: "100",
+      }),
+    ).rejects.toThrow("credentials first");
+    await expect(
+      session.call("exportRecoveryMaterial", {
+        format: "shieldedKey" as const,
+        context,
+      }),
+    ).rejects.toThrow("credentials first");
+  });
+
+  it("rejects the original fingerprint when different credentials derive a different bound root", async () => {
+    const original = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    mocks.fundsIdentity.mockResolvedValueOnce(new Uint8Array(32).fill(4));
+    const session = await unlockedSession();
+    await expect(
+      session.call("importRecoveryMaterial", {
+        ...fundsParams(session),
+        format: "shieldedKey" as const,
+        material: encodeShieldedAssetKey(fixedRoot),
+        expectedFingerprint: original.fundsFingerprint,
+        context,
+      }),
+    ).rejects.toThrow("fingerprint differs");
+    expect(session.state().funds).toBeNull();
+  });
+
+  it("discards a funds KDF result after a new credentials session has replaced it", async () => {
+    let finish!: (value: Uint8Array) => void;
+    mocks.fundsIdentity.mockImplementationOnce(
+      () =>
+        new Promise<Uint8Array>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const session = new ShieldedAssetSession();
+    const params = identityParams();
+    const late = session.call("unlockIdentity", params);
+    const rejected = expect(late).rejects.toThrow("replaced or locked");
+    const current = await session.call("unlockIdentity", identityParams());
+    const lateSecret = new Uint8Array(32).fill(9);
+    finish(lateSecret);
+    await rejected;
+    expect(lateSecret.every((byte) => byte === 0)).toBe(true);
+    expect(params.rawPassphrase).toBe("");
+    expect(session.state()).toEqual(current);
+  });
+
+  it("clears uninstalled identity and funds material when locking during identity derivation", async () => {
+    let finish!: (value: unknown) => void;
+    const identityImpl = mocks.identity.getMockImplementation()!;
+    const material = await identityImpl({ identity: identityParams().identity });
+    const fundsSecret = new Uint8Array(32).fill(8);
+    mocks.fundsIdentity.mockResolvedValueOnce(fundsSecret);
+    mocks.identity.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const session = new ShieldedAssetSession();
+    const late = session.call("unlockIdentity", identityParams());
+    const rejected = expect(late).rejects.toThrow("replaced or locked");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    session.clear();
+    finish(material);
+    await rejected;
+    for (const bytes of [fundsSecret, material.derivedSecretBytes, material.identitySalt])
+      expect(bytes.every((byte: number) => byte === 0)).toBe(true);
+    expect(session.state()).toEqual({ credentials: null, identity: null, funds: null });
+  });
+
+  it.each(["clearFunds", "replaceCredentials"] as const)(
+    "rejects a late asset derivation after %s and wipes temporary copies",
+    async (event) => {
+      const session = await unlockedSession();
+      const currentHandle = session.state().credentials!.handle;
+      const actual = await vi.importActual<typeof import("@deepfamily/protocol-core")>(
+        "@deepfamily/protocol-core",
+      );
+      const keys = await actual.deriveShieldedAssetKeyMaterial({
+        assetRoot: fixedRoot,
+        fundsIdentitySecret,
+      });
+      let finish!: (value: typeof keys) => void;
+      let temporaryRoot!: Uint8Array;
+      let temporarySecret!: Uint8Array;
+      mocks.assetKeys.mockImplementationOnce((params) => {
+        temporaryRoot = params.assetRoot;
+        temporarySecret = params.fundsIdentitySecret;
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      });
+      const late = session.call("importRecoveryMaterial", {
+        ...fundsParams(session),
+        format: "shieldedKey" as const,
+        material: encodeShieldedAssetKey(fixedRoot),
+        context,
+      });
+      const rejected = expect(late).rejects.toThrow(
+        event === "clearFunds" ? "replaced or cleared" : "replaced or locked",
+      );
+      await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+      if (event === "clearFunds") await session.call("clearFunds", {});
+      else await session.call("unlockIdentity", identityParams());
+      const current = session.state();
+      finish(keys);
+      await rejected;
+      expect(temporaryRoot.every((byte) => byte === 0)).toBe(true);
+      expect(temporarySecret.every((byte) => byte === 0)).toBe(true);
+      expect(session.state()).toEqual(current);
+      expect(session.state().funds).toBeNull();
+      if (event === "clearFunds") expect(current.credentials?.handle).toBe(currentHandle);
+      else expect(current.credentials?.handle).not.toBe(currentHandle);
+    },
+  );
+
+  it("never installs old scan openings into a replaced credentials session", async () => {
+    const session = await unlockedSession();
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(fixedRoot),
+      context,
+    });
+    let finish!: (value: unknown) => void;
+    mocks.recover.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const late = session.call("recover", { context });
+    const rejected = expect(late).rejects.toThrow("replaced or locked");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    const current = await session.call("unlockIdentity", identityParams());
+    finish(recoveryHistory(keys.ownerCommitment));
+    await rejected;
+    expect(session.state()).toEqual(current);
+    const internals = session as unknown as { wallets: Map<string, unknown>; summary: unknown };
+    expect(internals.wallets.size).toBe(0);
+    expect(internals.summary).toBeNull();
+  });
+});
+
+describe("pending backup challenges across credentials sessions", () => {
+  it.each([
+    { source: "random", format: "mnemonic" },
+    { source: "random", format: "shieldedKey" },
+    { source: "walletSignature", format: "mnemonic" },
+    { source: "walletSignature", format: "shieldedKey" },
+  ] as const)(
+    "completes a saved $source $format drill after a full lock without chain history",
+    async ({ source, format }) => {
+      const original = await unlockedSession();
+      const signer = new Wallet(`0x${"11".repeat(32)}`);
+      const created = await original.call("createFunds", {
+        ...fundsParams(original),
+        intent: "create",
+        rootSource: source,
+        ...(source === "walletSignature"
+          ? {
+              signerAddress: signer.address,
+              signature: await signer.signMessage(buildShieldedAssetSigningMessage(signer.address)),
+            }
+          : {}),
+        context,
+      });
+      const backup = await original.call("exportRecoveryMaterial", { format, context });
+      original.clear();
+      const recovered = await unlockedSession();
+      const state = await recovered.call("importRecoveryMaterial", {
+        ...fundsParams(recovered),
+        format,
+        material: backup.material,
+        pendingBackupFingerprints: [created.funds!.fundsFingerprint],
+        context,
+      });
+      expect(state.funds).toMatchObject({
+        fundsFingerprint: created.funds!.fundsFingerprint,
+        recoveryVerified: true,
+        recoveryPath: format,
+        backupRequired: false,
+      });
+      expect(state.credentials?.handle).not.toBe(created.credentials?.handle);
+      expect(mocks.recover).not.toHaveBeenCalled();
+      expect((await recovered.call("exportRecoveryMaterial", { format, context })).material).toBe(
+        backup.material,
+      );
+      assertPublic(state);
+    },
+  );
+
+  it("keeps a different credential's import as a candidate and preserves every other challenge", async () => {
+    const original = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    const other = await deriveShieldedAssetKeyMaterial({
+      assetRoot: new Uint8Array(32).fill(42),
+      fundsIdentitySecret,
+    });
+    const pendingBackupFingerprints = [original.fundsFingerprint, other.fundsFingerprint];
+    mocks.fundsIdentity.mockResolvedValueOnce(new Uint8Array(32).fill(4));
+    const recovered = await unlockedSession();
+    const state = await recovered.call("importRecoveryMaterial", {
+      ...fundsParams(recovered),
+      format: "shieldedKey",
+      material: encodeShieldedAssetKey(fixedRoot),
+      pendingBackupFingerprints,
+      context,
+    });
+    expect(state.funds?.recoveryVerified).toBe(false);
+    expect(state.funds?.recoveryPath).toBeUndefined();
+    expect(state.funds?.backupRequired).toBe(false);
+    expect(pendingBackupFingerprints).toEqual([original.fundsFingerprint, other.fundsFingerprint]);
+    await recovered.call("recover", { context });
+    expect(recovered.state().funds?.recoveryVerified).toBe(false);
+    await expect(
+      recovered.call("exportRecoveryMaterial", { format: "shieldedKey", context }),
+    ).rejects.toThrow();
+  });
+
+  it("matches only its own bound fingerprint when the tab holds challenges for multiple credentials", async () => {
+    const original = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    const currentSecret = new Uint8Array(32).fill(4);
+    const current = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret: currentSecret,
+    });
+    const pendingBackupFingerprints = [original.fundsFingerprint, current.fundsFingerprint];
+    mocks.fundsIdentity.mockResolvedValueOnce(currentSecret.slice());
+    const recovered = await unlockedSession();
+    const state = await recovered.call("importRecoveryMaterial", {
+      ...fundsParams(recovered),
+      format: "mnemonic",
+      material: encodeShieldedAssetMnemonic(fixedRoot),
+      pendingBackupFingerprints,
+      context,
+    });
+    expect(state.funds).toMatchObject({
+      fundsFingerprint: current.fundsFingerprint,
+      recoveryVerified: true,
+      recoveryPath: "mnemonic",
+    });
+    expect(state.funds?.fundsFingerprint).not.toBe(original.fundsFingerprint);
+    expect(pendingBackupFingerprints).toEqual([
+      original.fundsFingerprint,
+      current.fundsFingerprint,
+    ]);
+  });
+
+  it("does not replace an explicit original fingerprint with a different matching tab challenge", async () => {
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
+    const recovered = await unlockedSession();
+    await expect(
+      recovered.call("importRecoveryMaterial", {
+        ...fundsParams(recovered),
+        format: "shieldedKey",
+        material: encodeShieldedAssetKey(fixedRoot),
+        expectedFingerprint: `0x${"ff".repeat(32)}`,
+        pendingBackupFingerprints: [keys.fundsFingerprint],
+        context,
+      }),
+    ).rejects.toThrow("fingerprint differs");
+    expect(recovered.state().funds).toBeNull();
+  });
+});
 
 describe("ephemeral asset Worker funds lifecycle", () => {
   it("keeps VALUE recovery available when family records fail and restores parent versions on retry", async () => {
-    const session = new ShieldedAssetSession();
-    const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
+    const session = await unlockedSession();
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
     const emptyRecovery = mocks.recover.getMockImplementation()!;
     mocks.recover.mockImplementation(async (pool, input, options) =>
       input.keyMaterial.keyMode === 1
         ? recoveryHistory(keys.ownerCommitment)
         : emptyRecovery(pool, input, options),
     );
-    await session.call("importRecoveryMaterial", {
-      format: "shieldedKey",
-      material: encodeShieldedAssetKey(fixedRoot),
-      context,
-    });
+    await session.call(
+      "importRecoveryMaterial",
+      Object.assign(
+        {
+          format: "shieldedKey" as const,
+          material: encodeShieldedAssetKey(fixedRoot),
+          context,
+        },
+        fundsParams(session),
+      ),
+    );
     const rootOnly = await session.call("recover", { context });
     expect(rootOnly.familyRecordsAvailable).toBeUndefined();
     expect(mocks.loadLineage).not.toHaveBeenCalled();
 
     await session.call("unlockIdentity", identityParams());
+    await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(fixedRoot),
+      context,
+    });
     mocks.loadLineage.mockRejectedValueOnce(new Error("private-lineage-error-sentinel"));
     const failed = await session.call("recover", { context });
     expect(failed.familyRecordsAvailable).toBe(false);
@@ -369,20 +903,32 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   it("creates only on explicit intent and refuses private method dispatch or recovery fallback", async () => {
     const session = new ShieldedAssetSession();
     await expect(
-      session.call("createFunds", { intent: "restore" as "create", rootSource: "random", context }),
+      session.call(
+        "createFunds",
+        Object.assign(
+          { intent: "restore" as "create", rootSource: "random" as const, context },
+          fundsParams(session),
+        ),
+      ),
     ).rejects.toThrow("explicit");
     await expect(session.call("recover", { context })).rejects.toThrow("Unlock");
     await expect(session.call("keys" as "receiveCode", { slot: "asset" })).rejects.toThrow(
       "Unsupported",
     );
     await expect(
-      session.call("createFunds", {
-        intent: "create",
-        rootSource: "walletSignature",
-        signature: "bad-secret",
-        signerAddress: mocks.lineage,
-        context,
-      }),
+      session.call(
+        "createFunds",
+        Object.assign(
+          {
+            intent: "create" as const,
+            rootSource: "walletSignature" as const,
+            signature: "bad-secret",
+            signerAddress: mocks.lineage,
+            context,
+          },
+          fundsParams(session),
+        ),
+      ),
     ).rejects.toThrow();
     expect(session.state().funds).toBeNull();
     assertPublic(session.state());
@@ -393,17 +939,27 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     async (format) => {
       const session = new ShieldedAssetSession();
       const identity = await session.call("unlockIdentity", identityParams());
-      const created = await session.call("createFunds", {
-        intent: "create",
-        rootSource: "random",
-        context,
-      });
+      const created = await session.call(
+        "createFunds",
+        Object.assign(
+          {
+            intent: "create" as const,
+            rootSource: "random" as const,
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       const exported = await session.call("exportRecoveryMaterial", { format, context });
       const secretBytes = (session as unknown as { root: Uint8Array }).root;
 
       const cleared = await session.call("clearFunds", {});
       expect(secretBytes.every((byte) => byte === 0)).toBe(true);
-      expect(cleared).toEqual({ identity: identity.identity, funds: null });
+      expect(cleared).toEqual({
+        credentials: identity.credentials,
+        identity: identity.identity,
+        funds: null,
+      });
       await expect(session.call("exportRecoveryMaterial", { format, context })).rejects.toThrow(
         "Unlock the existing funds root",
       );
@@ -411,19 +967,25 @@ describe("ephemeral asset Worker funds lifecycle", () => {
         "Restore the original funds",
       );
 
-      // Manually re-entering the saved material completes the drill, even when the
-      // original fingerprint is no longer at hand.
-      const reentered = await session.call("importRecoveryMaterial", {
-        format,
-        material: exported.material,
-        context,
-      });
+      // Without the application's original fingerprint, valid words remain a
+      // candidate; they cannot establish that the original credentials were used.
+      const reentered = await session.call(
+        "importRecoveryMaterial",
+        Object.assign(
+          {
+            format,
+            material: exported.material,
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       expect(reentered.funds).toMatchObject({
         fundsFingerprint: created.funds!.fundsFingerprint,
         backupRequired: false,
-        recoveryVerified: true,
-        recoveryPath: format,
+        recoveryVerified: false,
       });
+      expect(reentered.funds?.recoveryPath).toBeUndefined();
       await session.call("clearFunds", {});
 
       const params = {
@@ -432,7 +994,10 @@ describe("ephemeral asset Worker funds lifecycle", () => {
         expectedFingerprint: exported.fundsFingerprint,
         context,
       };
-      const verified = await session.call("importRecoveryMaterial", params);
+      const verified = await session.call(
+        "importRecoveryMaterial",
+        Object.assign(params, fundsParams(session)),
+      );
       expect(params.material).toBe("");
       expect(verified.identity).toEqual(identity.identity);
       expect(verified.funds).toMatchObject({
@@ -456,13 +1021,19 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       const identity = identityParams();
       assertPublic(await session.call("unlockIdentity", identity));
       expect(identity.rawPassphrase).toBe("");
-      const initial = await session.call("createFunds", {
-        intent: "create",
-        rootSource: "random",
-        context,
-      });
+      const initial = await session.call(
+        "createFunds",
+        Object.assign(
+          {
+            intent: "create" as const,
+            rootSource: "random" as const,
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       expect(initial.funds).toMatchObject({
-        rootSource: "random",
+        rootSource: "random" as const,
         recoveryVerified: false,
         backupRequired: true,
       });
@@ -484,23 +1055,26 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       else expect(exported.material).toMatch(/^0x[0-9a-f]{64}$/);
       expect(session.state()).toEqual(initial);
       const notFresh = { format, material: exported.material, context };
-      await expect(session.call("importRecoveryMaterial", notFresh)).rejects.toThrow(
-        "Clear the original",
-      );
+      await expect(
+        session.call("importRecoveryMaterial", Object.assign(notFresh, fundsParams(session))),
+      ).rejects.toThrow("Clear the original");
       expect(notFresh.material).toBe("");
       expect(session.state()).toEqual(initial);
       const secretBytes = (session as unknown as { root: Uint8Array }).root;
       session.clear();
       expect(secretBytes.every((byte) => byte === 0)).toBe(true);
-      expect(session.state()).toEqual({ identity: null, funds: null });
-      const fresh = new ShieldedAssetSession();
+      expect(session.state()).toEqual({ credentials: null, identity: null, funds: null });
+      const fresh = await unlockedSession();
       const params = {
         format,
         material: exported.material,
         expectedFingerprint: exported.fundsFingerprint,
         context,
       };
-      const restored = await fresh.call("importRecoveryMaterial", params);
+      const restored = await fresh.call(
+        "importRecoveryMaterial",
+        Object.assign(params, fundsParams(fresh)),
+      );
       expect(params.material).toBe("");
       expect(restored.identity).toBeNull();
       expect(restored.funds).toMatchObject({
@@ -512,6 +1086,13 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       });
       assertPublic(restored);
       await fresh.call("unlockIdentity", identityParams());
+      await fresh.call("importRecoveryMaterial", {
+        ...fundsParams(fresh),
+        format,
+        material: exported.material,
+        expectedFingerprint: exported.fundsFingerprint,
+        context,
+      });
       assertPublic(await fresh.call("receiveCode", { slot: "asset" }));
       expect(mocks.receive).toHaveBeenCalledOnce();
     },
@@ -520,7 +1101,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   it.each(["mnemonic", "shieldedKey"] as const)(
     "rejects malformed %s and wrong fingerprints without installing or replacing funds",
     async (format) => {
-      const session = new ShieldedAssetSession();
+      const session = await unlockedSession();
       const material =
         format === "mnemonic"
           ? encodeShieldedAssetMnemonic(fixedRoot)
@@ -531,9 +1112,12 @@ describe("ephemeral asset Worker funds lifecycle", () => {
         expectedFingerprint: `0x${"ff".repeat(32)}`,
         context,
       };
-      await expect(session.call("importRecoveryMaterial", wrongFingerprint)).rejects.toThrow(
-        "fingerprint differs",
-      );
+      await expect(
+        session.call(
+          "importRecoveryMaterial",
+          Object.assign(wrongFingerprint, fundsParams(session)),
+        ),
+      ).rejects.toThrow("fingerprint differs");
       expect(wrongFingerprint.material).toBe("");
       expect(session.state().funds).toBeNull();
       const invalid = {
@@ -542,16 +1126,27 @@ describe("ephemeral asset Worker funds lifecycle", () => {
           format === "mnemonic" ? `${"abandon ".repeat(23)}abandon` : `0x${"11".repeat(31)}`,
         context,
       };
-      await expect(session.call("importRecoveryMaterial", invalid)).rejects.toThrow();
+      await expect(
+        session.call("importRecoveryMaterial", Object.assign(invalid, fundsParams(session))),
+      ).rejects.toThrow();
       expect(invalid.material).toBe("");
       expect(session.state().funds).toBeNull();
-      const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
-      const valid = await session.call("importRecoveryMaterial", {
-        format,
-        material,
-        expectedFingerprint: keys.fundsFingerprint,
-        context,
+      const keys = await deriveShieldedAssetKeyMaterial({
+        assetRoot: fixedRoot,
+        fundsIdentitySecret,
       });
+      const valid = await session.call(
+        "importRecoveryMaterial",
+        Object.assign(
+          {
+            format,
+            material,
+            expectedFingerprint: keys.fundsFingerprint,
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       const replacement = {
         format,
         material:
@@ -560,19 +1155,31 @@ describe("ephemeral asset Worker funds lifecycle", () => {
             : encodeShieldedAssetKey(new Uint8Array(32).fill(42)),
         context,
       };
-      await expect(session.call("importRecoveryMaterial", replacement)).rejects.toThrow(
-        "Clear the original",
-      );
+      await expect(
+        session.call("importRecoveryMaterial", Object.assign(replacement, fundsParams(session))),
+      ).rejects.toThrow("Clear the original");
       expect(replacement.material).toBe("");
       await expect(
-        session.call("createFunds", { intent: "create", rootSource: "random", context }),
+        session.call(
+          "createFunds",
+          Object.assign(
+            { intent: "create" as const, rootSource: "random" as const, context },
+            fundsParams(session),
+          ),
+        ),
       ).rejects.toThrow("empty funds slot");
       await expect(
-        session.call("restoreSignature", {
-          signerAddress: mocks.lineage,
-          signature: "bad-signature-sentinel",
-          context,
-        }),
+        session.call(
+          "restoreSignature",
+          Object.assign(
+            {
+              signerAddress: mocks.lineage,
+              signature: "bad-signature-sentinel",
+              context,
+            },
+            fundsParams(session),
+          ),
+        ),
       ).rejects.toThrow("Clear the original");
       expect(session.state()).toEqual(valid);
       expect(JSON.stringify(valid)).not.toContain(material);
@@ -583,25 +1190,40 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   it("verifies a real repeated signature against the old fingerprint and rejects a different signer", async () => {
     const wallet = new Wallet(`0x${"11".repeat(32)}`);
     const signature = await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address));
-    const first = new ShieldedAssetSession();
-    const created = await first.call("createFunds", {
-      intent: "create",
-      rootSource: "walletSignature",
-      signerAddress: wallet.address,
-      signature,
-      context,
-    });
+    const first = await unlockedSession();
+    const created = await first.call(
+      "createFunds",
+      Object.assign(
+        {
+          intent: "create" as const,
+          rootSource: "walletSignature" as const,
+          signerAddress: wallet.address,
+          signature,
+          context,
+        },
+        fundsParams(first),
+      ),
+    );
     expect(created.funds?.recoveryVerified).toBe(false);
     expect(created.funds?.backupRequired).toBe(true);
-    const exported = await first.call("exportRecoveryMaterial", { format: "shieldedKey", context });
-    first.clear();
-    const manual = new ShieldedAssetSession();
-    const manualState = await manual.call("importRecoveryMaterial", {
-      format: "shieldedKey",
-      material: exported.material,
-      expectedFingerprint: created.funds!.fundsFingerprint,
+    const exported = await first.call("exportRecoveryMaterial", {
+      format: "shieldedKey" as const,
       context,
     });
+    first.clear();
+    const manual = await unlockedSession();
+    const manualState = await manual.call(
+      "importRecoveryMaterial",
+      Object.assign(
+        {
+          format: "shieldedKey" as const,
+          material: exported.material,
+          expectedFingerprint: created.funds!.fundsFingerprint,
+          context,
+        },
+        fundsParams(manual),
+      ),
+    );
     expect(manualState.funds).toMatchObject({
       rootSource: "imported",
       recoveryVerified: true,
@@ -611,14 +1233,17 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     });
     expect(manualState.funds?.signerAddress).toBeUndefined();
     manual.clear();
-    const fresh = new ShieldedAssetSession();
+    const fresh = await unlockedSession();
     const params = {
       signerAddress: wallet.address,
       signature: await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address)),
       expectedFingerprint: created.funds!.fundsFingerprint,
       context,
     };
-    const restored = await fresh.call("restoreSignature", params);
+    const restored = await fresh.call(
+      "restoreSignature",
+      Object.assign(params, fundsParams(fresh)),
+    );
     expect(params.signature).toBe("");
     expect(restored.funds).toMatchObject({
       recoveryVerified: true,
@@ -627,14 +1252,20 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     });
     assertPublic(restored);
     const other = new Wallet(`0x${"22".repeat(32)}`);
-    const wrong = new ShieldedAssetSession();
+    const wrong = await unlockedSession();
     await expect(
-      wrong.call("restoreSignature", {
-        signerAddress: other.address,
-        signature: await other.signMessage(buildShieldedAssetSigningMessage(other.address)),
-        expectedFingerprint: created.funds!.fundsFingerprint,
-        context,
-      }),
+      wrong.call(
+        "restoreSignature",
+        Object.assign(
+          {
+            signerAddress: other.address,
+            signature: await other.signMessage(buildShieldedAssetSigningMessage(other.address)),
+            expectedFingerprint: created.funds!.fundsFingerprint,
+            context,
+          },
+          fundsParams(wrong),
+        ),
+      ),
     ).rejects.toThrow("fingerprint differs");
     expect(wrong.state().funds).toBeNull();
   });
@@ -648,16 +1279,25 @@ describe("ephemeral asset Worker funds lifecycle", () => {
         signerAddress: wallet.address,
         signature,
       });
-      const keys = await deriveShieldedAssetKeyMaterial(generated.assetRoot);
-      const pendingBackupFingerprints = [keys.fundsFingerprint];
-      const signatureSession = new ShieldedAssetSession();
-      const restored = await signatureSession.call("restoreSignature", {
-        signerAddress: wallet.address,
-        signature,
-        expectedFingerprint: hasOriginalFingerprint ? keys.fundsFingerprint : undefined,
-        pendingBackupFingerprints,
-        context,
+      const keys = await deriveShieldedAssetKeyMaterial({
+        assetRoot: generated.assetRoot,
+        fundsIdentitySecret,
       });
+      const pendingBackupFingerprints = [keys.fundsFingerprint];
+      const signatureSession = await unlockedSession();
+      const restored = await signatureSession.call(
+        "restoreSignature",
+        Object.assign(
+          {
+            signerAddress: wallet.address,
+            signature,
+            expectedFingerprint: hasOriginalFingerprint ? keys.fundsFingerprint : undefined,
+            pendingBackupFingerprints,
+            context,
+          },
+          fundsParams(signatureSession),
+        ),
+      );
       expect(restored.funds).toMatchObject({ backupRequired: true, recoveryVerified: false });
       mocks.recover.mockResolvedValue(recoveryHistory(keys.ownerCommitment));
       await signatureSession.call("recover", { context });
@@ -666,7 +1306,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
         recoveryVerified: false,
       });
       const knownOriginalExport = await signatureSession.call("exportRecoveryMaterial", {
-        format: "shieldedKey",
+        format: "shieldedKey" as const,
         context,
       });
       expect(knownOriginalExport.material).toBe(encodeShieldedAssetKey(generated.assetRoot));
@@ -677,64 +1317,93 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       });
 
       const exportedWords = await signatureSession.call("exportRecoveryMaterial", {
-        format: "mnemonic",
+        format: "mnemonic" as const,
         context,
       });
       expect(exportedWords.material).toBe(encodeShieldedAssetMnemonic(generated.assetRoot));
       signatureSession.clear();
       // Manually re-entering the exported words is the drill itself.
-      const manual = new ShieldedAssetSession();
-      const opened = await manual.call("importRecoveryMaterial", {
-        format: "mnemonic",
-        material: exportedWords.material,
-        ...(hasOriginalFingerprint ? { expectedFingerprint: keys.fundsFingerprint } : {}),
-        context,
-      });
+      const manual = await unlockedSession();
+      const opened = await manual.call(
+        "importRecoveryMaterial",
+        Object.assign(
+          {
+            format: "mnemonic" as const,
+            material: exportedWords.material,
+            ...(hasOriginalFingerprint ? { expectedFingerprint: keys.fundsFingerprint } : {}),
+            context,
+          },
+          fundsParams(manual),
+        ),
+      );
       expect(opened.funds).toMatchObject({
         backupRequired: false,
-        recoveryVerified: true,
-        recoveryPath: "mnemonic",
+        recoveryVerified: hasOriginalFingerprint,
+        ...(hasOriginalFingerprint ? { recoveryPath: "mnemonic" } : {}),
       });
+      if (!hasOriginalFingerprint) {
+        expect(opened.funds?.recoveryPath).toBeUndefined();
+        await manual.call("recover", { context });
+        expect(manual.state().funds).toMatchObject({
+          recoveryVerified: true,
+          recoveryPath: "history",
+        });
+      }
     },
   );
 
   it("refuses to export an unknown re-signed candidate when pending fingerprints do not match", async () => {
-    const session = new ShieldedAssetSession();
+    const session = await unlockedSession();
     const pendingBackupFingerprints = [`0x${"ff".repeat(32)}`];
     const wallet = new Wallet(`0x${"11".repeat(32)}`);
-    await session.call("restoreSignature", {
-      signerAddress: wallet.address,
-      signature: await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address)),
-      pendingBackupFingerprints,
-      context,
-    });
+    await session.call(
+      "restoreSignature",
+      Object.assign(
+        {
+          signerAddress: wallet.address,
+          signature: await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address)),
+          pendingBackupFingerprints,
+          context,
+        },
+        fundsParams(session),
+      ),
+    );
     expect(session.state().funds?.recoveryVerified).toBe(false);
     expect(session.state().funds?.fundsFingerprint).not.toBe(pendingBackupFingerprints[0]);
     await expect(
-      session.call("exportRecoveryMaterial", { format: "shieldedKey", context }),
+      session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }),
     ).rejects.toThrow();
     await session.call("recover", { context });
     expect(session.state().funds?.recoveryVerified).toBe(false);
     await expect(
-      session.call("exportRecoveryMaterial", { format: "mnemonic", context }),
+      session.call("exportRecoveryMaterial", { format: "mnemonic" as const, context }),
     ).rejects.toThrow();
   });
 
   it("restores the same funds root in a newly configured deployment without changing its backup", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
+    });
     const material = encodeShieldedAssetKey(fixedRoot);
     const changedContext = {
       ...context,
       factoryAddress: "0x6666666666666666666666666666666666666666",
     };
     for (const currentContext of [context, changedContext]) {
-      const session = new ShieldedAssetSession();
-      const state = await session.call("importRecoveryMaterial", {
-        format: "shieldedKey",
-        material,
-        expectedFingerprint: keys.fundsFingerprint,
-        context: currentContext,
-      });
+      const session = await unlockedSession();
+      const state = await session.call(
+        "importRecoveryMaterial",
+        Object.assign(
+          {
+            format: "shieldedKey" as const,
+            material,
+            expectedFingerprint: keys.fundsFingerprint,
+            context: currentContext,
+          },
+          fundsParams(session),
+        ),
+      );
       expect(state.funds).toMatchObject({
         fundsFingerprint: keys.fundsFingerprint,
         recoveryVerified: true,
@@ -743,7 +1412,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       expect(
         (
           await session.call("exportRecoveryMaterial", {
-            format: "shieldedKey",
+            format: "shieldedKey" as const,
             context: currentContext,
           })
         ).material,
@@ -752,15 +1421,24 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     }
   });
 
-  it("summarizes root-only VALUE and pending budgets without revealing openings or granting claims", async () => {
-    const session = new ShieldedAssetSession();
-    const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
-    await session.call("importRecoveryMaterial", {
-      format: "mnemonic",
-      material: encodeShieldedAssetMnemonic(fixedRoot),
-      expectedFingerprint: keys.fundsFingerprint,
-      context,
+  it("summarizes VALUE and pending budgets without identity proof capability without revealing openings or granting claims", async () => {
+    const session = await unlockedSession();
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
     });
+    await session.call(
+      "importRecoveryMaterial",
+      Object.assign(
+        {
+          format: "mnemonic" as const,
+          material: encodeShieldedAssetMnemonic(fixedRoot),
+          expectedFingerprint: keys.fundsFingerprint,
+          context,
+        },
+        fundsParams(session),
+      ),
+    );
     mocks.recover.mockImplementation(async (_pool, input, options) => ({
       chainId: 31337n,
       poolAddress: context.poolAddress,
@@ -827,8 +1505,14 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   });
 
   it("does not let random creation bypass its backup gate by scanning a matching history", async () => {
-    const session = new ShieldedAssetSession();
-    await session.call("createFunds", { intent: "create", rootSource: "random", context });
+    const session = await unlockedSession();
+    await session.call(
+      "createFunds",
+      Object.assign(
+        { intent: "create" as const, rootSource: "random" as const, context },
+        fundsParams(session),
+      ),
+    );
     mocks.recover.mockImplementation(async (_pool, input, options) => ({
       chainId: 31337n,
       poolAddress: context.poolAddress,
@@ -861,7 +1545,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   });
 
   it("confirms a re-signed candidate from an authenticated independent budget only after the original identity is unlocked", async () => {
-    const session = new ShieldedAssetSession();
+    const session = await unlockedSession();
     const { keys, root } = await signatureCandidate(session);
     const commitment = await authenticatedBudgetHistory(keys);
 
@@ -872,10 +1556,16 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     expect(session.state().funds?.recoveryVerified).toBe(false);
     expect(rootOnly.claims).toEqual([]);
     await expect(
-      session.call("exportRecoveryMaterial", { format: "shieldedKey", context }),
+      session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }),
     ).rejects.toThrow();
 
     await session.call("unlockIdentity", identityParams());
+    await session.call("importRecoveryMaterial", {
+      ...fundsParams(session),
+      format: "shieldedKey" as const,
+      material: encodeShieldedAssetKey(root),
+      context,
+    });
     const authenticated = await session.call("recover", { context });
     expect(authenticated.notes).toMatchObject([
       { commitment: String(commitment), kind: "budget", keyMode: 1, pendingIdentity: false },
@@ -888,7 +1578,8 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     // Recovering ownership does not grant lineage eligibility or create a claim.
     expect(authenticated.claims).toEqual([]);
     expect(
-      (await session.call("exportRecoveryMaterial", { format: "shieldedKey", context })).material,
+      (await session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }))
+        .material,
     ).toBe(encodeShieldedAssetKey(root));
     assertPublic(authenticated);
   });
@@ -897,8 +1588,8 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     "does not confirm a candidate root from a budget with a mismatching %s or spent history",
     async (invalid) => {
       const session = new ShieldedAssetSession();
-      const { keys } = await signatureCandidate(session);
       await session.call("unlockIdentity", identityParams());
+      const { keys } = await signatureCandidate(session);
       await authenticatedBudgetHistory(keys, {
         ...(invalid === "identity" ? { heirIdentity: 99n } : {}),
         ...(invalid === "owner" ? { heirOwner: keys.ownerCommitment + 1n } : {}),
@@ -910,7 +1601,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       expect(session.state().funds?.recoveryVerified).toBe(false);
       expect(session.state().funds?.recoveryPath).toBeUndefined();
       await expect(
-        session.call("exportRecoveryMaterial", { format: "shieldedKey", context }),
+        session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }),
       ).rejects.toThrow();
       assertPublic(summary);
     },
@@ -922,22 +1613,33 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       const session = new ShieldedAssetSession();
       await session.call("unlockIdentity", identityParams());
       const signer = new Wallet(`0x${"11".repeat(32)}`);
-      await session.call("createFunds", {
-        intent: "create",
-        rootSource,
-        ...(rootSource === "walletSignature"
-          ? {
-              signerAddress: signer.address,
-              signature: await signer.signMessage(buildShieldedAssetSigningMessage(signer.address)),
-            }
-          : {}),
-        context,
-      });
+      await session.call(
+        "createFunds",
+        Object.assign(
+          {
+            intent: "create" as const,
+            rootSource,
+            ...(rootSource === "walletSignature"
+              ? {
+                  signerAddress: signer.address,
+                  signature: await signer.signMessage(
+                    buildShieldedAssetSigningMessage(signer.address),
+                  ),
+                }
+              : {}),
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       const backup = await session.call("exportRecoveryMaterial", {
-        format: "shieldedKey",
+        format: "shieldedKey" as const,
         context,
       });
-      const keys = await deriveShieldedAssetKeyMaterial(getBytes(backup.material));
+      const keys = await deriveShieldedAssetKeyMaterial({
+        assetRoot: getBytes(backup.material),
+        fundsIdentitySecret,
+      });
       await authenticatedBudgetHistory(keys);
       const summary = await session.call("recover", { context });
       expect(summary.notes).toMatchObject([{ kind: "budget", keyMode: 1, pendingIdentity: false }]);
@@ -953,75 +1655,106 @@ describe("ephemeral asset Worker funds lifecycle", () => {
   );
 
   it.each(["mnemonic", "shieldedKey"] as const)(
-    "opens a %s restore at once, since the entered material is the backup",
+    "keeps a valid %s as a candidate until positive funds history confirms it",
     async (format) => {
-      const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
+      const keys = await deriveShieldedAssetKeyMaterial({
+        assetRoot: fixedRoot,
+        fundsIdentitySecret,
+      });
       const material =
         format === "mnemonic"
           ? encodeShieldedAssetMnemonic(fixedRoot)
           : encodeShieldedAssetKey(fixedRoot);
-      const session = new ShieldedAssetSession();
-      const params = { format, material, context };
+      const session = await unlockedSession();
+      const params = { ...fundsParams(session), format, material, context };
       const restored = await session.call("importRecoveryMaterial", params);
       expect(params.material).toBe("");
       expect(restored.funds).toMatchObject({
         fundsFingerprint: keys.fundsFingerprint,
         rootSource: "imported",
-        recoveryVerified: true,
-        recoveryPath: format,
+        recoveryVerified: false,
         backupRequired: false,
       });
-      expect(restored.funds?.signerAddress).toBeUndefined();
-      // An empty scan neither blocks nor downgrades it.
+      expect(restored.funds?.recoveryPath).toBeUndefined();
       await session.call("recover", { context });
-      expect(session.state().funds).toMatchObject({ recoveryVerified: true, recoveryPath: format });
+      expect(session.state().funds?.recoveryVerified).toBe(false);
+      await expect(session.call("exportRecoveryMaterial", { format, context })).rejects.toThrow();
+      await expect(
+        session.call("preview", {
+          context,
+          slot: "asset",
+          action: "shield",
+          amount: "100",
+        }),
+      ).rejects.toThrow("Verify recovery");
+      mocks.recover.mockResolvedValue(recoveryHistory(keys.ownerCommitment));
+      const confirmed = await session.call("recover", { context });
+      expect(confirmed.sessionState?.funds).toMatchObject({
+        recoveryVerified: true,
+        recoveryPath: "history",
+      });
       expect((await session.call("exportRecoveryMaterial", { format, context })).material).toBe(
         material,
       );
-      await session.call("unlockIdentity", identityParams());
-      assertPublic(await session.call("receiveCode", { slot: "asset" }));
-      assertPublic(session.state());
+      assertPublic(confirmed);
       session.clear();
-      expect(session.state()).toEqual({ identity: null, funds: null });
+      expect(session.state()).toEqual({ credentials: null, identity: null, funds: null });
       await expect(session.call("recover", { context })).rejects.toThrow("Unlock");
-      await expect(session.call("exportRecoveryMaterial", { format, context })).rejects.toThrow();
     },
   );
 
   it("clears pasted recovery secrets before an asynchronous context validation can fail", async () => {
-    const session = new ShieldedAssetSession();
+    const session = await unlockedSession();
     const params = {
       format: "shieldedKey" as const,
       material: encodeShieldedAssetKey(fixedRoot),
       context: { ...context, chainId: "1" },
     };
-    const failed = session.call("importRecoveryMaterial", params);
+    const failed = session.call(
+      "importRecoveryMaterial",
+      Object.assign(params, fundsParams(session)),
+    );
     expect(params.material).toBe("");
     await expect(failed).rejects.toThrow("RPC chain");
     expect(session.state().funds).toBeNull();
     assertPublic(session.state());
-    const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
-    const recovered = await session.call("importRecoveryMaterial", {
-      format: "shieldedKey",
-      material: encodeShieldedAssetKey(fixedRoot),
-      expectedFingerprint: keys.fundsFingerprint,
-      context,
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: fixedRoot,
+      fundsIdentitySecret,
     });
+    const recovered = await session.call(
+      "importRecoveryMaterial",
+      Object.assign(
+        {
+          format: "shieldedKey" as const,
+          material: encodeShieldedAssetKey(fixedRoot),
+          expectedFingerprint: keys.fundsFingerprint,
+          context,
+        },
+        fundsParams(session),
+      ),
+    );
     expect(recovered.funds).toMatchObject({ recoveryVerified: true, recoveryPath: "shieldedKey" });
   });
 
   it("keeps a re-signed candidate pending on empty or insufficient history and confirms it from owned positive VALUE", async () => {
     const wallet = new Wallet(`0x${"11".repeat(32)}`);
     const signature = await wallet.signMessage(buildShieldedAssetSigningMessage(wallet.address));
-    const session = new ShieldedAssetSession();
-    await session.call("restoreSignature", { signerAddress: wallet.address, signature, context });
+    const session = await unlockedSession();
+    await session.call(
+      "restoreSignature",
+      Object.assign({ signerAddress: wallet.address, signature, context }, fundsParams(session)),
+    );
     await session.call("recover", { context });
     expect(session.state().funds?.recoveryVerified).toBe(false);
     const generated = await deriveShieldedAssetRootFromSignature({
       signerAddress: wallet.address,
       signature,
     });
-    const keys = await deriveShieldedAssetKeyMaterial(generated.assetRoot);
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: generated.assetRoot,
+      fundsIdentitySecret,
+    });
     const spent = recoveryHistory(keys.ownerCommitment);
     spent.spentNullifiers.add(
       computeShieldedSpendNullifier(
@@ -1039,7 +1772,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       await session.call("recover", { context });
       expect(session.state().funds?.recoveryVerified).toBe(false);
       await expect(
-        session.call("exportRecoveryMaterial", { format: "shieldedKey", context }),
+        session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }),
       ).rejects.toThrow();
     }
     mocks.recover.mockResolvedValue({
@@ -1099,7 +1832,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       ],
     });
     async function candidateSession() {
-      const session = new ShieldedAssetSession();
+      const session = await unlockedSession();
       return { session, ...(await signatureCandidate(session)) };
     }
 
@@ -1126,7 +1859,8 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       // The unverified pool is never scanned, so its history cannot confirm anything.
       expect(mocks.recover.mock.calls.some(([pool]) => pool === unverifiedPool)).toBe(false);
       expect(
-        (await session.call("exportRecoveryMaterial", { format: "shieldedKey", context })).material,
+        (await session.call("exportRecoveryMaterial", { format: "shieldedKey" as const, context }))
+          .material,
       ).toBe(encodeShieldedAssetKey(root));
       assertPublic(result);
     });
@@ -1161,21 +1895,30 @@ describe("ephemeral asset Worker funds lifecycle", () => {
 
     it("keeps identity and the funds root but drops the previous pool's history", async () => {
       const session = new ShieldedAssetSession();
-      const keys = await deriveShieldedAssetKeyMaterial(fixedRoot);
-      await session.call("unlockIdentity", identityParams());
-      await session.call("importRecoveryMaterial", {
-        format: "shieldedKey",
-        material: encodeShieldedAssetKey(fixedRoot),
-        expectedFingerprint: keys.fundsFingerprint,
-        context,
+      const keys = await deriveShieldedAssetKeyMaterial({
+        assetRoot: fixedRoot,
+        fundsIdentitySecret,
       });
+      await session.call("unlockIdentity", identityParams());
+      await session.call(
+        "importRecoveryMaterial",
+        Object.assign(
+          {
+            format: "shieldedKey" as const,
+            material: encodeShieldedAssetKey(fixedRoot),
+            expectedFingerprint: keys.fundsFingerprint,
+            context,
+          },
+          fundsParams(session),
+        ),
+      );
       await session.call("recover", { context });
       expect(internals(session).summary).not.toBeNull();
       const before = session.state();
 
       mocks.canonicalPool = otherPoolContext.poolAddress;
       const exported = await session.call("exportRecoveryMaterial", {
-        format: "shieldedKey",
+        format: "shieldedKey" as const,
         context: otherPoolContext,
       });
       expect(exported.material).toBe(encodeShieldedAssetKey(fixedRoot));

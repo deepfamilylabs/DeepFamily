@@ -180,17 +180,36 @@ export function computeShieldedAssetFingerprint({
   );
 }
 
-/** Shared branches deliberately exclude root provenance, signer and identity. */
-export async function deriveShieldedAssetKeyMaterial(assetRoot) {
-  const root = rootBytes(assetRoot);
+/** Funds key derivation binds both branches to an independent funds credential secret. */
+export async function deriveShieldedAssetKeyMaterial(input) {
+  const root = rootBytes(input?.assetRoot);
+  let fundsIdentitySecret;
+  let ikm;
+  let boundRoot;
   let hpke;
   let sample;
   try {
+    try {
+      fundsIdentitySecret = copyBytes(input?.fundsIdentitySecret, "fundsIdentitySecret");
+    } catch {
+      throw new ProtocolError(
+        "INVALID_FUNDS_IDENTITY_SECRET",
+        "Funds identity secret must be 32 bytes",
+      );
+    }
+    protocolAssert(
+      fundsIdentitySecret.length === 32,
+      "INVALID_FUNDS_IDENTITY_SECRET",
+      "Funds identity secret must be 32 bytes",
+    );
+    ikm = concatBytes(root, fundsIdentitySecret);
+    boundRoot = hkdf32(ikm, "DeepFamily:IdentityBoundAssetRoot:v1");
+    wipeBytes(ikm);
     let ownerSecret;
     for (let counter = 0; counter <= 0xffff_ffff; counter += 1) {
       const info = new Uint8Array(4);
       new DataView(info.buffer).setUint32(0, counter, false);
-      sample = hkdf32(root, "DeepFamily:AssetSpend:v1", info);
+      sample = hkdf32(boundRoot, "DeepFamily:AssetSpend:v1", info);
       const candidate = BigInt(bytesToHex(sample));
       wipeBytes(sample);
       if (candidate > 0n && candidate < SNARK_SCALAR_FIELD) {
@@ -203,7 +222,7 @@ export async function deriveShieldedAssetKeyMaterial(assetRoot) {
       "ASSET_KEY_DERIVATION_FAILED",
       "Asset spend derivation exhausted its counter",
     );
-    hpke = hkdf32(root, "DeepFamily:AssetView:v1");
+    hpke = hkdf32(boundRoot, "DeepFamily:AssetView:v1");
     const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
     const viewPublicKey = await deriveShieldedViewPublicKey(hpke);
     return {
@@ -218,6 +237,9 @@ export async function deriveShieldedAssetKeyMaterial(assetRoot) {
     };
   } finally {
     wipeBytes(root);
+    wipeBytes(fundsIdentitySecret);
+    wipeBytes(ikm);
+    wipeBytes(boundRoot);
     wipeBytes(hpke);
     wipeBytes(sample);
   }

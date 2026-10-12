@@ -15,7 +15,13 @@ import { SHIELDED_IDENTITY_IDLE_TIMEOUT_MS } from "./useShieldedIdentitySession"
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
-  crypto: vi.fn(() => new Promise(() => {})),
+  crypto: vi.fn<
+    (
+      method: string,
+      params: unknown,
+      options?: { signal?: AbortSignal },
+    ) => Promise<{ identityHash: string }>
+  >(() => new Promise(() => {})),
   cancel: vi.fn(async () => {}),
   terminate: vi.fn(),
   terminateZk: vi.fn(),
@@ -27,9 +33,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: string | Record<string, unknown>) =>
-      key === "shielded.submit" && typeof options === "object"
-        ? `${key}:${options.action}`
-        : key,
+      key === "shielded.submit" && typeof options === "object" ? `${key}:${options.action}` : key,
     i18n: { language: "en" },
   }),
 }));
@@ -97,7 +101,11 @@ const identity = {
   personHash: "0x" + "01".repeat(32),
   identity: { fullName: "Alice" },
 };
-const unlocked: ShieldedAssetSessionState = { identity, funds: null };
+const unlocked: ShieldedAssetSessionState = {
+  credentials: { handle: "credentials:1" },
+  identity,
+  funds: null,
+};
 const modules = {
   chainId: 31337n,
   poolAddress: address,
@@ -124,7 +132,11 @@ const emptyWallet = {
 
 function SessionObserver() {
   const { identity: currentIdentity, identityDraft } = useShieldedPageIdentitySession();
-  return <output data-testid="session-state">{JSON.stringify({ identity: currentIdentity, identityDraft })}</output>;
+  return (
+    <output data-testid="session-state">
+      {JSON.stringify({ identity: currentIdentity, identityDraft })}
+    </output>
+  );
 }
 
 function panel(enabled = true) {
@@ -135,7 +147,6 @@ function panel(enabled = true) {
           modules={modules}
           signer={signer}
           account={address}
-          publicActivityAddresses={new Set()}
         />
         <SessionObserver />
       </ShieldedIdentitySessionProvider>
@@ -148,7 +159,9 @@ function sessionState() {
 }
 
 function nameInput() {
-  return screen.getByPlaceholderText("search.hashCalculator.nameInputPlaceholder") as HTMLInputElement;
+  return screen.getByPlaceholderText(
+    "search.hashCalculator.nameInputPlaceholder",
+  ) as HTMLInputElement;
 }
 
 function dateInput(name: "birthYear" | "birthMonth" | "birthDay") {
@@ -176,7 +189,10 @@ async function unlockIdentity() {
   });
   await waitFor(() => expect(sessionState().identity?.handle).toBe(identity.handle));
   await waitFor(() =>
-    expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false),
+    expect(
+      (screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
   );
 }
 
@@ -211,7 +227,10 @@ function expectEmptyIdentity() {
 function deferUnlock() {
   let complete!: (state: ShieldedAssetSessionState) => void;
   mocks.call.mockImplementation((method: string) => {
-    if (method === "unlockIdentity") return new Promise((resolve) => { complete = resolve; });
+    if (method === "unlockIdentity")
+      return new Promise((resolve) => {
+        complete = resolve;
+      });
     if (method === "recover") return Promise.resolve(emptyWallet);
     throw new Error(`Unexpected Worker call: ${method}`);
   });
@@ -221,6 +240,7 @@ function deferUnlock() {
 describe("Shielded identity form privacy with a real session and form", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.crypto.mockImplementation(() => new Promise(() => {}));
     mocks.generation = 0;
     mocks.form = null;
     mocks.listeners.clear();
@@ -289,4 +309,107 @@ describe("Shielded identity form privacy with a real session and form", () => {
     await act(async () => vi.advanceTimersByTimeAsync(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));
     expectEmptyIdentity();
   });
+  it("shows the identity hash while entering unlock credentials", async () => {
+    const previewHash = "0x" + "ab".repeat(32);
+    mocks.crypto.mockResolvedValue({ identityHash: previewHash });
+    render(panel());
+    enterIdentity();
+
+    await screen.findByText("search.hashCalculator.calculatedHash:");
+    expect(mocks.crypto).toHaveBeenLastCalledWith(
+      "computeIdentityHash",
+      {
+        input: expect.objectContaining({
+          fullName: "Alice",
+          passphrase: "private-identity-passphrase",
+        }),
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(document.body.textContent).toContain(previewHash);
+    expect(sessionState().identity).toBeNull();
+  });
+
+  it("cancels the hash preview before unlocking and ignores its late result", async () => {
+    vi.useFakeTimers();
+    let finishPreview!: (result: { identityHash: string }) => void;
+    mocks.crypto.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishPreview = resolve;
+        }),
+    );
+    const complete = deferUnlock();
+    render(panel());
+    enterIdentity();
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    const options = mocks.crypto.mock.calls[mocks.crypto.mock.calls.length - 1][2] as {
+      signal: AbortSignal;
+    };
+    expect(options.signal.aborted).toBe(false);
+    const previewCalls = mocks.crypto.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    expect(options.signal.aborted).toBe(true);
+    expect(screen.queryByText("search.hashCalculator.calculatingHash")).toBeNull();
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(mocks.crypto).toHaveBeenCalledTimes(previewCalls);
+
+    const lateHash = "0x" + "cd".repeat(32);
+    await act(async () => {
+      finishPreview({ identityHash: lateHash });
+      complete(unlocked);
+    });
+    expect(document.body.textContent).not.toContain(lateHash);
+    expect(sessionState().identity?.personHash).toBe(identity.personHash);
+  });
+
+  it("submits original credentials under fixed funds rules even when the identity hash preview is unavailable", async () => {
+    mocks.crypto.mockResolvedValue({ identityHash: "" });
+    render(panel());
+    const rawName = "  Ａlice\u3000Example  ";
+    const rawPassphrase = "  original\u00a0passphrase  ";
+    fireEvent.change(nameInput(), { target: { value: rawName } });
+    fireEvent.change(dateInput("birthYear"), { target: { value: "65535" } });
+    fireEvent.change(screen.getByLabelText("search.hashCalculator.passphrase"), {
+      target: { value: rawPassphrase },
+    });
+    expect(dateInput("birthYear").max).toBe("65535");
+    expect(mocks.form?.getRawIdentityFields().fullName).toBe(rawName);
+    await waitFor(() =>
+      expect(mocks.crypto).toHaveBeenCalledWith(
+        "computeIdentityHash",
+        {
+          input: expect.objectContaining({
+            fullName: rawName,
+            birthYear: 65535,
+            passphrase: rawPassphrase,
+          }),
+        },
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    await waitFor(() =>
+      expect(mocks.call).toHaveBeenCalledWith("unlockIdentity", {
+        identity: expect.objectContaining({ fullName: rawName, birthYear: 65535 }),
+        rawPassphrase,
+      }),
+    );
+  });
+
+  it.each(["birthYear", "birthMonth", "birthDay"] as const)(
+    "rejects a fractional %s without truncating the original funds credentials",
+    async (field) => {
+      render(panel());
+      enterIdentity();
+      fireEvent.change(dateInput(field), {
+        target: { value: field === "birthYear" ? "2000.5" : "1.5" },
+      });
+      expect(mocks.form?.getRawIdentityFields()[field]).toBe(field === "birthYear" ? 2000.5 : 1.5);
+      fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+      await screen.findByRole("alert");
+      expect(mocks.call.mock.calls.some(([method]) => method === "unlockIdentity")).toBe(false);
+    },
+  );
 });

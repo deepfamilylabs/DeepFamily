@@ -20,5 +20,6 @@ export * from "./precis.js";
 export * from "./story.js";
 
 export * from "./shielded-asset-keys.js";
+export * from "./shielded-funds-identity.js";
 export * from "./shielded-asset-recovery.js";
 export * from "./shielded-value-capacity.js";

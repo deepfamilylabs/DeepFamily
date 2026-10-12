@@ -3,7 +3,13 @@ import { isAddress } from "ethers";
 import { useTranslation } from "react-i18next";
 import { buildShieldedAssetSigningMessage } from "@deepfamily/protocol-core";
 import type { ShieldedPublicFunds } from "../../../shared/workers/shieldedAssetWorkerTypes";
-import { FieldBlock, PanelButton, SuccessNotice, WarningNotice } from "./inheritanceControls";
+import {
+  FieldBlock,
+  PanelButton,
+  SuccessNotice,
+  WarningNotice,
+  radioOptionClassName,
+} from "./inheritanceControls";
 
 export type ShieldedFundsRecoveryFormat = "mnemonic" | "shieldedKey";
 
@@ -25,7 +31,7 @@ export interface ShieldedFundsKeyManagerProps {
   onRootSourceChange: (value: "random" | "walletSignature") => void;
   account: string;
   canSign: boolean;
-  /** Recovery can finish without identity; only budget claims and identity-bound codes need it. */
+  /** Credentials are already unlocked; proofs may be unavailable for their identity suite. */
   identityReady?: boolean;
   /** A scan without a matching historical note does not confirm the original wallet. */
   recoveryScanned?: boolean;
@@ -63,7 +69,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
   const backup = props.flow === "backup" || backupPending || verification;
   const restored = !!funds?.recoveryVerified && !funds.backupRequired && !backup;
   const candidate = !!funds && !funds.recoveryVerified && !funds.backupRequired && !backup;
-  const fingerprint = props.exportedFingerprint || funds?.fundsFingerprint;
   const sourceLabel = funds
     ? tr(
         funds.rootSource === "random"
@@ -74,11 +79,8 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
       )
     : "";
 
-  const keySummary = fingerprint ? (
+  const keySummary = funds ? (
     <div className="space-y-1 rounded-xl bg-surface-alt p-3 text-xs text-ink-muted">
-      <p className="break-all">
-        {tr("fundsFingerprint")}: {fingerprint}
-      </p>
       {funds ? <p>{sourceLabel}</p> : null}
       {funds?.signerAddress ? (
         <p className="break-all">
@@ -167,9 +169,12 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
             <>
               <fieldset className="space-y-2" disabled={busy}>
                 <legend className="text-sm font-medium text-ink">{tr("backupFormat")}</legend>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-3">
                   {(["mnemonic", "shieldedKey"] as const).map((format) => (
-                    <label key={format} className="flex items-center gap-2 text-sm text-ink">
+                    <label
+                      key={format}
+                      className={`${radioOptionClassName(props.backupFormat === format, busy)} text-ink`}
+                    >
                       <input
                         type="radio"
                         name={`${id}-backup-format`}
@@ -238,9 +243,12 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
           <p className="text-sm text-ink-muted">{tr("newWalletExplanation")}</p>
           <fieldset className="space-y-2" disabled={busy}>
             <legend className="text-sm font-medium text-ink">{tr("newSource")}</legend>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3">
               {(["random", "walletSignature"] as const).map((source) => (
-                <label key={source} className="flex items-center gap-2 text-sm text-ink">
+                <label
+                  key={source}
+                  className={`${radioOptionClassName(props.rootSource === source, busy)} text-ink`}
+                >
                   <input
                     type="radio"
                     name={`${id}-new-source`}
@@ -284,9 +292,12 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
         <>
           <fieldset className="space-y-2" disabled={busy}>
             <legend className="text-sm font-medium text-ink">{tr("restorePath")}</legend>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3">
               {(["mnemonic", "shieldedKey", "signature"] as const).map((path) => (
-                <label key={path} className="flex items-center gap-2 text-sm text-ink">
+                <label
+                  key={path}
+                  className={`${radioOptionClassName(props.restorePath === path, busy)} text-ink`}
+                >
                   <input
                     type="radio"
                     name={`${id}-restore-path`}

@@ -96,9 +96,6 @@ function InheritanceContent() {
   const configurationMismatch = t("shielded.configurationMismatch");
   const unreachable = t("shielded.unreachable");
   const [state, setState] = useState<ModulesState>({ status: "loading" });
-  // Remember deposits across wallet switches during this page visit so the
-  // panel can explain the privacy implications of reusing a deposit wallet.
-  const publicActivityAddresses = useRef(new Set<string>());
   const assetContext = `${config.chainId}:${factoryAddress}`;
   const currentAssetContext = useRef(assetContext);
   currentAssetContext.current = assetContext;
@@ -384,7 +381,6 @@ function InheritanceContent() {
           modules={readyModules}
           signer={wallet.signer}
           account={wallet.address}
-          publicActivityAddresses={publicActivityAddresses.current}
           assetControls={assetControls}
           navigation={navigation}
           onNavigationChange={setNavigation}

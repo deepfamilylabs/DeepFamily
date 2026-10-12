@@ -5,7 +5,13 @@ import {
   ShieldedRecipientCredentialsForm,
   type ShieldedRecipientCredentialsFormHandle,
 } from "./ShieldedRecipientCredentialsForm";
-import { FieldBlock, PanelButton, PanelShell, WarningNotice } from "./inheritanceControls";
+import {
+  FieldBlock,
+  PanelButton,
+  PanelShell,
+  WarningNotice,
+  radioOptionClassName,
+} from "./inheritanceControls";
 
 const INPUT_CLASS =
   "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
@@ -43,9 +49,12 @@ export function ShieldedRecipientInput({
         <legend className="text-sm font-medium text-ink">
           {t("shielded.recipientMethodLabel")}
         </legend>
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-wrap gap-3">
           {(["receiveCode", "credentials"] as const).map((option) => (
-            <label key={option} className="flex items-center gap-2 text-sm text-ink">
+            <label
+              key={option}
+              className={`${radioOptionClassName(method === option, busy)} text-ink`}
+            >
               <input
                 type="radio"
                 name="shielded-recipient-method"
@@ -144,7 +153,14 @@ export function ShieldedValueNotePicker({
         const commitment = item.commitment;
         const checked = selectedCommitments.includes(commitment);
         return (
-          <label key={commitment} className="flex items-center gap-3 text-sm text-ink">
+          <label
+            key={commitment}
+            className={
+              singleChoice
+                ? `${radioOptionClassName(checked, busy)} text-ink`
+                : "flex items-center gap-3 text-sm text-ink"
+            }
+          >
             <input
               type={singleChoice ? "radio" : "checkbox"}
               name={singleChoice ? radioGroupName : undefined}
@@ -171,7 +187,7 @@ export function ShieldedValueNotePicker({
       })}
       {missing.map((commitment) =>
         singleChoice ? (
-          <div key={commitment} className="flex items-center gap-3 text-sm text-danger">
+          <div key={commitment} className={`${radioOptionClassName(true, busy)} text-danger`}>
             <input
               type="radio"
               name={radioGroupName}
@@ -235,7 +251,6 @@ export interface ShieldedWalletActionsProps {
   selectedCommitments: readonly string[];
   onSelectedCommitmentsChange: (commitments: string[]) => void;
   signerReady: boolean;
-  privateAccountWarning: boolean;
   /** An ERC20 deposit first approves the amount, then offers deposit confirmation. */
   approvalRequired?: boolean;
   submitDisabled?: boolean;
@@ -264,7 +279,6 @@ export function ShieldedWalletActions({
   selectedCommitments,
   onSelectedCommitmentsChange,
   signerReady,
-  privateAccountWarning,
   approvalRequired = false,
   submitDisabled = false,
   submitHidden = false,
@@ -416,9 +430,6 @@ export function ShieldedWalletActions({
         </>
       ) : null}
 
-      {privateAccountWarning ? (
-        <WarningNotice>{t("shielded.switchWalletPrompt", { symbol })}</WarningNotice>
-      ) : null}
       {!signerReady && action !== "receiveCode" ? (
         <WarningNotice>{t("shielded.walletNotReady", { symbol })}</WarningNotice>
       ) : null}

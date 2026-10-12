@@ -75,10 +75,13 @@ export function useShieldedIdentitySession({
   const scheduleDraftExpiry = useCallback(() => {
     clearDraftTimer();
     if (!mountedRef.current || !identityDraftRef.current || busyRef.current) return;
-    draftTimerRef.current = setTimeout(() => {
-      draftTimerRef.current = null;
-      if (!busyRef.current) forgetIdentityDraft();
-    }, Math.max(0, draftExpiresAtRef.current - Date.now()));
+    draftTimerRef.current = setTimeout(
+      () => {
+        draftTimerRef.current = null;
+        if (!busyRef.current) forgetIdentityDraft();
+      },
+      Math.max(0, draftExpiresAtRef.current - Date.now()),
+    );
   }, [clearDraftTimer, forgetIdentityDraft]);
 
   const touchDraft = useCallback(() => {
@@ -129,7 +132,7 @@ export function useShieldedIdentitySession({
     if (!mountedRef.current || scopeRef.current !== scope || generationRef.current !== generation)
       return () => {};
     clearWalletRequest();
-    // Only an actual wallet transaction request gets this brief exception. A
+    // Only an actual wallet signature or transaction gets this brief exception. A
     // request's object identity prevents a late release from ending a newer one.
     const request = {
       timer: setTimeout(() => {
@@ -177,7 +180,8 @@ export function useShieldedIdentitySession({
             ...(state.funds.recoveryPath ? { recoveryPath: state.funds.recoveryPath } : {}),
           }
         : null;
-      sessionRef.current = { scope, state: { identity, funds } };
+      const credentials = state.credentials ? { handle: state.credentials.handle } : null;
+      sessionRef.current = { scope, state: { credentials, identity, funds } };
       expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
       scheduleIdleLock();
       touchDraft();
@@ -187,7 +191,11 @@ export function useShieldedIdentitySession({
   );
   const unlock = useCallback(
     (identity: ShieldedPublicIdentity) => {
-      update({ identity, funds: sessionRef.current?.state.funds ?? null });
+      update({
+        credentials: sessionRef.current?.state.credentials ?? null,
+        identity,
+        funds: sessionRef.current?.state.funds ?? null,
+      });
     },
     [update],
   );
@@ -272,8 +280,10 @@ export function useShieldedIdentitySession({
   return {
     // Hide an old scope during render, before the layout effect releases it.
     identity: sessionRef.current?.scope === scope ? sessionRef.current.state.identity : null,
+    credentials: sessionRef.current?.scope === scope ? sessionRef.current.state.credentials : null,
     funds: sessionRef.current?.scope === scope ? sessionRef.current.state.funds : null,
-    identityDraft: identityDraftRef.current?.scope === scope ? identityDraftRef.current.draft : null,
+    identityDraft:
+      identityDraftRef.current?.scope === scope ? identityDraftRef.current.draft : null,
     rememberIdentityDraft,
     unlock,
     update,

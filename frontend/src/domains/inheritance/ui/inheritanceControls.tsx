@@ -13,6 +13,12 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
     "border border-hairline-strong bg-surface text-ink hover:bg-surface-alt focus:ring-primary/30 disabled:opacity-50",
 };
 
+export function radioOptionClassName(selected: boolean, disabled = false): string {
+  return `flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+    selected ? "border-primary bg-primary/5" : "border-hairline-strong"
+  } ${disabled ? "cursor-default opacity-60" : "cursor-pointer"}`;
+}
+
 export function PanelButton({
   variant = "secondary",
   size = "default",

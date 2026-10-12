@@ -6,6 +6,10 @@ import { getAddChainParams } from "../../../shared/config";
 import { normalizeFriendlyError, sanitizeErrorForLogging } from "../../../shared/lib/errors";
 import { SUPPORTED_WALLETS } from "../config/wallets";
 import { createWalletProvider } from "../services/walletProvider";
+import {
+  getWalletConnectionGeneration,
+  invalidateWalletConnection,
+} from "../services/walletConnectionGeneration";
 
 // localStorage key for persisting wallet type
 const WALLET_TYPE_STORAGE_KEY = "deepfamily_last_wallet_type";
@@ -92,23 +96,101 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     connectedWalletId: null,
     rawProvider: null,
   });
+  const walletStateRef = useRef(walletState);
+  walletStateRef.current = walletState;
+  const activeRawProviderRef = useRef<any | null>(null);
+  const mountedRef = useRef(true);
+  const connectionIsCurrent = useCallback(
+    (rawProvider: any, generation: number) =>
+      mountedRef.current &&
+      activeRawProviderRef.current === rawProvider &&
+      getWalletConnectionGeneration() === generation,
+    [],
+  );
+  useEffect(() => {
+    mountedRef.current = true;
+    // Development effect replay can preserve a selected connection's React state.
+    if (walletStateRef.current.rawProvider) {
+      activeRawProviderRef.current = walletStateRef.current.rawProvider;
+    }
+    return () => {
+      mountedRef.current = false;
+      activeRawProviderRef.current = null;
+      invalidateWalletConnection();
+    };
+  }, []);
 
   const [showWalletSelection, setShowWalletSelection] = useState(false);
   const [showNetworkSelection, setShowNetworkSelection] = useState(false);
 
+  const refreshConnection = useCallback(
+    async (rawProvider: any, generation: number, nextChainId?: number) => {
+      const current = () => connectionIsCurrent(rawProvider, generation);
+      try {
+        const provider = createWalletProvider(rawProvider);
+        const signer = await provider.getSigner();
+        const address = await signer.getAddress();
+        const chainId = nextChainId ?? Number((await provider.getNetwork()).chainId);
+        if (!current()) return;
+        setWalletState((prev) =>
+          current() && prev.rawProvider === rawProvider
+            ? { ...prev, provider, signer, address, chainId, isConnecting: false, balance: null }
+            : prev,
+        );
+        try {
+          const balance = await provider.getBalance(address);
+          if (!current()) return;
+          setWalletState((prev) =>
+            current() && prev.provider === provider
+              ? { ...prev, balance: ethers.formatEther(balance) }
+              : prev,
+          );
+        } catch (error) {
+          if (current())
+            console.warn("Failed to refresh wallet balance:", sanitizeErrorForLogging(error));
+        }
+      } catch (error) {
+        if (current()) {
+          console.warn("Failed to refresh wallet connection:", sanitizeErrorForLogging(error));
+          setWalletState((prev) => (current() ? { ...prev, isConnecting: false } : prev));
+        }
+      }
+    },
+    [connectionIsCurrent],
+  );
+
+  const restoreRetiredConnection = useCallback(
+    async (rawProvider: any | null) => {
+      activeRawProviderRef.current = rawProvider;
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
+      if (rawProvider) await refreshConnection(rawProvider, generation);
+      else
+        setWalletState((prev) =>
+          getWalletConnectionGeneration() === generation ? { ...prev, isConnecting: false } : prev,
+        );
+    },
+    [refreshConnection],
+  );
+
   const refreshBalance = useCallback(async () => {
     if (!walletState.provider || !walletState.address) return;
+    const generation = getWalletConnectionGeneration();
 
     try {
       const balance = await walletState.provider.getBalance(walletState.address);
-      setWalletState((prev) => ({
-        ...prev,
-        balance: ethers.formatEther(balance),
-      }));
+      if (!connectionIsCurrent(walletState.rawProvider, generation)) return;
+      setWalletState((prev) =>
+        connectionIsCurrent(walletState.rawProvider, generation) &&
+        prev.provider === walletState.provider &&
+        prev.address === walletState.address
+          ? { ...prev, balance: ethers.formatEther(balance) }
+          : prev,
+      );
     } catch (error) {
       console.error("[WalletContext] Failed to fetch balance:", sanitizeErrorForLogging(error));
     }
-  }, [walletState.provider, walletState.address]);
+  }, [walletState.provider, walletState.address, walletState.rawProvider, connectionIsCurrent]);
 
   const getAvailableWallets = useCallback((): WalletOption[] => {
     if (typeof window === "undefined") return [];
@@ -159,6 +241,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         toast.warning(t("wallet.noWallet", "Wallet not available"));
         return;
       }
+      const previousRawProvider = walletStateRef.current.rawProvider;
+      activeRawProviderRef.current = selectedProvider;
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
+      const current = () => connectionIsCurrent(selectedProvider, generation);
 
       // Determine wallet ID if not provided
       let detectedWalletId = walletId;
@@ -172,11 +259,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      setWalletState((prev) => ({ ...prev, isConnecting: true }));
+      setWalletState((prev) =>
+        current()
+          ? { ...prev, signer: null, provider: null, balance: null, isConnecting: true }
+          : prev,
+      );
 
       try {
         // Use the selected provider directly to avoid interception
         const accounts = await selectedProvider.request({ method: "eth_requestAccounts" });
+        if (!current()) return;
         if (!accounts || accounts.length === 0) {
           throw new Error("No accounts returned");
         }
@@ -185,6 +277,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         const signer = await provider.getSigner();
         const address = await signer.getAddress();
         const network = await provider.getNetwork();
+        if (!current()) return;
 
         // Save wallet type to localStorage for auto-reconnect
         try {
@@ -204,29 +297,32 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           rawProvider: selectedProvider,
         };
 
-        setWalletState(newState);
+        setWalletState((prev) => (current() ? newState : prev));
 
         // Refresh balance after connection
         try {
           const balance = await provider.getBalance(address);
-          setWalletState((prev) => ({
-            ...prev,
-            balance: ethers.formatEther(balance),
-          }));
+          if (!current()) return;
+          setWalletState((prev) =>
+            current() && prev.provider === provider
+              ? { ...prev, balance: ethers.formatEther(balance) }
+              : prev,
+          );
         } catch (balanceError) {
           console.warn("Failed to fetch balance:", balanceError);
         }
 
-        toast.success(t("wallet.connected", "Wallet connected successfully"));
+        if (current()) toast.success(t("wallet.connected", "Wallet connected successfully"));
       } catch (error: any) {
+        if (!current()) return;
         console.error("[WalletContext] Failed to connect wallet:", sanitizeErrorForLogging(error));
-        setWalletState((prev) => ({ ...prev, isConnecting: false }));
         showWalletError(error, t("wallet.connectionFailed", "Failed to connect wallet"), {
           USER_REJECTED: t("wallet.rejected", "Connection rejected by user"),
         });
+        await restoreRetiredConnection(previousRawProvider);
       }
     },
-    [showWalletError, t, toast],
+    [showWalletError, t, toast, connectionIsCurrent, restoreRetiredConnection],
   );
 
   const connect = useCallback(async () => {
@@ -245,36 +341,29 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [getAvailableWallets, connectWithProvider]);
 
   const disconnect = useCallback(() => {
-    let shouldNotify = false;
+    invalidateWalletConnection();
+    activeRawProviderRef.current = null;
+    const previous = walletStateRef.current;
+    const shouldNotify = !!(previous.address || previous.provider || previous.signer);
 
-    setWalletState((prev) => {
-      const wasConnected = !!(prev.address || prev.provider || prev.signer);
-      if (!wasConnected) {
-        return prev;
-      }
-
-      shouldNotify = true;
-      return {
-        address: null,
-        provider: null,
-        signer: null,
-        isConnecting: false,
-        chainId: null,
-        balance: null,
-        connectedWalletId: null,
-        rawProvider: null,
-      };
+    setWalletState({
+      address: null,
+      provider: null,
+      signer: null,
+      isConnecting: false,
+      chainId: null,
+      balance: null,
+      connectedWalletId: null,
+      rawProvider: null,
     });
 
-    if (shouldNotify) {
-      // Clear saved wallet type from localStorage
-      try {
-        localStorage.removeItem(WALLET_TYPE_STORAGE_KEY);
-      } catch (e) {
-        console.warn("[WalletContext] Failed to clear wallet type from localStorage:", e);
-      }
-      toast.info(t("wallet.disconnected", "Wallet disconnected"));
+    // An outstanding auto-connect must also remain disconnected after a reload.
+    try {
+      localStorage.removeItem(WALLET_TYPE_STORAGE_KEY);
+    } catch (e) {
+      console.warn("[WalletContext] Failed to clear wallet type from localStorage:", e);
     }
+    if (shouldNotify) toast.info(t("wallet.disconnected", "Wallet disconnected"));
   }, [t, toast]);
 
   const switchChain = useCallback(
@@ -285,30 +374,43 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         toast.warning(t("wallet.notConnected", "Please connect your wallet"));
         return;
       }
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
+      const current = () => connectionIsCurrent(rawProvider, generation);
+      setWalletState((prev) =>
+        current() ? { ...prev, signer: null, provider: null, balance: null } : prev,
+      );
 
       try {
         await rawProvider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: `0x${targetChainId.toString(16)}` }],
         });
+        if (!current()) return;
 
-        // Update chain ID in state
-        setWalletState((prev) => ({
-          ...prev,
-          chainId: targetChainId,
-        }));
-
+        await refreshConnection(rawProvider, generation, targetChainId);
+        if (!current()) return;
         toast.success(t("wallet.chainSwitched", "Chain switched successfully"));
       } catch (error: any) {
+        if (!current()) return;
         console.error("[WalletContext] Failed to switch chain:", sanitizeErrorForLogging(error));
         if (error.code === 4902) {
           toast.warning(t("wallet.chainNotAdded", "Chain not added to wallet"));
         } else {
           showWalletError(error, t("wallet.chainSwitchFailed", "Failed to switch chain"));
         }
+        await restoreRetiredConnection(rawProvider);
       }
     },
-    [showWalletError, t, toast, walletState.rawProvider],
+    [
+      showWalletError,
+      t,
+      toast,
+      walletState.rawProvider,
+      connectionIsCurrent,
+      refreshConnection,
+      restoreRetiredConnection,
+    ],
   );
 
   // Switch to chain, or add it first if not present in wallet
@@ -319,6 +421,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         toast.warning(t("wallet.notConnected", "Please connect your wallet"));
         return false;
       }
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
+      const current = () => connectionIsCurrent(rawProvider, generation);
+      setWalletState((prev) =>
+        current() ? { ...prev, signer: null, provider: null, balance: null } : prev,
+      );
 
       const chainIdHex = `0x${targetChainId.toString(16)}`;
 
@@ -328,16 +436,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           method: "wallet_switchEthereumChain",
           params: [{ chainId: chainIdHex }],
         });
+        if (!current()) return true;
 
-        setWalletState((prev) => ({ ...prev, chainId: targetChainId }));
+        await refreshConnection(rawProvider, generation, targetChainId);
+        if (!current()) return true;
         toast.success(t("wallet.chainSwitched", "Chain switched successfully"));
         return true;
       } catch (switchError: any) {
+        if (!current()) return false;
         // Error 4902: chain not added to wallet
         if (switchError.code === 4902) {
           const addChainParams = getAddChainParams(targetChainId);
           if (!addChainParams) {
             toast.warning(t("wallet.chainNotSupported", "This network is not supported"));
+            await restoreRetiredConnection(rawProvider);
             return false;
           }
 
@@ -346,16 +458,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               method: "wallet_addEthereumChain",
               params: [addChainParams],
             });
+            if (!current()) return true;
 
-            setWalletState((prev) => ({ ...prev, chainId: targetChainId }));
+            await refreshConnection(rawProvider, generation, targetChainId);
+            if (!current()) return true;
             toast.success(t("wallet.chainAdded", "Network added successfully"));
             return true;
           } catch (addError: any) {
+            if (!current()) return false;
             console.error(
               "[WalletContext] Failed to add chain:",
               sanitizeErrorForLogging(addError),
             );
             showWalletError(addError, t("wallet.chainAddFailed", "Failed to add network"));
+            await restoreRetiredConnection(rawProvider);
             return false;
           }
         } else {
@@ -364,11 +480,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             sanitizeErrorForLogging(switchError),
           );
           showWalletError(switchError, t("wallet.chainSwitchFailed", "Failed to switch chain"));
+          await restoreRetiredConnection(rawProvider);
           return false;
         }
       }
     },
-    [showWalletError, t, toast, walletState.rawProvider],
+    [
+      showWalletError,
+      t,
+      toast,
+      walletState.rawProvider,
+      connectionIsCurrent,
+      refreshConnection,
+      restoreRetiredConnection,
+    ],
   );
 
   // Listen to account and chain changes - use rawProvider from state
@@ -377,58 +502,53 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!rawProvider) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
+      if (activeRawProviderRef.current !== rawProvider) return;
+      // Invalidate before any await, including same-address notifications.
+      invalidateWalletConnection();
       if (accounts.length === 0) {
         disconnect();
-      } else if (accounts[0] !== walletState.address) {
-        // Account changed, refresh signer/address without prompting
-        (async () => {
-          try {
-            const provider = createWalletProvider(rawProvider);
-            const signer = await provider.getSigner();
-            const address = await signer.getAddress();
-            setWalletState((prev) => ({ ...prev, provider, signer, address }));
-            refreshBalance();
-          } catch (e) {
-            console.warn("Failed to refresh after account change:", sanitizeErrorForLogging(e));
-          }
-        })();
+        return;
       }
+      const generation = getWalletConnectionGeneration();
+      setWalletState((prev) =>
+        connectionIsCurrent(rawProvider, generation)
+          ? {
+              ...prev,
+              address: accounts[0],
+              signer: null,
+              provider: null,
+              balance: null,
+              isConnecting: false,
+            }
+          : prev,
+      );
+      void refreshConnection(rawProvider, generation);
     };
 
     const handleChainChanged = (chainId: string) => {
+      if (activeRawProviderRef.current !== rawProvider) return;
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
       const nextChainId = parseInt(chainId, 16);
-
-      // Recreate ethers provider/signer on every chain switch so they do not
-      // retain the old cached network and throw NETWORK_ERROR on the next call.
-      (async () => {
-        try {
-          const provider = createWalletProvider(rawProvider);
-          const signer = await provider.getSigner();
-          const address = await signer.getAddress();
-          const balance = await provider.getBalance(address);
-
-          setWalletState((prev) => ({
-            ...prev,
-            provider,
-            signer,
-            address,
-            chainId: nextChainId,
-            balance: ethers.formatEther(balance),
-          }));
-        } catch (error) {
-          console.warn(
-            "[WalletContext] Failed to refresh provider after chain change:",
-            sanitizeErrorForLogging(error),
-          );
-          setWalletState((prev) => ({
-            ...prev,
-            chainId: nextChainId,
-          }));
-        }
-      })();
+      // Retire the cached signer immediately; only this event may install its refresh.
+      setWalletState((prev) =>
+        connectionIsCurrent(rawProvider, generation)
+          ? {
+              ...prev,
+              chainId: nextChainId,
+              signer: null,
+              provider: null,
+              balance: null,
+              isConnecting: false,
+            }
+          : prev,
+      );
+      void refreshConnection(rawProvider, generation, nextChainId);
     };
 
     const handleDisconnect = () => {
+      if (activeRawProviderRef.current !== rawProvider) return;
+      invalidateWalletConnection();
       disconnect();
     };
 
@@ -471,17 +591,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         );
         // Fallback to polling
         pollTimer = setInterval(async () => {
+          const generation = getWalletConnectionGeneration();
+          const current = () => connectionIsCurrent(rawProvider, generation);
+          if (!current()) return;
           try {
             const accounts: string[] = await rawProvider.request({ method: "eth_accounts" });
+            if (!current()) return;
             if (!accounts || accounts.length === 0) {
-              if (walletState.address) disconnect();
-            } else if (accounts[0] !== walletState.address) {
+              if (walletStateRef.current.address) disconnect();
+              return;
+            } else if (accounts[0] !== walletStateRef.current.address) {
               handleAccountsChanged(accounts);
+              return;
             }
           } catch {}
+          if (!current()) return;
           try {
             const chainIdHex: string = await rawProvider.request({ method: "eth_chainId" });
-            handleChainChanged(chainIdHex);
+            if (!current()) return;
+            if (parseInt(chainIdHex, 16) !== walletStateRef.current.chainId)
+              handleChainChanged(chainIdHex);
           } catch {}
         }, 1500);
       }
@@ -499,13 +628,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
     };
-  }, [
-    walletState.rawProvider,
-    walletState.address,
-    walletState.connectedWalletId,
-    disconnect,
-    refreshBalance,
-  ]);
+  }, [walletState.rawProvider, disconnect, connectionIsCurrent, refreshConnection]);
 
   // Auto-connect if previously connected - use saved wallet type from localStorage
   const isAutoConnectDone = useRef(false);
@@ -544,33 +667,53 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         isAutoConnectDone.current = true;
         return;
       }
+      if (activeRawProviderRef.current) {
+        isAutoConnectDone.current = true;
+        return;
+      }
+      activeRawProviderRef.current = targetWallet.provider;
+      invalidateWalletConnection();
+      const generation = getWalletConnectionGeneration();
+      const current = () => connectionIsCurrent(targetWallet.provider, generation);
 
       try {
         // Use eth_accounts to check if already connected (doesn't prompt)
         const accounts = await targetWallet.provider.request({ method: "eth_accounts" });
+        if (!current()) return;
         if (accounts && accounts.length > 0) {
           // Hydrate state without prompting user
           const provider = createWalletProvider(targetWallet.provider);
           const signer = await provider.getSigner();
           const address = await signer.getAddress();
           const network = await provider.getNetwork();
+          if (!current()) return;
 
-          setWalletState((prev) => ({
-            ...prev,
-            address,
-            provider,
-            signer,
-            isConnecting: false,
-            chainId: Number(network.chainId),
-            connectedWalletId: targetWallet.id,
-            rawProvider: targetWallet.provider,
-          }));
+          setWalletState((prev) =>
+            current()
+              ? {
+                  ...prev,
+                  address,
+                  provider,
+                  signer,
+                  isConnecting: false,
+                  chainId: Number(network.chainId),
+                  connectedWalletId: targetWallet.id,
+                  rawProvider: targetWallet.provider,
+                }
+              : prev,
+          );
 
           try {
             const balance = await provider.getBalance(address);
-            setWalletState((prev) => ({ ...prev, balance: ethers.formatEther(balance) }));
+            if (!current()) return;
+            setWalletState((prev) =>
+              current() && prev.provider === provider
+                ? { ...prev, balance: ethers.formatEther(balance) }
+                : prev,
+            );
           } catch {}
         } else {
+          activeRawProviderRef.current = null;
           // Clear saved wallet type if no accounts connected
           try {
             localStorage.removeItem(WALLET_TYPE_STORAGE_KEY);
@@ -578,6 +721,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         }
         isAutoConnectDone.current = true;
       } catch (error) {
+        if (!current()) return;
+        activeRawProviderRef.current = null;
         console.warn("[WalletContext] Auto-connect failed:", sanitizeErrorForLogging(error));
         isAutoConnectDone.current = true;
       }
@@ -586,7 +731,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     // Add a small delay to ensure the page is fully loaded
     const timer = setTimeout(autoConnect, 100);
     return () => clearTimeout(timer);
-  }, [getAvailableWallets]);
+  }, [getAvailableWallets, connectionIsCurrent]);
 
   const contextValue: WalletContextValue = {
     ...walletState,

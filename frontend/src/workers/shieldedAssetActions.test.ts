@@ -28,6 +28,7 @@ vi.mock("ethers", async (original) => ({
 }));
 vi.mock("@deepfamily/protocol-core", async (original) => ({
   ...(await original<typeof import("@deepfamily/protocol-core")>()),
+  deriveShieldedFundsIdentitySecret: async () => new Uint8Array(32).fill(3),
   deriveIdentityMaterial: async ({ identity }: { identity: object }) => ({
     identity,
     identitySuiteId: 1,

@@ -10,6 +10,8 @@ import {
   normalizeShieldedAssetSignature,
 } from "../shielded-asset-keys.js";
 
+import { fundsVector as vector } from "./shielded-funds.fixture.js";
+
 const wallet = new Wallet(`0x${"11".repeat(32)}`);
 const order = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
@@ -113,29 +115,23 @@ test("signature input rejects compact, wrong message, wrong signer and invalid v
   );
 });
 
-test("common branches and funds fingerprint depend only on the root and branch suite", async () => {
+test("common branches and funds fingerprint require the root and funds identity secret", async () => {
   const root = Uint8Array.from({ length: 32 }, (_, i) => i);
-  const first = await deriveShieldedAssetKeyMaterial(root);
-  const second = await deriveShieldedAssetKeyMaterial(root);
+  const first = await deriveShieldedAssetKeyMaterial({
+    assetRoot: root,
+    fundsIdentitySecret: vector.fundsIdentitySecret,
+  });
+  const second = await deriveShieldedAssetKeyMaterial({
+    assetRoot: root,
+    fundsIdentitySecret: vector.fundsIdentitySecret,
+  });
   assert.deepEqual(first, second);
   // Frozen branch-v1 fixture for independent implementations and future releases.
-  assert.equal(
-    first.ownerSecret,
-    21163297713406726978733507212238736142897898906436691617414556311477803122818n,
-  );
-  assert.equal(
-    first.ownerCommitment,
-    16745082092878245220021372179056393625214528694427188481587298390944523844978n,
-  );
-  assert.equal(first.hpkeIkm, "0x12274570ef1254e45db69544110535022727b6c15646eead2ff4a7603c4646af");
-  assert.equal(
-    hexlify(first.viewPublicKey),
-    "0x1c383c23be2a8927f7835a83fdcb060b01acfff99661136c658f2d485e5bad56",
-  );
-  assert.equal(
-    first.fundsFingerprint,
-    "0xba9339b546645507471bedc1c78f017ec71d74de4dda220e376401883f02e027",
-  );
+  assert.equal(first.ownerSecret, vector.ownerSecret);
+  assert.equal(first.ownerCommitment, vector.ownerCommitment);
+  assert.equal(first.hpkeIkm, vector.hpkeIkm);
+  assert.equal(hexlify(first.viewPublicKey), vector.viewPublicKey);
+  assert.equal(first.fundsFingerprint, vector.fundsFingerprint);
   assert.equal(first.keyMode, 1);
   assert.equal(first.viewPublicKey.length, 32);
   assert.notEqual(first.hpkeIkm, hexlify(root));
@@ -146,10 +142,77 @@ test("common branches and funds fingerprint depend only on the root and branch s
   const changed = root.slice();
   changed[0] ^= 1;
   assert.notEqual(
-    (await deriveShieldedAssetKeyMaterial(changed)).fundsFingerprint,
+    (
+      await deriveShieldedAssetKeyMaterial({
+        assetRoot: changed,
+        fundsIdentitySecret: vector.fundsIdentitySecret,
+      })
+    ).fundsFingerprint,
     first.fundsFingerprint,
   );
-  await assert.rejects(deriveShieldedAssetKeyMaterial(new Uint8Array(31)), {
-    code: "INVALID_ASSET_ROOT",
+  await assert.rejects(
+    deriveShieldedAssetKeyMaterial({
+      assetRoot: new Uint8Array(31),
+      fundsIdentitySecret: vector.fundsIdentitySecret,
+    }),
+    {
+      code: "INVALID_ASSET_ROOT",
+    },
+  );
+});
+
+test("funds branches have no root-only or identity-output parameter fallback", async () => {
+  const assetRoot = getBytes(vector.assetRoot);
+  for (const input of [undefined, assetRoot, { fundsIdentitySecret: vector.fundsIdentitySecret }]) {
+    await assert.rejects(deriveShieldedAssetKeyMaterial(input), { code: "INVALID_ASSET_ROOT" });
+  }
+  for (const input of [
+    { assetRoot },
+    { assetRoot, fundsIdentitySecret: null },
+    { assetRoot, fundsIdentitySecret: new Uint8Array(31) },
+    { assetRoot, fundsIdentitySecret: new Uint8Array(33) },
+    { assetRoot, derivedSecretBytes: getBytes(vector.fundsIdentitySecret) },
+    { assetRoot, derivedSecretField: 1n },
+    { assetRoot, identityCommitment: 1n },
+  ]) {
+    await assert.rejects(deriveShieldedAssetKeyMaterial(input), {
+      code: "INVALID_FUNDS_IDENTITY_SECRET",
+    });
+  }
+});
+
+test("funds branches preserve leading zeros, caller buffers and context independence", async () => {
+  const assetRoot = getBytes(vector.assetRoot);
+  const fundsIdentitySecret = new Uint8Array(32);
+  fundsIdentitySecret[31] = 1;
+  const savedRoot = assetRoot.slice();
+  const savedSecret = fundsIdentitySecret.slice();
+  const plain = await deriveShieldedAssetKeyMaterial({ assetRoot, fundsIdentitySecret });
+  const extraContext = await deriveShieldedAssetKeyMaterial({
+    assetRoot,
+    fundsIdentitySecret,
+    identitySuiteId: 42,
+    identityCommitment: 123n,
+    personHash: "different",
+    chainId: 1,
+    poolAddress: "different",
+    rootSource: "walletSignature",
   });
+  assert.deepEqual(extraContext, plain);
+  assert.deepEqual(assetRoot, savedRoot);
+  assert.deepEqual(fundsIdentitySecret, savedSecret);
+  assert.notEqual(
+    (await deriveShieldedAssetKeyMaterial({ assetRoot, fundsIdentitySecret: new Uint8Array(32) }))
+      .fundsFingerprint,
+    plain.fundsFingerprint,
+  );
+  assert.notEqual(
+    (
+      await deriveShieldedAssetKeyMaterial({
+        assetRoot,
+        fundsIdentitySecret: vector.fundsIdentitySecret,
+      })
+    ).fundsFingerprint,
+    plain.fundsFingerprint,
+  );
 });

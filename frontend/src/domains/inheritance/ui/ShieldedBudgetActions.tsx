@@ -10,7 +10,13 @@ import { formatShieldedTimestamp, parseShieldedPeriodDays } from "../model/shiel
 import { ShieldedRecipientPicker } from "./ShieldedRecipientPicker";
 import type { ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import { ShieldedRecipientInput } from "./ShieldedWalletActions";
-import { FieldBlock, PanelButton, WarningNotice, shortHex } from "./inheritanceControls";
+import {
+  FieldBlock,
+  PanelButton,
+  WarningNotice,
+  shortHex,
+  radioOptionClassName,
+} from "./inheritanceControls";
 
 const INPUT_CLASS =
   "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
@@ -143,9 +149,12 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
           <legend className="text-sm font-medium text-ink">
             {t("shielded.fundingModeLabel", { symbol })}
           </legend>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-3">
             {(["public", "privateConvenient", "privateIndependent"] as const).map((mode) => (
-              <label key={mode} className="flex items-center gap-2 text-sm text-ink">
+              <label
+                key={mode}
+                className={`${radioOptionClassName(mode === fundingEntry, busy || !!template)} text-ink`}
+              >
                 <input
                   type="radio"
                   name="shielded-funding-mode"
@@ -229,7 +238,9 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
           htmlFor={selectedPolicy ? undefined : versionId}
           error={familyUnavailable ? t("shielded.familyRecordsUnavailable") : undefined}
           hint={
-            noParentVersions && !selectedPolicy ? t("search.storyRecordsQuery.noMatches") : undefined
+            noParentVersions && !selectedPolicy
+              ? t("search.storyRecordsQuery.noMatches")
+              : undefined
           }
         >
           {selectedPolicy ? (
@@ -386,9 +397,12 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
   const claimFilter = (
     <fieldset disabled={busy} className="space-y-2">
       <legend className="text-sm font-medium text-ink">{tr("claimViewLabel")}</legend>
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap gap-3">
         {(["identity", "asset"] as const).map((slot) => (
-          <label key={slot} className="flex items-center gap-2 text-sm text-ink">
+          <label
+            key={slot}
+            className={`${radioOptionClassName(props.receiveSlot === slot, busy)} text-ink`}
+          >
             <input
               type="radio"
               name="shielded-budget-key-mode"

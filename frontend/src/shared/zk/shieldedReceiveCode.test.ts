@@ -128,7 +128,10 @@ describe("receive code proofs", () => {
   }, 60_000);
 
   it("proves independent root keys and rejects a mode downgrade using the same proof", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial(new Uint8Array(32).fill(23));
+    const keys = await deriveShieldedAssetKeyMaterial({
+      assetRoot: new Uint8Array(32).fill(23),
+      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    });
     const independent = await createShieldedReceiveCode({
       ...identity,
       keyMode: 1,
