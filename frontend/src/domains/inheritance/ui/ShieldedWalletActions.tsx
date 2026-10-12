@@ -259,7 +259,7 @@ export interface ShieldedWalletActionsProps {
   onSubmit: () => void;
   feedback?: ReactNode;
   receivingSettings?: ReactNode;
-  /** Which loaded funds pay, or receive a deposit; precedes every other field. */
+  /** Explicit deposit destination or payment owner. */
   fundsSource?: ReactNode;
 }
 
@@ -319,10 +319,7 @@ export function ShieldedWalletActions({
       ) : null}
 
       {action === "shield" ? (
-        <FieldBlock
-          label={t("shielded.fields.amount", { symbol })}
-          hint={t("shielded.publicDepositHint", { symbol })}
-        >
+        <FieldBlock label={t("shielded.fields.amount", { symbol })}>
           <input
             aria-label={t("shielded.fields.amount", { symbol })}
             className={INPUT_CLASS}
@@ -333,9 +330,6 @@ export function ShieldedWalletActions({
             placeholder="100"
           />
         </FieldBlock>
-      ) : null}
-      {action === "shield" && approvalRequired ? (
-        <p className="text-xs text-ink-muted">{t("shielded.walletKeys.approveBeforeDeposit")}</p>
       ) : null}
 
       {action === "privateTransfer" ? (
@@ -406,10 +400,7 @@ export function ShieldedWalletActions({
               onChange={(event) => onAmountChange(event.target.value)}
             />
           </FieldBlock>
-          <FieldBlock
-            label={t("shielded.fields.exitRecipient", { symbol })}
-            hint={t("shielded.publicExitHint", { symbol })}
-          >
+          <FieldBlock label={t("shielded.fields.exitRecipient", { symbol })}>
             <input
               aria-label={t("shielded.fields.exitRecipient", { symbol })}
               className={INPUT_CLASS}

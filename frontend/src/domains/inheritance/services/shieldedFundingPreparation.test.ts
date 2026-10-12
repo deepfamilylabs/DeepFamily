@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -22,7 +22,11 @@ import {
 import { getBigInt, getBytes, hexlify, type Contract } from "ethers";
 import type { LineageSnapshot } from "./inheritanceChain";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
-import { prepareShieldedFund, createShieldedPolicyDescriptor } from "./shieldedFundingPreparation";
+import {
+  prepareShieldedFund,
+  createShieldedPolicyDescriptor,
+  validateShieldedFundingDestination,
+} from "./shieldedFundingPreparation";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 
@@ -233,6 +237,134 @@ async function recordFunding(
   });
   fixture.common.donorCommitment = change.commitment;
 }
+
+describe("funding destination validation before consolidation", () => {
+  it.each([0, 1] as const)(
+    "validates initial visibility-%s funding without selecting a donor, and rejects lost child eligibility",
+    async (budgetKind) => {
+      const fixture = await setup();
+      const input = {
+        ...fixture.common,
+        donorCommitment: 0n,
+        wallet: { ...fixture.common.wallet, ownedNotes: new Map() },
+        fundMode: 0 as const,
+        budgetKind,
+        policy: fixture.policy,
+        lineageIndex: {
+          ...fixture.lineageIndex,
+          identityCommitmentOf: async () => heirIdentity,
+          root: async (which: number) =>
+            which === 0 ? fixture.lineage.endorsementTree.root : fixture.lineage.trustedTree.root,
+        } as unknown as Contract,
+        lineage: fixture.lineage,
+        publicRecipientPersonHash: fixture.recipient.personHash,
+        budgetPeriods: 1n,
+      };
+      await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
+      await expect(prepareShieldedFund(input)).rejects.toThrow("recovered value note");
+      fixture.lineage.trustedTree.update(0n, 0n);
+      await expect(validateShieldedFundingDestination(input)).rejects.toThrow(
+        "no current direct-child endorsement",
+      );
+    },
+  );
+
+  it("rejects an unregistered public recipient before needing a donor note", async () => {
+    const fixture = await setup();
+    const lookup = vi.fn(async () => 0n);
+    await expect(
+      validateShieldedFundingDestination({
+        ...fixture.common,
+        donorCommitment: 0n,
+        fundMode: 0,
+        budgetKind: 1,
+        policy: fixture.policy,
+        lineageIndex: {
+          ...fixture.lineageIndex,
+          identityCommitmentOf: lookup,
+        } as unknown as Contract,
+        lineage: fixture.lineage,
+        publicRecipientPersonHash: fixture.recipient.personHash,
+        budgetPeriods: 1n,
+      }),
+    ).rejects.toThrow("Recipient identity is unknown");
+    expect(lookup).toHaveBeenCalledWith(fixture.recipient.personHash);
+  });
+
+  it("checks the existing lineage snapshot once during direct funding", async () => {
+    const fixture = await setup();
+    const root = vi.fn(async (which: number) =>
+      which === 0 ? fixture.lineage.endorsementTree.root : fixture.lineage.trustedTree.root,
+    );
+    await prepareShieldedFund({
+      ...fixture.common,
+      fundMode: 0,
+      policy: fixture.policy,
+      lineageIndex: { ...fixture.lineageIndex, root } as unknown as Contract,
+      lineage: fixture.lineage,
+      budgetPeriods: 1n,
+    });
+    expect(root).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([0, 1] as const)(
+    "validates a visibility-%s refill without a donor and preserves its template authorization",
+    async (budgetKind) => {
+      const fixture = await setup();
+      const lineageIndex = {
+        ...fixture.lineageIndex,
+        identityCommitmentOf: async () => heirIdentity,
+      } as unknown as Contract;
+      const initial = await prepareShieldedFund({
+        ...fixture.common,
+        fundMode: 0,
+        budgetKind,
+        policy: fixture.policy,
+        lineageIndex,
+        lineage: fixture.lineage,
+        publicRecipientPersonHash: fixture.recipient.personHash,
+        budgetPeriods: 1n,
+      });
+      await recordFunding(fixture, initial);
+      const budget = {
+        ...initial.outputs[0],
+        shardId: 0n,
+        viewingKey: fixture.recipient.viewingKey,
+        ruleOpening: initial.outputs[1].note.fundingMemo?.ruleOpening,
+      };
+      const input = {
+        ...fixture.common,
+        donorCommitment: 0n,
+        wallet: { ...fixture.common.wallet, ownedNotes: new Map() },
+        fundMode: 1 as const,
+        budgetKind,
+        lineageIndex,
+        publicRecipientPersonHash: fixture.recipient.personHash,
+        budget,
+        budgetPeriods: 1n,
+      };
+      await expect(validateShieldedFundingDestination(input)).resolves.toBeUndefined();
+      await expect(
+        validateShieldedFundingDestination({ ...input, budgetKind: budgetKind === 1 ? 0 : 1 }),
+      ).rejects.toThrow("cannot change budget binding");
+      if (budgetKind === 0) {
+        await expect(
+          validateShieldedFundingDestination({
+            ...input,
+            recipient: { ...fixture.recipient, viewingKey: `0x${"11".repeat(32)}` },
+          }),
+        ).rejects.toThrow("cannot change recipient viewing material");
+      } else {
+        await expect(
+          validateShieldedFundingDestination({
+            ...input,
+            budget: { ...budget, ruleOpening: undefined },
+          }),
+        ).rejects.toThrow("needs its donor rule opening");
+      }
+    },
+  );
+});
 
 describe("local unified funding preparation", () => {
   it("private independent funding retains owner, mode and viewing material on refill", async () => {

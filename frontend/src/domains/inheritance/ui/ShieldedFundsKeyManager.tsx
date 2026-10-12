@@ -67,6 +67,7 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
   const backupPending = !!funds?.backupRequired || !!props.exportedFingerprint;
   const verification = props.verificationStarted;
   const backup = props.flow === "backup" || backupPending || verification;
+  const choosingMode = props.canCreate && !funds && !backup;
   const restored = !!funds?.recoveryVerified && !funds.backupRequired && !backup;
   const candidate = !!funds && !funds.recoveryVerified && !funds.backupRequired && !backup;
   const sourceLabel = funds
@@ -81,12 +82,7 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
 
   const keySummary = funds ? (
     <div className="space-y-1 rounded-xl bg-surface-alt p-3 text-xs text-ink-muted">
-      {funds ? <p>{sourceLabel}</p> : null}
-      {funds?.signerAddress ? (
-        <p className="break-all">
-          {tr("sourceWallet")}: {funds.signerAddress}
-        </p>
-      ) : null}
+      <p>{sourceLabel}</p>
     </div>
   ) : null;
 
@@ -94,7 +90,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
     <FieldBlock
       label={tr(format === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput")}
       htmlFor={`${id}-recovery-material`}
-      hint={tr(format === "mnemonic" ? "mnemonicHint" : "shieldedKeyHint")}
     >
       <textarea
         key={format}
@@ -134,6 +129,27 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
 
   return (
     <div className="space-y-5">
+      {choosingMode ? (
+        <fieldset aria-label={tr("manageIndependentFunds")} className="space-y-2" disabled={busy}>
+          <div className="flex flex-wrap gap-3">
+            {(["restore", "create"] as const).map((mode) => (
+              <label
+                key={mode}
+                className={`${radioOptionClassName(props.flow === mode, busy)} text-ink`}
+              >
+                <input
+                  type="radio"
+                  name={`${id}-funds-mode`}
+                  value={mode}
+                  checked={props.flow === mode}
+                  onChange={mode === "restore" ? props.onShowRestore : props.onShowCreate}
+                />
+                {tr(mode === "restore" ? "restoreTitle" : "createTitle")}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
       {restored ? (
         <>
           <SuccessNotice>
@@ -240,7 +256,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
         </>
       ) : props.flow === "create" ? (
         <>
-          <p className="text-sm text-ink-muted">{tr("newWalletExplanation")}</p>
           <fieldset className="space-y-2" disabled={busy}>
             <legend className="text-sm font-medium text-ink">{tr("newSource")}</legend>
             <div className="flex flex-wrap gap-3">
@@ -260,20 +275,9 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
               ))}
             </div>
           </fieldset>
-          {props.rootSource === "walletSignature" ? (
-            <div className="space-y-2">
-              <p className="text-xs text-ink-muted">{tr("createSignatureExplanation")}</p>
-              {isAddress(props.account) ? (
-                <p className="break-all text-xs text-ink-muted">
-                  {tr("sourceWallet")}: {props.account}
-                </p>
-              ) : null}
-              {!props.canSign ? (
-                <p className="text-sm text-ink-muted">{tr("connectSignatureWallet")}</p>
-              ) : null}
-            </div>
+          {props.rootSource === "walletSignature" && !props.canSign ? (
+            <p className="text-sm text-ink-muted">{tr("connectSignatureWallet")}</p>
           ) : null}
-          <p className="text-xs text-ink-muted">{tr("newRootBackupHint")}</p>
           <div className="flex flex-wrap gap-3">
             <PanelButton
               variant="primary"
@@ -282,9 +286,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
               onClick={props.onCreate}
             >
               {tr("createNew")}
-            </PanelButton>
-            <PanelButton disabled={busy} onClick={props.onShowRestore}>
-              {tr("showRestoreFunds")}
             </PanelButton>
           </div>
         </>
@@ -318,17 +319,12 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
           {props.restorePath === "signature" ? (
             <div className="space-y-3">
               {isAddress(props.account) ? (
-                <>
-                  <p className="break-all text-xs text-ink-muted">
-                    {tr("sourceWallet")}: {props.account}
-                  </p>
-                  <details className="text-xs text-ink-muted">
-                    <summary className="cursor-pointer">{tr("signatureMessage")}</summary>
-                    <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-surface-alt p-3">
-                      {buildShieldedAssetSigningMessage(props.account)}
-                    </pre>
-                  </details>
-                </>
+                <details className="text-xs text-ink-muted">
+                  <summary className="cursor-pointer">{tr("signatureMessage")}</summary>
+                  <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-surface-alt p-3">
+                    {buildShieldedAssetSigningMessage(props.account)}
+                  </pre>
+                </details>
               ) : null}
               {!props.canSign ? (
                 <p className="text-sm text-ink-muted">{tr("connectSignatureWallet")}</p>
@@ -338,7 +334,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
             secretInput(props.restorePath)
           )}
           <div className="space-y-3">
-            <p className="text-xs text-ink-muted">{tr("recoveryAuthority")}</p>
             <PanelButton
               variant="primary"
               busy={busy}
@@ -350,13 +345,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
               {tr(props.restorePath === "signature" ? "restoreSignature" : "importRecovery")}
             </PanelButton>
           </div>
-          {props.canCreate ? (
-            <div className="border-t border-hairline pt-4">
-              <PanelButton disabled={busy} onClick={props.onShowCreate}>
-                {tr("showCreateFunds")}
-              </PanelButton>
-            </div>
-          ) : null}
         </>
       )}
       {props.showLock !== false || props.onUnlockIdentity ? (

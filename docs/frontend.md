@@ -254,17 +254,21 @@ current chain. Asset selection follows credentials unlock. Metadata failures
 preserve verified raw integer amounts with unknown precision.
 
 The workspace contains the asset overview, three task tabs and the selected
-task's controls. Funds creation/recovery opens only from **Receive code** or
-**Budgets (funds key)**; there is no global funds management button. Receive-code
-settings offer restoration before explicit creation; only this task creates new
-roots and offers backup once a key is ready. Claims offer restoration of the
+task's controls. A separate **Funds key** entry beside the wallet actions opens
+key recovery, explicit creation and backup. Receive-code settings only select
+the credential type and generate a code; they do not manage keys. The key manager
+opens recovery first when no key is loaded and backup when a verified key is ready.
+Claims offer restoration of the
 original missing key, since creating a replacement cannot change an existing
 budget's owner. Funds management replaces the current task's contents while the
 overview and navigation remain mounted. Returning keeps drafts and selections;
 leaving clears displayed secrets and pauses any backup drill. Amount drafts are
 separate, and transfer/withdrawal selections are allowed candidates for the
-8-input planner. Payment owner, receive-code type and budget filter remain
-separate choices. The overview groups balances by actual owner and pool.
+8-input planner. The overview groups balances and VALUE notes by actual owner
+and pool. Users explicitly choose **Deposit to** for new deposits and **Use
+balance from** for transfers, withdrawals and donor budget funding. These choices
+select the controlling key, separately from receive-code type and the budget
+claim filter, which select the recipient's authorization mode.
 
 Creating or importing a root requires the current credentials session.
 Replacing funds or starting a backup drill uses `clearFunds`: it wipes the root,
@@ -395,7 +399,11 @@ or root-source label.
 
 The page automatically scans only the selected pool after identity unlock, after a transaction, or when returning from confirmed funds recovery. The overview refresh control and the candidate-recovery scan rescan the selected pool and then discover and scan every pool in the currently configured chain and factory, listing each pool's verified raw balances or an unknown balance; this does not traverse past factories or other chains. Factory enumeration verifies `PoolCreated` history against `poolCount`. Pool recovery verifies immutable wiring, public trees, action history and `nullifierCount` at a fixed block/hash anchor. Bad pools have independent failure boundaries and unknown balances; healthy pools retain their results. A failed family-record check preserves recovered VALUE balances and reports that family records are unavailable beside the parent-version field; it is distinct from a confirmed empty version list. Refreshing retries the check and restores version selection after a successful read. Historical spent and zero-value donor change notes preserve authenticated original Fund templates, private viewing keys, policy openings and allocation keys. Claim remainders cannot replace those templates. Later pools under the same configured factory need no new root backup. To scan another chain/factory scope, use its trusted application configuration. Recovery words and Key do not embed discovery metadata.
 
-Budget funding automatically supplies the donor’s available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection, including more than eight candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range and does not require consuming every candidate. The Worker chooses an adequate subset under one actual owner and pool, using the smallest supported capacity. Transfers use 2/8-input circuits and withdrawals use 1/8-input circuits. When a payment needs preparatory consolidation, the Worker plans the complete consolidation/payment sequence and validates integer conservation and output capacity before the first step. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
+For ordinary-wallet deposits, **Deposit to** selects identity credentials or the funds key as the new VALUE notes' owner. This determines spending authority and recovery requirements, rather than a different encryption algorithm: both use the same HPKE note encryption and `shield` circuit. Transfers, withdrawals and donor budget funding use **Use balance from** to select the existing VALUE owner. Each request carries that explicit `slot`; the Worker requires its available keys, including verified recovery and completed backup for the funds key. Receive-code type and the budget claim filter do not change either choice. If a selected key becomes unavailable or changes, prepared work is invalidated and the user must restore it or explicitly choose another key; the application never silently switches to another owner.
+
+An independent deposit or payment choice is bound to the selected funds fingerprint and retained across pool navigation. Restoring the same key preserves that choice; opening a different verified key requires explicitly selecting it again before a deposit or payment can be prepared.
+
+Budget funding automatically supplies the selected donor owner's available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection within the selected owner, including more than eight candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range, does not require consuming every candidate and never uses notes outside it or from another owner. It chooses an adequate subset under the selected owner and pool using the smallest supported capacity; transfers use 2/8-input circuits and withdrawals use 1/8-input circuits. When a payment needs preparatory consolidation, the Worker plans the complete same-owner consolidation/payment sequence and validates integer conservation and output capacity before the first step. It does not automatically move funds between owners. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
 
 One confirmation sends the whole sequence, with no separate preview or fee review; the wallet still signs each transaction and shows its fee. Each step is prepared, proved and locally verified, then its gas is estimated and checked before the wallet request, and the transaction carries those fee caps, nonce and expected chain ID. After each receipt the flow scans again and plans the next step only from the original candidate range, minus the spent inputs and plus the positive consolidated outputs; while a multi-step plan runs, the page states how many transactions it contains. It stops when a step does not shorten the plan, the payment details, session or wallet change, or a transaction fails or is rejected. There is no automatic retry or consumption outside the candidate range.
 

@@ -173,11 +173,25 @@ const ZERO_LINEAGE_WITNESS: ShieldedWitness = {
 export function prepareShieldedFund(
   input: PrepareShieldedFundInput,
 ): Promise<PreparedShieldedFunding> {
-  if (input.budgetKind !== undefined && input.budgetKind !== 0 && input.budgetKind !== 1)
-    throw new Error("Budget visibility must be private or public");
+  assertFundingVisibility(input);
   if (input.fundMode === 0) return prepareInitialFunding(input);
   if (input.fundMode === 1) return prepareContinuationFunding(input);
   throw new Error("Fund mode must be initial or continuation");
+}
+
+/** Validate the final budget destination before spending on preparatory consolidation. */
+export async function validateShieldedFundingDestination(
+  input: PrepareShieldedFundInput,
+): Promise<void> {
+  assertFundingVisibility(input);
+  if (input.fundMode === 0) await initialFundingDestination(input);
+  else if (input.fundMode === 1) await continuationFundingDestination(input);
+  else throw new Error("Fund mode must be initial or continuation");
+}
+
+function assertFundingVisibility(input: PrepareShieldedFundInput) {
+  if (input.budgetKind !== undefined && input.budgetKind !== 0 && input.budgetKind !== 1)
+    throw new Error("Budget visibility must be private or public");
 }
 
 function uint64(value: BigNumberish, name: string): bigint {
@@ -525,15 +539,13 @@ function assertFundingParent(wallet: LocalShieldedWalletSnapshot, rootIdentity: 
   }
 }
 
-/** Fund a first budget for one heir under the parent's rule. */
-async function prepareInitialFunding(input: InitialFundingInput): Promise<PreparedShieldedFunding> {
+async function initialFundingDestination(input: InitialFundingInput) {
   assertFundingParent(input.wallet, input.policy.rootIdentityCommitment);
   const ctx = await currentContext(input);
   const expectedIndex = getAddress(await input.pool.LINEAGE_INDEX());
   if (expectedIndex.toLowerCase() !== (await input.lineageIndex.getAddress()).toLowerCase()) {
     throw new Error("Lineage index does not belong to this shielded pool");
   }
-  const donor = donorInput(input, ctx.keys.ownerSecret);
   const policy = input.policy;
   const allocationKeyCommitment = computeShieldedAllocationKeyCommitment(policy.allocationKey, ctx);
   const policyCommitment = shieldedPolicyCommitment(policy, ctx);
@@ -541,8 +553,6 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     uint128(policy.amountPerPeriod, "rate"),
     input.budgetPeriods,
   );
-  if (donor.note.amount < amount)
-    throw new Error("Donor value note cannot fund the whole child budget");
   const heir = ctx.heir;
   const enrollmentNullifier = computeShieldedEnrollmentNullifier(
     {
@@ -609,6 +619,47 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     trustedProof.siblings.length > 64
   )
     throw new Error("Lineage proof does not match active endorsement and trust leaves");
+  return {
+    ctx,
+    policy,
+    allocationKeyCommitment,
+    policyCommitment,
+    periods,
+    amount,
+    heir,
+    enrollmentNullifier,
+    endorsementRoot,
+    trustedRoot,
+    asOf,
+    eligibleFrom,
+    legitimacy,
+    endorsementProof,
+    trustedProof,
+  };
+}
+
+/** Fund a first budget for one heir under the parent's rule. */
+async function prepareInitialFunding(input: InitialFundingInput): Promise<PreparedShieldedFunding> {
+  const {
+    ctx,
+    policy,
+    allocationKeyCommitment,
+    policyCommitment,
+    periods,
+    amount,
+    heir,
+    enrollmentNullifier,
+    endorsementRoot,
+    trustedRoot,
+    asOf,
+    eligibleFrom,
+    legitimacy,
+    endorsementProof,
+    trustedProof,
+  } = await initialFundingDestination(input);
+  const donor = donorInput(input, ctx.keys.ownerSecret);
+  if (donor.note.amount < amount)
+    throw new Error("Donor value note cannot fund the whole child budget");
   const enrollmentSalt = generateShieldedRandomField();
   const enrollmentCommitment = computeShieldedEnrollmentCommitment(
     {
@@ -724,17 +775,13 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   return { data, witness, policyCommitment, outputs };
 }
 
-/** Add a new whole-period budget using a saved child budget as read-only template. */
-async function prepareContinuationFunding(
-  input: ContinuationFundingInput,
-): Promise<PreparedShieldedFunding> {
+async function continuationFundingDestination(input: ContinuationFundingInput) {
   const oldKind = input.budget.note.binding === "identity" ? 1 : 0;
   if (input.budgetKind !== undefined && input.budgetKind !== oldKind)
     throw new Error("Continuation cannot change budget binding");
   input = { ...input, budgetKind: oldKind };
   assertFundingParent(input.wallet, input.budget.note.rootIdentityCommitment);
   const ctx = await currentContext(input);
-  const donor = donorInput(input, ctx.keys.ownerSecret);
   const template = templatePath(input.wallet, input.budget, encodeShieldedBudgetNotePayload);
   const old = input.budget.note;
   const heir = ctx.heir;
@@ -767,8 +814,6 @@ async function prepareContinuationFunding(
   if (rate === 0n || oldRemaining % rate !== 0n)
     throw new Error("Template budget has fractional periods");
   const { periods, amount } = fundingAmount(rate, input.budgetPeriods);
-  if (donor.note.amount < amount)
-    throw new Error("Donor value note cannot fund the full additional amount");
   const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(old, ctx);
   if (
     computeShieldedPolicyCommitment({ ...old, ...ruleOpening }, ctx) !== policyCommitment ||
@@ -776,6 +821,45 @@ async function prepareContinuationFunding(
       enrollmentCommitment
   )
     throw new Error("Funding rule opening does not match this budget");
+  return {
+    input,
+    ctx,
+    template,
+    old,
+    heir,
+    ruleOpening,
+    rate,
+    periodDays,
+    oldRemaining,
+    periods,
+    amount,
+    policyCommitment,
+    enrollmentCommitment,
+  };
+}
+
+/** Add a new whole-period budget using a saved child budget as read-only template. */
+async function prepareContinuationFunding(
+  fundingInput: ContinuationFundingInput,
+): Promise<PreparedShieldedFunding> {
+  const {
+    input,
+    ctx,
+    template,
+    old,
+    heir,
+    ruleOpening,
+    rate,
+    periodDays,
+    oldRemaining,
+    periods,
+    amount,
+    policyCommitment,
+    enrollmentCommitment,
+  } = await continuationFundingDestination(fundingInput);
+  const donor = donorInput(input, ctx.keys.ownerSecret);
+  if (donor.note.amount < amount)
+    throw new Error("Donor value note cannot fund the full additional amount");
   const budgetUseNonce = generateShieldedRandomField();
   const useNullifier = computeShieldedBudgetUseNullifier(
     {

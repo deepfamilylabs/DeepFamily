@@ -75,6 +75,7 @@ import { prepareShieldedShield } from "../domains/inheritance/services/shieldedN
 import {
   createShieldedPolicyDescriptor,
   prepareShieldedFund,
+  validateShieldedFundingDestination,
 } from "../domains/inheritance/services/shieldedFundingPreparation";
 import { prepareShieldedClaim } from "../domains/inheritance/services/shieldedClaimPreparation";
 import {
@@ -898,6 +899,12 @@ export class ShieldedAssetSession {
         ? await this.recipient(request.recipientCode ?? "")
         : undefined;
     if (transferRecipient) recipient = transferRecipient.personHash;
+    let withdrawalRecipient: string | undefined;
+    if (request.action === "unshield") {
+      requireValue(request.publicRecipient, "Choose a public withdrawal destination.");
+      withdrawalRecipient = getAddress(request.publicRecipient);
+      requireValue(BigInt(withdrawalRecipient) !== 0n, "Unshield recipient must be nonzero");
+    }
     if (request.action === "fund") {
       requireValue(
         this.identity,
@@ -1121,6 +1128,11 @@ export class ShieldedAssetSession {
             : 0n,
         ),
       );
+      if (request.action === "fund" && first.kind === "merge") {
+        requireValue(fundArgs, "Funding policy was not prepared.");
+        // Validate the final destination before preparing any funding consolidation.
+        await validateShieldedFundingDestination(fundArgs);
+      }
       const valueInputs = inputs.map((commitment) => ({ wallet, keyMaterial: keys, commitment }));
       if (first.kind === "merge") {
         prepared = await prepareShieldedPrivateTransfer({
@@ -1151,12 +1163,12 @@ export class ShieldedAssetSession {
         actionId = SHIELDED_POOL_ACTION.PrivateTransfer;
         circuit = inputs.length > 2 ? "privateTransfer8" : "privateTransfer";
       } else {
-        requireValue(request.publicRecipient, "Choose a public withdrawal destination.");
+        requireValue(withdrawalRecipient, "Choose a public withdrawal destination.");
         const result = await prepareShieldedUnshield({
           ...scope,
           inputs: valueInputs,
           amount,
-          recipient: request.publicRecipient,
+          recipient: withdrawalRecipient,
         });
         prepared = result;
         recipient = result.recipient;

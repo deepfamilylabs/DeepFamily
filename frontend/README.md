@@ -27,12 +27,23 @@ supplies public `shield` deposits and transaction gas. Public budget needs only 
 registered person hash and publishes the recipient and budget terms. Private modes need the
 child's verified receive code of the matching type. Identity credentials recreate their derived
 funds; the funds-key mode uses a separate root that those credentials cannot recreate.
+Users explicitly select **Deposit to** for the key controlling new VALUE notes and **Use balance from**
+for transfers, withdrawals and donor budget funding. Both identity credentials and the funds key
+use the same HPKE encryption; the choice determines spending authority and recovery requirements.
+The selected key must be available, and a missing or changed key never silently selects another
+owner. An independent deposit or payment choice is bound to its funds fingerprint: restoring the
+same key preserves the choice, while a different verified key must be explicitly selected again.
+Payment planning stays within the selected owner, pool and allowed candidate notes,
+including same-owner consolidation when needed. Receive-code type, budget entry and claim filters
+separately select recipient authorization.
 
 Claims create private VALUE after identity, current family eligibility, maturity and allowance
 checks. Funds-key budgets also require the original funds key. Additional funding preserves the
 arrangement's original rate and clock.
 
-**Unlock funds key** accepts 24 English recovery words or a Shielded Key. New funds keys default
+The separate **Funds key** wallet entry manages recovery, creation and backup. Receive-code
+settings only select credentials and generate a code. **Unlock funds key** accepts 24 English
+recovery words or a Shielded Key. New funds keys default
 to a random root, with wallet-signature derivation as an alternative. Both methods require saving
 and re-importing a backup after clearing the in-memory funds key. For signature-derived keys, the
 original signing wallet produces a recovery candidate until matching pool history confirms it. See

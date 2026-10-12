@@ -78,6 +78,8 @@ type Action = ShieldedAssetActionRequest["action"] | "receiveCode";
 type RecoveryFormat = "mnemonic" | "shieldedKey";
 export interface ShieldedPanelNavigation {
   slot: ShieldedKeySlot;
+  /** Pins an independent payment choice to the key the user actually selected. */
+  fundsFingerprint?: string;
   action: Action;
   walletAction: Action;
   receiveSlot?: ShieldedKeySlot;
@@ -160,11 +162,21 @@ export function ShieldedInheritancePanel({
   const submissionPending = transactionPending || !!pendingRecord;
   // Three independent choices: the funds that pay (or receive a deposit), the
   // receive-code type and the claim filter. Changing one never changes another.
-  const [slot, setSlot] = useState<ShieldedKeySlot>(navigation?.slot ?? "identity");
+  const [slot, setSlot] = useState<ShieldedKeySlot>(
+    navigation?.slot ??
+      (!session.identity && session.funds?.recoveryVerified && !session.funds.backupRequired
+        ? "asset"
+        : "identity"),
+  );
+  const [selectedFundsFingerprint, setSelectedFundsFingerprint] = useState(
+    navigation?.fundsFingerprint ??
+      (navigation?.slot === "asset" ? "" : (session.funds?.fundsFingerprint ?? "")),
+  );
   const [codeSlot, setCodeSlot] = useState<ShieldedKeySlot>("identity");
   const [walletScreen, setWalletScreen] = useState<"workspace" | "manage" | "identity">(
     "workspace",
   );
+  const [fundsManagement, setFundsManagement] = useState(false);
   const [fundsFlow, setFundsFlow] = useState<"restore" | "create" | "backup">(() =>
     session.funds?.backupRequired ? "backup" : "restore",
   );
@@ -204,12 +216,13 @@ export function ShieldedInheritancePanel({
   useEffect(() => {
     onNavigationChange?.({
       slot,
+      fundsFingerprint: selectedFundsFingerprint,
       action,
       walletAction: walletAction.current,
       receiveSlot,
       taskChosen,
     });
-  }, [slot, action, receiveSlot, taskChosen, onNavigationChange]);
+  }, [slot, selectedFundsFingerprint, action, receiveSlot, taskChosen, onNavigationChange]);
   const [entry, setEntry] = useState<ShieldedFundingEntry>("privateIndependent");
   const [rootVersion, setRootVersion] = useState(""),
     [periodDays, setPeriodDays] = useState("30"),
@@ -260,11 +273,16 @@ export function ShieldedInheritancePanel({
       ? "restore"
       : fundsFlow;
   const fundsReady = !!session.funds?.recoveryVerified && !session.funds.backupRequired;
-  // Identity funds pay until a verified independent root is loaded.
-  const paymentSlot: ShieldedKeySlot = !session.identity ? "asset" : fundsReady ? slot : "identity";
+  const fundsSelectionMatches =
+    !!selectedFundsFingerprint && selectedFundsFingerprint === session.funds?.fundsFingerprint;
+  // Keep the explicit owner even when its key becomes unavailable; never redirect a deposit or spend.
+  const paymentSlot = slot;
   const actionSlot: ShieldedKeySlot =
     action === "claim" ? receiveSlot : action === "receiveCode" ? codeSlot : paymentSlot;
-  const slotReady = actionSlot === "identity" ? !!session.identity : fundsReady;
+  const slotReady =
+    actionSlot === "identity"
+      ? !!session.identity
+      : fundsReady && (action === "claim" || action === "receiveCode" || fundsSelectionMatches);
   const workspaceVisible = hasSession && walletScreen === "workspace";
   // Key management opened from a task stays in that task's container, including
   // the backup drill that temporarily removes the funds root from the Worker.
@@ -303,6 +321,7 @@ export function ShieldedInheritancePanel({
     wallet?.notes.filter(
       (note) =>
         note.kind === "value" &&
+        (paymentSlot === "identity" ? !!session.identity : fundsReady && fundsSelectionMatches) &&
         (note.slot === paymentSlot ||
           (paymentSlot === "asset" && note.ownerCommitment === session.funds?.ownerCommitment)) &&
         BigInt(note.amount) > 0n,
@@ -364,6 +383,7 @@ export function ShieldedInheritancePanel({
     session.funds?.fundsFingerprint,
     action,
     actionSlot,
+    selectedFundsFingerprint,
     amount,
     candidates,
     code,
@@ -703,10 +723,8 @@ export function ShieldedInheritancePanel({
           });
           autoRecoveryBlocked.current = false;
           focusDestination.current = "task";
-          // Without a verified independent root, payments and receive codes use identity
-          // funds. The claim filter is kept, so a missing original key is offered for restore.
+          // Receiving setup can reset after an unlock; the selected funds owner stays explicit.
           if (!(state.funds?.recoveryVerified && !state.funds.backupRequired)) {
-            setSlot("identity");
             setCodeSlot("identity");
           }
           setWalletScreen("workspace");
@@ -757,9 +775,10 @@ export function ShieldedInheritancePanel({
     setError("");
   }
   /** Opens key management without changing the current task or any funds selection. */
-  function openFundsManager(flow: "restore" | "create" | "backup") {
+  function openFundsManager(flow: "restore" | "create" | "backup", canCreate = false) {
     if (!latestSession.current.credentials) return;
     fundsOpenedFromWorkspace.current = showWorkspace;
+    setFundsManagement(canCreate);
     setTaskChosen(true);
     clearSecretInputs();
     focusDestination.current = showWorkspace ? "task" : "access";
@@ -1032,13 +1051,11 @@ export function ShieldedInheritancePanel({
           )
             ? "claim"
             : result.notes.some(
-                  (note) =>
-                    note.kind === "value" && note.slot === "identity" && BigInt(note.amount) > 0n,
+                  (note) => note.kind === "value" && note.slot === slot && BigInt(note.amount) > 0n,
                 )
               ? "privateTransfer"
               : "shield";
           setAction(next);
-          setSlot("identity");
           if (next === "claim") setReceiveSlot("identity");
           else walletAction.current = next;
         }
@@ -1198,7 +1215,7 @@ export function ShieldedInheritancePanel({
     }
   }
   async function approve() {
-    if (submissionPending) return;
+    if (submissionPending || !slotReady) return;
     await run(async (current) => {
       if (!signer || !modules.token) throw new Error(t("shielded.walletNotReady"));
       const chosen = signer,
@@ -1285,7 +1302,7 @@ export function ShieldedInheritancePanel({
    */
   async function prepare() {
     if (action === "receiveCode") return createCode();
-    if (submissionPending) return;
+    if (submissionPending || !slotReady) return;
     if (action === "shield" && !allowanceReady) return approve();
     const chosen = signer,
       requested = actionRequestKey,
@@ -1505,46 +1522,60 @@ export function ShieldedInheritancePanel({
       ) : null}
     </>
   );
-  // With one loaded owner there is nothing to choose; deposits go into the chosen funds.
-  const assetSource =
-    session.identity && fundsReady ? (
-      <fieldset className="space-y-2" disabled={busy}>
-        <legend className="text-sm font-medium">{tr("assetSource")}</legend>
-        <div className="flex flex-wrap gap-3">
-          {(["identity", "asset"] as const).map((sourceSlot) => (
-            <label
-              key={sourceSlot}
-              className={radioOptionClassName(paymentSlot === sourceSlot, busy)}
-            >
-              <input
-                type="radio"
-                name={`${formId}-asset-source`}
-                value={sourceSlot}
-                checked={paymentSlot === sourceSlot}
-                onChange={() => {
-                  setSlot(sourceSlot);
-                  setCandidates([]);
-                }}
-              />
-              {tr(sourceSlot === "identity" ? "identityFunds" : "budgetFunds")}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-    ) : null;
+  // The visible choice determines new note ownership for deposits and the permitted owner for payments.
+  const assetSource = (
+    <fieldset className="space-y-2" disabled={busy || submissionPending}>
+      <legend className="text-sm font-medium">
+        {tr(action === "shield" ? "depositDestination" : "assetSource")}
+      </legend>
+      <div className="flex flex-wrap gap-3">
+        {(["identity", "asset"] as const).map((sourceSlot) => (
+          <label
+            key={sourceSlot}
+            className={radioOptionClassName(
+              paymentSlot === sourceSlot &&
+                (sourceSlot === "identity" || !fundsReady || fundsSelectionMatches),
+              busy || submissionPending,
+            )}
+          >
+            <input
+              type="radio"
+              name={`${formId}-asset-source`}
+              value={sourceSlot}
+              checked={
+                paymentSlot === sourceSlot &&
+                (sourceSlot === "identity" || !fundsReady || fundsSelectionMatches)
+              }
+              onChange={() => {
+                setSlot(sourceSlot);
+                if (sourceSlot === "asset")
+                  setSelectedFundsFingerprint(session.funds?.fundsFingerprint ?? "");
+                setCandidates([]);
+                setError("");
+              }}
+            />
+            {tr(sourceSlot === "identity" ? "identityFunds" : "budgetFunds")}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
   const receiveSettings =
     action === "receiveCode" ? (
       <div className="space-y-4">
         {!session.identity ? (
           <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
         ) : null}
-        <fieldset className="space-y-2" disabled={busy}>
+        <fieldset className="space-y-2" disabled={busy || submissionPending}>
           <legend className="text-sm font-medium">{tr("receiveKeyLabel")}</legend>
           <div className="flex flex-wrap gap-3">
             {(["identity", "asset"] as const).map((receivingSlot) => (
               <label
                 key={receivingSlot}
-                className={radioOptionClassName(codeSlot === receivingSlot, busy)}
+                className={radioOptionClassName(
+                  codeSlot === receivingSlot,
+                  busy || submissionPending,
+                )}
               >
                 <input
                   type="radio"
@@ -1556,57 +1587,11 @@ export function ShieldedInheritancePanel({
                     setOwnCode("");
                   }}
                 />
-                {tr(receivingSlot === "identity" ? "identityReceive" : "independentReceive")}
+                {tr(receivingSlot === "identity" ? "identityFunds" : "budgetFunds")}
               </label>
             ))}
           </div>
         </fieldset>
-        {codeSlot !== "asset" ? null : session.funds && fundsReady ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="min-w-0 break-all text-xs text-ink-muted">
-              {tr("fundsFingerprint")}: {session.funds.fundsFingerprint} · {tr("verified")}
-            </p>
-            <PanelButton size="compact" disabled={busy} onClick={() => openFundsKey("backup")}>
-              {tr("showBackupFunds")}
-            </PanelButton>
-          </div>
-        ) : (
-          // Until a verified key is open, opening one takes the place of the receive-code action.
-          <div className="space-y-3">
-            {session.funds ? (
-              <p className="break-all text-xs text-ink-muted">
-                {tr("fundsFingerprint")}: {session.funds.fundsFingerprint} ·{" "}
-                {tr("needsVerification")}
-              </p>
-            ) : null}
-            {independentBackupPending ? (
-              <p role="status" className="text-xs text-ink-muted">
-                {tr("budgetKeyBackupPending")}
-              </p>
-            ) : null}
-            {/* Restore comes first: a second new key cannot receive budgets bound to the original. */}
-            <div className="flex flex-wrap gap-3">
-              {independentBackupPending ? (
-                <PanelButton
-                  variant="primary"
-                  disabled={busy}
-                  onClick={() => openFundsKey("backup")}
-                >
-                  {tr("showBackupFunds")}
-                </PanelButton>
-              ) : (
-                <PanelButton disabled={busy} onClick={() => openFundsKey("restore")}>
-                  {tr("showRestoreFunds")}
-                </PanelButton>
-              )}
-              {!session.funds && !independentBackupPending ? (
-                <PanelButton disabled={busy} onClick={() => openFundsKey("create")}>
-                  {tr("createNew")}
-                </PanelButton>
-              ) : null}
-            </div>
-          </div>
-        )}
       </div>
     ) : null;
   const nativeSymbol = SUPPORTED_NETWORKS[config.chainId]?.nativeCurrency.symbol ?? "Native";
@@ -1632,11 +1617,13 @@ export function ShieldedInheritancePanel({
     </div>
   ) : null;
   const fundsTitle = tr(
-    accessFlow === "create"
-      ? "createTitle"
-      : accessFlow === "backup"
-        ? "backupTitle"
-        : "restoreTitle",
+    fundsManagement && !session.funds && accessFlow !== "backup"
+      ? "manageIndependentFunds"
+      : accessFlow === "create"
+        ? "createTitle"
+        : accessFlow === "backup"
+          ? "backupTitle"
+          : "restoreTitle",
   );
   const fundsManager = (
     <ShieldedFundsKeyManager
@@ -1675,8 +1662,8 @@ export function ShieldedInheritancePanel({
       onRestoreSignature={() => void requestSignature("restore")}
       onRecover={() => void recover(true)}
       discoveryReport={discoveryReport}
-      // Claims and recovery need the original key; only receive-code setup creates one.
-      canCreate={action === "receiveCode"}
+      // Creating a key belongs to the standalone manager; claims require the original key.
+      canCreate={fundsManagement}
       onShowCreate={() => {
         clearSecretInputs();
         setRootSource("random");
@@ -1832,6 +1819,15 @@ export function ShieldedInheritancePanel({
             busy={busy}
             symbol={modules.assetSymbol}
             onActionChange={navigateToAction}
+            fundsAction={{
+              label: tr("manageIndependentFunds"),
+              active: fundsInWorkspace,
+              onClick: () =>
+                openFundsManager(
+                  independentBackupPending || fundsReady ? "backup" : "restore",
+                  true,
+                ),
+            }}
           />
           <div
             ref={taskRegion}
@@ -1891,7 +1887,6 @@ export function ShieldedInheritancePanel({
                   (action !== "receiveCode" && submissionPending) ||
                   (needsCode && !recipientReady)
                 }
-                submitHidden={action === "receiveCode" && codeSlot === "asset" && !fundsReady}
                 onSubmit={() => void prepare()}
                 fundsSource={action !== "receiveCode" ? assetSource : null}
                 feedback={feedback}
@@ -1909,7 +1904,7 @@ export function ShieldedInheritancePanel({
                   action={action}
                   symbol={modules.assetSymbol}
                   decimals={modules.tokenDecimals ?? 0}
-                  busy={busy}
+                  busy={busy || submissionPending}
                   wallet={wallet}
                   entry={effectiveEntry}
                   fundingSlot={paymentSlot}
@@ -1994,37 +1989,33 @@ export function ShieldedInheritancePanel({
                   fundingDeficit={fundingDeficit}
                 />
                 {!signer ? <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice> : null}
-                {action !== "claim" || slotReady ? (
-                  <PanelButton
-                    variant="primary"
-                    busy={busy}
-                    disabled={
-                      busy ||
-                      submissionPending ||
-                      !slotReady ||
-                      !session.identity ||
-                      !signer ||
-                      (needsCode && !recipientReady) ||
-                      (action === "fund" &&
-                        (fundingDeficit !== undefined ||
-                          !personHash ||
-                          (!selectedPolicy && !rootVersion))) ||
-                      (action === "claim" &&
-                        (!selectedClaim ||
-                          selectedClaim.status !== "claimable" ||
-                          !claimPeriods.length ||
-                          claimPeriods.some(
-                            (index) => !selectedClaim.periodIndices.includes(index),
-                          )))
-                    }
-                    onClick={() => void prepare()}
-                  >
-                    {t("shielded.submit", {
-                      symbol: modules.assetSymbol,
-                      action: t(`shielded.actions.${action}`, { symbol: modules.assetSymbol }),
-                    })}
-                  </PanelButton>
-                ) : null}
+                <PanelButton
+                  variant="primary"
+                  busy={busy}
+                  disabled={
+                    busy ||
+                    submissionPending ||
+                    !slotReady ||
+                    !session.identity ||
+                    !signer ||
+                    (needsCode && !recipientReady) ||
+                    (action === "fund" &&
+                      (fundingDeficit !== undefined ||
+                        !personHash ||
+                        (!selectedPolicy && !rootVersion))) ||
+                    (action === "claim" &&
+                      (!selectedClaim ||
+                        selectedClaim.status !== "claimable" ||
+                        !claimPeriods.length ||
+                        claimPeriods.some((index) => !selectedClaim.periodIndices.includes(index))))
+                  }
+                  onClick={() => void prepare()}
+                >
+                  {t("shielded.submit", {
+                    symbol: modules.assetSymbol,
+                    action: t(`shielded.actions.${action}`, { symbol: modules.assetSymbol }),
+                  })}
+                </PanelButton>
                 {feedback}
               </PanelShell>
             )}

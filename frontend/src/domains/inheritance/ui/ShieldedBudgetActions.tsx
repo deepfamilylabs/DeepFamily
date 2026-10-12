@@ -409,7 +409,7 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
               checked={props.receiveSlot === slot}
               onChange={() => props.onReceiveSlotChange(slot)}
             />
-            {tr(slot === "asset" ? "independentBudgets" : "identityBudgets")}
+            {tr(slot === "asset" ? "budgetFunds" : "identityFunds")}
           </label>
         ))}
       </div>

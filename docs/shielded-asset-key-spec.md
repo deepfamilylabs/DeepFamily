@@ -33,30 +33,45 @@ An unlocked asset session has an optional identity-derived slot (`keyMode = 0`)
 and at most one asset-root-derived slot (`keyMode = 1`, `assetRootDerived`). The
 identity slot is reconstructed from the original complete identity credentials
 and the frozen identity specification. It requires no backup.
-The UI names these choices **Identity credentials** (身份凭据) and **Funds key**
-(资金密钥). The corresponding labels are **Receive code (identity credentials)** /
-**Receive code (funds key)** and **Budgets (identity credentials)** /
-**Budgets (funds key)**. These display names preserve the existing derivation
+The UI names these key modes **Identity credentials** and **Funds key**.
+Deposit, payment, receive-code and budget-filter options share those
+same labels. They remain selectable when a key is unavailable; only submission
+requires that key to be ready. Processing or a pending transaction disables the
+choices consistently. These display names preserve the existing derivation
 mechanisms and protocol fields.
 
 Budget funding uses these entry labels:
 
 | UI entry | Existing authorization and visibility |
 | --- | --- |
-| **Public budget** (公开预算) | Identity-bound budget, `keyMode = 0`; identity commitments and budget terms are public. |
-| **Private (identity credentials)** (私密（身份凭据）) | Owner-bound encrypted budget, `keyMode = 0`; the original identity credentials reconstruct the spending and viewing keys. |
-| **Private (funds key)** (私密（资金密钥）) | Owner-bound encrypted budget, `keyMode = 1`; the asset root and funds-specific identity secret derive the spending and viewing keys. |
+| **Public budget** | Identity-bound budget, `keyMode = 0`; identity commitments and budget terms are public. |
+| **Private (identity credentials)** | Owner-bound encrypted budget, `keyMode = 0`; the original identity credentials reconstruct the spending and viewing keys. |
+| **Private (funds key)** | Owner-bound encrypted budget, `keyMode = 1`; the asset root and funds-specific identity secret derive the spending and viewing keys. |
 
-Both private entries use the same HPKE note encryption. The funds choice selects
-the payer's owner separately from the recipient's budget entry. A funds key
-controls its VALUE notes; budget claims also require the original identity
-credentials and existing family, period and enrollment eligibility.
+Both private entries use the same HPKE note encryption and select the recipient's
+authorization mode. Users separately select **Deposit to** for new VALUE notes
+and **Use balance from** for the payer's existing VALUE notes: **Identity credentials**
+or **Funds key**. The deposit choice determines who can spend and recover the
+new notes; it is not an encryption-algorithm choice. Each operation requires the
+selected slot's available keys, including verified recovery and completed backup
+for the funds slot. A missing or changed key invalidates prepared work and never
+silently selects another owner. An independent deposit or payment choice is bound
+to its funds fingerprint: restoring the same key preserves the choice, while a
+different verified key must be explicitly selected again. The Worker may choose
+an adequate subset and plan consolidation only within the user's selected owner,
+pool and allowed note range; it does not automatically combine or transfer
+balances across owners.
+Receive-code type and budget claim filters do not change the deposit destination
+or payer selection. A funds key controls its VALUE notes; budget claims also
+require the original identity credentials and existing family, period and
+enrollment eligibility.
 
 The funds slot uses a 32-byte `assetRoot` and the current credentials session.
-**Unlock funds key** opens its recovery flow only within receive-code settings or
-budget claims. A ready key offers backup in receive-code settings. A claim whose
-original funds key is missing first offers unlocking that key; the claim action
-appears after recovery and keeps the same identity and eligibility checks.
+The separate **Funds key** wallet entry manages recovery, creation and backup.
+Receive-code settings only choose the credential type and generate the code.
+A claim whose
+original funds key is missing offers unlocking that key; the claim action remains
+disabled until recovery and keeps the same identity and eligibility checks.
 New roots have one local `rootSource`:
 
 - `random`: the default for an explicit new-slot action. Obtain exactly 32 bytes
