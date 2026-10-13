@@ -11,20 +11,30 @@ async function fileExists(p) {
   }
 }
 
+// The frontend reads only each contract's ABI. The rest of a compiler artifact depends on which
+// sources were compiled together: Hardhat's buildInfoId, Solidity's immutable-reference AST IDs and
+// the bytecode's trailing metadata hash, which covers every remapping in the shared compiler input.
+// An incremental build that recompiles the shielded pools without DeepFamily therefore emits
+// different bytecode from a clean build, although the code is identical. Copying only the ABI and
+// the contract's identity keeps checkouts clean; full artifacts remain in the root build output.
+const FRONTEND_ARTIFACT_FIELDS = new Set([
+  "_format",
+  "contractName",
+  "sourceName",
+  "abi",
+  "inputSourceName",
+]);
+
 export function normalizeFrontendArtifact(artifact) {
   if (artifact === null || typeof artifact !== "object" || Array.isArray(artifact)) {
     throw new Error("Contract artifact must be a JSON object");
   }
-  // Hardhat's buildInfoId and Solidity's immutable-reference AST IDs can change when another source
-  // in the shared compiler input changes, even when this contract's ABI and bytecode are identical.
-  // They remain available in the root release artifacts; frontend runtime code uses neither field,
-  // so copying them makes clean builds dirty without adding runtime evidence.
-  const {
-    buildInfoId: _buildInfoId,
-    immutableReferences: _immutableReferences,
-    ...stableArtifact
-  } = artifact;
-  return stableArtifact;
+  if (!Array.isArray(artifact.abi)) {
+    throw new Error("Contract artifact must contain an ABI array");
+  }
+  return Object.fromEntries(
+    Object.entries(artifact).filter(([field]) => FRONTEND_ARTIFACT_FIELDS.has(field)),
+  );
 }
 
 export async function syncAbi(contractName, { cwd = process.cwd() } = {}) {

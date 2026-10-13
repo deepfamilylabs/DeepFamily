@@ -478,7 +478,7 @@ transitive import. If a worker breaks after a refactor, check the new import gra
 
 ### On-chain integration
 
-- Contract ABIs live in `frontend/src/abi/` and are copied from Hardhat build output by `frontend/scripts/sync-abi.mjs`. The script runs automatically in `npm run dev` and `npm run build`.
+- Contract ABIs live in `frontend/src/abi/` and are copied from Hardhat build output by `frontend/scripts/sync-abi.mjs`. The script runs automatically in `npm run dev` and `npm run build`. It keeps only each contract's ABI and identity: bytecode carries a metadata hash that depends on which sources were compiled together, so it stays in the root `artifacts/`.
 - Providers and contract instances are constructed in `frontend/src/shared/clients/`.
 - RPC URL plus the DeepFamilyReader module entry address come from `VITE_*` env vars; main and token addresses are derived on startup.
 - If the frontend breaks after a Solidity interface change, re-run dev/build or `node frontend/scripts/sync-abi.mjs` directly.
