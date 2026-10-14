@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState, type ReactNode } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Signer } from "ethers";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
@@ -209,7 +209,10 @@ const click = (key: string) => fireEvent.click(
 );
 const task = (group: "wallet" | "inheritance" | "receive") =>
   screen.getByRole("tab", { name: `shielded.groups.${group}` });
-const chooseTask = (group: "wallet" | "inheritance" | "receive") => fireEvent.click(task(group));
+const chooseTask = (group: "wallet" | "inheritance" | "receive") => {
+  closeWalletBalances();
+  fireEvent.click(task(group));
+};
 
 // Observe the real provider's public state. No session hook or context is mocked.
 function SessionObserver() {
@@ -286,33 +289,61 @@ function chooseIndependentBudget() {
   chooseBudgetKey("asset");
 }
 function chooseBudgetKey(mode: "identity" | "asset") {
-  const input = screen.getByLabelText(
-    label(mode === "asset" ? "budgetFunds" : "identityFunds"),
-  ) as HTMLInputElement;
-  fireEvent.click(input);
+  chooseActiveWallet(mode);
 }
 function chooseRecoveryPath(path: "mnemonic" | "shieldedKey" | "signature") {
   fireEvent.click(screen.getByRole("radio", { name: label(`${path}Restore`) }));
 }
-function openIndependentReceiving() {
-  chooseTask("wallet");
-  fireEvent.click(screen.getByRole("button", { name: "shielded.actions.receiveCode" }));
-  fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
+function openWalletBalances() {
+  if (!screen.queryByRole("group", { name: label("walletBalances") })) click("manageIndependentFunds");
 }
-function openFundsManagement() {
-  click("manageIndependentFunds");
+function closeWalletBalances() {
+  if (screen.queryByRole("group", { name: label("walletBalances") })) click("manageIndependentFunds");
+}
+function openReceiveCode(slot: "identity" | "asset") {
+  openWalletBalances();
+  const button = screen.getByRole("button", { name: label(slot === "asset" ? "fundsReceiveCode" : "identityReceiveCode") });
+  if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
+}
+function openIndependentReceiving() {
+  openReceiveCode("asset");
+}
+/** A usable funds key opens its settings and a new one its backup; otherwise the card offers unlocking or creating. */
+function fundsKeyButton(flow: "restore" | "create" = "restore") {
+  return (flow === "restore" && (screen.queryByRole("button", { name: label("keySettings") }) ??
+    screen.queryByRole("button", { name: label("backupTitle") }))) ||
+    screen.getByRole("button", { name: label(flow === "create" ? "createTitle" : "restoreTitle") });
+}
+function openFundsManagement(flow: "restore" | "create" = "restore") {
+  openWalletBalances();
+  const button = fundsKeyButton(flow);
+  if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
+}
+async function waitForReceiveCode(slot: "identity" | "asset") {
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", { slot }, expect.anything()));
+  await waitFor(() => expect((screen.getByRole("button", { name: label("manageIndependentFunds") }) as HTMLButtonElement).disabled).toBe(false));
+}
+function expectCurrentWallet(slot: "identity" | "asset") {
+  const destination = screen.getByRole("group", { name: label("currentWallet") });
+  expect(within(destination).getByText(label(slot === "asset" ? "budgetFunds" : "identityFunds"))).toBeTruthy();
+  expect(within(destination).queryByRole("radio")).toBeNull();
+}
+function chooseActiveWallet(slot: "identity" | "asset") {
+  openWalletBalances();
+  const selection = screen.getByRole("group", { name: label("walletBalances") });
+  fireEvent.click(within(selection).getByRole("radio", { name: label(slot === "asset" ? "budgetFunds" : "identityFunds") }));
+  closeWalletBalances();
 }
 async function restoreFunds() {
   if (!sessionState().identity) await unlockIdentity();
-  openIndependentReceiving();
   openFundsManagement();
   fireEvent.change(screen.getByLabelText(label("mnemonicInput")), {
     target: { value: "saved-independent-wallet-words" },
   });
   click("importRecovery");
   await waitFor(() => expect(sessionState().funds?.recoveryVerified).toBe(true));
-  await waitFor(() => expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true"));
-  await waitFor(() => expect(screen.getByRole("radio", { name: label("budgetFunds") })).toBeTruthy());
+  openReceiveCode("asset");
+  expect(screen.getByRole("button", { name: label("fundsReceiveCode") }).getAttribute("aria-expanded")).toBe("true");
   expect(screen.queryByText(label("fundsRecoveredTitle"))).toBeNull();
   expect(screen.queryByRole("button", { name: label("backToWorkspace") })).toBeNull();
   await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
@@ -426,7 +457,7 @@ describe("Shielded budget flow with a real identity session", () => {
     renderPanel({ selectedModules: fixture.modules });
     await restoreFunds();
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.shield" }));
-    fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
+    chooseActiveWallet("asset");
     fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1.25" } });
     const terminations = mocks.terminate.mock.calls.length;
     const scans = mocks.call.mock.calls.filter(([method]) => method === "recover").length;
@@ -561,8 +592,8 @@ describe("Shielded budget flow with a real identity session", () => {
     render(<PoolNavigationHarness />);
     await restoreFunds();
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.shield" }));
-    fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
+    chooseActiveWallet("asset");
+    expectCurrentWallet("asset");
     fireEvent.click(screen.getByRole("button", { name: "switch-pool" }));
     await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("recover", {
       context: expect.objectContaining({ poolAddress: "0x00000000000000000000000000000000000000bb" }),
@@ -570,7 +601,7 @@ describe("Shielded budget flow with a real identity session", () => {
     await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
     expect(sessionState().funds?.fundsFingerprint).toBe(verifiedFunds.fundsFingerprint);
     expect(screen.getByRole("button", { name: "shielded.actions.shield" }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
+    expectCurrentWallet("asset");
   });
 
   it.each(["claim", "privateTransfer"] as const)(
@@ -629,29 +660,29 @@ describe("Shielded budget flow with a real identity session", () => {
     renderPanel();
     await unlockIdentity();
     expect(task("wallet").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("group", { name: label("depositDestination") })).toBeTruthy();
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).disabled).toBe(false);
+    expect(screen.getByRole("group", { name: label("currentWallet") })).toBeTruthy();
+    expectCurrentWallet("identity");
     chooseTask("inheritance");
     expect((screen.getByRole("radio", { name: label("independentEntry") }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("radio", { name: label("publicEntry") })).toBeTruthy();
     expect(screen.getByRole("radio", { name: label("convenientEntry") })).toBeTruthy();
     chooseTask("receive");
-    expect(screen.queryByRole("button", { name: label("createNew") })).toBeNull();
+    expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
     expect(screen.queryByRole("button", { name: label("showBackupFunds") })).toBeNull();
     chooseTask("wallet");
-    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.receiveCode" }));
-    expect((screen.getByRole("radio", { name: label("identityFunds") }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
-    expect(screen.queryByRole("button", { name: label("createNew") })).toBeNull();
-    expect(screen.queryByRole("radio", { name: label("restoreTitle") })).toBeNull();
+    openReceiveCode("identity");
+    expectCurrentWallet("identity");
+    await waitForReceiveCode("identity");
+    expect(screen.queryByRole("button", { name: label("fundsReceiveCode") })).toBeNull();
+    expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
     openFundsManagement();
     expect(screen.getByLabelText(label("mnemonicInput"))).toBeTruthy();
     expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
-    fireEvent.click(screen.getByRole("radio", { name: label("createTitle") }));
-    expect((screen.getByRole("radio", { name: label("randomSource") }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: label("restoreTitle") }));
+    fireEvent.click(screen.getByRole("button", { name: label("createTitle") }));
+    expect(screen.getByRole("radio", { name: label("randomSource") })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: label("restoreTitle") }));
     expect(screen.getByRole("radio", { name: label("signatureRestore") })).toBeTruthy();
-    expect(mocks.call.mock.calls.map(([method]) => method)).toEqual(["unlockIdentity", "recover"]);
+    expect(mocks.call.mock.calls.map(([method]) => method)).toEqual(["unlockIdentity", "recover", "receiveCode"]);
   });
 
   it("restores independent funds without terminating the already unlocked identity", async () => {
@@ -663,9 +694,8 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(sessionState().funds?.fundsFingerprint).toBe(verifiedFunds.fundsFingerprint);
     expect(mocks.workerState.identity?.handle).toBe(identity.handle);
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: submitLabel }));
-    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", { slot: "asset" }, expect.anything()));
+    expect(screen.getByRole("button", { name: label("fundsReceiveCode") }).getAttribute("aria-expanded")).toBe("true");
+    await waitForReceiveCode("asset");
     expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).readOnly).toBe(true);
     chooseTask("wallet");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
@@ -676,10 +706,9 @@ describe("Shielded budget flow with a real identity session", () => {
     renderPanel();
     await restoreFunds();
     const terminations = mocks.terminate.mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: submitLabel }));
-    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", { slot: "asset" }, expect.anything()));
+    await waitForReceiveCode("asset");
     expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("budget-receive-code");
-    fireEvent.click(screen.getByRole("radio", { name: label("identityFunds") }));
+    openReceiveCode("identity");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(sessionState().funds?.fundsFingerprint).toBe(verifiedFunds.fundsFingerprint);
@@ -705,14 +734,14 @@ describe("Shielded budget flow with a real identity session", () => {
     const terminations = mocks.terminate.mock.calls.length;
     chooseTask("wallet");
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.shield" }));
-    expect(screen.getByRole("group", { name: label("depositDestination") })).toBeTruthy();
+    expect(screen.getByRole("group", { name: label("currentWallet") })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.recover" }));
-    await waitFor(() => expect(screen.getByRole("group", { name: label("depositDestination") })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("group", { name: label("currentWallet") })).toBeTruthy());
     // Choosing the independent receive code does not change which funds pay.
-    expect((screen.getByRole("radio", { name: label("identityFunds") }) as HTMLInputElement).checked).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
+    expectCurrentWallet("identity");
+    chooseActiveWallet("asset");
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.unshield" }));
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
+    expectCurrentWallet("asset");
     fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "shielded.valueOption" }));
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
@@ -720,15 +749,15 @@ describe("Shielded budget flow with a real identity session", () => {
       "preview", expect.objectContaining({ action: "unshield", slot: "asset", amount: "1000000000000000000", candidates: ["100"] }), expect.anything(),
     ));
     chooseTask("inheritance");
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
+    expectCurrentWallet("asset");
     chooseIndependentBudget();
-    expect((screen.getByLabelText(label("budgetFunds")) as HTMLInputElement).checked).toBe(true);
+    expectCurrentWallet("asset");
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(sessionState().funds?.fundsFingerprint).toBe(verifiedFunds.fundsFingerprint);
   });
 
-  it("returns a real lock to identity entry and resumes the independent receiving task after unlocking", async () => {
+  it("returns a real lock to identity entry and keeps wallet details closed after unlocking", async () => {
     renderPanel();
     await restoreFunds();
     lockCurrentFlow();
@@ -738,23 +767,23 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByRole("radio", { name: label("mnemonicRestore") })).toBeNull();
     await unlockIdentity();
     expect(task("wallet").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByLabelText(label("identityFunds")) as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByRole("group", { name: label("walletBalances") })).toBeNull();
+    expectCurrentWallet("identity");
     await restoreFunds();
     expect(sessionState().identity?.handle).toBe(identity.handle);
   });
 
-  it("returns key management to the receiving task without discarding either session", async () => {
+  it("opens independent receipt alongside the deposit task without discarding either session", async () => {
     renderPanel();
     await restoreFunds();
     const terminations = mocks.terminate.mock.calls.length;
     openFundsManagement();
     expect(screen.getByLabelText(label("exportedRecoveryMaterial"))).toBeTruthy();
     expect(screen.queryByRole("button", { name: label("backToWorkspace") })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.receiveCode" }));
+    openReceiveCode("asset");
     expect(task("wallet").getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByLabelText(label("budgetFunds")) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("button", { name: label("fundsReceiveCode") }).getAttribute("aria-expanded")).toBe("true");
+    expectCurrentWallet("identity");
     expect(screen.queryByRole("radio", { name: label("mnemonicRestore") })).toBeNull();
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
     expect(sessionState().identity?.handle).toBe(identity.handle);
@@ -764,7 +793,6 @@ describe("Shielded budget flow with a real identity session", () => {
   it("clears the recovery form and returns to identity entry when the Worker locks externally", async () => {
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     const material = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
     fireEvent.change(material, { target: { value: "unfinished-secret-recovery-material" } });
@@ -775,6 +803,11 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByRole("radio", { name: label("mnemonicRestore") })).toBeNull();
     await unlockIdentity();
     expect(task("wallet").getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByRole("group", { name: label("walletBalances") })).toBeNull();
+    expect(screen.queryByLabelText(label("mnemonicInput"))).toBeNull();
+    openWalletBalances();
+    expect(fundsKeyButton().getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByLabelText(label("mnemonicInput"))).toBeNull();
   });
 
   it("returns locked key management to identity entry before allowing budget recovery", async () => {
@@ -788,7 +821,6 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByLabelText(label("exportedRecoveryMaterial"))).toBeNull();
     expect(screen.queryByRole("radio", { name: label("mnemonicRestore") })).toBeNull();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     expect((screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement).disabled).toBe(false);
     expect((screen.getByRole("button", { name: label("importRecovery") }) as HTMLButtonElement).disabled).toBe(false);
@@ -816,7 +848,6 @@ describe("Shielded budget flow with a real identity session", () => {
     });
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     chooseRecoveryPath("signature");
     click("restoreSignature");
@@ -834,24 +865,24 @@ describe("Shielded budget flow with a real identity session", () => {
     click("recover");
     await waitFor(() => expect(sessionState().funds?.recoveryVerified).toBe(true));
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
-    await waitFor(() => expect(screen.getByText("2.5")).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("group", { name: label("walletBalances") })).getByText("2.5")).toBeTruthy());
     expect(screen.queryByText(label("fundsRecoveredTitle"))).toBeNull();
     expect(screen.queryByRole("button", { name: label("backToWorkspace") })).toBeNull();
-    expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByLabelText(label("mnemonicInput"))).toBeNull();
+    expectCurrentWallet("identity");
   });
 
   it("creates funds and verifies the manually re-entered backup without dropping identity", async () => {
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
-    fireEvent.click(screen.getByRole("radio", { name: label("createTitle") }));
+    fireEvent.click(screen.getByRole("button", { name: label("createTitle") }));
     const terminations = mocks.terminate.mock.calls.length;
-    click("createNew");
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
     await waitFor(() => expect(sessionState().funds?.backupRequired).toBe(true));
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
-    expect(screen.queryByRole("button", { name: submitLabel })).toBeNull();
+    expect(screen.getByRole("button", { name: submitLabel })).toBeTruthy();
     click("exportRecovery");
     const exported = await screen.findByLabelText(label("exportedRecoveryMaterial")) as HTMLTextAreaElement;
     await waitFor(() => expect(exported.value).toBe("original-secret-words"));
@@ -877,8 +908,9 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByText(label("fundsRecoveredTitle"))).toBeNull();
     expect(screen.queryByText(label("fundsRestoredIdentityHint"))).toBeNull();
     expect(screen.queryByRole("button", { name: label("backToWorkspace") })).toBeNull();
-    expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true");
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
+    openReceiveCode("asset");
+    expect(screen.getByRole("button", { name: label("fundsReceiveCode") }).getAttribute("aria-expanded")).toBe("true");
+    expectCurrentWallet("identity");
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(sessionState().funds?.recoveryVerified).toBe(true);
     expect(mocks.call.mock.calls.filter(([method]) => method === "unlockIdentity")).toHaveLength(1);
@@ -888,16 +920,19 @@ describe("Shielded budget flow with a real identity session", () => {
   it("keeps the backup gate when navigating away from a new root until saved material is manually verified", async () => {
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
-    fireEvent.click(screen.getByRole("radio", { name: label("createTitle") }));
-    click("createNew");
+    fireEvent.click(screen.getByRole("button", { name: label("createTitle") }));
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
     await waitFor(() => expect(sessionState().funds?.backupRequired).toBe(true));
     expect(screen.queryByRole("radio", { name: label("signatureRestore") })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.receiveCode" }));
-    expect((screen.getByRole("radio", { name: label("budgetFunds") }) as HTMLInputElement).checked).toBe(true);
-    // Receipt remains disabled until backup verification is completed in key management.
-    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+    openWalletBalances();
+    expectCurrentWallet("identity");
+    // Receipt stays unavailable until backup verification is completed in key management.
+    expect(screen.queryByRole("button", { name: label("fundsReceiveCode") })).toBeNull();
+    expect(screen.queryByRole("button", { name: label("restoreTitle") })).toBeNull();
+    expect(screen.queryByRole("button", { name: label("createTitle") })).toBeNull();
+    expect(screen.getByRole("button", { name: label("backupTitle") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "shielded.generateReceiveCode" })).toBeNull();
     expect(screen.queryByRole("button", { name: label("showBackupFunds") })).toBeNull();
     expect(sessionState().funds?.backupRequired).toBe(true);
     expect(sessionState().funds?.recoveryVerified).toBe(false);
@@ -925,8 +960,8 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByText(label("fundsRecoveredTitle"))).toBeNull();
     expect(screen.queryByRole("button", { name: label("backToWorkspace") })).toBeNull();
     expect(screen.queryByLabelText("identity passphrase")).toBeNull();
-    expect(screen.getByRole("button", { name: "shielded.actions.receiveCode" }).getAttribute("aria-pressed")).toBe("true");
-    await waitFor(() => expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false));
+    openReceiveCode("asset");
+    await waitForReceiveCode("asset");
   });
 
   it("opens backup management when re-signing reports that independent verification is still required", async () => {
@@ -942,7 +977,6 @@ describe("Shielded budget flow with a real identity session", () => {
     });
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     chooseRecoveryPath("signature");
     click("restoreSignature");
@@ -957,7 +991,6 @@ describe("Shielded budget flow with a real identity session", () => {
     const visibility = documentVisibility();
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     chooseRecoveryPath("signature");
     const terminations = mocks.terminate.mock.calls.length;
@@ -981,7 +1014,6 @@ describe("Shielded budget flow with a real identity session", () => {
     const visibility = documentVisibility();
     renderPanel();
     await unlockIdentity();
-    openIndependentReceiving();
     openFundsManagement();
     chooseRecoveryPath("signature");
     click("restoreSignature");
@@ -1003,7 +1035,6 @@ describe("Shielded budget flow with a real identity session", () => {
       const visibility = documentVisibility();
       renderPanel();
       await unlockIdentity();
-      openIndependentReceiving();
       openFundsManagement();
       chooseRecoveryPath("signature");
       click("restoreSignature");
@@ -1036,7 +1067,6 @@ describe("Shielded budget flow with a real identity session", () => {
     fireEvent.change(screen.getByLabelText("identity passphrase"), { target: { value: "original-credentials" } });
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
     await waitFor(() => expect(sessionState().credentials).toEqual(credentials));
-    openIndependentReceiving();
     openFundsManagement();
     fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "original-root" } });
     click("importRecovery");
@@ -1045,7 +1075,8 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(sessionState().identity).toBeNull();
     expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "shielded.actions.unshield" }));
-    fireEvent.click(screen.getByRole("radio", { name: label("budgetFunds") }));
+    closeWalletBalances();
+    chooseActiveWallet("asset");
     fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("shielded.fields.exitRecipient"), { target: { value: address } });
     fireEvent.click(screen.getByRole("checkbox", { name: "shielded.valueOption" }));

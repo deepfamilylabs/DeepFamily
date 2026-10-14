@@ -363,11 +363,7 @@ export const PersonHashCalculator = forwardRef<
               ])
               .optional()
               .transform((val) => (val === "" || val === undefined ? 0 : val)),
-            gender: z
-              .number()
-              .int()
-              .min(0)
-              .max(fundsCredentials ? 255 : 3),
+            gender: z.number().int().min(0).max(3),
           })
           .refine(
             (data) => {
@@ -709,12 +705,6 @@ export const PersonHashCalculator = forwardRef<
                   { value: 1, label: t("search.hashCalculator.genderOptions.male") },
                   { value: 2, label: t("search.hashCalculator.genderOptions.female") },
                   { value: 3, label: t("search.hashCalculator.genderOptions.other") },
-                  ...(fundsCredentials
-                    ? Array.from({ length: 252 }, (_, index) => ({
-                        value: index + 4,
-                        label: String(index + 4),
-                      }))
-                    : []),
                 ]}
               />
               <FieldError message={errors.gender?.message} />

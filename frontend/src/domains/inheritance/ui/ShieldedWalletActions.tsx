@@ -14,7 +14,7 @@ import {
 } from "./inheritanceControls";
 
 const INPUT_CLASS =
-  "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
+  "h-12 w-full rounded-xl border border-hairline bg-surface-alt px-3.5 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/20";
 
 export type ShieldedWalletAction = "shield" | "privateTransfer" | "unshield" | "receiveCode";
 export type ShieldedRecipientInputMethod = "receiveCode" | "credentials";
@@ -231,6 +231,7 @@ export function ShieldedValueNotePicker({
 }
 
 export interface ShieldedWalletActionsProps {
+  embedded?: boolean;
   action: ShieldedWalletAction;
   symbol: string;
   decimals: number;
@@ -259,12 +260,11 @@ export interface ShieldedWalletActionsProps {
   onSubmit: () => void;
   feedback?: ReactNode;
   receivingSettings?: ReactNode;
-  /** Explicit deposit destination or payment owner. */
-  fundsSource?: ReactNode;
 }
 
 /** Deposit, private transfer, withdrawal and receive-code forms for the selected funds. */
 export function ShieldedWalletActions({
+  embedded = false,
   action,
   symbol,
   decimals,
@@ -285,7 +285,6 @@ export function ShieldedWalletActions({
   onSubmit,
   feedback,
   receivingSettings,
-  fundsSource,
 }: ShieldedWalletActionsProps) {
   const { t } = useTranslation();
   const withdrawalSelectionAvailable =
@@ -296,13 +295,14 @@ export function ShieldedWalletActions({
   const recipientNeedsConfirmation = action === "privateTransfer" && recipient.needsConfirmation;
   return (
     <PanelShell
+      embedded={embedded}
       title={
         action === "receiveCode"
           ? t("shielded.actions.receiveCode", { symbol })
           : t(`shielded.actionTitles.${action}`, { symbol })
       }
     >
-      {action === "receiveCode" ? receivingSettings : fundsSource}
+      {action === "receiveCode" ? receivingSettings : null}
       {action === "receiveCode" && ownReceiveCode ? (
         <FieldBlock
           label={t("shielded.receiveCodeLabel", { symbol })}
@@ -427,6 +427,7 @@ export function ShieldedWalletActions({
       {submitHidden ? null : (
         <PanelButton
           variant="primary"
+          className="w-full sm:w-auto sm:min-w-36"
           busy={busy}
           disabled={
             busy ||

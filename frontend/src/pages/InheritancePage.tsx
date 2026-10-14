@@ -312,7 +312,7 @@ function InheritanceContent() {
 
   if (!wallet.address) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         {head}
         <EmptyState
           size="page"
@@ -326,7 +326,7 @@ function InheritanceContent() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-4xl space-y-6">
       {head}
       {!readyModules ? (
         <div className="min-w-0 rounded-xl border border-hairline bg-surface px-4 py-3 sm:px-5">

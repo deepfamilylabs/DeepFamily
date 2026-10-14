@@ -48,18 +48,22 @@ export function PanelShell({
   title,
   description,
   children,
+  embedded = false,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  embedded?: boolean;
 }) {
   return (
-    <section className="rounded-3xl border border-hairline bg-surface p-5 sm:p-6">
-      <h2 className="text-lg text-ink">{title}</h2>
+    <section
+      className={`min-w-0 p-5 sm:p-6 ${embedded ? "" : "rounded-2xl border border-hairline bg-surface"}`}
+    >
+      <h2 className="ui-heading text-base text-ink">{title}</h2>
       {description ? (
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">{description}</p>
       ) : null}
-      <div className="mt-5 space-y-5">{children}</div>
+      <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
 }

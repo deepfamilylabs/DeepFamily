@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type RefObject } from "react";
+import { useId, useState, type ReactNode, type RefObject } from "react";
 import { isAddress } from "ethers";
 import { useTranslation } from "react-i18next";
 import { buildShieldedAssetSigningMessage } from "@deepfamily/protocol-core";
@@ -27,15 +27,14 @@ export interface ShieldedFundsKeyManagerProps {
   verificationStarted: boolean;
   restorePath: ShieldedFundsRecoveryFormat | "signature";
   onRestorePathChange: (value: ShieldedFundsRecoveryFormat | "signature") => void;
-  rootSource: "random" | "walletSignature";
-  onRootSourceChange: (value: "random" | "walletSignature") => void;
   account: string;
   canSign: boolean;
   /** Credentials are already unlocked; proofs may be unavailable for their identity suite. */
   identityReady?: boolean;
   /** A scan without a matching historical note does not confirm the original wallet. */
   recoveryScanned?: boolean;
-  onCreate: () => void;
+  /** Each generation method creates the key directly; there is no separate confirm step. */
+  onCreate: (source: "random" | "walletSignature") => void;
   onExport: () => void;
   onBeginVerification: () => void;
   onImport: () => void;
@@ -43,9 +42,6 @@ export interface ShieldedFundsKeyManagerProps {
   /** Scans the selected pool, then every verified factory pool; history there can confirm a candidate. */
   onRecover: () => void;
   discoveryReport?: ReactNode;
-  /** Restoring for a claim or from the entry screen needs the original key, never a new one. */
-  canCreate?: boolean;
-  onShowCreate: () => void;
   onShowRestore: () => void;
   /** The initial entry has no workspace navigation and can still open identity unlock. */
   onUnlockIdentity?: () => void;
@@ -64,10 +60,10 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
   const id = useId();
   const tr = (key: string) => t(`shielded.walletKeys.${key}`);
   const { funds, busy } = props;
+  const [creatingSource, setCreatingSource] = useState<"random" | "walletSignature" | null>(null);
   const backupPending = !!funds?.backupRequired || !!props.exportedFingerprint;
   const verification = props.verificationStarted;
   const backup = props.flow === "backup" || backupPending || verification;
-  const choosingMode = props.canCreate && !funds && !backup;
   const restored = !!funds?.recoveryVerified && !funds.backupRequired && !backup;
   const candidate = !!funds && !funds.recoveryVerified && !funds.backupRequired && !backup;
   const sourceLabel = funds
@@ -129,27 +125,6 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
 
   return (
     <div className="space-y-5">
-      {choosingMode ? (
-        <fieldset aria-label={tr("manageIndependentFunds")} className="space-y-2" disabled={busy}>
-          <div className="flex flex-wrap gap-3">
-            {(["restore", "create"] as const).map((mode) => (
-              <label
-                key={mode}
-                className={`${radioOptionClassName(props.flow === mode, busy)} text-ink`}
-              >
-                <input
-                  type="radio"
-                  name={`${id}-funds-mode`}
-                  value={mode}
-                  checked={props.flow === mode}
-                  onChange={mode === "restore" ? props.onShowRestore : props.onShowCreate}
-                />
-                {tr(mode === "restore" ? "restoreTitle" : "createTitle")}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
       {restored ? (
         <>
           <SuccessNotice>
@@ -259,35 +234,34 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
           <fieldset className="space-y-2" disabled={busy}>
             <legend className="text-sm font-medium text-ink">{tr("newSource")}</legend>
             <div className="flex flex-wrap gap-3">
-              {(["random", "walletSignature"] as const).map((source) => (
-                <label
-                  key={source}
-                  className={`${radioOptionClassName(props.rootSource === source, busy)} text-ink`}
-                >
-                  <input
-                    type="radio"
-                    name={`${id}-new-source`}
-                    checked={props.rootSource === source}
-                    onChange={() => props.onRootSourceChange(source)}
-                  />
-                  {tr(source === "random" ? "randomSource" : "signatureSource")}
-                </label>
-              ))}
+              {(["random", "walletSignature"] as const).map((source) => {
+                // Nothing is preselected; choosing a method creates the key and stays
+                // checked only while that creation runs, so a failure can be retried.
+                const unavailable = source === "walletSignature" && !props.canSign;
+                return (
+                  <label
+                    key={source}
+                    className={`${radioOptionClassName(busy && creatingSource === source, busy || unavailable)} text-ink`}
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-new-source`}
+                      checked={busy && creatingSource === source}
+                      disabled={unavailable}
+                      onChange={() => {
+                        setCreatingSource(source);
+                        props.onCreate(source);
+                      }}
+                    />
+                    {tr(source === "random" ? "randomSource" : "signatureSource")}
+                  </label>
+                );
+              })}
             </div>
           </fieldset>
-          {props.rootSource === "walletSignature" && !props.canSign ? (
+          {!props.canSign ? (
             <p className="text-sm text-ink-muted">{tr("connectSignatureWallet")}</p>
           ) : null}
-          <div className="flex flex-wrap gap-3">
-            <PanelButton
-              variant="primary"
-              busy={busy}
-              disabled={busy || (props.rootSource === "walletSignature" && !props.canSign)}
-              onClick={props.onCreate}
-            >
-              {tr("createNew")}
-            </PanelButton>
-          </div>
         </>
       ) : (
         <>

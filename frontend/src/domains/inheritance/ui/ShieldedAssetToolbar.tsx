@@ -57,13 +57,16 @@ export function ShieldedAssetToolbar({
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-        <label htmlFor={selectId} className="shrink-0 text-xs text-ink-muted">
+        <label
+          htmlFor={selectId}
+          className="sr-only sm:not-sr-only sm:shrink-0 sm:text-xs sm:text-ink-muted"
+        >
           {t("shielded.assets.label")}
         </label>
-        <div className="relative min-w-0 flex-1 sm:max-w-48">
+        <div className="relative min-w-0 flex-1 sm:max-w-40">
           <select
             id={selectId}
-            className="h-9 w-full min-w-0 appearance-none rounded-lg border border-hairline-strong bg-surface pl-3 pr-9 text-sm font-medium text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+            className="h-9 w-full min-w-0 appearance-none rounded-lg border border-hairline bg-surface-alt pl-3 pr-8 text-sm font-medium text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
             value={selectedValue ?? selectedAddress}
             disabled={controlsDisabled}
             onChange={(event) => onSelect(event.target.value)}
@@ -85,6 +88,7 @@ export function ShieldedAssetToolbar({
           type="button"
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-ink-muted transition-colors hover:bg-surface-alt hover:text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
           aria-expanded={expanded}
+          aria-label={t(expanded ? "shielded.assets.cancel" : "shielded.assets.add")}
           aria-controls={expanded ? importId : undefined}
           disabled={controlsDisabled}
           onClick={() => {
@@ -97,7 +101,9 @@ export function ShieldedAssetToolbar({
           ) : (
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {t(expanded ? "shielded.assets.cancel" : "shielded.assets.add")}
+          <span className="hidden sm:inline">
+            {t(expanded ? "shielded.assets.cancel" : "shielded.assets.add")}
+          </span>
         </button>
       </div>
       {expanded ? (

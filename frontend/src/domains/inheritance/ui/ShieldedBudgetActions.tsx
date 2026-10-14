@@ -28,7 +28,7 @@ export interface ShieldedBudgetActionsProps {
   decimals: number;
   busy: boolean;
   wallet: ShieldedWalletSummary | null;
-  fundingSlot?: ShieldedKeySlot;
+  slot: ShieldedKeySlot;
   entry: ShieldedFundingEntry;
   onEntryChange: (value: ShieldedFundingEntry) => void;
   policyHandle: string;
@@ -53,10 +53,7 @@ export interface ShieldedBudgetActionsProps {
   onClaimChange: (value: string) => void;
   claimPeriods: string[];
   onClaimPeriodsChange: (value: string[]) => void;
-  receiveSlot: ShieldedKeySlot;
-  onReceiveSlotChange: (value: ShieldedKeySlot) => void;
   independentKeyReady?: boolean;
-  onRestoreIndependentKey?: () => void;
   localRecipientLabels?: ReadonlyMap<string, string>;
   parentPersonHash?: string;
   fundingDeficit?: string;
@@ -110,7 +107,7 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
   const privateFunding = fundingEntry !== "public";
   const fundingBalance =
     wallet?.notes
-      .filter((note) => note.kind === "value" && note.slot === (props.fundingSlot ?? "identity"))
+      .filter((note) => note.kind === "value" && note.slot === props.slot)
       .reduce((sum, note) => sum + BigInt(note.amount), 0n) ?? 0n;
   let fundingRate: bigint | undefined;
   let fundingDays: bigint | undefined;
@@ -127,11 +124,11 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
   const fundingPeriods = /^[1-9][0-9]{0,19}$/.test(props.periods.trim())
     ? BigInt(props.periods)
     : undefined;
-  const claims = wallet?.claims.filter((claim) => claim.slot === props.receiveSlot) ?? [];
+  const claims = wallet?.claims.filter((claim) => claim.slot === props.slot) ?? [];
   const defaultClaim = claims.find((claim) => claim.status === "claimable") ?? claims[0];
   const selectedClaim = claims.find((claim) => claim.handle === props.claimHandle) ?? defaultClaim;
   const budgets =
-    wallet?.notes.filter((note) => note.kind === "budget" && note.slot === props.receiveSlot) ?? [];
+    wallet?.notes.filter((note) => note.kind === "budget" && note.slot === props.slot) ?? [];
   const claimBudget = budgets.find((note) => selectedClaim?.budgets.includes(note.commitment));
   const chosenClaimAmount = selectedClaim
     ? BigInt(selectedClaim.amountPerPeriod) * BigInt(props.claimPeriods.length)
@@ -394,44 +391,13 @@ export function ShieldedBudgetActions(props: ShieldedBudgetActionsProps) {
     );
   }
 
-  const claimFilter = (
-    <fieldset disabled={busy} className="space-y-2">
-      <legend className="text-sm font-medium text-ink">{tr("claimViewLabel")}</legend>
-      <div className="flex flex-wrap gap-3">
-        {(["identity", "asset"] as const).map((slot) => (
-          <label
-            key={slot}
-            className={`${radioOptionClassName(props.receiveSlot === slot, busy)} text-ink`}
-          >
-            <input
-              type="radio"
-              name="shielded-budget-key-mode"
-              checked={props.receiveSlot === slot}
-              onChange={() => props.onReceiveSlotChange(slot)}
-            />
-            {tr(slot === "asset" ? "budgetFunds" : "identityFunds")}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-
-  if (props.receiveSlot === "asset" && !props.independentKeyReady) {
-    return (
-      <>
-        {claimFilter}
-        {props.onRestoreIndependentKey ? (
-          <PanelButton variant="primary" disabled={busy} onClick={props.onRestoreIndependentKey}>
-            {tr("restoreBudgetKey")}
-          </PanelButton>
-        ) : null}
-      </>
-    );
+  // Unlocking or creating keys belongs to the funds key card under Private wallets.
+  if (props.slot === "asset" && !props.independentKeyReady) {
+    return <WarningNotice>{tr("claimFundsKeyRequired")}</WarningNotice>;
   }
 
   return (
     <>
-      {claimFilter}
       {claims.length > 1 ? (
         <FieldBlock label={t("shielded.fields.budgetNote", { symbol })}>
           <select

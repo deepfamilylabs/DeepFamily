@@ -254,13 +254,17 @@ current chain. Asset selection follows credentials unlock. Metadata failures
 preserve verified raw integer amounts with unknown precision.
 
 The workspace contains the asset overview, three task tabs and the selected
-task's controls. A separate **Funds key** entry beside the wallet actions opens
-key recovery, explicit creation and backup. Receive-code settings only select
-the credential type and generate a code; they do not manage keys. The key manager
-opens recovery first when no key is loaded and backup when a verified key is ready.
-Claims offer restoration of the
-original missing key, since creating a replacement cannot change an existing
-budget's owner. Funds management replaces the current task's contents while the
+task's controls. **Private wallets** beside the current wallet opens the identity
+credentials and funds key cards. Opening a card's **Receive code** generates the
+code at once; **Generate receive code** appears only to retry a failure. Only a
+usable funds key (verified, backup complete) offers **Receive code** and **Keys**
+(backup). A newly created key offers only its mandatory **Back up and verify funds
+key**; with no key or an unconfirmed candidate, the card offers **Unlock funds key**
+and **Create funds key**. Creation lists its generation methods unselected, and
+choosing one creates the key at once. Receive codes do not manage keys.
+A claim with an unusable funds key only points to Private wallets: an existing
+budget can be claimed only with its original key, since creating a replacement
+cannot change the budget's owner. Funds management replaces the current task's contents while the
 overview and navigation remain mounted. Returning keeps drafts and selections;
 leaving clears displayed secrets and pauses any backup drill. Amount drafts are
 separate, and transfer/withdrawal selections are allowed candidates for the

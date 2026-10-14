@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { ShieldedAssetActionRequest } from "../../../shared/workers/shieldedAssetWorkerTypes";
 
-type Action = ShieldedAssetActionRequest["action"] | "receiveCode";
+type Action = ShieldedAssetActionRequest["action"];
 const GROUPS = ["wallet", "inheritance", "receive"] as const;
 const actionClass = (active: boolean) =>
   `min-h-8 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-surface text-ink shadow-xs" : "text-ink-muted hover:text-ink"}`;
@@ -13,7 +13,6 @@ export function ShieldedTaskNavigation({
   busy,
   symbol,
   onActionChange,
-  fundsAction,
 }: {
   id: string;
   action: Action;
@@ -21,23 +20,18 @@ export function ShieldedTaskNavigation({
   busy: boolean;
   symbol: string;
   onActionChange: (action: Action) => void;
-  fundsAction?: { label: string; active: boolean; onClick: () => void };
 }) {
   const { t } = useTranslation();
   const group = action === "fund" ? "inheritance" : action === "claim" ? "receive" : "wallet";
   const selectGroup = (next: (typeof GROUPS)[number]) => {
-    if (fundsAction?.active && next === group) {
-      onActionChange(action);
-      return;
-    }
     onActionChange(next === "inheritance" ? "fund" : next === "receive" ? "claim" : walletAction);
   };
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-4 border-b border-hairline px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6">
       <div
         role="tablist"
         aria-label={t("shielded.actionsTitle", { symbol })}
-        className="flex flex-wrap gap-x-5 border-b border-hairline"
+        className="flex min-w-0 flex-wrap items-center gap-x-5"
       >
         {GROUPS.map((item) => (
           <button
@@ -66,10 +60,10 @@ export function ShieldedTaskNavigation({
               selectGroup(next);
               document.getElementById(`${id}-tab-${next}`)?.focus();
             }}
-            className={`-mb-px border-b-2 py-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 ${
+            className={`relative py-1.5 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 ${
               group === item
-                ? "border-primary text-ink"
-                : "border-transparent text-ink-muted hover:text-ink"
+                ? "text-ink after:bg-primary"
+                : "text-ink-muted after:bg-transparent hover:text-ink"
             }`}
           >
             {t(`shielded.groups.${item}`)}
@@ -78,31 +72,20 @@ export function ShieldedTaskNavigation({
       </div>
       {group === "wallet" ? (
         <div className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-surface-alt p-1">
-          {(["shield", "privateTransfer", "unshield", "receiveCode"] as const).map((item) => (
+          {(["shield", "privateTransfer", "unshield"] as const).map((item) => (
             <button
               key={item}
               type="button"
-              aria-pressed={item === action && !fundsAction?.active}
+              aria-pressed={item === action}
               disabled={busy}
               onClick={() => onActionChange(item)}
-              className={actionClass(item === action && !fundsAction?.active)}
+              className={actionClass(item === action)}
             >
               {t(`shielded.actions.${item}`, { symbol })}
             </button>
           ))}
-          {fundsAction ? (
-            <button
-              type="button"
-              aria-pressed={fundsAction.active}
-              disabled={busy}
-              onClick={fundsAction.onClick}
-              className={actionClass(fundsAction.active)}
-            >
-              {fundsAction.label}
-            </button>
-          ) : null}
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

@@ -309,6 +309,18 @@ describe("Shielded identity form privacy with a real session and form", () => {
     await act(async () => vi.advanceTimersByTimeAsync(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS));
     expectEmptyIdentity();
   });
+  it("offers only the four named gender options for unlocking", () => {
+    render(panel());
+    const genderTrigger = screen.getByRole("button", {
+      name: "search.hashCalculator.genderOptions.unknown",
+    });
+    fireEvent.keyDown(genderTrigger, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(
+      ["unknown", "male", "female", "other"].map(
+        (gender) => `search.hashCalculator.genderOptions.${gender}`,
+      ),
+    );
+  });
   it("shows the identity hash while entering unlock credentials", async () => {
     const previewHash = "0x" + "ab".repeat(32);
     mocks.crypto.mockResolvedValue({ identityHash: previewHash });
