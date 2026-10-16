@@ -19,6 +19,21 @@ const dataFor = (overrides = {}) => ({
   ...overrides,
 });
 
+const valueDataFor = (overrides = {}) => {
+  const data = dataFor(overrides);
+  const pad = (values, filler) =>
+    Array.from({ length: 8 }, (_, slot) => values[slot] ?? filler(slot));
+  return {
+    ...data,
+    inputShardIds: pad(data.inputShardIds, () => data.inputShardIds[0]),
+    inputRoots: pad(data.inputRoots, () => data.inputRoots[0]),
+    inputNullifiers: pad(
+      data.inputNullifiers,
+      (slot) => data.inputNullifiers[0] * 100n + BigInt(slot),
+    ),
+  };
+};
+
 async function proofFor(pool, action, data, amount = 0n, recipient) {
   const signals = buildShieldedPoolPublicSignals({
     action,
@@ -59,7 +74,7 @@ async function setup({ native = false, precision = 18 } = {}) {
   }
   async function withdrawal(recipientAddress = recipient.address, amount = 30n) {
     const root = (await pool.noteShard(0)).root;
-    const data = dataFor({
+    const data = valueDataFor({
       inputRoots: [root, root],
       inputNullifiers: [201n, 202n],
       outputCommitments: [103n, 104n],
@@ -188,7 +203,7 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     const { pool, token, recipient, shield, withdrawal } = await setup();
     await shield();
     const root = (await pool.noteShard(0)).root;
-    const nestedData = dataFor({
+    const nestedData = valueDataFor({
       inputRoots: [root, root],
       inputNullifiers: [301n, 302n],
       outputCommitments: [105n, 106n],

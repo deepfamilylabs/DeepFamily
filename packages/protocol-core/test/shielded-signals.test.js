@@ -33,6 +33,13 @@ const base = {
   outputCiphertexts: [ciphertextA, ciphertextB],
 };
 
+const valueBase = {
+  ...base,
+  inputShardIds: Array.from({ length: 8 }, (_, index) => index + 2),
+  inputRoots: Array.from({ length: 8 }, (_, index) => index + 11),
+  inputNullifiers: Array.from({ length: 8 }, (_, index) => index + 21),
+};
+
 test("each pool action has the verifier input count in ProofConstants.sol", () => {
   assert.deepEqual(
     Object.fromEntries(
@@ -45,8 +52,8 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
       Shield: 7,
       Fund: 27,
       Claim: 27,
-      PrivateTransfer: 12,
-      Unshield: 12,
+      PrivateTransfer: 30,
+      Unshield: 32,
     },
   );
 });
@@ -90,12 +97,22 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.equal(witness.asOf, "31");
 });
 
-test("two-input actions list both shard ids before both roots", () => {
+test("VALUE transfers list all eight shard ids before all roots and nullifiers", () => {
   const signals = buildShieldedPoolPublicSignals({
-    ...base,
+    ...valueBase,
     action: SHIELDED_POOL_ACTION.PrivateTransfer,
   });
-  assert.deepEqual(signals, [1030n, 1n, 2n, 3n, 11n, 12n, 13n, 14n, 27n, 28n, hashA, hashB]);
+  assert.deepEqual(signals, [
+    1030n,
+    1n,
+    ...valueBase.inputShardIds.map(BigInt),
+    ...valueBase.inputRoots.map(BigInt),
+    ...valueBase.inputNullifiers.map(BigInt),
+    27n,
+    28n,
+    hashA,
+    hashB,
+  ]);
 });
 
 test("fund includes its mode before the roots and keeps lineage only for the initial enrollment", () => {
@@ -163,7 +180,7 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
   );
   assert.throws(() =>
     buildShieldedPoolPublicSignals({
-      ...base,
+      ...valueBase,
       action: SHIELDED_POOL_ACTION.PrivateTransfer,
       fundMode: 1,
     }),
@@ -185,14 +202,24 @@ test("shield and unshield bind their public amount and recipient", () => {
   );
   assert.deepEqual(
     buildShieldedPoolPublicSignals({
-      ...base,
+      ...valueBase,
       action: SHIELDED_POOL_ACTION.Unshield,
-      inputShardIds: [2, 2],
-      inputRoots: [11, 11],
       amount: 500,
       recipient,
     }),
-    [1030n, 1n, 2n, 11n, 13n, 14n, 27n, 28n, hashA, hashB, 500n, 0xaan],
+    [
+      1030n,
+      1n,
+      ...valueBase.inputShardIds.map(BigInt),
+      ...valueBase.inputRoots.map(BigInt),
+      ...valueBase.inputNullifiers.map(BigInt),
+      27n,
+      28n,
+      hashA,
+      hashB,
+      500n,
+      0xaan,
+    ],
   );
 });
 
@@ -207,8 +234,11 @@ test("data an action does not use must be zero, as the pool requires", () => {
     { ...base, action: SHIELDED_POOL_ACTION.Fund, fundMode: 1, relation0: 1 },
     "continuation lineage root",
   );
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.PrivateTransfer, asOf: 1 }, "transfer asOf");
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.PrivateTransfer, amount: 1 }, "transfer amount");
+  rejects({ ...valueBase, action: SHIELDED_POOL_ACTION.PrivateTransfer, asOf: 1 }, "transfer asOf");
+  rejects(
+    { ...valueBase, action: SHIELDED_POOL_ACTION.PrivateTransfer, amount: 1 },
+    "transfer amount",
+  );
   rejects(
     {
       ...base,
@@ -218,7 +248,13 @@ test("data an action does not use must be zero, as the pool requires", () => {
     "fund period nullifier",
   );
   rejects({ ...base, action: SHIELDED_POOL_ACTION.Shield, amount: 1 }, "shield note inputs");
-  rejects({ ...base, action: SHIELDED_POOL_ACTION.Unshield }, "single-input second root");
+  for (const action of [SHIELDED_POOL_ACTION.PrivateTransfer, SHIELDED_POOL_ACTION.Unshield]) {
+    assert.throws(
+      () => buildShieldedPoolPublicSignals({ ...base, action }),
+      (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
+      "VALUE actions reject the removed two-slot format",
+    );
+  }
   assert.throws(
     () =>
       buildShieldedPoolPublicSignals({

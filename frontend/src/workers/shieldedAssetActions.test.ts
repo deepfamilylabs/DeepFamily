@@ -113,16 +113,16 @@ const assetKeys = await deriveShieldedAssetKeyMaterial({
   assetRoot: fixedRoot,
   fundsIdentitySecret: new Uint8Array(32).fill(3),
 });
-function preparedValueOutputs(amounts: bigint[], offset = 0n) {
+function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 8) {
   return {
     witness: {},
     outputs: amounts.map((amount) => ({ note: { amount } })),
     data: {
       fundMode: 0n,
       budgetKind: 0n,
-      inputShardIds: [0n, 0n],
-      inputRoots: [17n, 17n],
-      inputNullifiers: [51n, 52n],
+      inputShardIds: Array(capacity).fill(0n),
+      inputRoots: Array(capacity).fill(17n),
+      inputNullifiers: Array.from({ length: capacity }, (_, index) => BigInt(51 + index)),
       periodNullifiers: Array(12).fill(0n),
       outputCommitments: [61n + offset, 62n + offset],
       outputCiphertexts: [`0x${"00".repeat(512)}`, `0x${"00".repeat(512)}`],
@@ -166,7 +166,7 @@ beforeEach(() => {
     amount: BigInt(amount),
     recipient,
   }));
-  mocks.fund.mockResolvedValue(preparedValueOutputs([10n, 0n]));
+  mocks.fund.mockResolvedValue(preparedValueOutputs([10n, 0n], 0n, 2));
   mocks.fundingDestination.mockResolvedValue(undefined);
   mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1000 });
   mocks.scan.mockResolvedValue({ blockHash, spentNullifiers: new Set() });

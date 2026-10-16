@@ -30,13 +30,13 @@ const PROOF = {
   pi_c: ["7", "8", "1"],
 };
 
-function actionData(): ShieldedPoolActionData {
+function actionData(capacity = 2): ShieldedPoolActionData {
   return {
     fundMode: 0n,
     budgetKind: 0n,
-    inputShardIds: [0n, 0n],
-    inputRoots: [0n, 0n],
-    inputNullifiers: [0n, 0n],
+    inputShardIds: Array(capacity).fill(0n),
+    inputRoots: Array(capacity).fill(0n),
+    inputNullifiers: Array(capacity).fill(0n),
     periodNullifiers: Array<bigint>(12).fill(0n),
     outputCommitments: [123n, 456n],
     outputCiphertexts: [CIPHERTEXT, CIPHERTEXT],
@@ -151,7 +151,15 @@ describe("shielded pool local proof and self-submit flows", () => {
     expect(endWalletRequest).not.toHaveBeenCalled();
     releaseWallet({ hash: "0xshield", wait });
     await vi.waitFor(() => expect(wait).toHaveBeenCalledOnce());
-    expect(order).toEqual(["begin", "anchor", "wallet", "end", "broadcast", "confirming", "receipt"]);
+    expect(order).toEqual([
+      "begin",
+      "anchor",
+      "wallet",
+      "end",
+      "broadcast",
+      "confirming",
+      "receipt",
+    ]);
     expect(onWalletRequest).toHaveBeenCalledOnce();
     expect(endWalletRequest).toHaveBeenCalledOnce();
     releaseReceipt({ status: 1 });
@@ -176,43 +184,46 @@ describe("shielded pool local proof and self-submit flows", () => {
     expect(onStage).not.toHaveBeenCalledWith("confirming");
   });
 
-  it.each(["preflight", "network", "gas balance", "fee review", "network after fee review"] as const)(
-    "does not start a wallet request guard when %s fails",
-    async (failure) => {
-      const f = fixture();
-      const onWalletRequest = vi.fn(() => vi.fn());
-      const onGasEstimate = vi.fn();
-      let data = f.common.data;
-      let message: string;
-      switch (failure) {
-        case "preflight":
-          data = { ...data, outputCiphertexts: ["0xab", CIPHERTEXT] };
-          message = "exactly 512 bytes";
-          break;
-        case "network":
-          f.setChainId(1n);
-          message = "wrong network";
-          break;
-        case "gas balance":
-          f.setBalance(1n);
-          message = "Transaction wallet needs at least";
-          break;
-        case "fee review":
-          onGasEstimate.mockRejectedValueOnce(new Error("Fee review canceled"));
-          message = "Fee review canceled";
-          break;
-        case "network after fee review":
-          onGasEstimate.mockImplementationOnce(() => f.setChainId(1n));
-          message = "wrong network";
-          break;
-      }
-      await expect(
-        submitShield({ ...f.common, data, amount: 100n, onGasEstimate, onWalletRequest }),
-      ).rejects.toThrow(message);
-      expect(onWalletRequest).not.toHaveBeenCalled();
-      expect(f.methods.shield).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    "preflight",
+    "network",
+    "gas balance",
+    "fee review",
+    "network after fee review",
+  ] as const)("does not start a wallet request guard when %s fails", async (failure) => {
+    const f = fixture();
+    const onWalletRequest = vi.fn(() => vi.fn());
+    const onGasEstimate = vi.fn();
+    let data = f.common.data;
+    let message: string;
+    switch (failure) {
+      case "preflight":
+        data = { ...data, outputCiphertexts: ["0xab", CIPHERTEXT] };
+        message = "exactly 512 bytes";
+        break;
+      case "network":
+        f.setChainId(1n);
+        message = "wrong network";
+        break;
+      case "gas balance":
+        f.setBalance(1n);
+        message = "Transaction wallet needs at least";
+        break;
+      case "fee review":
+        onGasEstimate.mockRejectedValueOnce(new Error("Fee review canceled"));
+        message = "Fee review canceled";
+        break;
+      case "network after fee review":
+        onGasEstimate.mockImplementationOnce(() => f.setChainId(1n));
+        message = "wrong network";
+        break;
+    }
+    await expect(
+      submitShield({ ...f.common, data, amount: 100n, onGasEstimate, onWalletRequest }),
+    ).rejects.toThrow(message);
+    expect(onWalletRequest).not.toHaveBeenCalled();
+    expect(f.methods.shield).not.toHaveBeenCalled();
+  });
 
   it("does not send a transaction when the wallet request boundary rejects the caller's state", async () => {
     const f = fixture();
@@ -253,7 +264,7 @@ describe("shielded pool local proof and self-submit flows", () => {
           continueReview = resolve;
         }),
     );
-    const pending = submitPrivateTransfer({ ...f.common, onGasEstimate });
+    const pending = submitPrivateTransfer({ ...f.common, data: actionData(8), onGasEstimate });
     while (!onGasEstimate.mock.calls.length) await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onGasEstimate).toHaveBeenCalledWith({
       gasEstimate: 100_000n,
@@ -286,6 +297,7 @@ describe("shielded pool local proof and self-submit flows", () => {
     });
     const pending = submitPrivateTransfer({
       ...f.common,
+      data: actionData(8),
       onGasEstimate,
       onSubmitting,
       onStage: (stage) => {
@@ -325,6 +337,7 @@ describe("shielded pool local proof and self-submit flows", () => {
     const onSubmitting = vi.fn();
     const pending = submitPrivateTransfer({
       ...f.common,
+      data: actionData(8),
       onSubmitting,
       onStage: (stage) => {
         if (stage === "submitting" && locked)
@@ -353,7 +366,7 @@ describe("shielded pool local proof and self-submit flows", () => {
 
   it("leaves nonce choice unchanged when submission tracking is not requested", async () => {
     const f = fixture();
-    await submitPrivateTransfer(f.common);
+    await submitPrivateTransfer({ ...f.common, data: actionData(8) });
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
     expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
     expect(
@@ -368,9 +381,9 @@ describe("shielded pool local proof and self-submit flows", () => {
     f.methods.privateTransfer.mockRejectedValueOnce(
       new Error("Wallet disconnected before returning a hash"),
     );
-    await expect(submitPrivateTransfer({ ...f.common, onSubmitting, onBroadcast })).rejects.toThrow(
-      "disconnected",
-    );
+    await expect(
+      submitPrivateTransfer({ ...f.common, data: actionData(8), onSubmitting, onBroadcast }),
+    ).rejects.toThrow("disconnected");
     expect(onSubmitting).toHaveBeenCalledOnce();
     expect(onSubmitting).toHaveBeenCalledWith({
       nonce: 9,
@@ -384,15 +397,21 @@ describe("shielded pool local proof and self-submit flows", () => {
     const f = fixture();
     const onBroadcast = vi.fn();
     const preparedProof = { ...PROOF, protocol: "groth16", curve: "bn128" } as Groth16Proof;
-    await submitPrivateTransfer({ ...f.common, witness: undefined, preparedProof, onBroadcast });
+    await submitPrivateTransfer({
+      ...f.common,
+      data: actionData(8),
+      witness: undefined,
+      preparedProof,
+      onBroadcast,
+    });
     expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
     expect(onBroadcast).toHaveBeenCalledWith("0xprivateTransfer");
-    await expect(submitPrivateTransfer({ ...f.common, preparedProof })).rejects.toThrow(
-      "must not include a witness",
-    );
+    await expect(
+      submitPrivateTransfer({ ...f.common, data: actionData(8), preparedProof }),
+    ).rejects.toThrow("must not include a witness");
   });
 
-  it("selects eight-input keys while preserving the transfer and exit contract methods", async () => {
+  it("uses the canonical eight-input circuit names and matching contract methods", async () => {
     for (const action of ["privateTransfer", "unshield"] as const) {
       const f = fixture();
       const data = {
@@ -403,12 +422,25 @@ describe("shielded pool local proof and self-submit flows", () => {
       };
       if (action === "privateTransfer") await submitPrivateTransfer({ ...f.common, data });
       else await submitUnshield({ ...f.common, data, recipient: RECIPIENT, amount: 75n });
-      expect(mocks.zkWorkerCall.mock.lastCall?.[1].circuit).toBe(`${action}8`);
+      expect(mocks.zkWorkerCall.mock.lastCall?.[1].circuit).toBe(action);
       expect(mocks.zkWorkerCall.mock.lastCall?.[1].expectedPublicSignals).toHaveLength(
         action === "privateTransfer" ? 30 : 32,
       );
       expect(f.methods[action]).toHaveBeenCalledOnce();
     }
+  });
+
+  it("rejects the removed small VALUE input shape before proving or submission", async () => {
+    for (const action of ["privateTransfer", "unshield"] as const) {
+      const f = fixture();
+      const pending =
+        action === "privateTransfer"
+          ? submitPrivateTransfer(f.common)
+          : submitUnshield({ ...f.common, recipient: RECIPIENT, amount: 75n });
+      await expect(pending).rejects.toThrow("inputShardIds must have 8 values");
+      expect(f.methods[action]).not.toHaveBeenCalled();
+    }
+    expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
   });
   it("sends the native deposit amount for both estimation and submission", async () => {
     const f = fixture();
@@ -481,17 +513,18 @@ describe("shielded pool local proof and self-submit flows", () => {
     ] as const;
     for (const [name, submit] of cases) {
       const f = fixture();
-      await submit(f.common);
+      const data = name === "privateTransfer" ? actionData(8) : f.common.data;
+      await submit({ ...f.common, data });
       expect(mocks.zkWorkerCall.mock.lastCall?.[1].circuit).toBe(name);
       expect(f.methods[name]).toHaveBeenCalledOnce();
-      expect(f.methods[name].mock.calls[0][0]).toEqual(f.common.data);
+      expect(f.methods[name].mock.calls[0][0]).toEqual(data);
     }
     const f = fixture();
-    await submitUnshield({ ...f.common, recipient: RECIPIENT, amount: 75n });
+    await submitUnshield({ ...f.common, data: actionData(8), recipient: RECIPIENT, amount: 75n });
     const signals = mocks.zkWorkerCall.mock.lastCall?.[1].expectedPublicSignals;
-    expect(signals).toHaveLength(12);
-    expect(signals[10]).toBe("75");
-    expect(signals[11]).toBe(BigInt(RECIPIENT).toString());
+    expect(signals).toHaveLength(32);
+    expect(signals[30]).toBe("75");
+    expect(signals[31]).toBe(BigInt(RECIPIENT).toString());
     expect(f.methods.unshield.mock.calls[0][0]).toBe(RECIPIENT);
     expect(f.methods.unshield.mock.calls[0][1]).toBe(75n);
   });

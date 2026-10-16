@@ -1,4 +1,4 @@
-const SHIELDED_ROUTES = ["shield", "fund", "claim", "privateTransfer", "unshield", "privateTransfer8", "unshield8"];
+const SHIELDED_ROUTES = ["shield", "fund", "claim", "privateTransfer", "unshield"];
 
 /** Configure only the generated verifier routes exercised by an isolated fixture. */
 export async function deployUnifiedVerifierAdapter(hre, verifiers = {}) {

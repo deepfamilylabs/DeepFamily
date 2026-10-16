@@ -25,14 +25,14 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
     : checkShieldedDevelopmentArtifacts({ root });
   if ((core.trustedSetupStatus === "production") !== production) {
     throw new Error(
-      "All ten circuits must use the same development or production artifact status",
+      "All eight circuits must use the same development or production artifact status",
     );
   }
-  return { status: production ? "production" : "development", circuitCount: 10, core, shielded };
+  return { status: production ? "production" : "development", circuitCount: 8, core, shielded };
 }
 
 /**
- * Whether all ten freshly compiled circuits have the R1CS and WASM digests their development
+ * Whether all eight freshly compiled circuits have the R1CS and WASM digests their development
  * manifests pin. The pinned keys then still fit, and only their files are missing here.
  */
 export function compiledCircuitsMatchManifests({ root = ROOT } = {}) {
@@ -116,7 +116,7 @@ export async function ensureZkArtifacts({
     );
   }
   log(
-    `[zk] Development artifacts missing or stale (${failure.message}); setting up all ten circuits`,
+    `[zk] Development artifacts missing or stale (${failure.message}); setting up all eight circuits`,
   );
   await setup({ root });
   const artifacts = await check({ root });

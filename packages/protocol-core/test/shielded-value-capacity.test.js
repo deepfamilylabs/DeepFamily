@@ -33,6 +33,7 @@ test("planner consumes the smallest sufficient single note and otherwise the few
   const plan = planShieldedValueSpend({ notes: notes([3, 4, 5, 1]), amount: 9n, maxInputs: 8 });
   assert.deepEqual(plan.steps[0].inputCommitments, ["3", "2"]);
   assert.equal(plan.steps.length, 1);
+  assert.equal(plan.steps[0].capacity, 8);
 });
 test("large candidate total does not force consumption beyond a sufficient subset", () => {
   const plan = planShieldedValueSpend({
@@ -52,6 +53,7 @@ test("planner previews all merges and single-input funding without importing uns
     maxInputs: 1,
   });
   assert.equal(plan.steps.at(-1).inputCommitments.length, 1);
+  assert(plan.steps.every((step) => step.capacity === 8));
   assert(
     plan.steps
       .filter((step) => step.kind === "merge")

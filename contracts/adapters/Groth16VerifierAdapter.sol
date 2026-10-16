@@ -40,16 +40,6 @@ interface IGroth16Verifier7 {
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface shared by the twelve-signal pool circuits. */
-interface IGroth16Verifier12 {
-  function verifyProof(
-    uint256[2] calldata a,
-    uint256[2][2] calldata b,
-    uint256[2] calldata c,
-    uint256[12] calldata publicSignals
-  ) external view returns (bool);
-}
-
 /** @dev Generated verifier interface shared by the funding and claim circuits. */
 interface IGroth16Verifier27 {
   function verifyProof(
@@ -80,7 +70,7 @@ interface IGroth16Verifier32 {
 
 /**
  * @title Groth16VerifierAdapter
- * @notice Shared Groth16 proof transport for identity, disclosure and seven shielded pool
+ * @notice Shared Groth16 proof transport for identity, disclosure and five shielded pool
  *         actions. Each route has an immutable verifier address.
  *
  *         Business contracts select a purpose and construct its public signals. This adapter
@@ -103,17 +93,15 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable claimVerifier;
   address public immutable privateTransferVerifier;
   address public immutable unshieldVerifier;
-  address public immutable privateTransfer8Verifier;
-  address public immutable unshield8Verifier;
 
   /**
-   * @param shieldedVerifiers Five small-capacity actions in enum order, then transfer8/unshield8. A zero
+   * @param shieldedVerifiers Five pool actions in enum order. A zero
    *                          address explicitly disables a route.
    */
   constructor(
     address _personVerifier,
     address _disclosureBindingVerifier,
-    address[7] memory shieldedVerifiers
+    address[5] memory shieldedVerifiers
   ) {
     _validateVerifier(_personVerifier);
     _validateVerifier(_disclosureBindingVerifier);
@@ -127,8 +115,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     claimVerifier = shieldedVerifiers[2];
     privateTransferVerifier = shieldedVerifiers[3];
     unshieldVerifier = shieldedVerifiers[4];
-    privateTransfer8Verifier = shieldedVerifiers[5];
-    unshield8Verifier = shieldedVerifiers[6];
   }
 
   /** @notice Returns a known route's verifier, or zero when the route was explicitly disabled. */
@@ -144,9 +130,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       return privateTransferVerifier;
     }
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD) return unshieldVerifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER_8)
-      return privateTransfer8Verifier;
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD_8) return unshield8Verifier;
     revert UnsupportedPurpose();
   }
 
@@ -158,7 +141,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
    *        `PROOF_ENCODING_ID_ABI_GROTH16_ABC`.
    *      - `MalformedProofData` — `proofData` is not exactly 256 bytes, or
    *        `publicSignals.length` does not match the purpose-specific constant.
-   *      - `UnsupportedPurpose` — `purpose` does not identify one of the nine on-chain routes.
+   *      - `UnsupportedPurpose` — `purpose` does not identify one of the seven on-chain routes.
    *      - `VerifierNotConfigured` — the selected route was explicitly disabled at deployment.
    *      - `false` — proof cryptographically rejected by the underlying Groth16 verifier.
    */
@@ -217,11 +200,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       for (uint256 i = 0; i < length; ++i) signals7[i] = publicSignals[i];
       return IGroth16Verifier7(verifier).verifyProof(a, b, c, signals7);
     }
-    if (length == 12) {
-      uint256[12] memory signals12;
-      for (uint256 i = 0; i < length; ++i) signals12[i] = publicSignals[i];
-      return IGroth16Verifier12(verifier).verifyProof(a, b, c, signals12);
-    }
     if (length == 30) {
       uint256[30] memory signals30;
       for (uint256 i = 0; i < length; ++i) signals30[i] = publicSignals[i];
@@ -258,12 +236,6 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     }
     if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD) {
       return ProofConstants.SHIELDED_UNSHIELD_PUBLIC_SIGNALS_LEN;
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER_8) {
-      return ProofConstants.SHIELDED_PRIVATE_TRANSFER_8_PUBLIC_SIGNALS_LEN;
-    }
-    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD_8) {
-      return ProofConstants.SHIELDED_UNSHIELD_8_PUBLIC_SIGNALS_LEN;
     }
     revert UnsupportedPurpose();
   }

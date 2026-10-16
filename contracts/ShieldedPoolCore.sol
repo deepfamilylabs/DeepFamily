@@ -44,10 +44,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   /**
-   * @notice All actions use two output slots. VALUE actions route by two or eight input slots.
-   *         The other actions use two input slots. Initial Fund and
-   *         single-input Claim/PrivateTransfer repeat the first shard and root;
-   *         Unshield has one proved input and repeats its shard and root.
+   * @notice All actions use two output slots. PrivateTransfer and Unshield always use
+   *         eight input slots, including proved placeholders for unused slots.
+   *         Shield, Fund and Claim use two input slots. Initial Fund repeats the
+   *         first shard and root; Claim proves both input roots.
    */
   struct ActionData {
     uint256[] inputShardIds;
@@ -249,12 +249,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
-    uint256 capacity = data.inputNullifiers.length;
+    uint256 capacity = action == Action.PrivateTransfer || action == Action.Unshield ? 8 : 2;
     if (
+      data.inputNullifiers.length != capacity ||
       data.inputShardIds.length != capacity ||
-      data.inputRoots.length != capacity ||
-      (capacity != 2 && capacity != 8) ||
-      (capacity == 8 && action != Action.PrivateTransfer && action != Action.Unshield)
+      data.inputRoots.length != capacity
     ) revert InvalidActionData();
     if (action == Action.Fund) {
       if (data.fundMode > 1 || data.budgetKind > 1) revert InvalidActionData();
@@ -290,7 +289,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       revert NullifierAlreadySpent();
     }
     if (
-      (_inputCount(action, capacity) == 1 || isInitialFund) &&
+      isInitialFund &&
       (data.inputShardIds[1] != data.inputShardIds[0] || data.inputRoots[1] != data.inputRoots[0])
     ) revert InvalidActionData();
 
@@ -330,13 +329,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     }
     if (
       !VERIFIER.verifyProof(
-        capacity == 8
-          ? (
-            action == Action.PrivateTransfer
-              ? ProofConstants.PROOF_PURPOSE_SHIELDED_PRIVATE_TRANSFER_8
-              : ProofConstants.PROOF_PURPOSE_SHIELDED_UNSHIELD_8
-          )
-          : ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
+        ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
         ProofConstants.PROOF_ENCODING_ID_ABI_GROTH16_ABC,
         proof,
         signals
@@ -355,7 +348,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 amount,
     address recipient
   ) private view returns (uint256[] memory signals) {
-    uint256 inputs = _inputCount(action, data.inputNullifiers.length);
+    uint256 inputs = _inputCount(action);
     bool isClaim = action == Action.Claim;
     bool hasLineage = isClaim || action == Action.Fund;
     bool hasAmount = action == Action.Shield || action == Action.Unshield;
@@ -442,13 +435,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     ) revert InvalidFieldElement();
   }
 
-  /** @dev Fund/Claim prove two root slots; only Unshield has one public input root. */
-  function _inputCount(Action action, uint256 capacity) private pure returns (uint256) {
+  /** @dev VALUE actions prove eight root slots; Fund and Claim prove two. */
+  function _inputCount(Action action) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
-    if (capacity == 8) return 8;
-    if (action == Action.Unshield) {
-      return 1;
-    }
+    if (action == Action.PrivateTransfer || action == Action.Unshield) return 8;
     return 2;
   }
 
@@ -472,11 +462,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
 
   function _appendOutputs(Action action, ActionData calldata data) internal {
     emit ActionExecuted(uint8(action), data.inputShardIds[0], data.inputShardIds[1]);
-    for (uint256 i = 0; i < 2; ++i) {
-      uint256 commitment = data.outputCommitments[i];
-      commitmentExists[commitment] = true;
-      _append(commitment, data.outputCiphertexts[i]);
-    }
+    commitmentExists[data.outputCommitments[0]] = true;
+    _append(data.outputCommitments[0], data.outputCiphertexts[0]);
+    commitmentExists[data.outputCommitments[1]] = true;
+    _append(data.outputCommitments[1], data.outputCiphertexts[1]);
     // Both outputs land in one shard: shards start empty, every action appends two leaves and
     // MAX_SHARD_LEAVES is even. Accepting only this completed root keeps a new shard's one-leaf
     // root, which equals its first commitment, from revealing the note a proof spends.

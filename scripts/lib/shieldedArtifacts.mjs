@@ -46,7 +46,7 @@ export function currentShieldedCandidateManifest({ root = DEFAULT_ROOT } = {}) {
 }
 
 /**
- * Accepts the eight pinned public artifact sets and the named contract verifiers of the seven
+ * Accepts the six pinned public artifact sets and the named contract verifiers of the five
  * pool verifier routes. The receive-code circuit is verified in the browser and has no contract.
  */
 export function loadCandidateArtifacts({
@@ -76,7 +76,7 @@ export function loadCandidateArtifacts({
       .sort()
       .join(",") !== expectedActions.join(",")
   ) {
-    throw new Error("Candidate manifest must contain exactly the eight shielded circuits");
+    throw new Error("Candidate manifest must contain exactly the six shielded circuits");
   }
   const circuits = {};
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {

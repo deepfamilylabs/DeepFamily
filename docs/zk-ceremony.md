@@ -8,7 +8,7 @@ with one command:
 npm run zk:production:setup
 ```
 
-That command creates production artifacts for all 10 circuits, writes auditable transcripts and
+That command creates production artifacts for all 8 circuits, writes auditable transcripts and
 manifests, and verifies the complete result before returning. It does **not** commit files, deploy a
 contract, submit a transaction, or authorize a Mainnet release.
 
@@ -42,7 +42,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All 10 circuits reuse the same published BN254 Phase 1 file:
+All 8 circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -91,7 +91,7 @@ ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-`npm run zk:development:setup` prepares all 10 circuits using the same committed Phase 1 file. Its Phase 2 contribution
+`npm run zk:development:setup` prepares all 8 circuits using the same committed Phase 1 file. Its Phase 2 contribution
 passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
 secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
 records no ceremony evidence, so it does not establish a production trust model. The resulting
@@ -334,7 +334,7 @@ The identity/disclosure schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all eight shielded circuits to their source and artifact hashes, the pinned
+`@1` schemas bind all six shielded circuits to their source and artifact hashes, the pinned
 toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
 manifests and two transcripts are generated and installed together.
 

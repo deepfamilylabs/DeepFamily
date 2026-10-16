@@ -78,36 +78,54 @@ const mutate = (original, change) => {
   change(copy);
   return copy;
 };
-test("eight-input VALUE constraints and capacity-stable nullifiers", async (t) => {
+test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
   const calculators = {};
-  for (const circuit of ["shielded_private_transfer_8", "shielded_unshield_8"]) {
+  for (const circuit of ["shielded_private_transfer", "shielded_unshield"]) {
     const wasm = path.join(root, "zk-artifacts/shielded", `${circuit}_js`, `${circuit}.wasm`);
     assert(fs.existsSync(wasm), `Build ${circuit} before running circuit tests`);
     calculators[circuit] = await WitnessCalculatorBuilder(fs.readFileSync(wasm));
   }
-  const transfer = calculators.shielded_private_transfer_8;
-  const unshield = calculators.shielded_unshield_8;
-  await t.test("all eight inputs support complete 32-sibling paths and enforce their bounds", async () => {
-    for (const isExit of [false, true]) {
-      const witness = fixture(8, isExit);
-      for (let slot = 0; slot < 8; slot++) {
-        const index = BigInt(slot * 71);
-        const siblings = Array.from({length:32},(_,level)=>BigInt(10000+slot*32+level));
-        let root = BigInt(witness.inputRoots[slot]);
-        siblings.forEach((sibling,level)=> {
-          root = ((index>>BigInt(level))&1n)===1n ? poseidon2([sibling,root]) : poseidon2([root,sibling]);
-        });
-        witness.inputDepths[slot] = "32";
-        witness.inputIndices[slot] = String(index);
-        witness.inputSiblings[slot] = siblings.map(String);
-        witness.inputRoots[slot] = String(root);
+  const transfer = calculators.shielded_private_transfer;
+  const unshield = calculators.shielded_unshield;
+  await t.test(
+    "all eight inputs support complete 32-sibling paths and enforce their bounds",
+    async () => {
+      for (const isExit of [false, true]) {
+        const witness = fixture(8, isExit);
+        for (let slot = 0; slot < 8; slot++) {
+          const index = BigInt(slot * 71);
+          const siblings = Array.from({ length: 32 }, (_, level) =>
+            BigInt(10000 + slot * 32 + level),
+          );
+          let root = BigInt(witness.inputRoots[slot]);
+          siblings.forEach((sibling, level) => {
+            root =
+              ((index >> BigInt(level)) & 1n) === 1n
+                ? poseidon2([sibling, root])
+                : poseidon2([root, sibling]);
+          });
+          witness.inputDepths[slot] = "32";
+          witness.inputIndices[slot] = String(index);
+          witness.inputSiblings[slot] = siblings.map(String);
+          witness.inputRoots[slot] = String(root);
+        }
+        const calculator = isExit ? unshield : transfer;
+        await calculator.calculateWitness(witness, true);
+        await assert.rejects(
+          calculator.calculateWitness(
+            mutate(witness, (copy) => (copy.inputDepths[7] = "33")),
+            true,
+          ),
+        );
+        await assert.rejects(
+          calculator.calculateWitness(
+            mutate(witness, (copy) => (copy.inputIndices[7] = String(1n << 32n))),
+            true,
+          ),
+        );
       }
-      const calculator = isExit ? unshield : transfer;
-      await calculator.calculateWitness(witness,true);
-      await assert.rejects(calculator.calculateWitness(mutate(witness,(copy)=>copy.inputDepths[7]="33"),true));
-      await assert.rejects(calculator.calculateWitness(mutate(witness,(copy)=>copy.inputIndices[7]=String(1n<<32n)),true));
-    }
-  });
+    },
+  );
   for (let count = 1; count <= 8; count++)
     await t.test(`${count} contiguous inputs pass transfer and withdrawal`, async () => {
       await transfer.calculateWitness(fixture(count), true);

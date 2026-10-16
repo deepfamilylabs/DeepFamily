@@ -53,6 +53,21 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ...overrides,
   });
 
+  const valueActionData = (overrides = {}) => {
+    const data = actionData(overrides);
+    const pad = (values, filler) =>
+      Array.from({ length: 8 }, (_, slot) => values[slot] ?? filler(slot));
+    return {
+      ...data,
+      inputShardIds: pad(data.inputShardIds, () => data.inputShardIds[0]),
+      inputRoots: pad(data.inputRoots, () => data.inputRoots[0]),
+      inputNullifiers: pad(
+        data.inputNullifiers,
+        (slot) => data.inputNullifiers[0] * 100n + BigInt(slot),
+      ),
+    };
+  };
+
   async function proofFor(pool, action, data, amount = 0n, recipient) {
     const network = await hre.ethers.provider.getNetwork();
     const signals = buildShieldedPoolPublicSignals({
@@ -68,35 +83,82 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     // It proves wiring, not soundness of any shielded note transition.
     return hre.ethers.AbiCoder.defaultAbiCoder().encode(
       ["uint8", "uint256[]"],
-      [data.inputNullifiers.length === 8 ? action === 3 ? 7 : 8 : ACTION_PURPOSE_BASE + action, signals],
+      [ACTION_PURPOSE_BASE + action, signals],
     );
   }
 
   it("routes eight-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
     const { pool, recipient } = await setup();
     const deposit = actionData();
-    await pool.shield(100n, deposit, await proofFor(pool,0,deposit,100n));
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
     const root = (await pool.noteShard(0)).root;
-    const transfer = actionData({inputShardIds:Array(8).fill(0n),inputRoots:Array(8).fill(root),
-      inputNullifiers:Array.from({length:8},(_,i)=>BigInt(501+i)),outputCommitments:[5031n,5032n]});
-    const proof = await proofFor(pool,3,transfer);
-    const wrongPurpose = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint8","uint256[]"],
-      [5,buildShieldedPoolPublicSignals({action:3,chainId:(await hre.ethers.provider.getNetwork()).chainId,poolAddress:await pool.getAddress(),...transfer})]);
-    await expect(pool.privateTransfer(transfer,wrongPurpose)).to.be.revertedWithCustomError(pool,"InvalidZKProof");
-    const duplicate = {...transfer,inputNullifiers:[...transfer.inputNullifiers]};
-    duplicate.inputNullifiers[7]=duplicate.inputNullifiers[6];
-    await expect(pool.privateTransfer(duplicate,proof)).to.be.revertedWithCustomError(pool,"NullifierAlreadySpent");
-    await expect(pool.fund(transfer,proof)).to.be.revertedWithCustomError(pool,"InvalidActionData");
-    await pool.privateTransfer(transfer,proof);
+    const transfer = valueActionData({
+      inputShardIds: Array(8).fill(0n),
+      inputRoots: Array(8).fill(root),
+      inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(501 + i)),
+      outputCommitments: [5031n, 5032n],
+    });
+    const proof = await proofFor(pool, 3, transfer);
+    const wrongPurpose = hre.ethers.AbiCoder.defaultAbiCoder().encode(
+      ["uint8", "uint256[]"],
+      [
+        7,
+        buildShieldedPoolPublicSignals({
+          action: 3,
+          chainId: (await hre.ethers.provider.getNetwork()).chainId,
+          poolAddress: await pool.getAddress(),
+          ...transfer,
+        }),
+      ],
+    );
+    await expect(pool.privateTransfer(transfer, wrongPurpose)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidZKProof",
+    );
+    const shortInputs = {
+      ...transfer,
+      inputShardIds: transfer.inputShardIds.slice(0, 2),
+      inputRoots: transfer.inputRoots.slice(0, 2),
+      inputNullifiers: transfer.inputNullifiers.slice(0, 2),
+    };
+    await expect(pool.privateTransfer(shortInputs, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
+    await expect(
+      pool.unshield(recipient.address, 1n, shortInputs, proof),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    const duplicate = { ...transfer, inputNullifiers: [...transfer.inputNullifiers] };
+    duplicate.inputNullifiers[7] = duplicate.inputNullifiers[6];
+    await expect(pool.privateTransfer(duplicate, proof)).to.be.revertedWithCustomError(
+      pool,
+      "NullifierAlreadySpent",
+    );
+    await expect(pool.fund(transfer, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidActionData",
+    );
+    await pool.privateTransfer(transfer, proof);
     expect(await pool.nullifierCount()).to.equal(8n);
-    for(const nullifier of transfer.inputNullifiers) expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+    for (const nullifier of transfer.inputNullifiers)
+      expect(await pool.nullifierSpent(nullifier)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(100n);
-    const nextRoot=(await pool.noteShard(0)).root;
-    const withdrawal=actionData({inputShardIds:Array(8).fill(0n),inputRoots:Array(8).fill(nextRoot),
-      inputNullifiers:Array.from({length:8},(_,i)=>BigInt(601+i)),outputCommitments:[6031n,6032n]});
-    await pool.unshield(recipient.address,30n,withdrawal,await proofFor(pool,4,withdrawal,30n,recipient.address));
+    const nextRoot = (await pool.noteShard(0)).root;
+    const withdrawal = valueActionData({
+      inputShardIds: Array(8).fill(0n),
+      inputRoots: Array(8).fill(nextRoot),
+      inputNullifiers: Array.from({ length: 8 }, (_, i) => BigInt(601 + i)),
+      outputCommitments: [6031n, 6032n],
+    });
+    await pool.unshield(
+      recipient.address,
+      30n,
+      withdrawal,
+      await proofFor(pool, 4, withdrawal, 30n, recipient.address),
+    );
     expect(await pool.nullifierCount()).to.equal(16n);
-    for(const nullifier of withdrawal.inputNullifiers) expect(await pool.nullifierSpent(nullifier)).to.equal(true);
+    for (const nullifier of withdrawal.inputNullifiers)
+      expect(await pool.nullifierSpent(nullifier)).to.equal(true);
     expect(await pool.totalShielded()).to.equal(70n);
   });
 
@@ -114,7 +176,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
 
     const firstAppend = (await pool.queryFilter(pool.filters.NoteAppended()))[0];
     expect(firstAppend.args.root).to.equal(101n);
-    const exposedRootSpend = actionData({
+    const exposedRootSpend = valueActionData({
       inputRoots: [firstAppend.args.root, firstAppend.args.root],
       inputNullifiers: [191n, 192n],
       outputCommitments: [191n, 192n],
@@ -124,7 +186,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ).to.be.revertedWithCustomError(pool, "UnknownNoteRoot");
 
     const firstRoot = (await pool.noteShard(0)).root;
-    const transfer = actionData({
+    const transfer = valueActionData({
       inputRoots: [firstRoot, firstRoot],
       inputNullifiers: [201n, 202n],
       outputCommitments: [103n, 104n],
@@ -154,7 +216,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     }
 
     const withdrawRoot = (await pool.noteShard(0)).root;
-    const withdrawal = actionData({
+    const withdrawal = valueActionData({
       inputRoots: [withdrawRoot, withdrawRoot],
       inputNullifiers: [301n, 302n],
       outputCommitments: [105n, 106n],
@@ -394,7 +456,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(pool.interface.hasFunction("totalPublicBudget")).to.equal(false);
   });
 
-  it("requires single-input actions to repeat their input slot", async () => {
+  it("binds every VALUE input root while allowing different known roots", async () => {
     const { pool, recipient } = await setup();
     const first = actionData();
     await pool.shield(100n, first, await proofFor(pool, 0, first, 100n));
@@ -406,18 +468,26 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const events = await pool.queryFilter(pool.filters.NoteAppended());
     const olderRoot = events[1].args.root;
     const latestRoot = (await pool.noteShard(0)).root;
-    const withdrawal = actionData({
+    const withdrawal = valueActionData({
       inputRoots: [latestRoot, latestRoot],
       inputNullifiers: [801n, 802n],
       outputCommitments: [121n, 122n],
       outputCiphertexts: [ciphertext("11"), ciphertext("12")],
     });
     const proof = await proofFor(pool, 4, withdrawal, 30n, recipient.address);
-    const mixedRoots = { ...withdrawal, inputRoots: [latestRoot, olderRoot] };
+    const mixedRoots = {
+      ...withdrawal,
+      inputRoots: [latestRoot, olderRoot, ...withdrawal.inputRoots.slice(2)],
+    };
     await expect(
       pool.unshield(recipient.address, 30n, mixedRoots, proof),
-    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
-    await pool.unshield(recipient.address, 30n, withdrawal, proof);
+    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    await pool.unshield(
+      recipient.address,
+      30n,
+      mixedRoots,
+      await proofFor(pool, 4, mixedRoots, 30n, recipient.address),
+    );
     expect(await pool.nullifierSpent(802n)).to.equal(true);
   });
 
@@ -465,7 +535,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(appended.map(({ args }) => args.shardId)).to.deep.equal([1n, 1n]);
     expect(await pool.isKnownNoteRoot(1, appended[0].args.root)).to.equal(false);
     const secondShardRoot = (await pool.noteShard(1)).root;
-    const transfer = actionData({
+    const transfer = valueActionData({
       inputShardIds: [0n, 1n],
       inputRoots: [1n, secondShardRoot],
       inputNullifiers: [201n, 202n],

@@ -21,16 +21,20 @@ const MAX_FIELD = SNARK_SCALAR_FIELD - 1n;
 const field = (value, label) => bigintFrom(value, label, MAX_FIELD);
 
 const CONTEXT = ["chainId", "pool"];
-const ONE_INPUT = ["inputShardId", "inputRoot", "inputNullifiers"];
-const TWO_INPUTS = ["inputShardIds", "inputRoots", "inputNullifiers"];
+const INPUT_ARRAYS = ["inputShardIds", "inputRoots", "inputNullifiers"];
 const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
 const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
+function inputSlotCount(action) {
+  return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield
+    ? 8
+    : 2;
+}
+
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
- * ShieldedPoolCore._publicSignals builds the same sequence. Single-input actions
- * repeat their first input shard and root in ActionData's second slot; only the
- * first pair is a public input.
+ * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
+ * withdrawals always use eight input slots; Fund and Claim use two.
  */
 export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),
@@ -39,21 +43,21 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
     "fundMode",
     "budgetKind",
     "publicBudget",
-    ...TWO_INPUTS,
+    ...INPUT_ARRAYS,
     ...OUTPUTS,
     ...LINEAGE,
   ]),
   [SHIELDED_POOL_ACTION.Claim]: Object.freeze([
     ...CONTEXT,
-    ...TWO_INPUTS,
+    ...INPUT_ARRAYS,
     "periodNullifiers",
     ...OUTPUTS,
     ...LINEAGE,
   ]),
-  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([...CONTEXT, ...TWO_INPUTS, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([...CONTEXT, ...INPUT_ARRAYS, ...OUTPUTS]),
   [SHIELDED_POOL_ACTION.Unshield]: Object.freeze([
     ...CONTEXT,
-    ...ONE_INPUT,
+    ...INPUT_ARRAYS,
     ...OUTPUTS,
     "amount",
     "recipient",
@@ -66,8 +70,6 @@ const INPUT_WIDTHS = Object.freeze({
   fundMode: 1,
   budgetKind: 1,
   publicBudget: 10,
-  inputShardId: 1,
-  inputRoot: 1,
   inputShardIds: 2,
   inputRoots: 2,
   inputNullifiers: 2,
@@ -86,16 +88,16 @@ export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
   Object.fromEntries(
     Object.entries(SHIELDED_POOL_PUBLIC_INPUTS).map(([action, names]) => [
       action,
-      names.reduce((total, name) => total + INPUT_WIDTHS[name], 0),
+      names.reduce(
+        (total, name) =>
+          total + (INPUT_ARRAYS.includes(name) ? inputSlotCount(Number(action)) : INPUT_WIDTHS[name]),
+        0,
+      ),
     ]),
   ),
 );
 
 export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT = 9;
-export const SHIELDED_POOL_CAPACITY_PUBLIC_SIGNAL_COUNTS = Object.freeze({
-  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze({ 2: 12, 8: 30 }),
-  [SHIELDED_POOL_ACTION.Unshield]: Object.freeze({ 1: 12, 8: 32 }),
-});
 
 function values(list, length, label) {
   protocolAssert(
@@ -118,28 +120,8 @@ function unused(condition, label) {
  */
 export function buildShieldedPoolPublicInputs(input) {
   const action = Number(bigintFrom(input.action, "action", 4n));
-  const valueAction =
-    action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield;
-  const capacity =
-    input.capacity === undefined
-      ? valueAction && input.inputShardIds?.length === 8
-        ? 8
-        : action === SHIELDED_POOL_ACTION.Unshield
-          ? 1
-          : 2
-      : Number(bigintFrom(input.capacity, "capacity", 8n));
-  protocolAssert(
-    valueAction
-      ? (action === SHIELDED_POOL_ACTION.Unshield ? [1, 8] : [2, 8]).includes(capacity)
-      : capacity === 2,
-    "INVALID_SHIELDED_CAPACITY",
-    "Unsupported capacity for this action",
-  );
-  const width = capacity === 8 ? 8 : 2;
-  const names =
-    action === SHIELDED_POOL_ACTION.Unshield && capacity === 8
-      ? [...CONTEXT, ...TWO_INPUTS, ...OUTPUTS, "amount", "recipient"]
-      : SHIELDED_POOL_PUBLIC_INPUTS[action];
+  const width = inputSlotCount(action);
+  const names = SHIELDED_POOL_PUBLIC_INPUTS[action];
   const inputShardIds = values(input.inputShardIds, width, "inputShardIds");
   const inputRoots = values(input.inputRoots, width, "inputRoots");
   const inputNullifiers = values(input.inputNullifiers, width, "inputNullifiers");
@@ -177,8 +159,6 @@ export function buildShieldedPoolPublicInputs(input) {
     fundMode: [bigintFrom(input.fundMode ?? 0n, "fundMode", 1n)],
     budgetKind: [budgetKind],
     publicBudget,
-    inputShardId: [inputShardIds[0]],
-    inputRoot: [inputRoots[0]],
     inputShardIds,
     inputRoots,
     inputNullifiers,
@@ -207,12 +187,7 @@ export function buildShieldedPoolPublicInputs(input) {
       "Continuation fund lineage/time",
     );
   }
-  if (uses.has("inputShardId")) {
-    unused(
-      inputShardIds[1] === inputShardIds[0] && inputRoots[1] === inputRoots[0],
-      "A second input root",
-    );
-  } else if (!uses.has("inputShardIds")) {
+  if (!uses.has("inputShardIds")) {
     unused(
       [...inputShardIds, ...inputRoots, ...inputNullifiers].every((value) => value === 0n),
       "Note input",

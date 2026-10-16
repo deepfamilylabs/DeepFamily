@@ -982,8 +982,6 @@ export type ShieldedPoolPublicInputName =
   | "fundMode"
   | "budgetKind"
   | "publicBudget"
-  | "inputShardId"
-  | "inputRoot"
   | "inputShardIds"
   | "inputRoots"
   | "inputNullifiers"
@@ -1004,7 +1002,6 @@ export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 9;
 export interface ShieldedPoolPublicSignalInput {
   fundMode?: BigNumberish;
   budgetKind?: BigNumberish;
-  capacity?: 1 | 2 | 8;
   /** Optional cross-check; otherwise the nine fields are read from the public output envelope. */
   publicBudget?: readonly BigNumberish[];
   action: BigNumberish;
@@ -1083,10 +1080,6 @@ export function computeShieldedBudgetOwnerAuthorization(
   scope: ShieldedScope,
 ): bigint;
 
-export const SHIELDED_POOL_CAPACITY_PUBLIC_SIGNAL_COUNTS: Readonly<
-  Record<number, Readonly<Record<number, number>>>
->;
-
 export function computeShieldedDummyInputNullifierForSlot(
   ownerSecret: BigNumberish,
   firstCommitment: BigNumberish,
@@ -1102,7 +1095,7 @@ export interface ShieldedValueSpendCandidate {
 }
 export interface ShieldedValueSpendStep {
   kind: "merge" | "spend";
-  capacity: 2 | 8;
+  capacity: 8;
   inputCommitments: string[];
   inputAmount: bigint;
   outputAmounts: [bigint, bigint];
@@ -1110,7 +1103,7 @@ export interface ShieldedValueSpendStep {
 }
 export interface ShieldedValueSpendPlan {
   amount: bigint;
-  maxInputs: 1 | 2 | 8;
+  maxInputs: 1 | 8;
   steps: ShieldedValueSpendStep[];
   selectedCommitments: string[];
 }
@@ -1118,7 +1111,7 @@ export function planShieldedValueSpend(input: {
   notes: readonly ShieldedValueSpendCandidate[];
   candidateCommitments?: readonly BigNumberish[];
   amount: BigNumberish;
-  maxInputs?: 1 | 2 | 8;
+  maxInputs?: 1 | 8;
 }): ShieldedValueSpendPlan;
 
 export const SHIELDED_ASSET_KEY_VERSION: 1;

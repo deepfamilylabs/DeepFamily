@@ -334,14 +334,13 @@ export async function runShieldedAcceptanceSmoke({
     external = {},
     label = `shielded-action-${action}`,
   ) => {
-    const method = action === "privateTransfer8" ? "privateTransfer" : action === "unshield8" ? "unshield" : action;
     const args =
-      method === "shield"
+      action === "shield"
         ? [external.amount, data, generated.encoded]
-        : method === "unshield"
+        : action === "unshield"
           ? [external.recipient, external.amount, data, generated.encoded]
           : [data, generated.encoded];
-    const receipt = await record(label, await pool[method](...args));
+    const receipt = await record(label, await pool[action](...args));
     if (action === "shield") firstShieldBlock = receipt.blockNumber;
     const events = receipt.logs
       .filter((log) => getAddress(log.address) === getAddress(poolAddress))
@@ -960,32 +959,45 @@ export async function runShieldedAcceptanceSmoke({
       "Verifier-only identity claim changed pool state",
     );
 
+    const valuePrivateInputs = (source, membership) => ({
+      inputEnabled: ["1", ...Array(7).fill("0")],
+      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(7).fill("0")],
+      inputAmounts: [String(source.amount), ...Array(7).fill("0")],
+      inputNonces: [String(source.nonce), ...Array(7).fill("0")],
+      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(7).fill("0")],
+      inputDepths: [membership.depth, ...Array(7).fill("0")],
+      inputIndices: [membership.index, ...Array(7).fill("0")],
+      inputSiblings: [membership.siblings, ...Array.from({ length: 7 }, () => Array(32).fill("0"))],
+    });
+    const valueData = (source, membership, outputNotes) => ({
+      ...zeroData(),
+      inputShardIds: Array(8).fill(membership.shardId),
+      inputRoots: Array(8).fill(membership.root),
+      inputNullifiers: Array.from({ length: 8 }, (_, index) =>
+        index === 0
+          ? spend(source)
+          : computeShieldedDummyInputNullifierForSlot(
+              source.keys.ownerSecret,
+              source.commitment,
+              index,
+              scope,
+            ),
+      ),
+      ...outputs(outputNotes),
+    });
+
     const transferOutputs = await Promise.all([
       valueNote(heirKeys, 400n),
       valueNote(donorKeys, 100n),
     ]);
     const transferPath = await notePath(publicFundChange);
-    const transferData = {
-      ...zeroData(),
-      ...inputs(
-        [transferPath, transferPath],
-        [spend(publicFundChange), dummySpend(publicFundChange)],
-      ),
-      ...outputs(transferOutputs),
-    };
+    const transferData = valueData(publicFundChange, transferPath, transferOutputs);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",
       {
         ...transferInputs.witness,
-        hasSecondInput: "0",
-        inputOwnerSecrets: [String(donorKeys.ownerSecret), "0"],
-        inputAmounts: ["500", "0"],
-        inputNonces: [String(publicFundChange.nonce), "0"],
-        inputCiphertextHashes: [String(publicFundChange.ciphertextHashField), "0"],
-        inputDepths: [transferPath.depth, "0"],
-        inputIndices: [transferPath.index, "0"],
-        inputSiblings: [transferPath.siblings, Array(32).fill("0")],
+        ...valuePrivateInputs(publicFundChange, transferPath),
         outputOwnerCommitments: decimals(transferOutputs.map((note) => note.ownerCommitment)),
         outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
         outputNonces: decimals(transferOutputs.map((note) => note.nonce)),
@@ -1000,11 +1012,7 @@ export async function runShieldedAcceptanceSmoke({
       valueNote(childKeys, 0n),
     ]);
     const unshieldPath = await notePath(unshieldSource);
-    const unshieldData = {
-      ...zeroData(),
-      ...inputs([unshieldPath, unshieldPath], [spend(unshieldSource), dummySpend(unshieldSource)]),
-      ...outputs(unshieldOutputs),
-    };
+    const unshieldData = valueData(unshieldSource, unshieldPath, unshieldOutputs);
     const unshieldInputs = publicInputsFor("unshield", unshieldData, {
       amount: unshieldedAmount,
       recipient: signerAddress,
@@ -1013,13 +1021,7 @@ export async function runShieldedAcceptanceSmoke({
       "unshield",
       {
         ...unshieldInputs.witness,
-        ownerSecret: String(childKeys.ownerSecret),
-        inputAmount: "400",
-        inputNonce: String(unshieldSource.nonce),
-        inputCiphertextHash: String(unshieldSource.ciphertextHashField),
-        noteDepth: unshieldPath.depth,
-        noteIndex: unshieldPath.index,
-        noteSiblings: unshieldPath.siblings,
+        ...valuePrivateInputs(unshieldSource, unshieldPath),
         changeAmount: "300",
         changeNonce: String(unshieldOutputs[0].nonce),
         dummyNonce: String(unshieldOutputs[1].nonce),
@@ -1031,55 +1033,12 @@ export async function runShieldedAcceptanceSmoke({
       recipient: signerAddress,
     });
 
-    // Exercise both large-capacity routes as actual pool transactions. The public array
-    // shape fixes the verifier route even when this fixture enables only one real note.
-    const largePrivateInputs = (source, path) => ({
-      inputEnabled: ["1", ...Array(7).fill("0")],
-      inputOwnerSecrets: [String(source.keys.ownerSecret), ...Array(7).fill("0")],
-      inputAmounts: [String(source.amount), ...Array(7).fill("0")],
-      inputNonces: [String(source.nonce), ...Array(7).fill("0")],
-      inputCiphertextHashes: [String(source.ciphertextHashField), ...Array(7).fill("0")],
-      inputDepths: [path.depth, ...Array(7).fill("0")],
-      inputIndices: [path.index, ...Array(7).fill("0")],
-      inputSiblings: [path.siblings, ...Array.from({length:7},()=>Array(32).fill("0"))],
-    });
-    const largeData = (source,path,outputNotes) => ({
-      ...zeroData(),
-      inputShardIds:Array(8).fill(path.shardId),
-      inputRoots:Array(8).fill(path.root),
-      inputNullifiers:Array.from({length:8},(_,index)=>index===0 ? spend(source) :
-        computeShieldedDummyInputNullifierForSlot(source.keys.ownerSecret,source.commitment,index,scope)),
-      ...outputs(outputNotes),
-    });
-    const largeTransferSource = unshieldOutputs[0];
-    const largeTransferPath = await notePath(largeTransferSource);
-    const largeTransferOutputs = await Promise.all([valueNote(childKeys,300n),valueNote(childKeys,0n)]);
-    const largeTransferData = largeData(largeTransferSource,largeTransferPath,largeTransferOutputs);
-    const largeTransferPublic = publicInputsFor("privateTransfer8",largeTransferData);
-    const largeTransferProof = await prove("privateTransfer8",{
-      ...largeTransferPublic.witness,...largePrivateInputs(largeTransferSource,largeTransferPath),
-      outputOwnerCommitments:decimals(largeTransferOutputs.map((note)=>note.ownerCommitment)),
-      outputAmounts:decimals(largeTransferOutputs.map((note)=>note.amount)),
-      outputNonces:decimals(largeTransferOutputs.map((note)=>note.nonce)),
-    },largeTransferPublic.signals);
-    await submit("privateTransfer8",largeTransferData,largeTransferProof,largeTransferOutputs);
-    const largeExitSource = largeTransferOutputs[0];
-    const largeExitPath = await notePath(largeExitSource);
-    const largeExitOutputs = await Promise.all([valueNote(childKeys,200n),valueNote(childKeys,0n)]);
-    const largeExitData = largeData(largeExitSource,largeExitPath,largeExitOutputs);
-    const largeExitPublic = publicInputsFor("unshield8",largeExitData,{amount:unshieldedAmount,recipient:signerAddress});
-    const largeExitProof = await prove("unshield8",{
-      ...largeExitPublic.witness,...largePrivateInputs(largeExitSource,largeExitPath),
-      changeAmount:"200",changeNonce:String(largeExitOutputs[0].nonce),dummyNonce:String(largeExitOutputs[1].nonce),
-    },largeExitPublic.signals);
-    await submit("unshield8",largeExitData,largeExitProof,largeExitOutputs,{amount:unshieldedAmount,recipient:signerAddress});
-
     const totalShieldedAfter = await pool.totalShielded();
     const poolTokenAfter = await token.balanceOf(poolAddress);
     const signerTokenAfter = await token.balanceOf(signerAddress);
-    assert.equal(totalShieldedAfter - totalShieldedBefore, shieldedAmount - 2n * unshieldedAmount);
-    assert.equal(poolTokenAfter - poolTokenBefore, shieldedAmount - 2n * unshieldedAmount);
-    assert.equal(signerTokenBefore - signerTokenAfter, shieldedAmount - 2n * unshieldedAmount);
+    assert.equal(totalShieldedAfter - totalShieldedBefore, shieldedAmount - unshieldedAmount);
+    assert.equal(poolTokenAfter - poolTokenBefore, shieldedAmount - unshieldedAmount);
+    assert.equal(signerTokenBefore - signerTokenAfter, shieldedAmount - unshieldedAmount);
     assert.ok(
       poolTokenAfter >= totalShieldedAfter,
       "Pool custody does not cover shielded liabilities",
@@ -1156,7 +1115,7 @@ export async function runShieldedAcceptanceSmoke({
           claimProof: identityClaimProof.evidence,
         },
         shieldedAmount: String(shieldedAmount),
-        unshieldedAmount: String(2n * unshieldedAmount),
+        unshieldedAmount: String(unshieldedAmount),
         totalShieldedBefore: String(totalShieldedBefore),
         totalShieldedAfter: String(totalShieldedAfter),
         poolTokenBefore: String(poolTokenBefore),

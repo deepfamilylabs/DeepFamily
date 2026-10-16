@@ -80,6 +80,26 @@ describe("unified shielded runtime benchmarks", function () {
 });
 
 describe("shielded release source digest", function () {
+  it("hashes removed optional sources while rejecting a missing active circuit source", function () {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-source-removal-"));
+    try {
+      execFileSync("git", ["init", "-q", root]);
+      fs.mkdirSync(path.join(root, "circuits"));
+      const active = path.join(root, "circuits/shielded_private_transfer.circom");
+      const obsolete = path.join(root, "circuits/obsolete.circom");
+      fs.writeFileSync(active, "active source");
+      fs.writeFileSync(obsolete, "obsolete source");
+      execFileSync("git", ["add", "-A"], { cwd: root });
+      const baseline = sourceBundleSha256(root);
+      fs.rmSync(obsolete);
+      expect(sourceBundleSha256(root)).not.to.equal(baseline);
+      fs.rmSync(active);
+      expect(() => sourceBundleSha256(root)).to.throw("tracked source is missing");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("binds release sources without depending on generated proof files", function () {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shielded-release-digest-"));
     const tracked = [

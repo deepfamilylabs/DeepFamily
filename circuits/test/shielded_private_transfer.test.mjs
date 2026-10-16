@@ -10,6 +10,7 @@ import { poseidon2 } from "poseidon-lite";
 import {
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifier,
+  computeShieldedDummyInputNullifierForSlot,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
@@ -47,7 +48,7 @@ function privateTransferFixture(scope = defaultScope) {
   const inputs = inputAmounts.map((amount, i) =>
     valueNote(owner(inputOwnerSecrets[i]), amount, inputNonces[i], inputCiphertextHashes[i], scope),
   );
-  return {
+  const witness = {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
     inputShardIds: ["0", "1"],
@@ -63,7 +64,7 @@ function privateTransferFixture(scope = defaultScope) {
       ),
     ),
     ciphertextHashes: strs(outputHashes),
-    hasSecondInput: "1",
+    inputEnabled: ["1", "1", ...Array(6).fill("0")],
     inputOwnerSecrets: strs(inputOwnerSecrets),
     inputAmounts: strs(inputAmounts),
     inputNonces: strs(inputNonces),
@@ -75,6 +76,25 @@ function privateTransferFixture(scope = defaultScope) {
     outputAmounts: strs(outputAmounts),
     outputNonces: strs(outputNonces),
   };
+  for (let i = 2; i < 8; i++) {
+    witness.inputShardIds.push(witness.inputShardIds[0]);
+    witness.inputRoots.push(witness.inputRoots[0]);
+    witness.inputNullifiers.push(
+      String(computeShieldedDummyInputNullifierForSlot(inputOwnerSecrets[0], inputs[0], i, scope)),
+    );
+    for (const field of [
+      "inputOwnerSecrets",
+      "inputAmounts",
+      "inputNonces",
+      "inputCiphertextHashes",
+      "inputDepths",
+      "inputIndices",
+    ]) {
+      witness[field].push("0");
+    }
+    witness.inputSiblings.push(Array(32).fill("0"));
+  }
+  return witness;
 }
 
 function singleInputPrivateTransferFixture(scope = defaultScope) {
@@ -98,7 +118,7 @@ function singleInputPrivateTransferFixture(scope = defaultScope) {
     BigInt(witness.ciphertextHashes[1]),
     scope,
   ).toString();
-  witness.hasSecondInput = "0";
+  witness.inputEnabled[1] = "0";
   witness.inputOwnerSecrets[1] = "0";
   witness.inputAmounts[1] = "0";
   witness.inputNonces[1] = "0";
@@ -214,7 +234,7 @@ test("private transfer circuit", async (t) => {
       }
       witness.inputDepths[0] = "32";
       witness.inputIndices[0] = ((1n << 32n) - 1n).toString();
-      witness.inputRoots = [root.toString(), root.toString()];
+      witness.inputRoots = Array(8).fill(root.toString());
       await transfer.valid(witness);
       await transfer.invalid(
         mutate(witness, (w) => {
@@ -321,7 +341,7 @@ test("private transfer circuit", async (t) => {
         );
         await transfer.invalid(
           mutate(validSingleTransfer, (w) => {
-            w.hasSecondInput = "2";
+            w.inputEnabled[1] = "2";
           }),
         );
         await transfer.invalid(

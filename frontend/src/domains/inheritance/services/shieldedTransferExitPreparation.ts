@@ -2,7 +2,6 @@ import {
   SHIELDED_POOL_ACTION,
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
-  computeShieldedDummyInputNullifier,
   computeShieldedDummyInputNullifierForSlot,
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
@@ -116,9 +115,9 @@ async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<
   };
   if (note.ownerCommitment !== computeShieldedOwnerCommitment(keys.ownerSecret)) {
     throw new Error("Input value note belongs to another owner");
-    if (note.amount <= 0n || note.amount > MAX_UINT128)
-      throw new Error("VALUE input amount must be positive uint128");
   }
+  if (note.amount <= 0n || note.amount > MAX_UINT128)
+    throw new Error("VALUE input amount must be positive uint128");
   const ciphertextHashField = computeShieldedCiphertextHashField(owned.ciphertext);
   if (
     owned.ciphertextHashField !== ciphertextHashField ||
@@ -277,6 +276,30 @@ function publicInputs(
   }).witness;
 }
 
+/** Every VALUE proof has eight slots; disabled private openings are zero-filled. */
+function valueInputWitness(opened: readonly OpenedValueInput[]): ShieldedWitness {
+  return {
+    inputEnabled: Array.from({ length: 8 }, (_, index) => (index < opened.length ? "1" : "0")),
+    inputOwnerSecrets: Array.from({ length: 8 }, (_, index) =>
+      String(opened[index]?.ownerSecret ?? 0n),
+    ),
+    inputAmounts: Array.from({ length: 8 }, (_, index) => String(opened[index]?.note.amount ?? 0n)),
+    inputNonces: Array.from({ length: 8 }, (_, index) => String(opened[index]?.note.nonce ?? 0n)),
+    inputCiphertextHashes: Array.from({ length: 8 }, (_, index) =>
+      String(opened[index]?.ciphertextHashField ?? 0n),
+    ),
+    inputDepths: Array.from({ length: 8 }, (_, index) =>
+      String(opened[index]?.path.proofDepth ?? 0),
+    ),
+    inputIndices: Array.from({ length: 8 }, (_, index) =>
+      String(opened[index]?.path.proofIndex ?? 0n),
+    ),
+    inputSiblings: Array.from({ length: 8 }, (_, index) =>
+      decimal(opened[index]?.path.siblings ?? Array<bigint>(32).fill(0n)),
+    ),
+  };
+}
+
 /**
  * Spend one to eight locally recovered value notes of one owner into two encrypted notes.
  * Recipient identity is absent from the public proof and event. The recipient's
@@ -300,7 +323,6 @@ export async function prepareShieldedPrivateTransfer(input: {
   }
   const opened = await Promise.all(input.inputs.map((note) => openValueInput(note, ctx)));
   const first = opened[0];
-  const second = opened[1];
   if (!first) throw new Error("Private transfer needs a value note");
   // Different wallet scans must be anchored to the same public chain state.
   if (
@@ -352,22 +374,9 @@ export async function prepareShieldedPrivateTransfer(input: {
       return encryptValueOutput(note, destination.viewingKey, ctx, destination.selfHpkeIkm);
     }),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
-  const secondNullifier =
-    second?.nullifier ??
-    computeShieldedDummyInputNullifier(
-      {
-        ownerSecret: first.ownerSecret,
-        noteCommitment: getBigInt(input.inputs[0].commitment),
-      },
-      ctx,
-    );
-  if (!second && input.inputs[0].wallet.spentNullifiers.has(secondNullifier)) {
-    throw new Error("Input value note has already been spent");
-  }
-  const capacity = opened.length > 2 ? 8 : 2;
-  const paths = Array.from({ length: capacity }, (_, index) => opened[index] ?? first);
+  const paths = Array.from({ length: 8 }, (_, index) => opened[index] ?? first);
   const nullifiers = Array.from(
-    { length: capacity },
+    { length: 8 },
     (_, index) =>
       opened[index]?.nullifier ??
       computeShieldedDummyInputNullifierForSlot(
@@ -381,37 +390,9 @@ export async function prepareShieldedPrivateTransfer(input: {
     throw new Error("Input value note has already been spent");
   }
   const data = actionData(paths, nullifiers, outputs);
-  const zeroSiblings = Array<bigint>(32).fill(0n);
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
-    ...(capacity === 8
-      ? {
-          inputEnabled: Array.from({ length: capacity }, (_, index) =>
-            index < opened.length ? "1" : "0",
-          ),
-        }
-      : { hasSecondInput: second ? "1" : "0" }),
-    inputOwnerSecrets: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.ownerSecret ?? 0n),
-    ),
-    inputAmounts: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.note.amount ?? 0n),
-    ),
-    inputNonces: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.note.nonce ?? 0n),
-    ),
-    inputCiphertextHashes: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.ciphertextHashField ?? 0n),
-    ),
-    inputDepths: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.path.proofDepth ?? 0),
-    ),
-    inputIndices: Array.from({ length: capacity }, (_, index) =>
-      String(opened[index]?.path.proofIndex ?? 0n),
-    ),
-    inputSiblings: Array.from({ length: capacity }, (_, index) =>
-      decimal(opened[index]?.path.siblings ?? zeroSiblings),
-    ),
+    ...valueInputWitness(opened),
     outputOwnerCommitments: decimal(
       destinationKeys.map((destination) => destination.ownerCommitment),
     ),
@@ -422,14 +403,13 @@ export async function prepareShieldedPrivateTransfer(input: {
 }
 
 /**
- * Withdraw public DEEP from one private value note. The recipient and amount
+ * Withdraw public DEEP from one to eight private value notes. The recipient and amount
  * are deliberately public; change and the zero-value dummy remain encrypted.
  */
 export async function prepareShieldedUnshield(input: {
   chainId: BigNumberish;
   poolAddress: string;
-  input?: ShieldedValueInput;
-  inputs?: readonly ShieldedValueInput[];
+  inputs: readonly ShieldedValueInput[];
   amount: BigNumberish;
   recipient: string;
 }): Promise<PreparedShieldedUnshield> {
@@ -438,7 +418,7 @@ export async function prepareShieldedUnshield(input: {
   if (amount === 0n) throw new Error("Unshield amount must be positive");
   const recipient = getAddress(input.recipient);
   if (BigInt(recipient) === 0n) throw new Error("Unshield recipient must be nonzero");
-  const sources = input.inputs ?? (input.input ? [input.input] : []);
+  const sources = input.inputs;
   if (sources.length < 1 || sources.length > 8)
     throw new Error("Unshield needs one to eight input notes");
   if (
@@ -461,16 +441,6 @@ export async function prepareShieldedUnshield(input: {
   const total = allOpened.reduce((sum, note) => sum + note.note.amount, 0n);
   if (amount > total) throw new Error("Unshield amount exceeds the input notes");
   if (total - amount > MAX_UINT128) throw new Error("Unshield change must fit in uint128");
-  const dummyNullifier = computeShieldedDummyInputNullifier(
-    {
-      ownerSecret: opened.ownerSecret,
-      noteCommitment: getBigInt(sources[0].commitment),
-    },
-    ctx,
-  );
-  if (sources[0].wallet.spentNullifiers.has(dummyNullifier)) {
-    throw new Error("Input value note has already been spent");
-  }
   const viewingKey = await deriveShieldedViewPublicKey(opened.hpkeIkm);
   const notes: readonly [ValueNote, ValueNote] = [
     {
@@ -483,9 +453,8 @@ export async function prepareShieldedUnshield(input: {
   const outputs = (await Promise.all(
     notes.map((note) => encryptValueOutput(note, viewingKey, ctx, opened.hpkeIkm)),
   )) as [PreparedShieldedValueOutput, PreparedShieldedValueOutput];
-  const capacity = sources.length === 1 ? 2 : 8;
   const nullifiers = Array.from(
-    { length: capacity },
+    { length: 8 },
     (_, index) =>
       allOpened[index]?.nullifier ??
       computeShieldedDummyInputNullifierForSlot(
@@ -498,48 +467,13 @@ export async function prepareShieldedUnshield(input: {
   if (nullifiers.some((nullifier) => sources[0].wallet.spentNullifiers.has(nullifier)))
     throw new Error("Input value note has already been spent");
   const data = actionData(
-    Array.from({ length: capacity }, (_, index) => allOpened[index] ?? opened),
+    Array.from({ length: 8 }, (_, index) => allOpened[index] ?? opened),
     nullifiers,
     outputs,
   );
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Unshield, ctx, data, amount, recipient),
-    ...(capacity === 8
-      ? {
-          inputEnabled: Array.from({ length: 8 }, (_, index) =>
-            index < allOpened.length ? "1" : "0",
-          ),
-          inputOwnerSecrets: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.ownerSecret ?? 0n),
-          ),
-          inputAmounts: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.note.amount ?? 0n),
-          ),
-          inputNonces: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.note.nonce ?? 0n),
-          ),
-          inputCiphertextHashes: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.ciphertextHashField ?? 0n),
-          ),
-          inputDepths: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.path.proofDepth ?? 0),
-          ),
-          inputIndices: Array.from({ length: 8 }, (_, index) =>
-            String(allOpened[index]?.path.proofIndex ?? 0n),
-          ),
-          inputSiblings: Array.from({ length: 8 }, (_, index) =>
-            decimal(allOpened[index]?.path.siblings ?? Array<bigint>(32).fill(0n)),
-          ),
-        }
-      : {
-          ownerSecret: String(opened.ownerSecret),
-          inputAmount: String(opened.note.amount),
-          inputNonce: String(opened.note.nonce),
-          inputCiphertextHash: String(opened.ciphertextHashField),
-          noteDepth: opened.path.proofDepth,
-          noteIndex: String(opened.path.proofIndex),
-          noteSiblings: decimal(opened.path.siblings),
-        }),
+    ...valueInputWitness(allOpened),
     changeAmount: String(notes[0].amount),
     changeNonce: String(notes[0].nonce),
     dummyNonce: String(notes[1].nonce),
@@ -555,7 +489,7 @@ export async function prepareShieldedValueConsolidation(input: {
   derivedSecretField?: BigNumberish;
   keyMaterial?: ShieldedValueInput["keyMaterial"];
   candidateCommitments?: readonly BigNumberish[];
-  maxInputs?: 1 | 2 | 8;
+  maxInputs?: 1 | 8;
   amount: BigNumberish;
 }): Promise<PreparedShieldedPrivateTransfer | undefined> {
   const amount = uint128(input.amount, "amount");

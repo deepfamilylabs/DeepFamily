@@ -46,8 +46,6 @@ const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 const publicSignalCount = (action) =>
   action === "receiveCode"
     ? SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT
-    : action === "privateTransfer8" ? 30
-    : action === "unshield8" ? 32
     : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
 
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
@@ -137,7 +135,7 @@ export function snapshotShieldedCompilation({ root, stageBuild, expectedManifest
     "Shielded reviewed development manifest",
   ).value;
   if (!sameKeys(expectedManifest.circuits, Object.keys(SHIELDED_SETUP_CIRCUITS))) {
-    throw new Error("Shielded compilation baseline must cover all eight circuits");
+    throw new Error("Shielded compilation baseline must cover all six circuits");
   }
   const circuits = {};
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
@@ -406,7 +404,7 @@ export function inspectShieldedProductionArtifacts({
   }
   const actions = Object.keys(SHIELDED_SETUP_CIRCUITS);
   if (!sameKeys(manifest.circuits, actions) || !sameKeys(transcript.circuits, actions)) {
-    throw new Error("Shielded production manifest and transcript must cover all eight circuits");
+    throw new Error("Shielded production manifest and transcript must cover all six circuits");
   }
   if (manifest.releaseCriteria !== undefined) {
     if (!sameKeys(manifest.releaseCriteria, RELEASE_CRITERIA_FIELDS)) {

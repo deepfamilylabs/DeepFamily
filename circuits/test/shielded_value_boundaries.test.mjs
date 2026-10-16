@@ -12,7 +12,7 @@ import { poseidon2, poseidon5 } from "poseidon-lite";
 import {
   SNARK_SCALAR_FIELD,
   computeShieldedCiphertextHashField,
-  computeShieldedDummyInputNullifier,
+  computeShieldedDummyInputNullifierForSlot,
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
@@ -70,12 +70,15 @@ function unshieldFixture(scope = defaultScope) {
   return {
     chainId: String(scope.chainId),
     pool: String(BigInt(scope.poolAddress)),
-    inputShardId: "0",
-    inputRoot: inputCommitment.toString(),
-    inputNullifiers: asStrings([
-      computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope),
-      computeShieldedDummyInputNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope),
-    ]),
+    inputShardIds: Array(8).fill("0"),
+    inputRoots: Array(8).fill(inputCommitment.toString()),
+    inputNullifiers: asStrings(
+      Array.from({ length: 8 }, (_, i) =>
+        i === 0
+          ? computeShieldedSpendNullifier({ ownerSecret, noteCommitment: inputCommitment }, scope)
+          : computeShieldedDummyInputNullifierForSlot(ownerSecret, inputCommitment, i, scope),
+      ),
+    ),
     outputCommitments: asStrings([
       valueNote(changeAmount, changeNonce, changeHash, scope),
       valueNote(0n, dummyNonce, dummyHash, scope),
@@ -83,13 +86,14 @@ function unshieldFixture(scope = defaultScope) {
     ciphertextHashes: asStrings([changeHash, dummyHash]),
     amount: "30",
     recipient: String(0x5678n),
-    ownerSecret: ownerSecret.toString(),
-    inputAmount: inputAmount.toString(),
-    inputNonce: inputNonce.toString(),
-    inputCiphertextHash: inputCiphertextHash.toString(),
-    noteDepth: "0",
-    noteIndex: "0",
-    noteSiblings: Array(32).fill("0"),
+    inputEnabled: ["1", ...Array(7).fill("0")],
+    inputOwnerSecrets: [ownerSecret.toString(), ...Array(7).fill("0")],
+    inputAmounts: [inputAmount.toString(), ...Array(7).fill("0")],
+    inputNonces: [inputNonce.toString(), ...Array(7).fill("0")],
+    inputCiphertextHashes: [inputCiphertextHash.toString(), ...Array(7).fill("0")],
+    inputDepths: Array(8).fill("0"),
+    inputIndices: Array(8).fill("0"),
+    inputSiblings: Array.from({ length: 8 }, () => Array(32).fill("0")),
     changeAmount: changeAmount.toString(),
     changeNonce: changeNonce.toString(),
     dummyNonce: dummyNonce.toString(),
@@ -270,12 +274,12 @@ test("shield and unshield boundary circuits", async (t) => {
     await t.test("unshield rejects theft, inflation, and bad change", async () => {
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.ownerSecret = "5002";
+          w.inputOwnerSecrets[0] = "5002";
         }),
       );
       await unshield.invalid(
         mutated(withdrawal, (w) => {
-          w.inputRoot = "123";
+          w.inputRoots[0] = "123";
         }),
       );
       await unshield.invalid(
@@ -311,7 +315,7 @@ test("shield and unshield boundary circuits", async (t) => {
       wrapped.changeAmount = String(SNARK_SCALAR_FIELD - 1n);
       assert.equal(
         (BigInt(wrapped.amount) + BigInt(wrapped.changeAmount)) % SNARK_SCALAR_FIELD,
-        BigInt(wrapped.inputAmount),
+        BigInt(wrapped.inputAmounts[0]),
       );
       wrapped.outputCommitments[0] = String(
         poseidon5([
@@ -327,15 +331,15 @@ test("shield and unshield boundary circuits", async (t) => {
 
     await t.test("unshield accepts an exact 32-level LeanIMT path", async () => {
       const deep = structuredClone(withdrawal);
-      let root = BigInt(deep.inputRoot);
+      let root = BigInt(deep.inputRoots[0]);
       for (let level = 0; level < 32; level += 1) {
         const sibling = BigInt(level + 1);
-        deep.noteSiblings[level] = sibling.toString();
+        deep.inputSiblings[0][level] = sibling.toString();
         root = level === 31 ? poseidon2([sibling, root]) : poseidon2([root, sibling]);
       }
-      deep.noteDepth = "32";
-      deep.noteIndex = (1n << 31n).toString();
-      deep.inputRoot = root.toString();
+      deep.inputDepths[0] = "32";
+      deep.inputIndices[0] = (1n << 31n).toString();
+      deep.inputRoots.fill(root.toString());
       await unshield.valid(deep);
     });
   } finally {

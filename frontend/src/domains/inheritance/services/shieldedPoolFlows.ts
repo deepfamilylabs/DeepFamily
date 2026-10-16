@@ -60,7 +60,7 @@ type BaseFlowInput = {
   /** Record this exact transaction slot before asking the wallet to submit it. */
   onSubmitting?: (anchor: ShieldedSubmissionAnchor) => void;
   /** Keep the unlocked session through a wallet handoff, then release it before receipt tracking. */
-  onWalletRequest?: () => (() => void);
+  onWalletRequest?: () => () => void;
   /** Pause before requesting the wallet transaction so the user can review this step's fee. */
   onGasEstimate?: (review: ShieldedGasReview) => Promise<void> | void;
   /** Large lineage proofs can take longer than the default worker timeout. */
@@ -214,16 +214,7 @@ async function submitAction(
   }
   const data = copyActionData(input.data);
   const poolAddress = await pool.getAddress();
-  const { id } = ACTIONS[action];
-  const large = data.inputNullifiers.length === 8;
-  if (large && action !== "privateTransfer" && action !== "unshield") {
-    throw new Error("Only VALUE transfer and unshield support eight inputs");
-  }
-  const circuit: ShieldedCircuitName = large
-    ? action === "privateTransfer"
-      ? "privateTransfer8"
-      : "unshield8"
-    : ACTIONS[action].circuit;
+  const { id, circuit } = ACTIONS[action];
   const expectedSignals = buildShieldedPoolPublicSignals({
     action: id,
     fundMode: data.fundMode,

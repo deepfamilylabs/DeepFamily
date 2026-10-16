@@ -118,7 +118,7 @@ cp frontend/.env.example frontend/.env.local  # Then set VITE_ZK_ASSET_BASE_URL
 npm run check           # Run frontend + contract verification
 npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
-npm run dev:deploy      # Check all 10 circuit artifacts and deploy the complete system
+npm run dev:deploy      # Check all 8 circuit artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
 npm run dev:seed        # Seed demo data
 npm run frontend:config # Generate frontend config from deployed contracts
@@ -152,27 +152,27 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers the two identity/disclosure circuits and all eight shielded circuits:
+The same `zk:*` workflow covers the two identity/disclosure circuits and all six shielded circuits:
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
-| `npm run zk:build`             | Compile all 10 circuits                                            |
-| `npm run zk:development:setup` | Generate development keys and verifiers for all 10 circuits        |
-| `npm run zk:production:setup`  | Generate production keys and verifiers for all 10 circuits         |
-| `npm run zk:check`             | Check all 10 circuit artifacts and available proof fixtures        |
-| `npm run zk:artifacts:check`   | Rebuild and validate all 10 circuit artifacts                      |
-| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 10 circuits           |
+| `npm run zk:build`             | Compile all 8 circuits                                            |
+| `npm run zk:development:setup` | Generate development keys and verifiers for all 8 circuits        |
+| `npm run zk:production:setup`  | Generate production keys and verifiers for all 8 circuits         |
+| `npm run zk:check`             | Check all 8 circuit artifacts and available proof fixtures        |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 8 circuit artifacts                      |
+| `npm run zk:ceremony:verify`   | Verify the production setup evidence for all 8 circuits           |
 
 Each Groth16 circuit has its own proving and verification keys. The unified production setup
-performs the required circuit-specific setup for all 10 circuits; it does not reuse another
+performs the required circuit-specific setup for all 8 circuits; it does not reuse another
 circuit's `.zkey`. Both development and production setup install shielded browser files under
 `frontend/public/zk/shielded/` and generated verifiers under `contracts/`, using the same static
 asset flow as identity/disclosure. Development artifacts remain explicitly marked as such;
-`npm run release:preflight` requires production evidence for all 10 circuits. The pool deploys
-seven verifier routes, including transfer capacities 2/8 and withdrawal capacities 1/8;
+`npm run release:preflight` requires production evidence for all 8 circuits. The pool deploys
+five verifier routes, with one eight-input circuit each for transfer and withdrawal;
 receive-code proofs are verified locally.
 
 The browser `.wasm` and `.zkey` files are not committed; only their `.vkey.json` files are. The
@@ -242,7 +242,7 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 10 circuits,
+Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 8 circuits,
 generates development zkeys and verification keys, exports the Solidity verifiers, copies the
 required frontend assets, and updates the `development` manifest. Its Phase 2 contribution runs on
 any developer or CI machine and records no ceremony evidence; these keys are unsuitable for

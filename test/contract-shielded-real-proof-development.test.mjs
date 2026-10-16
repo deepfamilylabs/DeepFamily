@@ -21,6 +21,7 @@ import {
   getShieldedBudgetCommitments,
   encodePublicShieldedBudgetEnvelope,
   computeShieldedDummyInputNullifier,
+  computeShieldedDummyInputNullifierForSlot,
   computeShieldedDummyPeriodNullifier,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
@@ -69,6 +70,44 @@ const zeroData = () => ({
   fundMode: 0n,
   budgetKind: 0n,
 });
+
+/** Build the canonical eight slots, including distinct proved placeholders. */
+function valueSpendInputs({ notes, ownerSecrets, memberships, roots, chainId, poolAddress }) {
+  const scope = { chainId, poolAddress };
+  const fill = (values) => Array.from({ length: 8 }, (_, slot) => String(values[slot] ?? 0n));
+  return {
+    data: {
+      inputShardIds: Array(8).fill(0n),
+      inputRoots: Array.from({ length: 8 }, (_, slot) => roots[slot] ?? roots[0]),
+      inputNullifiers: Array.from({ length: 8 }, (_, slot) =>
+        notes[slot]
+          ? computeShieldedSpendNullifier(
+              { ownerSecret: ownerSecrets[slot], noteCommitment: notes[slot].commitment },
+              scope,
+            )
+          : computeShieldedDummyInputNullifierForSlot(
+              ownerSecrets[0],
+              notes[0].commitment,
+              slot,
+              scope,
+            ),
+      ),
+    },
+    witness: {
+      inputEnabled: Array.from({ length: 8 }, (_, slot) => (slot < notes.length ? "1" : "0")),
+      inputOwnerSecrets: fill(ownerSecrets),
+      inputAmounts: fill(notes.map((note) => note.amount)),
+      inputNonces: fill(notes.map((note) => note.nonce)),
+      inputCiphertextHashes: fill(notes.map((note) => note.ciphertextHashField)),
+      inputDepths: fill(memberships.map((proof) => proof.depth)),
+      inputIndices: fill(memberships.map((proof) => proof.index)),
+      inputSiblings: Array.from(
+        { length: 8 },
+        (_, slot) => memberships[slot]?.siblings ?? Array(32).fill("0"),
+      ),
+    },
+  };
+}
 
 /** Ordered verifier inputs of a witness that uses the circuit's named public inputs. */
 const claimSignalsOf = (witness) =>
@@ -711,19 +750,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const root = (await pool.noteShard(0)).root;
       const exitChange = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 307n });
       const exitDummy = await encryptValueNote({ ...heirContext, amount: 0n, nonce: 308n });
+      const exitSpend = valueSpendInputs({
+        notes: [pure.payout],
+        ownerSecrets: [keys.ownerSecret],
+        memberships: [payoutPath],
+        roots: [root],
+        chainId,
+        poolAddress,
+      });
       const exitData = {
         ...zeroData(),
-        inputRoots: [root, root],
-        inputNullifiers: [
-          spend(keys.ownerSecret, pure.payout),
-          computeShieldedDummyInputNullifier(
-            {
-              ownerSecret: keys.ownerSecret,
-              noteCommitment: pure.payout.commitment,
-            },
-            { chainId, poolAddress },
-          ),
-        ],
+        ...exitSpend.data,
         outputCommitments: [exitChange.commitment, exitDummy.commitment],
         outputCiphertexts: [exitChange.ciphertextHex, exitDummy.ciphertextHex],
       };
@@ -739,13 +776,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         "unshield",
         {
           ...exitInputs.witness,
-          ownerSecret: String(keys.ownerSecret),
-          inputAmount: "100",
-          inputNonce: String(pure.payout.nonce),
-          inputCiphertextHash: String(pure.payout.ciphertextHashField),
-          noteDepth: payoutPath.depth,
-          noteIndex: payoutPath.index,
-          noteSiblings: payoutPath.siblings,
+          ...exitSpend.witness,
           changeAmount: "0",
           changeNonce: "307",
           dummyNonce: "308",
@@ -988,10 +1019,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       encryptValueNote({ ...noteInput, amount: 70n, nonce: 13n }),
       encryptValueNote({ ...noteInput, amount: 0n, nonce: 14n }),
     ]);
+    const unshieldSpend = valueSpendInputs({
+      notes: [initialNotes[0]],
+      ownerSecrets: [ownerSecret],
+      memberships: [compactMembership(pathProof)],
+      roots: [root],
+      chainId,
+      poolAddress,
+    });
     const unshieldData = {
       ...zeroData(),
-      inputRoots: [root, root],
-      inputNullifiers: [spendNullifier, dummyNullifier],
+      ...unshieldSpend.data,
       outputCommitments: changeNotes.map((note) => note.commitment),
       outputCiphertexts: changeNotes.map((note) => note.ciphertextHex),
     };
@@ -1008,16 +1046,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       "unshield",
       {
         ...unshieldPublicInputs,
-        ownerSecret: String(ownerSecret),
-        inputAmount: "100",
-        inputNonce: "11",
-        inputCiphertextHash: String(initialNotes[0].ciphertextHashField),
-        noteDepth: String(pathProof.proofDepth),
-        noteIndex: String(pathProof.proofIndex),
-        noteSiblings: [
-          ...pathProof.siblings.map(String),
-          ...Array(32 - pathProof.siblings.length).fill("0"),
-        ],
+        ...unshieldSpend.witness,
         changeAmount: "70",
         changeNonce: "13",
         dummyNonce: "14",
@@ -1025,8 +1054,10 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       unshieldSignals,
     );
     expect(await adapter.verifyProof(6, 1, unshieldProof, unshieldSignals)).to.equal(true);
-    // Equal public-signal lengths do not allow a proof from one circuit to verify in another.
-    expect(await adapter.verifyProof(5, 1, unshieldProof, unshieldSignals)).to.equal(false);
+    // A proof cannot reach the transfer verifier with the unshield signal shape.
+    await expect(
+      adapter.verifyProof(5, 1, unshieldProof, unshieldSignals),
+    ).to.be.revertedWithCustomError(adapter, "MalformedProofData");
     await expect(
       pool.unshield(depositor.address, 30n, unshieldData, unshieldProof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
@@ -2113,19 +2144,18 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           return { ...recipient, hpkeIkm, ownerCommitment, note };
         }),
       );
-      const inputNullifiers = sourceNotes.map((note, index) =>
-        computeShieldedSpendNullifier(
-          {
-            ownerSecret: sourceOwners[index],
-            noteCommitment: note.commitment,
-          },
-          { chainId, poolAddress },
-        ),
-      );
+      const transferSpend = valueSpendInputs({
+        notes: sourceNotes,
+        ownerSecrets: sourceOwners,
+        memberships,
+        roots: [sourceRoot, sourceRoot],
+        chainId,
+        poolAddress,
+      });
+      const inputNullifiers = transferSpend.data.inputNullifiers;
       const transferData = {
         ...zeroData(),
-        inputRoots: [sourceRoot, sourceRoot],
-        inputNullifiers,
+        ...transferSpend.data,
         outputCommitments: recipients.map(({ note }) => note.commitment),
         outputCiphertexts: recipients.map(({ note }) => note.ciphertextHex),
       };
@@ -2140,14 +2170,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         "privateTransfer",
         {
           ...transferPublicInputs,
-          hasSecondInput: "1",
-          inputOwnerSecrets: sourceOwners.map(String),
-          inputAmounts: sourceAmounts.map(String),
-          inputNonces: sourceNonces.map(String),
-          inputCiphertextHashes: sourceNotes.map((note) => String(note.ciphertextHashField)),
-          inputDepths: memberships.map((proof) => proof.depth),
-          inputIndices: memberships.map((proof) => proof.index),
-          inputSiblings: memberships.map((proof) => proof.siblings),
+          ...transferSpend.witness,
           outputOwnerCommitments: recipients.map(({ ownerCommitment }) => String(ownerCommitment)),
           outputAmounts: recipients.map(({ amount }) => String(amount)),
           outputNonces: recipients.map(({ nonce }) => String(nonce)),
@@ -2226,26 +2249,18 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           return { ...destination, hpkeIkm, ownerCommitment, note };
         }),
       );
-      const singleNullifiers = [
-        computeShieldedSpendNullifier(
-          {
-            ownerSecret: singleSource.ownerSecret,
-            noteCommitment: singleSource.note.commitment,
-          },
-          { chainId, poolAddress },
-        ),
-        computeShieldedDummyInputNullifier(
-          {
-            ownerSecret: singleSource.ownerSecret,
-            noteCommitment: singleSource.note.commitment,
-          },
-          { chainId, poolAddress },
-        ),
-      ];
+      const singleSpend = valueSpendInputs({
+        notes: [singleSource.note],
+        ownerSecrets: [singleSource.ownerSecret],
+        memberships: [singlePath],
+        roots: [singleRoot],
+        chainId,
+        poolAddress,
+      });
+      const singleNullifiers = singleSpend.data.inputNullifiers;
       const singleData = {
         ...zeroData(),
-        inputRoots: [singleRoot, singleRoot],
-        inputNullifiers: singleNullifiers,
+        ...singleSpend.data,
         outputCommitments: singleDestinations.map(({ note }) => note.commitment),
         outputCiphertexts: singleDestinations.map(({ note }) => note.ciphertextHex),
       };
@@ -2261,14 +2276,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         "privateTransfer",
         {
           ...singlePublicInputs,
-          hasSecondInput: "0",
-          inputOwnerSecrets: [String(singleSource.ownerSecret), "0"],
-          inputAmounts: [String(singleSource.amount), "0"],
-          inputNonces: [String(singleSource.nonce), "0"],
-          inputCiphertextHashes: [String(singleSource.note.ciphertextHashField), "0"],
-          inputDepths: [singlePath.depth, "0"],
-          inputIndices: [singlePath.index, "0"],
-          inputSiblings: [singlePath.siblings, Array(32).fill("0")],
+          ...singleSpend.witness,
           outputOwnerCommitments: singleDestinations.map(({ ownerCommitment }) =>
             String(ownerCommitment),
           ),
@@ -2279,7 +2287,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       );
       expect(await adapter.verifyProof(5, 1, singleProof, singleSignals)).to.equal(true);
       await expect(
-        pool.privateTransfer({ ...singleData, inputRoots: [singleRoot, sourceRoot] }, singleProof),
+        pool.privateTransfer(
+          {
+            ...singleData,
+            inputRoots: [singleRoot, sourceRoot, ...singleData.inputRoots.slice(2)],
+          },
+          singleProof,
+        ),
       ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
       const singleReceipt = await (await pool.privateTransfer(singleData, singleProof)).wait();
       for (const nullifier of singleNullifiers) {
@@ -2311,7 +2325,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         "NullifierAlreadySpent",
       );
       console.log(
-        `local Hardhat gas (not release evidence): privateTransfer2=${receipt.gasUsed} privateTransfer1=${singleReceipt.gasUsed}`,
+        `local Hardhat gas (not release evidence): privateTransfer(2 real inputs)=${receipt.gasUsed} privateTransfer(1 real input)=${singleReceipt.gasUsed}`,
       );
     });
   }

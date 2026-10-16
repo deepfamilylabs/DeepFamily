@@ -303,7 +303,7 @@ The current pool protocol, receive-code format, note payload and HPKE envelope e
 
 `circuits/shielded_receive_code.circom` backs version-1 receive codes. Its nine public signals are `[identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, identitySuiteId, assetSuiteId, assetDerivationVersion, receiveCodeVersion]`; the four metadata values are `[1, 1, 1, 1]`. It proves identity-secret knowledge and a nonzero secret opening the owner commitment. Identity-derived mode 0 constrains that secret to `Poseidon(1012, derivedSecretField)`; asset-root-derived mode 1 permits an independent nonzero secret. Both bind `ownerCommitment = Poseidon(1013, spendingSecret)`. The viewing key is bound but its derivation and the asset root's random/signature source are not proved. Source metadata never enters the statement. Browser verification includes a BN254 G2 subgroup check. There is no on-chain receive-code verifier or payment-key registry. A code does not prove that the identity exists in DeepFamily; initial `fund` proves lineage eligibility.
 
-Seven pool circuits cover five actions: shield, fund, claim, privateTransfer and unshield, with separate eight-input transfer/exit variants. Together with receiveCode there are eight shielded circuits, and ten circuits including identity/disclosure. Pool public input counts range from 7 to 32; fund and claim retain 27. See [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout. Every budget fixes a positive uint32 `periodDays`; claim keeps 12 public period-nullifier slots.
+Five pool circuits cover five actions: shield, fund, claim, privateTransfer and unshield. Transfer and withdrawal each use one eight-input circuit. Together with receiveCode there are six shielded circuits, and eight circuits including identity/disclosure. Pool public input counts range from 7 to 32; fund and claim retain 27. See [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) for each layout. Every budget fixes a positive uint32 `periodDays`; claim keeps 12 public period-nullifier slots.
 
 Each pool action computes `D = Poseidon3(1031, chainId, uint160(poolAddress))` once through `ShieldedPoolDomain`, including nonzero uint64/uint160 checks. Pool-specific hashes use `S(purpose) = Poseidon3(1032, D, purpose)` for purposes 1010, 1011, 1014–1017, 1019, 1021, 1026–1030 and 1033. Commitments, owner authorization, spend/period/enrollment/template-use nullifiers and allocation-key commitments require the same explicit scope as donor memo recovery. Notes, budget templates and claim markers cannot cross asset pools; identity, lineage and owner/view derivation remain independent of the scope.
 
@@ -313,7 +313,7 @@ Fund reuses its donor's constrained VALUE tag for change. Fund and claim compute
 
 Circuit quality takes precedence over constraint counts: interfaces must make their trust assumptions clear, security bounds must remain explicit, and tests must check protocol semantics independently. `ShieldedBudgetNoteTags` owns the private-budget, identity-budget and owner-authorization purpose tags so fund, claim and their test harness share one definition. Merkle tests compare every legal depth against independently computed JS Poseidon roots, with separate direction, invalid-witness and disabled-slot cases. Pinning the dependency does not replace the project's bounds or regression tests; any library upgrade requires another review and regenerated artifacts. The library's core has related historical PSE review evidence, but that does not constitute a complete audit of version 2.0.0, this wrapper or the protocol.
 
-With the pinned compiler and `--O2 --sanity_check 2`, the shielded circuits have 1,681 constraints for receiveCode, 2,006 for shield, 57,700 for fund, 68,714 for claim, 20,136 for privateTransfer, 11,405 for unshield, 75,070 for privateTransfer8 and 75,357 for unshield8. Shared domains, purpose tags and bit-width reuse remain in place. Claim and the eight-input VALUE circuits exceed power-16 capacity; development setup retains the pinned power-17 Phase-1 file. These counts do not establish proving-time or memory improvements.
+With the pinned compiler and `--O2 --sanity_check 2`, the shielded circuits have 1,681 constraints for receiveCode, 2,006 for shield, 57,700 for fund, 68,714 for claim, 75,070 for privateTransfer and 75,357 for unshield. Shared domains, purpose tags and bit-width reuse remain in place. Claim and the eight-input VALUE circuits exceed power-16 capacity; development setup retains the pinned power-17 Phase-1 file. These counts do not establish proving-time or memory improvements.
 
 The following historical experiment predates the switch back to the fixed library. On 2026-10-04, the second optimization round (budget-tag reuse plus the project-owned Merkle selector) was compared with the preceding shared-domain implementation on macOS, Node v26.9.0 and snarkjs 0.7.5. It did not isolate the Merkle change. Each variant received one warmup and five alternating measured runs in fresh Node CLI processes. `groth16 fullprove` timing includes witness calculation and proving; proof verification runs separately. The fund fixture creates an initial private budget; claim uses 12 periods and a second identity-bound budget. Every proof verified and every public signal matched between variants.
 
@@ -332,9 +332,9 @@ Private kind-2 budgets are 283 bytes and bind keyMode through `Poseidon3(S(1033)
 
 `claim` spends one or two budgets sharing binding kind, mode, owner and all policy/enrollment terms. It proves the identity, current lineage, mature unpaid periods and the authorized owner secret. Mode 0 requires the identity-derived secret; mode 1 requires the independent asset secret with no identity fallback. Owner-bound budgets require their rule openings; identity budgets do not. The remainder preserves binding/mode and the VALUE payout preserves the authorized owner; VALUE has no persistent keyMode. All 27 public signals exclude the private input identity, binding and mode. Period nullifiers remain `H(identitySecret, P, epoch, scope)` across entries and exclude owner/mode/root source. This prevents allowance resets but permits a funder knowing the complete identity secret and P to precompute real period markers and associate claims with epochs without knowing the funds root.
 
-`ShieldedPoolCore` maintains 32-level note shards and secret-derived spend/period nullifiers. The lineage trees remain 64 levels deep. `privateTransfer` has two- and eight-input circuits; `unshield` has one- and eight-input circuits. Every real VALUE input has a positive uint128 amount and the same owner, chain and pool. Eight-slot enabled inputs are contiguous; disabled private openings are zero, their public shard/root repeat slot zero, and their slot-specific dummy nullifiers are distinct. The real spend nullifier is identical across capacities. Input sums use 131 bits; each of the two outputs remains uint128, and unshield has one change output plus a zero dummy. Different public roots reveal multiple real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and proof shapes do not prevent timing, wallet or small-set correlation.
+`ShieldedPoolCore` maintains 32-level note shards and secret-derived spend/period nullifiers. The lineage trees remain 64 levels deep. `privateTransfer` and `unshield` each have one circuit supporting one to eight real inputs. Every real VALUE input has a positive uint128 amount and the same owner, chain and pool. Eight-slot enabled inputs are contiguous; disabled private openings are zero, their public shard/root repeat slot zero, and their slot-specific dummy nullifiers are distinct. The real spend nullifier remains derived from the owner secret and note commitment. Input sums use 131 bits; each of the two outputs remains uint128, and unshield has one change output plus a zero dummy. Different public roots reveal multiple real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and proof shapes do not prevent timing, wallet or small-set correlation.
 
-`npm run zk:development:setup` prepares all 10 circuits and synchronizes browser artifacts to `frontend/public/zk/`, with eight shielded sets under `shielded/`. The shielded catalog is receiveCode, shield, fund, claim, privateTransfer, unshield, privateTransfer8 and unshield8. Seven pool verifier contracts live under `contracts/Shielded*Verifier.sol`; the receive code has none. `npm run zk:production:setup` uses the same production workflow for all 10 circuits, generating independent keys for each. The rebuilt local keys remain explicitly development-only and are not production ceremony evidence.
+`npm run zk:development:setup` prepares all 8 circuits and synchronizes browser artifacts to `frontend/public/zk/`, with six shielded sets under `shielded/`. The shielded catalog is receiveCode, shield, fund, claim, privateTransfer and unshield. Five pool verifier contracts live under `contracts/Shielded*Verifier.sol`; the receive code has none. `npm run zk:production:setup` uses the same production workflow for all 8 circuits, generating independent keys for each. The rebuilt local keys remain explicitly development-only and are not production ceremony evidence.
 
 To rebuild one development shielded key after changing its circuit, use `node scripts/zk-shielded-development-setup.mjs --circuit claim` (or another shielded action). The command preserves other manifest entries and keys, validates the pinned Phase-1 file, and synchronizes the complete artifact set. A fresh checkout without a complete development set needs full setup first.
 
@@ -369,12 +369,12 @@ Current generated verifiers are:
 
 - `contracts/PersonCommitmentVerifier.sol` for 5 person-relation public signals;
 - `contracts/DisclosureBindingVerifier.sol` for 4 disclosure public signals;
-- seven shielded verifier routes, with 7 to 32 public signals.
+- five shielded verifier routes, with 7 to 32 public signals.
 
-These nine verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
+These seven verifiers share one `contracts/adapters/Groth16VerifierAdapter.sol` instance. The
 adapter accepts the same encoding-1, 256-byte ABC payload and routes purposes 0/1 to identity
-and disclosure, purposes 2–6 to the five small-capacity pool actions (pool action ID + 2), and
-purposes 7/8 to privateTransfer8/unshield8 (30/32 public signals). Each route fixes
+and disclosure, and purposes 2–6 to the five pool actions (pool action ID + 2). Transfer and
+withdrawal have 30/32 public signals. Each route fixes
 its verifier address and checks its expected public-signal length. The action is not a public
 signal: the pool picks the purpose for its action, and the adapter handles proof transport only.
 
@@ -395,7 +395,7 @@ are published under `frontend/public/zk/`:
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;
 - `disclosure_binding.wasm`, `disclosure_binding_final.zkey`,
   `disclosure_binding.vkey.json`;
-- eight shielded WASM/zkey/vkey sets under `shielded/`.
+- six shielded WASM/zkey/vkey sets under `shielded/`.
 
 Production shielded artifacts use the same `/zk/shielded/` URLs and are installed in
 `frontend/public/zk/shielded/` by `zk:production:setup` with the production manifest. Only the
@@ -421,18 +421,18 @@ Supported top-level commands:
 | Command                        | Purpose                                             |
 | ------------------------------ | --------------------------------------------------- |
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                 |
-| `npm run zk:build`             | Compile all 10 circuits                              |
-| `npm run zk:development:setup` | Generate development artifacts for all 10 circuits   |
-| `npm run zk:production:setup`  | Generate production artifacts for all 10 circuits    |
-| `npm run zk:check`             | Check all 10 artifacts and available proof fixtures  |
-| `npm run zk:artifacts:check`   | Rebuild and validate all 10 circuit artifact sets    |
-| `npm run zk:ceremony:verify`   | Verify production setup evidence for all 10 circuits |
+| `npm run zk:build`             | Compile all 8 circuits                              |
+| `npm run zk:development:setup` | Generate development artifacts for all 8 circuits   |
+| `npm run zk:production:setup`  | Generate production artifacts for all 8 circuits    |
+| `npm run zk:check`             | Check all 8 artifacts and available proof fixtures  |
+| `npm run zk:artifacts:check`   | Rebuild and validate all 8 circuit artifact sets    |
+| `npm run zk:ceremony:verify`   | Verify production setup evidence for all 8 circuits |
 
 The top-level commands cover identity, disclosure, and shielded circuits together.
-`zk:check` proves the identity and disclosure fixtures; in development it also checks all eight
+`zk:check` proves the identity and disclosure fixtures; in development it also checks all six
 shielded artifact sets and runs the available fund/claim proof fixtures. Production checks
-validate all eight shielded circuit ceremonies. Release preflight additionally checks independent
-audits and committed runtime benchmarks. The same testnet acceptance report verifies all 10
+validate all six shielded circuit ceremonies. Release preflight additionally checks independent
+audits and committed runtime benchmarks. The same testnet acceptance report verifies all 8
 circuits, deployment bindings, transaction receipts, and finality before Mainnet planning.
 Development keys cannot be
 used for a production release.

@@ -1145,7 +1145,7 @@ export class ShieldedAssetSession {
         });
         actualAction = "privateTransfer";
         actionId = SHIELDED_POOL_ACTION.PrivateTransfer;
-        circuit = inputs.length > 2 ? "privateTransfer8" : "privateTransfer";
+        circuit = "privateTransfer";
       } else if (request.action === "fund") {
         requireValue(fundArgs, "Funding policy was not prepared.");
         prepared = await prepareShieldedFund({ ...fundArgs, donorCommitment: inputs[0] });
@@ -1161,7 +1161,7 @@ export class ShieldedAssetSession {
           ],
         });
         actionId = SHIELDED_POOL_ACTION.PrivateTransfer;
-        circuit = inputs.length > 2 ? "privateTransfer8" : "privateTransfer";
+        circuit = "privateTransfer";
       } else {
         requireValue(withdrawalRecipient, "Choose a public withdrawal destination.");
         const result = await prepareShieldedUnshield({
@@ -1173,7 +1173,7 @@ export class ShieldedAssetSession {
         prepared = result;
         recipient = result.recipient;
         actionId = SHIELDED_POOL_ACTION.Unshield;
-        circuit = inputs.length > 1 ? "unshield8" : "unshield";
+        circuit = "unshield";
       }
     }
     const outputAmounts = prepared.outputs.map((output) =>

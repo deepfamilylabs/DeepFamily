@@ -38,7 +38,7 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
   const target = BigInt(amount);
   if (target <= 0n || target > MAX_UINT128)
     throw new Error("Spend amount must be positive uint128");
-  if (![1, 2, 8].includes(maxInputs)) throw new Error("Spend capacity must be 1, 2 or 8");
+  if (![1, 8].includes(maxInputs)) throw new Error("Spend capacity must be 1 or 8");
   if (!Array.isArray(notes)) throw new Error("Candidate notes must be an array");
   const commitmentId = (value) => {
     const commitment = BigInt(value);
@@ -112,7 +112,7 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
     for (const note of inputs) if (seen.has(note.commitment)) usedOriginal.add(note.commitment);
     steps.push({
       kind: final ? "spend" : "merge",
-      capacity: inputs.length <= 2 ? 2 : 8,
+      capacity: 8,
       inputCommitments: inputs.map((note) => note.commitment),
       inputAmount: total,
       outputAmounts: [principal, remainder],

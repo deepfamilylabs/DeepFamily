@@ -407,7 +407,7 @@ For ordinary-wallet deposits, **Deposit to** selects identity credentials or the
 
 An independent deposit or payment choice is bound to the selected funds fingerprint and retained across pool navigation. Restoring the same key preserves that choice; opening a different verified key requires explicitly selecting it again before a deposit or payment can be prepared.
 
-Budget funding automatically supplies the selected donor owner's available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection within the selected owner, including more than eight candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range, does not require consuming every candidate and never uses notes outside it or from another owner. It chooses an adequate subset under the selected owner and pool using the smallest supported capacity; transfers use 2/8-input circuits and withdrawals use 1/8-input circuits. When a payment needs preparatory consolidation, the Worker plans the complete same-owner consolidation/payment sequence and validates integer conservation and output capacity before the first step. It does not automatically move funds between owners. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
+Budget funding automatically supplies the selected donor owner's available positive VALUE notes as the allowed candidate range. Transfers and withdrawals both allow manual candidate selection within the selected owner, including more than eight candidates when consolidation is needed. The Worker treats these selections as an allowed candidate range, does not require consuming every candidate and never uses notes outside it or from another owner. It chooses an adequate subset under the selected owner and pool, preferring fewer real inputs; transfers and withdrawals each use one eight-slot circuit for one to eight real inputs. When a payment needs preparatory consolidation, the Worker plans the complete same-owner consolidation/payment sequence and validates integer conservation and output capacity before the first step. It does not automatically move funds between owners. Claim options expose compatible budget groups and up to twelve due, unpaid period indices; the selected identity and original budget authorization still control claim eligibility.
 
 One confirmation sends the whole sequence, with no separate preview or fee review; the wallet still signs each transaction and shows its fee. Each step is prepared, proved and locally verified, then its gas is estimated and checked before the wallet request, and the transaction carries those fee caps, nonce and expected chain ID. After each receipt the flow scans again and plans the next step only from the original candidate range, minus the spent inputs and plus the positive consolidated outputs; while a multi-step plan runs, the page states how many transactions it contains. It stops when a step does not shorten the plan, the payment details, session or wallet change, or a transaction fails or is rejected. There is no automatic retry or consumption outside the candidate range.
 
@@ -541,7 +541,7 @@ npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks all 10 circuit artifacts (2 identity and 8 shielded), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks all 8 circuit artifacts (2 identity and 6 shielded), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 
@@ -578,7 +578,7 @@ Proof workflows load public artifacts at runtime:
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`
 - Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); only `.vkey.json` is committed, `npm run zk:assets:fetch` installs the rest
 - Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
-- Circuit catalog: 2 identity circuits plus 8 shielded circuits (`receiveCode`, `shield`, `fund`, `claim`, `privateTransfer`, `unshield`, `privateTransfer8`, `unshield8`), 10 in total
+- Circuit catalog: 2 identity circuits plus 6 shielded circuits (`receiveCode`, `shield`, `fund`, `claim`, `privateTransfer`, `unshield`), 8 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.

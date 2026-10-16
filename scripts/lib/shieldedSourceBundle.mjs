@@ -19,6 +19,12 @@ const SOURCE_ROOTS = [
   "test/",
 ];
 const SOURCE_SINGLETONS = new Set(["package.json", "package-lock.json", "hardhat.config.mjs"]);
+const REQUIRED_SOURCES = new Set([
+  ...SOURCE_SINGLETONS,
+  "circuits/person_commitment.circom",
+  "circuits/disclosure_binding.circom",
+  ...Object.values(SHIELDED_CIRCUITS).map((source) => `circuits/${source}.circom`),
+]);
 const SOURCE_EXCLUSIONS = new Set([
   "circuits/shielded-production-manifest.json",
   "circuits/shielded-development-manifest.json",
@@ -37,8 +43,6 @@ const SOURCE_EXCLUSIONS = new Set([
   "contracts/ShieldedClaimVerifier.sol",
   "contracts/ShieldedPrivateTransferVerifier.sol",
   "contracts/ShieldedUnshieldVerifier.sol",
-  "contracts/ShieldedPrivateTransfer8Verifier.sol",
-  "contracts/ShieldedUnshield8Verifier.sol",
   ...Object.values(SHIELDED_CIRCUITS).flatMap((source) => [
     `frontend/public/zk/shielded/${source}.wasm`,
     `frontend/public/zk/shielded/${source}_final.zkey`,
@@ -83,12 +87,19 @@ export function checkedFile(root, relativePath, label, prefix = "") {
 export function sourceBundleSha256(root = DEFAULT_ROOT) {
   root = path.resolve(root);
   const output = execFileSync("git", ["ls-files", "-z"], { cwd: root });
+  const deleted = new Set(
+    execFileSync("git", ["ls-files", "--deleted", "-z"], { cwd: root })
+      .toString("utf8")
+      .split("\0")
+      .filter(Boolean),
+  );
   const files = output
     .toString("utf8")
     .split("\0")
     .filter(Boolean)
     .filter(
       (file) =>
+        (!deleted.has(file) || REQUIRED_SOURCES.has(file)) &&
         !SOURCE_EXCLUSIONS.has(file) &&
         !file.startsWith("release-evidence/") &&
         (SOURCE_SINGLETONS.has(file) || SOURCE_ROOTS.some((prefix) => file.startsWith(prefix))),

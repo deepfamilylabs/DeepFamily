@@ -12,7 +12,7 @@ import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
 
-/** Writes the ten compiled circuits and development manifests that pin their digests. */
+/** Writes the eight compiled circuits and development manifests that pin their digests. */
 function writeCompiledCircuits(root) {
   const compile = (directory, name) => {
     const output = path.join(root, directory);
@@ -55,7 +55,7 @@ describe("integrated local ZK artifact preparation", function () {
 
   it("compiles all 8 circuits and reuses verified current keys", async function () {
     const calls = [];
-    const artifacts = { status: "development", circuitCount: 10 };
+    const artifacts = { status: "development", circuitCount: 8 };
     const result = await ensureZkArtifacts({
       root,
       build: async (options) => calls.push(["build", options.circuit]),
@@ -80,7 +80,7 @@ describe("integrated local ZK artifact preparation", function () {
       check: async () => {
         calls.push("check");
         if (!downloaded) throw new Error("missing public zkey");
-        return { status: "development", circuitCount: 10 };
+        return { status: "development", circuitCount: 8 };
       },
       fetchAssets: async () => {
         calls.push("fetch");
@@ -106,7 +106,7 @@ describe("integrated local ZK artifact preparation", function () {
       check: async () => {
         calls.push("check");
         if (!ready) throw new Error("missing shielded key");
-        return { status: "development", circuitCount: 10 };
+        return { status: "development", circuitCount: 8 };
       },
       fetchAssets: async () => calls.push("fetch"),
       setup: async () => {
@@ -158,7 +158,7 @@ describe("integrated local ZK artifact preparation", function () {
     writeCompiledCircuits(root);
     expect(compiledCircuitsMatchManifests({ root })).to.equal(true);
 
-    fs.writeFileSync(path.join(root, "zk-artifacts/shielded/shielded_unshield_8.r1cs"), "edited");
+    fs.writeFileSync(path.join(root, "zk-artifacts/shielded/shielded_unshield.r1cs"), "edited");
     expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
 
     writeCompiledCircuits(root);
@@ -171,7 +171,7 @@ describe("integrated local ZK artifact preparation", function () {
     writeCompiledCircuits(root);
     const shieldedManifest = path.join(root, "circuits/shielded-development-manifest.json");
     const manifest = JSON.parse(fs.readFileSync(shieldedManifest, "utf8"));
-    delete manifest.circuits.privateTransfer8;
+    delete manifest.circuits.privateTransfer;
     fs.writeFileSync(shieldedManifest, JSON.stringify(manifest));
     expect(compiledCircuitsMatchManifests({ root })).to.equal(false);
 
