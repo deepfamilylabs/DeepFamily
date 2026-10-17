@@ -11,15 +11,18 @@ import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import {
   computeShieldedBudgetNoteCommitment,
+  computeShieldedBudgetOwnerAuthorization,
   computeShieldedClaimBatch,
   computeShieldedDummyInputNullifier,
   computeShieldedDummyPeriodNullifier,
   computeShieldedEnrollmentCommitment,
+  computeShieldedIdentityBudgetTermsCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
   deriveShieldedHeirKeyMaterial,
 } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
@@ -67,16 +70,8 @@ test("shielded claim constraints", async (t) => {
       const wires = await calculator.calculateWitness(witness, 1);
       assert.equal(wires[0], 1n);
     };
-    const invalid = async (witness) => {
-      // The WASM runtime prints each expected constraint failure to stderr.
-      const originalError = console.error;
-      console.error = () => {};
-      try {
-        await assert.rejects(() => calculator.calculateWitness(witness, 1));
-      } finally {
-        console.error = originalError;
-      }
-    };
+    const invalid = (witness) =>
+      assertConstraintViolation(() => calculator.calculateWitness(witness, 1));
     const mutate = (witness, change) => {
       const copy = structuredClone(witness);
       change(copy);
@@ -204,21 +199,31 @@ test("shielded claim constraints", async (t) => {
         await valid(buildShieldedClaimFixture({ budgetKind }).witness);
         for (const secondBudgetKind of [0, 1]) {
           await (budgetKind === secondBudgetKind ? valid : invalid)(
-            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 }).witness,
+            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 })
+              .witness,
           );
         }
       }
     });
-    await t.test("independent authorization requires its owner and preserves identity period history", async () => {
-      const independent = buildShieldedClaimFixture({ keyMode: 1, secondRemainingPeriods: 2 });
-      await valid(independent.witness);
-      const legacy = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
-      assert.deepEqual(independent.witness.periodNullifiers.slice(0, 2), legacy.witness.periodNullifiers.slice(0, 2));
-      await invalid({ ...independent.witness, ownerSecret: legacy.ownerSecret.toString() });
-      await invalid({ ...independent.witness, keyMode: "0" });
-      await invalid(buildShieldedClaimFixture({ keyMode: 1, secondKeyMode: 0, secondRemainingPeriods: 2 }).witness);
-      await invalid(buildShieldedClaimFixture({ budgetKind: 1, keyMode: 1 }).witness);
-    });
+    await t.test(
+      "independent authorization requires its owner and preserves identity period history",
+      async () => {
+        const independent = buildShieldedClaimFixture({ keyMode: 1, secondRemainingPeriods: 2 });
+        await valid(independent.witness);
+        const legacy = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
+        assert.deepEqual(
+          independent.witness.periodNullifiers.slice(0, 2),
+          legacy.witness.periodNullifiers.slice(0, 2),
+        );
+        await invalid({ ...independent.witness, ownerSecret: legacy.ownerSecret.toString() });
+        await invalid({ ...independent.witness, keyMode: "0" });
+        await invalid(
+          buildShieldedClaimFixture({ keyMode: 1, secondKeyMode: 0, secondRemainingPeriods: 2 })
+            .witness,
+        );
+        await invalid(buildShieldedClaimFixture({ budgetKind: 1, keyMode: 1 }).witness);
+      },
+    );
     await t.test("public and private budgets share real period nullifiers", () => {
       const privateWitness = buildShieldedClaimFixture().witness;
       const publicWitness = buildShieldedClaimFixture({ budgetKind: 1 }).witness;
@@ -274,38 +279,65 @@ test("shielded claim constraints", async (t) => {
       },
     );
     await t.test(
-      "private input cannot bypass its opening or become an identity-bound remainder",
+      "valid private and public inputs retain their binding and required openings",
       async () => {
-        for (const budgetKind of [0, 1]) {
+        for (const [budgetKind, keyMode] of [
+          [0, 0],
+          [0, 1],
+          [1, 0],
+        ]) {
           const fixture = buildShieldedClaimFixture({
             budgetKind,
-            secondBudgetKind: 0,
+            keyMode,
+            secondBudgetKind: budgetKind,
+            secondKeyMode: keyMode,
             secondRemainingPeriods: 2,
           });
           const { witness } = fixture;
-          for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
-            await invalid(
-              mutate(witness, (w) => {
-                w[field] = "0";
-              }),
-            );
+          // Every attack starts from a compatible pair that satisfies the circuit.
+          await valid(witness);
+          if (budgetKind === 0) {
+            for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
+              await invalid(
+                mutate(witness, (w) => {
+                  w[field] = "0";
+                }),
+              );
+            }
           }
           await invalid(
             mutate(witness, (w) => {
-              const terms = poseidon7([
-                shieldedFixtureTag(1029n, 1030n, 0x1111111111111111111111111111111111111111n),
-                BigInt(w.fatherIdentityCommitment),
-                BigInt(w.rootVersionIndex),
-                fixture.heirIdentityCommitment,
-                BigInt(w.eligibleFrom),
-                BigInt(w.rate),
-                BigInt(w.periodDays),
-              ]);
+              const scope = shieldedFixtureScope(w);
+              const binding =
+                budgetKind === 0
+                  ? computeShieldedIdentityBudgetTermsCommitment(
+                      {
+                        rootIdentityCommitment:
+                          BigInt(w.rootIsMother) === 1n
+                            ? w.motherIdentityCommitment
+                            : w.fatherIdentityCommitment,
+                        rootVersionIndex: w.rootVersionIndex,
+                        heirIdentityCommitment: fixture.heirIdentityCommitment,
+                        eligibleFrom: w.eligibleFrom,
+                        amountPerPeriod: w.rate,
+                        periodDays: w.periodDays,
+                      },
+                      scope,
+                    )
+                  : computeShieldedBudgetOwnerAuthorization(
+                      {
+                        heirOwnerCommitment: fixture.ownerCommitment,
+                        keyMode,
+                      },
+                      scope,
+                    );
+              // Recompute a valid opposite-kind output, so rejection tests the
+              // output binding rather than a stale hash or an invalid input pair.
               w.outputCommitments[0] = poseidon8([
-                shieldedFixtureTag(1030n, 1030n, 0x1111111111111111111111111111111111111111n),
+                shieldedFixtureTag(budgetKind === 0 ? 1030n : 1015n, w.chainId, w.pool),
                 fixture.policy,
                 fixture.enrollment,
-                terms,
+                binding,
                 BigInt(w.rate),
                 BigInt(w.remaining) +
                   BigInt(w.secondRemaining) -

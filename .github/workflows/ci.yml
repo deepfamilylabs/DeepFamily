@@ -13,6 +13,29 @@ env:
   VITE_ZK_ASSET_BASE_URL: ${{ vars.VITE_ZK_ASSET_BASE_URL }}
 
 jobs:
+  circuit-constraints:
+    name: Shielded circuit constraints
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.2
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Circom compiler
+        run: npm run zk:fetch
+
+      - name: Check shielded circuit constraints
+        run: npm run test:circuits
+
   build-test:
     runs-on: ubuntu-latest
 
@@ -49,9 +72,6 @@ jobs:
 
       - name: Check ZK artifacts and proofs
         run: npm run zk:artifacts:check && npm run zk:check
-
-      - name: Check shielded circuit constraints
-        run: node --test circuits/test/shielded_*.test.mjs
 
       - name: Lint (solhint)
         run: npm run lint

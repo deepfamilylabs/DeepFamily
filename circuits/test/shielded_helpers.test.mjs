@@ -10,9 +10,12 @@ import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2, poseidon3, poseidon8 } from "poseidon-lite";
 import { shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-const purposes = [1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030, 1033];
+const purposes = [
+  1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030, 1033,
+];
 const fieldPrime = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const field = (value) => ((value % fieldPrime) + fieldPrime) % fieldPrime;
 
@@ -47,15 +50,7 @@ async function compile(directory, name, source) {
     valid: async (witness) => {
       assert.equal((await calculator.calculateWitness(witness, 1))[0], 1n);
     },
-    invalid: async (witness) => {
-      const originalError = console.error;
-      console.error = () => {};
-      try {
-        await assert.rejects(() => calculator.calculateWitness(witness, 1));
-      } finally {
-        console.error = originalError;
-      }
-    },
+    invalid: (witness) => assertConstraintViolation(() => calculator.calculateWitness(witness, 1)),
   };
 }
 

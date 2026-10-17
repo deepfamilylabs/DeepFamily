@@ -14,6 +14,7 @@ import {
 } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
@@ -57,7 +58,12 @@ test("a receive code proves the identity holder chose the owner and viewing keys
       ownerCommitment: String(publicSignals[1]),
       viewKeyLo: String(publicSignals[2]),
       viewKeyHi: String(publicSignals[3]),
-      keyMode: "0", identitySuiteId: "1", assetSuiteId: "1", assetDerivationVersion: "1", receiveCodeVersion: "1", spendingSecret: String(keys.ownerSecret),
+      keyMode: "0",
+      identitySuiteId: "1",
+      assetSuiteId: "1",
+      assetDerivationVersion: "1",
+      receiveCodeVersion: "1",
+      spendingSecret: String(keys.ownerSecret),
       nameField: lineage.nameField,
       derivedSecretField: lineage.derivedSecretField,
       isBirthBC: lineage.isBirthBC,
@@ -70,16 +76,8 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     const wires = await calculator.calculateWitness(witness, 1);
     assert.equal(wires[0], 1n);
     assert.deepEqual(wires.slice(1, 10), publicSignals);
-    const invalid = async (change) => {
-      const changed = { ...witness, ...change };
-      const originalError = console.error;
-      console.error = () => {};
-      try {
-        await assert.rejects(() => calculator.calculateWitness(changed, 1));
-      } finally {
-        console.error = originalError;
-      }
-    };
+    const invalid = (change) =>
+      assertConstraintViolation(() => calculator.calculateWitness({ ...witness, ...change }, 1));
     // Another person's secret cannot vouch for this identity.
     await invalid({ derivedSecretField: String(derivedSecretField + 1n) });
     await invalid({ identityCommitment: String(identityCommitment + 1n) });
@@ -87,12 +85,17 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     await invalid({ ownerCommitment: String(keys.ownerCommitment + 1n) });
     await invalid({ viewKeyLo: "0", viewKeyHi: "0" });
     await invalid({ viewKeyHi: String(1n << 128n) });
-    const independent = { ...witness, keyMode: "1", spendingSecret: "987654321", ownerCommitment: String(computeShieldedOwnerCommitment(987654321n)) };
-    assert.equal((await calculator.calculateWitness(independent, 1))[0], 1n);
-    const independentInvalid = async (change) => {
-      const originalError = console.error; console.error = () => {};
-      try { await assert.rejects(() => calculator.calculateWitness({ ...independent, ...change }, 1)); } finally { console.error = originalError; }
+    const independent = {
+      ...witness,
+      keyMode: "1",
+      spendingSecret: "987654321",
+      ownerCommitment: String(computeShieldedOwnerCommitment(987654321n)),
     };
+    assert.equal((await calculator.calculateWitness(independent, 1))[0], 1n);
+    const independentInvalid = (change) =>
+      assertConstraintViolation(() =>
+        calculator.calculateWitness({ ...independent, ...change }, 1),
+      );
     await independentInvalid({ keyMode: "0" });
     await independentInvalid({ keyMode: "2" });
     await independentInvalid({ spendingSecret: "0" });

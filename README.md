@@ -142,7 +142,7 @@ Rerunning the seed resumes existing data and does not change an existing NFT's o
 npm test              # Run all contract tests
 npm run test:gas      # Benchmark lineage writes at real and synthetic tree depths
 npm run frontend:check # Run frontend lint + typecheck + tests
-npm run check         # Run frontend checks + contract lint/build/test
+npm run check         # Run circuit constraints, frontend checks and contract lint/build/test
 ```
 
 `test:gas` uses Hardhat's in-process chain. The person-version case uses a proof-verifier stub;
@@ -153,6 +153,11 @@ Use `npm run test:shielded:depth-gas` and `npm run test:shielded:depth-proof` fo
 ### ZK Artifact Workflow
 
 The same `zk:*` workflow covers the two identity/disclosure circuits and all six shielded circuits:
+
+Run `npm run test:circuits` for shielded constraint tests. They compile the current sources into
+temporary directories and require only npm dependencies and the pinned Circom compiler
+(`npm run zk:fetch`), without proving keys, Powers of Tau, or downloaded browser artifacts.
+`npm run check` includes these tests, and CI runs them in an independent job.
 
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |

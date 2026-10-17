@@ -15,6 +15,7 @@ import {
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
 import { shieldedFixtureScope } from "./shielded_scope_fixture.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const hash = (byte) =>
@@ -159,15 +160,7 @@ async function compile(directory, name) {
       const wires = await calculator.calculateWitness(witness, 1);
       assert.equal(wires[0], 1n);
     },
-    invalid: async (witness) => {
-      const oldError = console.error;
-      console.error = () => {};
-      try {
-        await assert.rejects(() => calculator.calculateWitness(witness, 1));
-      } finally {
-        console.error = oldError;
-      }
-    },
+    invalid: (witness) => assertConstraintViolation(() => calculator.calculateWitness(witness, 1)),
     checkR1cs: (witness) => {
       const inputPath = path.join(directory, `${name}.input.json`);
       const witnessPath = path.join(directory, `${name}.wtns`);

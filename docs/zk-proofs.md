@@ -429,6 +429,10 @@ Supported top-level commands:
 | `npm run zk:ceremony:verify`   | Verify production setup evidence for all 8 circuits |
 
 The top-level commands cover identity, disclosure, and shielded circuits together.
+`npm run test:circuits` separately compiles current shielded sources into temporary directories
+and checks their constraints without proving keys, Powers of Tau, or browser artifacts. It is
+included in `npm run check` and runs in an independent CI job. Negative witnesses must trigger
+a Circom constraint assertion; malformed inputs and runtime failures fail the test instead.
 `zk:check` proves the identity and disclosure fixtures; in development it also checks all six
 shielded artifact sets and runs the available fund/claim proof fixtures. Production checks
 validate all six shielded circuit ceremonies. Release preflight additionally checks independent

@@ -1,9 +1,12 @@
-import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2 } from "poseidon-lite";
+import { CIRCOM_ARTIFACT_FLAGS } from "../../scripts/lib/circomToolchain.mjs";
+import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
@@ -79,11 +82,28 @@ const mutate = (original, change) => {
   return copy;
 };
 test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-value-eight-"));
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
   for (const circuit of ["shielded_private_transfer", "shielded_unshield"]) {
-    const wasm = path.join(root, "zk-artifacts/shielded", `${circuit}_js`, `${circuit}.wasm`);
-    assert(fs.existsSync(wasm), `Build ${circuit} before running circuit tests`);
-    calculators[circuit] = await WitnessCalculatorBuilder(fs.readFileSync(wasm));
+    execFileSync(
+      path.join(root, "bin/circom"),
+      [
+        `circuits/${circuit}.circom`,
+        ...CIRCOM_ARTIFACT_FLAGS,
+        "-l",
+        "node_modules",
+        "-l",
+        "node_modules/circomlib/circuits",
+        "-o",
+        output,
+      ],
+      { cwd: root, stdio: "pipe" },
+    );
+    const wasm = path.join(output, `${circuit}_js`, `${circuit}.wasm`);
+    calculators[circuit] = await WitnessCalculatorBuilder(fs.readFileSync(wasm), {
+      singleThread: true,
+    });
   }
   const transfer = calculators.shielded_private_transfer;
   const unshield = calculators.shielded_unshield;
@@ -111,13 +131,13 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
         }
         const calculator = isExit ? unshield : transfer;
         await calculator.calculateWitness(witness, true);
-        await assert.rejects(
+        await assertConstraintViolation(() =>
           calculator.calculateWitness(
             mutate(witness, (copy) => (copy.inputDepths[7] = "33")),
             true,
           ),
         );
-        await assert.rejects(
+        await assertConstraintViolation(() =>
           calculator.calculateWitness(
             mutate(witness, (copy) => (copy.inputIndices[7] = String(1n << 32n))),
             true,
@@ -140,8 +160,12 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
       witness.outputAmounts = [String(MAX), "1"];
       witness.outputCommitments = [String(note(MAX, 1001n, 201n)), String(note(1n, 1002n, 202n))];
       await transfer.calculateWitness(witness, true);
-      await assert.rejects(transfer.calculateWitness(fixture(8, false, Array(8).fill(MAX)), true));
-      await assert.rejects(unshield.calculateWitness(fixture(8, true, Array(8).fill(MAX)), true));
+      await assertConstraintViolation(() =>
+        transfer.calculateWitness(fixture(8, false, Array(8).fill(MAX)), true),
+      );
+      await assertConstraintViolation(() =>
+        unshield.calculateWitness(fixture(8, true, Array(8).fill(MAX)), true),
+      );
     },
   );
   for (const [label, change] of [
@@ -158,16 +182,18 @@ test("eight-input VALUE constraints and canonical nullifiers", async (t) => {
     ["amount conservation", (w) => (w.outputAmounts[0] = "29")],
   ])
     await t.test(`rejects ${label}`, async () => {
-      await assert.rejects(transfer.calculateWitness(mutate(fixture(3), change), true));
+      await assertConstraintViolation(() =>
+        transfer.calculateWitness(mutate(fixture(3), change), true),
+      );
     });
   await t.test("changing withdrawal value or recipient cannot reuse a proof opening", async () => {
-    await assert.rejects(
+    await assertConstraintViolation(() =>
       unshield.calculateWitness(
         mutate(fixture(3, true), (w) => (w.amount = "2")),
         true,
       ),
     );
-    await assert.rejects(
+    await assertConstraintViolation(() =>
       unshield.calculateWitness(
         mutate(fixture(3, true), (w) => (w.recipient = "0")),
         true,
