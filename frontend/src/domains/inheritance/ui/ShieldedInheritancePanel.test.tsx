@@ -3123,6 +3123,64 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.submit).not.toHaveBeenCalled();
     expect(record.phase).toBe("done");
   });
+  it("recovers a known hash's successful replacement and releases the pool's pending guard", async () => {
+    mocks.identity = identity;
+    const record = restorePendingSubmission();
+    const queryFilter = vi.fn(async () => [
+      { args: { commitment: 100n }, transactionHash: "0xreplacement" },
+      { args: { commitment: 101n }, transactionHash: "0xreplacement" },
+    ]);
+    const noteFilter = vi.fn(() => "unfiltered-notes");
+    let finishReceipt!: (receipt: unknown) => void;
+    mocks.receipt.mockImplementation(async (hash: string) => hash === "0xold"
+      ? null
+      : new Promise((resolve) => { finishReceipt = resolve; }));
+    const selectedModules = {
+      ...modules,
+      pool: { runner: { provider: signer.provider }, queryFilter, filters: { NoteAppended: noteFilter } },
+    } as unknown as ShieldedPageModules;
+
+    await renderPanel(signer, selectedModules);
+    await waitFor(() => expect(mocks.receipt).toHaveBeenCalledWith("0xreplacement"));
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finishReceipt({ status: 1 }));
+
+    await waitFor(() => expect(screen.getByText(/0xreplacement.*transaction\.success$/)).toBeTruthy());
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false);
+    expect(record.phase).toBe("done");
+    expect(record.transactionHash).toBe("0xreplacement");
+    expect(noteFilter).toHaveBeenCalledWith();
+    expect(queryFilter).toHaveBeenCalledWith("unfiltered-notes", 30, 40);
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("releases a known cancelled transaction's pending guard after its nonce is consumed", async () => {
+    mocks.identity = identity;
+    const record = restorePendingSubmission();
+    const queryFilter = vi.fn(async () => []);
+    const noteFilter = vi.fn(() => "unfiltered-notes");
+    let finishNonce!: (nonce: number) => void;
+    (signer.provider!.getTransactionCount as any).mockImplementation(
+      () => new Promise((resolve) => { finishNonce = resolve; }),
+    );
+    const selectedModules = {
+      ...modules,
+      pool: { runner: { provider: signer.provider }, queryFilter, filters: { NoteAppended: noteFilter } },
+    } as unknown as ShieldedPageModules;
+
+    await renderPanel(signer, selectedModules);
+    await waitFor(() => expect(signer.provider!.getTransactionCount).toHaveBeenCalledWith(address, 40));
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finishNonce(8));
+
+    await waitFor(() => expect(screen.getByText(/transaction\.failed$/)).toBeTruthy());
+    expect(screen.getByText(label("nonceConsumed"))).toBeTruthy();
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false);
+    expect(record.phase).toBe("failed");
+    expect(queryFilter).toHaveBeenCalledWith("unfiltered-notes", 30, 40);
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
   it("retries a missing receipt and an RPC error every five seconds", async () => {
     const record = restorePendingSubmission();
     mocks.receipt.mockResolvedValue(null);

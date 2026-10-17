@@ -488,6 +488,44 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
   });
 
+  it("accepts a repriced approval through the receipt helper and permits the deposit", async () => {
+    const fixture = tokenModules();
+    const repricedHash = `0x${"cd".repeat(32)}`;
+    const wait = vi.fn(async () => {
+      fixture.token.allowance.mockResolvedValue(1_250_000_000_000_000_000n);
+      throw Object.assign(new Error("Approval transaction repriced"), {
+        code: "TRANSACTION_REPLACED",
+        reason: "repriced",
+        cancelled: false,
+        replacement: { hash: repricedHash },
+        receipt: { status: 1 },
+      });
+    });
+    fixture.token.approve.mockImplementationOnce(async () => ({ hash: "0xapproval", wait }));
+    renderPanel({ selectedModules: fixture.modules });
+    await restoreFunds();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.actions.shield" }));
+    chooseActiveWallet("asset");
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1.25" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: label("approve") })).toBeTruthy());
+
+    click("approve");
+
+    await waitFor(() => expect(screen.getByText(`${label("transactionHash")}: ${repricedHash} · transaction.success`)).toBeTruthy());
+    expect(wait).toHaveBeenCalledOnce();
+    expect(fixture.token.approve).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("button", { name: label("approve") })).toBeNull();
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false);
+    expect(sessionState()).toEqual({ credentials, identity, funds: verifiedFunds });
+    fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+    await waitFor(() => expect(mocks.submitShield).toHaveBeenCalledOnce());
+    expect(mocks.call).toHaveBeenCalledWith("preview", expect.objectContaining({
+      action: "shield", slot: "asset", amount: "1250000000000000000",
+    }), expect.anything());
+    expect(sessionState()).toEqual({ credentials, identity, funds: verifiedFunds });
+  });
+
   it("keeps the unlocked deposit session when the transaction wallet hides and restores the page", async () => {
     const visibility = documentVisibility();
     const request = deferred();

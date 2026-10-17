@@ -4,6 +4,7 @@ import {
   deriveShieldedHeirKeyMaterial,
   encodeShieldedAssetKey,
 } from "@deepfamily/protocol-core";
+import { getAddress } from "ethers";
 import { ShieldedAssetSession } from "./shieldedAssetSession";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 const mocks = vi.hoisted(() => ({
@@ -154,6 +155,7 @@ function assertNoOpenings(value: unknown) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.pool = context.poolAddress;
   mocks.notes = [];
   mocks.transfer.mockImplementation(async ({ destinations }) =>
     preparedValueOutputs(
@@ -585,25 +587,72 @@ describe("asset Worker preview and proof boundary", () => {
     },
   );
 
-  it.each(["", "invalid-address", "0x0000000000000000000000000000000000000000"])(
-    "rejects withdrawal recipient %s before same-owner consolidation",
-    async (publicRecipient) => {
+  it.each([
+    "",
+    "invalid-address",
+    "0x0000000000000000000000000000000000000000",
+    context.poolAddress,
+  ])("rejects withdrawal recipient %s before same-owner consolidation", async (publicRecipient) => {
+    const session = await unlocked();
+    mocks.notes = Array.from({ length: 9 }, (_, index) =>
+      value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
+    );
+    await expect(
+      session.call("preview", {
+        context,
+        slot: "identity",
+        action: "unshield",
+        amount: "9",
+        publicRecipient,
+        candidates: mocks.notes.map((note) => String(note.commitment)),
+      }),
+    ).rejects.toThrow();
+    expect(mocks.transfer).not.toHaveBeenCalled();
+    expect(mocks.unshield).not.toHaveBeenCalled();
+  });
+
+  it.each(["lowercase", "checksum"] as const)(
+    "rejects the pool's %s address before a nine-note withdrawal consolidation",
+    async (addressCase) => {
       const session = await unlocked();
+      const poolAddress = getAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+      mocks.pool = poolAddress;
       mocks.notes = Array.from({ length: 9 }, (_, index) =>
         value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
       );
       await expect(
         session.call("preview", {
-          context,
+          context: { ...context, poolAddress },
           slot: "identity",
           action: "unshield",
           amount: "9",
-          publicRecipient,
+          publicRecipient: addressCase === "lowercase" ? poolAddress.toLowerCase() : poolAddress,
           candidates: mocks.notes.map((note) => String(note.commitment)),
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow("Unshield recipient must not be the pool");
       expect(mocks.transfer).not.toHaveBeenCalled();
       expect(mocks.unshield).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
     },
   );
+
+  it("normalizes a valid withdrawal recipient before preparation", async () => {
+    const session = await unlocked();
+    const destination = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
+    const preview = await session.call("preview", {
+      context,
+      slot: "identity",
+      action: "unshield",
+      amount: "8",
+      publicRecipient: destination,
+      candidates: ["1"],
+    });
+    expect(preview.action).toBe("unshield");
+    expect(preview.recipient).toBe(getAddress(destination));
+    expect(mocks.unshield).toHaveBeenCalledWith(
+      expect.objectContaining({ recipient: getAddress(destination) }),
+    );
+    expect(mocks.transfer).not.toHaveBeenCalled();
+  });
 });

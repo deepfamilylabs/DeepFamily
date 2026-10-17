@@ -65,6 +65,7 @@ import {
   readShieldedSubmissionOutcome,
   type ShieldedSubmissionTracking,
 } from "../services/shieldedSubmissionTracking";
+import { waitForShieldedTransaction } from "../services/shieldedTransactionReceipt";
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { type ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import {
@@ -1363,8 +1364,10 @@ export function ShieldedInheritancePanel({
         endWalletRequest();
       }
       trackBroadcast(chosen.provider!, tx.hash, txId, label);
-      const receipt = await tx.wait();
-      if (receipt) recordReceipt(tx.hash, receipt.status, { id: txId, label });
+      const { transactionHash, receipt } = await waitForShieldedTransaction(tx, (hash) => {
+        trackBroadcast(chosen.provider!, hash, txId, label);
+      });
+      recordReceipt(transactionHash, receipt.status, { id: txId, label });
       if (current()) {
         if (
           walletRef.current.signer !== chosen ||
@@ -1374,8 +1377,8 @@ export function ShieldedInheritancePanel({
         const allowance: bigint = await modules.token.allowance(account, modules.poolAddress);
         setAllowanceReady(receipt?.status === 1 && allowance >= value);
       }
-      if (receipt?.status !== 1)
-        throw new Error(t("shielded.transactionFailed", { hash: tx.hash }));
+      if (receipt.status !== 1)
+        throw new Error(t("shielded.transactionFailed", { hash: transactionHash }));
     }, t("shielded.stages.submitting"));
   }
   /**

@@ -8,6 +8,7 @@ import {
 
 const SIGNER_ADDRESS = "0x1111111111111111111111111111111111111111";
 const HASH = `0x${"ab".repeat(32)}`;
+const REPLACEMENT_HASH = `0x${"cd".repeat(32)}`;
 
 function fixture() {
   const provider = {
@@ -24,24 +25,33 @@ function fixture() {
     nonce: 7,
     signerAddress: SIGNER_ADDRESS,
     fromBlock: 80,
-    pool: { queryFilter, filters: { NoteAppended: noteFilter } } as unknown as ShieldedPageModules["pool"],
+    pool: {
+      queryFilter,
+      filters: { NoteAppended: noteFilter },
+    } as unknown as ShieldedPageModules["pool"],
     outputCommitments: ["100", "101"],
   };
   return { provider, noteFilter, queryFilter, tracked };
 }
 
 describe("shielded public submission tracking", () => {
-  it.each([null, { status: null }])("keeps a known hash pending without a settled receipt: %j", async (receipt) => {
-    const f = fixture();
-    f.tracked.hash = HASH;
-    f.provider.getTransactionReceipt.mockResolvedValue(receipt);
+  it.each([null, { status: null }])(
+    "keeps a known hash pending after checking replacement evidence: %j",
+    async (receipt) => {
+      const f = fixture();
+      f.tracked.hash = HASH;
+      f.provider.getTransactionReceipt.mockResolvedValue(receipt);
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending", hash: HASH });
-    expect(f.provider.getTransactionReceipt).toHaveBeenCalledWith(HASH);
-    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
-    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
-    expect(f.queryFilter).not.toHaveBeenCalled();
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+        status: "pending",
+        hash: HASH,
+      });
+      expect(f.provider.getTransactionReceipt).toHaveBeenCalledWith(HASH);
+      expect(f.provider.getTransactionReceipt).toHaveBeenCalledOnce();
+      expect(f.queryFilter).toHaveBeenCalledExactlyOnceWith("all-public-notes", 80, 90);
+      expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 90);
+    },
+  );
 
   it.each([1, 0])("reports a known transaction's receipt status %i", async (receiptStatus) => {
     const f = fixture();
@@ -49,8 +59,74 @@ describe("shielded public submission tracking", () => {
     f.provider.getTransactionReceipt.mockResolvedValue({ status: receiptStatus });
 
     expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
-      status: "confirmed", hash: HASH, receiptStatus,
+      status: "confirmed",
+      hash: HASH,
+      receiptStatus,
     });
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
+    expect(f.queryFilter).not.toHaveBeenCalled();
+  });
+
+  it("recovers a successful speed-up from public outputs when the original hash has no receipt", async () => {
+    const f = fixture();
+    f.tracked.hash = HASH;
+    f.provider.getTransactionCount.mockResolvedValue(8);
+    f.queryFilter.mockResolvedValue([
+      { args: { commitment: 100n }, transactionHash: REPLACEMENT_HASH },
+      { args: { commitment: 101n }, transactionHash: REPLACEMENT_HASH },
+    ]);
+    f.provider.getTransactionReceipt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ status: 1 });
+
+    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+      status: "confirmed",
+      hash: REPLACEMENT_HASH,
+      receiptStatus: 1,
+    });
+    expect(f.provider.getTransactionReceipt).toHaveBeenNthCalledWith(1, HASH);
+    expect(f.provider.getTransactionReceipt).toHaveBeenNthCalledWith(2, REPLACEMENT_HASH);
+    expect(f.noteFilter).toHaveBeenCalledExactlyOnceWith();
+    expect(f.queryFilter).toHaveBeenCalledExactlyOnceWith("all-public-notes", 80, 90);
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.tracked.hash).toBe(HASH);
+  });
+
+  it.each([null, { status: null }])(
+    "keeps a discovered replacement pending while its receipt is unavailable: %j",
+    async (receipt) => {
+      const f = fixture();
+      f.tracked.hash = HASH;
+      f.provider.getTransactionCount.mockResolvedValue(8);
+      f.queryFilter.mockResolvedValue([
+        { args: { commitment: 100n }, transactionHash: REPLACEMENT_HASH },
+        { args: { commitment: 101n }, transactionHash: REPLACEMENT_HASH },
+      ]);
+      f.provider.getTransactionReceipt.mockResolvedValueOnce(null).mockResolvedValueOnce(receipt);
+
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+        status: "pending",
+        hash: REPLACEMENT_HASH,
+      });
+      expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps the original hash pending when its outputs exist but its receipt is temporarily missing", async () => {
+    const f = fixture();
+    f.tracked.hash = HASH;
+    f.provider.getTransactionCount.mockResolvedValue(8);
+    f.queryFilter.mockResolvedValue([
+      { args: { commitment: 100n }, transactionHash: HASH },
+      { args: { commitment: 101n }, transactionHash: HASH },
+    ]);
+
+    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+      status: "pending",
+      hash: HASH,
+    });
+    expect(f.provider.getTransactionReceipt).toHaveBeenCalledExactlyOnceWith(HASH);
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
   });
 
@@ -60,7 +136,8 @@ describe("shielded public submission tracking", () => {
     f.provider.getNetwork.mockResolvedValue({ chainId: 72n });
 
     expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
-      status: "pending", ...(hash ? { hash } : {}),
+      status: "pending",
+      ...(hash ? { hash } : {}),
     });
     expect(f.provider.getTransactionReceipt).not.toHaveBeenCalled();
     expect(f.provider.getBlockNumber).not.toHaveBeenCalled();
@@ -79,7 +156,9 @@ describe("shielded public submission tracking", () => {
     f.provider.getTransactionReceipt.mockResolvedValue({ status: 1 });
 
     expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
-      status: "confirmed", hash: HASH, receiptStatus: 1,
+      status: "confirmed",
+      hash: HASH,
+      receiptStatus: 1,
     });
     expect(f.noteFilter).toHaveBeenCalledExactlyOnceWith();
     expect(f.queryFilter).toHaveBeenCalledExactlyOnceWith("all-public-notes", 80, 90);
@@ -94,7 +173,10 @@ describe("shielded public submission tracking", () => {
       { args: { commitment: 101n }, transactionHash: HASH },
     ]);
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending", hash: HASH });
+    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+      status: "pending",
+      hash: HASH,
+    });
     expect(f.tracked.hash).toBeUndefined();
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
   });
@@ -111,58 +193,93 @@ describe("shielded public submission tracking", () => {
     expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 90);
   });
 
-  it.each([6, 7])("keeps an unknown submission pending while nonce %i has not consumed its nonce", async (nonce) => {
-    const f = fixture();
-    f.provider.getTransactionCount.mockResolvedValue(nonce);
+  it.each([6, 7])(
+    "keeps an unknown submission pending while nonce %i has not consumed its nonce",
+    async (nonce) => {
+      const f = fixture();
+      f.provider.getTransactionCount.mockResolvedValue(nonce);
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending" });
-    expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 90);
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending" });
+      expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 90);
+    },
+  );
 
-  it("reports a consumed nonce only after checking public outputs at the same block", async () => {
-    const f = fixture();
-    f.provider.getTransactionCount.mockResolvedValue(8);
+  it.each([undefined, HASH])(
+    "reports a consumed nonce only after checking public outputs at the same block: %s",
+    async (hash) => {
+      const f = fixture();
+      if (hash) f.tracked.hash = hash;
+      f.provider.getTransactionCount.mockResolvedValue(8);
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "replaced" });
-    expect(f.queryFilter).toHaveBeenCalledWith("all-public-notes", 80, 90);
-    expect(f.provider.getTransactionCount).toHaveBeenCalledWith(SIGNER_ADDRESS, 90);
-    expect(f.provider.getBlockNumber).toHaveBeenCalledOnce();
-    expect(f.queryFilter.mock.invocationCallOrder[0]).toBeLessThan(f.provider.getTransactionCount.mock.invocationCallOrder[0]);
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "replaced" });
+      expect(f.queryFilter).toHaveBeenCalledWith("all-public-notes", 80, 90);
+      expect(f.provider.getTransactionCount).toHaveBeenCalledWith(SIGNER_ADDRESS, 90);
+      expect(f.provider.getBlockNumber).toHaveBeenCalledOnce();
+      expect(f.queryFilter.mock.invocationCallOrder[0]).toBeLessThan(
+        f.provider.getTransactionCount.mock.invocationCallOrder[0],
+      );
+    },
+  );
 
-  it("checks an unknown approval's nonce without querying pool events", async () => {
-    const f = fixture();
-    delete f.tracked.pool;
-    delete f.tracked.outputCommitments;
-    f.provider.getTransactionCount.mockResolvedValue(8);
+  it.each([undefined, HASH])(
+    "checks an approval's nonce without querying pool events: %s",
+    async (hash) => {
+      const f = fixture();
+      if (hash) f.tracked.hash = hash;
+      delete f.tracked.pool;
+      delete f.tracked.outputCommitments;
+      f.provider.getTransactionCount.mockResolvedValue(8);
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "replaced" });
-    expect(f.queryFilter).not.toHaveBeenCalled();
-    expect(f.provider.getTransactionCount).toHaveBeenCalledWith(SIGNER_ADDRESS, 90);
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "replaced" });
+      expect(f.queryFilter).not.toHaveBeenCalled();
+      expect(f.provider.getTransactionCount).toHaveBeenCalledWith(SIGNER_ADDRESS, 90);
+    },
+  );
 
-  it.each(["nonce", "signerAddress"] as const)("cannot classify an unknown submission without %s", async (missing) => {
-    const f = fixture();
-    delete f.tracked[missing];
+  it.each(["nonce", "signerAddress"] as const)(
+    "cannot classify an unknown submission without %s",
+    async (missing) => {
+      const f = fixture();
+      delete f.tracked[missing];
 
-    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending" });
-    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending" });
+      expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    },
+  );
 
-  it.each(["network", "block", "events", "nonce", "receipt"] as const)("propagates %s RPC failures so the caller can retry", async (stage) => {
-    const f = fixture();
-    const failure = new Error("RPC unavailable");
-    if (stage === "network") f.provider.getNetwork.mockRejectedValue(failure);
-    else if (stage === "block") f.provider.getBlockNumber.mockRejectedValue(failure);
-    else if (stage === "events") f.queryFilter.mockRejectedValue(failure);
-    else if (stage === "nonce") f.provider.getTransactionCount.mockRejectedValue(failure);
-    else {
+  it.each(["nonce", "signerAddress"] as const)(
+    "keeps a known hash pending without %s metadata",
+    async (missing) => {
+      const f = fixture();
       f.tracked.hash = HASH;
-      f.provider.getTransactionReceipt.mockRejectedValue(failure);
-    }
+      delete f.tracked[missing];
+      f.provider.getTransactionCount.mockResolvedValue(8);
 
-    await expect(readShieldedSubmissionOutcome(f.tracked)).rejects.toBe(failure);
-  });
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+        status: "pending",
+        hash: HASH,
+      });
+      expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["network", "block", "events", "nonce", "receipt"] as const)(
+    "propagates %s RPC failures so the caller can retry",
+    async (stage) => {
+      const f = fixture();
+      const failure = new Error("RPC unavailable");
+      if (stage === "network") f.provider.getNetwork.mockRejectedValue(failure);
+      else if (stage === "block") f.provider.getBlockNumber.mockRejectedValue(failure);
+      else if (stage === "events") f.queryFilter.mockRejectedValue(failure);
+      else if (stage === "nonce") f.provider.getTransactionCount.mockRejectedValue(failure);
+      else {
+        f.tracked.hash = HASH;
+        f.provider.getTransactionReceipt.mockRejectedValue(failure);
+      }
+
+      await expect(readShieldedSubmissionOutcome(f.tracked)).rejects.toBe(failure);
+    },
+  );
 
   it("leaves a frozen tracking record and its outputs unchanged after discovering a hash", async () => {
     const f = fixture();
@@ -171,7 +288,10 @@ describe("shielded public submission tracking", () => {
       { args: { commitment: 100n }, transactionHash: HASH },
     ]);
     const outputs = Object.freeze(["100", "101"]);
-    const tracked = Object.freeze({ ...f.tracked, outputCommitments: outputs as unknown as string[] });
+    const tracked = Object.freeze({
+      ...f.tracked,
+      outputCommitments: outputs as unknown as string[],
+    });
 
     expect(await readShieldedSubmissionOutcome(tracked)).toEqual({ status: "pending", hash: HASH });
     expect(tracked.hash).toBeUndefined();

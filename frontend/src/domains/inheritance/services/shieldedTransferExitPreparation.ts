@@ -418,6 +418,7 @@ export async function prepareShieldedUnshield(input: {
   if (amount === 0n) throw new Error("Unshield amount must be positive");
   const recipient = getAddress(input.recipient);
   if (BigInt(recipient) === 0n) throw new Error("Unshield recipient must be nonzero");
+  if (recipient === ctx.poolAddress) throw new Error("Unshield recipient must not be the pool");
   const sources = input.inputs;
   if (sources.length < 1 || sources.length > 8)
     throw new Error("Unshield needs one to eight input notes");

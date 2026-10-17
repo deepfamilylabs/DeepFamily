@@ -12,7 +12,7 @@ import { poseidon2, poseidon3, poseidon8 } from "poseidon-lite";
 import { shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
-const purposes = [1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030];
+const purposes = [1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030, 1033];
 const fieldPrime = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const field = (value) => ((value % fieldPrime) + fieldPrime) % fieldPrime;
 
@@ -105,6 +105,7 @@ template BudgetBindingCheck() {
     signal input chainId;
     signal input pool;
     signal input budgetKind;
+    signal input keyMode;
     signal input policyCommitment;
     signal input enrollmentCommitment;
     signal input termsCommitment;
@@ -123,6 +124,8 @@ template BudgetBindingCheck() {
     note.privateNoteTag <== tags.privateNoteTag;
     note.identityNoteTag <== tags.identityNoteTag;
     note.budgetKind <== budgetKind;
+    note.keyMode <== keyMode;
+    note.authorizationTag <== tags.authorizationTag;
     note.policyCommitment <== policyCommitment;
     note.enrollmentCommitment <== enrollmentCommitment;
     note.termsCommitment <== termsCommitment;
@@ -136,11 +139,20 @@ template BudgetBindingCheck() {
 component main = BudgetBindingCheck();`;
 }
 
-function budgetBindingWitness(budgetKind) {
+function budgetOwnerAuthorization(witness) {
+  return poseidon3([
+    shieldedFixtureTag(1033, witness.chainId, witness.pool),
+    BigInt(witness.ownerCommitment),
+    field(BigInt(witness.keyMode)),
+  ]);
+}
+
+function budgetBindingWitness(budgetKind, keyMode = 0) {
   const witness = {
     chainId: "31337",
     pool: String(0x1111111111111111111111111111111111111111n),
     budgetKind: String(budgetKind),
+    keyMode: String(keyMode),
     policyCommitment: "2100",
     enrollmentCommitment: "2101",
     termsCommitment: "2102",
@@ -155,7 +167,7 @@ function budgetBindingWitness(budgetKind) {
       shieldedFixtureTag(budgetKind === 0 ? 1015 : 1030, witness.chainId, witness.pool),
       BigInt(witness.policyCommitment),
       BigInt(witness.enrollmentCommitment),
-      BigInt(budgetKind === 0 ? witness.ownerCommitment : witness.termsCommitment),
+      budgetKind === 0 ? budgetOwnerAuthorization(witness) : BigInt(witness.termsCommitment),
       BigInt(witness.rate),
       BigInt(witness.remaining),
       BigInt(witness.nonce),
@@ -223,8 +235,12 @@ component main = DomainCheck();`,
     await t.test(
       "shared budget tags retain distinct private owner and public terms bindings",
       async () => {
-        for (const budgetKind of [0, 1]) {
-          const witness = budgetBindingWitness(budgetKind);
+        for (const [budgetKind, keyMode] of [
+          [0, 0],
+          [0, 1],
+          [1, 0],
+        ]) {
+          const witness = budgetBindingWitness(budgetKind, keyMode);
           await budget.valid(witness);
           const binding = budgetKind === 0 ? "ownerCommitment" : "termsCommitment";
           const unusedBinding = budgetKind === 0 ? "termsCommitment" : "ownerCommitment";
@@ -235,12 +251,12 @@ component main = DomainCheck();`,
           });
           await budget.invalid({ ...witness, budgetKind: String(1 - budgetKind) });
           for (const invalidKind of ["2", "-1"]) {
-            // A matching interpolated note isolates the Boolean guard instead
+            // A matching interpolated note isolates the selector constraints instead
             // of failing merely because expectedCommitment became stale.
             const selector = BigInt(invalidKind);
             const privateTag = shieldedFixtureTag(1015, witness.chainId, witness.pool);
             const identityTag = shieldedFixtureTag(1030, witness.chainId, witness.pool);
-            const owner = BigInt(witness.ownerCommitment);
+            const owner = budgetOwnerAuthorization(witness);
             await budget.invalid({
               ...witness,
               budgetKind: invalidKind,
@@ -259,6 +275,27 @@ component main = DomainCheck();`,
             });
           }
         }
+      },
+    );
+    await t.test(
+      "private budgets bind both key modes and public budgets require mode zero",
+      async () => {
+        const identityDerived = budgetBindingWitness(0, 0);
+        const independent = budgetBindingWitness(0, 1);
+        assert.notEqual(identityDerived.expectedCommitment, independent.expectedCommitment);
+        for (const witness of [identityDerived, independent]) {
+          await budget.valid(witness);
+          await budget.invalid({ ...witness, keyMode: String(1n - BigInt(witness.keyMode)) });
+        }
+        for (const keyMode of [2, -1]) {
+          // Recompute the note so rejection exercises the Boolean mode constraint.
+          await budget.invalid(budgetBindingWitness(0, keyMode));
+        }
+        const publicBudget = budgetBindingWitness(1, 0);
+        const independentPublicBudget = budgetBindingWitness(1, 1);
+        assert.equal(publicBudget.expectedCommitment, independentPublicBudget.expectedCommitment);
+        await budget.valid(publicBudget);
+        await budget.invalid(independentPublicBudget);
       },
     );
     for (const maxDepth of [32, 64]) {

@@ -11,7 +11,7 @@ import {
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
-import { getBigInt, getBytes, hexlify } from "ethers";
+import { getAddress, getBigInt, getBytes, hexlify } from "ethers";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import {
@@ -591,6 +591,36 @@ describe("local private transfer and unshield preparation", () => {
         prepared.outputs[0].commitment,
       ),
     ).toMatchObject({ ownerCommitment: receiver.ownerCommitment, amount: 60n });
+  });
+
+  it.each(["lowercase", "checksum"] as const)(
+    "rejects a withdrawal to the pool's %s address before opening inputs",
+    async (addressCase) => {
+      const destination = getAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+      await expect(
+        prepareShieldedUnshield({
+          chainId,
+          poolAddress: destination,
+          inputs: [],
+          amount: 1n,
+          recipient: addressCase === "lowercase" ? destination.toLowerCase() : destination,
+        }),
+      ).rejects.toThrow("Unshield recipient must not be the pool");
+    },
+  );
+
+  it("normalizes a valid withdrawal recipient's address", async () => {
+    const { input0 } = await walletFixture();
+    const destination = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd";
+    const prepared = await prepareShieldedUnshield({
+      chainId,
+      poolAddress,
+      inputs: [input0],
+      amount: 30n,
+      recipient: destination,
+    });
+    expect(prepared.recipient).toBe(getAddress(destination));
+    expect(prepared.witness.recipient).toBe(String(BigInt(destination)));
   });
 
   it("rejects an invalid withdrawal amount, recipient, dummy spend and exposing root", async () => {

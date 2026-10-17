@@ -14,6 +14,7 @@ import {
 import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
 import type { ShieldedCircuitName, ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { Groth16Proof } from "../../../shared/zk/zk";
+import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
 
 /** All private values stay in the caller's memory and the local ZK worker. */
 export type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
@@ -307,9 +308,8 @@ async function submitAction(
   }
   input.onBroadcast?.(tx.hash);
   onStage?.("confirming");
-  const receipt = await tx.wait();
-  if (!receipt) throw new Error("Shielded pool transaction has no receipt");
-  return { transactionHash: tx.hash, receipt, gasEstimate, gasLimit };
+  const { transactionHash, receipt } = await waitForShieldedTransaction(tx, input.onBroadcast);
+  return { transactionHash, receipt, gasEstimate, gasLimit };
 }
 
 /** ERC-20 deposits require allowance; native deposits send the proven amount as value. */

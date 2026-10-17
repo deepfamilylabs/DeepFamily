@@ -113,6 +113,55 @@ beforeEach(() => {
 });
 
 describe("shielded pool local proof and self-submit flows", () => {
+  it.each([1, 0])("returns a repriced transaction's hash and receipt status %i", async (status) => {
+    const f = fixture();
+    const receipt = { status };
+    const replacement = Object.assign(new Error("Transaction repriced"), {
+      code: "TRANSACTION_REPLACED",
+      reason: "repriced",
+      cancelled: false,
+      replacement: { hash: "0xrepriced" },
+      receipt,
+    });
+    f.methods.shield.mockResolvedValueOnce({
+      hash: "0xshield",
+      wait: vi.fn().mockRejectedValue(replacement),
+    });
+    const onBroadcast = vi.fn();
+
+    const result = await submitShield({ ...f.common, amount: 100n, onBroadcast });
+
+    expect(result).toMatchObject({ transactionHash: "0xrepriced", receipt });
+    expect(onBroadcast.mock.calls).toEqual([["0xshield"], ["0xrepriced"]]);
+    expect(f.methods.shield).toHaveBeenCalledOnce();
+  });
+
+  it.each(["cancelled", "replaced"])(
+    "leaves a %s transaction for public reconciliation without reporting its receipt as success",
+    async (reason) => {
+      const f = fixture();
+      const replacement = Object.assign(new Error("Transaction replaced"), {
+        code: "TRANSACTION_REPLACED",
+        reason,
+        cancelled: true,
+        replacement: { hash: "0xother-call" },
+        receipt: { status: 1 },
+      });
+      f.methods.shield.mockResolvedValueOnce({
+        hash: "0xshield",
+        wait: vi.fn().mockRejectedValue(replacement),
+      });
+      const onBroadcast = vi.fn();
+
+      await expect(submitShield({ ...f.common, amount: 100n, onBroadcast })).rejects.toBe(
+        replacement,
+      );
+
+      expect(onBroadcast).toHaveBeenCalledExactlyOnceWith("0xshield");
+      expect(f.methods.shield).toHaveBeenCalledOnce();
+    },
+  );
+
   it("holds the wallet request guard only until the wallet returns, before broadcasting or waiting for a receipt", async () => {
     const f = fixture();
     const order: string[] = [];

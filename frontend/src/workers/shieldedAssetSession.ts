@@ -904,6 +904,10 @@ export class ShieldedAssetSession {
       requireValue(request.publicRecipient, "Choose a public withdrawal destination.");
       withdrawalRecipient = getAddress(request.publicRecipient);
       requireValue(BigInt(withdrawalRecipient) !== 0n, "Unshield recipient must be nonzero");
+      requireValue(
+        withdrawalRecipient !== getAddress(ctx.poolAddress),
+        "Unshield recipient must not be the pool",
+      );
     }
     if (request.action === "fund") {
       requireValue(
