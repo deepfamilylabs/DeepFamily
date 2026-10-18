@@ -4,10 +4,8 @@ import {
   encodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
-import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import {
   ShieldedReceiveCodeError,
-  createOwnShieldedReceiveCode,
   createShieldedReceiveCodeForRecipient,
   peekShieldedReceiveCodePersonHash,
   verifyShieldedReceiveCode,
@@ -100,26 +98,6 @@ describe("shielded receive codes", () => {
     expect(peekShieldedReceiveCodePersonHash("")).toBeNull();
     expect(peekShieldedReceiveCodePersonHash(code.slice(0, -1))).toBeNull();
     expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
-  });
-
-  it("creates the unlocked identity's own code in the worker", async () => {
-    const material = {
-      identity,
-      identitySuiteId: 1,
-      derivedSecretField: "13",
-      personHash,
-    } as IdentityMaterialV1Result;
-    mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
-    await expect(createOwnShieldedReceiveCode(material)).resolves.toBe(code);
-    expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
-      "createShieldedReceiveCode",
-      { identity, identitySuiteId: 1, derivedSecretField: "13" },
-      expect.any(Object),
-    );
-    mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash: `0x${"00".repeat(32)}` });
-    await expect(createOwnShieldedReceiveCode(material)).rejects.toThrow(
-      "does not belong to the unlocked identity",
-    );
   });
 
   it("returns only the code when creating one from a recipient's credentials", async () => {

@@ -25,8 +25,8 @@ export type ShieldedReceiveCodeIdentity = {
   identity: IdentityFields;
   identitySuiteId: number;
   derivedSecretField: string | bigint;
-  keyMode?: 0 | 1;
-  keyMaterial?: { ownerSecret: BigNumberish; ownerCommitment: BigNumberish; hpkeIkm: string };
+  keyMode: 0 | 1;
+  keyMaterial: { ownerSecret: BigNumberish; ownerCommitment: BigNumberish; hpkeIkm: string };
 };
 
 export type ShieldedReceiveCodeCheck =
@@ -47,12 +47,11 @@ export type ShieldedReceiveCodeCheck =
 /** Derive the payment keys and prove that this identity chose them. */
 export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdentity) {
   const material = computeIdentityFromDerivedSecret(input);
-  const legacy = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
-  const keyMode = input.keyMode ?? 0;
+  const identityKeys = deriveShieldedHeirKeyMaterial(material.derivedSecretField);
+  const keyMode = input.keyMode;
   if (keyMode !== 0 && keyMode !== 1) throw new Error("Unsupported receive authorization mode");
-  if (keyMode === 1 && !input.keyMaterial)
-    throw new Error("Independent receive code requires its original spending material");
-  const supplied = input.keyMaterial ?? legacy;
+  if (!input.keyMaterial) throw new Error("Receive code requires explicit spending material");
+  const supplied = input.keyMaterial;
   const keys = {
     ownerSecret: getBigInt(supplied.ownerSecret),
     ownerCommitment: getBigInt(supplied.ownerCommitment),
@@ -65,8 +64,8 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
     throw new Error("Receive key material is inconsistent");
   if (
     keyMode === 0 &&
-    (keys.ownerSecret !== legacy.ownerSecret ||
-      keys.hpkeIkm.toLowerCase() !== legacy.hpkeIkm.toLowerCase())
+    (keys.ownerSecret !== identityKeys.ownerSecret ||
+      keys.hpkeIkm.toLowerCase() !== identityKeys.hpkeIkm.toLowerCase())
   )
     throw new Error("Identity receive mode requires canonical identity keys");
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
@@ -140,7 +139,11 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
     });
     // The remaining proof needs the derived material, never the raw credential.
     input.rawPassphrase = "";
-    return await createShieldedReceiveCode(material);
+    return await createShieldedReceiveCode({
+      ...material,
+      keyMode: 0,
+      keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
+    });
   } catch {
     // Library failures can embed normalized/encoded credentials or witnesses.
     throw new Error("Receive code could not be created");

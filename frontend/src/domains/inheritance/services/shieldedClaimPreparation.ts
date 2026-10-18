@@ -32,7 +32,7 @@ import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
-import { resolveShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+import { validateShieldedClaimKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
@@ -49,7 +49,7 @@ export type PrepareShieldedClaimInput = {
   chainId: BigNumberish;
   poolAddress: string;
   identity: IdentityMaterialV1Result;
-  keyMaterial?: ShieldedKeyMaterial;
+  keyMaterial: ShieldedKeyMaterial;
   wallet: LocalShieldedWalletSnapshot;
   /** Reconstructed from unfiltered public events; refresh roots before submission. */
   lineage: LineageSnapshot;
@@ -201,9 +201,10 @@ export async function prepareShieldedClaim(
   }
   const budget = owned.note;
   const keyMode = normalizeShieldedKeyMode(budget.keyMode, budget.binding);
-  const keys = resolveShieldedKeyMaterial(
-    { keyMaterial: input.keyMaterial, derivedSecretField: material.derivedSecretField },
+  const keys = validateShieldedClaimKeyMaterial(
+    input.keyMaterial,
     keyMode,
+    material.derivedSecretField,
   );
   sameWallet(input.wallet, chainId, poolAddress, keys.ownerCommitment, material.identityCommitment);
   if (

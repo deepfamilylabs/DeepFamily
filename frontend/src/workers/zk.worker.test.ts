@@ -3,16 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const mocks = vi.hoisted(() => ({
   createFromCredentials: vi.fn(),
-  generateShieldedProof: vi.fn(),
+  verifyReceiveCode: vi.fn(),
   post: vi.fn(),
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../shared/zk/shieldedReceiveCode")>()),
   createShieldedReceiveCodeFromCredentials: mocks.createFromCredentials,
-}));
-vi.mock("../shared/zk/shieldedZk", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../shared/zk/shieldedZk")>()),
-  generateShieldedProof: mocks.generateShieldedProof,
+  verifyShieldedReceiveCode: mocks.verifyReceiveCode,
 }));
 
 let onMessage: (event: { data: any }) => Promise<void>;
@@ -29,7 +26,7 @@ beforeEach(() => vi.resetAllMocks());
 afterAll(() => vi.unstubAllGlobals());
 
 describe("production ZK worker secret boundary", () => {
-  it.each(["createShieldedReceiveCodeFromCredentials", "generateShieldedProof"])(
+  it.each(["createShieldedReceiveCodeFromCredentials", "verifyShieldedReceiveCode"])(
     "does not forward credential or witness exceptions from %s",
     async (method) => {
       const rawPassphrase = "a\u030a-credential-7K!";
@@ -40,17 +37,13 @@ describe("production ZK worker secret boundary", () => {
         cause: rawPassphrase,
       });
       mocks.createFromCredentials.mockRejectedValueOnce(error);
-      mocks.generateShieldedProof.mockRejectedValueOnce(error);
+      mocks.verifyReceiveCode.mockRejectedValueOnce(error);
       const request = {
         id: 7,
         method,
         params:
-          method === "generateShieldedProof"
-            ? {
-                circuit: "receiveCode",
-                witness: { derivedSecretField: "314159265358979323846" },
-                expectedPublicSignals: [],
-              }
+          method === "verifyShieldedReceiveCode"
+            ? { code: "dfrecv1unverified" }
             : {
                 identity: {
                   fullName: "Alice",
@@ -72,6 +65,19 @@ describe("production ZK worker secret boundary", () => {
         ok: false,
         error: { message: "Local cryptographic operation failed" },
       });
+    },
+  );
+
+  it.each(["generateShieldedProof", "createShieldedReceiveCode"])(
+    "rejects the retired raw-secret RPC %s", async (method) => {
+      const request = { id: 9, method, params: { derivedSecretField: "private", witness: {} } };
+      await onMessage({ data: request });
+      expect(mocks.post).toHaveBeenCalledExactlyOnceWith({
+        id: 9, ok: false, error: { message: "Invalid ZK worker request" },
+      });
+      expect(request.params).toBeUndefined();
+      expect(mocks.createFromCredentials).not.toHaveBeenCalled();
+      expect(mocks.verifyReceiveCode).not.toHaveBeenCalled();
     },
   );
 

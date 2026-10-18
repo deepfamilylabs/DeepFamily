@@ -5,7 +5,6 @@ import {
 } from "@deepfamily/protocol-core";
 import { getBigInt } from "ethers";
 import { getFundingPassphraseError } from "../../../shared/crypto/passphraseStrength";
-import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
 import { InheritanceError } from "../model/inheritanceErrors";
 
@@ -81,25 +80,6 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
   } catch {
     return null;
   }
-}
-
-/** The unlocked identity's own code. It is regenerated on demand and never stored. */
-export async function createOwnShieldedReceiveCode(
-  identity: IdentityMaterialV1Result,
-): Promise<string> {
-  const { code, personHash } = await zkWorkerCall(
-    "createShieldedReceiveCode",
-    {
-      identity: identity.identity,
-      identitySuiteId: identity.identitySuiteId,
-      derivedSecretField: identity.derivedSecretField,
-    },
-    { timeoutMs: RECEIVE_CODE_TIMEOUT_MS },
-  );
-  if (personHash.toLowerCase() !== identity.personHash.toLowerCase()) {
-    throw new Error("Receive code does not belong to the unlocked identity");
-  }
-  return code;
 }
 
 /** Create another person's code from their details. Their secret stays in the ZK worker. */

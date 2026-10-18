@@ -1,16 +1,9 @@
 import type { Groth16Proof } from "../shared/zk/zk";
 import { serializeWorkerError } from "../shared/workers/workerErrors";
 import {
-  generateShieldedProof,
-  type ShieldedCircuitName,
-  type ShieldedWitness,
-} from "../shared/zk/shieldedZk";
-import {
-  createShieldedReceiveCode,
   createShieldedReceiveCodeFromCredentials,
   verifyShieldedReceiveCode,
   type ShieldedReceiveCodeCheck,
-  type ShieldedReceiveCodeIdentity,
 } from "../shared/zk/shieldedReceiveCode";
 import type { IdentityFields } from "@deepfamily/protocol-core";
 import type {
@@ -45,18 +38,6 @@ type ZkWorkerMethods = {
   verifyDisclosureBindingProof: {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
-  };
-  generateShieldedProof: {
-    params: {
-      circuit: ShieldedCircuitName;
-      witness: ShieldedWitness;
-      expectedPublicSignals: string[];
-    };
-    result: { proof: Groth16Proof; publicSignals: string[] };
-  };
-  createShieldedReceiveCode: {
-    params: ShieldedReceiveCodeIdentity;
-    result: { code: string; personHash: string };
   };
   createShieldedReceiveCodeFromCredentials: {
     params: { identity: IdentityFields; rawPassphrase: string };
@@ -98,8 +79,6 @@ const handlers: {
     assertDescriptorPurpose("DisclosureBinding");
     return { ok: await verifyDisclosureBindingProof(proof, publicSignals) };
   },
-  generateShieldedProof: async (parameters) => await generateShieldedProof(parameters),
-  createShieldedReceiveCode: async (identity) => await createShieldedReceiveCode(identity),
   createShieldedReceiveCodeFromCredentials: async (credentials) =>
     await createShieldedReceiveCodeFromCredentials(credentials),
   verifyShieldedReceiveCode: async ({ code }) => await verifyShieldedReceiveCode(code),

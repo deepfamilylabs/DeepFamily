@@ -1,5 +1,5 @@
 import type { Provider } from "ethers";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import {
   readShieldedSubmissionOutcome,
@@ -18,7 +18,10 @@ function fixture() {
     getTransactionReceipt: vi.fn<() => Promise<{ status: number | null } | null>>(async () => null),
   };
   const noteFilter = vi.fn(() => "all-public-notes");
-  const queryFilter = vi.fn<() => Promise<unknown[]>>(async () => []);
+  const queryFilter =
+    vi.fn<(filter: unknown, fromBlock: number, toBlock: number) => Promise<unknown[]>>(
+      async () => [],
+    );
   const tracked: ShieldedSubmissionTracking = {
     provider: provider as unknown as Provider,
     chainId: 71n,
@@ -35,6 +38,8 @@ function fixture() {
 }
 
 describe("shielded public submission tracking", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it.each([null, { status: null }])(
     "keeps a known hash pending after checking replacement evidence: %j",
     async (receipt) => {
@@ -91,6 +96,105 @@ describe("shielded public submission tracking", () => {
     expect(f.queryFilter).toHaveBeenCalledExactlyOnceWith("all-public-notes", 80, 90);
     expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
     expect(f.tracked.hash).toBe(HASH);
+  });
+
+  it("recovers outputs beyond a chunk boundary when the RPC caps log ranges", async () => {
+    vi.stubEnv("VITE_DF_EVENT_BLOCK_CHUNK", "10");
+    const f = fixture();
+    f.tracked.hash = HASH;
+    f.provider.getBlockNumber.mockResolvedValue(105);
+    f.provider.getTransactionCount.mockResolvedValue(8);
+    f.queryFilter.mockImplementation(async (_filter, fromBlock, toBlock) => {
+      if (toBlock - fromBlock + 1 > 10) throw new Error("RPC log range exceeded");
+      return fromBlock === 100
+        ? [
+            { args: { commitment: 100n }, transactionHash: REPLACEMENT_HASH },
+            { args: { commitment: 101n }, transactionHash: REPLACEMENT_HASH },
+          ]
+        : [{ args: { commitment: 999n }, transactionHash: HASH }];
+    });
+    f.provider.getTransactionReceipt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ status: 1 });
+
+    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({
+      status: "confirmed",
+      hash: REPLACEMENT_HASH,
+      receiptStatus: 1,
+    });
+    expect(f.queryFilter.mock.calls).toEqual([
+      ["all-public-notes", 80, 89],
+      ["all-public-notes", 90, 99],
+      ["all-public-notes", 100, 105],
+    ]);
+    expect(f.noteFilter).toHaveBeenCalledExactlyOnceWith();
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.tracked.fromBlock).toBe(80);
+    expect(f.tracked.hash).toBe(HASH);
+  });
+
+  it.each([undefined, HASH])(
+    "checks a consumed nonce only after the complete chunked history: %s",
+    async (hash) => {
+      vi.stubEnv("VITE_DF_EVENT_BLOCK_CHUNK", "10");
+      const f = fixture();
+      if (hash) f.tracked.hash = hash;
+      f.provider.getBlockNumber.mockResolvedValue(105);
+      f.provider.getTransactionCount.mockResolvedValue(8);
+      f.queryFilter.mockImplementation(async (_filter, fromBlock, toBlock) => {
+        if (toBlock - fromBlock + 1 > 10) throw new Error("RPC log range exceeded");
+        return [];
+      });
+
+      expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "replaced" });
+      expect(f.queryFilter.mock.calls).toEqual([
+        ["all-public-notes", 80, 89],
+        ["all-public-notes", 90, 99],
+        ["all-public-notes", 100, 105],
+      ]);
+      expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 105);
+      expect(f.queryFilter.mock.invocationCallOrder[2]).toBeLessThan(
+        f.provider.getTransactionCount.mock.invocationCallOrder[0],
+      );
+    },
+  );
+
+  it("does not combine partial outputs from different transactions across chunks", async () => {
+    vi.stubEnv("VITE_DF_EVENT_BLOCK_CHUNK", "10");
+    const f = fixture();
+    f.provider.getBlockNumber.mockResolvedValue(105);
+    f.queryFilter.mockImplementation(async (_filter, fromBlock) =>
+      fromBlock === 80
+        ? [{ args: { commitment: 100n }, transactionHash: HASH }]
+        : [{ args: { commitment: 101n }, transactionHash: REPLACEMENT_HASH }],
+    );
+
+    expect(await readShieldedSubmissionOutcome(f.tracked)).toEqual({ status: "pending" });
+    expect(f.queryFilter).toHaveBeenCalledTimes(3);
+    expect(f.provider.getTransactionReceipt).not.toHaveBeenCalled();
+    expect(f.provider.getTransactionCount).toHaveBeenCalledExactlyOnceWith(SIGNER_ADDRESS, 105);
+  });
+
+  it("does not infer cancellation when an intermediate history chunk fails", async () => {
+    vi.stubEnv("VITE_DF_EVENT_BLOCK_CHUNK", "10");
+    const f = fixture();
+    const failure = new Error("RPC unavailable for middle chunk");
+    f.provider.getBlockNumber.mockResolvedValue(105);
+    f.provider.getTransactionCount.mockResolvedValue(8);
+    f.queryFilter.mockImplementation(async (_filter, fromBlock) => {
+      if (fromBlock === 90) throw failure;
+      return [{ args: { commitment: 100n }, transactionHash: HASH }];
+    });
+
+    await expect(readShieldedSubmissionOutcome(f.tracked)).rejects.toBe(failure);
+    expect(f.queryFilter.mock.calls).toEqual([
+      ["all-public-notes", 80, 89],
+      ["all-public-notes", 90, 99],
+    ]);
+    expect(f.provider.getTransactionCount).not.toHaveBeenCalled();
+    expect(f.provider.getTransactionReceipt).not.toHaveBeenCalled();
+    expect(f.tracked.fromBlock).toBe(80);
+    expect(f.tracked.hash).toBeUndefined();
   });
 
   it.each([null, { status: null }])(

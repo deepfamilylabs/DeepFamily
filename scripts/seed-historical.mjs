@@ -13,7 +13,7 @@ import { appendDfsStoryRecord } from "../lib/archiveOperations.js";
  * Generate demo data using real historical person data
  * Features:
  * - Historical persons without copyright issues (public domain)
- * - 19 record types corresponding to real biographical content
+ * - 19 record types corresponding to real biographical content (story and storyData are optional)
  * - The seed builder splits source text into records of at most 16 KiB of UTF-8
  * - Real family relationships
  * - Data and logic separated (loaded from JSON files)
@@ -352,12 +352,6 @@ function validateFamilyData(data) {
           `Member ${index} (${member.fullName || "unknown"}) missing required field: ${field}`,
         );
       }
-    }
-
-    const hasStory = typeof member.story === "string" && member.story.trim().length > 0;
-    const hasStoryData = member.storyData && typeof member.storyData === "object";
-    if (!hasStory && !hasStoryData) {
-      throw new Error(`Member ${index} (${member.fullName}) missing story or storyData`);
     }
   });
 

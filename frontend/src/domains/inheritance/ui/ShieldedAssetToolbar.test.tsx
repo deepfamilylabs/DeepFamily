@@ -31,7 +31,7 @@ describe("ShieldedAssetToolbar", () => {
   it("keeps an asset selectable when its token precision is unavailable", () => {
     const props = propsFor({
       importedAssets: [
-        { address: TOKEN, kind: "erc20", symbol: "TOKEN", decimals: null, token: null },
+        { address: TOKEN, kind: "erc20", symbol: "TOKEN", decimals: null, token: null, metadataAvailable: false, interoperabilityAvailable: false },
       ],
     });
     render(<ShieldedAssetToolbar {...props} />);
@@ -61,9 +61,9 @@ describe("ShieldedAssetToolbar", () => {
   it("selects native or imported assets without duplicating the default options", () => {
     const props = propsFor({
       importedAssets: [
-        { address: DEEP, kind: "erc20", symbol: "DEEP", decimals: 18, token: null },
-        { address: ZeroAddress, kind: "native", symbol: "CFX", decimals: 18, token: null },
-        { address: TOKEN, kind: "erc20", symbol: "USDT", decimals: 6, token: null },
+        { address: DEEP, kind: "erc20", symbol: "DEEP", decimals: 18, token: null, metadataAvailable: true, interoperabilityAvailable: true },
+        { address: ZeroAddress, kind: "native", symbol: "CFX", decimals: 18, token: null, metadataAvailable: true, interoperabilityAvailable: true },
+        { address: TOKEN, kind: "erc20", symbol: "USDT", decimals: 6, token: null, metadataAvailable: true, interoperabilityAvailable: true },
       ],
     });
     render(<ShieldedAssetToolbar {...props} />);

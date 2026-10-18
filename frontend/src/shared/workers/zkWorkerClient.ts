@@ -1,10 +1,6 @@
 import type { Groth16Proof } from "../zk/zk";
 import { serializeWorkerError } from "./workerErrors";
-import type { ShieldedCircuitName, ShieldedWitness } from "../zk/shieldedZk";
-import type {
-  ShieldedReceiveCodeCheck,
-  ShieldedReceiveCodeIdentity,
-} from "../zk/shieldedReceiveCode";
+import type { ShieldedReceiveCodeCheck } from "../zk/shieldedReceiveCode";
 import type { IdentityFields } from "@deepfamily/protocol-core";
 import type {
   DisclosureBindingProofParameters,
@@ -28,19 +24,6 @@ type ZkWorkerCallMap = {
     params: { proof: Groth16Proof; publicSignals: string[] };
     result: { ok: boolean };
   };
-  generateShieldedProof: {
-    params: {
-      circuit: ShieldedCircuitName;
-      witness: ShieldedWitness;
-      expectedPublicSignals: string[];
-    };
-    result: { proof: Groth16Proof; publicSignals: string[] };
-  };
-  createShieldedReceiveCode: {
-    params: ShieldedReceiveCodeIdentity;
-    result: { code: string; personHash: string };
-  };
-  /** The recipient's derived secret stays in the worker; only the code returns. */
   createShieldedReceiveCodeFromCredentials: {
     params: { identity: IdentityFields; rawPassphrase: string };
     result: { code: string; personHash: string };

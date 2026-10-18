@@ -16,7 +16,7 @@ import {
 const INPUT_CLASS =
   "h-12 w-full rounded-xl border border-hairline bg-surface-alt px-3.5 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/20";
 
-export type ShieldedWalletAction = "shield" | "privateTransfer" | "unshield" | "receiveCode";
+export type ShieldedWalletAction = "shield" | "privateTransfer" | "unshield";
 export type ShieldedRecipientInputMethod = "receiveCode" | "credentials";
 export type ShieldedValueBalance = { commitment: string; amount: string };
 
@@ -139,7 +139,7 @@ export function ShieldedValueNotePicker({
       className="min-w-0 space-y-3"
     >
       <legend className="text-sm font-medium text-ink">
-        {t("shielded.fields.valueNote", { symbol })}
+        {t(singleChoice ? "shielded.fields.valueNote" : "shielded.fields.valueCandidates", { symbol })}
       </legend>
       <p className="text-xs text-ink-muted">
         {singleChoice
@@ -238,7 +238,6 @@ export interface ShieldedWalletActionsProps {
   busy: boolean;
   amount: string;
   onAmountChange: (value: string) => void;
-  ownReceiveCode: string;
   recipient: Omit<ShieldedRecipientInputProps, "busy"> & {
     targetHash?: string;
     targetName?: string;
@@ -255,14 +254,12 @@ export interface ShieldedWalletActionsProps {
   /** An ERC20 deposit first approves the amount, then offers deposit confirmation. */
   approvalRequired?: boolean;
   submitDisabled?: boolean;
-  /** The receive-code form replaces its action until the selected key is ready. */
-  submitHidden?: boolean;
+  reviewing?: boolean;
   onSubmit: () => void;
   feedback?: ReactNode;
-  receivingSettings?: ReactNode;
 }
 
-/** Deposit, private transfer, withdrawal and receive-code forms for the selected funds. */
+/** Deposit, private transfer and withdrawal forms for the selected funds. */
 export function ShieldedWalletActions({
   embedded = false,
   action,
@@ -271,7 +268,6 @@ export function ShieldedWalletActions({
   busy,
   amount,
   onAmountChange,
-  ownReceiveCode,
   recipient,
   withdrawalRecipient,
   onWithdrawalRecipientChange,
@@ -281,10 +277,9 @@ export function ShieldedWalletActions({
   signerReady,
   approvalRequired = false,
   submitDisabled = false,
-  submitHidden = false,
+  reviewing = false,
   onSubmit,
   feedback,
-  receivingSettings,
 }: ShieldedWalletActionsProps) {
   const { t } = useTranslation();
   const withdrawalSelectionAvailable =
@@ -296,28 +291,8 @@ export function ShieldedWalletActions({
   return (
     <PanelShell
       embedded={embedded}
-      title={
-        action === "receiveCode"
-          ? t("shielded.actions.receiveCode", { symbol })
-          : t(`shielded.actionTitles.${action}`, { symbol })
-      }
+      title={t(`shielded.actionTitles.${action}`, { symbol })}
     >
-      {action === "receiveCode" ? receivingSettings : null}
-      {action === "receiveCode" && ownReceiveCode ? (
-        <FieldBlock
-          label={t("shielded.receiveCodeLabel", { symbol })}
-          hint={t("shielded.receiveCodeShareHint", { symbol })}
-        >
-          <textarea
-            aria-label={t("shielded.receiveCodeLabel", { symbol })}
-            className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
-            readOnly
-            value={ownReceiveCode}
-            rows={4}
-          />
-        </FieldBlock>
-      ) : null}
-
       {action === "shield" ? (
         <FieldBlock label={t("shielded.fields.amount", { symbol })}>
           <input
@@ -421,10 +396,10 @@ export function ShieldedWalletActions({
         </>
       ) : null}
 
-      {!signerReady && action !== "receiveCode" ? (
+      {!signerReady ? (
         <WarningNotice>{t("shielded.walletNotReady", { symbol })}</WarningNotice>
       ) : null}
-      {submitHidden ? null : (
+      {!reviewing ? (
         <PanelButton
           variant="primary"
           className="w-full sm:w-auto sm:min-w-36"
@@ -432,7 +407,7 @@ export function ShieldedWalletActions({
           disabled={
             busy ||
             submitDisabled ||
-            (!signerReady && action !== "receiveCode") ||
+            !signerReady ||
             (recipientNeedsConfirmation && !recipient.confirmed) ||
             (action === "privateTransfer" && selectedCommitments.length === 0) ||
             (action === "unshield" && !withdrawalSelectionAvailable)
@@ -441,9 +416,12 @@ export function ShieldedWalletActions({
         >
           {action === "shield" && approvalRequired
             ? t("shielded.walletKeys.approve")
-            : t("shielded.submit", { symbol, action: t(`shielded.actions.${action}`, { symbol }) })}
+            : t(action === "shield" ? "shielded.submit" : "shielded.spendReview.preview", {
+                symbol,
+                action: t(`shielded.actions.${action}`, { symbol }),
+              })}
         </PanelButton>
-      )}
+      ) : null}
       {feedback}
     </PanelShell>
   );

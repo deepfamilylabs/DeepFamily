@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   transfer: vi.fn(),
   unshield: vi.fn(),
   fund: vi.fn(),
+  claim: vi.fn(),
+  lineageRoot: vi.fn(),
+  proofLifetime: vi.fn(),
   fundingDestination: vi.fn(),
   notes: [] as Array<{
     commitment: bigint;
@@ -53,7 +56,7 @@ vi.mock("@deepfamily/protocol-core", async (original) => ({
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: () => ({ lineageIndex: async () => mocks.lineage }),
-  createLineageIndexContract: () => ({ root: async () => 0n }),
+  createLineageIndexContract: () => ({ root: mocks.lineageRoot }),
   createShieldedPoolFactoryContract: () => ({
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
@@ -65,6 +68,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
     assetKind: async () => 1n,
+    ACTION_PROOF_LIFETIME: mocks.proofLifetime,
     nullifierSpent: mocks.selectedQuery,
   }),
 }));
@@ -84,6 +88,9 @@ vi.mock("../domains/inheritance/services/shieldedWalletRecovery", async (origina
 vi.mock("../domains/inheritance/services/shieldedTransferExitPreparation", () => ({
   prepareShieldedPrivateTransfer: mocks.transfer,
   prepareShieldedUnshield: mocks.unshield,
+}));
+vi.mock("../domains/inheritance/services/shieldedClaimPreparation", () => ({
+  prepareShieldedClaim: mocks.claim,
 }));
 vi.mock("../domains/inheritance/services/shieldedFundingPreparation", async (original) => ({
   ...(await original<
@@ -169,6 +176,8 @@ beforeEach(() => {
     recipient,
   }));
   mocks.fund.mockResolvedValue(preparedValueOutputs([10n, 0n], 0n, 2));
+  mocks.lineageRoot.mockResolvedValue(0n);
+  mocks.proofLifetime.mockResolvedValue(300n);
   mocks.fundingDestination.mockResolvedValue(undefined);
   mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1000 });
   mocks.scan.mockResolvedValue({ blockHash, spentNullifiers: new Set() });
@@ -234,7 +243,191 @@ async function withBothOwners() {
 function value(commitment: bigint, amount: bigint, ownerCommitment: bigint) {
   return { commitment, note: { kind: "value" as const, amount, ownerCommitment } };
 }
+async function timeBoundPreview(action: "fund" | "claim") {
+  const session = await unlocked();
+  const prepared = preparedValueOutputs([10n, 0n], 0n, 2);
+  prepared.data.asOf = 1000n;
+  if (action === "fund") {
+    mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
+    mocks.fund.mockResolvedValue(prepared);
+  } else {
+    prepared.data.periodNullifiers[0] = 91n;
+    mocks.claim.mockResolvedValue({ ...prepared, amount: 10n });
+    // Claim eligibility and witness construction have dedicated integration tests.
+    // Supply their public summary while retaining the real recovered wallet/session.
+    const recover = session.recover.bind(session);
+    vi.spyOn(session, "recover").mockImplementation(async (params) => ({
+      ...(await recover(params)),
+      claims: [{
+        handle: "identity:budget",
+        slot: "identity",
+        budgets: ["1"],
+        periodIndices: ["0"],
+        amount: "10",
+        amountPerPeriod: "10",
+        status: "ready",
+      }],
+    }));
+  }
+  const request = {
+    context,
+    slot: "identity" as const,
+    action,
+    amount: "10",
+    fundingEntry: "public" as const,
+    periods: "1",
+    periodDays: "30",
+    rootVersionIndex: 1,
+    publicRecipient: `0x${"00".repeat(31)}1f`,
+    candidates: ["1"],
+    claimHandle: "identity:budget",
+  };
+  return { session, prepared, request, preview: await session.call("preview", request) };
+}
 describe("asset Worker preview and proof boundary", () => {
+  describe.each(["privateTransfer", "unshield"] as const)("exact balance selection for %s", (action) => {
+    it.each([true, false])("uses only permitted inputs when the exact pair is allowed: %s", async (allowPair) => {
+      const session = await unlocked();
+      mocks.notes = [
+        value(1n, 1n, secretKeys.ownerCommitment),
+        value(2n, 2n, secretKeys.ownerCommitment),
+        value(3n, 10n, secretKeys.ownerCommitment),
+      ];
+      mocks.verify.mockResolvedValue({
+        ok: true,
+        fingerprint: "verified-destination",
+        identityCommitment: "31",
+        personHash: `0x${"00".repeat(31)}1f`,
+        ownerCommitment: String(secretKeys.ownerCommitment),
+        keyMode: 0,
+        viewingKey: `0x${"01".repeat(32)}`,
+      });
+      const preview = await session.call("preview", {
+        context,
+        slot: "identity",
+        action,
+        amount: "3",
+        candidates: allowPair ? ["1", "2", "3"] : ["3"],
+        ...(action === "privateTransfer"
+          ? { recipientCode: "verified-code" }
+          : { publicRecipient: context.familyAddress }),
+      });
+      expect(preview.action).toBe(action);
+      expect([...preview.inputs].sort()).toEqual(allowPair ? ["1", "2"] : ["3"]);
+      expect(preview.inputAmounts.reduce((sum, amount) => sum + BigInt(amount), 0n)).toBe(allowPair ? 3n : 10n);
+      expect(preview.steps).toEqual([{
+        action,
+        inputs: preview.inputs,
+        outputAmounts: ["3", allowPair ? "0" : "7"],
+      }]);
+      const preparation = action === "privateTransfer" ? mocks.transfer : mocks.unshield;
+      expect(preparation).toHaveBeenCalledOnce();
+      expect(preparation.mock.calls[0][0].inputs.map((input: { commitment: string }) => input.commitment)).toEqual(preview.inputs);
+      if (action === "privateTransfer") {
+        expect(mocks.unshield).not.toHaveBeenCalled();
+        expect(preparation.mock.calls[0][0].destinations).toMatchObject([
+          { kind: "recipient", amount: 3n },
+          { kind: "inputOwner", amount: allowPair ? 0n : 7n },
+        ]);
+      } else {
+        expect(mocks.transfer).not.toHaveBeenCalled();
+        expect(preparation.mock.calls[0][0]).toMatchObject({ amount: 3n, recipient: context.familyAddress });
+      }
+      assertNoOpenings(preview);
+      const proven = await session.call("prove", { context, handle: preview.handle });
+      expect(proven.action).toBe(action);
+      expect(preparation).toHaveBeenCalledOnce();
+      expect(mocks.proof).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ circuit: action }));
+    });
+  });
+
+  it("keeps funding to one donor input instead of merging an exact pair", async () => {
+    const session = await unlocked();
+    mocks.notes = [
+      value(1n, 1n, secretKeys.ownerCommitment),
+      value(2n, 2n, secretKeys.ownerCommitment),
+      value(3n, 10n, secretKeys.ownerCommitment),
+    ];
+    mocks.fund.mockResolvedValueOnce(preparedValueOutputs([3n, 7n], 0n, 2));
+    const preview = await session.call("preview", {
+      context,
+      slot: "identity",
+      action: "fund",
+      fundingEntry: "public",
+      amount: "3",
+      periods: "1",
+      periodDays: "30",
+      rootVersionIndex: 1,
+      publicRecipient: `0x${"00".repeat(31)}1f`,
+      candidates: ["1", "2", "3"],
+    });
+    expect(preview.action).toBe("fund");
+    expect(preview.inputs).toEqual(["3"]);
+    expect(preview.steps).toEqual([{ action: "fund", inputs: ["3"], outputAmounts: ["3", "7"] }]);
+    expect(mocks.fund).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ donorCommitment: "3" }));
+    expect(mocks.transfer).not.toHaveBeenCalled();
+  });
+
+  describe.each(["fund", "claim"] as const)("time-bound %s", (action) => {
+    it.each([0, 1])("rejects a changed family root %s without rebuilding the approved plan", async (changedRoot) => {
+      const { session, preview } = await timeBoundPreview(action);
+      mocks.lineageRoot.mockImplementation(async (kind) => kind === changedRoot ? 1n : 0n);
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
+        "Family roots changed after preview",
+      );
+      expect(mocks.proof).not.toHaveBeenCalled();
+      expect(action === "fund" ? mocks.fund : mocks.claim).toHaveBeenCalledOnce();
+      expect(mocks.lineageRoot).toHaveBeenCalledWith(changedRoot, { blockTag: 12 });
+    });
+
+    it.each([
+      ["expired", 1300, blockHash],
+      ["future", 999, blockHash],
+      ["different history anchor", 1000, `0x${"bb".repeat(32)}`],
+    ])("rejects a %s preview before generating a proof", async (_reason, timestamp, hash) => {
+      const { session, preview } = await timeBoundPreview(action);
+      mocks.getBlock
+        .mockResolvedValueOnce({ number: 12, hash: blockHash, timestamp: 1000 })
+        .mockResolvedValueOnce({ number: 12, hash, timestamp });
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
+        "time-bound proof preview expired",
+      );
+      expect(mocks.proof).not.toHaveBeenCalled();
+      expect(mocks.lineageRoot).not.toHaveBeenCalled();
+    });
+
+    it("requires a fresh preview after roots change and binds the proof to its new roots", async () => {
+      const { session, preview, prepared, request } = await timeBoundPreview(action);
+      mocks.lineageRoot.mockResolvedValue(7n);
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
+        "Family roots changed after preview",
+      );
+      prepared.data.relation0 = 7n;
+      prepared.data.relation1 = 7n;
+      const fresh = await session.call("preview", request);
+      expect(fresh.handle).not.toBe(preview.handle);
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow("expired");
+      const proven = await session.call("prove", { context, handle: fresh.handle });
+      expect(proven.data).toMatchObject({ relation0: 7n, relation1: 7n, asOf: 1000n });
+      expect(mocks.proof).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+        circuit: action,
+        expectedPublicSignals: expect.arrayContaining(["7", "1000"]),
+      }));
+      expect(mocks.proofLifetime).toHaveBeenCalledWith({ blockTag: 12 });
+      expect(action === "fund" ? mocks.fund : mocks.claim).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("rejects a claim period spent after preview using the full history", async () => {
+    const { session, preview } = await timeBoundPreview("claim");
+    mocks.scan.mockResolvedValueOnce({ blockHash, spentNullifiers: new Set([91n]) });
+    await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
+      "claim period was used after preview",
+    );
+    expect(mocks.proof).not.toHaveBeenCalled();
+    expect(mocks.selectedQuery).not.toHaveBeenCalled();
+  });
+
   it("returns no openings and checks complete anchored history without selected-nullifier RPCs", async () => {
     const session = await unlocked();
     const preview = await session.call("preview", {

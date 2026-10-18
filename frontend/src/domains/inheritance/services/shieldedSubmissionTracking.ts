@@ -1,4 +1,5 @@
 import type { Provider } from "ethers";
+import { getEventScanConfig } from "../../../shared/config/env";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 
 /** Public data retained when a wallet submission outlasts its secret session. */
@@ -38,19 +39,25 @@ export async function readShieldedSubmissionOutcome(
   if (tracked.pool && tracked.fromBlock !== undefined && tracked.outputCommitments?.length) {
     // Fetch every public output, then match locally. Filtering the RPC request
     // by a private note or nullifier would reveal which funds are being tracked.
-    const logs = await tracked.pool.queryFilter(
-      tracked.pool.filters.NoteAppended(),
-      tracked.fromBlock,
-      toBlock,
-    );
+    const blockChunk = Math.max(1, getEventScanConfig().blockChunk);
+    if (!Number.isSafeInteger(blockChunk))
+      throw new Error("Invalid shielded submission scan block range");
+    const filter = tracked.pool.filters.NoteAppended();
     const matches = new Map<string, Set<string>>();
-    for (const log of logs) {
-      if (!("args" in log)) continue;
-      const commitment = String(log.args.commitment);
-      if (!tracked.outputCommitments.includes(commitment)) continue;
-      const outputs = matches.get(log.transactionHash) ?? new Set<string>();
-      outputs.add(commitment);
-      matches.set(log.transactionHash, outputs);
+    for (let start = tracked.fromBlock; start <= toBlock; start += blockChunk) {
+      const logs = await tracked.pool.queryFilter(
+        filter,
+        start,
+        Math.min(toBlock, start + blockChunk - 1),
+      );
+      for (const log of logs) {
+        if (!("args" in log)) continue;
+        const commitment = String(log.args.commitment);
+        if (!tracked.outputCommitments.includes(commitment)) continue;
+        const outputs = matches.get(log.transactionHash) ?? new Set<string>();
+        outputs.add(commitment);
+        matches.set(log.transactionHash, outputs);
+      }
     }
     hash = [...matches].find(([, outputs]) =>
       tracked.outputCommitments!.every((commitment) => outputs.has(commitment)),

@@ -34,6 +34,11 @@ import type { ShieldedPageModules } from "../model/shieldedPageTypes";
 import { getShieldedPoolFactoryDeploymentBlock } from "../../../shared/config/env";
 import { SUPPORTED_NETWORKS } from "../../../shared/config/networks";
 import {
+  getFriendlyErrorMessage,
+  REASON_FRIENDLY_MAP,
+  resolveErrorReason,
+} from "../../../shared/lib/errors";
+import {
   cancelShieldedAssetPreview,
   getShieldedAssetWorkerGeneration,
   shieldedAssetWorkerCall,
@@ -66,6 +71,10 @@ import {
   type ShieldedSubmissionTracking,
 } from "../services/shieldedSubmissionTracking";
 import { waitForShieldedTransaction } from "../services/shieldedTransactionReceipt";
+import {
+  assertShieldedDepositBalance,
+  ShieldedDepositBalanceError,
+} from "../services/shieldedDepositBalance";
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { type ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import {
@@ -79,6 +88,7 @@ import { ShieldedTaskNavigation } from "./ShieldedTaskNavigation";
 import { ShieldedAssetOverview } from "./ShieldedAssetOverview";
 import { ShieldedWalletBalances } from "./ShieldedWalletBalances";
 import { ShieldedWalletActions, type ShieldedRecipientInputMethod } from "./ShieldedWalletActions";
+import { ShieldedSpendReview, type ShieldedSpendReviewProps } from "./ShieldedSpendReview";
 import { ShieldedBudgetActions } from "./ShieldedBudgetActions";
 import { ShieldedFundsKeyManager } from "./ShieldedFundsKeyManager";
 import { SHIELDED_WALLET_REQUEST_TIMEOUT_MS } from "./useShieldedIdentitySession";
@@ -86,14 +96,15 @@ const INPUT =
   "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
 type Action = ShieldedAssetActionRequest["action"];
 type RecoveryFormat = "mnemonic" | "shieldedKey";
+type OperationScope = "session" | "wallet";
+type SpendReview = Pick<ShieldedSpendReviewProps,
+  "preview" | "action" | "notes" | "candidateCommitments" | "generatedCommitments" | "recipientLabel"
+>;
 export interface ShieldedPanelNavigation {
   slot: ShieldedKeySlot;
   /** Pins an independent payment choice to the key the user actually selected. */
   fundsFingerprint?: string;
-  action: Action | "receiveCode";
-  walletAction: Action | "receiveCode";
-  /** Legacy cache field; the current wallet is always read from slot. */
-  receiveSlot?: ShieldedKeySlot;
+  action: Action;
   /** The first scan or a user choice has settled the task; later pools keep it. */
   taskChosen?: boolean;
 }
@@ -141,9 +152,13 @@ export function ShieldedInheritancePanel({
   const walletRegion = useRef<HTMLDivElement>(null);
   const focusDestination = useRef<"access" | "task" | "wallet" | null>(null);
   const mounted = useRef(false),
-    running = useRef(false),
-    job = useRef(0),
     signatureRequest = useRef(0);
+  const activeOperation = useRef<{ scope: OperationScope } | null>(null);
+  const [spendReview, setSpendReview] = useState<SpendReview | null>(null);
+  const pendingSpendReview = useRef<{
+    review: SpendReview;
+    resolve: (confirmed: boolean) => void;
+  } | null>(null);
   const activeSignatureRequest = useRef<number | null>(null);
   const walletRef = useRef({ signer, account });
   walletRef.current = { signer, account };
@@ -161,6 +176,7 @@ export function ShieldedInheritancePanel({
     [error, setError] = useState("");
   const [transactionHash, setTransactionHash] = useState(""),
     [transactionPending, setTransactionPending] = useState(false);
+  const [transactionLabel, setTransactionLabel] = useState("");
   const [transactionResult, setTransactionResult] = useState<"done" | "failed" | "unknown" | null>(
     null,
   );
@@ -184,10 +200,8 @@ export function ShieldedInheritancePanel({
       (navigation?.slot === "asset" ? "" : (session.funds?.fundsFingerprint ?? "")),
   );
   const [codeSlot, setCodeSlot] = useState<ShieldedKeySlot>("identity");
-  const [walletDetailsOpen, setWalletDetailsOpen] = useState(navigation?.action === "receiveCode");
-  const [walletSection, setWalletSection] = useState<"balances" | "receiveCode" | "keys">(
-    navigation?.action === "receiveCode" ? "receiveCode" : "balances",
-  );
+  const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
+  const [walletSection, setWalletSection] = useState<"balances" | "receiveCode" | "keys">("balances");
   const [walletScreen, setWalletScreen] = useState<"workspace" | "manage" | "identity">(
     "workspace",
   );
@@ -209,11 +223,7 @@ export function ShieldedInheritancePanel({
   const [action, setAction] = useState<Action>(() =>
     !session.identity && session.funds?.recoveryVerified && !session.funds.backupRequired
       ? "privateTransfer"
-      : navigation?.action === "receiveCode"
-        ? navigation.walletAction === "receiveCode"
-          ? "shield"
-          : navigation.walletAction
-        : (navigation?.action ?? "shield"),
+      : (navigation?.action ?? "shield"),
   );
   const [amounts, setAmounts] = useState<Partial<Record<Action, string>>>({});
   const amount = amounts[action] ?? "";
@@ -227,16 +237,11 @@ export function ShieldedInheritancePanel({
     useState<ShieldedRecipientInputMethod>("receiveCode");
   const [recipientConfirmed, setRecipientConfirmed] = useState(false);
   const [codeError, setCodeError] = useState("");
-  const walletAction = useRef<Action>(
-    navigation?.walletAction === "receiveCode" ? "shield" : (navigation?.walletAction ?? "shield"),
-  );
   useEffect(() => {
     onNavigationChange?.({
       slot,
       fundsFingerprint: selectedFundsFingerprint,
       action,
-      walletAction: walletAction.current,
-      receiveSlot: slot,
       taskChosen,
     });
   }, [slot, selectedFundsFingerprint, action, taskChosen, onNavigationChange]);
@@ -258,8 +263,43 @@ export function ShieldedInheritancePanel({
     [claimPeriods, setClaimPeriods] = useState<string[]>([]);
   // Transactions in a multi-step plan, shown while one confirmation sends them all.
   const [planCount, setPlanCount] = useState(0);
-  const [allowanceReady, setAllowanceReady] = useState(modules.assetKind === "native");
   const [allowanceRevision, setAllowanceRevision] = useState(0);
+  const walletGeneration = getWalletConnectionGeneration();
+  const allowanceScope = useMemo(
+    () => ({
+      token: modules.token,
+      assetKind: modules.assetKind,
+      poolAddress: modules.poolAddress,
+      chainId: modules.chainId,
+      signer,
+      account,
+      walletGeneration,
+      revision: allowanceRevision,
+    }),
+    [
+      modules.token,
+      modules.assetKind,
+      modules.poolAddress,
+      modules.chainId,
+      signer,
+      account,
+      walletGeneration,
+      allowanceRevision,
+    ],
+  );
+  const [allowanceSnapshot, setAllowanceSnapshot] = useState<{
+    scope: typeof allowanceScope;
+    amount: bigint;
+  } | null>(null);
+  const allowanceReady = useMemo(() => {
+    if (modules.assetKind === "native") return true;
+    if (!signer || allowanceSnapshot?.scope !== allowanceScope) return false;
+    try {
+      return allowanceSnapshot.amount >= parseUnits(amount || "0", modules.tokenDecimals ?? 0);
+    } catch {
+      return false;
+    }
+  }, [modules.assetKind, modules.tokenDecimals, signer, allowanceSnapshot, allowanceScope, amount]);
   const context: ShieldedWorkerContext = {
     rpcUrl: config.rpcUrl,
     chainId: String(modules.chainId),
@@ -434,11 +474,47 @@ export function ShieldedInheritancePanel({
   clearRef.current = clearSecretInputs;
   const lockRef = useRef(lock);
   lockRef.current = lock;
+  function settleSpendReview(review: SpendReview, confirmed: boolean) {
+    const pending = pendingSpendReview.current;
+    if (pending?.review !== review) return;
+    pendingSpendReview.current = null;
+    if (mounted.current) setSpendReview(null);
+    if (!confirmed) void cancelShieldedAssetPreview().catch(() => undefined);
+    pending.resolve(confirmed);
+  }
+  function cancelSpendReview() {
+    const pending = pendingSpendReview.current;
+    if (pending) settleSpendReview(pending.review, false);
+  }
+  function reviewSpend(review: SpendReview): Promise<boolean> {
+    return new Promise((resolve) => {
+      pendingSpendReview.current = { review, resolve };
+      // Waiting for a person is idle time. Keep the form frozen while allowing
+      // the normal session idle lock (or pool navigation) to cancel this review.
+      latestSession.current.setBusy(false);
+      setStage("");
+      setSpendReview(review);
+    });
+  }
+  function invalidateWalletOperation() {
+    if (activeSignatureRequest.current !== null) {
+      lockRef.current();
+      return;
+    }
+    if (activeOperation.current?.scope !== "wallet") return;
+    cancelSpendReview();
+    activeOperation.current = null;
+    setBusy(false);
+    setStage("");
+    setPlanCount(0);
+    latestSession.current.setBusy(false);
+    void cancelShieldedAssetPreview().catch(() => undefined);
+  }
   useEffect(() => {
     mounted.current = true;
     // StrictMode and Fast Refresh re-run this effect on the same instance; an
     // operation it already started stays current and keeps the session busy.
-    if (running.current) latestSession.current.setBusy(true);
+    if (activeOperation.current) latestSession.current.setBusy(true);
     const clear = () => clearRef.current();
     const hidden = () => {
       if (document.visibilityState !== "hidden") return;
@@ -452,11 +528,12 @@ export function ShieldedInheritancePanel({
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", pagehide);
     const unsubscribeLock = subscribeShieldedAssetWorkerLock(() => {
+      cancelSpendReview();
       autoRecoveryBlocked.current = true;
       fundsOpenedFromWorkspace.current = false;
       signatureRequest.current++;
-      job.current++;
-      running.current = false;
+      activeSignatureRequest.current = null;
+      activeOperation.current = null;
       clear();
       if (mounted.current) {
         setBusy(false);
@@ -469,12 +546,16 @@ export function ShieldedInheritancePanel({
       }
     });
     const unsubscribeWallet = subscribeWalletConnectionChange(() => {
-      // Provider events invalidate a signature before asynchronous signer refresh finishes.
-      if (activeSignatureRequest.current !== null) lockRef.current();
+      // Invalidate wallet work before asynchronous signer refresh reaches React.
+      // Local key operations still have to publish the Worker's completed state.
+      clear();
+      setAllowanceSnapshot(null);
+      invalidateWalletOperation();
     });
     return () => {
       // After a real unmount, mounted.current already rejects late results.
       mounted.current = false;
+      cancelSpendReview();
       signatureRequest.current++;
       clear();
       document.removeEventListener("visibilitychange", hidden);
@@ -491,6 +572,7 @@ export function ShieldedInheritancePanel({
       lockRef.current();
       receiptTracking.current = null;
       setTransactionHash("");
+      setTransactionLabel("");
       setTransactionPending(false);
       setTransactionResult(null);
     }
@@ -525,6 +607,7 @@ export function ShieldedInheritancePanel({
         : {}),
     };
     setTransactionHash(pendingRecord.transactionHash ?? "");
+    setTransactionLabel(pendingRecord.label);
     setTransactionResult(null);
     setTransactionPending(true);
   }, [pendingRecord, modules.pool, modules.chainId]);
@@ -533,15 +616,8 @@ export function ShieldedInheritancePanel({
     previousGasWallet.current = { signer, account };
     if (previous.signer === signer && previous.account === account) return;
     clearSecretInputs();
-    job.current++;
     signatureRequest.current++;
-    if (activeSignatureRequest.current !== null) latestSession.current.lock();
-    running.current = false;
-    setBusy(false);
-    setStage("");
-    setPlanCount(0);
-    latestSession.current.setBusy(false);
-    void cancelShieldedAssetPreview().catch(() => undefined);
+    invalidateWalletOperation();
   }, [signer, account]);
   useEffect(() => {
     if (draftPolicy.current?.key !== draftKey) {
@@ -581,31 +657,25 @@ export function ShieldedInheritancePanel({
     setClaimPeriods(first?.periodIndices ?? []);
   }, [slot, selectedFundsFingerprint, wallet]);
   useEffect(() => {
+    cancelSpendReview();
     void cancelShieldedAssetPreview().catch(() => undefined);
   }, [actionRequestKey]);
   useEffect(() => {
-    if (!signer || modules.assetKind !== "erc20") return;
+    const { signer, token, assetKind, account, poolAddress, walletGeneration } = allowanceScope;
+    if (!signer || !token || assetKind !== "erc20") return;
     let cancelled = false;
-    void modules
-      .token!.allowance(account, modules.poolAddress)
+    const current = () => !cancelled && walletGeneration === getWalletConnectionGeneration();
+    void token.allowance(account, poolAddress)
       .then((value: bigint) => {
-        if (!cancelled) {
-          try {
-            setAllowanceReady(
-              BigInt(value) >= parseUnits(amount || "0", modules.tokenDecimals ?? 0),
-            );
-          } catch {
-            setAllowanceReady(false);
-          }
-        }
+        if (current()) setAllowanceSnapshot({ scope: allowanceScope, amount: getBigInt(value) });
       })
       .catch(() => {
-        if (!cancelled) setAllowanceReady(false);
+        if (current()) setAllowanceSnapshot(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [modules, account, signer, amount, allowanceRevision]);
+  }, [allowanceScope]);
 
   useEffect(() => {
     // Normal submissions await their own receipts, including every step in a
@@ -622,9 +692,9 @@ export function ShieldedInheritancePanel({
       const identityHandle = latestSession.current.identity?.handle;
       const fundsFingerprint = latestSession.current.funds?.fundsFingerprint;
       try {
-        if (running.current) return;
+        if (activeOperation.current) return;
         const outcome = await readShieldedSubmissionOutcome(tracked);
-        if (!current() || receiptTracking.current !== tracked || running.current) return;
+        if (!current() || receiptTracking.current !== tracked || activeOperation.current) return;
         if (outcome.status === "pending") {
           if (outcome.hash && outcome.hash !== tracked.hash) {
             tracked.hash = outcome.hash;
@@ -660,6 +730,7 @@ export function ShieldedInheritancePanel({
         receiptTracking.current = null;
         setTransactionPending(false);
         setTransactionResult(successful ? "done" : unknownApproval ? "unknown" : "failed");
+        setTransactionLabel(tracked.label);
         if (outcome.status === "confirmed") setTransactionHash(outcome.hash);
         setError(
           successful || unknownApproval
@@ -668,7 +739,9 @@ export function ShieldedInheritancePanel({
               ? latestTranslations.current.tr("nonceConsumed")
               : latestTranslations.current.t("shielded.transactionFailed", { hash: outcome.hash }),
         );
-        if (tracked.kind === "approval") setAllowanceRevision((revision) => revision + 1);
+        // A recovered deposit may have consumed its approval, including when
+        // a replacement's exact receipt cannot be identified. Re-read current state.
+        setAllowanceRevision((revision) => revision + 1);
         // A public result must not clear a newer secret session's selection.
         if (
           generation === getShieldedAssetWorkerGeneration() &&
@@ -692,17 +765,27 @@ export function ShieldedInheritancePanel({
       if (timer) clearTimeout(timer);
     };
   }, [busy, submissionPending, contextKey, transactionHash, pendingRecord?.id]);
-  async function run(task: (current: () => boolean) => Promise<void>, label: string) {
-    if (running.current) return;
-    running.current = true;
-    const epoch = ++job.current,
-      scope = contextKey;
+  async function run(
+    task: (current: () => boolean) => Promise<void>,
+    label: string,
+    operationScope: OperationScope = "session",
+  ) {
+    if (activeOperation.current) return;
+    const operation = { scope: operationScope };
+    activeOperation.current = operation;
+    const scope = contextKey;
     const generation = getShieldedAssetWorkerGeneration();
+    const walletGeneration = getWalletConnectionGeneration();
+    const wallet = walletRef.current;
     const current = () =>
       mounted.current &&
-      epoch === job.current &&
+      activeOperation.current === operation &&
       scope === contextRef.current &&
-      generation === getShieldedAssetWorkerGeneration();
+      generation === getShieldedAssetWorkerGeneration() &&
+      (operationScope === "session" ||
+        (walletGeneration === getWalletConnectionGeneration() &&
+          wallet.signer === walletRef.current.signer &&
+          wallet.account === walletRef.current.account));
     setBusy(true);
     latestSession.current.setBusy(true);
     setError("");
@@ -711,14 +794,36 @@ export function ShieldedInheritancePanel({
     try {
       await task(current);
     } catch (cause) {
-      if (current()) setError(cause instanceof Error ? cause.message : tr("failed"));
-    } finally {
       if (current()) {
-        setBusy(false);
-        setStage("");
-        latestSession.current.setBusy(false);
+        const reason = resolveErrorReason(cause);
+        if (cause instanceof ShieldedDepositBalanceError) {
+          setError(t("shielded.depositBalanceInsufficient", {
+            balance: formatUnits(cause.balance, modules.tokenDecimals ?? 0),
+            amount: formatUnits(cause.amount, modules.tokenDecimals ?? 0),
+            symbol: modules.assetSymbol,
+          }));
+        } else if (reason === "ERC20InsufficientAllowance") {
+          // The allowance may also change outside this page while a proof is prepared.
+          setAllowanceRevision((revision) => revision + 1);
+          setError(getFriendlyErrorMessage(cause, t, tr("failed")));
+        } else if (
+          (reason && Object.prototype.hasOwnProperty.call(REASON_FRIENDLY_MAP, reason)) ||
+          (cause && typeof cause === "object" && "code" in cause && cause.code === "CALL_EXCEPTION")
+        ) {
+          setError(getFriendlyErrorMessage(cause, t, tr("failed")));
+        } else {
+          setError(cause instanceof Error ? cause.message : tr("failed"));
+        }
       }
-      if (epoch === job.current) running.current = false;
+    } finally {
+      if (activeOperation.current === operation) {
+        activeOperation.current = null;
+        if (mounted.current) {
+          setBusy(false);
+          setStage("");
+          latestSession.current.setBusy(false);
+        }
+      }
     }
   }
   async function unlock() {
@@ -758,12 +863,13 @@ export function ShieldedInheritancePanel({
     }, tr("unlocking"));
   }
   function lock() {
+    cancelSpendReview();
     autoRecoveryBlocked.current = true;
     fundsOpenedFromWorkspace.current = false;
     focusDestination.current = "access";
     signatureRequest.current++;
-    job.current++;
-    running.current = false;
+    activeSignatureRequest.current = null;
+    activeOperation.current = null;
     setBusy(false);
     setStage("");
     latestSession.current.setBusy(false);
@@ -860,9 +966,9 @@ export function ShieldedInheritancePanel({
     setStage("");
     if (!submissionPending) {
       setTransactionHash("");
+      setTransactionLabel("");
       setTransactionResult(null);
     }
-    if (next !== "fund" && next !== "claim") walletAction.current = next;
     if (next === "claim") {
       const first =
         wallet?.claims.find((claim) => claim.slot === slot && claim.status === "claimable") ??
@@ -983,7 +1089,7 @@ export function ShieldedInheritancePanel({
       } finally {
         if (activeSignatureRequest.current === requestId) activeSignatureRequest.current = null;
       }
-    }, tr("signing"));
+    }, tr("signing"), "wallet");
   }
   async function createFunds(source: "random" | "walletSignature") {
     if (source === "walletSignature") return requestSignature("create");
@@ -1111,7 +1217,6 @@ export function ShieldedInheritancePanel({
               ? "privateTransfer"
               : "shield";
           setAction(next);
-          if (next !== "claim") walletAction.current = next;
         }
       }
       if (!allPools || !current()) return;
@@ -1133,7 +1238,7 @@ export function ShieldedInheritancePanel({
       autoRecoveryScope.current = "";
       return;
     }
-    if (autoRecoveryBlocked.current || walletScreen !== "workspace" || busy || running.current)
+    if (autoRecoveryBlocked.current || walletScreen !== "workspace" || busy || activeOperation.current)
       return;
     const scope = JSON.stringify([
       contextKey,
@@ -1170,7 +1275,7 @@ export function ShieldedInheritancePanel({
       receiveCodeScope.current = "";
       return;
     }
-    if (ownCode || !receiveCodeReady || busy || submissionPending || running.current) return;
+    if (ownCode || !receiveCodeReady || busy || submissionPending || activeOperation.current) return;
     const scope = JSON.stringify([
       contextKey,
       codeSlot,
@@ -1264,14 +1369,35 @@ export function ShieldedInheritancePanel({
     };
     if (mounted.current) {
       setTransactionHash(hash);
+      setTransactionLabel(label);
       setTransactionPending(true);
       setTransactionResult(null);
     }
   }
-  function rejectKnownWalletRequest(cause: unknown, id: string) {
+  function clearFailedWalletRequest(cause: unknown, id: string) {
     const tracked = receiptTracking.current;
-    const code = cause && typeof cause === "object" && "code" in cause ? cause.code : undefined;
-    if (tracked?.id !== id || tracked.hash || (code !== "ACTION_REJECTED" && code !== 4001)) return;
+    if (tracked?.id !== id || tracked.hash) return;
+    const error = cause && typeof cause === "object" ? cause : undefined;
+    const code = error && "code" in error ? error.code : undefined;
+    const info = error && "info" in error ? error.info : undefined;
+    // ethers can send successfully, then fail while fetching the transaction.
+    // Preserve tracking whenever the error carries evidence of a broadcast.
+    if (
+      (error && "receipt" in error && error.receipt) ||
+      (info && typeof info === "object" && "sendTransactionHash" in info && info.sendTransactionHash)
+    )
+      return;
+    const estimationFailed =
+      code === "CALL_EXCEPTION" && error && "action" in error && error.action === "estimateGas";
+    // An explicit rejection, insufficient funds, or failed estimation cannot
+    // produce a transaction. Transport errors still need public reconciliation.
+    if (
+      code !== "ACTION_REJECTED" &&
+      code !== 4001 &&
+      code !== "INSUFFICIENT_FUNDS" &&
+      !estimationFailed
+    )
+      return;
     txCenter?.upsert({ id, kind: "shielded", label: tracked.label, phase: "failed" });
     receiptTracking.current = null;
     if (mounted.current) setTransactionPending(false);
@@ -1291,16 +1417,25 @@ export function ShieldedInheritancePanel({
       phase: status === 1 ? "done" : "failed",
       transactionHash: hash,
     });
+    // ERC-20 deposits consume allowance. Never reuse the pre-deposit snapshot
+    // for the next amount, even if the original secret session has been locked.
+    if (mounted.current) setAllowanceRevision((revision) => revision + 1);
     if (mounted.current && tracked?.id === record.id) {
       receiptTracking.current = null;
       setTransactionPending(false);
       setTransactionResult(status === 1 ? "done" : "failed");
-      if (tracked.kind === "approval") setAllowanceRevision((revision) => revision + 1);
+      setTransactionLabel(record.label);
     }
+  }
+  function clearTransactionFeedback() {
+    setTransactionHash("");
+    setTransactionResult(null);
+    setTransactionLabel("");
   }
   async function approve() {
     if (submissionPending || !slotReady) return;
     await run(async (current) => {
+      clearTransactionFeedback();
       if (!signer || !modules.token) throw new Error(t("shielded.walletNotReady"));
       const chosen = signer,
         generation = getShieldedAssetWorkerGeneration(),
@@ -1313,6 +1448,8 @@ export function ShieldedInheritancePanel({
         walletRef.current.signer !== chosen
       )
         throw new Error(t("shielded.walletChanged"));
+      await assertShieldedDepositBalance(modules.token, account, value);
+      if (!current()) return;
       const [nonce, fromBlock] = await Promise.all([
         chosen.provider!.getTransactionCount(account, "pending"),
         chosen.provider!.getBlockNumber(),
@@ -1347,6 +1484,7 @@ export function ShieldedInheritancePanel({
         },
       });
       setTransactionHash("");
+      setTransactionLabel(label);
       setTransactionPending(true);
       setTransactionResult(null);
       const endWalletRequest = latestSession.current.beginWalletRequest();
@@ -1358,7 +1496,7 @@ export function ShieldedInheritancePanel({
           { nonce, chainId: modules.chainId },
         );
       } catch (cause) {
-        rejectKnownWalletRequest(cause, txId);
+        clearFailedWalletRequest(cause, txId);
         throw cause;
       } finally {
         endWalletRequest();
@@ -1368,23 +1506,13 @@ export function ShieldedInheritancePanel({
         trackBroadcast(chosen.provider!, hash, txId, label);
       });
       recordReceipt(transactionHash, receipt.status, { id: txId, label });
-      if (current()) {
-        if (
-          walletRef.current.signer !== chosen ||
-          (await chosen.provider!.getNetwork()).chainId !== modules.chainId
-        )
-          throw new Error(t("shielded.walletChanged"));
-        const allowance: bigint = await modules.token.allowance(account, modules.poolAddress);
-        setAllowanceReady(receipt?.status === 1 && allowance >= value);
-      }
       if (receipt.status !== 1)
         throw new Error(t("shielded.transactionFailed", { hash: transactionHash }));
-    }, t("shielded.stages.submitting"));
+    }, t("shielded.stages.submitting"), "wallet");
   }
   /**
-   * One confirmation sends the whole plan in order: any consolidation, then the payment.
-   * Each step is proved, its gas checked and its receipt awaited before the next; the
-   * wallet still signs every transaction.
+   * Spending plans pause for review before proving each actual transaction.
+   * After a consolidation receipt, rebuild and review the remaining plan.
    */
   async function prepare() {
     if (submissionPending || !slotReady) return;
@@ -1393,6 +1521,7 @@ export function ShieldedInheritancePanel({
       requested = actionRequestKey,
       generation = getShieldedAssetWorkerGeneration();
     await run(async (current) => {
+      clearTransactionFeedback();
       if (!chosen) throw new Error(t("shielded.walletNotReady"));
       if (needsCode && !recipientReady) throw new Error(tr("confirmRecipient"));
       if (action === "shield" && !allowanceReady) throw new Error(tr("approveFirst"));
@@ -1407,6 +1536,13 @@ export function ShieldedInheritancePanel({
         action === "claim" || (action === "fund" && selectedPolicy)
           ? undefined
           : parseUnits(amount, modules.tokenDecimals ?? 0).toString();
+      if (action === "shield" && modules.assetKind === "erc20") {
+        if (!modules.token) throw new Error(t("shielded.walletNotReady"));
+        if ((await chosen.getAddress()).toLowerCase() !== account.toLowerCase())
+          throw new Error(t("shielded.walletChanged"));
+        await assertShieldedDepositBalance(modules.token, account, amountValue!);
+        assertCurrent();
+      }
       let stepCandidates =
         action === "fund"
           ? values.map((note) => note.commitment)
@@ -1416,6 +1552,8 @@ export function ShieldedInheritancePanel({
       let stepPolicy =
         policyHandle ||
         (draftPolicy.current?.key === draftKey ? draftPolicy.current.handle : undefined);
+      let reviewNotes = values.map(({ commitment, amount }) => ({ commitment, amount }));
+      let generatedCommitments: string[] = [];
       let remaining = Number.POSITIVE_INFINITY;
       let sent = false;
       try {
@@ -1453,6 +1591,21 @@ export function ShieldedInheritancePanel({
           if (action === "fund" && !policyHandle && planned.policyHandle) {
             stepPolicy = planned.policyHandle;
             draftPolicy.current = { handle: planned.policyHandle, key: draftKey };
+          }
+          if (action === "privateTransfer" || action === "unshield") {
+            const confirmed = await reviewSpend({
+              preview: planned,
+              action,
+              notes: reviewNotes,
+              candidateCommitments: [...(stepCandidates ?? [])],
+              generatedCommitments,
+              recipientLabel: action === "unshield"
+                ? withdrawalRecipient
+                : verifiedRecipient!.personHash,
+            });
+            if (!confirmed) return;
+            assertCurrent();
+            latestSession.current.setBusy(true);
           }
           setStage(t("shielded.stages.proving"));
           const result = await shieldedAssetWorkerCall(
@@ -1513,6 +1666,7 @@ export function ShieldedInheritancePanel({
               });
               if (mounted.current) {
                 setTransactionHash("");
+                setTransactionLabel(label);
                 setTransactionPending(true);
                 setTransactionResult(null);
               }
@@ -1525,7 +1679,9 @@ export function ShieldedInheritancePanel({
                 ? await submitShield({
                     ...common,
                     amount: result.amount,
-                    assetKind: modules.assetKind,
+                    ...(modules.assetKind === "erc20"
+                      ? { assetKind: "erc20" as const, token: modules.token! }
+                      : { assetKind: "native" as const }),
                   })
                 : result.action === "fund"
                   ? await submitFund(common)
@@ -1539,13 +1695,14 @@ export function ShieldedInheritancePanel({
                           recipient: result.recipient!,
                         });
           } catch (cause) {
-            rejectKnownWalletRequest(cause, txId);
+            clearFailedWalletRequest(cause, txId);
             throw cause;
           }
           sent = true;
           recordReceipt(submitted.transactionHash, submitted.receipt.status, { id: txId, label });
           if (current()) {
             setTransactionHash(submitted.transactionHash);
+            setTransactionLabel(label);
             setTransactionPending(false);
             setTransactionResult(submitted.receipt.status === 1 ? "done" : "failed");
           }
@@ -1558,6 +1715,14 @@ export function ShieldedInheritancePanel({
             ...(stepCandidates ?? []).filter((commitment) => !planned.inputs.includes(commitment)),
             ...outputs.filter((_, index) => BigInt(planned.outputAmounts[index] ?? "0") > 0n),
           ];
+          reviewNotes = [
+            ...reviewNotes,
+            ...outputs.flatMap((commitment, index) => {
+              const amount = planned.outputAmounts[index];
+              return BigInt(amount) > 0n ? [{ commitment, amount }] : [];
+            }),
+          ];
+          generatedCommitments = [...generatedCommitments, ...outputs];
         }
       } finally {
         if (current()) setPlanCount(0);
@@ -1567,10 +1732,19 @@ export function ShieldedInheritancePanel({
           setCandidates([]);
         }
       }
-    }, tr("preparing"));
+    }, tr("preparing"), "wallet");
   }
   const feedback = (
     <>
+      {spendReview ? (
+        <ShieldedSpendReview
+          {...spendReview}
+          decimals={modules.tokenDecimals ?? 0}
+          symbol={modules.assetSymbol}
+          onConfirm={() => settleSpendReview(spendReview, true)}
+          onCancel={() => settleSpendReview(spendReview, false)}
+        />
+      ) : null}
       {busy && planCount > 1 ? (
         <p role="status" className="text-sm text-ink-muted">
           {t("shielded.walletKeys.planTransactions", { count: planCount })}
@@ -1588,6 +1762,7 @@ export function ShieldedInheritancePanel({
       ) : null}
       {transactionHash || submissionPending || transactionResult ? (
         <p role="status" className="break-all text-xs">
+          {transactionLabel ? `${transactionLabel} · ` : ""}
           {transactionHash ? `${tr("transactionHash")}: ${transactionHash} · ` : ""}
           {t(
             submissionPending
@@ -1723,9 +1898,9 @@ export function ShieldedInheritancePanel({
         symbol={modules.assetSymbol}
         decimals={modules.tokenDecimals ?? 0}
         busy={busy}
+        reviewing={spendReview !== null}
         amount={amount}
         onAmountChange={setAmount}
-        ownReceiveCode={ownCode}
         recipient={{
           method: recipientInputMethod,
           onMethodChange: (method) => {

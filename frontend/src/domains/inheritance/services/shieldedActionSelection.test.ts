@@ -10,9 +10,7 @@ import {
   getShieldedClaimBudgetKey,
   nextClaimPeriods,
   selectClaimBudget,
-  selectValueNotes,
   type ShieldedSelectableBudgetNote,
-  type ShieldedSelectableValueNote,
 } from "./shieldedActionSelection";
 
 const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
@@ -34,10 +32,10 @@ function publicNote(commitment: bigint) {
   };
 }
 
-function value(commitment: bigint, amount: bigint): ShieldedSelectableValueNote {
+function value(commitment: bigint, amount: bigint) {
   return {
     ...publicNote(commitment),
-    note: { kind: "value", ownerCommitment: 444n, amount, nonce: commitment },
+    note: { kind: "value" as const, ownerCommitment: 444n, amount, nonce: commitment },
   };
 }
 
@@ -79,59 +77,6 @@ function spentPeriod(
     scope,
   );
 }
-
-describe("automatic shielded value note selection", () => {
-  it("chooses the smallest sufficient single note with stable ties and no input mutation", () => {
-    const notes = [value(5n, 20n), value(3n, 12n), value(2n, 12n), value(1n, 5n)];
-    const original = [...notes];
-    expect(selectValueNotes(notes, 10n)?.map((note) => note.commitment)).toEqual([2n]);
-    expect(selectValueNotes([...notes].reverse(), 10n)?.map((note) => note.commitment)).toEqual([
-      2n,
-    ]);
-    expect(notes).toEqual(original);
-  });
-
-  it("prefers one input even when a two-note total would leave less change", () => {
-    const single = value(3n, 20n);
-    expect(selectValueNotes([value(1n, 6n), value(2n, 4n), single], 10n, 2)).toEqual([single]);
-  });
-
-  it("uses the smallest sufficient distinct pair only when two inputs are supported", () => {
-    const notes = [value(40n, 4n), value(70n, 7n), value(60n, 6n), value(80n, 8n)];
-    expect(selectValueNotes(notes, 10n)).toBeUndefined();
-    expect(selectValueNotes(notes, 10n, 2)?.map((note) => note.commitment)).toEqual([40n, 60n]);
-    expect(selectValueNotes(notes, 100n, 2)).toBeUndefined();
-  });
-
-  it("breaks equal pair totals by commitment independently of input order", () => {
-    const notes = [value(100n, 1n), value(1n, 3n), value(2n, 5n), value(99n, 7n)];
-    expect(selectValueNotes(notes, 8n, 2)?.map((note) => note.commitment)).toEqual([1n, 2n]);
-    expect(selectValueNotes([...notes].reverse(), 8n, 2)?.map((note) => note.commitment)).toEqual([
-      1n,
-      2n,
-    ]);
-  });
-
-  it("never counts duplicate commitments twice or spends a zero-value continuation", () => {
-    const first = value(1n, 6n);
-    expect(
-      selectValueNotes([first, { ...first }, value(2n, 0n), budget(3n)], 10n, 2),
-    ).toBeUndefined();
-    expect(
-      selectValueNotes([first, value(4n, 4n), { ...first }], 10n, 2)?.map(
-        (note) => note.commitment,
-      ),
-    ).toEqual([1n, 4n]);
-    expect(selectValueNotes([first], 0n)).toBeUndefined();
-  });
-
-  it("compares token amounts exactly above JavaScript's safe integer range", () => {
-    const amount = (1n << 100n) + 1n;
-    expect(
-      selectValueNotes([value(1n, amount - 1n), value(2n, amount + 1n)], amount)?.[0].commitment,
-    ).toBe(2n);
-  });
-});
 
 describe("automatic shielded claim selection", () => {
   it("uses the wallet's chain and pool for rule keys and already claimed periods", () => {

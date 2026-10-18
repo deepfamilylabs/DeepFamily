@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Interface, Wallet, getBytes, hexlify, type Contract } from "ethers";
 import {
+  SHIELDED_POOL_PROTOCOL_VERSION,
   buildShieldedAssetSigningMessage,
   deriveShieldedAssetKeyMaterial,
+  deriveShieldedHeirKeyMaterial,
+  deriveShieldedViewPublicKey,
   deriveShieldedAssetRootFromSignature,
   encodeShieldedAssetKey,
   encodeShieldedAssetMnemonic,
@@ -11,6 +14,7 @@ import {
   computeShieldedNoteCommitmentFromPayload,
   createLineageTree,
   encodeShieldedBudgetNotePayload,
+  encodeShieldedValueNotePayload,
   encryptShieldedNote,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
@@ -267,37 +271,79 @@ async function authenticatedBudgetHistory(
     { payload, ciphertextHashField: computeShieldedCiphertextHashField(ciphertext) },
     scope,
   ).noteCommitment;
+  const unrelatedKeys = deriveShieldedHeirKeyMaterial(999n);
+  const unrelatedViewingKey = await deriveShieldedViewPublicKey(unrelatedKeys.hpkeIkm);
+  async function unrelatedOutput(nonce: bigint) {
+    const payload = encodeShieldedValueNotePayload(
+      { ownerCommitment: unrelatedKeys.ownerCommitment, amount: 0n, nonce },
+      scope,
+    );
+    const ciphertext = await encryptShieldedNote({
+      payload,
+      recipientPublicKey: unrelatedViewingKey,
+      ...scope,
+    });
+    const commitment = computeShieldedNoteCommitmentFromPayload(
+      { payload, ciphertextHashField: computeShieldedCiphertextHashField(ciphertext) },
+      scope,
+    ).noteCommitment;
+    return { commitment, ciphertext };
+  }
   const tree = createLineageTree();
-  tree.insert(commitment);
   const iface = new Interface([
     "event NoteAppended(uint256 indexed shardId,uint256 indexed leafIndex,uint256 commitment,uint256 root,bytes ciphertext)",
     "event NullifierSpent(uint256 nullifier)",
     "event ActionExecuted(uint8 action,uint256 inputShardId0,uint256 inputShardId1)",
+    "function protocolVersion() view returns (uint256)",
+    "function nullifierCount() view returns (uint256)",
   ]);
-  const log = (event: string, values: unknown[], index: number) => ({
+  const log = (event: string, values: unknown[], index: number, transactionHash: string) => ({
     ...iface.encodeEventLog(iface.getEvent(event)!, values),
     address: context.poolAddress,
     blockNumber: 2,
-    transactionHash: `0x${"01".repeat(32)}`,
+    transactionHash,
     index,
   });
-  const logs = [
-    log("ActionExecuted", [1n, 0n, 0n], 0),
-    log("NoteAppended", [0n, 0n, commitment, tree.root, ciphertext], 1),
-  ];
-  if (options.spent)
-    logs.push(
-      log(
-        "NullifierSpent",
-        [
-          computeShieldedSpendNullifier(
-            { ownerSecret: keys.ownerSecret, noteCommitment: commitment },
-            scope,
-          ),
-        ],
-        2,
-      ),
+  const logs: ReturnType<typeof log>[] = [];
+  function appendAction(
+    action: 1 | 2,
+    outputs: readonly [{ commitment: bigint; ciphertext: Uint8Array }, { commitment: bigint; ciphertext: Uint8Array }],
+    transactionHash: string,
+  ) {
+    logs.push(log("ActionExecuted", [action, 0n, 0n], logs.length, transactionHash));
+    for (const output of outputs) {
+      const leafIndex = tree.sizeBigInt;
+      tree.insert(output.commitment);
+      logs.push(log(
+        "NoteAppended",
+        [0n, leafIndex, output.commitment, tree.root, output.ciphertext],
+        logs.length,
+        transactionHash,
+      ));
+    }
+  }
+  appendAction(
+    1,
+    [{ commitment, ciphertext }, await unrelatedOutput(37n)],
+    `0x${"01".repeat(32)}`,
+  );
+  if (options.spent) {
+    const transactionHash = `0x${"02".repeat(32)}`;
+    logs.push(log(
+      "NullifierSpent",
+      [computeShieldedSpendNullifier(
+        { ownerSecret: keys.ownerSecret, noteCommitment: commitment },
+        scope,
+      )],
+      logs.length,
+      transactionHash,
+    ));
+    appendAction(
+      2,
+      [await unrelatedOutput(41n), await unrelatedOutput(43n)],
+      transactionHash,
     );
+  }
   const pool = {
     interface: iface,
     runner: {
@@ -308,9 +354,9 @@ async function authenticatedBudgetHistory(
       },
     },
     getAddress: async () => context.poolAddress,
-    protocolVersion: async () => 1n,
+    protocolVersion: async () => BigInt(SHIELDED_POOL_PROTOCOL_VERSION),
     currentShardId: async () => 0n,
-    noteShard: async () => ({ size: 1n, root: tree.root }),
+    noteShard: async () => ({ size: tree.sizeBigInt, root: tree.root }),
     nullifierCount: async () => (options.spent ? 1n : 0n),
   } as unknown as Contract;
   const actual = await vi.importActual<
@@ -1783,6 +1829,7 @@ describe("ephemeral asset Worker funds lifecycle", () => {
       shards: new Map(),
       spentNullifiers: new Set(),
       walletOwnerCommitment: keys.ownerCommitment,
+      walletKeyMode: keys.keyMode,
       ownedNotes: new Map([
         [
           71n,

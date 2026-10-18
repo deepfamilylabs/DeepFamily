@@ -5,6 +5,100 @@ import {
   SHIELDED_INHERITANCE_DOMAINS,
 } from "./shielded-inheritance.js";
 
+const SUBSET_SEARCH_BUDGET = 250_000;
+const byAmount = (a, b) => {
+  if (a.amount !== b.amount) return a.amount > b.amount ? -1 : 1;
+  return a.commitment < b.commitment ? -1 : a.commitment > b.commitment ? 1 : 0;
+};
+
+/** Minimize change, then input count, without introducing another transaction. */
+function selectValueInputs(available, target, maxInputs) {
+  const greedy = [];
+  let greedyTotal = 0n;
+  for (const note of available) {
+    greedy.push(note);
+    greedyTotal += note.amount;
+    if (greedyTotal >= target) break;
+  }
+  // The largest notes establish the minimum number of inputs needed. If even
+  // they exceed capacity, no subset can avoid the next consolidation step.
+  if (greedy.length > maxInputs || greedyTotal === target) return greedy;
+
+  let best = greedy;
+  let bestTotal = greedyTotal;
+  const consider = (inputs, total) => {
+    if (
+      total >= target &&
+      total - target <= MAX_UINT128 &&
+      (total < bestTotal || (total === bestTotal && inputs.length < best.length))
+    ) {
+      best = [...inputs].sort(byAmount);
+      bestTotal = total;
+    }
+  };
+  for (const note of available) {
+    if (note.amount < target) break;
+    consider([note], note.amount);
+  }
+  // Funding still consumes one donor note; an exact multi-input combination
+  // must not add a consolidation when a direct donor note is available.
+  if (maxInputs === 1 || (bestTotal === target && best.length === 1)) return best;
+
+  // A note that already covers the target cannot improve a combination with
+  // other positive notes. Singles and pairs are checked across all candidates.
+  const searchable = available.filter((note) => note.amount < target);
+  let left = 0;
+  let right = searchable.length - 1;
+  while (left < right) {
+    const total = searchable[left].amount + searchable[right].amount;
+    if (total >= target) {
+      consider([searchable[left], searchable[right]], total);
+      if (total === target) return best;
+      left += 1;
+    } else {
+      right -= 1;
+    }
+  }
+
+  const prefix = [0n];
+  for (const note of searchable) prefix.push(prefix.at(-1) + note.amount);
+  const chosen = [];
+  let remaining = SUBSET_SEARCH_BUDGET;
+  const search = (start, sum) => {
+    // With exact change already found, only a smaller input count can improve
+    // it. Equal-valued notes are interchangeable within this owner and pool.
+    const slots = Math.min(
+      maxInputs - chosen.length,
+      bestTotal === target ? best.length - chosen.length - 1 : maxInputs,
+    );
+    if (
+      slots <= 0 ||
+      start >= searchable.length ||
+      sum + prefix[Math.min(start + slots, searchable.length)] - prefix[start] < target ||
+      sum + searchable.at(-1).amount > bestTotal
+    )
+      return;
+    for (let index = start; index < searchable.length && remaining > 0; index += 1) {
+      remaining -= 1;
+      if (index > start && searchable[index].amount === searchable[index - 1].amount) continue;
+      if (sum + prefix[Math.min(index + slots, searchable.length)] - prefix[index] < target) break;
+      const note = searchable[index];
+      const total = sum + note.amount;
+      chosen.push(note);
+      if (total >= target) consider(chosen, total);
+      else if (chosen.length < maxInputs) search(index + 1, total);
+      chosen.pop();
+      // Exact singles and pairs were checked above; three inputs are optimal
+      // once no such smaller exact solution exists.
+      if (bestTotal === target && best.length === 3) return;
+    }
+  };
+  search(0, 0n);
+  // Candidate counts are unrestricted. Bound combinatorial work rather than
+  // dropping permitted notes; exhausting the budget retains a valid plan.
+  return best;
+}
+
 /** Slot one retains the two-slot domain; further placeholders have a distinct slot domain. */
 export function computeShieldedDummyInputNullifierForSlot(
   ownerSecret,
@@ -77,27 +171,12 @@ export function planShieldedValueSpend({ notes, candidateCommitments, amount, ma
   }
   if (candidates.reduce((sum, note) => sum + note.amount, 0n) < target)
     throw new Error("Insufficient candidate VALUE balance");
-  const byAmount = (a, b) =>
-    a.amount === b.amount ? a.commitment.localeCompare(b.commitment) : a.amount > b.amount ? -1 : 1;
   let available = [...candidates];
   const steps = [];
   const usedOriginal = new Set();
   for (;;) {
     available.sort(byAmount);
-    const single = available
-      .filter((note) => note.amount >= target)
-      .sort((a, b) => -byAmount(a, b))[0];
-    let selected;
-    if (single) selected = [single];
-    else {
-      selected = [];
-      let total = 0n;
-      for (const note of available) {
-        selected.push(note);
-        total += note.amount;
-        if (total >= target) break;
-      }
-    }
+    const selected = selectValueInputs(available, target, maxInputs);
     const final = selected.length <= maxInputs;
     // Transfers can merge up to eight even when the final operation (Fund) consumes one.
     const inputs = final ? selected : selected.slice(0, 8);

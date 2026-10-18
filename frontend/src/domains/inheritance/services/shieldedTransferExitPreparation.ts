@@ -7,21 +7,19 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
-  deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
   verifyShieldedNotePayload,
-  planShieldedValueSpend,
 } from "@deepfamily/protocol-core";
-export { planShieldedValueSpend } from "@deepfamily/protocol-core";
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
+import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
@@ -30,8 +28,7 @@ type ValueNote = { ownerCommitment: bigint; amount: bigint; nonce: bigint };
 
 export type ShieldedValueInput = {
   wallet: LocalShieldedWalletSnapshot;
-  derivedSecretField?: BigNumberish;
-  keyMaterial?: { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string };
+  keyMaterial: ShieldedKeyMaterial;
   commitment: BigNumberish;
 };
 
@@ -87,15 +84,7 @@ function decimal(values: readonly bigint[]): string[] {
 }
 
 async function openValueInput(input: ShieldedValueInput, ctx: Context): Promise<OpenedValueInput> {
-  const keys =
-    input.keyMaterial ??
-    (input.derivedSecretField !== undefined
-      ? deriveShieldedHeirKeyMaterial(input.derivedSecretField)
-      : undefined);
-  if (!keys) throw new Error("VALUE spending needs an unlocked owner key");
-  if (computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment) {
-    throw new Error("VALUE owner key does not match its commitment");
-  }
+  const keys = validateShieldedKeyMaterial(input.keyMaterial);
   const wallet = input.wallet;
   if (
     wallet.invalidated ||
@@ -480,63 +469,4 @@ export async function prepareShieldedUnshield(input: {
     dummyNonce: String(notes[1].nonce),
   };
   return { amount, recipient, data, witness, outputs };
-}
-
-/** Prepare only the first merge from a complete preview; re-scan and confirm after its receipt. */
-export async function prepareShieldedValueConsolidation(input: {
-  chainId: BigNumberish;
-  poolAddress: string;
-  wallet: LocalShieldedWalletSnapshot;
-  derivedSecretField?: BigNumberish;
-  keyMaterial?: ShieldedValueInput["keyMaterial"];
-  candidateCommitments?: readonly BigNumberish[];
-  maxInputs?: 1 | 8;
-  amount: BigNumberish;
-}): Promise<PreparedShieldedPrivateTransfer | undefined> {
-  const amount = uint128(input.amount, "amount");
-  if (amount === 0n) throw new Error("Consolidation target must be positive");
-  const keys =
-    input.keyMaterial ??
-    (input.derivedSecretField !== undefined
-      ? deriveShieldedHeirKeyMaterial(input.derivedSecretField)
-      : undefined);
-  if (!keys) throw new Error("Consolidation needs an unlocked owner key");
-  const ctx = context(input.chainId, input.poolAddress);
-  const notes = [...input.wallet.ownedNotes.values()].filter(
-    (owned) =>
-      owned.note.kind === "value" &&
-      owned.note.ownerCommitment === keys.ownerCommitment &&
-      owned.note.amount > 0n &&
-      !input.wallet.spentNullifiers.has(
-        computeShieldedSpendNullifier(
-          { ownerSecret: keys.ownerSecret, noteCommitment: owned.commitment },
-          ctx,
-        ),
-      ),
-  );
-  const plan = planShieldedValueSpend({
-    notes: notes.map((owned) => ({
-      commitment: owned.commitment,
-      amount: (owned.note as ValueNote).amount,
-    })),
-    candidateCommitments: input.candidateCommitments?.map((value) => String(getBigInt(value))),
-    amount,
-    maxInputs: input.maxInputs ?? 1,
-  });
-  const step = plan.steps[0];
-  if (step.kind === "spend") return undefined;
-  return prepareShieldedPrivateTransfer({
-    chainId: input.chainId,
-    poolAddress: input.poolAddress,
-    inputs: step.inputCommitments.map((commitment) => ({
-      wallet: input.wallet,
-      derivedSecretField: input.derivedSecretField,
-      keyMaterial: input.keyMaterial,
-      commitment,
-    })),
-    destinations: [
-      { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[0] },
-      { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[1] },
-    ],
-  });
 }

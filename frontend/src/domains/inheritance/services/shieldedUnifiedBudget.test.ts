@@ -7,12 +7,14 @@ import { describe, expect, it, vi } from "vitest";
 import { Interface, getBigInt, hexlify, type Contract } from "ethers";
 import {
   SECONDS_PER_DAY,
+  SHIELDED_POOL_PROTOCOL_VERSION,
   computeIdentityFromDerivedSecret,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
+  deriveShieldedAssetKeyMaterial,
   deriveShieldedViewPublicKey,
   getShieldedBudgetCommitments,
   isPublicShieldedBudgetEnvelope,
@@ -39,6 +41,7 @@ const endorser = "0x3333333333333333333333333333333333333333";
 const rootIC = 111n;
 const donorSecret = 777n;
 const childSecret = 888n;
+const donorKeys = { ...deriveShieldedHeirKeyMaterial(donorSecret), keyMode: 0 as const };
 const initialTime = 1_700_000_000n;
 
 /** Opt-in circuit assertions for the exact public/private witnesses prepared by the UI service. */
@@ -91,7 +94,7 @@ function childIdentity(): IdentityMaterialV1Result {
   };
 }
 
-async function fixture(periodDays = 30n) {
+async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
   const identity = childIdentity();
   const childIC = BigInt(identity.identityCommitment);
   const rootHash = wrapIdentityCommitmentAsPersonHash(rootIC).toLowerCase();
@@ -156,7 +159,9 @@ async function fixture(periodDays = 30n) {
   const iface = new Interface([
     "event NoteAppended(uint256 indexed shardId,uint256 indexed leafIndex,uint256 commitment,uint256 root,bytes ciphertext)",
     "event NullifierSpent(uint256 nullifier)",
-    "event ActionExecuted(uint8 indexed action)",
+    "event ActionExecuted(uint8 action,uint256 inputShardId0,uint256 inputShardId1)",
+    "function protocolVersion() view returns (uint256)",
+    "function nullifierCount() view returns (uint256)",
   ]);
   const tree = createLineageTree();
   const logs: Array<{
@@ -168,6 +173,7 @@ async function fixture(periodDays = 30n) {
     transactionHash: string;
   }> = [];
   let now = initialTime;
+  let nullifierCount = 0n;
   const getLogs = vi.fn(async () => [...logs]);
   const provider = {
     getNetwork: async () => ({ chainId }),
@@ -179,6 +185,8 @@ async function fixture(periodDays = 30n) {
     interface: iface,
     runner: { provider },
     getAddress: async () => poolAddress,
+    protocolVersion: async () => BigInt(SHIELDED_POOL_PROTOCOL_VERSION),
+    nullifierCount: async () => nullifierCount,
     LINEAGE_INDEX: async () => lineageAddress,
     currentShardId: async () => 0n,
     noteShard: async () => ({ size: tree.sizeBigInt, root: tree.root }),
@@ -190,28 +198,25 @@ async function fixture(periodDays = 30n) {
     ),
     root: async (which: number) => (which === 0 ? endorsementTree.root : trustedTree.root),
   } as unknown as Contract;
-  function record(prepared: {
-    outputs: readonly { commitment: bigint; ciphertext: Uint8Array }[];
-    data: {
-      inputNullifiers: readonly unknown[];
-      periodNullifiers: readonly unknown[];
-      fundMode?: unknown;
-    };
-  }) {
+  function record(
+    prepared: {
+      outputs: readonly { commitment: bigint; ciphertext: Uint8Array }[];
+      data: {
+        inputShardIds: readonly unknown[];
+        inputNullifiers: readonly unknown[];
+        periodNullifiers: readonly unknown[];
+      };
+    },
+    action: 0 | 1 | 2,
+  ) {
+    if (prepared.outputs.length !== 2) throw new Error("An action must have two outputs");
     const transactionHash = `0x${BigInt(logs.length + 1)
       .toString(16)
       .padStart(64, "0")}`;
-    const action = prepared.data.fundMode === undefined ? 0 : 1;
-    logs.push({
-      ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [action]),
-      address: poolAddress,
-      blockNumber: 10,
-      index: logs.length,
-      transactionHash,
-    });
     for (const value of [...prepared.data.inputNullifiers, ...prepared.data.periodNullifiers]) {
       const nf = getBigInt(value as bigint);
-      if (nf !== 0n)
+      if (nf !== 0n) {
+        nullifierCount += 1n;
         logs.push({
           ...iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [nf]),
           address: poolAddress,
@@ -219,7 +224,17 @@ async function fixture(periodDays = 30n) {
           index: logs.length,
           transactionHash,
         });
+      }
     }
+    logs.push({
+      ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [
+        action, ...prepared.data.inputShardIds,
+      ]),
+      address: poolAddress,
+      blockNumber: 10,
+      index: logs.length,
+      transactionHash,
+    });
     for (const output of prepared.outputs) {
       const index = tree.sizeBigInt;
       tree.insert(output.commitment);
@@ -241,12 +256,12 @@ async function fixture(periodDays = 30n) {
   const shield = await prepareShieldedShield({
     chainId,
     poolAddress,
-    derivedSecretField: donorSecret,
+    keyMaterial: donorKeys,
     amount: 100n,
   });
-  record(shield);
+  record(shield, 0);
   const donor = await recoverLocalShieldedWallet(pool, {
-    derivedSecretField: donorSecret,
+    keyMaterial: donorKeys,
     identityCommitment: rootIC,
   });
   const policy = createShieldedPolicyDescriptor(
@@ -258,8 +273,15 @@ async function fixture(periodDays = 30n) {
     },
     { chainId, poolAddress },
   );
-  const childKeys = deriveShieldedHeirKeyMaterial(childSecret);
+  const childKeys = keyMode === 0
+    ? { ...deriveShieldedHeirKeyMaterial(childSecret), keyMode: 0 as const }
+    : await deriveShieldedAssetKeyMaterial({
+        assetRoot: new Uint8Array(32).fill(33),
+        fundsIdentitySecret: new Uint8Array(32).fill(44),
+      });
+  const childRecovery = { keyMaterial: childKeys, identityCommitment: childIC };
   const recipient = {
+    keyMode,
     identityCommitment: childIC,
     personHash: identity.personHash,
     ownerCommitment: childKeys.ownerCommitment,
@@ -268,7 +290,7 @@ async function fixture(periodDays = 30n) {
   const common = {
     pool,
     wallet: donor,
-    donorDerivedSecretField: donorSecret,
+    keyMaterial: donorKeys,
     donorCommitment: shield.outputs[0].commitment,
     lineageIndex,
     publicRecipientPersonHash: identity.personHash,
@@ -280,6 +302,7 @@ async function fixture(periodDays = 30n) {
     pool,
     identity,
     childKeys,
+    childRecovery,
     recipient,
     record,
     getLogs,
@@ -313,19 +336,19 @@ describe("unified budget recovery and claims", () => {
       expect(funded.witness.heirOwnerCommitment).toBe("0");
       expect(isPublicShieldedBudgetEnvelope(funded.outputs[0].ciphertext)).toBe(true);
       expect(funded.outputs[0].note).not.toHaveProperty("policySalt");
-      f.record(funded);
+      f.record(funded, 1);
       const donor = await recoverLocalShieldedWallet(f.pool, {
-        derivedSecretField: donorSecret,
+        keyMaterial: donorKeys,
         identityCommitment: rootIC,
       });
       const template = listRecoveredFundingTemplates(donor)[0];
       expect(template.ruleOpening?.policySalt).toBe(f.policy.policySalt);
       expect(listRecoveredShieldedPolicies(donor)).toEqual([f.policy]);
       expect(donor.ownedNotes.has(funded.outputs[0].commitment)).toBe(false);
-      const child = await recoverLocalShieldedWallet(f.pool, f.identity);
+      const child = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
       expect(child.ownedNotes.has(funded.outputs[0].commitment)).toBe(true);
       const wrongChild = await recoverLocalShieldedWallet(f.pool, {
-        derivedSecretField: 889n,
+        keyMaterial: { ...deriveShieldedHeirKeyMaterial(889n), keyMode: 0 },
         identityCommitment: 123n,
       });
       expect(wrongChild.ownedNotes.size).toBe(0);
@@ -338,6 +361,7 @@ describe("unified budget recovery and claims", () => {
         chainId,
         poolAddress,
         identity: f.identity,
+        keyMaterial: f.childKeys,
         wallet: child,
         lineage: f.lineage,
         budgetCommitment: funded.outputs[0].commitment,
@@ -352,14 +376,14 @@ describe("unified budget recovery and claims", () => {
       expect(claimed.outputs[0].note.binding).toBe("identity");
       expect(isPublicShieldedBudgetEnvelope(claimed.outputs[0].ciphertext)).toBe(false);
       expect(claimed.outputs[1].note.ownerCommitment).toBe(f.childKeys.ownerCommitment);
-      f.record(claimed);
-      const afterClaim = await recoverLocalShieldedWallet(f.pool, f.identity);
-      const live = listUnspentRecoveredShieldedNotes(afterClaim, childSecret);
+      f.record(claimed, 2);
+      const afterClaim = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
+      const live = listUnspentRecoveredShieldedNotes(afterClaim, f.childKeys);
       expect(live.find((entry) => entry.note.kind === "value")?.note).toMatchObject({
         amount: 20n,
       });
       const recoveredDonor = await recoverLocalShieldedWallet(f.pool, {
-        derivedSecretField: donorSecret,
+        keyMaterial: donorKeys,
         identityCommitment: rootIC,
       });
       const refill = await prepareShieldedFund({
@@ -376,10 +400,10 @@ describe("unified budget recovery and claims", () => {
       expect(
         getShieldedBudgetCommitments(refill.outputs[0].note, { chainId, poolAddress }),
       ).toEqual(getShieldedBudgetCommitments(funded.outputs[0].note, { chainId, poolAddress }));
-      f.record(refill);
-      const replenished = await recoverLocalShieldedWallet(f.pool, f.identity);
+      f.record(refill, 1);
+      const replenished = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
       const choice = selectClaimBudget(
-        listUnspentRecoveredShieldedNotes(replenished, childSecret),
+        listUnspentRecoveredShieldedNotes(replenished, f.childKeys),
         replenished,
         childSecret,
         f.now,
@@ -390,6 +414,7 @@ describe("unified budget recovery and claims", () => {
           chainId,
           poolAddress,
           identity: f.identity,
+        keyMaterial: f.childKeys,
           wallet: replenished,
           lineage: f.lineage,
           budgetCommitment: claimed.outputs[0].commitment,
@@ -400,8 +425,8 @@ describe("unified budget recovery and claims", () => {
     },
   );
 
-  it("preserves private authorization and rejects cross-binding refills and mixed claims", async () => {
-    const f = await fixture();
+  it.each([0, 1] as const)("preserves private authorization and rejects mixed bindings in key mode %s", async (keyMode) => {
+    const f = await fixture(30n, keyMode);
     await expect(
       prepareShieldedFund({
         ...f.common,
@@ -421,9 +446,9 @@ describe("unified budget recovery and claims", () => {
     });
     checkWitness("fund", privateFund.witness);
     expect(privateFund.witness.publicBudget).toEqual(Array(10).fill("0"));
-    f.record(privateFund);
+    f.record(privateFund, 1);
     const donor = await recoverLocalShieldedWallet(f.pool, {
-      derivedSecretField: donorSecret,
+      keyMaterial: donorKeys,
       identityCommitment: rootIC,
     });
     const budget = listRecoveredFundingTemplates(donor)[0];
@@ -448,11 +473,11 @@ describe("unified budget recovery and claims", () => {
       budgetPeriods: 2n,
     });
     checkWitness("fund", privateRefill.witness);
-    f.record(privateRefill);
+    f.record(privateRefill, 1);
     f.mature();
-    const wallet = await recoverLocalShieldedWallet(f.pool, f.identity);
+    const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
     const selection = selectClaimBudget(
-      listUnspentRecoveredShieldedNotes(wallet, childSecret),
+      listUnspentRecoveredShieldedNotes(wallet, f.childKeys),
       wallet,
       childSecret,
       f.now,
@@ -462,6 +487,7 @@ describe("unified budget recovery and claims", () => {
       chainId,
       poolAddress,
       identity: f.identity,
+        keyMaterial: f.childKeys,
       wallet,
       lineage: f.lineage,
       budgetCommitment: privateRefill.outputs[0].commitment,
@@ -475,7 +501,7 @@ describe("unified budget recovery and claims", () => {
     expect(claim.outputs[0].note).toMatchObject({
       heirOwnerCommitment: f.childKeys.ownerCommitment,
       remaining: 10n,
-      keyMode: 0n,
+      keyMode: BigInt(keyMode),
     });
     // Even with identical owner, policy and enrollment, the public structure cannot be mixed in.
     const original = wallet.ownedNotes.get(privateFund.outputs[0].commitment)!;
@@ -493,6 +519,7 @@ describe("unified budget recovery and claims", () => {
         chainId,
         poolAddress,
         identity: f.identity,
+        keyMaterial: f.childKeys,
         wallet,
         lineage: f.lineage,
         budgetCommitment: privateRefill.outputs[0].commitment,
@@ -517,18 +544,22 @@ describe("unified budget recovery and claims", () => {
     const own = await prepareShieldedShield({
       chainId,
       poolAddress,
-      derivedSecretField: childSecret,
+      keyMaterial: f.childKeys,
       amount: 9n,
     });
     f.record({
-      outputs: [{ commitment: 123456n, ciphertext: bad }, ...own.outputs],
-      data: { inputNullifiers: [0n, 0n], periodNullifiers: [] },
-    });
-    const wallet = await recoverLocalShieldedWallet(f.pool, f.identity);
+      outputs: [
+        { commitment: 123456n, ciphertext: bad },
+        { commitment: 123457n, ciphertext: bad },
+      ],
+      data: { inputShardIds: [0n, 0n], inputNullifiers: [0n, 0n], periodNullifiers: [] },
+    }, 0);
+    f.record(own, 0);
+    const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);
     expect(wallet.ownedNotes.has(123456n)).toBe(false);
     expect(wallet.ownedNotes.has(own.outputs[0].commitment)).toBe(true);
     expect(
-      listUnspentRecoveredShieldedNotes(wallet, childSecret).filter(
+      listUnspentRecoveredShieldedNotes(wallet, f.childKeys).filter(
         (entry) => entry.note.kind === "value",
       ),
     ).toHaveLength(2);

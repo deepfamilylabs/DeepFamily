@@ -8,15 +8,16 @@ import {
   type BytesLike,
   type Contract,
   type ContractTransactionResponse,
+  type Provider,
   type Signer,
   type TransactionReceipt,
 } from "ethers";
-import { zkWorkerCall } from "../../../shared/workers/zkWorkerClient";
-import type { ShieldedCircuitName, ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { Groth16Proof } from "../../../shared/zk/zk";
+import { createLineageIndexContract } from "../../../shared/clients/contractFactory";
 import { waitForShieldedTransaction } from "./shieldedTransactionReceipt";
+import { assertShieldedDepositBalance } from "./shieldedDepositBalance";
 
-/** All private values stay in the caller's memory and the local ZK worker. */
+/** Submissions contain only public action data and a proof produced by the asset Worker. */
 export type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
 import type { ShieldedPoolActionData } from "../../../shared/zk/shieldedActionTypes";
 
@@ -34,7 +35,7 @@ type ContractActionData = {
   asOf: bigint;
 };
 
-export type ShieldedPoolFlowStage = "proving" | "checkingGas" | "submitting" | "confirming";
+export type ShieldedPoolFlowStage = "checkingGas" | "submitting" | "confirming";
 export type ShieldedGasReview = {
   gasEstimate: bigint;
   gasLimit: bigint;
@@ -53,9 +54,8 @@ type BaseFlowInput = {
   signer: Signer;
   expectedChainId: bigint;
   data: ShieldedPoolActionData;
-  witness?: ShieldedWitness;
   /** Already verified in the asset worker; the main thread receives no private witness. */
-  preparedProof?: Groth16Proof;
+  preparedProof: Groth16Proof;
   onStage?: (stage: ShieldedPoolFlowStage) => void;
   onBroadcast?: (transactionHash: string) => void;
   /** Record this exact transaction slot before asking the wallet to submit it. */
@@ -64,14 +64,11 @@ type BaseFlowInput = {
   onWalletRequest?: () => () => void;
   /** Pause before requesting the wallet transaction so the user can review this step's fee. */
   onGasEstimate?: (review: ShieldedGasReview) => Promise<void> | void;
-  /** Large lineage proofs can take longer than the default worker timeout. */
-  proofTimeoutMs?: number;
 };
 
 export type ShieldFlowInput = BaseFlowInput & {
   amount: BigNumberish;
-  assetKind: "erc20" | "native";
-};
+} & ({ assetKind: "erc20"; token: Contract } | { assetKind: "native" });
 export type UnshieldFlowInput = BaseFlowInput & {
   amount: BigNumberish;
   recipient: string;
@@ -86,17 +83,20 @@ export type ShieldedPoolFlowResult = {
 };
 
 type PoolAction = "shield" | "fund" | "claim" | "privateTransfer" | "unshield";
+type PoolSubmission =
+  | { action: "shield"; input: ShieldFlowInput }
+  | { action: Exclude<PoolAction, "shield">; input: BaseFlowInput };
 
 type PoolTransactionMethod = ((...args: unknown[]) => Promise<ContractTransactionResponse>) & {
   estimateGas: (...args: unknown[]) => Promise<bigint>;
 };
 
-const ACTIONS: Record<PoolAction, { circuit: ShieldedCircuitName; id: number }> = {
-  shield: { circuit: "shield", id: SHIELDED_POOL_ACTION.Shield },
-  fund: { circuit: "fund", id: SHIELDED_POOL_ACTION.Fund },
-  claim: { circuit: "claim", id: SHIELDED_POOL_ACTION.Claim },
-  privateTransfer: { circuit: "privateTransfer", id: SHIELDED_POOL_ACTION.PrivateTransfer },
-  unshield: { circuit: "unshield", id: SHIELDED_POOL_ACTION.Unshield },
+const ACTIONS: Record<PoolAction, number> = {
+  shield: SHIELDED_POOL_ACTION.Shield,
+  fund: SHIELDED_POOL_ACTION.Fund,
+  claim: SHIELDED_POOL_ACTION.Claim,
+  privateTransfer: SHIELDED_POOL_ACTION.PrivateTransfer,
+  unshield: SHIELDED_POOL_ACTION.Unshield,
 };
 
 function copyPair(pair: readonly [BigNumberish, BigNumberish]): [bigint, bigint] {
@@ -149,15 +149,39 @@ async function assertSignerNetwork(signer: Signer, expectedChainId: bigint): Pro
   }
 }
 
-function assertExpectedSignals(actual: readonly string[], expected: readonly string[]): void {
-  if (actual.length !== expected.length) {
-    throw new Error("Shielded proof public signal count does not match transaction");
-  }
-  for (let index = 0; index < expected.length; index += 1) {
-    if (BigInt(actual[index]) !== BigInt(expected[index])) {
-      throw new Error(`Shielded proof public signal ${index} does not match transaction`);
-    }
-  }
+/** Recheck public proof bindings after every fee-review and nonce wait. */
+async function assertTimeBoundActionCurrent(
+  pool: Contract,
+  provider: Provider,
+  data: ContractActionData,
+): Promise<void> {
+  const blockNumber = await provider.getBlockNumber();
+  if (!Number.isSafeInteger(blockNumber) || blockNumber < 0)
+    throw new Error("Shielded submission block is invalid");
+  const overrides = { blockTag: blockNumber };
+  const [anchor, lineageAddress, rawLifetime] = await Promise.all([
+    provider.getBlock(blockNumber),
+    pool.LINEAGE_INDEX(overrides) as Promise<string>,
+    pool.ACTION_PROOF_LIFETIME(overrides) as Promise<bigint>,
+  ]);
+  if (!anchor?.hash) throw new Error("Shielded submission block is unavailable");
+  const lifetime = getBigInt(rawLifetime);
+  if (
+    lifetime <= 0n ||
+    data.asOf > BigInt(anchor.timestamp) ||
+    BigInt(anchor.timestamp) - data.asOf >= lifetime
+  )
+    throw new Error("The proof expired before submission. Prepare and confirm a fresh preview.");
+  const lineage = createLineageIndexContract(lineageAddress, provider);
+  const [endorsement, trusted] = await Promise.all([
+    lineage.root(0, overrides) as Promise<bigint>,
+    lineage.root(1, overrides) as Promise<bigint>,
+  ]);
+  const finalAnchor = await provider.getBlock(blockNumber);
+  if (finalAnchor?.hash !== anchor.hash)
+    throw new Error("The submission block was reorganized. Prepare and confirm a fresh preview.");
+  if (getBigInt(endorsement) !== data.relation0 || getBigInt(trusted) !== data.relation1)
+    throw new Error("Family roots changed before submission. Prepare and confirm a fresh preview.");
 }
 
 /** Reserve native currency for gas and any public native deposit. */
@@ -199,13 +223,15 @@ async function assertTransactionGas(
 }
 
 async function submitAction(
-  action: PoolAction,
-  input: BaseFlowInput,
+  submissionRequest: PoolSubmission,
   publicAmount = 0n,
   publicRecipient?: string,
   transactionValue = 0n,
 ): Promise<ShieldedPoolFlowResult> {
-  const { pool, signer, expectedChainId, witness, onStage } = input;
+  const { action, input } = submissionRequest;
+  const { pool, signer, expectedChainId, preparedProof, onStage } = input;
+  if ("witness" in input || !preparedProof)
+    throw new Error("Shielded submission requires an asset-worker proof and accepts no witness");
   await assertSignerNetwork(signer, expectedChainId);
   const provider = signer.provider;
   if (!provider) throw new Error("Transaction wallet has no provider");
@@ -215,9 +241,9 @@ async function submitAction(
   }
   const data = copyActionData(input.data);
   const poolAddress = await pool.getAddress();
-  const { id, circuit } = ACTIONS[action];
-  const expectedSignals = buildShieldedPoolPublicSignals({
-    action: id,
+  // Enforce the current action's public shape before estimation or wallet handoff.
+  buildShieldedPoolPublicSignals({
+    action: ACTIONS[action],
     fundMode: data.fundMode,
     budgetKind: data.budgetKind,
     chainId: expectedChainId,
@@ -233,23 +259,11 @@ async function submitAction(
     relation0: data.relation0,
     relation1: data.relation1,
     asOf: data.asOf,
-  }).map(String);
-  let groth16Proof = input.preparedProof;
-  if (groth16Proof) {
-    if (witness !== undefined)
-      throw new Error("Prepared proof submission must not include a witness");
-  } else {
-    if (!witness) throw new Error("Shielded action needs a prepared proof or a private witness");
-    onStage?.("proving");
-    const generated = await zkWorkerCall(
-      "generateShieldedProof",
-      { circuit, witness, expectedPublicSignals: expectedSignals },
-      { timeoutMs: input.proofTimeoutMs ?? 1_200_000 },
-    );
-    assertExpectedSignals(generated.publicSignals, expectedSignals);
-    groth16Proof = generated.proof;
+  });
+  const proof = encodeGroth16AbcProofData(normalizeGroth16Proof(preparedProof));
+  if (submissionRequest.action === "shield" && submissionRequest.input.assetKind === "erc20") {
+    await assertShieldedDepositBalance(submissionRequest.input.token, signerAddress, publicAmount);
   }
-  const proof = encodeGroth16AbcProofData(normalizeGroth16Proof(groth16Proof));
   await assertSignerNetwork(signer, expectedChainId);
   const connected = pool.connect(signer) as unknown as Record<PoolAction, PoolTransactionMethod>;
   const method = connected[action];
@@ -289,6 +303,9 @@ async function submitAction(
       throw new Error("Transaction submission anchor is invalid");
     submission = { nonce, fromBlock, signerAddress };
   }
+  if (action === "claim" || (action === "fund" && data.fundMode === 0n)) {
+    await assertTimeBoundActionCurrent(pool, provider, data);
+  }
   // This synchronous boundary lets the caller recheck lock/context state after
   // every preparatory RPC read, before recording an unknown broadcast attempt.
   onStage?.("submitting");
@@ -312,13 +329,12 @@ async function submitAction(
   return { transactionHash, receipt, gasEstimate, gasLimit };
 }
 
-/** ERC-20 deposits require allowance; native deposits send the proven amount as value. */
+/** ERC-20 deposits need both public funds and allowance; native deposits send the proven amount. */
 export function submitShield(input: ShieldFlowInput): Promise<ShieldedPoolFlowResult> {
   const amount = getBigInt(input.amount);
   if (amount <= 0n) throw new Error("Shield amount must be positive");
   return submitAction(
-    "shield",
-    input,
+    { action: "shield", input },
     amount,
     undefined,
     input.assetKind === "native" ? amount : 0n,
@@ -326,21 +342,21 @@ export function submitShield(input: ShieldFlowInput): Promise<ShieldedPoolFlowRe
 }
 
 export function submitFund(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("fund", input);
+  return submitAction({ action: "fund", input });
 }
 
 export function submitClaim(input: PrivatePoolFlowInput): Promise<ShieldedPoolFlowResult> {
-  return submitAction("claim", input);
+  return submitAction({ action: "claim", input });
 }
 
 export function submitPrivateTransfer(
   input: PrivatePoolFlowInput,
 ): Promise<ShieldedPoolFlowResult> {
-  return submitAction("privateTransfer", input);
+  return submitAction({ action: "privateTransfer", input });
 }
 
 export function submitUnshield(input: UnshieldFlowInput): Promise<ShieldedPoolFlowResult> {
   const amount = getBigInt(input.amount);
   if (amount <= 0n) throw new Error("Unshield amount must be positive");
-  return submitAction("unshield", input, amount, input.recipient);
+  return submitAction({ action: "unshield", input }, amount, input.recipient);
 }

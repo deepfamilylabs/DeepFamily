@@ -195,10 +195,11 @@ async function fixture(
     ]),
     spentNullifiers: new Set(),
     walletOwnerCommitment: keys.ownerCommitment,
+    walletKeyMode: keyMaterial ? 1 : 0,
     walletIdentityCommitment: BigInt(identity.identityCommitment),
   };
   return {
-    keyMaterial,
+    keyMaterial: keys,
     chainId,
     poolAddress,
     identity,
@@ -250,6 +251,16 @@ async function addSecondBudget(
 }
 
 describe("local shielded claim preparation", () => {
+  it("requires explicit funds keys even for an identity-derived budget", async () => {
+    const input = await fixture();
+    await expect(
+      prepareShieldedClaim({
+        ...input,
+        keyMaterial: undefined,
+      } as unknown as Parameters<typeof prepareShieldedClaim>[0]),
+    ).rejects.toThrow("key material is required");
+  });
+
   it("independent budgets claim to their original root and reject identity fallback", async () => {
     const keys = await deriveShieldedAssetKeyMaterial({
       assetRoot: new Uint8Array(32).fill(9),
@@ -260,19 +271,34 @@ describe("local shielded claim preparation", () => {
     expect(prepared.outputs[0].note.keyMode).toBe(1n);
     expect(prepared.outputs[1].note.ownerCommitment).toBe(keys.ownerCommitment);
     expect(prepared.witness.ownerSecret).toBe(keys.ownerSecret.toString());
-    await expect(prepareShieldedClaim({ ...input, keyMaterial: undefined })).rejects.toThrow(
-      "original key material",
-    );
+    await expect(
+      prepareShieldedClaim({
+        ...input,
+        keyMaterial: undefined,
+      } as unknown as Parameters<typeof prepareShieldedClaim>[0]),
+    ).rejects.toThrow("key material is required");
     await expect(
       prepareShieldedClaim({
         ...input,
         keyMaterial: deriveShieldedHeirKeyMaterial(derivedSecretField),
       }),
     ).rejects.toThrow();
-    const legacy = await fixture();
-    await expect(prepareShieldedClaim({ ...legacy, keyMaterial: keys })).rejects.toThrow(
+    const identityBound = await fixture();
+    await expect(prepareShieldedClaim({ ...identityBound, keyMaterial: keys })).rejects.toThrow(
       "canonical identity keys",
     );
+  });
+  it("rejects a substituted viewing key for identity-derived claim authorization", async () => {
+    const input = await fixture();
+    await expect(
+      prepareShieldedClaim({
+        ...input,
+        keyMaterial: {
+          ...input.keyMaterial,
+          hpkeIkm: deriveShieldedHeirKeyMaterial(123n).hpkeIkm,
+        },
+      }),
+    ).rejects.toThrow("canonical identity keys");
   });
   it("does not combine mode-0 and mode-1 budgets even when their actual owner is identical", async () => {
     const input = await fixture(100n);

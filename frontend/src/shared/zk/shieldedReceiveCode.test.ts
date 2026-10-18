@@ -42,6 +42,8 @@ const identity = {
   },
   identitySuiteId: 1,
   derivedSecretField: 123456789n,
+  keyMode: 0 as const,
+  keyMaterial: deriveShieldedHeirKeyMaterial(123456789n),
 };
 
 function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
@@ -49,6 +51,17 @@ function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
   payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 5 + wordIndex * 32);
   return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
 }
+
+describe("explicit receive-code spending material", () => {
+  it.each([
+    ["missing authorization mode", { ...identity, keyMode: undefined }, "Unsupported receive authorization mode"],
+    ["missing spending material", { ...identity, keyMaterial: undefined }, "requires explicit spending material"],
+  ])("rejects %s instead of deriving fallback keys", async (_label, input, message) => {
+    await expect(createShieldedReceiveCode(
+      input as unknown as Parameters<typeof createShieldedReceiveCode>[0],
+    )).rejects.toThrow(message);
+  });
+});
 
 describe("recipient empty-passphrase protection inside the ZK worker", () => {
   beforeEach(() => mocks.deriveIdentityMaterial.mockReset());

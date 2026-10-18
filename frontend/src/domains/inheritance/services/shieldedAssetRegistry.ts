@@ -6,44 +6,17 @@ import {
   createShieldedNativePoolContract,
 } from "../../../shared/clients/contractFactory";
 
+/** Token metadata can fail independently of a verified canonical pool. */
 export type ShieldedAsset = {
   address: string;
   kind: "erc20" | "native";
   symbol: string;
-  decimals: number;
+  /** Null means show integer base units, never guess token precision. */
+  decimals: number | null;
   token: Contract | null;
+  metadataAvailable: boolean;
+  interoperabilityAvailable: boolean;
 };
-
-/** Metadata is only display information. The address identifies an asset. */
-export async function readShieldedAsset(
-  address: string,
-  provider: JsonRpcProvider,
-  nativeSymbol: string,
-): Promise<ShieldedAsset> {
-  address = getAddress(address);
-  if (address === ZeroAddress) {
-    return { address, kind: "native", symbol: nativeSymbol, decimals: 18, token: null };
-  }
-  if ((await provider.getCode(address)) === "0x")
-    throw new Error("Token address has no contract code");
-  const token = createDeepTokenContract(address, provider);
-  // These calls check basic interoperability, not the token's future transfer behavior.
-  const [rawDecimals, , , rawSymbol] = await Promise.all([
-    token.decimals() as Promise<bigint>,
-    token.balanceOf(ZeroAddress),
-    token.allowance(ZeroAddress, ZeroAddress),
-    (token.symbol() as Promise<unknown>).catch(() => undefined),
-  ]);
-  const decimals = Number(rawDecimals);
-  if (!Number.isSafeInteger(decimals) || decimals < 0 || decimals > 36) {
-    throw new Error("Token decimals must be an integer between 0 and 36");
-  }
-  const symbol =
-    typeof rawSymbol === "string" && /^[\x21-\x7e]{1,32}$/.test(rawSymbol)
-      ? rawSymbol
-      : `${address.slice(0, 6)}…${address.slice(-4)}`;
-  return { address, kind: "erc20", symbol, decimals, token };
-}
 
 /** Only accept the selected factory's canonical pool and its fixed protocol bindings. */
 export async function resolveShieldedAssetPool(
@@ -98,13 +71,6 @@ export async function resolveShieldedAssetPool(
   return { pool, poolAddress, poolDeploymentBlock };
 }
 
-export type RecoveredShieldedAsset = Omit<ShieldedAsset, "decimals"> & {
-  /** Null means show integer base units, never guess token precision. */
-  decimals: number | null;
-  metadataAvailable: boolean;
-  interoperabilityAvailable: boolean;
-};
-
 export async function withShieldedRecoveryTimeout<T>(
   task: Promise<T>,
   timeoutMs = 10_000,
@@ -127,13 +93,13 @@ export async function withShieldedRecoveryTimeout<T>(
   }
 }
 
-/** Recovery metadata never decides whether protocol note history can be verified. */
-export async function readRecoveredShieldedAsset(
+/** Read display and interoperability metadata at one anchor; pool validation stays independent. */
+export async function readShieldedAsset(
   address: string,
   provider: JsonRpcProvider,
   nativeSymbol: string,
   options: { blockTag: number; timeoutMs?: number },
-): Promise<RecoveredShieldedAsset> {
+): Promise<ShieldedAsset> {
   address = getAddress(address);
   if (address === ZeroAddress)
     return {
@@ -199,7 +165,7 @@ export type DiscoveredShieldedPool = {
   creationEventBlock: number;
   pool?: Contract;
   poolDeploymentBlock?: number;
-  asset?: RecoveredShieldedAsset;
+  asset?: ShieldedAsset;
   configurationVerified: boolean;
   error?: string;
 };
@@ -328,7 +294,7 @@ export async function discoverShieldedFactoryPools(
           resolved.poolDeploymentBlock > item.creationEventBlock
         )
           throw new Error("Pool configuration does not match its creation event");
-        const asset = await readRecoveredShieldedAsset(
+        const asset = await readShieldedAsset(
           item.assetAddress,
           provider,
           options.nativeSymbol ?? "Native",

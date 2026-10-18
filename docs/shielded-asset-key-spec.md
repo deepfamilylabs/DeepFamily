@@ -11,6 +11,33 @@ The root alone cannot reconstruct the funds spending or viewing keys.
 The frontend operation sequence and secret-session lifecycle are documented in
 [Shielded family inheritance](frontend.md#shielded-family-inheritance).
 
+## Current frontend entry points
+
+The project has no released frontend contract to preserve. Callers use the
+following current paths directly; retired entry points have no adapters,
+aliases or alternate witness-generation flow.
+
+| Responsibility | Current implementation and boundary |
+| --- | --- |
+| Unlock the holder's credentials | [`ShieldedAssetSession.unlockIdentity`](../frontend/src/workers/shieldedAssetSession.ts) retains identity and funds secrets in the asset Worker and returns public session handles. The form-to-crypto-Worker service that returned derived identity material to the page has been removed. |
+| Generate the holder's receive code | The same asset session's `receiveCode({ slot })` uses its private identity and selected keys and returns only the code. The raw-identity-material service wrapper has been removed. Creating and verifying another recipient's code remains in [`shieldedReceiveCode.ts`](../frontend/src/domains/inheritance/services/shieldedReceiveCode.ts). |
+| Read asset metadata | [`readShieldedAsset`](../frontend/src/domains/inheritance/services/shieldedAssetRegistry.ts) is the single reader for page selection, import and factory recovery. Every token read uses the selected block. Unknown precision is `null` and displays base units; failed metadata or interoperability calls do not discard a verified pool. `resolveShieldedAssetPool` independently checks the canonical factory mapping, asset, kind, protocol, lineage, verifier and creation block. The separate fail-closed metadata reader and recovered-asset type have been removed. |
+| Prepare and prove an action | The asset session's `preview` binds the approved inputs, outputs and chain context; `prove` rejects changed family roots, expired snapshots and spent inputs. A stale plan requires a fresh preview and confirmation. The witness-callback submission service and its automatic lineage retry loop have been removed. |
+| Supply spending material | Preparation and recovery require explicit `keyMaterial`; receive-code generation also requires an explicit `keyMode`. Raw-secret overloads and missing-key derivation fallbacks have been removed. Identity mode still validates its canonical keys; funds mode requires the original independent keys. |
+| Submit a transaction | [`shieldedPoolFlows.ts`](../frontend/src/domains/inheritance/services/shieldedPoolFlows.ts) accepts the asset Worker's verified proof and public action data. After fee confirmation and nonce reads, it rechecks time-bound family roots and proof lifetime at one fixed block before requesting the wallet. It rejects private witnesses. The generic crypto Worker no longer exposes raw asset-proof or holder receive-code RPCs. |
+| Replay current pool history | [`shieldedPoolChain.ts`](../frontend/src/domains/inheritance/services/shieldedPoolChain.ts) requires the current protocol version, event ABI, complete action output groups and nullifier count. Contracts or fixtures without these interfaces are rejected rather than scanned through a reduced path. |
+| Select VALUE inputs | [`planShieldedValueSpend`](../packages/protocol-core/shielded-value-capacity.js) plans the permitted candidates and consolidation for the current one-input funding or eight-input spending circuits. The separate one/two-input selector has been removed. Active BUDGET claim selection remains in [`shieldedActionSelection.ts`](../frontend/src/domains/inheritance/services/shieldedActionSelection.ts). |
+
+These removals do not retire `keyMode = 0` or `keyMode = 1`: both are current
+authorization modes with different required credentials. The secret boundary and
+plan guards are checked by the
+[asset session tests](../frontend/src/workers/shieldedAssetSession.test.ts) and
+[action tests](../frontend/src/workers/shieldedAssetActions.test.ts). Canonical pool
+bindings, pinned metadata reads and hostile-token isolation are checked by the
+[registry tests](../frontend/src/domains/inheritance/services/shieldedAssetRegistry.test.ts);
+candidate limits, ownership and consolidation by the
+[VALUE planner tests](../packages/protocol-core/test/shielded-value-capacity.test.js).
+
 ## Protocol and encoding versions
 
 | Format | Version | Definition |

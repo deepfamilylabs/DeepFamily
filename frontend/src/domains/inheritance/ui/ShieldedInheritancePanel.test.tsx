@@ -34,7 +34,9 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
       key === "shielded.claimPeriodOption" ? `${key}:${options?.period}` :
-        key === "shielded.submit" ? `${key}:${options?.action}` : key,
+        key === "shielded.submit" || key === "shielded.spendReview.preview" ? `${key}:${options?.action}` :
+          key.startsWith("shielded.spendReview.") && options
+            ? `${key}:${JSON.stringify(options)}` : key,
   }),
 }));
 vi.mock("../../config", () => ({
@@ -53,7 +55,10 @@ vi.mock("../../wallet", () => ({
     return () => { mocks.walletListeners.delete(listener); };
   },
 }));
-vi.mock("../../../shared/config/env", () => ({ getShieldedPoolFactoryDeploymentBlock: () => 10 }));
+vi.mock("../../../shared/config/env", () => ({
+  getShieldedPoolFactoryDeploymentBlock: () => 10,
+  getEventScanConfig: () => ({ blockChunk: 10_000 }),
+}));
 vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
   shieldedAssetWorkerCall: mocks.call,
   cancelShieldedAssetPreview: mocks.cancel,
@@ -205,11 +210,69 @@ const signer = {
   },
 } as unknown as Signer;
 const label = (key: string) => `shielded.walletKeys.${key}`;
-const submitLabel = /^shielded\.submit:shielded\.actions\./;
-// Request-shape tests stop the one-click flow after its preview.
+const submitLabel = /^(?:shielded\.submit|shielded\.spendReview\.preview):shielded\.actions\./;
+// Request-shape tests do not confirm spend previews; other actions stop before proving.
 const stopAfterPreview = () => Promise.reject(new Error("stopped after preview"));
 const sentTransaction = { transactionHash: `0x${"ab".repeat(32)}`, receipt: { status: 1 } };
 const recoverCount = () => mocks.call.mock.calls.filter(([method]) => method === "recover").length;
+async function confirmSpendPreview() {
+  fireEvent.click(await screen.findByRole("button", { name: "shielded.spendReview.confirm" }));
+}
+async function startCandidateSpendReview(
+  amount: "1000" | "2000",
+  action: "privateTransfer" | "unshield" = "privateTransfer",
+) {
+  const candidateAmounts = [10000, 100, 10, 1, 20000, 200, 20, 2, 1000];
+  const notes = candidateAmounts.map((value, index) => ({
+    commitment: String(index + 11),
+    ownerCommitment: "1",
+    slot: "identity",
+    kind: "value",
+    amount: (BigInt(value) * 10n ** 18n).toString(),
+  }));
+  const input = notes[amount === "1000" ? 8 : 0];
+  const value = (BigInt(amount) * 10n ** 18n).toString();
+  const outputs = [value, (BigInt(input.amount) - BigInt(value)).toString()];
+  mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 0, fingerprint: "recipient-fingerprint" });
+  mocks.call.mockImplementation(async (method, params) => {
+    if (method === "recover") return { ...emptyWallet, notes };
+    if (method === "discover") return emptyDiscovery;
+    if (method === "prove") return {
+      action,
+      amount: value,
+      recipient: address,
+      data: { outputCommitments: [31n, 32n] },
+      proof: {},
+    };
+    return {
+      handle: `spend:${action}:${amount}`,
+      action,
+      slot: params.slot,
+      amount: value,
+      inputs: [input.commitment],
+      inputAmounts: [input.amount],
+      outputAmounts: outputs,
+      steps: [{ action, inputs: [input.commitment], outputAmounts: outputs }],
+      recipient: address,
+    };
+  });
+  mocks.submit.mockResolvedValue(sentTransaction);
+  const selectedModules = { ...modules, assetSymbol: "DEEP" };
+  const rendered = await renderUnlockedPanel(signer, selectedModules);
+  chooseAction(action);
+  const amountInput = screen.getByLabelText(action === "privateTransfer" ? "shielded.fields.transferAmount" : "shielded.fields.amount");
+  fireEvent.change(amountInput, { target: { value: amount } });
+  for (const note of notes) selectValue(note.commitment);
+  if (action === "privateTransfer") {
+    fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "recipient-code" } });
+    fireEvent.click(await screen.findByRole("checkbox", { name: "shielded.recipientConfirm" }));
+  } else {
+    fireEvent.change(screen.getByLabelText("shielded.fields.exitRecipient"), { target: { value: address } });
+  }
+  fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+  const review = await screen.findByRole("region", { name: "shielded.spendReview.title" });
+  return { rendered, review, amountInput, selectedModules };
+}
 async function waitUntilIdle() {
   await waitFor(() =>
     expect(
@@ -447,20 +510,6 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.lock).not.toHaveBeenCalled();
     expect(mocks.identity).toEqual(identity);
   });
-  it.each([
-    ["unshield", "unshield"],
-    ["receiveCode", "shield"],
-  ] as const)("restores legacy receipt navigation with %s as a visible main wallet task", async (savedWalletAction, mainAction) => {
-    mocks.identity = identity;
-    await renderPanel(signer, modules, {
-      slot: "identity", action: "receiveCode", walletAction: savedWalletAction, taskChosen: true,
-    });
-    expect(screen.getByRole("button", { name: `shielded.actions.${mainAction}` }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByLabelText("shielded.fields.amount")).toBeTruthy();
-    expect(screen.getByRole("button", { name: `shielded.submit:shielded.actions.${mainAction}` })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: label("returnToAction") })).toBeNull();
-    await waitForReceiveCode("identity");
-  });
   it("requires original credentials before offering funds recovery and asset controls", async () => {
     render(
       <ShieldedInheritancePanel modules={modules} signer={signer} account={address}
@@ -657,7 +706,7 @@ describe("Worker-backed shielded wallet", () => {
     const erc20 = {
       ...modules,
       assetKind: "erc20",
-      token: { allowance: vi.fn(async () => 0n) },
+      token: { allowance: vi.fn(async () => 0n), balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n) },
     } as unknown as ShieldedPageModules;
     await renderUnlockedPanel(signer, erc20);
     await waitFor(() => expect(screen.queryByRole("button", { name: label("approve") })).toBeNull());
@@ -947,7 +996,7 @@ describe("Worker-backed shielded wallet", () => {
       expect(mocks.call.mock.calls.filter(([method]) => method === "preview").every(([, request]) => request.slot === selectedSlot)).toBe(true);
     },
   );
-  it("ignores the legacy receiving filter and uses the saved active wallet for claiming", async () => {
+  it("uses the saved active wallet for claiming", async () => {
     mocks.identity = identity;
     mocks.funds = { ...funds, recoveryVerified: true };
     mocks.call.mockImplementation(async () => ({
@@ -959,7 +1008,7 @@ describe("Worker-backed shielded wallet", () => {
     }));
     await renderPanel(signer, modules, {
       slot: "asset", fundsFingerprint: funds.fundsFingerprint,
-      action: "claim", walletAction: "shield", receiveSlot: "identity", taskChosen: true,
+      action: "claim", taskChosen: true,
     });
     expectCurrentWallet("asset");
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "shielded.claimPeriodOption:2" })).toBeTruthy());
@@ -1508,6 +1557,60 @@ describe("Worker-backed shielded wallet", () => {
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("rejected"));
     expect(mocks.call.mock.calls.filter(([method]) => method !== "recover" && method !== "clearFunds")).toHaveLength(0);
   });
+  it.each([
+    ["createFunds", "signer"],
+    ["createFunds", "account"],
+    ["createFunds", "connection event"],
+    ["importRecoveryMaterial", "signer"],
+    ["importRecoveryMaterial", "account"],
+    ["importRecoveryMaterial", "connection event"],
+  ] as const)("keeps a pending local %s coherent after the gas %s changes", async (method, change) => {
+    let finish!: (state: any) => void;
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation((calledMethod, params) => calledMethod === method
+      ? new Promise((resolve) => { finish = resolve; })
+      : defaultCall?.(calledMethod, params));
+    const rendered = await renderUnlockedPanel();
+    if (method === "createFunds") {
+      openCreateWallet();
+      fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+    } else {
+      openIndependentWallet();
+      fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "saved-backup" } });
+      importRecovery();
+    }
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith(method,
+      expect.objectContaining({ expectedCredentialsHandle: credentials.handle })));
+    if (change === "connection event") {
+      act(() => {
+        mocks.walletGeneration++;
+        mocks.walletListeners.forEach((listener) => listener());
+      });
+    } else {
+      rendered.rerender(<ShieldedInheritancePanel modules={modules}
+        signer={change === "signer" ? { ...signer } as Signer : signer}
+        account={change === "account" ? "0x00000000000000000000000000000000000000bb" : address} />);
+    }
+    expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(true);
+    const state = {
+      credentials, identity,
+      funds: { ...funds, recoveryVerified: method === "importRecoveryMaterial", backupRequired: method === "createFunds" },
+    };
+    await act(async () => finish(state));
+    expect(mocks.credentials).toEqual(credentials);
+    expect(mocks.identity).toEqual(identity);
+    expect(mocks.funds).toEqual(state.funds);
+    expect(mocks.lock).not.toHaveBeenCalled();
+    if (method === "createFunds") {
+      expect(screen.getByRole("button", { name: label("exportRecovery") })).toBeTruthy();
+    } else {
+      openWalletBalances();
+      expect(screen.getByRole("button", { name: label("keySettings") })).toBeTruthy();
+      expect(screen.getByRole("button", { name: label("fundsReceiveCode") })).toBeTruthy();
+    }
+    await waitUntilIdle();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
   it("a cancelled late signature cannot reopen the session", async () => {
     let resolve!: (value: string) => void;
     (signer.signMessage as any).mockImplementation(
@@ -1693,7 +1796,6 @@ describe("Worker-backed shielded wallet", () => {
     await renderPanel(signer, modules, {
       slot: "asset",
       action: "shield",
-      walletAction: "shield",
       taskChosen: true,
     });
     expectCurrentWallet("asset");
@@ -1714,7 +1816,6 @@ describe("Worker-backed shielded wallet", () => {
         slot: "asset",
         fundsFingerprint,
         action: "shield",
-        walletAction: "shield",
         taskChosen: true,
       });
       expectCurrentWallet("asset");
@@ -2327,6 +2428,51 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.funds?.recoveryVerified).toBe(true);
     expect(mocks.lock).not.toHaveBeenCalled();
   });
+  it.each(["signer", "account", "connection event"] as const)(
+    "finishes clearing the backup root after the gas %s changes and accepts the saved backup",
+    async (change) => {
+      mocks.funds = { ...funds, backupRequired: true };
+      let finishClear!: (state: any) => void;
+      const defaultCall = mocks.call.getMockImplementation();
+      mocks.call.mockImplementation((method, params) => method === "clearFunds"
+        ? new Promise((resolve) => { finishClear = resolve; })
+        : method === "exportRecoveryMaterial"
+          ? Promise.resolve({ material: "saved-backup", format: "mnemonic", version: 1,
+              fundsFingerprint: funds.fundsFingerprint })
+          : defaultCall?.(method, params));
+      const rendered = await renderUnlockedPanel();
+      await openWalletManagement();
+      fireEvent.click(screen.getByRole("button", { name: label("exportRecovery") }));
+      fireEvent.click(await screen.findByRole("checkbox", { name: label("savedExternal") }));
+      fireEvent.click(screen.getByRole("button", { name: label("beginIndependentImport") }));
+      await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("clearFunds", {}));
+      if (change === "connection event") {
+        act(() => {
+          mocks.walletGeneration++;
+          mocks.walletListeners.forEach((listener) => listener());
+        });
+      } else {
+        rendered.rerender(<ShieldedInheritancePanel modules={modules}
+          signer={change === "signer" ? { ...signer } as Signer : signer}
+          account={change === "account" ? "0x00000000000000000000000000000000000000bb" : address} />);
+      }
+      expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => finishClear({ credentials, identity, funds: null }));
+      expect(mocks.credentials).toEqual(credentials);
+      expect(mocks.identity).toEqual(identity);
+      expect(mocks.funds).toBeNull();
+      expect(screen.getByText(label("reenterBackup"))).toBeTruthy();
+      fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "saved-backup" } });
+      importRecovery();
+      await waitFor(() => expect(mocks.funds?.recoveryVerified).toBe(true));
+      expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
+        expectedCredentialsHandle: credentials.handle, expectedFingerprint: funds.fundsFingerprint,
+        material: "saved-backup",
+      }));
+      expect(mocks.lock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
   it("does not let a newly created signature root replace backup verification by re-signing", async () => {
     mocks.funds = { ...funds, rootSource: "walletSignature", backupRequired: true };
     mocks.call.mockImplementation(async (method) => method === "recover" ? emptyWallet
@@ -2467,7 +2613,82 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.lock).toHaveBeenCalled();
     expect(input.value).toBe("");
   });
-  it("sends the selected candidates with one confirmation and no fee review", async () => {
+  it.each([
+    ["privateTransfer", "1000", "1000.0", "0.0"],
+    ["privateTransfer", "2000", "10000.0", "8000.0"],
+    ["unshield", "1000", "1000.0", "0.0"],
+    ["unshield", "2000", "10000.0", "8000.0"],
+  ] as const)(
+    "reviews the actual inputs and change for %s of %s from nine candidates before proving",
+    async (action, amount, inputAmount, change) => {
+      const { review } = await startCandidateSpendReview(amount, action);
+      const preview = mocks.call.mock.calls.find(([method]) => method === "preview")?.[1];
+      expect(preview.candidates).toHaveLength(9);
+      expect(within(review).getByText('shielded.spendReview.candidates:{"count":9,"amount":"31333.0","symbol":"DEEP"}')).toBeTruthy();
+      expect(within(review).getByText(`shielded.spendReview.used:{"count":1,"amount":"${inputAmount}","symbol":"DEEP"}`)).toBeTruthy();
+      expect(within(review).getByText(`shielded.spendReview.inputs:{"count":1,"amount":"${inputAmount}","symbol":"DEEP"}`)).toBeTruthy();
+      expect(within(review).getAllByText("shielded.valueOption")).toHaveLength(1);
+      const changeField = within(review).getByText("shielded.spendReview.change").parentElement!;
+      expect(within(changeField).getByText(`${change} DEEP`)).toBeTruthy();
+      expect(mocks.call.mock.calls.some(([method]) => method === "prove")).toBe(false);
+      expect(mocks.submit).not.toHaveBeenCalled();
+      await confirmSpendPreview();
+      await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
+      expect(mocks.call).toHaveBeenCalledWith("prove", expect.objectContaining({ handle: `spend:${action}:${amount}` }), expect.anything());
+      await waitUntilIdle();
+    },
+  );
+  it.each(["privateTransfer", "unshield"] as const)(
+    "cancels a %s spend preview without proving or submitting",
+    async (action) => {
+      await startCandidateSpendReview("1000", action);
+      fireEvent.click(screen.getByRole("button", { name: "shielded.spendReview.cancel" }));
+      await waitUntilIdle();
+      expect(screen.queryByRole("region", { name: "shielded.spendReview.title" })).toBeNull();
+      expect(mocks.call.mock.calls.some(([method]) => method === "prove")).toBe(false);
+      expect(mocks.submit).not.toHaveBeenCalled();
+      expect(mocks.cancel).toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
+  it.each([
+    ["privateTransfer", "lock"], ["unshield", "lock"],
+    ["privateTransfer", "wallet"], ["unshield", "wallet"],
+    ["privateTransfer", "pool"], ["unshield", "pool"],
+    ["privateTransfer", "amount"], ["unshield", "amount"],
+    ["privateTransfer", "unmount"], ["unshield", "unmount"],
+  ] as const)(
+    "invalidates a waiting %s confirmation when %s changes",
+    async (action, invalidation) => {
+      const { rendered, amountInput, selectedModules } = await startCandidateSpendReview("1000", action);
+      const oldConfirm = screen.getByRole("button", { name: "shielded.spendReview.confirm" });
+      if (invalidation === "lock") {
+        lockWorkspace();
+      } else if (invalidation === "wallet") {
+        act(() => {
+          mocks.walletGeneration++;
+          mocks.walletListeners.forEach((listener) => listener());
+        });
+      } else if (invalidation === "pool") {
+        rendered.rerender(<ShieldedInheritancePanel
+          modules={{ ...selectedModules, poolAddress: "0x00000000000000000000000000000000000000bb" }}
+          signer={signer} account={address}
+        />);
+      } else if (invalidation === "amount") {
+        // A queued form update must invalidate the approval even though the form is disabled.
+        fireEvent.change(amountInput, { target: { value: "2000" } });
+      } else {
+        rendered.unmount();
+      }
+      await waitFor(() => expect(screen.queryByRole("region", { name: "shielded.spendReview.title" })).toBeNull());
+      fireEvent.click(oldConfirm);
+      await act(async () => {});
+      expect(mocks.call.mock.calls.some(([method]) => method === "prove")).toBe(false);
+      expect(mocks.submit).not.toHaveBeenCalled();
+      expect(mocks.cancel).toHaveBeenCalled();
+    },
+  );
+  it("sends the selected candidates only after their spend preview is confirmed", async () => {
     mocks.identity = identity;
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover"
@@ -2515,6 +2736,7 @@ describe("Worker-backed shielded wallet", () => {
     selectValue("11");
     const scans = recoverCount();
     fireEvent.click(screen.getByText(submitLabel));
+    await confirmSpendPreview();
     await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
     expect(mocks.call).toHaveBeenCalledWith(
       "preview",
@@ -2524,7 +2746,7 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.submit).toHaveBeenCalledWith(
       expect.objectContaining({ amount: "500000000000000000", recipient: address }),
     );
-    // The wallet shows its own fee; the page does not pause for a separate review.
+    // The wallet shows its own fee after the spend preview is confirmed.
     expect(mocks.submit.mock.calls[0][0].onGasEstimate).toBeUndefined();
     await waitFor(() => expect(recoverCount()).toBeGreaterThan(scans));
     await waitUntilIdle();
@@ -2556,7 +2778,7 @@ describe("Worker-backed shielded wallet", () => {
           ? { action: "privateTransfer", data: { outputCommitments: [200n, 201n] }, proof: {} }
           : { action, amount: "8500000000000000000", recipient: address, data: { outputCommitments: [300n, 301n] }, proof: {} };
         previews++;
-        const payment = { action, inputs: ["200", commitments[8]], outputAmounts: ["8500000000000000000", "500000000000000000"] };
+        const payment = { action, inputs: [previews === 1 ? "planned:0:0" : "200", commitments[8]], outputAmounts: ["8500000000000000000", "500000000000000000"] };
         return previews === 1 ? {
           handle: "plan:merge", action: "privateTransfer", amount: params.amount, slot: params.slot,
           inputs: commitments.slice(0, 8),
@@ -2599,8 +2821,12 @@ describe("Worker-backed shielded wallet", () => {
       }
       expect(mocks.call.mock.calls.some(([method]) => method === "preview")).toBe(false);
       fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      const mergeReview = await screen.findByRole("region", { name: "shielded.spendReview.title" });
+      expect(within(mergeReview).getByText('shielded.spendReview.inputs:{"count":8,"amount":"8.0","symbol":"CFX"}')).toBeTruthy();
+      expect(within(mergeReview).getByText('shielded.spendReview.transactions:{"count":2}')).toBeTruthy();
+      await confirmSpendPreview();
       await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1));
-      // While it runs, the page says how many wallet confirmations follow.
+      // The transaction count remains visible while the first step runs.
       expect(screen.getByText(label("planTransactions"))).toBeTruthy();
       if (sessionChange === "lock and new session") {
         lockWorkspace();
@@ -2618,12 +2844,20 @@ describe("Worker-backed shielded wallet", () => {
         expect(mocks.submit).toHaveBeenCalledTimes(1);
         return;
       }
-      await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
+      await screen.findByRole("button", { name: "shielded.spendReview.confirm" });
+      const paymentReview = screen.getByRole("region", { name: "shielded.spendReview.title" });
+      expect(within(paymentReview).getByText('shielded.spendReview.candidates:{"count":2,"amount":"9.0","symbol":"CFX"}')).toBeTruthy();
+      expect(within(paymentReview).getByText('shielded.spendReview.inputs:{"count":2,"amount":"9.0","symbol":"CFX"}')).toBeTruthy();
+      expect(within(paymentReview).getByText('shielded.spendReview.transactions:{"count":1}')).toBeTruthy();
+      expect(mocks.submit).toHaveBeenCalledTimes(1);
+      expect(mocks.call.mock.calls.filter(([method]) => method === "prove")).toHaveLength(1);
       const previews_ = mocks.call.mock.calls.filter(([method]) => method === "preview");
       expect(previews_).toHaveLength(2);
       expect(previews_[0][1]).toMatchObject({ action, amount: "8500000000000000000", candidates: commitments });
       // The consolidated output replaces its inputs; its zero-value change is not a candidate.
       expect(previews_[1][1]).toMatchObject({ action, candidates: [commitments[8], "200"] });
+      await confirmSpendPreview();
+      await waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(2));
       await waitUntilIdle();
       expect(screen.queryByText(label("planTransactions"))).toBeNull();
     },
@@ -2877,7 +3111,11 @@ describe("Worker-backed shielded wallet", () => {
       vi.useRealTimers();
     }
   });
-  it("automatically follows a lost receipt after the secret session is locked", async () => {
+  it.each([
+    {},
+    { code: "INSUFFICIENT_FUNDS" },
+    { code: "CALL_EXCEPTION", action: "estimateGas" },
+  ])("follows a broadcast transaction after locking even when its response fails: %j", async (failure) => {
     mocks.identity = identity;
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover" ? emptyWallet : method === "prove"
@@ -2897,7 +3135,7 @@ describe("Worker-backed shielded wallet", () => {
     mocks.submit.mockImplementation(async (params: any) => {
       feeReview = params.onGasEstimate;
       params.onBroadcast("0xpending");
-      throw new Error("connection lost after broadcast");
+      throw Object.assign(new Error("connection lost after broadcast"), failure);
     });
     let finishReceipt!: (receipt: unknown) => void;
     mocks.receipt.mockImplementation(() => new Promise((resolve) => { finishReceipt = resolve; }));
@@ -2984,6 +3222,43 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.call.mock.calls.some(([method]) => method === "createFunds")).toBe(false);
   });
   it.each(["preview", "prove"] as const)(
+    "cancels %s on a connection event and preserves a newer local key operation",
+    async (method) => {
+      let finishOld!: (value: unknown) => void;
+      let finishFunds!: (value: unknown) => void;
+      const preview = { handle: "action:1", action: "shield", amount: "1", slot: "identity",
+        steps: [], inputs: [], inputAmounts: [], outputAmounts: ["1", "0"] };
+      const proof = { action: "shield", amount: "1", data: { outputCommitments: [100n, 101n] }, proof: {} };
+      const defaultCall = mocks.call.getMockImplementation();
+      mocks.call.mockImplementation((calledMethod, params) => {
+        if (calledMethod === method) return new Promise((resolve) => { finishOld = resolve; });
+        if (calledMethod === "createFunds") return new Promise((resolve) => { finishFunds = resolve; });
+        if (calledMethod === "preview") return Promise.resolve(preview);
+        return defaultCall?.(calledMethod, params);
+      });
+      await renderUnlockedPanel();
+      fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      await waitFor(() => expect(mocks.call.mock.calls.some(([calledMethod]) => calledMethod === method)).toBe(true));
+      act(() => {
+        mocks.walletGeneration++;
+        mocks.walletListeners.forEach((listener) => listener());
+      });
+      await waitUntilIdle();
+      openCreateWallet();
+      fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+      await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("createFunds", expect.anything()));
+      await act(async () => finishOld(method === "preview" ? preview : proof));
+      expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(true);
+      expect(mocks.submit).not.toHaveBeenCalled();
+      await act(async () => finishFunds({ credentials, identity, funds: { ...funds, backupRequired: true } }));
+      expect(mocks.funds?.backupRequired).toBe(true);
+      expect(screen.getByRole("button", { name: label("exportRecovery") })).toBeTruthy();
+      expect(mocks.lock).not.toHaveBeenCalled();
+      expect(screen.queryByRole("alert")).toBeNull();
+    },
+  );
+  it.each(["preview", "prove"] as const)(
     "discards an outdated %s result when the amount changes before completion",
     async (phase) => {
       mocks.identity = identity;
@@ -3062,7 +3337,18 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.receipt).toHaveBeenCalledWith("0xfound");
     expect(mocks.submit).toHaveBeenCalledTimes(1);
   });
-  it("releases the pending guard only for an explicit wallet rejection", async () => {
+  it.each([
+    [{ code: "ACTION_REJECTED" }, "USER_REJECTED"],
+    [{ code: 4001 }, "USER_REJECTED"],
+    [{ code: "INSUFFICIENT_FUNDS" }, "INSUFFICIENT_FUNDS"],
+    [{ code: "CALL_EXCEPTION", action: "estimateGas" }, "CALL_EXCEPTION"],
+    [{
+      code: "ACTION_REJECTED",
+      action: "sendTransaction",
+      reason: "rejected",
+      info: { error: { code: 4001 }, payload: { method: "eth_sendTransaction" } },
+    }, "USER_REJECTED"],
+  ] as const)("releases the pending guard for a definite unsubmitted failure: %j", async (failure, expectedReason) => {
     mocks.identity = identity;
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover" ? emptyWallet : method === "prove"
@@ -3080,14 +3366,178 @@ describe("Worker-backed shielded wallet", () => {
     );
     mocks.submit.mockImplementation(async (params: any) => {
       params.onSubmitting({ nonce: 7, fromBlock: 30, signerAddress: address });
-      throw Object.assign(new Error("wallet rejected"), { code: "ACTION_REJECTED" });
+      throw Object.assign(new Error("wallet request failed"), failure);
     });
     await renderPanel();
     fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
     fireEvent.click(screen.getByText(submitLabel));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("wallet rejected"));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(
+      `errors.contractError.${expectedReason}`,
+    ));
     expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
     expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(false);
+    expect(mocks.submit).toHaveBeenCalledOnce();
+  });
+  it.each([
+    [{ code: "INSUFFICIENT_FUNDS" }, "INSUFFICIENT_FUNDS"],
+    [{ code: "CALL_EXCEPTION", action: "estimateGas" }, "CALL_EXCEPTION"],
+    [{
+      code: "ACTION_REJECTED",
+      action: "sendTransaction",
+      reason: "rejected",
+      info: { error: { code: 4001 }, payload: { method: "eth_sendTransaction" } },
+    }, "USER_REJECTED"],
+  ] as const)("allows an ERC20 approval to retry after a pre-broadcast failure: %j", async (failure, expectedReason) => {
+    mocks.identity = identity;
+    let approved = false;
+    const approve = vi.fn(async () => ({
+      hash: "0xapproval",
+      wait: async () => {
+        approved = true;
+        return { status: 1 };
+      },
+    })).mockRejectedValueOnce(Object.assign(new Error("approval failed before broadcast"), failure));
+    const records: Array<{ id: string; phase: string }> = [];
+    mocks.center = {
+      records,
+      upsert: vi.fn((next) => {
+        const existing = records.find((record) => record.id === next.id);
+        if (existing) Object.assign(existing, next);
+        else records.push(next);
+      }),
+    };
+    const selectedModules = {
+      ...modules,
+      assetKind: "erc20",
+      token: {
+        allowance: vi.fn(async () => approved ? 1000000000000000000n : 0n),
+        balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n),
+        connect: vi.fn(() => ({ approve })),
+      },
+      pool: { runner: { provider: signer.provider } },
+    } as unknown as ShieldedPageModules;
+    await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
+    fireEvent.click(await screen.findByRole("button", { name: label("approve") }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(
+      `errors.contractError.${expectedReason}`,
+    ));
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect(records.every((record) => record.phase === "failed")).toBe(true);
+    expect((screen.getByRole("button", { name: label("approve") }) as HTMLButtonElement).disabled).toBe(false);
+    expect(approve).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: label("approve") }));
+    await waitFor(() => expect(screen.getByRole("button", { name: submitLabel })).toBeTruthy());
+    expect(approve).toHaveBeenCalledTimes(2);
+    expect(records.some((record) => record.phase === "busy")).toBe(false);
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("cancels an approval nonce lookup on a connection event and keeps a newer local key operation busy", async () => {
+    let finishNonce!: (nonce: number) => void;
+    let finishFunds!: (state: any) => void;
+    const provider = {
+      ...signer.provider!,
+      getTransactionCount: vi.fn(() => new Promise<number>((resolve) => { finishNonce = resolve; })),
+    };
+    const signingWallet = { ...signer, provider } as unknown as Signer;
+    const approve = vi.fn();
+    const selectedModules = {
+      ...modules, assetKind: "erc20",
+      token: {
+        allowance: vi.fn(async () => 0n),
+        balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n),
+        connect: vi.fn(() => ({ approve })),
+      },
+      pool: { runner: { provider } },
+    } as unknown as ShieldedPageModules;
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation((method, params) => method === "createFunds"
+      ? new Promise((resolve) => { finishFunds = resolve; })
+      : defaultCall?.(method, params));
+    await renderUnlockedPanel(signingWallet, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
+    fireEvent.click(await screen.findByRole("button", { name: label("approve") }));
+    await waitFor(() => expect(provider.getTransactionCount).toHaveBeenCalled());
+    act(() => {
+      mocks.walletGeneration++;
+      mocks.walletListeners.forEach((listener) => listener());
+    });
+    await waitUntilIdle();
+    openCreateWallet();
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("createFunds", expect.anything()));
+    await act(async () => finishNonce(7));
+    expect(approve).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finishFunds({ credentials, identity, funds: { ...funds, backupRequired: true } }));
+    expect(mocks.funds?.backupRequired).toBe(true);
+    expect(screen.getByRole("button", { name: label("exportRecovery") })).toBeTruthy();
+    expect(mocks.lock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+  it("keeps the new account's approval requirement when the old account's receipt readback finishes late", async () => {
+    mocks.identity = identity;
+    let approved = false;
+    let finishAllowance!: (value: bigint) => void;
+    const allowance = vi.fn((owner: string) => owner.toLowerCase() === address && approved
+      ? new Promise<bigint>((resolve) => { finishAllowance = resolve; })
+      : Promise.resolve(0n));
+    const approve = vi.fn(async () => ({
+      hash: "0xapproval",
+      wait: async () => {
+        approved = true;
+        return { status: 1 };
+      },
+    }));
+    const selectedModules = {
+      ...modules, assetKind: "erc20",
+      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => ({ approve })) },
+      pool: { runner: { provider: signer.provider } },
+    } as unknown as ShieldedPageModules;
+    const rendered = await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
+    fireEvent.click(await screen.findByRole("button", { name: label("approve") }));
+    await waitFor(() => expect(finishAllowance).toBeTypeOf("function"));
+    const nextAddress = "0x00000000000000000000000000000000000000bb";
+    const nextSigner = { ...signer, getAddress: vi.fn(async () => nextAddress) } as unknown as Signer;
+    rendered.rerender(<ShieldedInheritancePanel modules={selectedModules}
+      signer={nextSigner} account={nextAddress} />);
+    await waitFor(() => expect(allowance).toHaveBeenCalledWith(nextAddress, modules.poolAddress));
+    await waitFor(() => expect((screen.getByRole("button", { name: label("approve") }) as HTMLButtonElement).disabled).toBe(false));
+    await act(async () => finishAllowance(1000000000000000000n));
+    expect(screen.getByRole("button", { name: label("approve") })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: submitLabel })).toBeNull();
+    expect(mocks.submit).not.toHaveBeenCalled();
+    expect(mocks.lock).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ code: "NETWORK_ERROR" }, "errors.contractError.NETWORK_ERROR"],
+    [{ code: "UNKNOWN_ERROR" }, "broadcast status unresolved"],
+    [{ code: "CALL_EXCEPTION", action: "sendTransaction" }, "errors.contractError.CALL_EXCEPTION"],
+    [{ code: "INSUFFICIENT_FUNDS", info: { sendTransactionHash: "0xbroadcast" } }, "errors.contractError.INSUFFICIENT_FUNDS"],
+    [{ code: "CALL_EXCEPTION", action: "estimateGas", receipt: { hash: "0xbroadcast" } }, "errors.contractError.CALL_EXCEPTION"],
+    [{ code: "ACTION_REJECTED", reason: "rejected", info: { sendTransactionHash: "0xbroadcast" } }, "errors.contractError.USER_REJECTED"],
+    [{ code: "ACTION_REJECTED", reason: "rejected", receipt: { hash: "0xbroadcast" } }, "errors.contractError.USER_REJECTED"],
+  ] as const)("keeps tracking a request with uncertain or known broadcast status: %j", async (failure, expectedMessage) => {
+    mocks.identity = identity;
+    const selectedModules = {
+      ...modules,
+      pool: { queryFilter: vi.fn(async () => []), filters: { NoteAppended: () => "all-notes" } },
+    } as unknown as ShieldedPageModules;
+    mocks.call.mockImplementation(async (method: string) => method === "recover" ? emptyWallet : method === "prove"
+      ? { action: "shield", amount: "1", data: { outputCommitments: [100n, 101n] }, proof: {} }
+      : { handle: "action:1", steps: [], inputs: [], inputAmounts: [], outputAmounts: ["1", "0"] });
+    mocks.submit.mockImplementation(async (params) => {
+      params.onSubmitting({ nonce: 7, fromBlock: 30, signerAddress: address });
+      throw Object.assign(new Error("broadcast status unresolved"), failure);
+    });
+    await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(expectedMessage));
+    expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("automatically resumes public submission tracking after navigating back to the pool", async () => {
     mocks.identity = identity;
@@ -3266,9 +3716,12 @@ describe("Worker-backed shielded wallet", () => {
     expect(mocks.identity.handle).toBe("identity:2");
     expect(mocks.submit).not.toHaveBeenCalled();
   });
-  it.each(["confirmed", "replaced"] as const)("rereads the current ERC20 allowance when a tracked approval is %s", async (outcome) => {
+  it.each([
+    ["approval", "confirmed"], ["approval", "replaced"],
+    ["action", "confirmed"], ["action", "replaced"],
+  ] as const)("rereads the current ERC20 allowance when a tracked %s is %s", async (kind, outcome) => {
     mocks.identity = identity;
-    const record = restorePendingSubmission("approval", outcome === "confirmed" ? "0xold" : null);
+    const record = restorePendingSubmission(kind, outcome === "confirmed" ? "0xold" : null);
     let finishReceipt!: (receipt: unknown) => void;
     let finishNonce!: (nonce: number) => void;
     if (outcome === "confirmed") {
@@ -3278,26 +3731,160 @@ describe("Worker-backed shielded wallet", () => {
         () => new Promise((resolve) => { finishNonce = resolve; }),
       );
     }
-    const allowance = vi.fn(async () => 0n);
+    const allowance = vi.fn(async () => kind === "approval" ? 0n : 1000000000000000000n);
     const selectedModules = {
-      ...modules, assetKind: "erc20", token: { allowance },
-      pool: { runner: { provider: signer.provider } },
+      ...modules, assetKind: "erc20", token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n) },
+      pool: {
+        runner: { provider: signer.provider },
+        filters: { NoteAppended: () => "unfiltered-notes" },
+        queryFilter: vi.fn(async () => []),
+      },
     } as unknown as ShieldedPageModules;
     await renderPanel(signer, selectedModules);
     fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: label("approve") })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", {
+      name: kind === "approval" ? label("approve") : submitLabel,
+    })).toBeTruthy());
     const allowanceReads = allowance.mock.calls.length;
-    allowance.mockResolvedValue(1000000000000000000n);
+    allowance.mockResolvedValue(kind === "approval" ? 1000000000000000000n : 0n);
     await act(async () => outcome === "confirmed" ? finishReceipt({ status: 1 }) : finishNonce(8));
-    await waitFor(() => expect(screen.getByRole("button", { name: submitLabel })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", {
+      name: kind === "approval" ? submitLabel : label("approve"),
+    })).toBeTruthy());
     expect(allowance.mock.calls.length).toBeGreaterThan(allowanceReads);
     expect(allowance).toHaveBeenLastCalledWith(address, address);
     expect(record.phase).toBe(outcome === "confirmed" ? "done" : "failed");
-    if (outcome === "replaced") {
-      expect(screen.getByText("transaction.unknown")).toBeTruthy();
+    if (kind === "approval" && outcome === "replaced") {
+      expect(screen.getByText(/transaction\.unknown$/)).toBeTruthy();
       expect(screen.queryByText(/transaction\.failed$/)).toBeNull();
     }
     expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["0xe450d38c", "errors.contractError.ERC20InsufficientBalance"],
+    ["0xdeadbeef", "errors.contractError.CALL_EXCEPTION"],
+  ])("explains a deposit estimation failure %s without calldata or an unnecessary approval", async (selector, message) => {
+    mocks.identity = identity;
+    const value = 10000n * 10n ** 18n;
+    const approve = vi.fn();
+    const token = {
+      allowance: vi.fn(async () => value),
+      balanceOf: vi.fn(async () => value),
+      connect: vi.fn(() => ({ approve })),
+    };
+    const selectedModules = {
+      ...modules, assetKind: "erc20", assetSymbol: "DEEP", token,
+    } as unknown as ShieldedPageModules;
+    mocks.call.mockImplementation(async (method: string) => method === "recover" ? emptyWallet : method === "prove"
+      ? { action: "shield", amount: value.toString(), data: { outputCommitments: [100n, 101n] }, proof: {} }
+      : { handle: "action:1", steps: [], inputs: [], inputAmounts: [], outputAmounts: [value.toString(), "0"] });
+    const calldata = `0xf89a687a${"ab".repeat(1000)}`;
+    mocks.submit.mockRejectedValueOnce(Object.assign(new Error(`execution reverted (unknown custom error), transaction data=${calldata}`), {
+      code: "CALL_EXCEPTION",
+      action: "estimateGas",
+      data: `${selector}${address.slice(2).padStart(64, "0")}${"0".repeat(64)}${value.toString(16).padStart(64, "0")}`,
+    }));
+    await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "10000" } });
+    fireEvent.click(await screen.findByRole("button", { name: submitLabel }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe(message));
+    expect(token.balanceOf).toHaveBeenCalledWith(address);
+    expect(approve).not.toHaveBeenCalled();
+    expect(mocks.submit).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: label("approve") })).toBeNull();
+    expect(screen.queryByText(/unknown custom error|0xf89a687a/)).toBeNull();
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect(screen.queryByText(/transaction\.success$/)).toBeNull();
+  });
+  it("clears the previous approval hash and success when the following deposit has no token balance", async () => {
+    mocks.identity = identity;
+    let balance = 10000n * 10n ** 18n;
+    let approved = false;
+    const hash = `0x${"73".repeat(32)}`;
+    const approve = vi.fn(async () => ({
+      hash,
+      wait: vi.fn(async () => {
+        approved = true;
+        return { status: 1 };
+      }),
+    }));
+    const token = {
+      allowance: vi.fn(async () => approved ? 10000n * 10n ** 18n : 0n),
+      balanceOf: vi.fn(async () => balance),
+      connect: vi.fn(() => ({ approve })),
+    };
+    const selectedModules = {
+      ...modules, assetKind: "erc20", assetSymbol: "DEEP", token,
+    } as unknown as ShieldedPageModules;
+    await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "10000" } });
+    fireEvent.click(await screen.findByRole("button", { name: label("approve") }));
+    await waitFor(() => expect(screen.getByText(/transaction\.success$/).textContent).toContain(hash));
+    expect(screen.getByText(/transaction\.success$/).textContent).toContain(label("approve"));
+    const submit = await screen.findByRole("button", { name: submitLabel });
+    await waitFor(() => expect((submit as HTMLButtonElement).disabled).toBe(false));
+    balance = 0n;
+    fireEvent.click(submit);
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("shielded.depositBalanceInsufficient"));
+    expect(screen.queryByText(/transaction\.success$/)).toBeNull();
+    expect(screen.queryByText(new RegExp(hash))).toBeNull();
+    expect(mocks.call.mock.calls.some(([method]) => method === "preview" || method === "prove")).toBe(false);
+    expect(mocks.submit).not.toHaveBeenCalled();
+    expect(approve).toHaveBeenCalledOnce();
+  });
+  it.each(["approval", "deposit"] as const)("does not continue %s after the account changes during a token balance read", async (kind) => {
+    let finishBalance!: (balance: bigint) => void;
+    const balanceOf = vi.fn(() => new Promise<bigint>((resolve) => { finishBalance = resolve; }));
+    const approve = vi.fn();
+    const token = {
+      allowance: vi.fn(async () => kind === "approval" ? 0n : 10000n * 10n ** 18n),
+      balanceOf,
+      connect: vi.fn(() => ({ approve })),
+    };
+    const selectedModules = {
+      ...modules, assetKind: "erc20", token,
+    } as unknown as ShieldedPageModules;
+    const rendered = await renderUnlockedPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "10000" } });
+    fireEvent.click(await screen.findByRole("button", { name: kind === "approval" ? label("approve") : submitLabel }));
+    await waitFor(() => expect(balanceOf).toHaveBeenCalledWith(address));
+    const nextAddress = "0x00000000000000000000000000000000000000bb";
+    const nextSigner = { ...signer, getAddress: vi.fn(async () => nextAddress) } as unknown as Signer;
+    rendered.rerender(<ShieldedInheritancePanel modules={selectedModules} signer={nextSigner} account={nextAddress} />);
+    await waitUntilIdle();
+    await act(async () => finishBalance(10000n * 10n ** 18n));
+    expect(approve).not.toHaveBeenCalled();
+    expect(mocks.call.mock.calls.some(([method]) => method === "preview" || method === "prove")).toBe(false);
+    expect(mocks.submit).not.toHaveBeenCalled();
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+  it("refreshes an externally consumed allowance and explains the token's custom error", async () => {
+    mocks.identity = identity;
+    const allowance = vi.fn(async () => 1000000000000000000000n);
+    const selectedModules = {
+      ...modules, assetKind: "erc20", token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n) },
+    } as unknown as ShieldedPageModules;
+    mocks.call.mockImplementation(async (method: string) => method === "recover" ? emptyWallet : method === "prove"
+      ? { action: "shield", amount: "1000000000000000000000", data: { outputCommitments: [100n, 101n] }, proof: {} }
+      : { handle: "action:1", steps: [], inputs: [], inputAmounts: [], outputAmounts: ["1000000000000000000000", "0"] });
+    mocks.submit.mockImplementationOnce(async () => {
+      allowance.mockResolvedValue(0n);
+      // ERC20InsufficientAllowance(pool, 0, 1000 DEEP), as returned by estimateGas.
+      throw Object.assign(new Error("execution reverted (unknown custom error) with transaction data"), {
+        code: "CALL_EXCEPTION",
+        action: "estimateGas",
+        data: `0xfb8f41b2${address.slice(2).padStart(64, "0")}${"0".repeat(64)}${(1000n * 10n ** 18n).toString(16).padStart(64, "0")}`,
+      });
+    });
+    await renderPanel(signer, selectedModules);
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "1000" } });
+    fireEvent.click(await screen.findByRole("button", { name: submitLabel }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("errors.contractError.ERC20InsufficientAllowance"));
+    await waitFor(() => expect((screen.getByRole("button", { name: label("approve") }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect(screen.queryByText(/unknown custom error/)).toBeNull();
+    expect(mocks.submit).toHaveBeenCalledOnce();
   });
   it("resumes the destination pool's pending submission when the selected pool changes", async () => {
     mocks.identity = identity;
@@ -3326,7 +3913,7 @@ describe("Worker-backed shielded wallet", () => {
     const allowance = vi.fn(async () => 0n);
     const selectedModules = {
       ...modules, assetKind: "erc20",
-      token: { allowance, connect: vi.fn(() => ({ approve })) },
+      token: { allowance, balanceOf: vi.fn(async () => 1_000_000n * 10n ** 18n), connect: vi.fn(() => ({ approve })) },
       pool: { runner: { provider: signer.provider } },
     } as unknown as ShieldedPageModules;
     await renderPanel(signer, selectedModules);

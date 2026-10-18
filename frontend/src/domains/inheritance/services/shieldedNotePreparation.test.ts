@@ -11,9 +11,20 @@ import { prepareShieldedShield } from "./shieldedNotePreparation";
 const chainId = 1030n;
 const poolAddress = "0x1111111111111111111111111111111111111111";
 const derivedSecretField = 7654321n;
-const identity = { chainId, poolAddress, derivedSecretField };
+const identity = { chainId, poolAddress, keyMaterial: deriveShieldedHeirKeyMaterial(derivedSecretField) };
 
 describe("local shield preparation", () => {
+  it("rejects the removed derived-secret-only input shape", async () => {
+    await expect(
+      prepareShieldedShield({
+        chainId,
+        poolAddress,
+        derivedSecretField,
+        amount: 100n,
+      } as unknown as Parameters<typeof prepareShieldedShield>[0]),
+    ).rejects.toThrow("key material is required");
+  });
+
   it("encrypts both shield outputs, including the zero-value dummy, under the one identity key", async () => {
     const prepared = await prepareShieldedShield({ ...identity, amount: 100n });
     expect(prepared.witness.amount).toBe("100");
@@ -49,6 +60,29 @@ describe("local shield preparation", () => {
         payload.fill(0);
       }
     }
+  });
+
+  it.each([
+    { ...identity.keyMaterial, ownerCommitment: identity.keyMaterial.ownerCommitment + 1n },
+    { ...identity.keyMaterial, hpkeIkm: "0x1234" },
+  ])("rejects inconsistent explicit funds keys before encrypting", async (keyMaterial) => {
+    await expect(
+      prepareShieldedShield({ ...identity, keyMaterial, amount: 100n }),
+    ).rejects.toThrow("key material is inconsistent");
+  });
+
+  it("normalizes explicit numeric key fields", async () => {
+    const prepared = await prepareShieldedShield({
+      ...identity,
+      keyMaterial: {
+        ...identity.keyMaterial,
+        ownerSecret: identity.keyMaterial.ownerSecret.toString(),
+        ownerCommitment: identity.keyMaterial.ownerCommitment.toString(),
+      },
+      amount: 100n,
+    });
+    expect(prepared.outputs[0].note.ownerCommitment).toBe(identity.keyMaterial.ownerCommitment);
+    expect(prepared.witness.ownerSecret).toBe(identity.keyMaterial.ownerSecret.toString());
   });
 
   it("rejects an invalid shield split", async () => {

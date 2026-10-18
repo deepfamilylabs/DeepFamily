@@ -1596,6 +1596,7 @@
     "fields": {
       "amount": "金额（{{symbol}}）",
       "valueNote": "选择余额",
+      "valueCandidates": "选择允许使用的余额",
       "budgetNote": "选择预算",
       "familyVersion": "父母人物版本",
       "rate": "每期额度（{{symbol}}）",
@@ -1628,11 +1629,37 @@
     "noBudgetNote": "暂无可领取的预算。",
     "valueSelectionHint": "至少选择一笔，最多 {{count}} 笔；合计须覆盖本次金额。",
     "valueSelectionRequired": "请选择要使用的余额。",
-    "valueSelectionSummary": "已选 {{count}} 笔 · {{amount}} {{symbol}}",
+    "valueSelectionSummary": "允许使用 {{count}} 笔 · 共 {{amount}} {{symbol}}，实际使用见预览",
     "valueSelectionLimit": "最多选择 {{count}} 笔不同余额。",
     "selectedValueUnavailable": "所选余额已不可用，请取消勾选并重新选择。",
     "amountExceedsNotes": "所选余额不足，请减少金额或重新选择。",
     "submit": "确认{{action}}",
+    "spendReview": {
+      "title": "余额使用预览",
+      "titles": {
+        "privateTransfer": "转账预览",
+        "unshield": "提现预览"
+      },
+      "preview": "预览{{action}}",
+      "candidates": "允许使用：{{count}} 笔，共 {{amount}} {{symbol}}",
+      "used": "本次计划实际使用：{{count}} 笔，共 {{amount}} {{symbol}}",
+      "amountLabels": {
+        "privateTransfer": "转给收款人",
+        "unshield": "提现至普通钱包"
+      },
+      "recipient": "收款人",
+      "transactions": "共 {{count}} 笔交易；每步最多使用 8 笔余额，逐步确认。",
+      "step": "第 {{index}} / {{count}} 步：{{action}}",
+      "merge": "合并余额",
+      "inputs": "本步使用 {{count}} 笔，共 {{amount}} {{symbol}}",
+      "generatedInput": "第 {{step}} 步生成的余额 · {{amount}} {{symbol}}",
+      "mergedInput": "已合并余额 · {{amount}} {{symbol}}",
+      "continuationHint": "确认仅执行下一步。取消会停止后续步骤，已完成的交易不会撤回。",
+      "mergeOutput": "合并后余额（仍归你所有）",
+      "change": "找零（仍归你所有）",
+      "confirm": "确认并继续",
+      "cancel": "取消预览"
+    },
     "done": "操作完成，余额已更新。",
     "confirmedRefreshFailed": "交易已完成，余额刷新失败：{{detail}}。请刷新余额，勿重复提交。",
     "unlock": "解锁身份",
@@ -1826,7 +1853,7 @@
       "recoveryCandidateHistoryMissing": "未找到可用于确认原资金密钥的有效历史，恢复仍为候选状态；空扫描不能证明备份或身份输入正确。",
       "restoreAnotherMethod": "重新输入恢复材料",
       "connectSignatureWallet": "请连接用于生成或恢复此资金密钥的签名钱包。",
-      "valueCandidatesHint": "勾选允许使用的余额，预览会选择足额子集。每步最多使用 8 笔；需要合并时，会先展示步骤并逐步确认。",
+      "valueCandidatesHint": "勾选仅表示允许使用，不会全部花费。优先避免额外合并，尝试精确凑额，再减少找零；实际使用见预览。每笔交易最多使用 8 笔余额，候选数量不限。",
       "signatureMessage": "查看将要签名的固定消息",
       "planTransactions": "共 {{count}} 笔交易，请在钱包中逐笔确认。",
       "continueIdentity": "解锁身份"

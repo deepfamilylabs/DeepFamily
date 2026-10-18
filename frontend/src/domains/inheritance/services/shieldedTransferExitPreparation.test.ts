@@ -8,6 +8,7 @@ import {
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
+  planShieldedValueSpend,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
@@ -16,7 +17,6 @@ import type { VerifiedShieldedRecipient } from "./shieldedReceiveCode";
 import { prepareShieldedShield } from "./shieldedNotePreparation";
 import {
   prepareShieldedPrivateTransfer,
-  prepareShieldedValueConsolidation,
   prepareShieldedUnshield,
   type ShieldedValueInput,
 } from "./shieldedTransferExitPreparation";
@@ -35,7 +35,7 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
   const sender = await prepareShieldedShield({
     chainId,
     poolAddress,
-    derivedSecretField: senderSecret,
+    keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
     amount: 100n,
     outputAmounts: secondOwner ? [70n, 30n] : [70n, 30n],
   });
@@ -43,7 +43,7 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
     ? await prepareShieldedShield({
         chainId,
         poolAddress,
-        derivedSecretField: secondSecret,
+        keyMaterial: deriveShieldedHeirKeyMaterial(secondSecret),
         amount: 20n,
       })
     : undefined;
@@ -52,7 +52,7 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
       prepareShieldedShield({
         chainId,
         poolAddress,
-        derivedSecretField: senderSecret,
+        keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
         amount: 20n,
         outputAmounts: [10n, 10n],
       }),
@@ -67,6 +67,7 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
     poolAddress: poolAddress.toLowerCase(),
     ...checkpoint,
     walletOwnerCommitment: deriveShieldedHeirKeyMaterial(secret).ownerCommitment,
+    walletKeyMode: 0,
     shards: new Map([[0n, tree]]),
     spentNullifiers: new Set(),
     ownedNotes: new Map(
@@ -101,19 +102,19 @@ async function walletFixture(secondOwner = false, extraPairs = 0) {
   const otherWallet = other ? wallet(secondSecret, [2, 3]) : undefined;
   const input0: ShieldedValueInput = {
     wallet: senderWallet,
-    derivedSecretField: senderSecret,
+    keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
     commitment: sender.outputs[0].commitment,
   };
   const input1: ShieldedValueInput =
     other && otherWallet
       ? {
           wallet: otherWallet,
-          derivedSecretField: secondSecret,
+          keyMaterial: deriveShieldedHeirKeyMaterial(secondSecret),
           commitment: other.outputs[0].commitment,
         }
       : {
           wallet: senderWallet,
-          derivedSecretField: senderSecret,
+          keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
           commitment: sender.outputs[1].commitment,
         };
   return { senderWallet, otherWallet, input0, input1 };
@@ -155,7 +156,7 @@ describe("local private transfer and unshield preparation", () => {
       const { senderWallet } = await walletFixture(false, 3);
       const inputs = [...senderWallet.ownedNotes.keys()].map((commitment) => ({
         wallet: senderWallet,
-        derivedSecretField: senderSecret,
+        keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
         commitment,
       }));
       const prepared =
@@ -211,6 +212,36 @@ describe("local private transfer and unshield preparation", () => {
       ).rejects.toThrow("one to eight input notes");
     },
   );
+  it.each(["privateTransfer", "unshield"] as const)(
+    "rejects the removed derived-secret-only input shape for %s",
+    async (action) => {
+      const { input0 } = await walletFixture();
+      const oldInput = {
+        wallet: input0.wallet,
+        commitment: input0.commitment,
+        derivedSecretField: senderSecret,
+      } as unknown as ShieldedValueInput;
+      await expect(
+        action === "privateTransfer"
+          ? prepareShieldedPrivateTransfer({
+              chainId,
+              poolAddress,
+              inputs: [oldInput],
+              destinations: [
+                { kind: "inputOwner", inputIndex: 0, amount: 60n },
+                { kind: "inputOwner", inputIndex: 0, amount: 10n },
+              ],
+            })
+          : prepareShieldedUnshield({
+              chainId,
+              poolAddress,
+              inputs: [oldInput],
+              amount: 60n,
+              recipient,
+            }),
+      ).rejects.toThrow("key material is required");
+    },
+  );
   it("spends several VALUE notes with explicit owner keys and no identity preimage", async () => {
     const { input0, input1 } = await walletFixture();
     const keyMaterial = deriveShieldedHeirKeyMaterial(senderSecret);
@@ -218,8 +249,8 @@ describe("local private transfer and unshield preparation", () => {
       chainId,
       poolAddress,
       inputs: [
-        { ...input0, derivedSecretField: undefined, keyMaterial },
-        { ...input1, derivedSecretField: undefined, keyMaterial },
+        { ...input0, keyMaterial },
+        { ...input1, keyMaterial },
       ],
       amount: 90n,
       recipient,
@@ -229,41 +260,38 @@ describe("local private transfer and unshield preparation", () => {
     expect(prepared.outputs[0].note.amount).toBe(10n);
     expect(prepared.witness).not.toHaveProperty("derivedSecretField");
   });
-  it("automatically joins owned values without asking for a receive code", async () => {
+  it("previews a merge and prepares its exact inputs and self outputs", async () => {
     const { senderWallet } = await walletFixture();
-    const prepared = await prepareShieldedValueConsolidation({
+    const notes = [...senderWallet.ownedNotes.values()].map((owned) => {
+      if (owned.note.kind !== "value") throw new Error("Expected VALUE fixture");
+      return { commitment: owned.commitment, amount: owned.note.amount };
+    });
+    const plan = planShieldedValueSpend({ notes, amount: 90n, maxInputs: 1 });
+    const step = plan.steps[0];
+    expect(step.kind).toBe("merge");
+    const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
-      wallet: senderWallet,
-      derivedSecretField: senderSecret,
-      amount: 90n,
+      inputs: step.inputCommitments.map((commitment) => ({
+        wallet: senderWallet,
+        keyMaterial: deriveShieldedHeirKeyMaterial(senderSecret),
+        commitment,
+      })),
+      destinations: [
+        { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[0] },
+        { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[1] },
+      ],
     });
-    expect(prepared?.witness.inputEnabled).toEqual(["1", "1", "0", "0", "0", "0", "0", "0"]);
-    expect(prepared?.outputs[0].note.amount).toBe(90n);
-    expect(prepared?.outputs[1].note.amount).toBe(10n);
-    expect(prepared?.outputs[0].note.ownerCommitment).toBe(senderWallet.walletOwnerCommitment);
-    await expect(
-      prepareShieldedValueConsolidation({
-        chainId,
-        poolAddress,
-        wallet: senderWallet,
-        derivedSecretField: senderSecret,
-        amount: 70n,
-      }),
-    ).resolves.toBeUndefined();
-    await expect(
-      prepareShieldedValueConsolidation({
-        chainId,
-        poolAddress,
-        wallet: senderWallet,
-        derivedSecretField: senderSecret,
-        amount: 101n,
-      }),
-    ).rejects.toThrow("balance");
+    expect(prepared.witness.inputEnabled).toEqual(["1", "1", "0", "0", "0", "0", "0", "0"]);
+    expect(prepared.outputs.map((output) => output.note.amount)).toEqual([90n, 10n]);
+    expect(prepared.outputs[0].note.ownerCommitment).toBe(senderWallet.walletOwnerCommitment);
+    expect(planShieldedValueSpend({ notes, amount: 70n, maxInputs: 1 }).steps[0].kind).toBe("spend");
+    expect(() => planShieldedValueSpend({ notes, amount: 101n, maxInputs: 1 })).toThrow("balance");
   });
 
-  it("uses the eight-slot transfer to consolidate three fragments into one funding input", async () => {
+  it("replans after a three-fragment merge using the new unspent receipt outputs", async () => {
     const { senderWallet } = await walletFixture();
+    const keys = deriveShieldedHeirKeyMaterial(senderSecret);
     const append = async (
       outputs: readonly {
         commitment: bigint;
@@ -291,40 +319,60 @@ describe("local private transfer and unshield preparation", () => {
     const extra = await prepareShieldedShield({
       chainId,
       poolAddress,
-      derivedSecretField: senderSecret,
+      keyMaterial: keys,
       amount: 25n,
     });
     await append(extra.outputs);
-    const first = await prepareShieldedValueConsolidation({
+    const unspentNotes = () =>
+      [...senderWallet.ownedNotes.values()].flatMap((owned) => {
+        const spent = senderWallet.spentNullifiers.has(
+          computeShieldedSpendNullifier(
+            { ownerSecret: keys.ownerSecret, noteCommitment: owned.commitment },
+            { chainId, poolAddress },
+          ),
+        );
+        return owned.note.kind === "value" && owned.note.amount > 0n && !spent
+          ? [{ commitment: owned.commitment, amount: owned.note.amount }]
+          : [];
+      });
+    const step = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 }).steps[0];
+    expect(step.kind).toBe("merge");
+    const prepared = await prepareShieldedPrivateTransfer({
       chainId,
       poolAddress,
-      wallet: senderWallet,
-      derivedSecretField: senderSecret,
-      amount: 110n,
+      inputs: step.inputCommitments.map((commitment) => ({
+        wallet: senderWallet,
+        keyMaterial: keys,
+        commitment,
+      })),
+      destinations: [
+        { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[0] },
+        { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[1] },
+      ],
     });
-    expect(first?.outputs[0].note.amount).toBe(110n);
-    expect(first?.outputs[1].note.amount).toBe(15n);
-    expect(first?.witness.inputEnabled).toEqual(["1", "1", "1", "0", "0", "0", "0", "0"]);
-    for (const nullifier of first!.data.inputNullifiers)
+    expect(prepared.outputs.map((output) => output.note.amount)).toEqual([110n, 15n]);
+    expect(prepared.witness.inputEnabled).toEqual(["1", "1", "1", "0", "0", "0", "0", "0"]);
+    for (const nullifier of prepared.data.inputNullifiers)
       senderWallet.spentNullifiers.add(getBigInt(nullifier));
-    await append(first!.outputs);
-    const second = await prepareShieldedValueConsolidation({
-      chainId,
-      poolAddress,
-      wallet: senderWallet,
-      derivedSecretField: senderSecret,
-      amount: 110n,
-    });
-    expect(second).toBeUndefined();
+    await append(prepared.outputs);
+    const next = planShieldedValueSpend({ notes: unspentNotes(), amount: 110n, maxInputs: 1 }).steps[0];
+    expect(next.kind).toBe("spend");
+    expect(next.inputCommitments).toEqual([String(prepared.outputs[0].commitment)]);
     await expect(
-      prepareShieldedValueConsolidation({
+      prepareShieldedPrivateTransfer({
         chainId,
         poolAddress,
-        wallet: senderWallet,
-        derivedSecretField: senderSecret,
-        amount: 110n,
+        inputs: step.inputCommitments.map((commitment) => ({
+          wallet: senderWallet,
+          keyMaterial: keys,
+          commitment,
+        })),
+        destinations: [
+          { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[0] },
+          { kind: "inputOwner", inputIndex: 0, amount: step.outputAmounts[1] },
+        ],
       }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("already been spent");
   });
 
   it("makes two private outputs with exact conservation and a verified recipient key", async () => {
@@ -555,7 +603,7 @@ describe("local private transfer and unshield preparation", () => {
     await expect(
       prepareShieldedPrivateTransfer({
         ...base,
-        inputs: [{ ...input0, derivedSecretField: 999n }, input1],
+        inputs: [{ ...input0, keyMaterial: deriveShieldedHeirKeyMaterial(999n) }, input1],
       }),
     ).rejects.toThrow("another owner");
     input0.wallet.ownedNotes.get(BigInt(input0.commitment))!.ciphertextHashField = 1n;

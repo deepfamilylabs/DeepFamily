@@ -61,7 +61,7 @@ async function setup(periodDays = 30n) {
   const shield = await prepareShieldedShield({
     chainId,
     poolAddress,
-    derivedSecretField: donorSecret,
+    keyMaterial: donorKeys,
     amount: 100n,
   });
   const firstTree = createLineageTree(shield.outputs.map((output) => output.commitment));
@@ -94,6 +94,7 @@ async function setup(periodDays = 30n) {
     ),
     spentNullifiers: new Set(),
     walletOwnerCommitment: donorKeys.ownerCommitment,
+    walletKeyMode: 0,
     walletIdentityCommitment: rootIdentity,
   };
   const policy = createShieldedPolicyDescriptor(
@@ -208,7 +209,7 @@ async function setup(periodDays = 30n) {
   const common = {
     pool,
     wallet,
-    donorDerivedSecretField: donorSecret,
+    keyMaterial: donorKeys,
     donorCommitment: shield.outputs[0].commitment,
     recipient,
   };
@@ -367,6 +368,22 @@ describe("funding destination validation before consolidation", () => {
 });
 
 describe("local unified funding preparation", () => {
+  it("rejects the removed donor-derived-secret-only input shape", async () => {
+    const fixture = await setup();
+    const { keyMaterial: _keyMaterial, ...oldCommon } = fixture.common;
+    await expect(
+      prepareShieldedFund({
+        ...oldCommon,
+        donorDerivedSecretField: donorSecret,
+        fundMode: 0,
+        policy: fixture.policy,
+        lineage: fixture.lineage,
+        lineageIndex: fixture.lineageIndex,
+        budgetPeriods: 2n,
+      } as unknown as Parameters<typeof prepareShieldedFund>[0]),
+    ).rejects.toThrow("key material is required");
+  });
+
   it("private independent funding retains owner, mode and viewing material on refill", async () => {
     const fixture = await setup();
     const keys = await deriveShieldedAssetKeyMaterial({

@@ -11,22 +11,9 @@ export type ShieldedKeyMaterial = {
   hpkeIkm: string;
 };
 
-export function resolveShieldedKeyMaterial(
-  input: {
-    keyMaterial?: ShieldedKeyMaterial;
-    derivedSecretField?: BigNumberish;
-  },
-  mode?: bigint,
-) {
-  const legacy =
-    input.derivedSecretField === undefined
-      ? undefined
-      : deriveShieldedHeirKeyMaterial(input.derivedSecretField);
-  const supplied = input.keyMaterial;
-  if (mode === 1n && !supplied)
-    throw new Error("Independent funding authorization requires its original key material");
-  const material = supplied ?? legacy;
-  if (!material) throw new Error("The original spending and viewing material is required");
+/** Validate explicit spending and viewing keys; preparation never derives missing funds keys. */
+export function validateShieldedKeyMaterial(material: ShieldedKeyMaterial) {
+  if (!material) throw new Error("The original spending and viewing key material is required");
   const ownerSecret = getBigInt(material.ownerSecret);
   const ownerCommitment = getBigInt(material.ownerCommitment);
   if (
@@ -34,13 +21,26 @@ export function resolveShieldedKeyMaterial(
     getBytes(material.hpkeIkm).length !== 32
   )
     throw new Error("Funding key material is inconsistent");
-  if (
-    mode === 0n &&
-    (!legacy ||
-      ownerSecret !== legacy.ownerSecret ||
-      ownerCommitment !== legacy.ownerCommitment ||
-      material.hpkeIkm.toLowerCase() !== legacy.hpkeIkm.toLowerCase())
-  )
-    throw new Error("Identity-derived authorization requires the canonical identity keys");
   return { ownerSecret, ownerCommitment, hpkeIkm: material.hpkeIkm };
+}
+
+/** Mode 0 is bound by the circuit to the heir's canonical identity-derived funds keys. */
+export function validateShieldedClaimKeyMaterial(
+  material: ShieldedKeyMaterial,
+  keyMode: bigint,
+  identityDerivedSecretField: BigNumberish,
+) {
+  const keys = validateShieldedKeyMaterial(material);
+  if (keyMode === 0n) {
+    const canonical = deriveShieldedHeirKeyMaterial(identityDerivedSecretField);
+    if (
+      keys.ownerSecret !== canonical.ownerSecret ||
+      keys.ownerCommitment !== canonical.ownerCommitment ||
+      keys.hpkeIkm.toLowerCase() !== canonical.hpkeIkm.toLowerCase()
+    )
+      throw new Error("Identity-derived authorization requires the canonical identity keys");
+  } else if (keyMode !== 1n) {
+    throw new Error("Claim key mode must be identity-derived or independent");
+  }
+  return keys;
 }

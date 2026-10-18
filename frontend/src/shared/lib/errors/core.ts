@@ -628,6 +628,11 @@ const extractReasonFromMessages = (value: unknown): string | undefined => {
 };
 
 export const resolveErrorReason = (error: any): string | undefined => {
+  // ethers supplies reason="rejected" for denied wallet requests. The explicit
+  // provider code is more precise than that generic reason or a cached decode.
+  const code = getPrimaryErrorCode(error);
+  if (code === "ACTION_REJECTED" || code === 4001) return "USER_REJECTED";
+
   const cachedReason = normalizeReason(error?.__dfDecodedReason);
   if (cachedReason) return cachedReason;
 

@@ -1,4 +1,5 @@
 import {
+  SHIELDED_POOL_PROTOCOL_VERSION,
   computeShieldedCiphertextHashField,
   createLineageTree,
   type LineageTree,
@@ -70,12 +71,20 @@ export async function loadShieldedPoolSnapshot<T>(
   if (!Number.isSafeInteger(toBlock) || toBlock < 0) throw new Error("Invalid shielded scan block");
   const anchor = await provider.getBlock(toBlock);
   if (!anchor?.hash) throw new Error("Shielded pool scan block is unavailable");
-  // Lightweight test doubles have no protocolVersion method. Actual pool
-  // contracts must expose the complete public nullifier count and action ABI.
-  const protocolVersion =
-    typeof pool.protocolVersion === "function"
-      ? Number(await pool.protocolVersion({ blockTag: toBlock }))
-      : undefined;
+  const noteEvent = pool.interface.getEvent("NoteAppended(uint256,uint256,uint256,uint256,bytes)");
+  const spentEvent = pool.interface.getEvent("NullifierSpent(uint256)");
+  const actionEvent = pool.interface.getEvent("ActionExecuted(uint8,uint256,uint256)");
+  if (
+    !noteEvent ||
+    !spentEvent ||
+    !actionEvent ||
+    !pool.interface.getFunction("protocolVersion()") ||
+    !pool.interface.getFunction("nullifierCount()")
+  )
+    throw new Error("Shielded pool recovery ABI is incomplete");
+  const protocolVersion = BigInt(await pool.protocolVersion({ blockTag: toBlock }));
+  if (protocolVersion !== BigInt(SHIELDED_POOL_PROTOCOL_VERSION))
+    throw new Error("Unsupported shielded pool protocol version");
   const previous = options.previous;
   if (previous?.invalidated)
     throw new Error("Shielded pool snapshot is invalid; replay from deployment block");
@@ -95,30 +104,23 @@ export async function loadShieldedPoolSnapshot<T>(
   const blockChunk = Math.max(1, options.blockChunk ?? configured.blockChunk);
   if (!Number.isSafeInteger(fromBlock) || !Number.isSafeInteger(blockChunk))
     throw new Error("Invalid shielded replay block range");
-  const noteEvent = pool.interface.getEvent("NoteAppended");
-  const spentEvent = pool.interface.getEvent("NullifierSpent");
-  const actionEvent = pool.interface.getEvent("ActionExecuted");
-  if (!noteEvent || !spentEvent) throw new Error("Shielded pool ABI is missing public events");
-  if (protocolVersion === 1 && (!actionEvent || typeof pool.nullifierCount !== "function"))
-    throw new Error("Shielded pool recovery ABI is incomplete");
-
   const shards = previous?.shards ?? new Map<bigint, LineageTree>();
   const ownedNotes = previous?.ownedNotes ?? new Map<bigint, OwnedShieldedNote<T>>();
   const spentNullifiers = previous?.spentNullifiers ?? new Set<bigint>();
   let actionBoundary:
-    | { action: number; transactionHash: string; logIndex: number; outputIndex: number }
+    | {
+        action: number;
+        transactionHash: string;
+        blockNumber: number;
+        logIndex: number;
+        outputIndex: number;
+      }
     | undefined;
   try {
     for (let start = fromBlock; start <= toBlock; start += blockChunk) {
       const logs = await provider.getLogs({
         address: poolAddress,
-        topics: [
-          [
-            noteEvent.topicHash,
-            spentEvent.topicHash,
-            ...(actionEvent ? [actionEvent.topicHash] : []),
-          ],
-        ],
+        topics: [[noteEvent.topicHash, spentEvent.topicHash, actionEvent.topicHash]],
         fromBlock: start,
         toBlock: Math.min(toBlock, start + blockChunk - 1),
       });
@@ -127,12 +129,15 @@ export async function loadShieldedPoolSnapshot<T>(
         const parsed = pool.interface.parseLog(log);
         if (!parsed) throw new Error("Unrecognized shielded pool log");
         if (parsed.name === "ActionExecuted") {
+          if (actionBoundary && actionBoundary.outputIndex !== 2)
+            throw new Error("Shielded pool action history is incomplete");
           const action = Number(parsed.args.action);
           if (!Number.isInteger(action) || action < 0 || action > 4 || !log.transactionHash)
             throw new Error("Invalid shielded action boundary");
           actionBoundary = {
             action,
             transactionHash: log.transactionHash,
+            blockNumber: log.blockNumber,
             logIndex: log.index,
             outputIndex: 0,
           };
@@ -145,13 +150,14 @@ export async function loadShieldedPoolSnapshot<T>(
           continue;
         }
         if (parsed.name !== "NoteAppended") throw new Error("Unexpected shielded pool log");
-        const boundary =
-          actionBoundary &&
-          actionBoundary.transactionHash === log.transactionHash &&
-          actionBoundary.outputIndex < 2
-            ? actionBoundary
-            : undefined;
-        if (protocolVersion === 1 && !boundary)
+        const boundary = actionBoundary;
+        if (
+          !boundary ||
+          !log.transactionHash ||
+          boundary.transactionHash !== log.transactionHash ||
+          boundary.blockNumber !== log.blockNumber ||
+          boundary.outputIndex >= 2
+        )
           throw new Error("Shielded pool action history is incomplete");
         const shardId = BigInt(parsed.args.shardId);
         const leafIndex = BigInt(parsed.args.leafIndex);
@@ -184,13 +190,9 @@ export async function loadShieldedPoolSnapshot<T>(
           blockNumber: log.blockNumber,
           logIndex: log.index,
           transactionHash: log.transactionHash,
-          ...(boundary
-            ? {
-                action: boundary.action,
-                actionLogIndex: boundary.logIndex,
-                outputIndex: boundary.outputIndex++,
-              }
-            : {}),
+          action: boundary.action,
+          actionLogIndex: boundary.logIndex,
+          outputIndex: boundary.outputIndex++,
         };
         const opened = await decode(event);
         if (opened) {
@@ -201,6 +203,8 @@ export async function loadShieldedPoolSnapshot<T>(
         }
       }
     }
+    if (actionBoundary && actionBoundary.outputIndex !== 2)
+      throw new Error("Shielded pool action history is incomplete");
 
     const currentShardId = BigInt(await pool.currentShardId({ blockTag: toBlock }));
     if (
@@ -220,7 +224,6 @@ export async function loadShieldedPoolSnapshot<T>(
       }
     }
     if (
-      protocolVersion === 1 &&
       BigInt(await pool.nullifierCount({ blockTag: toBlock })) !== BigInt(spentNullifiers.size)
     )
       throw new Error("Shielded pool nullifier history is incomplete");

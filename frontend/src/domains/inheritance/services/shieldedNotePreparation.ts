@@ -3,10 +3,8 @@ import {
   buildShieldedHpkeAad,
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
-  computeShieldedOwnerCommitment,
   computeShieldedValueNoteCommitment,
   decryptShieldedNote,
-  deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
@@ -18,6 +16,7 @@ import {
 import { getAddress, getBigInt, getBytes, type BigNumberish } from "ethers";
 import type { ShieldedWitness } from "../../../shared/zk/shieldedZk";
 import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
+import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
 
 const ZERO_PERIOD_NULLIFIERS = Array<bigint>(12).fill(0n);
 const MAX_UINT64 = (1n << 64n) - 1n;
@@ -26,9 +25,7 @@ const MAX_UINT128 = (1n << 128n) - 1n;
 type CommonPreparationInput = {
   chainId: BigNumberish;
   poolAddress: string;
-  /** Existing identity secret, derived on this device from the one identity passphrase. */
-  derivedSecretField?: BigNumberish;
-  keyMaterial?: { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string };
+  keyMaterial: ShieldedKeyMaterial;
 };
 
 type PreparedOutput<T> = {
@@ -73,13 +70,7 @@ function context(input: CommonPreparationInput) {
   const chainId = assertUint64(input.chainId, "chainId");
   const poolAddress = getAddress(input.poolAddress);
   buildShieldedHpkeAad({ chainId, poolAddress });
-  if (!input.keyMaterial && input.derivedSecretField === undefined) {
-    throw new Error("Shielding requires an unlocked funds key");
-  }
-  const keys = input.keyMaterial ?? deriveShieldedHeirKeyMaterial(input.derivedSecretField!);
-  if (computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment) {
-    throw new Error("Shield funds key does not match its owner");
-  }
+  const keys = validateShieldedKeyMaterial(input.keyMaterial);
   return { chainId, poolAddress, keys };
 }
 

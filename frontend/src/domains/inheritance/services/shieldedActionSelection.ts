@@ -16,9 +16,6 @@ type PeriodWallet = Pick<
   "spentNullifiers" | "chainId" | "poolAddress"
 >;
 
-export type ShieldedSelectableValueNote = OwnedShieldedNote<
-  Extract<DecodedShieldedNotePayload, { kind: "value" }>
->;
 export type ShieldedSelectableBudgetNote = OwnedShieldedNote<BudgetPayload>;
 
 const MAX_UINT64 = (1n << 64n) - 1n;
@@ -32,70 +29,6 @@ function compareBigInt(a: bigint, b: bigint): number {
 
 function uniqueNotes<T extends Note>(notes: readonly T[]): T[] {
   return [...new Map(notes.map((note) => [note.commitment, note])).values()];
-}
-
-function orderedPair<T extends Note>(a: T, b: T): [T, T] {
-  return a.commitment < b.commitment ? [a, b] : [b, a];
-}
-
-function comparePairs<T extends Note>(a: readonly [T, T], b: readonly [T, T]): number {
-  return (
-    compareBigInt(a[0].commitment, b[0].commitment) ||
-    compareBigInt(a[1].commitment, b[1].commitment)
-  );
-}
-
-/**
- * Choose from locally recovered, unspent notes. Prefer the smallest sufficient
- * single note, then the smallest sufficient two-note total when allowed.
- * Ties use commitment order, independently of the wallet's replay order.
- */
-export function selectValueNotes(
-  notes: readonly Note[],
-  amount: bigint,
-  maxInputs: 1 | 2 = 1,
-): ShieldedSelectableValueNote[] | undefined {
-  if (amount <= 0n || amount > MAX_UINT128) return undefined;
-  const values = uniqueNotes(
-    notes.filter(
-      (note): note is ShieldedSelectableValueNote =>
-        note.note.kind === "value" && note.note.amount > 0n,
-    ),
-  ).sort(
-    (a, b) =>
-      compareBigInt(a.note.amount, b.note.amount) || compareBigInt(a.commitment, b.commitment),
-  );
-  const single = values.find((note) => note.note.amount >= amount);
-  if (single) return [single];
-  if (maxInputs !== 2) return undefined;
-
-  let best: [ShieldedSelectableValueNote, ShieldedSelectableValueNote] | undefined;
-  let bestTotal: bigint | undefined;
-  for (let index = 0; index < values.length - 1; index += 1) {
-    const first = values[index];
-    const needed = amount - first.note.amount;
-    // Find the smallest sufficient partner without an exhaustive pair walk.
-    let low = index + 1;
-    let high = values.length;
-    while (low < high) {
-      const middle = Math.floor((low + high) / 2);
-      if (values[middle].note.amount < needed) low = middle + 1;
-      else high = middle;
-    }
-    const second = values[low];
-    if (!second) continue;
-    const total = first.note.amount + second.note.amount;
-    const pair = orderedPair(first, second);
-    if (
-      bestTotal === undefined ||
-      total < bestTotal ||
-      (total === bestTotal && best && comparePairs(pair, best) < 0)
-    ) {
-      best = pair;
-      bestTotal = total;
-    }
-  }
-  return best;
 }
 
 /** Stable key for budget notes that may fund a single claim together. */

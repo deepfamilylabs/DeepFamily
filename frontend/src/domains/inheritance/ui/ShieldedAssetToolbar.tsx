@@ -9,7 +9,7 @@ export type ShieldedAssetToolbarProps = {
   selectedAddress: string;
   deepTokenAddress: string;
   nativeSymbol: string;
-  importedAssets: readonly (Omit<ShieldedAsset, "decimals"> & { decimals: number | null })[];
+  importedAssets: readonly ShieldedAsset[];
   disabled: boolean;
   onSelect: (address: string) => void;
   importAddress: string;

@@ -46,7 +46,10 @@ vi.mock("../../config", () => ({
 }));
 vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} }) }));
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => null }));
-vi.mock("../../../shared/config/env", () => ({ getShieldedPoolFactoryDeploymentBlock: () => 10 }));
+vi.mock("../../../shared/config/env", () => ({
+  getShieldedPoolFactoryDeploymentBlock: () => 10,
+  getEventScanConfig: () => ({ blockChunk: 10_000 }),
+}));
 vi.mock("../../../shared/workers/cryptoWorkerClient", () => ({ cryptoWorkerCall: mocks.crypto }));
 vi.mock("../../../shared/workers/zkWorkerClient", () => ({ terminateZkWorker: mocks.terminateZk }));
 vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({

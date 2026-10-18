@@ -3,7 +3,6 @@ import { Interface, ZeroAddress, type Contract, type JsonRpcProvider } from "eth
 import { SHIELDED_POOL_PROTOCOL_VERSION } from "@deepfamily/protocol-core";
 import {
   discoverShieldedFactoryPools,
-  readRecoveredShieldedAsset,
   readShieldedAsset,
   resolveShieldedAssetPool,
 } from "./shieldedAssetRegistry";
@@ -18,7 +17,7 @@ vi.mock("../../../shared/clients/contractFactory", () => ({
   createShieldedErc20PoolContract: mocks.erc20,
   createShieldedNativePoolContract: mocks.native,
 }));
-const provider = { getCode: vi.fn(async () => "0x1234") } as unknown as JsonRpcProvider;
+const provider = {} as JsonRpcProvider;
 const factory = {
   poolFor: vi.fn(async () => POOL),
   LINEAGE_INDEX: async () => LINEAGE,
@@ -209,7 +208,7 @@ describe("complete recovery discovery and hostile token isolation", () => {
       allowance: async () => 0n,
     });
     expect(
-      await readRecoveredShieldedAsset(ASSET, provider, "ETH", { blockTag: 10 }),
+      await readShieldedAsset(ASSET, provider, "ETH", { blockTag: 10 }),
     ).toMatchObject({
       decimals: null,
       metadataAvailable: false,
@@ -231,7 +230,7 @@ beforeEach(() => {
 });
 describe("canonical multi-asset discovery", () => {
   it("supports native assets without calling ERC-20 interfaces", async () => {
-    const asset = await readShieldedAsset(ZeroAddress, provider, "CFX");
+    const asset = await readShieldedAsset(ZeroAddress, provider, "CFX", { blockTag: 10 });
     expect(asset).toMatchObject({ kind: "native", symbol: "CFX", decimals: 18, token: null });
     expect(await resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).toMatchObject({
       poolDeploymentBlock: 42,
@@ -248,12 +247,61 @@ describe("canonical multi-asset discovery", () => {
       balanceOf: async () => 0n,
       allowance: async () => 0n,
     });
-    expect(await readShieldedAsset(ASSET, provider, "CFX")).toMatchObject({
+    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
       decimals: 6,
       symbol: "0x1111…1111",
     });
   });
-  it("rejects absent decimals instead of assuming 18", async () => {
+  it("pins every metadata and interoperability read to the selected block", async () => {
+    const token = {
+      decimals: vi.fn(async () => 6n),
+      symbol: vi.fn(async () => "USD"),
+      balanceOf: vi.fn(async () => 0n),
+      allowance: vi.fn(async () => 0n),
+    };
+    mocks.token.mockReturnValue(token);
+    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
+      address: ASSET,
+      kind: "erc20",
+      symbol: "USD",
+      decimals: 6,
+      metadataAvailable: true,
+      interoperabilityAvailable: true,
+    });
+    expect(token.decimals).toHaveBeenCalledExactlyOnceWith({ blockTag: 10 });
+    expect(token.symbol).toHaveBeenCalledExactlyOnceWith({ blockTag: 10 });
+    expect(token.balanceOf).toHaveBeenCalledExactlyOnceWith(ZeroAddress, { blockTag: 10 });
+    expect(token.allowance).toHaveBeenCalledExactlyOnceWith(ZeroAddress, ZeroAddress, {
+      blockTag: 10,
+    });
+  });
+  it.each([0n, 36n])("accepts the supported precision boundary %s", async (decimals) => {
+    mocks.token.mockReturnValue({
+      decimals: async () => decimals,
+      symbol: async () => "USD",
+      balanceOf: async () => 0n,
+      allowance: async () => 0n,
+    });
+    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
+      decimals: Number(decimals),
+      metadataAvailable: true,
+      interoperabilityAvailable: true,
+    });
+  });
+  it.each([-1n, 37n, 6, "6"])("does not infer precision from invalid metadata %s", async (decimals) => {
+    mocks.token.mockReturnValue({
+      decimals: async () => decimals,
+      symbol: async () => "USD",
+      balanceOf: async () => 0n,
+      allowance: async () => 0n,
+    });
+    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
+      decimals: null,
+      metadataAvailable: false,
+      interoperabilityAvailable: true,
+    });
+  });
+  it("preserves a recoverable asset with unknown precision instead of assuming 18", async () => {
     mocks.token.mockReturnValue({
       decimals: async () => {
         throw new Error("no decimals");
@@ -262,11 +310,15 @@ describe("canonical multi-asset discovery", () => {
       balanceOf: async () => 0n,
       allowance: async () => 0n,
     });
-    await expect(readShieldedAsset(ASSET, provider, "CFX")).rejects.toThrow("no decimals");
+    expect(await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 })).toMatchObject({
+      decimals: null,
+      metadataAvailable: false,
+      interoperabilityAvailable: true,
+    });
   });
   it("leaves an unknown asset ready for permissionless creation", async () => {
     vi.mocked(factory.poolFor).mockResolvedValue(ZeroAddress);
-    const asset = await readShieldedAsset(ASSET, provider, "CFX");
+    const asset = await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 });
     expect(await resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).toBeNull();
   });
   it.each([
@@ -277,7 +329,7 @@ describe("canonical multi-asset discovery", () => {
     { VERIFIER: async () => ZeroAddress },
   ])("rejects a pool with mismatching immutable configuration %s", async (changes) => {
     mocks.erc20.mockReturnValue({ ...pool(0n), ...changes });
-    const asset = await readShieldedAsset(ASSET, provider, "CFX");
+    const asset = await readShieldedAsset(ASSET, provider, "CFX", { blockTag: 10 });
     await expect(resolveShieldedAssetPool(factory, asset, provider, LINEAGE)).rejects.toThrow(
       "configuration",
     );

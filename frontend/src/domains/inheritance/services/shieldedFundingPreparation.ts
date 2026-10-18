@@ -39,7 +39,7 @@ import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
-import { resolveShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
@@ -60,8 +60,7 @@ export type SavedTemplate<T> = {
 type CommonFundingInput = {
   pool: Contract;
   wallet: LocalShieldedWalletSnapshot;
-  donorDerivedSecretField?: BigNumberish;
-  keyMaterial?: ShieldedKeyMaterial;
+  keyMaterial: ShieldedKeyMaterial;
   donorCommitment: BigNumberish;
   /** Verified before preparation; its keys receive the new budget. */
   recipient?: VerifiedShieldedRecipient;
@@ -258,10 +257,7 @@ async function currentContext(input: CommonFundingInput) {
     throw new Error("Funding snapshot belongs to another chain or contract");
   }
   assertSnapshotBlock(input.wallet, walletBlock, "Wallet");
-  const keys = resolveShieldedKeyMaterial({
-    keyMaterial: input.keyMaterial,
-    derivedSecretField: input.donorDerivedSecretField,
-  });
+  const keys = validateShieldedKeyMaterial(input.keyMaterial);
   if (input.wallet.walletOwnerCommitment !== keys.ownerCommitment) {
     throw new Error("Donor wallet belongs to another identity");
   }

@@ -2,7 +2,6 @@ import {
   ProtocolError,
   buildShieldedHpkeAad,
   decryptShieldedNote,
-  deriveShieldedHeirKeyMaterial,
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedAllocationKeyCommitment,
@@ -16,7 +15,7 @@ import {
   type ShieldedBudgetRuleOpening,
   type ShieldedPolicyDescriptor,
 } from "@deepfamily/protocol-core";
-import { getBytes, getBigInt, hexlify, type BigNumberish, type Contract } from "ethers";
+import { getBytes, getBytesCopy, getBigInt, hexlify, type BigNumberish, type Contract } from "ethers";
 import {
   loadShieldedPoolSnapshot,
   type OwnedShieldedNote,
@@ -24,31 +23,23 @@ import {
   type ShieldedPoolSnapshot,
 } from "./shieldedPoolChain";
 
-type ShieldedIdentityMaterial = {
-  derivedSecretField: BigNumberish;
-  identityCommitment?: BigNumberish;
-};
-
 export type ShieldedWalletKeyMaterial = {
   ownerSecret: BigNumberish;
   ownerCommitment: BigNumberish;
   hpkeIkm: string | Uint8Array;
-  keyMode?: 0 | 1;
+  keyMode: 0 | 1;
 };
 
-export type ShieldedWalletRecoveryInput =
-  | BigNumberish
-  | ShieldedIdentityMaterial
-  | {
-      keyMaterial: ShieldedWalletKeyMaterial;
-      identityCommitment?: BigNumberish;
-    };
+export type ShieldedWalletRecoveryInput = {
+  keyMaterial: ShieldedWalletKeyMaterial;
+  identityCommitment?: BigNumberish;
+};
 
 export type LocalShieldedWalletSnapshot = ShieldedPoolSnapshot<DecodedShieldedNotePayload> & {
   /** Prevents an incremental scan from reusing notes decrypted for another identity. */
   walletOwnerCommitment: bigint;
   walletIdentityCommitment?: bigint;
-  walletKeyMode?: 0 | 1;
+  walletKeyMode: 0 | 1;
   /** Opened independent budgets whose identity has not yet been authenticated. */
   pendingIdentityBudgets?: Map<bigint, OwnedShieldedNote<DecodedShieldedNotePayload>>;
   /** Donor-readable copies of child budget templates carried by change notes. */
@@ -73,39 +64,25 @@ export type ShieldedWalletRecoveryOptions = {
   previous?: LocalShieldedWalletSnapshot;
 };
 
-function identityFields(input: BigNumberish | ShieldedIdentityMaterial): ShieldedIdentityMaterial {
-  return typeof input === "object" && input !== null && "derivedSecretField" in input
-    ? input
-    : { derivedSecretField: input };
-}
-
-function recoveryMaterial(input: ShieldedWalletRecoveryInput) {
-  if (typeof input === "object" && input !== null && "keyMaterial" in input) {
-    const keys = input.keyMaterial;
-    const ownerSecret = getBigInt(keys.ownerSecret);
-    const ownerCommitment = getBigInt(keys.ownerCommitment);
+function walletKeyMaterial(material: ShieldedWalletKeyMaterial) {
+  try {
+    if (
+      typeof material !== "object" ||
+      material === null ||
+      (material.keyMode !== 0 && material.keyMode !== 1)
+    )
+      throw new Error();
+    const ownerSecret = getBigInt(material.ownerSecret);
+    const ownerCommitment = getBigInt(material.ownerCommitment);
     if (
       computeShieldedOwnerCommitment(ownerSecret) !== ownerCommitment ||
-      getBytes(keys.hpkeIkm).length !== 32 ||
-      (keys.keyMode !== 0 && keys.keyMode !== 1)
+      getBytes(material.hpkeIkm).length !== 32
     )
-      throw new Error("Invalid explicit shielded wallet key material");
-    return {
-      keys: { ...keys, ownerSecret, ownerCommitment },
-      keyMode: keys.keyMode,
-      identityCommitment:
-        input.identityCommitment === undefined ? undefined : getBigInt(input.identityCommitment),
-    };
+      throw new Error();
+    return { ...material, ownerSecret, ownerCommitment };
+  } catch {
+    throw new Error("Invalid explicit shielded wallet key material");
   }
-  const identity = identityFields(input);
-  return {
-    keys: deriveShieldedHeirKeyMaterial(identity.derivedSecretField),
-    keyMode: 0 as const,
-    identityCommitment:
-      identity.identityCommitment === undefined
-        ? undefined
-        : getBigInt(identity.identityCommitment),
-  };
 }
 
 /**
@@ -116,26 +93,27 @@ function recoveryMaterial(input: ShieldedWalletRecoveryInput) {
  */
 export async function recoverLocalShieldedWallet(
   pool: Contract,
-  identity: ShieldedWalletRecoveryInput,
+  input: ShieldedWalletRecoveryInput,
   options: ShieldedWalletRecoveryOptions = {},
 ): Promise<LocalShieldedWalletSnapshot> {
   const provider = pool.runner?.provider;
   if (!provider) throw new Error("Shielded pool has no provider");
-  const {
-    keys,
-    keyMode,
-    identityCommitment: expectedIdentityCommitment,
-  } = recoveryMaterial(identity);
+  if (typeof input !== "object" || input === null || !("keyMaterial" in input))
+    throw new Error("Explicit shielded wallet key material is required");
+  const keys = walletKeyMaterial(input.keyMaterial);
+  const keyMode = keys.keyMode;
+  const expectedIdentityCommitment =
+    input.identityCommitment === undefined ? undefined : getBigInt(input.identityCommitment);
   if (
     options.previous &&
     (options.previous.walletOwnerCommitment !== keys.ownerCommitment ||
       options.previous.walletIdentityCommitment !== expectedIdentityCommitment ||
-      (options.previous.walletKeyMode ?? 0) !== keyMode)
+      options.previous.walletKeyMode !== keyMode)
   ) {
     throw new Error("Shielded wallet snapshot belongs to another identity");
   }
 
-  const hpkeIkm = getBytes(keys.hpkeIkm);
+  const hpkeIkm = getBytesCopy(keys.hpkeIkm);
   const fundingTemplates =
     options.previous?.fundingTemplates ?? new Map<bigint, RecoveredFundingTemplate>();
   const shieldedPolicies =
@@ -323,21 +301,14 @@ export function listRecoveredShieldedPolicies(
 /** Nullifiers are computed only on the device from the holder's secret. */
 export function listUnspentRecoveredShieldedNotes(
   snapshot: LocalShieldedWalletSnapshot,
-  derivedSecretField: BigNumberish | ShieldedWalletKeyMaterial,
+  keyMaterial: ShieldedWalletKeyMaterial,
 ): OwnedShieldedNote<DecodedShieldedNotePayload>[] {
   if (snapshot.invalidated) throw new Error("Shielded pool snapshot is invalid");
-  const keys =
-    typeof derivedSecretField === "object" &&
-    derivedSecretField !== null &&
-    "ownerSecret" in derivedSecretField
-      ? {
-          ownerSecret: getBigInt(derivedSecretField.ownerSecret),
-          ownerCommitment: getBigInt(derivedSecretField.ownerCommitment),
-        }
-      : deriveShieldedHeirKeyMaterial(derivedSecretField);
-  if (computeShieldedOwnerCommitment(keys.ownerSecret) !== keys.ownerCommitment)
-    throw new Error("Invalid shielded wallet owner material");
-  if (keys.ownerCommitment !== snapshot.walletOwnerCommitment) {
+  const keys = walletKeyMaterial(keyMaterial);
+  if (
+    keys.ownerCommitment !== snapshot.walletOwnerCommitment ||
+    keys.keyMode !== snapshot.walletKeyMode
+  ) {
     throw new Error("Shielded wallet snapshot belongs to another identity");
   }
   return [...snapshot.ownedNotes.values()].filter(

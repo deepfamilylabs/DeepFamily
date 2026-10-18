@@ -7,9 +7,9 @@ import {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
   ShieldedAssetToolbar,
-  readRecoveredShieldedAsset,
+  readShieldedAsset,
   resolveShieldedAssetPool,
-  type RecoveredShieldedAsset,
+  type ShieldedAsset,
   type ShieldedPageModules,
   type ShieldedPanelNavigation,
 } from "../domains/inheritance";
@@ -25,21 +25,37 @@ import { getAddress, ZeroAddress } from "ethers";
 import { SUPPORTED_NETWORKS } from "../shared/config/networks";
 import { EmptyState, PageHead } from "../shared/ui";
 
+type PageError =
+  | {
+      key:
+        | "shielded.configurationMissing"
+        | "shielded.configurationMismatch"
+        | "shielded.unreachable"
+        | "shielded.walletChanged"
+        | "shielded.transactionFailed";
+      values?: { hash: string };
+    }
+  | { message: string };
+
 type ModulesState =
   | { status: "loading" }
-  | { status: "unavailable"; message: string }
-  | { status: "missingPool"; asset: RecoveredShieldedAsset }
+  | { status: "unavailable"; error: PageError }
+  | { status: "missingPool"; asset: ShieldedAsset }
   | { status: "ready"; modules: ShieldedPageModules };
 
 function sameAddress(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
+function pageError(error: unknown): PageError {
+  return error instanceof Error
+    ? { message: error.message }
+    : { key: "shielded.unreachable" };
+}
+
 const INITIAL_NAVIGATION: ShieldedPanelNavigation = {
   slot: "identity",
   action: "shield",
-  walletAction: "shield",
-  receiveSlot: "identity",
   taskChosen: false,
 };
 
@@ -62,6 +78,8 @@ function InheritanceContent() {
   const config = useConfig();
   const wallet = useWallet();
   const { busy: sessionBusy, identity } = useShieldedPageIdentitySession();
+  const currentSessionBusy = useRef(sessionBusy);
+  currentSessionBusy.current = sessionBusy;
   const factoryAddress = getShieldedPoolFactoryAddress(config.chainId);
   const [selectedAssetAddress, setSelectedAddress] = useState(config.tokenAddress);
   // Each pool remounts its panel; public navigation carries the current task across.
@@ -79,10 +97,10 @@ function InheritanceContent() {
   }
   const selectedAddress = selectedAssetAddress;
   const [importAddress, setImportAddress] = useState("");
-  const [importedAssets, setImportedAssets] = useState<RecoveredShieldedAsset[]>([]);
+  const [importedAssets, setImportedAssets] = useState<ShieldedAsset[]>([]);
   const [creatingPool, setCreatingPool] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [assetError, setAssetError] = useState("");
+  const [assetError, setAssetError] = useState<PageError | null>(null);
   const [revision, setRevision] = useState(0);
   const nativeSymbol = SUPPORTED_NETWORKS[config.chainId]?.nativeCurrency.symbol ?? "Native";
   useEffect(() => {
@@ -90,11 +108,8 @@ function InheritanceContent() {
     setImportedAssets([]);
     setImportAddress("");
     setImporting(false);
-    setAssetError("");
+    setAssetError(null);
   }, [config.chainId, config.tokenAddress, factoryAddress]);
-  const configurationMissing = t("shielded.configurationMissing");
-  const configurationMismatch = t("shielded.configurationMismatch");
-  const unreachable = t("shielded.unreachable");
   const [state, setState] = useState<ModulesState>({ status: "loading" });
   const assetContext = `${config.chainId}:${factoryAddress}`;
   const currentAssetContext = useRef(assetContext);
@@ -127,7 +142,7 @@ function InheritanceContent() {
 
   useEffect(() => {
     if (!config.rpcUrl || !config.contractAddress || !config.tokenAddress || !factoryAddress) {
-      setState({ status: "unavailable", message: configurationMissing });
+      setState({ status: "unavailable", error: { key: "shielded.configurationMissing" } });
       return;
     }
     let cancelled = false;
@@ -141,13 +156,15 @@ function InheritanceContent() {
         provider.getNetwork(),
         deepFamily.lineageIndex() as Promise<string>,
         factory.DEEP_TOKEN() as Promise<string>,
-        readRecoveredShieldedAsset(selectedAddress, provider, nativeSymbol, { blockTag: toBlock }),
+        readShieldedAsset(selectedAddress, provider, nativeSymbol, { blockTag: toBlock }),
       ]);
       if (
         network.chainId !== BigInt(config.chainId) ||
         !sameAddress(deepToken, config.tokenAddress)
       ) {
-        throw new Error(configurationMismatch);
+        if (!cancelled)
+          setState({ status: "unavailable", error: { key: "shielded.configurationMismatch" } });
+        return;
       }
       const resolved = await resolveShieldedAssetPool(factory, asset, provider, familyIndex, {
         blockTag: toBlock,
@@ -182,7 +199,7 @@ function InheritanceContent() {
       if (!cancelled) {
         setState({
           status: "unavailable",
-          message: error instanceof Error ? error.message : unreachable,
+          error: pageError(error),
         });
       }
     });
@@ -198,9 +215,6 @@ function InheritanceContent() {
     selectedAddress,
     nativeSymbol,
     revision,
-    configurationMissing,
-    configurationMismatch,
-    unreachable,
   ]);
 
   const wrongNetwork = useMemo(
@@ -208,13 +222,13 @@ function InheritanceContent() {
     [config.chainId, wallet.chainId],
   );
   const importAsset = async () => {
-    if (importing) return;
+    if (importing || sessionBusy) return;
     setImporting(true);
-    setAssetError("");
+    setAssetError(null);
     const importingContext = assetContext;
     try {
       const provider = getReadonlyProvider(config.rpcUrl, config.chainId);
-      const asset = await readRecoveredShieldedAsset(
+      const asset = await readShieldedAsset(
         getAddress(importAddress.trim()),
         provider,
         nativeSymbol,
@@ -226,11 +240,13 @@ function InheritanceContent() {
           ? assets
           : [...assets, asset],
       );
-      setSelectedAddress(asset.address);
+      // An operation may start while metadata loads. Keep its pool and draft;
+      // the imported asset remains available for explicit selection afterward.
+      if (!currentSessionBusy.current) setSelectedAddress(asset.address);
       setImportAddress("");
     } catch (error) {
       if (mounted.current && currentAssetContext.current === importingContext)
-        setAssetError(error instanceof Error ? error.message : unreachable);
+        setAssetError(pageError(error));
     } finally {
       if (mounted.current && currentAssetContext.current === importingContext) setImporting(false);
     }
@@ -249,7 +265,7 @@ function InheritanceContent() {
       currentPoolOperation.current.signer === signer &&
       currentPoolOperation.current.account === context.account;
     setCreatingPool(true);
-    setAssetError("");
+    setAssetError(null);
     try {
       const [network, signerAddress] = await Promise.all([
         signer.provider?.getNetwork(),
@@ -261,21 +277,27 @@ function InheritanceContent() {
         !context.account ||
         !sameAddress(signerAddress, context.account)
       ) {
-        throw new Error(t("shielded.walletChanged"));
+        if (isCurrent()) setAssetError({ key: "shielded.walletChanged" });
+        return;
       }
       const factory = createShieldedPoolFactoryContract(factoryAddress, signer);
       const tx = await factory.createPool(asset.address);
       const receipt = await tx.wait();
-      if (receipt?.status !== 1)
-        throw new Error(t("shielded.transactionFailed", { hash: tx.hash }));
+      if (receipt?.status !== 1) {
+        if (isCurrent())
+          setAssetError({ key: "shielded.transactionFailed", values: { hash: tx.hash } });
+        return;
+      }
       // Re-read the canonical mapping after confirmation, including a concurrent creation.
       if (isCurrent()) setRevision((value) => value + 1);
     } catch (error) {
-      if (isCurrent()) setAssetError(error instanceof Error ? error.message : unreachable);
+      if (isCurrent()) setAssetError(pageError(error));
     } finally {
       if (isCurrent()) setCreatingPool(false);
     }
   };
+  const errorMessage = (error: PageError) =>
+    "message" in error ? error.message : t(error.key, error.values);
   const head = <PageHead title={t("shielded.title")} />;
   const readyModules =
     state.status === "ready" &&
@@ -299,7 +321,7 @@ function InheritanceContent() {
         onImport={() => void importAsset()}
         onSelect={(address) => {
           setSelectedAddress(address);
-          setAssetError("");
+          setAssetError(null);
         }}
       />
       {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
@@ -335,7 +357,7 @@ function InheritanceContent() {
       ) : null}
       {assetError ? (
         <p role="alert" className="text-sm text-danger">
-          {assetError}
+          {errorMessage(assetError)}
         </p>
       ) : null}
       {state.status === "missingPool" ? (
@@ -357,7 +379,7 @@ function InheritanceContent() {
           role="alert"
           className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
         >
-          {state.message}
+          {errorMessage(state.error)}
         </p>
       ) : null}
       {wrongNetwork ? (
