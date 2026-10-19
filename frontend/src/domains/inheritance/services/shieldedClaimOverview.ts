@@ -32,6 +32,10 @@ export type ShieldedClaimOverview = {
   };
   /** Earliest future unpaid period that the available budgets can still fund. */
   nextDueAt?: bigint;
+  /** Index of the period due at nextDueAt, for a single funding schedule. */
+  nextPeriodIndex?: bigint;
+  /** Funded periods from nextPeriodIndex on, after every due unpaid period is paid. */
+  futurePeriods?: bigint;
   /** A capped search left the future schedule or automatic selection unknown. */
   scanLimited: boolean;
 };
@@ -113,7 +117,7 @@ function futureFundedPeriod(
   wallet: PeriodWallet,
   derivedSecretField: BigNumberish,
   now: bigint,
-): { nextDueAt?: bigint; scanLimited: boolean } {
+): { nextDueAt?: bigint; nextPeriodIndex?: bigint; futurePeriods?: bigint; scanLimited: boolean } {
   const elapsed = now - funding.eligibleFrom;
   const periodSeconds = funding.periodDays * SECONDS_PER_DAY;
   const dueCount = elapsed > 0n ? elapsed / periodSeconds : 0n;
@@ -136,7 +140,13 @@ function futureFundedPeriod(
       wallet,
     );
     if (wallet.spentNullifiers.has(nullifier)) continue;
-    if (dueAt > now) return { nextDueAt: dueAt, scanLimited: false };
+    if (dueAt > now)
+      return {
+        nextDueAt: dueAt,
+        nextPeriodIndex: index,
+        futurePeriods: funding.fundedPeriods - unpaidDuePeriods,
+        scanLimited: false,
+      };
     unpaidDuePeriods += 1n;
     if (unpaidDuePeriods >= funding.fundedPeriods) return { scanLimited: false };
   }
@@ -193,6 +203,7 @@ export function getShieldedClaimOverview(
   }
 
   let nextDueAt: bigint | undefined;
+  let schedule: { nextPeriodIndex?: bigint; futurePeriods?: bigint } = {};
   let scanLimited = false;
   for (const funding of policies.values()) {
     // Distinct initial enrollments under one policy can start on different
@@ -209,16 +220,20 @@ export function getShieldedClaimOverview(
       (nextDueAt === undefined || future.nextDueAt < nextDueAt)
     ) {
       nextDueAt = future.nextDueAt;
+      schedule = { nextPeriodIndex: future.nextPeriodIndex, futurePeriods: future.futurePeriods };
     }
   }
   // A different capped policy may have an earlier future slot. Keep the date
   // unknown instead of presenting a partial result as the earliest date.
   if (scanLimited) nextDueAt = undefined;
+  // Periods of different schedules interleave; only a single schedule lists its own.
+  const single = nextDueAt !== undefined && policies.size === 1;
   return {
     status: claim ? "claimable" : scanLimited ? "scanLimited" : "notDue",
     totalRemaining,
     claim,
     nextDueAt,
+    ...(single ? schedule : {}),
     scanLimited,
   };
 }

@@ -1,20 +1,21 @@
-import { useId, type ReactNode, type RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { formatUnits } from "ethers";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { formatShieldedAmount } from "../model/shieldedDisplay";
 import {
   ShieldedRecipientCredentialsForm,
   type ShieldedRecipientCredentialsFormHandle,
 } from "./ShieldedRecipientCredentialsForm";
 import {
+  CHOICE_INPUT,
+  FIELD_BASE,
+  FIELD_INPUT,
+  FIELD_TEXTAREA,
   FieldBlock,
   PanelButton,
-  PanelShell,
-  WarningNotice,
-  radioOptionClassName,
+  TaskHeader,
+  choiceCardClass,
 } from "./inheritanceControls";
-
-const INPUT_CLASS =
-  "h-12 w-full rounded-xl border border-hairline bg-surface-alt px-3.5 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/20";
 
 export type ShieldedWalletAction = "shield" | "privateTransfer" | "unshield";
 export type ShieldedRecipientInputMethod = "receiveCode" | "credentials";
@@ -25,10 +26,13 @@ export interface ShieldedRecipientInputProps {
   onMethodChange: (method: ShieldedRecipientInputMethod) => void;
   code: string;
   codeHint?: string;
+  codeError?: string;
   onCodeChange: (value: string) => void;
   credentialsFormRef: RefObject<ShieldedRecipientCredentialsFormHandle>;
   onGenerateCode: () => void;
   busy: boolean;
+  /** Shown under the code once it verifies, such as the recipient it belongs to. */
+  verification?: ReactNode;
 }
 
 /** Recipient by receive code, or by complete identity credentials that generate one locally. */
@@ -37,30 +41,32 @@ export function ShieldedRecipientInput({
   onMethodChange,
   code,
   codeHint,
+  codeError,
   onCodeChange,
   credentialsFormRef,
   onGenerateCode,
   busy,
+  verification,
 }: ShieldedRecipientInputProps) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-3">
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium text-ink">
+    <div className="min-w-0 space-y-4">
+      <fieldset className="min-w-0 space-y-2" disabled={busy}>
+        <legend className="mb-2 text-[13px] font-medium text-ink/80">
           {t("shielded.recipientMethodLabel")}
         </legend>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           {(["receiveCode", "credentials"] as const).map((option) => (
             <label
               key={option}
-              className={`${radioOptionClassName(method === option, busy)} text-ink`}
+              className={`flex min-h-10 items-center gap-2 px-3 text-[13px] text-ink ${choiceCardClass(method === option, busy)}`}
             >
               <input
                 type="radio"
                 name="shielded-recipient-method"
                 value={option}
+                className={CHOICE_INPUT}
                 checked={method === option}
-                disabled={busy}
                 onChange={() => onMethodChange(option)}
               />
               {t(`shielded.recipientMethods.${option}`)}
@@ -68,18 +74,15 @@ export function ShieldedRecipientInput({
           ))}
         </div>
       </fieldset>
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy} className="min-w-0">
         {method === "receiveCode" ? (
-          <FieldBlock label={t("shielded.receiveCodeInputLabel")} hint={codeHint}>
-            <textarea
-              aria-label={t("shielded.receiveCodeInputLabel")}
-              className={`${INPUT_CLASS} h-auto min-h-20 break-all py-2 font-mono text-xs`}
-              value={code}
-              onChange={(event) => onCodeChange(event.target.value)}
-              spellCheck={false}
-              rows={3}
-            />
-          </FieldBlock>
+          <ShieldedReceiveCodeInput
+            code={code}
+            hint={codeHint}
+            error={codeError}
+            onChange={onCodeChange}
+            verification={verification}
+          />
         ) : (
           <div className="space-y-3">
             <ShieldedRecipientCredentialsForm ref={credentialsFormRef} />
@@ -93,12 +96,69 @@ export function ShieldedRecipientInput({
   );
 }
 
-/** Public balance summaries replace note openings without changing the balance picker. */
+/** The recipient's receive code, with its verification and its hint on one line beneath. */
+export function ShieldedReceiveCodeInput({
+  code,
+  hint,
+  error,
+  onChange,
+  verification,
+  disabled,
+}: {
+  code: string;
+  hint?: string;
+  error?: string;
+  onChange: (value: string) => void;
+  verification?: ReactNode;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="min-w-0 space-y-2">
+      <FieldBlock label={t("shielded.receiveCodeInputLabel")}>
+        <textarea
+          aria-label={t("shielded.receiveCodeInputLabel")}
+          className={`${FIELD_TEXTAREA} min-h-20`}
+          value={code}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          spellCheck={false}
+          rows={3}
+        />
+      </FieldBlock>
+      {error ? (
+        <p role="alert" className="break-words text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+      {verification || hint ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {verification}
+          {hint ? <span className="text-xs text-ink-muted">{hint}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A verified recipient chip: the check and the colour both say it matched. */
+export function ShieldedRecipientChip({ children }: { children: ReactNode }) {
+  return (
+    <span
+      role="status"
+      className="inline-flex min-w-0 items-center gap-1.5 break-all rounded-full border border-success/30 bg-success/5 py-1 pl-2 pr-2.5 text-[13px] font-medium text-ink"
+    >
+      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
+
+/** Permitted balances for a spend; the Worker plan decides what is actually used. */
 export function ShieldedValueNotePicker({
   notes,
   selectedCommitments,
   onChange,
-  maxInputs,
   decimals,
   symbol,
   busy,
@@ -106,14 +166,11 @@ export function ShieldedValueNotePicker({
   notes: readonly ShieldedValueBalance[];
   selectedCommitments: readonly string[];
   onChange: (commitments: string[]) => void;
-  maxInputs?: number;
   decimals: number;
   symbol: string;
   busy: boolean;
 }) {
   const { t } = useTranslation();
-  const radioGroupName = useId();
-  const singleChoice = maxInputs === 1;
   const values = notes.filter((item) => BigInt(item.amount) > 0n);
   const missing = selectedCommitments.filter(
     (commitment) => !values.some((item) => item.commitment === commitment),
@@ -124,106 +181,78 @@ export function ShieldedValueNotePicker({
     0n,
   );
   const toggle = (commitment: string, checked: boolean) => {
-    if (singleChoice && checked) onChange([commitment]);
-    else if (!checked) onChange(selectedCommitments.filter((value) => value !== commitment));
-    else if (
-      (maxInputs === undefined || selectedCommitments.length < maxInputs) &&
-      !selectedCommitments.includes(commitment)
-    )
+    if (!checked) onChange(selectedCommitments.filter((value) => value !== commitment));
+    else if (!selectedCommitments.includes(commitment))
       onChange([...selectedCommitments, commitment]);
   };
   return (
-    <fieldset
-      disabled={busy}
-      role={singleChoice ? "radiogroup" : undefined}
-      className="min-w-0 space-y-3"
-    >
-      <legend className="text-sm font-medium text-ink">
-        {t(singleChoice ? "shielded.fields.valueNote" : "shielded.fields.valueCandidates", { symbol })}
+    <fieldset disabled={busy} className="min-w-0 space-y-2.5">
+      <legend className="mb-1 text-[13px] font-medium text-ink/80">
+        {t("shielded.fields.valueCandidates", { symbol })}
       </legend>
-      <p className="text-xs text-ink-muted">
-        {singleChoice
-          ? t("shielded.singleValueSelectionHint", { symbol })
-          : t("shielded.walletKeys.valueCandidatesHint", { symbol })}
+      <p className="text-xs leading-relaxed text-ink-muted">
+        {t("shielded.walletKeys.valueCandidatesHint", { symbol })}
       </p>
       {values.length === 0 && missing.length === 0 ? (
-        <p className="text-sm text-ink-muted">{t("shielded.noRecoveredNote", { symbol })}</p>
+        <p className="rounded-xl bg-surface-alt px-3.5 py-3 text-sm text-ink-muted">
+          {t("shielded.noRecoveredNote", { symbol })}
+        </p>
       ) : null}
-      {values.map((item, index) => {
-        const commitment = item.commitment;
-        const checked = selectedCommitments.includes(commitment);
-        return (
-          <label
-            key={commitment}
-            className={
-              singleChoice
-                ? `${radioOptionClassName(checked, busy)} text-ink`
-                : "flex items-center gap-3 text-sm text-ink"
-            }
-          >
-            <input
-              type={singleChoice ? "radio" : "checkbox"}
-              name={singleChoice ? radioGroupName : undefined}
-              value={commitment}
-              className="shrink-0"
-              checked={checked}
-              disabled={
-                !singleChoice &&
-                !checked &&
-                maxInputs !== undefined &&
-                selectedCommitments.length >= maxInputs
-              }
-              onChange={(event) => toggle(commitment, event.target.checked)}
-            />
-            <span className="min-w-0 break-words">
-              {t("shielded.valueOption", {
-                symbol,
-                index: index + 1,
-                amount: formatUnits(BigInt(item.amount), decimals),
-              })}
-            </span>
-          </label>
-        );
-      })}
-      {missing.map((commitment) =>
-        singleChoice ? (
-          <div key={commitment} className={`${radioOptionClassName(true, busy)} text-danger`}>
-            <input
-              type="radio"
-              name={radioGroupName}
-              value={commitment}
-              checked
-              disabled
-              aria-label={t("shielded.singleSelectedValueUnavailable", { symbol })}
-              className="shrink-0"
-            />
-            <span className="min-w-0 flex-1 break-words">
-              {t("shielded.singleSelectedValueUnavailable", { symbol })}
-            </span>
-            <button
-              type="button"
-              disabled={busy}
-              className="shrink-0 text-primary hover:underline"
-              onClick={() => onChange([])}
+      {values.length > 0 || missing.length > 0 ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(9.5rem,100%),1fr))] gap-1.5">
+          {values.map((item, index) => {
+            const checked = selectedCommitments.includes(item.commitment);
+            return (
+              <label
+                key={item.commitment}
+                className={`flex min-h-11 items-center gap-2 rounded-[10px] border px-2.5 py-1.5 text-xs leading-snug text-ink ${
+                  checked
+                    ? "border-orange-300 bg-orange-50 dark:border-orange-400/50 dark:bg-orange-400/10"
+                    : "border-hairline bg-surface-alt"
+                } ${busy ? "cursor-default" : "cursor-pointer"}`}
+              >
+                <input
+                  type="checkbox"
+                  value={item.commitment}
+                  className={`${CHOICE_INPUT} rounded`}
+                  checked={checked}
+                  onChange={(event) => toggle(item.commitment, event.target.checked)}
+                />
+                <span className="min-w-0 break-words">
+                  {t("shielded.valueOption", {
+                    symbol,
+                    index: index + 1,
+                    amount: formatShieldedAmount(item.amount, decimals),
+                  })}
+                </span>
+              </label>
+            );
+          })}
+          {missing.map((commitment) => (
+            <label
+              key={commitment}
+              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[10px] border border-danger/30 bg-danger/5 px-2.5 py-1.5 text-xs text-danger"
             >
-              {t("shielded.clearValueSelection", { symbol })}
-            </button>
-          </div>
-        ) : (
-          <label key={commitment} className="flex items-center gap-3 text-sm text-danger">
-            <input type="checkbox" checked onChange={() => toggle(commitment, false)} />
-            <span>{t("shielded.selectedValueUnavailable", { symbol })}</span>
-          </label>
-        ),
-      )}
+              <input
+                type="checkbox"
+                className={`${CHOICE_INPUT} rounded`}
+                checked
+                onChange={() => toggle(commitment, false)}
+              />
+              <span className="min-w-0 break-words">
+                {t("shielded.selectedValueUnavailable", { symbol })}
+              </span>
+            </label>
+          ))}
+        </div>
+      ) : null}
       {selectedCommitments.length > 0 && missing.length === 0 ? (
         <p aria-live="polite" className="break-words text-xs text-ink-muted">
-          {t(
-            singleChoice
-              ? "shielded.singleValueSelectionSummary"
-              : "shielded.valueSelectionSummary",
-            { symbol, count: selectedCommitments.length, amount: formatUnits(total, decimals) },
-          )}
+          {t("shielded.valueSelectionSummary", {
+            symbol,
+            count: selectedCommitments.length,
+            amount: formatShieldedAmount(total, decimals),
+          })}
         </p>
       ) : null}
     </fieldset>
@@ -231,16 +260,18 @@ export function ShieldedValueNotePicker({
 }
 
 export interface ShieldedWalletActionsProps {
-  embedded?: boolean;
+  titleId: string;
   action: ShieldedWalletAction;
   symbol: string;
   decimals: number;
   busy: boolean;
   amount: string;
   onAmountChange: (value: string) => void;
-  recipient: Omit<ShieldedRecipientInputProps, "busy"> & {
+  recipient: Omit<ShieldedRecipientInputProps, "busy" | "verification" | "codeHint"> & {
     targetHash?: string;
     targetName?: string;
+    /** The receive code's proof has been checked. */
+    verified: boolean;
     needsConfirmation: boolean;
     confirmed: boolean;
     onConfirmedChange: (value: boolean) => void;
@@ -250,18 +281,11 @@ export interface ShieldedWalletActionsProps {
   values: readonly ShieldedValueBalance[];
   selectedCommitments: readonly string[];
   onSelectedCommitmentsChange: (commitments: string[]) => void;
-  signerReady: boolean;
-  /** An ERC20 deposit first approves the amount, then offers deposit confirmation. */
-  approvalRequired?: boolean;
-  submitDisabled?: boolean;
-  reviewing?: boolean;
-  onSubmit: () => void;
-  feedback?: ReactNode;
 }
 
-/** Deposit, private transfer and withdrawal forms for the selected funds. */
+/** Deposit, private transfer and withdrawal forms; the receipt beside them confirms. */
 export function ShieldedWalletActions({
-  embedded = false,
+  titleId,
   action,
   symbol,
   decimals,
@@ -274,155 +298,121 @@ export function ShieldedWalletActions({
   values,
   selectedCommitments,
   onSelectedCommitmentsChange,
-  signerReady,
-  approvalRequired = false,
-  submitDisabled = false,
-  reviewing = false,
-  onSubmit,
-  feedback,
 }: ShieldedWalletActionsProps) {
   const { t } = useTranslation();
-  const withdrawalSelectionAvailable =
-    selectedCommitments.length > 0 &&
-    selectedCommitments.every((commitment) =>
-      values.some((note) => note.commitment === commitment && BigInt(note.amount) > 0n),
-    );
+  const amountField = (label: string) => (
+    <div className="max-w-xs">
+      <FieldBlock label={label}>
+        <input
+          aria-label={label}
+          className={FIELD_INPUT}
+          inputMode="decimal"
+          disabled={busy}
+          value={amount}
+          onChange={(event) => onAmountChange(event.target.value)}
+          placeholder={action === "shield" ? "100" : undefined}
+        />
+      </FieldBlock>
+    </div>
+  );
   const recipientNeedsConfirmation = action === "privateTransfer" && recipient.needsConfirmation;
-  return (
-    <PanelShell
-      embedded={embedded}
-      title={t(`shielded.actionTitles.${action}`, { symbol })}
-    >
-      {action === "shield" ? (
-        <FieldBlock label={t("shielded.fields.amount", { symbol })}>
-          <input
-            aria-label={t("shielded.fields.amount", { symbol })}
-            className={INPUT_CLASS}
-            inputMode="decimal"
-            disabled={busy}
-            value={amount}
-            onChange={(event) => onAmountChange(event.target.value)}
-            placeholder="100"
-          />
-        </FieldBlock>
-      ) : null}
-
-      {action === "privateTransfer" ? (
-        <>
-          <ShieldedRecipientInput {...recipient} busy={busy} />
-          {recipient.method === "receiveCode" && recipient.targetHash ? (
-            <div className="space-y-2 break-all rounded-xl bg-surface-alt p-3 text-sm text-ink">
-              <p>
-                {t("shielded.recipientTarget", {
-                  symbol,
-                  identity: recipient.targetName ?? recipient.targetHash,
-                })}
-                {recipient.targetName ? (
-                  <span className="mt-1 block font-mono text-xs text-ink-muted">
-                    {recipient.targetHash}
-                  </span>
-                ) : null}
-              </p>
-              {recipientNeedsConfirmation ? (
-                <>
-                  <p className="text-xs text-warning">
-                    {t("shielded.recipientTargetUnverified", { symbol })}
-                  </p>
-                  <label className="flex items-start gap-3 break-normal">
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={recipient.confirmed}
-                      disabled={busy}
-                      onChange={(event) => recipient.onConfirmedChange(event.target.checked)}
-                    />
-                    <span>{t("shielded.recipientConfirm", { symbol })}</span>
-                  </label>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-          <FieldBlock label={t("shielded.fields.transferAmount", { symbol })}>
-            <input
-              aria-label={t("shielded.fields.transferAmount", { symbol })}
-              className={INPUT_CLASS}
-              inputMode="decimal"
-              disabled={busy}
-              value={amount}
-              onChange={(event) => onAmountChange(event.target.value)}
-            />
-          </FieldBlock>
-          <ShieldedValueNotePicker
-            notes={values}
-            selectedCommitments={selectedCommitments}
-            onChange={onSelectedCommitmentsChange}
-            decimals={decimals}
-            symbol={symbol}
-            busy={busy}
-          />
-        </>
-      ) : null}
-
-      {action === "unshield" ? (
-        <>
-          <FieldBlock label={t("shielded.fields.amount", { symbol })}>
-            <input
-              aria-label={t("shielded.fields.amount", { symbol })}
-              className={INPUT_CLASS}
-              inputMode="decimal"
-              disabled={busy}
-              value={amount}
-              onChange={(event) => onAmountChange(event.target.value)}
-            />
-          </FieldBlock>
-          <FieldBlock label={t("shielded.fields.exitRecipient", { symbol })}>
-            <input
-              aria-label={t("shielded.fields.exitRecipient", { symbol })}
-              className={INPUT_CLASS}
-              disabled={busy}
-              value={withdrawalRecipient}
-              onChange={(event) => onWithdrawalRecipientChange(event.target.value)}
-              placeholder="0x…"
-            />
-          </FieldBlock>
-          <ShieldedValueNotePicker
-            notes={values}
-            selectedCommitments={selectedCommitments}
-            onChange={onSelectedCommitmentsChange}
-            decimals={decimals}
-            symbol={symbol}
-            busy={busy}
-          />
-        </>
-      ) : null}
-
-      {!signerReady ? (
-        <WarningNotice>{t("shielded.walletNotReady", { symbol })}</WarningNotice>
-      ) : null}
-      {!reviewing ? (
-        <PanelButton
-          variant="primary"
-          className="w-full sm:w-auto sm:min-w-36"
-          busy={busy}
-          disabled={
-            busy ||
-            submitDisabled ||
-            !signerReady ||
-            (recipientNeedsConfirmation && !recipient.confirmed) ||
-            (action === "privateTransfer" && selectedCommitments.length === 0) ||
-            (action === "unshield" && !withdrawalSelectionAvailable)
-          }
-          onClick={onSubmit}
+  const target =
+    action === "privateTransfer" && recipient.method === "receiveCode" && recipient.targetHash ? (
+      recipient.verified && recipient.targetName ? (
+        <div
+          role="status"
+          className="space-y-1 rounded-xl border border-success/30 bg-success/5 px-3.5 py-3 text-sm text-ink"
         >
-          {action === "shield" && approvalRequired
-            ? t("shielded.walletKeys.approve")
-            : t(action === "shield" ? "shielded.submit" : "shielded.spendReview.preview", {
-                symbol,
-                action: t(`shielded.actions.${action}`, { symbol }),
-              })}
-        </PanelButton>
-      ) : null}
-      {feedback}
-    </PanelShell>
+          <p className="flex items-center gap-1.5 font-semibold">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+            {t("shielded.recipientTarget", { symbol, identity: recipient.targetName })}
+          </p>
+          <p className="break-all font-mono text-xs text-ink-muted">{recipient.targetHash}</p>
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-xl bg-surface-alt px-3.5 py-3 text-sm text-ink">
+          <p className="break-all">
+            {t("shielded.recipientTarget", {
+              symbol,
+              identity: recipient.targetName ?? recipient.targetHash,
+            })}
+            {recipient.targetName ? (
+              <span className="mt-1 block font-mono text-xs text-ink-muted">
+                {recipient.targetHash}
+              </span>
+            ) : null}
+          </p>
+          {recipientNeedsConfirmation ? (
+            <>
+              <p className="flex items-start gap-1.5 text-xs text-warning">
+                <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {t("shielded.recipientTargetUnverified", { symbol })}
+              </p>
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  className={`${CHOICE_INPUT} mt-0.5 rounded`}
+                  checked={recipient.confirmed}
+                  disabled={busy}
+                  onChange={(event) => recipient.onConfirmedChange(event.target.checked)}
+                />
+                <span>{t("shielded.recipientConfirm", { symbol })}</span>
+              </label>
+            </>
+          ) : null}
+        </div>
+      )
+    ) : null;
+
+  return (
+    <>
+      <TaskHeader id={titleId} title={t(`shielded.actionTitles.${action}`, { symbol })} />
+      <div className="mt-6 min-w-0 space-y-6">
+        {action === "shield" ? amountField(t("shielded.fields.amount", { symbol })) : null}
+
+        {action === "privateTransfer" ? (
+          <>
+            <div className="space-y-3">
+              <ShieldedRecipientInput {...recipient} busy={busy} />
+              {target}
+            </div>
+            {amountField(t("shielded.fields.transferAmount", { symbol }))}
+            <ShieldedValueNotePicker
+              notes={values}
+              selectedCommitments={selectedCommitments}
+              onChange={onSelectedCommitmentsChange}
+              decimals={decimals}
+              symbol={symbol}
+              busy={busy}
+            />
+          </>
+        ) : null}
+
+        {action === "unshield" ? (
+          <>
+            {amountField(t("shielded.fields.amount", { symbol }))}
+            <FieldBlock label={t("shielded.fields.exitRecipient", { symbol })}>
+              <input
+                aria-label={t("shielded.fields.exitRecipient", { symbol })}
+                className={`${FIELD_BASE} font-mono text-sm`}
+                disabled={busy}
+                value={withdrawalRecipient}
+                onChange={(event) => onWithdrawalRecipientChange(event.target.value)}
+                placeholder="0x…"
+                spellCheck={false}
+              />
+            </FieldBlock>
+            <ShieldedValueNotePicker
+              notes={values}
+              selectedCommitments={selectedCommitments}
+              onChange={onSelectedCommitmentsChange}
+              decimals={decimals}
+              symbol={symbol}
+              busy={busy}
+            />
+          </>
+        ) : null}
+      </div>
+    </>
   );
 }

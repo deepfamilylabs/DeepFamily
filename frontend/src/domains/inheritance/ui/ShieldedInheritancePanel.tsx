@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { Fingerprint, KeyRound, LockOpen, QrCode, ShieldCheck } from "lucide-react";
 import {
   buildShieldedAssetSigningMessage,
   normalizeShieldedFundsIdentity,
@@ -77,23 +78,59 @@ import {
 } from "../services/shieldedDepositBalance";
 import { useShieldedPageIdentitySession } from "./ShieldedIdentitySessionContext";
 import { type ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
+import { CopyIconButton } from "../../../shared/ui";
 import {
-  PanelButton,
+  formatShieldedTimestamp,
+  parseShieldedPeriodDays,
+  SHIELDED_FUNDING_START_DELAY_SECONDS,
+} from "../model/shieldedBudgetPeriod";
+import { formatShieldedAmount, getShieldedAvatarText } from "../model/shieldedDisplay";
+import {
+  FIELD_TEXTAREA,
   FieldBlock,
-  PanelShell,
+  PanelButton,
   WarningNotice,
   shortHex,
 } from "./inheritanceControls";
 import { ShieldedTaskNavigation } from "./ShieldedTaskNavigation";
-import { ShieldedAssetOverview } from "./ShieldedAssetOverview";
-import { ShieldedWalletBalances } from "./ShieldedWalletBalances";
+import {
+  ShieldedAssetOverview,
+  type ShieldedOverviewWallet,
+  type ShieldedWalletSheetState,
+} from "./ShieldedAssetOverview";
 import { ShieldedWalletActions, type ShieldedRecipientInputMethod } from "./ShieldedWalletActions";
-import { ShieldedSpendReview, type ShieldedSpendReviewProps } from "./ShieldedSpendReview";
-import { ShieldedBudgetActions } from "./ShieldedBudgetActions";
+import {
+  ShieldedSpendReview,
+  type ShieldedCompletedSpendStep,
+  type ShieldedSpendReviewProps,
+} from "./ShieldedSpendReview";
+import {
+  ShieldedFundComposer,
+  listShieldedFundingHeirs,
+  shieldedFundingEntryLabelKey,
+} from "./ShieldedFundComposer";
+import {
+  ShieldedClaimComposer,
+  buildShieldedClaimSchedule,
+  findShieldedClaimBudget,
+} from "./ShieldedClaimComposer";
+import {
+  SHIELDED_ACTION_STAGES,
+  SHIELDED_APPROVAL_STAGES,
+  ShieldedProgressList,
+  type ShieldedPeriodSegment,
+  type ShieldedProgressStage,
+} from "./ShieldedTaskReceipt";
+import {
+  ShieldedClaimReceipt,
+  ShieldedFundReceipt,
+  ShieldedShieldReceipt,
+  ShieldedSpendReceipt,
+} from "./ShieldedTaskReceipts";
+import { ShieldedWalletSheet } from "./ShieldedWalletSheet";
 import { ShieldedFundsKeyManager } from "./ShieldedFundsKeyManager";
+import type { ShieldedRecoveryMaterialHandle } from "./ShieldedRecoveryMaterialView";
 import { SHIELDED_WALLET_REQUEST_TIMEOUT_MS } from "./useShieldedIdentitySession";
-const INPUT =
-  "h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink focus:outline-hidden focus:ring-2 focus:ring-primary/30";
 type Action = ShieldedAssetActionRequest["action"];
 type RecoveryFormat = "mnemonic" | "shieldedKey";
 type OperationScope = "session" | "wallet";
@@ -114,6 +151,7 @@ export function ShieldedInheritancePanel({
   modules,
   signer,
   account,
+  head,
   assetControls,
   navigation,
   onNavigationChange,
@@ -121,6 +159,8 @@ export function ShieldedInheritancePanel({
   modules: ShieldedPageModules;
   signer: Signer | null;
   account: string;
+  /** The page heading, placed inside whichever column the panel currently uses. */
+  head?: ReactNode;
   assetControls?: ReactNode;
   navigation?: ShieldedPanelNavigation;
   onNavigationChange?: (navigation: ShieldedPanelNavigation) => void;
@@ -145,16 +185,22 @@ export function ShieldedInheritancePanel({
   const identityForm = useRef<PersonHashCalculatorHandle>(null);
   const [identityFormEpoch, setIdentityFormEpoch] = useState(0);
   const recipientForm = useRef<ShieldedRecipientCredentialsFormHandle>(null);
-  const exportedMaterial = useRef<HTMLTextAreaElement>(null);
+  const exportedMaterial = useRef<ShieldedRecoveryMaterialHandle>(null);
   const recoveryMaterial = useRef<HTMLTextAreaElement>(null);
   const accessRegion = useRef<HTMLDivElement>(null);
-  const taskRegion = useRef<HTMLDivElement>(null);
-  const walletRegion = useRef<HTMLDivElement>(null);
-  const focusDestination = useRef<"access" | "task" | "wallet" | null>(null);
+  const taskRegion = useRef<HTMLElement>(null);
+  const focusDestination = useRef<"access" | "task" | null>(null);
   const mounted = useRef(false),
     signatureRequest = useRef(0);
   const activeOperation = useRef<{ scope: OperationScope } | null>(null);
   const [spendReview, setSpendReview] = useState<SpendReview | null>(null);
+  // A confirmed plan stays on screen while its first step is proven and sent.
+  const [executingReview, setExecutingReview] = useState<SpendReview | null>(null);
+  const [completedSpendSteps, setCompletedSpendSteps] = useState<ShieldedCompletedSpendStep[]>([]);
+  const [progress, setProgress] = useState<{
+    kind: "action" | "approval";
+    stage: ShieldedProgressStage;
+  } | null>(null);
   const pendingSpendReview = useRef<{
     review: SpendReview;
     resolve: (confirmed: boolean) => void;
@@ -204,7 +250,7 @@ export function ShieldedInheritancePanel({
       (navigation?.slot === "asset" ? "" : (session.funds?.fundsFingerprint ?? "")),
   );
   const [codeSlot, setCodeSlot] = useState<ShieldedKeySlot>("identity");
-  const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
+  // "balances" means no wallet sheet is open; the overview always shows both wallets.
   const [walletSection, setWalletSection] = useState<"balances" | "receiveCode" | "keys">("balances");
   const [walletScreen, setWalletScreen] = useState<"workspace" | "manage" | "identity">(
     "workspace",
@@ -367,17 +413,14 @@ export function ShieldedInheritancePanel({
     const target =
       focusDestination.current === "access" && !showWorkspace
         ? accessRegion.current
-        : focusDestination.current === "wallet" && showWorkspace && walletDetailsOpen
-          ? walletRegion.current
-          : focusDestination.current === "task" && showWorkspace
-            ? taskRegion.current
-            : null;
+        : focusDestination.current === "task" && showWorkspace
+          ? taskRegion.current
+          : null;
     if (target && document.visibilityState === "visible") {
       target.focus({ preventScroll: true });
       focusDestination.current = null;
     }
-  }, [showWorkspace, walletScreen, fundsInWorkspace, walletDetailsOpen]);
-  const showAmount = (value: string) => formatUnits(BigInt(value), modules.tokenDecimals ?? 0);
+  }, [showWorkspace, walletScreen, fundsInWorkspace]);
   const values =
     wallet?.notes.filter(
       (note) =>
@@ -466,7 +509,7 @@ export function ShieldedInheritancePanel({
   const currentRequestKey = useRef(actionRequestKey);
   currentRequestKey.current = actionRequestKey;
   function clearWalletSecretInputs() {
-    if (exportedMaterial.current) exportedMaterial.current.value = "";
+    exportedMaterial.current?.clear();
     if (recoveryMaterial.current) recoveryMaterial.current.value = "";
   }
   function clearSecretInputs() {
@@ -482,7 +525,10 @@ export function ShieldedInheritancePanel({
     const pending = pendingSpendReview.current;
     if (pending?.review !== review) return;
     pendingSpendReview.current = null;
-    if (mounted.current) setSpendReview(null);
+    if (mounted.current) {
+      setSpendReview(null);
+      if (confirmed) setExecutingReview(review);
+    }
     if (!confirmed) void cancelShieldedAssetPreview().catch(() => undefined);
     pending.resolve(confirmed);
   }
@@ -546,10 +592,12 @@ export function ShieldedInheritancePanel({
         setCodeError("");
         clearTransactionFeedback(true);
         latestSession.current.setBusy(false);
-        setWalletDetailsOpen(false);
         setWalletSection("balances");
         setOwnCode("");
         setWalletScreen("workspace");
+        setProgress(null);
+        setExecutingReview(null);
+        setCompletedSpendSteps([]);
       }
     });
     const unsubscribeWallet = subscribeWalletConnectionChange(() => {
@@ -665,6 +713,7 @@ export function ShieldedInheritancePanel({
   }, [slot, selectedFundsFingerprint, wallet]);
   useEffect(() => {
     cancelSpendReview();
+    setCompletedSpendSteps([]);
     void cancelShieldedAssetPreview().catch(() => undefined);
   }, [actionRequestKey]);
   useEffect(() => {
@@ -837,6 +886,8 @@ export function ShieldedInheritancePanel({
         if (mounted.current) {
           setBusy(false);
           setStage("");
+          setProgress(null);
+          setExecutingReview(null);
           latestSession.current.setBusy(false);
         }
       }
@@ -894,11 +945,13 @@ export function ShieldedInheritancePanel({
     latestSession.current.setBusy(false);
     clearSecretInputs();
     latestSession.current.lock();
-    setWalletDetailsOpen(false);
     setWalletSection("balances");
     setOwnCode("");
     setWalletScreen("workspace");
     setPlanCount(0);
+    setProgress(null);
+    setExecutingReview(null);
+    setCompletedSpendSteps([]);
     draftPolicy.current = null;
   }
   /** An explicit exit also forgets the public person details kept for re-unlock. */
@@ -935,30 +988,21 @@ export function ShieldedInheritancePanel({
     }
     setError("");
   }
-  function showWalletBalances() {
-    clearWalletSecretInputs();
-    setWalletDetailsOpen(true);
-    setWalletSection("balances");
-    if (hasSession) setWalletScreen("workspace");
-    focusDestination.current = "wallet";
-  }
-  function toggleWalletDetails() {
+  /** Closes the wallet sheet; its secrets are cleared and the workspace stays as it was. */
+  function closeWalletSheet() {
     if (busy) return;
-    if (!walletDetailsOpen) return showWalletBalances();
     clearWalletSecretInputs();
-    setWalletDetailsOpen(false);
     setWalletSection("balances");
     setOwnCode("");
     if (hasSession) setWalletScreen("workspace");
   }
   function openReceiveCode(next: ShieldedKeySlot) {
     if (busy || submissionPending) return;
-    const collapse = walletSection === "receiveCode" && codeSlot === next;
     clearWalletSecretInputs();
     receiveCodeScope.current = "";
     setCodeSlot(next);
     setOwnCode("");
-    setWalletSection(collapse ? "balances" : "receiveCode");
+    setWalletSection("receiveCode");
     if (hasSession) setWalletScreen("workspace");
   }
   /** Key recovery and backup appear only after an explicit key action. */
@@ -967,9 +1011,9 @@ export function ShieldedInheritancePanel({
     fundsOpenedFromWorkspace.current = showWorkspace;
     setTaskChosen(true);
     clearWalletSecretInputs();
-    setWalletDetailsOpen(true);
     setWalletSection("keys");
-    focusDestination.current = showWorkspace ? "wallet" : "access";
+    // In the workspace the key sheet takes focus itself; the entry card is focused here.
+    focusDestination.current = showWorkspace ? null : "access";
     setRecoveryScanned(false);
     setFundsFlow(flow);
     setWalletScreen("manage");
@@ -1004,7 +1048,8 @@ export function ShieldedInheritancePanel({
   function returnToTask(state: ShieldedAssetSessionState = latestSession.current) {
     clearWalletSecretInputs();
     const ready = !!state.funds?.recoveryVerified && !state.funds.backupRequired;
-    focusDestination.current = state.credentials ? "wallet" : "access";
+    // Closing the key sheet returns focus to the control that opened it.
+    focusDestination.current = state.credentials ? null : "access";
     setWalletSection("balances");
     setWalletScreen(state.credentials ? "workspace" : "identity");
     autoRecoveryBlocked.current = false;
@@ -1144,7 +1189,7 @@ export function ShieldedInheritancePanel({
       });
       try {
         if (!current()) return;
-        if (exportedMaterial.current) exportedMaterial.current.value = result.material;
+        exportedMaterial.current?.show(result.material);
         setExportedFingerprint(result.fundsFingerprint);
         setExternalSaved(false);
         setVerificationStarted(false);
@@ -1456,6 +1501,7 @@ export function ShieldedInheritancePanel({
     if (submissionPending || !slotReady) return;
     await run(async (current) => {
       clearTransactionFeedback();
+      setProgress({ kind: "approval", stage: "submitting" });
       if (!signer || !modules.token) throw new Error(t("shielded.walletNotReady"));
       const chosen = signer,
         generation = getShieldedAssetWorkerGeneration(),
@@ -1522,6 +1568,10 @@ export function ShieldedInheritancePanel({
         endWalletRequest();
       }
       trackBroadcast(chosen.provider!, tx.hash, txId, label);
+      if (current()) {
+        setStage(t("shielded.stages.confirming"));
+        setProgress({ kind: "approval", stage: "confirming" });
+      }
       const { transactionHash, receipt } = await waitForShieldedTransaction(tx, (hash) => {
         trackBroadcast(chosen.provider!, hash, txId, label);
       });
@@ -1542,6 +1592,7 @@ export function ShieldedInheritancePanel({
       generation = getShieldedAssetWorkerGeneration();
     await run(async (current) => {
       clearTransactionFeedback();
+      setCompletedSpendSteps([]);
       if (!chosen) throw new Error(t("shielded.walletNotReady"));
       if (needsCode && !recipientReady) throw new Error(tr("confirmRecipient"));
       if (action === "shield" && !allowanceReady) throw new Error(tr("approveFirst"));
@@ -1582,6 +1633,7 @@ export function ShieldedInheritancePanel({
           // Reject it before it can mutate the shared Worker's next preview.
           assertCurrent();
           setStage(tr("preparing"));
+          setProgress({ kind: "action", stage: "preparing" });
           const planned = await shieldedAssetWorkerCall(
             "preview",
             {
@@ -1628,6 +1680,7 @@ export function ShieldedInheritancePanel({
             latestSession.current.setBusy(true);
           }
           setStage(t("shielded.stages.proving"));
+          setProgress({ kind: "action", stage: "proving" });
           const result = await shieldedAssetWorkerCall(
             "prove",
             { handle: planned.handle, context },
@@ -1642,9 +1695,12 @@ export function ShieldedInheritancePanel({
             expectedChainId: modules.chainId,
             data: result.data,
             preparedProof: result.proof,
-            onStage: (next: string) => {
+            onStage: (next: "checkingGas" | "submitting" | "confirming") => {
               if (next !== "confirming") assertCurrent();
-              if (current()) setStage(t(`shielded.stages.${next}`));
+              if (current()) {
+                setStage(t(`shielded.stages.${next}`));
+                setProgress({ kind: "action", stage: next });
+              }
             },
             onBroadcast: (hash: string) => {
               trackBroadcast(chosen.provider!, hash, txId, label);
@@ -1729,6 +1785,24 @@ export function ShieldedInheritancePanel({
           if (submitted.receipt.status !== 1)
             throw new Error(t("shielded.transactionFailed", { hash: submitted.transactionHash }));
           if (planned.steps.length <= 1) break;
+          // The confirmed step stays listed, with its hash, above the plan rebuilt for the rest.
+          if (current()) {
+            const [first] = planned.steps;
+            setCompletedSpendSteps((steps) => [
+              ...steps,
+              {
+                merge: true,
+                inputCount: first.inputs.length,
+                inputTotal: planned.inputAmounts
+                  .reduce((sum, value) => sum + BigInt(value), 0n)
+                  .toString(),
+                principal: first.outputAmounts[0],
+                change: first.outputAmounts[1],
+                hash: submitted.transactionHash,
+              },
+            ]);
+            setExecutingReview(null);
+          }
           // The consolidated outputs replace its inputs among the next step's candidates.
           const outputs = result.data.outputCommitments.map((value) => getBigInt(value).toString());
           stepCandidates = [
@@ -1754,79 +1828,77 @@ export function ShieldedInheritancePanel({
       }
     }, tr("preparing"), "wallet");
   }
-  const feedback = (
-    <>
-      {spendReview ? (
-        <ShieldedSpendReview
-          {...spendReview}
-          decimals={modules.tokenDecimals ?? 0}
-          symbol={modules.assetSymbol}
-          onConfirm={() => settleSpendReview(spendReview, true)}
-          onCancel={() => settleSpendReview(spendReview, false)}
+  const decimals = modules.tokenDecimals ?? 0;
+  const symbol = modules.assetSymbol;
+  const copy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      setError(t("common.copyFailed"));
+    }
+  };
+  const parsePositive = (value: string) => {
+    try {
+      const parsed = parseUnits(value.trim(), decimals);
+      return parsed > 0n ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const walletName = tr(slot === "identity" ? "identityFunds" : "budgetFunds");
+  const slotAvailable = wallet && slotReady ? valueTotals[slot] : undefined;
+  const transactionStatus =
+    hasSession &&
+    !transactionFeedbackDismissed &&
+    (transactionHash || submissionPending || transactionResult) ? (
+      <p
+        role="status"
+        className="break-all rounded-xl bg-surface-alt px-3.5 py-2.5 text-xs leading-relaxed text-ink-muted"
+      >
+        {transactionLabel ? `${transactionLabel} · ` : ""}
+        {transactionHash ? `${tr("transactionHash")}: ${transactionHash} · ` : ""}
+        {t(
+          submissionPending
+            ? "transaction.pending"
+            : transactionResult === "unknown"
+              ? "transaction.unknown"
+              : transactionResult === "failed"
+                ? "transaction.failed"
+                : "transaction.success",
+        )}
+      </p>
+    ) : null;
+  const errorNotice = error ? (
+    <p role="alert" className="break-words text-sm text-danger">
+      {error}
+    </p>
+  ) : null;
+  // A confirmed spend plan shows its own progress inside the step being sent.
+  const progressList =
+    busy && progress && progress.stage !== "preparing" && !executingReview ? (
+      <div role="status">
+        <ShieldedProgressList
+          stage={progress.stage}
+          stages={progress.kind === "approval" ? SHIELDED_APPROVAL_STAGES : SHIELDED_ACTION_STAGES}
         />
-      ) : null}
+      </div>
+    ) : null;
+  const taskFeedback = (
+    <>
       {busy && planCount > 1 ? (
-        <p role="status" className="text-sm text-ink-muted">
+        <p role="status" className="text-[13px] font-medium text-ink/80">
           {t("shielded.walletKeys.planTransactions", { count: planCount })}
         </p>
       ) : null}
-      {stage ? (
-        <p role="status" className="text-sm text-ink-muted">
-          {stage}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="break-words text-sm text-danger">
-          {error}
-        </p>
-      ) : null}
-      {hasSession &&
-      !transactionFeedbackDismissed &&
-      (transactionHash || submissionPending || transactionResult) ? (
-        <p role="status" className="break-all text-xs">
-          {transactionLabel ? `${transactionLabel} · ` : ""}
-          {transactionHash ? `${tr("transactionHash")}: ${transactionHash} · ` : ""}
-          {t(
-            submissionPending
-              ? "transaction.pending"
-              : transactionResult === "unknown"
-                ? "transaction.unknown"
-                : transactionResult === "failed"
-                  ? "transaction.failed"
-                  : "transaction.success",
-          )}
-        </p>
-      ) : null}
-      {codeError && needsCode ? (
-        <p role="alert" className="break-words text-sm text-danger">
-          {codeError}
-        </p>
-      ) : null}
+      {progressList ??
+        (stage && !executingReview ? (
+          <p role="status" className="text-sm text-ink-muted">
+            {stage}
+          </p>
+        ) : null)}
+      {errorNotice}
+      {transactionStatus}
     </>
-  );
-  const currentWallet = (
-    <div
-      role="group"
-      aria-label={tr("currentWallet")}
-      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5 text-xs"
-    >
-      <p className="rounded-full bg-surface-alt px-2.5 py-1.5">
-        <span className="sr-only">{tr("currentWallet")}: </span>
-        <span className="font-medium text-ink">
-          {tr(slot === "identity" ? "identityFunds" : "budgetFunds")}
-        </span>
-      </p>
-      {slot === "asset" && selectedFundsFingerprint ? (
-        <code title={selectedFundsFingerprint} className="break-all text-ink-muted">
-          {shortHex(selectedFundsFingerprint)}
-        </code>
-      ) : null}
-      {!slotReady ? (
-        <p role="status" className="text-warning">
-          {tr("depositWalletUnavailable")}
-        </p>
-      ) : null}
-    </div>
   );
   const nativeSymbol = SUPPORTED_NETWORKS[config.chainId]?.nativeCurrency.symbol ?? "Native";
   // Other pools have no verified decimals here, so amounts stay raw integers.
@@ -1857,10 +1929,13 @@ export function ShieldedInheritancePanel({
         ? "backupTitle"
         : "restoreTitle",
   );
+  const fundsFingerprint =
+    session.funds?.fundsFingerprint || exportedFingerprint || expectedFingerprint;
   const fundsManager = (
     <ShieldedFundsKeyManager
       flow={accessFlow}
       funds={session.funds}
+      fingerprint={fundsFingerprint}
       identityReady={!!session.identity}
       busy={busy}
       backupFormat={backupFormat}
@@ -1892,6 +1967,7 @@ export function ShieldedInheritancePanel({
       onRestoreSignature={() => void requestSignature("restore")}
       onRecover={() => void recover(true)}
       discoveryReport={discoveryReport}
+      onCopyFingerprint={() => void copy(fundsFingerprint)}
       onShowRestore={() => {
         clearSecretInputs();
         setRecoveryScanned(false);
@@ -1910,17 +1986,390 @@ export function ShieldedInheritancePanel({
       }
       onLock={exitSession}
       showLock={!fundsInWorkspace}
+      pinnedActions={showWorkspace}
     />
   );
-  const walletActionForm =
-    action === "fund" || action === "claim" ? null : (
+  const walletSheet: ShieldedWalletSheetState | null = !showWorkspace
+    ? null
+    : walletSection === "receiveCode"
+      ? { kind: "receiveCode", slot: codeSlot }
+      : walletSection === "keys"
+        ? { kind: "keys", flow: accessFlow }
+        : null;
+  const receiveCodeContent = (
+    <div role="group" aria-label={tr("receiveKeyLabel")} className="space-y-4">
+      {!session.identity ? (
+        <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
+      ) : codeSlot === "asset" && !fundsReady ? (
+        <p className="text-xs text-warning">{tr("walletLocked")}</p>
+      ) : null}
+      {ownCode ? (
+        <FieldBlock
+          label={t("shielded.receiveCodeLabel", { symbol })}
+          hint={t("shielded.receiveCodeShareHint", { symbol })}
+        >
+          <div className="relative">
+            <textarea
+              aria-label={t("shielded.receiveCodeLabel", { symbol })}
+              className={`${FIELD_TEXTAREA} min-h-28 resize-none pr-10`}
+              readOnly
+              value={ownCode}
+              rows={5}
+            />
+            <div className="absolute right-1.5 top-1.5">
+              <CopyIconButton label={t("common.copy")} onClick={() => void copy(ownCode)} />
+            </div>
+          </div>
+        </FieldBlock>
+      ) : busy ? (
+        <p role="status" className="text-sm text-ink-muted">
+          {stage}
+        </p>
+      ) : receiveCodeReady ? (
+        <>
+          {error ? <p className="break-words text-xs text-danger">{error}</p> : null}
+          <PanelButton
+            size="compact"
+            disabled={submissionPending}
+            onClick={() => void createCode(codeSlot)}
+          >
+            {t("shielded.generateReceiveCode")}
+          </PanelButton>
+        </>
+      ) : null}
+    </div>
+  );
+  const overviewWallets: ShieldedOverviewWallet[] = (
+    [
+      { slot: "identity", unlocked: !!session.identity },
+      { slot: "asset", unlocked: fundsReady },
+    ] as const
+  ).map(({ slot: walletSlot, unlocked }) => ({
+    slot: walletSlot,
+    unlocked,
+    available: wallet && unlocked ? formatShieldedAmount(valueTotals[walletSlot], decimals) : "—",
+    budget:
+      wallet && unlocked && session.identity
+        ? formatShieldedAmount(budgetTotals[walletSlot], decimals)
+        : "—",
+    current: slot === walletSlot,
+    checked:
+      slot === walletSlot && (walletSlot === "identity" || fundsSelectionMatches || !unlocked),
+    fingerprint:
+      walletSlot === "asset" && slot === "asset" && selectedFundsFingerprint
+        ? selectedFundsFingerprint
+        : undefined,
+  }));
+  const claimablePeriods = claims
+    .filter((claim) => claim.status === "claimable")
+    .reduce((sum, claim) => sum + claim.periodIndices.length, 0);
+  const taskTitleId = `${formId}-task-title`;
+  const signerNotice = !signer ? (
+    <WarningNotice>{t("shielded.walletNotReady", { symbol })}</WarningNotice>
+  ) : null;
+  const slotNotice = !slotReady ? <WarningNotice>{tr("depositWalletUnavailable")}</WarningNotice> : null;
+  const submitLabel = (task: Action) =>
+    t("shielded.submit", { symbol, action: t(`shielded.actions.${task}`, { symbol }) });
+
+  let composer: ReactNode;
+  let receipt: ReactNode;
+  if (action === "fund") {
+    const fundingVersion = selectedPolicy?.rootVersionIndex ?? rootVersion;
+    const heirs = listShieldedFundingHeirs(wallet, policyHandle, fundingVersion, localRecipientLabels);
+    const heirIndex = heirs.findIndex(
+      (heir) => heir.personHash.toLowerCase() === personHash.toLowerCase(),
+    );
+    const heirName = personHash
+      ? (heirs[heirIndex]?.label ??
+        (heirIndex >= 0
+          ? t("shielded.recipientPicker.childFallback", { index: heirIndex + 1 })
+          : shortHex(personHash)))
+      : undefined;
+    let rate: bigint | undefined;
+    let days: bigint | undefined;
+    try {
+      rate = selectedPolicy ? BigInt(selectedPolicy.amountPerPeriod) : parseUnits(amount, decimals);
+    } catch {
+      // Incomplete inputs have no preview until they are valid.
+    }
+    try {
+      days = selectedPolicy ? BigInt(selectedPolicy.periodDays) : parseShieldedPeriodDays(periodDays);
+    } catch {
+      // As above.
+    }
+    const fundingPeriods = /^[1-9][0-9]{0,19}$/.test(periods.trim())
+      ? BigInt(periods.trim())
+      : undefined;
+    const fundingBalance = values.reduce((sum, note) => sum + BigInt(note.amount), 0n);
+    const parentLabel = session.identity
+      ? (localRecipientLabels.get(session.identity.personHash.toLowerCase()) ??
+        shortHex(session.identity.personHash))
+      : undefined;
+    composer = (
+      <ShieldedFundComposer
+        titleId={taskTitleId}
+        symbol={symbol}
+        decimals={decimals}
+        busy={busy || submissionPending}
+        wallet={wallet}
+        identityReady={!!session.identity}
+        heirs={heirs}
+        entry={effectiveEntry}
+        templateHandle={template?.handle}
+        onEntryChange={(next) => {
+          // The child, version, rule and amounts stay; only receiving material differs.
+          if (template || next === entry) return;
+          setEntry(next);
+          changeCode("");
+          setRecipientInputMethod("receiveCode");
+          recipientForm.current?.clearSecretInputs();
+        }}
+        policyHandle={policyHandle}
+        onPolicyChange={(handle) => {
+          setPolicyHandle(handle);
+          setPersonHash("");
+          setRootVersion("");
+          changeCode("");
+          recipientForm.current?.clearSecretInputs();
+          setError("");
+        }}
+        rootVersion={rootVersion}
+        onRootVersionChange={(value) => {
+          setRootVersion(value);
+          setPersonHash("");
+          changeCode("");
+        }}
+        personHash={personHash}
+        onPersonHashChange={(value) => {
+          setPersonHash(value);
+          const original = wallet?.templates.find(
+            (item) =>
+              item.policyHandle === policyHandle &&
+              item.personHash.toLowerCase() === value.toLowerCase(),
+          );
+          if (original)
+            setEntry(
+              original.bindingKind === 1
+                ? "public"
+                : original.keyMode === 1
+                  ? "privateIndependent"
+                  : "privateConvenient",
+            );
+          changeCode("");
+          recipientForm.current?.clearSecretInputs();
+          setError("");
+        }}
+        amount={amount}
+        onAmountChange={setAmount}
+        periodDays={periodDays}
+        onPeriodDaysChange={setPeriodDays}
+        periods={periods}
+        onPeriodsChange={setPeriods}
+        code={code}
+        onCodeChange={changeCode}
+        codeError={needsCode ? codeError || undefined : undefined}
+        recipientMatches={needsCode && recipientMatches}
+        recipientMismatch={needsCode && !!verifiedRecipient && !recipientMatches}
+        recipientInputMethod={recipientInputMethod}
+        onRecipientInputMethodChange={(method) => {
+          changeCode("");
+          setRecipientInputMethod(method);
+          recipientForm.current?.clearSecretInputs();
+        }}
+        recipientFormRef={recipientForm}
+        onGenerateRecipientCode={() => void generateConvenientCode()}
+        parentLabel={parentLabel}
+      />
+    );
+    receipt = (
+      <ShieldedFundReceipt
+        symbol={symbol}
+        decimals={decimals}
+        walletName={walletName}
+        available={slotAvailable}
+        rate={rate}
+        periods={fundingPeriods}
+        days={days}
+        startsAt={
+          selectedPolicy
+            ? undefined
+            : BigInt(Math.floor(Date.now() / 1000)) + SHIELDED_FUNDING_START_DELAY_SECONDS
+        }
+        heirName={heirName}
+        versionLabel={
+          fundingVersion
+            ? t("shielded.fundingVersionOption", { symbol, version: fundingVersion })
+            : undefined
+        }
+        entryLabel={t(shieldedFundingEntryLabelKey(effectiveEntry))}
+        notices={
+          <>
+            {fundingDeficit !== undefined && fundingBalance > 0n ? (
+              <WarningNotice>
+                {t("shielded.fundingBalanceInsufficient", {
+                  symbol,
+                  amount: formatShieldedAmount(fundingDeficit, decimals),
+                })}
+              </WarningNotice>
+            ) : null}
+            {signerNotice}
+            {slotNotice}
+            {taskFeedback}
+          </>
+        }
+        action={
+          <PanelButton
+            variant="primary"
+            size="large"
+            className="w-full"
+            busy={busy}
+            disabled={
+              busy ||
+              submissionPending ||
+              !slotReady ||
+              !session.identity ||
+              !signer ||
+              (needsCode && !recipientReady) ||
+              fundingDeficit !== undefined ||
+              !personHash ||
+              (!selectedPolicy && !rootVersion)
+            }
+            onClick={() => void prepare()}
+          >
+            {submitLabel("fund")}
+          </PanelButton>
+        }
+      />
+    );
+  } else if (action === "claim") {
+    const displayClaim =
+      selectedClaim ?? claims.find((claim) => claim.status === "claimable") ?? claims[0];
+    const schedule = displayClaim
+      ? buildShieldedClaimSchedule(displayClaim, findShieldedClaimBudget(wallet, displayClaim))
+      : [];
+    const chosen = displayClaim
+      ? claimPeriods.filter((index) => displayClaim.periodIndices.includes(index))
+      : [];
+    const total = displayClaim ? BigInt(displayClaim.amountPerPeriod) * BigInt(chosen.length) : 0n;
+    const slotBudgets =
+      wallet?.notes.filter((note) => note.kind === "budget" && note.slot === slot) ?? [];
+    const status = !wallet
+      ? t("shielded.claimOverview.checking", { symbol })
+      : slotBudgets.length === 0
+        ? t("shielded.claimOverview.noFunds", { symbol })
+        : claims.length === 0
+          ? t("shielded.claimOverview.ineligible", { symbol })
+          : displayClaim?.status === "claimable"
+            ? chosen.length
+              ? t("shielded.claimOverview.claimable", {
+                  symbol,
+                  amount: formatShieldedAmount(total, decimals),
+                  periods: chosen.length,
+                })
+              : t("shielded.claimSelectionRequired", { symbol })
+            : t(`shielded.claimOverview.${displayClaim?.status ?? "noFunds"}`, { symbol });
+    const segments = schedule.flatMap((row): ShieldedPeriodSegment[] =>
+      row.kind === "claimable"
+        ? [claimPeriods.includes(row.index) ? "selected" : "claimable"]
+        : row.kind === "upcoming"
+          ? ["upcoming"]
+          : [],
+    );
+    const locked = slot === "asset" && !slotReady;
+    composer = (
+      <ShieldedClaimComposer
+        titleId={taskTitleId}
+        symbol={symbol}
+        decimals={decimals}
+        busy={busy || submissionPending}
+        wallet={wallet}
+        slot={slot}
+        identityReady={!!session.identity}
+        independentKeyReady={fundsReady && fundsSelectionMatches}
+        claimHandle={claimHandle}
+        onClaimChange={(handle) => {
+          setClaimHandle(handle);
+          setClaimPeriods(claims.find((claim) => claim.handle === handle)?.periodIndices ?? []);
+        }}
+        claimPeriods={claimPeriods}
+        onClaimPeriodsChange={setClaimPeriods}
+      />
+    );
+    receipt = (
+      <ShieldedClaimReceipt
+        symbol={symbol}
+        decimals={decimals}
+        walletName={walletName}
+        available={slotAvailable}
+        total={total}
+        status={status}
+        nextDue={
+          displayClaim?.nextDueAt !== undefined
+            ? t("shielded.claimOverview.nextDue", {
+                symbol,
+                date:
+                  formatShieldedTimestamp(BigInt(displayClaim.nextDueAt)) ??
+                  t("shielded.dateOutOfRange", { symbol }),
+              })
+            : undefined
+        }
+        segments={segments}
+        budgetName={
+          displayClaim
+            ? t("shielded.budgetOption", {
+                symbol,
+                index: claims.indexOf(displayClaim) + 1,
+                amount: formatShieldedAmount(
+                  displayClaim.totalRemaining ?? displayClaim.amount,
+                  decimals,
+                ),
+              })
+            : undefined
+        }
+        periods={chosen.map((index) => String(BigInt(index) + 1n))}
+        notices={
+          <>
+            {locked ? null : signerNotice}
+            {slotNotice}
+            {taskFeedback}
+          </>
+        }
+        action={
+          // A locked funds key offers only its unlock action, on the wallet card above.
+          locked ? undefined : (
+            <PanelButton
+              variant="primary"
+              size="large"
+              className="w-full"
+              busy={busy}
+              disabled={
+                busy ||
+                submissionPending ||
+                !slotReady ||
+                !session.identity ||
+                !signer ||
+                !selectedClaim ||
+                selectedClaim.status !== "claimable" ||
+                !claimPeriods.length ||
+                claimPeriods.some((index) => !selectedClaim.periodIndices.includes(index))
+              }
+              onClick={() => void prepare()}
+            >
+              {submitLabel("claim")}
+            </PanelButton>
+          )
+        }
+      />
+    );
+  } else {
+    const spendAmount = parsePositive(amount);
+    composer = (
       <ShieldedWalletActions
-        embedded
+        titleId={taskTitleId}
         action={action}
-        symbol={modules.assetSymbol}
-        decimals={modules.tokenDecimals ?? 0}
+        symbol={symbol}
+        decimals={decimals}
         busy={busy}
-        reviewing={spendReview !== null}
         amount={amount}
         onAmountChange={setAmount}
         recipient={{
@@ -1931,11 +2380,13 @@ export function ShieldedInheritancePanel({
             recipientForm.current?.clearSecretInputs();
           },
           code,
+          codeError: needsCode ? codeError || undefined : undefined,
           onCodeChange: changeCode,
           credentialsFormRef: recipientForm,
           onGenerateCode: () => void generateConvenientCode(),
           targetHash: recipientTargetHash ?? undefined,
           targetName: recipientTargetName,
+          verified: !!verifiedRecipient,
           needsConfirmation: recipientNeedsConfirmation,
           confirmed: recipientConfirmed,
           onConfirmedChange: setRecipientConfirmed,
@@ -1945,183 +2396,250 @@ export function ShieldedInheritancePanel({
         values={values}
         selectedCommitments={candidates}
         onSelectedCommitmentsChange={setCandidates}
-        signerReady={!!signer}
-        approvalRequired={modules.assetKind === "erc20" && !allowanceReady}
-        submitDisabled={!slotReady || submissionPending || (needsCode && !recipientReady)}
-        onSubmit={() => void prepare()}
-        feedback={feedback}
       />
     );
-  const walletDetails = walletDetailsOpen ? (
-    <div
-      id={`${formId}-wallet-details`}
-      ref={walletRegion}
-      role="region"
-      aria-label={tr("manageIndependentFunds")}
-      tabIndex={-1}
-      className="space-y-5 rounded-xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
-    >
-      <ShieldedWalletBalances
-        symbol={modules.assetSymbol}
-        selectedSlot={slot}
-        selectionMatches={fundsSelectionMatches}
-        disabled={busy || submissionPending}
-        onSelect={selectWallet}
-        onReceiveCode={openReceiveCode}
-        expandedReceiveSlot={walletSection === "receiveCode" ? codeSlot : null}
-        fundsKeyState={fundsKeyState}
-        expandedKeyFlow={walletSection === "keys" ? accessFlow : null}
-        // Creating a key belongs to the wallet card; claims require the original key.
-        onOpenFundsKey={(flow) => {
-          if (walletSection === "keys" && accessFlow === flow) showWalletBalances();
-          else openFundsManager(flow);
-        }}
-        balances={(
-          [
-            { slot: "identity", unlocked: !!session.identity },
-            { slot: "asset", unlocked: fundsReady },
-          ] as const
-        ).map(({ slot: balanceSlot, unlocked }) => ({
-          slot: balanceSlot,
-          unlocked,
-          available: wallet && unlocked ? showAmount(valueTotals[balanceSlot].toString()) : "—",
-          budget:
-            wallet && unlocked && session.identity
-              ? showAmount(budgetTotals[balanceSlot].toString())
-              : "—",
-        }))}
-      />
-      {walletSection === "receiveCode" ? (
-        <div
-          role="group"
-          aria-label={tr("receiveKeyLabel")}
-          className="space-y-3 border-t border-hairline pt-4"
-        >
-          <p className="text-sm font-medium text-ink">
-            {tr(codeSlot === "identity" ? "identityReceiveCode" : "fundsReceiveCode")}
-          </p>
-          {!session.identity ? (
-            <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
-          ) : codeSlot === "asset" && !fundsReady ? (
-            <p className="text-xs text-warning">{tr("walletLocked")}</p>
-          ) : null}
-          {ownCode ? (
-            <FieldBlock
-              label={t("shielded.receiveCodeLabel", { symbol: modules.assetSymbol })}
-              hint={t("shielded.receiveCodeShareHint", { symbol: modules.assetSymbol })}
+    const notices = (
+      <>
+        {signerNotice}
+        {slotNotice}
+        {taskFeedback}
+      </>
+    );
+    if (action === "shield") {
+      receipt = (
+        <ShieldedShieldReceipt
+          symbol={symbol}
+          decimals={decimals}
+          walletName={walletName}
+          available={slotAvailable}
+          amount={spendAmount}
+          notices={notices}
+          action={
+            <PanelButton
+              variant="primary"
+              size="large"
+              className="w-full"
+              busy={busy}
+              disabled={busy || !slotReady || submissionPending || !signer}
+              onClick={() => void prepare()}
             >
-              <textarea
-                aria-label={t("shielded.receiveCodeLabel", { symbol: modules.assetSymbol })}
-                className={`${INPUT} h-auto min-h-20 break-all py-2 font-mono text-xs`}
-                readOnly
-                value={ownCode}
-                rows={4}
-              />
-            </FieldBlock>
-          ) : busy ? (
-            <p className="text-xs text-ink-muted">{stage}</p>
-          ) : receiveCodeReady ? (
+              {modules.assetKind === "erc20" && !allowanceReady ? tr("approve") : submitLabel("shield")}
+            </PanelButton>
+          }
+        />
+      );
+    } else {
+      const candidateTotal = values
+        .filter((note) => candidates.includes(note.commitment))
+        .reduce((sum, note) => sum + BigInt(note.amount), 0n);
+      const withdrawalSelectionAvailable =
+        candidates.length > 0 &&
+        candidates.every((commitment) =>
+          values.some((note) => note.commitment === commitment && BigInt(note.amount) > 0n),
+        );
+      const review = spendReview ? (
+        <ShieldedSpendReview
+          {...spendReview}
+          decimals={decimals}
+          symbol={symbol}
+          completedSteps={completedSpendSteps}
+          onConfirm={() => settleSpendReview(spendReview, true)}
+          onCancel={() => settleSpendReview(spendReview, false)}
+        />
+      ) : executingReview ? (
+        <ShieldedSpendReview
+          {...executingReview}
+          decimals={decimals}
+          symbol={symbol}
+          completedSteps={completedSpendSteps}
+          running
+          stage={progress?.stage ?? null}
+        />
+      ) : undefined;
+      receipt = (
+        <ShieldedSpendReceipt
+          spendAction={action}
+          symbol={symbol}
+          decimals={decimals}
+          walletName={walletName}
+          available={slotAvailable}
+          amount={spendAmount}
+          recipient={
+            action === "unshield" ? (
+              withdrawalRecipient.trim() ? (
+                <code className="font-mono" title={withdrawalRecipient.trim()}>
+                  {shortHex(withdrawalRecipient.trim())}
+                </code>
+              ) : undefined
+            ) : recipientTargetHash ? (
+              (recipientTargetName ?? (
+                <code className="font-mono" title={recipientTargetHash}>
+                  {shortHex(recipientTargetHash)}
+                </code>
+              ))
+            ) : undefined
+          }
+          selection={
+            candidates.length
+              ? t("shielded.valueSelectionSummary", {
+                  symbol,
+                  count: candidates.length,
+                  amount: formatShieldedAmount(candidateTotal, decimals),
+                })
+              : undefined
+          }
+          review={review}
+          notices={notices}
+          action={
+            <PanelButton
+              variant="primary"
+              size="large"
+              className="w-full"
+              busy={busy}
+              disabled={
+                busy ||
+                !slotReady ||
+                submissionPending ||
+                (needsCode && !recipientReady) ||
+                !signer ||
+                (recipientNeedsConfirmation && !recipientConfirmed) ||
+                (action === "privateTransfer" && candidates.length === 0) ||
+                (action === "unshield" && !withdrawalSelectionAvailable)
+              }
+              onClick={() => void prepare()}
+            >
+              {t("shielded.spendReview.preview", {
+                symbol,
+                action: t(`shielded.actions.${action}`, { symbol }),
+              })}
+            </PanelButton>
+          }
+        />
+      );
+    }
+  }
+
+  const accessTitleId = `${formId}-access-title`;
+  const accessCard = (
+    <section
+      aria-labelledby={accessTitleId}
+      className="min-w-0 rounded-[20px] border border-hairline bg-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-28px_rgba(15,23,42,0.2)] dark:shadow-none sm:p-8"
+    >
+      <div className="flex items-start gap-3.5">
+        <span
+          aria-hidden="true"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300"
+        >
+          {identityAccess ? (
+            <Fingerprint className="h-[22px] w-[22px]" />
+          ) : (
+            <KeyRound className="h-[22px] w-[22px]" />
+          )}
+        </span>
+        <div className="min-w-0 space-y-1.5">
+          <h2 id={accessTitleId} className="ui-heading text-xl text-ink">
+            {identityAccess ? t("shielded.identityTitle", { symbol }) : fundsTitle}
+          </h2>
+          {identityAccess ? (
+            <p className="text-sm leading-relaxed text-ink-muted">
+              {t("shielded.identityDescription", { symbol })}
+            </p>
+          ) : null}
+        </div>
+      </div>
+      <div className="mt-7 space-y-6">
+        {identityAccess ? (
+          session.identity ? (
+            <p className="break-all text-sm">
+              {session.identity.identity.fullName} · {session.identity.personHash}
+            </p>
+          ) : (
             <>
-              {error ? <p className="break-words text-xs text-danger">{error}</p> : null}
+              <PersonHashCalculator
+                key={`${identityFormEpoch}:${JSON.stringify(session.identityDraft)}`}
+                ref={identityForm}
+                initialValues={session.identityDraft ?? undefined}
+                computeHash={!busy}
+                fundsCredentials
+                showTitle={false}
+                collapsible={false}
+                showPassphraseGuidance={false}
+                className="border-0 bg-transparent p-0 shadow-none"
+              />
               <PanelButton
-                size="compact"
-                disabled={submissionPending}
-                onClick={() => void createCode(codeSlot)}
+                variant="primary"
+                size="hero"
+                className="w-full"
+                busy={busy}
+                disabled={busy}
+                onClick={() => void unlock()}
               >
-                {t("shielded.generateReceiveCode")}
+                {busy ? null : <LockOpen className="h-[18px] w-[18px]" aria-hidden="true" />}
+                {t("shielded.unlock", { symbol })}
               </PanelButton>
             </>
-          ) : null}
-        </div>
-      ) : null}
-      {walletSection === "keys" ? (
-        <div className="space-y-4 border-t border-hairline pt-4">
-          <h3 className="text-sm font-medium text-ink">{fundsTitle}</h3>
-          {fundsManager}
-        </div>
-      ) : null}
-    </div>
-  ) : undefined;
+          )
+        ) : (
+          fundsManager
+        )}
+        {identityAccess && fundsReady ? (
+          <div className="space-y-3 border-t border-hairline/70 pt-5">
+            <p className="text-sm leading-relaxed text-ink-muted">{tr("fundsIdentityNeeded")}</p>
+            <PanelButton
+              onClick={() => {
+                chooseAction("privateTransfer");
+                setWalletScreen("workspace");
+              }}
+            >
+              {tr("useIndependentFunds")}
+            </PanelButton>
+          </div>
+        ) : null}
+        {identityAccess && (hasSession || busy) ? (
+          <PanelButton onClick={exitSession}>{t("shielded.lock", { symbol })}</PanelButton>
+        ) : null}
+        {stage ? (
+          <p role="status" className="text-sm text-ink-muted">
+            {stage}
+          </p>
+        ) : null}
+        {errorNotice}
+        {transactionStatus}
+      </div>
+    </section>
+  );
+
   return (
-    <div className="min-w-0 space-y-5 break-normal sm:space-y-6">
+    <div className="min-w-0 break-normal">
       {!showWorkspace ? (
-        <div
-          ref={accessRegion}
-          tabIndex={-1}
-          className="rounded-3xl focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-          <PanelShell
-            title={
-              identityAccess
-                ? t("shielded.identityTitle", { symbol: modules.assetSymbol })
-                : fundsTitle
-            }
-            description={
-              identityAccess
-                ? t("shielded.identityDescription", { symbol: modules.assetSymbol })
-                : undefined
-            }
+        <div className="mx-auto w-full max-w-[45rem] space-y-6">
+          {head}
+          <div
+            ref={accessRegion}
+            tabIndex={-1}
+            className="rounded-[20px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            {identityAccess ? (
-              <>
-                {session.identity ? (
-                  <p className="break-all text-sm">
-                    {session.identity.identity.fullName} · {session.identity.personHash}
-                  </p>
-                ) : (
-                  <>
-                    <PersonHashCalculator
-                      key={`${identityFormEpoch}:${JSON.stringify(session.identityDraft)}`}
-                      ref={identityForm}
-                      initialValues={session.identityDraft ?? undefined}
-                      computeHash={!busy}
-                      fundsCredentials
-                      showTitle={false}
-                      collapsible={false}
-                      showPassphraseGuidance={false}
-                      className="border-0 bg-transparent p-0 shadow-none"
-                    />
-                    <div className="flex flex-wrap gap-3">
-                      <PanelButton
-                        variant="primary"
-                        busy={busy}
-                        disabled={busy}
-                        onClick={() => void unlock()}
-                      >
-                        {t("shielded.unlock", { symbol: modules.assetSymbol })}
-                      </PanelButton>
-                    </div>
-                  </>
-                )}
-              </>
-            ) : (
-              fundsManager
-            )}
-            {identityAccess && fundsReady ? (
-              <div className="space-y-3 border-t border-hairline pt-4">
-                <p className="text-sm text-ink-muted">{tr("fundsIdentityNeeded")}</p>
-                <PanelButton
-                  onClick={() => {
-                    chooseAction("privateTransfer");
-                    setWalletScreen("workspace");
-                  }}
-                >
-                  {tr("useIndependentFunds")}
-                </PanelButton>
-              </div>
-            ) : null}
-            {identityAccess && (hasSession || busy) ? (
-              <PanelButton onClick={exitSession}>
-                {t("shielded.lock", { symbol: modules.assetSymbol })}
-              </PanelButton>
-            ) : null}
-            {feedback}
-          </PanelShell>
+            {accessCard}
+          </div>
         </div>
-      ) : null}
-      {showWorkspace ? (
-        <>
+      ) : (
+        <div className="space-y-6">
+          {head}
           <ShieldedAssetOverview
+            person={{
+              name: session.identity?.identity.fullName ?? tr("independentFundsTitle"),
+              avatar: session.identity
+                ? getShieldedAvatarText(session.identity.identity.fullName)
+                : undefined,
+              hash: overviewHash,
+              hashLabel: session.identity
+                ? t("shielded.identityHash", { symbol })
+                : tr("fundsFingerprint"),
+              copyLabel: session.identity
+                ? t("shielded.copyIdentityHash", { symbol })
+                : tr("copyFundsFingerprint"),
+              onCopy: () => void copy(overviewHash),
+            }}
             assetControls={
               assetControls ? (
                 <fieldset disabled={busy} className="min-w-0">
@@ -2129,195 +2647,67 @@ export function ShieldedInheritancePanel({
                 </fieldset>
               ) : undefined
             }
-            fullName={session.identity?.identity.fullName ?? tr("independentFundsTitle")}
-            personHash={overviewHash}
-            hashLabel={session.identity ? undefined : tr("fundsFingerprint")}
-            copyHashLabel={session.identity ? undefined : tr("copyFundsFingerprint")}
-            symbol={modules.assetSymbol}
-            currentWallet={currentWallet}
-            availableBalance={wallet && slotReady ? showAmount(valueTotals[slot].toString()) : "—"}
-            budgetBalance={
-              wallet && slotReady && session.identity
-                ? showAmount(budgetTotals[slot].toString())
-                : "—"
-            }
+            symbol={symbol}
             busy={busy}
             onRecover={() => void recover(true)}
             onLock={exitSession}
-            onManageWallets={toggleWalletDetails}
-            walletDetailsOpen={walletDetailsOpen}
-            walletDetailsId={`${formId}-wallet-details`}
-            walletDetails={walletDetails}
+            wallets={overviewWallets}
+            selectionDisabled={busy || submissionPending}
+            onSelectWallet={selectWallet}
+            fundsKeyState={fundsKeyState}
+            onReceiveCode={openReceiveCode}
+            onOpenFundsKey={openFundsManager}
+            openSheet={walletSheet}
             footer={walletSection === "keys" ? undefined : discoveryReport}
-            onCopyIdentityHash={async () => {
-              try {
-                await navigator.clipboard.writeText(overviewHash);
-              } catch {
-                setError(t("common.copyFailed"));
-              }
-            }}
           />
           {modules.tokenDecimals === null ? (
             <p className="text-xs text-ink-muted">{tr("rawUnits")}</p>
           ) : null}
-          <div className="min-w-0 overflow-hidden rounded-2xl border border-hairline bg-surface">
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
             <ShieldedTaskNavigation
-              id={formId}
               action={action}
-              walletAction={
-                wallet?.notes.some(
-                  (note) => note.kind === "value" && note.slot === slot && BigInt(note.amount) > 0n,
-                )
-                  ? "privateTransfer"
-                  : "shield"
-              }
               busy={busy}
-              symbol={modules.assetSymbol}
+              symbol={symbol}
+              claimablePeriods={claimablePeriods}
               onActionChange={navigateToAction}
             />
-            <div
-              ref={taskRegion}
-              id={`${formId}-task-panel`}
-              role="tabpanel"
-              tabIndex={-1}
-              className="focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
-              aria-labelledby={`${formId}-tab-${action === "fund" ? "inheritance" : action === "claim" ? "receive" : "wallet"}`}
-            >
-              {action !== "fund" && action !== "claim" ? (
-                walletActionForm
-              ) : (
-                <PanelShell
-                  embedded
-                  title={t(`shielded.actions.${action}`, { symbol: modules.assetSymbol })}
-                  description={t(`shielded.descriptions.${action}`, {
-                    symbol: modules.assetSymbol,
-                  })}
-                >
-                  {!session.identity ? (
-                    <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
-                  ) : null}
-                  <ShieldedBudgetActions
-                    action={action}
-                    symbol={modules.assetSymbol}
-                    decimals={modules.tokenDecimals ?? 0}
-                    busy={busy || submissionPending}
-                    wallet={wallet}
-                    entry={effectiveEntry}
-                    slot={slot}
-                    onEntryChange={(next) => {
-                      // The child, version, rule and amounts stay; only receiving material differs.
-                      if (template || next === entry) return;
-                      setEntry(next);
-                      changeCode("");
-                      setRecipientInputMethod("receiveCode");
-                      recipientForm.current?.clearSecretInputs();
-                    }}
-                    policyHandle={policyHandle}
-                    onPolicyChange={(handle) => {
-                      setPolicyHandle(handle);
-                      setPersonHash("");
-                      setRootVersion("");
-                      changeCode("");
-                      recipientForm.current?.clearSecretInputs();
-                      setError("");
-                    }}
-                    rootVersion={rootVersion}
-                    onRootVersionChange={(value) => {
-                      setRootVersion(value);
-                      setPersonHash("");
-                      changeCode("");
-                    }}
-                    personHash={personHash}
-                    onPersonHashChange={(value) => {
-                      setPersonHash(value);
-                      const original = wallet?.templates.find(
-                        (item) =>
-                          item.policyHandle === policyHandle &&
-                          item.personHash.toLowerCase() === value.toLowerCase(),
-                      );
-                      if (original)
-                        setEntry(
-                          original.bindingKind === 1
-                            ? "public"
-                            : original.keyMode === 1
-                              ? "privateIndependent"
-                              : "privateConvenient",
-                        );
-                      changeCode("");
-                      recipientForm.current?.clearSecretInputs();
-                      setError("");
-                    }}
-                    amount={amount}
-                    onAmountChange={setAmount}
-                    periodDays={periodDays}
-                    onPeriodDaysChange={setPeriodDays}
-                    periods={periods}
-                    onPeriodsChange={setPeriods}
-                    code={code}
-                    onCodeChange={changeCode}
-                    recipientInputMethod={recipientInputMethod}
-                    onRecipientInputMethodChange={(method) => {
-                      changeCode("");
-                      setRecipientInputMethod(method);
-                      recipientForm.current?.clearSecretInputs();
-                    }}
-                    recipientFormRef={recipientForm}
-                    onGenerateRecipientCode={() => void generateConvenientCode()}
-                    claimHandle={claimHandle}
-                    onClaimChange={(handle) => {
-                      setClaimHandle(handle);
-                      setClaimPeriods(
-                        claims.find((claim) => claim.handle === handle)?.periodIndices ?? [],
-                      );
-                    }}
-                    claimPeriods={claimPeriods}
-                    onClaimPeriodsChange={setClaimPeriods}
-                    independentKeyReady={fundsReady && fundsSelectionMatches}
-                    parentPersonHash={session.identity?.personHash}
-                    localRecipientLabels={localRecipientLabels}
-                    fundingDeficit={fundingDeficit}
-                  />
-                  {!signer ? <WarningNotice>{t("shielded.walletNotReady")}</WarningNotice> : null}
-                  {/* A locked funds key offers only its unlock action above. */}
-                  {action === "claim" && slot === "asset" && !slotReady ? null : (
-                    <PanelButton
-                      variant="primary"
-                      className="w-full sm:w-auto sm:min-w-36"
-                      busy={busy}
-                      disabled={
-                        busy ||
-                        submissionPending ||
-                        !slotReady ||
-                        !session.identity ||
-                        !signer ||
-                        (needsCode && !recipientReady) ||
-                        (action === "fund" &&
-                          (fundingDeficit !== undefined ||
-                            !personHash ||
-                            (!selectedPolicy && !rootVersion))) ||
-                        (action === "claim" &&
-                          (!selectedClaim ||
-                            selectedClaim.status !== "claimable" ||
-                            !claimPeriods.length ||
-                            claimPeriods.some(
-                              (index) => !selectedClaim.periodIndices.includes(index),
-                            )))
-                      }
-                      onClick={() => void prepare()}
-                    >
-                      {t("shielded.submit", {
-                        symbol: modules.assetSymbol,
-                        action: t(`shielded.actions.${action}`, { symbol: modules.assetSymbol }),
-                      })}
-                    </PanelButton>
-                  )}
-                  {feedback}
-                </PanelShell>
-              )}
+            <div className="flex min-w-0 flex-[999_1_40rem] flex-wrap items-start gap-6">
+              <section
+                ref={taskRegion}
+                tabIndex={-1}
+                aria-labelledby={taskTitleId}
+                className="min-w-0 flex-[999_1_27.5rem] rounded-[20px] border border-hairline bg-surface p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-7"
+              >
+                {composer}
+              </section>
+              {receipt}
             </div>
           </div>
-        </>
-      ) : null}
+          <ShieldedWalletSheet
+            open={walletSheet !== null}
+            title={
+              walletSheet?.kind === "receiveCode"
+                ? tr(codeSlot === "identity" ? "identityReceiveCode" : "fundsReceiveCode")
+                : fundsTitle
+            }
+            icon={
+              walletSheet?.kind === "receiveCode"
+                ? QrCode
+                : accessFlow === "backup"
+                  ? ShieldCheck
+                  : KeyRound
+            }
+            closeLabel={t("common.close")}
+            onClose={closeWalletSheet}
+          >
+            {walletSheet?.kind === "receiveCode"
+              ? receiveCodeContent
+              : walletSheet?.kind === "keys"
+                ? fundsManager
+                : null}
+          </ShieldedWalletSheet>
+        </div>
+      )}
     </div>
   );
 }

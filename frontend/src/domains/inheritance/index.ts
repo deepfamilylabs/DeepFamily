@@ -11,4 +11,5 @@ export {
   useShieldedPageIdentitySession,
 } from "./ui/ShieldedIdentitySessionContext";
 export { ShieldedAssetToolbar } from "./ui/ShieldedAssetToolbar";
+export { PanelButton } from "./ui/inheritanceControls";
 export type { ShieldedAssetToolbarProps } from "./ui/ShieldedAssetToolbar";

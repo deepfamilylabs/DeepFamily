@@ -253,26 +253,44 @@ recovery and matching VALUE use, without requiring a person record on the
 current chain. Asset selection follows credentials unlock. Metadata failures
 preserve verified raw integer amounts with unknown precision.
 
-The workspace contains the asset overview, three task tabs and the selected
-task's controls. **Private wallets** beside the current wallet opens the identity
-credentials and funds key cards. Opening a card's **Receive code** generates the
-code at once; **Generate receive code** appears only to retry a failure. Only a
-usable funds key (verified, backup complete) offers **Receive code** and **Keys**
+The workspace shows the asset overview, a task list and the selected task's form
+beside a live receipt. The overview keeps both private wallets in view, identity
+credentials and funds key, each with its spendable and budget balances. The
+current wallet carries the **Current private wallet** badge and is chosen on its
+card; it controls every deposit, spend, budget funding and claim. A loaded funds
+key that differs from the pinned one leaves the card's radio unchecked, showing
+the pinned fingerprint, until the user accepts the new key by choosing it again.
+This choice is separate from the receive-code type and the funding entry, which
+select the recipient's authorization mode.
+
+The task list groups **Deposit**, **Transfer** and **Withdraw**, **Fund a child
+budget** and **Claim budget**, and counts the periods that can be claimed now; on a
+phone it becomes a row of chips. Each form sits beside a receipt that totals the
+result and holds its confirmation; on a phone the receipt is a bar pinned above
+the status bar. Funding is numbered as arrangement, child and entry, and its
+receipt previews the schedule from the first period to the last. A new
+arrangement's dates are estimated from the funding start delay; an existing one
+keeps its own clock. Claiming lists the due periods to choose and the funded
+periods ahead, from the Worker's next period index and count. A spend plan lists
+its confirmed steps, with their hashes, above the remaining ones and shows proving
+and sending progress inside the step being sent.
+
+A wallet card's **Receive code** opens a side sheet that generates the code at
+once; **Generate receive code** appears only to retry a failure. Only a usable
+funds key (verified, backup complete) offers **Receive code** and **Keys**
 (backup). A newly created key offers only its mandatory **Back up and verify funds
 key**; with no key or an unconfirmed candidate, the card offers **Unlock funds key**
 and **Create funds key**. Creation lists its generation methods unselected, and
-choosing one creates the key at once. Receive codes do not manage keys.
-A claim with an unusable funds key only points to Private wallets: an existing
-budget can be claimed only with its original key, since creating a replacement
-cannot change the budget's owner. Funds management replaces the current task's contents while the
-overview and navigation remain mounted. Returning keeps drafts and selections;
-leaving clears displayed secrets and pauses any backup drill. Amount drafts are
-separate, and transfer/withdrawal selections are allowed candidates for the
-8-input planner. The overview groups balances and VALUE notes by actual owner
-and pool. Users explicitly choose **Deposit to** for new deposits and **Use
-balance from** for transfers, withdrawals and donor budget funding. These choices
-select the controlling key, separately from receive-code type and the budget
-claim filter, which select the recipient's authorization mode.
+choosing one creates the key at once. Receive codes do not manage keys. A claim
+with an unusable funds key only points to that card: an existing budget can be
+claimed only with its original key, since creating a replacement cannot change the
+budget's owner. Funds management opens in the same side sheet while the overview,
+navigation and task drafts stay mounted underneath. Closing the sheet keeps drafts
+and selections, clears displayed secrets and pauses any backup drill. The backup
+lists its 24 words masked until shown; the Worker's material is written straight
+into the page, never into React state. Amount drafts are separate, and
+transfer/withdrawal selections are allowed candidates for the 8-input planner. The
+overview groups balances and VALUE notes by actual owner and pool.
 
 Creating or importing a root requires the current credentials session.
 Replacing funds or starting a backup drill uses `clearFunds`: it wipes the root,

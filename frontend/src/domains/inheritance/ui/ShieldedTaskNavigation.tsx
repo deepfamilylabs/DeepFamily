@@ -1,91 +1,116 @@
+import { useId, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  ArrowDownToLine,
+  ArrowLeftRight,
+  ArrowUpFromLine,
+  CalendarClock,
+  HandCoins,
+  type LucideProps,
+} from "lucide-react";
 import type { ShieldedAssetActionRequest } from "../../../shared/workers/shieldedAssetWorkerTypes";
 
 type Action = ShieldedAssetActionRequest["action"];
-const GROUPS = ["wallet", "inheritance", "receive"] as const;
-const actionClass = (active: boolean) =>
-  `min-h-8 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${active ? "bg-surface text-ink shadow-xs" : "text-ink-muted hover:text-ink"}`;
 
+const GROUPS: readonly { key: "wallet" | "inheritance" | "receive"; actions: readonly Action[] }[] =
+  [
+    { key: "wallet", actions: ["shield", "privateTransfer", "unshield"] },
+    { key: "inheritance", actions: ["fund"] },
+    { key: "receive", actions: ["claim"] },
+  ];
+
+const ICONS: Record<Action, ComponentType<LucideProps>> = {
+  shield: ArrowDownToLine,
+  privateTransfer: ArrowLeftRight,
+  unshield: ArrowUpFromLine,
+  fund: HandCoins,
+  claim: CalendarClock,
+};
+
+/**
+ * Every task in one list: a rail grouped by purpose on wide screens, a row of
+ * chips on a phone. The claim entry counts the periods that can be claimed now.
+ */
 export function ShieldedTaskNavigation({
-  id,
   action,
-  walletAction,
   busy,
   symbol,
+  claimablePeriods,
   onActionChange,
 }: {
-  id: string;
   action: Action;
-  walletAction: Action;
   busy: boolean;
   symbol: string;
+  claimablePeriods: number;
   onActionChange: (action: Action) => void;
 }) {
   const { t } = useTranslation();
-  const group = action === "fund" ? "inheritance" : action === "claim" ? "receive" : "wallet";
-  const selectGroup = (next: (typeof GROUPS)[number]) => {
-    onActionChange(next === "inheritance" ? "fund" : next === "receive" ? "claim" : walletAction);
-  };
+  const id = useId();
   return (
-    <div className="flex min-w-0 flex-col gap-4 border-b border-hairline px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-6">
-      <div
-        role="tablist"
-        aria-label={t("shielded.actionsTitle", { symbol })}
-        className="flex min-w-0 flex-wrap items-center gap-x-5"
-      >
-        {GROUPS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="tab"
-            id={`${id}-tab-${item}`}
-            aria-controls={`${id}-task-panel`}
-            aria-selected={group === item}
-            tabIndex={group === item ? 0 : -1}
-            disabled={busy}
-            onClick={() => selectGroup(item)}
-            onKeyDown={(event) => {
-              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-              event.preventDefault();
-              const index = GROUPS.indexOf(item);
-              const next =
-                GROUPS[
-                  event.key === "Home"
-                    ? 0
-                    : event.key === "End"
-                      ? GROUPS.length - 1
-                      : (index + (event.key === "ArrowLeft" ? -1 : 1) + GROUPS.length) %
-                        GROUPS.length
-                ];
-              selectGroup(next);
-              document.getElementById(`${id}-tab-${next}`)?.focus();
-            }}
-            className={`relative py-1.5 text-sm font-medium transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 ${
-              group === item
-                ? "text-ink after:bg-primary"
-                : "text-ink-muted after:bg-transparent hover:text-ink"
-            }`}
+    <nav
+      aria-label={t("shielded.actionsTitle", { symbol })}
+      className="min-w-0 basis-full lg:sticky lg:top-6 lg:max-w-[13.75rem] lg:flex-[1_1_12.5rem]"
+    >
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-[18px] lg:overflow-visible lg:px-0 lg:pb-0 lg:pt-1">
+        {GROUPS.map((group) => (
+          <div
+            key={group.key}
+            role="group"
+            aria-labelledby={`${id}-${group.key}`}
+            className="flex shrink-0 gap-2 lg:flex-col lg:gap-0.5"
           >
-            {t(`shielded.groups.${item}`)}
-          </button>
+            <span
+              id={`${id}-${group.key}`}
+              className="hidden px-3 pb-1.5 text-xs font-semibold text-ink-muted lg:block"
+            >
+              {t(`shielded.groups.${group.key}`)}
+            </span>
+            {group.actions.map((item) => {
+              const Icon = ICONS[item];
+              const active = item === action;
+              const count = item === "claim" ? claimablePeriods : 0;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  aria-current={active ? "true" : undefined}
+                  aria-describedby={count > 0 ? `${id}-count` : undefined}
+                  disabled={busy}
+                  onClick={() => onActionChange(item)}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-11 lg:rounded-[10px] lg:border-0 lg:px-3 ${
+                    active
+                      ? "border-orange-300 bg-orange-50 font-semibold text-orange-800 dark:border-orange-400/40 dark:bg-orange-400/10 dark:text-orange-300"
+                      : "border-hairline bg-surface font-medium text-ink/80 hover:bg-surface-alt hover:text-ink lg:bg-transparent"
+                  }`}
+                >
+                  <Icon
+                    className={`hidden h-[18px] w-[18px] shrink-0 lg:block ${
+                      active ? "text-orange-600 dark:text-orange-300" : "text-ink-muted"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="lg:flex-1 lg:text-left">
+                    {t(`shielded.actions.${item}`, { symbol })}
+                  </span>
+                  {count > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-orange-700 px-1.5 text-xs font-semibold tabular-nums text-white dark:bg-primary dark:text-orange-950"
+                    >
+                      {count}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         ))}
       </div>
-      {group === "wallet" ? (
-        <div className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-surface-alt p-1">
-          {(["shield", "privateTransfer", "unshield"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={item === action}
-              disabled={busy}
-              onClick={() => onActionChange(item)}
-              className={actionClass(item === action)}
-            >
-              {t(`shielded.actions.${item}`, { symbol })}
-            </button>
-          ))}
-        </div>
+      {claimablePeriods > 0 ? (
+        <span id={`${id}-count`} hidden>
+          {`${t("shielded.claimPeriodsLabel", { symbol })} ${claimablePeriods}`}
+        </span>
       ) : null}
-    </div>
+    </nav>
   );
 }

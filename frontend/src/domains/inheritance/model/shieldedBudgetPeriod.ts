@@ -21,3 +21,9 @@ export function formatShieldedTimestamp(
   const date = new Date(Number(seconds * 1000n));
   return kind === "date" ? date.toLocaleDateString() : date.toLocaleString();
 }
+
+/**
+ * A new budget's first period starts this long after its family eligibility
+ * snapshot, which also bounds how long that snapshot can back a funding proof.
+ */
+export const SHIELDED_FUNDING_START_DELAY_SECONDS = 7200n;

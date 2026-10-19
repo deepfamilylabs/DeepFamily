@@ -1595,7 +1595,6 @@
     },
     "fields": {
       "amount": "金额（{{symbol}}）",
-      "valueNote": "选择余额",
       "valueCandidates": "选择允许使用的余额",
       "budgetNote": "选择预算",
       "familyVersion": "父母人物版本",
@@ -1694,9 +1693,9 @@
       "submitting": "请在钱包中确认交易…",
       "confirming": "正在等待交易确认…"
     },
-    "fundingPreview": "{{amount}} {{symbol}} · {{periods}} 期 · 每 {{days}} 天 {{rate}} {{symbol}}",
+    "fundingPreview": "{{periods}} 期 · 每 {{days}} 天 {{rate}} {{symbol}}",
     "valueOption": "第 {{index}} 笔余额 · {{amount}} {{symbol}}",
-    "budgetOption": "预算 {{index}} · 剩余 {{amount}} {{symbol}} · 每 {{days}} 天",
+    "budgetOption": "预算 {{index}} · 剩余 {{amount}} {{symbol}}",
     "policyOption": "安排 {{index}} · {{identity}} · 每 {{days}} 天 {{amount}} {{symbol}}",
     "walletNotReady": "钱包尚未就绪，请稍后重试。",
     "claimOverview": {
@@ -1704,7 +1703,7 @@
       "unavailable": "无法核对领取条件，请刷新。",
       "ineligible": "当前家族记录未确认领取资格。",
       "claimable": "已选 {{periods}} 期 · 合计 {{amount}} {{symbol}}",
-      "notDue": "暂未到期。",
+      "notDue": "暂未到期",
       "exhausted": "预算已用尽。",
       "noFunds": "暂无待领取预算。",
       "scanLimited": "暂时无法列出可领取期次，请刷新后重试。",
@@ -1712,7 +1711,6 @@
     },
     "recipientPicker": {
       "loading": "正在查找子女…",
-      "placeholder": "选择子女",
       "emptyChildren": "没有符合条件的子女",
       "childFallback": "子女 {{index}}",
       "identityHash": "身份哈希"
@@ -1733,11 +1731,6 @@
     "claimSelectionRequired": "请至少选择一期。",
     "claimSelectionUnavailable": "所选预算或期次已不可领取，请刷新后重新选择。",
     "reselectClaim": "重新选择",
-    "unavailableBudget": "预算已不可用",
-    "singleValueSelectionHint": "请选择一笔足额余额。",
-    "singleValueSelectionSummary": "所选余额：{{amount}} {{symbol}}",
-    "singleSelectedValueUnavailable": "所选余额已不可用，请重新选择。",
-    "clearValueSelection": "清除选择",
     "periodDaysSummary": "每 {{days}} 天",
     "customPeriodDays": "自定义天数",
     "dateOutOfRange": "到期时间超出可显示范围",
@@ -1753,7 +1746,7 @@
       "importWarning": "导入仅检查基础接口。请确认代币不扣转账费、不自动调整余额，且可信。"
     },
     "walletKeys": {
-      "claimFundsKeyRequired": "请先在“私密钱包”中设置资金密钥。已有预算只能用收款时的原资金密钥领取。",
+      "claimFundsKeyRequired": "请先在“资金密钥”钱包中解锁或新建资金密钥。已有预算只能用收款时的原资金密钥领取。",
       "currentWallet": "当前私密钱包",
       "walletBalances": "私密钱包余额",
       "walletUnlocked": "已解锁",
@@ -1838,7 +1831,6 @@
       "claimViewLabel": "预算类型",
       "receiveKeyLabel": "收款码类型",
       "openIndependentFunds": "解锁资金密钥",
-      "manageIndependentFunds": "私密钱包",
       "fundsIdentityNeeded": "先用原身份资料和原口令解锁，再恢复资金备份。身份证明暂不可用时，仍可转账和提现已确认的资金。",
       "useIndependentFunds": "使用已到账资金",
       "independentFundsTitle": "资金密钥",

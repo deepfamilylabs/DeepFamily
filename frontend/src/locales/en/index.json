@@ -1595,7 +1595,6 @@
     },
     "fields": {
       "amount": "Amount ({{symbol}})",
-      "valueNote": "Select balances",
       "valueCandidates": "Choose balances available to spend",
       "budgetNote": "Select budget",
       "familyVersion": "Parent person version",
@@ -1694,9 +1693,9 @@
       "submitting": "Confirm the transaction in your wallet…",
       "confirming": "Waiting for transaction confirmation…"
     },
-    "fundingPreview": "{{amount}} {{symbol}} · {{periods}} periods · {{rate}} {{symbol}} every {{days}} days",
+    "fundingPreview": "{{periods}} periods · {{rate}} {{symbol}} every {{days}} days",
     "valueOption": "Balance {{index}} · {{amount}} {{symbol}}",
-    "budgetOption": "Budget {{index}} · {{amount}} {{symbol}} remaining · Every {{days}} days",
+    "budgetOption": "Budget {{index}} · {{amount}} {{symbol}} remaining",
     "policyOption": "Arrangement {{index}} · {{identity}} · {{amount}} {{symbol}} every {{days}} days",
     "walletNotReady": "The wallet is not ready. Try again shortly.",
     "claimOverview": {
@@ -1704,7 +1703,7 @@
       "unavailable": "Claim eligibility could not be checked. Refresh.",
       "ineligible": "The current family record does not confirm eligibility.",
       "claimable": "Selected {{periods}} periods · Total {{amount}} {{symbol}}",
-      "notDue": "Not due yet.",
+      "notDue": "Not due yet",
       "exhausted": "Budget exhausted.",
       "noFunds": "No pending budgets.",
       "scanLimited": "Claimable periods could not be listed. Refresh and try again.",
@@ -1712,7 +1711,6 @@
     },
     "recipientPicker": {
       "loading": "Finding children…",
-      "placeholder": "Select child",
       "emptyChildren": "No eligible children found",
       "childFallback": "Child {{index}}",
       "identityHash": "Person hash"
@@ -1733,11 +1731,6 @@
     "claimSelectionRequired": "Select at least one period.",
     "claimSelectionUnavailable": "The selected budget or periods are no longer claimable. Refresh and select again.",
     "reselectClaim": "Select again",
-    "unavailableBudget": "Budget unavailable",
-    "singleValueSelectionHint": "Choose one balance that covers the amount.",
-    "singleValueSelectionSummary": "Selected balance: {{amount}} {{symbol}}",
-    "singleSelectedValueUnavailable": "The selected balance is unavailable. Select another balance.",
-    "clearValueSelection": "Clear selection",
     "periodDaysSummary": "Every {{days}} days",
     "customPeriodDays": "Custom days",
     "dateOutOfRange": "Due date exceeds the display range",
@@ -1753,7 +1746,7 @@
       "importWarning": "Import checks basic interfaces only. Use trusted tokens without transfer fees or automatic balance changes."
     },
     "walletKeys": {
-      "claimFundsKeyRequired": "Set up the funds key under Private wallets first. Existing budgets can be claimed only with the original funds key that received them.",
+      "claimFundsKeyRequired": "Unlock or create the funds key on its wallet card first. Existing budgets can be claimed only with the original funds key that received them.",
       "currentWallet": "Current private wallet",
       "walletBalances": "Private wallet balances",
       "walletUnlocked": "Unlocked",
@@ -1838,7 +1831,6 @@
       "claimViewLabel": "Budget type",
       "receiveKeyLabel": "Receive code type",
       "openIndependentFunds": "Unlock funds key",
-      "manageIndependentFunds": "Private wallets",
       "fundsIdentityNeeded": "First unlock the original identity details and passphrase, then restore the funds backup. Transfers and withdrawals remain available if identity proofs are unavailable.",
       "useIndependentFunds": "Use received funds",
       "independentFundsTitle": "Funds key",

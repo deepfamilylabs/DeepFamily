@@ -131,6 +131,8 @@ describe("shielded claim overview", () => {
     expect(result.totalRemaining).toBe(300n);
     expect(result.claim).toBeUndefined();
     expect(result.nextDueAt).toBe(start + period);
+    expect(result.nextPeriodIndex).toBe(0n);
+    expect(result.futurePeriods).toBe(3n);
   });
 
   it("shows exactly the amount and periods of the automatic next claim", () => {
@@ -143,6 +145,9 @@ describe("shielded claim overview", () => {
     );
     expect(result.claim).toEqual({ budget: note, periodIndices: [0n, 1n], amount: 200n });
     expect(result.nextDueAt).toBe(start + 3n * period);
+    // Two of the three funded periods are due now; one remains for the schedule ahead.
+    expect(result.nextPeriodIndex).toBe(2n);
+    expect(result.futurePeriods).toBe(1n);
   });
 
   it("skips paid periods shared across budgets and deduplicates budget commitments", () => {
@@ -158,6 +163,8 @@ describe("shielded claim overview", () => {
     expect(result.totalRemaining).toBe(200n);
     expect(result.claim).toBeUndefined();
     expect(result.nextDueAt).toBe(start + 2n * period);
+    expect(result.nextPeriodIndex).toBe(1n);
+    expect(result.futurePeriods).toBe(2n);
   });
 
   it("does not invent a next date when allocations sharing a policy started on different days", () => {
@@ -168,6 +175,8 @@ describe("shielded claim overview", () => {
     expect(result.status).toBe("claimable");
     expect(result.scanLimited).toBe(true);
     expect(result.nextDueAt).toBeUndefined();
+    expect(result.nextPeriodIndex).toBeUndefined();
+    expect(result.futurePeriods).toBeUndefined();
   });
 
   it("keeps no funds, exhausted funds, and invalid budgets distinct", () => {

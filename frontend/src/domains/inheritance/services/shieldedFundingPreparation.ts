@@ -40,11 +40,12 @@ import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
 import { validateShieldedKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+import { SHIELDED_FUNDING_START_DELAY_SECONDS } from "../model/shieldedBudgetPeriod";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
 const MAX_UINT128 = (1n << 128n) - 1n;
-const PROOF_LIFETIME = 7200n;
+const PROOF_LIFETIME = SHIELDED_FUNDING_START_DELAY_SECONDS;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
 
 export type SavedTemplate<T> = {

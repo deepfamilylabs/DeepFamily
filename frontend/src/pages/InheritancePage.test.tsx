@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ShieldedPublicIdentity } from "../shared/workers/shieldedAssetWorkerTypes";
 import {
@@ -90,12 +90,14 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
     account,
     signer,
     modules,
+    head,
     assetControls,
     navigation,
     onNavigationChange,
   }: {
     account: string;
     signer: unknown;
+    head?: React.ReactNode;
     assetControls?: React.ReactNode;
     navigation?: ShieldedPanelNavigation;
     onNavigationChange?: (navigation: ShieldedPanelNavigation) => void;
@@ -116,6 +118,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
     }, []);
     return (
       <div data-testid="shielded-panel">
+        {head}
         {assetControls}
         <span data-testid="shielded-session-state">{session.identity ? "unlocked" : "locked"}</span>
         <span data-testid="shielded-identity">{session.identity?.identityCommitment ?? ""}</span>
@@ -255,8 +258,11 @@ describe("InheritancePage private pool entry", () => {
 
   it("opens only the private pool after checking its deployment wiring", async () => {
     render(<InheritancePage />);
-    expect(await screen.findByTestId("shielded-panel")).toBeTruthy();
+    const panel = await screen.findByTestId("shielded-panel");
     expect(screen.getByTestId("shielded-deployment-block").textContent).toBe("12");
+    // The panel places the page heading in whichever column it uses.
+    expect(within(panel).getByRole("heading", { name: "shielded.title" })).toBeTruthy();
+    expect(screen.getAllByRole("heading", { name: "shielded.title" })).toHaveLength(1);
   });
 
   it("disables asset changes while a secret operation runs", async () => {

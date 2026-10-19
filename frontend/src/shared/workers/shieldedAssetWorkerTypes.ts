@@ -78,6 +78,9 @@ export type ShieldedClaimSummary = {
   periodDays?: string;
   status: string;
   nextDueAt?: string;
+  /** The period due at nextDueAt and the funded periods from it on, for one schedule. */
+  nextPeriodIndex?: string;
+  futurePeriods?: string;
 };
 export type ShieldedWalletSummary = {
   /** Public recovery-gate updates, including a signature candidate confirmed by history. */

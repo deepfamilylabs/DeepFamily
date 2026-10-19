@@ -7,6 +7,7 @@ import {
   ShieldedIdentitySessionProvider,
   useShieldedPageIdentitySession,
   ShieldedAssetToolbar,
+  PanelButton,
   readShieldedAsset,
   resolveShieldedAssetPool,
   type ShieldedAsset,
@@ -325,8 +326,13 @@ function InheritanceContent() {
         }}
       />
       {selectedAddress !== ZeroAddress && !sameAddress(selectedAddress, config.tokenAddress) ? (
-        <p className="text-xs leading-relaxed text-ink-muted">
+        <p className="max-w-md text-xs leading-relaxed text-ink-muted">
           {t("shielded.assets.importWarning")}
+        </p>
+      ) : null}
+      {assetError ? (
+        <p role="alert" className="max-w-md text-sm text-danger">
+          {errorMessage(assetError)}
         </p>
       ) : null}
     </div>
@@ -334,7 +340,7 @@ function InheritanceContent() {
 
   if (!wallet.address) {
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-6">
+      <div className="mx-auto w-full max-w-[45rem] space-y-6">
         {head}
         <EmptyState
           size="page"
@@ -347,30 +353,41 @@ function InheritanceContent() {
     );
   }
 
+  // The workspace spans the wider column; every other state is one focused narrow column.
+  if (readyModules) {
+    return (
+      <div className="mx-auto w-full max-w-[70rem]">
+        <ShieldedInheritancePanel
+          key={`${readyModules.chainId}:${readyModules.poolAddress}:${person.epoch}`}
+          modules={readyModules}
+          signer={wallet.signer}
+          account={wallet.address}
+          head={head}
+          assetControls={assetControls}
+          navigation={navigation}
+          onNavigationChange={setNavigation}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-6">
+    <div className="mx-auto w-full max-w-[45rem] space-y-6">
       {head}
-      {!readyModules ? (
-        <div className="min-w-0 rounded-xl border border-hairline bg-surface px-4 py-3 sm:px-5">
-          {assetControls}
-        </div>
-      ) : null}
-      {assetError ? (
-        <p role="alert" className="text-sm text-danger">
-          {errorMessage(assetError)}
-        </p>
-      ) : null}
+      <div className="min-w-0 rounded-[20px] border border-hairline bg-surface px-4 py-3.5 sm:px-5">
+        {assetControls}
+      </div>
       {state.status === "missingPool" ? (
         <div className="space-y-2">
           <p className="text-sm text-ink-muted">{t("shielded.assets.noPool")}</p>
-          <button
-            type="button"
+          <PanelButton
+            variant="primary"
+            busy={creatingPool}
             disabled={creatingPool || wrongNetwork || !wallet.signer}
-            className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary"
             onClick={() => void createPool()}
           >
             {t(creatingPool ? "shielded.assets.creating" : "shielded.assets.create")}
-          </button>
+          </PanelButton>
         </div>
       ) : null}
       {state.status === "loading" ? <p role="status">{t("shielded.loading")}</p> : null}
@@ -388,25 +405,13 @@ function InheritanceContent() {
           className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm text-ink"
         >
           <p>{t("shielded.wrongNetwork", { chainId: String(config.chainId) })}</p>
-          <button
-            type="button"
-            className="mt-3 rounded-lg border border-hairline px-4 py-2"
+          <PanelButton
+            className="mt-3"
             onClick={() => void wallet.switchOrAddChain(config.chainId)}
           >
             {t("inheritance.gate.switchNetwork")}
-          </button>
+          </PanelButton>
         </div>
-      ) : null}
-      {readyModules ? (
-        <ShieldedInheritancePanel
-          key={`${readyModules.chainId}:${readyModules.poolAddress}:${person.epoch}`}
-          modules={readyModules}
-          signer={wallet.signer}
-          account={wallet.address}
-          assetControls={assetControls}
-          navigation={navigation}
-          onNavigationChange={setNavigation}
-        />
       ) : null}
     </div>
   );

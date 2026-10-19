@@ -831,6 +831,13 @@ export class ShieldedAssetSession {
           ...(option.overview.nextDueAt === undefined
             ? {}
             : { nextDueAt: String(option.overview.nextDueAt) }),
+          ...(option.overview.nextPeriodIndex === undefined ||
+          option.overview.futurePeriods === undefined
+            ? {}
+            : {
+                nextPeriodIndex: String(option.overview.nextPeriodIndex),
+                futurePeriods: String(option.overview.futurePeriods),
+              }),
         });
       }
     }
