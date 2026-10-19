@@ -56,10 +56,12 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256[12] periodNullifiers;
     uint256[2] outputCommitments;
     bytes[2] outputCiphertexts;
-    // Initial Fund/Claim: current endorsement/trusted roots.
+    // Initial Fund/Claim: endorsement/trusted roots from one accepted checkpoint.
     uint256 relation0;
     uint256 relation1;
     uint256 asOf;
+    // Index metadata, checked against the roots and asOf already bound by the ZK proof.
+    uint256 lineageCheckpointId;
     // Fund only: 0 starts an enrollment; 1 continues a historical enrollment.
     uint256 fundMode;
     // Fund only: 0 owner-bound encrypted budget; 1 identity-bound public budget.
@@ -302,24 +304,26 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         revert InvalidActionData();
       }
     }
-    if (isClaim) {
-      _requireNonzeroField(data.relation0);
-      _requireNonzeroField(data.relation1);
-      if (data.relation0 != LINEAGE_INDEX.root(0) || data.relation1 != LINEAGE_INDEX.root(1))
-        revert UnknownLineageRoot();
-    } else if (isInitialFund) {
-      _requireNonzeroField(data.relation0);
-      _requireNonzeroField(data.relation1);
-      if (data.relation0 != LINEAGE_INDEX.root(0) || data.relation1 != LINEAGE_INDEX.root(1))
-        revert UnknownLineageRoot();
-    } else if (data.relation0 != 0 || data.relation1 != 0) {
-      revert InvalidActionData();
-    }
     if (isClaim || isInitialFund) {
+      _requireNonzeroField(data.relation0);
+      _requireNonzeroField(data.relation1);
       if (data.asOf > block.timestamp || block.timestamp - data.asOf >= ACTION_PROOF_LIFETIME) {
         revert InvalidClaimTime();
       }
-    } else if (data.asOf != 0) {
+      // The ID need not be a circuit input: the proof binds both roots and asOf. The index
+      // requires createdAt <= asOf, preventing rebinding to a checkpoint created after
+      // the proof's timestamp when the same roots recur. Each retired ID has one fixed deadline.
+      if (
+        !LINEAGE_INDEX.isKnownCheckpoint(
+          data.lineageCheckpointId,
+          data.relation0,
+          data.relation1,
+          data.asOf
+        )
+      ) revert UnknownLineageRoot();
+    } else if (
+      data.relation0 != 0 || data.relation1 != 0 || data.asOf != 0 || data.lineageCheckpointId != 0
+    ) {
       revert InvalidActionData();
     }
 

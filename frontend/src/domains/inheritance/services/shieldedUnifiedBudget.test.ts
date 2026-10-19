@@ -123,6 +123,10 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
   ]);
   const lineage: LineageSnapshot = {
     blockNumber: 10,
+    blockHash: `0x${"ab".repeat(32)}`,
+    timestamp: initialTime,
+    checkpointId: 7n,
+    checkpointCreatedAt: 0n,
     endorsementTree,
     trustedTree,
     versions: new Map([
@@ -197,6 +201,8 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
       hash.toLowerCase() === childHash ? childIC : 0n,
     ),
     root: async (which: number) => (which === 0 ? endorsementTree.root : trustedTree.root),
+    isKnownCheckpoint: async (id: bigint, endorsement: bigint, trusted: bigint) =>
+      id === 7n && endorsement === endorsementTree.root && trusted === trustedTree.root,
   } as unknown as Contract;
   function record(
     prepared: {
@@ -308,6 +314,7 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
     getLogs,
     mature() {
       now = initialTime + 7200n + 4n * periodDays * SECONDS_PER_DAY;
+      lineage.timestamp = now;
     },
     get now() {
       return now;

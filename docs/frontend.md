@@ -442,6 +442,14 @@ not.
 
 Before requesting a wallet transaction, the flow records its public nonce, block and expected outputs. Unknown results block another submission and display pending feedback while the page automatically checks the result. Public transaction context and receipt tracking live in the in-memory transaction center, survive secret locking and application navigation, and resume automatically when returning to the same pool. Automatic checks can locate unknown hashes by replaying unfiltered public output events and checking the original nonce at the same block; unresolved checks retry every five seconds. Explicit wallet rejection releases the pending guard; ambiguous RPC failures do not. Clearing secrets cannot revoke a wallet request already issued, and returning to the page never automatically resubmits it.
 
+Initial Fund and Claim prepare both lineage trees, their checkpoint ID and `asOf` at the same
+authenticated block. Proof generation and the final submission check use `isKnownCheckpoint`, so
+unrelated updates do not discard a preview during its checkpoint's 15-minute retirement window.
+The transaction must execute before that deadline; requesting a wallet does not restart it.
+The two-hour proof freshness and initial eligibility delay are separate rules. Qualification
+revocation can take up to 15 minutes to take full effect, including collection of mature unpaid
+budget periods during that window.
+
 See the [asset-key specification](shielded-asset-key-spec.md), [contract interfaces](contracts.md#shielded-inheritance-contracts) and [circuit specification](zk-proofs.md#shielded-inheritance-circuits) for precise protocol definitions and their verification boundaries.
 
 ### Workers (crypto, ZK and asset sessions)

@@ -8,7 +8,20 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
  *         zero-knowledge proof can show membership in that state without naming the record.
  */
 interface IDeepFamilyLineageIndex is IERC165 {
+  struct Checkpoint {
+    uint256 endorsementRoot;
+    uint256 trustedRoot;
+    uint256 createdAt;
+    uint256 retiredAt;
+  }
+
   event LeafWritten(uint8 indexed treeId, uint256 indexed leafIndex, uint256 leaf, uint256 root);
+  event CheckpointCreated(
+    uint256 indexed checkpointId,
+    uint256 endorsementRoot,
+    uint256 trustedRoot,
+    uint256 createdAt
+  );
   /// @notice The Poseidon identity commitments behind a version, which DeepFamily stores only
   ///         keccak-wrapped. A claim needs both parents' commitments to open the parents digest.
   event VersionIndexed(
@@ -42,7 +55,24 @@ interface IDeepFamilyLineageIndex is IERC165 {
   function root(uint8 treeId) external view returns (uint256);
   function size(uint8 treeId) external view returns (uint256);
   function depth(uint8 treeId) external view returns (uint256);
+  /// @notice Per-tree history. Pool eligibility uses paired checkpoints instead.
   function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
+  function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);
+  function currentCheckpointId() external view returns (uint256);
+  function getCheckpoint(
+    uint256 checkpointId
+  )
+    external
+    view
+    returns (uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt);
+  /// @notice Checks a root pair that coexisted, its proof time, and its retirement deadline.
+  /// @dev A retired checkpoint requires asOf <= retiredAt and expires strictly at its deadline.
+  function isKnownCheckpoint(
+    uint256 checkpointId,
+    uint256 endorsementRoot,
+    uint256 trustedRoot,
+    uint256 asOf
+  ) external view returns (bool);
   function identityCommitmentOf(bytes32 personHash) external view returns (uint256);
   function parentsDigestOf(
     bytes32 personHash,

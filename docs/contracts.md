@@ -1162,6 +1162,14 @@ function root(uint8 treeId) external view returns (uint256);
 function size(uint8 treeId) external view returns (uint256);
 function depth(uint8 treeId) external view returns (uint256);
 function isKnownRoot(uint8 treeId, uint256 candidate) external view returns (bool);
+function CHECKPOINT_RETIREMENT_WINDOW() external view returns (uint256);
+function currentCheckpointId() external view returns (uint256);
+function getCheckpoint(uint256 checkpointId) external view returns (
+  uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt
+);
+function isKnownCheckpoint(
+  uint256 checkpointId, uint256 endorsementRoot, uint256 trustedRoot, uint256 asOf
+) external view returns (bool);
 function identityCommitmentOf(bytes32 personHash) external view returns (uint256);
 function parentsDigestOf(bytes32 personHash, uint256 versionIndex) external view returns (uint256);
 function endorsementLeafIndex(
@@ -1209,10 +1217,25 @@ storage. A targeted RPC call reveals `treeId` and `leafIndex` to the RPC provide
 correlate the index with public `LeafWritten` events. The current client instead rebuilds both
 trees from full event scans.
 
-`isKnownRoot` accepts the current root, or a root replaced at most `ROOT_HISTORY_WINDOW` (1 hour)
-ago, so a proof built just before another write still verifies. Only the proxy may call the
-`on*` hooks. Clients rebuild both trees by replaying every `LeafWritten` event in order and check
-the result against `root(treeId)` at the scanned block.
+Every actual root change creates a monotonically numbered checkpoint containing both roots and
+its creation timestamp, and retires the preceding checkpoint exactly once. `isKnownCheckpoint`
+requires a nonzero root pair from that one checkpoint and `createdAt <= asOf <= block.timestamp`.
+A retired checkpoint also requires `asOf <= retiredAt` and
+`block.timestamp < retiredAt + CHECKPOINT_RETIREMENT_WINDOW` (15 minutes). Checkpoints are not
+evicted by a fixed-size history buffer: any number of unrelated writes cannot shorten this
+window. Repeated root values receive new IDs; a proof's bound `asOf` prevents moving it to a
+checkpoint created later. The deadline of the original ID never changes.
+
+This deliberately permits revoked qualifications for at most 15 minutes after revocation.
+During that window a claimant may still collect already mature unpaid periods; the window is
+not a cap on the amount paid. The pool never combines independently known historical roots,
+which could represent qualifications that never coexisted. `isKnownRoot` remains a separate
+per-tree history view with a one-hour window; it does not authorize pool actions.
+
+Only the proxy may call the `on*` hooks. Clients rebuild both trees by replaying every
+`LeafWritten` event in order and authenticate their roots, checkpoint ID and timestamp at the
+same scanned block. Proof preparation and submission recheck checkpoint acceptance, not equality
+with the latest roots, while retaining block-reorganization and spent-nullifier checks.
 
 The contract links the PoseidonT3–T6 libraries from `poseidon-solidity`. They are compiled without
 `viaIR` (see `hardhat.config.mjs`); with it, PoseidonT6 exceeds the contract size limit.
@@ -1233,7 +1256,7 @@ The immutable, non-upgradeable `ShieldedPoolFactory` registers native currency a
 
 `ShieldedErc20Pool` and `ShieldedNativePool` each hold one asset using `ShieldedPoolCore` and a global sequence of note commitments in 32-level shards. Its five actions are `shield`, `fund`, `claim`, `privateTransfer` and `unshield`; each appends two fixed-size envelopes and commitments. Spends must use a root recorded after a complete action; the root emitted with an action's first output is never accepted, because in a new shard it equals that output's commitment. Public and private addressing share `shield → donor VALUE → fund → child BUDGET → claim → child VALUE`. Funding always spends donor VALUE; it does not directly transfer ordinary-wallet tokens. Only `shield` increases `totalShielded` and custody, and only `unshield` decreases them. Internal funding, claims and transfers conserve both. The lineage trees remain 64 levels deep.
 
-Private budget funding verifies a receive code in the browser and delivers an owner-bound BUDGET with HPKE. Public addressing resolves the selected child's existing `personHash` to its identity commitment, needs no receive code or payment-key registration, and publishes an identity-bound BUDGET's own recovery fields. Both modes prove current lineage on initial funding and the same initial-enrollment uniqueness. Public funding reveals the chosen parent/child identities and terms; claims do not reveal which budget format or identity they spend.
+Private budget funding verifies a receive code in the browser and delivers an owner-bound BUDGET with HPKE. Public addressing resolves the selected child's existing `personHash` to its identity commitment, needs no receive code or payment-key registration, and publishes an identity-bound BUDGET's own recovery fields. Both modes prove lineage from one accepted checkpoint on initial funding and the same initial-enrollment uniqueness. Public funding reveals the chosen parent/child identities and terms; claims do not reveal which budget format or identity they spend.
 
 Rules are private parameters. Policy commitment P binds the parent identity/version, rate, positive uint32 periodDays, random policy salt and allocation-key commitment; enrollment commitment E binds P, the child, eligibility start and enrollment salt. `fundMode = 0` consumes donor VALUE plus a unique policy/heir enrollment tag and fixes `eligibleFrom = asOf + 7200`. `fundMode = 1` consumes new donor VALUE plus a randomized read-use tag, proves the historical budget template's membership, and preserves P/E and terms without consuming or counting the template balance. A spent or zero-value template remains usable.
 
@@ -1247,17 +1270,17 @@ The interface uses the following names. The recovered budget summary's `bindingK
 | Private (identity credentials) | 0 | 0 | 0 |
 | Private (funds key) | 0 | 0 | 1 |
 
-Both private entries use the same owner-bound BUDGET format and HPKE encryption. Their difference is key derivation and authorization: mode 0 reconstructs its keys from the complete identity credentials, while mode 1 uses separate funds-root Spend/View branches and requires their owner secret in addition to the identity proof. Both still require identity credentials and current lineage eligibility to claim.
+Both private entries use the same owner-bound BUDGET format and HPKE encryption. Their difference is key derivation and authorization: mode 0 reconstructs its keys from the complete identity credentials, while mode 1 uses separate funds-root Spend/View branches and requires their owner secret in addition to the identity proof. Both still require identity credentials and lineage eligibility from one accepted checkpoint to claim.
 
 Private kind-2 payloads are 283 bytes: 282 bytes of budget fields followed by one `keyMode` byte. Commitment domain 1015 uses `Poseidon3(S(1033), heirOwnerCommitment, keyMode)` as its owner-authorization field. Identity kind 5 is 218 bytes, containing `rootIdentityCommitment`, `rootVersionIndex`, `heirIdentityCommitment`, `amountPerPeriod`, `eligibleFrom`, `policyCommitment`, `enrollmentCommitment`, `remaining`, `nonce` and `periodDays`; mode 0 is implicit. Terms domain 1029 binds the identity and schedule, and note domain 1030 separates the format. Public delivery pads the version-1 payload with zeros to 512 bytes. The contract validates the header, widths, field bounds and padding; the fund proof binds all ten recovery fields to the output. Public packets contain no owner, private salts or allocation key.
 
 Donor change memos encrypt a budget copy and, for identity budgets, its private `ruleOpening`. Initial funding also backs up `allocationKey`, checked against its commitment on recovery. That key never enters a child budget or public packet. Historical memos remain recoverable after their VALUE is spent, but recovery accepts templates only at an authenticated Fund output boundary. Identity-budget memos use 400/432-byte payloads without/with allocation key; private memos use 427/459 bytes, including the original recipient viewing key. All fit the fixed 512-byte HPKE envelope. Identity memos omit the redundant policy commitment, reconstruct it from the encrypted opening and verify enrollment.
 
-`claim` consumes one or two compatible budgets and proves current lineage, identity-secret knowledge, the budget's owner-secret authorization, conservation and 1–12 distinct unpaid mature periods. Inputs share binding kind, key mode, owner, P/E, parent/version, child, rate, periodDays and start. Private notes retain their rule-opening checks; public notes require no private salts and strictly derive their owner from the identity secret. Mode-1 notes additionally require their independent owner secret, with no identity fallback. A remainder retains the original binding and key mode; its encryption does not convert a public identity-bound note into an owner-bound note. Payout VALUE is fixed to that authorized owner and has no persistent keyMode. Both outputs are encrypted to the claimant. Period and enrollment nullifiers remain identity/P-based and exclude owner, mode and root source, so changing keys cannot reset an allowance. A funder who knows the complete identity secret and P can precompute real period nullifiers and associate claims with periods even without a mode-1 spending root.
+`claim` consumes one or two compatible budgets and proves checkpoint-bound lineage, identity-secret knowledge, the budget's owner-secret authorization, conservation and 1–12 distinct unpaid mature periods. Inputs share binding kind, key mode, owner, P/E, parent/version, child, rate, periodDays and start. Private notes retain their rule-opening checks; public notes require no private salts and strictly derive their owner from the identity secret. Mode-1 notes additionally require their independent owner secret, with no identity fallback. A remainder retains the original binding and key mode; its encryption does not convert a public identity-bound note into an owner-bound note. Payout VALUE is fixed to that authorized owner and has no persistent keyMode. Both outputs are encrypted to the claimant. Period and enrollment nullifiers remain identity/P-based and exclude owner, mode and root source, so changing keys cannot reset an allowance. A funder who knows the complete identity secret and P can precompute real period nullifiers and associate claims with periods even without a mode-1 spending root.
 
 Each budget fixes a positive integer number of days per period at initial funding; additional funding preserves it. Period k (starting at zero) matures at `eligibleFrom + (k + 1) * periodDays * 86400`. One day is 86400 seconds; 30 and 365 days do not mean calendar months or years. The claim circuit bounds period indices to uint64 and periodDays to uint32, then compares maturity with 113 bits to prevent finite-field wraparound. Claims remain limited to 12 periods per proof; overdue periods do not expire. Changing periodDays creates another policy rather than changing an existing clock.
 
-For a single claim input, the second witness is zero, the shard/root repeats the first, and the second nullifier is secret-bound padding. `privateTransfer` and `unshield` each use one eight-slot circuit supporting one to eight real inputs. Real VALUE inputs must have positive uint128 amounts and share one owner, chain and pool; VALUE carries no permanent budget keyMode. Eight-slot enabled inputs are contiguous, disabled openings are zero, and their public shard/root repeat the first. Placeholder nullifiers are distinct by slot; real spend nullifiers depend on the owner secret and note commitment. Input sums are bounded to 131 bits, both outputs to uint128; withdrawal has one change and a zero dummy. Initial `fund` and all `claim` calls require current lineage roots and a fresh `asOf`. Initial funding constrains endorsement `writtenAt ≤ asOf`; the current claim circuit only binds its range, while the frontend checks that comparison. Encrypted-output correctness is not proved by binding its ciphertext hash.
+For a single claim input, the second witness is zero, the shard/root repeats the first, and the second nullifier is secret-bound padding. `privateTransfer` and `unshield` each use one eight-slot circuit supporting one to eight real inputs. Real VALUE inputs must have positive uint128 amounts and share one owner, chain and pool; VALUE carries no permanent budget keyMode. Eight-slot enabled inputs are contiguous, disabled openings are zero, and their public shard/root repeat the first. Placeholder nullifiers are distinct by slot; real spend nullifiers depend on the owner secret and note commitment. Input sums are bounded to 131 bits, both outputs to uint128; withdrawal has one change and a zero dummy. Initial `fund` and all `claim` calls require `lineageCheckpointId` identifying one accepted root pair and a fresh `asOf`. The checkpoint ID is lookup metadata authenticated by the proof-bound roots and timestamp; it does not add a circuit public signal. Other actions, including continuation funding, require a zero checkpoint ID. The two-hour proof lifetime and initial eligibility delay remain separate from the 15-minute checkpoint retirement window. Initial funding constrains endorsement `writtenAt ≤ asOf`; the claim circuit binds its range, while the frontend checks that comparison and the authentic index checkpoint indirectly enforces it through `writtenAt <= createdAt <= asOf`. Encrypted-output correctness is not proved by binding its ciphertext hash.
 
 The pool's five generated verifiers and DeepFamily share one `Groth16VerifierAdapter` with seven routes: person relation (purpose 0), disclosure binding (purpose 1), and pool actions (purposes 2–6, action ID + 2). The adapter constructor takes five pool verifier addresses in action order. Receive-code verification stays in the browser.
 

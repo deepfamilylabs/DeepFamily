@@ -1063,17 +1063,16 @@ export class ShieldedAssetSession {
           ),
         "Select 1 to 12 strictly increasing, due and unpaid periods from the preview.",
       );
-      const block = await env.provider.getBlock("latest");
-      requireValue(block, "Current block is unavailable.");
+      const lineage = await loadLineageSnapshot(env.lineageIndex, env.family);
       const result = await prepareShieldedClaim({
         ...scope,
         identity: serializeIdentity(this.identity),
         keyMaterial: keys,
         wallet,
-        lineage: await loadLineageSnapshot(env.lineageIndex, env.family),
+        lineage,
         budgetCommitment: claim.budgets[0],
         ...(claim.budgets[1] ? { secondBudgetCommitment: claim.budgets[1] } : {}),
-        asOf: block.timestamp,
+        asOf: lineage.timestamp,
         periodIndices: indices,
       });
       prepared = result;
@@ -1252,14 +1251,16 @@ export class ShieldedAssetSession {
             getBigInt(await env.pool.ACTION_PROOF_LIFETIME({ blockTag: toBlock })),
         "This time-bound proof preview expired. Recover and confirm a new plan.",
       );
-      const [endorsement, trusted] = await Promise.all([
-        env.lineageIndex.root(0, { blockTag: toBlock }),
-        env.lineageIndex.root(1, { blockTag: toBlock }),
-      ]);
       requireValue(
-        getBigInt(endorsement) === getBigInt(pending.prepared.data.relation0) &&
-          getBigInt(trusted) === getBigInt(pending.prepared.data.relation1),
-        "Family roots changed after preview. Prepare and confirm a fresh proof.",
+        getBigInt(pending.prepared.data.lineageCheckpointId) > 0n &&
+          (await env.lineageIndex.isKnownCheckpoint(
+            pending.prepared.data.lineageCheckpointId,
+            pending.prepared.data.relation0,
+            pending.prepared.data.relation1,
+            pending.prepared.data.asOf,
+            { blockTag: toBlock },
+          )),
+        "Family eligibility snapshot expired after preview. Prepare and confirm a fresh proof.",
       );
     }
     const expected = buildShieldedPoolPublicSignals({

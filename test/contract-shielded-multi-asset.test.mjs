@@ -14,6 +14,7 @@ const dataFor = (overrides = {}) => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
+  lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
   ...overrides,

@@ -483,6 +483,7 @@ function actionData(input: {
   relation0?: bigint;
   relation1?: bigint;
   asOf?: bigint;
+  lineageCheckpointId?: bigint;
 }): ShieldedPoolActionData {
   return {
     fundMode: BigInt(input.fundMode),
@@ -496,6 +497,7 @@ function actionData(input: {
     relation0: input.relation0 ?? 0n,
     relation1: input.relation1 ?? 0n,
     asOf: input.asOf ?? 0n,
+    lineageCheckpointId: input.lineageCheckpointId ?? 0n,
   };
 }
 
@@ -563,16 +565,31 @@ async function initialFundingDestination(input: InitialFundingInput) {
   const latestBlock = ctx.latestBlock;
   if (input.lineage.blockNumber > latestBlock.number)
     throw new Error("Lineage snapshot is ahead of the chain");
-  const [endorsementRoot, trustedRoot] = await Promise.all([
-    input.lineageIndex.root(0, { blockTag: latestBlock.number }),
-    input.lineageIndex.root(1, { blockTag: latestBlock.number }),
-  ]);
+  const lineageBlock = await ctx.provider.getBlock(input.lineage.blockNumber);
+  assertSnapshotBlock(
+    { toBlock: input.lineage.blockNumber, blockHash: input.lineage.blockHash },
+    lineageBlock,
+    "Lineage",
+  );
+  const endorsementRoot = input.lineage.endorsementTree.root;
+  const trustedRoot = input.lineage.trustedTree.root;
+  const asOf = uint64(input.lineage.timestamp, "asOf");
+  const lineageCheckpointId = getBigInt(input.lineage.checkpointId);
   if (
-    input.lineage.endorsementTree.root !== BigInt(endorsementRoot) ||
-    input.lineage.trustedTree.root !== BigInt(trustedRoot)
+    lineageCheckpointId <= 0n ||
+    !(await input.lineageIndex.isKnownCheckpoint(
+      lineageCheckpointId,
+      endorsementRoot,
+      trustedRoot,
+      asOf,
+      { blockTag: latestBlock.number },
+    ))
   )
-    throw new Error("Lineage snapshot roots are stale; replay public events");
-  const asOf = uint64(latestBlock.timestamp, "asOf");
+    throw new Error(
+      "Family eligibility snapshot expired or is unavailable. Refresh and prepare a new funding plan.",
+    );
+  if (asOf > BigInt(latestBlock.timestamp) || BigInt(latestBlock.timestamp) - asOf >= PROOF_LIFETIME)
+    throw new Error("Family eligibility snapshot expired. Refresh and prepare a new funding plan.");
   const eligibleFrom = uint64(asOf + PROOF_LIFETIME, "eligibleFrom");
   const rootPersonHash = wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment);
   const rootVersion = input.lineage.versions
@@ -627,6 +644,7 @@ async function initialFundingDestination(input: InitialFundingInput) {
     endorsementRoot,
     trustedRoot,
     asOf,
+    lineageCheckpointId,
     eligibleFrom,
     legitimacy,
     endorsementProof,
@@ -648,6 +666,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     endorsementRoot,
     trustedRoot,
     asOf,
+    lineageCheckpointId,
     eligibleFrom,
     legitimacy,
     endorsementProof,
@@ -723,6 +742,7 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     relation0: BigInt(endorsementRoot),
     relation1: BigInt(trustedRoot),
     asOf,
+    lineageCheckpointId,
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),

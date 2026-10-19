@@ -234,6 +234,7 @@ function actionData(
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
+    lineageCheckpointId: 0n,
   };
 }
 

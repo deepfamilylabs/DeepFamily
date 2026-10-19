@@ -3117,6 +3117,8 @@ describe("Worker-backed shielded wallet", () => {
     { code: "CALL_EXCEPTION", action: "estimateGas" },
   ])("follows a broadcast transaction after locking even when its response fails: %j", async (failure) => {
     mocks.identity = identity;
+    const upsert = vi.fn();
+    mocks.center = { records: [], upsert };
     mocks.call.mockImplementation(async (method: string) =>
       method === "recover" ? emptyWallet : method === "prove"
         ? { action: "shield", amount: "1", data: {}, proof: {} }
@@ -3145,10 +3147,15 @@ describe("Worker-backed shielded wallet", () => {
     await waitFor(() => expect(mocks.receipt).toHaveBeenCalledWith("0xpending"));
     expect(feeReview).toBeUndefined();
     expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
-    lockWorkspace();
+    await act(async () => lockWorkspace());
     const scansAfterLock = recoverCount();
     await act(async () => finishReceipt({ status: 1 }));
-    await waitFor(() => expect(screen.getByText(/transaction\.success$/)).toBeTruthy());
+    await waitFor(() => expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      phase: "done", transactionHash: "0xpending",
+    })));
+    expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
+    expect(screen.queryByText(/0xpending/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(recoverCount()).toBe(scansAfterLock);
     expect(mocks.identity).toBeNull();
     expect(mocks.call.mock.calls.some(([method]) => method === "unlockIdentity")).toBe(false);
@@ -3292,8 +3299,10 @@ describe("Worker-backed shielded wallet", () => {
       }
     },
   );
-  it("automatically finds an unknown submission from public outputs and completes it after locking", async () => {
+  it.each([1, 0])("reconciles an unknown submission after locking with receipt status %i without showing feedback", async (status) => {
     mocks.identity = identity;
+    const upsert = vi.fn();
+    mocks.center = { records: [], upsert };
     const queryFilter = vi.fn(async () => [
       { args: { commitment: 100n }, transactionHash: "0xfound" },
       { args: { commitment: 101n }, transactionHash: "0xfound" },
@@ -3329,9 +3338,14 @@ describe("Worker-backed shielded wallet", () => {
     await waitFor(() => expect(mocks.receipt).toHaveBeenCalledWith("0xfound"));
     expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
     expect((screen.getByText(submitLabel) as HTMLButtonElement).disabled).toBe(true);
-    lockWorkspace();
-    await act(async () => finishReceipt({ status: 1 }));
-    await waitFor(() => expect(screen.getByText(/transaction\.success$/)).toBeTruthy());
+    await act(async () => lockWorkspace());
+    await act(async () => finishReceipt({ status }));
+    await waitFor(() => expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      phase: status === 1 ? "done" : "failed", transactionHash: "0xfound",
+    })));
+    expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
+    expect(screen.queryByText(/0xfound/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(queryFilter).toHaveBeenCalledWith("unfiltered-notes", 30, 40);
     expect(noteFilter).toHaveBeenCalledWith();
     expect(mocks.receipt).toHaveBeenCalledWith("0xfound");
@@ -3647,20 +3661,20 @@ describe("Worker-backed shielded wallet", () => {
       expect(initialReads).toBeGreaterThan(0);
       mocks.receipt.mockRejectedValueOnce(new Error("RPC temporarily unavailable"))
         .mockResolvedValueOnce({ status: 1 });
-      expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
+      expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
       expect(record.phase).toBe("busy");
       await act(async () => { await vi.advanceTimersByTimeAsync(4999); });
       expect(mocks.receipt).toHaveBeenCalledTimes(initialReads);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(mocks.receipt).toHaveBeenCalledTimes(initialReads + 1);
-      expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
+      expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
       expect(screen.queryByRole("alert")).toBeNull();
       expect(record.phase).toBe("busy");
       await act(async () => { await vi.advanceTimersByTimeAsync(4999); });
       expect(mocks.receipt).toHaveBeenCalledTimes(initialReads + 1);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(mocks.receipt).toHaveBeenCalledTimes(initialReads + 2);
-      expect(screen.getByText(/transaction\.success$/)).toBeTruthy();
+      expect(screen.queryByText(/transaction\.success$/)).toBeNull();
       expect(record.phase).toBe("done");
       expect(mocks.submit).not.toHaveBeenCalled();
       expect(mocks.call).not.toHaveBeenCalled();
@@ -3686,7 +3700,7 @@ describe("Worker-backed shielded wallet", () => {
   });
   it("ignores an earlier session's receipt response after a new session selects funds", async () => {
     mocks.identity = identity;
-    restorePendingSubmission();
+    const record = restorePendingSubmission();
     const finishReceipts: Array<(receipt: unknown) => void> = [];
     mocks.receipt.mockImplementation(() => new Promise((resolve) => { finishReceipts.push(resolve); }));
     mocks.call.mockImplementation(async (method: string) => method === "recover" ? {
@@ -3710,7 +3724,9 @@ describe("Worker-backed shielded wallet", () => {
     selectValue("200");
     const scansBeforeReceipt = recoverCount();
     await act(async () => finishReceipts[0]({ status: 1 }));
-    expect(screen.getByText(/transaction\.pending$/)).toBeTruthy();
+    expect(screen.queryByText(/transaction\.pending$/)).toBeNull();
+    expect(record.phase).toBe("busy");
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector<HTMLInputElement>('input[value="200"]')?.checked).toBe(true);
     expect(recoverCount()).toBe(scansBeforeReceipt);
     expect(mocks.identity.handle).toBe("identity:2");
@@ -3902,7 +3918,8 @@ describe("Worker-backed shielded wallet", () => {
       account={address} />);
     await waitFor(() => expect(mocks.receipt).toHaveBeenCalledWith("0xdestination"));
     await waitFor(() => expect(record.phase).toBe("done"));
-    expect(screen.getByText(/transaction\.success$/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+    expect(screen.queryByText(/transaction\.success$/)).toBeNull();
     expect(mocks.submit).not.toHaveBeenCalled();
   });
   it("updates the ERC20 allowance when an approval's wallet wait succeeds after locking", async () => {

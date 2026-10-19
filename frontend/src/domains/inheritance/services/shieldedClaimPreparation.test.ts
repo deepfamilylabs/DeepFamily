@@ -93,6 +93,10 @@ function lineage(identity: IdentityMaterialV1Result): LineageSnapshot {
   const personHash = identity.personHash.toLowerCase();
   return {
     blockNumber: 1,
+    blockHash: `0x${"11".repeat(32)}`,
+    timestamp: eligibleFrom + 12n * period,
+    checkpointId: 7n,
+    checkpointCreatedAt: 0n,
     versions: new Map([
       [
         personHash,
@@ -251,6 +255,25 @@ async function addSecondBudget(
 }
 
 describe("local shielded claim preparation", () => {
+  it("binds the claim to its snapshot ID and defaults asOf to that snapshot's block", async () => {
+    const input = await fixture();
+    const prepared = await prepareShieldedClaim({ ...input, asOf: undefined });
+    expect(prepared.data.lineageCheckpointId).toBe(input.lineage.checkpointId);
+    expect(prepared.data.asOf).toBe(input.lineage.timestamp);
+  });
+
+  it("rejects claim times outside the selected snapshot's active interval", async () => {
+    const input = await fixture();
+    input.lineage.checkpointCreatedAt = input.asOf - 1n;
+    for (const asOf of [input.asOf - 2n, input.lineage.timestamp + 1n]) {
+      await expect(prepareShieldedClaim({ ...input, asOf })).rejects.toThrow(
+        "outside the family eligibility snapshot",
+      );
+    }
+    input.lineage.checkpointId = 0n;
+    await expect(prepareShieldedClaim(input)).rejects.toThrow("valid family eligibility snapshot");
+  });
+
   it("requires explicit funds keys even for an identity-derived budget", async () => {
     const input = await fixture();
     await expect(
@@ -326,6 +349,7 @@ describe("local shielded claim preparation", () => {
     async (periodDays) => {
       const input = await fixture(1_200n, 100n, periodDays);
       const dueAt = eligibleFrom + periodDays * 86_400n;
+      input.lineage.timestamp = dueAt;
       await expect(prepareShieldedClaim({ ...input, asOf: dueAt - 1n })).rejects.toThrow();
       const prepared = await prepareShieldedClaim({ ...input, asOf: dueAt });
       expect(prepared.amount).toBe(100n);

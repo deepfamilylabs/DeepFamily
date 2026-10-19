@@ -33,6 +33,7 @@ type ContractActionData = {
   relation0: bigint;
   relation1: bigint;
   asOf: bigint;
+  lineageCheckpointId: bigint;
 };
 
 export type ShieldedPoolFlowStage = "checkingGas" | "submitting" | "confirming";
@@ -139,6 +140,7 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
     relation0: getBigInt(data.relation0),
     relation1: getBigInt(data.relation1),
     asOf: getBigInt(data.asOf),
+    lineageCheckpointId: getBigInt(data.lineageCheckpointId),
   };
 }
 
@@ -173,15 +175,20 @@ async function assertTimeBoundActionCurrent(
   )
     throw new Error("The proof expired before submission. Prepare and confirm a fresh preview.");
   const lineage = createLineageIndexContract(lineageAddress, provider);
-  const [endorsement, trusted] = await Promise.all([
-    lineage.root(0, overrides) as Promise<bigint>,
-    lineage.root(1, overrides) as Promise<bigint>,
-  ]);
+  const known = await lineage.isKnownCheckpoint(
+    data.lineageCheckpointId,
+    data.relation0,
+    data.relation1,
+    data.asOf,
+    overrides,
+  );
   const finalAnchor = await provider.getBlock(blockNumber);
   if (finalAnchor?.hash !== anchor.hash)
     throw new Error("The submission block was reorganized. Prepare and confirm a fresh preview.");
-  if (getBigInt(endorsement) !== data.relation0 || getBigInt(trusted) !== data.relation1)
-    throw new Error("Family roots changed before submission. Prepare and confirm a fresh preview.");
+  if (data.lineageCheckpointId <= 0n || !known)
+    throw new Error(
+      "Family eligibility snapshot expired before submission. Prepare and confirm a fresh preview.",
+    );
 }
 
 /** Reserve native currency for gas and any public native deposit. */

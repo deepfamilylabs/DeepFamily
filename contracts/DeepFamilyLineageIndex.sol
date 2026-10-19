@@ -33,8 +33,10 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
 
   uint8 public constant ENDORSEMENT_TREE = 0;
   uint8 public constant TRUSTED_TREE = 1;
-  /// @notice How long a replaced root still verifies, so a proof built just before a write lands.
+  /// @notice Per-tree history; pools use the paired checkpoint window below.
   uint256 public constant ROOT_HISTORY_WINDOW = 1 hours;
+  /// @notice Qualification changes take effect for all proofs within this retirement window.
+  uint256 public constant override CHECKPOINT_RETIREMENT_WINDOW = 15 minutes;
 
   uint256 internal constant DOMAIN_ENDORSEMENT_LEAF = 1007;
   uint256 internal constant DOMAIN_TRUSTED_LEAF = 1008;
@@ -60,6 +62,8 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     private _endorsementSlots;
   mapping(bytes32 personHash => mapping(uint256 versionIndex => mapping(address account => uint256 slot)))
     private _trustedSlots;
+  uint256 public override currentCheckpointId;
+  mapping(uint256 checkpointId => Checkpoint checkpoint) private _checkpoints;
 
   modifier onlyDeepFamily() {
     if (msg.sender != DEEP_FAMILY) revert UnauthorizedCaller();
@@ -181,6 +185,48 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     if (candidate == tree.root) return true;
     uint256 replacedAt = tree.replacedAt[candidate];
     return replacedAt != 0 && block.timestamp <= replacedAt + ROOT_HISTORY_WINDOW;
+  }
+
+  function getCheckpoint(
+    uint256 checkpointId
+  )
+    external
+    view
+    override
+    returns (uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt)
+  {
+    Checkpoint storage checkpoint = _checkpoints[checkpointId];
+    return (
+      checkpoint.endorsementRoot,
+      checkpoint.trustedRoot,
+      checkpoint.createdAt,
+      checkpoint.retiredAt
+    );
+  }
+
+  function isKnownCheckpoint(
+    uint256 checkpointId,
+    uint256 endorsementRoot,
+    uint256 trustedRoot,
+    uint256 asOf
+  ) external view override returns (bool) {
+    if (
+      checkpointId == 0 ||
+      checkpointId > currentCheckpointId ||
+      endorsementRoot == 0 ||
+      trustedRoot == 0 ||
+      asOf > block.timestamp
+    ) return false;
+    Checkpoint storage checkpoint = _checkpoints[checkpointId];
+    if (
+      checkpoint.endorsementRoot != endorsementRoot ||
+      checkpoint.trustedRoot != trustedRoot ||
+      checkpoint.createdAt > asOf
+    ) return false;
+    if (checkpointId == currentCheckpointId) return true;
+    return
+      asOf <= checkpoint.retiredAt &&
+      block.timestamp < checkpoint.retiredAt + CHECKPOINT_RETIREMENT_WINDOW;
   }
 
   function identityCommitmentOf(bytes32 personHash) external view override returns (uint256) {
@@ -330,7 +376,26 @@ contract DeepFamilyLineageIndex is ERC165, IDeepFamilyLineageIndex {
     if (oldRoot != newRoot) {
       if (oldRoot != 0) tree.replacedAt[oldRoot] = block.timestamp;
       tree.root = newRoot;
+      _recordCheckpoint();
     }
     emit LeafWritten(treeId, leafIndex, leaf, newRoot);
+  }
+
+  function _recordCheckpoint() private {
+    uint256 previousId = currentCheckpointId;
+    // An ID is retired only when it stops being current. Repeated root values get new IDs,
+    // so unrelated writes and later root restoration cannot extend an old ID's deadline.
+    if (previousId != 0) _checkpoints[previousId].retiredAt = block.timestamp;
+    uint256 checkpointId = previousId + 1;
+    currentCheckpointId = checkpointId;
+    uint256 endorsementRoot = _trees[ENDORSEMENT_TREE].root;
+    uint256 trustedRoot = _trees[TRUSTED_TREE].root;
+    _checkpoints[checkpointId] = Checkpoint({
+      endorsementRoot: endorsementRoot,
+      trustedRoot: trustedRoot,
+      createdAt: block.timestamp,
+      retiredAt: 0
+    });
+    emit CheckpointCreated(checkpointId, endorsementRoot, trustedRoot, block.timestamp);
   }
 }

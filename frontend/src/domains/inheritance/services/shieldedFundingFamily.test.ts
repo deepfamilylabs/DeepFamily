@@ -79,6 +79,10 @@ function snapshot({
   }
   return {
     blockNumber: 10,
+    blockHash: `0x${"aa".repeat(32)}`,
+    timestamp: AS_OF,
+    checkpointId: 7n,
+    checkpointCreatedAt: 0n,
     versions,
     endorsements: current,
     trustedEndorsers: new Map(),

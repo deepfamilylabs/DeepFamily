@@ -67,6 +67,7 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
+  lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
 });
@@ -564,6 +565,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
                 relation0: BigInt(claimant.witness.endorsementRoot),
                 relation1: BigInt(claimant.witness.trustedRoot),
                 asOf,
+                lineageCheckpointId: await lineage.currentCheckpointId(),
               }),
         };
         const inputs = buildShieldedPoolPublicInputs({ action: 1, chainId, poolAddress, ...data });
@@ -669,6 +671,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
           relation0: BigInt(claimant.witness.endorsementRoot),
           relation1: BigInt(claimant.witness.trustedRoot),
           asOf: eligibleFrom + PERIOD,
+          lineageCheckpointId: await lineage.currentCheckpointId(),
         };
         const inputs = buildShieldedPoolPublicInputs({ action: 2, chainId, poolAddress, ...data });
         assert.equal(inputs.signals.length, 27);
@@ -1280,6 +1283,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       relation0: endorsementRoot,
       relation1: trustedRoot,
       asOf,
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     };
     const { signals: allocationSignals, witness: allocationPublicInputs } =
       buildShieldedPoolPublicInputs({
@@ -1303,10 +1307,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     };
     const fundProof = await prove("fund", realAllocationWitness, allocationSignals);
     await lineage.setRoot(0, endorsementRoot + 1n);
-    await expect(pool.fund(allocationData, fundProof)).to.be.revertedWithCustomError(
-      pool,
-      "UnknownLineageRoot",
-    );
+    await pool.fund.staticCall(allocationData, fundProof);
+    await expect(
+      pool.fund(
+        { ...allocationData, lineageCheckpointId: await lineage.currentCheckpointId() },
+        fundProof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await lineage.setRoot(0, endorsementRoot);
     const fundReceipt = await (await pool.fund(allocationData, fundProof)).wait();
     expect(await pool.nullifierSpent(allocationData.inputNullifiers[1])).to.equal(true);
@@ -1581,6 +1588,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
         relation0: endorsementRoot,
         relation1: trustedRoot,
         asOf: claimAsOf,
+        lineageCheckpointId: await lineage.currentCheckpointId(),
       };
       const { signals: claimSignals, witness: claimPublicInputs } = buildShieldedPoolPublicInputs({
         action: 2,
@@ -1791,8 +1799,8 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       "InvalidClaimTime",
     );
     await hre.networkHelpers.time.increaseTo(Number(onePeriod.claimAsOf));
-    // Mirror the lineage index's leaf update: clearing the endorsement changes
-    // the current root, so an otherwise valid old proof is no longer usable.
+    // Revoking an endorsement keeps the old snapshot usable for 15 minutes,
+    // then rejects the same real proof at the exact retirement deadline.
     const parentsDigest = computeLineageParentsDigest({
       fatherIdentityCommitment: onePeriod.witness.fatherIdentityCommitment,
       motherIdentityCommitment: onePeriod.witness.motherIdentityCommitment,
@@ -1808,6 +1816,9 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     expect(endorsementTree.root).to.equal(endorsementRoot);
     endorsementTree.update(1, 0n);
     await lineage.setRoot(0, endorsementTree.root);
+    const revokedCheckpoint = await lineage.getCheckpoint(onePeriod.claimData.lineageCheckpointId);
+    await pool.claim.staticCall(onePeriod.claimData, oneProof);
+    await hre.networkHelpers.time.increaseTo(Number(revokedCheckpoint.retiredAt + 900n));
     await expect(pool.claim(onePeriod.claimData, oneProof)).to.be.revertedWithCustomError(
       pool,
       "UnknownLineageRoot",
@@ -1831,7 +1842,12 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       pool,
       "UnknownLineageRoot",
     );
-    const renewedClaimData = { ...onePeriod.claimData, relation0: renewedRoot };
+    const renewedClaimData = {
+      ...onePeriod.claimData,
+      relation0: renewedRoot,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
+    };
     const { signals: renewedClaimSignals, witness: renewedClaimPublicInputs } =
       buildShieldedPoolPublicInputs({
         action: 2,
@@ -1977,10 +1993,13 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     );
     await hre.networkHelpers.time.increaseTo(Number(twelvePeriods.claimAsOf));
     await lineage.setRoot(1, trustedRoot + 1n);
-    await expect(pool.claim(twelvePeriods.claimData, twelveProof)).to.be.revertedWithCustomError(
-      pool,
-      "UnknownLineageRoot",
-    );
+    await pool.claim.staticCall(twelvePeriods.claimData, twelveProof);
+    await expect(
+      pool.claim(
+        { ...twelvePeriods.claimData, lineageCheckpointId: await lineage.currentCheckpointId() },
+        twelveProof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await lineage.setRoot(1, trustedRoot);
     const twelveReceipt = await (await pool.claim(twelvePeriods.claimData, twelveProof)).wait();
     for (const periodTag of twelvePeriods.claimData.periodNullifiers) {

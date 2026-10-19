@@ -339,6 +339,11 @@
             },
             {
               "internalType": "uint256",
+              "name": "lineageCheckpointId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
               "name": "fundMode",
               "type": "uint256"
             },
@@ -455,6 +460,11 @@
             {
               "internalType": "uint256",
               "name": "asOf",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lineageCheckpointId",
               "type": "uint256"
             },
             {
@@ -663,6 +673,11 @@
             },
             {
               "internalType": "uint256",
+              "name": "lineageCheckpointId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
               "name": "fundMode",
               "type": "uint256"
             },
@@ -752,6 +767,11 @@
             {
               "internalType": "uint256",
               "name": "asOf",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lineageCheckpointId",
               "type": "uint256"
             },
             {
@@ -850,6 +870,11 @@
             {
               "internalType": "uint256",
               "name": "asOf",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lineageCheckpointId",
               "type": "uint256"
             },
             {

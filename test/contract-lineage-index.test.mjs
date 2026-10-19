@@ -327,6 +327,50 @@ describe("DeepFamily lineage index", function () {
     );
   });
 
+  it("records paired checkpoint roots and constrains asOf to their actual lifetime", async () => {
+    const context = await setup();
+    const { deepFamily, lineageIndex, signers } = context;
+    const family = await addFamily(context);
+    const receipt = await (
+      await deepFamily.connect(signers[1]).endorseVersion(family.childHash, 1)
+    ).wait();
+    const id = await lineageIndex.currentCheckpointId();
+    const checkpoint = await lineageIndex.getCheckpoint(id);
+    expect(checkpoint.endorsementRoot).to.equal(await lineageIndex.root(ENDORSEMENT_TREE));
+    expect(checkpoint.trustedRoot).to.equal(await lineageIndex.root(TRUSTED_TREE));
+    expect(checkpoint.createdAt).to.equal(await blockTime(receipt));
+    expect(checkpoint.retiredAt).to.equal(0n);
+    const knownAt = (asOf, checkpointId = id) =>
+      lineageIndex.isKnownCheckpoint(
+        checkpointId,
+        checkpoint.endorsementRoot,
+        checkpoint.trustedRoot,
+        asOf,
+      );
+    expect(await knownAt(checkpoint.createdAt)).to.equal(true);
+    expect(await knownAt(checkpoint.createdAt - 1n)).to.equal(false);
+    expect(await knownAt(checkpoint.createdAt, 0n)).to.equal(false);
+    expect(await knownAt(checkpoint.createdAt, id + 1n)).to.equal(false);
+
+    const replacement = await (
+      await deepFamily
+        .connect(signers[0])
+        .addTrustedEndorser(family.rootHash, 1, signers[1].address)
+    ).wait();
+    const retired = await lineageIndex.getCheckpoint(id);
+    expect(retired.retiredAt).to.equal(await blockTime(replacement));
+    expect(await knownAt(retired.retiredAt)).to.equal(true);
+    expect(await knownAt(retired.retiredAt + 1n)).to.equal(false);
+    const next = await lineageIndex.getCheckpoint(await lineageIndex.currentCheckpointId());
+    expect(next.createdAt).to.equal(retired.retiredAt);
+    expect(next.endorsementRoot).to.equal(checkpoint.endorsementRoot);
+    expect(next.trustedRoot).to.not.equal(checkpoint.trustedRoot);
+    await hre.networkHelpers.time.increaseTo(Number(retired.retiredAt + 899n));
+    expect(await knownAt(checkpoint.createdAt)).to.equal(true);
+    await hre.networkHelpers.time.increaseTo(Number(retired.retiredAt + 900n));
+    expect(await knownAt(checkpoint.createdAt)).to.equal(false);
+  });
+
   it("accepts writes from DeepFamily only", async () => {
     const { lineageIndex, signers } = await setup();
     const personHash = hre.ethers.ZeroHash;

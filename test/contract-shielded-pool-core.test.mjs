@@ -48,6 +48,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
+    lineageCheckpointId: 0n,
     fundMode: 0n,
     budgetKind: 0n,
     ...overrides,
@@ -248,7 +249,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ).to.be.revertedWithCustomError(pool, "NullifierAlreadySpent");
   });
 
-  it("rejects changed public inputs, duplicate commitments, and old lineage roots", async () => {
+  it("rejects changed public inputs, duplicate commitments, and mismatched checkpoints", async () => {
     const { pool, lineage, token } = await setup();
     const deposit = actionData();
     const proof = await proofFor(pool, 0, deposit, 100n);
@@ -283,14 +284,17 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       relation0: 700n,
       relation1: 800n,
       asOf,
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     });
     const claimProof = await proofFor(pool, 2, claim);
     await lineage.setRoot(0, 701n);
-    await expect(pool.claim(claim, claimProof)).to.be.revertedWithCustomError(
-      pool,
-      "UnknownLineageRoot",
-    );
-    await lineage.setRoot(0, 700n);
+    await pool.claim.staticCall(claim, claimProof);
+    await expect(
+      pool.claim(
+        { ...claim, lineageCheckpointId: await lineage.currentCheckpointId() },
+        claimProof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await pool.claim(claim, claimProof);
     expect(await pool.nullifierSpent(500n)).to.equal(true);
     expect(await pool.nullifierSpent(511n)).to.equal(true);
@@ -301,9 +305,10 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       periodNullifiers: Array.from({ length: 12 }, (_, i) => 600n + BigInt(i)),
       outputCommitments: [109n, 110n],
       outputCiphertexts: [ciphertext("09"), ciphertext("0a")],
-      relation0: 700n,
+      relation0: 701n,
       relation1: 800n,
-      asOf,
+      asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     });
     await hre.networkHelpers.time.increase(7200);
     await expect(
@@ -316,9 +321,9 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const deposit = actionData();
     await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
     const root = (await pool.noteShard(0)).root;
-    const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
     await lineage.setRoot(0, 700n);
     await lineage.setRoot(1, 800n);
+    const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
     const funding = actionData({
       inputRoots: [root, root],
       inputNullifiers: [701n, 702n],
@@ -327,6 +332,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       relation0: 700n,
       relation1: 800n,
       asOf,
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     });
     const fundProof = await proofFor(pool, 1, funding);
     await expect(pool.fund({ ...funding, fundMode: 2n }, fundProof)).to.be.revertedWithCustomError(
@@ -334,11 +340,10 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       "InvalidActionData",
     );
     await lineage.setRoot(0, 701n);
-    await expect(pool.fund(funding, fundProof)).to.be.revertedWithCustomError(
-      pool,
-      "UnknownLineageRoot",
-    );
-    await lineage.setRoot(0, 700n);
+    await pool.fund.staticCall(funding, fundProof);
+    await expect(
+      pool.fund({ ...funding, lineageCheckpointId: 0n }, fundProof),
+    ).to.be.revertedWithCustomError(pool, "UnknownLineageRoot");
     await pool.fund(funding, fundProof);
     const toppedRoot = (await pool.noteShard(0)).root;
     const additionalFunding = actionData({
@@ -359,6 +364,45 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       pool,
       "InvalidActionData",
     );
+  });
+
+  it("requires checkpoint ID zero on Shield, additional Fund, Transfer and Unshield", async () => {
+    const { pool, lineage, recipient } = await setup();
+    await lineage.setRoot(0, 700n);
+    await lineage.setRoot(1, 800n);
+    const lineageCheckpointId = await lineage.currentCheckpointId();
+    const deposit = actionData();
+    const depositProof = await proofFor(pool, 0, deposit, 100n);
+    await expect(
+      pool.shield(100n, { ...deposit, lineageCheckpointId }, depositProof),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    await pool.shield(100n, deposit, depositProof);
+    const root = (await pool.noteShard(0)).root;
+    const funding = actionData({
+      inputRoots: [root, root],
+      inputNullifiers: [701n, 702n],
+      outputCommitments: [111n, 112n],
+      fundMode: 1n,
+    });
+    await expect(
+      pool.fund({ ...funding, lineageCheckpointId }, await proofFor(pool, 1, funding)),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    const transfer = valueActionData({
+      inputRoots: [root, root],
+      inputNullifiers: [801n, 802n],
+      outputCommitments: [113n, 114n],
+    });
+    await expect(
+      pool.privateTransfer({ ...transfer, lineageCheckpointId }, await proofFor(pool, 3, transfer)),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
+    await expect(
+      pool.unshield(
+        recipient.address,
+        1n,
+        { ...transfer, lineageCheckpointId },
+        await proofFor(pool, 4, transfer, 1n, recipient.address),
+      ),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
   });
 
   it("public addressing uses Fund and the same shielded balance with canonical recovery data", async () => {
@@ -396,6 +440,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       relation0: 700n,
       relation1: 800n,
       asOf,
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     });
     const proof = await proofFor(pool, 1, funding);
     const replaceEnvelope = (bytes) => ({
@@ -512,6 +557,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       relation0: 700n,
       relation1: 800n,
       asOf: BigInt((await hre.ethers.provider.getBlock("latest")).timestamp),
+      lineageCheckpointId: await lineage.currentCheckpointId(),
     });
     const proof = await proofFor(pool, 2, claim);
     await expect(
@@ -574,6 +620,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
         relation0: 700n,
         relation1: 800n,
         asOf,
+        lineageCheckpointId: await lineage.currentCheckpointId(),
       });
       const fundReceipt = await (await pool.fund(funding, await proofFor(pool, 1, funding))).wait();
       const claim = actionData({
@@ -585,6 +632,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
         relation0: 700n,
         relation1: 800n,
         asOf,
+        lineageCheckpointId: await lineage.currentCheckpointId(),
       });
       const claimReceipt = await (await pool.claim(claim, await proofFor(pool, 2, claim))).wait();
       const size = (await pool.noteShard(0)).size;

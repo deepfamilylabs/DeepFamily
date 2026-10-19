@@ -65,6 +65,7 @@ const zeroData = () => ({
   relation0: 0n,
   relation1: 0n,
   asOf: 0n,
+  lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
 });
@@ -462,8 +463,13 @@ export async function runShieldedAcceptanceSmoke({
     const endorsed = endorsements.filter((event) => event.args.versionIndex === 1n).at(-1);
     assert.ok(endorsed, "Child endorsement timestamp is unavailable");
     const writtenAt = endorsed.args.timestamp;
-    const endorsementProof = await lineage.getMerkleProof(0, endorsementLeafIndex);
-    const trustedProof = await lineage.getMerkleProof(1, trustedLeafIndex);
+    const lineageBlock = await provider.getBlock("latest");
+    const lineageOverrides = { blockTag: lineageBlock.number };
+    const [endorsementProof, trustedProof, lineageCheckpointId] = await Promise.all([
+      lineage.getMerkleProof(0, endorsementLeafIndex, lineageOverrides),
+      lineage.getMerkleProof(1, trustedLeafIndex, lineageOverrides),
+      lineage.currentCheckpointId(lineageOverrides),
+    ]);
     const parentsDigest = computeLineageParentsDigest({
       fatherIdentityCommitment: fatherMaterial.identityCommitment,
       motherIdentityCommitment: motherMaterial.identityCommitment,
@@ -550,7 +556,7 @@ export async function runShieldedAcceptanceSmoke({
       allocationKeyCommitment,
     };
     const policyCommitment = computeShieldedPolicyCommitment(policyFields, scope);
-    const asOf = BigInt((await provider.getBlock("latest")).timestamp);
+    const asOf = BigInt(lineageBlock.timestamp);
     const eligibleFrom = asOf + 7200n;
     const enrollmentSalt = generateShieldedRandomField();
     const heirIdentityCommitment = recipient.identityCommitment;
@@ -609,6 +615,7 @@ export async function runShieldedAcceptanceSmoke({
       relation0: endorsement.root,
       relation1: trusted.root,
       asOf,
+      lineageCheckpointId,
     };
     const fundInputs = publicInputsFor("fund", fundData);
     const commonFunding = {
@@ -783,7 +790,7 @@ export async function runShieldedAcceptanceSmoke({
     const publicFundData = {
       ...zeroData(), fundMode: 0n, budgetKind: 1n,
       ...inputs([publicDonorPath, publicDonorPath], [spend(additionalFundingChange), computeShieldedEnrollmentNullifier({ allocationKey: publicAllocationKey, policyCommitment: publicPolicyCommitment, heirIdentityCommitment }, scope)]),
-      ...outputs([publicBudget, publicFundChange]), relation0: endorsement.root, relation1: trusted.root, asOf,
+      ...outputs([publicBudget, publicFundChange]), relation0: endorsement.root, relation1: trusted.root, asOf, lineageCheckpointId,
     };
     const publicFundInputs = publicInputsFor("fund", publicFundData);
     const publicFundProof = await prove("fund", {
@@ -828,6 +835,7 @@ export async function runShieldedAcceptanceSmoke({
       relation0: endorsement.root,
       relation1: trusted.root,
       asOf: claimAsOf,
+      lineageCheckpointId,
     };
     const claimInputs = publicInputsFor("claim", claimData);
     await prove(
@@ -903,6 +911,7 @@ export async function runShieldedAcceptanceSmoke({
       relation0: endorsement.root,
       relation1: trusted.root,
       asOf: claimAsOf,
+      lineageCheckpointId,
     };
     const identityClaimInputs = publicInputsFor("claim", identityClaimData);
     const identityClaimProof = await prove(

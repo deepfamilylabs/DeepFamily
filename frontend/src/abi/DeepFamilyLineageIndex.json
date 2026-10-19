@@ -64,6 +64,37 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "checkpointId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "endorsementRoot",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "trustedRoot",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        }
+      ],
+      "name": "CheckpointCreated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
           "internalType": "uint8",
           "name": "treeId",
           "type": "uint8"
@@ -126,6 +157,19 @@
       ],
       "name": "VersionIndexed",
       "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "CHECKPOINT_RETIREMENT_WINDOW",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     },
     {
       "inputs": [],
@@ -193,6 +237,19 @@
       "type": "function"
     },
     {
+      "inputs": [],
+      "name": "currentCheckpointId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
       "inputs": [
         {
           "internalType": "uint8",
@@ -234,6 +291,40 @@
         {
           "internalType": "uint256",
           "name": "leafIndex",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "checkpointId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getCheckpoint",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "endorsementRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "trustedRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "createdAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "retiredAt",
           "type": "uint256"
         }
       ],
@@ -314,6 +405,40 @@
         }
       ],
       "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "checkpointId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "endorsementRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "trustedRoot",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "asOf",
+          "type": "uint256"
+        }
+      ],
+      "name": "isKnownCheckpoint",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {

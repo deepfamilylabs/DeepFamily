@@ -69,6 +69,8 @@ test("claim signals follow the circuit's named public inputs", () => {
     relation0: 29,
     relation1: 30,
     asOf: 31,
+    // Checkpoint lookup metadata is authenticated on chain, not added to the circuit statement.
+    lineageCheckpointId: 37,
   });
   assert.deepEqual(signals, [
     1030n,

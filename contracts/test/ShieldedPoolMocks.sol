@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IProofVerifierAdapter} from "../interfaces/IProofVerifierAdapter.sol";
+import {IDeepFamilyLineageIndex} from "../interfaces/IDeepFamilyLineageIndex.sol";
 import {ShieldedErc20Pool} from "../ShieldedErc20Pool.sol";
 
 /**
@@ -23,14 +24,81 @@ contract ShieldedPoolVerifierMock is IProofVerifierAdapter {
 }
 
 contract ShieldedPoolLineageMock {
+  uint256 public constant CHECKPOINT_RETIREMENT_WINDOW = 15 minutes;
   uint256[2] private _roots;
+  uint256 public currentCheckpointId;
+  mapping(uint256 checkpointId => IDeepFamilyLineageIndex.Checkpoint checkpoint)
+    private _checkpoints;
 
   function setRoot(uint8 treeId, uint256 value) external {
+    if (_roots[treeId] == value) return;
     _roots[treeId] = value;
+    _recordCheckpoint();
+  }
+
+  function setRoots(uint256 endorsementRoot, uint256 trustedRoot) external {
+    if (_roots[0] == endorsementRoot && _roots[1] == trustedRoot) return;
+    _roots[0] = endorsementRoot;
+    _roots[1] = trustedRoot;
+    _recordCheckpoint();
   }
 
   function root(uint8 treeId) external view returns (uint256) {
     return _roots[treeId];
+  }
+
+  function getCheckpoint(
+    uint256 checkpointId
+  )
+    external
+    view
+    returns (uint256 endorsementRoot, uint256 trustedRoot, uint256 createdAt, uint256 retiredAt)
+  {
+    IDeepFamilyLineageIndex.Checkpoint storage checkpoint = _checkpoints[checkpointId];
+    return (
+      checkpoint.endorsementRoot,
+      checkpoint.trustedRoot,
+      checkpoint.createdAt,
+      checkpoint.retiredAt
+    );
+  }
+
+  function isKnownCheckpoint(
+    uint256 checkpointId,
+    uint256 endorsementRoot,
+    uint256 trustedRoot,
+    uint256 asOf
+  ) external view returns (bool) {
+    if (
+      checkpointId == 0 ||
+      checkpointId > currentCheckpointId ||
+      endorsementRoot == 0 ||
+      trustedRoot == 0 ||
+      asOf > block.timestamp
+    ) return false;
+    IDeepFamilyLineageIndex.Checkpoint storage checkpoint = _checkpoints[checkpointId];
+    if (
+      checkpoint.endorsementRoot != endorsementRoot ||
+      checkpoint.trustedRoot != trustedRoot ||
+      checkpoint.createdAt > asOf
+    ) return false;
+    if (checkpointId == currentCheckpointId) return true;
+    return
+      asOf <= checkpoint.retiredAt &&
+      block.timestamp < checkpoint.retiredAt + CHECKPOINT_RETIREMENT_WINDOW;
+  }
+
+  function _recordCheckpoint() private {
+    uint256 previousId = currentCheckpointId;
+    if (previousId != 0) _checkpoints[previousId].retiredAt = block.timestamp;
+    uint256 checkpointId = previousId + 1;
+    currentCheckpointId = checkpointId;
+    _checkpoints[checkpointId] = IDeepFamilyLineageIndex.Checkpoint({
+      endorsementRoot: _roots[0],
+      trustedRoot: _roots[1],
+      createdAt: block.timestamp,
+      retiredAt: 0
+    });
   }
 }
 

@@ -51,12 +51,12 @@ export type PrepareShieldedClaimInput = {
   identity: IdentityMaterialV1Result;
   keyMaterial: ShieldedKeyMaterial;
   wallet: LocalShieldedWalletSnapshot;
-  /** Reconstructed from unfiltered public events; refresh roots before submission. */
+  /** Reconstructed from unfiltered public events at one checkpoint and block. */
   lineage: LineageSnapshot;
   budgetCommitment: BigNumberish;
   secondBudgetCommitment?: BigNumberish;
-  /** Current chain timestamp used as public asOf; the pool enforces its recency. */
-  asOf: BigNumberish;
+  /** Defaults to the lineage snapshot timestamp; the pool enforces its recency. */
+  asOf?: BigNumberish;
   /** Strictly increasing, due period indices, with 1–12 entries. */
   periodIndices: readonly BigNumberish[];
   /** Optional choice when several current direct-child endorsements are valid. */
@@ -170,16 +170,19 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
 
 /**
  * Build a claim entirely from local plaintext and locally replayed public trees.
- * Load a fresh lineage snapshot and chain timestamp before proving. A lineage
- * write after that snapshot changes the current roots and requires preparing
- * again. The witness and private notes must never be sent to a server or RPC.
+ * The snapshot checkpoint remains usable for its bounded retirement window.
+ * The witness and private notes must never be sent to a server or RPC.
  */
 export async function prepareShieldedClaim(
   input: PrepareShieldedClaimInput,
 ): Promise<PreparedShieldedClaim> {
   const chainId = checkedUint64(input.chainId, "chainId");
   const poolAddress = getAddress(input.poolAddress);
-  const asOf = checkedUint64(input.asOf, "asOf");
+  const asOf = checkedUint64(input.asOf ?? input.lineage.timestamp, "asOf");
+  const lineageCheckpointId = getBigInt(input.lineage.checkpointId);
+  if (lineageCheckpointId <= 0n) throw new Error("A valid family eligibility snapshot is required");
+  if (asOf < input.lineage.checkpointCreatedAt || asOf > input.lineage.timestamp)
+    throw new Error("Claim time is outside the family eligibility snapshot");
   const material = computeIdentityFromDerivedSecret({
     identity: input.identity.identity,
     identitySuiteId: input.identity.identitySuiteId,
@@ -428,6 +431,7 @@ export async function prepareShieldedClaim(
     relation0: endorsement.root,
     relation1: trusted.root,
     asOf,
+    lineageCheckpointId,
   } satisfies ShieldedPoolActionData;
   const { witness: publicInputs } = buildShieldedPoolPublicInputs({
     action: SHIELDED_POOL_ACTION.Claim,

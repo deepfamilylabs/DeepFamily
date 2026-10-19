@@ -180,6 +180,10 @@ export function ShieldedInheritancePanel({
   const [transactionResult, setTransactionResult] = useState<"done" | "failed" | "unknown" | null>(
     null,
   );
+  // Public receipt tracking survives a lock; the exited session's feedback stays dismissed.
+  const [transactionFeedbackDismissed, setTransactionFeedbackDismissed] = useState(
+    !session.credentials,
+  );
   const pendingRecord = txCenter?.records.find(
     (record) =>
       record.kind === "shielded" &&
@@ -538,6 +542,9 @@ export function ShieldedInheritancePanel({
       if (mounted.current) {
         setBusy(false);
         setStage("");
+        setError("");
+        setCodeError("");
+        clearTransactionFeedback(true);
         latestSession.current.setBusy(false);
         setWalletDetailsOpen(false);
         setWalletSection("balances");
@@ -732,13 +739,15 @@ export function ShieldedInheritancePanel({
         setTransactionResult(successful ? "done" : unknownApproval ? "unknown" : "failed");
         setTransactionLabel(tracked.label);
         if (outcome.status === "confirmed") setTransactionHash(outcome.hash);
-        setError(
-          successful || unknownApproval
-            ? ""
-            : outcome.status === "replaced"
-              ? latestTranslations.current.tr("nonceConsumed")
-              : latestTranslations.current.t("shielded.transactionFailed", { hash: outcome.hash }),
-        );
+        if (!transactionFeedbackDismissed && latestSession.current.credentials) {
+          setError(
+            successful || unknownApproval
+              ? ""
+              : outcome.status === "replaced"
+                ? latestTranslations.current.tr("nonceConsumed")
+                : latestTranslations.current.t("shielded.transactionFailed", { hash: outcome.hash }),
+          );
+        }
         // A recovered deposit may have consumed its approval, including when
         // a replacement's exact receipt cannot be identified. Re-read current state.
         setAllowanceRevision((revision) => revision + 1);
@@ -764,7 +773,14 @@ export function ShieldedInheritancePanel({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [busy, submissionPending, contextKey, transactionHash, pendingRecord?.id]);
+  }, [
+    busy,
+    submissionPending,
+    contextKey,
+    transactionHash,
+    pendingRecord?.id,
+    transactionFeedbackDismissed,
+  ]);
   async function run(
     task: (current: () => boolean) => Promise<void>,
     label: string,
@@ -872,6 +888,9 @@ export function ShieldedInheritancePanel({
     activeOperation.current = null;
     setBusy(false);
     setStage("");
+    setError("");
+    setCodeError("");
+    clearTransactionFeedback(true);
     latestSession.current.setBusy(false);
     clearSecretInputs();
     latestSession.current.lock();
@@ -1427,10 +1446,11 @@ export function ShieldedInheritancePanel({
       setTransactionLabel(record.label);
     }
   }
-  function clearTransactionFeedback() {
+  function clearTransactionFeedback(dismissed = false) {
     setTransactionHash("");
     setTransactionResult(null);
     setTransactionLabel("");
+    setTransactionFeedbackDismissed(dismissed);
   }
   async function approve() {
     if (submissionPending || !slotReady) return;
@@ -1760,7 +1780,9 @@ export function ShieldedInheritancePanel({
           {error}
         </p>
       ) : null}
-      {transactionHash || submissionPending || transactionResult ? (
+      {hasSession &&
+      !transactionFeedbackDismissed &&
+      (transactionHash || submissionPending || transactionResult) ? (
         <p role="status" className="break-all text-xs">
           {transactionLabel ? `${transactionLabel} · ` : ""}
           {transactionHash ? `${tr("transactionHash")}: ${transactionHash} · ` : ""}

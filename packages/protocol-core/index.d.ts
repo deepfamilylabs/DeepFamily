@@ -1018,6 +1018,8 @@ export interface ShieldedPoolPublicSignalInput {
   relation0?: BigNumberish;
   relation1?: BigNumberish;
   asOf?: BigNumberish;
+  /** Pool lookup metadata, checked against the proof-bound roots/asOf; not a circuit input. */
+  lineageCheckpointId?: BigNumberish;
 }
 export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInput): {
   signals: bigint[];

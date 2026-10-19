@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   fund: vi.fn(),
   claim: vi.fn(),
   lineageRoot: vi.fn(),
+  knownCheckpoint: vi.fn(),
   proofLifetime: vi.fn(),
   fundingDestination: vi.fn(),
   notes: [] as Array<{
@@ -56,7 +57,7 @@ vi.mock("@deepfamily/protocol-core", async (original) => ({
 }));
 vi.mock("../shared/clients/contractFactory", () => ({
   createDeepFamilyContract: () => ({ lineageIndex: async () => mocks.lineage }),
-  createLineageIndexContract: () => ({ root: mocks.lineageRoot }),
+  createLineageIndexContract: () => ({ root: mocks.lineageRoot, isKnownCheckpoint: mocks.knownCheckpoint }),
   createShieldedPoolFactoryContract: () => ({
     LINEAGE_INDEX: async () => mocks.lineage,
     VERIFIER: async () => mocks.verifier,
@@ -100,7 +101,7 @@ vi.mock("../domains/inheritance/services/shieldedFundingPreparation", async (ori
   validateShieldedFundingDestination: mocks.fundingDestination,
 }));
 vi.mock("../domains/inheritance/services/inheritanceChain", () => ({
-  loadLineageSnapshot: async () => null,
+  loadLineageSnapshot: async () => ({ timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() }),
   findHeirLegitimacy: () => [],
 }));
 const blockHash = `0x${"aa".repeat(32)}`;
@@ -137,6 +138,7 @@ function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 8) {
       relation0: 0n,
       relation1: 0n,
       asOf: 0n,
+      lineageCheckpointId: 0n,
     },
   };
 }
@@ -177,6 +179,7 @@ beforeEach(() => {
   }));
   mocks.fund.mockResolvedValue(preparedValueOutputs([10n, 0n], 0n, 2));
   mocks.lineageRoot.mockResolvedValue(0n);
+  mocks.knownCheckpoint.mockResolvedValue(true);
   mocks.proofLifetime.mockResolvedValue(300n);
   mocks.fundingDestination.mockResolvedValue(undefined);
   mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1000 });
@@ -247,6 +250,7 @@ async function timeBoundPreview(action: "fund" | "claim") {
   const session = await unlocked();
   const prepared = preparedValueOutputs([10n, 0n], 0n, 2);
   prepared.data.asOf = 1000n;
+  prepared.data.lineageCheckpointId = 7n;
   if (action === "fund") {
     mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
     mocks.fund.mockResolvedValue(prepared);
@@ -369,15 +373,25 @@ describe("asset Worker preview and proof boundary", () => {
   });
 
   describe.each(["fund", "claim"] as const)("time-bound %s", (action) => {
-    it.each([0, 1])("rejects a changed family root %s without rebuilding the approved plan", async (changedRoot) => {
+    it("rejects an expired checkpoint without rebuilding the approved plan", async () => {
       const { session, preview } = await timeBoundPreview(action);
-      mocks.lineageRoot.mockImplementation(async (kind) => kind === changedRoot ? 1n : 0n);
+      mocks.knownCheckpoint.mockResolvedValue(false);
       await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
-        "Family roots changed after preview",
+        "Family eligibility snapshot expired after preview",
       );
       expect(mocks.proof).not.toHaveBeenCalled();
       expect(action === "fund" ? mocks.fund : mocks.claim).toHaveBeenCalledOnce();
-      expect(mocks.lineageRoot).toHaveBeenCalledWith(changedRoot, { blockTag: 12 });
+      expect(mocks.knownCheckpoint).toHaveBeenCalledWith(7n, 0n, 0n, 1000n, { blockTag: 12 });
+    });
+
+    it("reuses its prepared proof inputs after unrelated roots change within the checkpoint window", async () => {
+      const { session, preview } = await timeBoundPreview(action);
+      mocks.lineageRoot.mockResolvedValue(999n);
+      const proven = await session.call("prove", { context, handle: preview.handle });
+      expect(proven.data).toMatchObject({ lineageCheckpointId: 7n, asOf: 1000n });
+      expect(mocks.knownCheckpoint).toHaveBeenCalledWith(7n, 0n, 0n, 1000n, { blockTag: 12 });
+      expect(mocks.lineageRoot).not.toHaveBeenCalled();
+      expect(mocks.proof).toHaveBeenCalledOnce();
     });
 
     it.each([
@@ -396,12 +410,14 @@ describe("asset Worker preview and proof boundary", () => {
       expect(mocks.lineageRoot).not.toHaveBeenCalled();
     });
 
-    it("requires a fresh preview after roots change and binds the proof to its new roots", async () => {
+    it("requires a fresh preview after expiry and binds it to the replacement snapshot", async () => {
       const { session, preview, prepared, request } = await timeBoundPreview(action);
-      mocks.lineageRoot.mockResolvedValue(7n);
+      mocks.knownCheckpoint.mockResolvedValue(false);
       await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(
-        "Family roots changed after preview",
+        "Family eligibility snapshot expired after preview",
       );
+      mocks.knownCheckpoint.mockResolvedValue(true);
+      prepared.data.lineageCheckpointId = 8n;
       prepared.data.relation0 = 7n;
       prepared.data.relation1 = 7n;
       const fresh = await session.call("preview", request);

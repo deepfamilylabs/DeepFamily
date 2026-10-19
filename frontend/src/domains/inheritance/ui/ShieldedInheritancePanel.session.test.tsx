@@ -829,6 +829,10 @@ describe("Shielded budget flow with a real identity session", () => {
     visibility("visible");
     await act(async () => confirmation.resolve(sentShieldTransaction));
     expect(sessionState()).toEqual({ credentials: null, identity: null, funds: null });
+    expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
+    expect(screen.queryByText(/0xshield/)).toBeNull();
+    await unlockIdentity();
+    expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
   });
 
   it("starts with one identity entry and no independent wallet or asset controls", () => {
@@ -1058,6 +1062,43 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(mocks.submitUnshield).not.toHaveBeenCalled();
     expect(mocks.submitPrivateTransfer).not.toHaveBeenCalled();
   });
+
+  it.each(["manual", "worker", "hidden", "idle"] as const)(
+    "dismisses completed transaction feedback on %s lock and keeps it dismissed after unlocking",
+    async (reason) => {
+      const visibility = documentVisibility();
+      renderPanel();
+      await chooseDeposit("1.25");
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      await waitFor(() => expect(screen.getByText(/0xshield.*transaction\.success$/)).toBeTruthy());
+
+      if (reason === "manual") lockCurrentFlow();
+      else if (reason === "worker") act(() => mocks.terminate());
+      else if (reason === "idle") {
+        vi.useFakeTimers();
+        try {
+          fireEvent.pointerDown(window);
+          await act(async () => vi.advanceTimersByTimeAsync(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS + 1));
+        } finally {
+          vi.useRealTimers();
+        }
+      } else {
+        visibility("hidden");
+        visibility("visible");
+      }
+
+      expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
+      expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
+      expect(screen.queryByText(/0xshield/)).toBeNull();
+      await unlockIdentity();
+      expect(screen.queryByText(/transaction\.(pending|success|failed)$/)).toBeNull();
+
+      await chooseDeposit("2");
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      await waitFor(() => expect(screen.getByText(/0xshield.*transaction\.success$/)).toBeTruthy());
+      expect(mocks.submitShield).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it("returns a real lock to identity entry and keeps wallet details closed after unlocking", async () => {
     renderPanel();

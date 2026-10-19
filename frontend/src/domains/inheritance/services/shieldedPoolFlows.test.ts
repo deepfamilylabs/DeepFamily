@@ -48,6 +48,7 @@ function actionData(capacity = 2): ShieldedPoolActionData {
     relation0: 0n,
     relation1: 0n,
     asOf: 0n,
+    lineageCheckpointId: 7n,
   };
 }
 
@@ -56,9 +57,10 @@ function fixture() {
   let gasBalance = 10n ** 18n;
   const receipt = { status: 1 };
   const lineageRoot = vi.fn(async (_kind: number, _overrides: { blockTag: number }) => 0n);
+  const knownCheckpoint = vi.fn(async (..._args: unknown[]) => true);
   const lineageIndex = vi.fn(async (_overrides: { blockTag: number }) => LINEAGE_ADDRESS);
   const proofLifetime = vi.fn(async (_overrides: { blockTag: number }) => 300n);
-  mocks.lineageContract.mockReturnValue({ root: lineageRoot });
+  mocks.lineageContract.mockReturnValue({ root: lineageRoot, isKnownCheckpoint: knownCheckpoint });
   const estimateGas = vi.fn(async () => 100_000n);
   const methodNames = ["shield", "fund", "claim", "privateTransfer", "unshield"] as const;
   const methods = Object.fromEntries(
@@ -111,6 +113,7 @@ function fixture() {
     estimateGas,
     provider,
     lineageRoot,
+    knownCheckpoint,
     lineageIndex,
     proofLifetime,
     tokenBalance,
@@ -128,12 +131,7 @@ describe("shielded pool asset-worker proof submission", () => {
     ["fund", submitFund],
     ["claim", submitClaim],
   ] as const)("final public bindings for %s", (action, submit) => {
-    it.each([
-      ["fee review", 0],
-      ["fee review", 1],
-      ["nonce lookup", 0],
-      ["nonce lookup", 1],
-    ] as const)("rejects a %s wait with changed family root %s before starting a wallet request", async (wait, changedRoot) => {
+    it.each(["fee review", "nonce lookup"] as const)("rejects a %s wait with an expired checkpoint before starting a wallet request", async (wait) => {
       const f = fixture();
       const onWalletRequest = vi.fn(() => vi.fn());
       const onSubmitting = vi.fn();
@@ -150,8 +148,8 @@ describe("shielded pool asset-worker proof submission", () => {
       const pending = submit({ ...f.common, onGasEstimate, onStage, onSubmitting, onWalletRequest });
       await vi.waitFor(() => expect(release).toBeTypeOf("function"));
       expect(f.lineageRoot).not.toHaveBeenCalled();
-      f.lineageRoot.mockImplementation(async (kind) => kind === changedRoot ? 1n : 0n);
-      const rejection = expect(pending).rejects.toThrow("Family roots changed before submission");
+      f.knownCheckpoint.mockResolvedValue(false);
+      const rejection = expect(pending).rejects.toThrow("Family eligibility snapshot expired before submission");
       release();
       await rejection;
       expect(f.methods[action]).not.toHaveBeenCalled();
@@ -182,7 +180,7 @@ describe("shielded pool asset-worker proof submission", () => {
       expect(onSubmitting).not.toHaveBeenCalled();
     });
 
-    it("reads the latest roots and lifetime at one anchored block after nonce lookup", async () => {
+    it("checks the snapshot checkpoint and lifetime at one anchored block after nonce lookup", async () => {
       const f = fixture();
       f.provider.getBlockNumber.mockResolvedValueOnce(77).mockResolvedValueOnce(78);
       const onSubmitting = vi.fn();
@@ -190,12 +188,22 @@ describe("shielded pool asset-worker proof submission", () => {
       expect(f.lineageIndex).toHaveBeenCalledExactlyOnceWith({ blockTag: 78 });
       expect(f.proofLifetime).toHaveBeenCalledExactlyOnceWith({ blockTag: 78 });
       expect(mocks.lineageContract).toHaveBeenLastCalledWith(LINEAGE_ADDRESS, f.provider);
-      expect(f.lineageRoot.mock.calls).toEqual([[0, { blockTag: 78 }], [1, { blockTag: 78 }]]);
+      expect(f.knownCheckpoint).toHaveBeenCalledExactlyOnceWith(7n, 0n, 0n, 0n, { blockTag: 78 });
+      expect(f.lineageRoot).not.toHaveBeenCalled();
       expect(f.provider.getBlock.mock.calls).toEqual([[78], [78]]);
       expect(onSubmitting).toHaveBeenCalledExactlyOnceWith({
         nonce: 9, fromBlock: 77, signerAddress: WALLET_ADDRESS,
       });
       expect(f.methods[action]).toHaveBeenCalledOnce();
+    });
+
+    it("submits the original proof after unrelated roots change while its checkpoint remains valid", async () => {
+      const f = fixture();
+      const data = { ...f.common.data, relation0: 700n, relation1: 800n };
+      await submit({ ...f.common, data, onGasEstimate: async () => { f.lineageRoot.mockResolvedValue(999n); } });
+      expect(f.knownCheckpoint).toHaveBeenCalledWith(7n, 700n, 800n, 0n, { blockTag: 77 });
+      expect(f.lineageRoot).not.toHaveBeenCalled();
+      expect(f.methods[action].mock.calls[0][0]).toMatchObject({ lineageCheckpointId: 7n, relation0: 700n, relation1: 800n });
     });
 
     it("rejects a reorganized final anchor before any submission bookkeeping", async () => {
@@ -212,10 +220,10 @@ describe("shielded pool asset-worker proof submission", () => {
       expect(onSubmitting).not.toHaveBeenCalled();
     });
 
-    it("rechecks the caller after the final roots RPC before marking submission", async () => {
+    it("rechecks the caller after the final checkpoint RPC before marking submission", async () => {
       const f = fixture();
       let locked = false;
-      f.lineageRoot.mockImplementation(async () => { locked = true; return 0n; });
+      f.knownCheckpoint.mockImplementation(async () => { locked = true; return true; });
       const onSubmitting = vi.fn();
       const onWalletRequest = vi.fn(() => vi.fn());
       const onStage = vi.fn((stage) => {

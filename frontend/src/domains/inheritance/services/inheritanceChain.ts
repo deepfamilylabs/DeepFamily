@@ -35,6 +35,10 @@ type LatestEndorsement = { versionIndex: number; timestamp: bigint };
 /** Everything funding and claiming need, rebuilt from events and checked against the chain. */
 export type LineageSnapshot = {
   blockNumber: number;
+  blockHash: string;
+  timestamp: bigint;
+  checkpointId: bigint;
+  checkpointCreatedAt: bigint;
   /** Lowercase person hash → that person's versions. */
   versions: Map<string, IndexedVersion[]>;
   /** `${personHash}:${versionIndex}` → current trusted endorsers, lowercase. */
@@ -142,7 +146,12 @@ export async function loadLineageSnapshot(
   deepFamily: ethers.Contract,
   options: ScanOptions = {},
 ): Promise<LineageSnapshot> {
-  const blockNumber = await providerOf(lineageIndex).getBlockNumber();
+  const provider = providerOf(lineageIndex);
+  const blockNumber = await provider.getBlockNumber();
+  const anchor = await provider.getBlock(blockNumber);
+  if (!anchor?.hash) throw new Error("Lineage snapshot block is unavailable");
+  const checkpointId = BigInt(await lineageIndex.currentCheckpointId({ blockTag: blockNumber }));
+  const checkpoint = await lineageIndex.getCheckpoint(checkpointId, { blockTag: blockNumber });
   const [indexEvents, familyEvents] = await Promise.all([
     scanEvents(lineageIndex, ["LeafWritten", "VersionIndexed"], blockNumber, options),
     scanEvents(
@@ -176,6 +185,25 @@ export async function loadLineageSnapshot(
     }
   }
 
+  const roots = [
+    endorsementTree.sizeBigInt === 0n ? 0n : endorsementTree.root,
+    trustedTree.sizeBigInt === 0n ? 0n : trustedTree.root,
+  ];
+  if (
+    BigInt(checkpoint.endorsementRoot) !== roots[0] ||
+    BigInt(checkpoint.trustedRoot) !== roots[1] ||
+    BigInt(checkpoint.createdAt) > BigInt(anchor.timestamp) ||
+    BigInt(checkpoint.retiredAt) !== 0n
+  ) {
+    throw new InheritanceError(
+      "snapshotMismatch",
+      "Family eligibility snapshot does not match the replayed history",
+    );
+  }
+  const finalAnchor = await provider.getBlock(blockNumber);
+  if (finalAnchor?.hash !== anchor.hash)
+    throw new InheritanceError("snapshotMismatch", "Lineage snapshot block was reorganized");
+
   // A later endorsement by the same account replaces the earlier one, as the index's slot does.
   const endorsements = new Map<string, Map<string, LatestEndorsement>>();
   for (const event of familyEvents) {
@@ -191,6 +219,10 @@ export async function loadLineageSnapshot(
 
   return {
     blockNumber,
+    blockHash: anchor.hash,
+    timestamp: BigInt(anchor.timestamp),
+    checkpointId,
+    checkpointCreatedAt: BigInt(checkpoint.createdAt),
     versions: collectVersions(indexEvents),
     trustedEndorsers: collectTrustedEndorsers(familyEvents),
     endorsementTree,

@@ -39,6 +39,7 @@ function log(
 function chainStub(logs: TestLog[], head = 10) {
   const provider = {
     getBlockNumber: vi.fn(async () => head),
+    getBlock: vi.fn(async () => ({ hash: `0x${"aa".repeat(32)}`, timestamp: 1000 })),
     getLogs: vi.fn(
       async (filter: { address: string; topics: string[][]; fromBlock: number; toBlock: number }) =>
         logs.filter(
@@ -58,6 +59,12 @@ function chainStub(logs: TestLog[], head = 10) {
     runner: { provider },
     interface: iface,
     getAddress: async () => address,
+    currentCheckpointId: vi.fn(async () => 7n),
+    getCheckpoint: vi.fn(async () => ({
+      endorsementRoot: await (extra as any).root(0),
+      trustedRoot: await (extra as any).root(1),
+      createdAt: 900n, retiredAt: 0n,
+    })),
     ...extra,
   });
   return { provider, contract };
@@ -127,6 +134,9 @@ describe("loadLineageSnapshot", () => {
 
     expect(snapshot.endorsementTree.root).toBe(expectedRoots(0));
     expect(snapshot.trustedTree.root).toBe(expectedRoots(1));
+    expect(snapshot).toMatchObject({ checkpointId: 7n, timestamp: 1000n, blockHash: `0x${"aa".repeat(32)}` });
+    expect(index.currentCheckpointId).toHaveBeenCalledWith({ blockTag: 10 });
+    expect(index.getCheckpoint).toHaveBeenCalledWith(7n, { blockTag: 10 });
     expect(index.root).toHaveBeenCalledWith(0, { blockTag: 10 });
     expect(snapshot.versions.get(HEIR.toLowerCase())?.[0]).toMatchObject({
       versionIndex: 1,
@@ -138,6 +148,25 @@ describe("loadLineageSnapshot", () => {
       timestamp: 300n,
     });
     expect(snapshot.trustedEndorsers.get(`${ROOT.toLowerCase()}:1`)).toEqual(new Set([B]));
+  });
+
+  it("rejects checkpoint roots from a different snapshot", async () => {
+    const chain = chainStub(logs);
+    const index = chain.contract(INDEX, indexIface, {
+      root: async (treeId: number) => expectedRoots(treeId),
+      getCheckpoint: async () => ({ endorsementRoot: expectedRoots(0), trustedRoot: 1n, createdAt: 900n, retiredAt: 0n }),
+    });
+    await expect(loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any))
+      .rejects.toMatchObject({ code: "snapshotMismatch" });
+  });
+
+  it("rejects a snapshot whose block changed during replay", async () => {
+    const chain = chainStub(logs);
+    chain.provider.getBlock.mockResolvedValueOnce({ hash: `0x${"aa".repeat(32)}`, timestamp: 1000 })
+      .mockResolvedValueOnce({ hash: `0x${"bb".repeat(32)}`, timestamp: 1000 });
+    const index = chain.contract(INDEX, indexIface, { root: async (treeId: number) => expectedRoots(treeId) });
+    await expect(loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any))
+      .rejects.toThrow("reorganized");
   });
 
   it("never names a person in a log filter", async () => {
@@ -175,6 +204,10 @@ describe("findHeirLegitimacy", () => {
   ];
   const snapshot = {
     blockNumber: 9,
+    checkpointId: 7n,
+    checkpointCreatedAt: 0n,
+    blockHash: `0x${"aa".repeat(32)}`,
+    timestamp: 1000n,
     endorsementTree: createLineageTree(leaves),
     trustedTree: createLineageTree([trustedLeaf(A), trustedLeaf(B), trustedLeaf(C)]),
     versions: new Map([

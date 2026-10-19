@@ -144,6 +144,10 @@ async function setup(periodDays = 30n) {
   const rootPersonHash = wrapIdentityCommitmentAsPersonHash(rootIdentity).toLowerCase();
   const lineage: LineageSnapshot = {
     blockNumber: 10,
+    blockHash,
+    timestamp: BigInt(timestamp),
+    checkpointId: 7n,
+    checkpointCreatedAt: 0n,
     endorsementTree,
     trustedTree,
     versions: new Map([
@@ -205,6 +209,8 @@ async function setup(periodDays = 30n) {
   const lineageIndex = {
     getAddress: async () => lineageAddress,
     root: async (which: number) => (which === 0 ? chainEndorsementRoot : chainTrustedRoot),
+    isKnownCheckpoint: vi.fn(async (id: bigint, endorsement: bigint, trusted: bigint) =>
+      id === 7n && endorsement === chainEndorsementRoot && trusted === chainTrustedRoot),
   } as unknown as Contract;
   const common = {
     pool,
@@ -256,6 +262,7 @@ describe("funding destination validation before consolidation", () => {
           identityCommitmentOf: async () => heirIdentity,
           root: async (which: number) =>
             which === 0 ? fixture.lineage.endorsementTree.root : fixture.lineage.trustedTree.root,
+          isKnownCheckpoint: async () => true,
         } as unknown as Contract,
         lineage: fixture.lineage,
         publicRecipientPersonHash: fixture.recipient.personHash,
@@ -294,18 +301,19 @@ describe("funding destination validation before consolidation", () => {
 
   it("checks the existing lineage snapshot once during direct funding", async () => {
     const fixture = await setup();
-    const root = vi.fn(async (which: number) =>
-      which === 0 ? fixture.lineage.endorsementTree.root : fixture.lineage.trustedTree.root,
-    );
+    const isKnownCheckpoint = vi.fn(async () => true);
     await prepareShieldedFund({
       ...fixture.common,
       fundMode: 0,
       policy: fixture.policy,
-      lineageIndex: { ...fixture.lineageIndex, root } as unknown as Contract,
+      lineageIndex: { ...fixture.lineageIndex, isKnownCheckpoint } as unknown as Contract,
       lineage: fixture.lineage,
       budgetPeriods: 1n,
     });
-    expect(root).toHaveBeenCalledTimes(2);
+    expect(isKnownCheckpoint).toHaveBeenCalledExactlyOnceWith(
+      7n, fixture.lineage.endorsementTree.root, fixture.lineage.trustedTree.root,
+      BigInt(timestamp), { blockTag: 10 },
+    );
   });
 
   it.each([0, 1] as const)(
@@ -710,6 +718,7 @@ describe("local unified funding preparation", () => {
         ? { number: 11, timestamp: timestamp + 2, hash: `0x${"cd".repeat(32)}` }
         : getBlock(block);
 
+    const latestRoots = vi.spyOn(fixture.lineageIndex, "root").mockResolvedValue(999n);
     const initialFunding = await prepareShieldedFund({
       ...fixture.common,
       fundMode: 0 as const,
@@ -718,7 +727,9 @@ describe("local unified funding preparation", () => {
       lineage: fixture.lineage,
       budgetPeriods: 1n,
     });
-    expect(initialFunding.data.asOf).toBe(BigInt(timestamp + 2));
+    expect(initialFunding.data.asOf).toBe(BigInt(timestamp));
+    expect(initialFunding.data.lineageCheckpointId).toBe(7n);
+    expect(latestRoots).not.toHaveBeenCalled();
     await recordFunding(fixture, initialFunding);
     const additionalFunding = await prepareShieldedFund({
       fundMode: 1,
@@ -730,7 +741,7 @@ describe("local unified funding preparation", () => {
       },
       budgetPeriods: 1n,
     });
-    expect(additionalFunding.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 2 + 7200));
+    expect(additionalFunding.outputs[0].note.eligibleFrom).toBe(BigInt(timestamp + 7200));
   });
 
   it("rejects a recipient whose identity is inconsistent or not an endorsed direct child", async () => {
@@ -803,7 +814,7 @@ describe("local unified funding preparation", () => {
     await expect(prepareShieldedFund(input)).rejects.toThrow("cannot fund the whole");
     fixture.lineage.endorsementTree.insert(999n);
     await expect(prepareShieldedFund({ ...input, budgetPeriods: 1n })).rejects.toThrow(
-      "roots are stale",
+      "eligibility snapshot expired",
     );
     const validFixture = await setup();
     validFixture.common.wallet.ownedNotes.get(

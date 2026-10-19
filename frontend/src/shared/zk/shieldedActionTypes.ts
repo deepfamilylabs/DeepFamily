@@ -13,4 +13,6 @@ export type ShieldedPoolActionData = {
   relation0: BigNumberish;
   relation1: BigNumberish;
   asOf: BigNumberish;
+  /** Metadata binding the public roots and asOf to one lineage checkpoint. */
+  lineageCheckpointId: BigNumberish;
 };
