@@ -1,4 +1,7 @@
-import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
+import {
+  MAINNET_MIN_DELAY_FLOOR_SECONDS,
+  MAINNET_TRANSACTION_LABELS,
+} from "./mainnetReleaseSafety.mjs";
 import { MAINNET_DEPLOYMENT_NONCE_OFFSETS } from "./protocolDeploymentProjection.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
 
@@ -100,7 +103,11 @@ export const buildMainnetReleaseIntents = async ({
   const normalizedChainId = BigInt(chainId);
   if (normalizedChainId <= 0n) throw new Error("chainId must be positive");
   const delay = BigInt(minDelaySeconds);
-  if (delay <= 0n) throw new Error("minDelaySeconds must be positive");
+  if (delay < BigInt(MAINNET_MIN_DELAY_FLOOR_SECONDS)) {
+    throw new Error(
+      `minDelaySeconds must be at least ${MAINNET_MIN_DELAY_FLOOR_SECONDS} seconds (7 days)`,
+    );
+  }
 
   const names = [
     "GovernanceTimelock",

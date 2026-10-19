@@ -43,7 +43,7 @@ const baseEnv = (overrides = {}) => ({
   GOVERNANCE_SAFE_ADDRESS: SAFE,
   GOVERNANCE_SAFE_PROFILE: "conflux-safe-1.3.0-2of3",
   GOVERNANCE_TIMELOCK_ADDRESS: "",
-  MIN_DELAY: "172800",
+  MIN_DELAY: "604800",
   ...overrides,
 });
 
@@ -105,7 +105,10 @@ describe("eSpace Mainnet release safety", function () {
 
   it("enforces the production delay floor, finality, verification and an explicit budget", function () {
     expect(parse()).to.include({ confirmations: 2, finalityTimeoutSeconds: 3600 });
-    expect(() => parse({ MIN_DELAY: "86399" })).to.throw("between 86400");
+    expect(parse().minDelaySeconds).to.equal(604800);
+    for (const minDelay of ["86400", "172800", "604799"]) {
+      expect(() => parse({ MIN_DELAY: minDelay })).to.throw("between 604800");
+    }
     expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("verifyEnvironmentName");
     expect(ESPACE_CHAIN_PROFILE.mainnet).not.to.have.property("requireFinalityEnvironmentName");
     expect(() => parse({ EVM_MAINNET_MAX_NATIVE: "" })).to.throw("explicitly set");

@@ -72,17 +72,17 @@ describe("eSpace acceptance safety helpers", function () {
       const releaseEnv = {
         EVM_E2E_MODE: ACCEPTANCE_MODE_RELEASE_REHEARSAL,
         EVM_E2E_MIN_DELAY: "30",
-        MIN_DELAY: "172800",
+        MIN_DELAY: "604800",
         GOVERNANCE_SAFE_PROFILE: ESPACE_E2E_RELEASE_SAFE_PROFILE,
       };
       const result = parseESpaceAcceptanceConfig(baseConfig(releaseEnv));
       expect(result.acceptanceMode).to.equal(ACCEPTANCE_MODE_RELEASE_REHEARSAL);
       expect(result.verify).to.equal(true);
       expect(result.requireFinality).to.equal(true);
-      expect(result.minDelaySeconds).to.equal(172800);
+      expect(result.minDelaySeconds).to.equal(604800);
       expect(result.diagnosticMinDelaySeconds).to.equal(30);
       expect(result.runGovernanceLifecycle).to.equal(false);
-      expect(result.productionMinDelaySeconds).to.equal(172800);
+      expect(result.productionMinDelaySeconds).to.equal(604800);
       expect(result.productionGovernanceMultisigProfile).to.equal(ESPACE_E2E_RELEASE_SAFE_PROFILE);
 
       expect(() =>
@@ -94,15 +94,17 @@ describe("eSpace acceptance safety helpers", function () {
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, MIN_DELAY: "" })),
       ).to.throw(/MIN_DELAY.*explicitly set.*positive/i);
-      expect(() =>
-        parseESpaceAcceptanceConfig(
-          baseConfig({
-            ...releaseEnv,
-            EVM_E2E_MIN_DELAY: "30",
-            MIN_DELAY: "30",
-          }),
-        ),
-      ).to.throw(/release-rehearsal requires MIN_DELAY >= 86400 seconds/i);
+      for (const minDelay of ["30", "86400", "172800", "604799"]) {
+        expect(() =>
+          parseESpaceAcceptanceConfig(
+            baseConfig({
+              ...releaseEnv,
+              EVM_E2E_MIN_DELAY: "30",
+              MIN_DELAY: minDelay,
+            }),
+          ),
+        ).to.throw(/release-rehearsal requires MIN_DELAY >= 604800 seconds/i);
+      }
       expect(() =>
         parseESpaceAcceptanceConfig(baseConfig({ ...releaseEnv, GOVERNANCE_SAFE_PROFILE: "" })),
       ).to.throw(/GOVERNANCE_SAFE_PROFILE=conflux-safe-1\.3\.0-2of3/i);

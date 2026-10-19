@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { rejects } from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { ethers } from "ethers";
@@ -21,7 +22,7 @@ const DEPLOYER = "0x1000000000000000000000000000000000000001";
 const MULTISIG = "0x2000000000000000000000000000000000000002";
 const STARTING_NONCE = 41;
 const CHAIN_ID = 1030n;
-const MIN_DELAY = 86_400;
+const MIN_DELAY = 604_800;
 
 const artifactPaths = {
   ...Object.fromEntries(
@@ -60,7 +61,7 @@ const artifacts = {
     JSON.parse(await fs.readFile(path.join(process.cwd(), artifactPaths[name]), "utf8")),
 };
 
-const build = () =>
+const build = (overrides = {}) =>
   buildMainnetReleaseIntents({
     ethers,
     artifacts,
@@ -69,12 +70,22 @@ const build = () =>
     chainId: CHAIN_ID,
     minDelaySeconds: MIN_DELAY,
     governanceMultisig: MULTISIG,
+    ...overrides,
   });
 
 const constructorData = (intent, artifact) =>
   `0x${intent.data.slice(String(artifact.bytecode).length)}`;
 
 describe("eSpace Mainnet release transaction intents", function () {
+  it("rejects deployment intents below seven days when called without the configuration parser", async function () {
+    for (const minDelaySeconds of [0, 86_400, 172_800, 604_799]) {
+      await rejects(
+        () => build({ minDelaySeconds }),
+        /minDelaySeconds must be at least 604800 seconds \(7 days\)/,
+      );
+    }
+  });
+
   it("requires source verification for every deployed instance", function () {
     const addresses = deriveMainnetPlannedAddresses({
       ethers,

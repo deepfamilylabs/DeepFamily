@@ -1,10 +1,10 @@
 /**
  * Usage (new delay is expressed in seconds):
  *   npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
- *     --phase schedule --new-delay 259200 --contract-name GovernanceTimelock
+ *     --phase schedule --new-delay 1209600 --contract-name GovernanceTimelock
  *   # After the schedule transaction is mined and the current delay has elapsed:
  *   npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
- *     --phase execute --new-delay 259200 --contract-name GovernanceTimelock
+ *     --phase execute --new-delay 1209600 --contract-name GovernanceTimelock
  *
  * Required: --phase and a positive integer --new-delay in seconds.
  * Keep --new-delay, --contract-name, and optional --salt identical in both phases. The update is a

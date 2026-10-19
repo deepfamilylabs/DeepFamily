@@ -4,13 +4,14 @@ import { resolveTimelockDeploymentConfig } from "./lib/timelockDeployment.mjs";
 // Deploy a TimelockController (via the GovernanceTimelock artifact) to own the UUPS proxy.
 //
 // Usage:
-//   MIN_DELAY=172800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy.. \
+//   MIN_DELAY=604800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy.. \
 //     hardhat --config hardhat.config.mjs run scripts/deploy-timelock.mjs --network <network>
 //
-// Deployer defaults (120 seconds) exist only on edr-simulated and named localhost networks.
+// Deployer defaults (120 seconds) exist only on edr-simulated and non-Mainnet localhost networks.
 // Live networks require both variables explicitly. The governance address must expose a valid
 // inspectable threshold/owner configuration with threshold >= 2. GovernanceTimelock assigns that
 // one multisig all proposer/canceller/executor roles and has no external admin.
+// Ethereum and Conflux eSpace Mainnet deployments require at least seven days.
 
 const main = async () => {
   const connection = await hre.network.create();

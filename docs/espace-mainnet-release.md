@@ -86,7 +86,7 @@ The runner also enforces all of the following for execution:
 
 - Hardhat network `conflux` and raw RPC chain ID `1030`;
 - a clean, unchanged release checkout and the production compiler profile;
-- `MIN_DELAY >= 86400` seconds;
+- `MIN_DELAY >= 604800` seconds (7 days);
 - the approved deployer, accepted Safe address, exact ordered three-owner set, and Safe nonce `1`;
 - a required CFX budget ceiling;
 - contract source verification, finalized-block coverage, and terminal on-chain checks, with no
@@ -144,7 +144,7 @@ ZK_PTAU_PATH=
 GOVERNANCE_SAFE_ADDRESS=
 # Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.
 GOVERNANCE_SAFE_PROFILE=conflux-safe-1.3.0-2of3
-MIN_DELAY=172800
+MIN_DELAY=604800
 
 # Public identities shared by Safe creation and protocol release.
 EVM_MAINNET_EXPECTED_DEPLOYER=0x...
@@ -426,7 +426,7 @@ The normal release sequence is:
    owner, and treasury relationships; write the final report.
 
 This fresh-release sequence performs no Mock deployment, UUPS upgrade, Timelock operation, or
-Timelock wait. The configured 48-hour delay first applies when governance later schedules a fee,
+Timelock wait. The configured 7-day delay first applies when governance later schedules a fee,
 verifier, treasury, upgrade, or migration operation. No mainnet business-data smoke transaction is
 part of this sequence; any mainnet data write must be separately approved as real production
 activity.

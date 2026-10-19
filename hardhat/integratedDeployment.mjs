@@ -10,6 +10,10 @@ import {
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "../scripts/lib/governanceSafety.mjs";
+import {
+  assertProductionTimelockDelay,
+  isProductionTimelockNetwork,
+} from "../scripts/lib/timelockDeployment.mjs";
 
 const PERSON_RELATION_CIRCUIT_ID = 1;
 const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
@@ -186,6 +190,7 @@ const assertGovernanceOwnerInvariants = async ({
   address,
   governanceMultisig = process.env.GOVERNANCE_SAFE_ADDRESS,
   governanceMultisigProfile = process.env.GOVERNANCE_SAFE_PROFILE,
+  enforceProductionDeploymentDelay = false,
 }) => {
   if (!artifacts?.readArtifact) {
     throw new Error(
@@ -227,6 +232,15 @@ const assertGovernanceOwnerInvariants = async ({
         `with a non-zero delay (${error.message}). Configure the multisig as the timelock's ` +
         `proposer/canceller/executor instead of making it the protocol owner directly.`,
     );
+  }
+
+  if (enforceProductionDeploymentDelay) {
+    await assertProductionTimelockDelay({
+      connection,
+      provider: ethers.provider,
+      minDelay,
+      label: `GovernanceTimelock ${address} minDelay`,
+    });
   }
 
   const configuredMultisig = governanceMultisig;
@@ -613,8 +627,10 @@ export const deployIntegratedSystem = async (
 
   // Validate the GovernanceTimelock up front so a misconfigured live deployment fails before any
   // contracts are created, rather than leaving orphaned modules after a late-stage throw. Local
-  // dev networks (edr-simulated / localhost) are exempt and keep the deployer as owner.
-  const isLocalDev = isLocalDevNetwork(connection);
+  // dev networks (edr-simulated / non-Mainnet localhost) keep the deployer as owner.
+  const isLocalDev =
+    isLocalDevNetwork(connection) &&
+    !(await isProductionTimelockNetwork({ connection, provider: ethers.provider }));
   const governanceOwner = configuredGovernanceOwner ?? process.env.GOVERNANCE_TIMELOCK_ADDRESS;
   const hasGovernanceOwner =
     Boolean(governanceOwner) &&
@@ -636,6 +652,7 @@ export const deployIntegratedSystem = async (
       address: ethers.getAddress(governanceOwner),
       governanceMultisig,
       governanceMultisigProfile,
+      enforceProductionDeploymentDelay: true,
     });
   }
 

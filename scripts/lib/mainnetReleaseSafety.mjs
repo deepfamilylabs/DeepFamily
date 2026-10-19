@@ -13,7 +13,7 @@ export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
 export const ESPACE_MAINNET_CHAIN_ID = ESPACE_CHAIN_PROFILE.mainnet.chainId;
 export const ETHEREUM_MAINNET_NETWORK = ETHEREUM_CHAIN_PROFILE.mainnet.networkName;
 export const ETHEREUM_MAINNET_CHAIN_ID = ETHEREUM_CHAIN_PROFILE.mainnet.chainId;
-export const MAINNET_MIN_DELAY_FLOOR_SECONDS = 86_400;
+export const MAINNET_MIN_DELAY_FLOOR_SECONDS = 604_800;
 export const MAINNET_STATE_SCHEMA_VERSION = 1;
 export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "governanceTimelock",

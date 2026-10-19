@@ -34,7 +34,8 @@ Execute mode sends real Ethereum transactions and spends real ETH.
 
 A fresh protocol release deploys the Timelock and initial implementation only. It deploys no Mock,
 performs no upgrade, schedules no Timelock operation, and therefore waits for no Timelock delay.
-The configured delay applies to governance after release.
+The production release requires `MIN_DELAY >= 604800` seconds (7 days). The configured delay
+applies to governance after release.
 
 ## Security and responsibility boundary
 
@@ -112,7 +113,7 @@ ZK_PTAU_PATH=
 
 # Safe implementation plus the exact three-owner, 2/3 policy; this is not an address.
 GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3
-MIN_DELAY=172800
+MIN_DELAY=604800
 # Deployed production Safe Proxy address. Keep blank through Safe plan/deploy/owner acceptance.
 GOVERNANCE_SAFE_ADDRESS=
 
@@ -352,7 +353,7 @@ wires the protocol system, hands `DeepFamily` ownership to the Timelock, verifie
 Etherscan, waits for finality, re-reads receipts and block hashes, checks proxy/verifier/Token/
 Reader/Timelock/treasury invariants, and writes its terminal report. It does not create person,
 endorsement, NFT, or story business data on Mainnet. It also deploys no Mock, performs no upgrade,
-and waits for no Timelock operation. `MIN_DELAY=172800` is the on-chain 48-hour policy for future
+and waits for no Timelock operation. `MIN_DELAY=604800` is the on-chain 7-day policy for future
 governance, not a sleep in the fresh-release command.
 
 `GOVERNANCE_TIMELOCK_ADDRESS` is not a fresh-run setting because the orchestrator creates and

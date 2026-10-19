@@ -81,7 +81,7 @@ const ethereumReleaseEnv = (overrides = {}) => ({
   GOVERNANCE_SAFE_ADDRESS: SAFE,
   GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
   GOVERNANCE_TIMELOCK_ADDRESS: "",
-  MIN_DELAY: "172800",
+  MIN_DELAY: "604800",
   ...overrides,
 });
 
@@ -321,33 +321,35 @@ describe("Ethereum production tooling profiles", function () {
     expect(diagnostic.diagnosticMinDelaySeconds).to.equal(30);
     expect(diagnostic.runGovernanceLifecycle).to.equal(true);
 
-    expect(() =>
-      parseEthereumAcceptanceConfig({
-        env: {
-          ...baseEnv,
-          EVM_E2E_MODE: "release-rehearsal",
-          MIN_DELAY: "30",
-          GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
-        },
-        networkName: "sepolia",
-        chainId: 11155111n,
-      }),
-    ).to.throw(/release-rehearsal requires MIN_DELAY >= 86400 seconds/i);
+    for (const minDelay of ["30", "86400", "172800", "604799"]) {
+      expect(() =>
+        parseEthereumAcceptanceConfig({
+          env: {
+            ...baseEnv,
+            EVM_E2E_MODE: "release-rehearsal",
+            MIN_DELAY: minDelay,
+            GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
+          },
+          networkName: "sepolia",
+          chainId: 11155111n,
+        }),
+      ).to.throw(/release-rehearsal requires MIN_DELAY >= 604800 seconds/i);
+    }
 
     const rehearsal = parseEthereumAcceptanceConfig({
       env: {
         ...baseEnv,
         EVM_E2E_MODE: "release-rehearsal",
-        MIN_DELAY: "86400",
+        MIN_DELAY: "604800",
         GOVERNANCE_SAFE_PROFILE: ETHEREUM_SAFE_1_3_0_2_OF_3_PROFILE,
       },
       networkName: "sepolia",
       chainId: 11155111n,
     });
-    expect(rehearsal.minDelaySeconds).to.equal(86400);
+    expect(rehearsal.minDelaySeconds).to.equal(604800);
     expect(rehearsal.diagnosticMinDelaySeconds).to.equal(30);
     expect(rehearsal.runGovernanceLifecycle).to.equal(false);
-    expect(rehearsal.productionMinDelaySeconds).to.equal(86400);
+    expect(rehearsal.productionMinDelaySeconds).to.equal(604800);
   });
 
   it("shares public Safe variables while retaining Ethereum network, chain and digest guards", function () {
@@ -478,9 +480,19 @@ describe("Ethereum production tooling profiles", function () {
     expect(config.nativeSymbol).to.equal("ETH");
     expect(config.gasChargingPolicy).to.equal(GAS_CHARGING_ETHEREUM_RECEIPT);
     expect(config.maximumCostWei).to.equal(ethers.parseEther("2"));
+    expect(config.minDelaySeconds).to.equal(604800);
     expect(config.testnetReleaseReportPath).to.equal(
       "tmp/release-evidence/ethereum-release-rehearsal.json",
     );
+    for (const minDelay of ["86400", "172800", "604799"]) {
+      expect(() =>
+        parseEthereumMainnetReleaseConfig({
+          env: ethereumReleaseEnv({ MIN_DELAY: minDelay }),
+          networkName: "mainnet",
+          chainId: 1n,
+        }),
+      ).to.throw("between 604800");
+    }
 
     for (const field of [
       "planDigestEnvironmentName",

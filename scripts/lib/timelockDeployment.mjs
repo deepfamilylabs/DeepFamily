@@ -2,6 +2,8 @@ import {
   assertGovernanceMultisigWithProfile,
   isLocalDevelopmentConnection,
 } from "./governanceSafety.mjs";
+import { supportedChainProfiles } from "./chainProfiles.mjs";
+import { MAINNET_MIN_DELAY_FLOOR_SECONDS } from "./mainnetReleaseSafety.mjs";
 
 const LOCAL_MIN_DELAY_SECONDS = 120;
 
@@ -34,6 +36,29 @@ export const parseGovernanceMultisig = ({ ethers, value }) => {
 
 export const isLocalTimelockNetwork = ({ connection }) => isLocalDevelopmentConnection(connection);
 
+export const isProductionTimelockNetwork = async ({ connection, provider }) => {
+  if (connection?.networkConfig?.type === "edr-simulated") return false;
+  // HTTP network names and configured chain IDs do not establish the RPC's actual chain.
+  const { chainId } = await provider.getNetwork();
+  return supportedChainProfiles().some((profile) => profile.mainnet.chainId === BigInt(chainId));
+};
+
+/** Deployment policy only; later governance operations continue to use the live delay. */
+export const assertProductionTimelockDelay = async ({
+  connection,
+  provider,
+  minDelay,
+  label = "MIN_DELAY",
+}) => {
+  const isMainnet = await isProductionTimelockNetwork({ connection, provider });
+  if (isMainnet && BigInt(minDelay) < BigInt(MAINNET_MIN_DELAY_FLOOR_SECONDS)) {
+    throw new Error(
+      `${label} must be at least ${MAINNET_MIN_DELAY_FLOOR_SECONDS} seconds (7 days) ` +
+        `on mainnet; got ${minDelay}`,
+    );
+  }
+};
+
 export const resolveTimelockDeploymentConfig = async ({
   connection,
   ethers,
@@ -42,7 +67,9 @@ export const resolveTimelockDeploymentConfig = async ({
   provider = ethers.provider,
   inspectMultisig,
 }) => {
-  const isLocal = isLocalTimelockNetwork({ connection });
+  const isLocal =
+    isLocalTimelockNetwork({ connection }) &&
+    !(await isProductionTimelockNetwork({ connection, provider }));
 
   if (!isLocal) {
     const missing = ["MIN_DELAY", "GOVERNANCE_SAFE_ADDRESS"].filter((name) => !hasValue(env[name]));
@@ -58,6 +85,7 @@ export const resolveTimelockDeploymentConfig = async ({
     hasValue(env.MIN_DELAY) ? env.MIN_DELAY : LOCAL_MIN_DELAY_SECONDS,
     "MIN_DELAY",
   );
+  await assertProductionTimelockDelay({ connection, provider, minDelay });
   const governanceMultisig = parseGovernanceMultisig({
     ethers,
     value: hasValue(env.GOVERNANCE_SAFE_ADDRESS) ? env.GOVERNANCE_SAFE_ADDRESS : deployerAddress,

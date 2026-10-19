@@ -44,7 +44,7 @@ const INPUT_DIGEST = `0x${"34".repeat(32)}`;
 const FINALIZED_BLOCK_HASH = `0x${"56".repeat(32)}`;
 const FINALIZED_TRANSACTION_HASH = `0x${"78".repeat(32)}`;
 const REFUND_TRANSACTION_HASH = `0x${"9a".repeat(32)}`;
-const MIN_DELAY = 172800;
+const MIN_DELAY = 604800;
 const CHAIN_ID = 71;
 const DESTINATION_RELATIVE_PATH = "tmp/release-evidence/espace-release-rehearsal.json";
 const PROTOCOL = "deepfamily/onchain-biography-unified-passphrase-v1";
@@ -1173,21 +1173,23 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     const deploymentMismatch = validReport();
     deploymentMismatch.timelockDeployment.minDelaySeconds = MIN_DELAY + 1;
     await writeReport(deploymentMismatch);
-    await expectRejected(() => validate(), /timelockDeployment\.minDelaySeconds must be 172800/iu);
+    await expectRejected(() => validate(), /timelockDeployment\.minDelaySeconds must be 604800/iu);
 
     const terminalMismatch = validReport();
     terminalMismatch.terminalGovernanceState.timelock.minDelay = String(MIN_DELAY + 1);
     await writeReport(terminalMismatch);
     await expectRejected(
       () => validate(),
-      /terminalGovernanceState\.timelock\.minDelay must be 172800/iu,
+      /terminalGovernanceState\.timelock\.minDelay must be 604800/iu,
     );
 
     await writeReport(validReport());
-    await expectRejected(
-      () => validate({ mainnetMinDelaySeconds: 30 }),
-      /mainnetMinDelaySeconds must be a safe integer >= 86400/iu,
-    );
+    for (const minDelay of [30, 86400, 172800, 604799]) {
+      await expectRejected(
+        () => validate({ mainnetMinDelaySeconds: minDelay }),
+        /mainnetMinDelaySeconds must be a safe integer >= 604800/iu,
+      );
+    }
   });
 
   it("requires the exact schema v1 readiness gate set and every gate to be true", async function () {

@@ -2,11 +2,13 @@ import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
 import {
+  assertProductionTimelockDelay,
   parseGovernanceMultisig,
   parsePositiveSafeInteger,
   resolveTimelockDeploymentConfig,
 } from "../scripts/lib/timelockDeployment.mjs";
 import { CONFLUX_SAFE_1_3_0_2_OF_3_PROFILE } from "../scripts/lib/governanceSafety.mjs";
+import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 
 describe("Timelock deployment configuration", function () {
   const deployer = "0x0000000000000000000000000000000000000001";
@@ -67,18 +69,148 @@ describe("Timelock deployment configuration", function () {
       /requires explicit MIN_DELAY, GOVERNANCE_SAFE_ADDRESS/i,
     );
     await expect(
-      resolve({ env: { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: " " } }),
+      resolve({ env: { MIN_DELAY: "604800", GOVERNANCE_SAFE_ADDRESS: " " } }),
     ).to.be.rejectedWith(/requires explicit GOVERNANCE_SAFE_ADDRESS/i);
   });
 
   it("accepts only positive safe integer delays", function () {
-    expect(parsePositiveSafeInteger("172800", "MIN_DELAY")).to.equal(172800);
+    expect(parsePositiveSafeInteger("604800", "MIN_DELAY")).to.equal(604800);
 
     for (const invalid of ["", "0", "-1", "1.5", "seconds", "9007199254740992"]) {
       expect(() => parsePositiveSafeInteger(invalid, "MIN_DELAY")).to.throw(
         /positive safe integer/i,
       );
     }
+  });
+
+  it("requires seven days on both mainnets before inspecting the governance wallet", async () => {
+    for (const chainId of [1n, 1030n]) {
+      for (const minDelay of [86400, 172800, 604799]) {
+        await expect(
+          resolve({
+            env: { MIN_DELAY: String(minDelay), GOVERNANCE_SAFE_ADDRESS: multisig },
+            provider: provider({ chainId }),
+          }),
+        ).to.be.rejectedWith(/at least 604800 seconds \(7 days\) on mainnet/i);
+      }
+      for (const minDelay of [604800, 1209600]) {
+        const config = await resolve({
+          env: { MIN_DELAY: String(minDelay), GOVERNANCE_SAFE_ADDRESS: multisig },
+          provider: provider({ chainId, code: { [multisig.toLowerCase()]: "0x60006000" } }),
+        });
+        expect(config.minDelay).to.equal(minDelay);
+      }
+    }
+  });
+
+  it("checks the actual HTTP chain even with a testnet or localhost network name", async () => {
+    for (const networkName of ["sepolia", "localhost"]) {
+      await expect(
+        resolve({
+          connection: { networkName, networkConfig: { type: "http", chainId: 31337 } },
+          env: { MIN_DELAY: "120", GOVERNANCE_SAFE_ADDRESS: multisig },
+          provider: provider({ chainId: 1n }),
+        }),
+      ).to.be.rejectedWith(/at least 604800 seconds/i);
+    }
+    await expect(
+      resolve({
+        connection: { networkName: "localhost", networkConfig: { type: "http", chainId: 31337 } },
+        env: { MIN_DELAY: "604800" },
+        provider: provider({ chainId: 1n }),
+      }),
+    ).to.be.rejectedWith(/requires explicit GOVERNANCE_SAFE_ADDRESS/i);
+  });
+
+  it("preserves short diagnostic Timelocks on both testnets", async () => {
+    for (const chainId of [71n, 11155111n]) {
+      const config = await resolve({
+        env: { MIN_DELAY: "30", GOVERNANCE_SAFE_ADDRESS: multisig },
+        provider: provider({ chainId, code: { [multisig.toLowerCase()]: "0x60006000" } }),
+      });
+      expect(config.minDelay).to.equal(30);
+    }
+  });
+
+  it("keeps simulated networks independent of the production chain ID policy", async () => {
+    const config = await resolve({
+      connection: { networkConfig: { type: "edr-simulated", chainId: 1 } },
+      provider: provider({ chainId: 1n }),
+    });
+    expect(config.minDelay).to.equal(120);
+  });
+
+  it("applies the same policy to an existing Timelock selected for a new mainnet deployment", async () => {
+    await expect(
+      assertProductionTimelockDelay({
+        connection: { networkConfig: { type: "http" } },
+        provider: provider(),
+        minDelay: 172800n,
+        label: "GovernanceTimelock minDelay",
+      }),
+    ).to.be.rejectedWith(/GovernanceTimelock minDelay must be at least 604800 seconds/i);
+  });
+
+  it("checks the selected Timelock before broadcasting a new mainnet protocol deployment", async () => {
+    const [deployerSigner, firstOwner, secondOwner] = await hre.ethers.getSigners();
+    const multisigContract = await hre.ethers.deployContract("TwoOfTwoMultisigMock", [
+      firstOwner.address,
+      secondOwner.address,
+    ]);
+    await multisigContract.waitForDeployment();
+    const multisigAddress = await multisigContract.getAddress();
+    const Timelock = await hre.ethers.getContractFactory("GovernanceTimelock");
+    const shorter = await Timelock.deploy(604799, multisigAddress);
+    const accepted = await Timelock.deploy(604800, multisigAddress);
+    await Promise.all([shorter.waitForDeployment(), accepted.waitForDeployment()]);
+    const nonceBefore = await deployerSigner.getNonce();
+
+    for (const chainId of [1n, 1030n]) {
+      // Keep every EVM read local; substitute only the RPC's reported chain identity.
+      const mainnetProvider = new Proxy(hre.ethers.provider, {
+        get(target, key) {
+          if (key === "getNetwork") return async () => ({ chainId });
+          const value = Reflect.get(target, key, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const mainnetEthers = new Proxy(hre.ethers, {
+        get(target, key) {
+          if (key === "provider") return mainnetProvider;
+          return Reflect.get(target, key, target);
+        },
+      });
+      const connection = {
+        networkName: "localhost",
+        networkConfig: { type: "http", chainId: 31337 },
+        ethers: mainnetEthers,
+      };
+      let broadcasts = 0;
+      const options = {
+        artifacts: hre.artifacts,
+        governanceMultisig: multisigAddress,
+        governanceMultisigProfile: "",
+        transactionExecutor: async () => {
+          broadcasts += 1;
+          throw new Error("deployment preflight accepted; no broadcast");
+        },
+      };
+      await expect(
+        deployIntegratedSystem(connection, {
+          ...options,
+          governanceOwner: await shorter.getAddress(),
+        }),
+      ).to.be.rejectedWith(/at least 604800 seconds \(7 days\) on mainnet/i);
+      expect(broadcasts).to.equal(0);
+      await expect(
+        deployIntegratedSystem(connection, {
+          ...options,
+          governanceOwner: await accepted.getAddress(),
+        }),
+      ).to.be.rejectedWith("deployment preflight accepted; no broadcast");
+      expect(broadcasts).to.equal(1);
+    }
+    expect(await deployerSigner.getNonce()).to.equal(nonceBefore);
   });
 
   it("validates the single governance multisig address", function () {
@@ -92,7 +224,7 @@ describe("Timelock deployment configuration", function () {
   });
 
   it("requires a deployed, inspectable multisig on live networks", async () => {
-    const env = { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: multisig };
+    const env = { MIN_DELAY: "604800", GOVERNANCE_SAFE_ADDRESS: multisig };
     await expect(resolve({ env })).to.be.rejectedWith(
       new RegExp(`${multisig}.*no contract code`, "i"),
     );
@@ -102,13 +234,13 @@ describe("Timelock deployment configuration", function () {
 
     expect(config).to.deep.equal({
       isLocal: false,
-      minDelay: 172800,
+      minDelay: 604800,
       governanceMultisig: multisig,
     });
   });
 
   it("propagates multisig policy inspection failures", async () => {
-    const env = { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: multisig };
+    const env = { MIN_DELAY: "604800", GOVERNANCE_SAFE_ADDRESS: multisig };
     await expect(
       resolve({
         env,
@@ -135,13 +267,13 @@ describe("Timelock deployment configuration", function () {
       const config = await resolveTimelockDeploymentConfig({
         connection: { networkConfig: { type: "http" } },
         ethers: hre.ethers,
-        env: { MIN_DELAY: "172800", GOVERNANCE_SAFE_ADDRESS: deployedAddress },
+        env: { MIN_DELAY: "604800", GOVERNANCE_SAFE_ADDRESS: deployedAddress },
         deployerAddress: deployer,
         provider: hre.ethers.provider,
       });
       expect(config).to.deep.equal({
         isLocal: false,
-        minDelay: 172800,
+        minDelay: 604800,
         governanceMultisig: deployedAddress,
       });
     } finally {

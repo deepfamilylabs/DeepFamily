@@ -94,7 +94,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       deployer: deployerAddress,
       startingNonce,
       chainId: 1030n,
-      minDelaySeconds: 86_400,
+      minDelaySeconds: 604_800,
       governanceMultisig: multisig,
     });
     const byLabel = Object.fromEntries(intents.map((intent) => [intent.label, intent]));
@@ -137,7 +137,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       deployerAddress,
     ]);
     const requests = {
-      governanceTimelock: await Timelock.getDeployTransaction(86_400, multisig),
+      governanceTimelock: await Timelock.getDeployTransaction(604_800, multisig),
       deepFamilyToken: await Token.getDeployTransaction(),
       poseidonT5: await PoseidonT5.getDeployTransaction(),
       adultAgeGate: await AdultAgeGate.getDeployTransaction(),

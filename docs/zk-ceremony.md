@@ -425,7 +425,7 @@ After the ZK artifacts are frozen, follow the target-chain runbook in this order
    production protocol manifest;
 3. commit that chain-specific state and run `release:preflight` from the clean final commit;
 4. run the target testnet acceptance command in `release-rehearsal` mode with
-   `MIN_DELAY >= 86400` from that same commit;
+   `MIN_DELAY >= 604800` from that same commit;
 5. accept only a schema-v1 fresh-release report with `status=passed`, `releaseReady=true`,
    `evidenceType=initial-mainnet-release`, `governanceLifecycleIncluded=false`,
    `zkArtifactTrust.productionReady=true`, and `zkCeremonyVerification.status=passed`;
@@ -442,7 +442,7 @@ testnet deployment itself; they are not compared to the final Mainnet addresses/
 The release rehearsal deploys that Timelock delay but schedules no Timelock operation, so it has
 zero Timelock waits. Diagnostic mode uses the built-in 30-second delay for each of four governance
 windows; diagnostic output is never release evidence. A fresh Mainnet release also has zero
-Timelock waits. Its configured 48-hour delay governs later changes.
+Timelock waits. Its configured 7-day delay governs later changes.
 
 The Safe remains a separate 2/3 governance control. The testnet/Mainnet release tools validate the
 recorded ZK trust model but do not reinterpret one ZK contributor as one governance signer.

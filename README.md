@@ -399,7 +399,7 @@ npm run ethereum:acceptance
 A diagnostic run always reports `releaseReady=false`. Before a production release, rerun from the
 clean release commit with `EVM_E2E_MODE=release-rehearsal`,
 `GOVERNANCE_SAFE_PROFILE=ethereum-safe-1.3.0-2of3`, verification/finality enabled, and
-the intended production `MIN_DELAY >= 86400`. Diagnostic mode uses the built-in 30-second delay
+the intended production `MIN_DELAY >= 604800`. Diagnostic mode uses the built-in 30-second delay
 for each real governance window; `release-rehearsal` ignores that diagnostic default.
 
 For Mainnet, configure three reviewed public owner addresses and a fixed salt, then create a
@@ -477,7 +477,7 @@ networks it must contain contract code, expose `getOwners()`/`getThreshold()` wi
 least 2, and be the exclusive holder of the Timelock's proposer, canceller, and executor roles.
 `GOVERNANCE_TIMELOCK_ADDRESS` is the already-deployed `GovernanceTimelock` contract address; when a
 manual/reuse/upgrade command accepts it, the address must match the current Timelock runtime and
-have a non-zero delay.
+have a non-zero delay. New Mainnet deployments require at least 7 days (`604800` seconds).
 `DeepFamily` upgrade authority is handed to the timelock after wiring, never left on the deployer
 EOA. Local and simulated networks keep the deployer as `DeepFamily.owner()` for test flows.
 
@@ -507,16 +507,20 @@ Timelock address only to a later, explicitly reviewed manual/reuse/upgrade comma
 existing deployment.
 
 ```bash
-MIN_DELAY=172800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
+MIN_DELAY=604800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 GOVERNANCE_TIMELOCK_ADDRESS=0xTimelock... GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
   npm run deploy:net --net=confluxTestnet
 ```
 
 Every non-local Timelock deployment requires `MIN_DELAY` and `GOVERNANCE_SAFE_ADDRESS` explicitly.
-Use an initialized Safe Proxy whose reported threshold is at least 2. Only in-process simulated networks
-and the explicitly named `localhost` network use the 120-second/deployer defaults. The wrapper fixes
-the external admin to zero and permits role changes only through a scheduled, delayed self-call.
+On Ethereum Mainnet and Conflux eSpace Mainnet, deployment requires `MIN_DELAY >= 604800` (7 days).
+Testnet diagnostic runs may use shorter delays. Use an initialized Safe Proxy whose reported
+threshold is at least 2. Only in-process simulated networks and a `localhost` connection to a
+non-Mainnet chain use the 120-second/deployer defaults. The wrapper fixes the external admin to
+zero and permits role changes only through a scheduled, delayed self-call.
+The 7-day minimum is a deployment and release-tooling policy. Governance can later change the delay
+through a self-call that first waits the current delay; the contract itself only rejects zero.
 
 Owner-only configuration, such as changing the endorsement fee to 7.5%, uses the general governance
 tasks. If the CLI signer is not the role holder, the task prints the destination and calldata to
@@ -574,11 +578,11 @@ npx hardhat --config hardhat.config.mjs timelock-migrate-multisig --network conf
   --contract-name GovernanceTimelock --phase execute \
   --old-multisig 0xOldMultisig... --new-multisig 0xNewMultisig...
 
-# Change the minimum delay through a delayed Timelock self-call.
+# Raise the minimum delay to 14 days through a delayed Timelock self-call.
 npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
-  --contract-name GovernanceTimelock --phase schedule --new-delay 259200
+  --contract-name GovernanceTimelock --phase schedule --new-delay 1209600
 npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
-  --contract-name GovernanceTimelock --phase execute --new-delay 259200
+  --contract-name GovernanceTimelock --phase execute --new-delay 1209600
 ```
 
 Replacing the Timelock itself is a separate ownership migration. Deploy and verify the new
@@ -586,7 +590,7 @@ Timelock first using the intended new Safe Proxy as a one-command override; do n
 the persistent operator environment yet:
 
 ```bash
-MIN_DELAY=259200 GOVERNANCE_SAFE_ADDRESS=0xNewSafeProxy... \
+MIN_DELAY=1209600 GOVERNANCE_SAFE_ADDRESS=0xNewSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 ```
 

@@ -491,8 +491,9 @@ verifiers, the verifier adapter, and the libraries.
   balance is unrelated to ERC-20 ownership: `DeepFamilyToken.owner()` remains `address(0)`.
 - On live networks the deployment refuses to keep upgrade authority on an EOA:
   `GOVERNANCE_TIMELOCK_ADDRESS` identifies an already-deployed `GovernanceTimelock`, which must
-  match the current runtime bytecode and have a non-zero delay. Ownership
-  of `DeepFamily` is handed over after wiring. Local/simulated networks keep the deployer as
+  match the current runtime bytecode and have a non-zero delay. New Mainnet deployments require
+  at least 7 days (`604800` seconds). Ownership of `DeepFamily` is handed over after wiring.
+  Local/simulated networks keep the deployer as
   `DeepFamily.owner()` for test flows.
 - `DeepFamilyToken` is deliberately outside Timelock **administrative ownership**. Its deployer owner
   exists only to authorize the one-time reciprocal binding. A successful
@@ -611,7 +612,7 @@ that clean commit, and a successful eSpace `release-rehearsal` must have automat
 exact schema-v1 `releaseReady=true` evidence to the chain-specific, Git-ignored
 `tmp/release-evidence/espace-release-rehearsal.json`. The Mainnet release reads that fixed file
 automatically and rejects a missing file or evidence from an older commit, a different artifact
-input, or a different production `MIN_DELAY >= 86400`. Diagnostic, failed, and recovery acceptance
+input, or a different production `MIN_DELAY >= 604800`. Diagnostic, failed, and recovery acceptance
 runs never overwrite the published evidence. The default ZK setup records one Phase 2 contributor
 under `trustModel=single-operator`; this is
 independent of the three-owner, 2/3 governance Safe.
@@ -620,11 +621,11 @@ Acceptance modes deliberately prove different things:
 
 - `diagnostic` uses the built-in 30-second Testnet delay and runs all four real governance windows.
   It is fast lifecycle coverage and never release evidence.
-- `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 86400`, but schedules
+- `release-rehearsal` deploys the initial production shape with `MIN_DELAY >= 604800`, but schedules
   no Timelock operation and waits zero Timelock windows. Its schema-v1 report contains no Mock,
   upgrade, or governance migration and records `evidenceType=initial-mainnet-release` with
   `governanceLifecycleIncluded=false`.
-- a fresh Mainnet release follows the same zero-wait shape. Its 48-hour Timelock delay constrains
+- a fresh Mainnet release follows the same zero-wait shape. Its 7-day Timelock delay constrains
   the first future governance operation, not deployment itself.
 
 The plan command is always read-only. After review, at least two current Safe owners sign the
@@ -700,9 +701,11 @@ in the [Ethereum Mainnet release runbook](ethereum-mainnet-release.md).
 For manual deployment on another supported network, or an explicitly reviewed recovery, deploy the
 Timelock first with one Safe Proxy. The deploy script requires `MIN_DELAY` and
 `GOVERNANCE_SAFE_ADDRESS` explicitly on every non-local network, validates the delay as a positive
-safe integer, and checks the `getOwners()`/`getThreshold()` state. This confirms the reported threshold
-and owners, but it does not independently attest the Safe implementation or bytecode; verify
-the wallet deployment, signer policy, modules, and guards before funding or transferring ownership.
+safe integer, and requires at least `604800` seconds (7 days) on Ethereum Mainnet and Conflux eSpace
+Mainnet. Testnet diagnostic runs may use shorter delays. It also checks the
+`getOwners()`/`getThreshold()` state. This confirms the reported threshold and owners, but it does
+not independently attest the Safe implementation or bytecode; verify the wallet deployment,
+signer policy, modules, and guards before funding or transferring ownership.
 
 Conflux eSpace is an EVM-compatible execution environment within Conflux Network, not an Ethereum
 L2. Its guarded flow rehearses on `confluxTestnet` and releases on `conflux`; the guarded Ethereum
@@ -731,10 +734,13 @@ The wrapper internally fixes the external admin to `address(0)`, makes role memb
 and restricts `grantRole`, `revokeRole`, and `renounceRole` to timelock self-calls. OpenZeppelin's
 timelock still grants `DEFAULT_ADMIN_ROLE` to itself, so roles can be migrated, but only by scheduling
 and executing a delayed timelock operation. A zero delay is rejected both initially and on updates.
+The 7-day minimum is enforced by Mainnet deployment and production release tooling, rather than
+as a permanent contract floor. Governance can later lower it through a self-call that first waits the
+current delay.
 
 ```bash
 # Advanced stepwise example: temporary overrides using the actual testnet Safe Proxy.
-MIN_DELAY=172800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
+MIN_DELAY=604800 GOVERNANCE_SAFE_ADDRESS=0xSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 
 # Use the resulting Timelock address, not the Safe Proxy, as the protocol owner.
@@ -757,9 +763,9 @@ placeholder automatically. Sepolia uses Hardhat's API-key-free Blockscout provid
 Ethereum Mainnet retains Etherscan and requires a real `EXPLORER_API_KEY`; do not reuse the
 Conflux placeholder for Mainnet verification.
 
-Only in-process simulated networks and the explicitly named `localhost` network permit the local
-defaults (`MIN_DELAY=120` with the deployer as role holder). A remote HTTP network is treated as live
-even if it uses chain ID 31337.
+Only in-process simulated networks and a `localhost` connection to a non-Mainnet chain permit the
+local defaults (`MIN_DELAY=120` with the deployer as role holder). A remote HTTP network is treated
+as live even if it uses chain ID 31337. Mainnet checks use the RPC's actual chain ID.
 
 #### General owner operations
 
@@ -903,13 +909,13 @@ this Timelock.
 
 Change the minimum delay through a Timelock self-call. The update itself is always scheduled using
 the current delay; zero and no-op values are rejected. Raising the delay does not extend operations
-that were already scheduled:
+that were already scheduled. For example, raise it to 14 days:
 
 ```bash
 npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
-  --contract-name GovernanceTimelock --phase schedule --new-delay 259200
+  --contract-name GovernanceTimelock --phase schedule --new-delay 1209600
 npx hardhat --config hardhat.config.mjs timelock-update-delay --network confluxTestnet \
-  --contract-name GovernanceTimelock --phase execute --new-delay 259200
+  --contract-name GovernanceTimelock --phase execute --new-delay 1209600
 ```
 
 To replace the Timelock contract, first deploy a new `GovernanceTimelock` using the intended new
@@ -917,7 +923,7 @@ Safe Proxy as a one-command override. Keep the persistent operator environment p
 governance until migration is confirmed:
 
 ```bash
-MIN_DELAY=259200 GOVERNANCE_SAFE_ADDRESS=0xNewSafeProxy... \
+MIN_DELAY=1209600 GOVERNANCE_SAFE_ADDRESS=0xNewSafeProxy... \
   npm run deploy:timelock --net=confluxTestnet
 ```
 
