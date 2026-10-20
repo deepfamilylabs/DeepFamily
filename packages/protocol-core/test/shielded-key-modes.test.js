@@ -8,7 +8,7 @@ import {
   decodeShieldedNotePayload,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   getShieldedBudgetCommitments,
   deriveShieldedHeirKeyMaterial,
 } from "../index.js";
@@ -58,9 +58,9 @@ test("private modes alter owner authorization while retaining policy and enrollm
 });
 
 test("private funding backup carries the mode and original viewing key within 459 bytes", async () => {
-  const root = await deriveShieldedAssetKeyMaterial({
-    assetRoot: new Uint8Array(32).fill(7),
-    fundsIdentitySecret: new Uint8Array(32).fill(3),
+  const root = await deriveShieldedIndependentKeyMaterial({
+    independentKeyRoot: new Uint8Array(32).fill(7),
+    independentKeyIdentitySecret: new Uint8Array(32).fill(3),
   });
   const budgetNote = { ...note, keyMode: 1n, heirOwnerCommitment: root.ownerCommitment };
   const payload = encodeShieldedValueNotePayload(
@@ -88,9 +88,9 @@ test("private funding backup carries the mode and original viewing key within 45
 });
 
 test("receive-code fingerprint binds the proved mode, identity and view but no root source or proof", async () => {
-  const keys = await deriveShieldedAssetKeyMaterial({
-    assetRoot: new Uint8Array(32).fill(8),
-    fundsIdentitySecret: new Uint8Array(32).fill(3),
+  const keys = await deriveShieldedIndependentKeyMaterial({
+    independentKeyRoot: new Uint8Array(32).fill(8),
+    independentKeyIdentitySecret: new Uint8Array(32).fill(3),
   });
   const input = {
     identityCommitment: 14n,
@@ -110,6 +110,6 @@ test("receive-code fingerprint binds the proved mode, identity and view but no r
     computeShieldedReceiveCodeFingerprint({ ...input, identityCommitment: 15n }),
   );
   assert.throws(() =>
-    buildShieldedReceiveCodePublicSignals({ ...input, assetDerivationVersion: 2 }),
+    buildShieldedReceiveCodePublicSignals({ ...input, independentKeyDerivationVersion: 2 }),
   );
 });

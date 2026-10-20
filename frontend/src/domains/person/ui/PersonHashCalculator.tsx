@@ -41,8 +41,8 @@ import {
 import { safeCanonicalizeFullName } from "../../../shared/identity/fullName";
 import { cryptoWorkerCall } from "../../../shared/workers/cryptoWorkerClient";
 import {
-  normalizeShieldedFundsIdentity,
-  normalizeShieldedFundsPassphrase,
+  normalizeShieldedIndependentKeyIdentity,
+  normalizeShieldedIndependentKeyPassphrase,
 } from "@deepfamily/protocol-core";
 
 const MAX_FULL_NAME_BYTES = 256;
@@ -226,8 +226,8 @@ interface PersonHashCalculatorProps {
   requirePassphraseConfirmation?: boolean;
   /** Disable live hash computation when the enclosing action derives the identity itself. */
   computeHash?: boolean;
-  /** Validate funds credentials with their frozen rules, independently of identity suites. */
-  fundsCredentials?: boolean;
+  /** Validate independent-key credentials with their frozen rules, independently of identity suites. */
+  independentKeyCredentials?: boolean;
   /** Hide explanatory passphrase help and strength details in focused action forms. */
   showPassphraseGuidance?: boolean;
 }
@@ -261,7 +261,7 @@ export const PersonHashCalculator = forwardRef<
       identitySuiteId = 1,
       requirePassphraseConfirmation = false,
       computeHash = true,
-      fundsCredentials = false,
+      independentKeyCredentials = false,
       showPassphraseGuidance = true,
     },
     ref,
@@ -282,9 +282,9 @@ export const PersonHashCalculator = forwardRef<
     const passphraseInputId = useId();
     const passphraseErrorId = useId();
     const canonicalName = (value: string) => {
-      if (!fundsCredentials) return safeCanonicalizeFullName(value);
+      if (!independentKeyCredentials) return safeCanonicalizeFullName(value);
       try {
-        return normalizeShieldedFundsIdentity({
+        return normalizeShieldedIndependentKeyIdentity({
           fullName: value,
           gender: 0,
           isBirthBC: false,
@@ -297,9 +297,9 @@ export const PersonHashCalculator = forwardRef<
       }
     };
     const normalizeFormPassphrase = (value: string) => {
-      if (!fundsCredentials) return normalizePassphraseForHash(value);
+      if (!independentKeyCredentials) return normalizePassphraseForHash(value);
       try {
-        return normalizeShieldedFundsPassphrase(value);
+        return normalizeShieldedIndependentKeyPassphrase(value);
       } catch {
         return "";
       }
@@ -336,7 +336,7 @@ export const PersonHashCalculator = forwardRef<
                   .number()
                   .int()
                   .min(0, t("search.validation.yearRange"))
-                  .max(fundsCredentials ? 65535 : 9999, t("search.validation.yearRange")),
+                  .max(independentKeyCredentials ? 65535 : 9999, t("search.validation.yearRange")),
                 z.literal(""),
               ])
               .optional()
@@ -369,7 +369,7 @@ export const PersonHashCalculator = forwardRef<
             (data) => {
               // If AD (Anno Domini), the year must not exceed the current year
               if (
-                !fundsCredentials &&
+                !independentKeyCredentials &&
                 !data.isBirthBC &&
                 data.birthYear > new Date().getFullYear()
               ) {
@@ -382,7 +382,7 @@ export const PersonHashCalculator = forwardRef<
               path: ["birthYear"],
             },
           ),
-      [t, fundsCredentials],
+      [t, independentKeyCredentials],
     );
 
     const {
@@ -422,7 +422,7 @@ export const PersonHashCalculator = forwardRef<
       const rawPassphrase = passphraseInputRef.current?.value ?? "";
       const normalized = normalizeFormPassphrase(rawPassphrase);
       return {
-        risk: fundsCredentials
+        risk: independentKeyCredentials
           ? ((rawPassphrase === ""
               ? "empty"
               : normalized
@@ -433,7 +433,7 @@ export const PersonHashCalculator = forwardRef<
         hasPassphrase: normalized.length > 0,
         strength: validatePassphraseStrength(normalized, false),
       };
-    }, [passphraseRevision, fundsCredentials]);
+    }, [passphraseRevision, independentKeyCredentials]);
     const isPassphraseDisallowed = passphraseRisk === "disallowed";
 
     const buildTransformedData = (
@@ -577,7 +577,7 @@ export const PersonHashCalculator = forwardRef<
         passphraseRevision,
         requirePassphraseConfirmation,
         clearSecretInputs,
-        fundsCredentials,
+        independentKeyCredentials,
       ],
     );
 
@@ -612,8 +612,8 @@ export const PersonHashCalculator = forwardRef<
         gender: Number(gender || 0),
       });
       // The preview uses the identity suite's own rules. It must not rewrite
-      // the original fields later submitted to the independent funds path.
-      if (fundsCredentials) transformedData.fullName = fullName || "";
+      // the original fields later submitted to the independent key path.
+      if (independentKeyCredentials) transformedData.fullName = fullName || "";
       if (!transformedData.fullName.length || isPassphraseDisallowed) {
         setIsComputingHash(false);
         return;
@@ -674,7 +674,7 @@ export const PersonHashCalculator = forwardRef<
       isPassphraseDisallowed,
       identitySuiteId,
       computeHash,
-      fundsCredentials,
+      independentKeyCredentials,
     ]);
 
     const content = (
@@ -737,9 +737,9 @@ export const PersonHashCalculator = forwardRef<
                 <input
                   type="number"
                   min="0"
-                  max={fundsCredentials ? 65535 : isBirthBC ? 9999 : new Date().getFullYear()}
+                  max={independentKeyCredentials ? 65535 : isBirthBC ? 9999 : new Date().getFullYear()}
                   placeholder={
-                    fundsCredentials
+                    independentKeyCredentials
                       ? "0–65535"
                       : isBirthBC
                         ? "<10000"
@@ -748,7 +748,7 @@ export const PersonHashCalculator = forwardRef<
                   className={MODAL_FIELD_SM}
                   {...register("birthYear", {
                     setValueAs: (v) =>
-                      v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
+                      v === "" ? "" : independentKeyCredentials ? Number(v) : parseInt(v, 10),
                   })}
                 />
                 <FieldError message={errors.birthYear?.message} />
@@ -767,7 +767,7 @@ export const PersonHashCalculator = forwardRef<
                 className={MODAL_FIELD_SM}
                 {...register("birthMonth", {
                   setValueAs: (v) =>
-                    v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
+                    v === "" ? "" : independentKeyCredentials ? Number(v) : parseInt(v, 10),
                 })}
               />
               <FieldError message={errors.birthMonth?.message} />
@@ -785,7 +785,7 @@ export const PersonHashCalculator = forwardRef<
                 className={MODAL_FIELD_SM}
                 {...register("birthDay", {
                   setValueAs: (v) =>
-                    v === "" ? "" : fundsCredentials ? Number(v) : parseInt(v, 10),
+                    v === "" ? "" : independentKeyCredentials ? Number(v) : parseInt(v, 10),
                 })}
               />
               <FieldError message={errors.birthDay?.message} />

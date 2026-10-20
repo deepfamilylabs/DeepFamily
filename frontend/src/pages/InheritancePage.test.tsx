@@ -122,12 +122,12 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
         {assetControls}
         <span data-testid="shielded-session-state">{session.identity ? "unlocked" : "locked"}</span>
         <span data-testid="shielded-identity">{session.identity?.identityCommitment ?? ""}</span>
-        <span data-testid="shielded-funds">{session.funds?.fundsFingerprint ?? ""}</span>
+        <span data-testid="shielded-independent-key">{session.independentKey?.keyFingerprint ?? ""}</span>
         <span data-testid="shielded-navigation">
           {navigation ? `${navigation.slot}:${navigation.action}` : ""}
         </span>
         <button type="button" onClick={() => onNavigationChange?.({
-          slot: "asset",
+          slot: "independent",
           action: "claim",
         })}>
           select-independent-claim
@@ -161,10 +161,10 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
             session.update({
               credentials: { handle: "credentials:test" },
               identity: null,
-              funds: {
+              independentKey: {
                 ownerCommitment: "123",
                 viewingKey: `0x${"12".repeat(32)}`,
-                fundsFingerprint: `0x${"34".repeat(32)}`,
+                keyFingerprint: `0x${"34".repeat(32)}`,
                 rootSource: "random",
                 recoveryVerified: true,
                 recoveryPath: "shieldedKey",
@@ -172,7 +172,7 @@ vi.mock("../domains/inheritance/ui/ShieldedInheritancePanel", () => ({
             })
           }
         >
-          unlock-funds-without-identity-proof
+          unlock-independent-key-without-identity-proof
         </button>
         <input
           aria-label="private-workflow-draft"
@@ -406,12 +406,12 @@ describe("InheritancePage private pool entry", () => {
     render(<InheritancePage />);
     const original = await screen.findByTestId("shielded-panel");
     expect(screen.getByTestId("shielded-navigation").textContent).toBe("identity:shield");
-    fireEvent.click(screen.getByRole("button", { name: "unlock-funds-without-identity-proof" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-independent-key-without-identity-proof" }));
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
-    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
+    expect(screen.getByTestId("shielded-independent-key").textContent).toBe(`0x${"34".repeat(32)}`);
     fireEvent.click(screen.getByRole("button", { name: "select-independent-claim" }));
-    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("independent:claim");
     fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
       target: { value: "old DEEP budget" },
     });
@@ -422,8 +422,8 @@ describe("InheritancePage private pool entry", () => {
     expect(screen.getByTestId("shielded-panel")).not.toBe(original);
     expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
     expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
-    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
-    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim");
+    expect(screen.getByTestId("shielded-independent-key").textContent).toBe(`0x${"34".repeat(32)}`);
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("independent:claim");
     expect(screen.getByTestId("shielded-token").textContent).toBe("native");
     expect(screen.getByTestId("shielded-deployment-block").textContent).toBe("5");
     expect(
@@ -447,7 +447,7 @@ describe("InheritancePage private pool entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
     expect(screen.getByTestId("shielded-panel")).toBe(original);
     expect(draft()).toBe("first person's budget");
-    expect(screen.getByTestId("shielded-navigation").textContent).toBe("asset:claim");
+    expect(screen.getByTestId("shielded-navigation").textContent).toBe("independent:claim");
     // Another person shows nothing of the first one.
     fireEvent.click(screen.getByRole("button", { name: "lock-test-session" }));
     fireEvent.click(screen.getByRole("button", { name: "unlock-other-test-session" }));
@@ -683,17 +683,17 @@ describe("InheritancePage private pool entry", () => {
     expect(assetSelector().textContent).toBe("TEST · 0x0000…0030");
   });
 
-  it("keeps funds credentials without identity proof capability when another pool is selected", async () => {
+  it("keeps independent-key credentials without identity proof capability when another pool is selected", async () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
-    fireEvent.click(screen.getByRole("button", { name: "unlock-funds-without-identity-proof" }));
+    fireEvent.click(screen.getByRole("button", { name: "unlock-independent-key-without-identity-proof" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe("");
-    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
+    expect(screen.getByTestId("shielded-independent-key").textContent).toBe(`0x${"34".repeat(32)}`);
     chooseAsset("ETH");
     await waitFor(() =>
       expect(screen.getByTestId("shielded-asset").textContent).toContain("native:"),
     );
-    expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
+    expect(screen.getByTestId("shielded-independent-key").textContent).toBe(`0x${"34".repeat(32)}`);
   });
 
   it("offers a network switch and hides the actions on the wrong chain", async () => {

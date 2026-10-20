@@ -8,7 +8,7 @@ import {
   computeShieldedSpendNullifier,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encodePublicShieldedBudgetEnvelope,
@@ -289,9 +289,9 @@ describe("local shielded wallet recovery", () => {
   });
 
   it("recovers root-only VALUE and keeps budgets pending a matching identity, without mixing modes", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial({
-      assetRoot: new Uint8Array(32).fill(41),
-      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    const keys = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(41),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
     const budget = {
       keyMode: 1n,
@@ -411,9 +411,9 @@ describe("local shielded wallet recovery", () => {
         (event) => event.note.kind === "budget" && event.note.binding === "identity",
       ),
     ).toBe(true);
-    const independent = await deriveShieldedAssetKeyMaterial({
-      assetRoot: new Uint8Array(32).fill(42),
-      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    const independent = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(42),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
     const wrongSlot = await recoverLocalShieldedWallet(
       pool,

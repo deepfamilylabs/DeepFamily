@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedHeirKeyMaterial,
-  encodeShieldedAssetKey,
+  encodeShieldedIndependentKey,
 } from "@deepfamily/protocol-core";
 import { getAddress } from "ethers";
 import { ShieldedAssetSession } from "./shieldedAssetSession";
@@ -40,7 +40,7 @@ vi.mock("ethers", async (original) => ({
 }));
 vi.mock("@deepfamily/protocol-core", async (original) => ({
   ...(await original<typeof import("@deepfamily/protocol-core")>()),
-  deriveShieldedFundsIdentitySecret: async () => new Uint8Array(32).fill(3),
+  deriveShieldedIndependentKeyIdentitySecret: async () => new Uint8Array(32).fill(3),
   deriveIdentityMaterial: async ({ identity }: { identity: object }) => ({
     identity,
     identitySuiteId: 1,
@@ -118,9 +118,9 @@ const context: ShieldedWorkerContext = {
 };
 const secretKeys = deriveShieldedHeirKeyMaterial(13n);
 const fixedRoot = new Uint8Array(32).fill(41);
-const assetKeys = await deriveShieldedAssetKeyMaterial({
-  assetRoot: fixedRoot,
-  fundsIdentitySecret: new Uint8Array(32).fill(3),
+const independentKeyMaterial = await deriveShieldedIndependentKeyMaterial({
+  independentKeyRoot: fixedRoot,
+  independentKeyIdentitySecret: new Uint8Array(32).fill(3),
 });
 function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 8) {
   return {
@@ -147,7 +147,7 @@ function assertNoOpenings(value: unknown) {
     typeof entry === "bigint" ? String(entry) : entry,
   );
   for (const secret of [
-    "assetRoot",
+    "independentKeyRoot",
     "ownerSecret",
     "hpkeIkm",
     "derivedSecretField",
@@ -157,8 +157,8 @@ function assertNoOpenings(value: unknown) {
     "witness",
     String(secretKeys.ownerSecret),
     secretKeys.hpkeIkm,
-    String(assetKeys.ownerSecret),
-    assetKeys.hpkeIkm,
+    String(independentKeyMaterial.ownerSecret),
+    independentKeyMaterial.hpkeIkm,
   ])
     expect(serialized).not.toContain(secret);
 }
@@ -237,8 +237,8 @@ async function withBothOwners() {
   await session.call("importRecoveryMaterial", {
     expectedCredentialsHandle: session.state().credentials!.handle,
     format: "shieldedKey",
-    material: encodeShieldedAssetKey(fixedRoot),
-    expectedFingerprint: assetKeys.fundsFingerprint,
+    material: encodeShieldedIndependentKey(fixedRoot),
+    expectedFingerprint: independentKeyMaterial.keyFingerprint,
     context,
   });
   return session;
@@ -582,12 +582,12 @@ describe("asset Worker preview and proof boundary", () => {
   });
 
   it.each(["unshield", "privateTransfer", "fund"] as const)(
-    "does not borrow funds-key balance for an explicitly selected identity %s",
+    "does not borrow independent-key balance for an explicitly selected identity %s",
     async (action) => {
       const session = await withBothOwners();
       mocks.notes = [
         value(1n, 4n, secretKeys.ownerCommitment),
-        value(2n, 10n, assetKeys.ownerCommitment),
+        value(2n, 10n, independentKeyMaterial.ownerCommitment),
       ];
       mocks.verify.mockResolvedValue({
         ok: true,
@@ -627,7 +627,7 @@ describe("asset Worker preview and proof boundary", () => {
       const session = await withBothOwners();
       mocks.notes = [
         value(1n, 10n, secretKeys.ownerCommitment),
-        value(2n, 10n, assetKeys.ownerCommitment),
+        value(2n, 10n, independentKeyMaterial.ownerCommitment),
       ];
       mocks.verify.mockResolvedValue({
         ok: true,
@@ -660,20 +660,20 @@ describe("asset Worker preview and proof boundary", () => {
   );
 
   it.each(["shield", "unshield", "privateTransfer", "fund"] as const)(
-    "requires a restored funds key when the user selects it for %s",
+    "requires a restored independent key when the user selects it for %s",
     async (action) => {
       const session = await unlocked();
       mocks.notes = [value(1n, 10n, secretKeys.ownerCommitment)];
       await expect(
         session.call("preview", {
           context,
-          slot: "asset",
+          slot: "independent",
           action,
           amount: "10",
           publicRecipient: context.familyAddress,
           candidates: ["1"],
         }),
-      ).rejects.toThrow("Restore the original funds");
+      ).rejects.toThrow("Restore the original independent key");
       expect(mocks.recover).not.toHaveBeenCalled();
       expect(mocks.transfer).not.toHaveBeenCalled();
       expect(mocks.unshield).not.toHaveBeenCalled();
@@ -681,25 +681,25 @@ describe("asset Worker preview and proof boundary", () => {
     },
   );
 
-  it("spends explicitly selected funds-key notes with their original owner keys", async () => {
+  it("spends explicitly selected independent-key notes with their original owner keys", async () => {
     const session = await withBothOwners();
     mocks.notes = [
       value(1n, 10n, secretKeys.ownerCommitment),
-      value(2n, 10n, assetKeys.ownerCommitment),
+      value(2n, 10n, independentKeyMaterial.ownerCommitment),
     ];
     const preview = await session.call("preview", {
       context,
-      slot: "asset",
+      slot: "independent",
       action: "unshield",
       amount: "8",
       publicRecipient: context.familyAddress,
       candidates: ["2"],
     });
-    expect(preview.slot).toBe("asset");
+    expect(preview.slot).toBe("independent");
     expect(preview.inputs).toEqual(["2"]);
     expect(preview.steps).toHaveLength(1);
     expect(mocks.unshield.mock.calls[0][0]).toMatchObject({
-      inputs: [{ keyMaterial: { ownerCommitment: assetKeys.ownerCommitment }, commitment: "2" }],
+      inputs: [{ keyMaterial: { ownerCommitment: independentKeyMaterial.ownerCommitment }, commitment: "2" }],
       amount: 8n,
     });
     assertNoOpenings(preview);
@@ -712,11 +712,11 @@ describe("asset Worker preview and proof boundary", () => {
     const session = await withBothOwners();
     mocks.notes = [
       value(1n, 10n, secretKeys.ownerCommitment),
-      value(2n, 10n, assetKeys.ownerCommitment),
+      value(2n, 10n, independentKeyMaterial.ownerCommitment),
     ];
     const preview = await session.call("preview", {
       context,
-      slot: "asset",
+      slot: "independent",
       action: "fund",
       fundingEntry: "public",
       amount: "10",
@@ -726,11 +726,11 @@ describe("asset Worker preview and proof boundary", () => {
       publicRecipient: `0x${"00".repeat(31)}1f`,
       candidates: ["2"],
     });
-    expect(preview.slot).toBe("asset");
+    expect(preview.slot).toBe("independent");
     expect(preview.action).toBe("fund");
     expect(mocks.fund.mock.calls[0][0]).toMatchObject({
-      keyMaterial: { ownerCommitment: assetKeys.ownerCommitment },
-      wallet: { walletOwnerCommitment: assetKeys.ownerCommitment },
+      keyMaterial: { ownerCommitment: independentKeyMaterial.ownerCommitment },
+      wallet: { walletOwnerCommitment: independentKeyMaterial.ownerCommitment },
       donorCommitment: "2",
     });
     expect(mocks.fundingDestination).not.toHaveBeenCalled();
@@ -741,24 +741,24 @@ describe("asset Worker preview and proof boundary", () => {
     mocks.notes = [
       value(1n, 100n, secretKeys.ownerCommitment),
       ...Array.from({ length: 9 }, (_, index) =>
-        value(BigInt(index + 2), 1n, assetKeys.ownerCommitment),
+        value(BigInt(index + 2), 1n, independentKeyMaterial.ownerCommitment),
       ),
     ];
     const preview = await session.call("preview", {
       context,
-      slot: "asset",
+      slot: "independent",
       action: "unshield",
       amount: "9",
       publicRecipient: context.familyAddress,
       candidates: mocks.notes.slice(1).map((note) => String(note.commitment)),
     });
-    expect(preview.slot).toBe("asset");
+    expect(preview.slot).toBe("independent");
     expect(preview.action).toBe("privateTransfer");
     expect(preview.steps.map((step) => step.action)).toEqual(["privateTransfer", "unshield"]);
     const transfer = mocks.transfer.mock.calls[0][0];
     expect(transfer.inputs.length).toBeGreaterThan(1);
     for (const input of transfer.inputs)
-      expect(input.keyMaterial.ownerCommitment).toBe(assetKeys.ownerCommitment);
+      expect(input.keyMaterial.ownerCommitment).toBe(independentKeyMaterial.ownerCommitment);
     expect(transfer.destinations).toMatchObject([
       { kind: "inputOwner", inputIndex: 0 },
       { kind: "inputOwner", inputIndex: 0 },

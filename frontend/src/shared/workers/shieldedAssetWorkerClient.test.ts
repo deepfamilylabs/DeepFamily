@@ -72,7 +72,7 @@ describe("asset Worker secret lifetime", () => {
     worker.emit("message", {
       id: worker.clones[0].id,
       ok: true,
-      result: { identity: null, funds: null },
+      result: { identity: null, independentKey: null },
     });
     await promise;
     expect(worker.terminate).not.toHaveBeenCalled();
@@ -138,17 +138,17 @@ describe("asset Worker secret lifetime", () => {
   });
   it("keeps the new-wallet backup challenge across realm destruction until manual restore", async () => {
     const fingerprint = `0x${"ab".repeat(32)}`;
-    const created = shieldedAssetWorkerCall("createFunds", {
+    const created = shieldedAssetWorkerCall("createIndependentKey", {
       expectedCredentialsHandle: "credentials:test",
       intent: "create",
       rootSource: "random",
       context,
     });
     respond(FakeWorker.instances[0], {
-      funds: { fundsFingerprint: fingerprint, backupRequired: true },
+      independentKey: { keyFingerprint: fingerprint, backupRequired: true },
     });
     await created;
-    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toContain(fingerprint);
+    expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).toContain(fingerprint);
     terminateShieldedAssetWorker();
 
     const restored = shieldedAssetWorkerCall("restoreSignature", {
@@ -162,7 +162,7 @@ describe("asset Worker secret lifetime", () => {
     expect(signatureWorker.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
     expect(signatureWorker.requests[0].params).toBeUndefined();
     respond(signatureWorker, {
-      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+      independentKey: { keyFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
     });
     await restored;
     terminateShieldedAssetWorker();
@@ -181,10 +181,10 @@ describe("asset Worker secret lifetime", () => {
     expect(importWorker.requests[0].params).toBeUndefined();
     expect(importWorker.clones[0].params.material).toBe("manual-root-secret");
     respond(importWorker, {
-      funds: { fundsFingerprint: fingerprint, backupRequired: false, recoveryVerified: true },
+      independentKey: { keyFingerprint: fingerprint, backupRequired: false, recoveryVerified: true },
     });
     await imported;
-    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1") ?? "").not.toContain(
+    expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1") ?? "").not.toContain(
       fingerprint,
     );
     terminateShieldedAssetWorker();
@@ -198,19 +198,19 @@ describe("asset Worker secret lifetime", () => {
     });
     const next = FakeWorker.instances[3];
     expect(next.clones[0].params.pendingBackupFingerprints).not.toContain(fingerprint);
-    respond(next, { identity: null, funds: null });
+    respond(next, { identity: null, independentKey: null });
     await reopened;
   });
   it("keeps the backup challenge when a material import fails", async () => {
     const fingerprint = `0x${"cd".repeat(32)}`;
-    const created = shieldedAssetWorkerCall("createFunds", {
+    const created = shieldedAssetWorkerCall("createIndependentKey", {
       expectedCredentialsHandle: "credentials:test",
       intent: "create",
       rootSource: "random",
       context,
     });
     respond(FakeWorker.instances[0], {
-      funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+      independentKey: { keyFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
     });
     await created;
     terminateShieldedAssetWorker();
@@ -225,7 +225,7 @@ describe("asset Worker secret lifetime", () => {
     next.emit("message", {
       id: next.clones[0].id,
       ok: false,
-      error: { message: "Funds fingerprint differs from the original wallet." },
+      error: { message: "Key fingerprint differs from the original wallet." },
     });
     await expect(failed).rejects.toThrow("fingerprint differs");
     terminateShieldedAssetWorker();
@@ -237,20 +237,20 @@ describe("asset Worker secret lifetime", () => {
     });
     const last = FakeWorker.instances[2];
     expect(last.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
-    respond(last, { identity: null, funds: null });
+    respond(last, { identity: null, independentKey: null });
     await restored;
   });
   it("leaves unrelated credentials challenges intact when an import is still a candidate", async () => {
     const fingerprints = [`0x${"12".repeat(32)}`, `0x${"34".repeat(32)}`];
     for (const fingerprint of fingerprints) {
-      const created = shieldedAssetWorkerCall("createFunds", {
+      const created = shieldedAssetWorkerCall("createIndependentKey", {
         expectedCredentialsHandle: "credentials:original",
         intent: "create",
         rootSource: "random",
         context,
       });
       respond(FakeWorker.instances[0], {
-        funds: { fundsFingerprint: fingerprint, backupRequired: true },
+        independentKey: { keyFingerprint: fingerprint, backupRequired: true },
       });
       await created;
     }
@@ -266,15 +266,15 @@ describe("asset Worker secret lifetime", () => {
     for (const fingerprint of fingerprints)
       expect(worker.clones[0].params.pendingBackupFingerprints).toContain(fingerprint);
     respond(worker, {
-      funds: {
-        fundsFingerprint: `0x${"56".repeat(32)}`,
+      independentKey: {
+        keyFingerprint: `0x${"56".repeat(32)}`,
         recoveryVerified: false,
         backupRequired: false,
       },
     });
     await candidate;
     for (const fingerprint of fingerprints)
-      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toContain(fingerprint);
+      expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).toContain(fingerprint);
     const verified = shieldedAssetWorkerCall("importRecoveryMaterial", {
       expectedCredentialsHandle: "credentials:original",
       format: "mnemonic",
@@ -282,13 +282,13 @@ describe("asset Worker secret lifetime", () => {
       context,
     });
     respond(worker, {
-      funds: { fundsFingerprint: fingerprints[1], recoveryVerified: true, backupRequired: false },
+      independentKey: { keyFingerprint: fingerprints[1], recoveryVerified: true, backupRequired: false },
     });
     await verified;
-    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toContain(
+    expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).toContain(
       fingerprints[0],
     );
-    expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).not.toContain(
+    expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).not.toContain(
       fingerprints[1],
     );
   });
@@ -296,7 +296,7 @@ describe("asset Worker secret lifetime", () => {
   it("reloads only public pending fingerprints for a new client instance", async () => {
     const fingerprint = `0x${"ef".repeat(32)}`;
     sessionStorage.setItem(
-      "deepfamily:pending-funds-backups:v1",
+      "deepfamily:pending-independent-key-backups:v1",
       JSON.stringify([fingerprint, "not-a-fingerprint"]),
     );
     vi.resetModules();
@@ -311,13 +311,13 @@ describe("asset Worker secret lifetime", () => {
       const next = FakeWorker.instances[0];
       expect(next.clones[0].params.pendingBackupFingerprints).toEqual([fingerprint]);
       respond(next, {
-        funds: { fundsFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
+        independentKey: { keyFingerprint: fingerprint, backupRequired: true, recoveryVerified: false },
       });
       await candidate;
-      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toBe(
+      expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).toBe(
         JSON.stringify([fingerprint]),
       );
-      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).not.toContain(
+      expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).not.toContain(
         "reload-signature-secret",
       );
       const imported = reloaded.shieldedAssetWorkerCall("importRecoveryMaterial", {
@@ -329,10 +329,10 @@ describe("asset Worker secret lifetime", () => {
       expect(next.clones[1].params.expectedFingerprint).toBeUndefined();
       expect(next.clones[1].params.pendingBackupFingerprints).toEqual([fingerprint]);
       respond(next, {
-        funds: { fundsFingerprint: fingerprint, recoveryVerified: true, backupRequired: false },
+        independentKey: { keyFingerprint: fingerprint, recoveryVerified: true, backupRequired: false },
       });
       await imported;
-      expect(sessionStorage.getItem("deepfamily:pending-funds-backups:v1")).toBeNull();
+      expect(sessionStorage.getItem("deepfamily:pending-independent-key-backups:v1")).toBeNull();
     } finally {
       reloaded.terminateShieldedAssetWorker();
       sessionStorage.clear();

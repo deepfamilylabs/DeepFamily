@@ -14,7 +14,7 @@ import {
   decodeShieldedNotePayload,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   verifyShieldedNotePayload,
   wrapIdentityCommitmentAsPersonHash,
@@ -394,9 +394,9 @@ describe("local unified funding preparation", () => {
 
   it("private independent funding retains owner, mode and viewing material on refill", async () => {
     const fixture = await setup();
-    const keys = await deriveShieldedAssetKeyMaterial({
-      assetRoot: new Uint8Array(32).fill(10),
-      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    const keys = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(10),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
     fixture.common.recipient = {
       ...fixture.common.recipient,
@@ -869,9 +869,9 @@ describe("local unified funding preparation", () => {
     async (keyMode) => {
       const fixture = await setup();
       if (keyMode === 1) {
-        const keys = await deriveShieldedAssetKeyMaterial({
-          assetRoot: new Uint8Array(32).fill(10),
-          fundsIdentitySecret: new Uint8Array(32).fill(91),
+        const keys = await deriveShieldedIndependentKeyMaterial({
+          independentKeyRoot: new Uint8Array(32).fill(10),
+          independentKeyIdentitySecret: new Uint8Array(32).fill(91),
         });
         fixture.common.recipient = {
           ...fixture.common.recipient,

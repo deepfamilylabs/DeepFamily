@@ -38,8 +38,8 @@ export type ShieldedReceiveCodeCheck =
       personHash: string;
       keyMode: 0 | 1;
       identitySuiteId: number;
-      assetSuiteId: number;
-      assetDerivationVersion: number;
+      independentKeySuiteId: number;
+      independentKeyDerivationVersion: number;
       fingerprint: string;
     }
   | { ok: false; reason: "malformed" | "invalid" };
@@ -85,8 +85,8 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       viewKeyHi: publicSignals[3].toString(),
       keyMode: publicSignals[4].toString(),
       identitySuiteId: publicSignals[5].toString(),
-      assetSuiteId: publicSignals[6].toString(),
-      assetDerivationVersion: publicSignals[7].toString(),
+      independentKeySuiteId: publicSignals[6].toString(),
+      independentKeyDerivationVersion: publicSignals[7].toString(),
       receiveCodeVersion: publicSignals[8].toString(),
       spendingSecret: keys.ownerSecret.toString(),
       nameField: material.nameField.toString(),
@@ -201,8 +201,8 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
     personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment),
     keyMode: decoded.keyMode as 0 | 1,
     identitySuiteId: decoded.identitySuiteId,
-    assetSuiteId: decoded.assetSuiteId,
-    assetDerivationVersion: decoded.assetDerivationVersion,
+    independentKeySuiteId: decoded.independentKeySuiteId,
+    independentKeyDerivationVersion: decoded.independentKeyDerivationVersion,
     fingerprint: decoded.fingerprint,
   };
 }

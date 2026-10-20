@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  ShieldedPublicFunds,
+  ShieldedPublicIndependentKey,
   ShieldedPublicIdentity,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { terminateShieldedAssetWorker } from "../../../shared/workers/shieldedAssetWorkerClient";
@@ -14,10 +14,10 @@ import {
 } from "./useShieldedIdentitySession";
 
 const identity: ShieldedPublicIdentity = {handle: "identity:1", identitySuiteId: 1, identity: {fullName: "Test Person"}, identityCommitment: "777", personHash: "0x" + "00".repeat(32)};
-const funds: ShieldedPublicFunds = {
+const independentKey: ShieldedPublicIndependentKey = {
   ownerCommitment: "888",
   viewingKey: "0x" + "11".repeat(32),
-  fundsFingerprint: "0x" + "22".repeat(32),
+  keyFingerprint: "0x" + "22".repeat(32),
   rootSource: "random",
   recoveryVerified: true,
 };
@@ -218,7 +218,7 @@ describe("useShieldedIdentitySession", () => {
   it("keeps both credentials during a wallet transaction and renews idle time on visible return", () => {
     const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
     const { result } = renderHook(() => useShieldedIdentitySession({ scope: "wallet-a" }));
-    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
     let endRequest!: () => void;
     act(() => {
@@ -229,7 +229,7 @@ describe("useShieldedIdentitySession", () => {
     });
     act(() => vi.advanceTimersByTime(SHIELDED_WALLET_REQUEST_TIMEOUT_MS - 1));
     expect(result.current.identity).toEqual(identity);
-    expect(result.current.funds).toEqual(funds);
+    expect(result.current.independentKey).toEqual(independentKey);
     act(() => {
       visibility.mockReturnValue("visible");
       document.dispatchEvent(new Event("visibilitychange"));
@@ -240,23 +240,23 @@ describe("useShieldedIdentitySession", () => {
     expect(vi.getTimerCount()).toBe(1);
     act(() => vi.advanceTimersByTime(SHIELDED_IDENTITY_IDLE_TIMEOUT_MS - 1));
     expect(result.current.identity).toEqual(identity);
-    expect(result.current.funds).toEqual(funds);
+    expect(result.current.independentKey).toEqual(independentKey);
     act(() => vi.advanceTimersByTime(1));
     expect(result.current.identity).toBeNull();
-    expect(result.current.funds).toBeNull();
+    expect(result.current.independentKey).toBeNull();
   });
 
   it("locks on hiding even when busy if no wallet transaction request is pending", () => {
     const { result } = renderHook(() =>
       useShieldedIdentitySession({ scope: "wallet-a", busy: true }),
     );
-    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
     act(() => {
       vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
       document.dispatchEvent(new Event("visibilitychange"));
     });
     expect(result.current.identity).toBeNull();
-    expect(result.current.funds).toBeNull();
+    expect(result.current.independentKey).toBeNull();
     expect(result.current.isWalletRequestPending()).toBe(false);
   });
 
@@ -265,7 +265,7 @@ describe("useShieldedIdentitySession", () => {
     const { result } = renderHook(() =>
       useShieldedIdentitySession({ scope: "wallet-a", busy: true }),
     );
-    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
     let endRequest!: () => void;
     act(() => {
       endRequest = result.current.beginWalletRequest();
@@ -275,7 +275,7 @@ describe("useShieldedIdentitySession", () => {
     expect(result.current.identity).toEqual(identity);
     act(() => endRequest());
     expect(result.current.identity).toBeNull();
-    expect(result.current.funds).toBeNull();
+    expect(result.current.independentKey).toBeNull();
     expect(result.current.isWalletRequestPending()).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -287,7 +287,7 @@ describe("useShieldedIdentitySession", () => {
       const { result } = renderHook(() =>
         useShieldedIdentitySession({ scope: "wallet-a", busy: true }),
       );
-      act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+      act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
       let endRequest!: () => void;
       act(() => {
         endRequest = result.current.beginWalletRequest();
@@ -298,7 +298,7 @@ describe("useShieldedIdentitySession", () => {
       expect(result.current.identity).toEqual(identity);
       act(() => vi.advanceTimersByTime(1));
       expect(result.current.identity).toBeNull();
-      expect(result.current.funds).toBeNull();
+      expect(result.current.independentKey).toBeNull();
       expect(result.current.isWalletRequestPending()).toBe(false);
       act(() => endRequest());
       expect(vi.getTimerCount()).toBe(0);
@@ -312,7 +312,7 @@ describe("useShieldedIdentitySession", () => {
         ({ scope }) => useShieldedIdentitySession({ scope, busy: true }),
         { initialProps: { scope: "wallet-a" } },
       );
-      act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+      act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
       let endRequest!: () => void;
       act(() => { endRequest = result.current.beginWalletRequest(); });
       expect(result.current.isWalletRequestPending()).toBe(true);
@@ -323,7 +323,7 @@ describe("useShieldedIdentitySession", () => {
         else window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true }));
       });
       expect(result.current.identity).toBeNull();
-      expect(result.current.funds).toBeNull();
+      expect(result.current.independentKey).toBeNull();
       expect(result.current.isWalletRequestPending()).toBe(false);
       expect(vi.getTimerCount()).toBe(0);
       act(() => endRequest());
@@ -342,7 +342,7 @@ describe("useShieldedIdentitySession", () => {
     let oldEnd!: () => void;
     act(() => { oldEnd = oldBegin(); });
     act(() => result.current.lock());
-    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, funds }));
+    act(() => result.current.update({ credentials: { handle: "credentials:1" }, identity, independentKey }));
     let newEnd!: () => void;
     act(() => {
       newEnd = result.current.beginWalletRequest();
@@ -353,7 +353,7 @@ describe("useShieldedIdentitySession", () => {
     });
     expect(result.current.isWalletRequestPending()).toBe(true);
     expect(result.current.identity).toEqual(identity);
-    expect(result.current.funds).toEqual(funds);
+    expect(result.current.independentKey).toEqual(independentKey);
     expect(vi.getTimerCount()).toBe(1);
     act(() => {
       visibility.mockReturnValue("visible");

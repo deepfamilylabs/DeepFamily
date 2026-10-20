@@ -1,4 +1,4 @@
-// Funds credential frozen Unicode 17.0.0 implementation/data.
+// Independent-key credential frozen Unicode 17.0.0 implementation/data.
 // Keep independent of the active identity/Unicode defaults for long-term recovery.
 // Unicode 17.0.0 snapshot from scripts/generate-unicode-normalization-data.mjs; maintained independently.
 /*! @license Unicode-3.0

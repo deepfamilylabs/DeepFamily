@@ -38,7 +38,7 @@ export interface ShieldedFundComposerProps {
   decimals: number;
   busy: boolean;
   wallet: ShieldedWalletSummary | null;
-  /** Funds credentials can be unlocked while the identity proof suite is unavailable. */
+  /** Independent-key credentials can be unlocked while the identity proof suite is unavailable. */
   identityReady: boolean;
   heirs: readonly ShieldedFundingHeir[];
   /** The entry in effect: an existing heir keeps the entry and key it was first funded with. */
@@ -129,7 +129,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
       >
         {!props.identityReady ? (
           <div className="pt-3">
-            <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
+            <WarningNotice>{tr("independentKeyRestoredIdentityHint")}</WarningNotice>
           </div>
         ) : null}
       </TaskHeader>

@@ -195,18 +195,18 @@ const runWorkerFlows = async (page) => {
         identity,
         rawPassphrase: receivePassphrase,
       })
-      assertPublicFields(assetState, ['credentials', 'identity', 'funds'], 'asset session')
-      assertPublicFields(assetState.credentials, ['handle'], 'funds credentials')
+      assertPublicFields(assetState, ['credentials', 'identity', 'independentKey'], 'asset session')
+      assertPublicFields(assetState.credentials, ['handle'], 'independent-key credentials')
       assertPublicFields(assetState.identity, [
         'handle', 'identitySuiteId', 'identityCommitment', 'personHash', 'identity',
       ], 'asset identity')
       assertPublicFields(assetState.identity.identity, ['fullName'], 'asset identity display')
-      if (assetState.funds !== null || typeof assetState.credentials.handle !== 'string' || typeof assetState.identity.handle !== 'string' ||
+      if (assetState.independentKey !== null || typeof assetState.credentials.handle !== 'string' || typeof assetState.identity.handle !== 'string' ||
         typeof assetState.identity.identityCommitment !== 'string' ||
         typeof assetState.identity.personHash !== 'string' ||
         typeof assetState.identity.identitySuiteId !== 'number' ||
         typeof assetState.identity.identity.fullName !== 'string') {
-        throw new Error('asset session returned invalid public field types or created a funds root')
+        throw new Error('asset session returned invalid public field types or created an independent key root')
       }
       const assetCreated = await call(asset, 'receiveCode', { slot: 'identity' })
       assertPublicFields(assetCreated, ['code'], 'asset receive code')

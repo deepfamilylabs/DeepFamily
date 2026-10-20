@@ -21,7 +21,7 @@ import {
   createLineageTree,
   decryptShieldedNote,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
   encryptShieldedNote,
@@ -274,7 +274,7 @@ describe("local shielded claim preparation", () => {
     await expect(prepareShieldedClaim(input)).rejects.toThrow("valid family eligibility snapshot");
   });
 
-  it("requires explicit funds keys even for an identity-derived budget", async () => {
+  it("requires explicit independent keys even for an identity-derived budget", async () => {
     const input = await fixture();
     await expect(
       prepareShieldedClaim({
@@ -285,9 +285,9 @@ describe("local shielded claim preparation", () => {
   });
 
   it("independent budgets claim to their original root and reject identity fallback", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial({
-      assetRoot: new Uint8Array(32).fill(9),
-      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    const keys = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(9),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
     const input = await fixture(1_200n, 100n, 30n, keys);
     const prepared = await prepareShieldedClaim(input);
@@ -653,9 +653,9 @@ describe("local shielded claim preparation", () => {
         ] as const) {
           const keys =
             keyMode === 1
-              ? await deriveShieldedAssetKeyMaterial({
-                  assetRoot: new Uint8Array(32).fill(9),
-                  fundsIdentitySecret: new Uint8Array(32).fill(91),
+              ? await deriveShieldedIndependentKeyMaterial({
+                  independentKeyRoot: new Uint8Array(32).fill(9),
+                  independentKeyIdentitySecret: new Uint8Array(32).fill(91),
                 })
               : undefined;
           const input = await fixture(useSecond ? 600n : 1_200n, 100n, 30n, keys);

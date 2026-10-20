@@ -7,7 +7,7 @@ import {
   computeIdentityFromDerivedSecret,
   decodeShieldedReceiveCode,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   encodeShieldedReceiveCode,
   wrapIdentityCommitmentAsPersonHash,
@@ -134,16 +134,16 @@ describe("receive code proofs", () => {
       personHash: wrapIdentityCommitmentAsPersonHash(material.identityCommitment),
       keyMode: 0,
       identitySuiteId: 1,
-      assetSuiteId: 1,
-      assetDerivationVersion: 1,
+      independentKeySuiteId: 1,
+      independentKeyDerivationVersion: 1,
       fingerprint: decodeShieldedReceiveCode(code).fingerprint,
     });
   }, 60_000);
 
   it("proves independent root keys and rejects a mode downgrade using the same proof", async () => {
-    const keys = await deriveShieldedAssetKeyMaterial({
-      assetRoot: new Uint8Array(32).fill(23),
-      fundsIdentitySecret: new Uint8Array(32).fill(91),
+    const keys = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: new Uint8Array(32).fill(23),
+      independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
     const independent = await createShieldedReceiveCode({
       ...identity,

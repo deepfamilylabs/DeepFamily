@@ -13,7 +13,7 @@ let sequence = 0;
 let generation = 0;
 const pending = new Map<number, Pending>();
 const lockListeners = new Set<() => void>();
-const BACKUP_CHALLENGES_KEY = "deepfamily:pending-funds-backups:v1";
+const BACKUP_CHALLENGES_KEY = "deepfamily:pending-independent-key-backups:v1";
 function readBackupChallenges(): Set<string> {
   try {
     const stored: unknown = JSON.parse(sessionStorage.getItem(BACKUP_CHALLENGES_KEY) ?? "[]");
@@ -111,14 +111,14 @@ export function shieldedAssetWorkerCall<M extends keyof ShieldedAssetWorkerCallM
       resolve: (value) => {
         finish();
         if (
-          method === "createFunds" ||
+          method === "createIndependentKey" ||
           method === "restoreSignature" ||
           method === "importRecoveryMaterial"
         ) {
-          const funds = (value as ShieldedAssetSessionState).funds;
-          if (funds?.backupRequired) pendingBackupFingerprints.add(funds.fundsFingerprint);
-          else if (method === "importRecoveryMaterial" && funds?.recoveryVerified)
-            pendingBackupFingerprints.delete(funds.fundsFingerprint);
+          const independentKey = (value as ShieldedAssetSessionState).independentKey;
+          if (independentKey?.backupRequired) pendingBackupFingerprints.add(independentKey.keyFingerprint);
+          else if (method === "importRecoveryMaterial" && independentKey?.recoveryVerified)
+            pendingBackupFingerprints.delete(independentKey.keyFingerprint);
           saveBackupChallenges();
         }
         resolve(value as ShieldedAssetWorkerCallMap[M]["result"]);

@@ -306,7 +306,7 @@ function InheritanceContent() {
     sameAddress(selectedAddress, state.modules.assetAddress)
       ? state.modules
       : null;
-  // Changing pools keeps the unlocked identity and funds root; the Worker drops only
+  // Changing pools keeps the unlocked identity and independent key root; the Worker drops only
   // the previous pool's history and prepared work. A running operation finishes first.
   const assetControls = (
     <div className="min-w-0 space-y-2">

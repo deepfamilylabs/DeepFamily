@@ -212,7 +212,7 @@ export function computeShieldedValueNoteCommitment(input, scope) {
   ]);
 }
 
-export const SHIELDED_KEY_MODE = Object.freeze({ identityDerived: 0, assetRootDerived: 1 });
+export const SHIELDED_KEY_MODE = Object.freeze({ identityDerived: 0, independentKeyRootDerived: 1 });
 export function normalizeShieldedKeyMode(value = 0n, binding = "owner") {
   const mode = bigintFrom(value, "keyMode", 1n);
   protocolAssert(

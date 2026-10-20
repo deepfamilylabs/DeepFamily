@@ -32,7 +32,7 @@ function spendPreview(amount: string, action: "privateTransfer" | "unshield"): S
   const plan = planShieldedValueSpend({ notes, candidateCommitments: notes.map((note) => note.commitment), amount });
   const first = plan.steps[0];
   return {
-    handle: "action:1", action, amount, slot: "asset",
+    handle: "action:1", action, amount, slot: "independent",
     inputs: first.inputCommitments,
     inputAmounts: first.inputCommitments.map((commitment) => notes.find((note) => note.commitment === commitment)!.amount),
     steps: plan.steps.map((step) => ({

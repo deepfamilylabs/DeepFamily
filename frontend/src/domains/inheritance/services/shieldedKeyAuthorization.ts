@@ -11,7 +11,7 @@ export type ShieldedKeyMaterial = {
   hpkeIkm: string;
 };
 
-/** Validate explicit spending and viewing keys; preparation never derives missing funds keys. */
+/** Validate explicit spending and viewing keys; preparation never derives missing independent keys. */
 export function validateShieldedKeyMaterial(material: ShieldedKeyMaterial) {
   if (!material) throw new Error("The original spending and viewing key material is required");
   const ownerSecret = getBigInt(material.ownerSecret);
@@ -24,7 +24,7 @@ export function validateShieldedKeyMaterial(material: ShieldedKeyMaterial) {
   return { ownerSecret, ownerCommitment, hpkeIkm: material.hpkeIkm };
 }
 
-/** Mode 0 is bound by the circuit to the heir's canonical identity-derived funds keys. */
+/** Mode 0 is bound by the circuit to the heir's canonical identity-derived independent keys. */
 export function validateShieldedClaimKeyMaterial(
   material: ShieldedKeyMaterial,
   keyMode: bigint,

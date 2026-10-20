@@ -107,7 +107,7 @@ const identity = {
 const unlocked: ShieldedAssetSessionState = {
   credentials: { handle: "credentials:1" },
   identity,
-  funds: null,
+  independentKey: null,
 };
 const modules = {
   chainId: 31337n,
@@ -430,7 +430,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
     expect(sessionState().identity?.personHash).toBe(identity.personHash);
   });
 
-  it("submits original credentials under fixed funds rules even when the identity hash preview is unavailable", async () => {
+  it("submits original credentials under fixed independent-key rules even when the identity hash preview is unavailable", async () => {
     mocks.crypto.mockResolvedValue({ identityHash: "" });
     render(panel());
     const rawName = "  Ａlice\u3000Example  ";
@@ -465,7 +465,7 @@ describe("Shielded identity form privacy with a real session and form", () => {
   });
 
   it.each(["birthYear", "birthMonth", "birthDay"] as const)(
-    "rejects a fractional %s without truncating the original funds credentials",
+    "rejects a fractional %s without truncating the original independent-key credentials",
     async (field) => {
       render(panel());
       enterIdentity();

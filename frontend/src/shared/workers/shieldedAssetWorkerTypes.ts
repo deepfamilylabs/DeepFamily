@@ -10,11 +10,11 @@ export type ShieldedPublicIdentity = {
   personHash: string;
   identity: { fullName: string };
 };
-export type ShieldedKeySlot = "identity" | "asset";
-export type ShieldedPublicFunds = {
+export type ShieldedKeySlot = "identity" | "independent";
+export type ShieldedPublicIndependentKey = {
   ownerCommitment: string;
   viewingKey: string;
-  fundsFingerprint: string;
+  keyFingerprint: string;
   rootSource: "random" | "walletSignature" | "imported";
   signerAddress?: string;
   recoveryVerified: boolean;
@@ -23,10 +23,10 @@ export type ShieldedPublicFunds = {
   backupRequired?: boolean;
 };
 export type ShieldedAssetSessionState = {
-  /** Funds credentials remain available even when the identity proof suite is unavailable. */
+  /** Independent-key credentials remain available even when the identity proof suite is unavailable. */
   credentials: { handle: string } | null;
   identity: ShieldedPublicIdentity | null;
-  funds: ShieldedPublicFunds | null;
+  independentKey: ShieldedPublicIndependentKey | null;
 };
 export type ShieldedWorkerContext = {
   rpcUrl: string;
@@ -148,7 +148,7 @@ export type ShieldedAssetWorkerCallMap = {
     params: { identity: IdentityFields; rawPassphrase: string; identitySuiteId?: number };
     result: ShieldedAssetSessionState;
   };
-  createFunds: {
+  createIndependentKey: {
     params: {
       intent: "create";
       expectedCredentialsHandle: string;
@@ -177,7 +177,7 @@ export type ShieldedAssetWorkerCallMap = {
       material: string;
       format: "mnemonic" | "shieldedKey";
       version: 1;
-      fundsFingerprint: string;
+      keyFingerprint: string;
     };
   };
   importRecoveryMaterial: {
@@ -192,8 +192,8 @@ export type ShieldedAssetWorkerCallMap = {
     };
     result: ShieldedAssetSessionState;
   };
-  /** Removes the funds root and its branches; credentials and identity capability remain. */
-  clearFunds: { params: Record<string, never>; result: ShieldedAssetSessionState };
+  /** Removes the independent key root and its branches; credentials and identity capability remain. */
+  clearIndependentKey: { params: Record<string, never>; result: ShieldedAssetSessionState };
   receiveCode: {
     params: { slot: ShieldedKeySlot };
     result: { code: string };

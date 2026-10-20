@@ -166,22 +166,22 @@ export function useShieldedIdentitySession({
             identity: { fullName: state.identity.identity.fullName },
           }
         : null;
-      const funds = state.funds
+      const independentKey = state.independentKey
         ? {
-            ownerCommitment: state.funds.ownerCommitment,
-            viewingKey: state.funds.viewingKey,
-            fundsFingerprint: state.funds.fundsFingerprint,
-            rootSource: state.funds.rootSource,
-            recoveryVerified: state.funds.recoveryVerified,
-            ...(state.funds.backupRequired === undefined
+            ownerCommitment: state.independentKey.ownerCommitment,
+            viewingKey: state.independentKey.viewingKey,
+            keyFingerprint: state.independentKey.keyFingerprint,
+            rootSource: state.independentKey.rootSource,
+            recoveryVerified: state.independentKey.recoveryVerified,
+            ...(state.independentKey.backupRequired === undefined
               ? {}
-              : { backupRequired: state.funds.backupRequired }),
-            ...(state.funds.signerAddress ? { signerAddress: state.funds.signerAddress } : {}),
-            ...(state.funds.recoveryPath ? { recoveryPath: state.funds.recoveryPath } : {}),
+              : { backupRequired: state.independentKey.backupRequired }),
+            ...(state.independentKey.signerAddress ? { signerAddress: state.independentKey.signerAddress } : {}),
+            ...(state.independentKey.recoveryPath ? { recoveryPath: state.independentKey.recoveryPath } : {}),
           }
         : null;
       const credentials = state.credentials ? { handle: state.credentials.handle } : null;
-      sessionRef.current = { scope, state: { credentials, identity, funds } };
+      sessionRef.current = { scope, state: { credentials, identity, independentKey } };
       expiresAtRef.current = Date.now() + SHIELDED_IDENTITY_IDLE_TIMEOUT_MS;
       scheduleIdleLock();
       touchDraft();
@@ -194,7 +194,7 @@ export function useShieldedIdentitySession({
       update({
         credentials: sessionRef.current?.state.credentials ?? null,
         identity,
-        funds: sessionRef.current?.state.funds ?? null,
+        independentKey: sessionRef.current?.state.independentKey ?? null,
       });
     },
     [update],
@@ -281,7 +281,7 @@ export function useShieldedIdentitySession({
     // Hide an old scope during render, before the layout effect releases it.
     identity: sessionRef.current?.scope === scope ? sessionRef.current.state.identity : null,
     credentials: sessionRef.current?.scope === scope ? sessionRef.current.state.credentials : null,
-    funds: sessionRef.current?.scope === scope ? sessionRef.current.state.funds : null,
+    independentKey: sessionRef.current?.scope === scope ? sessionRef.current.state.independentKey : null,
     identityDraft:
       identityDraftRef.current?.scope === scope ? identityDraftRef.current.draft : null,
     rememberIdentityDraft,

@@ -46,7 +46,7 @@ export function ShieldedIdentitySessionProvider({
   const {
     credentials,
     identity,
-    funds,
+    independentKey,
     identityDraft,
     rememberIdentityDraft,
     unlock,
@@ -81,7 +81,7 @@ export function ShieldedIdentitySessionProvider({
     () => ({
       credentials: enabled ? credentials : null,
       identity: enabled ? identity : null,
-      funds: enabled ? funds : null,
+      independentKey: enabled ? independentKey : null,
       identityDraft: enabled ? identityDraft : null,
       rememberIdentityDraft,
       unlock: guardedUnlock,
@@ -98,7 +98,7 @@ export function ShieldedIdentitySessionProvider({
       enabled,
       credentials,
       identity,
-      funds,
+      independentKey,
       identityDraft,
       rememberIdentityDraft,
       guardedUnlock,
@@ -126,7 +126,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
     setBusyFor,
     credentials,
     identity,
-    funds,
+    independentKey,
     identityDraft,
     rememberIdentityDraft,
     unlock,
@@ -154,7 +154,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
     () => ({
       credentials,
       identity,
-      funds,
+      independentKey,
       identityDraft,
       rememberIdentityDraft,
       unlock,
@@ -169,7 +169,7 @@ export function useShieldedPageIdentitySession(): IdentitySession & {
     [
       credentials,
       identity,
-      funds,
+      independentKey,
       identityDraft,
       rememberIdentityDraft,
       unlock,

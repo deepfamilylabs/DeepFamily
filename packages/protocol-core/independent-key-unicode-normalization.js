@@ -1,4 +1,4 @@
-// Funds credential frozen Unicode 17.0.0 implementation/data.
+// Independent-key credential frozen Unicode 17.0.0 implementation/data.
 // Keep independent of the active identity/Unicode defaults for long-term recovery.
 import { assertUnicodeScalarString } from "./bytes.js";
 import {
@@ -8,7 +8,7 @@ import {
   UNICODE_COMPATIBILITY_DECOMPOSITION_ENTRIES,
   UNICODE_NON_ASCII_ZS_CODE_POINTS,
   UNICODE_NORMALIZATION_VERSION,
-} from "./funds-unicode-normalization-data.js";
+} from "./independent-key-unicode-normalization-data.js";
 
 export { UNICODE_NORMALIZATION_VERSION };
 

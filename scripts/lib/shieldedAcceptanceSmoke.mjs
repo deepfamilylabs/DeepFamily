@@ -233,7 +233,7 @@ export async function runShieldedAcceptanceSmoke({
         ownerCommitment: String(signals[1]),
         viewKeyLo: String(signals[2]),
         viewKeyHi: String(signals[3]),
-        keyMode: String(signals[4]), identitySuiteId: String(signals[5]), assetSuiteId: String(signals[6]), assetDerivationVersion: String(signals[7]), receiveCodeVersion: String(signals[8]), spendingSecret: String(keys.ownerSecret),
+        keyMode: String(signals[4]), identitySuiteId: String(signals[5]), independentKeySuiteId: String(signals[6]), independentKeyDerivationVersion: String(signals[7]), receiveCodeVersion: String(signals[8]), spendingSecret: String(keys.ownerSecret),
         nameField: String(material.nameField),
         derivedSecretField: String(material.derivedSecretField),
         isBirthBC: Number(material.identity.isBirthBC),

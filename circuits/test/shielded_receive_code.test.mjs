@@ -60,8 +60,8 @@ test("a receive code proves the identity holder chose the owner and viewing keys
       viewKeyHi: String(publicSignals[3]),
       keyMode: "0",
       identitySuiteId: "1",
-      assetSuiteId: "1",
-      assetDerivationVersion: "1",
+      independentKeySuiteId: "1",
+      independentKeyDerivationVersion: "1",
       receiveCodeVersion: "1",
       spendingSecret: String(keys.ownerSecret),
       nameField: lineage.nameField,
@@ -99,8 +99,8 @@ test("a receive code proves the identity holder chose the owner and viewing keys
     await independentInvalid({ keyMode: "0" });
     await independentInvalid({ keyMode: "2" });
     await independentInvalid({ spendingSecret: "0" });
-    await independentInvalid({ assetSuiteId: "2" });
-    await independentInvalid({ assetDerivationVersion: "2" });
+    await independentInvalid({ independentKeySuiteId: "2" });
+    await independentInvalid({ independentKeyDerivationVersion: "2" });
     await independentInvalid({ receiveCodeVersion: "2" });
     await independentInvalid({ identitySuiteId: "2" });
   } finally {

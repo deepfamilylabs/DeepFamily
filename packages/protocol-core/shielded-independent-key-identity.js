@@ -8,17 +8,17 @@ import {
   wipeBytes,
 } from "./bytes.js";
 import { protocolAssert } from "./errors.js";
-import { assertFreeformClass } from "./funds-precis.js";
+import { assertFreeformClass } from "./independent-key-precis.js";
 import {
   mapNonAsciiSpacesToAscii,
   normalizeUnicodeNfc,
   normalizeUnicodeNfkc,
-} from "./funds-unicode-normalization.js";
+} from "./independent-key-unicode-normalization.js";
 
-// These are funds protocol constants, independent of identity suites, current
+// These are independent-key protocol constants, independent of identity suites, current
 // Unicode defaults and device performance. Release still requires device review.
-export const SHIELDED_FUNDS_UNICODE_VERSION = "17.0.0";
-export const FUNDS_ARGON2ID_PROFILE = Object.freeze({
+export const SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION = "17.0.0";
+export const INDEPENDENT_KEY_ARGON2ID_PROFILE = Object.freeze({
   status: "candidate-awaiting-device-benchmark",
   provisional: true,
   algorithm: "Argon2id",
@@ -29,8 +29,8 @@ export const FUNDS_ARGON2ID_PROFILE = Object.freeze({
   outputBytes: 32,
   saltBytes: 16,
 });
-const PASSWORD_DOMAIN = "DeepFamily:FundsIdentityPassword:v1";
-const SALT_DOMAIN = "DeepFamily:FundsIdentitySalt:v1";
+const PASSWORD_DOMAIN = "DeepFamily:IndependentKeyIdentityPassword:v1";
+const SALT_DOMAIN = "DeepFamily:IndependentKeyIdentitySalt:v1";
 const WHITE_SPACE_RUN =
   /[\u0009-\u000d\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/gu;
 const WHITE_SPACE_ONLY =
@@ -40,12 +40,12 @@ function smallUnsigned(value, maximum, label) {
   return Number(bigintFrom(value, label, BigInt(maximum)));
 }
 
-/** Frozen funds validation; never first normalize through an identity suite. */
-export function normalizeShieldedFundsIdentity(input) {
+/** Frozen independent-key validation; never first normalize through an identity suite. */
+export function normalizeShieldedIndependentKeyIdentity(input) {
   protocolAssert(
     input && typeof input === "object",
     "INVALID_IDENTITY",
-    "Funds identity fields are required",
+    "Independent-key identity fields are required",
   );
   protocolAssert(
     typeof input.fullName === "string",
@@ -61,12 +61,12 @@ export function normalizeShieldedFundsIdentity(input) {
     protocolAssert(
       nameBytes.length > 0,
       "EMPTY_FULL_NAME",
-      "Canonical funds fullName cannot be empty",
+      "Canonical independent-key fullName cannot be empty",
     );
     protocolAssert(
       nameBytes.length <= 256,
       "FULL_NAME_TOO_LARGE",
-      "Canonical funds fullName exceeds 256 UTF-8 bytes",
+      "Canonical independent-key fullName exceeds 256 UTF-8 bytes",
     );
   } finally {
     wipeBytes(nameBytes);
@@ -87,8 +87,8 @@ export function normalizeShieldedFundsIdentity(input) {
 }
 
 /** uint16 name length, UTF-8 name, uint8 gender/BC, uint16 year, uint8 month/day. */
-export function encodeShieldedFundsIdentity(input) {
-  const identity = normalizeShieldedFundsIdentity(input);
+export function encodeShieldedIndependentKeyIdentity(input) {
+  const identity = normalizeShieldedIndependentKeyIdentity(input);
   const name = utf8Bytes(identity.fullName);
   try {
     const bytes = new Uint8Array(2 + name.length + 6);
@@ -108,7 +108,7 @@ export function encodeShieldedFundsIdentity(input) {
 }
 
 /** Unicode 17 PRECIS FreeformClass, non-ASCII Zs mapping, NFC, no trim/case map. */
-export function normalizeShieldedFundsPassphrase(rawPassphrase) {
+export function normalizeShieldedIndependentKeyPassphrase(rawPassphrase) {
   protocolAssert(
     typeof rawPassphrase === "string",
     "INVALID_PASSPHRASE",
@@ -122,15 +122,15 @@ export function normalizeShieldedFundsPassphrase(rawPassphrase) {
   assertFreeformClass(normalized, "passphrase");
   protocolAssert(
     !WHITE_SPACE_ONLY.test(normalized),
-    "FUNDS_PASSPHRASE_REQUIRED",
-    "Funds credentials require a nonblank passphrase",
+    "INDEPENDENT_KEY_PASSPHRASE_REQUIRED",
+    "Independent-key credentials require a nonblank passphrase",
   );
   return normalized;
 }
 
 /** Password bytes owned by the caller, who must wipe them after use. */
-export function buildShieldedFundsPasswordBytes(rawPassphrase) {
-  const normalizedBytes = utf8Bytes(normalizeShieldedFundsPassphrase(rawPassphrase));
+export function buildShieldedIndependentKeyPasswordBytes(rawPassphrase) {
+  const normalizedBytes = utf8Bytes(normalizeShieldedIndependentKeyPassphrase(rawPassphrase));
   try {
     return concatBytes(utf8Bytes(PASSWORD_DOMAIN), Uint8Array.of(0), normalizedBytes);
   } finally {
@@ -138,13 +138,13 @@ export function buildShieldedFundsPasswordBytes(rawPassphrase) {
   }
 }
 
-export function deriveShieldedFundsIdentitySalt(identity) {
-  const encoded = encodeShieldedFundsIdentity(identity);
+export function deriveShieldedIndependentKeyIdentitySalt(identity) {
+  const encoded = encodeShieldedIndependentKeyIdentity(identity);
   const input = concatBytes(utf8Bytes(SALT_DOMAIN), Uint8Array.of(0), encoded);
   let digest;
   try {
     digest = getBytes(sha256(input));
-    return digest.slice(0, FUNDS_ARGON2ID_PROFILE.saltBytes);
+    return digest.slice(0, INDEPENDENT_KEY_ARGON2ID_PROFILE.saltBytes);
   } finally {
     wipeBytes(encoded);
     wipeBytes(input);
@@ -153,29 +153,29 @@ export function deriveShieldedFundsIdentitySalt(identity) {
 }
 
 /** Dedicated asset-Worker entry point. The returned secret is caller-owned. */
-export async function deriveShieldedFundsIdentitySecret(input) {
+export async function deriveShieldedIndependentKeyIdentitySecret(input) {
   let password;
   let salt;
   let output;
   try {
-    salt = deriveShieldedFundsIdentitySalt(input?.identity);
-    password = buildShieldedFundsPasswordBytes(input?.rawPassphrase);
+    salt = deriveShieldedIndependentKeyIdentitySalt(input?.identity);
+    password = buildShieldedIndependentKeyPasswordBytes(input?.rawPassphrase);
     // hash-wasm 4.12.0 fixes Argon2 version 0x13 and empty associated data;
     // each call owns its temporary WASM work memory, released when it returns.
     output = await argon2id({
       password,
       salt,
       secret: new Uint8Array(),
-      parallelism: FUNDS_ARGON2ID_PROFILE.parallelism,
-      iterations: FUNDS_ARGON2ID_PROFILE.iterations,
-      memorySize: FUNDS_ARGON2ID_PROFILE.memoryKiB,
-      hashLength: FUNDS_ARGON2ID_PROFILE.outputBytes,
+      parallelism: INDEPENDENT_KEY_ARGON2ID_PROFILE.parallelism,
+      iterations: INDEPENDENT_KEY_ARGON2ID_PROFILE.iterations,
+      memorySize: INDEPENDENT_KEY_ARGON2ID_PROFILE.memoryKiB,
+      hashLength: INDEPENDENT_KEY_ARGON2ID_PROFILE.outputBytes,
       outputType: "binary",
     });
     protocolAssert(
       output instanceof Uint8Array && output.length === 32,
       "INVALID_ARGON2_OUTPUT",
-      "Funds Argon2id returned an unexpected output length",
+      "Independent-key Argon2id returned an unexpected output length",
     );
     const ownedOutput = output;
     output = undefined;

@@ -6,22 +6,22 @@ import { assertAddress } from "./identity.js";
 import { deriveShieldedViewPublicKey } from "./shielded-hpke.js";
 import { computeShieldedOwnerCommitment } from "./shielded-inheritance.js";
 
-export const SHIELDED_ASSET_KEY_VERSION = 1;
-export const SHIELDED_ASSET_SUITE = 1;
-export const SHIELDED_ASSET_BRANCH_VERSION = 1;
+export const SHIELDED_INDEPENDENT_KEY_VERSION = 1;
+export const SHIELDED_INDEPENDENT_KEY_SUITE = 1;
+export const SHIELDED_INDEPENDENT_KEY_BRANCH_VERSION = 1;
 const CURVE_ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 const HALF_CURVE_ORDER = CURVE_ORDER >> 1n;
 
 function rootBytes(value) {
   let bytes;
   try {
-    bytes = copyBytes(value, "assetRoot");
+    bytes = copyBytes(value, "independentKeyRoot");
   } catch {
-    throw new ProtocolError("INVALID_ASSET_ROOT", "Asset root must be 32 bytes");
+    throw new ProtocolError("INVALID_INDEPENDENT_KEY_ROOT", "Independent key root must be 32 bytes");
   }
   if (bytes.length !== 32) {
     wipeBytes(bytes);
-    throw new ProtocolError("INVALID_ASSET_ROOT", "Asset root must be 32 bytes");
+    throw new ProtocolError("INVALID_INDEPENDENT_KEY_ROOT", "Independent key root must be 32 bytes");
   }
   return bytes;
 }
@@ -37,27 +37,27 @@ function hkdf32(ikm, domain, info = new Uint8Array()) {
   }
 }
 
-export function buildShieldedAssetSigningMessage(signerAddress) {
+export function buildShieldedIndependentKeySigningMessage(signerAddress) {
   const signer = assertAddress(signerAddress, "signerAddress").toLowerCase();
-  protocolAssert(BigInt(signer) !== 0n, "INVALID_ASSET_SIGNER", "Asset signer must be nonzero");
-  return `DeepFamily Asset Key v1\nAccount: ${signer}\nPurpose: Create or restore the DeepFamily asset wallet\nKeep this signature private. It controls the derived funds.`;
+  protocolAssert(BigInt(signer) !== 0n, "INVALID_INDEPENDENT_KEY_SIGNER", "Independent key signer must be nonzero");
+  return `DeepFamily Independent Key v1\nAccount: ${signer}\nPurpose: Create or restore the DeepFamily independent key\nKeep this signature private. It controls the derived funds.`;
 }
 
 /** Accept only r||s||v; normalize v and high-s before exact EIP-191 verification. */
-export function normalizeShieldedAssetSignature({ signerAddress, signature }) {
+export function normalizeShieldedIndependentKeySignature({ signerAddress, signature }) {
   let bytes;
   try {
     bytes = copyBytes(signature, "signature");
   } catch {
     throw new ProtocolError(
-      "INVALID_ASSET_SIGNATURE",
+      "INVALID_INDEPENDENT_KEY_SIGNATURE",
       "A 65-byte personal_sign signature is required",
     );
   }
   try {
     protocolAssert(
       bytes.length === 65,
-      "INVALID_ASSET_SIGNATURE",
+      "INVALID_INDEPENDENT_KEY_SIGNATURE",
       "A 65-byte personal_sign signature is required",
     );
     const r = BigInt(bytesToHex(bytes.subarray(0, 32)));
@@ -65,13 +65,13 @@ export function normalizeShieldedAssetSignature({ signerAddress, signature }) {
     let v = bytes[64];
     protocolAssert(
       r > 0n && r < CURVE_ORDER && s > 0n && s < CURVE_ORDER,
-      "INVALID_ASSET_SIGNATURE",
+      "INVALID_INDEPENDENT_KEY_SIGNATURE",
       "Invalid signature scalar",
     );
     if (v === 0 || v === 1) v += 27;
     protocolAssert(
       v === 27 || v === 28,
-      "INVALID_ASSET_SIGNATURE",
+      "INVALID_INDEPENDENT_KEY_SIGNATURE",
       "Invalid signature recovery bit",
     );
     if (s > HALF_CURVE_ORDER) {
@@ -84,18 +84,18 @@ export function normalizeShieldedAssetSignature({ signerAddress, signature }) {
       Uint8Array.of(v),
     );
     try {
-      const message = utf8Bytes(buildShieldedAssetSigningMessage(signerAddress));
+      const message = utf8Bytes(buildShieldedIndependentKeySigningMessage(signerAddress));
       const recovered = verifyMessage(message, bytesToHex(canonical));
       protocolAssert(
         recovered.toLowerCase() === assertAddress(signerAddress, "signerAddress").toLowerCase(),
-        "ASSET_SIGNATURE_SIGNER_MISMATCH",
-        "Signature does not match the selected asset signer",
+        "INDEPENDENT_KEY_SIGNATURE_SIGNER_MISMATCH",
+        "Signature does not match the selected independent key signer",
       );
       return canonical;
     } catch (error) {
       wipeBytes(canonical);
       if (error instanceof ProtocolError) throw error;
-      throw new ProtocolError("INVALID_ASSET_SIGNATURE", "Invalid personal_sign signature");
+      throw new ProtocolError("INVALID_INDEPENDENT_KEY_SIGNATURE", "Invalid personal_sign signature");
     }
   } finally {
     wipeBytes(bytes);
@@ -103,15 +103,15 @@ export function normalizeShieldedAssetSignature({ signerAddress, signature }) {
 }
 
 /** Only this explicit creation entry point obtains fresh entropy. Recovery never calls it. */
-export function createShieldedAssetRoot({ intent, rootSource = "random" } = {}) {
+export function createShieldedIndependentKeyRoot({ intent, rootSource = "random" } = {}) {
   protocolAssert(
     intent === "create",
-    "EXPLICIT_ASSET_CREATION_REQUIRED",
-    "Explicit new asset-slot creation is required",
+    "EXPLICIT_INDEPENDENT_KEY_CREATION_REQUIRED",
+    "Explicit new independent key creation is required",
   );
   protocolAssert(
     rootSource === "random",
-    "INVALID_ASSET_ROOT_SOURCE",
+    "INVALID_INDEPENDENT_KEY_ROOT_SOURCE",
     "Signature roots require explicit signature derivation",
   );
   protocolAssert(
@@ -122,20 +122,20 @@ export function createShieldedAssetRoot({ intent, rootSource = "random" } = {}) 
   return globalThis.crypto.getRandomValues(new Uint8Array(32));
 }
 
-export async function deriveShieldedAssetRootFromSignature(input) {
+export async function deriveShieldedIndependentKeyRootFromSignature(input) {
   const signerAddress = assertAddress(input.signerAddress, "signerAddress").toLowerCase();
-  const message = buildShieldedAssetSigningMessage(signerAddress);
+  const message = buildShieldedIndependentKeySigningMessage(signerAddress);
   const messageBytes = utf8Bytes(message);
-  const canonical = normalizeShieldedAssetSignature(input);
+  const canonical = normalizeShieldedIndependentKeySignature(input);
   try {
     const messageHash = sha256(messageBytes);
-    const assetRoot = hkdf32(
+    const independentKeyRoot = hkdf32(
       canonical,
-      "DeepFamily:WalletAssetRoot:v1",
+      "DeepFamily:WalletIndependentKeyRoot:v1",
       concatBytes(getBytes(messageHash), getBytes(signerAddress)),
     );
     return {
-      assetRoot,
+      independentKeyRoot,
       sourceMetadata: {
         signerAddress,
         message,
@@ -151,16 +151,16 @@ export async function deriveShieldedAssetRootFromSignature(input) {
   }
 }
 
-export function computeShieldedAssetFingerprint({
+export function computeShieldedIndependentKeyFingerprint({
   ownerCommitment,
   viewPublicKey,
-  assetSuite = 1,
+  independentKeySuite = 1,
   branchVersion = 1,
 }) {
   protocolAssert(
-    assetSuite === SHIELDED_ASSET_SUITE && branchVersion === SHIELDED_ASSET_BRANCH_VERSION,
-    "UNSUPPORTED_ASSET_KEY_VERSION",
-    "Unsupported asset branch specification",
+    independentKeySuite === SHIELDED_INDEPENDENT_KEY_SUITE && branchVersion === SHIELDED_INDEPENDENT_KEY_BRANCH_VERSION,
+    "UNSUPPORTED_INDEPENDENT_KEY_VERSION",
+    "Unsupported independent key branch specification",
   );
   const owner = bigintFrom(ownerCommitment, "ownerCommitment", SNARK_SCALAR_FIELD - 1n);
   protocolAssert(owner > 0n, "ZERO_SHIELDED_SECRET", "Owner commitment must be nonzero");
@@ -172,44 +172,44 @@ export function computeShieldedAssetFingerprint({
   );
   return sha256(
     concatBytes(
-      utf8Bytes("DeepFamily:AssetFingerprint:v1\0"),
-      Uint8Array.of(assetSuite, branchVersion),
+      utf8Bytes("DeepFamily:IndependentKeyFingerprint:v1\0"),
+      Uint8Array.of(independentKeySuite, branchVersion),
       getBytes(toBeHex(owner, 32)),
       view,
     ),
   );
 }
 
-/** Funds key derivation binds both branches to an independent funds credential secret. */
-export async function deriveShieldedAssetKeyMaterial(input) {
-  const root = rootBytes(input?.assetRoot);
-  let fundsIdentitySecret;
+/** Independent key derivation binds both branches to an independent key credential secret. */
+export async function deriveShieldedIndependentKeyMaterial(input) {
+  const root = rootBytes(input?.independentKeyRoot);
+  let independentKeyIdentitySecret;
   let ikm;
   let boundRoot;
   let hpke;
   let sample;
   try {
     try {
-      fundsIdentitySecret = copyBytes(input?.fundsIdentitySecret, "fundsIdentitySecret");
+      independentKeyIdentitySecret = copyBytes(input?.independentKeyIdentitySecret, "independentKeyIdentitySecret");
     } catch {
       throw new ProtocolError(
-        "INVALID_FUNDS_IDENTITY_SECRET",
-        "Funds identity secret must be 32 bytes",
+        "INVALID_INDEPENDENT_KEY_IDENTITY_SECRET",
+        "Independent-key identity secret must be 32 bytes",
       );
     }
     protocolAssert(
-      fundsIdentitySecret.length === 32,
-      "INVALID_FUNDS_IDENTITY_SECRET",
-      "Funds identity secret must be 32 bytes",
+      independentKeyIdentitySecret.length === 32,
+      "INVALID_INDEPENDENT_KEY_IDENTITY_SECRET",
+      "Independent-key identity secret must be 32 bytes",
     );
-    ikm = concatBytes(root, fundsIdentitySecret);
-    boundRoot = hkdf32(ikm, "DeepFamily:IdentityBoundAssetRoot:v1");
+    ikm = concatBytes(root, independentKeyIdentitySecret);
+    boundRoot = hkdf32(ikm, "DeepFamily:IdentityBoundIndependentKeyRoot:v1");
     wipeBytes(ikm);
     let ownerSecret;
     for (let counter = 0; counter <= 0xffff_ffff; counter += 1) {
       const info = new Uint8Array(4);
       new DataView(info.buffer).setUint32(0, counter, false);
-      sample = hkdf32(boundRoot, "DeepFamily:AssetSpend:v1", info);
+      sample = hkdf32(boundRoot, "DeepFamily:IndependentKeySpend:v1", info);
       const candidate = BigInt(bytesToHex(sample));
       wipeBytes(sample);
       if (candidate > 0n && candidate < SNARK_SCALAR_FIELD) {
@@ -219,10 +219,10 @@ export async function deriveShieldedAssetKeyMaterial(input) {
     }
     protocolAssert(
       ownerSecret !== undefined,
-      "ASSET_KEY_DERIVATION_FAILED",
-      "Asset spend derivation exhausted its counter",
+      "INDEPENDENT_KEY_DERIVATION_FAILED",
+      "Independent key spend derivation exhausted its counter",
     );
-    hpke = hkdf32(boundRoot, "DeepFamily:AssetView:v1");
+    hpke = hkdf32(boundRoot, "DeepFamily:IndependentKeyView:v1");
     const ownerCommitment = computeShieldedOwnerCommitment(ownerSecret);
     const viewPublicKey = await deriveShieldedViewPublicKey(hpke);
     return {
@@ -230,14 +230,14 @@ export async function deriveShieldedAssetKeyMaterial(input) {
       ownerCommitment,
       hpkeIkm: bytesToHex(hpke),
       viewPublicKey,
-      fundsFingerprint: computeShieldedAssetFingerprint({ ownerCommitment, viewPublicKey }),
+      keyFingerprint: computeShieldedIndependentKeyFingerprint({ ownerCommitment, viewPublicKey }),
       keyMode: 1,
-      assetSuite: SHIELDED_ASSET_SUITE,
-      branchVersion: SHIELDED_ASSET_BRANCH_VERSION,
+      independentKeySuite: SHIELDED_INDEPENDENT_KEY_SUITE,
+      branchVersion: SHIELDED_INDEPENDENT_KEY_BRANCH_VERSION,
     };
   } finally {
     wipeBytes(root);
-    wipeBytes(fundsIdentitySecret);
+    wipeBytes(independentKeyIdentitySecret);
     wipeBytes(ikm);
     wipeBytes(boundRoot);
     wipeBytes(hpke);

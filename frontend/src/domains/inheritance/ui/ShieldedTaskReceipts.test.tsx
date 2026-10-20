@@ -42,7 +42,7 @@ describe("ShieldedFundReceipt", () => {
         startsAt={startsAt}
         heirName="曹丕"
         versionLabel="第1版"
-        entryLabel="私密（资金密钥）"
+        entryLabel="私密（独立密钥）"
         action={<button type="button">确认存入</button>}
       />,
     );
@@ -59,7 +59,7 @@ describe("ShieldedFundReceipt", () => {
     ).toBeTruthy();
     expect(within(receipt).getByText("曹丕")).toBeTruthy();
     expect(within(receipt).getByText("第1版")).toBeTruthy();
-    expect(within(receipt).getByText("私密（资金密钥）")).toBeTruthy();
+    expect(within(receipt).getByText("私密（独立密钥）")).toBeTruthy();
     expect(within(receipt).getByText("12,480 → 11,280 DEEP")).toBeTruthy();
     expect(within(receipt).getByRole("button", { name: "确认存入" })).toBeTruthy();
   });

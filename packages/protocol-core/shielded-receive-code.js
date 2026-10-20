@@ -79,16 +79,16 @@ export function encodeShieldedReceiveCode(input) {
     ,
     keyMode,
     identitySuiteId,
-    assetSuiteId,
-    assetDerivationVersion,
+    independentKeySuiteId,
+    independentKeyDerivationVersion,
   ] = buildShieldedReceiveCodePublicSignals(input);
   const payload = new Uint8Array(PAYLOAD_BYTES);
   payload.set([
     SHIELDED_RECEIVE_CODE_VERSION,
     Number(keyMode),
     Number(identitySuiteId),
-    Number(assetSuiteId),
-    Number(assetDerivationVersion),
+    Number(independentKeySuiteId),
+    Number(independentKeyDerivationVersion),
   ]);
   payload.set(word(identityCommitment), HEADER_BYTES);
   payload.set(word(ownerCommitment), HEADER_BYTES + WORD_BYTES);
@@ -128,8 +128,8 @@ export function decodeShieldedReceiveCode(code) {
   const metadata = {
     keyMode: payload[1],
     identitySuiteId: payload[2],
-    assetSuiteId: payload[3],
-    assetDerivationVersion: payload[4],
+    independentKeySuiteId: payload[3],
+    independentKeyDerivationVersion: payload[4],
     receiveCodeVersion: payload[0],
   };
   const ownerCommitment = read(HEADER_BYTES + WORD_BYTES);

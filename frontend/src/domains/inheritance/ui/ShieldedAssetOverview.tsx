@@ -15,7 +15,7 @@ import type { ShieldedKeySlot } from "../../../shared/workers/shieldedAssetWorke
 import { CopyIconButton } from "../../../shared/ui";
 import { BADGE_ACCENT, CHOICE_INPUT, shortHex } from "./inheritanceControls";
 
-export type ShieldedFundsKeyFlow = "restore" | "create" | "backup";
+export type ShieldedIndependentKeyFlow = "restore" | "create" | "backup";
 
 export type ShieldedOverviewWallet = {
   slot: ShieldedKeySlot;
@@ -25,19 +25,19 @@ export type ShieldedOverviewWallet = {
   /** The wallet every deposit, spend and claim uses. */
   current: boolean;
   /**
-   * Its radio is checked only while the loaded funds key is the pinned one, so a
+   * Its radio is checked only while the loaded independent key is the pinned one, so a
    * replacement key has to be accepted by choosing the wallet again.
    */
   checked: boolean;
-  /** The funds key this wallet is pinned to, which a replacement key never takes over. */
+  /** The independent key this wallet is pinned to, which a replacement key never takes over. */
   fingerprint?: string;
 };
 
 export type ShieldedWalletSheetState =
   | { kind: "receiveCode"; slot: ShieldedKeySlot }
-  | { kind: "keys"; flow: ShieldedFundsKeyFlow };
+  | { kind: "keys"; flow: ShieldedIndependentKeyFlow };
 
-const FUNDS_KEY_ACTIONS = {
+const INDEPENDENT_KEY_ACTIONS = {
   restore: { icon: LockOpen, label: "restoreTitle" },
   create: { icon: Plus, label: "createTitle" },
   backup: { icon: ShieldCheck, label: "backupTitle" },
@@ -57,15 +57,15 @@ export function ShieldedAssetOverview({
   wallets,
   selectionDisabled,
   onSelectWallet,
-  fundsKeyState,
+  independentKeyState,
   onReceiveCode,
-  onOpenFundsKey,
+  onOpenIndependentKey,
   openSheet,
   footer,
 }: {
   person: {
     name: string;
-    /** Initials for a person; a funds-only session shows the key glyph instead. */
+    /** Initials for a person; a independent-key-only session shows the key glyph instead. */
     avatar?: string;
     hash: string;
     hashLabel: string;
@@ -81,12 +81,12 @@ export function ShieldedAssetOverview({
   selectionDisabled: boolean;
   onSelectWallet: (slot: ShieldedKeySlot) => void;
   /**
-   * Only a usable funds key offers receiving and its key settings. A new key first
+   * Only a usable independent key offers receiving and its key settings. A new key first
    * offers its mandatory backup; otherwise the card offers unlocking or creating one.
    */
-  fundsKeyState: "ready" | "backup" | "setup";
+  independentKeyState: "ready" | "backup" | "setup";
   onReceiveCode: (slot: ShieldedKeySlot) => void;
-  onOpenFundsKey: (flow: ShieldedFundsKeyFlow) => void;
+  onOpenIndependentKey: (flow: ShieldedIndependentKeyFlow) => void;
   /** The wallet sheet that is open, so its trigger reports that it is expanded. */
   openSheet: ShieldedWalletSheetState | null;
   footer?: ReactNode;
@@ -156,7 +156,7 @@ export function ShieldedAssetOverview({
         className="-mx-2 flex snap-x snap-mandatory gap-2 overflow-x-auto px-2 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0"
       >
         {wallets.map((wallet) => {
-          const title = tr(wallet.slot === "identity" ? "identityFunds" : "budgetFunds");
+          const title = tr(wallet.slot === "identity" ? "identityCredentials" : "independentKey");
           const Icon = wallet.slot === "identity" ? Fingerprint : KeyRound;
           const longBalance = wallet.available.length > 14 || wallet.budget.length > 14;
           const receiveOpen = openSheet?.kind === "receiveCode" && openSheet.slot === wallet.slot;
@@ -197,7 +197,7 @@ export function ShieldedAssetOverview({
                   </span>
                   {wallet.fingerprint ? (
                     <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
-                      <span className="shrink-0">{tr("fundsFingerprint")}</span>
+                      <span className="shrink-0">{tr("keyFingerprint")}</span>
                       <code
                         className="min-w-0 truncate font-mono text-ink/80"
                         title={wallet.fingerprint}
@@ -266,12 +266,12 @@ export function ShieldedAssetOverview({
                     : "border-hairline/70"
                 }`}
               >
-                {wallet.slot === "asset" && fundsKeyState !== "ready" ? (
-                  (fundsKeyState === "backup"
+                {wallet.slot === "independent" && independentKeyState !== "ready" ? (
+                  (independentKeyState === "backup"
                     ? (["backup"] as const)
                     : (["restore", "create"] as const)
                   ).map((flow) => {
-                    const { icon: FlowIcon, label } = FUNDS_KEY_ACTIONS[flow];
+                    const { icon: FlowIcon, label } = INDEPENDENT_KEY_ACTIONS[flow];
                     return (
                       <button
                         key={flow}
@@ -279,7 +279,7 @@ export function ShieldedAssetOverview({
                         className={WALLET_ACTION}
                         disabled={busy}
                         aria-expanded={openSheet?.kind === "keys" && openSheet.flow === flow}
-                        onClick={() => onOpenFundsKey(flow)}
+                        onClick={() => onOpenIndependentKey(flow)}
                       >
                         <FlowIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         {tr(label)}
@@ -294,21 +294,21 @@ export function ShieldedAssetOverview({
                       disabled={busy}
                       aria-expanded={receiveOpen}
                       aria-label={tr(
-                        wallet.slot === "identity" ? "identityReceiveCode" : "fundsReceiveCode",
+                        wallet.slot === "identity" ? "identityReceiveCode" : "independentKeyReceiveCode",
                       )}
                       onClick={() => onReceiveCode(wallet.slot)}
                     >
                       <QrCode className="h-3.5 w-3.5" aria-hidden="true" />
                       {t("shielded.actions.receiveCode", { symbol })}
                     </button>
-                    {wallet.slot === "asset" ? (
+                    {wallet.slot === "independent" ? (
                       <button
                         type="button"
                         className={WALLET_ACTION}
                         disabled={busy}
                         aria-expanded={openSheet?.kind === "keys"}
                         aria-label={tr("keySettings")}
-                        onClick={() => onOpenFundsKey("backup")}
+                        onClick={() => onOpenIndependentKey("backup")}
                       >
                         <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
                         {tr("keySettings")}

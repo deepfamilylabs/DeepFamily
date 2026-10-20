@@ -88,7 +88,7 @@ export interface ShieldedClaimComposerProps {
   wallet: ShieldedWalletSummary | null;
   slot: ShieldedKeySlot;
   identityReady: boolean;
-  /** Claims from a funds-key budget need the original funds key unlocked. */
+  /** Claims from a independent-key budget need the original independent key unlocked. */
   independentKeyReady: boolean;
   claimHandle: string;
   onClaimChange: (value: string) => void;
@@ -139,19 +139,19 @@ export function ShieldedClaimComposer(props: ShieldedClaimComposerProps) {
     >
       {!props.identityReady ? (
         <div className="pt-3">
-          <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
+          <WarningNotice>{tr("independentKeyRestoredIdentityHint")}</WarningNotice>
         </div>
       ) : null}
     </TaskHeader>
   );
 
-  // Unlocking or creating keys belongs to the funds key card above.
-  if (props.slot === "asset" && !props.independentKeyReady) {
+  // Unlocking or creating keys belongs to the independent key card above.
+  if (props.slot === "independent" && !props.independentKeyReady) {
     return (
       <>
         {header}
         <div className="mt-6">
-          <WarningNotice>{tr("claimFundsKeyRequired")}</WarningNotice>
+          <WarningNotice>{tr("claimIndependentKeyRequired")}</WarningNotice>
         </div>
       </>
     );

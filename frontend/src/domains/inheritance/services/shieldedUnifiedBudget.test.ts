@@ -14,7 +14,7 @@ import {
   computeLineageTrustedLeaf,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
-  deriveShieldedAssetKeyMaterial,
+  deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
   getShieldedBudgetCommitments,
   isPublicShieldedBudgetEnvelope,
@@ -281,9 +281,9 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
   );
   const childKeys = keyMode === 0
     ? { ...deriveShieldedHeirKeyMaterial(childSecret), keyMode: 0 as const }
-    : await deriveShieldedAssetKeyMaterial({
-        assetRoot: new Uint8Array(32).fill(33),
-        fundsIdentitySecret: new Uint8Array(32).fill(44),
+    : await deriveShieldedIndependentKeyMaterial({
+        independentKeyRoot: new Uint8Array(32).fill(33),
+        independentKeyIdentitySecret: new Uint8Array(32).fill(44),
       });
   const childRecovery = { keyMaterial: childKeys, identityCommitment: childIC };
   const recipient = {

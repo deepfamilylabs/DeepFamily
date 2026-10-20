@@ -10,7 +10,7 @@ const MNEMONIC_WORDS = 24;
 const MASK = "••••••";
 
 /**
- * The exported funds backup: 24 numbered words or one Shielded Key. Every slot
+ * The exported independent key backup: 24 numbered words or one Shielded Key. Every slot
  * stays masked until the Worker's material is written in, and empties again on clear.
  */
 export const ShieldedRecoveryMaterialView = forwardRef<

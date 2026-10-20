@@ -65,7 +65,7 @@ describe("local shield preparation", () => {
   it.each([
     { ...identity.keyMaterial, ownerCommitment: identity.keyMaterial.ownerCommitment + 1n },
     { ...identity.keyMaterial, hpkeIkm: "0x1234" },
-  ])("rejects inconsistent explicit funds keys before encrypting", async (keyMaterial) => {
+  ])("rejects inconsistent explicit independent keys before encrypting", async (keyMaterial) => {
     await expect(
       prepareShieldedShield({ ...identity, keyMaterial, amount: 100n }),
     ).rejects.toThrow("key material is inconsistent");

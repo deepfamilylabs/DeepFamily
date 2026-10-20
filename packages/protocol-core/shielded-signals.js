@@ -247,8 +247,8 @@ export function buildShieldedReceiveCodePublicSignals(input) {
   const keyMode = bigintFrom(input.keyMode ?? 0n, "keyMode", 1n);
   const metadata = [
     input.identitySuiteId ?? 1,
-    input.assetSuiteId ?? 1,
-    input.assetDerivationVersion ?? 1,
+    input.independentKeySuiteId ?? 1,
+    input.independentKeyDerivationVersion ?? 1,
     input.receiveCodeVersion ?? 1,
   ].map((value, index) => bigintFrom(value, `receiveMetadata[${index}]`, 255n));
   protocolAssert(

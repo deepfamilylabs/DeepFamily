@@ -22,8 +22,8 @@ export type VerifiedShieldedRecipient = {
   readonly personHash: string;
   readonly keyMode: 0 | 1;
   readonly identitySuiteId: number;
-  readonly assetSuiteId: number;
-  readonly assetDerivationVersion: number;
+  readonly independentKeySuiteId: number;
+  readonly independentKeyDerivationVersion: number;
   readonly fingerprint: string;
   readonly [verifiedRecipient]: true;
 };
@@ -63,8 +63,8 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     personHash: result.personHash,
     keyMode: result.keyMode,
     identitySuiteId: result.identitySuiteId,
-    assetSuiteId: result.assetSuiteId,
-    assetDerivationVersion: result.assetDerivationVersion,
+    independentKeySuiteId: result.independentKeySuiteId,
+    independentKeyDerivationVersion: result.independentKeyDerivationVersion,
     fingerprint: result.fingerprint,
   } as VerifiedShieldedRecipient;
 }

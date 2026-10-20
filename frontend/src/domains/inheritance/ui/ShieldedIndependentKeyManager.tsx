@@ -2,8 +2,8 @@ import { useId, useState, type ReactNode, type RefObject } from "react";
 import { isAddress } from "ethers";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, Eye } from "lucide-react";
-import { buildShieldedAssetSigningMessage } from "@deepfamily/protocol-core";
-import type { ShieldedPublicFunds } from "../../../shared/workers/shieldedAssetWorkerTypes";
+import { buildShieldedIndependentKeySigningMessage } from "@deepfamily/protocol-core";
+import type { ShieldedPublicIndependentKey } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { CopyIconButton } from "../../../shared/ui";
 import {
   CHOICE_INPUT,
@@ -20,24 +20,24 @@ import {
   type ShieldedRecoveryMaterialHandle,
 } from "./ShieldedRecoveryMaterialView";
 
-export type ShieldedFundsRecoveryFormat = "mnemonic" | "shieldedKey";
+export type ShieldedIndependentKeyRecoveryFormat = "mnemonic" | "shieldedKey";
 
-export interface ShieldedFundsKeyManagerProps {
+export interface ShieldedIndependentKeyManagerProps {
   flow: "create" | "restore" | "backup";
-  funds: ShieldedPublicFunds | null;
+  independentKey: ShieldedPublicIndependentKey | null;
   /** The key being backed up or restored, also while the backup drill has removed it. */
   fingerprint?: string;
   busy: boolean;
-  backupFormat: ShieldedFundsRecoveryFormat;
-  onBackupFormatChange: (value: ShieldedFundsRecoveryFormat) => void;
+  backupFormat: ShieldedIndependentKeyRecoveryFormat;
+  onBackupFormatChange: (value: ShieldedIndependentKeyRecoveryFormat) => void;
   exportedMaterialRef: RefObject<ShieldedRecoveryMaterialHandle>;
   recoveryMaterialRef: RefObject<HTMLTextAreaElement>;
   exportedFingerprint: string;
   externalSaved: boolean;
   onExternalSavedChange: (value: boolean) => void;
   verificationStarted: boolean;
-  restorePath: ShieldedFundsRecoveryFormat | "signature";
-  onRestorePathChange: (value: ShieldedFundsRecoveryFormat | "signature") => void;
+  restorePath: ShieldedIndependentKeyRecoveryFormat | "signature";
+  onRestorePathChange: (value: ShieldedIndependentKeyRecoveryFormat | "signature") => void;
   account: string;
   canSign: boolean;
   /** Credentials are already unlocked; proofs may be unavailable for their identity suite. */
@@ -110,23 +110,23 @@ function Segmented<T extends string>({
 }
 
 /** Public flow state lives in React; recovery secrets stay in the DOM and in uncontrolled inputs. */
-export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
+export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManagerProps) {
   const { t } = useTranslation();
   const id = useId();
   const tr = (key: string) => t(`shielded.walletKeys.${key}`);
-  const { funds, busy } = props;
+  const { independentKey, busy } = props;
   const [creatingSource, setCreatingSource] = useState<"random" | "walletSignature" | null>(null);
-  const backupPending = !!funds?.backupRequired || !!props.exportedFingerprint;
+  const backupPending = !!independentKey?.backupRequired || !!props.exportedFingerprint;
   const verification = props.verificationStarted;
   const backup = props.flow === "backup" || backupPending || verification;
-  const restored = !!funds?.recoveryVerified && !funds.backupRequired && !backup;
-  const candidate = !!funds && !funds.recoveryVerified && !funds.backupRequired && !backup;
-  const fingerprint = funds?.fundsFingerprint || props.fingerprint || "";
-  const sourceLabel = funds
+  const restored = !!independentKey?.recoveryVerified && !independentKey.backupRequired && !backup;
+  const candidate = !!independentKey && !independentKey.recoveryVerified && !independentKey.backupRequired && !backup;
+  const fingerprint = independentKey?.keyFingerprint || props.fingerprint || "";
+  const sourceLabel = independentKey
     ? tr(
-        funds.rootSource === "random"
+        independentKey.rootSource === "random"
           ? "randomSource"
-          : funds.rootSource === "walletSignature"
+          : independentKey.rootSource === "walletSignature"
             ? "signatureSource"
             : "importedSource",
       )
@@ -142,13 +142,13 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
         ) : null}
         {fingerprint ? (
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="shrink-0">{tr("fundsFingerprint")}</span>
+            <span className="shrink-0">{tr("keyFingerprint")}</span>
             <code className="min-w-0 truncate font-mono text-ink/80" title={fingerprint}>
               {shortHex(fingerprint)}
             </code>
             <CopyIconButton
               size="xs"
-              label={tr("copyFundsFingerprint")}
+              label={tr("copyKeyFingerprint")}
               onClick={props.onCopyFingerprint}
             />
           </span>
@@ -205,7 +205,7 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
     </ol>
   ) : null;
 
-  const secretInput = (format: ShieldedFundsRecoveryFormat) => (
+  const secretInput = (format: ShieldedIndependentKeyRecoveryFormat) => (
     <FieldBlock
       label={tr(format === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput")}
       htmlFor={`${id}-recovery-material`}
@@ -272,8 +272,8 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
       {restored ? (
         <>
           <SuccessNotice>
-            <p className="font-medium">{tr("fundsRecoveredTitle")}</p>
-            {!props.identityReady ? <p>{tr("fundsRestoredIdentityHint")}</p> : null}
+            <p className="font-medium">{tr("independentKeyRecoveredTitle")}</p>
+            {!props.identityReady ? <p>{tr("independentKeyRestoredIdentityHint")}</p> : null}
           </SuccessNotice>
           {keySummary}
           {props.discoveryReport}
@@ -305,7 +305,7 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
         <>
           <p className="text-sm leading-relaxed text-ink">{tr("independentBackupGate")}</p>
           {keySummary}
-          {funds ? (
+          {independentKey ? (
             <>
               <div className="space-y-2">
                 <Segmented
@@ -439,7 +439,7 @@ export function ShieldedFundsKeyManager(props: ShieldedFundsKeyManagerProps) {
                 <details className="text-xs text-ink-muted">
                   <summary className="cursor-pointer">{tr("signatureMessage")}</summary>
                   <pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-surface-alt p-3">
-                    {buildShieldedAssetSigningMessage(props.account)}
+                    {buildShieldedIndependentKeySigningMessage(props.account)}
                   </pre>
                 </details>
               ) : null}

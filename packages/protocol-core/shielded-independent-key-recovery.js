@@ -8,25 +8,25 @@ const ENGLISH_WORDLIST = wordlists.en;
 function rootBytes(value) {
   let root;
   try {
-    root = copyBytes(value, "assetRoot");
+    root = copyBytes(value, "independentKeyRoot");
     if (root.length === 32) return root;
   } catch {
     // Do not propagate a library error containing the supplied secret.
   }
   wipeBytes(root);
-  throw new ProtocolError("INVALID_ASSET_ROOT", "Asset root must be 32 bytes");
+  throw new ProtocolError("INVALID_INDEPENDENT_KEY_ROOT", "Independent key root must be 32 bytes");
 }
 
 /**
  * BIP39 English entropy encoding only: no seed, wallet path or extra password.
  * All 32-byte roots, including zero, retain their exact original bytes.
  */
-export function encodeShieldedAssetMnemonic(assetRoot) {
-  const root = rootBytes(assetRoot);
+export function encodeShieldedIndependentKeyMnemonic(independentKeyRoot) {
+  const root = rootBytes(independentKeyRoot);
   try {
     return Mnemonic.entropyToPhrase(root, ENGLISH_WORDLIST);
   } catch {
-    throw new ProtocolError("INVALID_ASSET_MNEMONIC", "Could not encode asset recovery words");
+    throw new ProtocolError("INVALID_INDEPENDENT_KEY_MNEMONIC", "Could not encode recovery words");
   } finally {
     wipeBytes(root);
   }
@@ -37,7 +37,7 @@ export function encodeShieldedAssetMnemonic(assetRoot) {
  * whitespace (space, tab, LF, VT, FF, CR) are normalized. Non-ASCII text is
  * rejected before normalization; accepted English text is already NFKD-stable.
  */
-export function decodeShieldedAssetMnemonic(mnemonic) {
+export function decodeShieldedIndependentKeyMnemonic(mnemonic) {
   try {
     if (
       typeof mnemonic !== "string" ||
@@ -56,15 +56,15 @@ export function decodeShieldedAssetMnemonic(mnemonic) {
     return getBytes(Mnemonic.phraseToEntropy(words.join(" "), ENGLISH_WORDLIST));
   } catch {
     throw new ProtocolError(
-      "INVALID_ASSET_MNEMONIC",
-      "Expected 24 valid English asset recovery words",
+      "INVALID_INDEPENDENT_KEY_MNEMONIC",
+      "Expected 24 valid English recovery words",
     );
   }
 }
 
-/** Canonical lowercase 0x-prefixed representation of the complete asset root. */
-export function encodeShieldedAssetKey(assetRoot) {
-  const root = rootBytes(assetRoot);
+/** Canonical lowercase 0x-prefixed representation of the complete independent key root. */
+export function encodeShieldedIndependentKey(independentKeyRoot) {
+  const root = rootBytes(independentKeyRoot);
   try {
     return bytesToHex(root);
   } finally {
@@ -73,17 +73,17 @@ export function encodeShieldedAssetKey(assetRoot) {
 }
 
 /** Import the complete root, not the separately derived spend secret. */
-export function decodeShieldedAssetKey(shieldedKey) {
+export function decodeShieldedIndependentKey(shieldedKey) {
   if (
     typeof shieldedKey !== "string" ||
     shieldedKey.length !== 66 ||
     !/^0x[0-9a-fA-F]{64}$/.test(shieldedKey)
   ) {
-    throw new ProtocolError("INVALID_ASSET_KEY", "Expected a 32-byte 0x-prefixed Shielded Key");
+    throw new ProtocolError("INVALID_INDEPENDENT_KEY", "Expected a 32-byte 0x-prefixed Shielded Key");
   }
   try {
     return getBytes(shieldedKey);
   } catch {
-    throw new ProtocolError("INVALID_ASSET_KEY", "Expected a 32-byte 0x-prefixed Shielded Key");
+    throw new ProtocolError("INVALID_INDEPENDENT_KEY", "Expected a 32-byte 0x-prefixed Shielded Key");
   }
 }

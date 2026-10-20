@@ -17,8 +17,8 @@ template ShieldedReceiveCode() {
     signal input viewKeyHi;
     signal input keyMode;
     signal input identitySuiteId;
-    signal input assetSuiteId;
-    signal input assetDerivationVersion;
+    signal input independentKeySuiteId;
+    signal input independentKeyDerivationVersion;
     signal input receiveCodeVersion;
     signal input spendingSecret;
 
@@ -34,8 +34,8 @@ template ShieldedReceiveCode() {
     component suite = AtomicSuiteCommitment();
     suite.suiteId <== suiteId;
     identitySuiteId === suiteId;
-    assetSuiteId === 1;
-    assetDerivationVersion === 1;
+    independentKeySuiteId === 1;
+    independentKeyDerivationVersion === 1;
     receiveCodeVersion === 1;
     keyMode * (1 - keyMode) === 0;
 
@@ -77,5 +77,5 @@ template ShieldedReceiveCode() {
 }
 
 component main {
-    public [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, identitySuiteId, assetSuiteId, assetDerivationVersion, receiveCodeVersion]
+    public [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, identitySuiteId, independentKeySuiteId, independentKeyDerivationVersion, receiveCodeVersion]
 } = ShieldedReceiveCode();

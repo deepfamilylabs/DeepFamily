@@ -1033,8 +1033,8 @@ export interface ShieldedReceiveCodeStatement {
   viewingKey: BytesLike;
   keyMode?: BigNumberish;
   identitySuiteId?: BigNumberish;
-  assetSuiteId?: BigNumberish;
-  assetDerivationVersion?: BigNumberish;
+  independentKeySuiteId?: BigNumberish;
+  independentKeyDerivationVersion?: BigNumberish;
   receiveCodeVersion?: BigNumberish;
 }
 export function buildShieldedReceiveCodePublicSignals(
@@ -1067,15 +1067,15 @@ export function decodeShieldedReceiveCode(code: string): {
   viewingKey: Uint8Array;
   keyMode: number;
   identitySuiteId: number;
-  assetSuiteId: number;
-  assetDerivationVersion: number;
+  independentKeySuiteId: number;
+  independentKeyDerivationVersion: number;
   receiveCodeVersion: number;
   fingerprint: string;
   publicSignals: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
   proof: ShieldedReceiveCodeProof;
 };
 
-export const SHIELDED_KEY_MODE: Readonly<{ identityDerived: 0; assetRootDerived: 1 }>;
+export const SHIELDED_KEY_MODE: Readonly<{ identityDerived: 0; independentKeyRootDerived: 1 }>;
 export function normalizeShieldedKeyMode(value?: BigNumberish, binding?: string): bigint;
 export function computeShieldedBudgetOwnerAuthorization(
   input: { heirOwnerCommitment: BigNumberish; keyMode?: BigNumberish },
@@ -1116,11 +1116,11 @@ export function planShieldedValueSpend(input: {
   maxInputs?: 1 | 8;
 }): ShieldedValueSpendPlan;
 
-export const SHIELDED_ASSET_KEY_VERSION: 1;
-export const SHIELDED_ASSET_SUITE: 1;
-export const SHIELDED_ASSET_BRANCH_VERSION: 1;
-export const SHIELDED_FUNDS_UNICODE_VERSION: "17.0.0";
-export const FUNDS_ARGON2ID_PROFILE: Readonly<{
+export const SHIELDED_INDEPENDENT_KEY_VERSION: 1;
+export const SHIELDED_INDEPENDENT_KEY_SUITE: 1;
+export const SHIELDED_INDEPENDENT_KEY_BRANCH_VERSION: 1;
+export const SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION: "17.0.0";
+export const INDEPENDENT_KEY_ARGON2ID_PROFILE: Readonly<{
   status: "candidate-awaiting-device-benchmark";
   provisional: true;
   algorithm: "Argon2id";
@@ -1131,19 +1131,19 @@ export const FUNDS_ARGON2ID_PROFILE: Readonly<{
   outputBytes: 32;
   saltBytes: 16;
 }>;
-/** Frozen Unicode 17 funds rules, independent of the active identity suite. */
-export function normalizeShieldedFundsIdentity(identity: IdentityFields): CanonicalIdentityFields;
-export function encodeShieldedFundsIdentity(identity: IdentityFields): Uint8Array;
-export function normalizeShieldedFundsPassphrase(rawPassphrase: string): string;
+/** Frozen Unicode 17 independent-key rules, independent of the active identity suite. */
+export function normalizeShieldedIndependentKeyIdentity(identity: IdentityFields): CanonicalIdentityFields;
+export function encodeShieldedIndependentKeyIdentity(identity: IdentityFields): Uint8Array;
+export function normalizeShieldedIndependentKeyPassphrase(rawPassphrase: string): string;
 /** The caller must wipe the returned password bytes after use. */
-export function buildShieldedFundsPasswordBytes(rawPassphrase: string): Uint8Array;
-export function deriveShieldedFundsIdentitySalt(identity: IdentityFields): Uint8Array;
+export function buildShieldedIndependentKeyPasswordBytes(rawPassphrase: string): Uint8Array;
+export function deriveShieldedIndependentKeyIdentitySalt(identity: IdentityFields): Uint8Array;
 /** Dedicated asset-Worker derivation; never return this secret in a public DTO. */
-export function deriveShieldedFundsIdentitySecret(input: {
+export function deriveShieldedIndependentKeyIdentitySecret(input: {
   identity: IdentityFields;
   rawPassphrase: string;
 }): Promise<Uint8Array>;
-export interface ShieldedAssetSignatureMetadata {
+export interface ShieldedIndependentKeySignatureMetadata {
   signerAddress: string;
   message: string;
   messageHash: string;
@@ -1152,44 +1152,44 @@ export interface ShieldedAssetSignatureMetadata {
   rootKdfVersion: 1;
   method: "personal_sign";
 }
-export interface ShieldedAssetKeyMaterial {
+export interface ShieldedIndependentKeyMaterial {
   ownerSecret: bigint;
   ownerCommitment: bigint;
   hpkeIkm: string;
   viewPublicKey: Uint8Array;
-  fundsFingerprint: string;
+  keyFingerprint: string;
   keyMode: 1;
-  assetSuite: 1;
+  independentKeySuite: 1;
   branchVersion: 1;
 }
-export function buildShieldedAssetSigningMessage(address: string): string;
-export function normalizeShieldedAssetSignature(input: {
+export function buildShieldedIndependentKeySigningMessage(address: string): string;
+export function normalizeShieldedIndependentKeySignature(input: {
   signerAddress: string;
   signature: string;
 }): Uint8Array;
-export function deriveShieldedAssetRootFromSignature(input: {
+export function deriveShieldedIndependentKeyRootFromSignature(input: {
   signerAddress: string;
   signature: string;
-}): Promise<{ assetRoot: Uint8Array; sourceMetadata: ShieldedAssetSignatureMetadata }>;
-export function createShieldedAssetRoot(input: {
+}): Promise<{ independentKeyRoot: Uint8Array; sourceMetadata: ShieldedIndependentKeySignatureMetadata }>;
+export function createShieldedIndependentKeyRoot(input: {
   intent: "create";
   rootSource?: "random";
 }): Uint8Array;
-export function deriveShieldedAssetKeyMaterial(input: {
-  assetRoot: BytesLike;
-  fundsIdentitySecret: BytesLike;
-}): Promise<ShieldedAssetKeyMaterial>;
-export function computeShieldedAssetFingerprint(input: {
+export function deriveShieldedIndependentKeyMaterial(input: {
+  independentKeyRoot: BytesLike;
+  independentKeyIdentitySecret: BytesLike;
+}): Promise<ShieldedIndependentKeyMaterial>;
+export function computeShieldedIndependentKeyFingerprint(input: {
   ownerCommitment: BigNumberish;
   viewPublicKey: BytesLike;
-  assetSuite?: 1;
+  independentKeySuite?: 1;
   branchVersion?: 1;
 }): string;
-/** Encode the exact 32-byte asset root as 24 English BIP39 words, without a password. */
-export function encodeShieldedAssetMnemonic(assetRoot: BytesLike): string;
+/** Encode the exact 32-byte independent key root as 24 English BIP39 words, without a password. */
+export function encodeShieldedIndependentKeyMnemonic(independentKeyRoot: BytesLike): string;
 /** Decode 24 checksum-valid English words to the original root; no seed or wallet derivation. */
-export function decodeShieldedAssetMnemonic(mnemonic: string): Uint8Array;
-/** Canonical 0x-prefixed 64-hex representation of the complete asset root. */
-export function encodeShieldedAssetKey(assetRoot: BytesLike): string;
+export function decodeShieldedIndependentKeyMnemonic(mnemonic: string): Uint8Array;
+/** Canonical 0x-prefixed 64-hex representation of the complete independent key root. */
+export function encodeShieldedIndependentKey(independentKeyRoot: BytesLike): string;
 /** Import a complete root from exactly 0x + 64 hex characters, not a spend secret. */
-export function decodeShieldedAssetKey(shieldedKey: string): Uint8Array;
+export function decodeShieldedIndependentKey(shieldedKey: string): Uint8Array;

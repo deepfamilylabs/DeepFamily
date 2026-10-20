@@ -15,14 +15,14 @@ import {
   planShieldedValueSpend,
 } from "@deepfamily/protocol-core";
 import {
-  createShieldedAssetRoot,
-  deriveShieldedAssetKeyMaterial,
-  deriveShieldedFundsIdentitySecret,
-  deriveShieldedAssetRootFromSignature,
-  encodeShieldedAssetMnemonic,
-  decodeShieldedAssetMnemonic,
-  encodeShieldedAssetKey,
-  decodeShieldedAssetKey,
+  createShieldedIndependentKeyRoot,
+  deriveShieldedIndependentKeyMaterial,
+  deriveShieldedIndependentKeyIdentitySecret,
+  deriveShieldedIndependentKeyRootFromSignature,
+  encodeShieldedIndependentKeyMnemonic,
+  decodeShieldedIndependentKeyMnemonic,
+  encodeShieldedIndependentKey,
+  decodeShieldedIndependentKey,
 } from "@deepfamily/protocol-core";
 import { JsonRpcProvider, getAddress, getBigInt, hexlify, type BigNumberish } from "ethers";
 import {
@@ -36,7 +36,7 @@ import type { IdentityMaterialV1Result } from "../shared/workers/cryptoWorkerCli
 import type {
   ShieldedAssetWorkerCallMap,
   ShieldedAssetSessionState,
-  ShieldedPublicFunds,
+  ShieldedPublicIndependentKey,
   ShieldedPublicIdentity,
   ShieldedWorkerContext,
   ShieldedKeySlot,
@@ -91,10 +91,10 @@ import {
 } from "../domains/inheritance/services/shieldedAssetRegistry";
 
 type IdentityMaterial = Awaited<ReturnType<typeof deriveIdentityMaterial>>;
-type AssetKeys = Awaited<ReturnType<typeof deriveShieldedAssetKeyMaterial>>;
+type IndependentKeyMaterial = Awaited<ReturnType<typeof deriveShieldedIndependentKeyMaterial>>;
 type Keys = { ownerSecret: bigint; ownerCommitment: bigint; hpkeIkm: string; keyMode: 0 | 1 };
 type SourceMetadata = Awaited<
-  ReturnType<typeof deriveShieldedAssetRootFromSignature>
+  ReturnType<typeof deriveShieldedIndependentKeyRootFromSignature>
 >["sourceMetadata"];
 type Prepared = {
   data: ShieldedPoolActionData;
@@ -104,11 +104,11 @@ type Prepared = {
 class AssetSessionError extends Error {}
 const ASSET_METHODS = new Set([
   "unlockIdentity",
-  "createFunds",
+  "createIndependentKey",
   "restoreSignature",
   "exportRecoveryMaterial",
   "importRecoveryMaterial",
-  "clearFunds",
+  "clearIndependentKey",
   "receiveCode",
   "recover",
   "discover",
@@ -138,12 +138,12 @@ export class ShieldedAssetSession {
   private identity: IdentityMaterial | null = null;
   private identityHandle = "";
   private credentialsHandle = "";
-  private fundsIdentitySecret: Uint8Array | null = null;
+  private independentKeyIdentitySecret: Uint8Array | null = null;
   private credentialsEpoch = 0;
-  private fundsEpoch = 0;
+  private independentKeyEpoch = 0;
   private root: Uint8Array | null = null;
-  private assetKeys: AssetKeys | null = null;
-  private funds: ShieldedPublicFunds | null = null;
+  private independentKeyMaterial: IndependentKeyMaterial | null = null;
+  private independentKey: ShieldedPublicIndependentKey | null = null;
   private sourceMetadata: SourceMetadata | undefined;
   private allowHistoryVerification = false;
   private createdHere = false;
@@ -175,17 +175,17 @@ export class ShieldedAssetSession {
         }
       : null;
     return {
-      credentials: this.fundsIdentitySecret ? { handle: this.credentialsHandle } : null,
+      credentials: this.independentKeyIdentitySecret ? { handle: this.credentialsHandle } : null,
       identity,
-      funds: this.funds ? { ...this.funds } : null,
+      independentKey: this.independentKey ? { ...this.independentKey } : null,
     };
   }
 
   clear(): void {
     this.credentialsEpoch++;
-    this.fundsEpoch++;
-    wipeBytes(this.fundsIdentitySecret);
-    this.fundsIdentitySecret = null;
+    this.independentKeyEpoch++;
+    wipeBytes(this.independentKeyIdentitySecret);
+    this.independentKeyIdentitySecret = null;
     this.credentialsHandle = "";
     wipeBytes(this.identity?.identitySalt);
     wipeBytes(this.identity?.derivedSecretBytes);
@@ -193,8 +193,8 @@ export class ShieldedAssetSession {
     this.identityHandle = "";
     this.root?.fill(0);
     this.root = null;
-    this.assetKeys = null;
-    this.funds = null;
+    this.independentKeyMaterial = null;
+    this.independentKey = null;
     this.sourceMetadata = undefined;
     this.allowHistoryVerification = false;
     this.createdHere = false;
@@ -214,14 +214,14 @@ export class ShieldedAssetSession {
     }
     this.requireCredentials();
     requireValue(
-      this.assetKeys && this.funds,
-      "Restore the original funds mnemonic, Shielded Key or signature. A missing root cannot be replaced.",
+      this.independentKeyMaterial && this.independentKey,
+      "Restore the original independent key mnemonic, Shielded Key or signature. A missing root cannot be replaced.",
     );
     requireValue(
-      !requireVerified || this.funds.recoveryVerified,
-      "Verify recovery of this funds root before receiving or spending.",
+      !requireVerified || this.independentKey.recoveryVerified,
+      "Verify recovery of this independent key root before receiving or spending.",
     );
-    return { ...this.assetKeys, keyMode: 1 };
+    return { ...this.independentKeyMaterial, keyMode: 1 };
   }
 
   async unlockIdentity(
@@ -230,18 +230,18 @@ export class ShieldedAssetSession {
     // Replacing credentials releases both secret paths, every root and prepared action.
     this.clear();
     const epoch = this.credentialsEpoch;
-    let fundsSecret: Uint8Array | undefined;
+    let keyIdentitySecret: Uint8Array | undefined;
     let material: IdentityMaterial | undefined;
     try {
-      // This path receives the original form fields and uses the fixed funds rules.
+      // This path receives the original form fields and uses the fixed independent-key rules.
       // Run the two memory-hard KDFs sequentially.
-      fundsSecret = await deriveShieldedFundsIdentitySecret({
+      keyIdentitySecret = await deriveShieldedIndependentKeyIdentitySecret({
         identity: params.identity,
         rawPassphrase: params.rawPassphrase,
       });
       requireValue(
-        fundsSecret.length === 32,
-        "Funds credentials require a complete 32-byte secret.",
+        keyIdentitySecret.length === 32,
+        "Independent-key credentials require a complete 32-byte secret.",
       );
       requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
       try {
@@ -259,8 +259,8 @@ export class ShieldedAssetSession {
       requireValue(epoch === this.credentialsEpoch, "Credentials session was replaced or locked.");
       // A destroyed Worker may later be recreated with its counters reset.
       const credentialsHandle = `credentials:${crypto.randomUUID()}`;
-      this.fundsIdentitySecret = fundsSecret;
-      fundsSecret = undefined;
+      this.independentKeyIdentitySecret = keyIdentitySecret;
+      keyIdentitySecret = undefined;
       this.credentialsHandle = credentialsHandle;
       this.identity = material ?? null;
       material = undefined;
@@ -268,7 +268,7 @@ export class ShieldedAssetSession {
       return this.state();
     } finally {
       params.rawPassphrase = "";
-      wipeBytes(fundsSecret);
+      wipeBytes(keyIdentitySecret);
       wipeBytes(material?.identitySalt);
       wipeBytes(material?.derivedSecretBytes);
     }
@@ -276,32 +276,32 @@ export class ShieldedAssetSession {
 
   private requireCredentials(expectedHandle?: string): Uint8Array {
     requireValue(
-      this.credentialsHandle && this.fundsIdentitySecret?.length === 32,
-      "Unlock the original funds identity credentials first.",
+      this.credentialsHandle && this.independentKeyIdentitySecret?.length === 32,
+      "Unlock the original independent-key identity credentials first.",
     );
     requireValue(
       expectedHandle === undefined || expectedHandle === this.credentialsHandle,
       "Credentials session was replaced or locked.",
     );
-    return this.fundsIdentitySecret;
+    return this.independentKeyIdentitySecret;
   }
 
-  private requireFundsRequest(expectedHandle: string, epoch: number): Uint8Array {
+  private requireIndependentKeyRequest(expectedHandle: string, epoch: number): Uint8Array {
     requireValue(
       typeof expectedHandle === "string" && expectedHandle.length > 0,
       "A current credentials session handle is required.",
     );
     const secret = this.requireCredentials(expectedHandle);
-    requireValue(epoch === this.fundsEpoch, "Funds session was replaced or cleared.");
+    requireValue(epoch === this.independentKeyEpoch, "Independent key session was replaced or cleared.");
     return secret;
   }
 
   private sessionGuard(): () => void {
     const credentialsEpoch = this.credentialsEpoch;
-    const fundsEpoch = this.fundsEpoch;
+    const independentKeyEpoch = this.independentKeyEpoch;
     return () =>
       requireValue(
-        credentialsEpoch === this.credentialsEpoch && fundsEpoch === this.fundsEpoch,
+        credentialsEpoch === this.credentialsEpoch && independentKeyEpoch === this.independentKeyEpoch,
         "The secret session was replaced or locked. Retry with the current credentials.",
       );
   }
@@ -363,7 +363,7 @@ export class ShieldedAssetSession {
       "Credentials session was replaced or locked.",
     );
     if (this.poolScope && poolScope !== this.poolScope) {
-      // Identity and the funds root serve every pool of this factory. History,
+      // Identity and the independent key root serve every pool of this factory. History,
       // prepared witnesses and policy drafts belong to one pool and are dropped.
       this.wallets.clear();
       this.summary = null;
@@ -386,42 +386,42 @@ export class ShieldedAssetSession {
     root: Uint8Array,
     expectedCredentialsHandle: string,
     epoch: number,
-    source: ShieldedPublicFunds["rootSource"],
+    source: ShieldedPublicIndependentKey["rootSource"],
     metadata?: SourceMetadata,
     expectedFingerprint?: string,
     path?: "signature" | "mnemonic" | "shieldedKey",
   ) {
     let secret: Uint8Array | undefined;
     try {
-      secret = this.requireFundsRequest(expectedCredentialsHandle, epoch).slice();
-      const keys = await deriveShieldedAssetKeyMaterial({
-        assetRoot: root,
-        fundsIdentitySecret: secret,
+      secret = this.requireIndependentKeyRequest(expectedCredentialsHandle, epoch).slice();
+      const keys = await deriveShieldedIndependentKeyMaterial({
+        independentKeyRoot: root,
+        independentKeyIdentitySecret: secret,
       });
-      this.requireFundsRequest(expectedCredentialsHandle, epoch);
+      this.requireIndependentKeyRequest(expectedCredentialsHandle, epoch);
       if (expectedFingerprint)
         requireValue(
-          equalHexConstantTime(keys.fundsFingerprint, expectedFingerprint),
-          "Funds fingerprint differs from the original wallet. The existing root was not replaced.",
+          equalHexConstantTime(keys.keyFingerprint, expectedFingerprint),
+          "Key fingerprint differs from the original wallet. The existing root was not replaced.",
         );
-      if (this.assetKeys)
+      if (this.independentKeyMaterial)
         requireValue(
-          this.assetKeys.fundsFingerprint === keys.fundsFingerprint &&
-            this.funds?.rootSource === source &&
+          this.independentKeyMaterial.keyFingerprint === keys.keyFingerprint &&
+            this.independentKey?.rootSource === source &&
             JSON.stringify(this.sourceMetadata) === JSON.stringify(metadata),
-          "Lock before opening another funds root or changing its source. Existing budgets cannot change owner.",
+          "Lock before opening another independent key root or changing its source. Existing budgets cannot change owner.",
         );
       this.root?.fill(0);
       this.root = root.slice();
-      this.assetKeys = keys;
+      this.independentKeyMaterial = keys;
       this.sourceMetadata = metadata;
       this.allowHistoryVerification = false;
       this.createdHere = false;
       this.knownPendingRoot = false;
-      this.funds = {
+      this.independentKey = {
         ownerCommitment: String(keys.ownerCommitment),
         viewingKey: hexlify(keys.viewPublicKey),
-        fundsFingerprint: keys.fundsFingerprint,
+        keyFingerprint: keys.keyFingerprint,
         rootSource: source,
         ...(metadata ? { signerAddress: metadata.signerAddress } : {}),
         recoveryVerified: !!path,
@@ -436,13 +436,13 @@ export class ShieldedAssetSession {
     }
   }
 
-  async createFunds(params: ShieldedAssetWorkerCallMap["createFunds"]["params"]) {
-    const epoch = this.fundsEpoch;
+  async createIndependentKey(params: ShieldedAssetWorkerCallMap["createIndependentKey"]["params"]) {
+    const epoch = this.independentKeyEpoch;
     requireValue(
       params.intent === "create" && !this.root,
-      "Creating a new root requires an explicit new-wallet action and an empty funds slot.",
+      "Creating a new root requires an explicit new-wallet action and an empty independent key slot.",
     );
-    this.requireFundsRequest(params.expectedCredentialsHandle, epoch);
+    this.requireIndependentKeyRequest(params.expectedCredentialsHandle, epoch);
     await this.context(params.context);
     requireValue(
       params.rootSource === "random" || params.rootSource === "walletSignature",
@@ -454,7 +454,7 @@ export class ShieldedAssetSession {
         "Random creation does not use a signing wallet.",
       );
       await this.installRoot(
-        createShieldedAssetRoot({ intent: "create", rootSource: "random" }),
+        createShieldedIndependentKeyRoot({ intent: "create", rootSource: "random" }),
         params.expectedCredentialsHandle,
         epoch,
         "random",
@@ -462,15 +462,15 @@ export class ShieldedAssetSession {
     } else {
       requireValue(
         params.signerAddress && params.signature,
-        "The selected wallet must sign the exact funds message.",
+        "The selected wallet must sign the exact independent key message.",
       );
-      const generated = await deriveShieldedAssetRootFromSignature({
+      const generated = await deriveShieldedIndependentKeyRootFromSignature({
         signerAddress: params.signerAddress,
         signature: params.signature,
       });
       params.signature = undefined;
       await this.installRoot(
-        generated.assetRoot,
+        generated.independentKeyRoot,
         params.expectedCredentialsHandle,
         epoch,
         "walletSignature",
@@ -478,25 +478,25 @@ export class ShieldedAssetSession {
       );
     }
     this.createdHere = true;
-    this.funds!.backupRequired = true;
+    this.independentKey!.backupRequired = true;
     return this.state();
   }
 
   async restoreSignature(params: ShieldedAssetWorkerCallMap["restoreSignature"]["params"]) {
-    const epoch = this.fundsEpoch;
-    this.requireFundsRequest(params.expectedCredentialsHandle, epoch);
+    const epoch = this.independentKeyEpoch;
+    this.requireIndependentKeyRequest(params.expectedCredentialsHandle, epoch);
     requireValue(
       !this.root,
       "Clear the original secret session before a real re-sign verification.",
     );
     await this.context(params.context);
-    const generated = await deriveShieldedAssetRootFromSignature({
+    const generated = await deriveShieldedIndependentKeyRootFromSignature({
       signerAddress: params.signerAddress,
       signature: params.signature,
     });
     params.signature = "";
     await this.installRoot(
-      generated.assetRoot,
+      generated.independentKeyRoot,
       params.expectedCredentialsHandle,
       epoch,
       "walletSignature",
@@ -504,14 +504,14 @@ export class ShieldedAssetSession {
       params.expectedFingerprint,
       params.expectedFingerprint ? "signature" : undefined,
     );
-    const backupRequired = params.pendingBackupFingerprints?.includes(this.funds!.fundsFingerprint);
+    const backupRequired = params.pendingBackupFingerprints?.includes(this.independentKey!.keyFingerprint);
     if (backupRequired) {
       // The client retained this original public fingerprint before locking.
       // Re-export may resume its backup drill; spending remains gated.
       this.knownPendingRoot = true;
-      this.funds!.backupRequired = true;
-      this.funds!.recoveryVerified = false;
-      delete this.funds!.recoveryPath;
+      this.independentKey!.backupRequired = true;
+      this.independentKey!.recoveryVerified = false;
+      delete this.independentKey!.recoveryPath;
     }
     this.allowHistoryVerification = !params.expectedFingerprint && !backupRequired;
     return this.state();
@@ -521,24 +521,24 @@ export class ShieldedAssetSession {
     params: ShieldedAssetWorkerCallMap["exportRecoveryMaterial"]["params"],
   ): Promise<ShieldedAssetWorkerCallMap["exportRecoveryMaterial"]["result"]> {
     this.requireCredentials();
-    requireValue(this.root && this.funds, "Unlock the existing funds root before exporting it.");
+    requireValue(this.root && this.independentKey, "Unlock the existing independent key root before exporting it.");
     requireValue(
-      this.createdHere || this.knownPendingRoot || this.funds.recoveryVerified,
-      "Confirm the original funds fingerprint or owned history before backing up a recovery candidate.",
+      this.createdHere || this.knownPendingRoot || this.independentKey.recoveryVerified,
+      "Confirm the original key fingerprint or owned history before backing up a recovery candidate.",
     );
     requireValue(
       params.format === "mnemonic" || params.format === "shieldedKey",
-      "Unsupported funds recovery format.",
+      "Unsupported independent key recovery format.",
     );
     await this.context(params.context);
     return {
       material:
         params.format === "mnemonic"
-          ? encodeShieldedAssetMnemonic(this.root)
-          : encodeShieldedAssetKey(this.root),
+          ? encodeShieldedIndependentKeyMnemonic(this.root)
+          : encodeShieldedIndependentKey(this.root),
       format: params.format,
       version: 1,
-      fundsFingerprint: this.funds.fundsFingerprint,
+      keyFingerprint: this.independentKey.keyFingerprint,
     };
   }
 
@@ -549,20 +549,20 @@ export class ShieldedAssetSession {
     let material = params.material;
     params.material = "";
     try {
-      const epoch = this.fundsEpoch;
-      this.requireFundsRequest(params.expectedCredentialsHandle, epoch);
+      const epoch = this.independentKeyEpoch;
+      this.requireIndependentKeyRequest(params.expectedCredentialsHandle, epoch);
       requireValue(
         !this.root,
         "Clear the original secret session before importing recovery material.",
       );
       requireValue(
         params.format === "mnemonic" || params.format === "shieldedKey",
-        "Unsupported funds recovery format.",
+        "Unsupported independent key recovery format.",
       );
       root =
         params.format === "mnemonic"
-          ? decodeShieldedAssetMnemonic(material)
-          : decodeShieldedAssetKey(material);
+          ? decodeShieldedIndependentKeyMnemonic(material)
+          : decodeShieldedIndependentKey(material);
       material = "";
       await this.context(params.context);
       // A parsable backup alone does not confirm the original credentials or wallet.
@@ -575,18 +575,18 @@ export class ShieldedAssetSession {
         params.expectedFingerprint,
         params.expectedFingerprint ? params.format : undefined,
       );
-      this.funds!.backupRequired = false;
+      this.independentKey!.backupRequired = false;
       // The tab's original public creation challenge also survives a full lock
-      // or reload. Entering the saved backup under the same funds credentials
+      // or reload. Entering the saved backup under the same independent-key credentials
       // completes its real drill even when the new wallet has no history yet.
       const matchesCreationChallenge = params.pendingBackupFingerprints?.includes(
-        this.funds!.fundsFingerprint,
+        this.independentKey!.keyFingerprint,
       );
       if (matchesCreationChallenge) {
-        this.funds!.recoveryVerified = true;
-        this.funds!.recoveryPath = params.format;
+        this.independentKey!.recoveryVerified = true;
+        this.independentKey!.recoveryPath = params.format;
       }
-      this.allowHistoryVerification = !this.funds!.recoveryVerified;
+      this.allowHistoryVerification = !this.independentKey!.recoveryVerified;
       return this.state();
     } finally {
       material = "";
@@ -595,21 +595,21 @@ export class ShieldedAssetSession {
   }
 
   /**
-   * Removes the funds root, its branches and asset-slot history. The funds
-   * credential secret and optional identity capability stay available for
+   * Removes the independent key root, its branches and independent-slot history. The
+   * independent-key identity secret and optional identity capability stay available for
    * signing and backup rehearsal. The next import starts empty.
    */
-  async clearFunds(): Promise<ShieldedAssetSessionState> {
-    this.fundsEpoch++;
+  async clearIndependentKey(): Promise<ShieldedAssetSessionState> {
+    this.independentKeyEpoch++;
     this.root?.fill(0);
     this.root = null;
-    this.assetKeys = null;
-    this.funds = null;
+    this.independentKeyMaterial = null;
+    this.independentKey = null;
     this.sourceMetadata = undefined;
     this.allowHistoryVerification = false;
     this.createdHere = false;
     this.knownPendingRoot = false;
-    this.wallets.delete("asset");
+    this.wallets.delete("independent");
     this.summary = null;
     this.pending = null;
     this.policyDrafts.clear();
@@ -618,7 +618,7 @@ export class ShieldedAssetSession {
 
   /** Positive VALUE, or an independent BUDGET checked against the unlocked identity, under this owner. */
   private confirmsCandidateRoot(notes: ReturnType<typeof listUnspentRecoveredShieldedNotes>) {
-    const owner = this.assetKeys?.ownerCommitment;
+    const owner = this.independentKeyMaterial?.ownerCommitment;
     const identityCommitment = this.identity?.identityCommitment;
     return notes.some(({ note }) =>
       note.kind === "value"
@@ -633,11 +633,11 @@ export class ShieldedAssetSession {
   }
 
   private historyCandidate(): string | null {
-    return this.funds &&
+    return this.independentKey &&
       this.allowHistoryVerification &&
-      !this.funds.recoveryVerified &&
-      !this.funds.backupRequired
-      ? this.funds.fundsFingerprint
+      !this.independentKey.recoveryVerified &&
+      !this.independentKey.backupRequired
+      ? this.independentKey.keyFingerprint
       : null;
   }
 
@@ -657,8 +657,8 @@ export class ShieldedAssetSession {
   ): Promise<ShieldedWalletSummary> {
     const current = this.sessionGuard();
     requireValue(
-      this.identity || this.assetKeys,
-      "Unlock identity credentials or restore the original funds root first.",
+      this.identity || this.independentKeyMaterial,
+      "Unlock identity credentials or restore the original independent key root first.",
     );
     const ctx = params.context;
     const { provider, pool, lineageIndex, family } = await this.context(ctx);
@@ -688,8 +688,8 @@ export class ShieldedAssetSession {
     if (this.identity) summary.familyRecordsAvailable = !!lineage;
     const seenNotes = new Set<string>();
     this.wallets.clear();
-    for (const slot of ["identity", "asset"] as const) {
-      if ((slot === "identity" && !this.identity) || (slot === "asset" && !this.assetKeys))
+    for (const slot of ["identity", "independent"] as const) {
+      if ((slot === "identity" && !this.identity) || (slot === "independent" && !this.independentKeyMaterial))
         continue;
       const keys = this.keys(slot, false);
       const wallet = await recoverLocalShieldedWallet(
@@ -749,9 +749,9 @@ export class ShieldedAssetSession {
           pendingIdentity: true,
         });
       }
-      if (slot === "asset" && this.historyCandidate() && this.confirmsCandidateRoot(notes)) {
-        this.funds!.recoveryVerified = true;
-        this.funds!.recoveryPath = "history";
+      if (slot === "independent" && this.historyCandidate() && this.confirmsCandidateRoot(notes)) {
+        this.independentKey!.recoveryVerified = true;
+        this.independentKey!.recoveryPath = "history";
       }
       for (const policy of listRecoveredShieldedPolicies(wallet)) {
         if (
@@ -893,7 +893,7 @@ export class ShieldedAssetSession {
     const ctx = request.context;
     const summary = await this.recover({ context: ctx });
     const wallet = this.wallets.get(request.slot);
-    requireValue(wallet, "Recover this funds slot before preparing a transaction.");
+    requireValue(wallet, "Recover this independent key slot before preparing a transaction.");
     const env = await this.context(ctx);
     const scope = { chainId: BigInt(ctx.chainId), poolAddress: ctx.poolAddress };
     let amount = BigInt(request.amount ?? "0");
@@ -1057,7 +1057,7 @@ export class ShieldedAssetSession {
     } else if (request.action === "claim") {
       requireValue(
         this.identity,
-        "A funds root alone cannot replace the budget's identity credentials.",
+        "A independent key root alone cannot replace the budget's identity credentials.",
       );
       const claim = summary.claims.find(
         (candidate) => candidate.handle === request.claimHandle && candidate.slot === request.slot,
@@ -1325,7 +1325,7 @@ export class ShieldedAssetSession {
   ): Promise<ShieldedAssetWorkerCallMap["discover"]["result"]> {
     const current = this.sessionGuard();
     requireValue(
-      this.identity || this.assetKeys,
+      this.identity || this.independentKeyMaterial,
       "Unlock a key slot before recovering factory pools.",
     );
     const env = await this.context(params.context);
@@ -1355,8 +1355,8 @@ export class ShieldedAssetSession {
         let rawValueBalance = 0n;
         let rawBudgetBalance = 0n;
         const seen = new Set<string>();
-        for (const slot of ["identity", "asset"] as const) {
-          if ((slot === "identity" && !this.identity) || (slot === "asset" && !this.assetKeys))
+        for (const slot of ["identity", "independent"] as const) {
+          if ((slot === "identity" && !this.identity) || (slot === "independent" && !this.independentKeyMaterial))
             continue;
           const keys = this.keys(slot, false);
           // Timed-out work has only local variables; its late completion cannot install a session/snapshot.
@@ -1373,7 +1373,7 @@ export class ShieldedAssetSession {
           );
           const notes = listUnspentRecoveredShieldedNotes(wallet, keys);
           current();
-          if (slot === "asset" && candidate && this.confirmsCandidateRoot(notes))
+          if (slot === "independent" && candidate && this.confirmsCandidateRoot(notes))
             candidateConfirmed = true;
           for (const event of notes) {
             if (seen.has(String(event.commitment))) continue;
@@ -1404,9 +1404,9 @@ export class ShieldedAssetSession {
       anchor?.hash === found.blockHash,
       "Discovery block was reorganized. Re-run recovery.",
     );
-    if (candidateConfirmed && this.funds && this.funds.fundsFingerprint === candidate) {
-      this.funds.recoveryVerified = true;
-      this.funds.recoveryPath = "history";
+    if (candidateConfirmed && this.independentKey && this.independentKey.keyFingerprint === candidate) {
+      this.independentKey.recoveryVerified = true;
+      this.independentKey.recoveryPath = "history";
     }
     return {
       complete: found.enumerationComplete && pools.every((pool) => pool.status === "recovered"),

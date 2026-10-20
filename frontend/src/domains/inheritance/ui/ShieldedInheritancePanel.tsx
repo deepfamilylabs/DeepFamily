@@ -10,9 +10,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { Fingerprint, KeyRound, LockOpen, QrCode, ShieldCheck } from "lucide-react";
 import {
-  buildShieldedAssetSigningMessage,
-  normalizeShieldedFundsIdentity,
-  normalizeShieldedFundsPassphrase,
+  buildShieldedIndependentKeySigningMessage,
+  normalizeShieldedIndependentKeyIdentity,
+  normalizeShieldedIndependentKeyPassphrase,
 } from "@deepfamily/protocol-core";
 import {
   formatUnits,
@@ -128,7 +128,7 @@ import {
   ShieldedSpendReceipt,
 } from "./ShieldedTaskReceipts";
 import { ShieldedWalletSheet } from "./ShieldedWalletSheet";
-import { ShieldedFundsKeyManager } from "./ShieldedFundsKeyManager";
+import { ShieldedIndependentKeyManager } from "./ShieldedIndependentKeyManager";
 import type { ShieldedRecoveryMaterialHandle } from "./ShieldedRecoveryMaterialView";
 import { SHIELDED_WALLET_REQUEST_TIMEOUT_MS } from "./useShieldedIdentitySession";
 type Action = ShieldedAssetActionRequest["action"];
@@ -140,7 +140,7 @@ type SpendReview = Pick<ShieldedSpendReviewProps,
 export interface ShieldedPanelNavigation {
   slot: ShieldedKeySlot;
   /** Pins an independent payment choice to the key the user actually selected. */
-  fundsFingerprint?: string;
+  keyFingerprint?: string;
   action: Action;
   /** The first scan or a user choice has settled the task; later pools keep it. */
   taskChosen?: boolean;
@@ -241,13 +241,13 @@ export function ShieldedInheritancePanel({
   // One current wallet controls balances and every asset operation.
   const [slot, setSlot] = useState<ShieldedKeySlot>(
     navigation?.slot ??
-      (!session.identity && session.funds?.recoveryVerified && !session.funds.backupRequired
-        ? "asset"
+      (!session.identity && session.independentKey?.recoveryVerified && !session.independentKey.backupRequired
+        ? "independent"
         : "identity"),
   );
-  const [selectedFundsFingerprint, setSelectedFundsFingerprint] = useState(
-    navigation?.fundsFingerprint ??
-      (navigation?.slot === "asset" ? "" : (session.funds?.fundsFingerprint ?? "")),
+  const [selectedKeyFingerprint, setSelectedKeyFingerprint] = useState(
+    navigation?.keyFingerprint ??
+      (navigation?.slot === "independent" ? "" : (session.independentKey?.keyFingerprint ?? "")),
   );
   const [codeSlot, setCodeSlot] = useState<ShieldedKeySlot>("identity");
   // "balances" means no wallet sheet is open; the overview always shows both wallets.
@@ -255,8 +255,8 @@ export function ShieldedInheritancePanel({
   const [walletScreen, setWalletScreen] = useState<"workspace" | "manage" | "identity">(
     "workspace",
   );
-  const [fundsFlow, setFundsFlow] = useState<"restore" | "create" | "backup">(() =>
-    session.funds?.backupRequired ? "backup" : "restore",
+  const [independentKeyFlow, setIndependentKeyFlow] = useState<"restore" | "create" | "backup">(() =>
+    session.independentKey?.backupRequired ? "backup" : "restore",
   );
   const [expectedFingerprint, setExpectedFingerprint] = useState(""),
     [exportedFingerprint, setExportedFingerprint] = useState("");
@@ -271,7 +271,7 @@ export function ShieldedInheritancePanel({
     ShieldedAssetWorkerCallMap["discover"]["result"] | null
   >(null);
   const [action, setAction] = useState<Action>(() =>
-    !session.identity && session.funds?.recoveryVerified && !session.funds.backupRequired
+    !session.identity && session.independentKey?.recoveryVerified && !session.independentKey.backupRequired
       ? "privateTransfer"
       : (navigation?.action ?? "shield"),
   );
@@ -282,7 +282,7 @@ export function ShieldedInheritancePanel({
   const autoRecoveryScope = useRef("");
   const receiveCodeScope = useRef("");
   const autoRecoveryBlocked = useRef(false);
-  const fundsOpenedFromWorkspace = useRef(false);
+  const independentKeyOpenedFromWorkspace = useRef(false);
   const [recipientInputMethod, setRecipientInputMethod] =
     useState<ShieldedRecipientInputMethod>("receiveCode");
   const [recipientConfirmed, setRecipientConfirmed] = useState(false);
@@ -290,11 +290,11 @@ export function ShieldedInheritancePanel({
   useEffect(() => {
     onNavigationChange?.({
       slot,
-      fundsFingerprint: selectedFundsFingerprint,
+      keyFingerprint: selectedKeyFingerprint,
       action,
       taskChosen,
     });
-  }, [slot, selectedFundsFingerprint, action, taskChosen, onNavigationChange]);
+  }, [slot, selectedKeyFingerprint, action, taskChosen, onNavigationChange]);
   const [entry, setEntry] = useState<ShieldedFundingEntry>("privateIndependent");
   const [rootVersion, setRootVersion] = useState(""),
     [periodDays, setPeriodDays] = useState("30"),
@@ -369,43 +369,43 @@ export function ShieldedInheritancePanel({
     contextKey,
     session.identity?.handle,
     slot,
-    selectedFundsFingerprint,
+    selectedKeyFingerprint,
     rootVersion,
     amount,
     periodDays,
   ]);
   const hasSession = !!session.credentials;
-  const independentBackupPending = !!exportedFingerprint || !!session.funds?.backupRequired;
+  const independentBackupPending = !!exportedFingerprint || !!session.independentKey?.backupRequired;
   const accessFlow = independentBackupPending
     ? "backup"
-    : fundsFlow === "backup" && !session.funds
+    : independentKeyFlow === "backup" && !session.independentKey
       ? "restore"
-      : fundsFlow;
-  const fundsReady = !!session.funds?.recoveryVerified && !session.funds.backupRequired;
-  const fundsKeyState = fundsReady ? "ready" : independentBackupPending ? "backup" : "setup";
-  const fundsSelectionMatches =
-    !!selectedFundsFingerprint && selectedFundsFingerprint === session.funds?.fundsFingerprint;
+      : independentKeyFlow;
+  const independentKeyReady = !!session.independentKey?.recoveryVerified && !session.independentKey.backupRequired;
+  const independentKeyState = independentKeyReady ? "ready" : independentBackupPending ? "backup" : "setup";
+  const independentKeySelectionMatches =
+    !!selectedKeyFingerprint && selectedKeyFingerprint === session.independentKey?.keyFingerprint;
   // Keep the explicit owner even when its key becomes unavailable; never redirect a deposit or spend.
-  const slotReady = slot === "identity" ? !!session.identity : fundsReady && fundsSelectionMatches;
+  const slotReady = slot === "identity" ? !!session.identity : independentKeyReady && independentKeySelectionMatches;
   const workspaceVisible = hasSession && walletScreen === "workspace";
   // Key management opened from a task stays in that task's container, including
-  // the backup drill that temporarily removes the funds root from the Worker.
-  const fundsInWorkspace = walletScreen === "manage" && fundsOpenedFromWorkspace.current;
+  // the backup drill that temporarily removes the independent key root from the Worker.
+  const independentKeyInWorkspace = walletScreen === "manage" && independentKeyOpenedFromWorkspace.current;
   const showWorkspace =
     workspaceVisible ||
-    fundsInWorkspace ||
-    (walletScreen === "workspace" && fundsOpenedFromWorkspace.current && independentBackupPending);
+    independentKeyInWorkspace ||
+    (walletScreen === "workspace" && independentKeyOpenedFromWorkspace.current && independentBackupPending);
   const identityAccess = walletScreen !== "manage";
   const overviewHash =
     session.identity?.personHash ??
-    session.funds?.fundsFingerprint ??
+    session.independentKey?.keyFingerprint ??
     (exportedFingerprint || expectedFingerprint || "—");
   // Keep both wallet balances for comparison; the overview shows the current wallet.
-  const valueTotals = { identity: 0n, asset: 0n };
-  const budgetTotals = { identity: 0n, asset: 0n };
+  const valueTotals = { identity: 0n, independent: 0n };
+  const budgetTotals = { identity: 0n, independent: 0n };
   for (const note of wallet?.notes ?? []) {
-    if (!(note.slot === "identity" ? session.identity : fundsReady)) continue;
-    if (note.slot === "asset" && note.ownerCommitment !== session.funds?.ownerCommitment) continue;
+    if (!(note.slot === "identity" ? session.identity : independentKeyReady)) continue;
+    if (note.slot === "independent" && note.ownerCommitment !== session.independentKey?.ownerCommitment) continue;
     if (note.kind === "value") valueTotals[note.slot] += BigInt(note.amount);
     else if (!note.pendingIdentity) budgetTotals[note.slot] += BigInt(note.amount);
   }
@@ -420,14 +420,14 @@ export function ShieldedInheritancePanel({
       target.focus({ preventScroll: true });
       focusDestination.current = null;
     }
-  }, [showWorkspace, walletScreen, fundsInWorkspace]);
+  }, [showWorkspace, walletScreen, independentKeyInWorkspace]);
   const values =
     wallet?.notes.filter(
       (note) =>
         note.kind === "value" &&
-        (slot === "identity" ? !!session.identity : fundsReady && fundsSelectionMatches) &&
+        (slot === "identity" ? !!session.identity : independentKeyReady && independentKeySelectionMatches) &&
         note.slot === slot &&
-        (slot === "identity" || note.ownerCommitment === session.funds?.ownerCommitment) &&
+        (slot === "identity" || note.ownerCommitment === session.independentKey?.ownerCommitment) &&
         BigInt(note.amount) > 0n,
     ) ?? [];
   const claims = wallet?.claims.filter((claim) => claim.slot === slot) ?? [];
@@ -484,10 +484,10 @@ export function ShieldedInheritancePanel({
     contextKey,
     session.credentials?.handle,
     session.identity?.handle,
-    session.funds?.fundsFingerprint,
+    session.independentKey?.keyFingerprint,
     action,
     slot,
-    selectedFundsFingerprint,
+    selectedKeyFingerprint,
     amount,
     candidates,
     code,
@@ -580,7 +580,7 @@ export function ShieldedInheritancePanel({
     const unsubscribeLock = subscribeShieldedAssetWorkerLock(() => {
       cancelSpendReview();
       autoRecoveryBlocked.current = true;
-      fundsOpenedFromWorkspace.current = false;
+      independentKeyOpenedFromWorkspace.current = false;
       signatureRequest.current++;
       activeSignatureRequest.current = null;
       activeOperation.current = null;
@@ -639,7 +639,7 @@ export function ShieldedInheritancePanel({
   }, [
     session.credentials?.handle,
     session.identity?.handle,
-    session.funds?.fundsFingerprint,
+    session.independentKey?.keyFingerprint,
     contextKey,
   ]);
   useEffect(() => {
@@ -682,7 +682,7 @@ export function ShieldedInheritancePanel({
   useEffect(() => {
     setOwnCode("");
   }, [codeSlot]);
-  // Keep trusted recovery evidence across clearFunds, scoped to the credentials that
+  // Keep trusted recovery evidence across clearIndependentKey, scoped to the credentials that
   // established it. History confirmation is evidence too; a lock or replacement resets it.
   useEffect(() => {
     const handle = session.credentials?.handle;
@@ -693,16 +693,16 @@ export function ShieldedInheritancePanel({
       setExternalSaved(false);
       setVerificationStarted(false);
       setRecoveryScanned(false);
-      setFundsFlow("restore");
+      setIndependentKeyFlow("restore");
       clearSecretInputs();
     }
-    if (handle && session.funds?.recoveryVerified && !session.funds.backupRequired)
-      setExpectedFingerprint(session.funds.fundsFingerprint);
+    if (handle && session.independentKey?.recoveryVerified && !session.independentKey.backupRequired)
+      setExpectedFingerprint(session.independentKey.keyFingerprint);
   }, [
     session.credentials?.handle,
-    session.funds?.fundsFingerprint,
-    session.funds?.recoveryVerified,
-    session.funds?.backupRequired,
+    session.independentKey?.keyFingerprint,
+    session.independentKey?.recoveryVerified,
+    session.independentKey?.backupRequired,
   ]);
   useEffect(() => {
     const first =
@@ -710,7 +710,7 @@ export function ShieldedInheritancePanel({
       wallet?.claims.find((claim) => claim.slot === slot);
     setClaimHandle(first?.handle ?? "");
     setClaimPeriods(first?.periodIndices ?? []);
-  }, [slot, selectedFundsFingerprint, wallet]);
+  }, [slot, selectedKeyFingerprint, wallet]);
   useEffect(() => {
     cancelSpendReview();
     setCompletedSpendSteps([]);
@@ -746,7 +746,7 @@ export function ShieldedInheritancePanel({
       if (!tracked) return;
       const generation = getShieldedAssetWorkerGeneration();
       const identityHandle = latestSession.current.identity?.handle;
-      const fundsFingerprint = latestSession.current.funds?.fundsFingerprint;
+      const keyFingerprint = latestSession.current.independentKey?.keyFingerprint;
       try {
         if (activeOperation.current) return;
         const outcome = await readShieldedSubmissionOutcome(tracked);
@@ -804,7 +804,7 @@ export function ShieldedInheritancePanel({
         if (
           generation === getShieldedAssetWorkerGeneration() &&
           identityHandle === latestSession.current.identity?.handle &&
-          fundsFingerprint === latestSession.current.funds?.fundsFingerprint
+          keyFingerprint === latestSession.current.independentKey?.keyFingerprint
         ) {
           autoRecoveryScope.current = "";
           setWallet(null);
@@ -901,8 +901,8 @@ export function ShieldedInheritancePanel({
       let rawPassphrase = form.getSecretInputs().passphrase;
       form.clearSecretInputs();
       try {
-        normalizeShieldedFundsIdentity(identity);
-        normalizeShieldedFundsPassphrase(rawPassphrase);
+        normalizeShieldedIndependentKeyIdentity(identity);
+        normalizeShieldedIndependentKeyPassphrase(rawPassphrase);
         const pending = shieldedAssetWorkerCall("unlockIdentity", { identity, rawPassphrase });
         rawPassphrase = "";
         const state = await pending;
@@ -919,7 +919,7 @@ export function ShieldedInheritancePanel({
           autoRecoveryBlocked.current = false;
           focusDestination.current = "task";
           // Receiving setup can reset after an unlock; the selected funds owner stays explicit.
-          if (!(state.funds?.recoveryVerified && !state.funds.backupRequired)) {
+          if (!(state.independentKey?.recoveryVerified && !state.independentKey.backupRequired)) {
             setCodeSlot("identity");
           }
           setWalletScreen("workspace");
@@ -932,7 +932,7 @@ export function ShieldedInheritancePanel({
   function lock() {
     cancelSpendReview();
     autoRecoveryBlocked.current = true;
-    fundsOpenedFromWorkspace.current = false;
+    independentKeyOpenedFromWorkspace.current = false;
     focusDestination.current = "access";
     signatureRequest.current++;
     activeSignatureRequest.current = null;
@@ -961,10 +961,10 @@ export function ShieldedInheritancePanel({
     lock();
   }
   /** Drops only the independent root inside the Worker; an unlocked identity stays. */
-  async function clearFundsRoot() {
+  async function clearIndependentKeyRoot() {
     const credentialsHandle = latestSession.current.credentials?.handle;
     const generation = getShieldedAssetWorkerGeneration();
-    const state = await shieldedAssetWorkerCall("clearFunds", {});
+    const state = await shieldedAssetWorkerCall("clearIndependentKey", {});
     if (
       !mounted.current ||
       generation !== getShieldedAssetWorkerGeneration() ||
@@ -976,7 +976,7 @@ export function ShieldedInheritancePanel({
   function selectWallet(next: ShieldedKeySlot) {
     if (busy || submissionPending) return;
     setSlot(next);
-    if (next === "asset") setSelectedFundsFingerprint(session.funds?.fundsFingerprint ?? "");
+    if (next === "independent") setSelectedKeyFingerprint(session.independentKey?.keyFingerprint ?? "");
     draftPolicy.current = null;
     setCandidates([]);
     setClaimHandle("");
@@ -1006,16 +1006,16 @@ export function ShieldedInheritancePanel({
     if (hasSession) setWalletScreen("workspace");
   }
   /** Key recovery and backup appear only after an explicit key action. */
-  function openFundsManager(flow: "restore" | "create" | "backup") {
+  function openIndependentKeyManager(flow: "restore" | "create" | "backup") {
     if (!latestSession.current.credentials) return;
-    fundsOpenedFromWorkspace.current = showWorkspace;
+    independentKeyOpenedFromWorkspace.current = showWorkspace;
     setTaskChosen(true);
     clearWalletSecretInputs();
     setWalletSection("keys");
     // In the workspace the key sheet takes focus itself; the entry card is focused here.
     focusDestination.current = showWorkspace ? null : "access";
     setRecoveryScanned(false);
-    setFundsFlow(flow);
+    setIndependentKeyFlow(flow);
     setWalletScreen("manage");
     setError("");
   }
@@ -1047,16 +1047,16 @@ export function ShieldedInheritancePanel({
   /** Return with the operation's fresh public state, without resetting task drafts. */
   function returnToTask(state: ShieldedAssetSessionState = latestSession.current) {
     clearWalletSecretInputs();
-    const ready = !!state.funds?.recoveryVerified && !state.funds.backupRequired;
+    const ready = !!state.independentKey?.recoveryVerified && !state.independentKey.backupRequired;
     // Closing the key sheet returns focus to the control that opened it.
     focusDestination.current = state.credentials ? null : "access";
     setWalletSection("balances");
     setWalletScreen(state.credentials ? "workspace" : "identity");
     autoRecoveryBlocked.current = false;
-    if (!independentBackupPending || ready) fundsOpenedFromWorkspace.current = false;
+    if (!independentBackupPending || ready) independentKeyOpenedFromWorkspace.current = false;
   }
-  function finishFundsRecovery(state: ShieldedAssetSessionState) {
-    if (state.funds?.recoveryVerified && !state.funds.backupRequired) returnToTask(state);
+  function finishIndependentKeyRecovery(state: ShieldedAssetSessionState) {
+    if (state.independentKey?.recoveryVerified && !state.independentKey.backupRequired) returnToTask(state);
   }
   function navigateToAction(next: Action) {
     if (next !== action) chooseAction(next);
@@ -1065,7 +1065,7 @@ export function ShieldedInheritancePanel({
     await run(async (current) => {
       if (!signer) throw new Error(t("shielded.walletNotReady"));
       const credentialsHandle = latestSession.current.credentials?.handle;
-      if (!credentialsHandle) throw new Error(tr("fundsIdentityNeeded"));
+      if (!credentialsHandle) throw new Error(tr("independentKeyIdentityNeeded"));
       const chosen = signer;
       const generation = getShieldedAssetWorkerGeneration();
       const walletGeneration = getWalletConnectionGeneration();
@@ -1086,9 +1086,9 @@ export function ShieldedInheritancePanel({
         if (intent === "restore" && independentBackupPending)
           throw new Error(tr("independentBackupRequired"));
         const expected = expectedFingerprint || undefined;
-        const openedFromWorkspace = fundsOpenedFromWorkspace.current;
+        const openedFromWorkspace = independentKeyOpenedFromWorkspace.current;
         clearSecretInputs();
-        await clearFundsRoot();
+        await clearIndependentKeyRoot();
         if (!valid()) return;
         setWalletScreen("manage");
         let signature = "";
@@ -1098,7 +1098,7 @@ export function ShieldedInheritancePanel({
           let timer: ReturnType<typeof setTimeout> | undefined;
           try {
             signature = await Promise.race([
-              chosen.signMessage(toUtf8Bytes(buildShieldedAssetSigningMessage(address))),
+              chosen.signMessage(toUtf8Bytes(buildShieldedIndependentKeySigningMessage(address))),
               new Promise<never>((_, reject) => {
                 timer = setTimeout(
                   () => reject(new Error(tr("signatureExpired"))),
@@ -1114,7 +1114,7 @@ export function ShieldedInheritancePanel({
           if (Date.now() >= deadline || !valid()) return;
           const pending =
             intent === "create"
-              ? shieldedAssetWorkerCall("createFunds", {
+              ? shieldedAssetWorkerCall("createIndependentKey", {
                   intent: "create",
                   rootSource: "walletSignature",
                   expectedCredentialsHandle: credentialsHandle,
@@ -1132,20 +1132,20 @@ export function ShieldedInheritancePanel({
           signature = "";
           const state = await pending;
           if (valid()) {
-            fundsOpenedFromWorkspace.current = openedFromWorkspace;
+            independentKeyOpenedFromWorkspace.current = openedFromWorkspace;
             latestSession.current.update(state);
             setRecoveryScanned(false);
             if (intent === "create" || expected)
-              setExpectedFingerprint(state.funds?.fundsFingerprint ?? expected ?? "");
+              setExpectedFingerprint(state.independentKey?.keyFingerprint ?? expected ?? "");
             if (intent === "create") {
               setExportedFingerprint("");
               setExternalSaved(false);
               setVerificationStarted(false);
             }
-            const needsBackup = intent === "create" || state.funds?.backupRequired;
-            setFundsFlow(needsBackup ? "backup" : "restore");
+            const needsBackup = intent === "create" || state.independentKey?.backupRequired;
+            setIndependentKeyFlow(needsBackup ? "backup" : "restore");
             setWalletScreen("manage");
-            if (intent === "restore" && !needsBackup) finishFundsRecovery(state);
+            if (intent === "restore" && !needsBackup) finishIndependentKeyRecovery(state);
           }
         } finally {
           signature = "";
@@ -1155,15 +1155,15 @@ export function ShieldedInheritancePanel({
       }
     }, tr("signing"), "wallet");
   }
-  async function createFunds(source: "random" | "walletSignature") {
+  async function createIndependentKey(source: "random" | "walletSignature") {
     if (source === "walletSignature") return requestSignature("create");
     await run(async (current) => {
       const credentialsHandle = latestSession.current.credentials?.handle;
-      if (!credentialsHandle) throw new Error(tr("fundsIdentityNeeded"));
+      if (!credentialsHandle) throw new Error(tr("independentKeyIdentityNeeded"));
       clearSecretInputs();
-      if (latestSession.current.funds) await clearFundsRoot();
+      if (latestSession.current.independentKey) await clearIndependentKeyRoot();
       if (!current() || credentialsHandle !== latestSession.current.credentials?.handle) return;
-      const state = await shieldedAssetWorkerCall("createFunds", {
+      const state = await shieldedAssetWorkerCall("createIndependentKey", {
         intent: "create",
         rootSource: "random",
         expectedCredentialsHandle: credentialsHandle,
@@ -1171,11 +1171,11 @@ export function ShieldedInheritancePanel({
       });
       if (current() && credentialsHandle === latestSession.current.credentials?.handle) {
         latestSession.current.update(state);
-        setExpectedFingerprint(state.funds!.fundsFingerprint);
+        setExpectedFingerprint(state.independentKey!.keyFingerprint);
         setExportedFingerprint("");
         setExternalSaved(false);
         setVerificationStarted(false);
-        setFundsFlow("backup");
+        setIndependentKeyFlow("backup");
         setWalletScreen("manage");
       }
     }, tr("creating"));
@@ -1190,7 +1190,7 @@ export function ShieldedInheritancePanel({
       try {
         if (!current()) return;
         exportedMaterial.current?.show(result.material);
-        setExportedFingerprint(result.fundsFingerprint);
+        setExportedFingerprint(result.keyFingerprint);
         setExternalSaved(false);
         setVerificationStarted(false);
       } finally {
@@ -1203,14 +1203,14 @@ export function ShieldedInheritancePanel({
     const format = restorePath;
     await run(async (current) => {
       const credentialsHandle = latestSession.current.credentials?.handle;
-      if (!credentialsHandle) throw new Error(tr("fundsIdentityNeeded"));
+      if (!credentialsHandle) throw new Error(tr("independentKeyIdentityNeeded"));
       if (exportedFingerprint && (!externalSaved || !verificationStarted))
         throw new Error(tr("saveExternalFirst"));
       let material = recoveryMaterial.current?.value ?? "";
       const fingerprint = exportedFingerprint || expectedFingerprint || undefined;
       clearSecretInputs();
       try {
-        if (latestSession.current.funds) await clearFundsRoot();
+        if (latestSession.current.independentKey) await clearIndependentKeyRoot();
         if (!current() || credentialsHandle !== latestSession.current.credentials?.handle) return;
         const pending = shieldedAssetWorkerCall("importRecoveryMaterial", {
           expectedCredentialsHandle: credentialsHandle,
@@ -1224,13 +1224,13 @@ export function ShieldedInheritancePanel({
         if (current() && credentialsHandle === latestSession.current.credentials?.handle) {
           latestSession.current.update(state);
           setRecoveryScanned(false);
-          setFundsFlow(state.funds?.backupRequired ? "backup" : "restore");
+          setIndependentKeyFlow(state.independentKey?.backupRequired ? "backup" : "restore");
           setWalletScreen("manage");
           if (fingerprint) setExpectedFingerprint(fingerprint);
           setExportedFingerprint("");
           setExternalSaved(false);
           setVerificationStarted(false);
-          finishFundsRecovery(state);
+          finishIndependentKeyRecovery(state);
         }
       } finally {
         material = "";
@@ -1245,7 +1245,7 @@ export function ShieldedInheritancePanel({
   async function beginBackupVerification() {
     await run(async (current) => {
       clearSecretInputs();
-      await clearFundsRoot();
+      await clearIndependentKeyRoot();
       if (!current()) return;
       setRestorePath(backupFormat);
       setVerificationStarted(true);
@@ -1294,11 +1294,11 @@ export function ShieldedInheritancePanel({
       setDiscovery(found);
       recoveredState = found.sessionState ?? recoveredState;
       if (walletScreen === "manage" && accessFlow === "restore" && recoveredState)
-        finishFundsRecovery(recoveredState);
+        finishIndependentKeyRecovery(recoveredState);
     }, t("shielded.stages.recovering"));
   }
   useEffect(() => {
-    if (!session.identity && !fundsReady) {
+    if (!session.identity && !independentKeyReady) {
       autoRecoveryScope.current = "";
       return;
     }
@@ -1307,15 +1307,15 @@ export function ShieldedInheritancePanel({
     const scope = JSON.stringify([
       contextKey,
       session.identity?.handle,
-      session.funds?.fundsFingerprint,
+      session.independentKey?.keyFingerprint,
     ]);
     if (autoRecoveryScope.current === scope) return;
     autoRecoveryScope.current = scope;
     void recover();
   }, [
     session.identity?.handle,
-    session.funds?.fundsFingerprint,
-    fundsReady,
+    session.independentKey?.keyFingerprint,
+    independentKeyReady,
     contextKey,
     walletScreen,
     busy,
@@ -1330,7 +1330,7 @@ export function ShieldedInheritancePanel({
       if (current()) setOwnCode(result.code);
     }, t("shielded.stages.receiveCode"));
   }
-  const receiveCodeReady = !!session.identity && (codeSlot === "identity" || fundsReady);
+  const receiveCodeReady = !!session.identity && (codeSlot === "identity" || independentKeyReady);
   // Each explicit open or wallet switch generates a receive code once; after a failure the
   // button retries.
   // A layout effect starts the job before paint, so the retry button never flashes first.
@@ -1344,7 +1344,7 @@ export function ShieldedInheritancePanel({
       contextKey,
       codeSlot,
       session.identity?.handle,
-      session.funds?.fundsFingerprint,
+      session.independentKey?.keyFingerprint,
     ]);
     if (receiveCodeScope.current === scope) return;
     receiveCodeScope.current = scope;
@@ -1354,7 +1354,7 @@ export function ShieldedInheritancePanel({
     ownCode,
     codeSlot,
     session.identity?.handle,
-    session.funds?.fundsFingerprint,
+    session.independentKey?.keyFingerprint,
     receiveCodeReady,
     contextKey,
     busy,
@@ -1845,7 +1845,7 @@ export function ShieldedInheritancePanel({
       return undefined;
     }
   };
-  const walletName = tr(slot === "identity" ? "identityFunds" : "budgetFunds");
+  const walletName = tr(slot === "identity" ? "identityCredentials" : "independentKey");
   const slotAvailable = wallet && slotReady ? valueTotals[slot] : undefined;
   const transactionStatus =
     hasSession &&
@@ -1922,20 +1922,20 @@ export function ShieldedInheritancePanel({
       ))}
     </div>
   ) : null;
-  const fundsTitle = tr(
+  const independentKeyTitle = tr(
     accessFlow === "create"
       ? "createTitle"
       : accessFlow === "backup"
         ? "backupTitle"
         : "restoreTitle",
   );
-  const fundsFingerprint =
-    session.funds?.fundsFingerprint || exportedFingerprint || expectedFingerprint;
-  const fundsManager = (
-    <ShieldedFundsKeyManager
+  const keyFingerprint =
+    session.independentKey?.keyFingerprint || exportedFingerprint || expectedFingerprint;
+  const independentKeyManager = (
+    <ShieldedIndependentKeyManager
       flow={accessFlow}
-      funds={session.funds}
-      fingerprint={fundsFingerprint}
+      independentKey={session.independentKey}
+      fingerprint={keyFingerprint}
       identityReady={!!session.identity}
       busy={busy}
       backupFormat={backupFormat}
@@ -1960,20 +1960,20 @@ export function ShieldedInheritancePanel({
       account={account}
       canSign={!!signer}
       recoveryScanned={recoveryScanned}
-      onCreate={(source) => void createFunds(source)}
+      onCreate={(source) => void createIndependentKey(source)}
       onExport={() => void exportRecoveryMaterial()}
       onBeginVerification={() => void beginBackupVerification()}
       onImport={() => void importRecoveryMaterial()}
       onRestoreSignature={() => void requestSignature("restore")}
       onRecover={() => void recover(true)}
       discoveryReport={discoveryReport}
-      onCopyFingerprint={() => void copy(fundsFingerprint)}
+      onCopyFingerprint={() => void copy(keyFingerprint)}
       onShowRestore={() => {
         clearSecretInputs();
         setRecoveryScanned(false);
-        setFundsFlow("restore");
+        setIndependentKeyFlow("restore");
         setWalletScreen("manage");
-        if (session.funds) void run(clearFundsRoot, "");
+        if (session.independentKey) void run(clearIndependentKeyRoot, "");
       }}
       onUnlockIdentity={
         !showWorkspace && !session.identity
@@ -1985,7 +1985,7 @@ export function ShieldedInheritancePanel({
           : undefined
       }
       onLock={exitSession}
-      showLock={!fundsInWorkspace}
+      showLock={!independentKeyInWorkspace}
       pinnedActions={showWorkspace}
     />
   );
@@ -1999,8 +1999,8 @@ export function ShieldedInheritancePanel({
   const receiveCodeContent = (
     <div role="group" aria-label={tr("receiveKeyLabel")} className="space-y-4">
       {!session.identity ? (
-        <WarningNotice>{tr("fundsRestoredIdentityHint")}</WarningNotice>
-      ) : codeSlot === "asset" && !fundsReady ? (
+        <WarningNotice>{tr("independentKeyRestoredIdentityHint")}</WarningNotice>
+      ) : codeSlot === "independent" && !independentKeyReady ? (
         <p className="text-xs text-warning">{tr("walletLocked")}</p>
       ) : null}
       {ownCode ? (
@@ -2042,7 +2042,7 @@ export function ShieldedInheritancePanel({
   const overviewWallets: ShieldedOverviewWallet[] = (
     [
       { slot: "identity", unlocked: !!session.identity },
-      { slot: "asset", unlocked: fundsReady },
+      { slot: "independent", unlocked: independentKeyReady },
     ] as const
   ).map(({ slot: walletSlot, unlocked }) => ({
     slot: walletSlot,
@@ -2054,10 +2054,10 @@ export function ShieldedInheritancePanel({
         : "—",
     current: slot === walletSlot,
     checked:
-      slot === walletSlot && (walletSlot === "identity" || fundsSelectionMatches || !unlocked),
+      slot === walletSlot && (walletSlot === "identity" || independentKeySelectionMatches || !unlocked),
     fingerprint:
-      walletSlot === "asset" && slot === "asset" && selectedFundsFingerprint
-        ? selectedFundsFingerprint
+      walletSlot === "independent" && slot === "independent" && selectedKeyFingerprint
+        ? selectedKeyFingerprint
         : undefined,
   }));
   const claimablePeriods = claims
@@ -2276,7 +2276,7 @@ export function ShieldedInheritancePanel({
           ? ["upcoming"]
           : [],
     );
-    const locked = slot === "asset" && !slotReady;
+    const locked = slot === "independent" && !slotReady;
     composer = (
       <ShieldedClaimComposer
         titleId={taskTitleId}
@@ -2286,7 +2286,7 @@ export function ShieldedInheritancePanel({
         wallet={wallet}
         slot={slot}
         identityReady={!!session.identity}
-        independentKeyReady={fundsReady && fundsSelectionMatches}
+        independentKeyReady={independentKeyReady && independentKeySelectionMatches}
         claimHandle={claimHandle}
         onClaimChange={(handle) => {
           setClaimHandle(handle);
@@ -2336,7 +2336,7 @@ export function ShieldedInheritancePanel({
           </>
         }
         action={
-          // A locked funds key offers only its unlock action, on the wallet card above.
+          // A locked independent key offers only its unlock action, on the wallet card above.
           locked ? undefined : (
             <PanelButton
               variant="primary"
@@ -2539,7 +2539,7 @@ export function ShieldedInheritancePanel({
         </span>
         <div className="min-w-0 space-y-1.5">
           <h2 id={accessTitleId} className="ui-heading text-xl text-ink">
-            {identityAccess ? t("shielded.identityTitle", { symbol }) : fundsTitle}
+            {identityAccess ? t("shielded.identityTitle", { symbol }) : independentKeyTitle}
           </h2>
           {identityAccess ? (
             <p className="text-sm leading-relaxed text-ink-muted">
@@ -2561,7 +2561,7 @@ export function ShieldedInheritancePanel({
                 ref={identityForm}
                 initialValues={session.identityDraft ?? undefined}
                 computeHash={!busy}
-                fundsCredentials
+                independentKeyCredentials
                 showTitle={false}
                 collapsible={false}
                 showPassphraseGuidance={false}
@@ -2583,18 +2583,18 @@ export function ShieldedInheritancePanel({
             </>
           )
         ) : (
-          fundsManager
+          independentKeyManager
         )}
-        {identityAccess && fundsReady ? (
+        {identityAccess && independentKeyReady ? (
           <div className="space-y-3 border-t border-hairline/70 pt-5">
-            <p className="text-sm leading-relaxed text-ink-muted">{tr("fundsIdentityNeeded")}</p>
+            <p className="text-sm leading-relaxed text-ink-muted">{tr("independentKeyIdentityNeeded")}</p>
             <PanelButton
               onClick={() => {
                 chooseAction("privateTransfer");
                 setWalletScreen("workspace");
               }}
             >
-              {tr("useIndependentFunds")}
+              {tr("useIndependentKey")}
             </PanelButton>
           </div>
         ) : null}
@@ -2630,17 +2630,17 @@ export function ShieldedInheritancePanel({
           {head}
           <ShieldedAssetOverview
             person={{
-              name: session.identity?.identity.fullName ?? tr("independentFundsTitle"),
+              name: session.identity?.identity.fullName ?? tr("independentKeyTitle"),
               avatar: session.identity
                 ? getShieldedAvatarText(session.identity.identity.fullName)
                 : undefined,
               hash: overviewHash,
               hashLabel: session.identity
                 ? t("shielded.identityHash", { symbol })
-                : tr("fundsFingerprint"),
+                : tr("keyFingerprint"),
               copyLabel: session.identity
                 ? t("shielded.copyIdentityHash", { symbol })
-                : tr("copyFundsFingerprint"),
+                : tr("copyKeyFingerprint"),
               onCopy: () => void copy(overviewHash),
             }}
             assetControls={
@@ -2657,9 +2657,9 @@ export function ShieldedInheritancePanel({
             wallets={overviewWallets}
             selectionDisabled={busy || submissionPending}
             onSelectWallet={selectWallet}
-            fundsKeyState={fundsKeyState}
+            independentKeyState={independentKeyState}
             onReceiveCode={openReceiveCode}
-            onOpenFundsKey={openFundsManager}
+            onOpenIndependentKey={openIndependentKeyManager}
             openSheet={walletSheet}
             footer={walletSection === "keys" ? undefined : discoveryReport}
           />
@@ -2695,8 +2695,8 @@ export function ShieldedInheritancePanel({
             open={walletSheet !== null}
             title={
               walletSheet?.kind === "receiveCode"
-                ? tr(codeSlot === "identity" ? "identityReceiveCode" : "fundsReceiveCode")
-                : fundsTitle
+                ? tr(codeSlot === "identity" ? "identityReceiveCode" : "independentKeyReceiveCode")
+                : independentKeyTitle
             }
             icon={
               walletSheet?.kind === "receiveCode"
@@ -2711,7 +2711,7 @@ export function ShieldedInheritancePanel({
             {walletSheet?.kind === "receiveCode"
               ? receiveCodeContent
               : walletSheet?.kind === "keys"
-                ? fundsManager
+                ? independentKeyManager
                 : null}
           </ShieldedWalletSheet>
         </div>
