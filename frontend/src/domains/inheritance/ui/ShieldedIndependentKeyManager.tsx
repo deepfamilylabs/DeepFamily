@@ -44,6 +44,8 @@ export interface ShieldedIndependentKeyManagerProps {
   identityReady?: boolean;
   /** A scan without a matching historical note does not confirm the original wallet. */
   recoveryScanned?: boolean;
+  /** Candidate results belong to the recovery attempt that produced them. */
+  showRecoveryCandidate: boolean;
   /** Each generation method creates the key directly; there is no separate confirm step. */
   onCreate: (source: "random" | "walletSignature") => void;
   onExport: () => void;
@@ -64,7 +66,10 @@ export interface ShieldedIndependentKeyManagerProps {
   pinnedActions?: boolean;
 }
 
-/** Two or three mutually exclusive choices, shown as one segmented control. */
+/**
+ * Two or three mutually exclusive choices in one row of equal segments. The raised
+ * segment marks the choice, so the native radio stays only for keyboard and screen readers.
+ */
 function Segmented<T extends string>({
   name,
   legend,
@@ -83,20 +88,22 @@ function Segmented<T extends string>({
   return (
     <fieldset className="min-w-0 space-y-2" disabled={disabled}>
       <legend className="mb-2 text-[13px] font-medium text-ink/80">{legend}</legend>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-1 rounded-xl bg-surface-muted p-1">
+      <div className="flex gap-1 rounded-xl bg-surface-muted p-1">
         {options.map((option) => {
           const selected = option.value === value;
           return (
             <label
               key={option.value}
-              className={`flex min-h-10 items-center justify-center gap-2 rounded-[9px] px-2.5 text-center text-[13px] font-medium transition-colors ${
-                selected ? "bg-surface text-ink shadow-xs" : "text-ink-muted hover:text-ink"
+              className={`flex min-h-10 min-w-0 flex-1 basis-0 items-center justify-center rounded-[9px] px-2 py-1.5 text-center text-[13px] leading-tight text-balance transition-colors has-focus-visible:ring-2 has-focus-visible:ring-primary/40 ${
+                selected
+                  ? "bg-surface font-semibold text-ink shadow-xs"
+                  : "font-medium text-ink-muted hover:text-ink"
               } ${disabled ? "cursor-default" : "cursor-pointer"}`}
             >
               <input
                 type="radio"
                 name={name}
-                className={`${CHOICE_INPUT} h-3.5 w-3.5`}
+                className="sr-only"
                 checked={selected}
                 onChange={() => onChange(option.value)}
               />
@@ -120,7 +127,8 @@ export function ShieldedIndependentKeyManager(props: ShieldedIndependentKeyManag
   const verification = props.verificationStarted;
   const backup = props.flow === "backup" || backupPending || verification;
   const restored = !!independentKey?.recoveryVerified && !independentKey.backupRequired && !backup;
-  const candidate = !!independentKey && !independentKey.recoveryVerified && !independentKey.backupRequired && !backup;
+  const candidate = props.flow === "restore" && props.showRecoveryCandidate &&
+    !!independentKey && !independentKey.recoveryVerified && !independentKey.backupRequired && !backup;
   const fingerprint = independentKey?.keyFingerprint || props.fingerprint || "";
   const sourceLabel = independentKey
     ? tr(

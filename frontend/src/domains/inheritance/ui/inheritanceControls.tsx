@@ -31,9 +31,12 @@ export const FIELD_INPUT = `${FIELD_BASE} text-[15px] tabular-nums`;
 export const FIELD_TEXTAREA =
   "block w-full min-w-0 resize-y break-all rounded-[10px] border border-hairline-strong bg-surface px-3 py-2.5 font-mono text-xs leading-relaxed text-ink placeholder:text-ink-subtle focus:border-primary focus:outline-hidden focus:ring-3 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-alt disabled:text-ink-muted";
 
-/** Radios and checkboxes take their checked fill from the text colour (@tailwindcss/forms). */
+/**
+ * Radios and checkboxes take their checked fill from the text colour (@tailwindcss/forms).
+ * The plugin's white unchecked fill would glare in the dark theme, so it follows the surface.
+ */
 export const CHOICE_INPUT =
-  "h-4 w-4 shrink-0 cursor-pointer border-hairline-strong text-orange-600 focus:ring-primary/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-primary";
+  "h-4 w-4 shrink-0 cursor-pointer border-hairline-strong bg-surface text-orange-600 checked:bg-current focus:ring-primary/30 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-60 dark:text-primary";
 
 export const BADGE_ACCENT =
   "inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 tabular-nums dark:bg-orange-400/15 dark:text-orange-300";

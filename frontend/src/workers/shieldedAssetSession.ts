@@ -109,6 +109,7 @@ const ASSET_METHODS = new Set([
   "exportRecoveryMaterial",
   "importRecoveryMaterial",
   "clearIndependentKey",
+  "clearPendingIndependentKey",
   "receiveCode",
   "recover",
   "discover",
@@ -592,6 +593,26 @@ export class ShieldedAssetSession {
       material = "";
       root?.fill(0);
     }
+  }
+
+  /** Restart setup only while the same unverified key and credentials are still current. */
+  async clearPendingIndependentKey(
+    params: ShieldedAssetWorkerCallMap["clearPendingIndependentKey"]["params"],
+  ): Promise<ShieldedAssetSessionState> {
+    const epoch = this.independentKeyEpoch;
+    this.requireIndependentKeyRequest(params.expectedCredentialsHandle, epoch);
+    requireValue(
+      this.root &&
+        this.independentKey?.backupRequired === true &&
+        this.independentKey.recoveryVerified !== true,
+      "Only an unverified independent key awaiting backup can be cleared for new setup.",
+    );
+    requireValue(
+      typeof params.expectedFingerprint === "string" &&
+        equalHexConstantTime(this.independentKey.keyFingerprint, params.expectedFingerprint),
+      "The pending independent key fingerprint changed. The existing root was not cleared.",
+    );
+    return this.clearIndependentKey();
   }
 
   /**

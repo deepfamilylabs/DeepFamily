@@ -9,11 +9,10 @@ import {
   QrCode,
   RefreshCw,
   Settings2,
-  ShieldCheck,
 } from "lucide-react";
 import type { ShieldedKeySlot } from "../../../shared/workers/shieldedAssetWorkerTypes";
 import { CopyIconButton } from "../../../shared/ui";
-import { BADGE_ACCENT, CHOICE_INPUT, shortHex } from "./inheritanceControls";
+import { CHOICE_INPUT, shortHex } from "./inheritanceControls";
 
 export type ShieldedIndependentKeyFlow = "restore" | "create" | "backup";
 
@@ -25,7 +24,7 @@ export type ShieldedOverviewWallet = {
   /** The wallet every deposit, spend and claim uses. */
   current: boolean;
   /**
-   * Its radio is checked only while the loaded independent key is the pinned one, so a
+   * Its selector is checked only while the loaded independent key is the pinned one, so a
    * replacement key has to be accepted by choosing the wallet again.
    */
   checked: boolean;
@@ -37,14 +36,15 @@ export type ShieldedWalletSheetState =
   | { kind: "receiveCode"; slot: ShieldedKeySlot }
   | { kind: "keys"; flow: ShieldedIndependentKeyFlow };
 
+const WALLET_ICON = { identity: Fingerprint, independent: KeyRound } as const;
+
 const INDEPENDENT_KEY_ACTIONS = {
   restore: { icon: LockOpen, label: "restoreTitle" },
   create: { icon: Plus, label: "createTitle" },
-  backup: { icon: ShieldCheck, label: "backupTitle" },
 } as const;
 
 const WALLET_ACTION =
-  "inline-flex min-h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-ink/80 transition-colors hover:bg-surface-alt hover:text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50";
+  "relative z-20 inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium transition-colors hover:bg-surface-alt focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-8";
 
 /** The unlocked person, the asset in use and both private wallets with their balances. */
 export function ShieldedAssetOverview({
@@ -81,10 +81,10 @@ export function ShieldedAssetOverview({
   selectionDisabled: boolean;
   onSelectWallet: (slot: ShieldedKeySlot) => void;
   /**
-   * Only a usable independent key offers receiving and its key settings. A new key first
-   * offers its mandatory backup; otherwise the card offers unlocking or creating one.
+   * Until setup is completed, the card keeps its original unlock/create actions.
+   * Intermediate backup steps belong to key management, not the overview.
    */
-  independentKeyState: "ready" | "backup" | "setup";
+  independentKeyState: "ready" | "setup";
   onReceiveCode: (slot: ShieldedKeySlot) => void;
   onOpenIndependentKey: (flow: ShieldedIndependentKeyFlow) => void;
   /** The wallet sheet that is open, so its trigger reports that it is expanded. */
@@ -94,14 +94,22 @@ export function ShieldedAssetOverview({
   const { t } = useTranslation();
   const tr = (key: string) => t(`shielded.walletKeys.${key}`);
   const selectionName = useId();
+  const tabsId = useId();
+  // Mobile tabs and desktop wallet cards choose the wallet used by the task below.
+  const shown = wallets.find((wallet) => wallet.current)?.slot ?? wallets[0]?.slot;
+  const activateWallet = (wallet: ShieldedOverviewWallet) => {
+    // Clicking the current tab preserves the draft. A replacement independent key
+    // still requires an explicit selection, even when its slot is already current.
+    if (!selectionDisabled && !wallet.checked) onSelectWallet(wallet.slot);
+  };
+  const walletTitle = (slot: ShieldedKeySlot) =>
+    tr(slot === "identity" ? "identityCredentials" : "independentKey");
   const utility =
     "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface-alt hover:text-ink focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-50";
+  // Phone tabs share an edge with their content; desktop cards are selectable in full.
   return (
-    <section
-      aria-label={t("shielded.balanceTitle", { symbol })}
-      className="min-w-0 rounded-[20px] border border-hairline bg-surface p-2"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-2 pb-4 pt-2 sm:px-3">
+    <section aria-label={t("shielded.balanceTitle", { symbol })} className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pb-4">
         <div className="flex min-w-0 items-center gap-3">
           <span
             aria-hidden="true"
@@ -151,78 +159,177 @@ export function ShieldedAssetOverview({
         </div>
       </div>
       <div
+        role="tablist"
+        aria-label={tr("walletBalances")}
+        className="flex overflow-hidden rounded-t-[14px] border-x-[1.5px] border-t-[1.5px] border-b border-hairline bg-surface sm:hidden"
+      >
+        {wallets.map((wallet, index) => {
+          const selected = wallet.slot === shown;
+          const Icon = WALLET_ICON[wallet.slot];
+          return (
+            <button
+              key={wallet.slot}
+              type="button"
+              role="tab"
+              id={`${tabsId}-${wallet.slot}-tab`}
+              aria-selected={selected}
+              aria-controls={`${tabsId}-${wallet.slot}`}
+              tabIndex={selected ? 0 : -1}
+              disabled={selectionDisabled}
+              className={`relative flex min-h-[52px] min-w-0 flex-1 basis-0 items-center justify-center gap-2 px-3 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+                selected
+                  ? "font-semibold text-orange-700 dark:text-orange-300"
+                  : "font-medium text-ink-muted hover:bg-surface-alt hover:text-ink"
+              }`}
+              onClick={() => activateWallet(wallet)}
+              onKeyDown={(event) => {
+                if (selectionDisabled) return;
+                let nextIndex: number;
+                switch (event.key) {
+                  case "ArrowLeft":
+                    nextIndex = (index - 1 + wallets.length) % wallets.length;
+                    break;
+                  case "ArrowRight":
+                    nextIndex = (index + 1) % wallets.length;
+                    break;
+                  case "Home":
+                    nextIndex = 0;
+                    break;
+                  case "End":
+                    nextIndex = wallets.length - 1;
+                    break;
+                  default:
+                    return;
+                }
+                event.preventDefault();
+                const next = wallets[nextIndex];
+                activateWallet(next);
+                document.getElementById(`${tabsId}-${next.slot}-tab`)?.focus();
+              }}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{walletTitle(wallet.slot)}</span>
+              {selected ? (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-0 left-1/2 h-[3px] w-9 -translate-x-1/2 rounded-full bg-orange-600 dark:bg-primary"
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <div
         role="radiogroup"
         aria-label={tr("walletBalances")}
-        className="-mx-2 flex snap-x snap-mandatory gap-2 overflow-x-auto px-2 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0"
+        className="sm:grid sm:grid-cols-2 sm:gap-4"
       >
         {wallets.map((wallet) => {
-          const title = tr(wallet.slot === "identity" ? "identityCredentials" : "independentKey");
-          const Icon = wallet.slot === "identity" ? Fingerprint : KeyRound;
+          const title = walletTitle(wallet.slot);
+          const Icon = WALLET_ICON[wallet.slot];
           const longBalance = wallet.available.length > 14 || wallet.budget.length > 14;
           const receiveOpen = openSheet?.kind === "receiveCode" && openSheet.slot === wallet.slot;
+          const selectionId = `${selectionName}-${wallet.slot}`;
+          const needsKeySetup = wallet.slot === "independent" && independentKeyState !== "ready";
+          const canReceive = wallet.unlocked && !needsKeySetup;
+          const unavailableHint = tr(
+            wallet.slot === "identity"
+              ? "receiveCodeNeedsIdentity"
+              : "receiveCodeNeedsKey",
+          );
           return (
             <div
               key={wallet.slot}
+              id={`${tabsId}-${wallet.slot}`}
               role="group"
               aria-label={title}
-              className={`flex w-[85%] min-w-0 shrink-0 snap-start flex-col gap-5 rounded-[14px] border-[1.5px] px-4 pb-3 pt-4 transition-colors sm:w-auto sm:px-5 sm:pt-[18px] ${
-                wallet.current
-                  ? "border-orange-300 bg-orange-50/70 dark:border-orange-400/40 dark:bg-orange-400/[0.06]"
-                  : "border-hairline bg-surface"
+              className={`relative flex min-w-0 flex-col gap-5 rounded-b-[14px] border-x-[1.5px] border-b-[1.5px] border-hairline bg-surface px-4 pb-3 pt-4 transition-colors has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-primary/40 sm:rounded-[14px] sm:border-[1.5px] sm:px-5 sm:pt-[18px] ${
+                wallet.slot === shown ? "" : "max-sm:hidden"
+              } ${selectionDisabled ? "sm:cursor-not-allowed" : "sm:cursor-pointer"} ${
+                wallet.checked
+                  ? "sm:border-orange-400 sm:bg-orange-50/60 sm:dark:border-orange-400/70 sm:dark:bg-orange-400/[0.06]"
+                  : selectionDisabled
+                    ? ""
+                    : "sm:hover:border-orange-300 sm:hover:bg-surface-alt sm:dark:hover:border-orange-400/50"
               }`}
             >
               <label
-                className={`flex min-w-0 items-center gap-3 ${selectionDisabled ? "cursor-default" : "cursor-pointer"}`}
+                htmlFor={selectionId}
+                className={`absolute inset-0 z-10 hidden rounded-[inherit] sm:block ${selectionDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
               >
-                <span
-                  aria-hidden="true"
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
-                    wallet.current
-                      ? "bg-orange-100 text-orange-700 dark:bg-orange-400/15 dark:text-orange-300"
-                      : "bg-surface-alt text-ink-muted"
-                  }`}
-                >
-                  <Icon className="h-[18px] w-[18px]" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-ink">{title}</span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-muted">
+                <span className="sr-only">{title}</span>
+              </label>
+              <div
+                className={`space-y-2 ${wallet.unlocked && !wallet.fingerprint && !needsKeySetup ? "max-sm:hidden" : ""}`}
+              >
+                <div className="hidden min-h-7 min-w-0 items-center gap-3 sm:flex">
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`flex items-center gap-2 text-[15px] font-semibold ${
+                        wallet.checked ? "text-orange-700 dark:text-orange-300" : "text-ink"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      {title}
+                    </span>
+                  </span>
+                  {wallet.current ? <span className="sr-only">{tr("currentWallet")}</span> : null}
+                  <input
+                    id={selectionId}
+                    type="radio"
+                    name={selectionName}
+                    value={wallet.slot}
+                    className={`${CHOICE_INPUT} h-[18px] w-[18px]`}
+                    checked={wallet.checked}
+                    disabled={selectionDisabled}
+                    onChange={() => activateWallet(wallet)}
+                    aria-label={title}
+                  />
+                </div>
+                {needsKeySetup ? (
+                  <div className="-ml-2 flex min-w-0 flex-wrap gap-1">
+                    {(["restore", "create"] as const).map((flow) => {
+                      const { icon: FlowIcon, label } = INDEPENDENT_KEY_ACTIONS[flow];
+                      return (
+                        <button
+                          key={flow}
+                          type="button"
+                          className={`${WALLET_ACTION} text-orange-700 hover:text-orange-800 dark:text-orange-300 dark:hover:text-orange-200`}
+                          disabled={busy}
+                          aria-expanded={openSheet?.kind === "keys" && openSheet.flow === flow}
+                          onClick={() => onOpenIndependentKey(flow)}
+                        >
+                          <FlowIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                          {tr(label)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p
+                    className={`items-center gap-1.5 text-xs text-ink-muted ${wallet.unlocked ? "hidden sm:flex" : "flex"}`}
+                  >
                     <span
                       aria-hidden="true"
-                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                        wallet.unlocked ? "bg-success" : "border border-ink-subtle"
-                      }`}
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${wallet.unlocked ? "bg-success" : "border border-ink-subtle"}`}
                     />
                     {tr(wallet.unlocked ? "walletUnlocked" : "walletLocked")}
-                  </span>
-                  {wallet.fingerprint ? (
-                    <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
-                      <span className="shrink-0">{tr("keyFingerprint")}</span>
-                      <code
-                        className="min-w-0 truncate font-mono text-ink/80"
-                        title={wallet.fingerprint}
-                      >
-                        {shortHex(wallet.fingerprint)}
-                      </code>
-                    </span>
-                  ) : null}
-                </span>
-                {wallet.current ? (
-                  <span className={BADGE_ACCENT}>{tr("currentWallet")}</span>
+                  </p>
+                )}
+                {wallet.fingerprint ? (
+                  <p className="flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
+                    <span className="shrink-0">{tr("keyFingerprint")}</span>
+                    <code
+                      className="min-w-0 truncate font-mono text-ink/80"
+                      title={wallet.fingerprint}
+                    >
+                      {shortHex(wallet.fingerprint)}
+                    </code>
+                  </p>
                 ) : null}
-                <input
-                  type="radio"
-                  name={selectionName}
-                  value={wallet.slot}
-                  className={`${CHOICE_INPUT} h-[18px] w-[18px]`}
-                  checked={wallet.checked}
-                  disabled={selectionDisabled}
-                  onChange={() => onSelectWallet(wallet.slot)}
-                  aria-label={title}
-                />
-              </label>
+              </div>
               <dl
-                className={`flex min-w-0 gap-x-6 gap-y-3 ${
+                className={`mt-auto flex min-w-0 gap-x-6 gap-y-3 ${
                   longBalance ? "flex-col" : "flex-wrap items-end justify-between"
                 }`}
               >
@@ -259,42 +366,18 @@ export function ShieldedAssetOverview({
                   </dd>
                 </div>
               </dl>
-              <div
-                className={`mt-auto flex flex-wrap gap-1 border-t pt-2.5 ${
-                  wallet.current
-                    ? "border-orange-200/70 dark:border-orange-400/20"
-                    : "border-hairline/70"
-                }`}
-              >
-                {wallet.slot === "independent" && independentKeyState !== "ready" ? (
-                  (independentKeyState === "backup"
-                    ? (["backup"] as const)
-                    : (["restore", "create"] as const)
-                  ).map((flow) => {
-                    const { icon: FlowIcon, label } = INDEPENDENT_KEY_ACTIONS[flow];
-                    return (
-                      <button
-                        key={flow}
-                        type="button"
-                        className={WALLET_ACTION}
-                        disabled={busy}
-                        aria-expanded={openSheet?.kind === "keys" && openSheet.flow === flow}
-                        onClick={() => onOpenIndependentKey(flow)}
-                      >
-                        <FlowIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                        {tr(label)}
-                      </button>
-                    );
-                  })
-                ) : (
+              <div className="flex flex-wrap gap-1 border-t border-hairline/70 pt-2.5">
+                {canReceive ? (
                   <>
                     <button
                       type="button"
-                      className={WALLET_ACTION}
+                      className={`${WALLET_ACTION} text-ink/80 hover:text-ink`}
                       disabled={busy}
                       aria-expanded={receiveOpen}
                       aria-label={tr(
-                        wallet.slot === "identity" ? "identityReceiveCode" : "independentKeyReceiveCode",
+                        wallet.slot === "identity"
+                          ? "identityReceiveCode"
+                          : "independentKeyReceiveCode",
                       )}
                       onClick={() => onReceiveCode(wallet.slot)}
                     >
@@ -304,7 +387,7 @@ export function ShieldedAssetOverview({
                     {wallet.slot === "independent" ? (
                       <button
                         type="button"
-                        className={WALLET_ACTION}
+                        className={`${WALLET_ACTION} text-ink/80 hover:text-ink`}
                         disabled={busy}
                         aria-expanded={openSheet?.kind === "keys"}
                         aria-label={tr("keySettings")}
@@ -315,13 +398,32 @@ export function ShieldedAssetOverview({
                       </button>
                     ) : null}
                   </>
+                ) : (
+                  <div
+                    role="status"
+                    aria-label={tr(
+                      wallet.slot === "identity"
+                        ? "identityReceiveCode"
+                        : "independentKeyReceiveCode",
+                    )}
+                    aria-describedby={`${selectionId}-receive-unavailable`}
+                    title={unavailableHint}
+                    className="relative z-20 inline-flex min-h-11 cursor-default items-center gap-1.5 px-2 text-[13px] text-ink-muted sm:min-h-8"
+                  >
+                    <QrCode className="h-3.5 w-3.5 opacity-60" aria-hidden="true" />
+                    <span>{t("shielded.actions.receiveCode", { symbol })}</span>
+                    <span className="text-xs">{tr("receiveCodeUnavailable")}</span>
+                    <span id={`${selectionId}-receive-unavailable`} className="sr-only">
+                      {unavailableHint}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-      {footer ? <div className="px-2 pb-1 pt-3 text-xs sm:px-3">{footer}</div> : null}
+      {footer ? <div className="pt-3 text-xs">{footer}</div> : null}
     </section>
   );
 }

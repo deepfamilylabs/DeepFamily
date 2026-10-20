@@ -875,6 +875,115 @@ describe("pending backup challenges across credentials sessions", () => {
   });
 });
 
+describe("restarting pending independent key setup", () => {
+  async function pendingKeySession() {
+    const session = new ShieldedAssetSession();
+    const opened = await session.call("unlockIdentity", identityParams());
+    const created = await session.call("createIndependentKey", {
+      ...independentKeyParams(session),
+      intent: "create",
+      rootSource: "random",
+      context,
+    });
+    return { session, opened, created };
+  }
+
+  it("wipes the matching pending root while preserving unlocked identity and credentials", async () => {
+    const { session, opened, created } = await pendingKeySession();
+    const internals = session as unknown as {
+      root: Uint8Array;
+      independentKeyIdentitySecret: Uint8Array;
+      identity: { derivedSecretBytes: Uint8Array; identitySalt: Uint8Array };
+    };
+    const root = internals.root;
+    const keyIdentitySecret = internals.independentKeyIdentitySecret;
+    const identitySecret = internals.identity.derivedSecretBytes;
+    const identitySalt = internals.identity.identitySalt;
+    const cleared = await session.call("clearPendingIndependentKey", {
+      ...independentKeyParams(session),
+      expectedFingerprint: created.independentKey!.keyFingerprint,
+    });
+
+    expect(root.every((byte) => byte === 0)).toBe(true);
+    expect(cleared).toEqual({ ...opened, independentKey: null });
+    expect(keyIdentitySecret).toEqual(independentKeyIdentitySecret);
+    expect(identitySecret).toEqual(new Uint8Array(32).fill(2));
+    expect(identitySalt).toEqual(new Uint8Array(16).fill(1));
+    await expect(session.call("receiveCode", { slot: "identity" })).resolves.toEqual({ code: "public-code" });
+    await expect(session.call("receiveCode", { slot: "independent" })).rejects.toThrow("Restore the original independent key");
+    assertPublic(cleared);
+  });
+
+  it("keeps the pending root intact when the expected fingerprint differs", async () => {
+    const { session, created } = await pendingKeySession();
+    const root = (session as unknown as { root: Uint8Array }).root;
+    const originalBytes = root.slice();
+    await expect(session.call("clearPendingIndependentKey", {
+      ...independentKeyParams(session),
+      expectedFingerprint: `0x${"ff".repeat(32)}`,
+    })).rejects.toThrow("fingerprint changed");
+    expect(session.state()).toEqual(created);
+    expect((session as unknown as { root: Uint8Array }).root).toBe(root);
+    expect(root).toEqual(originalBytes);
+  });
+
+  it("rejects stale credentials after a replacement session creates another pending root", async () => {
+    const { session, opened, created } = await pendingKeySession();
+    await session.call("unlockIdentity", identityParams());
+    const current = await session.call("createIndependentKey", {
+      ...independentKeyParams(session),
+      intent: "create",
+      rootSource: "random",
+      context,
+    });
+    const root = (session as unknown as { root: Uint8Array }).root;
+    const originalBytes = root.slice();
+    await expect(session.call("clearPendingIndependentKey", {
+      expectedCredentialsHandle: opened.credentials!.handle,
+      expectedFingerprint: created.independentKey!.keyFingerprint,
+    })).rejects.toThrow("replaced or locked");
+    expect(session.state()).toEqual(current);
+    expect((session as unknown as { root: Uint8Array }).root).toBe(root);
+    expect(root).toEqual(originalBytes);
+  });
+
+  it.each([false, true])("refuses an imported key with recoveryVerified=%s and no pending backup", async (verified) => {
+    const session = new ShieldedAssetSession();
+    await session.call("unlockIdentity", identityParams());
+    const keys = await deriveShieldedIndependentKeyMaterial({
+      independentKeyRoot: fixedRoot,
+      independentKeyIdentitySecret,
+    });
+    const imported = await session.call("importRecoveryMaterial", {
+      ...independentKeyParams(session),
+      format: "shieldedKey",
+      material: encodeShieldedIndependentKey(fixedRoot),
+      ...(verified ? { expectedFingerprint: keys.keyFingerprint } : {}),
+      context,
+    });
+    expect(imported.independentKey).toMatchObject({ backupRequired: false, recoveryVerified: verified });
+    const root = (session as unknown as { root: Uint8Array }).root;
+    const originalBytes = root.slice();
+    await expect(session.call("clearPendingIndependentKey", {
+      ...independentKeyParams(session),
+      expectedFingerprint: imported.independentKey!.keyFingerprint,
+    })).rejects.toThrow("Only an unverified independent key awaiting backup");
+    expect(session.state()).toEqual(imported);
+    expect((session as unknown as { root: Uint8Array }).root).toBe(root);
+    expect(root).toEqual(originalBytes);
+  });
+
+  it("rejects an empty key slot without altering its identity session", async () => {
+    const session = new ShieldedAssetSession();
+    const opened = await session.call("unlockIdentity", identityParams());
+    await expect(session.call("clearPendingIndependentKey", {
+      ...independentKeyParams(session),
+      expectedFingerprint: `0x${"ff".repeat(32)}`,
+    })).rejects.toThrow("Only an unverified independent key awaiting backup");
+    expect(session.state()).toEqual(opened);
+  });
+});
+
 describe("ephemeral asset Worker independent key lifecycle", () => {
   it("keeps VALUE recovery available when family records fail and restores parent versions on retry", async () => {
     const session = await unlockedSession();

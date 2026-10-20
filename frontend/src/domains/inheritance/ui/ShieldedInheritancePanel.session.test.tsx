@@ -242,6 +242,16 @@ const chooseTask = (action: "fund" | "claim") =>
   fireEvent.click(navButton(action));
 const walletCard = (slot: "identity" | "independent") =>
   screen.getByRole("group", { name: label(slot === "independent" ? "independentKey" : "identityCredentials") });
+function expectIndependentKeySetup() {
+  const card = within(walletCard("independent"));
+  expect(card.getByRole("button", { name: label("restoreTitle") })).toBeTruthy();
+  expect(card.getByRole("button", { name: label("createTitle") })).toBeTruthy();
+  expect(card.queryByRole("button", { name: label("backupTitle") })).toBeNull();
+  expect(card.queryByRole("button", { name: label("keySettings") })).toBeNull();
+  expect(card.queryByText(label("keyFingerprint"))).toBeNull();
+  expect(card.queryByRole("button", { name: label("independentKeyReceiveCode") })).toBeNull();
+  expect(card.getByRole("status", { name: label("independentKeyReceiveCode") }).textContent).toContain(label("receiveCodeUnavailable"));
+}
 const walletSheet = () => screen.getByRole("dialog");
 const closeWalletSheet = () =>
   fireEvent.click(within(walletSheet()).getByRole("button", { name: "common.close" }));
@@ -335,10 +345,9 @@ function openReceiveCode(slot: "identity" | "independent") {
 function openIndependentReceiving() {
   openReceiveCode("independent");
 }
-/** A usable independent key opens its settings and a new one its backup; otherwise the card offers unlocking or creating. */
+/** The card keeps its setup entries until the independent key is verified. */
 function independentKeyButton(flow: "restore" | "create" = "restore") {
-  return (flow === "restore" && (screen.queryByRole("button", { name: label("keySettings") }) ??
-    screen.queryByRole("button", { name: label("backupTitle") }))) ||
+  return (flow === "restore" && screen.queryByRole("button", { name: label("keySettings") })) ||
     screen.getByRole("button", { name: label(flow === "create" ? "createTitle" : "restoreTitle") });
 }
 function openIndependentKeyManagement(flow: "restore" | "create" = "restore") {
@@ -416,7 +425,7 @@ describe("Shielded budget flow with a real identity session", () => {
         mocks.workerState = { credentials, identity: mocks.workerState.identity, independentKey: verifiedIndependentKey };
         return mocks.workerState;
       }
-      if (method === "clearIndependentKey") {
+      if (method === "clearIndependentKey" || method === "clearPendingIndependentKey") {
         mocks.workerState = { credentials, identity: mocks.workerState.identity, independentKey: null };
         return mocks.workerState;
       }
@@ -1218,20 +1227,32 @@ describe("Shielded budget flow with a real identity session", () => {
     expectCurrentWallet("identity");
   });
 
-  it("creates an independent key and verifies the manually re-entered backup without dropping identity", async () => {
+  it.each(["random", "signature"] as const)("updates the external card only after a %s key's backup is manually verified", async (source) => {
+    const defaultCall = mocks.call.getMockImplementation();
+    const verification = deferred();
+    mocks.call.mockImplementation(async (method, params) => {
+      if (method === "importRecoveryMaterial") await verification.promise;
+      return defaultCall?.(method, params);
+    });
     renderPanel();
     await unlockIdentity();
+    expectIndependentKeySetup();
     openIndependentKeyManagement();
     fireEvent.click(screen.getByRole("button", { name: label("createTitle") }));
     const terminations = mocks.terminate.mock.calls.length;
-    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+    fireEvent.click(screen.getByRole("radio", { name: label(`${source}Source`) }));
     await waitFor(() => expect(sessionState().independentKey?.backupRequired).toBe(true));
+    expectIndependentKeySetup();
+    expect(mocks.call).toHaveBeenCalledWith("createIndependentKey", expect.objectContaining({
+      intent: "create", rootSource: source === "random" ? "random" : "walletSignature",
+    }));
     expect(sessionState().identity?.handle).toBe(identity.handle);
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
     expect(screen.getByRole("button", { name: submitLabel })).toBeTruthy();
     click("exportRecovery");
     const exported = await screen.findByLabelText(label("exportedRecoveryMaterial"));
     await waitFor(() => expect(exported.textContent).toContain("original-secret-words"));
+    expectIndependentKeySetup();
     expect((screen.getByRole("button", { name: label("beginIndependentImport") }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: label("savedExternal") }));
     click("beginIndependentImport");
@@ -1241,14 +1262,26 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
     expect(exported.textContent).not.toContain("secret-words");
     expect(screen.getByText(label("reenterBackup"))).toBeTruthy();
+    expectIndependentKeySetup();
     const imported = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
     expect(imported.value).toBe("");
     fireEvent.change(imported, { target: { value: "manually-entered-independent-backup" } });
     click("importRecovery");
-    await waitFor(() => expect(sessionState().independentKey?.recoveryVerified).toBe(true));
     expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
       material: "manually-entered-independent-backup", expectedFingerprint: verifiedIndependentKey.keyFingerprint,
     }));
+    expectIndependentKeySetup();
+    await act(async () => verification.resolve());
+    await waitFor(() => expect(sessionState().independentKey?.recoveryVerified).toBe(true));
+    const verifiedCard = within(walletCard("independent"));
+    expect(verifiedCard.queryByRole("button", { name: label("restoreTitle") })).toBeNull();
+    expect(verifiedCard.queryByRole("button", { name: label("createTitle") })).toBeNull();
+    expect(verifiedCard.getByRole("button", { name: label("keySettings") })).toBeTruthy();
+    expect(verifiedCard.getByRole("button", { name: label("independentKeyReceiveCode") })).toBeTruthy();
+    expectCurrentWallet("identity");
+    chooseActiveWallet("independent");
+    expect(verifiedCard.getByTitle(verifiedIndependentKey.keyFingerprint)).toBeTruthy();
+    chooseActiveWallet("identity");
     expect(imported.value).toBe("");
     await waitFor(() => expect(screen.getByRole("radio", { name: label("independentKey") })).toBeTruthy());
     expect(screen.queryByText(label("independentKeyRecoveredTitle"))).toBeNull();
@@ -1263,7 +1296,7 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
   });
 
-  it("keeps the backup gate when navigating away from a new root until saved material is manually verified", async () => {
+  it("keeps the backup gate throughout a new root's save and manual verification", async () => {
     renderPanel();
     await unlockIdentity();
     openIndependentKeyManagement();
@@ -1274,16 +1307,13 @@ describe("Shielded budget flow with a real identity session", () => {
     expectCurrentWallet("identity");
     // Receipt stays unavailable until backup verification is completed in key management.
     expect(screen.queryByRole("button", { name: label("independentKeyReceiveCode") })).toBeNull();
-    expect(screen.queryByRole("button", { name: label("restoreTitle") })).toBeNull();
-    expect(screen.queryByRole("button", { name: label("createTitle") })).toBeNull();
-    expect(screen.getByRole("button", { name: label("backupTitle") })).toBeTruthy();
+    expectIndependentKeySetup();
     expect(screen.queryByRole("button", { name: "shielded.generateReceiveCode" })).toBeNull();
     expect(screen.queryByRole("button", { name: label("showIndependentKeyBackup") })).toBeNull();
     expect(sessionState().independentKey?.backupRequired).toBe(true);
     expect(sessionState().independentKey?.recoveryVerified).toBe(false);
     expect(mocks.call.mock.calls.some(([method]) => method === "receiveCode")).toBe(false);
     await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
-    openIndependentKeyManagement();
     expect(screen.getByText(label("backupSaveStep"))).toBeTruthy();
     click("exportRecovery");
     const exported = screen.getByLabelText(label("exportedRecoveryMaterial"));
@@ -1307,6 +1337,301 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(screen.queryByLabelText("identity passphrase")).toBeNull();
     openReceiveCode("independent");
     await waitForReceiveCode("independent");
+  });
+
+  it.each([
+    ["saved", "create"], ["verification", "create"],
+    ["saved", "restore"], ["verification", "restore"],
+  ] as const)("opens %s-stage unfinished key's %s entry without changing its identity or task", async (stage, flow) => {
+    renderPanel();
+    await unlockIdentity();
+    fireEvent.change(screen.getByLabelText("shielded.fields.amount"), { target: { value: "3.75" } });
+    const amount = screen.getByLabelText("shielded.fields.amount") as HTMLInputElement;
+    const terminations = mocks.terminate.mock.calls.length;
+    openIndependentKeyManagement("create");
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+    await waitFor(() => expect(sessionState().independentKey?.backupRequired).toBe(true));
+    await waitFor(() => expect((screen.getByRole("button", { name: label("exportRecovery") }) as HTMLButtonElement).disabled).toBe(false));
+    click("exportRecovery");
+    const exported = await screen.findByLabelText(label("exportedRecoveryMaterial"));
+    await waitFor(() => expect(exported.textContent).toContain("original-secret-words"));
+    fireEvent.click(screen.getByRole("checkbox", { name: label("savedExternal") }));
+    let verificationInput: HTMLTextAreaElement | null = null;
+    if (stage === "verification") {
+      click("beginIndependentImport");
+      await waitFor(() => expect(sessionState().independentKey).toBeNull());
+      verificationInput = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
+      fireEvent.change(verificationInput, { target: { value: "partially-entered-secret" } });
+    }
+    closeWalletSheet();
+    const clears = mocks.call.mock.calls.filter(([method]) => method === "clearIndependentKey").length;
+    await waitFor(() => expect((independentKeyButton(flow) as HTMLButtonElement).disabled).toBe(false));
+    const signatureRequests = vi.mocked(signer.signMessage).mock.calls.length;
+
+    openIndependentKeyManagement(flow);
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: label(flow === "create" ? "randomSource" : "mnemonicRestore") })).toBeTruthy());
+    if (flow === "create") {
+      expect(screen.getByRole("radio", { name: label("signatureSource") })).toBeTruthy();
+      expect(screen.queryByLabelText(label("mnemonicInput"))).toBeNull();
+    } else {
+      expect(within(screen.getByRole("group", { name: label("restorePath") })).getAllByRole("radio")).toHaveLength(3);
+      expect(screen.getByRole("radio", { name: label("shieldedKeyRestore") })).toBeTruthy();
+      expect(screen.getByRole("radio", { name: label("signatureRestore") })).toBeTruthy();
+      expect((screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement).value).toBe("");
+    }
+    expect(screen.queryByText(label("backupSaveStep"))).toBeNull();
+    expect(screen.queryByText(label("reenterBackup"))).toBeNull();
+    expect(screen.queryByLabelText(label("exportedRecoveryMaterial"))).toBeNull();
+    expect(exported.textContent).not.toContain("original-secret-words");
+    if (verificationInput) expect(verificationInput.value).toBe("");
+    expect(sessionState()).toEqual({ credentials, identity, independentKey: null });
+    expect(mocks.workerState).toEqual({ credentials, identity, independentKey: null });
+    expect(mocks.call.mock.calls.filter(([method]) => method === "createIndependentKey")).toHaveLength(1);
+    expect(mocks.call.mock.calls.filter(([method]) => method === "clearIndependentKey")).toHaveLength(clears);
+    expect(mocks.call.mock.calls.filter(([method]) => method === "clearPendingIndependentKey")).toHaveLength(stage === "saved" ? 1 : 0);
+    expect(mocks.call.mock.calls.some(([method]) => method === "restoreSignature" || method === "importRecoveryMaterial")).toBe(false);
+    expect(signer.signMessage).toHaveBeenCalledTimes(signatureRequests);
+    expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("3.75");
+    expectCurrentWallet("identity");
+    expectIndependentKeySetup();
+
+    if (flow === "restore") {
+      fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "previously-saved-key" } });
+      click("importRecovery");
+      await waitFor(() => expect(sessionState().independentKey?.recoveryVerified).toBe(true));
+      expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
+        material: "previously-saved-key", expectedFingerprint: undefined,
+      }));
+      expect(sessionState().identity).toEqual(identity);
+      expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+      expect(amount.value).toBe("3.75");
+      return;
+    }
+
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+
+    await waitFor(() => expect(sessionState().independentKey?.backupRequired).toBe(true));
+    expect(screen.getByText(label("backupSaveStep"))).toBeTruthy();
+    expect(screen.queryByText(label("reenterBackup"))).toBeNull();
+    expect(exported.textContent).not.toContain("original-secret-words");
+    await waitFor(() => expect((screen.getByRole("button", { name: label("exportRecovery") }) as HTMLButtonElement).disabled).toBe(false));
+    click("exportRecovery");
+    await waitFor(() => expect(screen.getByLabelText(label("exportedRecoveryMaterial")).textContent).toContain("original-secret-words"));
+    expect((screen.getByRole("checkbox", { name: label("savedExternal") }) as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByRole("button", { name: label("beginIndependentImport") }) as HTMLButtonElement).disabled).toBe(true);
+    expectIndependentKeySetup();
+  });
+
+  async function leaveVerifiedKeyBackupVerification(currentWallet: "identity" | "independent") {
+    renderPanel();
+    await restoreIndependentKey();
+    closeSheetIfOpen();
+    if (currentWallet === "independent") chooseActiveWallet("independent");
+    const amount = screen.getByLabelText("shielded.fields.amount") as HTMLInputElement;
+    fireEvent.change(amount, { target: { value: "4.25" } });
+    const terminations = mocks.terminate.mock.calls.length;
+    openIndependentKeyManagement();
+    click("exportRecovery");
+    const exported = screen.getByLabelText(label("exportedRecoveryMaterial"));
+    await waitFor(() => expect(exported.textContent).toContain("original-secret-words"));
+    fireEvent.click(screen.getByRole("checkbox", { name: label("savedExternal") }));
+    click("beginIndependentImport");
+    await waitFor(() => expect(sessionState().independentKey).toBeNull());
+    const verificationInput = screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement;
+    fireEvent.change(verificationInput, { target: { value: "unfinished-original-backup" } });
+    closeWalletSheet();
+    await waitFor(() => expect((independentKeyButton() as HTMLButtonElement).disabled).toBe(false));
+    return { amount, exported, verificationInput, terminations };
+  }
+
+  it.each([
+    ["identity", "mnemonic"], ["identity", "shieldedKey"], ["identity", "signature"],
+    ["independent", "mnemonic"], ["independent", "shieldedKey"], ["independent", "signature"],
+  ] as const)("opens %s wallet's original-key unlock choices after leaving backup verification and verifies its %s restore against the trusted fingerprint", async (currentWallet, path) => {
+    const { amount, exported, verificationInput, terminations } = await leaveVerifiedKeyBackupVerification(currentWallet);
+    const workerCalls = mocks.call.mock.calls.length;
+    const signatures = vi.mocked(signer.signMessage).mock.calls.length;
+
+    openIndependentKeyManagement("restore");
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: label("mnemonicRestore") })).toBeTruthy());
+    expect(within(screen.getByRole("group", { name: label("restorePath") })).getAllByRole("radio")).toHaveLength(3);
+    expect(screen.getByRole("radio", { name: label("shieldedKeyRestore") })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: label("signatureRestore") })).toBeTruthy();
+    expect(within(walletSheet()).getByRole("heading", { name: label("restoreTitle") })).toBeTruthy();
+    expect(screen.queryByText(label("reenterBackup"))).toBeNull();
+    expect(screen.queryByText(label("backupSaveStep"))).toBeNull();
+    expect(screen.queryByLabelText(label("exportedRecoveryMaterial"))).toBeNull();
+    expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
+    expect(mocks.call).toHaveBeenCalledTimes(workerCalls);
+    expect(mocks.call.mock.calls.some(([method]) => method === "clearPendingIndependentKey")).toBe(false);
+    expect(signer.signMessage).toHaveBeenCalledTimes(signatures);
+    expect(sessionState()).toEqual({ credentials, identity, independentKey: null });
+    expectCurrentWallet(currentWallet);
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("4.25");
+    expect(exported.textContent).not.toContain("original-secret-words");
+    expect(verificationInput.value).toBe("");
+    expect((screen.getByLabelText(label("mnemonicInput")) as HTMLTextAreaElement).value).toBe("");
+    expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
+
+    chooseRecoveryPath(path);
+    if (path === "signature") {
+      click("restoreSignature");
+      await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("restoreSignature", expect.objectContaining({
+        expectedFingerprint: verifiedIndependentKey.keyFingerprint,
+      })));
+    } else {
+      fireEvent.change(screen.getByLabelText(label(path === "mnemonic" ? "mnemonicInput" : "shieldedKeyInput")), {
+        target: { value: "original-verified-key-backup" },
+      });
+      click("importRecovery");
+      await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
+        format: path, material: "original-verified-key-backup", expectedFingerprint: verifiedIndependentKey.keyFingerprint,
+      })));
+    }
+    await waitFor(() => expect(sessionState().independentKey?.recoveryVerified).toBe(true));
+    expect(sessionState().identity).toEqual(identity);
+    expectCurrentWallet(currentWallet);
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("4.25");
+    expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
+    if (currentWallet === "independent") {
+      expect(within(walletCard("independent")).getByTitle(verifiedIndependentKey.keyFingerprint)).toBeTruthy();
+      expect((screen.getByRole("radio", { name: label("independentKey") }) as HTMLInputElement).checked).toBe(true);
+    }
+  });
+
+  it.each([
+    ["identity", "random"], ["identity", "signature"],
+    ["independent", "random"], ["independent", "signature"],
+  ] as const)("opens creation choices after leaving the %s wallet's verified-key drill without letting its %s replacement take over the selected wallet", async (currentWallet, source) => {
+    const { amount, exported, verificationInput, terminations } = await leaveVerifiedKeyBackupVerification(currentWallet);
+    const workerCalls = mocks.call.mock.calls.length;
+    const signatures = vi.mocked(signer.signMessage).mock.calls.length;
+
+    openIndependentKeyManagement("create");
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: label("randomSource") })).toBeTruthy());
+    expect(screen.getByRole("radio", { name: label("signatureSource") })).toBeTruthy();
+    expect(within(walletSheet()).getByRole("heading", { name: label("createTitle") })).toBeTruthy();
+    expect(screen.queryByText(label("reenterBackup"))).toBeNull();
+    expect(screen.queryByText(label("backupSaveStep"))).toBeNull();
+    expect(mocks.call).toHaveBeenCalledTimes(workerCalls);
+    expect(signer.signMessage).toHaveBeenCalledTimes(signatures);
+    expect(sessionState()).toEqual({ credentials, identity, independentKey: null });
+    expectCurrentWallet(currentWallet);
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("4.25");
+    expect(exported.textContent).not.toContain("original-secret-words");
+    expect(verificationInput.value).toBe("");
+
+    const replacementKey = {
+      ...verifiedIndependentKey,
+      ownerCommitment: "5",
+      viewingKey: "0x" + "05".repeat(32),
+      keyFingerprint: "0x" + "06".repeat(32),
+    };
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => {
+      if (method === "createIndependentKey") {
+        mocks.workerState = {
+          credentials,
+          identity,
+          independentKey: { ...replacementKey, recoveryVerified: false, backupRequired: true },
+        };
+        return mocks.workerState;
+      }
+      if (method === "exportRecoveryMaterial") return {
+        material: "replacement-backup", format: params.format, version: 1,
+        keyFingerprint: replacementKey.keyFingerprint,
+      };
+      if (method === "importRecoveryMaterial") {
+        mocks.workerState = { credentials, identity, independentKey: replacementKey };
+        return mocks.workerState;
+      }
+      return defaultCall?.(method, params);
+    });
+    fireEvent.click(screen.getByRole("radio", { name: label(`${source}Source`) }));
+    await waitFor(() => expect(sessionState().independentKey?.backupRequired).toBe(true));
+    expect(mocks.call).toHaveBeenCalledWith("createIndependentKey", expect.objectContaining({
+      rootSource: source === "random" ? "random" : "walletSignature",
+    }));
+    await waitFor(() => expect((screen.getByRole("button", { name: label("exportRecovery") }) as HTMLButtonElement).disabled).toBe(false));
+    click("exportRecovery");
+    await waitFor(() => expect(screen.getByLabelText(label("exportedRecoveryMaterial")).textContent).toContain("replacement-backup"));
+    fireEvent.click(screen.getByRole("checkbox", { name: label("savedExternal") }));
+    click("beginIndependentImport");
+    await waitFor(() => expect(screen.getByText(label("reenterBackup"))).toBeTruthy());
+    fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "replacement-backup" } });
+    click("importRecovery");
+    await waitFor(() => expect(sessionState().independentKey?.recoveryVerified).toBe(true));
+    expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
+      expectedFingerprint: replacementKey.keyFingerprint,
+    }));
+    expect(sessionState().identity).toEqual(identity);
+    expectCurrentWallet(currentWallet);
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("4.25");
+    expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
+    if (currentWallet === "independent") {
+      expect(within(walletCard("independent")).getByTitle(verifiedIndependentKey.keyFingerprint)).toBeTruthy();
+      expect((screen.getByRole("radio", { name: label("independentKey") }) as HTMLInputElement).checked).toBe(false);
+      expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: submitLabel }));
+      expectNoDepositPreparation();
+    }
+  });
+
+  it("retains an unselected verified wallet's trusted fingerprint after leaving its drill, starting a new root and returning to unlock", async () => {
+    const { amount, terminations } = await leaveVerifiedKeyBackupVerification("identity");
+    const draftFingerprint = "0x" + "06".repeat(32);
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => {
+      if (method === "createIndependentKey") {
+        mocks.workerState = {
+          credentials,
+          identity,
+          independentKey: {
+            ...verifiedIndependentKey,
+            keyFingerprint: draftFingerprint,
+            recoveryVerified: false,
+            backupRequired: true,
+          },
+        };
+        return mocks.workerState;
+      }
+      return defaultCall?.(method, params);
+    });
+
+    openIndependentKeyManagement("create");
+    await waitFor(() => expect(screen.getByRole("radio", { name: label("randomSource") })).toBeTruthy());
+    fireEvent.click(screen.getByRole("radio", { name: label("randomSource") }));
+    await waitFor(() => expect(sessionState().independentKey?.keyFingerprint).toBe(draftFingerprint));
+    await waitFor(() => expect((screen.getByRole("button", { name: label("exportRecovery") }) as HTMLButtonElement).disabled).toBe(false));
+    closeWalletSheet();
+    await waitFor(() => expect((independentKeyButton("restore") as HTMLButtonElement).disabled).toBe(false));
+
+    openIndependentKeyManagement("restore");
+
+    await waitFor(() => expect(screen.getByRole("radio", { name: label("mnemonicRestore") })).toBeTruthy());
+    expect(sessionState()).toEqual({ credentials, identity, independentKey: null });
+    expectCurrentWallet("identity");
+    expect(within(walletCard("independent")).queryByText(label("keyFingerprint"))).toBeNull();
+    expect(screen.getByLabelText("shielded.fields.amount")).toBe(amount);
+    expect(amount.value).toBe("4.25");
+    fireEvent.change(screen.getByLabelText(label("mnemonicInput")), { target: { value: "original-wallet-backup" } });
+    click("importRecovery");
+    await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("importRecoveryMaterial", expect.objectContaining({
+      material: "original-wallet-backup", expectedFingerprint: verifiedIndependentKey.keyFingerprint,
+    })));
+    await waitFor(() => expect(sessionState().independentKey?.keyFingerprint).toBe(verifiedIndependentKey.keyFingerprint));
+    expect(sessionState().identity).toEqual(identity);
+    expectCurrentWallet("identity");
+    expect(mocks.terminate).toHaveBeenCalledTimes(terminations);
   });
 
   it("opens backup management when re-signing reports that independent verification is still required", async () => {

@@ -194,6 +194,11 @@ export type ShieldedAssetWorkerCallMap = {
   };
   /** Removes the independent key root and its branches; credentials and identity capability remain. */
   clearIndependentKey: { params: Record<string, never>; result: ShieldedAssetSessionState };
+  /** Clears only the matching unverified root before restarting independent key setup. */
+  clearPendingIndependentKey: {
+    params: { expectedCredentialsHandle: string; expectedFingerprint: string };
+    result: ShieldedAssetSessionState;
+  };
   receiveCode: {
     params: { slot: ShieldedKeySlot };
     result: { code: string };
