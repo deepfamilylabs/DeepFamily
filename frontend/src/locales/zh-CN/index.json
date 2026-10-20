@@ -1579,10 +1579,10 @@
       "recover": "刷新",
       "receiveCode": "收款码",
       "shield": "存款",
-      "claim": "领取预算",
+      "claim": "领取",
       "privateTransfer": "转账",
       "unshield": "提现",
-      "fund": "存入子女预算"
+      "fund": "存入"
     },
     "actionTitles": {
       "shield": "从普通钱包存款",
@@ -1669,6 +1669,7 @@
     "fundingFamilyUnavailable": "所选父母人物版本未确认该子女的资格，请检查亲子背书及可信来源。",
     "fundingVersionPlaceholder": "请选择父母人物版本",
     "fundingVersionRequired": "请先选择父母人物版本。",
+    "fundingParentMissing": "当前网络未找到此身份的人物版本。请检查解锁身份或先登记人物资料。",
     "fundingBalanceInsufficient": "余额不足，还需存款 {{amount}} {{symbol}}。",
     "fundingVersionOption": "第{{version}}版",
     "balanceTitle": "资产概览",
@@ -1679,8 +1680,7 @@
     "refreshFailed": "余额刷新失败：{{detail}}。请重试，无需重新输入口令。",
     "groups": {
       "wallet": "私密资产",
-      "inheritance": "子女预算",
-      "receive": "预算领取"
+      "inheritance": "子女预算"
     },
     "unknownError": "操作未完成，请重试。",
     "stages": {
@@ -1721,7 +1721,8 @@
     "preparedButNotCompleted": "余额整理已完成，本次操作未完成：{{detail}}。请刷新后重试。",
     "invalidExitRecipient": "收款钱包地址无效或为零地址。",
     "fundingModeLabel": "存入方式",
-    "familyRecordsUnavailable": "无法核对家族记录，请刷新后重试。",
+    "familyRecordsUnavailable": "子女名单加载失败，请点击上方“刷新”重试。",
+    "familyRecordsIncompatible": "当前网络的子女预算服务版本不兼容，请联系维护者更新。",
     "transactionFailed": "交易未确认成功：{{hash}}。请核对状态后重试。",
     "claimPeriodsLabel": "领取期次",
     "claimPeriodsHint": "默认全选，每次最多 12 期。",

@@ -233,14 +233,13 @@ const navButton = (action: string) =>
   within(taskNavigation()).getByRole("button", { name: `shielded.actions.${action}` });
 const GROUP_ACTIONS = {
   wallet: ["shield", "privateTransfer", "unshield"],
-  inheritance: ["fund"],
-  receive: ["claim"],
+  inheritance: ["fund", "claim"],
 } as const;
 /** A group is current while one of its tasks is. */
 const groupCurrent = (group: keyof typeof GROUP_ACTIONS) =>
   GROUP_ACTIONS[group].some((action) => navButton(action).getAttribute("aria-current") === "true");
-const chooseTask = (group: "inheritance" | "receive") =>
-  fireEvent.click(navButton(group === "inheritance" ? "fund" : "claim"));
+const chooseTask = (action: "fund" | "claim") =>
+  fireEvent.click(navButton(action));
 const walletCard = (slot: "identity" | "asset") =>
   screen.getByRole("group", { name: label(slot === "asset" ? "budgetFunds" : "identityFunds") });
 const walletSheet = () => screen.getByRole("dialog");
@@ -320,7 +319,7 @@ async function unlockIdentity() {
   await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
 }
 function chooseIndependentBudget() {
-  chooseTask("receive");
+  chooseTask("claim");
   chooseBudgetKey("asset");
 }
 function chooseBudgetKey(mode: "identity" | "asset") {
@@ -887,7 +886,7 @@ describe("Shielded budget flow with a real identity session", () => {
       render(<PoolNavigationHarness />);
       await unlockIdentity();
       if (suggested === "claim") {
-        expect(groupCurrent("receive")).toBe(true);
+        expect(groupCurrent("inheritance")).toBe(true);
         closeSheetIfOpen();
       } else {
         expect(navButton("privateTransfer").getAttribute("aria-current")).toBe("true");
@@ -927,11 +926,11 @@ describe("Shielded budget flow with a real identity session", () => {
     expect(groupCurrent("wallet")).toBe(true);
     expect(screen.getByRole("radiogroup", { name: label("walletBalances") })).toBeTruthy();
     expectCurrentWallet("identity");
-    chooseTask("inheritance");
+    chooseTask("fund");
     expect((screen.getByRole("radio", { name: label("independentEntry") }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByRole("radio", { name: label("publicEntry") })).toBeTruthy();
     expect(screen.getByRole("radio", { name: label("convenientEntry") })).toBeTruthy();
-    chooseTask("receive");
+    chooseTask("claim");
     expect(screen.queryByRole("radio", { name: label("randomSource") })).toBeNull();
     expect(screen.queryByRole("button", { name: label("showBackupFunds") })).toBeNull();
     closeSheetIfOpen();
@@ -1014,7 +1013,7 @@ describe("Shielded budget flow with a real identity session", () => {
       "preview", expect.objectContaining({ action: "unshield", slot: "asset", amount: "1000000000000000000", candidates: ["100"] }), expect.anything(),
     ));
     await cancelSpendReview();
-    chooseTask("inheritance");
+    chooseTask("fund");
     expectCurrentWallet("asset");
     chooseIndependentBudget();
     expectCurrentWallet("asset");
@@ -1428,7 +1427,7 @@ describe("Shielded budget flow with a real identity session", () => {
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
     await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("preview", expect.objectContaining({ action: "unshield", slot: "asset" }), expect.anything()));
     await cancelSpendReview();
-    chooseTask("receive");
+    chooseTask("claim");
     expect(screen.getByText(label("fundsRestoredIdentityHint"))).toBeTruthy();
     expect(screen.queryByLabelText("identity passphrase")).toBeNull();
   });

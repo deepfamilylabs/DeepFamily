@@ -160,6 +160,50 @@ describe("loadLineageSnapshot", () => {
       .rejects.toMatchObject({ code: "snapshotMismatch" });
   });
 
+  it.each(["currentCheckpointId", "getCheckpoint"])(
+    "recognizes an older deployment that does not implement %s",
+    async (method) => {
+      const chain = chainStub(logs);
+      const index = chain.contract(INDEX, indexIface, {
+        root: async (treeId: number) => expectedRoots(treeId),
+        [method]: async () => {
+          throw ethers.makeError("execution reverted", "CALL_EXCEPTION", {
+            action: "call",
+            data: "0x",
+            reason: null,
+            transaction: { to: INDEX, data: "0x5488cc80" },
+            invocation: null,
+            revert: null,
+          });
+        },
+      });
+      await expect(loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any))
+        .rejects.toMatchObject({ code: "lineageIncompatible" });
+      expect(chain.provider.getLogs).not.toHaveBeenCalled();
+    },
+  );
+
+  it("recognizes an empty checkpoint response without treating it as an empty family", async () => {
+    const chain = chainStub(logs);
+    const index = chain.contract(INDEX, indexIface, {
+      currentCheckpointId: async () => {
+        throw ethers.makeError("could not decode result data", "BAD_DATA", { value: "0x" });
+      },
+    });
+    await expect(loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any))
+      .rejects.toMatchObject({ code: "lineageIncompatible" });
+  });
+
+  it("preserves a temporary checkpoint request failure for retry", async () => {
+    const chain = chainStub(logs);
+    const failure = ethers.makeError("request timed out", "TIMEOUT", { operation: "call", reason: "timeout" });
+    const index = chain.contract(INDEX, indexIface, {
+      currentCheckpointId: async () => { throw failure; },
+    });
+    await expect(loadLineageSnapshot(index as any, chain.contract(FAMILY, familyIface) as any))
+      .rejects.toBe(failure);
+  });
+
   it("rejects a snapshot whose block changed during replay", async () => {
     const chain = chainStub(logs);
     chain.provider.getBlock.mockResolvedValueOnce({ hash: `0x${"aa".repeat(32)}`, timestamp: 1000 })

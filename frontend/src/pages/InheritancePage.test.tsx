@@ -192,6 +192,15 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function assetSelector(label = "shielded.assets.label") {
+  return screen.getByLabelText(label, { selector: "button" }) as HTMLButtonElement;
+}
+
+function chooseAsset(name: string) {
+  fireEvent.click(assetSelector());
+  fireEvent.click(screen.getByRole("option", { name }));
+}
+
 describe("InheritancePage private pool entry", () => {
   beforeEach(() => {
     mocks.language = "";
@@ -269,8 +278,7 @@ describe("InheritancePage private pool entry", () => {
     render(<InheritancePage />);
     await screen.findByTestId("shielded-panel");
     fireEvent.click(screen.getByRole("button", { name: "unlock-test-session" }));
-    const selector = () =>
-      screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement;
+    const selector = () => assetSelector();
     expect(selector().disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "start-busy-test" }));
     expect(selector().disabled).toBe(true);
@@ -305,12 +313,9 @@ describe("InheritancePage private pool entry", () => {
       pendingImport.resolve(await readAsset(address, null, "Native"));
     });
 
-    const selector = screen.getByRole("combobox", {
-      name: "shielded.assets.label",
-    }) as HTMLSelectElement;
+    const selector = assetSelector();
     expect(selector.disabled).toBe(true);
-    expect(selector.value).toBe(mocks.config.tokenAddress);
-    expect(screen.getByRole("option", { name: /TEST/ })).toHaveProperty("value", address);
+    expect(selector.textContent).toBe("DEEP");
     expect(screen.getByTestId("shielded-panel")).toBe(panel);
     expect(mocks.panelUnmounted).not.toHaveBeenCalled();
     expect(
@@ -319,10 +324,11 @@ describe("InheritancePage private pool entry", () => {
     expect(mocks.resolveShieldedAssetPool).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole("button", { name: "stop-busy-test" }));
-    expect(selector.value).toBe(mocks.config.tokenAddress);
+    expect(selector.textContent).toBe("DEEP");
     expect(screen.getByTestId("shielded-panel")).toBe(panel);
-    fireEvent.change(selector, { target: { value: address } });
-    await waitFor(() => expect(selector.value).toBe(address));
+    // The import that finished during the operation is offered, but was never selected.
+    chooseAsset("TEST · 0x0000…0030");
+    await waitFor(() => expect(assetSelector().textContent).toBe("TEST · 0x0000…0030"));
     await screen.findByTestId("shielded-panel");
     expect(screen.getByTestId("shielded-asset").textContent).toBe("erc20:TEST:18");
   });
@@ -345,10 +351,7 @@ describe("InheritancePage private pool entry", () => {
     expect(
       (screen.getByRole("textbox", { name: "private-workflow-draft" }) as HTMLInputElement).value,
     ).toBe("fund a child");
-    expect(
-      (screen.getByRole("combobox", { name: "shielded.assets.label:zh" }) as HTMLSelectElement)
-        .disabled,
-    ).toBe(true);
+    expect(assetSelector("shielded.assets.label:zh").disabled).toBe(true);
     expect(mocks.panelMounted).toHaveBeenCalledOnce();
     expect(mocks.panelUnmounted).not.toHaveBeenCalled();
     expect(mocks.readShieldedAsset).toHaveBeenCalledOnce();
@@ -412,9 +415,7 @@ describe("InheritancePage private pool entry", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "private-workflow-draft" }), {
       target: { value: "old DEEP budget" },
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-      target: { value: "0x0000000000000000000000000000000000000000" },
-    });
+    chooseAsset("ETH");
     await waitFor(() =>
       expect(screen.getByTestId("shielded-pool").textContent).toBe(mocks.nativePoolAddress),
     );
@@ -472,12 +473,10 @@ describe("InheritancePage private pool entry", () => {
     mocks.resolveShieldedAssetPool.mockImplementation((factory, asset, ...rest) =>
       asset.kind === "native" ? pendingNative.promise : resolvePool!(factory, asset, ...rest),
     );
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-      target: { value: "0x0000000000000000000000000000000000000000" },
-    });
+    chooseAsset("ETH");
     await screen.findByText("shielded.loading");
     expect(screen.queryByTestId("shielded-panel")).toBeNull();
-    expect(screen.getByRole("combobox", { name: "shielded.assets.label" })).toBeTruthy();
+    expect(assetSelector()).toBeTruthy();
     mocks.factoryAddress = "0x0000000000000000000000000000000000000009";
     rerender(<InheritancePage />);
     const restoredPanel = await screen.findByTestId("shielded-panel");
@@ -509,16 +508,12 @@ describe("InheritancePage private pool entry", () => {
             : Promise.reject(new Error("Pool temporarily unreachable"));
         return resolvePool!(factory, asset, ...rest);
       });
-      fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-        target: { value: "0x0000000000000000000000000000000000000000" },
-      });
+      chooseAsset("ETH");
       if (result === "missing") await screen.findByText("shielded.assets.noPool");
       else await screen.findByText("Pool temporarily unreachable");
       expect(screen.queryByTestId("shielded-panel")).toBeNull();
       expect(screen.queryByRole("button", { name: "unlock-test-session" })).toBeNull();
-      fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-        target: { value: mocks.config.tokenAddress },
-      });
+      chooseAsset("DEEP");
       await screen.findByTestId("shielded-panel");
       expect(screen.getByTestId("shielded-identity").textContent).toBe(identity.identityCommitment);
       expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
@@ -666,9 +661,7 @@ describe("InheritancePage private pool entry", () => {
       expect(screen.getByTestId("shielded-asset").textContent).toBe("erc20:TEST:6"),
     );
     expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
-    expect(
-      (screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement).value,
-    ).toBe(address);
+    expect(assetSelector().textContent).toBe("TEST · 0x0000…0030");
     expect(mocks.config.tokenAddress).toBe("0x0000000000000000000000000000000000000003");
   });
 
@@ -687,9 +680,7 @@ describe("InheritancePage private pool entry", () => {
     );
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("shielded-session-state").textContent).toBe("unlocked");
-    expect(
-      (screen.getByRole("combobox", { name: "shielded.assets.label" }) as HTMLSelectElement).value,
-    ).toBe("0x0000000000000000000000000000000000000030");
+    expect(assetSelector().textContent).toBe("TEST · 0x0000…0030");
   });
 
   it("keeps funds credentials without identity proof capability when another pool is selected", async () => {
@@ -698,9 +689,7 @@ describe("InheritancePage private pool entry", () => {
     fireEvent.click(screen.getByRole("button", { name: "unlock-funds-without-identity-proof" }));
     expect(screen.getByTestId("shielded-identity").textContent).toBe("");
     expect(screen.getByTestId("shielded-funds").textContent).toBe(`0x${"34".repeat(32)}`);
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.assets.label" }), {
-      target: { value: "0x0000000000000000000000000000000000000000" },
-    });
+    chooseAsset("ETH");
     await waitFor(() =>
       expect(screen.getByTestId("shielded-asset").textContent).toContain("native:"),
     );

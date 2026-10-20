@@ -2,6 +2,7 @@ export type InheritanceErrorCode =
   | "nameRequired"
   | "passphraseRequired"
   | "passphraseDisallowed"
+  | "lineageIncompatible"
   | "snapshotMismatch"
   | "amountInvalid"
   | "periodsInvalid"

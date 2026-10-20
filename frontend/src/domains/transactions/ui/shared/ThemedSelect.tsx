@@ -2,16 +2,18 @@ import { useEffect, useId, useRef, useState, type FocusEvent } from "react";
 import { ChevronDown } from "lucide-react";
 import { useListboxA11y } from "../../../../shared/ui/useListboxA11y";
 
-interface ThemedSelectProps {
-  value: number;
-  onChange: (value: number) => void;
-  options: { value: number; label: string; meta?: string }[];
+interface ThemedSelectProps<T extends number | string> {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string; meta?: string }[];
   className?: string;
   disabled?: boolean;
   /** Shown when the value matches no option, e.g. before anything is chosen. */
   placeholder?: string;
   /** Match the neighbouring field token: "sm" for MODAL_FIELD_SM, "md" for MODAL_FIELD. */
   size?: "sm" | "md";
+  /** The id of a visible label; the trigger then reads as that label and its current choice. */
+  labelledBy?: string;
 }
 
 const SIZE_CLASS: Record<"sm" | "md", string> = {
@@ -19,7 +21,7 @@ const SIZE_CLASS: Record<"sm" | "md", string> = {
   md: "h-11 px-3.5 text-sm",
 };
 
-export function ThemedSelect({
+export function ThemedSelect<T extends number | string>({
   value,
   onChange,
   options,
@@ -27,10 +29,12 @@ export function ThemedSelect({
   disabled = false,
   placeholder = "",
   size = "sm",
-}: ThemedSelectProps) {
+  labelledBy,
+}: ThemedSelectProps<T>) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const buttonId = useId();
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
   const current = selected?.label ?? placeholder;
@@ -80,6 +84,7 @@ export function ThemedSelect({
     <div ref={rootRef} onBlur={handleRootBlur} className={`relative ${className}`}>
       <button
         ref={buttonRef}
+        id={buttonId}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((value) => !value)}
@@ -93,13 +98,19 @@ export function ThemedSelect({
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         aria-activedescendant={activeOptionId}
+        aria-labelledby={labelledBy ? `${labelledBy} ${buttonId}` : undefined}
       >
         <span className={`truncate ${selected ? "" : "text-ink-subtle"}`}>{current}</span>
         <ChevronDown size={16} className="text-ink-muted" />
       </button>
       {open && !disabled && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-hairline bg-surface shadow-lg overflow-hidden">
-          <ul id={listboxId} role="listbox" className="max-h-60 overflow-auto">
+          <ul
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={labelledBy}
+            className="max-h-60 overflow-auto"
+          >
             {options.map((option, index) => (
               <li
                 key={option.value}
@@ -112,13 +123,13 @@ export function ThemedSelect({
                   selectOption(index);
                 }}
                 className={`px-3 py-2 cursor-pointer select-none transition-colors ${
-                size === "md" ? "text-sm" : "text-xs"
-              } ${
+                  size === "md" ? "text-sm" : "text-xs"
+                } ${
                   option.value === value
                     ? "bg-primary/10 text-orange-700 dark:text-orange-300"
                     : index === activeIndex
                       ? "bg-surface-muted text-ink"
-                    : "text-ink hover:bg-surface-muted"
+                      : "text-ink hover:bg-surface-muted"
                 }`}
               >
                 <span className="block truncate">{option.label}</span>

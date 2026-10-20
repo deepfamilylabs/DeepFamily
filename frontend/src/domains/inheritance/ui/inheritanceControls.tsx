@@ -1,5 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, Loader2 } from "lucide-react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 import { MODAL_HINT } from "../../../shared/ui";
 
 type ButtonVariant = "primary" | "secondary";
@@ -72,27 +72,6 @@ export function PanelButton({
   );
 }
 
-export function SelectField({
-  className = "",
-  children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative min-w-0">
-      <select
-        className={`${FIELD_BASE} cursor-pointer appearance-none bg-none pr-9 text-sm ${className}`}
-        {...props}
-      >
-        {children}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-muted"
-        aria-hidden="true"
-      />
-    </div>
-  );
-}
-
 /** The heading of a task form and its one-line explanation. */
 export function TaskHeader({
   id,
@@ -158,6 +137,7 @@ export function TaskSection({
 export function FieldBlock({
   label,
   htmlFor,
+  labelId,
   hint,
   error,
   errorId,
@@ -165,6 +145,8 @@ export function FieldBlock({
 }: {
   label: string;
   htmlFor?: string;
+  /** Lets a control that is not a form field, such as a themed select, name itself by this label. */
+  labelId?: string;
   hint?: ReactNode;
   error?: string;
   errorId?: string;
@@ -172,7 +154,7 @@ export function FieldBlock({
 }) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <label className="block text-[13px] font-medium text-ink/80" htmlFor={htmlFor}>
+      <label id={labelId} className="block text-[13px] font-medium text-ink/80" htmlFor={htmlFor}>
         {label}
       </label>
       {children}

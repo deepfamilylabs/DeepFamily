@@ -39,22 +39,25 @@ describe("ShieldedTaskNavigation", () => {
       within(navigation)
         .getAllByRole("button")
         .map((button) => button.textContent),
-    ).toEqual(["存款", "转账", "提现", "存入子女预算", "领取预算"]);
+    ).toEqual(["存款", "转账", "提现", "存入", "领取"]);
     expect(within(navigation).getByRole("group", { name: "私密资产" })).toBeTruthy();
-    expect(within(navigation).getByRole("group", { name: "子女预算" })).toBeTruthy();
-    expect(within(navigation).getByRole("group", { name: "预算领取" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "存入子女预算" }).getAttribute("aria-current")).toBe(
+    const budgets = within(navigation).getByRole("group", { name: "子女预算" });
+    expect(within(navigation).getAllByRole("group")).toHaveLength(2);
+    expect(within(budgets).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "存入", "领取",
+    ]);
+    expect(within(budgets).getByRole("button", { name: "存入" }).getAttribute("aria-current")).toBe(
       "true",
     );
     expect(screen.getByRole("button", { name: "存款" }).getAttribute("aria-current")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "领取预算" }));
+    fireEvent.click(within(budgets).getByRole("button", { name: "领取" }));
     expect(onActionChange).toHaveBeenCalledWith("claim");
   });
 
   it("counts claimable periods on the claim task without changing its name", () => {
     renderNavigation(3);
-    const claim = screen.getByRole("button", { name: "领取预算" });
-    expect(claim.textContent).toBe("领取预算3");
+    const claim = screen.getByRole("button", { name: "领取" });
+    expect(claim.textContent).toBe("领取3");
     expect(document.getElementById(claim.getAttribute("aria-describedby")!)?.textContent).toBe(
       "领取期次 3",
     );

@@ -43,10 +43,10 @@ describe("ShieldedFundReceipt", () => {
         heirName="曹丕"
         versionLabel="第1版"
         entryLabel="私密（资金密钥）"
-        action={<button type="button">确认存入子女预算</button>}
+        action={<button type="button">确认存入</button>}
       />,
     );
-    const receipt = screen.getByRole("complementary", { name: "预览存入子女预算" });
+    const receipt = screen.getByRole("complementary", { name: "预览存入" });
     expect(within(receipt).getByText("1,200")).toBeTruthy();
     expect(within(receipt).getByText("12 期 · 每 30 天 100 DEEP")).toBeTruthy();
     expect(within(receipt).getByText("第 1 期 · 100 DEEP")).toBeTruthy();
@@ -61,7 +61,7 @@ describe("ShieldedFundReceipt", () => {
     expect(within(receipt).getByText("第1版")).toBeTruthy();
     expect(within(receipt).getByText("私密（资金密钥）")).toBeTruthy();
     expect(within(receipt).getByText("12,480 → 11,280 DEEP")).toBeTruthy();
-    expect(within(receipt).getByRole("button", { name: "确认存入子女预算" })).toBeTruthy();
+    expect(within(receipt).getByRole("button", { name: "确认存入" })).toBeTruthy();
   });
 
   it("leaves dates to an existing arrangement's own clock and dashes an incomplete budget", () => {
@@ -76,7 +76,7 @@ describe("ShieldedFundReceipt", () => {
         entryLabel="公开预算"
       />,
     );
-    const receipt = screen.getByRole("complementary", { name: "预览存入子女预算" });
+    const receipt = screen.getByRole("complementary", { name: "预览存入" });
     expect(within(receipt).getByText("—", { selector: "span" })).toBeTruthy();
     expect(within(receipt).queryByText(/到期：/)).toBeNull();
     expect(within(receipt).getAllByText("—", { selector: "dd" })).toHaveLength(3);
@@ -99,7 +99,7 @@ describe("ShieldedClaimReceipt", () => {
         periods={["4", "5", "6"]}
       />,
     );
-    const receipt = screen.getByRole("complementary", { name: "预览领取预算" });
+    const receipt = screen.getByRole("complementary", { name: "预览领取" });
     expect(within(receipt).getByRole("status").textContent).toBe("已选 3 期 · 合计 300 DEEP");
     expect(within(receipt).getByText("下次到期：2026/11/6")).toBeTruthy();
     const periods = within(receipt).getByText("领取期次").parentElement!;

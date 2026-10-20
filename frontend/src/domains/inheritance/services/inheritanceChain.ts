@@ -5,7 +5,7 @@ import {
   replayLineageTree,
   type LineageTree,
 } from "@deepfamily/protocol-core";
-import type { ethers } from "ethers";
+import { isError, type ethers } from "ethers";
 import { getEventScanConfig } from "../../../shared/config/env";
 import { InheritanceError } from "../model/inheritanceErrors";
 
@@ -136,6 +136,27 @@ function collectTrustedEndorsers(events: ScannedEvent[]): Map<string, Set<string
   return trusted;
 }
 
+async function loadLineageCheckpoint(lineageIndex: ethers.Contract, blockNumber: number) {
+  try {
+    const checkpointId = BigInt(await lineageIndex.currentCheckpointId({ blockTag: blockNumber }));
+    const checkpoint = await lineageIndex.getCheckpoint(checkpointId, { blockTag: blockNumber });
+    return { checkpointId, checkpoint };
+  } catch (cause) {
+    // Older deployments have roots but no paired-checkpoint interface. Retrying
+    // cannot add that interface, and using roots alone would weaken verification.
+    if (
+      (isError(cause, "CALL_EXCEPTION") && (cause.data === null || cause.data === "0x")) ||
+      (isError(cause, "BAD_DATA") && cause.value === "0x")
+    ) {
+      throw new InheritanceError(
+        "lineageIncompatible",
+        "The lineage index does not support paired checkpoints.",
+      );
+    }
+    throw cause;
+  }
+}
+
 /**
  * Rebuilds both lineage trees from `LeafWritten`, the versions from `VersionIndexed`, and each
  * endorser's latest endorsement from DeepFamily, all up to one block, then checks the rebuilt
@@ -150,8 +171,7 @@ export async function loadLineageSnapshot(
   const blockNumber = await provider.getBlockNumber();
   const anchor = await provider.getBlock(blockNumber);
   if (!anchor?.hash) throw new Error("Lineage snapshot block is unavailable");
-  const checkpointId = BigInt(await lineageIndex.currentCheckpointId({ blockTag: blockNumber }));
-  const checkpoint = await lineageIndex.getCheckpoint(checkpointId, { blockTag: blockNumber });
+  const { checkpointId, checkpoint } = await loadLineageCheckpoint(lineageIndex, blockNumber);
   const [indexEvents, familyEvents] = await Promise.all([
     scanEvents(lineageIndex, ["LeafWritten", "VersionIndexed"], blockNumber, options),
     scanEvents(

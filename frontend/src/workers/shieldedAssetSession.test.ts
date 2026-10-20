@@ -18,6 +18,7 @@ import {
   encryptShieldedNote,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
+import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 
 const mocks = vi.hoisted(() => ({
@@ -912,12 +913,23 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     mocks.loadLineage.mockRejectedValueOnce(new Error("private-lineage-error-sentinel"));
     const failed = await session.call("recover", { context });
     expect(failed.familyRecordsAvailable).toBe(false);
+    expect(failed.familyRecordsError).toBe("unavailable");
     expect(failed.notes).toMatchObject([{ slot: "asset", kind: "value", amount: "100" }]);
     expect(failed.parentVersions).toEqual([]);
     expect(failed.claims).toEqual([]);
     expect(failed.sessionState?.funds).toMatchObject({ recoveryVerified: true });
     expect(JSON.stringify(failed)).not.toContain("private-lineage-error-sentinel");
     assertPublic(failed);
+
+    mocks.loadLineage.mockRejectedValueOnce(
+      new InheritanceError("lineageIncompatible", "private-lineage-interface-sentinel"),
+    );
+    const incompatible = await session.call("recover", { context });
+    expect(incompatible.familyRecordsAvailable).toBe(false);
+    expect(incompatible.familyRecordsError).toBe("incompatible");
+    expect(incompatible.notes).toEqual(failed.notes);
+    expect(JSON.stringify(incompatible)).not.toContain("private-lineage-interface-sentinel");
+    assertPublic(incompatible);
 
     mocks.loadLineage.mockResolvedValueOnce({
       blockNumber: 12,
@@ -942,7 +954,8 @@ describe("ephemeral asset Worker funds lifecycle", () => {
     expect(recovered.familyRecordsAvailable).toBe(true);
     expect(recovered.parentVersions).toEqual([3, 1]);
     expect(recovered.notes).toEqual(failed.notes);
-    expect(mocks.loadLineage).toHaveBeenCalledTimes(2);
+    expect(recovered.familyRecordsError).toBeUndefined();
+    expect(mocks.loadLineage).toHaveBeenCalledTimes(3);
     assertPublic(recovered);
   });
 

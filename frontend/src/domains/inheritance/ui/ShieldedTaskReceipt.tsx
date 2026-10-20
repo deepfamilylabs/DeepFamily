@@ -21,9 +21,11 @@ export const SHIELDED_APPROVAL_STAGES = ["submitting", "confirming"] as const;
 
 const CARD_SHADOW =
   "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-26px_rgba(15,23,42,0.22)] dark:shadow-none";
-/** The same card on a wide screen, where a compact receipt stops being a bar. */
+/** The same card once the app leaves its phone layout, where a compact receipt stops being a bar. */
 const WIDE_CARD =
-  "lg:gap-5 lg:rounded-[20px] lg:border lg:p-6 lg:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-26px_rgba(15,23,42,0.22)] lg:dark:shadow-none";
+  "md:gap-5 md:rounded-[20px] md:border md:p-6 md:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_18px_40px_-26px_rgba(15,23,42,0.22)] md:dark:shadow-none";
+/** Beside the form the receipt stays in view below the sticky site header. */
+const STICKY_TOP = "md:top-[calc(var(--app-header-h)+1.5rem)]";
 
 /**
  * The live result of the task beside its form. On a phone a compact receipt
@@ -32,6 +34,7 @@ const WIDE_CARD =
 export function ShieldedTaskReceipt({
   label,
   compact = false,
+  wide = false,
   headline,
   details,
   notices,
@@ -40,6 +43,8 @@ export function ShieldedTaskReceipt({
   label: string;
   /** Pin to the bottom of a phone screen and leave the details to wider screens. */
   compact?: boolean;
+  /** The wider column a transfer's step plan takes, beside a narrower form. */
+  wide?: boolean;
   headline: ReactNode;
   details?: ReactNode;
   notices?: ReactNode;
@@ -48,10 +53,10 @@ export function ShieldedTaskReceipt({
   return (
     <aside
       aria-label={label}
-      className={`min-w-0 flex-[1_1_21rem] ${
+      className={`min-w-0 ${wide ? "flex-[1_1_23.75rem]" : "flex-[1_1_21rem]"} ${
         compact
-          ? "sticky bottom-[var(--app-statusbar-h)] z-20 -mx-4 sm:-mx-6 lg:bottom-auto lg:top-6 lg:mx-0"
-          : "lg:sticky lg:top-6"
+          ? `sticky bottom-[var(--app-statusbar-h)] z-20 -mx-4 sm:-mx-6 md:bottom-auto md:mx-0 ${STICKY_TOP}`
+          : `md:sticky ${STICKY_TOP}`
       }`}
     >
       <div
@@ -63,7 +68,7 @@ export function ShieldedTaskReceipt({
       >
         {headline}
         {details ? (
-          <div className={`flex-col gap-5 ${compact ? "hidden lg:flex" : "flex"}`}>{details}</div>
+          <div className={`flex-col gap-5 ${compact ? "hidden md:flex" : "flex"}`}>{details}</div>
         ) : null}
         {notices}
         {action}
@@ -92,7 +97,7 @@ export function ReceiptHeadline({
     <div
       className={
         compact
-          ? "flex flex-row-reverse items-end justify-between gap-3 lg:flex-col lg:items-stretch lg:justify-start lg:gap-2"
+          ? "flex flex-row-reverse items-end justify-between gap-3 md:flex-col md:items-stretch md:justify-start md:gap-2"
           : "flex flex-col gap-2"
       }
     >
@@ -100,7 +105,7 @@ export function ReceiptHeadline({
         <span
           className={`font-display font-extrabold leading-none tracking-[-0.01em] tabular-nums ${
             muted ? "text-ink-subtle" : "text-ink"
-          } ${compact ? "text-[34px] lg:text-[52px]" : "text-[44px] sm:text-[52px]"}`}
+          } ${compact ? "text-[34px] md:text-[52px]" : "text-[44px] sm:text-[52px]"}`}
         >
           {value}
         </span>

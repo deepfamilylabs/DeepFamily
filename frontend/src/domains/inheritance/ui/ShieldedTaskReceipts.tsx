@@ -316,10 +316,11 @@ export function ShieldedSpendReceipt({
   const label = t("shielded.spendReview.preview", {
     action: t(`shielded.actions.${spendAction}`, { symbol }),
   });
-  if (review) return <ShieldedTaskReceipt label={label} headline={review} notices={notices} />;
+  if (review) return <ShieldedTaskReceipt wide label={label} headline={review} notices={notices} />;
   return (
     <ShieldedTaskReceipt
       compact
+      wide
       label={label}
       headline={
         <ReceiptHeadline

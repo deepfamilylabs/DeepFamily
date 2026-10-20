@@ -104,11 +104,11 @@ import {
   type ShieldedCompletedSpendStep,
   type ShieldedSpendReviewProps,
 } from "./ShieldedSpendReview";
+import { ShieldedFundComposer } from "./ShieldedFundComposer";
 import {
-  ShieldedFundComposer,
   listShieldedFundingHeirs,
   shieldedFundingEntryLabelKey,
-} from "./ShieldedFundComposer";
+} from "../model/shieldedFundingOptions";
 import {
   ShieldedClaimComposer,
   buildShieldedClaimSchedule,
@@ -2229,6 +2229,7 @@ export function ShieldedInheritancePanel({
               !slotReady ||
               !session.identity ||
               !signer ||
+              (wallet?.familyRecordsAvailable === false && !template) ||
               (needsCode && !recipientReady) ||
               fundingDeficit !== undefined ||
               !personHash ||
@@ -2575,7 +2576,9 @@ export function ShieldedInheritancePanel({
                 onClick={() => void unlock()}
               >
                 {busy ? null : <LockOpen className="h-[18px] w-[18px]" aria-hidden="true" />}
-                {t("shielded.unlock", { symbol })}
+                <span role="status">
+                  {busy ? tr("unlocking") : t("shielded.unlock", { symbol })}
+                </span>
               </PanelButton>
             </>
           )
@@ -2595,10 +2598,10 @@ export function ShieldedInheritancePanel({
             </PanelButton>
           </div>
         ) : null}
-        {identityAccess && (hasSession || busy) ? (
+        {identityAccess && hasSession ? (
           <PanelButton onClick={exitSession}>{t("shielded.lock", { symbol })}</PanelButton>
         ) : null}
-        {stage ? (
+        {stage && (!identityAccess || hasSession) ? (
           <p role="status" className="text-sm text-ink-muted">
             {stage}
           </p>
@@ -2672,11 +2675,16 @@ export function ShieldedInheritancePanel({
               onActionChange={navigateToAction}
             />
             <div className="flex min-w-0 flex-[999_1_40rem] flex-wrap items-start gap-6">
+              {/* A transfer or withdrawal leaves its wider receipt room for the step plan. */}
               <section
                 ref={taskRegion}
                 tabIndex={-1}
                 aria-labelledby={taskTitleId}
-                className="min-w-0 flex-[999_1_27.5rem] rounded-[20px] border border-hairline bg-surface p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-7"
+                className={`min-w-0 ${
+                  action === "privateTransfer" || action === "unshield"
+                    ? "flex-[999_1_26.25rem]"
+                    : "flex-[999_1_27.5rem]"
+                } rounded-[20px] border border-hairline bg-surface p-5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 sm:p-7`}
               >
                 {composer}
               </section>

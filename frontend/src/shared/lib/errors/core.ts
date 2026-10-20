@@ -480,7 +480,11 @@ const RETRYABLE_REASONS = new Set([
 
 const normalizeReason = (val?: string) => {
   if (!val) return undefined;
-  return val.replace(/\(\)$/, "");
+  const reason = val.trim();
+  // ethers uses this placeholder when a call reverts without data. It is not a
+  // contract error name; treating it as one falls back to the full RPC payload.
+  if (/^require\(false\)$/i.test(reason)) return undefined;
+  return reason.replace(/\(\)$/, "");
 };
 
 const getKnownReasonFromErrorCode = (error: any): string | undefined => {

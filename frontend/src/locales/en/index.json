@@ -1579,10 +1579,10 @@
       "recover": "Refresh",
       "receiveCode": "Receive code",
       "shield": "Deposit",
-      "claim": "Claim budget",
+      "claim": "Claim",
       "privateTransfer": "Transfer",
       "unshield": "Withdraw",
-      "fund": "Fund a child budget"
+      "fund": "Fund"
     },
     "actionTitles": {
       "shield": "Deposit from an ordinary wallet",
@@ -1669,6 +1669,7 @@
     "fundingFamilyUnavailable": "The selected parent person version does not confirm this child’s eligibility. Check endorsements and trusted sources.",
     "fundingVersionPlaceholder": "Select a parent person version",
     "fundingVersionRequired": "Select a parent person version first.",
+    "fundingParentMissing": "No person versions match this identity on the current network. Check the unlocked identity or register the person first.",
     "fundingBalanceInsufficient": "Insufficient balance. Deposit another {{amount}} {{symbol}}.",
     "fundingVersionOption": "Version {{version}}",
     "balanceTitle": "Asset overview",
@@ -1679,8 +1680,7 @@
     "refreshFailed": "Balances could not be refreshed: {{detail}}. Retry without re-entering your passphrase.",
     "groups": {
       "wallet": "Private assets",
-      "inheritance": "Child budgets",
-      "receive": "Claim budgets"
+      "inheritance": "Child budgets"
     },
     "unknownError": "The action did not complete. Try again.",
     "stages": {
@@ -1721,7 +1721,8 @@
     "preparedButNotCompleted": "Balances were consolidated, but this action did not complete: {{detail}}. Refresh before retrying.",
     "invalidExitRecipient": "The recipient wallet address is invalid or zero.",
     "fundingModeLabel": "Funding method",
-    "familyRecordsUnavailable": "Family records could not be checked. Refresh and try again.",
+    "familyRecordsUnavailable": "The child list could not be loaded. Use Refresh above to try again.",
+    "familyRecordsIncompatible": "Child budgets on this network require a service update. Contact the maintainer.",
     "transactionFailed": "Transaction success could not be confirmed: {{hash}}. Check its status before retrying.",
     "claimPeriodsLabel": "Periods to claim",
     "claimPeriodsHint": "All selected by default, up to 12 periods per claim.",

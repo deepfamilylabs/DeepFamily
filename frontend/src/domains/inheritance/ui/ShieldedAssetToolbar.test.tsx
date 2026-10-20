@@ -26,6 +26,18 @@ const propsFor = (
   onImport: vi.fn(),
   ...overrides,
 });
+const selector = () =>
+  screen.getByLabelText("shielded.assets.label", { selector: "button" }) as HTMLButtonElement;
+function chooseAsset(name: string) {
+  fireEvent.click(selector());
+  fireEvent.click(screen.getByRole("option", { name }));
+}
+function assetOptions() {
+  fireEvent.click(selector());
+  const options = screen.getAllByRole("option").map((option) => option.textContent);
+  fireEvent.keyDown(selector(), { key: "Escape" });
+  return options;
+}
 
 describe("ShieldedAssetToolbar", () => {
   it("keeps an asset selectable when its token precision is unavailable", () => {
@@ -35,16 +47,13 @@ describe("ShieldedAssetToolbar", () => {
       ],
     });
     render(<ShieldedAssetToolbar {...props} />);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: TOKEN } });
+    chooseAsset("TOKEN · 0x0000…0022");
     expect(props.onSelect).toHaveBeenCalledWith(TOKEN);
   });
   it("shows one compact asset selector and hides token import until requested", () => {
     render(<ShieldedAssetToolbar {...propsFor()} />);
-    expect(screen.getByRole("combobox", { name: "shielded.assets.label" })).toBeTruthy();
-    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "DEEP",
-      "CFX",
-    ]);
+    expect(selector().textContent).toBe("DEEP");
+    expect(assetOptions()).toEqual(["DEEP", "CFX"]);
     expect(screen.queryByRole("textbox")).toBeNull();
     const add = screen.getByRole("button", { name: "shielded.assets.add" });
     expect(add.getAttribute("aria-expanded")).toBe("false");
@@ -67,13 +76,11 @@ describe("ShieldedAssetToolbar", () => {
       ],
     });
     render(<ShieldedAssetToolbar {...props} />);
-    expect(screen.getAllByRole("option")).toHaveLength(3);
-    const select = screen.getByRole("combobox");
-    fireEvent.change(select, { target: { value: ZeroAddress } });
-    fireEvent.change(select, { target: { value: TOKEN } });
+    expect(assetOptions()).toEqual(["DEEP", "CFX", "USDT · 0x0000…0022"]);
+    chooseAsset("CFX");
+    chooseAsset("USDT · 0x0000…0022");
     expect(props.onSelect).toHaveBeenNthCalledWith(1, ZeroAddress);
     expect(props.onSelect).toHaveBeenNthCalledWith(2, TOKEN);
-    expect(screen.getByRole("option", { name: "USDT · 0x0000…0022" })).toBeTruthy();
   });
 
   it("keeps a failed import open and closes after a submitted address is cleared", () => {
@@ -109,7 +116,7 @@ describe("ShieldedAssetToolbar", () => {
     for (const state of [{ disabled: true }, { importing: true }]) {
       rerender(<ShieldedAssetToolbar {...props} {...state} />);
       for (const control of [
-        screen.getByRole("combobox"),
+        selector(),
         screen.getByRole("textbox"),
         screen.getByRole("button", { name: "shielded.assets.cancel" }),
         screen.getByRole("button", { name: "shielded.assets.import" }),

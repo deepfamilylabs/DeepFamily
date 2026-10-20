@@ -263,9 +263,10 @@ the pinned fingerprint, until the user accepts the new key by choosing it again.
 This choice is separate from the receive-code type and the funding entry, which
 select the recipient's authorization mode.
 
-The task list groups **Deposit**, **Transfer** and **Withdraw**, **Fund a child
-budget** and **Claim budget**, and counts the periods that can be claimed now; on a
-phone it becomes a row of chips. Each form sits beside a receipt that totals the
+The task list groups **Deposit**, **Transfer** and **Withdraw** under **Private
+assets**, and **Fund** and **Claim** under **Child budgets**. Claim counts the
+periods that can be claimed now; on a phone the task list becomes a row of chips.
+Each form sits beside a receipt that totals the
 result and holds its confirmation; on a phone the receipt is a bar pinned above
 the status bar. Funding is numbered as arrangement, child and entry, and its
 receipt previews the schedule from the first period to the last. A new

@@ -12,11 +12,10 @@ import type { ShieldedAssetActionRequest } from "../../../shared/workers/shielde
 
 type Action = ShieldedAssetActionRequest["action"];
 
-const GROUPS: readonly { key: "wallet" | "inheritance" | "receive"; actions: readonly Action[] }[] =
+const GROUPS: readonly { key: "wallet" | "inheritance"; actions: readonly Action[] }[] =
   [
     { key: "wallet", actions: ["shield", "privateTransfer", "unshield"] },
-    { key: "inheritance", actions: ["fund"] },
-    { key: "receive", actions: ["claim"] },
+    { key: "inheritance", actions: ["fund", "claim"] },
   ];
 
 const ICONS: Record<Action, ComponentType<LucideProps>> = {
@@ -49,7 +48,7 @@ export function ShieldedTaskNavigation({
   return (
     <nav
       aria-label={t("shielded.actionsTitle", { symbol })}
-      className="min-w-0 basis-full lg:sticky lg:top-6 lg:max-w-[13.75rem] lg:flex-[1_1_12.5rem]"
+      className="min-w-0 basis-full lg:sticky lg:top-[calc(var(--app-header-h)+1.5rem)] lg:max-w-[13.75rem] lg:flex-[1_1_12.5rem]"
     >
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:gap-[18px] lg:overflow-visible lg:px-0 lg:pb-0 lg:pt-1">
         {GROUPS.map((group) => (

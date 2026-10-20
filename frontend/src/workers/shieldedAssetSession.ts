@@ -71,6 +71,7 @@ import {
   listShieldedFundingChildren,
   listShieldedFundingParentVersions,
 } from "../domains/inheritance/services/shieldedFundingFamily";
+import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
 import { prepareShieldedShield } from "../domains/inheritance/services/shieldedNotePreparation";
 import {
   createShieldedPolicyDescriptor,
@@ -675,7 +676,13 @@ export class ShieldedAssetSession {
       children: [],
     };
     const lineage = this.identity
-      ? await loadLineageSnapshot(lineageIndex, family).catch(() => null)
+      ? await loadLineageSnapshot(lineageIndex, family).catch((cause: unknown) => {
+          summary.familyRecordsError =
+            cause instanceof InheritanceError && cause.code === "lineageIncompatible"
+              ? "incompatible"
+              : "unavailable";
+          return null;
+        })
       : null;
     current();
     if (this.identity) summary.familyRecordsAvailable = !!lineage;

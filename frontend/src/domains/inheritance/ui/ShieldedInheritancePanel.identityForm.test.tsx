@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Signer } from "ethers";
 import type { PersonHashCalculatorHandle } from "../../person/ui/PersonHashCalculator";
@@ -264,14 +264,55 @@ describe("Shielded identity form privacy with a real session and form", () => {
     vi.restoreAllMocks();
   });
 
-  it("clears the prefilled form on explicit exit while re-unlocking and ignores the late result", async () => {
+  it("shows progress only in the unlock button without adding exit or cancellation controls", async () => {
+    const complete = deferUnlock();
     render(panel());
+    enterIdentity();
+    const unlockButton = screen.getByRole("button", { name: "shielded.unlock" });
+    const content = unlockButton.parentElement!;
+    const children = Array.from(content.children);
+
+    fireEvent.click(unlockButton);
+    expect(Array.from(content.children)).toEqual(children);
+    expect(unlockButton.getAttribute("aria-busy")).toBe("true");
+    expect((unlockButton as HTMLButtonElement).disabled).toBe(true);
+    expect(within(unlockButton).getByRole("status").textContent).toBe("shielded.walletKeys.unlocking");
+    expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "shielded.lock" })).toBeNull();
+    expect(screen.getAllByText("shielded.walletKeys.unlocking")).toHaveLength(1);
+
+    await act(async () => complete(unlocked));
+    expect(sessionState().identity?.handle).toBe(identity.handle);
+    expect(screen.getByRole("button", { name: "shielded.lock" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
+  });
+
+  it("returns to the unlock action after failure without leaving progress or exit controls", async () => {
+    mocks.call.mockRejectedValueOnce(new Error("Unlock failed"));
+    render(panel());
+    enterIdentity();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Unlock failed");
+    expect((screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText("shielded.walletKeys.unlocking")).toBeNull();
+    expect(screen.queryByRole("button", { name: "common.cancel" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "shielded.lock" })).toBeNull();
+    expect(sessionState().identity).toBeNull();
+
+    enterPassphrase();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
+    await waitFor(() => expect(sessionState().identity?.handle).toBe(identity.handle));
+  });
+
+  it("clears the prefilled form when the wallet disconnects during re-unlocking and ignores the late result", async () => {
+    const mounted = render(panel());
     await unlockIdentity();
     applicationLock();
     const complete = deferUnlock();
     enterPassphrase();
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
-    fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
+    mounted.rerender(panel(false));
     expectEmptyIdentity();
 
     await act(async () => complete(unlocked));
@@ -279,15 +320,25 @@ describe("Shielded identity form privacy with a real session and form", () => {
     expect(screen.queryByRole("tab", { name: "shielded.groups.wallet" })).toBeNull();
   });
 
-  it("clears newly entered details when cancelling the first unlock", async () => {
-    render(panel());
+  it("ignores the first unlock result after the wallet disconnects", async () => {
+    const mounted = render(panel());
     const complete = deferUnlock();
     enterIdentity();
     fireEvent.click(screen.getByRole("button", { name: "shielded.unlock" }));
-    fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
-    expectEmptyIdentity();
+    mounted.rerender(panel(false));
+    expect(sessionState()).toEqual({ identity: null, identityDraft: null });
+    expect((screen.getByLabelText("search.hashCalculator.passphrase") as HTMLInputElement).value).toBe("");
 
     await act(async () => complete(unlocked));
+    expect(sessionState()).toEqual({ identity: null, identityDraft: null });
+    expect((screen.getByRole("button", { name: "shielded.unlock" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
+  });
+
+  it("clears the identity form and retained draft when exiting an unlocked session", async () => {
+    render(panel());
+    await unlockIdentity();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.lock" }));
     expectEmptyIdentity();
   });
 

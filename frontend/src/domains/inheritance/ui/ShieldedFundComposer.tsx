@@ -4,7 +4,13 @@ import type {
   ShieldedFundingEntry,
   ShieldedWalletSummary,
 } from "../../../shared/workers/shieldedAssetWorkerTypes";
+import { ThemedSelect } from "../../transactions/ui/shared/ThemedSelect";
 import { formatShieldedAmount } from "../model/shieldedDisplay";
+import {
+  SHIELDED_FUNDING_ENTRY_KEYS as ENTRY_KEYS,
+  SHIELDED_PERIOD_DAY_PRESETS,
+  type ShieldedFundingHeir,
+} from "../model/shieldedFundingOptions";
 import type { ShieldedRecipientCredentialsFormHandle } from "./ShieldedRecipientCredentialsForm";
 import {
   ShieldedReceiveCodeInput,
@@ -17,7 +23,6 @@ import {
   CHOICE_INPUT,
   FIELD_INPUT,
   FieldBlock,
-  SelectField,
   TaskHeader,
   TaskSection,
   WarningNotice,
@@ -25,41 +30,7 @@ import {
   shortHex,
 } from "./inheritanceControls";
 
-export const SHIELDED_PERIOD_DAY_PRESETS = [1, 7, 14, 21, 30, 90, 180, 365] as const;
 const ENTRIES = ["public", "privateConvenient", "privateIndependent"] as const;
-const ENTRY_KEYS: Record<ShieldedFundingEntry, { label: string; hint: string }> = {
-  public: { label: "publicEntry", hint: "publicHint" },
-  privateConvenient: { label: "convenientEntry", hint: "convenientHint" },
-  privateIndependent: { label: "independentEntry", hint: "independentHint" },
-};
-
-export type ShieldedFundingHeir = { personHash: string; label?: string };
-
-/** Eligible children of the chosen parent version, plus every heir already on the arrangement. */
-export function listShieldedFundingHeirs(
-  wallet: ShieldedWalletSummary | null,
-  policyHandle: string,
-  fundingVersion: string,
-  labels?: ReadonlyMap<string, string>,
-): ShieldedFundingHeir[] {
-  return Array.from(
-    new Map(
-      [
-        ...(wallet?.children.filter(
-          (child) => child.eligible && String(child.rootVersionIndex) === fundingVersion,
-        ) ?? []),
-        ...(wallet?.templates.filter((item) => item.policyHandle === policyHandle) ?? []),
-      ].map((heir) => [
-        heir.personHash.toLowerCase(),
-        { personHash: heir.personHash, label: labels?.get(heir.personHash.toLowerCase()) },
-      ]),
-    ).values(),
-  );
-}
-
-export function shieldedFundingEntryLabelKey(entry: ShieldedFundingEntry): string {
-  return `shielded.walletKeys.${ENTRY_KEYS[entry].label}`;
-}
 
 export interface ShieldedFundComposerProps {
   titleId: string;
@@ -105,7 +76,8 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
   const { t } = useTranslation();
   const tr = (key: string) => t(`shielded.walletKeys.${key}`);
   const { symbol, decimals, busy, wallet, titleId } = props;
-  const versionId = useId();
+  const versionLabelId = useId();
+  const periodLabelId = useId();
   const [customPeriodDays, setCustomPeriodDays] = useState(
     !SHIELDED_PERIOD_DAY_PRESETS.some((days) => String(days) === props.periodDays),
   );
@@ -128,13 +100,17 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
     );
   };
   const policies = wallet?.policies ?? [];
-  const placeholder = !wallet
-    ? t("shielded.recipientPicker.loading")
-    : !fundingVersion
-      ? t("shielded.fundingVersionRequired", { symbol })
-      : props.heirs.length === 0
-        ? t("shielded.recipientPicker.emptyChildren")
-        : null;
+  const placeholder = familyUnavailable
+    ? null
+    : !wallet
+      ? t("shielded.recipientPicker.loading")
+      : noParentVersions && !selectedPolicy
+        ? t("shielded.fundingParentMissing")
+        : !fundingVersion
+          ? t("shielded.fundingVersionRequired", { symbol })
+          : props.heirs.length === 0
+            ? t("shielded.recipientPicker.emptyChildren")
+            : null;
   const verification = props.recipientMatches ? (
     <ShieldedRecipientChip>
       {t("shielded.recipientTarget", { symbol, identity: heirName(props.personHash) })}
@@ -165,16 +141,16 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
         trailing={
           policies.length > 0 ? (
             <div className="w-full sm:w-72">
-              <SelectField
-                aria-label={t("shielded.fields.fundingRule", { symbol })}
+              <ThemedSelect
+                labelledBy={`${titleId}-rule`}
                 value={props.policyHandle}
                 disabled={busy}
-                onChange={(event) => props.onPolicyChange(event.target.value)}
-              >
-                <option value="">{t("shielded.newFundingRule", { symbol })}</option>
-                {policies.map((policy, index) => (
-                  <option key={policy.handle} value={policy.handle}>
-                    {t("shielded.policyOption", {
+                onChange={props.onPolicyChange}
+                options={[
+                  { value: "", label: t("shielded.newFundingRule", { symbol }) },
+                  ...policies.map((policy, index) => ({
+                    value: policy.handle,
+                    label: t("shielded.policyOption", {
                       symbol,
                       index: index + 1,
                       identity:
@@ -185,10 +161,10 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
                         }),
                       amount: formatShieldedAmount(policy.amountPerPeriod, decimals),
                       days: policy.periodDays,
-                    })}
-                  </option>
-                ))}
-              </SelectField>
+                    }),
+                  })),
+                ]}
+              />
             </div>
           ) : undefined
         }
@@ -226,24 +202,27 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
                   placeholder="10"
                 />
               </FieldBlock>
-              <FieldBlock label={t("shielded.fields.periodDays", { symbol })}>
-                <SelectField
-                  aria-label={t("shielded.fields.periodDays", { symbol })}
+              <FieldBlock
+                label={t("shielded.fields.periodDays", { symbol })}
+                labelId={periodLabelId}
+              >
+                <ThemedSelect
+                  size="md"
+                  labelledBy={periodLabelId}
                   disabled={busy}
                   value={customPeriodDays ? "custom" : props.periodDays}
-                  onChange={(event) => {
-                    const choice = event.target.value;
+                  onChange={(choice) => {
                     setCustomPeriodDays(choice === "custom");
                     props.onPeriodDaysChange(choice === "custom" ? "" : choice);
                   }}
-                >
-                  {SHIELDED_PERIOD_DAY_PRESETS.map((days) => (
-                    <option key={days} value={String(days)}>
-                      {t("shielded.periodDaysSummary", { symbol, days })}
-                    </option>
-                  ))}
-                  <option value="custom">{t("shielded.customPeriodDays", { symbol })}</option>
-                </SelectField>
+                  options={[
+                    ...SHIELDED_PERIOD_DAY_PRESETS.map((days) => ({
+                      value: String(days),
+                      label: t("shielded.periodDaysSummary", { symbol, days }),
+                    })),
+                    { value: "custom", label: t("shielded.customPeriodDays", { symbol }) },
+                  ]}
+                />
               </FieldBlock>
             </>
           )}
@@ -295,29 +274,27 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
               </p>
             ) : (
               <>
-                <label htmlFor={versionId} className="whitespace-nowrap text-[13px] text-ink-muted">
+                <span id={versionLabelId} className="whitespace-nowrap text-[13px] text-ink-muted">
                   {t("shielded.fields.familyVersion", { symbol })}
-                </label>
-                <div className="w-36">
-                  <SelectField
-                    id={versionId}
+                </span>
+                <div className="w-40">
+                  <ThemedSelect
+                    labelledBy={versionLabelId}
                     disabled={busy || !wallet || wallet.parentVersions.length === 0}
                     value={props.rootVersion}
-                    onChange={(event) => props.onRootVersionChange(event.target.value)}
-                  >
-                    <option value="">{t("shielded.fundingVersionPlaceholder", { symbol })}</option>
-                    {props.rootVersion &&
-                    !wallet?.parentVersions.includes(Number(props.rootVersion)) ? (
-                      <option value={props.rootVersion} disabled>
-                        {t("shielded.fundingVersionOption", { symbol, version: props.rootVersion })}
-                      </option>
-                    ) : null}
-                    {wallet?.parentVersions.map((version) => (
-                      <option key={version} value={String(version)}>
-                        {t("shielded.fundingVersionOption", { symbol, version })}
-                      </option>
-                    ))}
-                  </SelectField>
+                    onChange={props.onRootVersionChange}
+                    // A version that is no longer available stays shown but cannot be chosen.
+                    placeholder={
+                      props.rootVersion &&
+                      !wallet?.parentVersions.includes(Number(props.rootVersion))
+                        ? t("shielded.fundingVersionOption", { symbol, version: props.rootVersion })
+                        : t("shielded.fundingVersionPlaceholder", { symbol })
+                    }
+                    options={(wallet?.parentVersions ?? []).map((version) => ({
+                      value: String(version),
+                      label: t("shielded.fundingVersionOption", { symbol, version }),
+                    }))}
+                  />
                 </div>
               </>
             )}
@@ -326,16 +303,18 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
       >
         {familyUnavailable ? (
           <p role="alert" className="text-xs text-danger">
-            {t("shielded.familyRecordsUnavailable")}
+            {t(
+              wallet.familyRecordsError === "incompatible"
+                ? "shielded.familyRecordsIncompatible"
+                : "shielded.familyRecordsUnavailable",
+            )}
           </p>
-        ) : noParentVersions && !selectedPolicy ? (
-          <p className="text-xs text-ink-muted">{t("search.storyRecordsQuery.noMatches")}</p>
         ) : null}
         {placeholder ? (
           <p className="rounded-xl bg-surface-alt px-3.5 py-3 text-sm text-ink-muted">
             {placeholder}
           </p>
-        ) : (
+        ) : props.heirs.length > 0 ? (
           <fieldset disabled={busy} className="flex min-w-0 flex-col gap-1.5">
             {props.heirs.map((heir, index) => {
               const selected = heir.personHash.toLowerCase() === props.personHash.toLowerCase();
@@ -363,7 +342,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
               );
             })}
           </fieldset>
-        )}
+        ) : null}
         {props.personHash.trim() ? (
           <p className="break-all text-xs leading-relaxed text-ink-muted">
             {t("shielded.recipientPicker.identityHash")}:{" "}

@@ -34,6 +34,9 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
       key === "shielded.claimPeriodOption" ? `${key}:${options?.period}` :
+        key === "shielded.fundingVersionOption" ? `${key}:${options?.version}` :
+        key === "shielded.periodDaysSummary" ? `${key}:${options?.days}` :
+        key === "shielded.policyOption" ? `${key}:${options?.index}` :
         key === "shielded.submit" || key === "shielded.spendReview.preview" ? `${key}:${options?.action}` :
           key.startsWith("shielded.spendReview.") && options
             ? `${key}:${JSON.stringify(options)}` : key,
@@ -353,6 +356,20 @@ function heirOptions() {
 function checkedHeir() {
   return document.querySelector<HTMLInputElement>('input[type="radio"][name$="-heir"]:checked');
 }
+function selectTrigger(label: string) {
+  return screen.getByLabelText(label, { selector: "button" }) as HTMLButtonElement;
+}
+function chooseOption(label: string, option: string) {
+  fireEvent.click(selectTrigger(label));
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+function selectOptions(label: string) {
+  const trigger = selectTrigger(label);
+  fireEvent.click(trigger);
+  const options = screen.getAllByRole("option").map((option) => option.textContent);
+  fireEvent.keyDown(trigger, { key: "Escape" });
+  return options;
+}
 function budgetChoice(handle: string) {
   const input = document.querySelector<HTMLInputElement>(`input[type="radio"][value="${handle}"]`);
   expect(input).toBeTruthy();
@@ -510,11 +527,11 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
     expect(mocks.call).not.toHaveBeenCalled();
   });
-  it("lists every task in its three groups and shows both wallets with the current one marked", async () => {
+  it("lists every task in its two groups and shows both wallets with the current one marked", async () => {
     await renderUnlockedPanel();
     expect(within(taskNavigation()).getAllByRole("group").map((group) =>
       group.getAttribute("aria-labelledby") && document.getElementById(group.getAttribute("aria-labelledby")!)?.textContent,
-    )).toEqual(["shielded.groups.wallet", "shielded.groups.inheritance", "shielded.groups.receive"]);
+    )).toEqual(["shielded.groups.wallet", "shielded.groups.inheritance"]);
     expect(within(taskNavigation()).getAllByRole("button").map((button) => button.textContent)).toEqual([
       "shielded.actions.shield",
       "shielded.actions.privateTransfer",
@@ -812,12 +829,12 @@ describe("Worker-backed shielded wallet", () => {
   it("keeps the original budget period presets and allows a custom period", async () => {
     await renderUnlockedPanel();
     chooseAction("fund");
-    const period = screen.getByLabelText("shielded.fields.periodDays") as HTMLSelectElement;
-    expect(Array.from(period.options, (option) => option.value)).toEqual([
-      "1", "7", "14", "21", "30", "90", "180", "365", "custom",
+    expect(selectOptions("shielded.fields.periodDays")).toEqual([
+      ...["1", "7", "14", "21", "30", "90", "180", "365"].map((days) => `shielded.periodDaysSummary:${days}`),
+      "shielded.customPeriodDays",
     ]);
     expect((screen.getByLabelText("shielded.fields.periods") as HTMLInputElement).value).toBe("1");
-    fireEvent.change(period, { target: { value: "custom" } });
+    chooseOption("shielded.fields.periodDays", "shielded.customPeriodDays");
     const custom = screen.getByLabelText("shielded.fields.customPeriodDays") as HTMLInputElement;
     fireEvent.change(custom, { target: { value: "45" } });
     expect(custom.value).toBe("45");
@@ -1007,7 +1024,7 @@ describe("Worker-backed shielded wallet", () => {
         })).toBeTruthy());
       } else if (action === "fund") {
         chooseFundingEntry("privateIndependent");
-        fireEvent.change(screen.getByLabelText("shielded.fields.familyVersion"), { target: { value: "0" } });
+        chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
         chooseHeir(identity.personHash);
         fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
         fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "recipient-code" } });
@@ -1343,34 +1360,37 @@ describe("Worker-backed shielded wallet", () => {
     mocks.verify.mockResolvedValue({ personHash: identity.personHash, keyMode: 1, fingerprint: "child-fingerprint" });
     await renderUnlockedPanel();
     chooseAction("fund");
-    const version = screen.getByLabelText("shielded.fields.familyVersion") as HTMLSelectElement;
+    const version = selectTrigger("shielded.fields.familyVersion");
     const amount = screen.getByLabelText("shielded.fields.rate") as HTMLInputElement;
     const code = screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement;
     expect(version.disabled).toBe(false);
-    expect(Array.from(version.options, (option) => option.value)).toEqual(["", "2", "1"]);
+    expect(selectOptions("shielded.fields.familyVersion")).toEqual([
+      "shielded.fundingVersionOption:2",
+      "shielded.fundingVersionOption:1",
+    ]);
     expect(screen.queryByText("shielded.familyRecordsUnavailable")).toBeNull();
     expect(screen.queryByText("search.storyRecordsQuery.noMatches")).toBeNull();
     // Children appear only once a parent version is chosen.
     expect(heirOptions()).toEqual([]);
     expect(screen.getByText("shielded.fundingVersionRequired")).toBeTruthy();
     fireEvent.change(amount, { target: { value: "2.5" } });
-    fireEvent.change(version, { target: { value: "2" } });
-    expect(version.value).toBe("2");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:2");
+    expect(version.textContent).toBe("shielded.fundingVersionOption:2");
     expect(heirOptions()).toEqual([identity.personHash]);
     chooseHeir(identity.personHash);
     fireEvent.change(code, { target: { value: "version-two-receive-code" } });
     expect(heirChoice(identity.personHash).checked).toBe(true);
     expect(code.value).toBe("version-two-receive-code");
 
-    fireEvent.change(version, { target: { value: "1" } });
-    expect(version.value).toBe("1");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:1");
+    expect(version.textContent).toBe("shielded.fundingVersionOption:1");
     expect(heirOptions()).toEqual([earlierChild]);
     expect(checkedHeir()).toBeNull();
     expect(code.value).toBe("");
     expect(amount.value).toBe("2.5");
     chooseHeir(earlierChild);
     fireEvent.change(code, { target: { value: "version-one-receive-code" } });
-    fireEvent.change(version, { target: { value: "2" } });
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:2");
     expect(checkedHeir()).toBeNull();
     expect(code.value).toBe("");
     expect(amount.value).toBe("2.5");
@@ -1385,23 +1405,79 @@ describe("Worker-backed shielded wallet", () => {
     } : defaultCall?.(method, params));
     await renderUnlockedPanel();
     chooseAction("fund");
-    const version = screen.getByLabelText("shielded.fields.familyVersion") as HTMLSelectElement;
+    const version = selectTrigger("shielded.fields.familyVersion");
     expect(version.disabled).toBe(true);
-    expect(Array.from(version.options, (option) => option.value)).toEqual([""]);
+    expect(version.textContent).toBe("shielded.fundingVersionPlaceholder");
     expect(screen.getByText("shielded.familyRecordsUnavailable")).toBeTruthy();
     expect(screen.queryByText("search.storyRecordsQuery.noMatches")).toBeNull();
+    expect(screen.queryByText("shielded.fundingVersionRequired")).toBeNull();
+    expect(screen.queryByText("shielded.recipientPicker.emptyChildren")).toBeNull();
 
     familyRecordsAvailable = true;
     refreshAssets();
     await waitUntilIdle();
-    expect(screen.getByLabelText("shielded.fields.familyVersion")).toBe(version);
+    expect(selectTrigger("shielded.fields.familyVersion")).toBe(version);
     expect(version.disabled).toBe(false);
     expect(screen.queryByText("shielded.familyRecordsUnavailable")).toBeNull();
-    expect(Array.from(version.options, (option) => option.value)).toEqual(["", "2", "1"]);
-    fireEvent.change(version, { target: { value: "2" } });
-    expect(version.value).toBe("2");
-    fireEvent.change(version, { target: { value: "1" } });
-    expect(version.value).toBe("1");
+    expect(selectOptions("shielded.fields.familyVersion")).toEqual([
+      "shielded.fundingVersionOption:2",
+      "shielded.fundingVersionOption:1",
+    ]);
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:2");
+    expect(version.textContent).toBe("shielded.fundingVersionOption:2");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:1");
+    expect(version.textContent).toBe("shielded.fundingVersionOption:1");
+  });
+  it("explains incompatible family services even when an existing budget supplies the parent version", async () => {
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
+      ...emptyWallet,
+      familyRecordsAvailable: false,
+      familyRecordsError: "incompatible",
+      parentVersions: [],
+      policies: [{ handle: "policy:existing", rootVersionIndex: "1", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
+    } : defaultCall?.(method, params));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
+    expect(screen.getByText("shielded.familyRecordsIncompatible")).toBeTruthy();
+    expect(screen.queryByText("shielded.familyRecordsUnavailable")).toBeNull();
+    expect(screen.queryByText("shielded.fundingVersionRequired")).toBeNull();
+    expect(screen.queryByText("shielded.recipientPicker.emptyChildren")).toBeNull();
+    expect(heirOptions()).toEqual([]);
+    expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it("blocks new funding after family records become unavailable with a previously selected version", async () => {
+    let familyRecordsAvailable = true;
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
+      ...emptyWallet,
+      familyRecordsAvailable,
+      familyRecordsError: familyRecordsAvailable ? undefined : "incompatible",
+      parentVersions: familyRecordsAvailable ? [1] : [],
+      children: familyRecordsAvailable
+        ? [{ personHash: identity.personHash, rootVersionIndex: 1, eligible: true }]
+        : [],
+      notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],
+    } : defaultCall?.(method, params));
+    await renderUnlockedPanel();
+    chooseAction("fund");
+    chooseFundingEntry("public");
+    const version = selectTrigger("shielded.fields.familyVersion");
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:1");
+    chooseHeir(identity.personHash);
+    fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
+    const submit = screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+
+    familyRecordsAvailable = false;
+    refreshAssets();
+    await waitUntilIdle();
+    expect(version.textContent).toBe("shielded.fundingVersionOption:1");
+    expect(version.disabled).toBe(true);
+    expect(screen.getByText("shielded.familyRecordsIncompatible")).toBeTruthy();
+    expect(screen.queryByText("shielded.recipientPicker.emptyChildren")).toBeNull();
+    expect(submit.disabled).toBe(true);
   });
   it("reports no matching loaded family records when parent versions are empty", async () => {
     const defaultCall = mocks.call.getMockImplementation();
@@ -1412,10 +1488,12 @@ describe("Worker-backed shielded wallet", () => {
     } : defaultCall?.(method, params));
     await renderUnlockedPanel();
     chooseAction("fund");
-    const version = screen.getByLabelText("shielded.fields.familyVersion") as HTMLSelectElement;
+    const version = selectTrigger("shielded.fields.familyVersion");
     expect(version.disabled).toBe(true);
-    expect(Array.from(version.options, (option) => option.value)).toEqual([""]);
-    expect(screen.getByText("search.storyRecordsQuery.noMatches")).toBeTruthy();
+    expect(version.textContent).toBe("shielded.fundingVersionPlaceholder");
+    expect(screen.getByText("shielded.fundingParentMissing")).toBeTruthy();
+    expect(screen.queryByText("shielded.fundingVersionRequired")).toBeNull();
+    expect(screen.queryByText("shielded.recipientPicker.emptyChildren")).toBeNull();
     expect(screen.queryByText("familyTree.config.versionNone")).toBeNull();
     expect(screen.queryByText("shielded.familyRecordsUnavailable")).toBeNull();
     expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
@@ -1463,7 +1541,7 @@ describe("Worker-backed shielded wallet", () => {
     });
     await renderUnlockedPanel();
     chooseAction("fund");
-    fireEvent.change(screen.getByLabelText("shielded.fields.familyVersion"), { target: { value: "0" } });
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "independent-code" } });
@@ -1471,7 +1549,7 @@ describe("Worker-backed shielded wallet", () => {
     // Only the receiving material belongs to an entry.
     expect((screen.getByLabelText("shielded.receiveCodeInputLabel") as HTMLTextAreaElement).value).toBe("");
     chooseFundingEntry("public");
-    expect((screen.getByLabelText("shielded.fields.familyVersion") as HTMLSelectElement).value).toBe("0");
+    expect(selectTrigger("shielded.fields.familyVersion").textContent).toBe("shielded.fundingVersionOption:0");
     expect(heirChoice(identity.personHash).checked).toBe(true);
     expect((screen.getByLabelText("shielded.fields.rate") as HTMLInputElement).value).toBe("2");
   });
@@ -1521,7 +1599,7 @@ describe("Worker-backed shielded wallet", () => {
     chooseAction("fund");
     chooseFundingEntry(entry);
     chooseActiveWallet(source);
-    fireEvent.change(screen.getByLabelText("shielded.fields.familyVersion"), { target: { value: "0" } });
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "child-receive-code" } });
@@ -1543,6 +1621,9 @@ describe("Worker-backed shielded wallet", () => {
   ] as const)("keeps an existing %s template fixed for further funding", async (entry, bindingKind, keyMode, entryLabel) => {
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
+      familyRecordsAvailable: false,
+      familyRecordsError: "unavailable",
+      parentVersions: [],
       policies: [{ handle: "policy:existing", rootVersionIndex: "0", amountPerPeriod: "1000000000000000000", periodDays: "30" }],
       templates: [{ handle: "template:existing", policyHandle: "policy:existing", personHash: identity.personHash, bindingKind, keyMode }],
       notes: [{ commitment: "11", ownerCommitment: "1", slot: "identity", kind: "value", amount: "100000000000000000000" }],
@@ -1552,7 +1633,7 @@ describe("Worker-backed shielded wallet", () => {
     });
     await renderUnlockedPanel();
     chooseAction("fund");
-    fireEvent.change(screen.getByRole("combobox", { name: "shielded.fields.fundingRule" }), { target: { value: "policy:existing" } });
+    chooseOption("shielded.fields.fundingRule", "shielded.policyOption:1");
     chooseHeir(identity.personHash);
     expect((screen.getByRole("radio", { name: label(entryLabel) }) as HTMLInputElement).checked).toBe(true);
     for (const key of ["publicEntry", "convenientEntry", "independentEntry"]) {
@@ -2931,7 +3012,7 @@ describe("Worker-backed shielded wallet", () => {
     await renderPanel();
     chooseAction("fund");
     chooseFundingEntry("public");
-    fireEvent.change(screen.getByLabelText("shielded.fields.familyVersion"), { target: { value: "0" } });
+    chooseOption("shielded.fields.familyVersion", "shielded.fundingVersionOption:0");
     chooseHeir(identity.personHash);
     fireEvent.change(screen.getByLabelText("shielded.fields.rate"), { target: { value: "1" } });
     const scans = recoverCount();

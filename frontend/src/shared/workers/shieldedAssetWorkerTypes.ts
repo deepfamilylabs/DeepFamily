@@ -87,6 +87,8 @@ export type ShieldedWalletSummary = {
   sessionState?: ShieldedAssetSessionState;
   /** Whether the unlocked identity's family records loaded; omitted without identity proof capability. */
   familyRecordsAvailable?: boolean;
+  /** A public failure category; raw RPC errors never leave the Worker. */
+  familyRecordsError?: "unavailable" | "incompatible";
   toBlock: number;
   blockHash: string;
   notes: ShieldedNoteSummary[];

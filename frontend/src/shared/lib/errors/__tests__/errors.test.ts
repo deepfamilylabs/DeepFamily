@@ -197,6 +197,31 @@ describe("errors", () => {
     );
   });
 
+  it.each([undefined, "require(false)"])(
+    "keeps empty revert data readable with a cached reason of %s",
+    (cachedReason) => {
+      const calldata = `0xbbbe9818${"ab".repeat(1000)}`;
+      const error = Object.assign(ethers.makeError(
+        "execution reverted (no data present; likely require(false) occurred",
+        "CALL_EXCEPTION",
+        {
+          action: "estimateGas",
+          data: "0x",
+          reason: "require(false)",
+          transaction: { to: ethers.ZeroAddress, data: calldata },
+          invocation: null,
+          revert: null,
+        },
+      ), { __dfDecodedReason: cachedReason });
+      const t = (key: string, fallback?: string) =>
+        key === "errors.contractError.CALL_EXCEPTION" ? "合约校验未通过。" : fallback ?? key;
+
+      expect(resolveErrorReason(error)).toBe("CALL_EXCEPTION");
+      expect(getFriendlyErrorMessage(error, t as any, "操作失败")).toBe("合约校验未通过。");
+      expect(getFriendlyError(error, t as any).details).not.toContain(calldata);
+    },
+  );
+
   it("maps rejected direct transfers without assuming the native currency is ETH", () => {
     const selector = selectorOf("DirectNativeCurrencyNotAccepted()");
 
