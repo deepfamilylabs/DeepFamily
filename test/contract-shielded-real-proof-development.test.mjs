@@ -46,8 +46,9 @@ import {
   encryptShieldedNote,
   emptyShieldedReceiveAuthorizations,
   verifyShieldedNotePayload,
+  encodeGroth16AbcProofData,
+  normalizeGroth16Proof,
 } from "@deepfamily/protocol-core";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildShieldedFundingFixtures } from "../circuits/test/generate_shielded_funding_input.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";

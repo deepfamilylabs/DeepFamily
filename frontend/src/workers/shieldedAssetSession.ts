@@ -21,8 +21,8 @@ import {
   splitShieldedViewPublicKey, createShieldedLetterEnvelope, computeShieldedLetterRelationCommitment,
   encryptShieldedLetter, decryptShieldedLetter, computeShieldedLetterCiphertextHash,
   computeShieldedCiphertextHashField, normalizeShieldedBudgetOrigin,
-} from "@deepfamily/protocol-core";
-import {
+  encodeGroth16AbcProofData,
+  normalizeGroth16Proof,
   createShieldedIndependentKeyRoot,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedIndependentKeyIdentitySecret,
@@ -97,7 +97,6 @@ import {
   discoverShieldedFactoryPools,
   withShieldedRecoveryTimeout,
 } from "../domains/inheritance/services/shieldedAssetRegistry";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationState } from "../domains/inheritance/services/shieldedIdentityAuthorizationChain";
 
 import { createPrivateLetterContract, readPrivateLetters } from "../domains/inheritance/services/privateLetterChain";

@@ -67,7 +67,7 @@ npm run test
 
 Run `npm install` from the repository root. `npm run dev` and `npm run build` automatically sync
 the contract ABI into `src/abi/DeepFamily.json` before starting Vite. The frontend consumes the
-private `@deepfamily/proof-core` workspace through the root lockfile.
+private `@deepfamily/protocol-core` workspace through the root lockfile.
 
 ## Cloudflare Pages
 
@@ -78,13 +78,13 @@ Configure the Pages project as a monorepo build:
 - Build output directory: `frontend/dist`
 - Environment variables (Production and Preview, plain text): `SKIP_DEPENDENCY_INSTALL=1`, and
   `VITE_ZK_ASSET_BASE_URL` set to the proving-file host. The build fails without the second.
-- Build watch paths (include): `frontend/*`, `packages/proof-core/*`, `packages/protocol-core/*`,
+- Build watch paths (include): `frontend/*`, `packages/protocol-core/*`,
   `circuits/*`, `functions/*`, `lib/zkPublicAssets.js`, `lib/cspReport.js`, `package.json`,
   `package-lock.json`, `.node-version`. Each directory needs its trailing `*`, and a lone `*`
   would match every file in the repository.
 
-`pages:build` performs a clean filtered workspace install for only `deepfamily-frontend` and
-`@deepfamily/proof-core`, so Cloudflare does not install the Hardhat toolchain.
+`pages:build` performs a clean install for the `deepfamily-frontend` workspace and its dependencies,
+including `@deepfamily/protocol-core`, so Cloudflare does not install the Hardhat toolchain.
 `.node-version` pins the build to the CI runtime; the build image's default Node.js is older than
 the repository's minimum.
 The build writes `dist/_headers` with the same security headers `vite preview` sends. Pages

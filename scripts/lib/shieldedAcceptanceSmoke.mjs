@@ -48,8 +48,9 @@ import {
   generateShieldedRandomField,
   verifyShieldedNotePayload,
   wipeBytes,
+  encodeGroth16AbcProofData,
+  normalizeGroth16Proof,
 } from "@deepfamily/protocol-core";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import { addPersonVersion } from "../../lib/seedHelpers.js";
 import { loadCandidateArtifacts } from "./shieldedArtifacts.mjs";
 import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";

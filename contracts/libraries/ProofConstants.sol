@@ -8,7 +8,7 @@ pragma solidity ^0.8.20;
  * @dev This library is the single source of truth for:
  *      - `proofEncodingId` values understood by the proof verifier adapters
  *      - Solidity mirrors of the public-signal shapes in
- *        `packages/proof-core/publicSignalSpecs.js` (identity/disclosure) and
+ *        `packages/protocol-core/publicSignalSpecs.js` (identity/disclosure) and
  *        `packages/protocol-core/shielded-signals.js` (pool actions).
  *
  *      Every adapter and every business contract that performs transport-layer length
@@ -46,7 +46,7 @@ library ProofConstants {
   // ---------------------------------------------------------------------------
   // Public-signal length mirrors.
   //
-  // JS signal builders/specs live in packages/proof-core/publicSignalSpecs.js and
+  // JS signal builders/specs live in packages/protocol-core/publicSignalSpecs.js and
   // packages/protocol-core/shielded-signals.js. Transport length checks use these
   // constants; fixed-array declarations preserve each generated verifier's ABI.
   // ---------------------------------------------------------------------------

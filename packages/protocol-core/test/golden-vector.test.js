@@ -4,6 +4,8 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
   CANDIDATE_ARGON2ID_PROFILE,
   PERSON_VERSION_SCHEMA,
   PROTOCOL_IMPLEMENTATION_STATUS,
@@ -29,10 +31,6 @@ import {
   serializeCanonicalPersonVersion,
   wipeBytes,
 } from "../index.js";
-import {
-  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
-  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
-} from "../../proof-core/index.js";
 
 const vectorPath = fileURLToPath(
   new URL("../../../protocol-vectors/onchain-biography-v1.json", import.meta.url),

@@ -1,4 +1,4 @@
-import type { ProofDefinition } from "@deepfamily/proof-core";
+import type { ProofDefinition } from "@deepfamily/protocol-core";
 
 export type ProofDescriptor = ProofDefinition & {
   readonly files: {

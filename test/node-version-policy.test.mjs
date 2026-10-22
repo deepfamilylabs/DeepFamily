@@ -6,12 +6,7 @@ import { expect } from "chai";
 const MINIMUM_NODE_VERSION = "22.18.0";
 const CI_NODE_VERSION = "22.23.2";
 const NODE_ENGINE = `>=${MINIMUM_NODE_VERSION}`;
-const MANIFESTS = [
-  "package.json",
-  "frontend/package.json",
-  "packages/proof-core/package.json",
-  "packages/protocol-core/package.json",
-];
+const MANIFESTS = ["package.json", "frontend/package.json", "packages/protocol-core/package.json"];
 
 async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, "utf8"));
@@ -25,7 +20,7 @@ describe("Node.js version policy", function () {
     }
 
     const packageLock = await readJson("package-lock.json");
-    for (const workspacePath of ["", "frontend", "packages/proof-core", "packages/protocol-core"]) {
+    for (const workspacePath of ["", "frontend", "packages/protocol-core"]) {
       expect(
         packageLock.packages[workspacePath]?.engines?.node,
         `lockfile:${workspacePath}`,

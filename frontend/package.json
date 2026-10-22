@@ -20,7 +20,6 @@
     "locales:check": "npm run locales:compare && npm run locales:usage"
   },
   "dependencies": {
-    "@deepfamily/proof-core": "0.1.0",
     "@deepfamily/protocol-core": "0.1.0",
     "@hookform/resolvers": "5.2.1",
     "d3": "^7.9.0",

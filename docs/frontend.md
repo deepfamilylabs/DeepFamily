@@ -97,10 +97,11 @@ app  →  pages  →  domains  →  shared  →  (workers / abi / i18n / assets)
 - `pages/` compose domains; they should not contain reusable logic — extract to the relevant domain instead.
 - Code imported by a worker (`workers/*.worker.ts`) must stay worker-safe: no React, no DOM, no `window`. Put such code under `shared/crypto/`, `shared/zk/`, or `shared/lib/`.
 
-Cross-runtime ZK protocol definitions live in the private `@deepfamily/proof-core` workspace.
-That package must remain browser- and Node-neutral: no filesystem access, `snarkjs`, artifact
-paths, or browser URLs. Node artifact candidates belong in `lib/proofDescriptors.js`; browser
-artifact URLs belong in `frontend/src/shared/zk/proofDescriptors.ts`.
+Cross-runtime identity, encryption, archive, and ZK protocol definitions live in the private
+`@deepfamily/protocol-core` workspace. Shared proof definitions and codecs remain browser- and
+Node-neutral, with no filesystem access, `snarkjs`, artifact paths, or browser URLs. Node artifact
+candidates belong in `lib/proofDescriptors.js`; browser artifact URLs belong in
+`frontend/src/shared/zk/proofDescriptors.ts`.
 
 `frontend:source-rules` keeps frontend source inside its owning layers, keeps `scripts/check-root.mjs`
 from printing a passphrase, and keeps Argon2id behind `@deepfamily/protocol-core`.

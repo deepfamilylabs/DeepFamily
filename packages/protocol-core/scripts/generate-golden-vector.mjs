@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
+  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
   buildFilePasswordBytes,
   buildIdentityPasswordBytes,
   bytesToHex,
@@ -18,10 +20,6 @@ import {
   parseFormat1Envelope,
   wipeBytes,
 } from "../index.js";
-import {
-  DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
-  PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
-} from "../../proof-core/index.js";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDirectory, "../../..");

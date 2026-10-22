@@ -11,7 +11,7 @@ import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
   PERSON_RELATION_PROOF_DEFINITION,
   getProofDefinitionByPurpose,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);

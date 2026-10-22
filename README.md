@@ -69,6 +69,7 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 - **Zero-Knowledge**: Groth16 proofs, circom circuits, snarkjs integration
 - **Frontend**: React 18, TypeScript, Vite, TailwindCSS, D3.js family tree visualization
 - **Development**: Hardhat, Ethers v6, comprehensive testing suite
+- **Shared protocol**: `packages/protocol-core` provides identity, encryption, archives, proof encoding and receive credentials for the frontend and Node tools
 
 ### Contracts Overview
 

@@ -6,8 +6,9 @@ import os from "node:os";
 import path from "node:path";
 import { expect } from "chai";
 import hre from "hardhat";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
 import {
+  encodeGroth16AbcProofData,
+  normalizeGroth16Proof,
   buildShieldedPoolPublicInputs,
   computeShieldedCiphertextHashField,
   computeShieldedDummyInputNullifierForSlot,

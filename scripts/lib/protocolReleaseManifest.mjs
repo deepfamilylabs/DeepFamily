@@ -53,7 +53,7 @@ import {
   DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC,
   PERSON_RELATION_PROOF_DEFINITION,
   PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
-} from "../../packages/proof-core/index.js";
+} from "@deepfamily/protocol-core";
 import {
   validateKdfAttackerStudyV2Evidence,
   validateKdfDeviceMatrixV2Evidence,

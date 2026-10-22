@@ -385,7 +385,7 @@ signal: the pool picks the purpose for its action, and the adapter handles proof
 
 ## Frontend and Shared Definitions
 
-Cross-runtime definitions are owned by `packages/proof-core/`:
+Cross-runtime definitions are owned by `packages/protocol-core/`:
 
 - `proofDefinitions.js` maps purpose to circuit ID, encoding, and artifact descriptor, plus the
   person and disclosure proof definitions;
@@ -394,7 +394,7 @@ Cross-runtime definitions are owned by `packages/proof-core/`:
 - `proofEnvelopeCodec.js` normalizes snarkjs points and builds `ProofEnvelope`.
 
 Browser artifact descriptors live in `frontend/src/shared/zk/proofDescriptors.ts`; Node descriptors
-live in `lib/proofDescriptors.js`. Both consume the same proof-core definitions. Runtime artifacts
+live in `lib/proofDescriptors.js`. Both consume the same protocol-core definitions. Runtime artifacts
 are published under `frontend/public/zk/`:
 
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;

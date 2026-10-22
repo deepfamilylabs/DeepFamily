@@ -6,18 +6,18 @@ export {
   getPublicSignalSpec,
   getPublicSignalSpecByPurpose,
   normalizePublicSignalsForSpec,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 import {
   decodeDisclosureBindingPublicSignals as decodeDisclosureBindingPublicSignalsRaw,
   decodePersonRelationPublicSignals as decodePersonRelationPublicSignalsRaw,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 export type {
   DecodePublicSignalsOptions,
   PublicSignalSpec,
   PublicSignalValue,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 export type PersonRelationPublicSignalsStruct = {
   identityCommitment: bigint;

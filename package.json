@@ -7,13 +7,12 @@
   "type": "module",
   "workspaces": [
     "frontend",
-    "packages/proof-core",
     "packages/protocol-core"
   ],
   "scripts": {
     "setup": "npm install",
     "build": "hardhat --config hardhat.config.mjs --build-profile production compile",
-    "pages:build": "npm ci --workspace deepfamily-frontend --workspace @deepfamily/proof-core --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
+    "pages:build": "npm ci --workspace deepfamily-frontend --include-workspace-root=false --no-audit --no-fund && npm run build --workspace deepfamily-frontend",
     "pretest": "npm run test:protocol",
     "test": "cross-env REQUIRE_REAL_RECEIVE_PROOFS=1 hardhat --config hardhat.config.mjs test mocha",
     "test:protocol": "node scripts/generate-unicode-normalization-data.mjs --check && node scripts/generate-precis-data.mjs --check && npm test --workspace @deepfamily/protocol-core",
@@ -158,7 +157,7 @@
     "underscore": "1.13.8"
   },
   "dependencies": {
-    "@deepfamily/proof-core": "0.1.0",
+    "@deepfamily/protocol-core": "0.1.0",
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.6.1",
     "big-integer": "^1.6.52",

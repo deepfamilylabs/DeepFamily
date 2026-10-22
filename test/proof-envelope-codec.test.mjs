@@ -4,7 +4,7 @@ import {
   encodeGroth16AbcProofData,
   normalizeGroth16Proof,
   packGroth16ProofEnvelope,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 describe("proof envelope codec", () => {
   const abcProof = {

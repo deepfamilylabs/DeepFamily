@@ -28,3 +28,7 @@ export * from "./shielded-independent-key.js";
 export * from "./shielded-independent-key-identity.js";
 export * from "./shielded-independent-key-recovery.js";
 export * from "./shielded-value-capacity.js";
+
+export * from "./proofDefinitions.js";
+export * from "./proofEnvelopeCodec.js";
+export * from "./publicSignalSpecs.js";

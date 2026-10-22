@@ -1,5 +1,9 @@
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
-import { SHIELDED_POOL_ACTION, buildShieldedPoolPublicSignals } from "@deepfamily/protocol-core";
+import {
+  SHIELDED_POOL_ACTION,
+  buildShieldedPoolPublicSignals,
+  encodeGroth16AbcProofData,
+  normalizeGroth16Proof,
+} from "@deepfamily/protocol-core";
 import {
   getBigInt,
   hexlify,

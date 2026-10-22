@@ -6,7 +6,7 @@ import { ensureIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import {
   packGroth16ProofEnvelope,
   PERSON_RELATION_V1_PUBLIC_SIGNAL_SPEC,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 // Usage:
 // npx hardhat add-person-version --proof ./proof.json --public ./public.json \

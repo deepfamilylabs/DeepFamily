@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { poseidon4 } from "poseidon-lite";
-import { DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC } from "@deepfamily/proof-core";
+import { DISCLOSURE_BINDING_V1_PUBLIC_SIGNAL_SPEC } from "@deepfamily/protocol-core";
 import { resolveDescriptorNodeArtifactCandidates } from "../lib/proofCommon.js";
 import { DISCLOSURE_BINDING_PROOF_DESCRIPTOR } from "../lib/proofDescriptors.js";
 import {

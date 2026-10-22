@@ -2,7 +2,7 @@ import {
   DISCLOSURE_BINDING_PROOF_DEFINITION,
   PERSON_RELATION_PROOF_DEFINITION,
   type ProofDefinition,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 type BrowserProofFiles = {
   readonly wasm: string;

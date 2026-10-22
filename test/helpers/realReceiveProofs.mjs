@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/proof-core";
+import { encodeGroth16AbcProofData, normalizeGroth16Proof } from "@deepfamily/protocol-core";
 import {
   inspectLinkedReceiveArtifacts,
   RECEIVE_LINK_KEYS_PATH,

@@ -7,7 +7,7 @@ import {
   getPublicSignalSpec,
   getPublicSignalSpecByPurpose,
   normalizePublicSignalsForSpec,
-} from "@deepfamily/proof-core";
+} from "@deepfamily/protocol-core";
 
 describe("fresh-v1 public signal specs", function () {
   it("freezes the PersonRelation five-signal ABI", function () {
