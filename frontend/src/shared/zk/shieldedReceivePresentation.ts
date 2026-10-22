@@ -1,21 +1,61 @@
-import { isDevMode } from "../config/env";
+import {
+  linkGroth16Proofs,
+  prepareReceivePresentationWitness,
+  type Groth16Proof as LinkedGroth16Proof,
+} from "@deepfamily/protocol-core";
+import {
+  generateShieldedProof,
+  SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS,
+  SHIELDED_RECEIVE_LINK_KEYS,
+} from "./shieldedZk";
 
-/** The recursive issuer proof and all private lookups stay inside the asset Worker. */
-export async function proveShieldedReceivePresentation(request: Record<string, unknown>, expected: readonly (string | bigint | number)[]) {
-  // The runtime is built with the fixed issuer keys and verifies its output before returning it.
-  // @ts-ignore The Go browser runtime is generated alongside the receive prover artifacts.
-  const runtime = await import("../../../../packages/receive-prover/browser.mjs");
+const PRESENTATION_CIRCUITS = {
+  anonymous: "anonymousReceivePresentation",
+  fund: "fundReceivePresentation",
+  attachment: "attachedReceivePresentation",
+} as const;
+
+/** Prove the operation locally, then hide and link the reusable credential inputs. */
+export async function proveShieldedReceivePresentation(
+  request: Record<string, unknown>,
+  expected: readonly (string | bigint | number)[],
+) {
   const kind = request.kind;
-  if (kind !== "anonymous" && kind !== "fund" && kind !== "attachment") throw new Error("Unsupported receive proof kind");
-  const manifestPath = `/zk/receive/${kind}/manifest.json`;
-  const result = await runtime.prove({ ...request, kind }, { allowDevelopmentArtifacts: isDevMode(),
-    assetHost: { baseUrl: __ZK_ASSET_BASE_URL__, digests: __ZK_ASSET_DIGESTS__ },
-    expectedManifestSha256: __ZK_ASSET_DIGESTS__[manifestPath],
-    expectedIssuerVkSha256: __SHIELDED_RECEIVE_CREDENTIAL_VKEY_SHA256__[kind === "fund" ? "fund" : "anonymous"],
-  }) as { proof: string; publicSignals: string[] };
-  if (!/^0x[0-9a-f]+$/i.test(result.proof) || result.publicSignals.length !== expected.length ||
-    result.publicSignals.some((value, index) => BigInt(value) !== BigInt(expected[index]))) {
+  if (kind !== "anonymous" && kind !== "fund" && kind !== "attachment") {
+    throw new Error("Unsupported receive proof kind");
+  }
+  const prepared = prepareReceivePresentationWitness(request);
+  const circuit = PRESENTATION_CIRCUITS[kind];
+  if (
+    prepared.circuit !== circuit ||
+    prepared.publicInputs.length !== expected.length ||
+    prepared.publicInputs.some((value, index) => BigInt(value) !== BigInt(expected[index]))
+  ) {
     throw new Error("Receive proof does not match the authenticated transaction");
   }
-  return result;
+  const keys = SHIELDED_RECEIVE_LINK_KEYS?.[kind];
+  if (!keys?.verificationKey || !keys.deltaG1 || !keys.issuerDeltaG1) {
+    throw new Error("Receive presentation keys are missing; rebuild the ZK artifacts");
+  }
+  const { proof } = await generateShieldedProof({
+    circuit,
+    witness: prepared.witness,
+    expectedPublicSignals: [...prepared.commonInputs, ...prepared.publicInputs].map(String),
+  });
+  const linkedProof = await linkGroth16Proofs({
+    issuer: {
+      proof: request.credentialProof as LinkedGroth16Proof,
+      verificationKey:
+        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[kind === "fund" ? "fund" : "anonymous"],
+      deltaG1: keys.issuerDeltaG1,
+    },
+    presentation: {
+      proof: proof as LinkedGroth16Proof,
+      verificationKey: keys.verificationKey,
+      deltaG1: keys.deltaG1,
+    },
+    commonInputs: prepared.commonInputs,
+    publicInputs: prepared.publicInputs,
+  });
+  return { proof: linkedProof, publicSignals: prepared.publicInputs.map(String) };
 }

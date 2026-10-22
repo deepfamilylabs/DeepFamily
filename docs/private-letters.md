@@ -7,8 +7,10 @@ The product rejects version-1 credentials; the two disclosures have distinct fix
 issuer verification keys and cannot be converted by removing the identity field.
 
 An identity's two key modes and disclosures share the alias R and authorization
-counter. Credential creation reads the shared state without filtering RPC events
-by the recipient's alias. The owner can increment the counter with a proof of the
+counter. First use requires no recipient registration or transaction. Credentials
+and renewals are proved locally; creation and payment still read the latest shared
+authorization state without filtering RPC events by the recipient's alias. The
+owner can increment the counter with a proof of the
 original identity secrets. This invalidates earlier credentials on this chain
 within the checkpoint retirement window of 15 minutes. Credential expiry is checked
 against the execution block and has no grace period. Incrementing the counter does
@@ -16,11 +18,20 @@ not change spending or decryption keys, existing balances, budgets or old letter
 
 ## Proof and contract flow
 
-The Circom issuer authenticates R, counter, expiry, owner, key mode and the complete
-viewing key. `packages/receive-prover` produces a private presentation of that issuer
-proof, checks a 64-level sparse state dictionary and binds the actual operation.
-The fixed issuer key is compiled into each presentation circuit. The caller cannot
-supply a different issuer key while proving.
+The Circom issuer authenticates the canonical identity and R derived from the
+original identity secrets, counter, expiry, owner, key mode and the complete viewing
+key. The three Circom presentation circuits check a 64-level sparse state
+dictionary and bind the actual operation; attachments also check Fund-note
+membership. LinkG16 links an issuer proof and a presentation proof over the same
+hidden credential fields, then rerandomizes both proofs before submission. Neither
+circuit evaluates pairing arithmetic or recursively verifies another proof.
+
+The fixed Solidity verifiers authenticate both keys and their shared hidden inputs.
+The caller cannot choose another issuer key. The shared
+`frontend/public/zk/shielded/receive-link-keys.json` contains the public linking
+parameters; `linkKeys` in the shielded artifact manifest pins that file, the shared
+verifier base and all three generated verifiers. The original identity preimage,
+alias derivation and key-ownership requirements remain in the issuer circuits.
 
 Private Fund and PrivateTransfer submit both the existing business proof and a
 receive presentation for every external recipient output. Both proofs authenticate
@@ -58,12 +69,23 @@ expiry or revocation does not prevent recovery of an already sent letter. Plaint
 and secrets are not persisted in ordinary application storage or sent to a prover
 service.
 
-## Development
+## Browser artifacts
 
-The presentation backend pins its Go and gnark versions in
-`packages/receive-prover/go.mod`. Supply that Go toolchain in PATH, or set
-`RECEIVE_PROVER_GO_BIN` to its executable. The Go runtime is compiled to WASM for
-the existing Worker flow; its JavaScript runtime is vendored and bundled locally.
+All proving uses Circom WASM and snarkjs in the existing Worker. There is no Go
+prover, separate receive runtime or browser R1CS download. The current presentation
+WASM and zkey download sizes are:
+
+| Presentation                 |                  WASM + zkey | Linked proof | Public signals |
+| ---------------------------- | ---------------------------: | -----------: | -------------: |
+| Anonymous / private transfer | 14,216,109 bytes (13.56 MiB) |  1,184 bytes |             11 |
+| Fund                         | 14,355,369 bytes (13.69 MiB) |  1,216 bytes |             11 |
+| Attached letter              | 21,993,051 bytes (20.97 MiB) |  1,184 bytes |             14 |
+
+Only the needed presentation is loaded. The roughly 26 KiB link-key file is shared
+by all three. Proof sizes exclude public signals, other transaction data and
+ciphertext. Issuing a receive credential uses its own small issuer WASM/zkey.
+
+## Development
 
 ```sh
 npm run zk:development:setup
@@ -71,16 +93,15 @@ npm run dev:deploy
 npm run frontend:config
 ```
 
-The setup generates the Circom issuers and counter-update verifier first, then the
-three fixed-issuer presentation circuits. Generated proving files stay out of Git.
-`circuits/receive-development-manifest.json` records their hashes and the matching
-issuer keys. It also pins the Go source/module/constants catalog and the browser
-loader sources. The build records native/WASM hashes and its source snapshot;
-each circuit setup must use that same snapshot. Synchronization rejects stale
-sources, a replaced issuer key, incomplete circuit sets and modified proving files.
-Browser asset downloads use the same content-addressed asset host and
-digest checks as the existing proof assets. Local development setup remains marked
-`developmentOnly: true` and `productionReady: false`.
+The same setup handles all 14 Circom circuits, including the credential issuers,
+counter update and three presentations. It derives the shared linking parameters
+and fixed verifiers from the matching keys. Generated proving files stay out of Git.
+`circuits/shielded-development-manifest.json` records shielded artifact hashes and
+`linkKeys`; no separate receive manifest is needed. Synchronization rejects stale
+sources, mismatched issuer keys, incomplete circuit sets and modified proving
+files. Browser downloads use the existing content-addressed asset host and digest
+checks. Local keys remain marked `developmentOnly: true` and
+`productionReady: false`.
 
 Integrated deployment creates the shared state, its owner-proof adapter, the
 presentation verifiers and money router, canonical pools/factory, and letter archive.
@@ -104,23 +125,8 @@ recovery. It requires the real artifacts and fails if they are missing or do not
 match the manifests. It also runs the complete 64/32-depth business-proof check.
 Regenerate keys only when needed with `npm run zk:development:setup`.
 
-For targeted prover maintenance, prepare current-key fixtures and run the optional
-Go engine smoke. This uses the installed keys without regenerating application assets:
-
-```sh
-node scripts/receive-proof-smoke.mjs --current --prepare-only --out-dir /tmp/receive-smoke
-RECEIVE_SMOKE_FIXTURES=/tmp/receive-smoke \
-  RECEIVE_SMOKE_ARTIFACTS="$PWD/zk-artifacts/receive" \
-  go -C packages/receive-prover test -run TestReceiveProductionBatchSmoke -count=1 -v
-```
-
-The smoke retains one engine at a time and checks four fresh proofs, 47 public-signal
-mutations and 31 invalid private witnesses. `batch-smoke-results.json` records the
-circuit version, key mode and artifact-manifest digests. Add `--key-mode 1` to fixture
-preparation to exercise independently backed-up keys.
-
-The current presentation artifacts remain development-only. Receive production
-release is not ready; a Circom ceremony or a changed manifest flag does not establish
-production security for these separate presentation keys. Release checks continue to
-reject the incomplete production bundle. Production setup and external deployment
-are not prerequisites for local feature acceptance.
+`zk:check` also exercises fresh linked receive proofs and rejects changed public
+signals and invalid private witnesses. Both development and release setup use the
+same Circom toolchain and artifact catalog; there is no extra receive setup stage.
+The current keys are development-only. Local feature acceptance does not require
+production setup or external deployment.

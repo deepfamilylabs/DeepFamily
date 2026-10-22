@@ -60,15 +60,15 @@ describe("current public shielded artifacts", function () {
     try {
       const options = writeFixture(root);
       const candidate = loadCandidateArtifacts({ root, ...options });
-      assert.equal(Object.keys(candidate.circuits).length, 9);
+      assert.equal(
+        Object.keys(candidate.circuits).length,
+        Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+      );
       assert.equal(candidate.candidateClass, "development-only");
       for (const [action, entry] of Object.entries(candidate.circuits)) {
         assert.ok(entry.zkey.includes(path.join("frontend", "public", "zk", "shielded")));
         assert.ok(entry.vkey.includes(path.join("frontend", "public", "zk", "shielded")));
-        assert.equal(
-          entry.contractName,
-          SHIELDED_SETUP_CIRCUITS[action].verifierContractName,
-        );
+        assert.equal(entry.contractName, SHIELDED_SETUP_CIRCUITS[action].verifierContractName);
       }
       assert.equal(candidate.circuits.receiveCode.verifier, null);
       fs.appendFileSync(candidate.circuits.claim.verifier, "\nmodified");
@@ -138,7 +138,10 @@ describe("current public shielded artifacts", function () {
         });
         assert.equal(builds, 1);
         assert.equal(result.regenerated, false);
-        assert.equal(Object.keys(result.artifacts.circuits).length, 9);
+        assert.equal(
+          Object.keys(result.artifacts.circuits).length,
+          Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+        );
         assert.deepEqual(
           Object.values(result.artifacts.circuits).map((entry) =>
             sha256(fs.readFileSync(entry.zkey)),

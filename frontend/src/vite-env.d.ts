@@ -2,7 +2,21 @@
 
 /** The receive-code Groth16 verification key, embedded by vite.config.ts at build time. */
 declare const __SHIELDED_RECEIVE_CODE_VKEY__: Readonly<Record<string, unknown>>;
-declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: Readonly<Record<"anonymous" | "fund", Readonly<Record<string, unknown>>>>;
+declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: Readonly<
+  Record<"anonymous" | "fund", import("@deepfamily/protocol-core").Groth16VerificationKey>
+>;
+
+/** Circuit verification keys and G1 delta points authenticated by the shielded manifest. */
+declare const __RECEIVE_LINK_KEYS__: Readonly<
+  Record<
+    "anonymous" | "fund" | "attachment",
+    {
+      readonly verificationKey: import("@deepfamily/protocol-core").Groth16VerificationKey;
+      readonly deltaG1: readonly string[];
+      readonly issuerDeltaG1: readonly string[];
+    }
+  >
+> | null;
 
 /** Origin and path prefix of the R2 proving-file host; empty when served from /zk. */
 declare const __ZK_ASSET_BASE_URL__: string;
@@ -39,5 +53,3 @@ declare module "*.webp" {
   const content: string;
   export default content;
 }
-
-declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEY_SHA256__: Readonly<Record<"anonymous" | "fund", string>>;

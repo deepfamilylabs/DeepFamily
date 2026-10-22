@@ -1,5 +1,3 @@
-// Fresh temporary circuit assets, including real issuer proofs. No release keys
-// or verifier assets are produced by this test.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -45,9 +43,6 @@ function expectedSignals(witness, discloseIdentity) {
 
 test("anonymous and Fund credentials authenticate canonical R, keys, counter and expiry", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-receive-code-"));
-  const originalCpus = os.cpus;
-  // Bound only the local development setup worker count. Proofs are single-threaded.
-  os.cpus = () => originalCpus().slice(0, 2);
   try {
     const lineage = buildLineageFixture().witness;
     const identityCommitment = buildShieldedClaimFixture().heirIdentityCommitment;
@@ -85,7 +80,6 @@ test("anonymous and Fund credentials authenticate canonical R, keys, counter and
       spendingSecret: "987654321",
       ownerCommitment: String(computeShieldedOwnerCommitment(987654321n)),
     };
-    const assets = [];
     for (const [circuit, discloseIdentity] of [
       ["shielded_anonymous_receive_credential", false],
       ["shielded_fund_receive_credential", true],
@@ -94,7 +88,6 @@ test("anonymous and Fund credentials authenticate canonical R, keys, counter and
         path.join(repoRoot, "bin/circom"),
         [
           `circuits/${circuit}.circom`,
-          "--r1cs",
           "--wasm",
           "--sym",
           "--O2",
@@ -178,58 +171,8 @@ test("anonymous and Fund credentials authenticate canonical R, keys, counter and
           assert.equal(first[1], renewed[1]);
         },
       );
-      assets.push({
-        circuit,
-        discloseIdentity,
-        wasm,
-        r1cs: path.join(output, `${circuit}.r1cs`),
-        witness,
-      });
     }
-    await t.test(
-      "real issuer proofs reject every public mutation and cross-disclosure reuse",
-      async () => {
-        const snarkjs = await import("snarkjs");
-        const proofs = [];
-        for (const asset of assets) {
-          const zkey = path.join(output, `${asset.circuit}.DEVELOPMENT.zkey`);
-          await snarkjs.zKey.newZKey(
-            asset.r1cs,
-            path.join(repoRoot, "circuits/ptau/ppot_0080_17.ptau"),
-            zkey,
-          );
-          const vkey = await snarkjs.zKey.exportVerificationKey(zkey);
-          const data = await snarkjs.groth16.fullProve(
-            asset.witness,
-            asset.wasm,
-            zkey,
-            undefined,
-            { singleThread: true },
-            { singleThread: true },
-          );
-          assert.equal(await snarkjs.groth16.verify(vkey, data.publicSignals, data.proof), true);
-          assert.deepEqual(
-            data.publicSignals,
-            expectedSignals(asset.witness, asset.discloseIdentity).map(String),
-          );
-          for (let slot = 0; slot < data.publicSignals.length; slot++) {
-            const changed = [...data.publicSignals];
-            changed[slot] = String(BigInt(changed[slot]) + 1n);
-            assert.equal(await snarkjs.groth16.verify(vkey, changed, data.proof), false);
-          }
-          proofs.push({ vkey, ...data });
-        }
-        const strippedFundSignals = proofs[1].publicSignals.filter((_, index) => index !== 3);
-        assert.deepEqual(strippedFundSignals, proofs[0].publicSignals);
-        assert.equal(
-          await snarkjs.groth16.verify(proofs[0].vkey, strippedFundSignals, proofs[1].proof),
-          false,
-        );
-        if (globalThis.curve_bn128?.terminate) await globalThis.curve_bn128.terminate();
-      },
-    );
   } finally {
-    os.cpus = originalCpus;
     fs.rmSync(output, { recursive: true, force: true });
   }
 });

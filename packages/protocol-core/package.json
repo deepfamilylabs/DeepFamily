@@ -25,6 +25,7 @@
     "@hpke/core": "1.9.0",
     "@scure/base": "1.2.6",
     "ethers": "6.17.0",
+    "ffjavascript": "0.3.1",
     "fflate": "0.8.3",
     "hash-wasm": "4.12.0",
     "poseidon-lite": "0.3.0"

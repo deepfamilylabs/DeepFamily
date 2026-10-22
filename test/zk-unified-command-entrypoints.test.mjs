@@ -11,7 +11,7 @@ import {
   checkShieldedDevelopmentArtifacts,
 } from "../scripts/check-zk-artifacts.mjs";
 import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs";
-import { SHIELDED_CIRCUITS } from "../scripts/zk-shielded-build.mjs";
+import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 import { syncShieldedDevelopmentAssets } from "../scripts/lib/shieldedDevelopmentAssets.mjs";
 import { PRODUCTION_PTAU_RELATIVE_PATH } from "../scripts/lib/productionPtau.mjs";
 import { hasShieldedSolidityVerifier } from "../scripts/lib/zkCircuitSelection.mjs";
@@ -66,7 +66,12 @@ async function developmentFixture() {
     };
   }
   const manifestPath = "circuits/shielded-development-manifest.json";
-  await syncShieldedDevelopmentAssets({ root, manifest, output: { log() {}, error() {} } });
+  await syncShieldedDevelopmentAssets({
+    root,
+    manifest,
+    output: { log() {}, error() {} },
+    linkSynchronizer: async () => {},
+  });
   const calls = [];
   const runner = (_executable, args) => {
     calls.push(args);
@@ -112,9 +117,9 @@ describe("unified ZK command entrypoints", function () {
       root: fixture.root,
       runner: fixture.runner,
     });
-    expect(result).to.deep.equal({ status: "development", circuitCount: 9 });
-    // Six verification keys and five Solidity verifiers: the receive code has none.
-    expect(fixture.calls).to.have.length(15);
+    expect(result).to.deep.equal({ status: "development", circuitCount: 12 });
+    // Twelve Circom verification keys and six Solidity verifiers for owner updates and money actions.
+    expect(fixture.calls).to.have.length(18);
   });
 
   it("checks development artifacts using an external pinned pTau selected by ZK_PTAU_PATH", function () {
@@ -124,7 +129,7 @@ describe("unified ZK command entrypoints", function () {
       runner: fixture.runner,
       env: { ZK_PTAU_PATH: external },
     });
-    expect(result.circuitCount).to.equal(9);
+    expect(result.circuitCount).to.equal(12);
     expect(fs.existsSync(path.join(fixture.root, PRODUCTION_PTAU_RELATIVE_PATH))).to.equal(false);
   });
 
@@ -134,14 +139,14 @@ describe("unified ZK command entrypoints", function () {
     expect(
       checkShieldedDevelopmentArtifacts({ ...options, env: { zk_ptau_path: external } })
         .circuitCount,
-    ).to.equal(9);
+    ).to.equal(12);
     expect(
       checkShieldedDevelopmentArtifacts({
         ...options,
         ptauPath: external,
         env: { ZK_PTAU_PATH: "missing.ptau" },
       }).circuitCount,
-    ).to.equal(9);
+    ).to.equal(12);
   });
 
   it("rejects unpinned external pTau contents and symlink file or directory paths", function () {
@@ -166,7 +171,7 @@ describe("unified ZK command entrypoints", function () {
 
   it("synchronizes every development proof file and verifier to the shared public locations", function () {
     const publicDirectory = path.join(fixture.root, "frontend/public/zk/shielded");
-    expect(fs.readdirSync(publicDirectory)).to.have.length(27);
+    expect(fs.readdirSync(publicDirectory)).to.have.length(36);
     for (const [action, item] of Object.entries(fixture.manifest.circuits)) {
       expect(sha256(path.join(publicDirectory, `${item.source}_final.zkey`))).to.equal(
         item.zkeySha256,
@@ -213,7 +218,7 @@ describe("unified ZK command entrypoints", function () {
       root: fixture.root,
       runner: fixture.runner,
     });
-    expect(result.circuitCount).to.equal(9);
+    expect(result.circuitCount).to.equal(12);
   });
 
   it("rejects an omitted circuit or a modified development zkey", function () {
@@ -266,7 +271,7 @@ describe("unified ZK command entrypoints", function () {
       },
     });
     expect(calls).to.deep.equal([fixture.root]);
-    expect(result).to.deep.equal({ status: "production", circuitCount: 9 });
+    expect(result).to.deep.equal({ status: "production", circuitCount: 12 });
     expect(() =>
       checkShieldedArtifacts({
         root: fixture.root,
@@ -282,7 +287,7 @@ describe("unified ZK command entrypoints", function () {
     ).to.throw("all configured circuits");
   });
 
-  it("requires independently verified receipt evidence before checking all Circom circuits", async function () {
+  it("checks the fixed linking keys and both Circom ceremony groups without counting presentations twice", async function () {
     const calls = [];
     const options = {
       root: fixture.root,
@@ -305,7 +310,7 @@ describe("unified ZK command entrypoints", function () {
       },
       shieldedVerifier: async (args) => {
         calls.push(["shielded", args]);
-        return { circuitCount: 9, manifestSha256: "22".repeat(32) };
+        return { circuitCount: 12, manifestSha256: "22".repeat(32) };
       },
     };
     const result = await verifyAllProductionCeremonies(options);
@@ -335,7 +340,7 @@ describe("unified ZK command entrypoints", function () {
     );
   });
 
-  it("blocks mainnet and rehearsal ceremony verification before other circuits without production receipt evidence", async function () {
+  it("rejects missing or invalid production linking keys before checking circuit ceremonies", async function () {
     let otherVerifiersCalled = false;
     const options = {
       root: fixture.root,
@@ -345,12 +350,12 @@ describe("unified ZK command entrypoints", function () {
       },
       shieldedVerifier: async () => {
         otherVerifiersCalled = true;
-        return { circuitCount: 9 };
+        return { circuitCount: 12 };
       },
     };
     await assert.rejects(
       () => verifyAllProductionCeremonies(options),
-      /Receive production setup and independent verification are not provided/u,
+      /Receive presentations require production Circom artifacts/u,
     );
     expect(otherVerifiersCalled).to.equal(false);
     for (const receive of [
@@ -363,7 +368,7 @@ describe("unified ZK command entrypoints", function () {
             ...options,
             receiveInspector: async () => receive,
           }),
-        /requires independently verified production receive presentation evidence/u,
+        /requires.*production receive presentation evidence/u,
       );
     }
     expect(otherVerifiersCalled).to.equal(false);

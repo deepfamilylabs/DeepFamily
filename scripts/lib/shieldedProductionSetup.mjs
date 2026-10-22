@@ -17,9 +17,13 @@ import {
 } from "./productionPtau.mjs";
 import { checkedFile, sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
-import { hasShieldedSolidityVerifier } from "./zkCircuitSelection.mjs";
+import {
+  hasShieldedSolidityVerifier,
+  RECEIVE_PRESENTATION_CIRCUITS,
+} from "./zkCircuitSelection.mjs";
 import { assertSnarkjsRuntimeHash } from "./snarkjsToolchain.mjs";
 import { verifyShieldedCeremonyArtifacts } from "./shieldedCeremonyVerification.mjs";
+import { syncLinkedReceiveArtifacts, RECEIVE_LINK_KEYS_PATH } from "./linkedReceiveArtifacts.mjs";
 
 export const SHIELDED_PRODUCTION_MANIFEST_PATH = "circuits/shielded-production-manifest.json";
 export const SHIELDED_PHASE2_TRANSCRIPT_PATH = "release-evidence/shielded/phase2-transcript.json";
@@ -44,15 +48,18 @@ const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 
 /** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
 const publicSignalCount = (action) =>
-  action === "receiveCode"
-    ? SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT
-    : action === "anonymousReceiveCredential"
-      ? 11
-      : action === "fundReceiveCredential"
-        ? 12
-        : action === "identityAuthorizationUpdate"
-          ? 8
-          : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
+  RECEIVE_PRESENTATION_CIRCUITS[action]
+    ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
+      RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
+    : action === "receiveCode"
+      ? SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT
+      : action === "anonymousReceiveCredential"
+        ? 11
+        : action === "fundReceiveCredential"
+          ? 12
+          : action === "identityAuthorizationUpdate"
+            ? 8
+            : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
 
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
   Object.fromEntries(
@@ -197,6 +204,7 @@ export async function buildShieldedProductionRecords({
   beaconHash,
   beaconIterationsExp,
   sourceDigest = sourceBundleSha256(root),
+  linkSynchronizer = syncLinkedReceiveArtifacts,
 }) {
   if (releaseCriteria !== undefined) {
     if (!sameKeys(releaseCriteria, RELEASE_CRITERIA_FIELDS)) {
@@ -282,9 +290,21 @@ export async function buildShieldedProductionRecords({
     circuits,
     ...(releaseCriteria === undefined ? {} : { releaseCriteria: { ...releaseCriteria } }),
   };
+  const linkedRoot = path.join(stageRoot, "linked");
+  await linkSynchronizer({
+    root,
+    outputRoot: linkedRoot,
+    manifest,
+    circuitFiles: Object.fromEntries(
+      Object.entries(finalized).map(([action, key]) => [
+        action,
+        { zkey: key.finalZkey, vkey: key.verificationKey },
+      ]),
+    ),
+  });
   const manifestPath = path.join(stageRoot, "release", "shielded-production-manifest.json");
   await fsp.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
-  return Object.freeze({ transcriptPath, manifestPath, transcript, manifest });
+  return Object.freeze({ transcriptPath, manifestPath, transcript, manifest, linkedRoot });
 }
 
 export function shieldedProductionInstallEntries({ compiled, finalized, records }) {
@@ -308,6 +328,19 @@ export function shieldedProductionInstallEntries({ compiled, finalized, records 
     );
   }
   entries.push(
+    ...(records.manifest.linkKeys
+      ? [
+          RECEIVE_LINK_KEYS_PATH,
+          ...Object.values(RECEIVE_PRESENTATION_CIRCUITS).map(
+            (spec) => `contracts/${spec.contractName}.sol`,
+          ),
+        ].map((file) => {
+          const source = path.join(records.linkedRoot, file);
+          if (!fs.existsSync(source))
+            throw new Error(`Missing staged receive linking artifact: ${file}`);
+          return { source, destination: file };
+        })
+      : []),
     { source: records.transcriptPath, destination: SHIELDED_PHASE2_TRANSCRIPT_PATH },
     { source: records.manifestPath, destination: SHIELDED_PRODUCTION_MANIFEST_PATH },
   );
@@ -410,7 +443,9 @@ export function inspectShieldedProductionArtifacts({
   }
   const actions = Object.keys(SHIELDED_SETUP_CIRCUITS);
   if (!sameKeys(manifest.circuits, actions) || !sameKeys(transcript.circuits, actions)) {
-    throw new Error("Shielded production manifest and transcript must cover all configured circuits");
+    throw new Error(
+      "Shielded production manifest and transcript must cover all configured circuits",
+    );
   }
   if (manifest.releaseCriteria !== undefined) {
     if (!sameKeys(manifest.releaseCriteria, RELEASE_CRITERIA_FIELDS)) {

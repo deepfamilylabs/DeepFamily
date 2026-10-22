@@ -8,6 +8,34 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   claim: "shielded_claim",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
+  anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
+  fundReceivePresentation: "shielded_fund_receive_presentation",
+  attachedReceivePresentation: "shielded_attached_receive_presentation",
+});
+
+/** Both Groth16 relations use the same hidden credential prefix; only operation fields escape. */
+export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
+  anonymousReceivePresentation: Object.freeze({
+    kind: "anonymous",
+    issuer: "anonymousReceiveCredential",
+    hiddenInputs: 11,
+    publicInputs: 11,
+    contractName: "AnonymousReceivePresentationVerifier",
+  }),
+  fundReceivePresentation: Object.freeze({
+    kind: "fund",
+    issuer: "fundReceiveCredential",
+    hiddenInputs: 12,
+    publicInputs: 11,
+    contractName: "FundReceivePresentationVerifier",
+  }),
+  attachedReceivePresentation: Object.freeze({
+    kind: "attachment",
+    issuer: "anonymousReceiveCredential",
+    hiddenInputs: 11,
+    publicInputs: 14,
+    contractName: "AttachedReceivePresentationVerifier",
+  }),
 });
 
 /**
@@ -18,6 +46,7 @@ export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze([
   "receiveCode",
   "anonymousReceiveCredential",
   "fundReceiveCredential",
+  ...Object.keys(RECEIVE_PRESENTATION_CIRCUITS),
 ]);
 export const hasShieldedSolidityVerifier = (action) =>
   !SHIELDED_CLIENT_ONLY_CIRCUITS.includes(action);

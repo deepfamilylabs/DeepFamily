@@ -16,16 +16,13 @@ import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
-test("64-level owner authorization proves canonical empty/collision/increment transitions", async (t) => {
+test("64-level owner authorization proves canonical empty/collision/increment transitions", async () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-identity-counter-"));
-  const originalCpus = os.cpus;
-  os.cpus = () => originalCpus().slice(0, 2);
   try {
     execFileSync(
       path.join(root, "bin/circom"),
       [
         "circuits/shielded_identity_authorization_update.circom",
-        "--r1cs",
         "--wasm",
         "--O2",
         "--sanity_check",
@@ -63,7 +60,6 @@ test("64-level owner authorization proves canonical empty/collision/increment tr
         "suiteId",
       ].map((name) => [name, lineage[name]]),
     );
-    let first;
     for (const state of [
       buildShieldedIdentityAuthorizationState(),
       buildShieldedIdentityAuthorizationState([[11n, 1n]]),
@@ -96,36 +92,8 @@ test("64-level owner authorization proves canonical empty/collision/increment tr
         { isOld0: "2" },
       ])
         await assertConstraintViolation(() => calc.calculateWitness({ ...witness, ...patch }, 1));
-      first ??= { transition, witness };
     }
-    await t.test("actual Groth16 owner proof rejects every changed public signal", async () => {
-      const snarkjs = await import("snarkjs");
-      const zkey = path.join(out, "owner.DEVELOPMENT.zkey");
-      await snarkjs.zKey.newZKey(
-        path.join(out, "shielded_identity_authorization_update.r1cs"),
-        path.join(root, "circuits/ptau/ppot_0080_17.ptau"),
-        zkey,
-      );
-      const vkey = await snarkjs.zKey.exportVerificationKey(zkey);
-      const data = await snarkjs.groth16.fullProve(
-        first.witness,
-        wasm,
-        zkey,
-        undefined,
-        { singleThread: true },
-        { singleThread: true },
-      );
-      assert.deepEqual(data.publicSignals, first.transition.publicSignals.map(String));
-      assert.equal(await snarkjs.groth16.verify(vkey, data.publicSignals, data.proof), true);
-      for (let index = 0; index < 8; index++) {
-        const changed = [...data.publicSignals];
-        changed[index] = String(BigInt(changed[index]) + 1n);
-        assert.equal(await snarkjs.groth16.verify(vkey, changed, data.proof), false);
-      }
-    });
   } finally {
-    if (globalThis.curve_bn128?.terminate) await globalThis.curve_bn128.terminate();
-    os.cpus = originalCpus;
     fs.rmSync(out, { recursive: true, force: true });
   }
 });

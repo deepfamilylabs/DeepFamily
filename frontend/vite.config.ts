@@ -33,12 +33,51 @@ const shieldedReceiveCredentialVerificationKeys = Object.fromEntries(
   })
 )
 
-const shieldedReceiveCredentialVerificationKeyHashes = Object.fromEntries(
-  ['anonymous', 'fund'].map(disclosure => {
-    const artifact = new URL(`./public/zk/shielded/shielded_${disclosure}_receive_credential.vkey.json`, import.meta.url)
-    return [disclosure, fs.existsSync(artifact) ? createHash('sha256').update(fs.readFileSync(artifact)).digest('hex') : '']
-  })
-)
+const readReceiveLinkKeys = (required: boolean) => {
+  const productionManifest = new URL('../circuits/shielded-production-manifest.json', import.meta.url)
+  const manifestFile = fs.existsSync(productionManifest)
+    ? productionManifest
+    : new URL('../circuits/shielded-development-manifest.json', import.meta.url)
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+  const relativePath = 'frontend/public/zk/shielded/receive-link-keys.json'
+  const artifact = new URL('../' + relativePath, import.meta.url)
+  if (!manifest.linkKeys && !required) return null
+  if (manifest.linkKeys?.path !== relativePath || !/^[0-9a-f]{64}$/.test(manifest.linkKeys?.sha256 ?? '')) {
+    throw new Error('Receive linking keys are missing from the shielded manifest; rebuild the ZK artifacts')
+  }
+  const bytes = fs.readFileSync(artifact)
+  if (createHash('sha256').update(bytes).digest('hex') !== manifest.linkKeys.sha256) {
+    throw new Error('Receive linking keys differ from the shielded manifest')
+  }
+  const keys = JSON.parse(bytes.toString('utf8'))
+  if (Object.keys(keys).sort().join() !== 'anonymous,attachment,fund') {
+    throw new Error('Receive linking keys must authenticate all three presentation circuits')
+  }
+  for (const kind of ['anonymous', 'fund', 'attachment']) {
+    const key = keys[kind]
+    const commonSignals = kind === 'fund' ? 12 : 11
+    const publicSignals = kind === 'attachment' ? 14 : 11
+    if (key?.verificationKey?.protocol !== 'groth16' ||
+      key.verificationKey.nPublic !== commonSignals + publicSignals ||
+      !Array.isArray(key.deltaG1) || key.deltaG1.length !== 3 ||
+      !Array.isArray(key.issuerDeltaG1) || key.issuerDeltaG1.length !== 3) {
+      throw new Error(`Invalid receive linking key for ${kind}`)
+    }
+    const issuer = kind === 'fund' ? 'fund' : 'anonymous'
+    const issuerBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${issuer}_receive_credential.vkey.json`, import.meta.url))
+    const issuerDigest = createHash('sha256').update(issuerBytes).digest('hex')
+    const action = kind === 'attachment' ? 'attachedReceivePresentation' : `${kind}ReceivePresentation`
+    const source = kind === 'attachment' ? 'attached' : kind
+    const presentationBytes = fs.readFileSync(new URL(`./public/zk/shielded/shielded_${source}_receive_presentation.vkey.json`, import.meta.url))
+    if (issuerDigest !== key.issuerVerificationKeySha256 ||
+      issuerDigest !== manifest.circuits?.[`${issuer}ReceiveCredential`]?.verificationKeySha256 ||
+      createHash('sha256').update(presentationBytes).digest('hex') !== manifest.circuits?.[action]?.verificationKeySha256 ||
+      JSON.stringify(JSON.parse(presentationBytes.toString('utf8'))) !== JSON.stringify(key.verificationKey)) {
+      throw new Error(`Receive linking keys do not match the pinned ${kind} Circom verification keys`)
+    }
+  }
+  return keys
+}
 
 // Proving WASM/zkey files are not in Git; the browser checks each download against these digests.
 const zkAssetDigests = Object.fromEntries(
@@ -197,7 +236,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       __SHIELDED_RECEIVE_CODE_VKEY__: JSON.stringify(shieldedReceiveCodeVerificationKey),
       __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: JSON.stringify(shieldedReceiveCredentialVerificationKeys),
-      __SHIELDED_RECEIVE_CREDENTIAL_VKEY_SHA256__: JSON.stringify(shieldedReceiveCredentialVerificationKeyHashes),
+      __RECEIVE_LINK_KEYS__: JSON.stringify(readReceiveLinkKeys(command === 'build')),
       __ZK_ASSET_BASE_URL__: JSON.stringify(zkAssetBaseUrl),
       __ZK_ASSET_DIGESTS__: JSON.stringify(zkAssetDigests),
     },

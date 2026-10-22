@@ -84,6 +84,12 @@ describe("Receive presentation real-proof canonical pool and letter integration"
       const credentialDir = fs.mkdtempSync(
         path.join(os.tmpdir(), "deepfamily-receive-credentials-"),
       );
+      const gasUsed = {};
+      const recordTransaction = async (label, transaction) => {
+        const receipt = await (await transaction).wait();
+        gasUsed[label] = receipt.gasUsed.toString();
+        return receipt;
+      };
       try {
         // Issuance, both Fund verifications and all letter presentations use real proofs.
         // Only lineage roots are supplied by the established test fixture.
@@ -234,7 +240,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           },
           shieldInputs.signals,
         ).solidityProof;
-        await pool.shield(1000n, shield, shieldProof, { value: 1000n });
+        await recordTransaction(
+          "shield",
+          pool.shield(1000n, shield, shieldProof, { value: 1000n }),
+        );
         const counterState = buildShieldedIdentityAuthorizationState();
         const prepare = async (credential, consumer, action, messageId, payloadHash, salt) =>
           prepareShieldedReceivePresentation({
@@ -413,7 +422,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           assert.equal(await pool.nullifierSpent(data.inputNullifiers[0]), false);
           assert.equal(await pool.commitmentExists(budget.commitment), false);
           budget.leaf = Number((await pool.noteShard(0)).size);
-          await pool.fund(data, businessProof);
+          await recordTransaction(
+            iteration === 0 ? "fundInitial" : "fundContinuation",
+            pool.fund(data, businessProof),
+          );
           assert.equal(await pool.commitmentExists(budget.commitment), true);
           budget.acceptedRoot = (await pool.noteShard(0)).root;
           budgets.push(budget);
@@ -512,7 +524,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         ).to.be.revertedWithCustomError(pool, "InvalidReceiveProof");
         assert.equal(await pool.nullifierSpent(transfer.inputNullifiers[0]), false);
         assert.equal(await pool.commitmentExists(external.commitment), false);
-        await pool.privateTransfer(transfer, transferProof);
+        await recordTransaction("privateTransfer", pool.privateTransfer(transfer, transferProof));
         assert.equal(await pool.nullifierSpent(transfer.inputNullifiers[0]), true);
         assert.equal(await pool.commitmentExists(external.commitment), true);
         assert.equal(await pool.commitmentExists(selfChange.commitment), true);
@@ -610,12 +622,18 @@ describe("Receive presentation real-proof canonical pool and letter integration"
             await expect(
               letters.registerLetter(delivery, ciphertext, proof),
             ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await letters.registerAttachedLetter(delivery, attached, ciphertext, proof);
+            await recordTransaction(
+              `attachedLetter${index}`,
+              letters.registerAttachedLetter(delivery, attached, ciphertext, proof),
+            );
           } else {
             await expect(
               letters.registerLetter(delivery, `${ciphertext}00`, proof),
             ).to.be.revertedWithCustomError(letters, "InvalidLetterProof");
-            await letters.registerLetter(delivery, ciphertext, proof);
+            await recordTransaction(
+              "standaloneLetter",
+              letters.registerLetter(delivery, ciphertext, proof),
+            );
           }
           const record = await letters.letterRecord(messageId);
           assert.equal(record.relationCommitment, relation);
@@ -699,14 +717,17 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         ).solidityProof;
         const [authorizationNullifier, , , alias, oldRoot, newRoot, oldCounter, newCounter] =
           transition.publicSignals;
-        await state.incrementCounter(
-          authorizationNullifier,
-          alias,
-          oldRoot,
-          newRoot,
-          oldCounter,
-          newCounter,
-          incrementProof,
+        await recordTransaction(
+          "authorizationIncrement",
+          state.incrementCounter(
+            authorizationNullifier,
+            alias,
+            oldRoot,
+            newRoot,
+            oldCounter,
+            newCounter,
+            incrementProof,
+          ),
         );
         // Discard the issuing device's material. Recovery below uses only the original
         // backups plus credentials, after the on-chain counter has changed.
@@ -794,7 +815,10 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           asOf: BigInt(renewed.presentation.asOf),
           recipientBinding: renewed.recipientBinding,
         };
-        await letters.registerLetter(renewedDelivery, pendingCiphertext, renewedProof);
+        await recordTransaction(
+          "renewedLetter",
+          letters.registerLetter(renewedDelivery, pendingCiphertext, renewedProof),
+        );
         records.push({
           messageId: pendingId,
           record: await letters.letterRecord(pendingId),
@@ -888,6 +912,9 @@ describe("Receive presentation real-proof canonical pool and letter integration"
               { code: "SHIELDED_LETTER_DECRYPTION_FAILED" },
             );
           }
+        }
+        if (process.env.RECEIVE_GAS_REPORT === "1") {
+          console.log(`Receive real-proof gas (keyMode ${keyMode}): ${JSON.stringify(gasUsed)}`);
         }
       } finally {
         prover.cleanup();

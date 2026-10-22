@@ -82,8 +82,8 @@ export function emptyShieldedReceiveAuthorizations() {
 }
 
 /**
- * Builds private prover input, never a public transport packet. A fixed issuer key must verify
- * credentialProof inside the presentation circuit. No identity, R or reusable proof is sent on chain.
+ * Builds private prover input, never a public transport packet. The issuer and presentation
+ * proofs are linked over hidden common inputs. No identity, R or reusable proof is sent on chain.
  */
 export function prepareShieldedReceivePresentation(input) {
   const credential = input.credential;
@@ -154,6 +154,81 @@ export function prepareShieldedReceivePresentation(input) {
       presentation,
     },
   };
+}
+
+/**
+ * The common prefix is public only to the local Groth16 prover. LinkG16 blinds it before
+ * transport; callers must never submit the raw presentation proof or this prefix on chain.
+ */
+export function prepareReceivePresentationWitness(request) {
+  const kinds = {
+    anonymous: ["anonymousReceivePresentation", 11],
+    fund: ["fundReceivePresentation", 12],
+    attachment: ["attachedReceivePresentation", 11],
+  };
+  check(request && Object.hasOwn(kinds, request.kind), "Unsupported receive presentation kind");
+  const [circuit, count] = kinds[request.kind];
+  check(
+    Array.isArray(request.credentialPublicSignals) &&
+      request.credentialPublicSignals.length === count,
+    "Incorrect credential signal count",
+  );
+  const commonInputs = request.credentialPublicSignals.map((value) =>
+    String(field(value, "credential signal")),
+  );
+  const p = request.presentation;
+  check(p && typeof p === "object", "Missing receive presentation");
+  const publicNames = [
+    "chainId",
+    "consumer",
+    "action",
+    "messageId",
+    "cipherLo",
+    "cipherHi",
+    "checkpointId",
+    "stateRoot",
+    "asOf",
+    "expiresAt",
+    "binding",
+  ];
+  const witness = { credentialPublicSignals: commonInputs };
+  for (const name of [...publicNames, "salt", "depth", "oldKey", "oldValue", "isOld0", "absent"]) {
+    witness[name] = String(field(p[name], name));
+  }
+  check(
+    Array.isArray(p.siblings) && p.siblings.length === 64,
+    "Authorization path requires 64 siblings",
+  );
+  witness.siblings = p.siblings.map((value) => String(field(value, "authorization sibling")));
+  const publicInputs = publicNames.map((name) => witness[name]);
+  if (request.kind === "attachment") {
+    const a = request.attachment;
+    check(a && typeof a === "object", "Missing attachment witness");
+    for (const name of ["budgetPool", "budgetRoot", "relation"]) {
+      witness[name] = String(field(a[name], name));
+      publicInputs.push(witness[name]);
+    }
+    for (const name of [
+      "policy",
+      "enrollment",
+      "rate",
+      "remaining",
+      "nonce",
+      "ciphertextHash",
+      "depth",
+      "index",
+    ]) {
+      witness[`budget${name[0].toUpperCase()}${name.slice(1)}`] = String(field(a[name], name));
+    }
+    check(
+      Array.isArray(a.siblings) && a.siblings.length === 32,
+      "Budget path requires 32 siblings",
+    );
+    witness.budgetSiblings = a.siblings.map((value) => String(field(value, "budget sibling")));
+  } else {
+    check(request.attachment === undefined, "Unexpected attachment witness");
+  }
+  return { circuit, witness, commonInputs, publicInputs };
 }
 
 /** Rebuild from all contract events, never query an RPC with a private recipient alias. */

@@ -24,14 +24,8 @@ import { prepareShieldedReceivePresentation } from "../packages/protocol-core/sh
 import { buildShieldedIdentityAuthorizationState } from "../packages/protocol-core/shielded-identity-authorization.js";
 import { buildShieldedClaimFixture } from "../circuits/test/generate_shielded_claim_input.mjs";
 import { buildLineageFixture } from "../circuits/test/generate_lineage_fixture.mjs";
-import { buildReceiveProver, nativeReceiveBinary } from "./receive-build.mjs";
-import { setupReceiveDevelopment } from "./receive-development-setup.mjs";
-import {
-  inspectReceiveArtifacts,
-  readReceiveBuildSnapshot,
-  receiveArtifactSha256,
-} from "./lib/receiveArtifacts.mjs";
-import { RECEIVE_CIRCUIT_VERSION } from "../packages/receive-prover/browser.mjs";
+import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
+import { proveReceivePresentation, verifyReceivePresentation } from "./lib/receiveProofs.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const sourceNames = {
@@ -269,75 +263,41 @@ export async function smokeReceiveProofs({
   outDir = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-receive-smoke-")),
   prepareOnly = false,
   reuse = false,
-  existingIssuers = false,
-  issuerDirectory,
-  artifactDirectory,
-  current = false,
   keyMode = 0,
 } = {}) {
   outDir = path.resolve(outDir);
-  if (current) {
-    // Exercise the exact keys and native prover already used by the application,
-    // without drawing fresh setup randomness or replacing any artifacts.
-    inspectReceiveArtifacts({ root });
-    artifactDirectory = path.join(root, "zk-artifacts/receive");
-    readReceiveBuildSnapshot({ root, outDir: artifactDirectory });
-    existingIssuers = true;
-    issuerDirectory = path.join(root, "frontend/public/zk/shielded");
-  }
+  const evidence = inspectLinkedReceiveArtifacts({ root });
   const fixtures = reuse
     ? JSON.parse(fs.readFileSync(path.join(outDir, "fixtures.json"), "utf8"))
-    : await prepareReceiveProofFixtures(outDir, { existingIssuers, issuerDirectory, keyMode });
+    : await prepareReceiveProofFixtures(outDir, {
+        existingIssuers: true,
+        issuerDirectory: path.join(root, "frontend/public/zk/shielded"),
+        keyMode,
+      });
   if (prepareOnly) return { outDir, ...fixtures };
-  const binary =
-    reuse || current
-      ? nativeReceiveBinary(path.resolve(artifactDirectory ?? outDir))
-      : buildReceiveProver({ outDir }).binary;
-  if (!reuse && !current)
-    setupReceiveDevelopment({
-      outDir,
-      issuerDir: fixtures.issuerDir,
-      skipBuild: true,
-      syncPublic: false,
-    });
-  const run = (args, accepts = true, rejectionLabel = args[0]) => {
-    let error;
-    try {
-      execFileSync(binary, args, { cwd: root, stdio: "pipe", maxBuffer: 16 * 1024 * 1024 });
-    } catch (caught) {
-      error = caught;
-    }
-    if (accepts && error) throw new Error(String(error.stderr || error.message));
-    if (!accepts && !error)
-      throw new Error(`Real prover/verifier accepted ${rejectionLabel}: ${args.join(" ")}`);
-  };
   const checks = [];
-  const artifactManifests = {};
   for (const item of fixtures.cases) {
-    const artifacts = path.join(path.resolve(artifactDirectory ?? outDir), item.kind);
-    artifactManifests[item.kind] = receiveArtifactSha256(path.join(artifacts, "manifest.json"));
-    const proofFile = path.join(outDir, `${item.name}.proof.json`);
-    run(["prove", "--artifacts", artifacts, "--input", item.input, "--output", proofFile]);
-    run(["verify", "--artifacts", artifacts, "--input", proofFile]);
-    const proof = JSON.parse(fs.readFileSync(proofFile, "utf8"));
+    const request = JSON.parse(fs.readFileSync(item.input, "utf8"));
+    const proof = await proveReceivePresentation({ root, request });
+    json(path.join(outDir, `${item.name}.proof.json`), proof);
     assert.equal(proof.verified, true);
     assert.equal(proof.publicSignals.length, item.kind === "attachment" ? 14 : 11);
-    checks.push(
-      `${item.name}: fresh raw-input proof verifies with full 64-level state path${item.kind === "attachment" ? " and 32-level Fund path" : ""}`,
-    );
+    checks.push(`${item.name}: full-depth Circom proof and hidden credential linkage verify`);
     for (let index = 0; index < proof.publicSignals.length; index++) {
-      const tampered = structuredClone(proof);
-      tampered.publicSignals[index] = String(BigInt(tampered.publicSignals[index]) + 1n);
-      const file = path.join(outDir, "tampered-proof.json");
-      json(file, tampered);
-      run(
-        ["verify", "--artifacts", artifacts, "--input", file],
+      const altered = [...proof.publicSignals];
+      altered[index] = String(BigInt(altered[index]) + 1n);
+      assert.equal(
+        await verifyReceivePresentation({
+          root,
+          kind: item.kind,
+          proof: proof.solidityProof,
+          publicSignals: altered,
+        }),
         false,
-        `${item.name} public field mutation at index ${index}`,
+        `${item.name} public field mutation ${index}`,
       );
     }
-    checks.push(`${item.name}: every public field mutation rejected by real verifier`);
-    const request = JSON.parse(fs.readFileSync(item.input, "utf8"));
+    checks.push(`${item.name}: every public operation field mutation rejected`);
     const changes = [
       [
         "authenticated recipient",
@@ -406,52 +366,36 @@ export async function smokeReceiveProofs({
     for (const [name, change] of changes) {
       const altered = structuredClone(request);
       change(altered);
-      const file = path.join(outDir, "invalid-request.json");
-      json(file, altered);
-      run(
-        [
-          "prove",
-          "--artifacts",
-          artifacts,
-          "--input",
-          file,
-          "--output",
-          path.join(outDir, "INVALID.proof.json"),
-        ],
-        false,
-        `${item.name} invalid ${name}`,
+      await assert.rejects(
+        proveReceivePresentation({ root, request: altered }),
+        undefined,
+        `${item.name}: invalid ${name}`,
       );
-      checks.push(`${item.name}: prover constraints reject ${name}`);
+      checks.push(`${item.name}: rejects ${name}`);
     }
   }
   json(path.join(outDir, "smoke-results.json"), {
-    developmentOnly: true,
-    productionReady: false,
-    circuitVersion: RECEIVE_CIRCUIT_VERSION,
-    artifactManifests,
+    developmentOnly: evidence.status !== "production",
+    protocol: "linked-groth16-receive-v1",
+    manifestSha256: evidence.manifestSha256,
     checks,
   });
-  console.log(`Receive proof smoke: ${checks.length} checks passed; artifacts ${outDir}`);
+  console.log(`Receive proof smoke: ${checks.length} checks passed; ${outDir}`);
   return { outDir, checks };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const index = process.argv.indexOf("--out-dir");
-  const result = await smokeReceiveProofs({
-    outDir: index < 0 ? undefined : process.argv[index + 1],
-    prepareOnly: process.argv.includes("--prepare-only"),
-    reuse: process.argv.includes("--reuse"),
-    current: process.argv.includes("--current"),
-    keyMode: process.argv.includes("--key-mode")
-      ? process.argv[process.argv.indexOf("--key-mode") + 1]
-      : 0,
-    existingIssuers: process.argv.includes("--existing-issuers"),
-    artifactDirectory: process.argv.includes("--artifacts")
-      ? process.argv[process.argv.indexOf("--artifacts") + 1]
-      : undefined,
-    issuerDirectory: process.argv.includes("--issuer-dir")
-      ? process.argv[process.argv.indexOf("--issuer-dir") + 1]
-      : undefined,
-  });
-  if (process.argv.includes("--prepare-only")) console.log(JSON.stringify(result));
+  const value = (flag) =>
+    process.argv.includes(flag) ? process.argv[process.argv.indexOf(flag) + 1] : undefined;
+  try {
+    const result = await smokeReceiveProofs({
+      outDir: value("--out-dir"),
+      prepareOnly: process.argv.includes("--prepare-only"),
+      reuse: process.argv.includes("--reuse"),
+      keyMode: value("--key-mode") ?? 0,
+    });
+    if (process.argv.includes("--prepare-only")) console.log(JSON.stringify(result));
+  } finally {
+    await globalThis.curve_bn128?.terminate?.();
+  }
 }

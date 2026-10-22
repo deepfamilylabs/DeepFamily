@@ -33,7 +33,8 @@ import {
   preparePrivateProductionCompiler,
 } from "./lib/zkProductionSetup.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
-import { inspectReceiveArtifacts } from "./lib/receiveArtifacts.mjs";
+import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
+import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
@@ -113,8 +114,11 @@ export const runReleasePreflight = async ({
   mpcMetadataReader,
   expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
   protocolManifestInspector = inspectProtocolReleaseManifest,
-  receiveArtifactInspector = inspectReceiveArtifacts,
-  receiveCeremonyVerifier,
+  receiveArtifactInspector = inspectLinkedReceiveArtifacts,
+  receiveCeremonyVerifier = async (options) => {
+    await verifyShieldedProductionCeremony(options);
+    return inspectLinkedReceiveArtifacts({ ...options, requireProduction: true });
+  },
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");

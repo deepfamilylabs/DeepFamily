@@ -47,15 +47,7 @@ const SOURCE_EXCLUSIONS = new Set([
   "contracts/AnonymousReceivePresentationVerifier.sol",
   "contracts/FundReceivePresentationVerifier.sol",
   "contracts/AttachedReceivePresentationVerifier.sol",
-  "circuits/receive-development-manifest.json",
-  "circuits/receive-production-manifest.json",
-  "frontend/public/zk/receive/receive-prover.wasm",
-  "frontend/public/zk/receive/wasm_exec.js",
-  ...["anonymous", "fund", "attachment"].flatMap((kind) =>
-    ["manifest.json", "receipt.r1cs", "receipt.pk", "receipt.vk"].map(
-      (file) => `frontend/public/zk/receive/${kind}/${file}`,
-    ),
-  ),
+  "frontend/public/zk/shielded/receive-link-keys.json",
   ...Object.values(SHIELDED_CIRCUITS).flatMap((source) => [
     `frontend/public/zk/shielded/${source}.wasm`,
     `frontend/public/zk/shielded/${source}_final.zkey`,

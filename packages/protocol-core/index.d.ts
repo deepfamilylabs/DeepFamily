@@ -1389,6 +1389,7 @@ export const SHIELDED_RECEIVE_PRESENTATION_ACTION: Readonly<{
   Fund: 3;
   PrivateTransfer: 4;
 }>;
+export * from "./groth16-link.js";
 export const SHIELDED_RECEIVE_BINDING_DOMAIN: bigint;
 export const SHIELDED_FUND_RECEIVE_BINDING_DOMAIN: bigint;
 export interface ShieldedReceiveAuthorization {
@@ -1454,3 +1455,14 @@ export function rebuildShieldedIdentityAuthorizationState(
   >,
   expectedRoot?: BigNumberish,
 ): ShieldedIdentityAuthorizationState;
+
+/** Local prover input; the credential prefix must be blinded by LinkG16 before transport. */
+export function prepareReceivePresentationWitness(request: Record<string, unknown>): {
+  circuit:
+    | "anonymousReceivePresentation"
+    | "fundReceivePresentation"
+    | "attachedReceivePresentation";
+  witness: Record<string, string | string[]>;
+  commonInputs: string[];
+  publicInputs: string[];
+};

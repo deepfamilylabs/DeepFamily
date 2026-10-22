@@ -181,16 +181,20 @@ describe("shielded production ceremony verification snapshots", function () {
     const result = await verifyShieldedCeremonyArtifacts(fixture.options);
     expect(result).to.include({
       status: "passed",
-      circuitCount: 9,
+      circuitCount: Object.keys(SHIELDED_SETUP_CIRCUITS).length,
       manifestSha256: fixture.inspected.manifestSha256,
     });
-    expect(fixture.calls).to.have.length(34);
+    expect(fixture.calls).to.have.length(
+      1 +
+        Object.keys(SHIELDED_SETUP_CIRCUITS).length * 3 +
+        Object.values(SHIELDED_SETUP_CIRCUITS).filter((spec) => spec.verifierPath).length,
+    );
     // The receive code is verified in the browser and exports no Solidity verifier.
     expect(fixture.calls.filter(({ args }) => args[3] === "solidityverifier")).to.have.length(6);
     const snapshotRoot = path.dirname(fixture.calls[0].args[3]);
     expect(snapshotRoot).not.to.equal(path.dirname(fixture.ptau));
     const nativeCalls = fixture.calls.filter(({ executable }) => executable !== process.execPath);
-    expect(nativeCalls).to.have.length(9);
+    expect(nativeCalls).to.have.length(Object.keys(SHIELDED_SETUP_CIRCUITS).length);
     expect(
       nativeCalls.every(({ executable }) => executable === path.join(snapshotRoot, "circom")),
     ).to.equal(true);

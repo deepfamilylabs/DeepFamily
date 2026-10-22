@@ -13,6 +13,9 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   receiveCode: "shielded_receive_code",
   anonymousReceiveCredential: "shielded_anonymous_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
+  anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
+  fundReceivePresentation: "shielded_fund_receive_presentation",
+  attachedReceivePresentation: "shielded_attached_receive_presentation",
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
   fund: "shielded_fund",
@@ -28,6 +31,9 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   receiveCode: SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
   anonymousReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous,
   fundReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund,
+  anonymousReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 11,
+  fundReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund + 11,
+  attachedReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 14,
   identityAuthorizationUpdate: 8,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
@@ -42,6 +48,7 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
  */
 export const SHIELDED_RECEIVE_CODE_VERIFICATION_KEY = __SHIELDED_RECEIVE_CODE_VKEY__;
 export const SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS = __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__;
+export const SHIELDED_RECEIVE_LINK_KEYS = __RECEIVE_LINK_KEYS__;
 export type ShieldedWitness = Record<string, string | number | Array<string | string[]>>;
 type Artifacts = { wasm: Uint8Array; zkey: Uint8Array; vkey: unknown };
 const cache = new Map<ShieldedCircuitName, Promise<Artifacts>>();
@@ -60,10 +67,16 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
   const existing = cache.get(circuit);
   if (existing) return existing;
   const pending = (async () => {
+    const linkedKind = receivePresentationKind(circuit);
+    const pinnedKey = linkedKind ? SHIELDED_RECEIVE_LINK_KEYS?.[linkedKind]?.verificationKey : null;
+    if (linkedKind && !pinnedKey) {
+      throw new Error("Receive presentation keys are missing; rebuild the ZK artifacts");
+    }
     const [wasm, zkey, vkey] = await Promise.all([
       fetchZkAsset(artifactPath(circuit, ".wasm")),
       fetchZkAsset(artifactPath(circuit, "_final.zkey")),
-      fetchArtifact(artifactPath(circuit, ".vkey.json")).then((response) => response.json()),
+      pinnedKey ??
+        fetchArtifact(artifactPath(circuit, ".vkey.json")).then((response) => response.json()),
     ]);
     return { wasm, zkey, vkey };
   })().catch((error) => {
@@ -72,6 +85,13 @@ async function loadArtifacts(circuit: ShieldedCircuitName): Promise<Artifacts> {
   });
   cache.set(circuit, pending);
   return pending;
+}
+
+function receivePresentationKind(circuit: ShieldedCircuitName) {
+  if (circuit === "anonymousReceivePresentation") return "anonymous";
+  if (circuit === "fundReceivePresentation") return "fund";
+  if (circuit === "attachedReceivePresentation") return "attachment";
+  return null;
 }
 
 /** A proof is accepted locally only for the exact public values sent on chain. */
@@ -100,13 +120,14 @@ export async function generateShieldedProof(input: {
   const { wasm, zkey, vkey } = await loadArtifacts(input.circuit);
   const result = await snarkjs.groth16.fullProve(input.witness, wasm, zkey);
   assertShieldedPublicSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
-  const verificationKey = input.circuit === "receiveCode"
-    ? SHIELDED_RECEIVE_CODE_VERIFICATION_KEY
-    : input.circuit === "anonymousReceiveCredential"
-      ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous
-      : input.circuit === "fundReceiveCredential"
-        ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.fund
-        : vkey;
+  const verificationKey =
+    input.circuit === "receiveCode"
+      ? SHIELDED_RECEIVE_CODE_VERIFICATION_KEY
+      : input.circuit === "anonymousReceiveCredential"
+        ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous
+        : input.circuit === "fundReceiveCredential"
+          ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.fund
+          : vkey;
   if (!(await snarkjs.groth16.verify(verificationKey, result.publicSignals, result.proof))) {
     throw new Error(`Shielded ${input.circuit} proof failed local verification`);
   }

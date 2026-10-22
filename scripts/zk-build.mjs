@@ -44,7 +44,6 @@ export const buildZkBuildCommands = ({
   circuit = "all",
   platform = process.platform,
   compilerPath,
-  syncReceive = true,
 } = {}) => {
   const resolvedRoot = path.resolve(root);
   const executable = compilerPath ?? path.join(resolvedRoot, localCircomBinaryPath({ platform }));
@@ -73,20 +72,6 @@ export const buildZkBuildCommands = ({
         cwd: resolvedRoot,
       });
     }),
-    ...(circuit === "all"
-      ? [
-          Object.freeze({
-            circuit: "receive",
-            executable: process.execPath,
-            args: Object.freeze([
-              path.join(resolvedRoot, "scripts", "receive-build.mjs"),
-              "--if-needed",
-              ...(syncReceive ? ["--sync-current"] : []),
-            ]),
-            cwd: resolvedRoot,
-          }),
-        ]
-      : []),
   ]);
 };
 
@@ -98,7 +83,6 @@ export const runZkBuild = async ({
   libc,
   report,
   env = process.env,
-  syncReceive = true,
   runner = defaultRunner,
   directoryCreator = defaultDirectoryCreator,
   compilerInspector = assertLocalCircomInstallation,
@@ -126,13 +110,11 @@ export const runZkBuild = async ({
     circuit,
     platform,
     compilerPath: compiler.path,
-    syncReceive,
   });
-  const circomCommands = commands.filter(({ circuit: name }) => name !== "receive");
-  if (circomCommands.some(({ executable }) => executable !== compiler.path)) {
+  if (commands.some(({ executable }) => executable !== compiler.path)) {
     throw new Error("Inspected local Circom path does not match the compiler build command");
   }
-  for (const directory of new Set(circomCommands.map(({ args }) => args.at(-1)))) {
+  for (const directory of new Set(commands.map(({ args }) => args.at(-1)))) {
     directoryCreator(path.join(resolvedRoot, directory));
   }
   for (const command of commands) {
@@ -146,8 +128,8 @@ const printUsage = () => {
   node scripts/zk-build.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Compiles the selected Circom circuits with fixed R1CS, WASM, symbol, include-path and output
-settings. The default --circuit all also builds the receive native/WASM prover, reusing a
-matching source/artifact snapshot. This command never generates or replaces proving keys.`);
+settings. The default --circuit all includes the receive presentation circuits.
+This command never generates or replaces proving keys.`);
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

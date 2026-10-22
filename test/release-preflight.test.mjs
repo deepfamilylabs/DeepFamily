@@ -29,7 +29,7 @@ import {
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
-import { inspectReceiveArtifacts } from "../scripts/lib/receiveArtifacts.mjs";
+import { inspectLinkedReceiveArtifacts } from "../scripts/lib/linkedReceiveArtifacts.mjs";
 
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
@@ -335,11 +335,12 @@ describe("production release preflight", function () {
     expect(source).not.to.include('import "dotenv/config"');
   });
 
-  it("blocks release before any work when independent receive verification is not provided", async function () {
+  it("rejects an explicitly invalid receive verifier before release work", async function () {
     const fake = createFakeRunner();
     let gitResolved = false;
     const error = await captureError(() =>
       runReleasePreflightRaw({
+        receiveCeremonyVerifier: null,
         platform: "linux",
         arch: "x64",
         libc: "glibc",
@@ -370,7 +371,7 @@ describe("production release preflight", function () {
         arch: "x64",
         libc: "glibc",
         runner: fake.runner,
-        receiveArtifactInspector: inspectReceiveArtifacts,
+        receiveArtifactInspector: inspectLinkedReceiveArtifacts,
         compilerInspector: () => {
           compilerInspected = true;
         },
@@ -379,7 +380,7 @@ describe("production release preflight", function () {
         },
       }),
     );
-    expect(error?.message).to.include("production manifest not found");
+    expect(error?.message).to.include("require production Circom artifacts");
     expect(compilerInspected).to.equal(false);
     expect(privateDirectoryCreated).to.equal(false);
     expect(fake.calls.every((call) => path.basename(call.executable) === "git")).to.equal(true);

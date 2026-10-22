@@ -6,19 +6,13 @@ import path from "node:path";
 
 import {
   compiledCircuitsMatchManifests,
-  ensureZkArtifacts as ensureZkArtifactsRaw,
+  ensureZkArtifacts,
 } from "../scripts/ensure-zk-artifacts.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
-import {
-  RECEIVE_DEVELOPMENT_MANIFEST,
-  receiveProverSourceHashes,
-} from "../scripts/lib/receiveArtifacts.mjs";
-
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
-const ensureZkArtifacts = (options) =>
-  ensureZkArtifactsRaw({ syncReceiveArtifacts: async () => {}, ...options });
+const circuitCount = 2 + Object.keys(SHIELDED_CIRCUITS).length;
 
-/** Writes the eight compiled circuits and development manifests that pin their digests. */
+/** Writes every compiled Circom circuit and development manifests that pin their digests. */
 function writeCompiledCircuits(root) {
   const compile = (directory, name) => {
     const output = path.join(root, directory);
@@ -47,14 +41,6 @@ function writeCompiledCircuits(root) {
     path.join(root, "circuits/shielded-development-manifest.json"),
     JSON.stringify({ circuits: shielded }),
   );
-  const receiveSources = path.join(root, "packages/receive-prover");
-  fs.mkdirSync(receiveSources, { recursive: true });
-  for (const file of ["circuit.go", "go.mod", "go.sum", "poseidon-constants.json"])
-    fs.writeFileSync(path.join(receiveSources, file), file);
-  fs.writeFileSync(
-    path.join(root, RECEIVE_DEVELOPMENT_MANIFEST),
-    JSON.stringify({ sourceFiles: receiveProverSourceHashes({ root }) }),
-  );
 }
 
 describe("integrated local ZK artifact preparation", function () {
@@ -67,13 +53,13 @@ describe("integrated local ZK artifact preparation", function () {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("compiles all 8 circuits and reuses verified current keys", async function () {
+  it("compiles every Circom circuit and reuses verified current keys", async function () {
     const calls = [];
-    const artifacts = { status: "development", circuitCount: 8 };
+    const artifacts = { status: "development", circuitCount };
     const result = await ensureZkArtifacts({
       root,
       build: async (options) => {
-        expect(options.syncReceive).to.equal(false);
+        expect(options).to.deep.equal({ root, circuit: "all" });
         calls.push(["build", options.circuit]);
       },
       check: async () => {
@@ -94,13 +80,10 @@ describe("integrated local ZK artifact preparation", function () {
     const result = await ensureZkArtifacts({
       root,
       build: async () => calls.push("build"),
-      syncReceiveArtifacts: async () => {
-        calls.push("sync");
-        if (!downloaded) throw new Error("missing public presentation keys");
-      },
       check: async () => {
         calls.push("check");
-        return { status: "development", circuitCount: 8 };
+        if (!downloaded) throw new Error("missing public presentation keys");
+        return { status: "development", circuitCount };
       },
       fetchAssets: async () => {
         calls.push("fetch");
@@ -109,13 +92,16 @@ describe("integrated local ZK artifact preparation", function () {
       setup: async () => calls.push("setup"),
       log: () => {},
     });
-    expect(calls).to.deep.equal(["build", "sync", "fetch", "sync", "check"]);
+    expect(calls).to.deep.equal(["build", "check", "fetch", "check"]);
     expect(result.regenerated).to.equal(false);
   });
 
-  it("regenerates the development set when receive constraints change and Circom stays unchanged", async function () {
+  it("regenerates development keys when a receive presentation circuit changes", async function () {
     writeCompiledCircuits(root);
-    fs.writeFileSync(path.join(root, "packages/receive-prover/circuit.go"), "changed constraints");
+    fs.writeFileSync(
+      path.join(root, "zk-artifacts/shielded/shielded_anonymous_receive_presentation.r1cs"),
+      "changed constraints",
+    );
     const calls = [];
     let ready = false;
     const result = await ensureZkArtifacts({
@@ -124,7 +110,7 @@ describe("integrated local ZK artifact preparation", function () {
       check: async () => {
         calls.push("check");
         if (!ready) throw new Error("missing shielded key");
-        return { status: "development", circuitCount: 8 };
+        return { status: "development", circuitCount };
       },
       fetchAssets: async () => calls.push("fetch"),
       setup: async () => {
@@ -139,8 +125,12 @@ describe("integrated local ZK artifact preparation", function () {
 
   it("stops before downloading or setup when a changed receive source does not compile", async function () {
     writeCompiledCircuits(root);
-    fs.writeFileSync(path.join(root, "packages/receive-prover/circuit.go"), "invalid Go source");
-    const compileError = new Error("Go compilation failed");
+    fs.mkdirSync(path.join(root, "circuits"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "circuits/shielded_anonymous_receive_presentation.circom"),
+      "invalid Circom source",
+    );
+    const compileError = new Error("Circom compilation failed");
     let fetchCalled = false;
     let setupCalled = false;
     try {
@@ -167,15 +157,17 @@ describe("integrated local ZK artifact preparation", function () {
 
   it("preserves proving keys when only the browser loader changed", async function () {
     writeCompiledCircuits(root);
-    fs.writeFileSync(path.join(root, "packages/receive-prover/browser.mjs"), "changed loader");
+    const loader = path.join(root, "frontend/src/shared/zk/shieldedReceivePresentation.ts");
+    fs.mkdirSync(path.dirname(loader), { recursive: true });
+    fs.writeFileSync(loader, "changed loader");
     expect(compiledCircuitsMatchManifests({ root })).to.equal(true);
     let setupCalled = false;
     try {
       await ensureZkArtifacts({
         root,
         build: async () => {},
-        syncReceiveArtifacts: async () => {
-          throw new Error("Receive loader stale source");
+        check: async () => {
+          throw new Error("Receive linking loader changed");
         },
         fetchAssets: async () => {},
         setup: async () => {
@@ -185,7 +177,7 @@ describe("integrated local ZK artifact preparation", function () {
       });
       expect.fail("Expected loader mismatch to remain blocked without replacing keys");
     } catch (error) {
-      expect(error.message).to.contain("unchanged circuits (Receive loader stale source)");
+      expect(error.message).to.contain("unchanged circuits (Receive linking loader changed)");
     }
     expect(setupCalled).to.equal(false);
   });
@@ -221,41 +213,6 @@ describe("integrated local ZK artifact preparation", function () {
       expect(error.message).to.contain("npm run zk:assets:publish");
       expect(error.message).to.contain("npm run zk:development:setup");
     }
-    expect(setupCalled).to.equal(false);
-  });
-
-  it("does not regenerate unchanged keys when downloaded keys cannot synchronize the native kit", async function () {
-    writeCompiledCircuits(root);
-    const calls = [];
-    let setupCalled = false;
-    try {
-      await ensureZkArtifacts({
-        root,
-        build: async ({ circuit }) => {
-          calls.push(`build:${circuit}`);
-        },
-        syncReceiveArtifacts: async () => {
-          calls.push("sync");
-          throw new Error("native key synchronization failed");
-        },
-        check: async () => {
-          calls.push("check");
-          throw new Error("public presentation keys missing");
-        },
-        fetchAssets: async () => calls.push("fetch"),
-        setup: async () => {
-          setupCalled = true;
-        },
-        log: () => {},
-      });
-      expect.fail("Expected native synchronization failure to preserve existing keys");
-    } catch (error) {
-      expect(error.message).to.contain(
-        "Refusing to replace the committed development keys of unchanged circuits " +
-          "(native key synchronization failed)",
-      );
-    }
-    expect(calls).to.deep.equal(["build:all", "sync", "fetch", "sync"]);
     expect(setupCalled).to.equal(false);
   });
 

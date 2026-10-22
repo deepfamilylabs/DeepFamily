@@ -6,6 +6,7 @@ import { syncZkAssets } from "../../circuits/sync-zk-assets.mjs";
 import { renameZkVerifierSource } from "../rename-zk-verifier.mjs";
 import { SHIELDED_SETUP_CIRCUITS } from "./shieldedProductionSetup.mjs";
 import { checkedFile } from "./shieldedSourceBundle.mjs";
+import { syncLinkedReceiveArtifacts } from "./linkedReceiveArtifacts.mjs";
 
 export const SHIELDED_DEVELOPMENT_MANIFEST_PATH = "circuits/shielded-development-manifest.json";
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -15,6 +16,7 @@ export async function syncShieldedDevelopmentAssets({
   root = process.cwd(),
   manifest,
   output = console,
+  linkSynchronizer = syncLinkedReceiveArtifacts,
 } = {}) {
   root = path.resolve(root);
   if (fs.existsSync(path.join(root, "circuits/shielded-production-manifest.json"))) {
@@ -83,6 +85,7 @@ export async function syncShieldedDevelopmentAssets({
     item.verifierContractName = spec.verifierContractName;
     item.solidityVerifierSha256 = sha256(file);
   }
+  await linkSynchronizer({ root, manifest });
   const raw = `${JSON.stringify(manifest, null, 2)}\n`;
   fs.writeFileSync(path.join(directory, "development-manifest.json"), raw);
   fs.writeFileSync(path.join(root, SHIELDED_DEVELOPMENT_MANIFEST_PATH), raw);

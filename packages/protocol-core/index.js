@@ -15,6 +15,7 @@ export * from "./shielded-receive-code.js";
 export * from "./shielded-receive-credential.js";
 export * from "./shielded-identity-authorization.js";
 export * from "./shielded-receive-presentation.js";
+export * from "./groth16-link.js";
 export * from "./shielded-hpke.js";
 export * from "./shielded-letters.js";
 export * from "./shielded-note-codec.js";

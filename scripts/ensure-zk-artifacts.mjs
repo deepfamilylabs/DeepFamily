@@ -13,14 +13,8 @@ import {
   sha256File,
 } from "./lib/zkArtifactTrust.mjs";
 import { runZkBuild } from "./zk-build.mjs";
-import { syncCurrentReceiveArtifacts } from "./receive-build.mjs";
 import { runZkDevelopmentSetup } from "./zk-development-setup.mjs";
-import {
-  RECEIVE_DEVELOPMENT_MANIFEST,
-  RECEIVE_PRODUCTION_MANIFEST,
-  inspectReceiveArtifacts,
-  receiveProverSourceHashes,
-} from "./lib/receiveArtifacts.mjs";
+import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -35,11 +29,9 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
       "All Circom circuits must use the same development or production artifact status",
     );
   }
-  const receive = inspectReceiveArtifacts({ root, requireProduction: production });
+  const receive = inspectLinkedReceiveArtifacts({ root, requireProduction: production });
   const circuitCount =
-    Object.keys(ZK_RELEASE_ARTIFACTS).length +
-    Object.keys(SHIELDED_CIRCUITS).length +
-    receive.circuitCount;
+    Object.keys(ZK_RELEASE_ARTIFACTS).length + Object.keys(SHIELDED_CIRCUITS).length;
   return {
     status: production ? "production" : "development",
     circuitCount,
@@ -50,8 +42,8 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
 }
 
 /**
- * Whether the compiled Circom circuits and receive constraint sources match their pinned
- * development snapshots. Loader changes do not justify replacing any proving keys.
+ * Whether every compiled Circom circuit matches its pinned development snapshot.
+ * Browser loader changes do not justify replacing any proving keys.
  */
 export function compiledCircuitsMatchManifests({ root = ROOT } = {}) {
   const pinned = (manifest) => {
@@ -68,7 +60,7 @@ export function compiledCircuitsMatchManifests({ root = ROOT } = {}) {
       shielded[action]?.source === name ? shielded[action] : undefined,
     ]),
   ];
-  const circomMatches = circuits.every(([directory, name, expected]) => {
+  return circuits.every(([directory, name, expected]) => {
     const r1cs = path.join(root, directory, `${name}.r1cs`);
     const wasm = path.join(root, directory, `${name}_js`, `${name}.wasm`);
     return (
@@ -79,22 +71,9 @@ export function compiledCircuitsMatchManifests({ root = ROOT } = {}) {
       sha256File(wasm) === expected.wasmSha256
     );
   });
-  if (!circomMatches) return false;
-  const receiveManifest = path.join(root, RECEIVE_DEVELOPMENT_MANIFEST);
-  if (!fs.existsSync(receiveManifest)) return false;
-  const expectedSources = JSON.parse(fs.readFileSync(receiveManifest, "utf8")).sourceFiles;
-  const actualSources = receiveProverSourceHashes({ root });
-  return (
-    expectedSources !== null &&
-    typeof expectedSources === "object" &&
-    !Array.isArray(expectedSources) &&
-    Object.keys(expectedSources).length === Object.keys(actualSources).length &&
-    Object.entries(actualSources).every(([file, digest]) => expectedSources[file] === digest)
-  );
 }
 
-async function reuseCurrentArtifacts({ root, check, syncReceiveArtifacts, log }) {
-  await syncReceiveArtifacts({ root });
+async function reuseCurrentArtifacts({ root, check, log }) {
   const artifacts = await check({ root });
   log(`[zk] All ${artifacts.circuitCount} current public artifact sets are ready`);
   return { regenerated: false, artifacts };
@@ -108,28 +87,26 @@ export async function ensureZkArtifacts({
   fetchAssets = fetchZkAssets,
   setup = runZkDevelopmentSetup,
   circuitsUnchanged = compiledCircuitsMatchManifests,
-  syncReceiveArtifacts = syncCurrentReceiveArtifacts,
   log = console.log,
 } = {}) {
   root = path.resolve(root);
-  await build({ root, circuit: "all", syncReceive: false });
+  await build({ root, circuit: "all" });
   let failure;
   try {
-    return await reuseCurrentArtifacts({ root, check, syncReceiveArtifacts, log });
+    return await reuseCurrentArtifacts({ root, check, log });
   } catch (error) {
     failure = error;
   }
   // A fresh checkout holds only the manifests; the pinned proving files come from R2.
   try {
     await fetchAssets({ root, log });
-    return await reuseCurrentArtifacts({ root, check, syncReceiveArtifacts, log });
+    return await reuseCurrentArtifacts({ root, check, log });
   } catch (error) {
     failure = error;
   }
   const coreManifest = path.join(root, "circuits/zk-artifacts-manifest.json");
   if (
     fs.existsSync(path.join(root, "circuits/shielded-production-manifest.json")) ||
-    fs.existsSync(path.join(root, RECEIVE_PRODUCTION_MANIFEST)) ||
     (fs.existsSync(coreManifest) &&
       JSON.parse(fs.readFileSync(coreManifest, "utf8")).trustedSetup?.status !== "development")
   ) {

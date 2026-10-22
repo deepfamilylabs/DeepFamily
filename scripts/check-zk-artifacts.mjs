@@ -19,7 +19,7 @@ import {
   inspectShieldedProductionArtifacts,
 } from "./lib/shieldedProductionSetup.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
-import { inspectReceiveArtifacts } from "./lib/receiveArtifacts.mjs";
+import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
 import { SHIELDED_CIRCUITS } from "./zk-shielded-build.mjs";
 
@@ -313,10 +313,9 @@ export function checkShieldedArtifacts({
 export function main({ circomOnly = false } = {}) {
   const core = checkCoreArtifacts();
   const shielded = checkShieldedArtifacts();
-  // Circom setup must finish before its fixed issuer keys can be compiled into
-  // the presentation circuits. This intermediate check never authorizes release.
+  // All relations now use the same Circom artifact workflow.
   if (circomOnly) return { core, shielded };
-  const receive = inspectReceiveArtifacts({
+  const receive = inspectLinkedReceiveArtifacts({
     root: projectRoot,
     requireProduction: shielded.status === "production",
   });

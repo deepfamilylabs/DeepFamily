@@ -24,6 +24,7 @@ import {
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
 import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
+import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 
 const usage = () => {
   console.log(`Usage:
@@ -314,10 +315,10 @@ export const verifyAllProductionCeremonies = async ({
   ptauPath,
   coreVerifier = verifyProductionCeremony,
   shieldedVerifier = verifyShieldedProductionCeremony,
-  receiveInspector,
+  receiveInspector = inspectLinkedReceiveArtifacts,
 } = {}) => {
-  // Every production protocol deployment includes the presentation verifiers.
-  // Circom ceremony evidence cannot establish the trust of their gnark keys.
+  // Presentations are Circom relations covered by the same shielded ceremony;
+  // independently check the fixed keys embedded by the lightweight linker.
   if (typeof receiveInspector !== "function") {
     throw new Error("Receive production setup and independent verification are not provided");
   }
@@ -349,7 +350,7 @@ export const verifyAllProductionCeremonies = async ({
     core,
     shielded,
     receive,
-    circuitCount: expectedCoreCircuits.length + shieldedCount + receive.circuitCount,
+    circuitCount: expectedCoreCircuits.length + shieldedCount,
   });
 };
 

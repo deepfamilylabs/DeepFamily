@@ -1,7 +1,7 @@
 # DeepFamily Production ZK Setup
 
-This runbook covers production setup for the eleven Circom circuits (two core and
-nine shielded):
+This runbook covers production setup for all fourteen Circom circuits (two core and
+twelve shielded, including three receive presentations):
 
 ```bash
 npm run zk:production:setup
@@ -10,16 +10,14 @@ npm run zk:production:setup
 This command generates and verifies the Circom transcripts and manifests. It does
 not commit files, deploy contracts, upload assets or authorize a Mainnet release.
 
-The three receive presentation circuits use a separate proving system and embed
-the credential issuer verification keys. Their current artifacts remain
-`developmentOnly: true` and `productionReady: false`; the Circom setup does not make
-these keys suitable for production. Receive production release is currently not
-ready. The unified `npm run zk:ceremony:verify` verifies the complete protocol
-production bundle and currently refuses to proceed without independent receive
-verification. Release preflight also rejects this incomplete bundle; a successful
-Circom setup alone cannot qualify the protocol for release. Local feature
-acceptance uses the shared development setup and `npm test`; it does not require a
-separate production setup stage.
+Receive presentations use ordinary Circom Groth16 proofs linked to their issuer
+proofs through LinkG16. They require no recursive pairing arithmetic, Go prover or
+separate ceremony. The same setup derives `shielded/receive-link-keys.json` and
+the three fixed Solidity verifiers; the shielded manifest's `linkKeys` pins their
+hashes and the shared verifier base. Verification checks these bindings together
+with all fourteen circuit ceremonies. Current checked-in keys remain
+`developmentOnly: true` and `productionReady: false`. Local acceptance uses the
+shared development setup and `npm test`; no production setup is required for it.
 
 ## Trust model
 
@@ -51,7 +49,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All 11 Circom circuits reuse the same published BN254 Phase 1 file:
+All 14 Circom circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -100,7 +98,7 @@ ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-`npm run zk:development:setup` prepares all 11 Circom circuits using the same committed Phase 1 file. Its Phase 2 contribution
+`npm run zk:development:setup` prepares all 14 Circom circuits using the same pinned Phase 1 file. Its Phase 2 contribution
 passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
 secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
 records no ceremony evidence, so it does not establish a production trust model. The resulting
@@ -288,10 +286,11 @@ Internally the command:
 7. embeds one `deepfamily-single-operator` contribution in each zkey;
 8. only after every contribution, generates a separate 32-byte local CSPRNG finalization value and
    applies it to every zkey;
-9. exports every verification key and Solidity verifier and stages the browser WASM/zkey assets;
+9. exports every verification key and Solidity verifier, derives the receive-link parameters and
+   three fixed receive verifiers, and stages the browser WASM/zkey assets;
 10. reads the real contribution metadata embedded in every final zkey;
 11. creates the identity/disclosure records at `circuits/zk-ceremony-transcript.json` and
-    `circuits/zk-artifacts-manifest.json`, plus the nine-circuit shielded records at
+    `circuits/zk-artifacts-manifest.json`, plus the twelve-circuit shielded records at
     `release-evidence/shielded/phase2-transcript.json` and
     `circuits/shielded-production-manifest.json`;
 12. rechecks the reviewed R1CS/WASM and pTau bytes, then validates the staged schema, pTau
@@ -343,9 +342,11 @@ The identity/disclosure schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all nine shielded circuits to their source and artifact hashes, the pinned
+`@1` schemas bind all twelve shielded circuits to their source and artifact hashes, the pinned
 toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
-manifests and two transcripts are generated and installed together.
+manifests and two transcripts are generated and installed together. The shielded manifest also
+binds the shared receive-link parameters, verifier base and all three fixed receive verifiers
+through `linkKeys`; no standalone receive manifest is installed.
 
 `platform` and `architecture` describe the Node/compiler execution runtime, not a hardware
 attestation.
@@ -371,15 +372,15 @@ git diff -- \
   release-evidence/shielded/phase2-transcript.json \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
-  contracts/Shielded*Verifier.sol
+  contracts/Shielded*Verifier.sol \
+  contracts/*ReceivePresentationVerifier.sol \
+  contracts/libraries/LinkedGroth16Verifier.sol \
+  frontend/public/zk/shielded/receive-link-keys.json
 
 npm run zk:ceremony:verify
 npm run zk:artifacts:check
 npm run zk:check
 ```
-
-The complete-bundle commands above currently reject the missing receive production
-verification; Circom setup success does not make those release gates pass.
 
 Review the large binary assets by comparing their hashes with the manifest rather than attempting
 to render their bytes. Publish the browser WASM/zkey files to R2, then commit the manifest,
@@ -396,13 +397,17 @@ git add \
   contracts/PersonCommitmentVerifier.sol \
   contracts/DisclosureBindingVerifier.sol \
   contracts/Shielded*Verifier.sol \
+  contracts/*ReceivePresentationVerifier.sol \
+  contracts/libraries/LinkedGroth16Verifier.sol \
+  frontend/public/zk/shielded/receive-link-keys.json \
   'frontend/public/zk/*.vkey.json' \
   'frontend/public/zk/shielded/*.vkey.json'
 
 git commit -m "chore: install production zk artifacts"
 ```
 
-The controlled release archive includes both manifests and transcripts, all 7 verifier contracts,
+The controlled release archive includes both manifests and transcripts, all 11 verifier contracts,
+the shared `LinkedGroth16Verifier.sol` base and `receive-link-keys.json`,
 and all browser proving artifacts under `frontend/public/zk/`. Include the ignored R1CS/WASM build
 outputs from both `zk-artifacts/circuits/` and `zk-artifacts/shielded/`, matched to their production
 manifest hashes. The final proving and verification keys come from the public directories. A clean

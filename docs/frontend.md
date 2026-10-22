@@ -404,11 +404,11 @@ remain candidates until valid funds history confirms them. These local workflow
 markers do not prove where users saved material or introduce another spending
 condition in the circuits.
 
-| Operation | Required material |
-| --- | --- |
-| Recover and use matching VALUE | Original credentials session and verified independent key root; active identity proof capability and a current-chain person record are unnecessary |
-| Generate an identity-authorized receive code | Its original identity proof capability plus the selected verified independent key slot |
-| Claim a independent-key BUDGET | Original identity proof material, verified independent key root, and existing family, period and enrollment eligibility |
+| Operation                                    | Required material                                                                                                                                  |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recover and use matching VALUE               | Original credentials session and verified independent key root; active identity proof capability and a current-chain person record are unnecessary |
+| Generate an identity-authorized receive code | Its original identity proof capability plus the selected verified independent key slot                                                             |
+| Claim a independent-key BUDGET               | Original identity proof material, verified independent key root, and existing family, period and enrollment eligibility                            |
 
 The credentials handle exists independently of the nullable identity DTO.
 Identity proof failure does not erase successfully derived independent-key credentials;
@@ -433,6 +433,15 @@ Transfers and withdrawals show a spend review before proving. The review disting
 The ordinary wallet `G` supplies deposits and gas; it does not determine either slot's owner. Signature source `S` is needed only for signature-root creation/restoration and may differ from `G`. Changing `G` invalidates prepared work without rederiving funds. ERC-20 deposits check the connected wallet's token balance before approval and proof preparation, and read it again after proving before gas estimation. A sufficient allowance does not establish a sufficient token balance. When allowance is insufficient, the deposit button explicitly approves the selected amount first. Approval checks the public receipt and allowance, keeps the current unlocked task, then offers deposit confirmation; approval itself does not deposit funds. Transaction feedback identifies the operation, and starting a new approval or deposit clears the previous inline result so an estimation failure cannot appear beside an earlier success. Public wallets, their funding links, deposit/exit amounts, timing and unusual amounts can associate private activity; the panel explains these limits without claiming complete anonymity.
 
 A receive code needs the unlocked identity and selected slot, with independent-key mode past its recovery gate. Its proof binds identity, owner, viewing key, key mode and suite/derivation versions. The code fingerprint excludes randomized proof bytes. The main-thread verification display and the asset Worker's payment preparation both verify the code; preparation also checks the intended child/mode before any consolidation. A valid proof does not authenticate which independent root the recipient intended: anyone holding the recipient's identity credentials can produce another valid mode-1 code. Payers do not confirm a fingerprint, so the code must come from the recipient over a trusted channel and should be shared privately.
+
+First use requires no recipient registration or transaction. Credential creation
+and renewal happen locally after reading the latest shared authorization counter;
+payment checks the latest state again. The asset Worker uses Circom and snarkjs for
+both issuance and presentation. LinkG16 links their ordinary Groth16 proofs over
+the same hidden credential fields and rerandomizes them before submission, keeping
+the original code, alias and identity off chain for anonymous receipts. There is
+no recursive verifier circuit or separate Go/WASM runtime. The original identity
+preimage, canonical alias and key-ownership constraints remain in the issuer.
 
 Secrets, roots, note openings and witnesses remain in `ShieldedAssetSession`;
 React receives public handles, amounts and proofs. Locking, scope changes,
@@ -568,7 +577,7 @@ npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks the complete ZK artifact bundle (11 Circom circuits and three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks the complete ZK artifact bundle (14 Circom circuits, including three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 
@@ -602,13 +611,21 @@ Run this after adding or removing i18n keys. Translations live under `frontend/s
 
 Proof workflows load public artifacts at runtime:
 
-- Inputs: `.wasm`, `.zkey`, `.vkey.json`
-- Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); only `.vkey.json` is committed, `npm run zk:assets:fetch` installs the rest
+- Inputs: `.wasm`, `.zkey`, `.vkey.json`, and the shared `shielded/receive-link-keys.json` for receive presentations
+- Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys and the small receive-link key file are committed, `npm run zk:assets:fetch` installs proving files
 - Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
-- Circuit catalog: 2 identity circuits plus 6 shielded circuits (`receiveCode`, `shield`, `fund`, `claim`, `privateTransfer`, `unshield`), 8 in total
+- Circuit catalog: 2 identity/disclosure circuits plus 12 shielded circuits (five business actions, two credential issuers, three presentations, the authorization update and the isolated old `receiveCode` fixture), 14 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.
+
+The payer loads one presentation's WASM and zkey: 13.56 MiB for anonymous receipts,
+13.69 MiB for Fund or 20.97 MiB for attached letters. The roughly 26 KiB linking
+key file is shared; its digest and three fixed on-chain verifiers are pinned by
+the shielded manifest's `linkKeys`. Browsers do not fetch R1CS files. Submitted
+linked proofs are 1,184 bytes for anonymous/attached receipts and 1,216 bytes for
+Fund, with eleven public signals (fourteen for attachments) and ciphertext counted
+separately. See [private letters](private-letters.md#browser-artifacts) for exact sizes.
 
 ## Encrypted Version Metadata
 

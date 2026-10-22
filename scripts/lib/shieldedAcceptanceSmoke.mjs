@@ -232,9 +232,20 @@ export async function runShieldedAcceptanceSmoke({
     const block = await provider.getBlock("latest");
     const overrides = { blockTag: block.number };
     const creation = Number(await contract.creationBlock(overrides));
-    const events = await contract.queryFilter(contract.filters.CounterIncremented(), creation, block.number);
-    const state = rebuildShieldedIdentityAuthorizationState(events, await contract.currentRoot(overrides));
-    return { state, checkpointId: await contract.currentCheckpointId(overrides), asOf: BigInt(block.timestamp) };
+    const events = await contract.queryFilter(
+      contract.filters.CounterIncremented(),
+      creation,
+      block.number,
+    );
+    const state = rebuildShieldedIdentityAuthorizationState(
+      events,
+      await contract.currentRoot(overrides),
+    );
+    return {
+      state,
+      checkpointId: await contract.currentCheckpointId(overrides),
+      asOf: BigInt(block.timestamp),
+    };
   };
   const receiveCodeFor = async (material, keys, disclosure = "fund") => {
     const action = disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential";
@@ -245,7 +256,8 @@ export async function runShieldedAcceptanceSmoke({
       disclosure,
       ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
       authorizationAlias: alias,
-      authorizationCounter: getShieldedIdentityAuthorizationWitness(checkpoint.state, alias).authorizationCounter,
+      authorizationCounter: getShieldedIdentityAuthorizationWitness(checkpoint.state, alias)
+        .authorizationCounter,
       expiresAt: checkpoint.asOf + 86400n,
       ownerCommitment: keys.ownerCommitment,
       viewingKey: keys.viewingKey,
@@ -299,30 +311,58 @@ export async function runShieldedAcceptanceSmoke({
   const authorizeReceivers = async (action, data, credentials) => {
     const checkpoint = await loadAuthorizationState();
     const hash = computeShieldedReceiveActionHash(data);
-    const fields = action === "fund" ? { receiveAuthorizationAlias: "0", receiveSalt: "0" } : {
-      receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"], receiveKeyModes: ["0", "0"],
-      receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
-    };
+    const fields =
+      action === "fund"
+        ? { receiveAuthorizationAlias: "0", receiveSalt: "0" }
+        : {
+            receiveAuthorizationAliases: ["0", "0"],
+            receiveSalts: ["0", "0"],
+            receiveKeyModes: ["0", "0"],
+            receiveViewKeyLo: ["0", "0"],
+            receiveViewKeyHi: ["0", "0"],
+          };
     for (const [slot, credential] of credentials.entries()) {
       if (!credential) continue;
       const salt = generateShieldedRandomField();
-      const prepared = prepareShieldedReceivePresentation({ credential, salt, ...checkpoint,
-        chainId, consumer: poolAddress, action: action === "fund" ? 3 : 4, messageId: slot, payloadHash: hash });
+      const prepared = prepareShieldedReceivePresentation({
+        credential,
+        salt,
+        ...checkpoint,
+        chainId,
+        consumer: poolAddress,
+        action: action === "fund" ? 3 : 4,
+        messageId: slot,
+        payloadHash: hash,
+      });
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-receive-acceptance-"));
       let result;
       try {
-        const input = path.join(temporary, "input.json"), output = path.join(temporary, "proof.json");
+        const input = path.join(temporary, "input.json"),
+          output = path.join(temporary, "proof.json");
         fs.writeFileSync(input, JSON.stringify(prepared.request), { mode: 0o600 });
-        execFileSync(path.join(root, "zk-artifacts/receive/receive-prover"), ["prove", "--artifacts",
-          path.join(root, "frontend/public/zk/receive", prepared.request.kind), "--input", input, "--output", output],
-          { cwd: root, stdio: "pipe", timeout: 600000, maxBuffer: 1024 * 1024 });
+        execFileSync(
+          process.execPath,
+          [path.join(root, "scripts/lib/receiveProofs.mjs"), "--input", input, "--output", output],
+          { cwd: root, stdio: "pipe", timeout: 600000, maxBuffer: 1024 * 1024 },
+        );
         result = JSON.parse(fs.readFileSync(output, "utf8"));
         assert.equal(result.verified, true);
         assert.deepEqual(result.publicSignals, prepared.publicSignals.map(String));
-      } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
-      data.receiveAuthorizations[slot] = { checkpointId: checkpoint.checkpointId, asOf: checkpoint.asOf,
-        expiresAt: credential.expiresAt, recipientBinding: prepared.recipientBinding, proof: result.solidityProof };
-      if (action === "fund") Object.assign(fields, { receiveAuthorizationAlias: String(credential.authorizationAlias), receiveSalt: String(salt) });
+      } finally {
+        fs.rmSync(temporary, { recursive: true, force: true });
+      }
+      data.receiveAuthorizations[slot] = {
+        checkpointId: checkpoint.checkpointId,
+        asOf: checkpoint.asOf,
+        expiresAt: credential.expiresAt,
+        recipientBinding: prepared.recipientBinding,
+        proof: result.solidityProof,
+      };
+      if (action === "fund")
+        Object.assign(fields, {
+          receiveAuthorizationAlias: String(credential.authorizationAlias),
+          receiveSalt: String(salt),
+        });
       else {
         const view = splitShieldedViewPublicKey(credential.viewingKey);
         fields.receiveAuthorizationAliases[slot] = String(credential.authorizationAlias);
@@ -769,7 +809,9 @@ export async function runShieldedAcceptanceSmoke({
       ),
       ...outputs([additionalFundingBudget, additionalFundingChange]),
     };
-    const additionalReceiverWitness = await authorizeReceivers("fund", additionalFundingData, [recipient]);
+    const additionalReceiverWitness = await authorizeReceivers("fund", additionalFundingData, [
+      recipient,
+    ]);
     const additionalFundingInputs = publicInputsFor("fund", additionalFundingData);
     const additionalFundingProof = await prove(
       "fund",
@@ -1177,7 +1219,10 @@ export async function runShieldedAcceptanceSmoke({
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
-    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, [await receiveCodeFor(childMaterial, childKeys, "anonymous"), null]);
+    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, [
+      await receiveCodeFor(childMaterial, childKeys, "anonymous"),
+      null,
+    ]);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",

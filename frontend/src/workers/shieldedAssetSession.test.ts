@@ -20,6 +20,8 @@ import {
   encryptShieldedLetter,
   computeShieldedLetterCiphertextHash,
   computeShieldedLetterRelationCommitment,
+  computeShieldedAuthorizationAlias,
+  buildShieldedIdentityAuthorizationState,
 } from "@deepfamily/protocol-core";
 import { ShieldedAssetSession, shieldedAssetErrorMessage } from "./shieldedAssetSession";
 import { InheritanceError } from "../domains/inheritance/model/inheritanceErrors";
@@ -34,6 +36,8 @@ const mocks = vi.hoisted(() => ({
   discoverPools: vi.fn(),
   loadLineage: vi.fn(),
   readLetters: vi.fn(),
+  network: vi.fn(),
+  authorizationState: vi.fn(),
   lineage: "0x1111111111111111111111111111111111111111",
   verifier: "0x2222222222222222222222222222222222222222",
   pool: "0x3333333333333333333333333333333333333333",
@@ -46,7 +50,7 @@ vi.mock("ethers", async (importOriginal) => {
   return {
     ...actual,
     JsonRpcProvider: class {
-      getNetwork = async () => ({ chainId: 31337n });
+      getNetwork = mocks.network;
       getBlockNumber = async () => 12;
       getBlock = async () => ({ hash: `0x${"aa".repeat(32)}`, timestamp: 1000 });
     },
@@ -77,10 +81,7 @@ vi.mock("../shared/clients/contractFactory", () => ({
 }));
 vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
   createIdentityAuthorizationContract: () => ({}),
-  loadShieldedIdentityAuthorizationState: async () => {
-    const { buildShieldedIdentityAuthorizationState } = await import("@deepfamily/protocol-core");
-    return { state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
-  },
+  loadShieldedIdentityAuthorizationState: mocks.authorizationState,
 }));
 vi.mock("../domains/inheritance/services/privateLetterChain", () => ({
   createPrivateLetterContract: () => ({ POOL_FACTORY: async () => mocks.factory, AUTHORIZATION_STATE: async () => mocks.verifier }),
@@ -137,6 +138,8 @@ vi.setConfig({ testTimeout: 30_000 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.network.mockReset().mockResolvedValue({ chainId: 31337n });
+  mocks.authorizationState.mockReset().mockResolvedValue({ state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 });
   mocks.independentKeyIdentity
     .mockReset()
     .mockImplementation(async () => independentKeyIdentitySecret.slice());
@@ -178,6 +181,37 @@ beforeEach(() => {
     fundingTemplates: new Map(),
     shieldedPolicies: new Map(),
   }));
+});
+
+describe("receive-code current authorization state", () => {
+  it("reads the current authorization state before issuing a new identity's code", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    await expect(session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" })).resolves.toEqual({ code: "public-code" });
+    expect(mocks.receive).toHaveBeenCalledWith(expect.objectContaining({ authorizationCounter: 0n }));
+    expect(mocks.network).toHaveBeenCalledOnce();
+    expect(mocks.authorizationState).toHaveBeenCalledOnce();
+  });
+
+  it("uses a nonzero current counter and reloads it for every renewal", async () => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    const alias = computeShieldedAuthorizationAlias({ identityCommitment: 31n, derivedSecretField: 13n });
+    for (const counter of [3n, 7n]) {
+      mocks.authorizationState.mockResolvedValueOnce({ state: buildShieldedIdentityAuthorizationState([[alias, counter]]), checkpointId: counter + 1n, asOf: 1000n, blockNumber: 12 });
+      await session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" });
+      expect(mocks.receive).toHaveBeenLastCalledWith(expect.objectContaining({ authorizationCounter: counter }));
+    }
+    expect(mocks.authorizationState).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["network", "authorizationState"] as const)("refuses to generate a code when the %s read fails", async (dependency) => {
+    const session = new ShieldedAssetSession();
+    await session.unlockIdentity(identityParams());
+    mocks[dependency].mockRejectedValue(new Error("RPC unavailable"));
+    await expect(session.receiveCode({ slot: "identity", context, expiresAt: "2000000000" })).rejects.toThrow("RPC unavailable");
+    expect(mocks.receive).not.toHaveBeenCalled();
+  });
 });
 
 function independentKeyParams(session: ShieldedAssetSession) {

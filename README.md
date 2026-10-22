@@ -149,8 +149,8 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers 11 Circom circuits (two identity/disclosure and nine shielded)
-and three receive presentation circuits. Receive credentials, letters and recovery use these
+The same `zk:*` workflow covers 14 Circom circuits (two identity/disclosure and twelve shielded,
+including three receive presentations). Receive credentials, letters and recovery use these
 shared build, setup and verification commands:
 
 Run `npm run test:circuits` for shielded constraint tests. They compile the current sources into
@@ -163,26 +163,32 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
-| `npm run zk:build`             | Compile the Circom circuits and build the receive prover           |
+| `npm run zk:build`             | Compile all 14 Circom circuits                                     |
 | `npm run zk:development:setup` | Generate all development keys and verifiers                        |
-| `npm run zk:production:setup`  | Generate production keys and verifiers for the 11 Circom circuits  |
+| `npm run zk:production:setup`  | Generate production keys and verifiers for all 14 Circom circuits  |
 | `npm run zk:check`             | Check current artifacts and available real proof fixtures          |
 | `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact bundle                  |
-| `npm run zk:ceremony:verify`   | Verify the complete production bundle (currently unavailable)      |
+| `npm run zk:ceremony:verify`   | Verify the complete production artifact bundle                     |
 
-Each Groth16 circuit has its own proving and verification keys. The Circom production setup
-performs the required circuit-specific setup for all 11 Circom circuits. Development setup
-also generates the three presentations against the matching credential issuer keys. Generated
-browser files go under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
+Each Groth16 circuit has its own proving and verification keys. Both setup commands handle
+the complete catalog and derive the shared receive-link parameters and three fixed Solidity
+verifiers from the matching keys. Generated browser files go under `frontend/public/zk/` and
+Solidity verifiers under `contracts/`.
 
-The current receive presentation keys are development-only. Receive production release is not
-ready: the existing Circom ceremony does not establish production security for the separate
-presentation circuits. Both `npm run zk:ceremony:verify` and `npm run release:preflight`
-reject this incomplete production bundle; completing Circom setup alone cannot qualify a release.
-Local functionality and real-proof acceptance use the development artifacts through the shared
-workflow; no separate receive setup or deployment-configuration step is needed.
+Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
+credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
+The payer downloads one presentation's WASM/zkey: about 13.56 MiB for anonymous receipts,
+13.69 MiB for Fund, or 20.97 MiB for attachments, plus a shared 26 KiB link-key file.
+The submitted proof is 1,184 bytes (anonymous/attachment) or 1,216 bytes (Fund), excluding
+public signals and ciphertext. First use needs no recipient registration or transaction;
+credential creation and payment still read the latest authorization counter. See
+[private letters](docs/private-letters.md) for the exact flow and sizes.
 
-The browser `.wasm` and `.zkey` files are not committed; only their `.vkey.json` files are. The
+Current keys remain development-only. Local functionality and real-proof acceptance use them
+through the shared workflow; no separate receive setup or deployment-configuration step is needed.
+
+The browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files and the
+small shared `shielded/receive-link-keys.json` are committed. The
 circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
 `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`. The repository names no host: set the variable
 in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
@@ -249,8 +255,8 @@ the reviewed old-manifest and new-runtime digests, validates the complete old pr
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 11 Circom circuits,
-generates their development keys and the three matching receive presentation key sets, exports
+Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 14 Circom circuits,
+generates their development keys and the matching receive-link parameters, exports
 the Solidity verifiers, copies the required frontend assets, and updates the development manifests.
 The Circom Phase 2 contribution runs on any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
 production.

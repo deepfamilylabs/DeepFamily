@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   computeIdentityFromDerivedSecret,
+  computeShieldedAuthorizationAlias,
+  buildShieldedIdentityAuthorizationState,
   decodeShieldedReceiveCredential,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
@@ -21,10 +23,24 @@ import {
   verifyShieldedReceiveCode,
 } from "./shieldedReceiveCode";
 
-const mocks = vi.hoisted(() => ({ deriveIdentityMaterial: vi.fn() }));
+const mocks = vi.hoisted(() => ({ deriveIdentityMaterial: vi.fn(), authorizationState: vi.fn(), providerDestroy: vi.fn() }));
 vi.mock("@deepfamily/protocol-core", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@deepfamily/protocol-core")>()),
   deriveIdentityMaterial: mocks.deriveIdentityMaterial,
+}));
+vi.mock("ethers", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("ethers")>()),
+  JsonRpcProvider: class {
+    getNetwork = async () => ({ chainId: 31337n });
+    destroy = mocks.providerDestroy;
+  },
+}));
+vi.mock("../clients/contractFactory", () => ({
+  createShieldedPoolFactoryContract: () => ({ AUTHORIZATION_STATE: async () => "0x2222222222222222222222222222222222222222" }),
+}));
+vi.mock("../clients/shieldedIdentityAuthorizationChain", () => ({
+  createIdentityAuthorizationContract: () => ({}),
+  loadShieldedIdentityAuthorizationState: mocks.authorizationState,
 }));
 
 const receiveOptions = { context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" }, expiresAt: "2000000000" };
@@ -139,6 +155,25 @@ describe("receive code proofs", () => {
       fingerprint: decodeShieldedReceiveCredential(code).fingerprint,
     });
   }, 60_000);
+
+  it("creates a recipient code using the current nonzero chain counter", async () => {
+    const material = computeIdentityFromDerivedSecret(identity);
+    mocks.deriveIdentityMaterial.mockResolvedValueOnce(material);
+    const alias = computeShieldedAuthorizationAlias(material);
+    mocks.authorizationState.mockResolvedValueOnce({ state: buildShieldedIdentityAuthorizationState([[alias, 5n]]) });
+    const result = await createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase: "recipient passphrase", ...receiveOptions });
+    expect(decodeShieldedReceiveCredential(result.code).authorizationCounter).toBe(5n);
+    expect(mocks.providerDestroy).toHaveBeenCalled();
+  }, 60_000);
+
+  it("does not substitute counter zero when a recipient's chain state cannot be read", async () => {
+    mocks.deriveIdentityMaterial.mockResolvedValueOnce(computeIdentityFromDerivedSecret(identity));
+    mocks.authorizationState.mockRejectedValueOnce(new Error("RPC unavailable"));
+    const credentials = { identity: identity.identity, rawPassphrase: "recipient passphrase", ...receiveOptions };
+    await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow("Receive code could not be created");
+    expect(credentials.rawPassphrase).toBe("");
+    expect(mocks.providerDestroy).toHaveBeenCalled();
+  });
 
   it("proves independent root keys and rejects a mode downgrade using the same proof", async () => {
     const keys = await deriveShieldedIndependentKeyMaterial({

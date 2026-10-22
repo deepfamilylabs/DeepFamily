@@ -143,6 +143,7 @@ function createFixture() {
       beaconName: "deepfamily-finalization",
       beaconHash: "dd".repeat(32),
       beaconIterationsExp: 10,
+      linkSynchronizer: async () => {},
       ...overrides,
     });
   };
@@ -184,7 +185,7 @@ describe("shielded production setup artifacts", function () {
     fs.rmSync(fixture.stageRoot, { recursive: true, force: true });
   });
 
-  it("records all nine independently generated keys without requiring release thresholds", async function () {
+  it("records all configured independently generated keys without requiring release thresholds", async function () {
     const records = await fixture.createRecords();
     expect(Object.keys(records.manifest.circuits).sort()).to.deep.equal(
       Object.keys(SHIELDED_SETUP_CIRCUITS).sort(),
@@ -194,7 +195,7 @@ describe("shielded production setup artifacts", function () {
     expect(records.manifest.toolchain.snarkjsRuntimeSha256).to.equal(fixture.runtimeSha256);
     expect(
       new Set(Object.values(records.manifest.circuits).map(({ zkeySha256 }) => zkeySha256)).size,
-    ).to.equal(9);
+    ).to.equal(Object.keys(SHIELDED_SETUP_CIRCUITS).length);
     for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
       const item = records.manifest.circuits[action];
       expect(item.source).to.equal(spec.source);
@@ -206,18 +207,62 @@ describe("shielded production setup artifacts", function () {
     }
     fixture.install(records);
     const inspected = inspectShieldedProductionArtifacts({ root: fixture.root });
-    expect(Object.keys(inspected.artifacts)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts)).to.have.length(
+      Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+    );
   });
+  it("installs linker keys and all three fixed verifiers with their production manifest", async function () {
+    const generated = [
+      "frontend/public/zk/shielded/receive-link-keys.json",
+      "contracts/AnonymousReceivePresentationVerifier.sol",
+      "contracts/FundReceivePresentationVerifier.sol",
+      "contracts/AttachedReceivePresentationVerifier.sol",
+    ];
+    const records = await fixture.createRecords({
+      linkSynchronizer: async ({ outputRoot, circuitFiles, manifest }) => {
+        expect(Object.keys(circuitFiles).sort()).to.deep.equal(
+          Object.keys(SHIELDED_SETUP_CIRCUITS).sort(),
+        );
+        for (const file of generated) write(outputRoot, file, `staged ${file}`);
+        manifest.linkKeys = {
+          path: generated[0],
+          sha256: sha256File(path.join(outputRoot, generated[0])),
+        };
+      },
+    });
+    const entries = shieldedProductionInstallEntries({
+      compiled: fixture.compiled,
+      finalized: fixture.finalized,
+      records,
+    });
+    expect(
+      entries
+        .filter((entry) => generated.includes(entry.destination))
+        .map((entry) => entry.destination)
+        .sort(),
+    ).to.deep.equal([...generated].sort());
+    fixture.install(records);
+    expect(
+      JSON.parse(fs.readFileSync(path.join(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH)))
+        .linkKeys,
+    ).to.deep.equal(records.manifest.linkKeys);
+    fs.unlinkSync(path.join(records.linkedRoot, generated[1]));
+    expect(() =>
+      shieldedProductionInstallEntries({
+        compiled: fixture.compiled,
+        finalized: fixture.finalized,
+        records,
+      }),
+    ).to.throw("Missing staged receive linking artifact");
+  });
+
   it("keeps issuer source evidence stable when generated receive keys and verifiers change", function () {
     const generated = [
       "contracts/ShieldedIdentityAuthorizationUpdateVerifier.sol",
       "contracts/AnonymousReceivePresentationVerifier.sol",
       "contracts/FundReceivePresentationVerifier.sol",
       "contracts/AttachedReceivePresentationVerifier.sol",
-      "circuits/receive-development-manifest.json",
-      "circuits/receive-production-manifest.json",
-      "frontend/public/zk/receive/anonymous/manifest.json",
-      "frontend/public/zk/receive/receive-prover.wasm",
+      "frontend/public/zk/shielded/receive-link-keys.json",
     ];
     const original = sourceBundleSha256(fixture.root);
     for (const file of generated) write(fixture.root, file, "generated first version");
@@ -225,8 +270,14 @@ describe("shielded production setup artifacts", function () {
     expect(sourceBundleSha256(fixture.root)).to.equal(original);
     for (const file of generated) write(fixture.root, file, "new production contribution");
     expect(sourceBundleSha256(fixture.root)).to.equal(original);
-    write(fixture.root, "packages/receive-prover/circuit.go", "reviewed presentation source");
-    execFileSync("git", ["add", "packages/receive-prover/circuit.go"], { cwd: fixture.root });
+    write(
+      fixture.root,
+      "contracts/libraries/LinkedGroth16Verifier.sol",
+      "reviewed presentation source",
+    );
+    execFileSync("git", ["add", "contracts/libraries/LinkedGroth16Verifier.sol"], {
+      cwd: fixture.root,
+    });
     expect(sourceBundleSha256(fixture.root)).not.to.equal(original);
   });
 
@@ -239,7 +290,9 @@ describe("shielded production setup artifacts", function () {
     });
     expect(inspected.ptauPath).to.equal(external);
     expect(inspected.manifest.phase1.path).to.equal(PRODUCTION_PTAU_RELATIVE_PATH);
-    expect(Object.keys(inspected.artifacts)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts)).to.have.length(
+      Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+    );
     expect(fs.existsSync(path.join(fixture.root, PRODUCTION_PTAU_RELATIVE_PATH))).to.equal(false);
   });
 
@@ -351,10 +404,17 @@ describe("shielded production setup artifacts", function () {
           };
         },
       });
-      expect(result).to.include({ status: "passed", circuitCount: 9 });
+      expect(result).to.include({
+        status: "passed",
+        circuitCount: Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+      });
       expect(result.ptau.path).to.equal(external);
       // The receive code exports a verification key but no Solidity verifier.
-      expect(calls).to.have.length(34);
+      expect(calls).to.have.length(
+        1 +
+          Object.keys(SHIELDED_SETUP_CIRCUITS).length * 3 +
+          Object.values(SHIELDED_SETUP_CIRCUITS).filter((spec) => spec.verifierPath).length,
+      );
     }
   });
 
@@ -374,7 +434,7 @@ describe("shielded production setup artifacts", function () {
     }
   });
 
-  it("installs exactly 27 browser artifacts and a distinct Solidity verifier for each pool circuit", async function () {
+  it("installs all configured browser artifacts and a distinct Solidity verifier for each pool circuit", async function () {
     const records = await fixture.createRecords();
     const plan = shieldedProductionInstallEntries({
       compiled: fixture.compiled,
@@ -385,7 +445,7 @@ describe("shielded production setup artifacts", function () {
     expect(new Set(destinations).size).to.equal(destinations.length);
     expect(
       destinations.filter((name) => name.startsWith("frontend/public/zk/shielded/")),
-    ).to.have.length(27);
+    ).to.have.length(3 * Object.keys(SHIELDED_SETUP_CIRCUITS).length);
     for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {
       expect(
         plan.find(
@@ -410,7 +470,9 @@ describe("shielded production setup artifacts", function () {
       });
     }
     const inspected = inspectShieldedProductionArtifacts({ root: fixture.root });
-    expect(Object.keys(inspected.artifacts)).to.have.length(9);
+    expect(Object.keys(inspected.artifacts)).to.have.length(
+      Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+    );
     for (const artifact of Object.values(inspected.artifacts)) {
       expect(artifact.zkey).to.include(path.join("frontend", "public", "zk", "shielded"));
       expect(artifact.vkey).to.include(path.join("frontend", "public", "zk", "shielded"));
@@ -472,7 +534,7 @@ describe("shielded production setup artifacts", function () {
       Object.keys(
         snapshotShieldedCompilation({ root: fixture.root, stageBuild: fixture.stageBuild }),
       ),
-    ).to.have.length(9);
+    ).to.have.length(Object.keys(SHIELDED_SETUP_CIRCUITS).length);
     delete fixture.initialManifest.circuits.claim;
     writeJson(fixture.root, "circuits/shielded-development-manifest.json", fixture.initialManifest);
     expect(() =>
@@ -494,7 +556,9 @@ describe("shielded production setup artifacts", function () {
       "source bundle SHA-256 mismatch",
     );
     const options = { root: fixture.root, expectedSnarkjsRuntimeSha256 };
-    expect(Object.keys(inspectShieldedProductionArtifacts(options).artifacts)).to.have.length(9);
+    expect(Object.keys(inspectShieldedProductionArtifacts(options).artifacts)).to.have.length(
+      Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+    );
     fs.appendFileSync(
       path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_final.zkey"),
       "modified key\n",
