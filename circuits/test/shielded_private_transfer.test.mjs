@@ -15,6 +15,7 @@ import {
   computeShieldedValueNoteCommitment,
 } from "@deepfamily/protocol-core";
 import { shieldedFixtureScope } from "./shielded_scope_fixture.mjs";
+import { fixtureReceiveBinding } from "./shielded_budget_fixture.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -65,6 +66,23 @@ function privateTransferFixture(scope = defaultScope) {
       ),
     ),
     ciphertextHashes: strs(outputHashes),
+    receiveAuthorizationAliases: ["99101", "99102"],
+    receiveSalts: ["99201", "99202"],
+    receiveKeyModes: ["0", "1"],
+    receiveViewKeyLo: ["123", "456"],
+    receiveViewKeyHi: ["789", "1011"],
+    receiveBindings: outputOwnerCommitments.map((owner, i) =>
+      String(
+        fixtureReceiveBinding(
+          99101n + BigInt(i),
+          owner,
+          BigInt(i),
+          [123n, 456n][i],
+          [789n, 1011n][i],
+          99201n + BigInt(i),
+        ),
+      ),
+    ),
     inputEnabled: ["1", "1", ...Array(6).fill("0")],
     inputOwnerSecrets: strs(inputOwnerSecrets),
     inputAmounts: strs(inputAmounts),
@@ -209,6 +227,148 @@ test("private transfer circuit", async (t) => {
     await t.test("private transfer conserves asset amounts for one input owner", async () => {
       await transfer.valid(validTransfer);
       transfer.checkR1cs(validTransfer);
+    });
+    await t.test("every external output is cross-bound to its authenticated receipt", async () => {
+      for (const field of [
+        "receiveBindings",
+        "receiveAuthorizationAliases",
+        "receiveSalts",
+        "receiveKeyModes",
+        "receiveViewKeyLo",
+        "receiveViewKeyHi",
+      ]) {
+        for (const slot of [0, 1]) {
+          await transfer.invalid(
+            mutate(validTransfer, (w) => {
+              w[field][slot] = String(BigInt(w[field][slot]) + 1n);
+            }),
+          );
+        }
+      }
+      for (const slot of [0, 1]) {
+        await transfer.invalid(
+          mutate(validTransfer, (w) => {
+            for (const field of [
+              "receiveBindings",
+              "receiveAuthorizationAliases",
+              "receiveSalts",
+              "receiveKeyModes",
+              "receiveViewKeyLo",
+              "receiveViewKeyHi",
+            ])
+              w[field][slot] = "0";
+          }),
+        );
+      }
+    });
+    await t.test(
+      "self and change outputs omit receipts only with the actual input owner",
+      async () => {
+        const witness = structuredClone(validTransfer);
+        for (const slot of [0, 1]) {
+          for (const field of [
+            "receiveBindings",
+            "receiveAuthorizationAliases",
+            "receiveSalts",
+            "receiveKeyModes",
+            "receiveViewKeyLo",
+            "receiveViewKeyHi",
+          ])
+            witness[field][slot] = "0";
+          witness.outputOwnerCommitments[slot] = String(
+            owner(BigInt(witness.inputOwnerSecrets[0])),
+          );
+          witness.outputCommitments[slot] = String(
+            valueNote(
+              BigInt(witness.outputOwnerCommitments[slot]),
+              BigInt(witness.outputAmounts[slot]),
+              BigInt(witness.outputNonces[slot]),
+              BigInt(witness.ciphertextHashes[slot]),
+            ),
+          );
+        }
+        await transfer.valid(witness);
+        await transfer.invalid(
+          mutate(witness, (w) => {
+            w.outputOwnerCommitments[1] = String(owner(123456n));
+            w.outputCommitments[1] = String(
+              valueNote(
+                BigInt(w.outputOwnerCommitments[1]),
+                BigInt(w.outputAmounts[1]),
+                BigInt(w.outputNonces[1]),
+                BigInt(w.ciphertextHashes[1]),
+              ),
+            );
+          }),
+        );
+      },
+    );
+    await t.test(
+      "a mixed external recipient and self change require only the external receipt",
+      async () => {
+        const witness = structuredClone(validTransfer);
+        const slot = 1;
+        for (const field of [
+          "receiveBindings",
+          "receiveAuthorizationAliases",
+          "receiveSalts",
+          "receiveKeyModes",
+          "receiveViewKeyLo",
+          "receiveViewKeyHi",
+        ])
+          witness[field][slot] = "0";
+        witness.outputOwnerCommitments[slot] = String(owner(BigInt(witness.inputOwnerSecrets[0])));
+        witness.outputCommitments[slot] = String(
+          valueNote(
+            BigInt(witness.outputOwnerCommitments[slot]),
+            BigInt(witness.outputAmounts[slot]),
+            BigInt(witness.outputNonces[slot]),
+            BigInt(witness.ciphertextHashes[slot]),
+          ),
+        );
+        await transfer.valid(witness);
+        transfer.checkR1cs(witness);
+        await transfer.invalid(
+          mutate(witness, (w) => {
+            for (const field of [
+              "receiveBindings",
+              "receiveAuthorizationAliases",
+              "receiveSalts",
+              "receiveKeyModes",
+              "receiveViewKeyLo",
+              "receiveViewKeyHi",
+            ])
+              w[field][0] = "0";
+          }),
+        );
+      },
+    );
+    await t.test("an external zero-value output still requires its own receipt", async () => {
+      const witness = structuredClone(validTransfer);
+      witness.outputAmounts = ["100", "0"];
+      for (const slot of [0, 1])
+        witness.outputCommitments[slot] = String(
+          valueNote(
+            BigInt(witness.outputOwnerCommitments[slot]),
+            BigInt(witness.outputAmounts[slot]),
+            BigInt(witness.outputNonces[slot]),
+            BigInt(witness.ciphertextHashes[slot]),
+          ),
+        );
+      await transfer.valid(witness);
+      await transfer.invalid(
+        mutate(witness, (w) => {
+          for (const field of [
+            "receiveBindings",
+            "receiveAuthorizationAliases",
+            "receiveSalts",
+            "receiveKeyModes",
+            "receiveViewKeyLo",
+            "receiveViewKeyHi",
+          ])
+            w[field][1] = "0";
+        }),
+      );
     });
     await t.test(
       "single-note private transfer conserves asset amounts with a bound dummy input",

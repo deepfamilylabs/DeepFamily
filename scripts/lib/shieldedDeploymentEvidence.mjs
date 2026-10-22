@@ -1,5 +1,5 @@
 import { getAddress } from "ethers";
-import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, RECEIVE_DEPLOYMENT_IMMUTABLES } from "./zkDeploymentCatalog.mjs";
 import {
   GROTH16_ADAPTER_VERIFIER_BINDINGS,
   shieldedDeploymentBindingsFromAddresses,
@@ -10,6 +10,7 @@ export function shieldedDeploymentBindings(addresses) {
     Object.fromEntries(
       [
         "token",
+        "deepFamily",
         "poseidonT3",
         "poseidonT6",
         "deepFamilyLineageIndex",
@@ -18,6 +19,7 @@ export function shieldedDeploymentBindings(addresses) {
         "shieldedNativePool",
         "shieldedPoolFactory",
         ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierLabel),
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property),
       ].map((name) => [name, getAddress(addresses[name])]),
     ),
   );
@@ -52,6 +54,8 @@ export async function assertShieldedDeploymentBindings({
     for (const [method, expected] of [
       ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
       ["VERIFIER", bindings[key].verifierAdapterImmutable],
+      ["AUTHORIZATION_STATE", bindings[key].authorizationStateImmutable],
+      ["RECEIVE_VERIFIER", bindings[key].receiveVerifierImmutable],
     ])
       same(await read(`${key} ${method}`, () => pool[method]()), expected, `${key} ${method}`);
     if (
@@ -71,6 +75,8 @@ export async function assertShieldedDeploymentBindings({
     ["LINEAGE_INDEX", bindings.deepFamilyLineageIndex],
     ["VERIFIER", bindings.shieldedPoolFactory.verifierAdapterImmutable],
     ["NATIVE_POOL", bindings.shieldedNativePool.address],
+    ["AUTHORIZATION_STATE", bindings.shieldedPoolFactory.authorizationStateImmutable],
+    ["RECEIVE_VERIFIER", bindings.shieldedPoolFactory.receiveVerifierImmutable],
   ])
     same(await read(`factory ${method}`, () => factory[method]()), expected, `factory ${method}`);
   same(
@@ -90,6 +96,11 @@ export async function assertShieldedDeploymentBindings({
     addresses.deepFamily,
     "lineage family",
   );
+  for (const {property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
+    for (const [getter, expectedKey] of Object.entries(RECEIVE_DEPLOYMENT_IMMUTABLES[property])) {
+      same(await read(`${property} ${getter}`, () => deployed[property][getter]()), addresses[expectedKey], `${property} ${getter}`);
+    }
+  }
   same(
     await read("family lineage", () => deployed.deepFamily.lineageIndex()),
     bindings.deepFamilyLineageIndex,
@@ -100,6 +111,7 @@ export async function assertShieldedDeploymentBindings({
 
 export function shieldedArtifactEntries(bindings, artifacts) {
   return [
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, bindings[property], artifacts[property]]),
     ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
       spec.verifierContractName,
       bindings.shieldedVerifiers[action],
@@ -121,6 +133,7 @@ export function shieldedDeploymentEvidence(bindings, artifacts) {
     Object.assign(evidence.shieldedVerifiers[action], hashes(artifacts.shieldedVerifiers[action]));
   for (const key of ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"])
     Object.assign(evidence[key], hashes(artifacts[key]));
+  for (const {property} of RECEIVE_DEPLOYMENT_CONTRACTS) Object.assign(evidence[property], hashes(artifacts[property]));
   delete evidence.token;
   return evidence;
 }

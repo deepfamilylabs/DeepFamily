@@ -7,6 +7,7 @@ import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "./chainProfiles.mj
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "./zkDeploymentCatalog.mjs";
 
 export const ESPACE_MAINNET_NETWORK = ESPACE_CHAIN_PROFILE.mainnet.networkName;
@@ -37,8 +38,10 @@ export const MAINNET_TRANSACTION_LABELS = Object.freeze([
   "poseidonT6",
   "deepFamilyLineageIndex",
   "setLineageIndex",
+  ...RECEIVE_DEPLOYMENT_CONTRACTS.filter(({ property }) => property !== "privateLetterArchive").map(({ property }) => property),
   "shieldedNativePool",
   "shieldedPoolFactory",
+  "privateLetterArchive",
   "transferDeepFamilyOwnership",
 ]);
 

@@ -26,6 +26,19 @@ const shieldedReceiveCodeVerificationKey = JSON.parse(
     'utf8'
   )
 )
+const shieldedReceiveCredentialVerificationKeys = Object.fromEntries(
+  ['anonymous', 'fund'].map(disclosure => {
+    const artifact = new URL(`./public/zk/shielded/shielded_${disclosure}_receive_credential.vkey.json`, import.meta.url)
+    return [disclosure, fs.existsSync(artifact) ? JSON.parse(fs.readFileSync(artifact, 'utf8')) : null]
+  })
+)
+
+const shieldedReceiveCredentialVerificationKeyHashes = Object.fromEntries(
+  ['anonymous', 'fund'].map(disclosure => {
+    const artifact = new URL(`./public/zk/shielded/shielded_${disclosure}_receive_credential.vkey.json`, import.meta.url)
+    return [disclosure, fs.existsSync(artifact) ? createHash('sha256').update(fs.readFileSync(artifact)).digest('hex') : '']
+  })
+)
 
 // Proving WASM/zkey files are not in Git; the browser checks each download against these digests.
 const zkAssetDigests = Object.fromEntries(
@@ -183,6 +196,8 @@ export default defineConfig(({ command, mode }) => {
   return {
     define: {
       __SHIELDED_RECEIVE_CODE_VKEY__: JSON.stringify(shieldedReceiveCodeVerificationKey),
+      __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: JSON.stringify(shieldedReceiveCredentialVerificationKeys),
+      __SHIELDED_RECEIVE_CREDENTIAL_VKEY_SHA256__: JSON.stringify(shieldedReceiveCredentialVerificationKeyHashes),
       __ZK_ASSET_BASE_URL__: JSON.stringify(zkAssetBaseUrl),
       __ZK_ASSET_DIGESTS__: JSON.stringify(zkAssetDigests),
     },

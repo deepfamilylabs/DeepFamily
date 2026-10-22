@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   computeIdentityFromDerivedSecret,
-  encodeShieldedReceiveCode,
+  encodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import {
@@ -29,14 +29,18 @@ const fixture = computeIdentityFromDerivedSecret({
   identitySuiteId: 1,
   derivedSecretField: 13n,
 });
+const receiveContext = { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" };
+const receiveOptions = { context: receiveContext, expiresAt: "2000000000" };
 const personHash = wrapIdentityCommitmentAsPersonHash(fixture.identityCommitment);
 const viewingKey = `0x${"42".repeat(32)}`;
 // Decoding only needs canonical proof coordinates; the worker verifies the proof.
-const code = encodeShieldedReceiveCode({
+const code = encodeShieldedReceiveCredential({
+  disclosure: "fund", authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2_000_000_000n, keyMode: 0, identitySuiteId: 1,
   identityCommitment: fixture.identityCommitment,
   ownerCommitment: 29n,
   viewingKey,
   proof: {
+    protocol: "groth16", curve: "bn128",
     pi_a: ["1", "2", "1"],
     pi_b: [
       ["3", "4"],
@@ -103,12 +107,12 @@ describe("shielded receive codes", () => {
   it("returns only the code when creating one from a recipient's credentials", async () => {
     const rawPassphrase = "  Tr0ub4dor&3-xkcd-horse\u00a0a\u030a ";
     mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
-    await expect(createShieldedReceiveCodeForRecipient({ identity, rawPassphrase })).resolves.toBe(
+    await expect(createShieldedReceiveCodeForRecipient({ identity, rawPassphrase, ...receiveOptions })).resolves.toBe(
       code,
     );
     expect(mocks.zkWorkerCall).toHaveBeenCalledWith(
       "createShieldedReceiveCodeFromCredentials",
-      { identity, rawPassphrase },
+      { identity, rawPassphrase, ...receiveOptions },
       expect.any(Object),
     );
   });
@@ -122,7 +126,7 @@ describe("shielded receive codes", () => {
     "rejects recipient credentials with %s before invoking the ZK worker",
     async (_label, rawPassphrase, code) => {
       await expect(
-        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase }),
+        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase, ...receiveOptions }),
       ).rejects.toMatchObject({ name: "InheritanceError", code });
       expect(mocks.zkWorkerCall).not.toHaveBeenCalled();
     },
@@ -139,11 +143,11 @@ describe("shielded receive codes", () => {
     async (_label, rawPassphrase) => {
       mocks.zkWorkerCall.mockResolvedValueOnce({ code, personHash });
       await expect(
-        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase }),
+        createShieldedReceiveCodeForRecipient({ identity, rawPassphrase, ...receiveOptions }),
       ).resolves.toBe(code);
       expect(mocks.zkWorkerCall).toHaveBeenCalledExactlyOnceWith(
         "createShieldedReceiveCodeFromCredentials",
-        { identity, rawPassphrase },
+        { identity, rawPassphrase, ...receiveOptions },
         expect.any(Object),
       );
     },

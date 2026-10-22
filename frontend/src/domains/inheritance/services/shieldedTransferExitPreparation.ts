@@ -382,6 +382,9 @@ export async function prepareShieldedPrivateTransfer(input: {
   const data = actionData(paths, nullifiers, outputs);
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.PrivateTransfer, ctx, data),
+    receiveBindings: ["0", "0"],
+    receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"],
+    receiveKeyModes: ["0", "0"], receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
     ...valueInputWitness(opened),
     outputOwnerCommitments: decimal(
       destinationKeys.map((destination) => destination.ownerCommitment),

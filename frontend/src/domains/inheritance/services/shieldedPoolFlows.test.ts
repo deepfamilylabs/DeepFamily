@@ -678,7 +678,7 @@ describe("shielded pool asset-worker proof submission", () => {
       const data = name === "privateTransfer" ? actionData(8) : f.common.data;
       await submit({ ...f.common, data });
       expect(f.methods[name]).toHaveBeenCalledOnce();
-      expect(f.methods[name].mock.calls[0][0]).toEqual(data);
+      expect(f.methods[name].mock.calls[0][0]).toEqual({ ...data, receiveAuthorizations: Array.from({ length: 2 }, () => ({ checkpointId: 0n, asOf: 0n, expiresAt: 0n, recipientBinding: 0n, proof: "0x" })) });
     }
     const f = fixture();
     await submitUnshield({ ...f.common, data: actionData(8), recipient: RECIPIENT, amount: 75n });

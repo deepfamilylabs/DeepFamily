@@ -27,6 +27,7 @@ import { FUND_SELECTOR } from "../scripts/lib/shieldedReceipts.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
 import {
@@ -108,6 +109,7 @@ const SHIELDED_ADDRESSES = Object.fromEntries(
   INTEGRATED_DEPLOYMENT_RECORDS.filter(
     (record) =>
       record.transactionLabel.startsWith("shielded") ||
+      RECEIVE_DEPLOYMENT_CONTRACTS.some(({ property }) => property === record.property) ||
       ["poseidonT3", "poseidonT6", "deepFamilyLineageIndex"].includes(record.transactionLabel),
   ).map((record, index) => [
     record.property === "shieldedErc20Pool" ? "shieldedErc20Pool" : record.transactionLabel,
@@ -121,6 +123,7 @@ const ADAPTER_BINDINGS = groth16VerifierAdapterBindingsFromAddresses({
   ...SHIELDED_ADDRESSES,
 });
 const SHIELDED_BINDINGS = shieldedDeploymentBindings({
+  deepFamily: DEEP_FAMILY,
   token: TOKEN,
   groth16VerifierAdapter: VERIFIER_ADAPTER,
   ...SHIELDED_ADDRESSES,
@@ -133,7 +136,12 @@ const SHIELDED_DEPLOYMENT_ARTIFACTS = {
     ]),
   ),
   ...Object.fromEntries(
-    ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+    [
+      "shieldedErc20Pool",
+      "shieldedNativePool",
+      "shieldedPoolFactory",
+      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
+    ].map((key) => [
       key,
       { artifactSha256: SHIELDED_ARTIFACT_SHA256, runtimeSha256: SHIELDED_RUNTIME_SHA256 },
     ]),
@@ -262,6 +270,12 @@ const protocolManifestInspector = ({ root, requireProduction }) => {
         shieldedErc20Pool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedErc20Pool,
         shieldedNativePool: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedNativePool,
         shieldedPoolFactory: SHIELDED_DEPLOYMENT_EVIDENCE.shieldedPoolFactory,
+        ...Object.fromEntries(
+          RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+            property,
+            SHIELDED_DEPLOYMENT_EVIDENCE[property],
+          ]),
+        ),
       },
     },
   };
@@ -486,10 +500,10 @@ const validReportTemplate = () => ({
       blake2b512: ZK_PRODUCTION_PHASE1.blake2b512,
     },
     circuits: Object.keys(ZK_RELEASE_ARTIFACTS),
-    circuitCount: 8,
+    circuitCount: Object.keys(ZK_RELEASE_ARTIFACTS).length + Object.keys(SHIELDED_CIRCUITS).length,
     shielded: {
       status: "passed",
-      circuitCount: 6,
+      circuitCount: Object.keys(SHIELDED_CIRCUITS).length,
       manifestSha256: SHIELDED_MANIFEST_SHA256,
       ptau: {
         bytes: ZK_PRODUCTION_PHASE1.bytes,
@@ -1512,7 +1526,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
     }
   });
 
-  it("binds all six public proof assets and the claim verifier call to the selected chain", async function () {
+  it("binds all configured public proof assets and the claim verifier call to the selected chain", async function () {
     const cases = [
       [
         (report) => (report.shieldedArtifacts.manifestSha256 = "ff".repeat(32)),
@@ -1521,6 +1535,22 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       [
         (report) => delete report.shieldedArtifacts.circuits.privateTransfer,
         /shieldedArtifacts\.circuits must contain exactly/iu,
+      ],
+      [
+        (report) => delete report.shieldedArtifacts.circuits.identityAuthorizationUpdate,
+        /shieldedArtifacts\.circuits must contain exactly/iu,
+      ],
+      [
+        (report) => {
+          report.zkCeremonyVerification.circuitCount = 8;
+        },
+        /zkCeremonyVerification\.circuitCount/iu,
+      ],
+      [
+        (report) => {
+          report.zkCeremonyVerification.shielded.circuitCount = 6;
+        },
+        /zkCeremonyVerification\.shielded\.circuitCount/iu,
       ],
       [
         (report) =>

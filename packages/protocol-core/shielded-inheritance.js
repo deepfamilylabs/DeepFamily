@@ -1,4 +1,4 @@
-import { keccak256, toBeHex, zeroPadValue } from "ethers";
+import { getBytes, keccak256, toBeHex, zeroPadValue } from "ethers";
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { asUint8Array, bigintFrom, bytesToHex } from "./bytes.js";
 import {
@@ -35,6 +35,8 @@ export const SHIELDED_INHERITANCE_DOMAINS = Object.freeze({
   poolScope: 1031n,
   scopedPurpose: 1032n,
   ownerBudgetAuthorization: 1033n,
+  fundBudgetNote: 202610210301n,
+  claimBudgetNote: 202610210302n,
 });
 
 export const SHIELDED_POOL_PROTOCOL_VERSION = 1;
@@ -212,7 +214,10 @@ export function computeShieldedValueNoteCommitment(input, scope) {
   ]);
 }
 
-export const SHIELDED_KEY_MODE = Object.freeze({ identityDerived: 0, independentKeyRootDerived: 1 });
+export const SHIELDED_KEY_MODE = Object.freeze({
+  identityDerived: 0,
+  independentKeyRootDerived: 1,
+});
 export function normalizeShieldedKeyMode(value = 0n, binding = "owner") {
   const mode = bigintFrom(value, "keyMode", 1n);
   protocolAssert(
@@ -223,11 +228,26 @@ export function normalizeShieldedKeyMode(value = 0n, binding = "owner") {
   return mode;
 }
 export function computeShieldedBudgetOwnerAuthorization(input, scope) {
-  return poseidon3([
+  const viewingKey = getBytes(input.viewingKey ?? scope?.viewingKey ?? "0x");
+  protocolAssert(
+    viewingKey.length === 32 && viewingKey.some(Boolean),
+    "INVALID_SHIELDED_VIEW_KEY",
+    "Private budget authorization requires its recipient viewing key",
+  );
+  return poseidon5([
     computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.ownerBudgetAuthorization, scope),
     nonzeroField(input.heirOwnerCommitment, "heirOwnerCommitment"),
     normalizeShieldedKeyMode(input.keyMode),
+    BigInt(bytesToHex(viewingKey.subarray(16))),
+    BigInt(bytesToHex(viewingKey.subarray(0, 16))),
   ]);
+}
+
+export const SHIELDED_BUDGET_ORIGIN = Object.freeze({ fund: 0n, claim: 1n });
+
+export function normalizeShieldedBudgetOrigin(origin = "fund") {
+  if (origin === "fund" || origin === "claim") return SHIELDED_BUDGET_ORIGIN[origin];
+  return bigintFrom(origin, "budgetOrigin", 1n);
 }
 
 /** A separate budget note per child allows a private, irreversible funding. */
@@ -247,7 +267,12 @@ export function computeShieldedBudgetNoteCommitment(input, scope) {
     "remaining exceeds the circuit's 64-bit period count",
   );
   return poseidon8([
-    computeShieldedScopedPurpose(SHIELDED_INHERITANCE_DOMAINS.budgetNote, scope),
+    computeShieldedScopedPurpose(
+      normalizeShieldedBudgetOrigin(input.budgetOrigin) === SHIELDED_BUDGET_ORIGIN.fund
+        ? SHIELDED_INHERITANCE_DOMAINS.fundBudgetNote
+        : SHIELDED_INHERITANCE_DOMAINS.claimBudgetNote,
+      scope,
+    ),
     nonzeroField(input.policyCommitment, "policyCommitment"),
     nonzeroField(input.enrollmentCommitment, "enrollmentCommitment"),
     computeShieldedBudgetOwnerAuthorization(input, scope),

@@ -50,9 +50,9 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     ),
     {
       Shield: 7,
-      Fund: 27,
+      Fund: 29,
       Claim: 27,
-      PrivateTransfer: 30,
+      PrivateTransfer: 32,
       Unshield: 32,
     },
   );
@@ -114,6 +114,8 @@ test("VALUE transfers list all eight shard ids before all roots and nullifiers",
     28n,
     hashA,
     hashB,
+    0n,
+    0n,
   ]);
 });
 
@@ -148,6 +150,8 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       29n,
       30n,
       31n,
+      0n,
+      0n,
     ],
   );
   assert.deepEqual(
@@ -172,6 +176,8 @@ test("fund includes its mode before the roots and keeps lineage only for the ini
       28n,
       hashA,
       hashB,
+      0n,
+      0n,
       0n,
       0n,
       0n,

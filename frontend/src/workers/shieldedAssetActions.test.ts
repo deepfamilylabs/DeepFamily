@@ -3,13 +3,15 @@ import {
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedHeirKeyMaterial,
   encodeShieldedIndependentKey,
+  encodePublicShieldedBudgetEnvelope,
 } from "@deepfamily/protocol-core";
-import { getAddress } from "ethers";
+import { getAddress, hexlify } from "ethers";
 import { ShieldedAssetSession } from "./shieldedAssetSession";
 import type { ShieldedWorkerContext } from "../shared/workers/shieldedAssetWorkerTypes";
 const mocks = vi.hoisted(() => ({
   scan: vi.fn(),
   proof: vi.fn(),
+  receipt: vi.fn(),
   verify: vi.fn(),
   recover: vi.fn(),
   getBlock: vi.fn(),
@@ -40,6 +42,9 @@ vi.mock("ethers", async (original) => ({
 }));
 vi.mock("@deepfamily/protocol-core", async (original) => ({
   ...(await original<typeof import("@deepfamily/protocol-core")>()),
+  decodeShieldedReceiveCredential: () => ({ disclosure: "anonymous", authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
+    ownerCommitment: 29n, viewingKey: `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
+    proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] } }),
   deriveShieldedIndependentKeyIdentitySecret: async () => new Uint8Array(32).fill(3),
   deriveIdentityMaterial: async ({ identity }: { identity: object }) => ({
     identity,
@@ -70,8 +75,17 @@ vi.mock("../shared/clients/contractFactory", () => ({
     VERIFIER: async () => mocks.verifier,
     assetKind: async () => 1n,
     ACTION_PROOF_LIFETIME: mocks.proofLifetime,
+    AUTHORIZATION_STATE: async () => mocks.verifier,
     nullifierSpent: mocks.selectedQuery,
   }),
+}));
+vi.mock("../shared/zk/shieldedReceivePresentation", () => ({ proveShieldedReceivePresentation: mocks.receipt }));
+vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", () => ({
+  createIdentityAuthorizationContract: () => ({}),
+  loadShieldedIdentityAuthorizationState: async () => {
+    const { buildShieldedIdentityAuthorizationState } = await import("@deepfamily/protocol-core");
+    return { state: buildShieldedIdentityAuthorizationState(), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
+  },
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", () => ({
   createShieldedReceiveCode: vi.fn(),
@@ -142,6 +156,16 @@ function preparedValueOutputs(amounts: bigint[], offset = 0n, capacity = 8) {
     },
   };
 }
+function preparedPublicFundOutputs(amounts: bigint[]) {
+  const prepared = preparedValueOutputs(amounts, 0n, 2);
+  prepared.data.budgetKind = 1n;
+  prepared.data.outputCiphertexts[0] = hexlify(encodePublicShieldedBudgetEnvelope({
+    binding: "identity", rootIdentityCommitment: 31n, rootVersionIndex: 1n, heirIdentityCommitment: 31n,
+    amountPerPeriod: amounts[0], periodDays: 30n, eligibleFrom: 1000n, policyCommitment: 101n,
+    enrollmentCommitment: 102n, remaining: amounts[0], nonce: 103n,
+  }, { chainId: context.chainId, poolAddress: context.poolAddress }));
+  return prepared;
+}
 function assertNoOpenings(value: unknown) {
   const serialized = JSON.stringify(value, (_key, entry) =>
     typeof entry === "bigint" ? String(entry) : entry,
@@ -177,7 +201,9 @@ beforeEach(() => {
     amount: BigInt(amount),
     recipient,
   }));
-  mocks.fund.mockResolvedValue(preparedValueOutputs([10n, 0n], 0n, 2));
+  const publicFund = preparedPublicFundOutputs([10n, 0n]);
+  mocks.fund.mockResolvedValue(publicFund);
+  mocks.receipt.mockResolvedValue({ proof: "0x1234", publicSignals: [] });
   mocks.lineageRoot.mockResolvedValue(0n);
   mocks.knownCheckpoint.mockResolvedValue(true);
   mocks.proofLifetime.mockResolvedValue(300n);
@@ -248,7 +274,7 @@ function value(commitment: bigint, amount: bigint, ownerCommitment: bigint) {
 }
 async function timeBoundPreview(action: "fund" | "claim") {
   const session = await unlocked();
-  const prepared = preparedValueOutputs([10n, 0n], 0n, 2);
+  const prepared = action === "fund" ? preparedPublicFundOutputs([10n, 0n]) : preparedValueOutputs([10n, 0n], 0n, 2);
   prepared.data.asOf = 1000n;
   prepared.data.lineageCheckpointId = 7n;
   if (action === "fund") {
@@ -352,7 +378,8 @@ describe("asset Worker preview and proof boundary", () => {
       value(2n, 2n, secretKeys.ownerCommitment),
       value(3n, 10n, secretKeys.ownerCommitment),
     ];
-    mocks.fund.mockResolvedValueOnce(preparedValueOutputs([3n, 7n], 0n, 2));
+    const publicFund = preparedPublicFundOutputs([3n, 7n]);
+    mocks.fund.mockResolvedValueOnce(publicFund);
     const preview = await session.call("preview", {
       context,
       slot: "identity",

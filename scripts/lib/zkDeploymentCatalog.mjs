@@ -35,6 +35,42 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   ),
 );
 
+/** Immutable shared receive state and the fixed credential-presentation statements. */
+export const RECEIVE_DEPLOYMENT_CONTRACTS = Object.freeze([
+  ["ShieldedIdentityAuthorizationUpdateVerifier", "identityAuthorizationUpdateVerifier"],
+  ["IdentityAuthorizationVerifierAdapter", "identityAuthorizationVerifierAdapter"],
+  ["IdentityAuthorizationState", "identityAuthorizationState"],
+  ["AnonymousReceivePresentationVerifier", "anonymousReceivePresentationVerifier"],
+  ["FundReceivePresentationVerifier", "fundReceivePresentationVerifier"],
+  ["AttachedReceivePresentationVerifier", "attachedReceivePresentationVerifier"],
+  ["ReceivePresentationVerifierRouter", "receivePresentationVerifierRouter"],
+  ["PrivateLetterArchive", "privateLetterArchive"],
+].map(([contractName, property]) => Object.freeze({ contractName, property })));
+
+export const receiveDeploymentConstructorArgs = (property, addresses) => {
+  switch (property) {
+    case "identityAuthorizationVerifierAdapter": return [addresses.identityAuthorizationUpdateVerifier];
+    case "identityAuthorizationState": return [addresses.identityAuthorizationVerifierAdapter];
+    case "receivePresentationVerifierRouter": return [addresses.anonymousReceivePresentationVerifier, addresses.fundReceivePresentationVerifier];
+    case "privateLetterArchive": return [addresses.deepFamily, addresses.identityAuthorizationState,
+      addresses.anonymousReceivePresentationVerifier, addresses.attachedReceivePresentationVerifier,
+      addresses.shieldedPoolFactory];
+    default: return [];
+  }
+};
+
+/** Runtime immutables and their canonical deployment address keys. */
+export const RECEIVE_DEPLOYMENT_IMMUTABLES = Object.freeze({
+  identityAuthorizationUpdateVerifier: {},
+  identityAuthorizationVerifierAdapter: { VERIFIER: "identityAuthorizationUpdateVerifier" },
+  identityAuthorizationState: { VERIFIER: "identityAuthorizationVerifierAdapter" },
+  anonymousReceivePresentationVerifier: {},
+  fundReceivePresentationVerifier: {},
+  attachedReceivePresentationVerifier: {},
+  receivePresentationVerifierRouter: { ANONYMOUS_VERIFIER: "anonymousReceivePresentationVerifier", FUND_VERIFIER: "fundReceivePresentationVerifier" },
+  privateLetterArchive: { DEEP_FAMILY: "deepFamily", AUTHORIZATION_STATE: "identityAuthorizationState", LETTER_VERIFIER: "anonymousReceivePresentationVerifier", ATTACHMENT_VERIFIER: "attachedReceivePresentationVerifier", POOL_FACTORY: "shieldedPoolFactory" },
+});
+
 export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
   [
     ["DeepFamilyToken", "token", "deepFamilyToken"],
@@ -55,6 +91,7 @@ export const INTEGRATED_DEPLOYMENT_RECORDS = Object.freeze(
     ["PoseidonT4", "poseidonT4", "poseidonT4"],
     ["PoseidonT6", "poseidonT6", "poseidonT6"],
     ["DeepFamilyLineageIndex", "lineageIndex", "deepFamilyLineageIndex"],
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [contractName, property, property]),
     ["ShieldedNativePool", "shieldedNativePool", "shieldedNativePool"],
     ["ShieldedPoolFactory", "shieldedPoolFactory", "shieldedPoolFactory"],
     ["ShieldedErc20Pool", "shieldedErc20Pool", "shieldedPoolFactory"],

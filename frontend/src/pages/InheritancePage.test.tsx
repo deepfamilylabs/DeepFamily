@@ -66,6 +66,8 @@ vi.mock("../domains/wallet", () => ({
 vi.mock("../shared/config/env", () => ({
   getShieldedPoolFactoryAddress: () => mocks.factoryAddress,
   getShieldedPoolFactoryDeploymentBlock: () => 10,
+  getPrivateLetterArchiveAddress: () => "",
+  getPrivateLetterArchiveDeploymentBlock: () => 0,
 }));
 vi.mock("../shared/clients/providerRegistry", () => ({
   getReadonlyProvider: () => ({

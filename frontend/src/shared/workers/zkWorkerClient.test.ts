@@ -68,6 +68,8 @@ describe("ZK worker lifecycle", () => {
             isBirthBC: false,
           },
           rawPassphrase: secret,
+          context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" },
+          expiresAt: "2000000000",
         }),
       ).rejects.toThrow("Local cryptographic operation failed");
       expect(FakeWorker.instances[0].terminate).toHaveBeenCalledOnce();

@@ -28,7 +28,7 @@ import {
   verifyShieldedNotePayload,
   type ShieldedOwnerBudgetNotePayload,
 } from "@deepfamily/protocol-core";
-import { getBytes } from "ethers";
+import { getBytes, hexlify } from "ethers";
 import type { IdentityMaterialV1Result } from "../../../shared/workers/cryptoWorkerClient";
 import type { LineageSnapshot } from "./inheritanceChain";
 import { prepareShieldedClaim } from "./shieldedClaimPreparation";
@@ -128,7 +128,10 @@ async function fixture(
 ) {
   const identity = identityMaterial();
   const keys = keyMaterial ?? deriveShieldedHeirKeyMaterial(derivedSecretField);
+  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const note = {
+    viewingKey: hexlify(viewingKey),
+    budgetOrigin: 0n,
     keyMode: keyMaterial ? 1n : 0n,
     rootIdentityCommitment,
     rootVersionIndex,
@@ -153,7 +156,6 @@ async function fixture(
     },
     { chainId, poolAddress },
   );
-  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const ciphertext = await encryptShieldedNote({
     recipientPublicKey: viewingKey,
     payload: encodeShieldedBudgetNotePayload(note, { chainId, poolAddress }),
@@ -166,6 +168,8 @@ async function fixture(
       policyCommitment,
       enrollmentCommitment,
       heirOwnerCommitment: note.heirOwnerCommitment,
+      viewingKey,
+      budgetOrigin: note.budgetOrigin,
       keyMode: note.keyMode,
       amountPerPeriod: note.amountPerPeriod,
       remaining: note.remaining,
@@ -238,7 +242,7 @@ async function addSecondBudget(
       payload,
       ciphertextHashField,
     },
-    { chainId, poolAddress },
+    { chainId, poolAddress, viewingKey: await deriveShieldedViewPublicKey(input.keys.hpkeIkm) },
   ).noteCommitment;
   const tree = input.wallet.shards.get(0n)!;
   const leafIndex = tree.sizeBigInt;
@@ -408,7 +412,11 @@ describe("local shielded claim preparation", () => {
               ciphertext: output.ciphertext,
               noteCommitment: output.commitment,
             },
-            { chainId, poolAddress },
+            {
+              chainId,
+              poolAddress,
+              viewingKey: await deriveShieldedViewPublicKey(input.keys.hpkeIkm),
+            },
           ).noteCommitment,
         ).toBe(output.commitment);
       } finally {

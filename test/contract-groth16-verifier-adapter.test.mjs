@@ -5,7 +5,7 @@ import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.m
 
 const ACTIONS = ["shield", "fund", "claim", "privateTransfer", "unshield"];
 // Mirrors ProofConstants.sol and SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS.
-const SIGNAL_COUNTS = [7, 27, 27, 30, 32];
+const SIGNAL_COUNTS = [7, 29, 27, 32, 32];
 const PROOF = hre.ethers.AbiCoder.defaultAbiCoder().encode(
   ["uint256[2]", "uint256[2][2]", "uint256[2]"],
   [
@@ -75,7 +75,7 @@ describe("Unified Groth16 verifier adapter", function () {
       [2, 8],
       [3, 12],
       [4, 12],
-      [5, 32],
+      [5, 30],
       [5, 12],
       [6, 11],
       [6, 12],

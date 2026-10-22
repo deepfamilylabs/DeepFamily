@@ -2,6 +2,7 @@
 
 /** The receive-code Groth16 verification key, embedded by vite.config.ts at build time. */
 declare const __SHIELDED_RECEIVE_CODE_VKEY__: Readonly<Record<string, unknown>>;
+declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: Readonly<Record<"anonymous" | "fund", Readonly<Record<string, unknown>>>>;
 
 /** Origin and path prefix of the R2 proving-file host; empty when served from /zk. */
 declare const __ZK_ASSET_BASE_URL__: string;
@@ -38,3 +39,5 @@ declare module "*.webp" {
   const content: string;
   export default content;
 }
+
+declare const __SHIELDED_RECEIVE_CREDENTIAL_VKEY_SHA256__: Readonly<Record<"anonymous" | "fund", string>>;

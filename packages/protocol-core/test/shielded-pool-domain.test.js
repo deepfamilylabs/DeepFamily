@@ -28,7 +28,11 @@ import {
   verifyShieldedNotePayload,
 } from "../index.js";
 
-const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
+const scope = {
+  viewingKey: "0x" + "11".repeat(32),
+  chainId: 1030n,
+  poolAddress: "0x0000000000000000000000000000000000000001",
+};
 const alternatives = [
   { ...scope, chainId: 71n },
   { ...scope, poolAddress: "0x0000000000000000000000000000000000000002" },
@@ -208,7 +212,7 @@ test("a donor backup uses the same scope for its nested rule and allocation key"
     },
     scope,
   );
-  assert.equal(payload.length, 459);
+  assert.equal(payload.length, 460);
   assert.equal(decodeShieldedNotePayload(payload, scope).fundingMemo.allocationKey, 53n);
   for (const alternative of alternatives) {
     assert.throws(

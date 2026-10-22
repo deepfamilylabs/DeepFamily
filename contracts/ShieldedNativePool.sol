@@ -8,7 +8,12 @@ contract ShieldedNativePool is ShieldedPoolCore {
   error UnexpectedNativeValue();
   error NativeTransferFailed();
 
-  constructor(address lineageIndex, address verifier) ShieldedPoolCore(lineageIndex, verifier) {}
+  constructor(
+    address lineageIndex,
+    address verifier,
+    address authorizationState,
+    address receiveVerifier
+  ) ShieldedPoolCore(lineageIndex, verifier, authorizationState, receiveVerifier) {}
 
   function assetKind() external pure override returns (uint8) {
     return 1;

@@ -111,6 +111,7 @@ async function updateLocalConfig() {
     const readerPath = path.join(DEPLOYMENTS_DIR, "DeepFamilyReader.json");
     const factoryPath = path.join(DEPLOYMENTS_DIR, "ShieldedPoolFactory.json");
     const nativePoolPath = path.join(DEPLOYMENTS_DIR, "ShieldedNativePool.json");
+    const lettersPath = path.join(DEPLOYMENTS_DIR, "PrivateLetterArchive.json");
     const poolPath = path.join(DEPLOYMENTS_DIR, "ShieldedErc20Pool.json");
     if (!fs.existsSync(deepFamilyPath)) {
       console.log("DeepFamily contract not deployed. Run `npm run dev:deploy` first.");
@@ -120,7 +121,7 @@ async function updateLocalConfig() {
       console.log("DeepFamily reader module not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
-    if (![poolPath, nativePoolPath, factoryPath].every((file) => fs.existsSync(file))) {
+    if (![poolPath, nativePoolPath, factoryPath, lettersPath].every((file) => fs.existsSync(file))) {
       console.log("Shielded pool not deployed. Run `npm run dev:deploy` first.");
       process.exit(1);
     }
@@ -129,13 +130,15 @@ async function updateLocalConfig() {
     const readerDeployment = JSON.parse(fs.readFileSync(readerPath, "utf8"));
     const poolDeployment = JSON.parse(fs.readFileSync(poolPath, "utf8"));
     const nativeDeployment = JSON.parse(fs.readFileSync(nativePoolPath, "utf8"));
+    const lettersDeployment = JSON.parse(fs.readFileSync(lettersPath, "utf8"));
+    const lettersAddress = ethers.getAddress(lettersDeployment.address);
     const factoryDeployment = JSON.parse(fs.readFileSync(factoryPath, "utf8"));
     const contractAddress = deepFamilyDeployment.address;
     const readerAddress = readerDeployment.address;
     const poolAddress = ethers.getAddress(poolDeployment.address);
     const factoryAddress = ethers.getAddress(factoryDeployment.address);
     const nativePoolAddress = ethers.getAddress(nativeDeployment.address);
-    if (!Number.isSafeInteger(factoryDeployment.deploymentBlock)) {
+    if (!Number.isSafeInteger(factoryDeployment.deploymentBlock) || !Number.isSafeInteger(lettersDeployment.deploymentBlock)) {
       throw new Error("Local integrated deployment metadata is incomplete");
     }
 
@@ -170,6 +173,7 @@ async function updateLocalConfig() {
     }
     const pool = new ethers.Contract(poolAddress, poolDeployment.abi, provider);
     const nativePool = new ethers.Contract(nativePoolAddress, nativeDeployment.abi, provider);
+    const letters = new ethers.Contract(lettersAddress, lettersDeployment.abi, provider);
     const factory = new ethers.Contract(factoryAddress, factoryDeployment.abi, provider);
     const [
       familyToken,
@@ -228,6 +232,16 @@ async function updateLocalConfig() {
       BigInt(nativeKind) !== 1n
     ) {
       throw new Error("Local shielded pool is not bound to this DeepFamily");
+    }
+
+    const [lettersCode, lettersFactory, lettersFamily, lettersState, poolState, nativeState, factoryState] = await Promise.all([
+      provider.getCode(lettersAddress), letters.POOL_FACTORY(), letters.DEEP_FAMILY(), letters.AUTHORIZATION_STATE(),
+      pool.AUTHORIZATION_STATE(), nativePool.AUTHORIZATION_STATE(), factory.AUTHORIZATION_STATE(),
+    ]);
+    if (lettersCode === "0x" || ethers.getAddress(lettersFactory) !== factoryAddress ||
+      ethers.getAddress(lettersFamily) !== ethers.getAddress(contractAddress) ||
+      [poolState, nativeState, factoryState].some(address => ethers.getAddress(address) !== ethers.getAddress(lettersState))) {
+      throw new Error("Local private letter archive is not bound to the canonical pools and authorization state");
     }
 
     try {
@@ -293,6 +307,10 @@ async function updateLocalConfig() {
       VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK: factoryDeployment.deploymentBlock,
       [`VITE_SHIELDED_POOL_FACTORY_FROM_BLOCK_${LOCAL_CHAIN_ID}`]:
         factoryDeployment.deploymentBlock,
+      VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS: lettersAddress,
+      [`VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS_${LOCAL_CHAIN_ID}`]: lettersAddress,
+      VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK: lettersDeployment.deploymentBlock,
+      [`VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK_${LOCAL_CHAIN_ID}`]: lettersDeployment.deploymentBlock,
       VITE_ROOT_PERSON_HASH: defaultRoot.hash,
       VITE_ROOT_VERSION_INDEX: defaultRoot.versionIndex,
     };

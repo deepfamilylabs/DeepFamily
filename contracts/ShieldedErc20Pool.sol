@@ -14,8 +14,10 @@ contract ShieldedErc20Pool is ShieldedPoolCore {
   constructor(
     address token,
     address lineageIndex,
-    address verifier
-  ) ShieldedPoolCore(lineageIndex, verifier) {
+    address verifier,
+    address authorizationState,
+    address receiveVerifier
+  ) ShieldedPoolCore(lineageIndex, verifier, authorizationState, receiveVerifier) {
     if (token.code.length == 0) revert InvalidConstructorAddress();
     TOKEN = IERC20(token);
   }

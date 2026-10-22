@@ -1,15 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { bech32m } from "@scure/base";
 import {
-  SHIELDED_RECEIVE_CODE_PREFIX,
   computeIdentityFromDerivedSecret,
-  decodeShieldedReceiveCode,
+  decodeShieldedReceiveCredential,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedViewPublicKey,
-  encodeShieldedReceiveCode,
+  encodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
 } from "@deepfamily/protocol-core";
 import { hexlify } from "ethers";
@@ -29,6 +27,8 @@ vi.mock("@deepfamily/protocol-core", async (importOriginal) => ({
   deriveIdentityMaterial: mocks.deriveIdentityMaterial,
 }));
 
+const receiveOptions = { context: { rpcUrl: "http://localhost:8545", chainId: "31337", factoryAddress: "0x1111111111111111111111111111111111111111" }, expiresAt: "2000000000" };
+
 const PUBLIC_DIRECTORY = fileURLToPath(new URL("../../../public", import.meta.url));
 
 const identity = {
@@ -43,14 +43,10 @@ const identity = {
   identitySuiteId: 1,
   derivedSecretField: 123456789n,
   keyMode: 0 as const,
+  disclosure: "fund" as const, authorizationCounter: 0n, expiresAt: 2_000_000_000n,
   keyMaterial: deriveShieldedHeirKeyMaterial(123456789n),
 };
 
-function replacePayloadWord(code: string, wordIndex: number, value: bigint) {
-  const payload = bech32m.fromWords(bech32m.decode(code as `${string}1${string}`, false).words);
-  payload.set(Buffer.from(value.toString(16).padStart(64, "0"), "hex"), 5 + wordIndex * 32);
-  return bech32m.encode(SHIELDED_RECEIVE_CODE_PREFIX, bech32m.toWords(payload), false);
-}
 
 describe("explicit receive-code spending material", () => {
   it.each([
@@ -73,7 +69,7 @@ describe("recipient empty-passphrase protection inside the ZK worker", () => {
     ["control character", "\t", "passphraseDisallowed"],
   ])("rejects %s before deriving identity material", async (_label, rawPassphrase, code) => {
     await expect(
-      createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase }),
+      createShieldedReceiveCodeFromCredentials({ identity: identity.identity, rawPassphrase, ...receiveOptions }),
     ).rejects.toThrow(code);
     expect(mocks.deriveIdentityMaterial).not.toHaveBeenCalled();
   });
@@ -92,6 +88,7 @@ describe("recipient empty-passphrase protection inside the ZK worker", () => {
       const credentials = {
         identity: { ...identity.identity, fullName: "\u3000Ａｄａ\u0085Example\u00a0" },
         rawPassphrase,
+        ...receiveOptions,
       };
       await expect(createShieldedReceiveCodeFromCredentials(credentials)).rejects.toThrow(
         "Receive code could not be created",
@@ -128,6 +125,9 @@ describe("receive code proofs", () => {
     const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
     await expect(verifyShieldedReceiveCode(code)).resolves.toEqual({
       ok: true,
+      disclosure: "fund",
+      authorizationAlias: String(decodeShieldedReceiveCredential(code).authorizationAlias),
+      authorizationCounter: "0", expiresAt: "2000000000",
       identityCommitment: material.identityCommitment.toString(),
       ownerCommitment: keys.ownerCommitment.toString(),
       viewingKey: hexlify(viewingKey),
@@ -136,7 +136,7 @@ describe("receive code proofs", () => {
       identitySuiteId: 1,
       independentKeySuiteId: 1,
       independentKeyDerivationVersion: 1,
-      fingerprint: decodeShieldedReceiveCode(code).fingerprint,
+      fingerprint: decodeShieldedReceiveCredential(code).fingerprint,
     });
   }, 60_000);
 
@@ -157,8 +157,8 @@ describe("receive code proofs", () => {
       viewingKey: hexlify(keys.viewPublicKey),
       fingerprint: independent.fingerprint,
     });
-    const decoded = decodeShieldedReceiveCode(independent.code);
-    const downgraded = encodeShieldedReceiveCode({ ...decoded, keyMode: 0 });
+    const decoded = decodeShieldedReceiveCredential(independent.code);
+    const downgraded = encodeShieldedReceiveCredential({ ...decoded, keyMode: 0 });
     await expect(verifyShieldedReceiveCode(downgraded)).resolves.toEqual({
       ok: false,
       reason: "invalid",
@@ -169,8 +169,8 @@ describe("receive code proofs", () => {
   }, 120_000);
 
   it("rejects a well-formed code whose identity was swapped", async () => {
-    const decoded = decodeShieldedReceiveCode(code);
-    const otherIdentity = replacePayloadWord(code, 0, decoded.identityCommitment + 1n);
+    const decoded = decodeShieldedReceiveCredential(code);
+    const otherIdentity = encodeShieldedReceiveCredential({ ...decoded, identityCommitment: decoded.identityCommitment! + 1n });
     await expect(verifyShieldedReceiveCode(otherIdentity)).resolves.toEqual({
       ok: false,
       reason: "invalid",
@@ -178,8 +178,8 @@ describe("receive code proofs", () => {
   }, 60_000);
 
   it("rejects a well-formed code whose owner key was swapped", async () => {
-    const decoded = decodeShieldedReceiveCode(code);
-    const otherOwner = replacePayloadWord(code, 1, decoded.ownerCommitment + 1n);
+    const decoded = decodeShieldedReceiveCredential(code);
+    const otherOwner = encodeShieldedReceiveCredential({ ...decoded, ownerCommitment: decoded.ownerCommitment + 1n });
     await expect(verifyShieldedReceiveCode(otherOwner)).resolves.toEqual({
       ok: false,
       reason: "invalid",
@@ -192,11 +192,11 @@ describe("receive code proofs", () => {
   ] as const)(
     "rejects a well-formed code with only %s changed",
     async (_name, byteIndex) => {
-      const decoded = decodeShieldedReceiveCode(code);
+      const decoded = decodeShieldedReceiveCredential(code);
       const viewingKey = decoded.viewingKey.slice();
       viewingKey[byteIndex] ^= 1;
       // Keep the identity, owner and proof intact and regenerate the checksum.
-      const otherViewingKey = encodeShieldedReceiveCode({ ...decoded, viewingKey });
+      const otherViewingKey = encodeShieldedReceiveCredential({ ...decoded, viewingKey });
       await expect(verifyShieldedReceiveCode(otherViewingKey)).resolves.toEqual({
         ok: false,
         reason: "invalid",
@@ -231,6 +231,6 @@ describe("receive code proofs", () => {
     const point = curve.G2.fromObject([outside[0].map(BigInt), outside[1].map(BigInt), [1n, 0n]]);
     expect(curve.G2.isValid(point)).toBe(true);
     expect(await isInG2Subgroup(outside)).toBe(false);
-    expect(await isInG2Subgroup(decodeShieldedReceiveCode(code).proof.pi_b)).toBe(true);
+    expect(await isInG2Subgroup(decodeShieldedReceiveCredential(code).proof.pi_b)).toBe(true);
   }, 60_000);
 });

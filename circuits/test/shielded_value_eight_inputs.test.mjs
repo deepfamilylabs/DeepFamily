@@ -71,6 +71,9 @@ function fixture(count, unshield = false, amounts = Array(count).fill(10n)) {
       }
     : {
         ...witness,
+        receiveBindings: ["0", "0"],
+        receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"],
+        receiveKeyModes: ["0", "0"], receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
         outputOwnerCommitments: [String(owner), String(owner)],
         outputAmounts: outputAmounts.map(String),
         outputNonces: outputNonces.map(String),

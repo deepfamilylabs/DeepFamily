@@ -13,6 +13,8 @@ import {
 } from "../scripts/lib/protocolReleaseManifest.mjs";
 import {
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+  receiveDeploymentConstructorArgs,
   integratedDeploymentAddresses,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
@@ -39,7 +41,7 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       transactionTimeoutMs: 30_000,
     });
     const nonceAfterFirst = await ethers.provider.getTransactionCount(deployerAddress, "pending");
-    expect(Object.keys(checkpoint.transactions)).to.have.length(26);
+    expect(Object.keys(checkpoint.transactions)).to.have.length(34);
     expect(
       Object.values(checkpoint.transactions).every((transaction) =>
         ["confirmed", "finalized"].includes(transaction.status),
@@ -201,6 +203,11 @@ describe("eSpace Mainnet resumable deployment integration", function () {
         await ethers.getContractFactory(spec.verifierContractName, deployer)
       ).getDeployTransaction();
     }
+    const receiveAddresses = Object.fromEntries(intents.filter((intent) => intent.kind === "deployment").map(({label, predictedAddress}) => [label, predictedAddress]));
+    receiveAddresses.deepFamily = address("deepFamilyProxy");
+    for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
+      requests[property] = await (await ethers.getContractFactory(contractName, deployer)).getDeployTransaction(...receiveDeploymentConstructorArgs(property, receiveAddresses));
+    }
     const nativePool = await ethers.getContractFactory("ShieldedNativePool", {
       signer: deployer,
       libraries: { PoseidonT3: address("poseidonT3") },
@@ -208,6 +215,8 @@ describe("eSpace Mainnet resumable deployment integration", function () {
     requests.shieldedNativePool = await nativePool.getDeployTransaction(
       address("deepFamilyLineageIndex"),
       address("groth16VerifierAdapter"),
+      address("identityAuthorizationState"),
+      address("receivePresentationVerifierRouter"),
     );
     const poolFactory = await ethers.getContractFactory("ShieldedPoolFactory", {
       signer: deployer,
@@ -218,8 +227,10 @@ describe("eSpace Mainnet resumable deployment integration", function () {
       address("deepFamilyLineageIndex"),
       address("groth16VerifierAdapter"),
       address("shieldedNativePool"),
+      address("identityAuthorizationState"),
+      address("receivePresentationVerifierRouter"),
     );
-    expect(Object.keys(requests)).to.have.length(28);
+    expect(Object.keys(requests)).to.have.length(36);
 
     for (const intent of intents) {
       const request = requests[intent.label];

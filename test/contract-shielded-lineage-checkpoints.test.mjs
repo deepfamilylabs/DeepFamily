@@ -1,7 +1,14 @@
 import "../hardhat-test-setup.mjs";
 import { expect } from "chai";
 import hre from "hardhat";
-import { buildShieldedPoolPublicSignals } from "@deepfamily/protocol-core";
+import {
+  buildShieldedPoolPublicSignals,
+  emptyShieldedReceiveAuthorizations,
+} from "@deepfamily/protocol-core";
+import {
+  authorizeMockReceive,
+  deployMockReceiveAuthorization,
+} from "./helpers/shieldedReceiveAuthorization.mjs";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import {
   addPerson,
@@ -23,6 +30,7 @@ const actionData = (overrides = {}) => ({
   lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
+  receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
   ...overrides,
 });
 
@@ -66,7 +74,12 @@ describe("Shielded lineage checkpoint integration", function () {
     const Pool = await hre.ethers.getContractFactory("ShieldedNativePool", {
       libraries: { PoseidonT3: await poseidonT3.getAddress() },
     });
-    const pool = await Pool.deploy(await lineageIndex.getAddress(), await verifier.getAddress());
+    const receive = await deployMockReceiveAuthorization(hre);
+    const pool = await Pool.deploy(
+      await lineageIndex.getAddress(),
+      await verifier.getAddress(),
+      ...receive.constructorArgs,
+    );
     await pool.waitForDeployment();
     const deposit = actionData();
     await pool.connect(claimant).shield(100n, deposit, await proofFor(pool, 0, deposit, 100n), {
@@ -103,8 +116,10 @@ describe("Shielded lineage checkpoint integration", function () {
     });
     const claim = {
       ...data,
+      receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
       periodNullifiers: Array.from({ length: 12 }, (_, i) => 500n + BigInt(i)),
     };
+    await authorizeMockReceive(hre, pool, data, 3, [777n, 0n]);
     return {
       data,
       claim,
@@ -198,7 +213,17 @@ describe("Shielded lineage checkpoint integration", function () {
         { ...prepared.data, lineageCheckpointId: laterId, asOf: refreshedTime },
         prepared.fundProof,
       ),
-    ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    ).to.be.revertedWithCustomError(pool, "InvalidReceiveProof");
+    const rebound = {
+      ...prepared.data,
+      lineageCheckpointId: laterId,
+      asOf: refreshedTime,
+    };
+    await authorizeMockReceive(hre, pool, rebound, 3, [777n, 0n]);
+    await expect(pool.fund.staticCall(rebound, prepared.fundProof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidZKProof",
+    );
     await hre.networkHelpers.time.increaseTo(Number(retired.retiredAt + 900n));
     await expectPreparedExpired(context, prepared);
     expect(await lineageIndex.currentCheckpointId()).to.equal(laterId);

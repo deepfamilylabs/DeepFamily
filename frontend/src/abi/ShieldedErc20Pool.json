@@ -19,6 +19,16 @@
           "internalType": "address",
           "name": "verifier",
           "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "authorizationState",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "receiveVerifier",
+          "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
@@ -27,6 +37,11 @@
     {
       "inputs": [],
       "name": "DuplicateCommitment",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ExpiredReceiveCode",
       "type": "error"
     },
     {
@@ -67,6 +82,16 @@
     {
       "inputs": [],
       "name": "InvalidLeafIndex",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidReceiveAuthorization",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidReceiveProof",
       "type": "error"
     },
     {
@@ -205,6 +230,19 @@
     },
     {
       "inputs": [],
+      "name": "AUTHORIZATION_STATE",
+      "outputs": [
+        {
+          "internalType": "contract IIdentityAuthorizationState",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "CIPHERTEXT_BYTES",
       "outputs": [
         {
@@ -250,6 +288,19 @@
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "RECEIVE_VERIFIER",
+      "outputs": [
+        {
+          "internalType": "contract IPrivateLetterVerifier",
+          "name": "",
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -370,6 +421,38 @@
               "internalType": "uint256",
               "name": "budgetKind",
               "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
             }
           ],
           "internalType": "struct ShieldedPoolCore.ActionData",
@@ -495,6 +578,38 @@
               "internalType": "uint256",
               "name": "budgetKind",
               "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
             }
           ],
           "internalType": "struct ShieldedPoolCore.ActionData",
@@ -704,6 +819,38 @@
               "internalType": "uint256",
               "name": "budgetKind",
               "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
             }
           ],
           "internalType": "struct ShieldedPoolCore.ActionData",
@@ -729,6 +876,119 @@
           "internalType": "uint256",
           "name": "",
           "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256[]",
+              "name": "inputShardIds",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "inputRoots",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256[]",
+              "name": "inputNullifiers",
+              "type": "uint256[]"
+            },
+            {
+              "internalType": "uint256[12]",
+              "name": "periodNullifiers",
+              "type": "uint256[12]"
+            },
+            {
+              "internalType": "uint256[2]",
+              "name": "outputCommitments",
+              "type": "uint256[2]"
+            },
+            {
+              "internalType": "bytes[2]",
+              "name": "outputCiphertexts",
+              "type": "bytes[2]"
+            },
+            {
+              "internalType": "uint256",
+              "name": "relation0",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "relation1",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "asOf",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lineageCheckpointId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "fundMode",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "budgetKind",
+              "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
+            }
+          ],
+          "internalType": "struct ShieldedPoolCore.ActionData",
+          "name": "data",
+          "type": "tuple"
+        }
+      ],
+      "name": "receiveActionHash",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
         }
       ],
       "stateMutability": "pure",
@@ -802,6 +1062,38 @@
               "internalType": "uint256",
               "name": "budgetKind",
               "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
             }
           ],
           "internalType": "struct ShieldedPoolCore.ActionData",
@@ -905,6 +1197,38 @@
               "internalType": "uint256",
               "name": "budgetKind",
               "type": "uint256"
+            },
+            {
+              "components": [
+                {
+                  "internalType": "uint256",
+                  "name": "checkpointId",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "asOf",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint64",
+                  "name": "expiresAt",
+                  "type": "uint64"
+                },
+                {
+                  "internalType": "uint256",
+                  "name": "recipientBinding",
+                  "type": "uint256"
+                },
+                {
+                  "internalType": "bytes",
+                  "name": "proof",
+                  "type": "bytes"
+                }
+              ],
+              "internalType": "struct ShieldedPoolCore.ReceiveAuthorization[2]",
+              "name": "receiveAuthorizations",
+              "type": "tuple[2]"
             }
           ],
           "internalType": "struct ShieldedPoolCore.ActionData",

@@ -10,6 +10,8 @@ import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
+  computeShieldedReceiveCredentialBinding,
+  emptyShieldedReceiveAuthorizations,
   createLineageTree,
   decodeShieldedNotePayload,
   decryptShieldedNote,
@@ -49,7 +51,11 @@ async function open(ciphertext: Uint8Array, secret: bigint) {
     poolAddress,
   });
   try {
-    return decodeShieldedNotePayload(payload, { chainId, poolAddress });
+    return decodeShieldedNotePayload(payload, {
+      chainId,
+      poolAddress,
+      viewingKey: await deriveShieldedViewPublicKey(deriveShieldedHeirKeyMaterial(secret).hpkeIkm),
+    });
   } finally {
     payload.fill(0);
   }
@@ -115,6 +121,8 @@ async function setup(periodDays = 30n) {
   const heirPersonHash = wrapIdentityCommitmentAsPersonHash(heirIdentity).toLowerCase();
   // The worker verifies a receive code before a payer can hold this type.
   const recipient = {
+    disclosure: "fund",
+    keyMode: 0,
     identityCommitment: heirIdentity,
     ownerCommitment: heirKeys.ownerCommitment,
     viewingKey: hexlify(viewingKey),
@@ -209,8 +217,10 @@ async function setup(periodDays = 30n) {
   const lineageIndex = {
     getAddress: async () => lineageAddress,
     root: async (which: number) => (which === 0 ? chainEndorsementRoot : chainTrustedRoot),
-    isKnownCheckpoint: vi.fn(async (id: bigint, endorsement: bigint, trusted: bigint) =>
-      id === 7n && endorsement === chainEndorsementRoot && trusted === chainTrustedRoot),
+    isKnownCheckpoint: vi.fn(
+      async (id: bigint, endorsement: bigint, trusted: bigint) =>
+        id === 7n && endorsement === chainEndorsementRoot && trusted === chainTrustedRoot,
+    ),
   } as unknown as Contract;
   const common = {
     pool,
@@ -311,8 +321,11 @@ describe("funding destination validation before consolidation", () => {
       budgetPeriods: 1n,
     });
     expect(isKnownCheckpoint).toHaveBeenCalledExactlyOnceWith(
-      7n, fixture.lineage.endorsementTree.root, fixture.lineage.trustedTree.root,
-      BigInt(timestamp), { blockTag: 10 },
+      7n,
+      fixture.lineage.endorsementTree.root,
+      fixture.lineage.trustedTree.root,
+      BigInt(timestamp),
+      { blockTag: 10 },
     );
   });
 
@@ -421,7 +434,8 @@ describe("local unified funding preparation", () => {
       viewingKey: fixture.common.recipient.viewingKey,
     };
     const input = { ...fixture.common, fundMode: 1 as const, budget, budgetPeriods: 1n };
-    const refill = await prepareShieldedFund({ ...input, recipient: undefined });
+    await expect(prepareShieldedFund({ ...input, recipient: undefined })).rejects.toThrow("current Fund identity disclosure material");
+    const refill = await prepareShieldedFund(input);
     expect(refill.outputs[0].note.keyMode).toBe(1n);
     expect(refill.witness.oldKeyMode).toBe("1");
     await expect(
@@ -603,7 +617,11 @@ describe("local unified funding preparation", () => {
             ciphertext: prepared.outputs[0].ciphertext,
             noteCommitment: prepared.outputs[0].commitment,
           },
-          { chainId, poolAddress },
+          {
+            chainId,
+            poolAddress,
+            viewingKey: await deriveShieldedViewPublicKey(fixture.heirKeys.hpkeIkm),
+          },
         ).note.kind,
       ).toBe("budget");
     } finally {
@@ -909,6 +927,20 @@ describe("local unified funding preparation", () => {
           ["shielded_fund", SHIELDED_POOL_ACTION.Fund, additionalFunding],
         ] as const) {
           const { witness } = prepared;
+          // Complete the same receiver binding the Worker adds after preparation.
+          // This test proves the Fund business circuit; presentation authentication
+          // is verified by the dedicated real receive-proof integration tests.
+          const authorizationAlias = 99101n;
+          const salt = 99102n;
+          const expiresAt = BigInt(timestamp + 86_400);
+          const binding = computeShieldedReceiveCredentialBinding({
+            credential: { ...fixture.common.recipient, authorizationAlias, authorizationCounter: 0n, expiresAt }, salt,
+          });
+          witness.receiveAuthorizationAlias = String(authorizationAlias);
+          witness.receiveSalt = String(salt);
+          witness.receiveBindings = [String(binding), "0"];
+          prepared.data.receiveAuthorizations = emptyShieldedReceiveAuthorizations();
+          prepared.data.receiveAuthorizations[0] = { checkpointId: 1n, asOf: BigInt(timestamp), expiresAt, recipientBinding: binding, proof: "0x" };
           const inputPath = path.join(temporary, `${source}.input.json`);
           const proofPath = path.join(temporary, `${source}.proof.json`);
           const publicPath = path.join(temporary, `${source}.public.json`);

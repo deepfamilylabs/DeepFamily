@@ -13,6 +13,7 @@ import {
   getShieldedBudgetCommitments,
   normalizeShieldedScope,
   normalizeShieldedKeyMode,
+  normalizeShieldedBudgetOrigin,
   SHIELDED_CIPHERTEXT_BYTES,
 } from "./shielded-inheritance.js";
 
@@ -23,7 +24,7 @@ export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND = 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND = 4;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND = 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES = 86;
-export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES = 283;
+export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES = 284;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES = 218;
 export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES = 400;
 export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES = 432;
@@ -55,6 +56,7 @@ const budgetSchema = [
   ["nonce", 32, MAX_FIELD],
   ["periodDays", 4, MAX_UINT32],
   ["keyMode", 1, 1n],
+  ["budgetOrigin", 1, 1n],
 ];
 const identityBudgetSchema = [
   ["rootIdentityCommitment", 32, MAX_FIELD],
@@ -220,7 +222,10 @@ export function encodeShieldedValueNotePayload(note, scope) {
         identityMemoBudgetSchema,
         IDENTITY_MEMO_BUDGET_BYTES,
       )
-    : encodeShieldedBudgetNotePayload(memoBudget, scope);
+    : encodeShieldedBudgetNotePayload(memoBudget, {
+        ...scope,
+        viewingKey: note.fundingMemo.viewingKey,
+      });
   const memoBytes = identityBound
     ? SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES
     : SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES;
@@ -312,7 +317,12 @@ export function encodeShieldedBudgetNotePayload(note, scope) {
       SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES,
     );
   }
-  const allowed = new Set(["binding", "kind", ...budgetSchema.map(([label]) => label)]);
+  const allowed = new Set([
+    "binding",
+    "kind",
+    "viewingKey",
+    ...budgetSchema.map(([label]) => label),
+  ]);
   protocolAssert(
     Object.keys(note).every((label) => allowed.has(label)),
     "UNEXPECTED_SHIELDED_NOTE_FIELD",
@@ -324,6 +334,8 @@ export function encodeShieldedBudgetNotePayload(note, scope) {
       policyCommitment,
       enrollmentCommitment,
       heirOwnerCommitment: note.heirOwnerCommitment,
+      viewingKey: note.viewingKey ?? scope.viewingKey,
+      budgetOrigin: note.budgetOrigin,
       keyMode: note.keyMode,
       amountPerPeriod: note.amountPerPeriod,
       remaining: note.remaining,
@@ -334,7 +346,11 @@ export function encodeShieldedBudgetNotePayload(note, scope) {
   );
   return encode(
     SHIELDED_BUDGET_NOTE_KIND,
-    { ...note, keyMode: normalizeShieldedKeyMode(note.keyMode) },
+    {
+      ...note,
+      keyMode: normalizeShieldedKeyMode(note.keyMode),
+      budgetOrigin: normalizeShieldedBudgetOrigin(note.budgetOrigin),
+    },
     budgetSchema,
     SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES,
   );
@@ -499,7 +515,12 @@ export function decodeShieldedNotePayload(payload, scope) {
         privatePayload.set(input.subarray(budgetStart, budgetEnd), HEADER_BYTES);
         let budgetNote;
         try {
-          budgetNote = decodeShieldedNotePayload(privatePayload, scope);
+          // The recipient key is already retained in the donor memo. Decode
+          // against that key rather than the donor's own viewing context.
+          budgetNote = decodeShieldedNotePayload(privatePayload, {
+            ...scope,
+            viewingKey: input.slice(input.length - 32),
+          });
         } finally {
           privatePayload.fill(0);
         }
@@ -562,6 +583,8 @@ export function decodeShieldedNotePayload(payload, scope) {
   } else if (kind === SHIELDED_IDENTITY_BUDGET_NOTE_KIND) {
     validateIdentityBudget(note, scope);
   } else if (kind === SHIELDED_BUDGET_NOTE_KIND) {
+    if (scope.viewingKey !== undefined)
+      note.viewingKey = bytesToHex(asUint8Array(scope.viewingKey));
     const commitments = getShieldedBudgetCommitments(note, scope);
     computeShieldedBudgetNoteCommitment(
       { ...note, ...commitments, ciphertextHashField: 0n },

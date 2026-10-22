@@ -114,6 +114,25 @@ describe("ZK public proving assets", function () {
     expect(shielded.map((asset) => asset.sha256)).to.deep.equal(["a".repeat(64), "b".repeat(64)]);
   });
 
+  it("pins each receive presentation manifest, proving key, circuit and runtime independently", function () {
+    const kinds = Object.fromEntries(["anonymous", "fund", "attachment"].map((kind, index) => [kind, {
+      manifestSha256: String(index + 1).repeat(64),
+      artifacts: { "receipt.r1cs": "a".repeat(64), "receipt.pk": "b".repeat(64), "receipt.vk": "c".repeat(64) },
+    }]));
+    const file = path.join(root, "circuits/receive-development-manifest.json");
+    fs.writeFileSync(file, JSON.stringify({ kinds, runtime: { wasmSha256: "d".repeat(64), wasmExecSha256: "e".repeat(64) } }));
+    const assets = listZkPublicAssets(root).filter((asset) => asset.path.startsWith("/zk/receive/"));
+    expect(assets).to.have.length(14);
+    for (const [kind, item] of Object.entries(kinds)) {
+      expect(assets.find((asset) => asset.path === `/zk/receive/${kind}/manifest.json`).sha256).to.equal(item.manifestSha256);
+      for (const name of Object.keys(item.artifacts))
+        expect(assets.find((asset) => asset.path === `/zk/receive/${kind}/${name}`).key).to.equal(`${item.artifacts[name]}/${name}`);
+    }
+    kinds.fund.artifacts["receipt.pk"] = "invalid";
+    fs.writeFileSync(file, JSON.stringify({ kinds, runtime: { wasmSha256: "d".repeat(64), wasmExecSha256: "e".repeat(64) } }));
+    expect(() => listZkPublicAssets(root)).to.throw("fund receipt.pk has no SHA-256 digest");
+  });
+
   it("downloads only missing or stale files and verifies their digests", async function () {
     writeLocal("frontend/public/zk/person_commitment.wasm");
     writeLocal("frontend/public/zk/person_commitment_final.zkey", Buffer.from("stale"));

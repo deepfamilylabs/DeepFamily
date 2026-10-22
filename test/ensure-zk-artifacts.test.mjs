@@ -6,11 +6,17 @@ import path from "node:path";
 
 import {
   compiledCircuitsMatchManifests,
-  ensureZkArtifacts,
+  ensureZkArtifacts as ensureZkArtifactsRaw,
 } from "../scripts/ensure-zk-artifacts.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
+import {
+  RECEIVE_DEVELOPMENT_MANIFEST,
+  receiveProverSourceHashes,
+} from "../scripts/lib/receiveArtifacts.mjs";
 
 const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+const ensureZkArtifacts = (options) =>
+  ensureZkArtifactsRaw({ syncReceiveArtifacts: async () => {}, ...options });
 
 /** Writes the eight compiled circuits and development manifests that pin their digests. */
 function writeCompiledCircuits(root) {
@@ -41,6 +47,14 @@ function writeCompiledCircuits(root) {
     path.join(root, "circuits/shielded-development-manifest.json"),
     JSON.stringify({ circuits: shielded }),
   );
+  const receiveSources = path.join(root, "packages/receive-prover");
+  fs.mkdirSync(receiveSources, { recursive: true });
+  for (const file of ["circuit.go", "go.mod", "go.sum", "poseidon-constants.json"])
+    fs.writeFileSync(path.join(receiveSources, file), file);
+  fs.writeFileSync(
+    path.join(root, RECEIVE_DEVELOPMENT_MANIFEST),
+    JSON.stringify({ sourceFiles: receiveProverSourceHashes({ root }) }),
+  );
 }
 
 describe("integrated local ZK artifact preparation", function () {
@@ -58,7 +72,10 @@ describe("integrated local ZK artifact preparation", function () {
     const artifacts = { status: "development", circuitCount: 8 };
     const result = await ensureZkArtifacts({
       root,
-      build: async (options) => calls.push(["build", options.circuit]),
+      build: async (options) => {
+        expect(options.syncReceive).to.equal(false);
+        calls.push(["build", options.circuit]);
+      },
       check: async () => {
         calls.push(["check"]);
         return artifacts;
@@ -77,9 +94,12 @@ describe("integrated local ZK artifact preparation", function () {
     const result = await ensureZkArtifacts({
       root,
       build: async () => calls.push("build"),
+      syncReceiveArtifacts: async () => {
+        calls.push("sync");
+        if (!downloaded) throw new Error("missing public presentation keys");
+      },
       check: async () => {
         calls.push("check");
-        if (!downloaded) throw new Error("missing public zkey");
         return { status: "development", circuitCount: 8 };
       },
       fetchAssets: async () => {
@@ -89,15 +109,13 @@ describe("integrated local ZK artifact preparation", function () {
       setup: async () => calls.push("setup"),
       log: () => {},
     });
-    expect(calls).to.deep.equal(["build", "check", "fetch", "check"]);
+    expect(calls).to.deep.equal(["build", "sync", "fetch", "sync", "check"]);
     expect(result.regenerated).to.equal(false);
   });
 
-  it("regenerates the complete development set after a circuit change", async function () {
-    fs.writeFileSync(
-      path.join(root, "circuits/zk-artifacts-manifest.json"),
-      JSON.stringify({ trustedSetup: { status: "development" } }),
-    );
+  it("regenerates the development set when receive constraints change and Circom stays unchanged", async function () {
+    writeCompiledCircuits(root);
+    fs.writeFileSync(path.join(root, "packages/receive-prover/circuit.go"), "changed constraints");
     const calls = [];
     let ready = false;
     const result = await ensureZkArtifacts({
@@ -113,11 +131,63 @@ describe("integrated local ZK artifact preparation", function () {
         calls.push("setup-all");
         ready = true;
       },
-      circuitsUnchanged: () => false,
       log: () => {},
     });
     expect(calls).to.deep.equal(["build:all", "check", "fetch", "check", "setup-all", "check"]);
     expect(result.regenerated).to.equal(true);
+  });
+
+  it("stops before downloading or setup when a changed receive source does not compile", async function () {
+    writeCompiledCircuits(root);
+    fs.writeFileSync(path.join(root, "packages/receive-prover/circuit.go"), "invalid Go source");
+    const compileError = new Error("Go compilation failed");
+    let fetchCalled = false;
+    let setupCalled = false;
+    try {
+      await ensureZkArtifacts({
+        root,
+        build: async () => {
+          throw compileError;
+        },
+        fetchAssets: async () => {
+          fetchCalled = true;
+        },
+        setup: async () => {
+          setupCalled = true;
+        },
+        log: () => {},
+      });
+      expect.fail("Expected compilation to fail before key preparation");
+    } catch (error) {
+      expect(error).to.equal(compileError);
+    }
+    expect(fetchCalled).to.equal(false);
+    expect(setupCalled).to.equal(false);
+  });
+
+  it("preserves proving keys when only the browser loader changed", async function () {
+    writeCompiledCircuits(root);
+    fs.writeFileSync(path.join(root, "packages/receive-prover/browser.mjs"), "changed loader");
+    expect(compiledCircuitsMatchManifests({ root })).to.equal(true);
+    let setupCalled = false;
+    try {
+      await ensureZkArtifacts({
+        root,
+        build: async () => {},
+        syncReceiveArtifacts: async () => {
+          throw new Error("Receive loader stale source");
+        },
+        fetchAssets: async () => {},
+        setup: async () => {
+          setupCalled = true;
+        },
+        log: () => {},
+      });
+      expect.fail("Expected loader mismatch to remain blocked without replacing keys");
+    } catch (error) {
+      expect(error.message).to.contain("unchanged circuits (Receive loader stale source)");
+    }
+    expect(setupCalled).to.equal(false);
   });
 
   it("keeps the committed keys of unchanged circuits when their files cannot be installed", async function () {
@@ -151,6 +221,41 @@ describe("integrated local ZK artifact preparation", function () {
       expect(error.message).to.contain("npm run zk:assets:publish");
       expect(error.message).to.contain("npm run zk:development:setup");
     }
+    expect(setupCalled).to.equal(false);
+  });
+
+  it("does not regenerate unchanged keys when downloaded keys cannot synchronize the native kit", async function () {
+    writeCompiledCircuits(root);
+    const calls = [];
+    let setupCalled = false;
+    try {
+      await ensureZkArtifacts({
+        root,
+        build: async ({ circuit }) => {
+          calls.push(`build:${circuit}`);
+        },
+        syncReceiveArtifacts: async () => {
+          calls.push("sync");
+          throw new Error("native key synchronization failed");
+        },
+        check: async () => {
+          calls.push("check");
+          throw new Error("public presentation keys missing");
+        },
+        fetchAssets: async () => calls.push("fetch"),
+        setup: async () => {
+          setupCalled = true;
+        },
+        log: () => {},
+      });
+      expect.fail("Expected native synchronization failure to preserve existing keys");
+    } catch (error) {
+      expect(error.message).to.contain(
+        "Refusing to replace the committed development keys of unchanged circuits " +
+          "(native key synchronization failed)",
+      );
+    }
+    expect(calls).to.deep.equal(["build:all", "sync", "fetch", "sync"]);
     expect(setupCalled).to.equal(false);
   });
 

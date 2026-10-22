@@ -9,6 +9,7 @@ import {
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "./zkDeploymentCatalog.mjs";
 import { MAINNET_TRANSACTION_LABELS } from "./mainnetReleaseSafety.mjs";
 
@@ -99,6 +100,7 @@ export const buildPlannedProtocolDeploymentEvidence = ({
       runtimeSha256: artifact?.runtimeSha256,
     });
   const deployments = Object.freeze({
+    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, withHashes(deploymentBindings[property], artifacts?.[property])])),
     token: deploymentBindings.token,
     poseidonT3: deploymentBindings.poseidonT3,
     poseidonT6: deploymentBindings.poseidonT6,
@@ -204,6 +206,7 @@ export const assertOnChainProtocolDeploymentRuntimes = async ({
       plannedAddresses?.[spec.verifierLabel],
       deploymentArtifacts?.shieldedVerifiers?.[action],
     ]),
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, plannedAddresses?.[property], deploymentArtifacts?.[property]]),
     [
       "ShieldedErc20Pool",
       plannedAddresses?.shieldedErc20Pool,

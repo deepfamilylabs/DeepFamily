@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { ethers } from "ethers";
 
 import { ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import {
   MAINNET_DEPLOYMENT_NONCE_OFFSETS,
   assertOnChainProtocolDeploymentRuntimes,
@@ -51,6 +51,7 @@ const fakeDeploymentArtifactInspector = ({ deployments }) => {
     });
   };
   return Object.freeze({
+    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [property, artifact(contractName, deployments[property])])),
     shieldedVerifiers: Object.fromEntries(
       Object.entries(deployments.shieldedVerifiers).map(([action, record]) => [
         action,
@@ -172,6 +173,8 @@ describe("planned production protocol deployment projection", function () {
       "TOKEN",
       "LINEAGE_INDEX",
       "VERIFIER",
+      "AUTHORIZATION_STATE",
+      "RECEIVE_VERIFIER",
     ]);
     const immutableValues = Object.fromEntries(
       GROTH16_ADAPTER_IMMUTABLE_FIELDS.map((getter) => [
@@ -267,6 +270,10 @@ describe("planned production protocol deployment projection", function () {
   it("checks immutable-linked deployed runtime bytes without masking", async function () {
     const fixture = fixtureFor(ESPACE_CHAIN_PROFILE);
     const codeByAddress = new Map([
+      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+        fixture.plannedAddresses[property].toLowerCase(),
+        fixture.planned.artifacts[property].runtimeBytecode,
+      ]),
       ...Object.entries(SHIELDED_DEPLOYMENT_CIRCUITS).map(([action, spec]) => [
         fixture.plannedAddresses[spec.verifierLabel].toLowerCase(),
         fixture.planned.artifacts.shieldedVerifiers[action].runtimeBytecode,

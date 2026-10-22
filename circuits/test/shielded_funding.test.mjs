@@ -10,7 +10,13 @@ import { WitnessCalculatorBuilder } from "circom_runtime";
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { SNARK_SCALAR_FIELD, computeShieldedEnrollmentNullifier } from "@deepfamily/protocol-core";
 import { buildShieldedFundingFixtures } from "./generate_shielded_funding_input.mjs";
+import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
+import {
+  fixtureFundReceive,
+  FUND_PRIVATE_BUDGET_PURPOSE,
+  CLAIM_PRIVATE_BUDGET_PURPOSE,
+} from "./shielded_budget_fixture.mjs";
 
 import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
@@ -23,7 +29,12 @@ const legalBudgetBindings = [
 
 // Rebind both outputs independently of the circuit after changing owner or
 // funding amounts, so unrelated commitment mismatches cannot mask a guard.
-function withFundingOutputs(fixture, witness, changeAmount) {
+function withFundingOutputs(
+  fixture,
+  witness,
+  changeAmount,
+  privatePurpose = FUND_PRIVATE_BUDGET_PURPOSE,
+) {
   const updated = structuredClone(witness);
   const scoped = (purpose) => shieldedFixtureTag(purpose, updated.chainId, updated.pool);
   const budgetAmount = BigInt(updated.rate) * BigInt(updated.budgetPeriods);
@@ -39,10 +50,16 @@ function withFundingOutputs(fixture, witness, changeAmount) {
         BigInt(updated.rate),
         BigInt(updated.periodDays),
       ])
-    : poseidon3([scoped(1033n), BigInt(updated.heirOwnerCommitment), BigInt(updated.keyMode)]);
+    : poseidon5([
+        scoped(1033n),
+        BigInt(updated.heirOwnerCommitment),
+        BigInt(updated.keyMode),
+        BigInt(updated.heirViewKeyLo),
+        BigInt(updated.heirViewKeyHi),
+      ]);
   updated.outputCommitments = [
     poseidon8([
-      scoped(publicBudget ? 1030n : 1015n),
+      scoped(publicBudget ? 1030n : privatePurpose),
       fixture.policy,
       fixture.enrollment,
       authorization,
@@ -61,6 +78,33 @@ function withFundingOutputs(fixture, witness, changeAmount) {
     ]),
   ].map(String);
   updated.publicBudget[7] = publicBudget ? String(budgetAmount) : "0";
+  Object.assign(updated, fixtureFundReceive(updated));
+  return updated;
+}
+
+function withClaimSource(witness, source) {
+  const updated = structuredClone(witness);
+  const scoped = (purpose) => shieldedFixtureTag(purpose, updated.chainId, updated.pool);
+  const old = BigInt(source.commitment);
+  const ownerSecret = BigInt(updated.ownerSecret);
+  updated.budgetNonce = source.nonce;
+  updated.budgetCiphertextHash = source.ciphertextHash;
+  const siblings = [source.sibling, ...(source.prefixRoot ? [source.prefixRoot] : [])];
+  updated.noteDepth = String(siblings.length);
+  updated.noteIndex = source.prefixRoot ? "2" : "0";
+  updated.noteSiblings = [...siblings, ...Array(32 - siblings.length).fill("0")];
+  const pairRoot = poseidon2([old, BigInt(source.sibling)]);
+  const root = source.prefixRoot ? poseidon2([BigInt(source.prefixRoot), pairRoot]) : pairRoot;
+  updated.inputRoots = Array(2).fill(String(root));
+  updated.inputNullifiers = [
+    poseidon3([scoped(1016n), ownerSecret, old]),
+    poseidon3([scoped(1021n), ownerSecret, old]),
+  ].map(String);
+  for (let slot = Number(updated.claimCount); slot < 12; slot++) {
+    updated.periodNullifiers[slot] = String(
+      poseidon4([scoped(1019n), ownerSecret, old, BigInt(slot)]),
+    );
+  }
   return updated;
 }
 
@@ -82,7 +126,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-funding-"));
   try {
     const calculators = {};
-    for (const action of ["fund"]) {
+    for (const action of ["fund", "claim"]) {
       const circuit = `shielded_${action}`;
       execFileSync(
         path.join(repoRoot, "bin/circom"),
@@ -119,6 +163,18 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       return copy;
     };
     const fixture = buildShieldedFundingFixtures();
+    await t.test("private Fund initial and top-up require the exact authenticated recipient binding", async () => {
+      for (const witness of [fixture.initial, fixture.continuation]) {
+        for (const field of ["receiveAuthorizationAlias", "receiveSalt"]) {
+          await invalid("fund", mutate(witness, (w) => { w[field] = "0"; }));
+          await invalid("fund", mutate(witness, (w) => { w[field] = String(BigInt(w[field]) + 1n); }));
+        }
+        for (const slot of [0, 1]) {
+          await invalid("fund", mutate(witness, (w) => { w.receiveBindings[slot] = String(BigInt(w.receiveBindings[slot]) + 1n); }));
+        }
+        await invalid("fund", mutate(witness, (w) => { w.receiveBindings[0] = "0"; }));
+      }
+    });
 
     await t.test("both funding bindings and modes enforce the public chain and pool", async () => {
       for (const budgetKind of [0, 1]) {
@@ -244,6 +300,171 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       const publicFixture = buildShieldedFundingFixtures({ budgetKind: 1 });
       assert.equal(publicFixture.initial.inputNullifiers[1], fixture.initial.inputNullifiers[1]);
     });
+    await t.test(
+      "refill authenticates both producer origins and preserves the exact view",
+      async () => {
+        for (const keyMode of [0, 1]) {
+          for (const oldBudgetOrigin of ["fund", "claim"]) {
+            const base = buildShieldedFundingFixtures({ keyMode, oldBudgetOrigin });
+            await valid("fund", base.continuation);
+            await invalid(
+              "fund",
+              mutate(base.continuation, (w) => {
+                w.oldBudgetIsClaim = w.oldBudgetIsClaim === "1" ? "0" : "1";
+              }),
+            );
+            await invalid(
+              "fund",
+              mutate(base.continuation, (w) => {
+                w.oldBudgetIsClaim = "2";
+              }),
+            );
+            for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
+              const changed = {
+                ...base.continuation,
+                [limb]: String(BigInt(base.continuation[limb]) ^ 1n),
+              };
+              // A consistent output with a changed key still cannot open the historical template.
+              await invalid("fund", withFundingOutputs(base, changed));
+            }
+          }
+        }
+        await invalid("fund", { ...fixture.initial, oldBudgetIsClaim: "1" });
+        const identity = buildShieldedFundingFixtures({ budgetKind: 1 });
+        await invalid("fund", { ...identity.continuation, oldBudgetIsClaim: "1" });
+        for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
+          await invalid("fund", { ...identity.initial, [limb]: "1" });
+        }
+        await invalid(
+          "fund",
+          withFundingOutputs(fixture, fixture.initial, undefined, CLAIM_PRIVATE_BUDGET_PURPOSE),
+        );
+      },
+    );
+    await t.test(
+      "executed Fund and Claim outputs feed continuation and refill with their original keys",
+      async () => {
+        for (const keyMode of [0, 1]) {
+          const funded = buildShieldedFundingFixtures({ keyMode });
+          await valid("fund", funded.initial);
+          const first = buildShieldedClaimFixture({ keyMode, claimCount: 1, remainingPeriods: 4 });
+          assert.equal(first.policy, funded.policy);
+          assert.equal(first.enrollment, funded.enrollment);
+          const claim = withClaimSource(first.witness, {
+            commitment: funded.initial.outputCommitments[0],
+            sibling: funded.initial.outputCommitments[1],
+            nonce: funded.initial.budgetNonce,
+            ciphertextHash: funded.initial.ciphertextHashes[0],
+          });
+          await valid("claim", claim);
+
+          const second = buildShieldedClaimFixture({
+            keyMode,
+            budgetOrigin: "claim",
+            claimCount: 1,
+            remainingPeriods: 3,
+          });
+          const continuation = withClaimSource(second.witness, {
+            commitment: claim.outputCommitments[0],
+            sibling: claim.outputCommitments[1],
+            nonce: claim.newBudgetNonce,
+            ciphertextHash: claim.ciphertextHashes[0],
+            prefixRoot: claim.inputRoots[0],
+          });
+          const scoped = (purpose) =>
+            shieldedFixtureTag(purpose, continuation.chainId, continuation.pool);
+          continuation.periodIndices[0] = "1";
+          continuation.asOf = String(
+            BigInt(continuation.eligibleFrom) + 2n * BigInt(continuation.periodDays) * 86400n,
+          );
+          continuation.periodNullifiers[0] = String(
+            poseidon4([scoped(1017n), BigInt(continuation.derivedSecretField), second.policy, 1n]),
+          );
+          // Give each produced note a fresh nonce throughout this sequential chain.
+          continuation.newBudgetNonce = "100000";
+          continuation.payoutNonce = "123457";
+          continuation.outputCommitments = [
+            poseidon8([
+              scoped(CLAIM_PRIVATE_BUDGET_PURPOSE),
+              second.policy,
+              second.enrollment,
+              poseidon5([
+                scoped(1033n),
+                second.ownerCommitment,
+                BigInt(keyMode),
+                BigInt(continuation.heirViewKeyLo),
+                BigInt(continuation.heirViewKeyHi),
+              ]),
+              100n,
+              200n,
+              100000n,
+              BigInt(continuation.ciphertextHashes[0]),
+            ]),
+            poseidon5([
+              scoped(1014n),
+              second.ownerCommitment,
+              100n,
+              123457n,
+              BigInt(continuation.ciphertextHashes[1]),
+            ]),
+          ].map(String);
+          await valid("claim", continuation);
+
+          const refilled = buildShieldedFundingFixtures({
+            keyMode,
+            donorAmount: 600n,
+            oldBudgetOrigin: "claim",
+            oldBudgetRemainingPeriods: 2n,
+          });
+          const refill = withFundingOutputs(refilled, {
+            ...refilled.continuation,
+            donorNonce: funded.initial.changeNonce,
+            donorCiphertextHash: funded.initial.ciphertextHashes[1],
+            donorDepth: "1",
+            donorIndex: "1",
+            donorSiblings: [funded.initial.outputCommitments[0], ...Array(31).fill("0")],
+            oldBudgetNonce: continuation.newBudgetNonce,
+            oldBudgetCiphertextHash: continuation.ciphertextHashes[0],
+            oldBudgetDepth: "2",
+            oldBudgetIndex: "2",
+            oldBudgetSiblings: [
+              continuation.outputCommitments[1],
+              continuation.inputRoots[0],
+              ...Array(30).fill("0"),
+            ],
+            budgetNonce: "207",
+            changeNonce: "209",
+          });
+          refill.inputRoots = [
+            poseidon2(funded.initial.outputCommitments.map(BigInt)),
+            poseidon2([
+              BigInt(continuation.inputRoots[0]),
+              poseidon2(continuation.outputCommitments.map(BigInt)),
+            ]),
+          ].map(String);
+          refill.inputNullifiers = [
+            poseidon3([
+              scoped(1016n),
+              BigInt(refill.donorOwnerSecret),
+              BigInt(funded.initial.outputCommitments[1]),
+            ]),
+            poseidon4([
+              scoped(1026n),
+              BigInt(refill.policySalt),
+              BigInt(continuation.outputCommitments[0]),
+              BigInt(refill.budgetUseNonce),
+            ]),
+          ].map(String);
+          await valid("fund", refill);
+          for (const step of [claim, continuation, refill]) {
+            assert.equal(step.heirViewKeyLo, funded.initial.heirViewKeyLo);
+            assert.equal(step.heirViewKeyHi, funded.initial.heirViewKeyHi);
+          }
+          await invalid("fund", { ...refill, oldBudgetIsClaim: "0" });
+          await invalid("claim", { ...continuation, inputBudgetIsClaim: ["0", "0"] });
+        }
+      },
+    );
     await t.test("public funding binds every disclosed field and hides rule openings", async () => {
       const witness = buildShieldedFundingFixtures({ budgetKind: 1 }).initial;
       assert.equal(witness.heirOwnerCommitment, "0");
@@ -518,7 +739,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
           ...fixture.initial,
           heirOwnerCommitment: String(owner),
         });
-      // The payer, not the circuit, checks that the owner belongs to the heir.
+      // The separate receipt proof authenticates this key; the business proof binds its opening.
       await valid("fund", withOwner(123n));
       await invalid("fund", withOwner(0n));
     });

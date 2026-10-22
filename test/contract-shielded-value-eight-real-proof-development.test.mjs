@@ -17,8 +17,10 @@ import {
   deriveShieldedViewPublicKey,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
+  emptyShieldedReceiveAuthorizations,
 } from "@deepfamily/protocol-core";
 import { deployUnifiedVerifierAdapter } from "./helpers/unifiedVerifierAdapter.mjs";
+import { deployMockReceiveAuthorization } from "./helpers/shieldedReceiveAuthorization.mjs";
 
 describe("development-key real proofs for eight-input VALUE routes", function () {
   this.timeout(600_000);
@@ -39,6 +41,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
       const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
       const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
       const poseidon = await hre.ethers.deployContract("PoseidonT3");
+      const receive = await deployMockReceiveAuthorization(hre);
       const Pool = await hre.ethers.getContractFactory("ShieldedErc20Pool", {
         libraries: { PoseidonT3: await poseidon.getAddress() },
       });
@@ -46,6 +49,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         await token.getAddress(),
         await lineage.getAddress(),
         await adapter.getAddress(),
+        ...receive.constructorArgs,
       );
       const [signer, recipient] = await hre.ethers.getSigners();
       const scope = {
@@ -85,6 +89,7 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         lineageCheckpointId: 0n,
         fundMode: 0n,
         budgetKind: 0n,
+        receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
       });
       const prove = (action, witness, expected) => {
         const circuit = manifest.circuits[action].source;
@@ -212,6 +217,11 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         {
           ...transferPublic.witness,
           ...opened.witness,
+          receiveAuthorizationAliases: ["0", "0"],
+          receiveSalts: ["0", "0"],
+          receiveKeyModes: ["0", "0"],
+          receiveViewKeyLo: ["0", "0"],
+          receiveViewKeyHi: ["0", "0"],
           outputOwnerCommitments: [String(owner), String(owner)],
           outputAmounts: ["40", "40"],
           outputNonces: outputs.map((note) => String(note.nonce)),
@@ -230,6 +240,11 @@ describe("development-key real proofs for eight-input VALUE routes", function ()
         {
           ...replayPublic.witness,
           ...replayInput.witness,
+          receiveAuthorizationAliases: ["0", "0"],
+          receiveSalts: ["0", "0"],
+          receiveKeyModes: ["0", "0"],
+          receiveViewKeyLo: ["0", "0"],
+          receiveViewKeyHi: ["0", "0"],
           outputOwnerCommitments: [String(owner), String(owner)],
           outputAmounts: ["20", "0"],
           outputNonces: replayOutputs.map((note) => String(note.nonce)),

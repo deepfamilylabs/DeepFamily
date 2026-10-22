@@ -8,13 +8,31 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { WitnessCalculatorBuilder } from "circom_runtime";
-import { poseidon2, poseidon3, poseidon8 } from "poseidon-lite";
+import { poseidon2, poseidon3, poseidon5, poseidon8 } from "poseidon-lite";
+import {
+  FUND_PRIVATE_BUDGET_PURPOSE,
+  CLAIM_PRIVATE_BUDGET_PURPOSE,
+} from "./shielded_budget_fixture.mjs";
 import { shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const purposes = [
-  1010, 1011, 1014, 1015, 1016, 1017, 1019, 1021, 1026, 1027, 1028, 1029, 1030, 1033,
+  1010,
+  1011,
+  1014,
+  1016,
+  1017,
+  1019,
+  1021,
+  1026,
+  1027,
+  1028,
+  1029,
+  1030,
+  1033,
+  FUND_PRIVATE_BUDGET_PURPOSE,
+  CLAIM_PRIVATE_BUDGET_PURPOSE,
 ];
 const fieldPrime = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 const field = (value) => ((value % fieldPrime) + fieldPrime) % fieldPrime;
@@ -105,6 +123,8 @@ template BudgetBindingCheck() {
     signal input enrollmentCommitment;
     signal input termsCommitment;
     signal input ownerCommitment;
+    signal input viewKeyLo;
+    signal input viewKeyHi;
     signal input rate;
     signal input remaining;
     signal input nonce;
@@ -116,7 +136,7 @@ template BudgetBindingCheck() {
     component tags = ShieldedBudgetNoteTags();
     tags.poolDomain <== scope.domain;
     component note = ShieldedBoundBudgetCommitment();
-    note.privateNoteTag <== tags.privateNoteTag;
+    note.privateNoteTag <== tags.fundPrivateNoteTag;
     note.identityNoteTag <== tags.identityNoteTag;
     note.budgetKind <== budgetKind;
     note.keyMode <== keyMode;
@@ -125,6 +145,8 @@ template BudgetBindingCheck() {
     note.enrollmentCommitment <== enrollmentCommitment;
     note.termsCommitment <== termsCommitment;
     note.ownerCommitment <== ownerCommitment;
+    note.viewKeyLo <== viewKeyLo;
+    note.viewKeyHi <== viewKeyHi;
     note.rate <== rate;
     note.remaining <== remaining;
     note.nonce <== nonce;
@@ -135,10 +157,12 @@ component main = BudgetBindingCheck();`;
 }
 
 function budgetOwnerAuthorization(witness) {
-  return poseidon3([
+  return poseidon5([
     shieldedFixtureTag(1033, witness.chainId, witness.pool),
     BigInt(witness.ownerCommitment),
     field(BigInt(witness.keyMode)),
+    field(BigInt(witness.viewKeyLo)),
+    field(BigInt(witness.viewKeyHi)),
   ]);
 }
 
@@ -152,6 +176,8 @@ function budgetBindingWitness(budgetKind, keyMode = 0) {
     enrollmentCommitment: "2101",
     termsCommitment: "2102",
     ownerCommitment: "2103",
+    viewKeyLo: budgetKind === 0 ? "2106" : "0",
+    viewKeyHi: budgetKind === 0 ? "2107" : "0",
     rate: "100",
     remaining: "300",
     nonce: "2104",
@@ -159,7 +185,11 @@ function budgetBindingWitness(budgetKind, keyMode = 0) {
   };
   witness.expectedCommitment = String(
     poseidon8([
-      shieldedFixtureTag(budgetKind === 0 ? 1015 : 1030, witness.chainId, witness.pool),
+      shieldedFixtureTag(
+        budgetKind === 0 ? FUND_PRIVATE_BUDGET_PURPOSE : 1030,
+        witness.chainId,
+        witness.pool,
+      ),
       BigInt(witness.policyCommitment),
       BigInt(witness.enrollmentCommitment),
       budgetKind === 0 ? budgetOwnerAuthorization(witness) : BigInt(witness.termsCommitment),
@@ -249,7 +279,11 @@ component main = DomainCheck();`,
             // A matching interpolated note isolates the selector constraints instead
             // of failing merely because expectedCommitment became stale.
             const selector = BigInt(invalidKind);
-            const privateTag = shieldedFixtureTag(1015, witness.chainId, witness.pool);
+            const privateTag = shieldedFixtureTag(
+              FUND_PRIVATE_BUDGET_PURPOSE,
+              witness.chainId,
+              witness.pool,
+            );
             const identityTag = shieldedFixtureTag(1030, witness.chainId, witness.pool);
             const owner = budgetOwnerAuthorization(witness);
             await budget.invalid({
@@ -293,6 +327,30 @@ component main = DomainCheck();`,
         await budget.invalid(independentPublicBudget);
       },
     );
+    await t.test("private authorization binds both bounded viewing-key limbs", async () => {
+      const witness = budgetBindingWitness(0);
+      for (const limb of ["viewKeyLo", "viewKeyHi"]) {
+        await budget.invalid({ ...witness, [limb]: String(BigInt(witness[limb]) + 1n) });
+        for (const value of [-1n, 1n << 128n]) {
+          const changed = { ...witness, [limb]: String(value) };
+          changed.expectedCommitment = String(
+            poseidon8([
+              shieldedFixtureTag(FUND_PRIVATE_BUDGET_PURPOSE, changed.chainId, changed.pool),
+              BigInt(changed.policyCommitment),
+              BigInt(changed.enrollmentCommitment),
+              budgetOwnerAuthorization(changed),
+              BigInt(changed.rate),
+              BigInt(changed.remaining),
+              BigInt(changed.nonce),
+              BigInt(changed.ciphertextHash),
+            ]),
+          );
+          await budget.invalid(changed);
+        }
+        // The public format ignores authorization, but its unused view must be canonical.
+        await budget.invalid({ ...budgetBindingWitness(1), [limb]: "1" });
+      }
+    });
     for (const maxDepth of [32, 64]) {
       const merkle = await compile(directory, `membership_${maxDepth}`, merkleSource(maxDepth));
       await t.test(

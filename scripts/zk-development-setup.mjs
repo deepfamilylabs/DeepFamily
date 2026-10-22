@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { syncZkAssets } from "../circuits/sync-zk-assets.mjs";
 import { ensureProductionPtau } from "./lib/productionPtau.mjs";
 import { buildSnarkjsCommand } from "./lib/snarkjsToolchain.mjs";
+import { RECEIVE_PRODUCTION_MANIFEST } from "./lib/receiveArtifacts.mjs";
 import {
   assertDevelopmentManifest,
   updateDevelopmentManifest,
@@ -95,6 +96,11 @@ export const assertNoShieldedProductionSetup = ({ root }) => {
   if (fs.existsSync(productionManifest)) {
     throw new Error("Refusing to overwrite shielded production artifacts with development keys");
   }
+  if (fs.existsSync(absolute(root, RECEIVE_PRODUCTION_MANIFEST))) {
+    throw new Error(
+      "Refusing to overwrite fixed receive credential issuer keys while production presentation artifacts exist",
+    );
+  }
 };
 
 export const runZkDevelopmentSetup = async ({
@@ -162,6 +168,12 @@ export const runZkDevelopmentSetup = async ({
     await commandRunner({
       executable: process.execPath,
       args: [absolute(resolvedRoot, "scripts/zk-shielded-development-proof-smoke.mjs")],
+      cwd: resolvedRoot,
+    });
+
+    await commandRunner({
+      executable: process.execPath,
+      args: [absolute(resolvedRoot, "scripts/receive-development-setup.mjs")],
       cwd: resolvedRoot,
     });
 

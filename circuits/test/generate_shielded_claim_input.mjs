@@ -2,6 +2,11 @@
 // the reviewed production ZK artifact manifest or verifier assets.
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildLineageFixture } from "./generate_lineage_fixture.mjs";
+import {
+  shieldedFixtureBudgetPurpose,
+  shieldedFixtureViewingKey,
+  shieldedFixtureViewLimbs,
+} from "./shielded_budget_fixture.mjs";
 
 import {
   DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
@@ -21,6 +26,10 @@ export function buildShieldedClaimFixture({
   secondPeriodDays = periodDays,
   budgetKind = 0,
   keyMode = 0,
+  viewingKey = shieldedFixtureViewingKey(keyMode),
+  secondViewingKey = viewingKey,
+  budgetOrigin = "fund",
+  secondBudgetOrigin = "fund",
   secondKeyMode = keyMode,
   ownerSecret: suppliedOwnerSecret,
   secondBudgetKind = budgetKind,
@@ -37,8 +46,15 @@ export function buildShieldedClaimFixture({
   secondPeriodDays = BigInt(secondPeriodDays);
   const lineage = buildLineageFixture().witness;
   const derivedSecret = BigInt(lineage.derivedSecretField);
-  const ownerSecret = suppliedOwnerSecret === undefined ? (keyMode === 1 ? 123456789n : poseidon2([1012n, derivedSecret])) : BigInt(suppliedOwnerSecret);
+  const ownerSecret =
+    suppliedOwnerSecret === undefined
+      ? keyMode === 1
+        ? 123456789n
+        : poseidon2([1012n, derivedSecret])
+      : BigInt(suppliedOwnerSecret);
   const ownerCommitment = poseidon2([1013n, ownerSecret]);
+  const { viewKeyLo, viewKeyHi } = shieldedFixtureViewLimbs(viewingKey, budgetKind);
+  const secondView = shieldedFixtureViewLimbs(secondViewingKey, secondBudgetKind);
   const rootIdentityCommitment = BigInt(lineage.fatherIdentityCommitment);
   const heirIdentityCommitment = poseidon4([
     1002n,
@@ -90,10 +106,12 @@ export function buildShieldedClaimFixture({
     periodDays,
   ]);
   const inputBudget = poseidon8([
-    scoped(budgetKind === 0 ? 1015n : 1030n),
+    scoped(shieldedFixtureBudgetPurpose(budgetKind, budgetOrigin)),
     policy,
     enrollment,
-    budgetKind === 0 ? poseidon3([scoped(1033n), ownerCommitment, BigInt(keyMode)]) : termsCommitment,
+    budgetKind === 0
+      ? poseidon5([scoped(1033n), ownerCommitment, BigInt(keyMode), viewKeyLo, viewKeyHi])
+      : termsCommitment,
     rate,
     remaining,
     budgetNonce,
@@ -130,10 +148,18 @@ export function buildShieldedClaimFixture({
     secondPeriodDays,
   ]);
   const secondBudget = poseidon8([
-    scoped(secondBudgetKind === 0 ? 1015n : 1030n),
+    scoped(shieldedFixtureBudgetPurpose(secondBudgetKind, secondBudgetOrigin)),
     secondPolicy,
     secondEnrollment,
-    secondBudgetKind === 0 ? poseidon3([scoped(1033n), ownerCommitment, BigInt(secondKeyMode)]) : secondTermsCommitment,
+    secondBudgetKind === 0
+      ? poseidon5([
+          scoped(1033n),
+          ownerCommitment,
+          BigInt(secondKeyMode),
+          secondView.viewKeyLo,
+          secondView.viewKeyHi,
+        ])
+      : secondTermsCommitment,
     rate,
     secondRemaining,
     secondBudgetNonce,
@@ -152,10 +178,12 @@ export function buildShieldedClaimFixture({
   const payout = rate * claimCountBigInt;
   const requiresOpening = budgetKind === 0;
   const budgetOutput = poseidon8([
-    scoped(requiresOpening ? 1015n : 1030n),
+    scoped(shieldedFixtureBudgetPurpose(budgetKind, "claim")),
     policy,
     enrollment,
-    requiresOpening ? poseidon3([scoped(1033n), ownerCommitment, BigInt(keyMode)]) : termsCommitment,
+    requiresOpening
+      ? poseidon5([scoped(1033n), ownerCommitment, BigInt(keyMode), viewKeyLo, viewKeyHi])
+      : termsCommitment,
     rate,
     remaining + secondRemaining - payout,
     newBudgetNonce,
@@ -213,6 +241,12 @@ export function buildShieldedClaimFixture({
     keyMode: decimal(keyMode),
     secondKeyMode: hasSecondInput ? decimal(secondKeyMode) : "0",
     ownerSecret: decimal(ownerSecret),
+    heirViewKeyLo: decimal(viewKeyLo),
+    heirViewKeyHi: decimal(viewKeyHi),
+    inputBudgetIsClaim: [
+      budgetKind === 0 && budgetOrigin === "claim" ? "1" : "0",
+      hasSecondInput && secondBudgetKind === 0 && secondBudgetOrigin === "claim" ? "1" : "0",
+    ],
     secondBudgetKind: hasSecondInput ? decimal(secondBudgetKind) : "0",
     policyCommitmentInput: decimal(policy),
     enrollmentCommitmentInput: decimal(enrollment),
@@ -252,5 +286,7 @@ export function buildShieldedClaimFixture({
     heirIdentityCommitment,
     ownerSecret,
     ownerCommitment,
+    viewingKey,
+    budgetOrigin,
   };
 }

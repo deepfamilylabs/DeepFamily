@@ -1,3 +1,6 @@
 contracts/DisclosureBindingVerifier.sol
 contracts/PersonCommitmentVerifier.sol
 contracts/Shielded*Verifier.sol
+contracts/AnonymousReceivePresentationVerifier.sol
+contracts/FundReceivePresentationVerifier.sol
+contracts/AttachedReceivePresentationVerifier.sol

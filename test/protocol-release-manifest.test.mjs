@@ -20,7 +20,7 @@ import {
   PROTOCOL_UNICODE_NORMALIZATION_DATA_PATH,
   shieldedDeploymentBindingsFromAddresses,
 } from "../scripts/lib/protocolReleaseManifest.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS } from "../scripts/lib/zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const hash = (digit) => digit.repeat(64);
@@ -275,6 +275,8 @@ const createProductionFixture = () => {
     },
   };
   const shieldedAddresses = {
+    deepFamily: ADDRESSES.proxy,
+    ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}, index) => [property, address(400 + index)])),
     groth16VerifierAdapter: ADDRESSES.adapter,
     personCommitmentVerifier: ADDRESSES.personVerifier,
     disclosureBindingVerifier: ADDRESSES.disclosureVerifier,
@@ -311,7 +313,7 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
         key,
         withHashes(shieldedBindings[key]),
       ]),
@@ -487,7 +489,7 @@ const createProductionFixture = () => {
       ]),
     ),
     ...Object.fromEntries(
-      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory"].map((key) => [
+      ["shieldedErc20Pool", "shieldedNativePool", "shieldedPoolFactory", ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property)].map((key) => [
         key,
         { artifactSha256: HASHES.adapterArtifact, runtimeSha256: HASHES.adapterRuntime },
       ]),
@@ -580,6 +582,7 @@ const acceptanceReportForManifest = (manifest) => ({
         "shieldedErc20Pool",
         "shieldedNativePool",
         "shieldedPoolFactory",
+        ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => property),
       ].map((key) => [key, structuredClone(manifest.deployments[key])]),
     ),
     deepFamily: {

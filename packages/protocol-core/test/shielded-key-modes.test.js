@@ -12,9 +12,15 @@ import {
   getShieldedBudgetCommitments,
   deriveShieldedHeirKeyMaterial,
 } from "../index.js";
-const scope = { chainId: 1030n, poolAddress: "0x1111111111111111111111111111111111111111" };
+const scope = {
+  viewingKey: "0x" + "11".repeat(32),
+  chainId: 1030n,
+  poolAddress: "0x1111111111111111111111111111111111111111",
+};
 const legacy = deriveShieldedHeirKeyMaterial(123n);
 const note = {
+  viewingKey: scope.viewingKey,
+  budgetOrigin: 0n,
   rootIdentityCommitment: 11n,
   rootVersionIndex: 1n,
   policySalt: 12n,
@@ -57,12 +63,17 @@ test("private modes alter owner authorization while retaining policy and enrollm
   assert.throws(() => getShieldedBudgetCommitments({ binding: "identity", keyMode: 1n }, scope));
 });
 
-test("private funding backup carries the mode and original viewing key within 459 bytes", async () => {
+test("private funding backup carries the mode and original viewing key within 460 bytes", async () => {
   const root = await deriveShieldedIndependentKeyMaterial({
     independentKeyRoot: new Uint8Array(32).fill(7),
     independentKeyIdentitySecret: new Uint8Array(32).fill(3),
   });
-  const budgetNote = { ...note, keyMode: 1n, heirOwnerCommitment: root.ownerCommitment };
+  const budgetNote = {
+    ...note,
+    viewingKey: root.viewPublicKey,
+    keyMode: 1n,
+    heirOwnerCommitment: root.ownerCommitment,
+  };
   const payload = encodeShieldedValueNotePayload(
     {
       ownerCommitment: legacy.ownerCommitment,
@@ -77,7 +88,7 @@ test("private funding backup carries the mode and original viewing key within 45
     },
     scope,
   );
-  assert.equal(payload.length, 459);
+  assert.equal(payload.length, 460);
   const restored = decodeShieldedNotePayload(payload, scope);
   assert.equal(restored.fundingMemo.budgetNote.keyMode, 1n);
   assert.equal(restored.fundingMemo.allocationKey, 13n);

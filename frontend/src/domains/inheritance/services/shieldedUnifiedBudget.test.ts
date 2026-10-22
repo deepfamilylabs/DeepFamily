@@ -287,6 +287,7 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
       });
   const childRecovery = { keyMaterial: childKeys, identityCommitment: childIC };
   const recipient = {
+    disclosure: "fund",
     keyMode,
     identityCommitment: childIC,
     personHash: identity.personHash,
@@ -442,7 +443,7 @@ describe("unified budget recovery and claims", () => {
         lineage: f.lineage,
         budgetPeriods: 1n,
       }),
-    ).rejects.toThrow("verified code");
+    ).rejects.toThrow("current Fund identity disclosure material");
     const privateFund = await prepareShieldedFund({
       ...f.common,
       recipient: f.recipient,
@@ -470,8 +471,18 @@ describe("unified budget recovery and claims", () => {
         budgetPeriods: 2n,
       }),
     ).rejects.toThrow("binding");
+    await expect(prepareShieldedFund({
+      ...f.common,
+      wallet: donor,
+      donorCommitment: privateFund.outputs[1].commitment,
+      fundMode: 1,
+      budgetKind: 0,
+      budget,
+      budgetPeriods: 2n,
+    })).rejects.toThrow("current Fund identity disclosure material");
     const privateRefill = await prepareShieldedFund({
       ...f.common,
+      recipient: f.recipient,
       wallet: donor,
       donorCommitment: privateFund.outputs[1].commitment,
       fundMode: 1,

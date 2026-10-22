@@ -1,0 +1,31 @@
+{
+  "circuitVersion": "receive-presentation-v1-64-32-checkpoint-bound",
+  "kind": "anonymous",
+  "publicSignals": 11,
+  "issuerVkSha256": "99d596ef04064da43f9231d6fe1de18443bce4ebc0629a95fb4175398b395e62",
+  "productionCeremony": false,
+  "setup": "insecure-local-development",
+  "constraints": 1372493,
+  "artifacts": {
+    "ReceiptVerifier.sol": "6e2bf65513e33ba870b8e6df97f4b5dc81a83b5ffd6b349273a5aa43316e922c",
+    "receipt.pk": "d1b5a2326fbfafac41563399402058eea441dc527b60ce44634e128589a35596",
+    "receipt.r1cs": "5ce063f0f07f6a50ff19739a5b8b57b68c048dfda4ccc847687be09549c6014f",
+    "receipt.vk": "31aba417fd5737322396df071552717a06596af667720b0a0a023092a06e57f0"
+  },
+  "sourceFiles": {
+    "circuit.go": "274c5914aba9f9253b8d51f7e0e2b482704bce3853f2f844d9e8e77818ea6c7d",
+    "engine.go": "8142fc5aa358947e86653f770214a18493affbb3ebb55c69617984ce5e815dd3",
+    "go.mod": "56672ebf0db083217bd82ac25258cd6c996f2d4b25290a85736f848ea0c3ba99",
+    "go.sum": "5ab595dd494d97481334a0f363ebe29591a827610ae971dd18e8084dd01eb426",
+    "input.go": "aaa1007392d5f320f41452bd743cb709ba04e1ce1a88d0a4e38ab7364b532da5",
+    "main_native.go": "4f416e5894255faa76892789ab82f4154941a78c37d804b22407c7e1387f792e",
+    "main_wasm.go": "38f73b02939ca777cf4c99ee6664659f719c94c31f8a0b9c37b9ccf251f79816",
+    "poseidon-constants.json": "d6612f336af4e44f8a58ddba4fbbf20323fccb20e1dc3285760a6691f79464e5",
+    "poseidon.go": "c337a0efa42b9f3b6d7310ad19bec494294eb0b9c55bdbc896c3d720f3894cfa",
+    "snarkjs.go": "831e624e3ba1be6cf09b264e26630f0a9644faf875d3dbc4264c8b9ced031047"
+  },
+  "runtimeArtifacts": {
+    "receive-prover.wasm": "e0a73ef65dabfe88db9a968703fdb5516e759840672c8d0830d23164db5b95f0",
+    "wasm_exec.js": "0c949f4996f9a89698e4b5c586de32249c3b69b7baadb64d220073cc04acba14"
+  }
+}

@@ -46,6 +46,8 @@ vi.mock("../../tree/context", () => ({ useTreeGraphData: () => ({ nodesData: {} 
 vi.mock("../../transactions", () => ({ useTransactionCenter: () => null }));
 vi.mock("../../../shared/config/env", () => ({
   getShieldedPoolFactoryDeploymentBlock: () => 10,
+  getPrivateLetterArchiveAddress: () => "",
+  getPrivateLetterArchiveDeploymentBlock: () => 0,
   getEventScanConfig: () => ({ blockChunk: 10_000 }),
 }));
 vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
@@ -355,7 +357,9 @@ function openIndependentKeyManagement(flow: "restore" | "create" = "restore") {
   if (button.getAttribute("aria-expanded") !== "true") fireEvent.click(button);
 }
 async function waitForReceiveCode(slot: "identity" | "independent") {
-  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", { slot }, expect.anything()));
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
+    slot, disclosure: "anonymous", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
+  }), expect.anything()));
   await waitFor(() => expect((screen.getByRole("button", { name: "shielded.actions.recover" }) as HTMLButtonElement).disabled).toBe(false));
 }
 async function cancelSpendReview() {

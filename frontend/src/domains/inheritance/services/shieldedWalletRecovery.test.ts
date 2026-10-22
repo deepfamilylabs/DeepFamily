@@ -44,6 +44,7 @@ const identity = { keyMaterial: identityKeyMaterial(13n), identityCommitment: 19
 
 async function poolFromCiphertexts(
   records: Array<{ payload: Uint8Array; ciphertext: Uint8Array }>,
+  viewingKey?: Uint8Array,
 ) {
   const iface = new Interface(ABI);
   const tree = createLineageTree();
@@ -51,11 +52,13 @@ async function poolFromCiphertexts(
   const logs = records.flatMap(({ payload, ciphertext }, index) => {
     const commitment = computeShieldedNoteCommitmentFromPayload(
       { payload, ciphertextHashField: computeShieldedCiphertextHashField(ciphertext) },
-      context,
+      { ...context, viewingKey },
     ).noteCommitment;
     commitments.push(commitment);
     tree.insert(commitment);
-    const transactionHash = `0x${BigInt(Math.floor(index / 2) + 1).toString(16).padStart(64, "0")}`;
+    const transactionHash = `0x${BigInt(Math.floor(index / 2) + 1)
+      .toString(16)
+      .padStart(64, "0")}`;
     const note = {
       ...iface.encodeEventLog(iface.getEvent("NoteAppended")!, [
         0n,
@@ -66,17 +69,20 @@ async function poolFromCiphertexts(
       ]),
       address: context.poolAddress,
       blockNumber: 1,
-      index: Math.floor(index / 2) * 3 + index % 2 + 1,
+      index: Math.floor(index / 2) * 3 + (index % 2) + 1,
       transactionHash,
     };
     return index % 2 === 0
-      ? [{
-          ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [0, 0n, 0n]),
-          address: context.poolAddress,
-          blockNumber: 1,
-          index: Math.floor(index / 2) * 3,
-          transactionHash,
-        }, note]
+      ? [
+          {
+            ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [0, 0n, 0n]),
+            address: context.poolAddress,
+            blockNumber: 1,
+            index: Math.floor(index / 2) * 3,
+            transactionHash,
+          },
+          note,
+        ]
       : [note];
   });
   const provider = {
@@ -100,6 +106,7 @@ async function poolFromCiphertexts(
 async function fixture() {
   const keys = identity.keyMaterial;
   const ownViewKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+  const scope = { ...context, viewingKey: ownViewKey };
   const otherKeys = deriveShieldedHeirKeyMaterial(14n);
   const otherViewKey = await deriveShieldedViewPublicKey(otherKeys.hpkeIkm);
   const valuePayload = encodeShieldedValueNotePayload(
@@ -108,7 +115,7 @@ async function fixture() {
       amount: 300n,
       nonce: 29n,
     },
-    context,
+    scope,
   );
   const budgetPayload = encodeShieldedBudgetNotePayload(
     {
@@ -125,7 +132,7 @@ async function fixture() {
       remaining: 1_200n,
       nonce: 31n,
     },
-    context,
+    scope,
   );
   const notes = [
     { payload: valuePayload, recipientPublicKey: ownViewKey },
@@ -166,7 +173,7 @@ async function fixture() {
               payload: note.payload,
               ciphertextHashField: computeShieldedCiphertextHashField(ciphertext),
             },
-            context,
+            scope,
           ).noteCommitment;
     commitments.push(commitment);
     tree.insert(commitment);
@@ -177,7 +184,9 @@ async function fixture() {
       tree.root,
       ciphertext,
     ]);
-    const transactionHash = `0x${BigInt(Math.floor(index / 2) + 1).toString(16).padStart(64, "0")}`;
+    const transactionHash = `0x${BigInt(Math.floor(index / 2) + 1)
+      .toString(16)
+      .padStart(64, "0")}`;
     if (index % 2 === 0) {
       logs.push({
         ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [0, 0n, 0n]),
@@ -187,14 +196,20 @@ async function fixture() {
         transactionHash,
       });
     }
-    logs.push({ ...event, address: context.poolAddress, blockNumber: 1, index: logs.length, transactionHash });
+    logs.push({
+      ...event,
+      address: context.poolAddress,
+      blockNumber: 1,
+      index: logs.length,
+      transactionHash,
+    });
   }
   const spent = computeShieldedSpendNullifier(
     {
       ownerSecret: keys.ownerSecret,
       noteCommitment: commitments[0],
     },
-    context,
+    scope,
   );
   const spentEvent = iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]);
   logs.splice(3, 0, {
@@ -204,7 +219,9 @@ async function fixture() {
     index: 3,
     transactionHash: logs[3].transactionHash,
   });
-  logs.forEach((log, index) => { log.index = index; });
+  logs.forEach((log, index) => {
+    log.index = index;
+  });
   const logFilters: Array<Record<string, unknown>> = [];
   const provider = {
     getNetwork: async () => ({ chainId: context.chainId }),
@@ -293,7 +310,9 @@ describe("local shielded wallet recovery", () => {
       independentKeyRoot: new Uint8Array(32).fill(41),
       independentKeyIdentitySecret: new Uint8Array(32).fill(91),
     });
+    const scope = { ...context, viewingKey: keys.viewPublicKey };
     const budget = {
+      viewingKey: hexlify(keys.viewPublicKey),
       keyMode: 1n,
       rootIdentityCommitment: 11n,
       rootVersionIndex: 2n,
@@ -330,7 +349,7 @@ describe("local shielded wallet recovery", () => {
         }),
       })),
     );
-    const { pool, commitments } = await poolFromCiphertexts(records);
+    const { pool, commitments } = await poolFromCiphertexts(records, keys.viewPublicKey);
     const pending = await recoverLocalShieldedWallet(
       pool,
       { keyMaterial: keys },
@@ -426,7 +445,9 @@ describe("local shielded wallet recovery", () => {
   it("restores a donor's child budget template from an encrypted change memo", async () => {
     const donor = identityKeyMaterial(13n);
     const heir = identityKeyMaterial(14n);
+    const scope = { ...context, viewingKey: await deriveShieldedViewPublicKey(heir.hpkeIkm) };
     const budget = {
+      viewingKey: hexlify(scope.viewingKey),
       rootIdentityCommitment: 11n,
       rootVersionIndex: 2n,
       policySalt: 17n,
@@ -451,7 +472,7 @@ describe("local shielded wallet recovery", () => {
         payload: budgetPayload,
         ciphertextHashField: computeShieldedCiphertextHashField(budgetCiphertext),
       },
-      context,
+      scope,
     ).noteCommitment;
     const changePayload = encodeShieldedValueNotePayload(
       {
@@ -477,7 +498,7 @@ describe("local shielded wallet recovery", () => {
         payload: changePayload,
         ciphertextHashField: computeShieldedCiphertextHashField(changeCiphertext),
       },
-      context,
+      scope,
     ).noteCommitment;
     const iface = new Interface(ABI);
     const tree = createLineageTree();
@@ -527,7 +548,9 @@ describe("local shielded wallet recovery", () => {
       },
       context,
     );
-    logs.forEach((log) => { log.index += 1; });
+    logs.forEach((log) => {
+      log.index += 1;
+    });
     logs.push({
       ...iface.encodeEventLog(iface.getEvent("NullifierSpent")!, [spent]),
       address: context.poolAddress,
@@ -535,7 +558,11 @@ describe("local shielded wallet recovery", () => {
       index: 0,
       transactionHash: `0x${"01".repeat(32)}`,
     });
-    const restored = await recoverLocalShieldedWallet(pool, { keyMaterial: donor }, { fromBlock: 1 });
+    const restored = await recoverLocalShieldedWallet(
+      pool,
+      { keyMaterial: donor },
+      { fromBlock: 1 },
+    );
     expect([...restored.ownedNotes.keys()]).toEqual([changeCommitment]);
     expect(listRecoveredFundingTemplates(restored)).toHaveLength(1);
     expect(listUnspentRecoveredShieldedNotes(restored, donor)).toEqual([]);
@@ -566,7 +593,11 @@ describe("local shielded wallet recovery", () => {
       ...originalBoundary,
       ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [2, 0n, 0n]),
     };
-    const claimMemo = await recoverLocalShieldedWallet(pool, { keyMaterial: donor }, { fromBlock: 1 });
+    const claimMemo = await recoverLocalShieldedWallet(
+      pool,
+      { keyMaterial: donor },
+      { fromBlock: 1 },
+    );
     expect(claimMemo.ownedNotes.has(changeCommitment)).toBe(true);
     expect(listRecoveredFundingTemplates(claimMemo)).toEqual([]);
     logs[0] = originalBoundary;
@@ -589,7 +620,7 @@ describe("local shielded wallet recovery", () => {
         payload: badKeyPayload,
         ciphertextHashField: computeShieldedCiphertextHashField(badKeyCiphertext),
       },
-      context,
+      scope,
     ).noteCommitment;
     tree.update(1n, badKeyCommitment);
     logs[2] = {
@@ -637,7 +668,7 @@ describe("local shielded wallet recovery", () => {
         payload: forgedPayload,
         ciphertextHashField: computeShieldedCiphertextHashField(forgedCiphertext),
       },
-      context,
+      scope,
     ).noteCommitment;
     tree.update(1n, forgedCommitment);
     logs[2] = {

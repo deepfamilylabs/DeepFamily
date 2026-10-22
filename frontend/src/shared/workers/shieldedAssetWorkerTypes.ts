@@ -38,6 +38,8 @@ export type ShieldedWorkerContext = {
   poolAddress: string;
   poolDeploymentBlock: number;
   assetKind: "native" | "erc20";
+  lettersAddress?: string;
+  lettersDeploymentBlock?: number;
 };
 export type ShieldedNoteSummary = {
   commitment: string;
@@ -199,9 +201,22 @@ export type ShieldedAssetWorkerCallMap = {
     params: { expectedCredentialsHandle: string; expectedFingerprint: string };
     result: ShieldedAssetSessionState;
   };
+  prepareLetter: {
+    params: { context: ShieldedWorkerContext; code: string; body: string; budgetCommitment?: string };
+    result: import("../../domains/inheritance/services/privateLetterChain").ProvenPrivateLetter;
+  };
+  recoverLetters: {
+    params: { context: ShieldedWorkerContext };
+    result: { letters: { messageId: string; body: string; registeredAt: string; slot: ShieldedKeySlot; transactionHash: string;
+      attachment: { chainId: string; poolAddress: string; budgetCommitment: string } | null }[]; unavailable: number };
+  };
   receiveCode: {
-    params: { slot: ShieldedKeySlot };
+    params: { slot: ShieldedKeySlot; context?: ShieldedWorkerContext; disclosure?: "anonymous" | "fund"; expiresAt?: string };
     result: { code: string };
+  };
+  authorizeIdentityCounter: {
+    params: { context: ShieldedWorkerContext };
+    result: { address: string; args: [string, string, string, string, string, string, string] };
   };
   recover: { params: { context: ShieldedWorkerContext }; result: ShieldedWalletSummary };
   discover: {

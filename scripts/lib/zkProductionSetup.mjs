@@ -1242,12 +1242,16 @@ const validateStagedProductionArtifacts = async ({
 };
 
 const defaultPreCommitValidator = async ({ root, runner, commandEnvironment }) => {
-  await runner({
-    executable: "npm",
-    args: ["run", "zk:check"],
-    cwd: root,
-    env: commandEnvironment,
-  });
+  // Issuer replacement cannot validate presentation keys bound to the previous issuers.
+  // Keep the existing eleven-circuit check without invoking the receive proof smoke.
+  for (const circuit of ["core", "shielded"]) {
+    await runner({
+      executable: process.execPath,
+      args: ["scripts/zk-check.mjs", "--circuit", circuit],
+      cwd: root,
+      env: commandEnvironment,
+    });
+  }
   await runner({
     executable: "npm",
     args: ["run", "build"],
@@ -1262,9 +1266,17 @@ const defaultPostCommitValidator = async ({
   runner,
   compilerEnvironment = process.env,
 }) => {
+  for (const circuit of ["core", "shielded"]) {
+    await runner({
+      executable: process.execPath,
+      args: ["scripts/zk-build.mjs", "--circuit", circuit],
+      cwd: root,
+      env: compilerEnvironment,
+    });
+  }
   await runner({
-    executable: "npm",
-    args: ["run", "zk:artifacts:check"],
+    executable: process.execPath,
+    args: ["scripts/check-zk-artifacts.mjs", "--circom-only"],
     cwd: root,
     env: compilerEnvironment,
   });
@@ -1313,7 +1325,7 @@ export const runSingleOperatorProductionSetup = async ({
     throw new Error("Production ZK setup includeShielded option must be a boolean");
   }
   if (!includeShielded && (shieldedReleaseCriteriaPath || expectedCurrentShieldedManifestSha256)) {
-    throw new Error("Shielded production options require the eight-circuit setup");
+    throw new Error("Shielded production options require the complete Circom setup");
   }
   if (!rotate && expectedCurrentShieldedManifestSha256 !== undefined) {
     throw new Error("Shielded rotation manifest hash requires the explicit rotate option");
@@ -1748,7 +1760,7 @@ export const runSingleOperatorProductionSetup = async ({
       records,
     });
     // The core manifest remains the final installation marker. The shielded manifest is installed
-    // immediately before it, after all eight circuit artifacts and the shielded transcript.
+    // immediately before it, after all shielded circuit artifacts and their transcript.
     const entries = includeShielded
       ? [
           ...coreEntries.slice(0, -1),
@@ -1852,8 +1864,12 @@ export const runSingleOperatorProductionSetup = async ({
         validation?.artifacts?.manifestSha256 ??
         sha256File(path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH)),
       ...(includeShielded
-        ? { shieldedManifestSha256: sha256File(shieldedRecords.manifestPath), circuitCount: 8 }
-        : { circuitCount: 2 }),
+        ? {
+            shieldedManifestSha256: sha256File(shieldedRecords.manifestPath),
+            circuitCount:
+              Object.keys(SETUP_CIRCUITS).length + Object.keys(SHIELDED_SETUP_CIRCUITS).length,
+          }
+        : { circuitCount: Object.keys(SETUP_CIRCUITS).length }),
       transcriptSha256:
         validation?.artifacts?.transcriptSha256 ?? records.manifest.trustedSetup.transcript.sha256,
     });

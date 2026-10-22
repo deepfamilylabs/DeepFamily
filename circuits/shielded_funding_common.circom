@@ -162,18 +162,25 @@ template ShieldedDonorChange() {
     noteCommitment <== note.out;
 }
 
-// Both budget formats use fixed purposes from the same constrained pool domain.
+// Each private producer and the public format use fixed, distinct purposes from
+// the same constrained pool domain. A caller cannot choose a producer tag.
 // Compute this pair once per action; it is internal wiring, not witness input.
 template ShieldedBudgetNoteTags() {
     signal input poolDomain;
-    signal output privateNoteTag;
+    signal output fundPrivateNoteTag;
+    signal output claimPrivateNoteTag;
     signal output identityNoteTag;
     signal output authorizationTag;
 
-    component privateTag = ShieldedScopedTag();
-    privateTag.poolDomain <== poolDomain;
-    privateTag.purpose <== 1015;
-    privateNoteTag <== privateTag.tag;
+    component fundPrivateTag = ShieldedScopedTag();
+    fundPrivateTag.poolDomain <== poolDomain;
+    fundPrivateTag.purpose <== 202610210301;
+    fundPrivateNoteTag <== fundPrivateTag.tag;
+
+    component claimPrivateTag = ShieldedScopedTag();
+    claimPrivateTag.poolDomain <== poolDomain;
+    claimPrivateTag.purpose <== 202610210302;
+    claimPrivateNoteTag <== claimPrivateTag.tag;
 
     component identityTag = ShieldedScopedTag();
     identityTag.poolDomain <== poolDomain;
@@ -186,7 +193,7 @@ template ShieldedBudgetNoteTags() {
 }
 
 // The binding selector is committed in the note tag and owner/terms slot.
-// Private kind 0 binds the owner's spending commitment and private policy.
+// Private kind 0 binds the spending owner, key mode, exact viewing key and policy.
 // Identity kind 1 binds all public terms without exposing private openings.
 // Internal note tags must come from ShieldedBudgetNoteTags, whose poolDomain
 // comes from the enclosing action's ShieldedPoolDomain over its public inputs.
@@ -201,6 +208,8 @@ template ShieldedBoundBudgetCommitment() {
     signal input enrollmentCommitment;
     signal input termsCommitment;
     signal input ownerCommitment;
+    signal input viewKeyLo;
+    signal input viewKeyHi;
     signal input rate;
     signal input remaining;
     signal input nonce;
@@ -210,10 +219,18 @@ template ShieldedBoundBudgetCommitment() {
     budgetKind * (1 - budgetKind) === 0;
     keyMode * (1 - keyMode) === 0;
     budgetKind * keyMode === 0;
-    component ownerAuthorization = Poseidon(3);
+    component viewLoBits = Num2Bits(128);
+    viewLoBits.in <== viewKeyLo;
+    component viewHiBits = Num2Bits(128);
+    viewHiBits.in <== viewKeyHi;
+    budgetKind * viewKeyLo === 0;
+    budgetKind * viewKeyHi === 0;
+    component ownerAuthorization = Poseidon(5);
     ownerAuthorization.inputs[0] <== authorizationTag;
     ownerAuthorization.inputs[1] <== ownerCommitment;
     ownerAuthorization.inputs[2] <== keyMode;
+    ownerAuthorization.inputs[3] <== viewKeyLo;
+    ownerAuthorization.inputs[4] <== viewKeyHi;
     signal noteTag <== privateNoteTag + budgetKind * (identityNoteTag - privateNoteTag);
     component note = Poseidon(8);
     note.inputs[0] <== noteTag;

@@ -34,6 +34,7 @@ type ContractActionData = {
   relation1: bigint;
   asOf: bigint;
   lineageCheckpointId: bigint;
+  receiveAuthorizations: { checkpointId: bigint; asOf: bigint; expiresAt: bigint; recipientBinding: bigint; proof: string }[];
 };
 
 export type ShieldedPoolFlowStage = "checkingGas" | "submitting" | "confirming";
@@ -128,7 +129,10 @@ function copyActionData(data: ShieldedPoolActionData): ContractActionData {
   if (outputCiphertexts.some((ciphertext) => getBytes(ciphertext).length !== 512)) {
     throw new Error("Shielded output ciphertext must be exactly 512 bytes");
   }
+  const authorizations = data.receiveAuthorizations ?? Array.from({ length: 2 }, () => ({ checkpointId: 0n, asOf: 0n, expiresAt: 0n, recipientBinding: 0n, proof: "0x" }));
+  if (authorizations.length !== 2) throw new Error("Shielded action needs two receive authorization slots");
   return {
+    receiveAuthorizations: authorizations.map((item) => ({ checkpointId: getBigInt(item.checkpointId), asOf: getBigInt(item.asOf), expiresAt: getBigInt(item.expiresAt), recipientBinding: getBigInt(item.recipientBinding), proof: hexlify(item.proof) })),
     fundMode: getBigInt(data.fundMode),
     budgetKind: getBigInt(data.budgetKind),
     inputShardIds: data.inputShardIds.map((value) => getBigInt(value)),
@@ -251,6 +255,7 @@ async function submitAction(
   // Enforce the current action's public shape before estimation or wallet handoff.
   buildShieldedPoolPublicSignals({
     action: ACTIONS[action],
+    receiveAuthorizations: data.receiveAuthorizations,
     fundMode: data.fundMode,
     budgetKind: data.budgetKind,
     chainId: expectedChainId,
@@ -312,6 +317,11 @@ async function submitAction(
   }
   if (action === "claim" || (action === "fund" && data.fundMode === 0n)) {
     await assertTimeBoundActionCurrent(pool, provider, data);
+  }
+  const activeReceipts = data.receiveAuthorizations.filter((item) => item.recipientBinding !== 0n);
+  if (activeReceipts.length) {
+    const block = await provider.getBlock("latest");
+    if (!block || activeReceipts.some((item) => BigInt(block.timestamp) >= item.expiresAt)) throw new Error("The receive code expired before submission");
   }
   // This synchronous boundary lets the caller recheck lock/context state after
   // every preparatory RPC read, before recording an unknown broadcast attempt.

@@ -31,7 +31,7 @@ import { useTreeGraphData } from "../../tree/context";
 import { getShieldedLocalRecipientLabels } from "../services/shieldedRecipientOptions";
 import { useTransactionCenter } from "../../transactions";
 import type { ShieldedPageModules } from "../model/shieldedPageTypes";
-import { getShieldedPoolFactoryDeploymentBlock } from "../../../shared/config/env";
+import { getShieldedPoolFactoryDeploymentBlock, getPrivateLetterArchiveAddress, getPrivateLetterArchiveDeploymentBlock } from "../../../shared/config/env";
 import {
   getFriendlyErrorMessage,
   REASON_FRIENDLY_MAP,
@@ -69,6 +69,7 @@ import {
   readShieldedSubmissionOutcome,
   type ShieldedSubmissionTracking,
 } from "../services/shieldedSubmissionTracking";
+import { createIdentityAuthorizationContract } from "../services/shieldedIdentityAuthorizationChain";
 import { waitForShieldedTransaction } from "../services/shieldedTransactionReceipt";
 import {
   assertShieldedDepositBalance,
@@ -85,11 +86,13 @@ import {
 import { formatShieldedAmount, getShieldedAvatarText } from "../model/shieldedDisplay";
 import {
   FIELD_TEXTAREA,
+  FIELD_INPUT,
   FieldBlock,
   PanelButton,
   WarningNotice,
   shortHex,
 } from "./inheritanceControls";
+import { PrivateLettersPanel } from "./PrivateLettersPanel";
 import { ShieldedTaskNavigation } from "./ShieldedTaskNavigation";
 import {
   ShieldedAssetOverview,
@@ -310,7 +313,18 @@ export function ShieldedInheritancePanel({
   const [verifiedRecipient, setVerifiedRecipient] = useState<VerifiedShieldedRecipient | null>(
     null,
   );
+  const [letterBudget, setLetterBudget] = useState("");
+  const [letterComposeRequest, setLetterComposeRequest] = useState(0);
+  function openBudgetLetter(commitment: string) {
+    setLetterBudget(commitment);
+    setLetterComposeRequest(value => value + 1);
+  }
   const [ownCode, setOwnCode] = useState("");
+  const [codeDisclosure, setCodeDisclosure] = useState<"anonymous" | "fund">("anonymous");
+  const [codeExpiry, setCodeExpiry] = useState(() => {
+    const date = new Date(Date.now() + 90 * 86400_000);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  });
   const [withdrawalRecipient, setWithdrawalRecipient] = useState(""),
     [candidates, setCandidates] = useState<string[]>([]);
   const [claimHandle, setClaimHandle] = useState(""),
@@ -364,6 +378,8 @@ export function ShieldedInheritancePanel({
     poolAddress: modules.poolAddress,
     poolDeploymentBlock: modules.poolDeploymentBlock,
     assetKind: modules.assetKind,
+    lettersAddress: getPrivateLetterArchiveAddress(Number(modules.chainId)),
+    lettersDeploymentBlock: getPrivateLetterArchiveDeploymentBlock(Number(modules.chainId)),
   };
   const contextKey = JSON.stringify(context),
     contextRef = useRef(contextKey);
@@ -458,7 +474,7 @@ export function ShieldedInheritancePanel({
         : "privateConvenient"
     : entry;
   const needsCode =
-    action === "privateTransfer" || (action === "fund" && effectiveEntry !== "public" && !template);
+    action === "privateTransfer" || (action === "fund" && effectiveEntry !== "public");
   const needsValues = ["fund", "privateTransfer", "unshield"].includes(action);
   const recipientTargetHash = peekShieldedReceiveCodePersonHash(code);
   const recipientTargetName = recipientTargetHash
@@ -472,7 +488,7 @@ export function ShieldedInheritancePanel({
   const recipientMatches =
     !!verifiedRecipient &&
     (action !== "fund" ||
-      (verifiedRecipient.personHash.toLowerCase() === personHash.toLowerCase() &&
+      (verifiedRecipient.personHash?.toLowerCase() === personHash.toLowerCase() &&
         verifiedRecipient.keyMode === (effectiveEntry === "privateIndependent" ? 1 : 0)));
   const recipientReady =
     recipientMatches &&
@@ -606,6 +622,7 @@ export function ShieldedInheritancePanel({
         latestSession.current.setBusy(false);
         setWalletSection("balances");
         setOwnCode("");
+        setLetterBudget("");
         setWalletScreen("workspace");
         setProgress(null);
         setExecutingReview(null);
@@ -965,6 +982,7 @@ export function ShieldedInheritancePanel({
     latestSession.current.lock();
     setWalletSection("balances");
     setOwnCode("");
+    setLetterBudget("");
     setWalletScreen("workspace");
     setPlanCount(0);
     setProgress(null);
@@ -1414,13 +1432,35 @@ export function ShieldedInheritancePanel({
   ]);
   async function createCode(receivingSlot: ShieldedKeySlot = codeSlot) {
     await run(async (current) => {
+      if (!Number.isFinite(new Date(codeExpiry).getTime()) || new Date(codeExpiry).getTime() <= Date.now()) throw new Error(t("shielded.privateLetters.expiryFuture"));
       const result = await shieldedAssetWorkerCall(
         "receiveCode",
-        { slot: receivingSlot },
+        { slot: receivingSlot, context, disclosure: codeDisclosure, expiresAt: String(Math.floor(new Date(codeExpiry).getTime() / 1000)) },
         { timeoutMs: 1_200_000 },
       );
       if (current()) setOwnCode(result.code);
     }, t("shielded.stages.receiveCode"));
+  }
+  async function revokeReceiveCodes() {
+    await run(async (current) => {
+      if (!signer) throw new Error(t("shielded.walletNotReady"));
+      const chosen = signer;
+      const result = await shieldedAssetWorkerCall("authorizeIdentityCounter", { context }, { timeoutMs: 1_200_000 });
+      if (!current()) return;
+      if ((await chosen.provider?.getNetwork())?.chainId !== modules.chainId ||
+        (await chosen.getAddress()).toLowerCase() !== account.toLowerCase() || walletRef.current.signer !== chosen)
+        throw new Error(t("shielded.walletChanged"));
+      if (!current()) return;
+      const contract = createIdentityAuthorizationContract(result.address, chosen);
+      const endWalletRequest = latestSession.current.beginWalletRequest();
+      let transaction: ContractTransactionResponse;
+      try {
+        transaction = await contract.incrementCounter(...result.args, { chainId: modules.chainId });
+      } finally { endWalletRequest(); }
+      const confirmed = await waitForShieldedTransaction(transaction);
+      if (confirmed.receipt.status !== 1) throw new Error(t("shielded.transactionFailed", { hash: confirmed.transactionHash }));
+      if (current()) { setOwnCode(""); receiveCodeScope.current = ""; }
+    }, t("shielded.privateLetters.revoking"), "wallet");
   }
   const receiveCodeReady = !!session.identity && (codeSlot === "identity" || independentKeyReady);
   // Each explicit open or wallet switch generates a receive code once; after a failure the
@@ -1481,7 +1521,7 @@ export function ShieldedInheritancePanel({
       if (!form) return;
       const credentials = form.readAndClear();
       try {
-        const pending = createShieldedReceiveCodeForRecipient(credentials);
+        const pending = createShieldedReceiveCodeForRecipient({ ...credentials, context, disclosure: action === "fund" ? "fund" : "anonymous", expiresAt: String(Math.floor(Date.now() / 1000) + 90 * 86400) });
         credentials.rawPassphrase = "";
         const result = await pending;
         if (current()) {
@@ -1765,7 +1805,7 @@ export function ShieldedInheritancePanel({
               generatedCommitments,
               recipientLabel: action === "unshield"
                 ? withdrawalRecipient
-                : verifiedRecipient!.personHash,
+                : verifiedRecipient!.fingerprint,
             });
             if (!confirmed) return;
             assertCurrent();
@@ -1876,6 +1916,7 @@ export function ShieldedInheritancePanel({
           }
           if (submitted.receipt.status !== 1)
             throw new Error(t("shielded.transactionFailed", { hash: submitted.transactionHash }));
+          if (result.action === "fund" && Number(result.data.budgetKind) === 0 && current()) openBudgetLetter(String(result.data.outputCommitments[0]));
           if (planned.steps.length <= 1) break;
           // The confirmed step stays listed, with its hash, above the plan rebuilt for the rest.
           if (current()) {
@@ -2078,6 +2119,16 @@ export function ShieldedInheritancePanel({
       ) : codeSlot === "independent" && !independentKeyReady ? (
         <p className="text-xs text-warning">{tr("walletLocked")}</p>
       ) : null}
+      <FieldBlock label={t("shielded.privateLetters.disclosure")}>
+        <select aria-label={t("shielded.privateLetters.disclosure")} className={FIELD_INPUT} disabled={busy || submissionPending} value={codeDisclosure} onChange={(event) => { setCodeDisclosure(event.target.value as "anonymous" | "fund"); setOwnCode(""); receiveCodeScope.current = ""; }}>
+          <option value="anonymous">{t("shielded.privateLetters.anonymousCode")}</option>
+          <option value="fund">{t("shielded.privateLetters.fundMaterial")}</option>
+        </select>
+      </FieldBlock>
+      <p className="text-xs text-ink-muted">{t(`shielded.privateLetters.${codeDisclosure === "anonymous" ? "anonymousPrivacy" : "fundPrivacy"}`)}</p>
+      <FieldBlock label={t("shielded.privateLetters.expiresAt")}>
+        <input type="datetime-local" aria-label={t("shielded.privateLetters.expiresAt")} className={FIELD_INPUT} value={codeExpiry} disabled={busy || submissionPending} onChange={(event) => { setCodeExpiry(event.target.value); setOwnCode(""); receiveCodeScope.current = ""; }} />
+      </FieldBlock>
       {ownCode ? (
         <FieldBlock
           label={t("shielded.receiveCodeLabel", { symbol })}
@@ -2112,6 +2163,10 @@ export function ShieldedInheritancePanel({
           </PanelButton>
         </>
       ) : null}
+      {session.identity ? <div className="space-y-2 border-t border-line pt-3">
+        <p className="text-xs text-ink-muted">{t("shielded.privateLetters.revokeHint")}</p>
+        <PanelButton size="compact" disabled={busy || submissionPending || !signer} onClick={() => void revokeReceiveCodes()}>{t("shielded.privateLetters.revokeAll")}</PanelButton>
+      </div> : null}
     </div>
   );
   const overviewWallets: ShieldedOverviewWallet[] = (
@@ -2252,6 +2307,7 @@ export function ShieldedInheritancePanel({
         }}
         recipientFormRef={recipientForm}
         onGenerateRecipientCode={() => void generateConvenientCode()}
+        onWriteLetter={template && effectiveEntry !== "public" ? () => openBudgetLetter(template.handle) : undefined}
         parentLabel={parentLabel}
       />
     );
@@ -2684,7 +2740,7 @@ export function ShieldedInheritancePanel({
   );
 
   return (
-    <div className="min-w-0 break-normal">
+    <div className="min-w-0 space-y-6 break-normal">
       {!showWorkspace ? (
         <div className="mx-auto w-full max-w-[45rem] space-y-6">
           {head}
@@ -2787,6 +2843,9 @@ export function ShieldedInheritancePanel({
           </ShieldedWalletSheet>
         </div>
       )}
+      <div className={showWorkspace ? undefined : "mx-auto w-full max-w-[45rem]"}>
+        <PrivateLettersPanel context={context} signer={signer ?? null} disabled={busy || submissionPending} wallet={wallet} recoveryReady={!!session.identity || !!session.independentKey} sessionScope={JSON.stringify([session.credentials?.handle, session.identity?.handle, session.independentKey?.keyFingerprint])} budgetCommitment={letterBudget} composeRequest={letterComposeRequest} onBudgetChange={setLetterBudget} onBusyChange={(value) => { setBusy(value); latestSession.current.setBusy(value); }} beginWalletRequest={() => latestSession.current.beginWalletRequest()} />
+      </div>
     </div>
   );
 }

@@ -1,16 +1,25 @@
 # DeepFamily Production ZK Setup
 
-This runbook describes how to replace the checked-in development Groth16 keys with production
-artifacts. The production Phase 1 file is committed, so the normal single-developer setup runs
-with one command:
+This runbook covers production setup for the eleven Circom circuits (two core and
+nine shielded):
 
 ```bash
 npm run zk:production:setup
 ```
 
-That command creates production artifacts for all 8 circuits, writes auditable transcripts and
-manifests, and verifies the complete result before returning. It does **not** commit files, deploy a
-contract, submit a transaction, or authorize a Mainnet release.
+This command generates and verifies the Circom transcripts and manifests. It does
+not commit files, deploy contracts, upload assets or authorize a Mainnet release.
+
+The three receive presentation circuits use a separate proving system and embed
+the credential issuer verification keys. Their current artifacts remain
+`developmentOnly: true` and `productionReady: false`; the Circom setup does not make
+these keys suitable for production. Receive production release is currently not
+ready. The unified `npm run zk:ceremony:verify` verifies the complete protocol
+production bundle and currently refuses to proceed without independent receive
+verification. Release preflight also rejects this incomplete bundle; a successful
+Circom setup alone cannot qualify the protocol for release. Local feature
+acceptance uses the shared development setup and `npm test`; it does not require a
+separate production setup stage.
 
 ## Trust model
 
@@ -42,7 +51,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All 8 circuits reuse the same published BN254 Phase 1 file:
+All 11 Circom circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -91,7 +100,7 @@ ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-`npm run zk:development:setup` prepares all 8 circuits using the same committed Phase 1 file. Its Phase 2 contribution
+`npm run zk:development:setup` prepares all 11 Circom circuits using the same committed Phase 1 file. Its Phase 2 contribution
 passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
 secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
 records no ceremony evidence, so it does not establish a production trust model. The resulting
@@ -282,7 +291,7 @@ Internally the command:
 9. exports every verification key and Solidity verifier and stages the browser WASM/zkey assets;
 10. reads the real contribution metadata embedded in every final zkey;
 11. creates the identity/disclosure records at `circuits/zk-ceremony-transcript.json` and
-    `circuits/zk-artifacts-manifest.json`, plus the eight-circuit shielded records at
+    `circuits/zk-artifacts-manifest.json`, plus the nine-circuit shielded records at
     `release-evidence/shielded/phase2-transcript.json` and
     `circuits/shielded-production-manifest.json`;
 12. rechecks the reviewed R1CS/WASM and pTau bytes, then validates the staged schema, pTau
@@ -334,7 +343,7 @@ The identity/disclosure schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all six shielded circuits to their source and artifact hashes, the pinned
+`@1` schemas bind all nine shielded circuits to their source and artifact hashes, the pinned
 toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
 manifests and two transcripts are generated and installed together.
 
@@ -368,6 +377,9 @@ npm run zk:ceremony:verify
 npm run zk:artifacts:check
 npm run zk:check
 ```
+
+The complete-bundle commands above currently reject the missing receive production
+verification; Circom setup success does not make those release gates pass.
 
 Review the large binary assets by comparing their hashes with the manifest rather than attempting
 to render their bytes. Publish the browser WASM/zkey files to R2, then commit the manifest,

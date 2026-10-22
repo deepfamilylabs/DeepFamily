@@ -1,6 +1,12 @@
 // Shared positive fixtures for initial and continuation Fund modes.
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
+import {
+  fixtureFundReceive,
+  shieldedFixtureBudgetPurpose,
+  shieldedFixtureViewingKey,
+  shieldedFixtureViewLimbs,
+} from "./shielded_budget_fixture.mjs";
 
 import {
   DEFAULT_SHIELDED_FIXTURE_CHAIN_ID,
@@ -19,6 +25,9 @@ export function buildShieldedFundingFixtures({
   poolAddress,
   budgetKind = 0,
   keyMode = 0,
+  viewingKey = shieldedFixtureViewingKey(keyMode),
+  oldViewingKey = viewingKey,
+  oldBudgetOrigin = "fund",
   oldKeyMode = keyMode,
   oldBudgetKind = budgetKind,
   oldBudgetRemainingPeriods = 3n,
@@ -27,7 +36,9 @@ export function buildShieldedFundingFixtures({
   pool = BigInt(poolAddress ?? pool);
   const scoped = (purpose) => shieldedFixtureTag(purpose, chainId, pool);
   periodDays = BigInt(periodDays);
-  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool, keyMode });
+  const heir = buildShieldedClaimFixture({ periodDays, chainId, pool, keyMode, viewingKey });
+  const { viewKeyLo, viewKeyHi } = shieldedFixtureViewLimbs(viewingKey, budgetKind);
+  const oldView = shieldedFixtureViewLimbs(oldViewingKey, oldBudgetKind);
   const donorOwnerSecret = 424242n;
   const donorOwnerCommitment = poseidon2([1013n, donorOwnerSecret]);
   donorAmount = BigInt(donorAmount);
@@ -82,10 +93,12 @@ export function buildShieldedFundingFixtures({
   const budgetNonce = 107n;
   const budgetCiphertextHash = 108n;
   const outputBudget = poseidon8([
-    scoped(budgetKind === 0 ? 1015n : 1030n),
+    scoped(shieldedFixtureBudgetPurpose(budgetKind, "fund")),
     policy,
     enrollment,
-    budgetKind === 0 ? poseidon3([scoped(1033n), heirOwnerCommitment, BigInt(keyMode)]) : termsCommitment,
+    budgetKind === 0
+      ? poseidon5([scoped(1033n), heirOwnerCommitment, BigInt(keyMode), viewKeyLo, viewKeyHi])
+      : termsCommitment,
     rate,
     fundedAmount,
     budgetNonce,
@@ -105,10 +118,18 @@ export function buildShieldedFundingFixtures({
   const oldBudgetNonce = 112n;
   const oldBudgetCiphertextHash = 113n;
   const oldBudget = poseidon8([
-    scoped(oldBudgetKind === 0 ? 1015n : 1030n),
+    scoped(shieldedFixtureBudgetPurpose(oldBudgetKind, oldBudgetOrigin)),
     policy,
     enrollment,
-    oldBudgetKind === 0 ? poseidon3([scoped(1033n), oldHeirOwnerCommitment, BigInt(oldKeyMode)]) : termsCommitment,
+    oldBudgetKind === 0
+      ? poseidon5([
+          scoped(1033n),
+          oldHeirOwnerCommitment,
+          BigInt(oldKeyMode),
+          oldView.viewKeyLo,
+          oldView.viewKeyHi,
+        ])
+      : termsCommitment,
     rate,
     oldBudgetRemaining,
     oldBudgetNonce,
@@ -132,6 +153,8 @@ export function buildShieldedFundingFixtures({
     allocationKeyCommitment: decimal(allocationKeyCommitment),
     heirIdentityCommitment: decimal(heirIdentityCommitment),
     heirOwnerCommitment: decimal(heirOwnerCommitment),
+    heirViewKeyLo: decimal(viewKeyLo),
+    heirViewKeyHi: decimal(viewKeyHi),
     keyMode: decimal(keyMode),
     eligibleFrom: decimal(eligibleFrom),
     enrollmentSalt: decimal(enrollmentSalt),
@@ -180,6 +203,7 @@ export function buildShieldedFundingFixtures({
   };
   const oldFields = {
     oldBudgetKind: decimal(oldBudgetKind),
+    oldBudgetIsClaim: oldBudgetKind === 0 && oldBudgetOrigin === "claim" ? "1" : "0",
     oldKeyMode: decimal(oldKeyMode),
     oldHeirOwnerCommitment: decimal(oldHeirOwnerCommitment),
     oldBudgetRemaining: decimal(oldBudgetRemaining),
@@ -227,6 +251,8 @@ export function buildShieldedFundingFixtures({
     asOf: "0",
     allocationKey: "0",
   };
+  Object.assign(initial, fixtureFundReceive(initial));
+  Object.assign(continuation, fixtureFundReceive(continuation));
   return {
     scope: { chainId, poolAddress: `0x${pool.toString(16).padStart(40, "0")}` },
     initial,
@@ -237,5 +263,6 @@ export function buildShieldedFundingFixtures({
     oldBudget,
     outputBudget,
     outputChange,
+    viewingKey,
   };
 }

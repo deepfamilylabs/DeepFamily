@@ -40,7 +40,7 @@ type ZkWorkerMethods = {
     result: { ok: boolean };
   };
   createShieldedReceiveCodeFromCredentials: {
-    params: { identity: IdentityFields; rawPassphrase: string };
+    params: { identity: IdentityFields; rawPassphrase: string; disclosure?: "anonymous" | "fund"; context: { rpcUrl: string; chainId: string; factoryAddress: string }; expiresAt: string };
     result: { code: string; personHash: string };
   };
   verifyShieldedReceiveCode: {

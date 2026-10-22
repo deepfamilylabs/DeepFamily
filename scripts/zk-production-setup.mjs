@@ -18,7 +18,7 @@ const usage = () => {
 Optional: --shielded-release-criteria <committed-json-path> records the six reviewed
 release thresholds. These thresholds are checked by release:preflight.
 
-Creates all eight production Groth16 proving keys with:
+Creates all eleven Circom production Groth16 proving keys with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
   - canonical R1CS/WASM hashes checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;
@@ -35,7 +35,9 @@ The explicit --rotate form accepts only a valid existing schema-v3 single-operat
 manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
 runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
 and restore the previous artifact set if final validation fails. They intentionally record that
-production security trusts the operator to destroy every Phase 2 secret.`);
+production security trusts the operator to destroy every Phase 2 secret.
+Receive presentation production setup and independent verification are not provided;
+the complete protocol release remains unavailable until they are supplied.`);
 };
 
 const USAGE_ERROR =

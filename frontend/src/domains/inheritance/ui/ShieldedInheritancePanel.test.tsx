@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   navigation: vi.fn(),
   verify: vi.fn(),
   submit: vi.fn(),
+  submitLetter: vi.fn(),
+  lettersAddress: "",
+  incrementCounter: vi.fn(),
   identity: null as any,
   credentials: null as any,
   walletRequestPending: false,
@@ -60,6 +63,8 @@ vi.mock("../../wallet", () => ({
 }));
 vi.mock("../../../shared/config/env", () => ({
   getShieldedPoolFactoryDeploymentBlock: () => 10,
+  getPrivateLetterArchiveAddress: () => mocks.lettersAddress,
+  getPrivateLetterArchiveDeploymentBlock: () => 0,
   getEventScanConfig: () => ({ blockChunk: 10_000 }),
 }));
 vi.mock("../../../shared/workers/shieldedAssetWorkerClient", () => ({
@@ -120,6 +125,13 @@ vi.mock("../services/shieldedPoolFlows", () => ({
   submitClaim: mocks.submit,
   submitPrivateTransfer: mocks.submit,
   submitUnshield: mocks.submit,
+}));
+vi.mock("../services/shieldedIdentityAuthorizationChain", () => ({
+  createIdentityAuthorizationContract: () => ({ incrementCounter: mocks.incrementCounter }),
+}));
+vi.mock("../services/privateLetterChain", async original => ({
+  ...await original<typeof import("../services/privateLetterChain")>(),
+  submitPrivateLetter: mocks.submitLetter,
 }));
 vi.mock("../../person", async () => {
   const React = await import("react");
@@ -421,7 +433,9 @@ async function createIndependentKeyForBackup(source: "random" | "signature" = "r
   await waitFor(() => expect((screen.getByRole("button", { name: label("exportRecovery") }) as HTMLButtonElement).disabled).toBe(false));
 }
 async function waitForReceiveCode(slot: "identity" | "independent") {
-  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", { slot }, expect.anything()));
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("receiveCode", expect.objectContaining({
+    slot, disclosure: "anonymous", context: expect.objectContaining({ chainId: "31337" }), expiresAt: expect.stringMatching(/^\d+$/),
+  }), expect.anything()));
   await waitUntilIdle();
 }
 function walletCard(slot: "identity" | "independent") {
@@ -502,6 +516,8 @@ describe("Worker-backed shielded wallet", () => {
     vi.clearAllMocks();
     mocks.identity = null;
     mocks.credentials = null;
+    mocks.lettersAddress = "";
+    mocks.submitLetter.mockReset().mockResolvedValue({ transactionHash: "0xletter" });
     mocks.walletRequestPending = false;
     mocks.walletGeneration = 0;
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
@@ -532,6 +548,7 @@ describe("Worker-backed shielded wallet", () => {
     });
     mocks.update.mockImplementation(publishSession);
     mocks.receipt.mockReset().mockResolvedValue(null);
+    mocks.incrementCounter.mockReset().mockResolvedValue({ hash: "0xrevocation", wait: async () => ({ status: 1 }) });
     (signer.signMessage as any).mockResolvedValue("signature");
     (signer.getAddress as any).mockResolvedValue(address);
     (signer.provider!.getTransactionCount as any).mockResolvedValue(7);
@@ -546,6 +563,31 @@ describe("Worker-backed shielded wallet", () => {
     expect(screen.queryByLabelText(label("action"))).toBeNull();
     expect(screen.queryByRole("navigation", { name: "shielded.actionsTitle" })).toBeNull();
     expect(mocks.call).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["native", "CFX"], ["erc20", "DEEP"], ["erc20", "TEST"],
+  ] as const)("sends a standalone letter with only a valid code and transaction wallet in the %s %s context", async (assetKind, assetSymbol) => {
+    mocks.lettersAddress = "0x1111111111111111111111111111111111111111";
+    const preparedLetter = { delivery: { messageId: "7", checkpointId: "1", asOf: "900", expiresAt: "1200", recipientBinding: "9" }, ciphertext: "0x010203", proof: "0x1234" };
+    mocks.call.mockImplementation(async (method: string) => {
+      if (method === "prepareLetter") return preparedLetter;
+      throw new Error(`Unexpected Worker method: ${method}`);
+    });
+    await renderPanel(signer, { ...modules, assetKind, assetSymbol });
+    expect((screen.getByRole("button", { name: "shielded.privateLetters.inbox" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.write" }));
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.recipientCode"), { target: { value: "valid-anonymous-code" } });
+    fireEvent.change(screen.getByLabelText("shielded.privateLetters.body"), { target: { value: "Letter without a sender identity or deposit" } });
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.send" }));
+    await screen.findByText("shielded.privateLetters.sent: 0xletter");
+    expect(mocks.call).toHaveBeenCalledExactlyOnceWith("prepareLetter", {
+      context: expect.objectContaining({ chainId: "31337", assetKind, lettersAddress: mocks.lettersAddress }),
+      code: "valid-anonymous-code", body: "Letter without a sender identity or deposit", budgetCommitment: undefined,
+    }, expect.anything());
+    expect(mocks.submitLetter).toHaveBeenCalledWith(expect.objectContaining({ signer, letter: preparedLetter, address: mocks.lettersAddress }));
+    expect(mocks.identity).toBeNull();
+    expect(mocks.credentials).toBeNull();
+    expect(screen.getByRole("button", { name: "shielded.unlock" })).toBeTruthy();
   });
   it("lists every task in its two groups and shows both wallets with the current one marked", async () => {
     await renderUnlockedPanel();
@@ -1004,12 +1046,44 @@ describe("Worker-backed shielded wallet", () => {
     openReceiveCode("independent");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
     await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("independent-receive-code"));
-    expect(mocks.call).toHaveBeenLastCalledWith("receiveCode", { slot: "independent" }, expect.anything());
+    expect(mocks.call).toHaveBeenLastCalledWith("receiveCode", expect.objectContaining({ slot: "independent", disclosure: "anonymous", expiresAt: expect.stringMatching(/^\d+$/) }), expect.anything());
     openReceiveCode("identity");
     expect(screen.queryByLabelText("shielded.receiveCodeLabel")).toBeNull();
     expect(mocks.identity).toEqual(identity);
     expect(mocks.independentKey?.recoveryVerified).toBe(true);
     expect(mocks.lock).not.toHaveBeenCalled();
+  });
+  it("submits batch revocation in the signing wallet request scope and regenerates current material", async () => {
+    const defaultCall = mocks.call.getMockImplementation();
+    let codeNumber = 0;
+    const args = ["1", "2", "3", "4", "0", "1", "0xproof"];
+    mocks.call.mockImplementation(async (method, params) => method === "receiveCode" ? { code: `code-${++codeNumber}` }
+      : method === "authorizeIdentityCounter" ? { address, args } : defaultCall?.(method, params));
+    mocks.incrementCounter.mockImplementation(async () => {
+      expect(mocks.walletRequestPending).toBe(true);
+      return { hash: "0xrevocation", wait: async () => ({ status: 1 }) };
+    });
+    await renderUnlockedPanel();
+    openReceiveCode("identity");
+    await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("code-1"));
+    await waitUntilIdle();
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.revokeAll" }));
+    await waitFor(() => expect(mocks.incrementCounter).toHaveBeenCalledWith(...args, { chainId: 31337n }));
+    await waitFor(() => expect((screen.getByLabelText("shielded.receiveCodeLabel") as HTMLTextAreaElement).value).toBe("code-2"));
+    expect(mocks.walletRequestPending).toBe(false);
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("rejects batch revocation when the transaction wallet changed networks", async () => {
+    const defaultCall = mocks.call.getMockImplementation();
+    mocks.call.mockImplementation(async (method, params) => method === "receiveCode" ? { code: "old-code" }
+      : method === "authorizeIdentityCounter" ? { address, args: [] } : defaultCall?.(method, params));
+    await renderUnlockedPanel();
+    openReceiveCode("identity");
+    await waitUntilIdle();
+    vi.mocked(signer.provider!.getNetwork).mockResolvedValueOnce({ chainId: 1n } as never);
+    fireEvent.click(screen.getByRole("button", { name: "shielded.privateLetters.revokeAll" }));
+    await screen.findByText("shielded.walletChanged");
+    expect(mocks.incrementCounter).not.toHaveBeenCalled();
   });
   it("generates and closes a receive code without losing a transfer draft or selected balance", async () => {
     mocks.verify.mockRejectedValue(new Error("unfinished recipient code"));
@@ -2098,6 +2172,7 @@ describe("Worker-backed shielded wallet", () => {
     ["privateConvenient", 0, 0, "convenientEntry"],
     ["privateIndependent", 0, 1, "independentEntry"],
   ] as const)("keeps an existing %s template fixed for further funding", async (entry, bindingKind, keyMode, entryLabel) => {
+    mocks.verify.mockResolvedValue({ disclosure: "fund", personHash: identity.personHash, keyMode, fingerprint: "child-fingerprint" });
     mocks.call.mockImplementation(async (method, params) => method === "recover" ? {
       ...emptyWallet,
       familyRecordsAvailable: false,
@@ -2119,11 +2194,16 @@ describe("Worker-backed shielded wallet", () => {
       expect(screen.getByRole("radio", { name: label(key) }).matches(":disabled")).toBe(true);
     }
     expect(screen.getByText(label("fundingEntryFixed"))).toBeTruthy();
-    expect(screen.queryByLabelText("shielded.receiveCodeInputLabel")).toBeNull();
+    if (entry === "public") expect(screen.queryByLabelText("shielded.receiveCodeInputLabel")).toBeNull();
+    else {
+      expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.change(screen.getByLabelText("shielded.receiveCodeInputLabel"), { target: { value: "current-fund-material" } });
+      await waitFor(() => expect((screen.getByRole("button", { name: submitLabel }) as HTMLButtonElement).disabled).toBe(false));
+    }
     fireEvent.click(screen.getByRole("button", { name: submitLabel }));
     await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("preview", expect.objectContaining({
       action: "fund", policyHandle: "policy:existing", fundingEntry: entry,
-      recipientCode: undefined,
+      recipientCode: entry === "public" ? undefined : "current-fund-material",
     }), expect.anything()));
     expect(mocks.submit).not.toHaveBeenCalled();
   });

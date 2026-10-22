@@ -29,6 +29,7 @@ import {
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
+import { inspectReceiveArtifacts } from "../scripts/lib/receiveArtifacts.mjs";
 
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
@@ -42,6 +43,11 @@ const FIXTURE_GIT_EXECUTABLE = path.resolve("test-tools", "git");
 const runReleasePreflight = (options) =>
   runReleasePreflightRaw({
     protocolManifestInspector: inspectFixtureProtocolManifest,
+    receiveArtifactInspector: () => ({ status: "production", manifestSha256: "ef".repeat(32) }),
+    receiveCeremonyVerifier: async () => ({
+      verification: "passed",
+      manifestSha256: "ef".repeat(32),
+    }),
     gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
     ...options,
   });
@@ -327,6 +333,125 @@ describe("production release preflight", function () {
   it("does not auto-load the Git-ignored repository .env file", function () {
     const source = fsSync.readFileSync("scripts/release-preflight.mjs", "utf8");
     expect(source).not.to.include('import "dotenv/config"');
+  });
+
+  it("blocks release before any work when independent receive verification is not provided", async function () {
+    const fake = createFakeRunner();
+    let gitResolved = false;
+    const error = await captureError(() =>
+      runReleasePreflightRaw({
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        env: {},
+        runner: fake.runner,
+        gitToolResolver: async () => {
+          gitResolved = true;
+          return FIXTURE_GIT_EXECUTABLE;
+        },
+      }),
+    );
+    expect(error?.message).to.include(
+      "Receive production setup and independent verification are not provided",
+    );
+    expect(gitResolved).to.equal(false);
+    expect(fake.calls).to.deep.equal([]);
+  });
+
+  it("blocks production receipt keys before compiler work or commands despite a production protocol/core fixture", async function () {
+    const fixture = await productionFixture();
+    const fake = createFakeRunner();
+    let compilerInspected = false;
+    let privateDirectoryCreated = false;
+    const error = await captureError(() =>
+      runReleasePreflight({
+        root: fixture.root,
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        runner: fake.runner,
+        receiveArtifactInspector: inspectReceiveArtifacts,
+        compilerInspector: () => {
+          compilerInspected = true;
+        },
+        privateDirectoryFactory: () => {
+          privateDirectoryCreated = true;
+        },
+      }),
+    );
+    expect(error?.message).to.include("production manifest not found");
+    expect(compilerInspected).to.equal(false);
+    expect(privateDirectoryCreated).to.equal(false);
+    expect(fake.calls.every((call) => path.basename(call.executable) === "git")).to.equal(true);
+  });
+
+  it("requires production receipt evidence instead of accepting an inspector's development result", async function () {
+    const fixture = await productionFixture();
+    const fake = createFakeRunner();
+    const error = await captureError(() =>
+      runReleasePreflight({
+        root: fixture.root,
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        runner: fake.runner,
+        receiveArtifactInspector: ({ requireProduction }) => {
+          expect(requireProduction).to.equal(true);
+          return { status: "development", manifestSha256: "ef".repeat(32) };
+        },
+      }),
+    );
+    expect(error?.message).to.include("requires production receive presentation evidence");
+    expect(fake.calls.every((call) => path.basename(call.executable) === "git")).to.equal(true);
+  });
+
+  it("rechecks receipt manifest identity after all release checks", async function () {
+    const fixture = await productionFixture();
+    const fake = createFakeRunner();
+    let inspections = 0;
+    const error = await captureError(() =>
+      runWithFixtureCompiler({
+        root: fixture.root,
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        commands: [],
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        ptauPath: fixture.ptauPath,
+        runner: fake.runner,
+        mpcMetadataReader: metadataReaderFor(fixture),
+        receiveArtifactInspector: () => ({
+          status: "production",
+          manifestSha256: (++inspections === 1 ? "ef" : "ab").repeat(32),
+        }),
+      }),
+    );
+    expect(inspections).to.equal(2);
+    expect(error?.message).to.include("Receive presentation manifest changed");
+  });
+  it("requires independent receive verification to cover the exact inspected production manifest", async function () {
+    for (const evidence of [
+      { manifestSha256: "ef".repeat(32) },
+      { verification: "passed", manifestSha256: "ab".repeat(32) },
+    ]) {
+      const fixture = await productionFixture();
+      const fake = createFakeRunner();
+      const error = await captureError(() =>
+        runWithFixtureCompiler({
+          root: fixture.root,
+          platform: "linux",
+          arch: "x64",
+          libc: "glibc",
+          commands: [],
+          expectedProductionPhase1: fixture.expectedProductionPhase1,
+          ptauPath: fixture.ptauPath,
+          runner: fake.runner,
+          mpcMetadataReader: metadataReaderFor(fixture),
+          receiveCeremonyVerifier: async () => evidence,
+        }),
+      );
+      expect(error?.message).to.include("requires independent receive ceremony verification");
+    }
   });
 
   it("accepts Linux x64/glibc, Darwin arm64, and Windows x64 execution runtimes", async function () {
@@ -711,7 +836,9 @@ describe("production release preflight", function () {
 
     expect(
       RELEASE_PREFLIGHT_COMMANDS.map(([executable, args]) => commandLabel({ executable, args })),
-    ).to.include("npm run protocol:unicode:check");
+    ).to.include(
+      `${path.basename(process.execPath)} scripts/generate-unicode-normalization-data.mjs --check`,
+    );
 
     const result = await runWithFixtureCompiler({
       root: fixture.root,
@@ -766,6 +893,7 @@ describe("production release preflight", function () {
       zkManifestSha256: sha256File(fixture.manifestPath),
       zkTranscriptSha256: fixture.manifest.trustedSetup.transcript.sha256,
       protocolManifestSha256: "cd".repeat(32),
+      receiveManifestSha256: "ef".repeat(32),
       ptauSha256: fixture.manifest.trustedSetup.phase1.sha256,
       checks: RELEASE_PREFLIGHT_COMMANDS.map(
         ([executable, args]) => `${executable} ${args.join(" ")}`,

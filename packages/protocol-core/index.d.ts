@@ -613,7 +613,12 @@ export function buildLineageMerkleProof(
   leafIndex: BigNumberish,
 ): LineageMerkleProof;
 export function buildLineageMerkleProofFromPath(input: LineageMerklePathInput): LineageMerkleProof;
-export type ShieldedScope = { chainId: BigNumberish; poolAddress: string };
+export type ShieldedScope = {
+  chainId: BigNumberish;
+  poolAddress: string;
+  /** Recovered recipient HPKE public key; never serialized twice in budget memos. */
+  viewingKey?: BytesLike;
+};
 export const SHIELDED_POOL_PROTOCOL_VERSION: 1;
 export function normalizeShieldedScope(scope: ShieldedScope): {
   chainId: bigint;
@@ -642,6 +647,8 @@ export const SHIELDED_INHERITANCE_DOMAINS: Readonly<{
   poolScope: bigint;
   scopedPurpose: bigint;
   ownerBudgetAuthorization: bigint;
+  fundBudgetNote: bigint;
+  claimBudgetNote: bigint;
 }>;
 export const SHIELDED_MAX_BATCH_PERIODS: 12;
 export const SHIELDED_CIPHERTEXT_BYTES: 512;
@@ -709,6 +716,8 @@ export function computeShieldedBudgetNoteCommitment(
     enrollmentCommitment: BigNumberish;
     heirOwnerCommitment: BigNumberish;
     keyMode?: BigNumberish;
+    viewingKey?: BytesLike;
+    budgetOrigin?: ShieldedBudgetOrigin;
     amountPerPeriod: BigNumberish;
     remaining: BigNumberish;
     nonce: BigNumberish;
@@ -827,12 +836,12 @@ export const SHIELDED_VALUE_WITH_BUDGET_MEMO_KIND: 3;
 export const SHIELDED_VALUE_WITH_RULE_MEMO_KIND: 4;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_KIND: 5;
 export const SHIELDED_VALUE_NOTE_PAYLOAD_BYTES: 86;
-export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 283;
+export const SHIELDED_BUDGET_NOTE_PAYLOAD_BYTES: 284;
 export const SHIELDED_IDENTITY_BUDGET_NOTE_PAYLOAD_BYTES: 218;
 export const SHIELDED_VALUE_WITH_IDENTITY_BUDGET_MEMO_PAYLOAD_BYTES: 400;
 export const SHIELDED_VALUE_WITH_IDENTITY_RULE_MEMO_PAYLOAD_BYTES: 432;
-export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 427;
-export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 459;
+export const SHIELDED_VALUE_WITH_BUDGET_MEMO_PAYLOAD_BYTES: 428;
+export const SHIELDED_VALUE_WITH_RULE_MEMO_PAYLOAD_BYTES: 460;
 export interface ShieldedValueNotePayload {
   ownerCommitment: BigNumberish;
   amount: BigNumberish;
@@ -848,6 +857,9 @@ export interface ShieldedValueNotePayload {
 }
 export interface ShieldedOwnerBudgetNotePayload {
   binding?: "owner";
+  /** Public receiving key restored from HPKE context or the donor memo. */
+  viewingKey?: BytesLike;
+  budgetOrigin?: ShieldedBudgetOrigin;
   rootIdentityCommitment: BigNumberish;
   rootVersionIndex: BigNumberish;
   policySalt: BigNumberish;
@@ -885,8 +897,11 @@ export interface ShieldedBudgetRuleOpening {
   enrollmentSalt: BigNumberish;
 }
 export type DecodedShieldedOwnerBudgetNotePayload = {
-  [K in Exclude<keyof ShieldedOwnerBudgetNotePayload, "binding" | "keyMode">]: bigint;
-} & { binding?: "owner"; keyMode?: bigint };
+  [K in Exclude<
+    keyof ShieldedOwnerBudgetNotePayload,
+    "binding" | "keyMode" | "viewingKey" | "budgetOrigin"
+  >]: bigint;
+} & { binding?: "owner"; keyMode?: bigint; viewingKey?: string; budgetOrigin: bigint };
 export type DecodedShieldedIdentityBudgetNotePayload = {
   [K in Exclude<keyof ShieldedIdentityBudgetNotePayload, "binding" | "keyMode">]: bigint;
 } & { binding: "identity"; keyMode?: bigint };
@@ -992,7 +1007,8 @@ export type ShieldedPoolPublicInputName =
   | "recipient"
   | "endorsementRoot"
   | "trustedRoot"
-  | "asOf";
+  | "asOf"
+  | "receiveBindings";
 /** Each pool action circuit's named public inputs, in verifier order. */
 export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
@@ -1000,6 +1016,8 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
 export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 9;
 export interface ShieldedPoolPublicSignalInput {
+  receiveBindings?: readonly [BigNumberish, BigNumberish];
+  receiveAuthorizations?: readonly ShieldedReceiveAuthorization[];
   fundMode?: BigNumberish;
   budgetKind?: BigNumberish;
   /** Optional cross-check; otherwise the nine fields are read from the public output envelope. */
@@ -1078,9 +1096,12 @@ export function decodeShieldedReceiveCode(code: string): {
 export const SHIELDED_KEY_MODE: Readonly<{ identityDerived: 0; independentKeyRootDerived: 1 }>;
 export function normalizeShieldedKeyMode(value?: BigNumberish, binding?: string): bigint;
 export function computeShieldedBudgetOwnerAuthorization(
-  input: { heirOwnerCommitment: BigNumberish; keyMode?: BigNumberish },
+  input: { heirOwnerCommitment: BigNumberish; keyMode?: BigNumberish; viewingKey?: BytesLike },
   scope: ShieldedScope,
 ): bigint;
+export type ShieldedBudgetOrigin = "fund" | "claim" | BigNumberish;
+export const SHIELDED_BUDGET_ORIGIN: Readonly<{ fund: 0n; claim: 1n }>;
+export function normalizeShieldedBudgetOrigin(origin?: ShieldedBudgetOrigin): bigint;
 
 export function computeShieldedDummyInputNullifierForSlot(
   ownerSecret: BigNumberish,
@@ -1132,7 +1153,9 @@ export const INDEPENDENT_KEY_ARGON2ID_PROFILE: Readonly<{
   saltBytes: 16;
 }>;
 /** Frozen Unicode 17 independent-key rules, independent of the active identity suite. */
-export function normalizeShieldedIndependentKeyIdentity(identity: IdentityFields): CanonicalIdentityFields;
+export function normalizeShieldedIndependentKeyIdentity(
+  identity: IdentityFields,
+): CanonicalIdentityFields;
 export function encodeShieldedIndependentKeyIdentity(identity: IdentityFields): Uint8Array;
 export function normalizeShieldedIndependentKeyPassphrase(rawPassphrase: string): string;
 /** The caller must wipe the returned password bytes after use. */
@@ -1170,7 +1193,10 @@ export function normalizeShieldedIndependentKeySignature(input: {
 export function deriveShieldedIndependentKeyRootFromSignature(input: {
   signerAddress: string;
   signature: string;
-}): Promise<{ independentKeyRoot: Uint8Array; sourceMetadata: ShieldedIndependentKeySignatureMetadata }>;
+}): Promise<{
+  independentKeyRoot: Uint8Array;
+  sourceMetadata: ShieldedIndependentKeySignatureMetadata;
+}>;
 export function createShieldedIndependentKeyRoot(input: {
   intent: "create";
   rootSource?: "random";
@@ -1193,3 +1219,238 @@ export function decodeShieldedIndependentKeyMnemonic(mnemonic: string): Uint8Arr
 export function encodeShieldedIndependentKey(independentKeyRoot: BytesLike): string;
 /** Import a complete root from exactly 0x + 64 hex characters, not a spend secret. */
 export function decodeShieldedIndependentKey(shieldedKey: string): Uint8Array;
+
+export const SHIELDED_LETTER_ENVELOPE_VERSION: 1;
+export const SHIELDED_LETTER_RELATION_DOMAIN: 202610210401n;
+export const SHIELDED_LETTER_HPKE_ENCAPSULATED_BYTES: 32;
+export interface ShieldedLetterScope {
+  chainId: BigNumberish;
+  lettersAddress: string;
+}
+export interface ShieldedLetterAttachment {
+  chainId: BigNumberish;
+  poolAddress: string;
+  budgetCommitment: BigNumberish;
+}
+export interface ShieldedLetterEnvelopeInput {
+  version?: 1;
+  body: string;
+  salt?: BigNumberish;
+  attachment?: ShieldedLetterAttachment | null;
+}
+export interface ShieldedLetterEnvelope {
+  version: 1;
+  body: string;
+  salt: bigint;
+  attachment: { chainId: bigint; poolAddress: string; budgetCommitment: bigint } | null;
+}
+export function normalizeShieldedLetterScope(input: ShieldedLetterScope): {
+  chainId: bigint;
+  lettersAddress: string;
+};
+/** Generates the existing message salt when omitted; retain it for the delivery proof. */
+export function createShieldedLetterEnvelope(
+  input: ShieldedLetterEnvelopeInput,
+): ShieldedLetterEnvelope;
+export function encodeShieldedLetterEnvelope(
+  input: ShieldedLetterEnvelopeInput & { salt: BigNumberish },
+): Uint8Array;
+export function decodeShieldedLetterEnvelope(value: BytesLike): ShieldedLetterEnvelope;
+export function buildShieldedLetterHpkeAad(
+  input: ShieldedLetterScope & { messageId: BigNumberish },
+): Uint8Array;
+export function computeShieldedLetterCiphertextHash(ciphertext: BytesLike): string;
+export function computeShieldedLetterCiphertextHashField(ciphertext: BytesLike): bigint;
+export function splitShieldedLetterCiphertextHash(ciphertext: BytesLike): {
+  cipherLo: bigint;
+  cipherHi: bigint;
+};
+export function computeShieldedLetterRelationCommitment(input: {
+  attachment?: ShieldedLetterAttachment | null;
+  salt: BigNumberish;
+  /** Required for attachments; read from the authenticated delivery proof result. */
+  binding?: BigNumberish;
+}): bigint;
+export function encryptShieldedLetter(
+  input: ShieldedLetterScope & {
+    messageId: BigNumberish;
+    recipientPublicKey: BytesLike;
+    envelope: ShieldedLetterEnvelopeInput & { salt: BigNumberish };
+  },
+): Promise<Uint8Array>;
+export function decryptShieldedLetter(
+  input: ShieldedLetterScope & {
+    messageId: BigNumberish;
+    hpkeIkm: BytesLike;
+    ciphertext: BytesLike;
+    /** Authenticated contract result; exactly zero for standalone letters. */
+    relationCommitment: BigNumberish;
+    /** Authenticated operation binding; required for attachments. */
+    expectedBinding?: BigNumberish;
+    expectedCiphertextHash?: BytesLike;
+  },
+): Promise<ShieldedLetterEnvelope>;
+
+/** Issuance transport; use the matching fixed anonymous/Fund verification key. */
+export type ShieldedReceiveCredentialDisclosure = "anonymous" | "fund";
+export const SHIELDED_RECEIVE_CREDENTIAL_VERSION: 2;
+export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN: bigint;
+export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS: Readonly<{
+  anonymous: 11;
+  fund: 12;
+}>;
+export interface ShieldedReceiveCredentialStatement {
+  disclosure?: ShieldedReceiveCredentialDisclosure;
+  authorizationAlias: BigNumberish;
+  authorizationCounter: BigNumberish;
+  expiresAt: BigNumberish;
+  /** Present only in the Fund disclosure; never in an anonymous packet. */
+  identityCommitment?: BigNumberish;
+  ownerCommitment: BigNumberish;
+  viewingKey: BytesLike;
+  keyMode?: BigNumberish;
+  identitySuiteId?: BigNumberish;
+  independentKeySuiteId?: BigNumberish;
+  independentKeyDerivationVersion?: BigNumberish;
+  receiveCodeVersion?: BigNumberish;
+}
+export function computeShieldedAuthorizationAlias(input: {
+  identityCommitment: BigNumberish;
+  derivedSecretField: BigNumberish;
+}): bigint;
+export function buildShieldedReceiveCredentialPublicSignals(
+  input: ShieldedReceiveCredentialStatement,
+): bigint[];
+export function computeShieldedReceiveCredentialFingerprint(
+  input: ShieldedReceiveCredentialStatement,
+): string;
+export function encodeShieldedReceiveCredential(
+  input: ShieldedReceiveCredentialStatement & {
+    proof: ShieldedReceiveCodeProof;
+  },
+): string;
+export function decodeShieldedReceiveCredential(code: string): {
+  disclosure: ShieldedReceiveCredentialDisclosure;
+  authorizationAlias: bigint;
+  authorizationCounter: bigint;
+  expiresAt: bigint;
+  identityCommitment?: bigint;
+  ownerCommitment: bigint;
+  viewingKey: Uint8Array;
+  keyMode: number;
+  identitySuiteId: number;
+  independentKeySuiteId: number;
+  independentKeyDerivationVersion: number;
+  receiveCodeVersion: 2;
+  fingerprint: string;
+  publicSignals: bigint[];
+  proof: ShieldedReceiveCodeProof;
+};
+
+export const SHIELDED_IDENTITY_AUTHORIZATION_DEPTH: 64;
+export const SHIELDED_IDENTITY_COUNTER_AUTHORIZATION_DOMAIN: bigint;
+export interface ShieldedIdentityAuthorizationState {
+  root: bigint;
+  entries: Map<bigint, bigint>;
+}
+export function buildShieldedIdentityAuthorizationState(
+  entries?: Iterable<readonly [BigNumberish, BigNumberish]>,
+): ShieldedIdentityAuthorizationState;
+export function getShieldedIdentityAuthorizationWitness(
+  state: ShieldedIdentityAuthorizationState,
+  authorizationAlias: BigNumberish,
+): {
+  authorizationAlias: bigint;
+  authorizationCounter: bigint;
+  stateRoot: bigint;
+  depth: bigint;
+  siblings: bigint[];
+  oldKey: bigint;
+  oldValue: bigint;
+  isOld0: bigint;
+  fnc: bigint;
+  absent: bigint;
+};
+export function prepareShieldedIdentityAuthorizationIncrement(input: {
+  state: ShieldedIdentityAuthorizationState;
+  chainId: BigNumberish;
+  authorizationStateAddress: string;
+  identityCommitment: BigNumberish;
+  derivedSecretField: BigNumberish;
+}): {
+  nextState: ShieldedIdentityAuthorizationState;
+  publicSignals: bigint[];
+  witness: Record<string, string | string[]>;
+};
+
+export const SHIELDED_RECEIVE_PRESENTATION_ACTION: Readonly<{
+  Letter: 1;
+  AttachedLetter: 2;
+  Fund: 3;
+  PrivateTransfer: 4;
+}>;
+export const SHIELDED_RECEIVE_BINDING_DOMAIN: bigint;
+export const SHIELDED_FUND_RECEIVE_BINDING_DOMAIN: bigint;
+export interface ShieldedReceiveAuthorization {
+  checkpointId: BigNumberish;
+  asOf: BigNumberish;
+  expiresAt: BigNumberish;
+  recipientBinding: BigNumberish;
+  proof: string;
+}
+export function computeShieldedReceiveCredentialBinding(input: {
+  credential: ShieldedReceiveCredentialStatement;
+  salt: BigNumberish;
+}): bigint;
+export function computeShieldedReceiveActionHash(
+  input: Omit<ShieldedPoolPublicSignalInput, "action" | "chainId" | "poolAddress">,
+): string;
+export function emptyShieldedReceiveAuthorizations(): [
+  ShieldedReceiveAuthorization,
+  ShieldedReceiveAuthorization,
+];
+export function prepareShieldedReceivePresentation(input: {
+  credential: ShieldedReceiveCredentialStatement & { proof: ShieldedReceiveCodeProof };
+  state: ShieldedIdentityAuthorizationState;
+  chainId: BigNumberish;
+  consumer: string;
+  action: BigNumberish;
+  messageId: BigNumberish;
+  payloadHash: BytesLike;
+  checkpointId: BigNumberish;
+  asOf: BigNumberish;
+  salt: BigNumberish;
+}): {
+  publicSignals: bigint[];
+  recipientBinding: bigint;
+  presentation: Record<string, string | string[]>;
+  request: {
+    kind: "anonymous" | "fund" | "attachment";
+    credentialProof: ShieldedReceiveCodeProof;
+    credentialPublicSignals: string[];
+    presentation: Record<string, string | string[]>;
+  };
+};
+export function rebuildShieldedIdentityAuthorizationState(
+  events: Iterable<
+    | {
+        args?: {
+          aliasR: BigNumberish;
+          oldCounter: BigNumberish;
+          newCounter: BigNumberish;
+          checkpointId: BigNumberish;
+          oldRoot: BigNumberish;
+          newRoot: BigNumberish;
+        };
+      }
+    | {
+        aliasR: BigNumberish;
+        oldCounter: BigNumberish;
+        newCounter: BigNumberish;
+        checkpointId: BigNumberish;
+        oldRoot: BigNumberish;
+        newRoot: BigNumberish;
+      }
+  >,
+  expectedRoot?: BigNumberish,
+): ShieldedIdentityAuthorizationState;

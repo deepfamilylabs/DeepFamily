@@ -8,6 +8,8 @@ import {
   computeShieldedNoteCommitmentFromPayload,
   getShieldedBudgetCommitments,
   normalizeShieldedKeyMode,
+  normalizeShieldedBudgetOrigin,
+  splitShieldedViewPublicKey,
   encodePublicShieldedBudgetEnvelope,
   computeShieldedCiphertextHashField,
   computeShieldedEnrollmentCommitment,
@@ -143,6 +145,7 @@ export function createShieldedPolicyDescriptor(
 
 const ZERO_TEMPLATE_WITNESS: ShieldedWitness = {
   oldBudgetKind: "0",
+  oldBudgetIsClaim: "0",
   oldKeyMode: "0",
   oldHeirOwnerCommitment: "0",
   oldBudgetRemaining: "0",
@@ -288,26 +291,10 @@ async function currentContext(input: CommonFundingInput) {
       keyMode: 0n,
     };
   } else {
-    const continuation = input as ContinuationFundingInput;
-    if (input.recipient && input.recipient.ownerCommitment !== 0n) {
-      heir = { ...input.recipient, keyMode: normalizeShieldedKeyMode(input.recipient.keyMode) };
-    } else if (
-      continuation.fundMode === 1 &&
-      continuation.budget.note.binding !== "identity" &&
-      continuation.budget.viewingKey
-    ) {
-      const saved = continuation.budget.note;
-      heir = {
-        identityCommitment: getBigInt(saved.heirIdentityCommitment),
-        ownerCommitment: getBigInt(saved.heirOwnerCommitment),
-        viewingKey: continuation.budget.viewingKey,
-        keyMode: normalizeShieldedKeyMode(saved.keyMode),
-        personHash: wrapIdentityCommitmentAsPersonHash(saved.heirIdentityCommitment),
-      };
-    } else
-      throw new Error(
-        "Private funding requires a verified code or the original funding template viewing material",
-      );
+    const recipient = input.recipient;
+    if (!recipient || recipient.disclosure !== "fund" || !recipient.identityCommitment || !recipient.personHash || recipient.ownerCommitment === 0n)
+      throw new Error("Private funding requires current Fund identity disclosure material");
+    heir = { ...recipient, identityCommitment: recipient.identityCommitment, personHash: recipient.personHash, keyMode: normalizeShieldedKeyMode(recipient.keyMode) };
   }
   if (
     wrapIdentityCommitmentAsPersonHash(heir.identityCommitment).toLowerCase() !==
@@ -351,7 +338,8 @@ function templatePath<T extends ShieldedBudgetNotePayload>(
 ) {
   const commitment = getBigInt(saved.commitment);
   const shardId = getBigInt(saved.shardId);
-  const payload = encode(saved.note, wallet);
+  const scope = { ...wallet, viewingKey: saved.viewingKey };
+  const payload = encode(saved.note, scope);
   try {
     verifyShieldedNotePayload(
       {
@@ -359,7 +347,7 @@ function templatePath<T extends ShieldedBudgetNotePayload>(
         ciphertext: saved.ciphertext,
         noteCommitment: commitment,
       },
-      wallet,
+      scope,
     );
   } finally {
     payload.fill(0);
@@ -420,7 +408,8 @@ async function fundingOutputs(input: {
   enrollmentCommitment: bigint;
   allocationKey?: bigint;
 }) {
-  const payload = encodeShieldedBudgetNotePayload(input.budget, input);
+  const scope = { ...input, viewingKey: input.heirViewingKey };
+  const payload = encodeShieldedBudgetNotePayload(input.budget, scope);
   let encryptedBudget: PreparedFundingOutput<ShieldedBudgetNotePayload>;
   try {
     const ciphertext = input.publicDelivery
@@ -437,7 +426,7 @@ async function fundingOutputs(input: {
         payload,
         ciphertextHashField,
       },
-      input,
+      scope,
     );
     encryptedBudget = { note: input.budget, ciphertext, ciphertextHashField, commitment };
   } finally {
@@ -589,7 +578,10 @@ async function initialFundingDestination(input: InitialFundingInput) {
     throw new Error(
       "Family eligibility snapshot expired or is unavailable. Refresh and prepare a new funding plan.",
     );
-  if (asOf > BigInt(latestBlock.timestamp) || BigInt(latestBlock.timestamp) - asOf >= PROOF_LIFETIME)
+  if (
+    asOf > BigInt(latestBlock.timestamp) ||
+    BigInt(latestBlock.timestamp) - asOf >= PROOF_LIFETIME
+  )
     throw new Error("Family eligibility snapshot expired. Refresh and prepare a new funding plan.");
   const eligibleFrom = uint64(asOf + PROOF_LIFETIME, "eligibleFrom");
   const rootPersonHash = wrapIdentityCommitmentAsPersonHash(policy.rootIdentityCommitment);
@@ -715,6 +707,8 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
           eligibleFrom,
           heirOwnerCommitment: heir.ownerCommitment,
           keyMode: heir.keyMode,
+          viewingKey: heir.viewingKey,
+          budgetOrigin: 0n,
           amountPerPeriod: policy.amountPerPeriod,
           periodDays: policy.periodDays,
           remaining: amount,
@@ -747,6 +741,8 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
+    receiveBindings: ["0", "0"],
+    receiveAuthorizationAlias: "0", receiveSalt: "0",
     ...ZERO_TEMPLATE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
@@ -765,6 +761,12 @@ async function prepareInitialFunding(input: InitialFundingInput): Promise<Prepar
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
     keyMode: String(heir.keyMode),
+    heirViewKeyLo: heir.viewingKey
+      ? String(splitShieldedViewPublicKey(heir.viewingKey).viewKeyLo)
+      : "0",
+    heirViewKeyHi: heir.viewingKey
+      ? String(splitShieldedViewPublicKey(heir.viewingKey).viewKeyHi)
+      : "0",
     heirVersionIndex: String(legitimacy.versionIndex),
     fatherIdentityCommitment: String(legitimacy.fatherIdentityCommitment),
     motherIdentityCommitment: String(legitimacy.motherIdentityCommitment),
@@ -902,7 +904,13 @@ async function prepareContinuationFunding(
   const budget: ShieldedBudgetNotePayload =
     input.budgetKind === 1
       ? { ...commonBudget, binding: "identity", policyCommitment, enrollmentCommitment }
-      : { ...commonBudget, ...ruleOpening, heirOwnerCommitment: heir.ownerCommitment };
+      : {
+          ...commonBudget,
+          ...ruleOpening,
+          heirOwnerCommitment: heir.ownerCommitment,
+          viewingKey: heir.viewingKey,
+          budgetOrigin: 0n,
+        };
   const outputs = await fundingOutputs({
     budget,
     donorOwnerCommitment: ctx.keys.ownerCommitment,
@@ -926,6 +934,8 @@ async function prepareContinuationFunding(
   });
   const witness: ShieldedWitness = {
     ...publicInputs(SHIELDED_POOL_ACTION.Fund, ctx.chainId, ctx.poolAddress, data),
+    receiveBindings: ["0", "0"],
+    receiveAuthorizationAlias: "0", receiveSalt: "0",
     ...ZERO_LINEAGE_WITNESS,
     donorOwnerSecret: String(ctx.keys.ownerSecret),
     donorAmount: String(donor.note.amount),
@@ -943,9 +953,17 @@ async function prepareContinuationFunding(
     heirIdentityCommitment: String(heir.identityCommitment),
     heirOwnerCommitment: String(heir.ownerCommitment),
     keyMode: String(heir.keyMode),
+    heirViewKeyLo: heir.viewingKey
+      ? String(splitShieldedViewPublicKey(heir.viewingKey).viewKeyLo)
+      : "0",
+    heirViewKeyHi: heir.viewingKey
+      ? String(splitShieldedViewPublicKey(heir.viewingKey).viewKeyHi)
+      : "0",
     eligibleFrom: String(old.eligibleFrom),
     enrollmentSalt: String(ruleOpening.enrollmentSalt),
     oldBudgetKind: old.binding === "identity" ? "1" : "0",
+    oldBudgetIsClaim:
+      old.binding === "identity" ? "0" : String(normalizeShieldedBudgetOrigin(old.budgetOrigin)),
     oldKeyMode: String(normalizeShieldedKeyMode(old.keyMode, old.binding)),
     oldHeirOwnerCommitment: old.binding === "identity" ? "0" : String(old.heirOwnerCommitment),
     oldBudgetRemaining: String(oldRemaining),

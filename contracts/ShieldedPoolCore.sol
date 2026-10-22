@@ -6,6 +6,8 @@ import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {IDeepFamilyLineageIndex} from "./interfaces/IDeepFamilyLineageIndex.sol";
 import {IProofVerifierAdapter} from "./interfaces/IProofVerifierAdapter.sol";
 import {ProofConstants} from "./libraries/ProofConstants.sol";
+import {IIdentityAuthorizationState} from "./interfaces/IIdentityAuthorizationState.sol";
+import {IPrivateLetterVerifier} from "./interfaces/IPrivateLetterVerifiers.sol";
 
 /**
  * @title ShieldedPoolCore
@@ -34,6 +36,9 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   error UnexpectedTokenTransfer();
   error InsufficientCollateral();
   error InvalidLeafIndex();
+  error InvalidReceiveAuthorization();
+  error ExpiredReceiveCode();
+  error InvalidReceiveProof();
 
   enum Action {
     Shield,
@@ -49,6 +54,14 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
    *         Shield, Fund and Claim use two input slots. Initial Fund repeats the
    *         first shard and root; Claim proves both input roots.
    */
+  struct ReceiveAuthorization {
+    uint256 checkpointId;
+    uint64 asOf;
+    uint64 expiresAt;
+    uint256 recipientBinding;
+    bytes proof;
+  }
+
   struct ActionData {
     uint256[] inputShardIds;
     uint256[] inputRoots;
@@ -66,6 +79,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     uint256 fundMode;
     // Fund only: 0 owner-bound encrypted budget; 1 identity-bound public budget.
     uint256 budgetKind;
+    ReceiveAuthorization[2] receiveAuthorizations;
   }
 
   struct Shard {
@@ -85,6 +99,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
 
   IDeepFamilyLineageIndex public immutable LINEAGE_INDEX;
   IProofVerifierAdapter public immutable VERIFIER;
+  IIdentityAuthorizationState public immutable AUTHORIZATION_STATE;
+  IPrivateLetterVerifier public immutable RECEIVE_VERIFIER;
 
   // Assigned once so recovery can include deposits made before factory registration.
   uint256 public creationBlock;
@@ -110,12 +126,24 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   /**
    * @param verifier The shared Groth16 adapter configured with all five pool action verifiers.
    */
-  constructor(address lineageIndex, address verifier) {
-    if (lineageIndex.code.length == 0 || verifier.code.length == 0) {
+  constructor(
+    address lineageIndex,
+    address verifier,
+    address authorizationState,
+    address receiveVerifier
+  ) {
+    if (
+      lineageIndex.code.length == 0 ||
+      verifier.code.length == 0 ||
+      authorizationState.code.length == 0 ||
+      receiveVerifier.code.length == 0
+    ) {
       revert InvalidConstructorAddress();
     }
     LINEAGE_INDEX = IDeepFamilyLineageIndex(lineageIndex);
     VERIFIER = IProofVerifierAdapter(verifier);
+    AUTHORIZATION_STATE = IIdentityAuthorizationState(authorizationState);
+    RECEIVE_VERIFIER = IPrivateLetterVerifier(receiveVerifier);
     creationBlock = block.number;
   }
 
@@ -331,6 +359,7 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     for (uint256 i = 0; i < signals.length; ++i) {
       _requireField(signals[i]);
     }
+    _verifyReceiveAuthorizations(action, data);
     if (
       !VERIFIER.verifyProof(
         ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE + uint8(action),
@@ -339,6 +368,75 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         signals
       )
     ) revert InvalidZKProof();
+  }
+
+  /** @notice Canonical receipt hash; excludes authorizations and all proofs. */
+  function receiveActionHash(ActionData calldata data) public pure returns (bytes32) {
+    return
+      keccak256(
+        abi.encode(
+          data.inputShardIds,
+          data.inputRoots,
+          data.inputNullifiers,
+          data.periodNullifiers,
+          data.outputCommitments,
+          data.outputCiphertexts,
+          data.relation0,
+          data.relation1,
+          data.asOf,
+          data.lineageCheckpointId,
+          data.fundMode,
+          data.budgetKind
+        )
+      );
+  }
+
+  function _verifyReceiveAuthorizations(Action action, ActionData calldata data) private view {
+    bool isFund = action == Action.Fund;
+    bool isTransfer = action == Action.PrivateTransfer;
+    bytes32 actionHash;
+    for (uint256 slot; slot < 2; ++slot) {
+      ReceiveAuthorization calldata authorization = data.receiveAuthorizations[slot];
+      bool required = isFund && data.budgetKind == 0 && slot == 0;
+      if (authorization.recipientBinding == 0) {
+        if (
+          required ||
+          authorization.checkpointId != 0 ||
+          authorization.asOf != 0 ||
+          authorization.expiresAt != 0 ||
+          authorization.proof.length != 0
+        ) {
+          revert InvalidReceiveAuthorization();
+        }
+        continue;
+      }
+      if ((!required && !isTransfer) || authorization.proof.length == 0) {
+        revert InvalidReceiveAuthorization();
+      }
+      _requireNonzeroField(authorization.recipientBinding);
+      _requireField(authorization.checkpointId);
+      if (block.timestamp >= authorization.expiresAt) revert ExpiredReceiveCode();
+      uint256 root = AUTHORIZATION_STATE.validateCheckpoint(
+        authorization.checkpointId,
+        authorization.asOf
+      );
+      if (actionHash == bytes32(0)) actionHash = receiveActionHash(data);
+      uint256[11] memory inputs;
+      inputs[0] = block.chainid;
+      inputs[1] = uint256(uint160(address(this)));
+      inputs[2] = isFund ? 3 : 4;
+      inputs[3] = slot;
+      inputs[4] = uint128(uint256(actionHash));
+      inputs[5] = uint256(actionHash) >> 128;
+      inputs[6] = authorization.checkpointId;
+      inputs[7] = root;
+      inputs[8] = authorization.asOf;
+      inputs[9] = authorization.expiresAt;
+      inputs[10] = authorization.recipientBinding;
+      try RECEIVE_VERIFIER.verifyProof(authorization.proof, inputs) {} catch {
+        revert InvalidReceiveProof();
+      }
+    }
   }
 
   /**
@@ -364,7 +462,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
         (action == Action.Fund ? 12 : 0) +
         (hasAmount ? 1 : 0) +
         (hasRecipient ? 1 : 0) +
-        (hasLineage ? 3 : 0)
+        (hasLineage ? 3 : 0) +
+        (action == Action.Fund || action == Action.PrivateTransfer ? 2 : 0)
     );
     uint256 n;
     signals[n++] = block.chainid;
@@ -397,6 +496,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
       signals[n++] = data.relation0;
       signals[n++] = data.relation1;
       signals[n++] = data.asOf;
+    }
+    if (action == Action.Fund || action == Action.PrivateTransfer) {
+      signals[n++] = data.receiveAuthorizations[0].recipientBinding;
+      signals[n++] = data.receiveAuthorizations[1].recipientBinding;
     }
   }
 

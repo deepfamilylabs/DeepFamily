@@ -33,11 +33,12 @@ import {
   preparePrivateProductionCompiler,
 } from "./lib/zkProductionSetup.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
+import { inspectReceiveArtifacts } from "./lib/receiveArtifacts.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
   // Re-run the pinned Unicode 17 conformance suite before a production release.
-  Object.freeze(["npm", ["run", "protocol:unicode:check"]]),
+  Object.freeze([process.execPath, ["scripts/generate-unicode-normalization-data.mjs", "--check"]]),
   // Contracts must build before the frontend synchronizes ABI artifacts.
   Object.freeze(["npm", ["run", "contracts:check"]]),
   Object.freeze(["npm", ["run", "frontend:check"]]),
@@ -112,6 +113,8 @@ export const runReleasePreflight = async ({
   mpcMetadataReader,
   expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
   protocolManifestInspector = inspectProtocolReleaseManifest,
+  receiveArtifactInspector = inspectReceiveArtifacts,
+  receiveCeremonyVerifier,
 } = {}) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");
@@ -130,7 +133,13 @@ export const runReleasePreflight = async ({
   if (typeof protocolManifestInspector !== "function") {
     throw new Error("protocolManifestInspector must be a function");
   }
+  if (typeof receiveArtifactInspector !== "function") {
+    throw new Error("receiveArtifactInspector must be a function");
+  }
   assertReleaseRuntimeCompatibility({ platform, arch, env, operation: "Release preflight" });
+  if (typeof receiveCeremonyVerifier !== "function") {
+    throw new Error("Receive production setup and independent verification are not provided");
+  }
 
   const localTarget = resolveLocalCircomTarget({ platform, arch, libc, report });
   const baseEnvironment = withoutCircomOverrideEnvironment(sanitizeReleaseEnvironment(env));
@@ -151,6 +160,14 @@ export const runReleasePreflight = async ({
   });
   if (!/^[0-9a-f]{64}$/.test(initialProtocolEvidence?.manifestSha256 ?? "")) {
     throw new Error("Release preflight protocol manifest SHA-256 is invalid");
+  }
+  // Check this independently before commands can rebuild artifacts or local compilers.
+  const initialReceiveEvidence = await receiveArtifactInspector({ root, requireProduction: true });
+  if (
+    initialReceiveEvidence?.status !== "production" ||
+    !/^[0-9a-f]{64}$/u.test(initialReceiveEvidence?.manifestSha256 ?? "")
+  ) {
+    throw new Error("Release preflight requires production receive presentation evidence");
   }
   // Refuse an unreviewed artifact set before inspecting or building any local compiler.
   const initialZkEvidence = inspectZkReleaseArtifacts({
@@ -246,6 +263,14 @@ export const runReleasePreflight = async ({
       mpcMetadataReader,
       expectedProductionPhase1,
     });
+    const receiveVerification = await receiveCeremonyVerifier({ root, env: baseEnvironment });
+    if (
+      receiveVerification?.verification !== "passed" ||
+      receiveVerification?.manifestSha256 !== initialReceiveEvidence.manifestSha256
+    )
+      throw new Error(
+        "Release preflight requires independent receive ceremony verification for its exact production manifest",
+      );
 
     const finishedCommit = assertCleanGitState({
       root,
@@ -273,6 +298,13 @@ export const runReleasePreflight = async ({
     if (finalProtocolEvidence.manifestSha256 !== initialProtocolEvidence.manifestSha256) {
       throw new Error("Protocol release manifest changed while release preflight was running");
     }
+    const finalReceiveEvidence = await receiveArtifactInspector({ root, requireProduction: true });
+    if (
+      finalReceiveEvidence?.status !== "production" ||
+      finalReceiveEvidence?.manifestSha256 !== initialReceiveEvidence.manifestSha256
+    ) {
+      throw new Error("Receive presentation manifest changed while release preflight was running");
+    }
 
     return Object.freeze({
       status: "passed",
@@ -284,6 +316,7 @@ export const runReleasePreflight = async ({
       zkManifestSha256: finalZkEvidence.manifestSha256,
       zkTranscriptSha256: ceremonyVerification.transcriptSha256,
       protocolManifestSha256: finalProtocolEvidence.manifestSha256,
+      receiveManifestSha256: finalReceiveEvidence.manifestSha256,
       ptauSha256: ceremonyVerification.ptau.sha256,
       checks: commands.map(([executable, args]) => `${executable} ${args.join(" ")}`),
     });

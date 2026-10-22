@@ -3,7 +3,7 @@ import {
   MAINNET_TRANSACTION_LABELS,
 } from "./mainnetReleaseSafety.mjs";
 import { MAINNET_DEPLOYMENT_NONCE_OFFSETS } from "./protocolDeploymentProjection.mjs";
-import { SHIELDED_DEPLOYMENT_CIRCUITS } from "./zkDeploymentCatalog.mjs";
+import { SHIELDED_DEPLOYMENT_CIRCUITS, RECEIVE_DEPLOYMENT_CONTRACTS, receiveDeploymentConstructorArgs } from "./zkDeploymentCatalog.mjs";
 
 const PERSON_RELATION_CIRCUIT_ID = 1;
 const DISCLOSURE_BINDING_CIRCUIT_ID = 1;
@@ -126,6 +126,7 @@ export const buildMainnetReleaseIntents = async ({
     "PoseidonT6",
     "DeepFamilyLineageIndex",
     ...Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => spec.verifierContractName),
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => contractName),
     "ShieldedErc20Pool",
     "ShieldedNativePool",
     "ShieldedPoolFactory",
@@ -287,6 +288,11 @@ export const buildMainnetReleaseIntents = async ({
     addresses.deepFamilyProxy,
     deepFamilyInterface.encodeFunctionData("setLineageIndex", [addresses.deepFamilyLineageIndex]),
   );
+  const receiveAddresses = { ...addresses, deepFamily: addresses.deepFamilyProxy };
+  for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
+    if (property === "privateLetterArchive") continue;
+    await pushDeployment(property, contractName, receiveDeploymentConstructorArgs(property, receiveAddresses));
+  }
   const nativePoolBytecode = linkBytecode({
     ethers,
     artifact: artifact.ShieldedNativePool,
@@ -295,7 +301,8 @@ export const buildMainnetReleaseIntents = async ({
   await pushDeployment(
     "shieldedNativePool",
     "ShieldedNativePool",
-    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+    [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
+      addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
     nativePoolBytecode,
   );
   const factoryBytecode = linkBytecode({
@@ -311,9 +318,12 @@ export const buildMainnetReleaseIntents = async ({
       addresses.deepFamilyLineageIndex,
       addresses.groth16VerifierAdapter,
       addresses.shieldedNativePool,
+      addresses.identityAuthorizationState,
+      addresses.receivePresentationVerifierRouter,
     ],
     factoryBytecode,
   );
+  await pushDeployment("privateLetterArchive", "PrivateLetterArchive", receiveDeploymentConstructorArgs("privateLetterArchive", receiveAddresses));
   pushCall(
     "transferDeepFamilyOwnership",
     addresses.deepFamilyProxy,

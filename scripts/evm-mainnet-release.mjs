@@ -17,6 +17,8 @@ import { deployIntegratedSystem } from "../hardhat/integratedDeployment.mjs";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+  receiveDeploymentConstructorArgs,
   integratedDeploymentAddresses,
 } from "./lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
@@ -666,6 +668,7 @@ const assertProtocolTerminalState = async ({
   await assertShieldedDeploymentBindings({
     deployed: {
       ...deployed,
+      ...Object.fromEntries(await Promise.all(RECEIVE_DEPLOYMENT_CONTRACTS.map(async ({contractName, property}) => [property, await ethers.getContractAt(contractName, addresses[property])]))),
       lineageIndex,
       shieldedErc20Pool: await ethers.getContractAt(
         "ShieldedErc20Pool",
@@ -1524,18 +1527,22 @@ export const main = async (chainProfile) => {
           ),
         ),
       )),
+      ...(await Promise.all(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) =>
+        verificationEntry(hre.artifacts, contractName, addresses[property], receiveDeploymentConstructorArgs(property, addresses))))),
       await verificationEntry(
         hre.artifacts,
         "ShieldedErc20Pool",
         addresses.shieldedErc20Pool,
-        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
         { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
         hre.artifacts,
         "ShieldedNativePool",
         addresses.shieldedNativePool,
-        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter],
+        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
         { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
@@ -1547,6 +1554,8 @@ export const main = async (chainProfile) => {
           addresses.deepFamilyLineageIndex,
           addresses.groth16VerifierAdapter,
           addresses.shieldedNativePool,
+          addresses.identityAuthorizationState,
+          addresses.receivePresentationVerifierRouter,
         ],
         { PoseidonT3: addresses.poseidonT3 },
       ),

@@ -23,6 +23,11 @@ import {
 } from "@deepfamily/protocol-core";
 import { buildShieldedClaimFixture } from "./generate_shielded_claim_input.mjs";
 import { assertConstraintViolation } from "./constraint_assertions.mjs";
+import {
+  CLAIM_PRIVATE_BUDGET_PURPOSE,
+  FUND_PRIVATE_BUDGET_PURPOSE,
+  shieldedFixtureViewingKey,
+} from "./shielded_budget_fixture.mjs";
 
 import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
 
@@ -40,6 +45,32 @@ function fullSyntheticPath(leaf, depth, index, siblingSeed) {
         : poseidon2([root, sibling]);
   }
   return { root, siblings, index: index.toString(), depth: depth.toString() };
+}
+
+function withPrivateClaimOutput(fixture, witness, purpose = CLAIM_PRIVATE_BUDGET_PURPOSE) {
+  const changed = structuredClone(witness);
+  const scoped = (tag) => shieldedFixtureTag(tag, changed.chainId, changed.pool);
+  changed.outputCommitments[0] = String(
+    poseidon8([
+      scoped(purpose),
+      fixture.policy,
+      fixture.enrollment,
+      poseidon5([
+        scoped(1033n),
+        fixture.ownerCommitment,
+        BigInt(changed.keyMode),
+        BigInt(changed.heirViewKeyLo),
+        BigInt(changed.heirViewKeyHi),
+      ]),
+      BigInt(changed.rate),
+      BigInt(changed.remaining) +
+        BigInt(changed.secondRemaining) -
+        BigInt(changed.claimCount) * BigInt(changed.rate),
+      BigInt(changed.newBudgetNonce),
+      BigInt(changed.ciphertextHashes[0]),
+    ]),
+  );
+  return changed;
 }
 
 test("shielded claim constraints", async (t) => {
@@ -77,6 +108,75 @@ test("shielded claim constraints", async (t) => {
       change(copy);
       return copy;
     };
+
+    await t.test(
+      "private claims accept both producer origins and always produce Claim notes",
+      async () => {
+        for (const keyMode of [0, 1]) {
+          for (const budgetOrigin of ["fund", "claim"]) {
+            for (const secondBudgetOrigin of ["fund", "claim"]) {
+              const fixture = buildShieldedClaimFixture({
+                keyMode,
+                budgetOrigin,
+                secondBudgetOrigin,
+                secondRemainingPeriods: 2,
+              });
+              await valid(fixture.witness);
+              for (const slot of [0, 1]) {
+                await invalid(
+                  mutate(fixture.witness, (w) => {
+                    w.inputBudgetIsClaim[slot] = w.inputBudgetIsClaim[slot] === "1" ? "0" : "1";
+                  }),
+                );
+                await invalid(
+                  mutate(fixture.witness, (w) => {
+                    w.inputBudgetIsClaim[slot] = "2";
+                  }),
+                );
+              }
+              await invalid(
+                withPrivateClaimOutput(fixture, fixture.witness, FUND_PRIVATE_BUDGET_PURPOSE),
+              );
+            }
+            const fixture = buildShieldedClaimFixture({ keyMode, budgetOrigin });
+            await valid(fixture.witness);
+            for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
+              await invalid(
+                withPrivateClaimOutput(fixture, {
+                  ...fixture.witness,
+                  [limb]: String(BigInt(fixture.witness[limb]) ^ 1n),
+                }),
+              );
+            }
+          }
+          const differentView = shieldedFixtureViewingKey(keyMode);
+          differentView[0] ^= 1;
+          await invalid(
+            buildShieldedClaimFixture({
+              keyMode,
+              secondRemainingPeriods: 2,
+              secondViewingKey: differentView,
+            }).witness,
+          );
+        }
+        const absent = buildShieldedClaimFixture().witness;
+        await invalid({ ...absent, inputBudgetIsClaim: ["0", "1"] });
+        const identity = buildShieldedClaimFixture({
+          budgetKind: 1,
+          secondRemainingPeriods: 2,
+        }).witness;
+        for (const slot of [0, 1]) {
+          await invalid(
+            mutate(identity, (w) => {
+              w.inputBudgetIsClaim[slot] = "1";
+            }),
+          );
+        }
+        for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
+          await invalid({ ...identity, [limb]: "1" });
+        }
+      },
+    );
 
     await t.test("same-binding claims enforce chain and pool domains", async () => {
       for (const budgetKind of [0, 1]) {
@@ -328,13 +428,18 @@ test("shielded claim constraints", async (t) => {
                       {
                         heirOwnerCommitment: fixture.ownerCommitment,
                         keyMode,
+                        viewingKey: fixture.viewingKey,
                       },
                       scope,
                     );
               // Recompute a valid opposite-kind output, so rejection tests the
               // output binding rather than a stale hash or an invalid input pair.
               w.outputCommitments[0] = poseidon8([
-                shieldedFixtureTag(budgetKind === 0 ? 1030n : 1015n, w.chainId, w.pool),
+                shieldedFixtureTag(
+                  budgetKind === 0 ? 1030n : CLAIM_PRIVATE_BUDGET_PURPOSE,
+                  w.chainId,
+                  w.pool,
+                ),
                 fixture.policy,
                 fixture.enrollment,
                 binding,
@@ -389,6 +494,8 @@ test("shielded claim constraints", async (t) => {
             policyCommitment: policy,
             enrollmentCommitment: enrollment,
             heirOwnerCommitment: fixture.ownerCommitment,
+            viewingKey: fixture.viewingKey,
+            budgetOrigin: fixture.budgetOrigin,
             amountPerPeriod: witness.rate,
             remaining: witness.remaining,
             nonce: witness.budgetNonce,
@@ -525,6 +632,8 @@ test("shielded claim constraints", async (t) => {
                 policyCommitment: fixture.policy,
                 enrollmentCommitment: fixture.enrollment,
                 heirOwnerCommitment: fixture.ownerCommitment,
+                viewingKey: fixture.viewingKey,
+                budgetOrigin: "claim",
                 amountPerPeriod: w.rate,
                 remaining: 2n * BigInt(w.remaining) - BigInt(w.claimCount) * BigInt(w.rate),
                 nonce: w.newBudgetNonce,
@@ -539,6 +648,8 @@ test("shielded claim constraints", async (t) => {
             policyCommitment: fixture.policy,
             enrollmentCommitment: fixture.enrollment + 1n,
             heirOwnerCommitment: fixture.ownerCommitment,
+            viewingKey: fixture.viewingKey,
+            budgetOrigin: fixture.budgetOrigin,
             amountPerPeriod: fixture.witness.rate,
             remaining: fixture.witness.secondRemaining,
             nonce: fixture.witness.secondBudgetNonce,

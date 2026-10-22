@@ -17,6 +17,13 @@ const dataFor = (overrides = {}) => ({
   lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
+  receiveAuthorizations: Array.from({ length: 2 }, () => ({
+    checkpointId: 0n,
+    asOf: 0n,
+    expiresAt: 0n,
+    recipientBinding: 0n,
+    proof: "0x",
+  })),
   ...overrides,
 });
 
@@ -55,6 +62,11 @@ async function setup({ native = false, precision = 18 } = {}) {
   const token = await hre.ethers.deployContract("ShieldedPoolBehaviorTokenMock", [precision]);
   const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
   const verifier = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
+  const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
+  const authorizationState = await hre.ethers.deployContract("IdentityAuthorizationState", [
+    await counterVerifier.getAddress(),
+  ]);
+  const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
   const poseidon = await hre.ethers.deployContract("PoseidonT3");
   await Promise.all([token, lineage, verifier, poseidon].map((c) => c.waitForDeployment()));
   const libraries = { PoseidonT3: await poseidon.getAddress() };
@@ -64,7 +76,12 @@ async function setup({ native = false, precision = 18 } = {}) {
       libraries,
     },
   );
-  const args = [await lineage.getAddress(), await verifier.getAddress()];
+  const args = [
+    await lineage.getAddress(),
+    await verifier.getAddress(),
+    await authorizationState.getAddress(),
+    await receiveVerifier.getAddress(),
+  ];
   const pool = await Pool.deploy(...(native ? args : [await token.getAddress(), ...args]));
   await pool.waitForDeployment();
   await token.mint(depositor.address, 1000n);
@@ -89,6 +106,8 @@ async function setup({ native = false, precision = 18 } = {}) {
     lineage,
     verifier,
     libraries,
+    authorizationState,
+    receiveVerifier,
     depositor,
     recipient,
     other,
@@ -318,6 +337,8 @@ describe("immutable multi-asset shielded pool boundaries", function () {
       await token.getAddress(),
       await lineage.getAddress(),
       await verifier.getAddress(),
+      await pool.AUTHORIZATION_STATE(),
+      await pool.RECEIVE_VERIFIER(),
     );
     await other.waitForDeployment();
     const data = dataFor();
@@ -348,6 +369,8 @@ describe("immutable multi-asset shielded pool boundaries", function () {
       await lineage.getAddress(),
       await verifier.getAddress(),
       await nativePool.getAddress(),
+      await nativePool.AUTHORIZATION_STATE(),
+      await nativePool.RECEIVE_VERIFIER(),
     );
     await factory.waitForDeployment();
     const factoryAddress = await factory.getAddress();
@@ -427,6 +450,8 @@ describe("immutable multi-asset shielded pool boundaries", function () {
         await lineage.getAddress(),
         await verifier.getAddress(),
         await pool.getAddress(),
+        await pool.AUTHORIZATION_STATE(),
+        await pool.RECEIVE_VERIFIER(),
       ),
     ).to.be.revertedWithCustomError(Factory, "InvalidNativePool");
     const Native = await hre.ethers.getContractFactory("ShieldedNativePool", { libraries });
@@ -435,6 +460,8 @@ describe("immutable multi-asset shielded pool boundaries", function () {
     const native = await Native.deploy(
       await otherLineage.getAddress(),
       await verifier.getAddress(),
+      await pool.AUTHORIZATION_STATE(),
+      await pool.RECEIVE_VERIFIER(),
     );
     await native.waitForDeployment();
     await expect(
@@ -443,8 +470,50 @@ describe("immutable multi-asset shielded pool boundaries", function () {
         await lineage.getAddress(),
         await verifier.getAddress(),
         await native.getAddress(),
+        await pool.AUTHORIZATION_STATE(),
+        await pool.RECEIVE_VERIFIER(),
       ),
     ).to.be.revertedWithCustomError(Factory, "InvalidNativePool");
+  });
+
+  it("requires the native pool and every new asset pool to use the factory's shared receive authorization", async function () {
+    const { pool, token, lineage, verifier, libraries, authorizationState, receiveVerifier } =
+      await setup({ native: true });
+    const Factory = await hre.ethers.getContractFactory("ShieldedPoolFactory", { libraries });
+    const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
+    const otherState = await hre.ethers.deployContract("IdentityAuthorizationState", [
+      await counterVerifier.getAddress(),
+    ]);
+    const otherVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
+    const args = [
+      await token.getAddress(),
+      await lineage.getAddress(),
+      await verifier.getAddress(),
+      await pool.getAddress(),
+    ];
+    for (const [state, receive] of [
+      [otherState, receiveVerifier],
+      [authorizationState, otherVerifier],
+    ]) {
+      await expect(
+        Factory.deploy(...args, await state.getAddress(), await receive.getAddress()),
+      ).to.be.revertedWithCustomError(Factory, "InvalidNativePool");
+    }
+    const factory = await Factory.deploy(
+      ...args,
+      await authorizationState.getAddress(),
+      await receiveVerifier.getAddress(),
+    );
+    const asset = await hre.ethers.deployContract("ShieldedPoolBehaviorTokenMock", [6]);
+    await factory.createPool(await asset.getAddress());
+    for (const assetAddress of [await token.getAddress(), await asset.getAddress()]) {
+      const canonical = await hre.ethers.getContractAt(
+        "ShieldedErc20Pool",
+        await factory.poolFor(assetAddress),
+      );
+      expect(await canonical.AUTHORIZATION_STATE()).to.equal(await authorizationState.getAddress());
+      expect(await canonical.RECEIVE_VERIFIER()).to.equal(await receiveVerifier.getAddress());
+    }
   });
 });
 

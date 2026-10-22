@@ -25,7 +25,11 @@ import {
   generateShieldedRandomField,
 } from "../index.js";
 
-const scope = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
+const scope = {
+  viewingKey: "0x" + "11".repeat(32),
+  chainId: 1030n,
+  poolAddress: "0x0000000000000000000000000000000000000001",
+};
 
 const P = 30n * SECONDS_PER_DAY;
 const VECTOR_CIPHERTEXT = Uint8Array.from(
@@ -108,7 +112,7 @@ test("shielded commitments and nullifiers match pinned protocol vectors", () => 
   );
   assert.equal(
     budgetNoteCommitment,
-    5347599895760436060338338506938845085749347444235421046400909311362806853045n,
+    8677252488518708734412607399047591932143936940622532647441806194094004714141n,
   );
   assert.equal(
     computeShieldedSpendNullifier(
@@ -118,7 +122,7 @@ test("shielded commitments and nullifiers match pinned protocol vectors", () => 
       },
       scope,
     ),
-    7844082452355350277252491886078821271073756696331124077899025380648126590105n,
+    2931913645951887879655669487034680383336274207783197865551507234355954196963n,
   );
   assert.equal(
     computeShieldedPeriodNullifier(
@@ -136,7 +140,7 @@ test("shielded commitments and nullifiers match pinned protocol vectors", () => 
       },
       scope,
     ),
-    8773002232470207682159429712790465852446147794052231683689378023286765941125n,
+    9388639045561649693276688503623875880794024598949127286330150510061686307238n,
   );
   assert.equal(
     computeShieldedDummyInputNullifier(
@@ -146,7 +150,7 @@ test("shielded commitments and nullifiers match pinned protocol vectors", () => 
       },
       scope,
     ),
-    11208185864999592450706829322714951182004295485039812429452113385134410021499n,
+    20310513605463317570622464136451119051464174105549227346962476247326577534631n,
   );
   assert.equal(
     computeShieldedEnrollmentNullifier(

@@ -15,13 +15,28 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
   address public immutable LINEAGE_INDEX;
   address public immutable VERIFIER;
   address public immutable NATIVE_POOL;
+  address public immutable AUTHORIZATION_STATE;
+  address public immutable RECEIVE_VERIFIER;
   mapping(address asset => address pool) public poolFor;
   uint256 public poolCount;
 
   event PoolCreated(address indexed asset, address indexed pool);
 
-  constructor(address deepToken, address lineageIndex, address verifier, address nativePool) {
-    if (deepToken.code.length == 0 || lineageIndex.code.length == 0 || verifier.code.length == 0) {
+  constructor(
+    address deepToken,
+    address lineageIndex,
+    address verifier,
+    address nativePool,
+    address authorizationState,
+    address receiveVerifier
+  ) {
+    if (
+      deepToken.code.length == 0 ||
+      lineageIndex.code.length == 0 ||
+      verifier.code.length == 0 ||
+      authorizationState.code.length == 0 ||
+      receiveVerifier.code.length == 0
+    ) {
       revert InvalidConstructorAddress();
     }
     if (nativePool.code.length == 0) revert InvalidNativePool();
@@ -30,12 +45,16 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
       nativeConfiguration.assetKind() != 1 ||
       nativeConfiguration.protocolVersion() != 1 ||
       nativeConfiguration.LINEAGE_INDEX() != lineageIndex ||
-      nativeConfiguration.VERIFIER() != verifier
+      nativeConfiguration.VERIFIER() != verifier ||
+      nativeConfiguration.AUTHORIZATION_STATE() != authorizationState ||
+      nativeConfiguration.RECEIVE_VERIFIER() != receiveVerifier
     ) revert InvalidNativePool();
     DEEP_TOKEN = deepToken;
     LINEAGE_INDEX = lineageIndex;
     VERIFIER = verifier;
     NATIVE_POOL = nativePool;
+    AUTHORIZATION_STATE = authorizationState;
+    RECEIVE_VERIFIER = receiveVerifier;
     poolFor[address(0)] = nativePool;
     poolCount = 1;
     emit PoolCreated(address(0), nativePool);
@@ -50,7 +69,9 @@ contract ShieldedPoolFactory is ReentrancyGuardTransient {
   }
 
   function _createPool(address token) private returns (address pool) {
-    pool = address(new ShieldedErc20Pool(token, LINEAGE_INDEX, VERIFIER));
+    pool = address(
+      new ShieldedErc20Pool(token, LINEAGE_INDEX, VERIFIER, AUTHORIZATION_STATE, RECEIVE_VERIFIER)
+    );
     poolFor[token] = pool;
     ++poolCount;
     emit PoolCreated(token, pool);

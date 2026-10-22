@@ -1,24 +1,29 @@
 import {
   IDENTITY_SUITE_CANDIDATE_1,
-  buildShieldedReceiveCodePublicSignals,
+  buildShieldedReceiveCredentialPublicSignals,
+  computeShieldedAuthorizationAlias,
   computeShieldedOwnerCommitment,
-  computeShieldedReceiveCodeFingerprint,
+  computeShieldedReceiveCredentialFingerprint,
   canonicalizeFullName,
   computeIdentityFromDerivedSecret,
-  decodeShieldedReceiveCode,
+  decodeShieldedReceiveCredential,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
-  encodeShieldedReceiveCode,
+  encodeShieldedReceiveCredential,
   wipeBytes,
+  getShieldedIdentityAuthorizationWitness,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
+  type ShieldedReceiveCodeProof,
 } from "@deepfamily/protocol-core";
-import { hexlify, getBigInt, getBytes, type BigNumberish } from "ethers";
+import { JsonRpcProvider, hexlify, getBigInt, getBytes, type BigNumberish } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
 import * as snarkjs from "snarkjs";
 import { getFundingPassphraseError } from "../crypto/passphraseStrength";
-import { generateShieldedProof, SHIELDED_RECEIVE_CODE_VERIFICATION_KEY } from "./shieldedZk";
+import { createIdentityAuthorizationContract, loadShieldedIdentityAuthorizationState } from "../clients/shieldedIdentityAuthorizationChain";
+import { createShieldedPoolFactoryContract } from "../clients/contractFactory";
+import { generateShieldedProof, SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS } from "./shieldedZk";
 
 /** The identity material a receive-code proof needs; it stays inside the ZK worker. */
 export type ShieldedReceiveCodeIdentity = {
@@ -27,15 +32,22 @@ export type ShieldedReceiveCodeIdentity = {
   derivedSecretField: string | bigint;
   keyMode: 0 | 1;
   keyMaterial: { ownerSecret: BigNumberish; ownerCommitment: BigNumberish; hpkeIkm: string };
+  disclosure?: "anonymous" | "fund";
+  authorizationCounter: BigNumberish;
+  expiresAt: BigNumberish;
 };
 
 export type ShieldedReceiveCodeCheck =
   | {
       ok: true;
-      identityCommitment: string;
+      identityCommitment?: string;
+      disclosure: "anonymous" | "fund";
+      authorizationAlias: string;
+      authorizationCounter: string;
+      expiresAt: string;
       ownerCommitment: string;
       viewingKey: string;
-      personHash: string;
+      personHash?: string;
       keyMode: 0 | 1;
       identitySuiteId: number;
       independentKeySuiteId: number;
@@ -69,25 +81,33 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
   )
     throw new Error("Identity receive mode requires canonical identity keys");
   const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const publicSignals = buildShieldedReceiveCodePublicSignals({
-    identityCommitment: material.identityCommitment,
+  const disclosure = input.disclosure ?? "anonymous";
+  const statement = {
+    disclosure,
+    authorizationAlias: computeShieldedAuthorizationAlias(material),
+    authorizationCounter: input.authorizationCounter,
+    expiresAt: input.expiresAt,
+    ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
     ownerCommitment: keys.ownerCommitment,
     viewingKey,
     keyMode,
     identitySuiteId: material.identitySuiteId,
-  });
+  };
+  const publicSignals = buildShieldedReceiveCredentialPublicSignals(statement);
   const { proof } = await generateShieldedProof({
-    circuit: "receiveCode",
+    circuit: disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential",
     witness: {
-      identityCommitment: publicSignals[0].toString(),
-      ownerCommitment: publicSignals[1].toString(),
-      viewKeyLo: publicSignals[2].toString(),
-      viewKeyHi: publicSignals[3].toString(),
-      keyMode: publicSignals[4].toString(),
-      identitySuiteId: publicSignals[5].toString(),
-      independentKeySuiteId: publicSignals[6].toString(),
-      independentKeyDerivationVersion: publicSignals[7].toString(),
-      receiveCodeVersion: publicSignals[8].toString(),
+      identityCommitment: String(material.identityCommitment),
+      authorizationCounter: String(input.authorizationCounter),
+      expiresAt: String(input.expiresAt),
+      ownerCommitment: String(keys.ownerCommitment),
+      viewKeyLo: String(publicSignals[disclosure === "fund" ? 5 : 4]),
+      viewKeyHi: String(publicSignals[disclosure === "fund" ? 6 : 5]),
+      keyMode,
+      identitySuiteId: material.identitySuiteId,
+      independentKeySuiteId: 1,
+      independentKeyDerivationVersion: 1,
+      receiveCodeVersion: 2,
       spendingSecret: keys.ownerSecret.toString(),
       nameField: material.nameField.toString(),
       derivedSecretField: material.derivedSecretField.toString(),
@@ -101,22 +121,9 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
     expectedPublicSignals: publicSignals.map(String),
   });
   return {
-    code: encodeShieldedReceiveCode({
-      identityCommitment: material.identityCommitment,
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey,
-      keyMode,
-      identitySuiteId: material.identitySuiteId,
-      proof,
-    }),
+    code: encodeShieldedReceiveCredential({ ...statement, proof: proof as unknown as ShieldedReceiveCodeProof }),
     personHash: material.personHash,
-    fingerprint: computeShieldedReceiveCodeFingerprint({
-      identityCommitment: material.identityCommitment,
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey,
-      keyMode,
-      identitySuiteId: material.identitySuiteId,
-    }),
+    fingerprint: computeShieldedReceiveCredentialFingerprint(statement),
   };
 }
 
@@ -127,6 +134,9 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
 export async function createShieldedReceiveCodeFromCredentials(input: {
   identity: IdentityFields;
   rawPassphrase: string;
+  disclosure?: "anonymous" | "fund";
+  context: { rpcUrl: string; chainId: string; factoryAddress: string };
+  expiresAt: BigNumberish;
 }) {
   const passphraseError = getFundingPassphraseError(input.rawPassphrase);
   if (passphraseError) throw new Error(`Funding passphrase rejected: ${passphraseError}`);
@@ -139,11 +149,21 @@ export async function createShieldedReceiveCodeFromCredentials(input: {
     });
     // The remaining proof needs the derived material, never the raw credential.
     input.rawPassphrase = "";
+    const provider = new JsonRpcProvider(input.context.rpcUrl);
+    try {
+    if ((await provider.getNetwork()).chainId !== BigInt(input.context.chainId)) throw new Error("Receive code chain mismatch");
+    const factory = createShieldedPoolFactoryContract(input.context.factoryAddress, provider);
+    const state = await loadShieldedIdentityAuthorizationState(createIdentityAuthorizationContract(await factory.AUTHORIZATION_STATE(), provider));
+    const alias = computeShieldedAuthorizationAlias(material);
     return await createShieldedReceiveCode({
       ...material,
       keyMode: 0,
+      disclosure: input.disclosure,
+      authorizationCounter: getShieldedIdentityAuthorizationWitness(state.state, alias).authorizationCounter,
+      expiresAt: input.expiresAt,
       keyMaterial: deriveShieldedHeirKeyMaterial(material.derivedSecretField),
     });
+    } finally { provider.destroy(); }
   } catch {
     // Library failures can embed normalized/encoded credentials or witnesses.
     throw new Error("Receive code could not be created");
@@ -175,17 +195,17 @@ export async function isInG2Subgroup(pi_b: readonly (readonly string[])[]) {
 export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedReceiveCodeCheck> {
   let decoded;
   try {
-    decoded = decodeShieldedReceiveCode(code);
+    decoded = decodeShieldedReceiveCredential(code);
   } catch (cause) {
     const malformed =
-      (cause as { code?: string } | null)?.code === "INVALID_SHIELDED_RECEIVE_CODE_ENCODING";
+      (cause as { code?: string } | null)?.code === "INVALID_SHIELDED_RECEIVE_CREDENTIAL_ENCODING";
     return { ok: false, reason: malformed ? "malformed" : "invalid" };
   }
   try {
     const verified =
       (await isInG2Subgroup(decoded.proof.pi_b)) &&
       (await snarkjs.groth16.verify(
-        SHIELDED_RECEIVE_CODE_VERIFICATION_KEY,
+        SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS[decoded.disclosure],
         decoded.publicSignals.map(String),
         decoded.proof,
       ));
@@ -195,10 +215,14 @@ export async function verifyShieldedReceiveCode(code: string): Promise<ShieldedR
   }
   return {
     ok: true,
-    identityCommitment: decoded.identityCommitment.toString(),
+    disclosure: decoded.disclosure,
+    authorizationAlias: String(decoded.authorizationAlias),
+    authorizationCounter: String(decoded.authorizationCounter),
+    expiresAt: String(decoded.expiresAt),
+    ...(decoded.identityCommitment === undefined ? {} : { identityCommitment: String(decoded.identityCommitment) }),
     ownerCommitment: decoded.ownerCommitment.toString(),
     viewingKey: hexlify(decoded.viewingKey),
-    personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment),
+    ...(decoded.identityCommitment === undefined ? {} : { personHash: wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) }),
     keyMode: decoded.keyMode as 0 | 1,
     identitySuiteId: decoded.identitySuiteId,
     independentKeySuiteId: decoded.independentKeySuiteId,

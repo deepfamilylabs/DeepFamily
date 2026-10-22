@@ -132,6 +132,20 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
                 cwd: resolvedRoot,
               });
             })),
+    ...(circuit === "all"
+      ? [
+          Object.freeze({
+            circuit: "receive",
+            check: "current-artifacts-and-proof-smoke",
+            executable: process.execPath,
+            args: Object.freeze([
+              path.join(resolvedRoot, "scripts", "receive-proof-smoke.mjs"),
+              "--current",
+            ]),
+            cwd: resolvedRoot,
+          }),
+        ]
+      : []),
   ]);
 };
 
@@ -156,8 +170,9 @@ const printUsage = () => {
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
 Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
-all six development artifact sets and proves fund/claim when no production manifest exists;
-with a production manifest it verifies production artifacts and ceremony. Default: --circuit all.`);
+all configured development artifact sets and proves fund/claim when no production manifest exists;
+with a production manifest it verifies production artifacts and ceremony. The default --circuit all
+also proves receive presentations with the current parameters, without generating new keys.`);
 };
 
 export const main = (argv = process.argv.slice(2)) => {

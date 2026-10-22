@@ -53,7 +53,7 @@ export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUI
   assert.deepEqual(
     Object.keys(manifest.circuits ?? {}).sort(),
     Object.keys(SHIELDED_CIRCUITS).sort(),
-    "Development manifest must cover all six shielded circuits",
+    "Development manifest must cover all configured shielded circuits",
   );
   for (const action of actions) {
     const source = SHIELDED_CIRCUITS[action];

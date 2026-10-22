@@ -22,17 +22,20 @@ describe("shielded proof public inputs", () => {
   it("checks each circuit against its own public-signal count", () => {
     for (const [circuit, count] of [
       ["receiveCode", 9],
+      ["anonymousReceiveCredential", 11],
+      ["fundReceiveCredential", 12],
+      ["identityAuthorizationUpdate", 8],
       ["shield", 7],
-      ["fund", 27],
+      ["fund", 29],
       ["claim", 27],
-      ["privateTransfer", 30],
+      ["privateTransfer", 32],
       ["unshield", 32],
     ] as const) {
       expect(() =>
         assertShieldedPublicSignals(circuit, Array(count).fill("0"), Array(count).fill("0")),
       ).not.toThrow();
       expect(() =>
-        assertShieldedPublicSignals(circuit, Array(12).fill("0"), Array(count).fill("0")),
+        assertShieldedPublicSignals(circuit, Array(count - 1).fill("0"), Array(count).fill("0")),
       ).toThrow(`${count} public signals`);
     }
   });

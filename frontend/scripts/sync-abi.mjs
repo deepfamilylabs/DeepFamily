@@ -77,6 +77,8 @@ export async function main() {
     "ShieldedErc20Pool",
     "ShieldedNativePool",
     "ShieldedPoolFactory",
+    "IdentityAuthorizationState",
+    "PrivateLetterArchive",
   ]) {
     await syncAbi(contractName);
   }

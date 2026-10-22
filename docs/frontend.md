@@ -568,7 +568,7 @@ npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks all 8 circuit artifacts (2 identity and 6 shielded), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks the complete ZK artifact bundle (11 Circom circuits and three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
 
 ### Inside `frontend/`
 

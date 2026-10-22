@@ -23,13 +23,14 @@ import {
 } from "./lib/snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
 import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
+import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
 
 const usage = () => {
   console.log(`Usage:
   npm run zk:ceremony:verify
   npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
 
-The command is read-only. It verifies both core and all six shielded production circuits,
+The command is read-only. It verifies both core and all configured shielded production circuits,
 including artifact hashes, the Powers of Tau transcript, and each final zkey's binding to its
 frozen R1CS. With no --ptau option it uses the file selected by ZK_PTAU_PATH, or the committed
 circuits/ptau file.`);
@@ -313,7 +314,24 @@ export const verifyAllProductionCeremonies = async ({
   ptauPath,
   coreVerifier = verifyProductionCeremony,
   shieldedVerifier = verifyShieldedProductionCeremony,
+  receiveInspector,
 } = {}) => {
+  // Every production protocol deployment includes the presentation verifiers.
+  // Circom ceremony evidence cannot establish the trust of their gnark keys.
+  if (typeof receiveInspector !== "function") {
+    throw new Error("Receive production setup and independent verification are not provided");
+  }
+  const receive = await receiveInspector({ root, requireProduction: true });
+  if (
+    receive?.status !== "production" ||
+    receive?.verification !== "passed" ||
+    receive?.circuitCount !== 3 ||
+    !/^[0-9a-f]{64}$/u.test(receive?.manifestSha256 ?? "")
+  ) {
+    throw new Error(
+      "Production ceremony verification requires independently verified production receive presentation evidence",
+    );
+  }
   const core = await coreVerifier({ root, ptauPath });
   const expectedCoreCircuits = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
@@ -323,10 +341,16 @@ export const verifyAllProductionCeremonies = async ({
     throw new Error("Core production ceremony verification must cover both circuits");
   }
   const shielded = await shieldedVerifier({ root, ptauPath });
-  if (shielded?.circuitCount !== 6) {
-    throw new Error("Shielded production ceremony verification must cover all six circuits");
+  const shieldedCount = Object.keys(SHIELDED_CIRCUITS).length;
+  if (shielded?.circuitCount !== shieldedCount) {
+    throw new Error("Shielded production ceremony verification must cover all configured circuits");
   }
-  return Object.freeze({ core, shielded, circuitCount: expectedCoreCircuits.length + 6 });
+  return Object.freeze({
+    core,
+    shielded,
+    receive,
+    circuitCount: expectedCoreCircuits.length + shieldedCount + receive.circuitCount,
+  });
 };
 
 export const main = async (argv = process.argv.slice(2)) => {

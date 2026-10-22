@@ -2,6 +2,7 @@ import {
   ProtocolError,
   buildShieldedHpkeAad,
   decryptShieldedNote,
+  deriveShieldedViewPublicKey,
   computeShieldedOwnerCommitment,
   computeShieldedSpendNullifier,
   computeShieldedAllocationKeyCommitment,
@@ -15,7 +16,14 @@ import {
   type ShieldedBudgetRuleOpening,
   type ShieldedPolicyDescriptor,
 } from "@deepfamily/protocol-core";
-import { getBytes, getBytesCopy, getBigInt, hexlify, type BigNumberish, type Contract } from "ethers";
+import {
+  getBytes,
+  getBytesCopy,
+  getBigInt,
+  hexlify,
+  type BigNumberish,
+  type Contract,
+} from "ethers";
 import {
   loadShieldedPoolSnapshot,
   type OwnedShieldedNote,
@@ -125,6 +133,7 @@ export async function recoverLocalShieldedWallet(
   try {
     const chainId = (await provider.getNetwork()).chainId;
     const poolAddress = await pool.getAddress();
+    const viewingKey = await deriveShieldedViewPublicKey(hpkeIkm);
     buildShieldedHpkeAad({ chainId, poolAddress });
     const snapshot = await loadShieldedPoolSnapshot(
       pool,
@@ -165,7 +174,7 @@ export async function recoverLocalShieldedWallet(
               ciphertext: event.ciphertext,
               noteCommitment: event.commitment,
             },
-            { chainId, poolAddress },
+            { chainId, poolAddress, viewingKey },
           );
           const note = opened.note;
           if (
@@ -206,6 +215,7 @@ export async function recoverLocalShieldedWallet(
             const budgetPayload = encodeShieldedBudgetNotePayload(note.fundingMemo.budgetNote, {
               chainId,
               poolAddress,
+              viewingKey: note.fundingMemo.viewingKey,
             });
             try {
               verifyShieldedNotePayload(
@@ -214,7 +224,7 @@ export async function recoverLocalShieldedWallet(
                   ciphertext: previousPublicNote.ciphertext,
                   noteCommitment: previousPublicNote.commitment,
                 },
-                { chainId, poolAddress },
+                { chainId, poolAddress, viewingKey: note.fundingMemo.viewingKey },
               );
               fundingTemplates.set(previousPublicNote.commitment, {
                 note: note.fundingMemo.budgetNote,

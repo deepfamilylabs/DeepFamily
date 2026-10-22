@@ -6,6 +6,8 @@ import {
   computeShieldedNoteCommitmentFromPayload,
   getShieldedBudgetCommitments,
   normalizeShieldedKeyMode,
+  normalizeShieldedBudgetOrigin,
+  splitShieldedViewPublicKey,
   computeShieldedCiphertextHashField,
   computeShieldedClaimBatch,
   computeShieldedDummyInputNullifier,
@@ -32,7 +34,10 @@ import type { ShieldedPoolActionData } from "./shieldedPoolFlows";
 import type { LocalShieldedWalletSnapshot } from "./shieldedWalletRecovery";
 import { getLocalShieldedNoteProof } from "./shieldedPoolChain";
 
-import { validateShieldedClaimKeyMaterial, type ShieldedKeyMaterial } from "./shieldedKeyAuthorization";
+import {
+  validateShieldedClaimKeyMaterial,
+  type ShieldedKeyMaterial,
+} from "./shieldedKeyAuthorization";
 
 const MAX_UINT64 = (1n << 64n) - 1n;
 const ZERO_PERIODS = Array<bigint>(12).fill(0n);
@@ -133,7 +138,7 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
   chainId: bigint,
   poolAddress: string,
 ): Promise<ClaimOutput<T>> {
-  const payload = encode(note, { chainId, poolAddress });
+  const payload = encode(note, { chainId, poolAddress, viewingKey });
   let opened: Uint8Array | undefined;
   try {
     const ciphertext = await encryptShieldedNote({
@@ -156,7 +161,7 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
         ciphertext,
         noteCommitment,
       },
-      { chainId, poolAddress },
+      { chainId, poolAddress, viewingKey },
     );
     if (recovered.noteCommitment !== noteCommitment) {
       throw new Error("Locally encrypted claim output does not match its commitment");
@@ -209,6 +214,8 @@ export async function prepareShieldedClaim(
     keyMode,
     material.derivedSecretField,
   );
+  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
+  const scope = { chainId, poolAddress, viewingKey };
   sameWallet(input.wallet, chainId, poolAddress, keys.ownerCommitment, material.identityCommitment);
   if (
     budget.heirIdentityCommitment !== material.identityCommitment ||
@@ -221,7 +228,7 @@ export async function prepareShieldedClaim(
     chainId,
     poolAddress,
   });
-  const budgetPayload = encodeShieldedBudgetNotePayload(budget, { chainId, poolAddress });
+  const budgetPayload = encodeShieldedBudgetNotePayload(budget, scope);
   try {
     verifyShieldedNotePayload(
       {
@@ -229,7 +236,7 @@ export async function prepareShieldedClaim(
         ciphertext: owned.ciphertext,
         noteCommitment: budgetCommitment,
       },
-      { chainId, poolAddress },
+      scope,
     );
   } finally {
     budgetPayload.fill(0);
@@ -292,7 +299,7 @@ export async function prepareShieldedClaim(
         secondBudget.heirOwnerCommitment !== keys.ownerCommitment)
     )
       throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
-    const payload = encodeShieldedBudgetNotePayload(secondBudget, { chainId, poolAddress });
+    const payload = encodeShieldedBudgetNotePayload(secondBudget, scope);
     try {
       verifyShieldedNotePayload(
         {
@@ -300,7 +307,7 @@ export async function prepareShieldedClaim(
           ciphertext: secondOwned.ciphertext,
           noteCommitment: secondCommitment,
         },
-        { chainId, poolAddress },
+        scope,
       );
     } finally {
       payload.fill(0);
@@ -373,6 +380,7 @@ export async function prepareShieldedClaim(
   const ownerBudget = budget.binding !== "identity" ? budget : undefined;
   const budgetOutput: ShieldedBudgetNotePayload = {
     ...budget,
+    ...(budget.binding === "identity" ? {} : { budgetOrigin: 1n, viewingKey }),
     remaining: batch.remaining,
     nonce: generateShieldedRandomField(),
   };
@@ -381,18 +389,15 @@ export async function prepareShieldedClaim(
     amount: batch.amount,
     nonce: generateShieldedRandomField(),
   };
-  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
   const outputs = (await Promise.all([
     encryptOwnOutput(
       budgetOutput,
       encodeShieldedBudgetNotePayload,
       (ciphertextHashField) => {
-        const payload = encodeShieldedBudgetNotePayload(budgetOutput, { chainId, poolAddress });
+        const payload = encodeShieldedBudgetNotePayload(budgetOutput, scope);
         try {
-          return computeShieldedNoteCommitmentFromPayload(
-            { payload, ciphertextHashField },
-            { chainId, poolAddress },
-          ).noteCommitment;
+          return computeShieldedNoteCommitmentFromPayload({ payload, ciphertextHashField }, scope)
+            .noteCommitment;
         } finally {
           payload.fill(0);
         }
@@ -444,6 +449,14 @@ export async function prepareShieldedClaim(
     ...publicInputs,
     budgetKind: budget.binding === "identity" ? "1" : "0",
     keyMode: String(keyMode),
+    heirViewKeyLo: ownerBudget ? String(splitShieldedViewPublicKey(viewingKey).viewKeyLo) : "0",
+    heirViewKeyHi: ownerBudget ? String(splitShieldedViewPublicKey(viewingKey).viewKeyHi) : "0",
+    inputBudgetIsClaim: [
+      ownerBudget ? String(normalizeShieldedBudgetOrigin(ownerBudget.budgetOrigin)) : "0",
+      secondBudget && secondBudget.binding !== "identity"
+        ? String(normalizeShieldedBudgetOrigin(secondBudget.budgetOrigin))
+        : "0",
+    ],
     ownerSecret: String(keys.ownerSecret),
     secondKeyMode: secondBudget ? String(keyMode) : "0",
     secondBudgetKind: secondBudget?.binding === "identity" ? "1" : "0",

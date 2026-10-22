@@ -231,8 +231,10 @@ contract ShieldedPoolRolloverHarness is ShieldedErc20Pool {
   constructor(
     address token,
     address lineageIndex,
-    address verifierAdapter
-  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter) {}
+    address verifierAdapter,
+    address authorizationState,
+    address receiveVerifier
+  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter, authorizationState, receiveVerifier) {}
 
   function seedFullShard() external {
     Shard storage shard = _shards[0];
@@ -253,8 +255,10 @@ contract ShieldedPoolDepthHarness is ShieldedErc20Pool {
   constructor(
     address token,
     address lineageIndex,
-    address verifierAdapter
-  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter) {}
+    address verifierAdapter,
+    address authorizationState,
+    address receiveVerifier
+  ) ShieldedErc20Pool(token, lineageIndex, verifierAdapter, authorizationState, receiveVerifier) {}
 
   function seedSyntheticLeftSubtree(uint256 leftRoot) external {
     Shard storage shard = _shards[0];

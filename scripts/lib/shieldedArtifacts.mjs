@@ -76,7 +76,7 @@ export function loadCandidateArtifacts({
       .sort()
       .join(",") !== expectedActions.join(",")
   ) {
-    throw new Error("Candidate manifest must contain exactly the six shielded circuits");
+    throw new Error("Candidate manifest must contain exactly the configured shielded circuits");
   }
   const circuits = {};
   for (const [action, spec] of Object.entries(SHIELDED_SETUP_CIRCUITS)) {

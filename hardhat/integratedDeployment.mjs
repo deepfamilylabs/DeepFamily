@@ -3,6 +3,8 @@ import path from "node:path";
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
+  receiveDeploymentConstructorArgs,
   integratedDeploymentContract,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 import { assertImplementationMatchesArtifact } from "../tasks/lib/timelockUpgrade.mjs";
@@ -481,6 +483,14 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     shieldedErc20Pool,
     shieldedNativePool,
     shieldedPoolFactory,
+    identityAuthorizationState,
+    identityAuthorizationVerifierAdapter,
+    identityAuthorizationUpdateVerifier,
+    anonymousReceivePresentationVerifier,
+    fundReceivePresentationVerifier,
+    attachedReceivePresentationVerifier,
+    receivePresentationVerifierRouter,
+    privateLetterArchive,
     groth16VerifierAdapter: adapter,
   } = deployed;
   const [tokenAddress, lineageAddress, adapterAddress, nativeAddress, deepPoolAddress] =
@@ -491,6 +501,8 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
       shieldedNativePool.getAddress(),
       shieldedErc20Pool.getAddress(),
     ]);
+  const stateAddress = await identityAuthorizationState.getAddress();
+  const receiveRouterAddress = await receivePresentationVerifierRouter.getAddress();
   for (const [pool, kind, label] of [
     [shieldedErc20Pool, 0n, "ERC20 pool"],
     [shieldedNativePool, 1n, "native pool"],
@@ -498,6 +510,8 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     for (const [value, expected, field] of [
       [await pool.LINEAGE_INDEX(), lineageAddress, "lineage index"],
       [await pool.VERIFIER(), adapterAddress, "verifier adapter"],
+      [await pool.AUTHORIZATION_STATE(), stateAddress, "identity authorization state"],
+      [await pool.RECEIVE_VERIFIER(), receiveRouterAddress, "receive verifier"],
     ]) {
       if (!sameAddress(value, expected))
         throw new Error(`Integrated deployment ${label} ${field} binding mismatch`);
@@ -511,6 +525,17 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     [await shieldedPoolFactory.LINEAGE_INDEX(), lineageAddress, "factory lineage"],
     [await shieldedPoolFactory.VERIFIER(), adapterAddress, "factory verifier"],
     [await shieldedPoolFactory.NATIVE_POOL(), nativeAddress, "factory native pool"],
+    [await shieldedPoolFactory.AUTHORIZATION_STATE(), stateAddress, "factory authorization state"],
+    [await shieldedPoolFactory.RECEIVE_VERIFIER(), receiveRouterAddress, "factory receive verifier"],
+    [await identityAuthorizationState.VERIFIER(), await identityAuthorizationVerifierAdapter.getAddress(), "counter verifier adapter"],
+    [await identityAuthorizationVerifierAdapter.VERIFIER(), await identityAuthorizationUpdateVerifier.getAddress(), "owner authorization verifier"],
+    [await receivePresentationVerifierRouter.ANONYMOUS_VERIFIER(), await anonymousReceivePresentationVerifier.getAddress(), "anonymous receive verifier"],
+    [await receivePresentationVerifierRouter.FUND_VERIFIER(), await fundReceivePresentationVerifier.getAddress(), "Fund receive verifier"],
+    [await privateLetterArchive.AUTHORIZATION_STATE(), stateAddress, "letter authorization state"],
+    [await privateLetterArchive.LETTER_VERIFIER(), await anonymousReceivePresentationVerifier.getAddress(), "letter verifier"],
+    [await privateLetterArchive.ATTACHMENT_VERIFIER(), await attachedReceivePresentationVerifier.getAddress(), "attachment verifier"],
+    [await privateLetterArchive.POOL_FACTORY(), await shieldedPoolFactory.getAddress(), "letter pool factory"],
+    [await privateLetterArchive.DEEP_FAMILY(), await deployed.deepFamily.getAddress(), "letter family"],
     [await shieldedPoolFactory.poolFor(tokenAddress), deepPoolAddress, "factory DEEP pool"],
     [
       await shieldedPoolFactory.poolFor("0x0000000000000000000000000000000000000000"),
@@ -858,6 +883,15 @@ export const deployIntegratedSystem = async (
     );
   }
 
+  const receive = {};
+  const receiveAddresses = { deepFamily: deepFamilyAddress };
+  for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
+    if (property === "privateLetterArchive") continue;
+    receive[property] = await deployContract(property,
+      await ethers.getContractFactory(contractName, deployer),
+      receiveDeploymentConstructorArgs(property, receiveAddresses));
+    receiveAddresses[property] = await receive[property].getAddress();
+  }
   const ShieldedNativePool = await ethers.getContractFactory("ShieldedNativePool", {
     signer: deployer,
     libraries: { PoseidonT3: lineageLibraries.PoseidonT3 },
@@ -865,6 +899,8 @@ export const deployIntegratedSystem = async (
   const shieldedNativePool = await deployContract("shieldedNativePool", ShieldedNativePool, [
     lineageIndexAddress,
     groth16VerifierAdapterAddress,
+    receiveAddresses.identityAuthorizationState,
+    receiveAddresses.receivePresentationVerifierRouter,
   ]);
   const ShieldedPoolFactory = await ethers.getContractFactory("ShieldedPoolFactory", {
     signer: deployer,
@@ -875,13 +911,20 @@ export const deployIntegratedSystem = async (
     lineageIndexAddress,
     groth16VerifierAdapterAddress,
     await shieldedNativePool.getAddress(),
+    receiveAddresses.identityAuthorizationState,
+    receiveAddresses.receivePresentationVerifierRouter,
   ]);
+  receiveAddresses.shieldedPoolFactory = await shieldedPoolFactory.getAddress();
+  receive.privateLetterArchive = await deployContract("privateLetterArchive",
+    await ethers.getContractFactory("PrivateLetterArchive", deployer),
+    receiveDeploymentConstructorArgs("privateLetterArchive", receiveAddresses));
   const shieldedErc20Pool = await ethers.getContractAt(
     "ShieldedErc20Pool",
     await shieldedPoolFactory.poolFor(tokenAddress),
     deployer,
   );
   const shielded = {
+    ...receive,
     shieldedVerifiers,
     shieldedNativePool,
     shieldedPoolFactory,
@@ -889,6 +932,7 @@ export const deployIntegratedSystem = async (
   };
   await assertIntegratedShieldedWiring({
     token,
+    deepFamily,
     lineageIndex,
     groth16VerifierAdapter,
     ...shielded,
@@ -1034,7 +1078,7 @@ export const deployIntegratedSystem = async (
       deploymentDirectory,
     );
     for (const record of INTEGRATED_DEPLOYMENT_RECORDS.filter((item) =>
-      item.property.startsWith("shielded"),
+      item.property.startsWith("shielded") || RECEIVE_DEPLOYMENT_CONTRACTS.some(({property}) => property === item.property),
     )) {
       const contract = integratedDeploymentContract(shielded, record.property);
       await writeDeployment(

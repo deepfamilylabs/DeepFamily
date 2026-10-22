@@ -24,6 +24,16 @@
           "internalType": "address",
           "name": "nativePool",
           "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "authorizationState",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "receiveVerifier",
+          "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
@@ -70,6 +80,19 @@
     },
     {
       "inputs": [],
+      "name": "AUTHORIZATION_STATE",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
       "name": "DEEP_TOKEN",
       "outputs": [
         {
@@ -97,6 +120,19 @@
     {
       "inputs": [],
       "name": "NATIVE_POOL",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "RECEIVE_VERIFIER",
       "outputs": [
         {
           "internalType": "address",

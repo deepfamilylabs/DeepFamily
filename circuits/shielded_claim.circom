@@ -54,6 +54,9 @@ template ShieldedClaim() {
     signal input budgetKind;
     signal input keyMode;
     signal input ownerSecret;
+    signal input heirViewKeyLo;
+    signal input heirViewKeyHi;
+    signal input inputBudgetIsClaim[2];
     signal input secondBudgetKind;
     signal input secondKeyMode;
     signal input policyCommitmentInput;
@@ -123,6 +126,10 @@ template ShieldedClaim() {
     hasSecondInput * (1 - hasSecondInput) === 0;
     budgetKind * (1 - budgetKind) === 0;
     secondBudgetKind * (1 - secondBudgetKind) === 0;
+    for (var i = 0; i < 2; i++) inputBudgetIsClaim[i] * (1 - inputBudgetIsClaim[i]) === 0;
+    budgetKind * inputBudgetIsClaim[0] === 0;
+    secondBudgetKind * inputBudgetIsClaim[1] === 0;
+    (1 - hasSecondInput) * inputBudgetIsClaim[1] === 0;
     (1 - hasSecondInput) * secondBudgetKind === 0;
     keyMode * (1 - keyMode) === 0;
     secondKeyMode * (1 - secondKeyMode) === 0;
@@ -274,7 +281,8 @@ template ShieldedClaim() {
     ownerCommitment.inputs[1] <== ownerSecret;
 
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    oldBudget.privateNoteTag <== budgetTags.fundPrivateNoteTag
+        + inputBudgetIsClaim[0] * (budgetTags.claimPrivateNoteTag - budgetTags.fundPrivateNoteTag);
     oldBudget.identityNoteTag <== budgetTags.identityNoteTag;
     oldBudget.budgetKind <== budgetKind;
     oldBudget.keyMode <== keyMode;
@@ -283,6 +291,8 @@ template ShieldedClaim() {
     oldBudget.enrollmentCommitment <== enrollmentCommitmentInput;
     oldBudget.termsCommitment <== terms.commitment;
     oldBudget.ownerCommitment <== ownerCommitment.out;
+    oldBudget.viewKeyLo <== heirViewKeyLo;
+    oldBudget.viewKeyHi <== heirViewKeyHi;
     oldBudget.rate <== rate;
     oldBudget.remaining <== remaining;
     oldBudget.nonce <== budgetNonce;
@@ -322,7 +332,8 @@ template ShieldedClaim() {
     secondNonceNotZero.in <== secondBudgetNonce;
     hasSecondInput * secondNonceNotZero.out === 0;
     component secondBudget = ShieldedBoundBudgetCommitment();
-    secondBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    secondBudget.privateNoteTag <== budgetTags.fundPrivateNoteTag
+        + inputBudgetIsClaim[1] * (budgetTags.claimPrivateNoteTag - budgetTags.fundPrivateNoteTag);
     secondBudget.identityNoteTag <== budgetTags.identityNoteTag;
     secondBudget.budgetKind <== secondBudgetKind;
     secondBudget.keyMode <== secondKeyMode;
@@ -331,6 +342,10 @@ template ShieldedClaim() {
     secondBudget.enrollmentCommitment <== enrollmentCommitmentInput;
     secondBudget.termsCommitment <== terms.commitment;
     secondBudget.ownerCommitment <== ownerCommitment.out;
+    // Both inputs and the successor use one exact receive key. Membership
+    // therefore rejects combining notes with different viewing keys.
+    secondBudget.viewKeyLo <== heirViewKeyLo;
+    secondBudget.viewKeyHi <== heirViewKeyHi;
     secondBudget.rate <== rate;
     secondBudget.remaining <== secondRemaining;
     secondBudget.nonce <== secondBudgetNonce;
@@ -423,7 +438,7 @@ template ShieldedClaim() {
     newRemaining === rate * newRemainingPeriods;
 
     component nextBudget = ShieldedBoundBudgetCommitment();
-    nextBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    nextBudget.privateNoteTag <== budgetTags.claimPrivateNoteTag;
     nextBudget.identityNoteTag <== budgetTags.identityNoteTag;
     nextBudget.budgetKind <== budgetKind;
     nextBudget.keyMode <== keyMode;
@@ -432,6 +447,8 @@ template ShieldedClaim() {
     nextBudget.enrollmentCommitment <== enrollmentCommitmentInput;
     nextBudget.termsCommitment <== terms.commitment;
     nextBudget.ownerCommitment <== ownerCommitment.out;
+    nextBudget.viewKeyLo <== heirViewKeyLo;
+    nextBudget.viewKeyHi <== heirViewKeyHi;
     nextBudget.rate <== rate;
     nextBudget.remaining <== newRemaining;
     nextBudget.nonce <== newBudgetNonce;

@@ -31,8 +31,9 @@ import {
 import {
   SHIELDED_DEPLOYMENT_CIRCUITS,
   INTEGRATED_DEPLOYMENT_RECORDS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "./zkDeploymentCatalog.mjs";
-import { SHIELDED_CIRCUITS, SHIELDED_CLIENT_ONLY_CIRCUITS } from "./zkCircuitSelection.mjs";
+import { SHIELDED_CIRCUITS } from "./zkCircuitSelection.mjs";
 import {
   shieldedDeploymentBindings,
   shieldedArtifactEntries,
@@ -692,6 +693,7 @@ const requireTerminalGovernanceEvidence = ({
       "shieldedErc20Pool",
       "shieldedNativePool",
       "shieldedPoolFactory",
+      ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => property),
     ],
   );
   requireExact(terminal.status, "passed", "terminalGovernanceState.status");
@@ -940,6 +942,7 @@ const requireTerminalGovernanceEvidence = ({
   }
   const shieldedRecords = protocolShieldedDeploymentEvidenceFromRecords({
     ...terminal,
+    deepFamilyProxy: addresses.deepFamily,
     token: addresses.token,
     groth16VerifierAdapter: verifierAdapter,
   });
@@ -1277,10 +1280,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     "shieldedArtifacts.manifestSha256",
   );
   const actions = Object.keys(SHIELDED_DEPLOYMENT_CIRCUITS);
-  const circuits = requireExactRecordKeys(artifacts.circuits, "shieldedArtifacts.circuits", [
-    ...actions,
-    ...SHIELDED_CLIENT_ONLY_CIRCUITS,
-  ]);
+  const circuits = requireExactRecordKeys(
+    artifacts.circuits,
+    "shieldedArtifacts.circuits",
+    Object.keys(SHIELDED_CIRCUITS),
+  );
   for (const [name, circuit] of Object.entries(circuits)) {
     const item = inspected.manifest.circuits[name];
     requireExact(circuit.source, SHIELDED_CIRCUITS[name], `shieldedArtifacts.${name}.source`);
@@ -1292,7 +1296,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       );
   }
   const ceremony = requireRecord(report.zkCeremonyVerification, "zkCeremonyVerification");
-  requireExact(ceremony.circuitCount, 8, "zkCeremonyVerification.circuitCount");
+  requireExact(
+    ceremony.circuitCount,
+    Object.keys(ZK_RELEASE_ARTIFACTS).length + Object.keys(SHIELDED_CIRCUITS).length,
+    "zkCeremonyVerification.circuitCount",
+  );
   const coreCircuitNames = Object.keys(ZK_RELEASE_ARTIFACTS).sort();
   if (
     !Array.isArray(ceremony.circuits) ||
@@ -1306,7 +1314,11 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     ["status", "manifestSha256", "circuitCount", "ptau"],
   );
   requireExact(shieldedCeremony.status, "passed", "zkCeremonyVerification.shielded.status");
-  requireExact(shieldedCeremony.circuitCount, 6, "zkCeremonyVerification.shielded.circuitCount");
+  requireExact(
+    shieldedCeremony.circuitCount,
+    Object.keys(SHIELDED_CIRCUITS).length,
+    "zkCeremonyVerification.shielded.circuitCount",
+  );
   requireExact(
     shieldedCeremony.manifestSha256,
     inspected.manifestSha256,

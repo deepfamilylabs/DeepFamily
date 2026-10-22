@@ -1,5 +1,9 @@
 import type { BigNumberish, BytesLike } from "ethers";
 
+export type ShieldedReceiveAuthorization = {
+  checkpointId: BigNumberish; asOf: BigNumberish; expiresAt: BigNumberish; recipientBinding: BigNumberish; proof: string;
+};
+
 /** Public transaction data. It contains no note openings or proof witness. */
 export type ShieldedPoolActionData = {
   fundMode: BigNumberish;
@@ -13,6 +17,7 @@ export type ShieldedPoolActionData = {
   relation0: BigNumberish;
   relation1: BigNumberish;
   asOf: BigNumberish;
+  receiveAuthorizations?: ShieldedReceiveAuthorization[];
   /** Metadata binding the public roots and asOf to one lineage checkpoint. */
   lineageCheckpointId: BigNumberish;
 };

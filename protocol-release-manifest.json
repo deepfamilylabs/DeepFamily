@@ -1608,14 +1608,18 @@
       "lineageIndexImmutable": null,
       "artifactSha256": null,
       "runtimeSha256": null,
-      "verifierAdapterImmutable": null
+      "verifierAdapterImmutable": null,
+      "authorizationStateImmutable": null,
+      "receiveVerifierImmutable": null
     },
     "shieldedNativePool": {
       "address": null,
       "lineageIndexImmutable": null,
       "verifierAdapterImmutable": null,
       "artifactSha256": null,
-      "runtimeSha256": null
+      "runtimeSha256": null,
+      "authorizationStateImmutable": null,
+      "receiveVerifierImmutable": null
     },
     "shieldedPoolFactory": {
       "address": null,
@@ -1624,6 +1628,69 @@
       "verifierAdapterImmutable": null,
       "nativePoolImmutable": null,
       "deepPool": null,
+      "artifactSha256": null,
+      "runtimeSha256": null,
+      "authorizationStateImmutable": null,
+      "receiveVerifierImmutable": null
+    },
+    "identityAuthorizationUpdateVerifier": {
+      "address": null,
+      "immutables": {},
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "identityAuthorizationVerifierAdapter": {
+      "address": null,
+      "immutables": {
+        "VERIFIER": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "identityAuthorizationState": {
+      "address": null,
+      "immutables": {
+        "VERIFIER": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "anonymousReceivePresentationVerifier": {
+      "address": null,
+      "immutables": {},
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "fundReceivePresentationVerifier": {
+      "address": null,
+      "immutables": {},
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "attachedReceivePresentationVerifier": {
+      "address": null,
+      "immutables": {},
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "receivePresentationVerifierRouter": {
+      "address": null,
+      "immutables": {
+        "ANONYMOUS_VERIFIER": null,
+        "FUND_VERIFIER": null
+      },
+      "artifactSha256": null,
+      "runtimeSha256": null
+    },
+    "privateLetterArchive": {
+      "address": null,
+      "immutables": {
+        "DEEP_FAMILY": null,
+        "AUTHORIZATION_STATE": null,
+        "LETTER_VERIFIER": null,
+        "ATTACHMENT_VERIFIER": null,
+        "POOL_FACTORY": null
+      },
       "artifactSha256": null,
       "runtimeSha256": null
     }

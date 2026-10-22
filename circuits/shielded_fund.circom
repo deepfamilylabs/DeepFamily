@@ -2,6 +2,7 @@ pragma circom 2.2.3;
 
 include "shielded_funding_common.circom";
 include "shielded_lineage_common.circom";
+include "shielded_receive_binding_common.circom";
 
 // Fund consumes only the donor VALUE note. Mode 0 starts a unique enrollment
 // after proving current lineage; mode 1 reads a historical budget template,
@@ -21,6 +22,9 @@ template ShieldedFund() {
     signal input endorsementRoot;
     signal input trustedRoot;
     signal input asOf;
+    signal input receiveBindings[2];
+    signal input receiveAuthorizationAlias;
+    signal input receiveSalt;
 
     signal input donorOwnerSecret;
     signal input donorAmount;
@@ -38,6 +42,8 @@ template ShieldedFund() {
     signal input allocationKeyCommitment;
     signal input heirIdentityCommitment;
     signal input heirOwnerCommitment;
+    signal input heirViewKeyLo;
+    signal input heirViewKeyHi;
     signal input eligibleFrom;
     signal input enrollmentSalt;
 
@@ -55,6 +61,7 @@ template ShieldedFund() {
     signal input trustedSiblings[64];
 
     signal input oldBudgetKind;
+    signal input oldBudgetIsClaim;
     signal input oldKeyMode;
     signal input oldHeirOwnerCommitment;
     signal input oldBudgetRemaining;
@@ -90,9 +97,28 @@ template ShieldedFund() {
     signal initial <== 1 - fundMode;
     budgetKind * (1 - budgetKind) === 0;
     oldBudgetKind * (1 - oldBudgetKind) === 0;
+    oldBudgetIsClaim * (1 - oldBudgetIsClaim) === 0;
+    oldBudgetKind * oldBudgetIsClaim === 0;
     keyMode * (1 - keyMode) === 0;
     oldKeyMode * (1 - oldKeyMode) === 0;
     budgetKind * keyMode === 0;
+    component receive = ShieldedReceiveRecipientBinding();
+    receive.enabled <== 1 - budgetKind;
+    receive.authorizationAlias <== receiveAuthorizationAlias;
+    receive.ownerCommitment <== heirOwnerCommitment;
+    receive.keyMode <== keyMode;
+    receive.viewKeyLo <== heirViewKeyLo;
+    receive.viewKeyHi <== heirViewKeyHi;
+    receive.salt <== receiveSalt;
+    component fundReceive = Poseidon(3);
+    fundReceive.inputs[0] <== 202610220102;
+    fundReceive.inputs[1] <== receive.binding;
+    fundReceive.inputs[2] <== heirIdentityCommitment;
+    receiveBindings[0] === (1 - budgetKind) * fundReceive.out;
+    receiveBindings[1] === 0;
+    component receiveZero = IsZero();
+    receiveZero.in <== receiveBindings[0];
+    (1 - budgetKind) * receiveZero.out === 0;
     oldBudgetKind * oldKeyMode === 0;
     initial * oldKeyMode === 0;
     fundMode * (budgetKind - oldBudgetKind) === 0;
@@ -202,6 +228,7 @@ template ShieldedFund() {
     terms.periodDays <== periodDays;
 
     initial * oldBudgetKind === 0;
+    initial * oldBudgetIsClaim === 0;
     initial * oldHeirOwnerCommitment === 0;
     oldBudgetKind * oldHeirOwnerCommitment === 0;
     component oldOwnerNotZero = IsZero();
@@ -227,7 +254,8 @@ template ShieldedFund() {
     oldNonceNotZero.in <== oldBudgetNonce;
     fundMode * oldNonceNotZero.out === 0;
     component oldBudget = ShieldedBoundBudgetCommitment();
-    oldBudget.privateNoteTag <== budgetTags.privateNoteTag;
+    oldBudget.privateNoteTag <== budgetTags.fundPrivateNoteTag
+        + oldBudgetIsClaim * (budgetTags.claimPrivateNoteTag - budgetTags.fundPrivateNoteTag);
     oldBudget.identityNoteTag <== budgetTags.identityNoteTag;
     oldBudget.budgetKind <== oldBudgetKind;
     oldBudget.keyMode <== oldKeyMode;
@@ -236,6 +264,10 @@ template ShieldedFund() {
     oldBudget.enrollmentCommitment <== enrollment.commitment;
     oldBudget.termsCommitment <== terms.commitment;
     oldBudget.ownerCommitment <== oldHeirOwnerCommitment;
+    // Reconstruct the old template with the same complete receive key as the
+    // new Fund output. A changed view cannot satisfy its historical root.
+    oldBudget.viewKeyLo <== heirViewKeyLo;
+    oldBudget.viewKeyHi <== heirViewKeyHi;
     oldBudget.rate <== rate;
     oldBudget.remaining <== oldBudgetRemaining;
     oldBudget.nonce <== oldBudgetNonce;
@@ -273,7 +305,7 @@ template ShieldedFund() {
     budgetNonceNotZero.in <== budgetNonce;
     budgetNonceNotZero.out === 0;
     component budget = ShieldedBoundBudgetCommitment();
-    budget.privateNoteTag <== budgetTags.privateNoteTag;
+    budget.privateNoteTag <== budgetTags.fundPrivateNoteTag;
     budget.identityNoteTag <== budgetTags.identityNoteTag;
     budget.budgetKind <== budgetKind;
     budget.keyMode <== keyMode;
@@ -282,6 +314,8 @@ template ShieldedFund() {
     budget.enrollmentCommitment <== enrollment.commitment;
     budget.termsCommitment <== terms.commitment;
     budget.ownerCommitment <== heirOwnerCommitment;
+    budget.viewKeyLo <== heirViewKeyLo;
+    budget.viewKeyHi <== heirViewKeyHi;
     budget.rate <== rate;
     budget.remaining <== budgetAmount;
     budget.nonce <== budgetNonce;
@@ -309,5 +343,5 @@ template ShieldedFund() {
 
 component main {
     public [chainId, pool, fundMode, budgetKind, publicBudget, inputShardIds, inputRoots, inputNullifiers,
-        outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf]
+        outputCommitments, ciphertextHashes, endorsementRoot, trustedRoot, asOf, receiveBindings]
 } = ShieldedFund();

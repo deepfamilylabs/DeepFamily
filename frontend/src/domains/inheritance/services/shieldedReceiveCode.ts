@@ -1,5 +1,5 @@
 import {
-  decodeShieldedReceiveCode,
+  decodeShieldedReceiveCredential,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
 } from "@deepfamily/protocol-core";
@@ -16,10 +16,14 @@ declare const verifiedRecipient: unique symbol;
  * keys that the recipient's identity did not authorize.
  */
 export type VerifiedShieldedRecipient = {
-  readonly identityCommitment: bigint;
+  readonly identityCommitment?: bigint;
+  readonly disclosure?: "anonymous" | "fund";
+  readonly authorizationAlias?: string;
+  readonly authorizationCounter?: string;
+  readonly expiresAt?: string;
   readonly ownerCommitment: bigint;
   readonly viewingKey: string;
-  readonly personHash: string;
+  readonly personHash?: string;
   readonly keyMode: 0 | 1;
   readonly identitySuiteId: number;
   readonly independentKeySuiteId: number;
@@ -49,14 +53,18 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
     { timeoutMs: RECEIVE_CODE_TIMEOUT_MS },
   );
   if (!result.ok) throw new ShieldedReceiveCodeError(result.reason);
-  const identityCommitment = getBigInt(result.identityCommitment);
+  const identityCommitment = result.identityCommitment === undefined ? undefined : getBigInt(result.identityCommitment);
   if (
-    wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !==
-    result.personHash.toLowerCase()
+    identityCommitment !== undefined && wrapIdentityCommitmentAsPersonHash(identityCommitment).toLowerCase() !==
+    result.personHash?.toLowerCase()
   ) {
     throw new ShieldedReceiveCodeError("invalid");
   }
   return {
+    disclosure: result.disclosure,
+    authorizationAlias: result.authorizationAlias,
+    authorizationCounter: result.authorizationCounter,
+    expiresAt: result.expiresAt,
     identityCommitment,
     ownerCommitment: getBigInt(result.ownerCommitment),
     viewingKey: result.viewingKey,
@@ -76,7 +84,9 @@ export async function verifyShieldedReceiveCode(code: string): Promise<VerifiedS
 export function peekShieldedReceiveCodePersonHash(code: string): string | null {
   if (!code.trim()) return null;
   try {
-    return wrapIdentityCommitmentAsPersonHash(decodeShieldedReceiveCode(code).identityCommitment);
+    const decoded = decodeShieldedReceiveCredential(code);
+    return decoded.disclosure === "fund" && decoded.identityCommitment !== undefined
+      ? wrapIdentityCommitmentAsPersonHash(decoded.identityCommitment) : null;
   } catch {
     return null;
   }
@@ -86,6 +96,9 @@ export function peekShieldedReceiveCodePersonHash(code: string): string | null {
 export async function createShieldedReceiveCodeForRecipient(credentials: {
   identity: IdentityFields;
   rawPassphrase: string;
+  disclosure?: "anonymous" | "fund";
+  context: { rpcUrl: string; chainId: string; factoryAddress: string };
+  expiresAt: string;
 }): Promise<string> {
   const passphraseError = getFundingPassphraseError(credentials.rawPassphrase);
   if (passphraseError) throw new InheritanceError(passphraseError);

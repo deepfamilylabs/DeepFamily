@@ -47,6 +47,7 @@ function budget(
     ...publicNote(commitment),
     note: {
       kind: "budget",
+      budgetOrigin: 0n,
       rootIdentityCommitment: 111n,
       rootVersionIndex: 3n,
       policySalt: 222n,

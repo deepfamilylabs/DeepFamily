@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DeepFamily research prover resource check</title>
+<p>Local research benchmark. Synthetic witnesses only.</p>
+<button id="run" type="button">Run configured proof</button>
+<pre id="result">Waiting</pre>
+<script type="module">
+let worker;
+const events=[];
+window.researchStatus={done:false,events,heartbeats:0};
+setInterval(()=>window.researchStatus.heartbeats++,100);
+window.startResearch=async function(job,repeat=1){
+ worker=new Worker("/worker.js");
+ worker.onmessage=({data})=>{
+  events.push(data);
+  if(data.type==="progress")document.querySelector("#result").textContent=JSON.stringify(data,null,2);
+  if(data.type==="result"||data.type==="error"){
+   window.researchStatus.done=true;
+   window.researchStatus.result=data;
+   document.querySelector("#result").textContent=JSON.stringify(data,null,2);
+  }
+ };
+ worker.onerror=e=>{
+  window.researchStatus.done=true;
+  window.researchStatus.result={type:"error",error:e.message};
+ };
+ worker.postMessage({job,repeat});
+};
+document.querySelector("#run").onclick=async()=>{
+ const config=await(await fetch("/jobs")).json();
+ window.startResearch(config.jobs[0].name,1);
+};
+</script>

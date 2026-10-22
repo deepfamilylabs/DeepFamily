@@ -18,7 +18,8 @@ const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).dige
  */
 export async function setupShieldedDevelopmentKeys({ root = ROOT, circuit = "all" } = {}) {
   root = path.resolve(root);
-  if (circuit !== "all" && !Object.hasOwn(SHIELDED_CIRCUITS, circuit)) {
+  const selected = circuit === "all" ? Object.keys(SHIELDED_CIRCUITS) : circuit.split(",");
+  if (selected.some((action) => !Object.hasOwn(SHIELDED_CIRCUITS, action))) {
     throw new Error(`Unknown shielded circuit: ${circuit}`);
   }
   const artifactDirectory = path.join(root, "zk-artifacts", "shielded");
@@ -46,7 +47,7 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT, circuit = "all
     }
   }
   const { path: ptau } = await ensureProductionPtau({ root });
-  await runZkBuild({ root, circuit: circuit === "all" ? "shielded" : `shielded:${circuit}` });
+  for (const action of selected) await runZkBuild({ root, circuit: `shielded:${action}` });
   const verifierDirectory = path.join(artifactDirectory, "verifiers");
   fs.mkdirSync(verifierDirectory, { recursive: true });
   const manifest =
@@ -63,7 +64,7 @@ export async function setupShieldedDevelopmentKeys({ root = ROOT, circuit = "all
     throw new Error("Selective development setup requires the same pinned Powers of Tau");
   }
   for (const [action, sourceName] of Object.entries(SHIELDED_CIRCUITS)) {
-    if (circuit !== "all" && action !== circuit) continue;
+    if (!selected.includes(action)) continue;
     const r1cs = path.join(artifactDirectory, `${sourceName}.r1cs`);
     const wasm = path.join(artifactDirectory, `${sourceName}_js`, `${sourceName}.wasm`);
     const initial = path.join(artifactDirectory, `${sourceName}_0000.zkey`);

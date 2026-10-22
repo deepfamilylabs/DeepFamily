@@ -46,6 +46,7 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
     ...INPUT_ARRAYS,
     ...OUTPUTS,
     ...LINEAGE,
+    "receiveBindings",
   ]),
   [SHIELDED_POOL_ACTION.Claim]: Object.freeze([
     ...CONTEXT,
@@ -54,7 +55,12 @@ export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
     ...OUTPUTS,
     ...LINEAGE,
   ]),
-  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([...CONTEXT, ...INPUT_ARRAYS, ...OUTPUTS]),
+  [SHIELDED_POOL_ACTION.PrivateTransfer]: Object.freeze([
+    ...CONTEXT,
+    ...INPUT_ARRAYS,
+    ...OUTPUTS,
+    "receiveBindings",
+  ]),
   [SHIELDED_POOL_ACTION.Unshield]: Object.freeze([
     ...CONTEXT,
     ...INPUT_ARRAYS,
@@ -81,6 +87,7 @@ const INPUT_WIDTHS = Object.freeze({
   endorsementRoot: 1,
   trustedRoot: 1,
   asOf: 1,
+  receiveBindings: 2,
 });
 
 /** Mirrors the per-purpose lengths in ProofConstants.sol. */
@@ -90,7 +97,8 @@ export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
       action,
       names.reduce(
         (total, name) =>
-          total + (INPUT_ARRAYS.includes(name) ? inputSlotCount(Number(action)) : INPUT_WIDTHS[name]),
+          total +
+          (INPUT_ARRAYS.includes(name) ? inputSlotCount(Number(action)) : INPUT_WIDTHS[name]),
         0,
       ),
     ]),
@@ -170,6 +178,12 @@ export function buildShieldedPoolPublicInputs(input) {
     endorsementRoot: [field(input.relation0 ?? 0n, "relation0")],
     trustedRoot: [field(input.relation1 ?? 0n, "relation1")],
     asOf: [bigintFrom(input.asOf ?? 0n, "asOf", MAX_UINT64)],
+    receiveBindings: values(
+      input.receiveBindings ??
+        input.receiveAuthorizations?.map((item) => item.recipientBinding) ?? [0n, 0n],
+      2,
+      "receiveBindings",
+    ),
   };
 
   const uses = new Set(names);
@@ -203,6 +217,7 @@ export function buildShieldedPoolPublicInputs(input) {
     "endorsementRoot",
     "trustedRoot",
     "asOf",
+    "receiveBindings",
   ]) {
     if (!uses.has(name))
       unused(

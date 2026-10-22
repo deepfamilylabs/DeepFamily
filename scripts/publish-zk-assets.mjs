@@ -15,6 +15,11 @@ const hmac = (key, data) => createHmac("sha256", key).update(data).digest();
 const CONTENT_TYPES = Object.freeze({
   ".wasm": "application/wasm",
   ".zkey": "application/octet-stream",
+  ".r1cs": "application/octet-stream",
+  ".pk": "application/octet-stream",
+  ".vk": "application/octet-stream",
+  ".json": "application/json",
+  ".js": "text/javascript",
 });
 // Object keys are content addressed, so a published object never changes.
 const CACHE_CONTROL = "public, max-age=31536000, immutable";

@@ -19,6 +19,7 @@ import {
   inspectShieldedProductionArtifacts,
 } from "./lib/shieldedProductionSetup.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
+import { inspectReceiveArtifacts } from "./lib/receiveArtifacts.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
 import { SHIELDED_CIRCUITS } from "./zk-shielded-build.mjs";
 
@@ -211,7 +212,7 @@ export function checkShieldedDevelopmentArtifacts({
   const expectedActions = Object.keys(SHIELDED_CIRCUITS).sort();
   const actualActions = Object.keys(manifest.circuits ?? {}).sort();
   if (JSON.stringify(actualActions) !== JSON.stringify(expectedActions)) {
-    throw new Error("Shielded development manifest must contain exactly all six circuits");
+    throw new Error("Shielded development manifest must contain exactly all configured circuits");
   }
   const snarkjsCli = resolveSnarkjsCliPath({ root });
   requireFile(snarkjsCli, "snarkjs CLI (run `npm install` first)");
@@ -301,7 +302,7 @@ export function checkShieldedArtifacts({
     const result = productionInspector({ root });
     const circuitCount = Object.keys(result.artifacts).length;
     if (circuitCount !== Object.keys(SHIELDED_CIRCUITS).length) {
-      throw new Error("Shielded production artifact check must cover all six circuits");
+      throw new Error("Shielded production artifact check must cover all configured circuits");
     }
     console.log(`Shielded production manifest: ${circuitCount} circuits, ` + result.manifestSha256);
     return { status: "production", circuitCount };
@@ -309,10 +310,20 @@ export function checkShieldedArtifacts({
   return checkShieldedDevelopmentArtifacts({ root });
 }
 
-export function main() {
+export function main({ circomOnly = false } = {}) {
   const core = checkCoreArtifacts();
   const shielded = checkShieldedArtifacts();
-  return { core, shielded };
+  // Circom setup must finish before its fixed issuer keys can be compiled into
+  // the presentation circuits. This intermediate check never authorizes release.
+  if (circomOnly) return { core, shielded };
+  const receive = inspectReceiveArtifacts({
+    root: projectRoot,
+    requireProduction: shielded.status === "production",
+  });
+  console.log(
+    `Receive presentation artifacts: ${receive.circuitCount} circuits, ${receive.manifestSha256}`,
+  );
+  return { core, shielded, receive };
 }
 
 const isMain =
@@ -320,7 +331,12 @@ const isMain =
 
 if (isMain) {
   try {
-    main();
+    const args = process.argv.slice(2);
+    if (args.length > 1 || (args.length === 1 && args[0] !== "--circom-only"))
+      throw new Error(
+        "Expected no arguments or --circom-only for the intermediate issuer setup check",
+      );
+    main({ circomOnly: args.includes("--circom-only") });
   } catch (error) {
     console.error(`[check-zk-artifacts] ${error.message}`);
     process.exitCode = 1;

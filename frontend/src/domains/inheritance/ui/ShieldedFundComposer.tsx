@@ -26,6 +26,7 @@ import {
   TaskHeader,
   TaskSection,
   WarningNotice,
+  PanelButton,
   choiceCardClass,
   shortHex,
 } from "./inheritanceControls";
@@ -69,6 +70,7 @@ export interface ShieldedFundComposerProps {
   onGenerateRecipientCode: () => void;
   /** The funding parent's own label, used to name existing arrangements. */
   parentLabel?: string;
+  onWriteLetter?: () => void;
 }
 
 /** Budget arrangement, then the child, then how privately the budget is held. */
@@ -390,11 +392,11 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           })}
         </fieldset>
         {fixed ? <p className="text-xs text-ink-muted">{tr("fundingEntryFixed")}</p> : null}
-        {privateFunding && !fixed ? (
+        {privateFunding ? (
           props.entry === "privateIndependent" ? (
             <ShieldedReceiveCodeInput
               code={props.code}
-              hint={t("shielded.receiveCodeInputHint", { symbol })}
+              hint={t("shielded.privateLetters.fundPrivacy")}
               error={codeError}
               onChange={props.onCodeChange}
               verification={verification}
@@ -405,7 +407,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
               method={props.recipientInputMethod}
               onMethodChange={props.onRecipientInputMethodChange}
               code={props.code}
-              codeHint={t("shielded.receiveCodeInputHint", { symbol })}
+              codeHint={t("shielded.privateLetters.fundPrivacy")}
               codeError={codeError}
               onCodeChange={props.onCodeChange}
               credentialsFormRef={props.recipientFormRef}
@@ -421,6 +423,7 @@ export function ShieldedFundComposer(props: ShieldedFundComposerProps) {
           </p>
         ) : null}
       </TaskSection>
+      {props.onWriteLetter && privateFunding ? <PanelButton size="compact" disabled={busy} onClick={props.onWriteLetter}>{t("shielded.privateLetters.attach")}</PanelButton> : null}
     </>
   );
 }

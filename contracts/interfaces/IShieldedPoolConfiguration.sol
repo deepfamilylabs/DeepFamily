@@ -11,5 +11,9 @@ interface IShieldedPoolConfiguration {
 
   function LINEAGE_INDEX() external view returns (address);
 
+  function AUTHORIZATION_STATE() external view returns (address);
+
+  function RECEIVE_VERIFIER() external view returns (address);
+
   function VERIFIER() external view returns (address);
 }

@@ -10,6 +10,13 @@ import {
 const ciphertext = (byte) => `0x${byte.repeat(512)}`;
 // ProofConstants.PROOF_PURPOSE_SHIELDED_ACTION_BASE.
 const ACTION_PURPOSE_BASE = 2;
+const emptyAuthorization = () => ({
+  checkpointId: 0n,
+  asOf: 0n,
+  expiresAt: 0n,
+  recipientBinding: 0n,
+  proof: "0x",
+});
 
 describe("ShieldedErc20Pool contract boundaries", function () {
   async function setup(poolContractName = "ShieldedErc20Pool") {
@@ -17,6 +24,11 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const token = await hre.ethers.deployContract("ShieldedPoolTokenMock");
     const lineage = await hre.ethers.deployContract("ShieldedPoolLineageMock");
     const verifier = await hre.ethers.deployContract("ShieldedPoolVerifierMock");
+    const counterVerifier = await hre.ethers.deployContract("IdentityCounterVerifierMock");
+    const authorizationState = await hre.ethers.deployContract("IdentityAuthorizationState", [
+      await counterVerifier.getAddress(),
+    ]);
+    const receiveVerifier = await hre.ethers.deployContract("PrivateLetterVerifierMock");
     const poseidon = await hre.ethers.deployContract("PoseidonT3");
     await Promise.all([
       token.waitForDeployment(),
@@ -31,11 +43,13 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       await token.getAddress(),
       await lineage.getAddress(),
       await verifier.getAddress(),
+      await authorizationState.getAddress(),
+      await receiveVerifier.getAddress(),
     );
     await pool.waitForDeployment();
     await token.mint(depositor.address, 1_000n);
     await token.connect(depositor).approve(await pool.getAddress(), 1_000n);
-    return { pool, token, lineage, depositor, recipient };
+    return { pool, token, lineage, authorizationState, receiveVerifier, depositor, recipient };
   }
 
   const actionData = (overrides = {}) => ({
@@ -51,6 +65,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     lineageCheckpointId: 0n,
     fundMode: 0n,
     budgetKind: 0n,
+    receiveAuthorizations: [emptyAuthorization(), emptyAuthorization()],
     ...overrides,
   });
 
@@ -71,11 +86,19 @@ describe("ShieldedErc20Pool contract boundaries", function () {
 
   async function proofFor(pool, action, data, amount = 0n, recipient) {
     const network = await hre.ethers.provider.getNetwork();
+    if (
+      action === 1 &&
+      data.budgetKind === 0n &&
+      data.receiveAuthorizations[0].recipientBinding === 0n
+    ) {
+      await authorize(pool, data, 0, 3);
+    }
     const signals = buildShieldedPoolPublicSignals({
       action,
       chainId: network.chainId,
       poolAddress: await pool.getAddress(),
       ...data,
+      receiveBindings: data.receiveAuthorizations.map((item) => item.recipientBinding),
       amount,
       recipient,
     });
@@ -87,6 +110,236 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       [ACTION_PURPOSE_BASE + action, signals],
     );
   }
+
+  async function authorize(
+    pool,
+    data,
+    slot,
+    action,
+    { expiresAt, checkpointId = 1n, asOf, binding = 777n } = {},
+  ) {
+    const latest = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
+    const state = await hre.ethers.getContractAt(
+      "IdentityAuthorizationState",
+      await pool.AUTHORIZATION_STATE(),
+    );
+    const authorization = {
+      checkpointId,
+      asOf: asOf ?? latest,
+      expiresAt: expiresAt ?? latest + 3600n,
+      recipientBinding: binding,
+      proof: "0x",
+    };
+    const hash = BigInt(await pool.receiveActionHash(data));
+    const root = (await state.getCheckpoint(checkpointId)).root;
+    const inputs = [
+      (await hre.ethers.provider.getNetwork()).chainId,
+      BigInt(await pool.getAddress()),
+      BigInt(action),
+      BigInt(slot),
+      hash & ((1n << 128n) - 1n),
+      hash >> 128n,
+      checkpointId,
+      root,
+      authorization.asOf,
+      authorization.expiresAt,
+      binding,
+    ];
+    authorization.proof = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[11]"], [inputs]);
+    data.receiveAuthorizations[slot] = authorization;
+    return authorization;
+  }
+
+  it("authenticates every private Fund, including top-ups, before atomically spending notes", async () => {
+    const { pool } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const funding = actionData({
+      fundMode: 1n,
+      inputRoots: [root, root],
+      inputNullifiers: [901n, 902n],
+      outputCommitments: [903n, 904n],
+    });
+    const proof = await proofFor(pool, 1, funding);
+    const original = structuredClone(funding);
+    const missing = structuredClone(funding);
+    missing.receiveAuthorizations[0] = emptyAuthorization();
+    await expect(pool.fund(missing, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveAuthorization",
+    );
+    const wrongExpiry = structuredClone(funding);
+    wrongExpiry.receiveAuthorizations[0].expiresAt += 1n;
+    await expect(pool.fund(wrongExpiry, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveProof",
+    );
+    const wrongBody = {
+      ...funding,
+      outputCiphertexts: [ciphertext("11"), funding.outputCiphertexts[1]],
+    };
+    await expect(pool.fund(wrongBody, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveProof",
+    );
+    const changeReceipt = structuredClone(funding);
+    changeReceipt.receiveAuthorizations[1] = changeReceipt.receiveAuthorizations[0];
+    await expect(pool.fund(changeReceipt, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveAuthorization",
+    );
+    await expect(pool.fund(funding, "0x")).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    expect(await pool.nullifierSpent(901n)).to.equal(false);
+    expect(await pool.commitmentExists(903n)).to.equal(false);
+    expect((await pool.noteShard(0)).size).to.equal(2n);
+    expect(funding).to.deep.equal(original);
+    await pool.fund(funding, proof);
+    expect(await pool.nullifierSpent(901n)).to.equal(true);
+  });
+
+  it("binds transfer receipts to their exact output slots and rejects unauthenticated expiry metadata", async () => {
+    const { pool } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = valueActionData({
+      inputRoots: [root, root],
+      inputNullifiers: [921n, 922n],
+      outputCommitments: [923n, 924n],
+    });
+    await authorize(pool, transfer, 0, 4);
+    await authorize(pool, transfer, 1, 4, { binding: 778n });
+    const proof = await proofFor(pool, 3, transfer);
+    const swapped = {
+      ...transfer,
+      receiveAuthorizations: [...transfer.receiveAuthorizations].reverse(),
+    };
+    await expect(pool.privateTransfer(swapped, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveProof",
+    );
+    const noBinding = structuredClone(transfer);
+    noBinding.receiveAuthorizations[0].recipientBinding = 0n;
+    await expect(pool.privateTransfer(noBinding, proof)).to.be.revertedWithCustomError(
+      pool,
+      "InvalidReceiveAuthorization",
+    );
+    await pool.privateTransfer(transfer, proof);
+  });
+
+  it("rejects expired codes at the exact expiry and retired shared counter checkpoints", async () => {
+    const { pool, authorizationState } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const funding = actionData({
+      fundMode: 1n,
+      inputRoots: [root, root],
+      inputNullifiers: [941n, 942n],
+      outputCommitments: [943n, 944n],
+    });
+    const expiry = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) + 20n;
+    await authorize(pool, funding, 0, 3, { expiresAt: expiry });
+    const proof = await proofFor(pool, 1, funding);
+    await hre.networkHelpers.time.increaseTo(expiry);
+    await expect(pool.fund.staticCall(funding, proof)).to.be.revertedWithCustomError(
+      pool,
+      "ExpiredReceiveCode",
+    );
+    await authorize(pool, funding, 0, 3, { expiresAt: expiry + 7200n });
+    const checkpointProof = await proofFor(pool, 1, funding);
+    const inputs = [
+      961n,
+      (await hre.ethers.provider.getNetwork()).chainId,
+      BigInt(await authorizationState.getAddress()),
+      99101n,
+      0n,
+      962n,
+      0n,
+      1n,
+    ];
+    const updateProof = hre.ethers.AbiCoder.defaultAbiCoder().encode(["uint256[8]"], [inputs]);
+    await authorizationState.incrementCounter(961n, 99101n, 0n, 962n, 0n, 1n, updateProof);
+    const { retiredAt } = await authorizationState.getCheckpoint(1n);
+    await hre.networkHelpers.time.increaseTo(retiredAt + 899n);
+    await pool.fund.staticCall(funding, checkpointProof);
+    await hre.networkHelpers.time.increaseTo(retiredAt + 900n);
+    await expect(pool.fund.staticCall(funding, checkpointProof)).to.be.revertedWithCustomError(
+      authorizationState,
+      "CheckpointExpired",
+    );
+    expect(await pool.nullifierSpent(941n)).to.equal(false);
+  });
+
+  it("rejects every unauthenticated time, state and recipient field before spending transfer inputs", async () => {
+    const { pool, authorizationState } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = valueActionData({
+      inputRoots: [root, root],
+      inputNullifiers: [971n, 972n],
+      outputCommitments: [973n, 974n],
+    });
+    await authorize(pool, transfer, 0, 4);
+    await authorize(pool, transfer, 1, 4, { binding: 778n });
+    const proof = await proofFor(pool, 3, transfer);
+    for (const slot of [0, 1]) {
+      for (const field of ["asOf", "expiresAt", "recipientBinding"]) {
+        const changed = structuredClone(transfer);
+        // Keep a valid state time to ensure the exact proof binding rejects the metadata.
+        changed.receiveAuthorizations[slot][field] += field === "asOf" ? -1n : 1n;
+        await expect(pool.privateTransfer(changed, proof)).to.be.revertedWithCustomError(
+          pool,
+          "InvalidReceiveProof",
+        );
+      }
+      const missingProof = structuredClone(transfer);
+      missingProof.receiveAuthorizations[slot].proof = "0x";
+      await expect(pool.privateTransfer(missingProof, proof)).to.be.revertedWithCustomError(
+        pool,
+        "InvalidReceiveAuthorization",
+      );
+      const unknown = structuredClone(transfer);
+      unknown.receiveAuthorizations[slot].checkpointId = 2n;
+      await expect(pool.privateTransfer(unknown, proof)).to.be.revertedWithCustomError(
+        authorizationState,
+        "UnknownCheckpoint",
+      );
+    }
+    expect(await pool.nullifierSpent(971n)).to.equal(false);
+    expect(await pool.commitmentExists(973n)).to.equal(false);
+    await pool.privateTransfer(transfer, proof);
+  });
+
+  it("checks expiry independently for every transfer output and accepts a fresh matching receipt", async () => {
+    const { pool } = await setup();
+    const deposit = actionData();
+    await pool.shield(100n, deposit, await proofFor(pool, 0, deposit, 100n));
+    const root = (await pool.noteShard(0)).root;
+    const transfer = valueActionData({
+      inputRoots: [root, root],
+      inputNullifiers: [981n, 982n],
+      outputCommitments: [983n, 984n],
+    });
+    const deadline = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp) + 20n;
+    await authorize(pool, transfer, 0, 4, { expiresAt: deadline + 3600n });
+    await authorize(pool, transfer, 1, 4, { expiresAt: deadline, binding: 778n });
+    const proof = await proofFor(pool, 3, transfer);
+    await hre.networkHelpers.time.increaseTo(deadline - 1n);
+    await pool.privateTransfer.staticCall(transfer, proof);
+    await hre.networkHelpers.time.increaseTo(deadline);
+    await expect(pool.privateTransfer.staticCall(transfer, proof)).to.be.revertedWithCustomError(
+      pool,
+      "ExpiredReceiveCode",
+    );
+    expect(await pool.nullifierSpent(981n)).to.equal(false);
+    expect(await pool.commitmentExists(983n)).to.equal(false);
+    await authorize(pool, transfer, 1, 4, { expiresAt: deadline + 3600n, binding: 778n });
+    await pool.privateTransfer(transfer, proof);
+    expect(await pool.nullifierSpent(981n)).to.equal(true);
+  });
 
   it("routes eight-slot VALUE proofs and spends every real and placeholder nullifier", async () => {
     const { pool, recipient } = await setup();
@@ -481,7 +734,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
     await expect(pool.fund({ ...funding, budgetKind: 0n }, proof)).to.be.revertedWithCustomError(
       pool,
-      "InvalidZKProof",
+      "InvalidReceiveAuthorization",
     );
     await expect(pool.fund({ ...funding, budgetKind: 2n }, proof)).to.be.revertedWithCustomError(
       pool,

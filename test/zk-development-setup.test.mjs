@@ -227,25 +227,30 @@ describe("development ZK setup", function () {
     expect(calls[3]).to.deep.equal(["temporary-directory", temporaryDirectory]);
 
     const commandCalls = calls.filter(([kind]) => kind === "command");
-    expect(commandCalls).to.have.length(4 + DEVELOPMENT_CIRCUITS.length * 5);
+    expect(commandCalls).to.have.length(5 + DEVELOPMENT_CIRCUITS.length * 5);
     expect(commandCalls[0][1]).to.deep.equal({
       executable: process.execPath,
       args: [path.join(root, "scripts/zk-build.mjs"), "--circuit", "core"],
       cwd: root,
     });
-    expect(commandCalls.at(-3)[1]).to.deep.equal({
+    expect(commandCalls.at(-4)[1]).to.deep.equal({
       executable: process.execPath,
       args: [path.join(root, "scripts/zk-check.mjs"), "--circuit", "core"],
       cwd: root,
     });
-    expect(commandCalls.at(-2)[1]).to.deep.equal({
+    expect(commandCalls.at(-3)[1]).to.deep.equal({
       executable: process.execPath,
       args: [path.join(root, "scripts/zk-shielded-development-setup.mjs")],
       cwd: root,
     });
-    expect(commandCalls.at(-1)[1]).to.deep.equal({
+    expect(commandCalls.at(-2)[1]).to.deep.equal({
       executable: process.execPath,
       args: [path.join(root, "scripts/zk-shielded-development-proof-smoke.mjs")],
+      cwd: root,
+    });
+    expect(commandCalls.at(-1)[1]).to.deep.equal({
+      executable: process.execPath,
+      args: [path.join(root, "scripts/receive-development-setup.mjs")],
       cwd: root,
     });
 
@@ -253,7 +258,7 @@ describe("development ZK setup", function () {
     const manifestIndex = calls.findIndex(([kind]) => kind === "manifest-update");
     const proofIndex = calls.lastIndexOf(commandCalls.at(-1));
     const cleanupIndex = calls.findIndex(([kind]) => kind === "remove");
-    expect(syncIndex).to.be.greaterThan(calls.indexOf(commandCalls.at(-4)));
+    expect(syncIndex).to.be.greaterThan(calls.indexOf(commandCalls.at(-5)));
     expect(manifestIndex).to.be.greaterThan(syncIndex);
     expect(proofIndex).to.be.greaterThan(manifestIndex);
     expect(cleanupIndex).to.be.greaterThan(proofIndex);

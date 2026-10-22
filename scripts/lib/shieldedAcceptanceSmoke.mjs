@@ -9,7 +9,13 @@ import { getAddress, getBytes, hexlify } from "ethers";
 import {
   SECONDS_PER_DAY,
   buildShieldedPoolPublicInputs,
-  buildShieldedReceiveCodePublicSignals,
+  buildShieldedReceiveCredentialPublicSignals,
+  computeShieldedAuthorizationAlias,
+  computeShieldedReceiveActionHash,
+  emptyShieldedReceiveAuthorizations,
+  getShieldedIdentityAuthorizationWitness,
+  prepareShieldedReceivePresentation,
+  rebuildShieldedIdentityAuthorizationState,
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
@@ -27,15 +33,16 @@ import {
   computeShieldedSpendNullifier,
   computeShieldedBudgetUseNullifier,
   computeShieldedValueNoteCommitment,
-  decodeShieldedReceiveCode,
+  decodeShieldedReceiveCredential,
   decodePublicShieldedBudgetEnvelope,
   encodePublicShieldedBudgetEnvelope,
   decryptShieldedNote,
   deriveIdentityMaterial,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedViewPublicKey,
+  splitShieldedViewPublicKey,
   encodeShieldedBudgetNotePayload,
-  encodeShieldedReceiveCode,
+  encodeShieldedReceiveCredential,
   encodeShieldedValueNotePayload,
   encryptShieldedNote,
   generateShieldedRandomField,
@@ -68,6 +75,7 @@ const zeroData = () => ({
   lineageCheckpointId: 0n,
   fundMode: 0n,
   budgetKind: 0n,
+  receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
 });
 
 function compactPath(proof, capacity) {
@@ -218,22 +226,48 @@ export async function runShieldedAcceptanceSmoke({
     keyMaterials.push(keys);
     return { ...keys, viewingKey: await deriveShieldedViewPublicKey(keys.hpkeIkm) };
   };
-  const receiveCodeFor = (material, keys) => {
-    const files = candidate.circuits.receiveCode;
-    const signals = buildShieldedReceiveCodePublicSignals({
-      identityCommitment: material.identityCommitment,
+  const loadAuthorizationState = async () => {
+    const contract = deployed.identityAuthorizationState;
+    assert.ok(contract, "Integrated deployment has no shared authorization state");
+    const block = await provider.getBlock("latest");
+    const overrides = { blockTag: block.number };
+    const creation = Number(await contract.creationBlock(overrides));
+    const events = await contract.queryFilter(contract.filters.CounterIncremented(), creation, block.number);
+    const state = rebuildShieldedIdentityAuthorizationState(events, await contract.currentRoot(overrides));
+    return { state, checkpointId: await contract.currentCheckpointId(overrides), asOf: BigInt(block.timestamp) };
+  };
+  const receiveCodeFor = async (material, keys, disclosure = "fund") => {
+    const action = disclosure === "fund" ? "fundReceiveCredential" : "anonymousReceiveCredential";
+    const files = candidate.circuits[action];
+    const checkpoint = await loadAuthorizationState();
+    const alias = computeShieldedAuthorizationAlias(material);
+    const statement = {
+      disclosure,
+      ...(disclosure === "fund" ? { identityCommitment: material.identityCommitment } : {}),
+      authorizationAlias: alias,
+      authorizationCounter: getShieldedIdentityAuthorizationWitness(checkpoint.state, alias).authorizationCounter,
+      expiresAt: checkpoint.asOf + 86400n,
       ownerCommitment: keys.ownerCommitment,
       viewingKey: keys.viewingKey,
-    });
+    };
+    const signals = buildShieldedReceiveCredentialPublicSignals(statement);
+    const view = splitShieldedViewPublicKey(keys.viewingKey);
     const generated = generateProof(
       root,
       files,
       {
-        identityCommitment: String(signals[0]),
-        ownerCommitment: String(signals[1]),
-        viewKeyLo: String(signals[2]),
-        viewKeyHi: String(signals[3]),
-        keyMode: String(signals[4]), identitySuiteId: String(signals[5]), independentKeySuiteId: String(signals[6]), independentKeyDerivationVersion: String(signals[7]), receiveCodeVersion: String(signals[8]), spendingSecret: String(keys.ownerSecret),
+        identityCommitment: String(material.identityCommitment),
+        authorizationCounter: String(statement.authorizationCounter),
+        expiresAt: String(statement.expiresAt),
+        ownerCommitment: String(keys.ownerCommitment),
+        viewKeyLo: String(view.viewKeyLo),
+        viewKeyHi: String(view.viewKeyHi),
+        keyMode: "0",
+        identitySuiteId: "1",
+        independentKeySuiteId: "1",
+        independentKeyDerivationVersion: "1",
+        receiveCodeVersion: "2",
+        spendingSecret: String(keys.ownerSecret),
         nameField: String(material.nameField),
         derivedSecretField: String(material.derivedSecretField),
         isBirthBC: Number(material.identity.isBirthBC),
@@ -245,27 +279,64 @@ export async function runShieldedAcceptanceSmoke({
       },
       signals,
     );
-    const code = encodeShieldedReceiveCode({
-      identityCommitment: material.identityCommitment,
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey: keys.viewingKey,
+    const code = encodeShieldedReceiveCredential({
+      ...statement,
       proof: generated.raw,
     });
     // The payer holds only the code and checks its proof as the browser does.
-    const decoded = decodeShieldedReceiveCode(code);
+    const decoded = decodeShieldedReceiveCredential(code);
     assert.ok(
       verifyProof(root, files, decoded.proof, decoded.publicSignals),
       "Receive code proof did not verify",
     );
     receiveCode = {
-      verificationKeySha256: candidate.manifest.circuits.receiveCode.verificationKeySha256,
+      verificationKeySha256: candidate.manifest.circuits[action].verificationKeySha256,
       proofSha256: jsonHash(generated.raw),
       verified: true,
     };
     return decoded;
   };
+  const authorizeReceivers = async (action, data, credentials) => {
+    const checkpoint = await loadAuthorizationState();
+    const hash = computeShieldedReceiveActionHash(data);
+    const fields = action === "fund" ? { receiveAuthorizationAlias: "0", receiveSalt: "0" } : {
+      receiveAuthorizationAliases: ["0", "0"], receiveSalts: ["0", "0"], receiveKeyModes: ["0", "0"],
+      receiveViewKeyLo: ["0", "0"], receiveViewKeyHi: ["0", "0"],
+    };
+    for (const [slot, credential] of credentials.entries()) {
+      if (!credential) continue;
+      const salt = generateShieldedRandomField();
+      const prepared = prepareShieldedReceivePresentation({ credential, salt, ...checkpoint,
+        chainId, consumer: poolAddress, action: action === "fund" ? 3 : 4, messageId: slot, payloadHash: hash });
+      const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-receive-acceptance-"));
+      let result;
+      try {
+        const input = path.join(temporary, "input.json"), output = path.join(temporary, "proof.json");
+        fs.writeFileSync(input, JSON.stringify(prepared.request), { mode: 0o600 });
+        execFileSync(path.join(root, "zk-artifacts/receive/receive-prover"), ["prove", "--artifacts",
+          path.join(root, "frontend/public/zk/receive", prepared.request.kind), "--input", input, "--output", output],
+          { cwd: root, stdio: "pipe", timeout: 600000, maxBuffer: 1024 * 1024 });
+        result = JSON.parse(fs.readFileSync(output, "utf8"));
+        assert.equal(result.verified, true);
+        assert.deepEqual(result.publicSignals, prepared.publicSignals.map(String));
+      } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+      data.receiveAuthorizations[slot] = { checkpointId: checkpoint.checkpointId, asOf: checkpoint.asOf,
+        expiresAt: credential.expiresAt, recipientBinding: prepared.recipientBinding, proof: result.solidityProof };
+      if (action === "fund") Object.assign(fields, { receiveAuthorizationAlias: String(credential.authorizationAlias), receiveSalt: String(salt) });
+      else {
+        const view = splitShieldedViewPublicKey(credential.viewingKey);
+        fields.receiveAuthorizationAliases[slot] = String(credential.authorizationAlias);
+        fields.receiveSalts[slot] = String(salt);
+        fields.receiveKeyModes[slot] = String(credential.keyMode);
+        fields.receiveViewKeyLo[slot] = String(view.viewKeyLo);
+        fields.receiveViewKeyHi[slot] = String(view.viewKeyHi);
+      }
+    }
+    return fields;
+  };
   const encrypt = async (keys, note, encode, commitment) => {
-    const payload = encode(note, scope);
+    const noteScope = { ...scope, viewingKey: keys.viewingKey };
+    const payload = encode(note, noteScope);
     let opened;
     try {
       const ciphertext = await encryptShieldedNote({
@@ -283,7 +354,7 @@ export async function runShieldedAcceptanceSmoke({
         poolAddress,
       });
       assert.deepEqual(opened, payload, "Encrypted note did not round trip");
-      verifyShieldedNotePayload({ payload: opened, ciphertext, noteCommitment }, scope);
+      verifyShieldedNotePayload({ payload: opened, ciphertext, noteCommitment }, noteScope);
       return {
         ...note,
         ciphertext,
@@ -510,7 +581,7 @@ export async function runShieldedAcceptanceSmoke({
     };
     const childKeys = await keysFor(childMaterial);
     const donorKeys = await keysFor(fatherMaterial);
-    const recipient = receiveCodeFor(childMaterial, childKeys);
+    const recipient = await receiveCodeFor(childMaterial, childKeys);
     // Notes for the heir use the code's keys; the heir still spends with its own secret.
     const heirKeys = {
       ...childKeys,
@@ -570,7 +641,9 @@ export async function runShieldedAcceptanceSmoke({
       },
       scope,
     );
+    const heirViewLimbs = splitShieldedViewPublicKey(heirKeys.viewingKey);
     const budgetFields = {
+      viewingKey: heirKeys.viewingKey,
       keyMode: 0n,
       ...policyFields,
       heirIdentityCommitment,
@@ -578,8 +651,13 @@ export async function runShieldedAcceptanceSmoke({
       enrollmentSalt,
       heirOwnerCommitment,
     };
-    const budgetNote = (remaining) => {
-      const note = { ...budgetFields, remaining, nonce: generateShieldedRandomField() };
+    const budgetNote = (remaining, budgetOrigin = "fund") => {
+      const note = {
+        ...budgetFields,
+        budgetOrigin,
+        remaining,
+        nonce: generateShieldedRandomField(),
+      };
       return encrypt(heirKeys, note, encodeShieldedBudgetNotePayload, (ciphertextHashField) =>
         computeShieldedBudgetNoteCommitment(
           {
@@ -617,8 +695,14 @@ export async function runShieldedAcceptanceSmoke({
       asOf,
       lineageCheckpointId,
     };
+    const fundReceiverWitness = await authorizeReceivers("fund", fundData, [recipient]);
     const fundInputs = publicInputsFor("fund", fundData);
     const commonFunding = {
+      receiveAuthorizationAlias: "0",
+      receiveSalt: "0",
+      heirViewKeyLo: String(heirViewLimbs.viewKeyLo),
+      heirViewKeyHi: String(heirViewLimbs.viewKeyHi),
+      oldBudgetIsClaim: "0",
       keyMode: "0",
       rootIdentityCommitment: String(rootIdentityCommitment),
       rootVersionIndex: "1",
@@ -634,6 +718,7 @@ export async function runShieldedAcceptanceSmoke({
       "fund",
       {
         ...commonFunding,
+        ...fundReceiverWitness,
         ...lineageWitness,
         ...donorWitness(initial[0], initialPath),
         ...fundInputs.witness,
@@ -684,11 +769,13 @@ export async function runShieldedAcceptanceSmoke({
       ),
       ...outputs([additionalFundingBudget, additionalFundingChange]),
     };
+    const additionalReceiverWitness = await authorizeReceivers("fund", additionalFundingData, [recipient]);
     const additionalFundingInputs = publicInputsFor("fund", additionalFundingData);
     const additionalFundingProof = await prove(
       "fund",
       {
         ...commonFunding,
+        ...additionalReceiverWitness,
         ...donorWitness(fundChange, changePath),
         ...additionalFundingInputs.witness,
         allocationKeyCommitment: String(allocationKeyCommitment),
@@ -741,14 +828,38 @@ export async function runShieldedAcceptanceSmoke({
     // Only this identity note's fields are public; private rule openings stay local.
     const publicPolicySalt = generateShieldedRandomField();
     const publicAllocationKey = generateShieldedRandomField();
-    const publicAllocationKeyCommitment = computeShieldedAllocationKeyCommitment(publicAllocationKey, scope);
-    const publicPolicyCommitment = computeShieldedPolicyCommitment({ ...policyFields, policySalt: publicPolicySalt, allocationKeyCommitment: publicAllocationKeyCommitment }, scope);
-    const publicEnrollmentCommitment = computeShieldedEnrollmentCommitment({ policyCommitment: publicPolicyCommitment, heirIdentityCommitment, eligibleFrom, enrollmentSalt }, scope);
+    const publicAllocationKeyCommitment = computeShieldedAllocationKeyCommitment(
+      publicAllocationKey,
+      scope,
+    );
+    const publicPolicyCommitment = computeShieldedPolicyCommitment(
+      {
+        ...policyFields,
+        policySalt: publicPolicySalt,
+        allocationKeyCommitment: publicAllocationKeyCommitment,
+      },
+      scope,
+    );
+    const publicEnrollmentCommitment = computeShieldedEnrollmentCommitment(
+      {
+        policyCommitment: publicPolicyCommitment,
+        heirIdentityCommitment,
+        eligibleFrom,
+        enrollmentSalt,
+      },
+      scope,
+    );
     const identityBudgetFields = {
-      binding: "identity", keyMode: 0n,
-      rootIdentityCommitment, rootVersionIndex: 1n, heirIdentityCommitment,
-      amountPerPeriod: rate, periodDays: PERIOD_DAYS, eligibleFrom,
-      policyCommitment: publicPolicyCommitment, enrollmentCommitment: publicEnrollmentCommitment,
+      binding: "identity",
+      keyMode: 0n,
+      rootIdentityCommitment,
+      rootVersionIndex: 1n,
+      heirIdentityCommitment,
+      amountPerPeriod: rate,
+      periodDays: PERIOD_DAYS,
+      eligibleFrom,
+      policyCommitment: publicPolicyCommitment,
+      enrollmentCommitment: publicEnrollmentCommitment,
     };
     const identityBudgetNote = async (remaining, clear = false) => {
       const note = { ...identityBudgetFields, remaining, nonce: generateShieldedRandomField() };
@@ -788,17 +899,63 @@ export async function runShieldedAcceptanceSmoke({
     const publicFundChange = await valueNote(donorKeys, 500n);
     const publicDonorPath = await notePath(additionalFundingChange);
     const publicFundData = {
-      ...zeroData(), fundMode: 0n, budgetKind: 1n,
-      ...inputs([publicDonorPath, publicDonorPath], [spend(additionalFundingChange), computeShieldedEnrollmentNullifier({ allocationKey: publicAllocationKey, policyCommitment: publicPolicyCommitment, heirIdentityCommitment }, scope)]),
-      ...outputs([publicBudget, publicFundChange]), relation0: endorsement.root, relation1: trusted.root, asOf, lineageCheckpointId,
+      ...zeroData(),
+      fundMode: 0n,
+      budgetKind: 1n,
+      ...inputs(
+        [publicDonorPath, publicDonorPath],
+        [
+          spend(additionalFundingChange),
+          computeShieldedEnrollmentNullifier(
+            {
+              allocationKey: publicAllocationKey,
+              policyCommitment: publicPolicyCommitment,
+              heirIdentityCommitment,
+            },
+            scope,
+          ),
+        ],
+      ),
+      ...outputs([publicBudget, publicFundChange]),
+      relation0: endorsement.root,
+      relation1: trusted.root,
+      asOf,
+      lineageCheckpointId,
     };
     const publicFundInputs = publicInputsFor("fund", publicFundData);
-    const publicFundProof = await prove("fund", {
-      ...commonFunding, ...lineageWitness, ...donorWitness(additionalFundingChange, publicDonorPath), ...publicFundInputs.witness,
-      heirOwnerCommitment: "0", keyMode: "0", policySalt: String(publicPolicySalt), allocationKeyCommitment: String(publicAllocationKeyCommitment), allocationKey: String(publicAllocationKey),
-      oldBudgetKind: "0", oldKeyMode: "0", oldHeirOwnerCommitment: "0", oldBudgetRemaining: "0", oldBudgetRemainingPeriods: "0", oldBudgetNonce: "0", oldBudgetCiphertextHash: "0", oldBudgetDepth: "0", oldBudgetIndex: "0", oldBudgetSiblings: Array(32).fill("0"), budgetUseNonce: "0",
-      heirVersionIndex: "1", budgetPeriods: "15", budgetNonce: String(publicBudget.nonce), changeNonce: String(publicFundChange.nonce),
-    }, publicFundInputs.signals, { label: "shielded-action-fund-identity" });
+    const publicFundProof = await prove(
+      "fund",
+      {
+        ...commonFunding,
+        ...lineageWitness,
+        ...donorWitness(additionalFundingChange, publicDonorPath),
+        ...publicFundInputs.witness,
+        heirOwnerCommitment: "0",
+        heirViewKeyLo: "0",
+        heirViewKeyHi: "0",
+        keyMode: "0",
+        policySalt: String(publicPolicySalt),
+        allocationKeyCommitment: String(publicAllocationKeyCommitment),
+        allocationKey: String(publicAllocationKey),
+        oldBudgetKind: "0",
+        oldKeyMode: "0",
+        oldHeirOwnerCommitment: "0",
+        oldBudgetRemaining: "0",
+        oldBudgetRemainingPeriods: "0",
+        oldBudgetNonce: "0",
+        oldBudgetCiphertextHash: "0",
+        oldBudgetDepth: "0",
+        oldBudgetIndex: "0",
+        oldBudgetSiblings: Array(32).fill("0"),
+        budgetUseNonce: "0",
+        heirVersionIndex: "1",
+        budgetPeriods: "15",
+        budgetNonce: String(publicBudget.nonce),
+        changeNonce: String(publicFundChange.nonce),
+      },
+      publicFundInputs.signals,
+      { label: "shielded-action-fund-identity" },
+    );
     await submit(
       "fund",
       publicFundData,
@@ -814,7 +971,7 @@ export async function runShieldedAcceptanceSmoke({
     );
 
     const claimAsOf = eligibleFrom + 12n * PERIOD;
-    const remainingBudget = await budgetNote(300n);
+    const remainingBudget = await budgetNote(300n, "claim");
     const payout = await valueNote(childKeys, 1200n);
     const claimPaths = await Promise.all([notePath(budget), notePath(additionalFundingBudget)]);
     const [budgetClaimPath, secondClaimPath] = claimPaths;
@@ -853,8 +1010,13 @@ export async function runShieldedAcceptanceSmoke({
         suiteId: 1,
         versionIndex: "1",
         budgetKind: "0",
+        heirViewKeyLo: String(heirViewLimbs.viewKeyLo),
+        heirViewKeyHi: String(heirViewLimbs.viewKeyHi),
+        inputBudgetIsClaim: ["0", "0"],
         secondBudgetKind: "0",
-        keyMode: "0", secondKeyMode: "0", ownerSecret: String(childKeys.ownerSecret),
+        keyMode: "0",
+        secondKeyMode: "0",
+        ownerSecret: String(childKeys.ownerSecret),
         policyCommitmentInput: String(policyCommitment),
         enrollmentCommitmentInput: String(enrollmentCommitment),
         policySalt: String(policySalt),
@@ -906,7 +1068,16 @@ export async function runShieldedAcceptanceSmoke({
         [publicClaimPath, publicClaimPath],
         [spend(publicBudget), dummySpend(publicBudget)],
       ),
-      periodNullifiers: Array.from({ length: 12 }, (_, index) => computeShieldedPeriodNullifier({ derivedSecretField: childMaterial.derivedSecretField, policyCommitment: publicPolicyCommitment, periodIndex: BigInt(index) }, scope)),
+      periodNullifiers: Array.from({ length: 12 }, (_, index) =>
+        computeShieldedPeriodNullifier(
+          {
+            derivedSecretField: childMaterial.derivedSecretField,
+            policyCommitment: publicPolicyCommitment,
+            periodIndex: BigInt(index),
+          },
+          scope,
+        ),
+      ),
       ...outputs([identityRemainder, identityPayout]),
       relation0: endorsement.root,
       relation1: trusted.root,
@@ -929,8 +1100,13 @@ export async function runShieldedAcceptanceSmoke({
         suiteId: 1,
         versionIndex: "1",
         budgetKind: "1",
+        heirViewKeyLo: "0",
+        heirViewKeyHi: "0",
+        inputBudgetIsClaim: ["0", "0"],
         secondBudgetKind: "0",
-        keyMode: "0", secondKeyMode: "0", ownerSecret: String(childKeys.ownerSecret),
+        keyMode: "0",
+        secondKeyMode: "0",
+        ownerSecret: String(childKeys.ownerSecret),
         policyCommitmentInput: String(publicPolicyCommitment),
         enrollmentCommitmentInput: String(publicEnrollmentCommitment),
         policySalt: "0",
@@ -1001,11 +1177,13 @@ export async function runShieldedAcceptanceSmoke({
     ]);
     const transferPath = await notePath(publicFundChange);
     const transferData = valueData(publicFundChange, transferPath, transferOutputs);
+    const transferReceiverWitness = await authorizeReceivers("privateTransfer", transferData, [await receiveCodeFor(childMaterial, childKeys, "anonymous"), null]);
     const transferInputs = publicInputsFor("privateTransfer", transferData);
     const transferProof = await prove(
       "privateTransfer",
       {
         ...transferInputs.witness,
+        ...transferReceiverWitness,
         ...valuePrivateInputs(publicFundChange, transferPath),
         outputOwnerCommitments: decimals(transferOutputs.map((note) => note.ownerCommitment)),
         outputAmounts: decimals(transferOutputs.map((note) => note.amount)),
@@ -1081,7 +1259,7 @@ export async function runShieldedAcceptanceSmoke({
             ciphertext: event.args.ciphertext,
             noteCommitment: event.args.commitment,
           },
-          scope,
+          { ...scope, viewingKey: local.keys.viewingKey },
         );
         recoveredNotes += 1;
       } finally {

@@ -165,3 +165,12 @@ export function getEventScanConfig() {
     maxResults: getPositiveNumberEnv("VITE_DF_EVENT_MAX_RESULTS", 1_000),
   };
 }
+
+/** Authenticated private-letter archive for the selected chain. */
+export function getPrivateLetterArchiveAddress(chainId: number): string {
+  return getPerChainEnv("VITE_PRIVATE_LETTER_ARCHIVE_ADDRESS", chainId);
+}
+export function getPrivateLetterArchiveDeploymentBlock(chainId: number): number {
+  const block = Number(getPerChainEnv("VITE_PRIVATE_LETTER_ARCHIVE_FROM_BLOCK", chainId));
+  return Number.isSafeInteger(block) && block >= 0 ? block : 0;
+}

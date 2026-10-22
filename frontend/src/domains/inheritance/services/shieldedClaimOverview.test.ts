@@ -31,6 +31,7 @@ function budget(
     logIndex: Number(commitment),
     note: {
       kind: "budget",
+      budgetOrigin: 0n,
       rootIdentityCommitment: 111n,
       rootVersionIndex: 3n,
       policySalt: 222n,
@@ -309,7 +310,15 @@ describe("shielded claim budget options", () => {
     expect(result[0].notes).toEqual([privateNote]);
     expect(result[1].notes).toEqual([publicNote]);
     expect(result[0].key).not.toBe(result[1].key);
-    expect(result[0].overview.claim).toEqual({ budget: privateNote, periodIndices: [0n], amount: 100n });
-    expect(result[1].overview.claim).toEqual({ budget: publicNote, periodIndices: [0n], amount: 100n });
+    expect(result[0].overview.claim).toEqual({
+      budget: privateNote,
+      periodIndices: [0n],
+      amount: 100n,
+    });
+    expect(result[1].overview.claim).toEqual({
+      budget: publicNote,
+      periodIndices: [0n],
+      amount: 100n,
+    });
   });
 });

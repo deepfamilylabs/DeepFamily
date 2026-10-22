@@ -28,7 +28,11 @@ import {
   verifyShieldedNotePayload,
 } from "../index.js";
 
-const context = { chainId: 1030n, poolAddress: "0x0000000000000000000000000000000000000001" };
+const context = {
+  viewingKey: "0x" + "11".repeat(32),
+  chainId: 1030n,
+  poolAddress: "0x0000000000000000000000000000000000000001",
+};
 const keys = deriveShieldedHeirKeyMaterial(13n);
 const ruleOpening = {
   policySalt: 17n,
@@ -56,7 +60,13 @@ const enrollmentCommitment = computeShieldedEnrollmentCommitment(
   context,
 );
 const budget = { binding: "identity", ...common, policyCommitment, enrollmentCommitment };
-const privateBudget = { ...common, ...ruleOpening, heirOwnerCommitment: keys.ownerCommitment };
+const privateBudget = {
+  ...common,
+  ...ruleOpening,
+  viewingKey: context.viewingKey,
+  budgetOrigin: 0n,
+  heirOwnerCommitment: keys.ownerCommitment,
+};
 const value = { ownerCommitment: keys.ownerCommitment, amount: 300n, nonce: 29n };
 
 test("budget schemas include the period and compact owner version indices", () => {
@@ -69,11 +79,11 @@ test("budget schemas include the period and compact owner version indices", () =
   );
   assert.deepEqual(decodeShieldedNotePayload(payload, context), { kind: "budget", ...budget });
   const original = encodeShieldedBudgetNotePayload(privateBudget, context);
-  assert.equal(original.length, 283);
+  assert.equal(original.length, 284);
   assert.equal(original[5], 2);
   assert.equal(
     keccak256(original),
-    "0xc15fb61b579c24ff91895d0f5870742f99dfd08d0f787f53d56c7dbb04253025",
+    "0xd0070e92e90db73206fa9f6281087987f30b78922fbaa350047ccd56247328bf",
   );
   assert.deepEqual(
     encodeShieldedBudgetNotePayload({ ...privateBudget, binding: "owner" }, context),
@@ -387,7 +397,7 @@ test("public fund signal fields come from the canonical output while claim expos
   };
   const { signals, witness } = buildShieldedPoolPublicInputs(base);
   const publicBudget = getShieldedPublicBudgetFields(budget, context);
-  assert.equal(signals.length, 27);
+  assert.equal(signals.length, 29);
   assert.deepEqual(signals.slice(0, 14), [1030n, 1n, 0n, 1n, ...publicBudget]);
   assert.deepEqual(witness.publicBudget, publicBudget.map(String));
   assert.throws(

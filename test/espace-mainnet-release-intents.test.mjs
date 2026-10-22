@@ -16,6 +16,7 @@ import { deriveMainnetPlannedAddresses } from "../scripts/lib/protocolDeployment
 import {
   INTEGRATED_DEPLOYMENT_RECORDS,
   SHIELDED_DEPLOYMENT_CIRCUITS,
+  RECEIVE_DEPLOYMENT_CONTRACTS,
 } from "../scripts/lib/zkDeploymentCatalog.mjs";
 
 const DEPLOYER = "0x1000000000000000000000000000000000000001";
@@ -25,6 +26,7 @@ const CHAIN_ID = 1030n;
 const MIN_DELAY = 604_800;
 
 const artifactPaths = {
+  ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName}) => [contractName, `artifacts/contracts/${contractName}.sol/${contractName}.json`])),
   ...Object.fromEntries(
     Object.values(SHIELDED_DEPLOYMENT_CIRCUITS).map((spec) => [
       spec.verifierContractName,
@@ -109,7 +111,7 @@ describe("eSpace Mainnet release transaction intents", function () {
         ],
       ]),
     ].map(([label, address]) => ({ label, address, status: "passed" }));
-    expect(contracts).to.have.length(23);
+    expect(contracts).to.have.length(31);
     expect(() => assertCompleteMainnetSourceVerification({ contracts, addresses })).not.to.throw();
 
     const wrongAdapter = contracts.map((contract) => ({ ...contract }));
@@ -125,11 +127,11 @@ describe("eSpace Mainnet release transaction intents", function () {
     ).to.throw(/incomplete source verification/);
   });
 
-  it("reconstructs all twenty-two deployments and six calls in nonce order", async function () {
+  it("reconstructs all thirty deployments and six calls in nonce order", async function () {
     const intents = await build();
     expect(intents.map(({ label }) => label)).to.deep.equal(MAINNET_TRANSACTION_LABELS);
-    expect(intents).to.have.length(28);
-    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(22);
+    expect(intents).to.have.length(36);
+    expect(intents.filter(({ kind }) => kind === "deployment")).to.have.length(30);
     for (const [index, intent] of intents.entries()) {
       expect(intent.nonce).to.equal(STARTING_NONCE + index);
       expect(intent.from).to.equal(ethers.getAddress(DEPLOYER));
@@ -187,20 +189,28 @@ describe("eSpace Mainnet release transaction intents", function () {
       "address",
       "address",
       "address",
+      "address",
+      "address",
     ]);
     expect([...poolArgs]).to.deep.equal([
       byLabel.deepFamilyToken.predictedAddress,
       byLabel.deepFamilyLineageIndex.predictedAddress,
       byLabel.groth16VerifierAdapter.predictedAddress,
       byLabel.shieldedNativePool.predictedAddress,
+      byLabel.identityAuthorizationState.predictedAddress,
+      byLabel.receivePresentationVerifierRouter.predictedAddress,
     ]);
     const nativeArgs = decodeConstructor("shieldedNativePool", "ShieldedNativePool", [
+      "address",
+      "address",
       "address",
       "address",
     ]);
     expect([...nativeArgs]).to.deep.equal([
       byLabel.deepFamilyLineageIndex.predictedAddress,
       byLabel.groth16VerifierAdapter.predictedAddress,
+      byLabel.identityAuthorizationState.predictedAddress,
+      byLabel.receivePresentationVerifierRouter.predictedAddress,
     ]);
 
     const deepData = byLabel.deepFamilyImplementation.data.slice(2);
