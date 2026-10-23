@@ -89,7 +89,10 @@ export const runAcceptanceCommand = async ({
   if (!["diagnostic", "release-rehearsal"].includes(mode)) {
     throw new Error(`${acceptance.modeEnvironmentName} must be diagnostic or release-rehearsal`);
   }
-  const sanitizedEnvironment = sanitizeReleaseEnvironment(environment);
+  const sanitizedEnvironment = {
+    ...sanitizeReleaseEnvironment(environment),
+    DEEPFAMILY_COMMAND_CHAIN: chainProfile.id,
+  };
 
   const runHardhat = async (childEnvironment) => {
     const hardhatArguments = [

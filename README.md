@@ -101,23 +101,21 @@ DeepFamily creates the decentralized family tree infrastructure, using zero-know
 ```bash
 git clone https://github.com/deepfamilylabs/DeepFamily.git
 cd DeepFamily
-npm run setup    # Install root + frontend dependencies
+npm install    # Install root + frontend dependencies
 cp .env.example .env
 # Set PRIVATE_KEY and HISTORICAL_DATA_FILES in .env before starting dev:all.
 cp frontend/.env.example frontend/.env.local
 # Set VITE_ZK_ASSET_BASE_URL in frontend/.env.local to the proving-file host.
 npm run check    # Frontend checks + contract lint/build/test
-npm run build    # Compile smart contracts
 npm run dev:all  # Start local node + deploy + seed data + frontend
 ```
 
 ### Step-by-Step Setup
 
 ```bash
-npm run setup           # Install dependencies
+npm install           # Install dependencies
 cp frontend/.env.example frontend/.env.local  # Then set VITE_ZK_ASSET_BASE_URL
 npm run check           # Run frontend + contract verification
-npm run build           # Compile contracts
 npm run dev:node        # Start local Hardhat node
 npm run dev:deploy      # Check ZK artifacts and deploy the complete system
 npm run dev:fund        # Fund the PRIVATE_KEY wallet with local test ETH
@@ -150,7 +148,7 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers 14 Circom circuits (two identity/disclosure and twelve shielded,
+The same `zk:*` workflow covers 13 Circom circuits (two identity/disclosure and eleven shielded,
 including three receive presentations). Receive credentials, letters and recovery use these
 shared build, setup and verification commands:
 
@@ -164,17 +162,17 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
-| `npm run zk:build`             | Compile all 14 Circom circuits                                     |
-| `npm run zk:development:setup` | Generate all development keys and verifiers                        |
-| `npm run zk:production:setup`  | Generate production keys and verifiers for all 14 Circom circuits  |
+| `npm run zk:build`             | Compile all 13 Circom circuits                                     |
+| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 13 circuits |
 | `npm run zk:check`             | Check current artifacts and available real proof fixtures          |
 | `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact bundle                  |
 | `npm run zk:ceremony:verify`   | Verify the complete production artifact bundle                     |
 
-Each Groth16 circuit has its own proving and verification keys. Both setup commands handle
-the complete catalog and derive the shared receive-link parameters and three fixed Solidity
-verifiers from the matching keys. Generated browser files go under `frontend/public/zk/` and
-Solidity verifiers under `contracts/`.
+Each Groth16 circuit has its own proving and verification keys. The single setup command handles
+the complete catalog and derives the shared receive-link parameters and three fixed Solidity
+verifiers from the matching keys. It records the single-operator ceremony and artifact evidence.
+Local development, CI and release use this same final artifact set. Generated browser files go
+under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
@@ -185,8 +183,9 @@ public signals and ciphertext. First use needs no recipient registration or tran
 credential creation and payment still read the latest authorization counter. See
 [private letters](docs/private-letters.md) for the exact flow and sizes.
 
-Current keys remain development-only. Local functionality and real-proof acceptance use them
-through the shared workflow; no separate receive setup or deployment-configuration step is needed.
+Current checked-in keys remain development-only and unattested until the final setup is explicitly
+run and its outputs reviewed. Local functionality and real-proof acceptance can reuse the current
+pinned files; the setup command creates their final replacement for every environment.
 
 The browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files and the
 small shared `shielded/receive-link-keys.json` are committed. The
@@ -195,9 +194,10 @@ circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
 in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
 `npm run zk:assets:fetch` installs them in a fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
 `npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-`R2_BUCKET` in `.env`) before pushing the new manifests. Development setup draws fresh randomness,
-so `dev:all` generates new keys only after a circuit change; when the circuits are unchanged and
-their pinned files cannot be downloaded, it stops instead of replacing the committed keys.
+`R2_BUCKET` in `.env`) before pushing the new manifests. Daily build, fetch and check commands reuse
+the pinned keys. `dev:all` stops if a circuit change makes them stale or a required pinned file
+cannot be obtained; key generation requires an explicit `npm run zk:setup` from a clean, reviewed
+commit.
 
 `zk:fetch` installs two distinct compiler roles. The native compiler is written to `bin/circom`
 (`bin/circom.exe` on Windows) and is used by local and diagnostic builds. Release gates snapshot it
@@ -224,23 +224,24 @@ Every selected compiler must report the repository-pinned Circom version and pas
 target-specific binary or source-provenance checks. All circuit compilation uses explicit
 `--O2 --sanity_check 2`, pinning both the optimization and sanity-check levels instead of relying
 on compiler defaults.
-For official targets, `zk:production:setup` snapshots the hash-verified compiler. For the macOS
+For official targets, `zk:setup` snapshots the hash-verified compiler. For the macOS
 arm64 source target it ignores the reusable development compiler and performs a fresh locked build
 of the pinned source commit under the user's protected build directory. The source builder rejects
 external ancestor Cargo configuration, discards inherited Git, Cargo, Rust, Node, dynamic-loader,
 npm, and native-build overrides, resolves Git/Cargo/Rustc to protected absolute executables, and
 uses a controlled PATH plus private home, Cargo, XDG, and temporary directories. It also disables
-ambient Git system/global configuration and hooks. Production setup copies the compiler and pTau
-into its private OS temporary stage, compiles every circuit, and validates every staged R1CS/WASM pair
-against the reviewed canonical hashes before starting any Groth16 Setup or Phase 2
-contribution. It repeats those integrity checks immediately before each setup and before
-installation. `release:preflight` performs the same fresh source-build isolation and artifact
-comparisons. Both commands therefore run on Linux x64 with glibc, macOS arm64, and Windows x64 while
-failing closed on any cross-platform output difference.
+ambient Git system/global configuration and hooks. The setup copies the compiler and pTau
+into its private OS temporary stage. For the first setup, it records the reviewed clean-commit
+sources and compiles every circuit to establish fresh R1CS/WASM hashes. It rechecks the sources,
+compiled outputs and pTau immediately before each Groth16 setup and before installation.
+Review the generated artifact bundle before committing it. Rotation compares sources and compiled
+outputs with the existing final manifest; `release:preflight` independently rebuilds and compares
+them with the reviewed final artifact hashes. Both commands support Linux x64 with glibc, macOS
+arm64, and Windows x64.
 
 Release-only staging is permission-checked: POSIX roots must be owned by the current user with mode
 `0700`; Windows roots have inheritance and existing access rules removed, are owned by the current
-user SID, and are re-read to verify that only that SID has full control. Production setup hashes the
+user SID, and are re-read to verify that only that SID has full control. The setup hashes the
 logical snarkjs production dependency graph—package content, identity, version, and logical
 dependency path, independent of checkout location or hoisting—rather than only the CLI file. It
 then copies the verified runtime into private staging, makes package files read-only on POSIX, and
@@ -249,27 +250,30 @@ from the exact release-commit Git blobs, then re-hashed both before Phase 2 entr
 again immediately before the child process receives it.
 
 The current ZK artifact manifest is schema v3 and commits that snarkjs runtime-graph digest.
-`zk:production:setup` and `release:preflight` both require schema v3.
+`zk:setup` and `release:preflight` both require schema v3.
 If a reviewed dependency update changes the runtime graph after production artifacts already
 exist, the setup command keeps refusing overwrite by default. Its explicit rotation mode requires
 the reviewed old-manifest and new-runtime digests, validates the complete old production bundle,
 and regenerates every Phase 2 artifact set from scratch; see the
 [production ZK setup runbook](docs/zk-ceremony.md#rotate-after-a-reviewed-snarkjs-runtime-change).
 
-Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB, Git-ignored). `zk:development:setup` verifies this local Phase 1 pTau, then compiles all 14 Circom circuits,
-generates their development keys and the matching receive-link parameters, exports
-the Solidity verifiers, copies the required frontend assets, and updates the development manifests.
-The Circom Phase 2 contribution runs on any developer or CI machine and records no ceremony evidence; these keys are unsuitable for
-production.
+Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB,
+Git-ignored). After freezing the reviewed circuit and dependency commit, run `npm run zk:setup`
+on a controlled machine outside CI. It verifies the pinned Phase 1 pTau, compiles all 13 circuits,
+generates their final keys and receive-link parameters, exports the Solidity verifiers, copies
+the frontend assets, and records the manifests and ceremony transcripts. Review and commit the
+complete generated bundle, then publish its proving files for development, CI and release to reuse.
+The first setup validates the existing manifest and toolchain pins without requiring the earlier
+development proving files or matching their old source/R1CS/WASM hashes.
 
-Production setup uses the pinned public Phase 1 pTau locally installed at
-`circuits/ptau/ppot_0080_17.ptau`, or the file selected by `ZK_PTAU_PATH`. Every
-command that reads it checks its byte length and both pinned hashes first; none downloads it.
+The setup uses the pinned public Phase 1 pTau locally installed at
+`circuits/ptau/ppot_0080_17.ptau`, or the file selected by `ZK_PTAU_PATH`. Setup and verification
+commands check its byte length and both pinned hashes first and do not download it.
 
 Artifact copying is strict: the refresh workflow fails if a required generated WASM, zkey, or
 verification key is missing. It never silently generates a missing artifact during the copy step.
 See [ZK proofs](docs/zk-proofs.md) and the
-[production ZK setup runbook](docs/zk-ceremony.md) for the development and release procedures.
+[ZK setup runbook](docs/zk-ceremony.md) for key generation and release verification.
 
 ## Deployment Guide
 
@@ -309,7 +313,7 @@ evidence, or authorization digest. Do not invoke a lower-level script with an ar
 ### Recommended eSpace Mainnet release
 
 Production release is blocked until the development Groth16 keys have been replaced with
-`npm run zk:production:setup`, the generated artifacts have been reviewed and committed together,
+`npm run zk:setup`, the generated artifacts have been reviewed and committed together,
 `npm run release:preflight` passes from that clean commit, and the exact release commit produces an
 eSpace Testnet `release-rehearsal` report with `releaseReady=true`. The default setup reuses the
 pinned public power-17 pTau and records one local Phase 2 contributor under the explicit
@@ -329,7 +333,7 @@ deployed Safe Proxy contract address; keep it empty
 while generating its read-only deterministic deployment plan:
 
 ```bash
-npm run espace:mainnet:safe:plan
+npm run mainnet:safe -- --chain espace --plan
 ```
 
 The creator is fixed to canonical Safe v1.3.0 with exactly three ordered EOA owners and a `2/3`
@@ -338,7 +342,7 @@ After an independent review, pass the exact printed digest to the explicit execu
 or resume. It reads only public owner addresses and never accepts an owner private key:
 
 ```bash
-npm run espace:mainnet:safe:execute -- --digest 0x...
+npm run mainnet:safe -- --chain espace --execute --digest 0x...
 ```
 
 Deployment alone does not prove that the real controllers can sign. Two owners must use their
@@ -347,7 +351,7 @@ external signing workflow to execute the documented refund-free `0 CFX`, empty-c
 `EVM_MAINNET_SAFE_ACCEPTANCE_TX`, then require this read-only check to pass:
 
 ```bash
-npm run espace:mainnet:safe:status
+npm run mainnet:safe -- --chain espace --status
 ```
 
 Only then copy the reviewed Safe Proxy address to `GOVERNANCE_SAFE_ADDRESS`. Do not configure
@@ -360,7 +364,7 @@ execution complete.
 Next use the resumable protocol orchestrator's explicit read-only plan command:
 
 ```bash
-npm run espace:mainnet:release:plan
+npm run mainnet:release -- --chain espace --plan
 ```
 
 Every release invocation performs the complete clean `release:preflight` gate. Review the plan with
@@ -378,7 +382,7 @@ digest and signatures in a regular JSON file inside the repository, for example:
 Then execute or resume with that reviewed file:
 
 ```bash
-npm run espace:mainnet:release:execute -- \
+npm run mainnet:release -- --chain espace --execute \
   --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
 ```
 
@@ -402,7 +406,7 @@ First run the destructive Sepolia acceptance suite:
 
 ```bash
 EVM_E2E_MODE=diagnostic \
-npm run ethereum:acceptance
+npm run acceptance -- --chain ethereum
 ```
 
 A diagnostic run always reports `releaseReady=false`. Before a production release, rerun from the
@@ -415,14 +419,14 @@ For Mainnet, configure three reviewed public owner addresses and a fixed salt, t
 read-only Safe plan:
 
 ```bash
-npm run ethereum:mainnet:safe:plan
+npm run mainnet:safe -- --chain ethereum --plan
 ```
 
 After independent review, pass the exact printed digest to the explicit execute command; this
 broadcasts the real Safe factory transaction:
 
 ```bash
-npm run ethereum:mainnet:safe:execute -- --digest 0x...
+npm run mainnet:safe -- --chain ethereum --execute --digest 0x...
 ```
 
 Two real owners must then execute the documented zero-ETH smoke transaction externally; this
@@ -430,13 +434,13 @@ repository never accepts owner private keys. Record its outer hash and validate 
 broadcasting:
 
 ```bash
-npm run ethereum:mainnet:safe:status
+npm run mainnet:safe -- --chain ethereum --status
 ```
 
 Finally, generate the read-only protocol plan:
 
 ```bash
-npm run ethereum:mainnet:release:plan
+npm run mainnet:release -- --chain ethereum --plan
 ```
 
 At least two current Safe owners must sign the complete EIP-191 plan-approval message printed by
@@ -444,7 +448,7 @@ plan mode. Store the independently reviewed digest and those external signatures
 `planDigest`/`signatures` approval JSON shape shown above, then execute or resume with:
 
 ```bash
-npm run ethereum:mainnet:release:execute -- \
+npm run mainnet:release -- --chain ethereum --execute \
   --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
 ```
 
@@ -511,7 +515,7 @@ The governance examples below use `confluxTestnet` for a stepwise rehearsal. The
 are temporary one-command inputs: `GOVERNANCE_SAFE_ADDRESS` identifies the Safe Proxy that will
 hold the Timelock roles, and `GOVERNANCE_TIMELOCK_ADDRESS` identifies the already-deployed Timelock
 that will become the protocol owner. For a fresh eSpace Mainnet release, do not set the latter;
-start with `npm run espace:mainnet:release:plan` and let the orchestrator deploy it. Supply a
+start with `npm run mainnet:release -- --chain espace --plan` and let the orchestrator deploy it. Supply a
 Timelock address only to a later, explicitly reviewed manual/reuse/upgrade command that needs an
 existing deployment.
 

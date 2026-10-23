@@ -11,7 +11,6 @@ export * from "./identity.js";
 export * from "./inheritance.js";
 export * from "./shielded-inheritance.js";
 export * from "./shielded-signals.js";
-export * from "./shielded-receive-code.js";
 export * from "./shielded-receive-credential.js";
 export * from "./shielded-identity-authorization.js";
 export * from "./shielded-receive-presentation.js";

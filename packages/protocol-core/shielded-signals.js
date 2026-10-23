@@ -3,7 +3,6 @@ import { bigintFrom } from "./bytes.js";
 import { MAX_UINT64, MAX_UINT128, SNARK_SCALAR_FIELD } from "./constants.js";
 import { protocolAssert } from "./errors.js";
 import { computeShieldedCiphertextHashField } from "./shielded-inheritance.js";
-import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
 import {
   decodePublicShieldedBudgetEnvelope,
   getShieldedPublicBudgetFields,
@@ -104,8 +103,6 @@ export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS = Object.freeze(
     ]),
   ),
 );
-
-export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT = 9;
 
 function values(list, length, label) {
   protocolAssert(
@@ -239,37 +236,4 @@ export function buildShieldedPoolPublicInputs(input) {
 /** The ordered verifier input for one pool action. */
 export function buildShieldedPoolPublicSignals(input) {
   return buildShieldedPoolPublicInputs(input).signals;
-}
-
-/**
- * A receive code proves that the holder of `identityCommitment` chose these
- * payment keys. The keys do not depend on chain or pool, so neither is bound.
- */
-export function buildShieldedReceiveCodePublicSignals(input) {
-  const identityCommitment = field(input.identityCommitment, "identityCommitment");
-  const ownerCommitment = field(input.ownerCommitment, "ownerCommitment");
-  protocolAssert(
-    identityCommitment !== 0n && ownerCommitment !== 0n,
-    "ZERO_SHIELDED_SECRET",
-    "Receive code commitments must be nonzero",
-  );
-  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(input.viewingKey);
-  protocolAssert(
-    viewKeyLo !== 0n || viewKeyHi !== 0n,
-    "ZERO_SHIELDED_VIEW_KEY",
-    "view public key must be nonzero",
-  );
-  const keyMode = bigintFrom(input.keyMode ?? 0n, "keyMode", 1n);
-  const metadata = [
-    input.identitySuiteId ?? 1,
-    input.independentKeySuiteId ?? 1,
-    input.independentKeyDerivationVersion ?? 1,
-    input.receiveCodeVersion ?? 1,
-  ].map((value, index) => bigintFrom(value, `receiveMetadata[${index}]`, 255n));
-  protocolAssert(
-    metadata[0] === 1n && metadata[1] === 1n && metadata[2] === 1n && metadata[3] === 1n,
-    "UNSUPPORTED_SHIELDED_RECEIVE_SUITE",
-    "Unsupported receive-code suite or version",
-  );
-  return [identityCommitment, ownerCommitment, viewKeyLo, viewKeyHi, keyMode, ...metadata];
 }

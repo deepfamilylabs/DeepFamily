@@ -26,6 +26,7 @@ import {
   ZK_CEREMONY_CIRCUIT_FIELDS,
   ZK_CEREMONY_TRANSCRIPT_PATH,
   ZK_RELEASE_ARTIFACTS,
+  ZK_TOOLCHAIN_PATHS,
   ZK_TRUST_MODEL_SINGLE_OPERATOR,
   inspectZkReleaseArtifacts,
   readCanonicalJsonFile,
@@ -41,7 +42,11 @@ import {
 } from "./portableCommand.mjs";
 import { createPrivateTemporaryDirectory } from "./privateTemporaryDirectory.mjs";
 import { ensureProductionPtau, inspectPtauFile } from "./productionPtau.mjs";
-import { buildSnarkjsCommand, snapshotSnarkjsRuntime } from "./snarkjsToolchain.mjs";
+import {
+  assertSnarkjsRuntimeHash,
+  buildSnarkjsCommand,
+  snapshotSnarkjsRuntime,
+} from "./snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./zkeyMpcMetadata.mjs";
 import {
   SHIELDED_PRODUCTION_MANIFEST_PATH,
@@ -857,6 +862,139 @@ const stagedCircuitPaths = ({ stageBuild, circuitName }) =>
     wasm: path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
   });
 
+// A first ceremony needs reviewed toolchain pins, not an earlier set of proving keys.
+// Rotation retains the full validation of the artifact set being replaced.
+export const inspectProductionSetupInputs = (options = {}) => {
+  if (options.requireProduction) return inspectZkReleaseArtifacts(options);
+  const root = path.resolve(options.root ?? process.cwd());
+  if (fs.realpathSync(root) !== root) {
+    throw new Error("Production ZK setup root must not traverse a symlink");
+  }
+  const { parsed: manifest, raw } = readCanonicalJsonFile(
+    path.join(root, ZK_ARTIFACT_MANIFEST_PATH),
+    "Initial ZK artifact manifest",
+  );
+  validateZkArtifactManifest(manifest);
+  if (manifest.trustedSetup.status !== "development") {
+    throw new Error("Refusing to overwrite an existing production ZK trusted setup");
+  }
+  const inspectTool = (relativePath, expectedSha256, label) => {
+    const absolutePath = path.join(root, relativePath);
+    const state = fs.lstatSync(absolutePath);
+    if (
+      !state.isFile() ||
+      state.isSymbolicLink() ||
+      fs.realpathSync(absolutePath) !== absolutePath
+    ) {
+      throw new Error(`${label} must be a regular file without symbolic links`);
+    }
+    const sha256 = sha256File(absolutePath);
+    if (sha256 !== expectedSha256) {
+      throw new Error(`${label} SHA-256 mismatch; expected ${expectedSha256}, got ${sha256}`);
+    }
+    return Object.freeze({ path: relativePath, sha256 });
+  };
+  return Object.freeze({
+    manifestSha256: sha256Text(raw),
+    circomVersion: manifest.circomVersion,
+    trustedSetupStatus: manifest.trustedSetup.status,
+    toolchain: Object.freeze({
+      circom: inspectTool(
+        ZK_TOOLCHAIN_PATHS.circomBinary,
+        manifest.toolchain.circomBinarySha256,
+        "Pinned canonical Circom compiler",
+      ),
+      snarkjs: inspectTool(
+        ZK_TOOLCHAIN_PATHS.snarkjsCli,
+        manifest.toolchain.snarkjsCliSha256,
+        "Installed snarkjs CLI",
+      ),
+      snarkjsRuntime: assertSnarkjsRuntimeHash({
+        root,
+        expectedSha256: manifest.toolchain.snarkjsRuntimeSha256,
+      }),
+    }),
+  });
+};
+
+export const snapshotProductionCompilationManifest = ({ root, stageBuild, initialManifest }) =>
+  Object.freeze({
+    ...initialManifest,
+    circuits: Object.freeze(
+      Object.fromEntries(
+        Object.keys(SETUP_CIRCUITS).map((circuitName) => {
+          const compiled = stagedCircuitPaths({ stageBuild, circuitName });
+          return [
+            circuitName,
+            Object.freeze({
+              sourceSha256: sha256File(path.join(root, SETUP_CIRCUITS[circuitName].source)),
+              r1csSha256: sha256File(compiled.r1cs),
+              wasmSha256: sha256File(compiled.wasm),
+            }),
+          ];
+        }),
+      ),
+    ),
+  });
+
+export const snapshotProductionSetupSources = ({ root, includeShielded = true }) => {
+  root = path.resolve(root);
+  const sourceBundleDigest = sourceBundleSha256(root);
+  const pending = [
+    ...Object.values(SETUP_CIRCUITS).map(({ source }) => path.join(root, source)),
+    ...(includeShielded
+      ? Object.values(SHIELDED_SETUP_CIRCUITS).map(({ source }) =>
+          path.join(root, "circuits", `${source}.circom`),
+        )
+      : []),
+  ];
+  const circuits = new Map();
+  // Mirror the compiler's local include search and both reviewed -l directories.
+  // These dependencies include installed package files that Git does not track.
+  while (pending.length > 0) {
+    const file = pending.pop();
+    if (circuits.has(file)) continue;
+    const relative = path.relative(root, file);
+    const state = fs.lstatSync(file);
+    if (
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative) ||
+      !state.isFile() ||
+      state.isSymbolicLink() ||
+      fs.realpathSync(file) !== file
+    ) {
+      throw new Error("Production Circom sources must be ordinary files inside the checkout");
+    }
+    const contents = fs.readFileSync(file, "utf8");
+    circuits.set(file, sha256Text(contents));
+    const uncommented = contents.replace(
+      /"(?:\\.|[^"\\])*"|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*/gu,
+      (token) => (token.startsWith('"') ? token : " "),
+    );
+    for (const match of uncommented.matchAll(/\binclude\s+"([^"]+)"\s*;/gu)) {
+      const include = [
+        path.dirname(file),
+        path.join(root, "node_modules"),
+        path.join(root, "node_modules", "circomlib", "circuits"),
+      ]
+        .map((directory) => path.resolve(directory, match[1]))
+        .find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
+      if (include === undefined) {
+        throw new Error(`Production Circom include is unavailable: ${match[1]}`);
+      }
+      pending.push(include);
+    }
+  }
+  return Object.freeze({
+    sourceBundleDigest,
+    compilationSourceDigest: sha256Text(
+      JSON.stringify(
+        [...circuits].map(([file, digest]) => [path.relative(root, file), digest]).sort(),
+      ),
+    ),
+  });
+};
+
 export const assertCompiledCircuitMatchesManifest = ({ compiledCircuit, initialManifest }) => {
   const { circuitName, r1cs, wasm } = compiledCircuit;
   const expected = initialManifest?.circuits?.[circuitName];
@@ -922,6 +1060,7 @@ const generateCircuitKeys = async ({
   contributionHelperSnapshot,
   runtimeRoot,
   snarkjsRuntimeSha256,
+  assertSourcesUnchanged,
 }) => {
   const { circuitName, r1cs, wasm } = compiledCircuit;
   const keyDirectory = path.join(stageRoot, "keys");
@@ -938,6 +1077,7 @@ const generateCircuitKeys = async ({
   // Revalidate immediately before every Phase 2 setup. This closes the long window in which the
   // second circuit (or the shared pTau) could otherwise change after the initial batch check.
   assertCompiledCircuitMatchesManifest({ compiledCircuit, initialManifest });
+  assertSourcesUnchanged();
   await assertPtauSnapshotMatchesEvidence({ ptauPath: ptau.path, expected: ptau });
   await runner({
     ...buildProductionSnarkjsCommand({
@@ -947,6 +1087,7 @@ const generateCircuitKeys = async ({
     }),
     env: contributionEnvironment,
   });
+  assertSourcesUnchanged();
   await runSecretContribution({
     runner,
     cwd: root,
@@ -1307,12 +1448,13 @@ export const runSingleOperatorProductionSetup = async ({
   randomBytesFn = randomBytes,
   metadataReader = readZkeyMpcMetadata,
   ptauInstaller = ensureProductionPtau,
-  artifactInspector = inspectZkReleaseArtifacts,
+  artifactInspector = inspectProductionSetupInputs,
   compilerInspector = assertLocalCircomInstallation,
   compilerSourceBuilder = buildPinnedCircomFromSource,
   gitToolResolver = resolveTrustedSourceBuildTool,
   runtimeSnapshotter = snapshotSnarkjsRuntime,
   privateDirectoryFactory = createPrivateTemporaryDirectory,
+  sourceSnapshotter = (root) => snapshotProductionSetupSources({ root, includeShielded }),
   preCommitValidator = defaultPreCommitValidator,
   postCommitValidator = defaultPostCommitValidator,
 } = {}) => {
@@ -1354,7 +1496,8 @@ export const runSingleOperatorProductionSetup = async ({
     typeof compilerSourceBuilder !== "function" ||
     typeof gitToolResolver !== "function" ||
     typeof runtimeSnapshotter !== "function" ||
-    typeof privateDirectoryFactory !== "function"
+    typeof privateDirectoryFactory !== "function" ||
+    typeof sourceSnapshotter !== "function"
   ) {
     throw new Error("Production ZK setup collaborators must be functions");
   }
@@ -1381,7 +1524,6 @@ export const runSingleOperatorProductionSetup = async ({
     captureRunner,
   });
   let shieldedReleaseCriteria;
-  let shieldedSourceDigest;
   let shieldedBaselineManifest;
   if (includeShielded) {
     if (shieldedReleaseCriteriaPath !== undefined) {
@@ -1410,7 +1552,6 @@ export const runSingleOperatorProductionSetup = async ({
     } else if (fs.existsSync(shieldedManifestPath)) {
       throw new Error("Refusing to overwrite an existing shielded production trusted setup");
     }
-    shieldedSourceDigest = sourceBundleSha256(resolvedRoot);
   }
   const initialManifestPath = path.join(resolvedRoot, ZK_ARTIFACT_MANIFEST_PATH);
   let initialManifestDocument = null;
@@ -1497,6 +1638,18 @@ export const runSingleOperatorProductionSetup = async ({
       );
     }
   }
+  const resolvedCeremonyId = assertCeremonyId(ceremonyId);
+  if (rotate && resolvedCeremonyId === initialManifest.trustedSetup.ceremonyId) {
+    throw new Error("Production ZK rotation requires a new ceremonyId");
+  }
+  // Bind compilation to the reviewed clean checkout before any compiler can run.
+  const setupSources = sourceSnapshotter(resolvedRoot);
+  const setupSourceDigest = JSON.stringify(setupSources);
+  const assertSetupSourcesUnchanged = () => {
+    if (JSON.stringify(sourceSnapshotter(resolvedRoot)) !== setupSourceDigest) {
+      throw new Error("Production ZK setup sources changed after the reviewed snapshot");
+    }
+  };
   let inspectedCompiler = null;
   if (localTarget.strategy === "official-binary") {
     inspectedCompiler = await compilerInspector({
@@ -1523,10 +1676,6 @@ export const runSingleOperatorProductionSetup = async ({
     ) {
       throw new Error("Production ZK setup compiler inspector returned unexpected target evidence");
     }
-  }
-  const resolvedCeremonyId = assertCeremonyId(ceremonyId);
-  if (rotate && resolvedCeremonyId === initialManifest.trustedSetup.ceremonyId) {
-    throw new Error("Production ZK rotation requires a new ceremonyId");
   }
   const reviewedSnarkjsRuntimeSha256 = rotate
     ? expectedSnarkjsRuntimeSha256
@@ -1609,16 +1758,17 @@ export const runSingleOperatorProductionSetup = async ({
         env: baseEnvironment,
       });
     }
+    assertSetupSourcesUnchanged();
+    const compilationManifest = rotate
+      ? initialManifest
+      : snapshotProductionCompilationManifest({ root: resolvedRoot, stageBuild, initialManifest });
     const compiled = assertStagedCircuitCompilationMatchesManifest({
       stageBuild,
-      initialManifest,
+      initialManifest: compilationManifest,
     });
     let shieldedCompiled;
     let shieldedInitialManifest;
     if (includeShielded) {
-      if (sourceBundleSha256(resolvedRoot) !== shieldedSourceDigest) {
-        throw new Error("Shielded release sources changed before production Phase 2");
-      }
       for (const spec of Object.values(SHIELDED_SETUP_CIRCUITS)) {
         await compileCircuit({
           root: resolvedRoot,
@@ -1633,6 +1783,7 @@ export const runSingleOperatorProductionSetup = async ({
         root: resolvedRoot,
         stageBuild,
         expectedManifest: shieldedBaselineManifest,
+        fresh: !rotate,
       });
       shieldedInitialManifest = {
         circuits: Object.fromEntries(
@@ -1644,13 +1795,16 @@ export const runSingleOperatorProductionSetup = async ({
       };
     }
 
+    assertSetupSourcesUnchanged();
+
     const generated = {};
     for (const circuitName of Object.keys(SETUP_CIRCUITS)) {
+      assertSetupSourcesUnchanged();
       generated[circuitName] = await generateCircuitKeys({
         root: resolvedRoot,
         stageRoot,
         compiledCircuit: compiled[circuitName],
-        initialManifest,
+        initialManifest: compilationManifest,
         ptau: stagedPtau,
         runner,
         randomBytesFn,
@@ -1659,11 +1813,13 @@ export const runSingleOperatorProductionSetup = async ({
         contributionHelperSnapshot: contributionHelper,
         runtimeRoot: snarkjsRuntime.root,
         snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+        assertSourcesUnchanged: assertSetupSourcesUnchanged,
       });
     }
     const shieldedGenerated = {};
     if (includeShielded) {
       for (const [action, entry] of Object.entries(shieldedCompiled)) {
+        assertSetupSourcesUnchanged();
         shieldedGenerated[action] = await generateCircuitKeys({
           root: resolvedRoot,
           stageRoot,
@@ -1681,11 +1837,13 @@ export const runSingleOperatorProductionSetup = async ({
           contributionHelperSnapshot: contributionHelper,
           runtimeRoot: snarkjsRuntime.root,
           snarkjsRuntimeSha256: reviewedSnarkjsRuntimeSha256,
+          assertSourcesUnchanged: assertSetupSourcesUnchanged,
         });
       }
     }
 
     // The finalization beacon is generated only after every independent Phase 2 contribution.
+    assertSetupSourcesUnchanged();
     const beaconBytes = requireRandomBytes(randomBytesFn, 32, "Finalization beacon");
     const beaconHash = beaconBytes.toString("hex");
     beaconBytes.fill(0);
@@ -1715,12 +1873,13 @@ export const runSingleOperatorProductionSetup = async ({
         });
       }
       assertShieldedCompilationUnchanged(shieldedCompiled);
-      if (sourceBundleSha256(resolvedRoot) !== shieldedSourceDigest) {
-        throw new Error("Shielded release sources changed during production Phase 2");
-      }
     }
 
-    assertStagedCircuitCompilationMatchesManifest({ stageBuild, initialManifest });
+    assertSetupSourcesUnchanged();
+    assertStagedCircuitCompilationMatchesManifest({
+      stageBuild,
+      initialManifest: compilationManifest,
+    });
     await assertPtauSnapshotMatchesEvidence({
       ptauPath: stagedPtau.path,
       expected: stagedPtau,
@@ -1728,7 +1887,7 @@ export const runSingleOperatorProductionSetup = async ({
     const records = await buildTranscriptAndManifest({
       root: resolvedRoot,
       stageRoot,
-      initialManifest,
+      initialManifest: compilationManifest,
       compiler: compilerEvidence,
       ceremonyId: resolvedCeremonyId,
       ptau,
@@ -1752,7 +1911,7 @@ export const runSingleOperatorProductionSetup = async ({
         beaconName: SINGLE_OPERATOR_BEACON_NAME,
         beaconHash,
         beaconIterationsExp: SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
-        sourceDigest: shieldedSourceDigest,
+        sourceDigest: setupSources.sourceBundleDigest,
       });
     }
     const coreEntries = buildInstallEntries({
@@ -1799,13 +1958,18 @@ export const runSingleOperatorProductionSetup = async ({
       }
       assertShieldedCompilationUnchanged(shieldedCompiled);
     }
-    assertStagedCircuitCompilationMatchesManifest({ stageBuild, initialManifest });
+    assertSetupSourcesUnchanged();
+    assertStagedCircuitCompilationMatchesManifest({
+      stageBuild,
+      initialManifest: compilationManifest,
+    });
     await assertPtauSnapshotMatchesEvidence({
       ptauPath: stagedPtau.path,
       expected: stagedPtau,
     });
     let validation;
     try {
+      assertSetupSourcesUnchanged();
       await installProductionArtifacts({
         root: resolvedRoot,
         entries,
@@ -1816,6 +1980,7 @@ export const runSingleOperatorProductionSetup = async ({
             runner,
             commandEnvironment: compilerEnvironment,
           });
+          assertSetupSourcesUnchanged();
         },
         validateAfterCommit: async () => {
           validation = await postCommitValidator({
@@ -1824,6 +1989,7 @@ export const runSingleOperatorProductionSetup = async ({
             runner,
             compilerEnvironment,
           });
+          assertSetupSourcesUnchanged();
           if (includeShielded) {
             const installed = inspectShieldedProductionArtifacts({
               root: resolvedRoot,

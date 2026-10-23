@@ -8,12 +8,12 @@ import {
   wipeBytes,
 } from "./bytes.js";
 import { protocolAssert } from "./errors.js";
-import { assertFreeformClass } from "./independent-key-precis.js";
+import { assertFreeformClass } from "./precis.js";
 import {
   mapNonAsciiSpacesToAscii,
   normalizeUnicodeNfc,
   normalizeUnicodeNfkc,
-} from "./independent-key-unicode-normalization.js";
+} from "./unicode-normalization.js";
 
 // These are independent-key protocol constants, independent of identity suites, current
 // Unicode defaults and device performance. Release still requires device review.

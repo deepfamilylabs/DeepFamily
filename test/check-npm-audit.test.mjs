@@ -140,6 +140,30 @@ describe("exact npm audit exception policy", function () {
     );
   });
 
+  it("selects the requested dependency scope and rejects unknown scopes before running npm", function () {
+    for (const scope of ["all", "prod"]) {
+      let observed;
+      const result = runNpmAuditPolicy({
+        scope,
+        stdout: () => {},
+        auditRunner: (options) => {
+          observed = options.scope;
+          return { status: 0, signal: null, stdout: JSON.stringify(cleanReport()) };
+        },
+      });
+      expect(observed).to.equal(scope);
+      expect(result.clean).to.equal(true);
+    }
+    expect(() =>
+      runNpmAuditPolicy({
+        scope: "unknown",
+        auditRunner: () => {
+          throw new Error("must not run");
+        },
+      }),
+    ).to.throw("Audit scope must be all or prod");
+  });
+
   it("runs the JSON audit gate and emits a concise reviewed-exception result", function () {
     const stdout = [];
     const result = runNpmAuditPolicy({

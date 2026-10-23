@@ -6,9 +6,7 @@ import path from "node:path";
 import {
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
-  SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
 } from "@deepfamily/protocol-core";
-import { SHIELDED_CIRCUITS } from "../zk-shielded-build.mjs";
 import { CIRCOM_VERSION, CIRCOM_LINUX_X64_SHA256 } from "./circomToolchain.mjs";
 import {
   PRODUCTION_PTAU_RELATIVE_PATH,
@@ -18,6 +16,7 @@ import {
 import { checkedFile, sourceBundleSha256 } from "./shieldedSourceBundle.mjs";
 import { sha256File } from "./zkArtifactTrust.mjs";
 import {
+  SHIELDED_CIRCUITS,
   hasShieldedSolidityVerifier,
   RECEIVE_PRESENTATION_CIRCUITS,
 } from "./zkCircuitSelection.mjs";
@@ -51,15 +50,13 @@ const publicSignalCount = (action) =>
   RECEIVE_PRESENTATION_CIRCUITS[action]
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
       RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
-    : action === "receiveCode"
-      ? SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT
-      : action === "anonymousReceiveCredential"
-        ? 11
-        : action === "fundReceiveCredential"
-          ? 12
-          : action === "identityAuthorizationUpdate"
-            ? 8
-            : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
+    : action === "anonymousReceiveCredential"
+      ? 11
+      : action === "fundReceiveCredential"
+        ? 12
+        : action === "identityAuthorizationUpdate"
+          ? 8
+          : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
 
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
   Object.fromEntries(
@@ -141,13 +138,18 @@ export function readShieldedReleaseCriteria({ root = process.cwd(), criteriaPath
   return Object.freeze({ ...criteria });
 }
 
-export function snapshotShieldedCompilation({ root, stageBuild, expectedManifest }) {
-  expectedManifest ??= readJson(
-    root,
-    "circuits/shielded-development-manifest.json",
-    "Shielded reviewed development manifest",
-  ).value;
-  if (!sameKeys(expectedManifest.circuits, Object.keys(SHIELDED_SETUP_CIRCUITS))) {
+export function snapshotShieldedCompilation({ root, stageBuild, expectedManifest, fresh = false }) {
+  if (typeof fresh !== "boolean" || (fresh && expectedManifest !== undefined)) {
+    throw new Error("A fresh shielded compilation snapshot cannot use an existing baseline");
+  }
+  if (!fresh) {
+    expectedManifest ??= readJson(
+      root,
+      "circuits/shielded-development-manifest.json",
+      "Shielded reviewed development manifest",
+    ).value;
+  }
+  if (!fresh && !sameKeys(expectedManifest.circuits, Object.keys(SHIELDED_SETUP_CIRCUITS))) {
     throw new Error("Shielded compilation baseline must cover all configured circuits");
   }
   const circuits = {};
@@ -164,7 +166,7 @@ export function snapshotShieldedCompilation({ root, stageBuild, expectedManifest
       wasm,
       wasmSha256: sha256File(wasm),
     });
-    for (const field of ["sourceSha256", "r1csSha256", "wasmSha256"]) {
+    for (const field of fresh ? [] : ["sourceSha256", "r1csSha256", "wasmSha256"]) {
       if (circuits[action][field] !== expectedManifest.circuits[action]?.[field]) {
         throw new Error(
           `${action} shielded ${field} differs from the reviewed compilation baseline`,

@@ -3,16 +3,16 @@
 The guarded Ethereum production path is fixed to Ethereum Mainnet (`mainnet`, chain ID `1`) and
 uses six explicit commands:
 
-- `npm run ethereum:mainnet:safe:plan` predicts a canonical governance Safe without broadcasting;
-- `npm run ethereum:mainnet:safe:execute -- --digest 0x...` deploys or resumes that Safe only from
+- `npm run mainnet:safe -- --chain ethereum --plan` predicts a canonical governance Safe without broadcasting;
+- `npm run mainnet:safe -- --chain ethereum --execute --digest 0x...` deploys or resumes that Safe only from
   its independently reviewed plan digest;
-- `npm run ethereum:mainnet:safe:status` performs read-only validation of the Safe deployment and
+- `npm run mainnet:safe -- --chain ethereum --status` performs read-only validation of the Safe deployment and
   the real-owner acceptance transaction;
-- `npm run ethereum:mainnet:release:projection -- --deployer <address> --nonce <decimal>` derives
+- `npm run mainnet:projection -- --chain ethereum --deployer <address> --nonce <decimal>` derives
   the manifest-ready deployment projection from one explicitly reviewed release nonce without RPC
   or broadcasting;
-- `npm run ethereum:mainnet:release:plan` creates a read-only protocol release plan;
-- `npm run ethereum:mainnet:release:execute -- --approval-file <path>` broadcasts or resumes only
+- `npm run mainnet:release -- --chain ethereum --plan` creates a read-only protocol release plan;
+- `npm run mainnet:release -- --chain ethereum --execute --approval-file <path>` broadcasts or resumes only
   from a separate operation-specific approval JSON file.
 
 Use these npm commands directly. Do not invoke the lower-level `.mjs` files, add a different
@@ -75,7 +75,7 @@ wallet, CI job, or replacement-transaction tool. Maintain an external production
 
 ## Prerequisites
 
-1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
+1. From a clean frozen circuit commit, run `npm run zk:setup` as described in
    [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
    verifiers, and frontend proving artifacts together. Run the final `release:preflight` only after
    the chain-specific deployment projection below has also been frozen into the protocol manifest.
@@ -123,12 +123,12 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 
 # Safe factory phase.
 EVM_MAINNET_SAFE_SALT_NONCE=2026072401
-# Set explicitly for this operation; ethereum:mainnet:safe interprets the value as ETH.
+# Set explicitly for this operation; mainnet:safe -- --chain ethereum interprets the value as ETH.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.1
 EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
 # Protocol release phase.
-# Set explicitly for this operation; ethereum:mainnet:release interprets the value as ETH.
+# Set explicitly for this operation; mainnet:release -- --chain ethereum interprets the value as ETH.
 EVM_MAINNET_MAX_NATIVE=1
 ```
 
@@ -187,7 +187,7 @@ GOVERNANCE_SAFE_ADDRESS=
 Run:
 
 ```bash
-npm run ethereum:mainnet:safe:plan
+npm run mainnet:safe -- --chain ethereum --plan
 ```
 
 The command is hard-locked to network `mainnet` and raw RPC chain ID `1`. It checks the canonical
@@ -210,7 +210,7 @@ After independent approval, keep `PRIVATE_KEY` set only to the approved deployer
 exact printed digest to the explicit execute command:
 
 ```bash
-npm run ethereum:mainnet:safe:execute -- --digest 0x...
+npm run mainnet:safe -- --chain ethereum --execute --digest 0x...
 ```
 
 This is a real Mainnet transaction. The tool recomputes the complete plan, rejects drift, records a
@@ -234,7 +234,7 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=0x...
 Run:
 
 ```bash
-npm run ethereum:mainnet:safe:status
+npm run mainnet:safe -- --chain ethereum --status
 ```
 
 Status is read-only. It revalidates the factory deployment, canonical profile, smoke transaction,
@@ -268,7 +268,7 @@ read-only projection. Substitute the reviewed deployer and nonce:
 ```bash
 npm run build
 mkdir -p tmp/release-evidence
-npm run --silent ethereum:mainnet:release:projection -- \
+npm run --silent mainnet:projection -- --chain ethereum \
   --deployer 0xReviewedDeployer \
   --nonce 123 > tmp/release-evidence/ethereum-mainnet-deployment-projection.json
 ```
@@ -284,7 +284,7 @@ From that exact clean commit, run:
 
 ```bash
 npm run release:preflight
-EVM_E2E_MODE=release-rehearsal npm run ethereum:acceptance
+EVM_E2E_MODE=release-rehearsal npm run acceptance -- --chain ethereum
 ```
 
 Accept and archive only the exact published schema-v1
@@ -304,7 +304,7 @@ projection mismatch before broadcast.
 Run:
 
 ```bash
-npm run ethereum:mainnet:release:plan
+npm run mainnet:release -- --chain ethereum --plan
 ```
 
 The wrapper obtains per-chain and shared production-build locks, runs the complete
@@ -342,7 +342,7 @@ the Git-ignored `tmp/release-evidence/ethereum-mainnet-release-approval.json`:
 Keep this reviewed file unchanged for execution and any resume, then run:
 
 ```bash
-npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
+npm run mainnet:release -- --chain ethereum --execute --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
 ```
 
 This execute phase first recomputes the plan and requires distinct valid signatures from at least
@@ -392,7 +392,7 @@ recover and independently validate the exact chain, sender, nonce, target, value
 and proxy result. Keep the original Safe digest and supply the recovered hash only for that resume:
 
 ```bash
-npm run ethereum:mainnet:safe:execute -- --digest 0xApprovedPlanDigest --recovery-tx 0xTransactionHash
+npm run mainnet:safe -- --chain ethereum --execute --digest 0xApprovedPlanDigest --recovery-tx 0xTransactionHash
 ```
 
 The recovery hash can only adopt a transaction matching the checkpointed intent; it does not
@@ -411,7 +411,7 @@ the Git-ignored `tmp/release-evidence/ethereum-mainnet-release-recovery.json`:
 Keep the original approval file and run:
 
 ```bash
-npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json --recovery-file tmp/release-evidence/ethereum-mainnet-release-recovery.json
+npm run mainnet:release -- --chain ethereum --execute --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json --recovery-file tmp/release-evidence/ethereum-mainnet-release-recovery.json
 ```
 
 Unknown labels, extra hashes, failed/replaced transactions, or sender/nonce/input/address/code/state

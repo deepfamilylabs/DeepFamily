@@ -3,16 +3,16 @@
 The production path for Conflux eSpace Mainnet (`conflux`, chain ID `1030`) has six deliberately
 explicit commands:
 
-- `npm run espace:mainnet:safe:plan` predicts one canonical governance Safe without broadcasting;
-- `npm run espace:mainnet:safe:execute -- --digest 0x...` deploys or resumes that exact reviewed
+- `npm run mainnet:safe -- --chain espace --plan` predicts one canonical governance Safe without broadcasting;
+- `npm run mainnet:safe -- --chain espace --execute --digest 0x...` deploys or resumes that exact reviewed
   Safe plan through its pinned factory call;
-- `npm run espace:mainnet:safe:status` performs read-only validation of the deployment and the
+- `npm run mainnet:safe -- --chain espace --status` performs read-only validation of the deployment and the
   real-owner smoke transaction;
-- `npm run espace:mainnet:release:projection -- --deployer <address> --nonce <decimal>` derives the
+- `npm run mainnet:projection -- --chain espace --deployer <address> --nonce <decimal>` derives the
   manifest-ready deployment projection from one explicitly reviewed release nonce without RPC or
   broadcasting;
-- `npm run espace:mainnet:release:plan` produces the read-only Timelock and protocol release plan;
-- `npm run espace:mainnet:release:execute -- --approval-file <path>` verifies the separate owner
+- `npm run mainnet:release -- --chain espace --plan` produces the read-only Timelock and protocol release plan;
+- `npm run mainnet:release -- --chain espace --execute --approval-file <path>` verifies the separate owner
   approval file, deploys or resumes the reviewed release, verifies sources, waits for finality,
   checks terminal governance, and records a resumable checkpoint.
 
@@ -66,7 +66,7 @@ an external signing workflow to execute one refund-free Safe transaction whose i
 
 The outer transaction must also carry zero CFX, succeed, emit exactly one `ExecutionSuccess`, emit
 no `ExecutionFailure`, and become finalized. Record its outer transaction hash in
-`EVM_MAINNET_SAFE_ACCEPTANCE_TX`; `npm run espace:mainnet:safe:status` replays and validates that
+`EVM_MAINNET_SAFE_ACCEPTANCE_TX`; `npm run mainnet:safe -- --chain espace --status` replays and validates that
 public evidence without any owner key.
 
 The release runner requires that acceptance to be the Safe's first and only execution, so the Safe
@@ -100,7 +100,7 @@ keys into this repository.
 
 ## Prerequisites
 
-1. From a clean frozen circuit commit, run `npm run zk:production:setup` as described in
+1. From a clean frozen circuit commit, run `npm run zk:setup` as described in
    [zk-ceremony.md](./zk-ceremony.md). Review and commit the generated manifest, transcript,
    verifiers, and frontend proving artifacts together. The final `release:preflight` must wait
    until the chain-specific deployment projection below has also been frozen into the protocol
@@ -152,13 +152,13 @@ EVM_MAINNET_SAFE_OWNERS=0xOwner1,0xOwner2,0xOwner3
 
 # Safe creation: owner order and this explicit decimal uint256 determine the address.
 EVM_MAINNET_SAFE_SALT_NONCE=2026072301
-# Set explicitly for this operation; espace:mainnet:safe:* interprets the value as CFX.
+# Set explicitly for this operation; mainnet:safe -- --chain espace interprets the value as CFX.
 EVM_MAINNET_SAFE_MAX_NATIVE=0.2
 # Fill only after two real owners complete the documented external smoke transaction.
 EVM_MAINNET_SAFE_ACCEPTANCE_TX=
 
 # Protocol release: separate budget; authorization and recovery use explicit JSON files.
-# Set explicitly for this operation; espace:mainnet:release:* interprets the value as CFX.
+# Set explicitly for this operation; mainnet:release -- --chain espace interprets the value as CFX.
 EVM_MAINNET_MAX_NATIVE=5
 ```
 
@@ -224,7 +224,7 @@ GOVERNANCE_SAFE_ADDRESS=
 `PRIVATE_KEY` is not needed for this read-only phase. Run:
 
 ```bash
-npm run espace:mainnet:safe:plan
+npm run mainnet:safe -- --chain espace --plan
 ```
 
 The command is restricted to chain `1030`. It verifies the raw RPC chain ID, clean Git state,
@@ -252,7 +252,7 @@ After approval, set `PRIVATE_KEY` only to the approved `EVM_MAINNET_EXPECTED_DEP
 the exact printed digest to the explicit execute command:
 
 ```bash
-npm run espace:mainnet:safe:execute -- --digest 0x...
+npm run mainnet:safe -- --chain espace --execute --digest 0x...
 ```
 
 The command recomputes the complete plan before any broadcast, requires enough deployer balance for
@@ -288,7 +288,7 @@ EVM_MAINNET_SAFE_ACCEPTANCE_TX=0x...
 Then run the read-only validator:
 
 ```bash
-npm run espace:mainnet:safe:status
+npm run mainnet:safe -- --chain espace --status
 ```
 
 Status revalidates the original finalized factory deployment, current canonical Safe profile, and
@@ -331,7 +331,7 @@ projection command never reads a private key, contacts RPC, writes the manifest,
 ```bash
 npm run build
 mkdir -p tmp/release-evidence
-npm run --silent espace:mainnet:release:projection -- \
+npm run --silent mainnet:projection -- --chain espace \
   --deployer 0xReviewedDeployer \
   --nonce 123 > tmp/release-evidence/espace-mainnet-deployment-projection.json
 ```
@@ -346,7 +346,7 @@ From that clean final commit, run the full gate and then the release rehearsal:
 
 ```bash
 npm run release:preflight
-EVM_E2E_MODE=release-rehearsal npm run espace:acceptance
+EVM_E2E_MODE=release-rehearsal npm run acceptance -- --chain espace
 ```
 
 The successful runner publishes
@@ -368,7 +368,7 @@ matches exactly.
 First run the explicit read-only plan command:
 
 ```bash
-npm run espace:mainnet:release:plan
+npm run mainnet:release -- --chain espace --plan
 ```
 
 This is the default read-only plan. It must not broadcast a transaction. The command still performs
@@ -398,7 +398,7 @@ The file must be a regular, non-symlink JSON file under the repository root and 
 (do not replace it with a direct Hardhat/script invocation):
 
 ```bash
-npm run espace:mainnet:release:execute -- \
+npm run mainnet:release -- --chain espace --execute \
   --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
 ```
 
@@ -482,10 +482,10 @@ archived completion report as historical release evidence and the governance sta
 new state.
 
 For Safe creation, an incomplete execution checkpoint must be resumed with
-`espace:mainnet:safe:execute` and its original reviewed digest. The Safe plan command stops when an
+`mainnet:safe -- --chain espace --execute` and its original reviewed digest. The Safe plan command stops when an
 incomplete checkpoint exists, so it can never claim “no transaction was broadcast” after a planned,
 submitted, or confirmed factory step. The release plan command applies the same rule to an
-incomplete 32-step checkpoint; resume it with `espace:mainnet:release:execute` and the original
+incomplete 32-step checkpoint; resume it with `mainnet:release -- --chain espace --execute` and the original
 approval file. A completed execute rerun performs read-only revalidation while the pinned initial
 state remains unchanged; it does not emit a new “no broadcast” plan.
 
@@ -504,7 +504,7 @@ For the Safe creator's single factory call, keep the same reviewed digest, owner
 deployer, and all other Safe inputs, then pass only the independently verified hash to execute:
 
 ```bash
-npm run espace:mainnet:safe:execute -- \
+npm run mainnet:safe -- --chain espace --execute \
   --digest 0xReviewedSafePlanDigest \
   --recovery-tx 0xTransactionHash
 ```
@@ -529,7 +529,7 @@ example `tmp/release-evidence/espace-mainnet-release-recovery.json`:
 Run execute with both the original approval and recovery files:
 
 ```bash
-npm run espace:mainnet:release:execute -- \
+npm run mainnet:release -- --chain espace --execute \
   --approval-file tmp/release-evidence/espace-mainnet-release-approval.json \
   --recovery-file tmp/release-evidence/espace-mainnet-release-recovery.json
 ```

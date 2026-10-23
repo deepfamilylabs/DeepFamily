@@ -1014,7 +1014,6 @@ export const SHIELDED_POOL_PUBLIC_INPUTS: Readonly<
   Record<number, readonly ShieldedPoolPublicInputName[]>
 >;
 export const SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS: Readonly<Record<number, number>>;
-export const SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT: 9;
 export interface ShieldedPoolPublicSignalInput {
   receiveBindings?: readonly [BigNumberish, BigNumberish];
   receiveAuthorizations?: readonly ShieldedReceiveAuthorization[];
@@ -1045,54 +1044,6 @@ export function buildShieldedPoolPublicInputs(input: ShieldedPoolPublicSignalInp
   witness: Record<string, string | string[]>;
 };
 export function buildShieldedPoolPublicSignals(input: ShieldedPoolPublicSignalInput): bigint[];
-export interface ShieldedReceiveCodeStatement {
-  identityCommitment: BigNumberish;
-  ownerCommitment: BigNumberish;
-  viewingKey: BytesLike;
-  keyMode?: BigNumberish;
-  identitySuiteId?: BigNumberish;
-  independentKeySuiteId?: BigNumberish;
-  independentKeyDerivationVersion?: BigNumberish;
-  receiveCodeVersion?: BigNumberish;
-}
-export function buildShieldedReceiveCodePublicSignals(
-  input: ShieldedReceiveCodeStatement,
-): [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
-export function computeShieldedReceiveCodeFingerprint(input: ShieldedReceiveCodeStatement): string;
-
-export const SHIELDED_RECEIVE_CODE_PREFIX: "dfrecv";
-export const SHIELDED_RECEIVE_CODE_VERSION: 1;
-export interface ShieldedReceiveCodeProof {
-  pi_a: [string, string, string];
-  pi_b: [[string, string], [string, string], [string, string]];
-  pi_c: [string, string, string];
-  protocol: "groth16";
-  curve: "bn128";
-}
-export function encodeShieldedReceiveCode(
-  input: ShieldedReceiveCodeStatement & {
-    proof: {
-      pi_a: ReadonlyArray<BigNumberish>;
-      pi_b: ReadonlyArray<ReadonlyArray<BigNumberish>>;
-      pi_c: ReadonlyArray<BigNumberish>;
-    };
-  },
-): string;
-/** Parses and range-checks a code; the caller must still verify its proof. */
-export function decodeShieldedReceiveCode(code: string): {
-  identityCommitment: bigint;
-  ownerCommitment: bigint;
-  viewingKey: Uint8Array;
-  keyMode: number;
-  identitySuiteId: number;
-  independentKeySuiteId: number;
-  independentKeyDerivationVersion: number;
-  receiveCodeVersion: number;
-  fingerprint: string;
-  publicSignals: [bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint];
-  proof: ShieldedReceiveCodeProof;
-};
-
 export const SHIELDED_KEY_MODE: Readonly<{ identityDerived: 0; independentKeyRootDerived: 1 }>;
 export function normalizeShieldedKeyMode(value?: BigNumberish, binding?: string): bigint;
 export function computeShieldedBudgetOwnerAuthorization(
@@ -1299,6 +1250,14 @@ export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS: Readonly<{
   anonymous: 11;
   fund: 12;
 }>;
+export interface ShieldedReceiveCredentialProof {
+  pi_a: [string, string, string];
+  pi_b: [[string, string], [string, string], [string, string]];
+  pi_c: [string, string, string];
+  protocol: "groth16";
+  curve: "bn128";
+}
+
 export interface ShieldedReceiveCredentialStatement {
   disclosure?: ShieldedReceiveCredentialDisclosure;
   authorizationAlias: BigNumberish;
@@ -1326,7 +1285,7 @@ export function computeShieldedReceiveCredentialFingerprint(
 ): string;
 export function encodeShieldedReceiveCredential(
   input: ShieldedReceiveCredentialStatement & {
-    proof: ShieldedReceiveCodeProof;
+    proof: ShieldedReceiveCredentialProof;
   },
 ): string;
 export function decodeShieldedReceiveCredential(code: string): {
@@ -1344,7 +1303,7 @@ export function decodeShieldedReceiveCredential(code: string): {
   receiveCodeVersion: 2;
   fingerprint: string;
   publicSignals: bigint[];
-  proof: ShieldedReceiveCodeProof;
+  proof: ShieldedReceiveCredentialProof;
 };
 
 export const SHIELDED_IDENTITY_AUTHORIZATION_DEPTH: 64;
@@ -1411,7 +1370,7 @@ export function emptyShieldedReceiveAuthorizations(): [
   ShieldedReceiveAuthorization,
 ];
 export function prepareShieldedReceivePresentation(input: {
-  credential: ShieldedReceiveCredentialStatement & { proof: ShieldedReceiveCodeProof };
+  credential: ShieldedReceiveCredentialStatement & { proof: ShieldedReceiveCredentialProof };
   state: ShieldedIdentityAuthorizationState;
   chainId: BigNumberish;
   consumer: string;
@@ -1427,7 +1386,7 @@ export function prepareShieldedReceivePresentation(input: {
   presentation: Record<string, string | string[]>;
   request: {
     kind: "anonymous" | "fund" | "attachment";
-    credentialProof: ShieldedReceiveCodeProof;
+    credentialProof: ShieldedReceiveCredentialProof;
     credentialPublicSignals: string[];
     presentation: Record<string, string | string[]>;
   };

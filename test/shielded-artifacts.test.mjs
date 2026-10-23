@@ -70,7 +70,7 @@ describe("current public shielded artifacts", function () {
         assert.ok(entry.vkey.includes(path.join("frontend", "public", "zk", "shielded")));
         assert.equal(entry.contractName, SHIELDED_SETUP_CIRCUITS[action].verifierContractName);
       }
-      assert.equal(candidate.circuits.receiveCode.verifier, null);
+      assert.equal(candidate.circuits.anonymousReceiveCredential.verifier, null);
       fs.appendFileSync(candidate.circuits.claim.verifier, "\nmodified");
       assert.throws(
         () => loadCandidateArtifacts({ root, ...options }),
@@ -133,7 +133,6 @@ describe("current public shielded artifacts", function () {
               fs.writeFileSync(file, bytes);
             }
           },
-          setup: () => assert.fail("Existing public keys must be reused"),
           log: () => {},
         });
         assert.equal(builds, 1);

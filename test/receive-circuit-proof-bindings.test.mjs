@@ -59,7 +59,7 @@ describe("Receive circuit real-proof public bindings", function () {
       for (const name of [`${source}.wasm`, `${source}_final.zkey`, `${source}.vkey.json`]) {
         assert.ok(
           fs.existsSync(path.join(directory, name)),
-          `Required real artifact ${name} is missing; run npm run zk:development:setup`,
+          `Required real artifact ${name} is missing; run npm run zk:setup`,
         );
       }
     }
@@ -69,7 +69,6 @@ describe("Receive circuit real-proof public bindings", function () {
     try {
       snarkjs = await import("snarkjs");
       await prepareReceiveProofFixtures(temporary, {
-        existingIssuers: true,
         issuerDirectory: directory,
       });
       requests = Object.fromEntries(

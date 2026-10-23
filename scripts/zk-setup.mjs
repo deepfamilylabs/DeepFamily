@@ -7,9 +7,9 @@ import { runSingleOperatorProductionSetup } from "./lib/zkProductionSetup.mjs";
 
 const usage = () => {
   console.log(`Usage:
-  npm run zk:production:setup
-  npm run zk:production:setup -- --ceremony-id <stable-audit-id>
-  npm run zk:production:setup -- --rotate \\
+  npm run zk:setup
+  npm run zk:setup -- --ceremony-id <stable-audit-id>
+  npm run zk:setup -- --rotate \\
     --expected-current-manifest-sha256 <current-production-manifest-sha256> \\
     --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \\
     --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \\
@@ -18,9 +18,9 @@ const usage = () => {
 Optional: --shielded-release-criteria <committed-json-path> records the six reviewed
 release thresholds. These thresholds are checked by release:preflight.
 
-Creates all eleven Circom production Groth16 proving keys with:
+Creates the single final artifact set for all thirteen Circom circuits with:
   - a hash-verified official compiler or fresh pinned-source private build for this host;
-  - canonical R1CS/WASM hashes checked before any Groth16 setup starts;
+  - a frozen source and compiled R1CS/WASM snapshot checked before any Groth16 setup starts;
   - the pinned, published Powers of Tau Phase 1 file, hash-verified before use;
   - one local Phase 2 operator using OS CSPRNG entropy per circuit;
   - one finalization beacon generated only after every contribution;
@@ -29,19 +29,20 @@ Creates all eleven Circom production Groth16 proving keys with:
 The Phase 1 file is read from circuits/ptau/ppot_0080_17.ptau, or from
 ZK_PTAU_PATH when set. Neither form downloads it.
 
-The command requires an identity/disclosure development manifest. It refuses to overwrite
-production artifacts.
+The first setup reads the reviewed source/toolchain manifest and compiles the committed sources;
+it does not require previously generated proving files. It refuses to overwrite an existing
+finalized setup without the explicit rotation options.
 The explicit --rotate form accepts only a valid existing schema-v3 single-operator production
 manifest and requires reviewed hashes for both that manifest and the newly installed snarkjs
 runtime graph. Both forms require a clean Git working tree, stage all outputs before installation,
 and restore the previous artifact set if final validation fails. They intentionally record that
 production security trusts the operator to destroy every Phase 2 secret.
-Receive presentation production setup and independent verification are not provided;
-the complete protocol release remains unavailable until they are supplied.`);
+The same final keys, verification/link keys and Solidity verifiers are used in local development,
+CI and releases. Build, fetch and check commands reuse them without generating new keys.`);
 };
 
 const USAGE_ERROR =
-  "Usage: npm run zk:production:setup -- [--ceremony-id <stable-audit-id>] " +
+  "Usage: npm run zk:setup -- [--ceremony-id <stable-audit-id>] " +
   "[--shielded-release-criteria <committed-json-path>] or " +
   "--rotate --expected-current-manifest-sha256 <sha256> " +
   "--expected-current-shielded-manifest-sha256 <sha256> " +
@@ -107,7 +108,7 @@ export const main = async (argv = process.argv.slice(2)) => {
     return;
   }
   console.warn(
-    `Starting single-operator production ZK ${parsed.rotate ? "rotation" : "setup"}. ` +
+    `Starting single-operator final ZK ${parsed.rotate ? "rotation" : "setup"}. ` +
       "Keep this machine isolated and destroy " +
       "all Phase 2 entropy after the process exits.",
   );
@@ -120,7 +121,7 @@ export const main = async (argv = process.argv.slice(2)) => {
     includeShielded: true,
     shieldedReleaseCriteriaPath: parsed.shieldedReleaseCriteriaPath,
   });
-  console.log("Production ZK setup completed and verified:");
+  console.log("Final ZK setup completed and verified:");
   console.log(`  ceremony:   ${result.ceremonyId}`);
   console.log(`  trust:      ${result.trustModel} (${result.contributorCount} contributor)`);
   console.log(`  manifest:   ${result.manifestSha256}`);
@@ -136,7 +137,7 @@ const isMain =
 
 if (isMain) {
   main().catch((error) => {
-    console.error(`[zk-production-setup] ${error.message}`);
+    console.error(`[zk-setup] ${error.message}`);
     process.exitCode = 1;
   });
 }

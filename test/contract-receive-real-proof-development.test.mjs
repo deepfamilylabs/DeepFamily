@@ -94,7 +94,6 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         // Issuance, both Fund verifications and all letter presentations use real proofs.
         // Only lineage roots are supplied by the established test fixture.
         await prepareReceiveProofFixtures(credentialDir, {
-          existingIssuers: true,
           issuerDirectory: path.join(RECEIVE_TEST_ROOT, "frontend/public/zk/shielded"),
           authorizationCounter: 0n,
           keyMode,

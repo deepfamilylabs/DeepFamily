@@ -1,10 +1,11 @@
-# DeepFamily Production ZK Setup
+# DeepFamily ZK Setup
 
-This runbook covers production setup for all fourteen Circom circuits (two core and
-twelve shielded, including three receive presentations):
+This runbook covers the single final setup for all thirteen Circom circuits (two core and
+eleven shielded, including three receive presentations). Local development, CI and release share
+the resulting keys, verifiers, linking parameters and evidence:
 
 ```bash
-npm run zk:production:setup
+npm run zk:setup
 ```
 
 This command generates and verifies the Circom transcripts and manifests. It does
@@ -15,9 +16,10 @@ proofs through LinkG16. They require no recursive pairing arithmetic, Go prover 
 separate ceremony. The same setup derives `shielded/receive-link-keys.json` and
 the three fixed Solidity verifiers; the shielded manifest's `linkKeys` pins their
 hashes and the shared verifier base. Verification checks these bindings together
-with all fourteen circuit ceremonies. Current checked-in keys remain
-`developmentOnly: true` and `productionReady: false`. Local acceptance uses the
-shared development setup and `npm test`; no production setup is required for it.
+with all thirteen circuit ceremonies. Current checked-in keys remain
+`developmentOnly: true` and `productionReady: false`; they are unattested material awaiting the
+explicit final setup and review. Daily builds, downloads, checks and local acceptance reuse the
+pinned artifact set. They stop on stale or missing keys rather than generate replacements.
 
 ## Trust model
 
@@ -49,7 +51,7 @@ ZK contributors and governance signers are separate concepts:
 
 ## Fixed Powers of Tau
 
-All 14 Circom circuits reuse the same published BN254 Phase 1 file:
+All 13 Circom circuits reuse the same published BN254 Phase 1 file:
 
 ```text
 File:
@@ -71,7 +73,7 @@ BLAKE2b-512:
 3010cec42bdd1583bb4477dfa1b11853a67e8611feaa39cd7b3311a353b3e1d8b3f318509d75208078dc6887500b61f3f46bc72c61abbb624bec3bad5ef16012
 ```
 
-The unified production command performs a separate circuit-specific Phase 2 for each circuit.
+The setup command performs a separate circuit-specific Phase 2 for each circuit.
 
 Install the exact file with `npm run zk:ptau:fetch`. The explicit developer/CI download verifies the byte length and both pinned hashes before publishing it locally. The 151 MB file is Git-ignored and stored at:
 
@@ -89,7 +91,7 @@ published URL above identifies the reviewed source bytes in ceremony evidence an
 by these commands.
 
 `ZK_PTAU_PATH` selects a different copy, for example one obtained independently, for setup,
-verification, and release commands. When it is empty, they use the committed file above. An
+verification, and release commands. When it is empty, they use the local file above. An
 override must still be an ordinary file whose byte length, SHA-256, and BLAKE2b-512 match the
 production manifest:
 
@@ -98,12 +100,11 @@ ZK_PTAU_PATH=/absolute/path/to/an-independent-copy \
 npm run release:preflight
 ```
 
-`npm run zk:development:setup` prepares all 14 Circom circuits using the same pinned Phase 1 file. Its Phase 2 contribution
-passes a fixed label as entropy, and snarkjs mixes 64 bytes of system randomness into it, so the
-secret is still random. The flow nevertheless runs on arbitrary machines, pins no toolchain, and
-records no ceremony evidence, so it does not establish a production trust model. The resulting
-manifest records `development` status. `npm run zk:production:setup` instead runs once from a
-clean commit with a pinned toolchain and records the transcript described above.
+`npm run zk:setup` runs from a clean, reviewed commit with a pinned toolchain on a controlled
+machine outside CI. It prepares the complete final artifact set and records the single-operator
+Phase 2 ceremony described below. Publish and commit that reviewed bundle once, then reuse it
+for development, CI and release. Circuit changes require a new explicit setup; build, fetch and
+check commands do not generate keys.
 
 ## Circom host and release compiler
 
@@ -132,7 +133,7 @@ WASM output hashes with the reviewed manifest and published files. A native comp
 suitable for development only until its output has passed those comparisons; matching the version
 string alone is not release evidence.
 
-Both `zk:production:setup` and `release:preflight` support the three release-gate runtimes above.
+Both `zk:setup` and `release:preflight` support the three release-gate runtimes above.
 Linux libc is detected from Node's process report: Linux x64 with glibc uses the pinned official
 asset, while musl is rejected explicitly. Windows ARM64 hosts remain unsupported even with x64 Node
 emulation. The macOS arm64 release gates never execute the reusable
@@ -143,13 +144,15 @@ removes inherited Git, Cargo, Rust, Node, dynamic-loader, npm, compiler, linker,
 package-discovery overrides. It resolves Git/Cargo/Rustc to protected absolute executables and uses
 a controlled PATH, private home/Cargo/XDG/temporary directories, empty Git system/global
 configuration files, and an empty hooks directory. The resulting compiler is copied into the
-private release stage. Before any Groth16 Setup or Phase 2 contribution, production setup compiles every
-circuit and verifies every staged R1CS/WASM hash against the reviewed manifest. The canonical
-Linux amd64 glibc binary remains a fixed-digest reference; other runtimes hash it but never execute
-it. The schema-v3 ceremony transcript records which native compiler and Linux libc evidence
-actually produced the staged circuits.
+private release stage. Before any Groth16 Setup or Phase 2 contribution, the first setup records
+the reviewed clean-commit sources and compiles every circuit to establish the R1CS/WASM baseline.
+It then rechecks source and compiled-output hashes throughout the operation. Rotation instead
+requires those hashes to match the existing final manifest. The canonical Linux amd64 glibc
+binary remains a fixed-digest reference; other runtimes hash it but never execute it. The schema-v3
+ceremony transcript records which native compiler and Linux libc evidence actually produced the
+staged circuits.
 
-Production setup reads the contribution helper and its local dependency from the exact
+The setup reads the contribution helper and its local dependency from the exact
 release-commit Git blobs. It verifies their Git object IDs while staging and their SHA-256 digests
 both before creating Phase 2 entropy and immediately before passing that entropy to the helper
 process.
@@ -174,6 +177,12 @@ Run the setup only after the circuit source, public signals, packing rules, depe
 verifier interface have been frozen for a release candidate. Any later circuit change requires new
 production keys. The controlled checkout may use any host listed in the support matrix.
 
+The first setup validates the existing manifest and toolchain pins, then uses the reviewed
+clean-commit sources and freshly compiled outputs as its baseline. Earlier development proving
+files and their source/R1CS/WASM hashes are not prerequisites. Review the newly generated
+manifests, transcripts, verification keys and verifiers before committing the complete result.
+Rotation retains the strict existing-artifact checks described below.
+
 Use a clean, controlled checkout:
 
 ```bash
@@ -196,18 +205,18 @@ git rev-parse HEAD
 The operator should use a machine they control, stop unrelated backup/snapshot tools during the
 run, and avoid terminal recording. No Safe owner private key, funded wallet, CFX, or ETH is needed.
 
-## Run the production setup
+## Run the setup
 
 The default command creates an audit ID automatically:
 
 ```bash
-npm run zk:production:setup
+npm run zk:setup
 ```
 
 An optional stable audit ID may be supplied:
 
 ```bash
-npm run zk:production:setup -- \
+npm run zk:setup -- \
   --ceremony-id deepfamily-production-2026-001
 ```
 
@@ -241,8 +250,7 @@ node --input-type=module -e "import { inspectSnarkjsRuntime } from './scripts/li
 After independently reviewing those exact digests, rotate with a new ceremony ID:
 
 ```bash
-npm run zk:production:setup -- \
-  --rotate \
+npm run zk:setup -- --rotate \
   --expected-current-manifest-sha256 <current-production-manifest-sha256> \
   --expected-current-shielded-manifest-sha256 <current-shielded-manifest-sha256> \
   --expected-snarkjs-runtime-sha256 <reviewed-new-runtime-sha256> \
@@ -266,15 +274,15 @@ The circuit WASM and R1CS are expected to stay unchanged for this runtime-only r
 
 Internally the command:
 
-1. validates the clean release commit and development manifest, or the explicitly hash-bound
-   production baseline in rotation mode;
+1. validates the clean reviewed commit and existing manifest/toolchain pins, or the explicitly
+   hash-bound final artifact baseline in rotation mode, and records the current source hashes;
 2. reads the pinned public power-17 pTau and checks both pinned digests;
 3. validates and snapshots an official compiler, or fresh-builds a source target, then copies the
    pTau into the current user's private OS temporary directory and compiles every circuit there
    with explicit `--O2 --sanity_check 2`;
-4. verifies all staged R1CS/WASM hashes against the reviewed manifest, then—and only then—creates
-   any initial Groth16 zkey; each circuit and the pTau are checked again immediately before its
-   setup;
+4. establishes fresh R1CS/WASM hashes for the first setup, or verifies them against the existing
+   final manifest for rotation, before creating any initial Groth16 zkey; the sources, compiled
+   circuit outputs and pTau are checked again immediately before each circuit's setup;
 5. hashes the logical installed snarkjs production dependency graph—each package's content,
    identity, version, and logical dependency path—and compares it with the schema-v3 manifest or
    the explicit reviewed rotation digest; it copies only that verified runtime into private
@@ -290,10 +298,10 @@ Internally the command:
    three fixed receive verifiers, and stages the browser WASM/zkey assets;
 10. reads the real contribution metadata embedded in every final zkey;
 11. creates the identity/disclosure records at `circuits/zk-ceremony-transcript.json` and
-    `circuits/zk-artifacts-manifest.json`, plus the twelve-circuit shielded records at
+    `circuits/zk-artifacts-manifest.json`, plus the eleven-circuit shielded records at
     `release-evidence/shielded/phase2-transcript.json` and
     `circuits/shielded-production-manifest.json`;
-12. rechecks the reviewed R1CS/WASM and pTau bytes, then validates the staged schema, pTau
+12. rechecks the source snapshot, R1CS/WASM baseline and pTau bytes, then validates the staged schema, pTau
     mathematics, zkey mathematics, contribution order, finalization metadata, and real proofs
     before any release file is replaced;
 13. installs every non-manifest artifact, reruns real proofs and the production contract build, and
@@ -342,7 +350,7 @@ The identity/disclosure schema-v3 transcript records:
 - the finalization value, exponent, source, and embedded finalization contribution hashes.
 
 The same setup command generates the shielded production manifest and Phase 2 transcript. Their
-`@1` schemas bind all twelve shielded circuits to their source and artifact hashes, the pinned
+`@1` schemas bind all eleven shielded circuits to their source and artifact hashes, the pinned
 toolchain and pTau, and each circuit's operator contribution and finalization metadata. The two
 manifests and two transcripts are generated and installed together. The shielded manifest also
 binds the shared receive-link parameters, verifier base and all three fixed receive verifiers
@@ -438,7 +446,7 @@ After the ZK artifacts are frozen, follow the target-chain runbook in this order
 
 1. bootstrap and validate the production governance Safe, then reserve the deployer EOA;
 2. query its exact next pending protocol-release nonce and use the chain-specific
-   `*:mainnet:release:projection` command to freeze the resulting deployments object into the
+   `mainnet:projection -- --chain <espace|ethereum>` command to freeze the resulting deployments object into the
    production protocol manifest;
 3. commit that chain-specific state and run `release:preflight` from the clean final commit;
 4. run the target testnet acceptance command in `release-rehearsal` mode with
@@ -489,7 +497,7 @@ and do not claim completion merely by generating several keys on one operator's 
 
 ## Restart conditions
 
-Generate a new production setup before release when:
+Generate a new final artifact set with `npm run zk:setup` when:
 
 - any circuit source or R1CS changes;
 - public-signal or packing semantics change;

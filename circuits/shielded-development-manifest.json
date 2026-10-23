@@ -4,14 +4,6 @@
   "productionReady": false,
   "ptauSha256": "f807e065fde53f72f4bf4d57140fab85b26daa6cc95bdfec7cce93622b3a367c",
   "circuits": {
-    "receiveCode": {
-      "source": "shielded_receive_code",
-      "sourceSha256": "5a311a29b7969cd9d9d34938485ce6b69a9fae83536f0c775684578b8560c87e",
-      "r1csSha256": "c56b087f8804442a75f89b3008196f7e7b8ce12bc38c4cccae1a463b53b838f2",
-      "wasmSha256": "5aea2edb1f23ef0900784b468ea50805deb17566ce1d036124fd31f51880eadf",
-      "zkeySha256": "bf99a97951947d65169dafdacd276468062c5f3600ab6ecee25604512e933f08",
-      "verificationKeySha256": "ef169a44903fe7750fccd3562ff541de60979b917742fe68c83fe85f5da2cb07"
-    },
     "anonymousReceiveCredential": {
       "source": "shielded_anonymous_receive_credential",
       "sourceSha256": "4c503f9b73886dc14f661e7eddf50c7b96dd51b3a8410fecd26fb27c59278537",

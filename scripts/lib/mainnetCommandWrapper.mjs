@@ -80,7 +80,7 @@ const parseOptionPairs = (arguments_, allowedNames, usage) => {
 
 const safeUsage = (chainProfile) =>
   `Usage: ${chainProfile.mainnet.safePlanCommand}; ` +
-  `${chainProfile.mainnet.safeExecuteCommand} -- --digest 0x... ` +
+  `${chainProfile.mainnet.safeExecuteCommand} --digest 0x... ` +
   `[--recovery-tx 0x...]; or ${chainProfile.mainnet.safeStatusCommand}`;
 
 export const parseMainnetSafeCommandArguments = (chainProfile, arguments_) => {
@@ -113,7 +113,7 @@ export const parseMainnetSafeCommandArguments = (chainProfile, arguments_) => {
 
 const releaseUsage = (chainProfile) =>
   `Usage: ${chainProfile.mainnet.releasePlanCommand}; or ` +
-  `${chainProfile.mainnet.releaseExecuteCommand} -- --approval-file <path> ` +
+  `${chainProfile.mainnet.releaseExecuteCommand} --approval-file <path> ` +
   `[--recovery-file <path>]`;
 
 export const parseMainnetReleaseCommandArguments = (chainProfile, arguments_) => {
@@ -170,6 +170,7 @@ export const runMainnetSafeCommand = async ({
     });
     const childEnvironment = {
       ...sanitizeReleaseEnvironment(environment),
+      DEEPFAMILY_COMMAND_CHAIN: chainProfile.id,
       [chainProfile.mainnet.safePlanDigestEnvironmentName]: command.digest ?? "",
       [chainProfile.mainnet.safeRecoveryTransactionEnvironmentName]:
         command.recoveryTransaction ?? "",
@@ -237,6 +238,7 @@ export const runMainnetReleaseCommand = async ({
     };
     const childEnvironment = {
       ...preflightEnvironment,
+      DEEPFAMILY_COMMAND_CHAIN: chainProfile.id,
       [chainProfile.mainnet.planDigestEnvironmentName]: approval?.planDigest ?? "",
       [chainProfile.mainnet.planApprovalSignaturesEnvironmentName]: approval
         ? JSON.stringify(approval.signatures)

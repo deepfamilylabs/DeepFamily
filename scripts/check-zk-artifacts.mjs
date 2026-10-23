@@ -21,7 +21,7 @@ import {
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
-import { SHIELDED_CIRCUITS } from "./zk-shielded-build.mjs";
+import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), "..");
@@ -179,7 +179,7 @@ export function checkShieldedDevelopmentArtifacts({
   const manifestFile = path.join(root, SHIELDED_DEVELOPMENT_MANIFEST);
   requireFile(
     manifestFile,
-    "shielded development manifest (run `npm run zk:development:setup` first)",
+    "shielded development manifest (run `npm run zk:setup` first)",
   );
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
   if (

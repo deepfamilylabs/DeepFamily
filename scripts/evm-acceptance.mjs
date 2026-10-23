@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import {
   appendDfsStoryRecord,
   sealArchiveStory,
@@ -66,7 +67,7 @@ import { deriveTreasuryTransferSalt } from "../tasks/lib/timelockTreasury.mjs";
 import { deriveGovernanceSalt } from "../tasks/lib/timelockGovernance.mjs";
 import { deriveDelayUpdateSalt } from "../tasks/timelock-update-delay.mjs";
 import { resolveProductionRpcUrl } from "./lib/hardhatConfig.mjs";
-import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { ESPACE_CHAIN_PROFILE, getChainProfile } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { hashReleaseInputs } from "./lib/releaseEvidence.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
@@ -377,7 +378,11 @@ const assertTerminalProtocolEvidenceMatchesManifest = ({
       terminalProjection.contracts.shieldedVerifiers[action],
       manifest.deployments.shieldedVerifiers[action],
     ]),
-    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) => [contractName, terminalProjection.contracts[property], manifest.deployments[property]]),
+    ...RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) => [
+      contractName,
+      terminalProjection.contracts[property],
+      manifest.deployments[property],
+    ]),
     [
       "ShieldedErc20Pool",
       terminalProjection.contracts.shieldedErc20Pool,
@@ -1956,17 +1961,28 @@ export const main = async (chainProfile) => {
         ),
       );
     }
-    for (const {contractName, property} of RECEIVE_DEPLOYMENT_CONTRACTS) {
-      initialVerificationEntries.push(await verificationEntry(hre.artifacts, contractName,
-        addresses[property], receiveDeploymentConstructorArgs(property, addresses)));
+    for (const { contractName, property } of RECEIVE_DEPLOYMENT_CONTRACTS) {
+      initialVerificationEntries.push(
+        await verificationEntry(
+          hre.artifacts,
+          contractName,
+          addresses[property],
+          receiveDeploymentConstructorArgs(property, addresses),
+        ),
+      );
     }
     initialVerificationEntries.push(
       await verificationEntry(
         hre.artifacts,
         "ShieldedErc20Pool",
         addresses.shieldedErc20Pool,
-        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState,
+          addresses.receivePresentationVerifierRouter,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
     );
@@ -1975,8 +1991,12 @@ export const main = async (chainProfile) => {
         hre.artifacts,
         "ShieldedNativePool",
         addresses.shieldedNativePool,
-        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
+        [
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState,
+          addresses.receivePresentationVerifierRouter,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
@@ -3649,7 +3669,12 @@ export const main = async (chainProfile) => {
         shieldedErc20Pool: terminalProtocolDeployment.shieldedErc20Pool,
         shieldedNativePool: terminalProtocolDeployment.shieldedNativePool,
         shieldedPoolFactory: terminalProtocolDeployment.shieldedPoolFactory,
-        ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, terminalProtocolDeployment[property]])),
+        ...Object.fromEntries(
+          RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+            property,
+            terminalProtocolDeployment[property],
+          ]),
+        ),
         retiredTimelockTreasuryBalance: terminalRetiredTreasuryBalance,
       };
     } else {
@@ -3774,7 +3799,12 @@ export const main = async (chainProfile) => {
         shieldedErc20Pool: terminalProtocolDeployment.shieldedErc20Pool,
         shieldedNativePool: terminalProtocolDeployment.shieldedNativePool,
         shieldedPoolFactory: terminalProtocolDeployment.shieldedPoolFactory,
-        ...Object.fromEntries(RECEIVE_DEPLOYMENT_CONTRACTS.map(({property}) => [property, terminalProtocolDeployment[property]])),
+        ...Object.fromEntries(
+          RECEIVE_DEPLOYMENT_CONTRACTS.map(({ property }) => [
+            property,
+            terminalProtocolDeployment[property],
+          ]),
+        ),
       };
     }
     const terminalDeploymentEvidenceSha256 = protocolDeploymentEvidenceSha256(
@@ -4043,3 +4073,21 @@ export const main = async (chainProfile) => {
     console.log(`[${CHAIN_PROFILE.id}-acceptance] DIAGNOSTIC PASSED run ${config.runId}`);
   }
 };
+
+if (
+  process.argv
+    .slice(1)
+    .some((argument) => path.resolve(argument) === fileURLToPath(import.meta.url))
+) {
+  Promise.resolve()
+    .then(() => main(getChainProfile(process.env.DEEPFAMILY_COMMAND_CHAIN)))
+    .then(
+      () => process.exit(0),
+      (error) => {
+        console.error(
+          `[acceptance] ${safeErrorMessage(error, [String(process.env.PRIVATE_KEY || "")])}`,
+        );
+        process.exit(1);
+      },
+    );
+}

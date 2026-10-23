@@ -1466,7 +1466,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   );
   requireExact(
     receiveCode.verificationKeySha256,
-    inspected.manifest.circuits.receiveCode.verificationKeySha256,
+    inspected.manifest.circuits.anonymousReceiveCredential.verificationKeySha256,
     "shielded.scenario.receiveCode.verificationKeySha256",
   );
   requireSha256(receiveCode.proofSha256, "shielded.scenario.receiveCode.proofSha256");

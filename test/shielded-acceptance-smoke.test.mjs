@@ -6,9 +6,18 @@ import hre from "hardhat";
 import { deployIntegratedFixture } from "./fixtures/integrated.mjs";
 import { addPersonVersion } from "../lib/seedHelpers.js";
 import { runShieldedAcceptanceSmoke } from "../scripts/lib/shieldedAcceptanceSmoke.mjs";
+import { runZkBuild } from "../scripts/zk-build.mjs";
+
+const root = path.resolve(import.meta.dirname, "..");
 
 describe("integrated shielded acceptance smoke", function () {
   this.timeout(600_000);
+
+  before(async function () {
+    // Candidate validation covers every shielded circuit, including receive presentations.
+    // Rebuild ignored R1CS/WASM outputs while retaining the pinned public keys and verifiers.
+    await runZkBuild({ root, circuit: "shielded" });
+  });
 
   it("funds both budget paths with all five pool routes, the shared DEEP token and actual lineage", async function () {
     const connection = await hre.network.create();
@@ -84,8 +93,10 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[3], "1");
     assert.equal(result.scenario.identityBudget.periodDays, "7");
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[13], "7");
-    const publicPeriodNullifiers =
-      result.scenario.identityBudget.claimProof.publicSignals.slice(8, 20);
+    const publicPeriodNullifiers = result.scenario.identityBudget.claimProof.publicSignals.slice(
+      8,
+      20,
+    );
     const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(8, 20);
     assert.notDeepEqual(publicPeriodNullifiers, privatePeriodNullifiers);
     assert.equal(new Set(publicPeriodNullifiers).size, 12);

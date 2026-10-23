@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { formatEther } from "ethers";
 
@@ -43,7 +44,7 @@ import {
   inspectCanonicalSafeInfrastructure,
   prepareCanonicalSafeDeployment,
 } from "./lib/safeGovernance.mjs";
-import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { ESPACE_CHAIN_PROFILE, getChainProfile } from "./lib/chainProfiles.mjs";
 
 const TRANSACTION_LABEL = "createGovernanceSafe";
 const TX_TIMEOUT_MS = 10 * 60 * 1_000;
@@ -90,7 +91,7 @@ const nowIso = () => new Date().toISOString();
 const sameAddress = (left, right) =>
   String(left ?? "").toLowerCase() === String(right ?? "").toLowerCase();
 const reviewedExecuteCommand = (digest = "<reviewed-digest>") =>
-  `${MAINNET_PROFILE.safeExecuteCommand} -- --digest ${digest}`;
+  `${MAINNET_PROFILE.safeExecuteCommand} --digest ${digest}`;
 
 const assertSafeCommandWrapper = async () => {
   const expectedToken = String(process.env[WRAPPER_TOKEN_ENV] ?? "").trim();
@@ -1129,3 +1130,16 @@ export const main = async (chainProfile) => {
     await releaseLock();
   }
 };
+
+if (
+  process.argv
+    .slice(1)
+    .some((argument) => path.resolve(argument) === fileURLToPath(import.meta.url))
+) {
+  Promise.resolve()
+    .then(() => main(getChainProfile(process.env.DEEPFAMILY_COMMAND_CHAIN)))
+    .catch((error) => {
+      console.error(`[evm-mainnet-safe] ${publicSafeCreatorError(error)}`);
+      process.exitCode = 1;
+    });
+}

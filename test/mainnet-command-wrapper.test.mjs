@@ -55,7 +55,7 @@ describe("mainnet command wrapper child environments", function () {
     await runMainnetSafeCommand({
       chainProfile: ESPACE_CHAIN_PROFILE,
       arguments_: ["--status"],
-      entryScript: "scripts/espace-mainnet-safe.mjs",
+      entryScript: "scripts/evm-mainnet-safe.mjs",
       environment: injectedEnvironment,
       root,
       hardhatRunner: async (args, environment, label) => {
@@ -90,7 +90,7 @@ describe("mainnet command wrapper child environments", function () {
       runMainnetSafeCommand({
         chainProfile: ESPACE_CHAIN_PROFILE,
         arguments_,
-        entryScript: "scripts/espace-mainnet-safe.mjs",
+        entryScript: "scripts/evm-mainnet-safe.mjs",
         environment,
         root,
         hardhatRunner: async (_args, childEnvironment) => calls.push(childEnvironment),
@@ -117,7 +117,7 @@ describe("mainnet command wrapper child environments", function () {
     await runMainnetReleaseCommand({
       chainProfile: ESPACE_CHAIN_PROFILE,
       arguments_: ["--plan"],
-      entryScript: "scripts/espace-mainnet-release.mjs",
+      entryScript: "scripts/evm-mainnet-release.mjs",
       environment: injectedEnvironment,
       root,
       preflightRunner: async (environment) => {
@@ -170,7 +170,7 @@ describe("mainnet command wrapper child environments", function () {
     await runMainnetReleaseCommand({
       chainProfile: ESPACE_CHAIN_PROFILE,
       arguments_: ["--execute", "--approval-file", approvalPath, "--recovery-file", recoveryPath],
-      entryScript: "scripts/espace-mainnet-release.mjs",
+      entryScript: "scripts/evm-mainnet-release.mjs",
       environment: {
         ...injectedEnvironment,
         [mainnet.planDigestEnvironmentName]: RECOVERY_HASH,

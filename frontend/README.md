@@ -3,23 +3,25 @@
 React/Vite SPA for exploring family-tree data, generating ZK proofs, submitting protocol transactions, and managing encrypted metadata.
 
 For local shielded inheritance development, run `npm run dev:all` from the repository root.
-The first run builds missing circuit outputs and downloads the manifest-pinned public keys from R2.
-It generates development proving keys only if they are still missing or stale. Key generation can
-take several minutes.
-To regenerate them manually, run
-`npm run zk:development:setup`.
+The first run builds missing circuit outputs and downloads the manifest-pinned proving files from R2.
+It reuses the pinned keys and stops if they are stale or cannot be obtained. Final key generation
+is an explicit repository-root operation: `npm run zk:setup` from a clean, reviewed commit on a
+controlled machine outside CI. The resulting artifact set is shared by local development, CI and
+release.
 The local deploy command binds the shielded pool to the same DeepFamily token
 and lineage index. `npm run frontend:config` writes their addresses and deployment blocks to
 `.env.local` from the integrated deployment records.
-Both setup commands synchronize browser WASM/zkey/vkey files to `public/zk/shielded/` and generated
-verifiers to `contracts/`, following the identity/disclosure flow. Only the `.vkey.json` files are
+The setup command records the single-operator ceremony evidence and synchronizes browser
+WASM/zkey/vkey files to `public/zk/shielded/` and generated verifiers to `contracts/`, following
+the identity/disclosure flow. Only the `.vkey.json` files are
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
 `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
-circuit manifests. `zk:artifacts:check` validates all 10 artifact sets; `zk:check` and
+circuit manifests. `zk:artifacts:check` validates all 13 artifact sets; `zk:check` and
 `zk:ceremony:verify` perform the cryptographic checks.
-The checked-in keys are development-only. `release:preflight` requires production keys and release
-evidence before publication.
+The current checked-in keys remain development-only and unattested until the explicit final setup
+and review. `release:preflight` requires the final keys, ceremony evidence and other release
+evidence before publication. Daily builds, downloads and checks reuse keys without generating them.
 
 The budget dialog offers **Public budget**, **Private (identity credentials)**, and
 **Private (independent key)**. All three spend donor VALUE from the selected pool; the ordinary wallet

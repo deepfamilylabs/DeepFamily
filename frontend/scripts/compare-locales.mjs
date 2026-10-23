@@ -718,6 +718,17 @@ function main() {
     args.splice(alignIndex, 1); // Remove --align parameter
   }
 
+  const checkIndex = args.indexOf('--check');
+  if (checkIndex !== -1) {
+    args.splice(checkIndex, 1);
+    if (args.length || autoSync || alignKeys) throw new Error('--check does not accept other options');
+    compareAllWithBase('en', localesDir, false, false);
+    const report = analyzeLocaleUsage(path.join(localesDir, 'en', 'index.json'), sourceDir);
+    if (!report) process.exit(1);
+    printUsageReport('en', report, false);
+    return;
+  }
+
   const usageIndex = args.indexOf('--usage');
   const checkUsage = usageIndex !== -1;
   if (checkUsage) {

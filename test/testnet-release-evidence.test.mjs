@@ -1671,7 +1671,7 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
         /shielded\.scenario\.receiveCode\.verified/iu,
       ],
       [
-        (report) => delete report.shieldedArtifacts.circuits.receiveCode,
+        (report) => delete report.shieldedArtifacts.circuits.fundReceiveCredential,
         /shieldedArtifacts\.circuits must contain exactly/iu,
       ],
       [

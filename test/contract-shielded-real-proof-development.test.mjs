@@ -901,7 +901,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const artifacts = checkedCurrentArtifacts(["claim"]);
     if (artifacts.missing) {
       console.log(
-        `Skipping local full-path proof; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+        `Skipping local full-path proof; run npm run zk:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
@@ -971,7 +971,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const artifacts = checkedCurrentArtifacts(["shield", "unshield", "privateTransfer"]);
     if (artifacts.missing) {
       console.log(
-        `Skipping local real proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+        `Skipping local real proof test; run npm run zk:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
@@ -1159,7 +1159,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const artifacts = checkedCurrentArtifacts(actions);
     if (artifacts.missing) {
       console.log(
-        `Skipping local fund/claim proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+        `Skipping local fund/claim proof test; run npm run zk:setup (${artifacts.missing.length} public artifacts absent)`,
       );
       this.skip();
     }
@@ -2146,7 +2146,7 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       const artifacts = checkedCurrentArtifacts(["shield", "privateTransfer"]);
       if (artifacts.missing) {
         console.log(
-          `Skipping local private transfer proof test; run npm run zk:development:setup (${artifacts.missing.length} public artifacts absent)`,
+          `Skipping local private transfer proof test; run npm run zk:setup (${artifacts.missing.length} public artifacts absent)`,
         );
         this.skip();
       }

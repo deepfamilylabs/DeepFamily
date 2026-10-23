@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { formatEther } from "ethers";
@@ -58,7 +59,7 @@ import {
   assertCanonicalSafeOperationalAcceptance,
   assertCanonicalSafeProfile,
 } from "./lib/safeGovernance.mjs";
-import { ESPACE_CHAIN_PROFILE } from "./lib/chainProfiles.mjs";
+import { ESPACE_CHAIN_PROFILE, getChainProfile } from "./lib/chainProfiles.mjs";
 import { resolveProductionPtauPath } from "./lib/productionPtau.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { inspectProtocolReleaseManifest } from "./lib/protocolReleaseManifest.mjs";
@@ -668,7 +669,14 @@ const assertProtocolTerminalState = async ({
   await assertShieldedDeploymentBindings({
     deployed: {
       ...deployed,
-      ...Object.fromEntries(await Promise.all(RECEIVE_DEPLOYMENT_CONTRACTS.map(async ({contractName, property}) => [property, await ethers.getContractAt(contractName, addresses[property])]))),
+      ...Object.fromEntries(
+        await Promise.all(
+          RECEIVE_DEPLOYMENT_CONTRACTS.map(async ({ contractName, property }) => [
+            property,
+            await ethers.getContractAt(contractName, addresses[property]),
+          ]),
+        ),
+      ),
       lineageIndex,
       shieldedErc20Pool: await ethers.getContractAt(
         "ShieldedErc20Pool",
@@ -1078,7 +1086,7 @@ export const main = async (chainProfile) => {
           `An incomplete protocol release checkpoint (${existingCheckpoint.status}/` +
             `${existingCheckpoint.phase}) already exists at ${STATE_PATH}. A blank plan digest ` +
             "cannot create a new plan or claim that no transaction was broadcast. Review and " +
-            `resume the existing checkpoint with ${MAINNET_PROFILE.releaseExecuteCommand} -- ` +
+            `resume the existing checkpoint with ${MAINNET_PROFILE.releaseExecuteCommand} ` +
             "--approval-file <path> and the approved digest and owner signatures.",
         );
       }
@@ -1147,7 +1155,7 @@ export const main = async (chainProfile) => {
     );
     console.log(`  {"planDigest":"${plan.planDigest}","signatures":["0x...","0x..."]}`);
     console.log("Then execute or resume with:");
-    console.log(`  ${MAINNET_PROFILE.releaseExecuteCommand} -- --approval-file <path>`);
+    console.log(`  ${MAINNET_PROFILE.releaseExecuteCommand} --approval-file <path>`);
     return;
   }
 
@@ -1337,7 +1345,7 @@ export const main = async (chainProfile) => {
       console.log(`  state:  ${STATE_PATH}`);
       console.log(`  report: ${REPORT_PATH}`);
       console.log(
-        `Resume with ${MAINNET_PROFILE.releaseExecuteCommand} -- --approval-file <path> and ` +
+        `Resume with ${MAINNET_PROFILE.releaseExecuteCommand} --approval-file <path> and ` +
           "omit --recovery-file.",
       );
       return;
@@ -1527,22 +1535,39 @@ export const main = async (chainProfile) => {
           ),
         ),
       )),
-      ...(await Promise.all(RECEIVE_DEPLOYMENT_CONTRACTS.map(({contractName, property}) =>
-        verificationEntry(hre.artifacts, contractName, addresses[property], receiveDeploymentConstructorArgs(property, addresses))))),
+      ...(await Promise.all(
+        RECEIVE_DEPLOYMENT_CONTRACTS.map(({ contractName, property }) =>
+          verificationEntry(
+            hre.artifacts,
+            contractName,
+            addresses[property],
+            receiveDeploymentConstructorArgs(property, addresses),
+          ),
+        ),
+      )),
       await verificationEntry(
         hre.artifacts,
         "ShieldedErc20Pool",
         addresses.shieldedErc20Pool,
-        [addresses.token, addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
+        [
+          addresses.token,
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState,
+          addresses.receivePresentationVerifierRouter,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
         hre.artifacts,
         "ShieldedNativePool",
         addresses.shieldedNativePool,
-        [addresses.deepFamilyLineageIndex, addresses.groth16VerifierAdapter,
-          addresses.identityAuthorizationState, addresses.receivePresentationVerifierRouter],
+        [
+          addresses.deepFamilyLineageIndex,
+          addresses.groth16VerifierAdapter,
+          addresses.identityAuthorizationState,
+          addresses.receivePresentationVerifierRouter,
+        ],
         { PoseidonT3: addresses.poseidonT3 },
       ),
       await verificationEntry(
@@ -1669,3 +1694,16 @@ export const main = async (chainProfile) => {
     await releaseLock();
   }
 };
+
+if (
+  process.argv
+    .slice(1)
+    .some((argument) => path.resolve(argument) === fileURLToPath(import.meta.url))
+) {
+  Promise.resolve()
+    .then(() => main(getChainProfile(process.env.DEEPFAMILY_COMMAND_CHAIN)))
+    .catch((error) => {
+      console.error(`[evm-mainnet-release] ${publicError(error)}`);
+      process.exitCode = 1;
+    });
+}

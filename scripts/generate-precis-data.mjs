@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fetchWithRetry } from "../lib/zkPublicAssets.js";
 
 const UNICODE_VERSION = "17.0.0";
 const SOURCES = Object.freeze([
@@ -86,13 +87,36 @@ const UNICODE_LICENSE_SHA256 = "e7a93b009565cfce55919a381437ac4db883e9da2126fa28
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-async function fetchPinnedSource(source) {
-  const response = await fetch(source.url, {
-    headers: { "user-agent": "DeepFamily PRECIS data generator" },
-    redirect: "follow",
-  });
-  if (!response.ok) throw new Error(`${source.name} download failed with HTTP ${response.status}`);
-  const bytes = Buffer.from(await response.arrayBuffer());
+export async function fetchPinnedSource(source) {
+  let bytes;
+  try {
+    const response = await fetchWithRetry(
+      async (url, init) => {
+        const result = await fetch(url, init);
+        // Consume within the retry boundary so interrupted response bodies retry too.
+        return {
+          ok: result.ok,
+          status: result.status,
+          bytes: Buffer.from(await result.arrayBuffer()),
+        };
+      },
+      source.url,
+      {
+        headers: { "user-agent": "DeepFamily PRECIS data generator" },
+        redirect: "follow",
+      },
+      { attempts: 3, delayMs: 500, timeoutMs: 20_000 },
+    );
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    bytes = response.bytes;
+  } catch (error) {
+    const cause = error.cause?.cause ?? error.cause ?? error;
+    throw new Error(
+      `${source.name} download failed (${source.url}): ${error.message}; ` +
+        `${cause.code ? `${cause.code}: ` : ""}${cause.message}`,
+      { cause: error },
+    );
+  }
   const actual = sha256(bytes);
   if (actual !== source.sha256) {
     throw new Error(`${source.name} SHA-256 mismatch: expected ${source.sha256}, got ${actual}`);
@@ -239,9 +263,8 @@ async function main(argv = process.argv.slice(2)) {
     throw new Error("UNICODE-LICENSE.txt does not match the reviewed Unicode-3.0 notice");
   }
 
-  const { normalizeUnicodeNfkc } = await import(
-    "../packages/protocol-core/unicode-normalization.js"
-  );
+  const { normalizeUnicodeNfkc } =
+    await import("../packages/protocol-core/unicode-normalization.js");
   const categories = parseGeneralCategories(unicodeData);
   const hangulTypes = parseEnumProperty(hangul, (value) => ["L", "V", "T"].includes(value));
   const joiningMap = parseEnumProperty(joiningTypes, (value) =>

@@ -20,12 +20,6 @@ const UNICODE_LICENSE_SHA256 = 'e7a93b009565cfce55919a381437ac4db883e9da2126fa28
 
 // Payers verify receive codes in the browser. The verification key is embedded in the bundle
 // so that replacing a file under /zk cannot make a forged receive code verify.
-const shieldedReceiveCodeVerificationKey = JSON.parse(
-  fs.readFileSync(
-    fileURLToPath(new URL('./public/zk/shielded/shielded_receive_code.vkey.json', import.meta.url)),
-    'utf8'
-  )
-)
 const shieldedReceiveCredentialVerificationKeys = Object.fromEntries(
   ['anonymous', 'fund'].map(disclosure => {
     const artifact = new URL(`./public/zk/shielded/shielded_${disclosure}_receive_credential.vkey.json`, import.meta.url)
@@ -234,7 +228,6 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     define: {
-      __SHIELDED_RECEIVE_CODE_VKEY__: JSON.stringify(shieldedReceiveCodeVerificationKey),
       __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__: JSON.stringify(shieldedReceiveCredentialVerificationKeys),
       __RECEIVE_LINK_KEYS__: JSON.stringify(readReceiveLinkKeys(command === 'build')),
       __ZK_ASSET_BASE_URL__: JSON.stringify(zkAssetBaseUrl),

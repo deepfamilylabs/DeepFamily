@@ -1,5 +1,4 @@
 export const SHIELDED_CIRCUITS = Object.freeze({
-  receiveCode: "shielded_receive_code",
   anonymousReceiveCredential: "shielded_anonymous_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
@@ -43,7 +42,6 @@ export const RECEIVE_PRESENTATION_CIRCUITS = Object.freeze({
  * go through the same build, setup and ceremony, but have no Solidity verifier.
  */
 export const SHIELDED_CLIENT_ONLY_CIRCUITS = Object.freeze([
-  "receiveCode",
   "anonymousReceiveCredential",
   "fundReceiveCredential",
   ...Object.keys(RECEIVE_PRESENTATION_CIRCUITS),

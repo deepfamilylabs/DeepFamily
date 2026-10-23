@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import * as crypto from "node:crypto";
-import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { getBytes, hexlify } from "ethers";
 import {
   INDEPENDENT_KEY_ARGON2ID_PROFILE,
   SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION,
+  UNICODE_NORMALIZATION_VERSION,
+  PRECIS_UNICODE_VERSION,
   buildShieldedIndependentKeyPasswordBytes,
   deriveShieldedIndependentKeyMaterial,
   deriveShieldedIndependentKeyIdentitySalt,
@@ -22,6 +23,8 @@ const hkdf = (value, domain, info = Buffer.alloc(0)) =>
 
 test("independent key freezes full credential, Argon2id, HKDF and X25519 recovery vector", async (t) => {
   assert.equal(SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION, "17.0.0");
+  assert.equal(UNICODE_NORMALIZATION_VERSION, SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION);
+  assert.equal(PRECIS_UNICODE_VERSION, SHIELDED_INDEPENDENT_KEY_UNICODE_VERSION);
   assert.deepEqual(INDEPENDENT_KEY_ARGON2ID_PROFILE, {
     status: "candidate-awaiting-device-benchmark",
     provisional: true,
@@ -148,8 +151,10 @@ test("independent key freezes full credential, Argon2id, HKDF and X25519 recover
 
 test("independent-key credential normalization preserves frozen Unicode 17 semantics and raw whitespace", () => {
   assert.equal(
-    normalizeShieldedIndependentKeyIdentity({ ...vector.identity, fullName: "\u2000꟱mith\u0085 Ａ\u3000" })
-      .fullName,
+    normalizeShieldedIndependentKeyIdentity({
+      ...vector.identity,
+      fullName: "\u2000꟱mith\u0085 Ａ\u3000",
+    }).fullName,
     "Smith A",
   );
   assert.equal(normalizeShieldedIndependentKeyPassphrase("\uff21\u00a0a\u030a "), "\uff21 å ");
@@ -202,8 +207,8 @@ test("independent-key identity uses exact integer widths and rejects malformed c
     9,
   );
   assert.equal(
-    normalizeShieldedIndependentKeyIdentity({ ...vector.identity, fullName: "é".repeat(128) }).fullName
-      .length,
+    normalizeShieldedIndependentKeyIdentity({ ...vector.identity, fullName: "é".repeat(128) })
+      .fullName.length,
     128,
   );
   for (const override of [
@@ -219,7 +224,9 @@ test("independent-key identity uses exact integer widths and rejects malformed c
     { birthDay: 32 },
     { isBirthBC: 1 },
   ]) {
-    assert.throws(() => normalizeShieldedIndependentKeyIdentity({ ...vector.identity, ...override }));
+    assert.throws(() =>
+      normalizeShieldedIndependentKeyIdentity({ ...vector.identity, ...override }),
+    );
     await assert.rejects(
       deriveShieldedIndependentKeyIdentitySecret({
         identity: { ...vector.identity, ...override },
@@ -268,22 +275,4 @@ test("independent-key credentials are stable across defaults and change only wit
       vector.keyFingerprint,
     );
   }
-});
-
-test("independent key keeps explicit frozen normalization/PRECIS implementations and data", () => {
-  const source = readFileSync(new URL("../shielded-independent-key-identity.js", import.meta.url), "utf8");
-  assert.match(source, /from "\.\/independent-key-precis\.js"/u);
-  assert.match(source, /from "\.\/independent-key-unicode-normalization\.js"/u);
-  assert.doesNotMatch(
-    source,
-    /from "\.\/(?:identity|canonical|precis|unicode-normalization)\.js"/u,
-  );
-  const normalization = readFileSync(
-    new URL("../independent-key-unicode-normalization.js", import.meta.url),
-    "utf8",
-  );
-  const precis = readFileSync(new URL("../independent-key-precis.js", import.meta.url), "utf8");
-  assert.match(normalization, /from "\.\/independent-key-unicode-normalization-data\.js"/u);
-  assert.match(precis, /from "\.\/independent-key-precis-data\.js"/u);
-  assert.match(precis, /from "\.\/independent-key-unicode-normalization\.js"/u);
 });

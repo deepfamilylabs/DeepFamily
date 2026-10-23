@@ -8,11 +8,7 @@ import {
   buildShieldedPoolPublicSignals,
   encodePublicShieldedBudgetEnvelope,
   getShieldedPublicBudgetFields,
-  buildShieldedReceiveCodePublicSignals,
   computeShieldedCiphertextHashField,
-  deriveShieldedHeirKeyMaterial,
-  deriveShieldedViewPublicKey,
-  splitShieldedViewPublicKey,
 } from "../index.js";
 
 const ciphertextA = Uint8Array.from({ length: 512 }, () => 0x11);
@@ -271,37 +267,5 @@ test("data an action does not use must be zero, as the pool requires", () => {
         periodNullifiers: [0],
       }),
     (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
-  );
-});
-
-test("receive code signals bind the identity, owner and exact HPKE key limbs", async () => {
-  const keys = deriveShieldedHeirKeyMaterial(13n);
-  const viewingKey = await deriveShieldedViewPublicKey(keys.hpkeIkm);
-  const { viewKeyLo, viewKeyHi } = splitShieldedViewPublicKey(viewingKey);
-  assert.deepEqual(
-    buildShieldedReceiveCodePublicSignals({
-      identityCommitment: 19n,
-      ownerCommitment: keys.ownerCommitment,
-      viewingKey,
-    }),
-    [19n, keys.ownerCommitment, viewKeyLo, viewKeyHi, 0n, 1n, 1n, 1n, 1n],
-  );
-  assert.throws(
-    () =>
-      buildShieldedReceiveCodePublicSignals({
-        identityCommitment: 0n,
-        ownerCommitment: keys.ownerCommitment,
-        viewingKey,
-      }),
-    (error) => error.code === "ZERO_SHIELDED_SECRET",
-  );
-  assert.throws(
-    () =>
-      buildShieldedReceiveCodePublicSignals({
-        identityCommitment: 19n,
-        ownerCommitment: keys.ownerCommitment,
-        viewingKey: new Uint8Array(32),
-      }),
-    (error) => error.code === "ZERO_SHIELDED_VIEW_KEY",
   );
 });

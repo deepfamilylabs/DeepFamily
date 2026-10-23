@@ -1,51 +1,89 @@
 import fs from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import { expect } from "chai";
+import { runEvmCommand } from "../scripts/evm-command.mjs";
+import { getChainProfile, parseChainArguments } from "../scripts/lib/chainProfiles.mjs";
 
 describe("eSpace Mainnet Safe command wiring", function () {
-  it("exposes separate plan, execute and status npm entry points", async function () {
-    const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
-    expect(packageJson.scripts["espace:mainnet:safe:plan"]).to.equal(
-      "node scripts/espace-mainnet-safe-command.mjs --plan",
-    );
-    expect(packageJson.scripts["espace:mainnet:safe:execute"]).to.equal(
-      "node scripts/espace-mainnet-safe-command.mjs --execute",
-    );
-    expect(packageJson.scripts["espace:mainnet:safe:status"]).to.equal(
-      "node scripts/espace-mainnet-safe-command.mjs --status",
-    );
-    expect(packageJson.scripts["espace:mainnet:release:plan"]).to.equal(
-      "node scripts/espace-mainnet-release-command.mjs --plan",
-    );
-    expect(packageJson.scripts["espace:mainnet:release:projection"]).to.equal(
-      "node scripts/protocol-deployment-projection.mjs --chain espace",
-    );
-    expect(packageJson.scripts["espace:mainnet:release:execute"]).to.equal(
-      "node scripts/espace-mainnet-release-command.mjs --execute",
-    );
+  it("routes each operation to the explicitly selected profile", async function () {
+    for (const chain of ["espace", "ethereum"]) {
+      for (const kind of ["acceptance", "safe", "release"]) {
+        let called = false;
+        const extra = kind === "acceptance" ? [] : ["--plan"];
+        await runEvmCommand([kind, "--chain", chain, ...extra], {
+          [kind]: async (options) => {
+            called = true;
+            expect(options.chainProfile).to.equal(getChainProfile(chain));
+            expect(options.arguments_).to.deep.equal(extra);
+            expect(options.entryScript).to.equal(
+              `scripts/evm-${kind === "acceptance" ? kind : `mainnet-${kind}`}.mjs`,
+            );
+          },
+        });
+        expect(called).to.equal(true);
+      }
+    }
   });
 
-  it("hard-wires the Safe entry to the eSpace profile and delegates fixed-network execution", async function () {
-    const [entry, wrapper] = await Promise.all([
-      fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
-      fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
+  it("rejects missing, unsupported or ambiguous chain selection before execution", async function () {
+    for (const argv of [
+      [],
+      ["--chain"],
+      ["--chain", "unknown"],
+      ["--chain", "espace", "--chain", "ethereum"],
+    ]) {
+      expect(() => parseChainArguments(argv)).to.throw();
+      let called = false;
+      try {
+        await runEvmCommand(["safe", ...argv], {
+          safe: async () => {
+            called = true;
+          },
+        });
+      } catch {
+        /* expected rejection */
+      }
+      expect(called).to.equal(false);
+    }
+    const selected = parseChainArguments([
+      "--execute",
+      "--chain",
+      "ethereum",
+      "--digest",
+      "0x1234",
     ]);
-    expect(entry).to.include("ESPACE_CHAIN_PROFILE");
-    expect(entry).to.include("runMainnetSafeCommand");
-    expect(entry).to.include('"scripts/espace-mainnet-safe.mjs"');
-    expect(entry).not.to.include("--network");
-    expect(entry).not.to.include("process.argv");
+    expect(selected.chainProfile.id).to.equal("ethereum");
+    expect(selected.arguments_).to.deep.equal(["--execute", "--digest", "0x1234"]);
+  });
 
-    expect(wrapper).to.include('"--network"');
-    expect(wrapper).to.include("chainProfile.mainnet.networkName");
-    expect(wrapper).to.include('"--no-compile"');
-    expect(wrapper).not.to.include('"confluxTestnet"');
+  it("executes the generic Hardhat entries and rejects an unsupported selector before RPC access", function () {
+    this.timeout(15_000);
+    for (const kind of ["acceptance", "mainnet-safe", "mainnet-release"]) {
+      const result = spawnSync(
+        process.execPath,
+        [
+          "node_modules/hardhat/dist/src/cli.js",
+          "--config",
+          "hardhat.config.mjs",
+          "run",
+          "--no-compile",
+          `scripts/evm-${kind}.mjs`,
+        ],
+        {
+          env: { ...process.env, DEEPFAMILY_COMMAND_CHAIN: "unsupported" },
+          encoding: "utf8",
+        },
+      );
+      expect(result.status, kind).not.to.equal(0);
+      expect(result.stderr, kind).to.include("Unsupported live-chain profile");
+    }
   });
 
   it("shares a production-command mutex with the protocol release wrapper", async function () {
     const [safeWrapper, releaseWrapper, sharedWrapper, safeRunner, releaseRunner] =
       await Promise.all([
-        fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
-        fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
+        fs.readFile("scripts/evm-command.mjs", "utf8"),
+        fs.readFile("scripts/evm-command.mjs", "utf8"),
         fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
         fs.readFile("scripts/evm-mainnet-safe.mjs", "utf8"),
         fs.readFile("scripts/evm-mainnet-release.mjs", "utf8"),
@@ -127,7 +165,7 @@ describe("eSpace Mainnet Safe command wiring", function () {
     expect(source).to.include("MAINNET_PROFILE.safePlanCommand");
     expect(source).to.include("MAINNET_PROFILE.safeExecuteCommand");
     expect(source).to.include("reviewedExecuteCommand(planDigest)");
-    expect(source).to.include("-- --digest ${digest}");
+    expect(source).to.include("--digest ${digest}");
     expect(source).not.to.include(
       "`${MAINNET_PROFILE.safePlanDigestEnvironmentName}=${planDigest}",
     );

@@ -44,7 +44,7 @@ function runSnarkjs(args) {
 export function verifyDevelopmentArtifacts(actions = Object.keys(SHIELDED_CIRCUITS)) {
   const manifestPath = path.join(root, "circuits/shielded-development-manifest.json");
   if (!fs.existsSync(manifestPath)) {
-    throw new Error("Run npm run zk:development:setup before the proof smoke");
+    throw new Error("Run npm run zk:setup before the proof smoke");
   }
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   assert.equal(manifest.schema, "deepfamily/shielded-development-keys@1");

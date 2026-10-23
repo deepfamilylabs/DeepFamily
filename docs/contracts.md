@@ -544,13 +544,13 @@ deployment arguments rather than treating every instance as byte-identical.
 For a new Conflux eSpace Mainnet governance wallet, configure the approved deployer, exactly three
 distinct EOA/hardware-wallet owner addresses in their final order, a fixed
 `EVM_MAINNET_SAFE_SALT_NONCE`, and a separate Safe factory-call budget in
-`EVM_MAINNET_SAFE_MAX_NATIVE`. The `espace:mainnet:*` command interprets that shared setting as CFX;
+`EVM_MAINNET_SAFE_MAX_NATIVE`. The `--chain espace` command interprets that shared setting as CFX;
 set it explicitly for the current plan/execution rather than carrying it across chains.
 `GOVERNANCE_SAFE_PROFILE` selects the pinned implementation and three-owner, 2/3 policy; it is not
 an address. Keep `GOVERNANCE_SAFE_ADDRESS` empty, then generate a read-only plan:
 
 ```bash
-npm run espace:mainnet:safe:plan
+npm run mainnet:safe -- --chain espace --plan
 ```
 
 The creator supports only canonical Safe v1.3.0, the exact ordered three-owner setup, and threshold
@@ -558,7 +558,7 @@ The creator supports only canonical Safe v1.3.0, the exact ordered three-owner s
 exact printed digest to the explicit execute command:
 
 ```bash
-npm run espace:mainnet:safe:execute -- --digest 0x...
+npm run mainnet:safe -- --chain espace --execute --digest 0x...
 ```
 
 Rerunning that command with the same digest safely resumes the one factory call. Only a hashless
@@ -571,7 +571,7 @@ Before protocol release, two real owners must externally execute the documented 
 hash in `EVM_MAINNET_SAFE_ACCEPTANCE_TX` and run:
 
 ```bash
-npm run espace:mainnet:safe:status
+npm run mainnet:safe -- --chain espace --status
 ```
 
 Only after that read-only validation should the reviewed Safe Proxy address be copied to
@@ -587,7 +587,7 @@ deployment projection before producing the final testnet rehearsal evidence:
 
 ```bash
 npm run build
-npm run espace:mainnet:release:projection -- \
+npm run mainnet:projection -- --chain espace \
   --deployer 0xReviewedDeployer \
   --nonce 123
 ```
@@ -602,11 +602,11 @@ Then run the protocol release plan command with its separate CFX budget, block-c
 finality timeout, and testnet evidence:
 
 ```bash
-npm run espace:mainnet:release:plan
+npm run mainnet:release -- --chain espace --plan
 ```
 
 Before this command can plan a release, the development proving keys must have been replaced with
-`npm run zk:production:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
+`npm run zk:setup` as described in [zk-ceremony.md](zk-ceremony.md), every generated
 artifact must have been reviewed and committed together, `npm run release:preflight` must pass from
 that clean commit, and a successful eSpace `release-rehearsal` must have automatically published the
 exact schema-v1 `releaseReady=true` evidence to the chain-specific, Git-ignored
@@ -643,7 +643,7 @@ in the operation-specific, Git-ignored
 Then execute or resume with:
 
 ```bash
-npm run espace:mainnet:release:execute -- --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
+npm run mainnet:release -- --chain espace --execute --approval-file tmp/release-evidence/espace-mainnet-release-approval.json
 ```
 
 For a hashless protocol checkpoint, put the exact runner-label-to-transaction-hash mapping in a
@@ -660,16 +660,16 @@ equivalent fixed entries are:
 
 ```bash
 # Destructive Sepolia acceptance; chain ID is fixed to 11155111.
-npm run ethereum:acceptance
+npm run acceptance -- --chain ethereum
 
 # Ethereum Mainnet Safe plan, digest-bound execute, and read-only owner-smoke validation.
-npm run ethereum:mainnet:safe:plan
-npm run ethereum:mainnet:safe:execute -- --digest 0x...
-npm run ethereum:mainnet:safe:status
+npm run mainnet:safe -- --chain ethereum --plan
+npm run mainnet:safe -- --chain ethereum --execute --digest 0x...
+npm run mainnet:safe -- --chain ethereum --status
 
 # Ethereum Mainnet protocol plan and approval-file-bound execute.
-npm run ethereum:mainnet:release:plan
-npm run ethereum:mainnet:release:execute -- --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
+npm run mainnet:release -- --chain ethereum --plan
+npm run mainnet:release -- --chain ethereum --execute --approval-file tmp/release-evidence/ethereum-mainnet-release-approval.json
 ```
 
 The Ethereum production flow requires
@@ -691,7 +691,7 @@ transient authorization and recovery values do not belong in long-lived environm
 
 As with eSpace, the repository never accepts a production Safe owner's private key. After Safe
 deployment, two real owners must externally execute the exact refund-free zero-ETH smoke
-transaction. `npm run ethereum:mainnet:safe:status` validates its public outer transaction hash;
+transaction. `npm run mainnet:safe -- --chain ethereum --status` validates its public outer transaction hash;
 the protocol release requires that smoke transaction to remain the Safe's first and only execution
 (`nonce == 1`).
 
@@ -1304,7 +1304,7 @@ Secret-derived nullifiers and hidden input commitments prevent a direct public n
 
 `ShieldedPoolFactory.poolCount` includes native and DEEP at construction and increments only when a new token pool is created; reusing a pool does not change it. Each pool's `nullifierCount` includes all emitted real, placeholder and period nullifiers. Recovery compares these public counts and note-tree state with unfiltered logs at one anchor block before treating a scan as complete.
 
-Localhost, testnet acceptance and guarded Mainnet release use the same integrated wiring: five business verifiers, the shared adapter, owner-update verifier/adapter, authorization state, fixed anonymous/Fund/attachment presentation verifiers, their money router, canonical pools/factory, and PrivateLetterArchive. The nine configured Circom artifact sets include the two credential issuers and owner update; presentation artifacts are pinned separately. Local development keys remain explicitly non-production. Production release retains its reviewed-artifact and ceremony requirements.
+Localhost, testnet acceptance and guarded Mainnet release use the same integrated wiring: five business verifiers, the shared adapter, owner-update verifier/adapter, authorization state, fixed anonymous/Fund/attachment presentation verifiers, their money router, canonical pools/factory, and PrivateLetterArchive. The shared manifests pin all thirteen Circom artifact sets, including eleven shielded sets. One explicit `zk:setup` generates the final keys and ceremony evidence shared by development, CI and release; daily builds, downloads and checks reuse them. Current checked-in keys remain development-only and unattested until that setup and review. Production release retains its other reviewed-artifact and evidence requirements.
 
 ## ZK Verifier Contracts
 
@@ -1324,7 +1324,7 @@ Localhost, testnet acceptance and guarded Mainnet release use the same integrate
 
 ### Shielded action verifiers
 
-The pool uses five verifier routes with 7 to 32 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The unified `zk:development:setup` and `zk:production:setup` commands generate `contracts/Shielded*Verifier.sol` for all five pool routes. They also synchronize the matching browser assets, including the receive-code proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
+The pool uses five verifier routes with 7 to 32 public signals, as listed above. They receive encoding-1, 256-byte ABC proof payloads through the same `Groth16VerifierAdapter` used for identity and disclosure. The single `zk:setup` command generates `contracts/Shielded*Verifier.sol` for all five pool routes. It also synchronizes the matching browser assets, including the receive-credential proving and verification keys, to `frontend/public/zk/shielded/` alongside the identity/disclosure workflow.
 
 The person and disclosure verifiers are generated from their Circom circuits by snarkjs. DeepFamily selects them through the permanent `(purpose,circuitId)` route and an `IProofVerifierAdapter`. Encoding ID `1`
 requires a 256-byte ABI encoding of Groth16 `a/b/c`, and the adapter forwards to the typed verifier:

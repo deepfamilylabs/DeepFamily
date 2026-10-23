@@ -1,9 +1,7 @@
 #!/usr/bin/env node
-// Full production relation with insecure local development setup. Generates
-// fresh issuer proofs, reconstructs every outer witness from raw JSON, and
-// exercises actual Groth16 proving/verification rather than a mock verifier.
+// Reuses the current public issuer keys to generate fresh proofs, reconstruct
+// every outer witness from raw JSON, and exercise actual Groth16 verification.
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -72,13 +70,12 @@ export async function receiveProofFixtureKeyMaterial(keyMode = 0) {
 
 export async function prepareReceiveProofFixtures(
   outDir,
-  { existingIssuers = false, issuerDirectory, authorizationCounter = 3n, keyMode = 0 } = {},
+  { issuerDirectory, authorizationCounter = 3n, keyMode = 0 } = {},
 ) {
   authorizationCounter = BigInt(authorizationCounter);
   assert(authorizationCounter >= 0n && authorizationCounter < 1n << 64n);
   fs.mkdirSync(outDir, { recursive: true });
-  const issuerDir = issuerDirectory ?? path.join(outDir, "issuers");
-  fs.mkdirSync(issuerDir, { recursive: true });
+  const issuerDir = issuerDirectory ?? path.join(root, "frontend/public/zk/shielded");
   const originalCpus = os.cpus;
   os.cpus = () => originalCpus().slice(0, 2);
   const snarkjs = await import("snarkjs");
@@ -118,48 +115,11 @@ export async function prepareReceiveProofFixtures(
     };
     const credentials = {};
     for (const [disclosure, source] of Object.entries(sourceNames)) {
-      if (!existingIssuers) {
-        execFileSync(
-          path.join(root, "bin/circom"),
-          [
-            `circuits/${source}.circom`,
-            "--r1cs",
-            "--wasm",
-            "--O2",
-            "--sanity_check",
-            "2",
-            "-l",
-            "node_modules",
-            "-l",
-            "node_modules/circomlib/circuits",
-            "-o",
-            issuerDir,
-          ],
-          { cwd: root, stdio: "inherit" },
-        );
-        const zkey = path.join(issuerDir, `${source}.DEVELOPMENT.zkey`);
-        await snarkjs.zKey.newZKey(
-          path.join(issuerDir, `${source}.r1cs`),
-          path.join(root, "circuits/ptau/ppot_0080_17.ptau"),
-          zkey,
-        );
-        const vk = await snarkjs.zKey.exportVerificationKey(zkey);
-        json(path.join(issuerDir, `${source}.vkey.json`), vk);
-      }
       const vk = JSON.parse(fs.readFileSync(path.join(issuerDir, `${source}.vkey.json`), "utf8"));
-      const existingZkey = [
-        path.join(issuerDir, `${source}_dev_final.zkey`),
-        path.join(issuerDir, `${source}_final.zkey`),
-        path.join(issuerDir, `${source}.DEVELOPMENT.zkey`),
-      ].find((file) => fs.existsSync(file));
-      const existingWasm = [
-        path.join(issuerDir, `${source}.wasm`),
-        path.join(issuerDir, `${source}_js/${source}.wasm`),
-      ].find((file) => fs.existsSync(file));
       const proof = await snarkjs.groth16.fullProve(
         witness,
-        existingWasm,
-        existingZkey,
+        path.join(issuerDir, `${source}.wasm`),
+        path.join(issuerDir, `${source}_final.zkey`),
         undefined,
         { singleThread: true },
         { singleThread: true },
@@ -270,8 +230,6 @@ export async function smokeReceiveProofs({
   const fixtures = reuse
     ? JSON.parse(fs.readFileSync(path.join(outDir, "fixtures.json"), "utf8"))
     : await prepareReceiveProofFixtures(outDir, {
-        existingIssuers: true,
-        issuerDirectory: path.join(root, "frontend/public/zk/shielded"),
         keyMode,
       });
   if (prepareOnly) return { outDir, ...fixtures };

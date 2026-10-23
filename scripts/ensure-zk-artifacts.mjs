@@ -7,13 +7,8 @@ import { checkShieldedDevelopmentArtifacts } from "./check-zk-artifacts.mjs";
 import { fetchZkAssets } from "./fetch-zk-assets.mjs";
 import { inspectShieldedProductionArtifacts } from "./lib/shieldedProductionSetup.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
-import {
-  ZK_RELEASE_ARTIFACTS,
-  inspectZkReleaseArtifacts,
-  sha256File,
-} from "./lib/zkArtifactTrust.mjs";
+import { ZK_RELEASE_ARTIFACTS, inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
 import { runZkBuild } from "./zk-build.mjs";
-import { runZkDevelopmentSetup } from "./zk-development-setup.mjs";
 import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -41,52 +36,18 @@ export function checkCurrentZkArtifacts({ root = ROOT } = {}) {
   };
 }
 
-/**
- * Whether every compiled Circom circuit matches its pinned development snapshot.
- * Browser loader changes do not justify replacing any proving keys.
- */
-export function compiledCircuitsMatchManifests({ root = ROOT } = {}) {
-  const pinned = (manifest) => {
-    const file = path.join(root, manifest);
-    return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, "utf8")).circuits ?? {}) : {};
-  };
-  const core = pinned("circuits/zk-artifacts-manifest.json");
-  const shielded = pinned("circuits/shielded-development-manifest.json");
-  const circuits = [
-    ...Object.keys(ZK_RELEASE_ARTIFACTS).map((name) => ["zk-artifacts/circuits", name, core[name]]),
-    ...Object.entries(SHIELDED_CIRCUITS).map(([action, name]) => [
-      "zk-artifacts/shielded",
-      name,
-      shielded[action]?.source === name ? shielded[action] : undefined,
-    ]),
-  ];
-  return circuits.every(([directory, name, expected]) => {
-    const r1cs = path.join(root, directory, `${name}.r1cs`);
-    const wasm = path.join(root, directory, `${name}_js`, `${name}.wasm`);
-    return (
-      expected !== undefined &&
-      fs.existsSync(r1cs) &&
-      fs.existsSync(wasm) &&
-      sha256File(r1cs) === expected.r1csSha256 &&
-      sha256File(wasm) === expected.wasmSha256
-    );
-  });
-}
-
 async function reuseCurrentArtifacts({ root, check, log }) {
   const artifacts = await check({ root });
   log(`[zk] All ${artifacts.circuitCount} current public artifact sets are ready`);
   return { regenerated: false, artifacts };
 }
 
-/** Compile all circuits and reuse the current public keys before the integrated local deployment. */
+/** Compile, check and fetch pinned keys before local deployment; setup is always explicit. */
 export async function ensureZkArtifacts({
   root = ROOT,
   build = runZkBuild,
   check = checkCurrentZkArtifacts,
   fetchAssets = fetchZkAssets,
-  setup = runZkDevelopmentSetup,
-  circuitsUnchanged = compiledCircuitsMatchManifests,
   log = console.log,
 } = {}) {
   root = path.resolve(root);
@@ -104,33 +65,14 @@ export async function ensureZkArtifacts({
   } catch (error) {
     failure = error;
   }
-  const coreManifest = path.join(root, "circuits/zk-artifacts-manifest.json");
-  if (
-    fs.existsSync(path.join(root, "circuits/shielded-production-manifest.json")) ||
-    (fs.existsSync(coreManifest) &&
-      JSON.parse(fs.readFileSync(coreManifest, "utf8")).trustedSetup?.status !== "development")
-  ) {
-    throw new Error(
-      `Refusing to replace current production ZK artifacts with development keys (${failure.message})`,
-      { cause: failure },
-    );
-  }
-  // Setup draws fresh randomness, so new keys would rewrite every committed verifier and vkey, and
-  // each other checkout would then regenerate its own in turn. Only a circuit change may do that.
-  if (circuitsUnchanged({ root })) {
-    throw new Error(
-      `Refusing to replace the committed development keys of unchanged circuits (${failure.message}); ` +
-        "publish them from the checkout that generated them with npm run zk:assets:publish, " +
-        "or replace them on purpose with npm run zk:development:setup",
-      { cause: failure },
-    );
-  }
-  log(
-    `[zk] Development artifacts missing or stale (${failure.message}); setting up all circuits and receive presentations`,
+  throw new Error(
+    `Current ZK artifacts are unavailable or stale (${failure.message}). ` +
+      "Restore the manifest-pinned files with npm run zk:assets:fetch, or explicitly generate " +
+      "a complete artifact set with npm run zk:setup. Publish generated files from their " +
+      "setup checkout with npm run zk:assets:publish before fetching them elsewhere. " +
+      "Local deployment never regenerates proving keys.",
+    { cause: failure },
   );
-  await setup({ root });
-  const artifacts = await check({ root });
-  return { regenerated: true, artifacts };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

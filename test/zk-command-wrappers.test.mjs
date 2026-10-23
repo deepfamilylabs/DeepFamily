@@ -13,6 +13,7 @@ import {
   parseArguments as parseCheckArguments,
   runZkCheck,
 } from "../scripts/zk-check.mjs";
+import { parseArguments as parseSetupArguments } from "../scripts/zk-setup.mjs";
 
 const fixtureRoot = path.resolve("/fixture/deepfamily");
 
@@ -41,8 +42,7 @@ describe("public ZK command surface", function () {
         "zk:assets:fetch",
         "zk:assets:publish",
         "zk:build",
-        "zk:development:setup",
-        "zk:production:setup",
+        "zk:setup",
         "zk:check",
         "zk:artifacts:check",
         "zk:ceremony:verify",
@@ -64,6 +64,26 @@ describe("public ZK command surface", function () {
 });
 
 describe("parameterized ZK command wrappers", function () {
+  describe("zk-setup argument parsing", function () {
+    it("defaults to final setup without a mode option", function () {
+      expect(parseSetupArguments([])).to.deep.equal({
+        help: false,
+        rotate: false,
+        ceremonyId: undefined,
+        expectedCurrentManifestSha256: undefined,
+        expectedSnarkjsRuntimeSha256: undefined,
+      });
+    });
+
+    it("rejects development and production mode selectors", function () {
+      for (const mode of ["development", "production"]) {
+        for (const args of [["--mode", mode], [`--mode=${mode}`]]) {
+          expect(() => parseSetupArguments(args)).to.throw("Usage: npm run zk:setup");
+        }
+      }
+    });
+  });
+
   for (const [label, parser] of [
     ["build", parseBuildArguments],
     ["check", parseCheckArguments],
@@ -177,7 +197,6 @@ describe("parameterized ZK command wrappers", function () {
       expect(commands.map(({ circuit }) => circuit)).to.deep.equal([
         "person",
         "disclosure",
-        "shielded:receiveCode",
         "shielded:anonymousReceiveCredential",
         "shielded:fundReceiveCredential",
         "shielded:identityAuthorizationUpdate",
@@ -196,7 +215,6 @@ describe("parameterized ZK command wrappers", function () {
         ["mkdir", path.join(fixtureRoot, "zk-artifacts", "shielded")],
         ["run", "person"],
         ["run", "disclosure"],
-        ["run", "shielded:receiveCode"],
         ["run", "shielded:anonymousReceiveCredential"],
         ["run", "shielded:fundReceiveCredential"],
         ["run", "shielded:identityAuthorizationUpdate"],
@@ -210,7 +228,9 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:attachedReceivePresentation"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
-      expect(commands[2].args[0]).to.equal(path.join("circuits", "shielded_receive_code.circom"));
+      expect(commands[2].args[0]).to.equal(
+        path.join("circuits", "shielded_anonymous_receive_credential.circom"),
+      );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
       expect(commands.at(-1).args[0]).to.equal(
         path.join("circuits", "shielded_attached_receive_presentation.circom"),

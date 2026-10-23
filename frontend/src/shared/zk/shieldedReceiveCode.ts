@@ -15,7 +15,7 @@ import {
   getShieldedIdentityAuthorizationWitness,
   wrapIdentityCommitmentAsPersonHash,
   type IdentityFields,
-  type ShieldedReceiveCodeProof,
+  type ShieldedReceiveCredentialProof,
 } from "@deepfamily/protocol-core";
 import { JsonRpcProvider, hexlify, getBigInt, getBytes, type BigNumberish } from "ethers";
 // @ts-ignore snarkjs does not publish complete browser typings.
@@ -121,7 +121,7 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
     expectedPublicSignals: publicSignals.map(String),
   });
   return {
-    code: encodeShieldedReceiveCredential({ ...statement, proof: proof as unknown as ShieldedReceiveCodeProof }),
+    code: encodeShieldedReceiveCredential({ ...statement, proof: proof as unknown as ShieldedReceiveCredentialProof }),
     personHash: material.personHash,
     fingerprint: computeShieldedReceiveCredentialFingerprint(statement),
   };

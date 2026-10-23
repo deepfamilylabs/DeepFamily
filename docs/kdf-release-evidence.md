@@ -11,9 +11,9 @@ benchmark, choose a production candidate, write a repository file, or claim that
 
 ```bash
 mkdir -p release-evidence
-npm run --silent release:kdf:device-matrix:template \
+npm run --silent release:kdf:template -- --kind device-matrix \
   > release-evidence/kdf-device-matrix.incomplete.json
-npm run --silent release:kdf:attacker-study:template \
+npm run --silent release:kdf:template -- --kind attacker-study \
   > release-evidence/kdf-attacker-study.incomplete.json
 ```
 

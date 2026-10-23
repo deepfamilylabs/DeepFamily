@@ -49,7 +49,7 @@ export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze([process.execPath, ["scripts/zk-shielded-release-check.mjs"]]),
   Object.freeze(["npm", ["run", "security:xss-scan"]]),
   // The release toolchain itself (Hardhat, Safe SDK, ethers and snarkjs) is in devDependencies.
-  Object.freeze(["npm", ["run", "security:audit:all"]]),
+  Object.freeze(["npm", ["run", "security:audit"]]),
 ]);
 
 export const defaultRunner = ({

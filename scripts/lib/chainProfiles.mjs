@@ -1,7 +1,7 @@
 /**
  * Immutable live-chain profiles used by the guarded acceptance and production runners.
  *
- * Public commands select one of these profiles in code. Environment variables may fill in
+ * Public commands select a supported profile with --chain. Environment variables may fill in
  * addresses, budgets and approvals, but they can never change the selected network or chain ID.
  */
 
@@ -107,7 +107,7 @@ export const ESPACE_CHAIN_PROFILE = profile({
     maximumCostCeiling: "5",
     wrapperEnvPrefix: "ESPACE_E2E",
     reportDirectoryName: "espace-acceptance",
-    command: "npm run espace:acceptance",
+    command: "npm run acceptance -- --chain espace",
     verificationProvider: "etherscan",
     explorerName: "ConfluxScan",
   },
@@ -117,11 +117,11 @@ export const ESPACE_CHAIN_PROFILE = profile({
     wrapperEnvPrefix: "ESPACE_MAINNET",
     deploymentDirectoryName: "conflux",
     gasChargingPolicy: GAS_CHARGING_CONFLUX_THREE_QUARTER,
-    safePlanCommand: "npm run espace:mainnet:safe:plan",
-    safeExecuteCommand: "npm run espace:mainnet:safe:execute",
-    safeStatusCommand: "npm run espace:mainnet:safe:status",
-    releasePlanCommand: "npm run espace:mainnet:release:plan",
-    releaseExecuteCommand: "npm run espace:mainnet:release:execute",
+    safePlanCommand: "npm run mainnet:safe -- --chain espace --plan",
+    safeExecuteCommand: "npm run mainnet:safe -- --chain espace --execute",
+    safeStatusCommand: "npm run mainnet:safe -- --chain espace --status",
+    releasePlanCommand: "npm run mainnet:release -- --chain espace --plan",
+    releaseExecuteCommand: "npm run mainnet:release -- --chain espace --execute",
     verificationProvider: "etherscan",
     explorerName: "ConfluxScan",
   },
@@ -142,7 +142,7 @@ export const ETHEREUM_CHAIN_PROFILE = profile({
     maximumCostCeiling: "0.2",
     wrapperEnvPrefix: "ETHEREUM_E2E",
     reportDirectoryName: "ethereum-acceptance",
-    command: "npm run ethereum:acceptance",
+    command: "npm run acceptance -- --chain ethereum",
     verificationProvider: "blockscout",
     explorerName: "Blockscout",
   },
@@ -152,11 +152,11 @@ export const ETHEREUM_CHAIN_PROFILE = profile({
     wrapperEnvPrefix: "ETHEREUM_MAINNET",
     deploymentDirectoryName: "mainnet",
     gasChargingPolicy: GAS_CHARGING_ETHEREUM_RECEIPT,
-    safePlanCommand: "npm run ethereum:mainnet:safe:plan",
-    safeExecuteCommand: "npm run ethereum:mainnet:safe:execute",
-    safeStatusCommand: "npm run ethereum:mainnet:safe:status",
-    releasePlanCommand: "npm run ethereum:mainnet:release:plan",
-    releaseExecuteCommand: "npm run ethereum:mainnet:release:execute",
+    safePlanCommand: "npm run mainnet:safe -- --chain ethereum --plan",
+    safeExecuteCommand: "npm run mainnet:safe -- --chain ethereum --execute",
+    safeStatusCommand: "npm run mainnet:safe -- --chain ethereum --status",
+    releasePlanCommand: "npm run mainnet:release -- --chain ethereum --plan",
+    releaseExecuteCommand: "npm run mainnet:release -- --chain ethereum --execute",
     verificationProvider: "etherscan",
     explorerName: "Etherscan",
   },
@@ -195,3 +195,16 @@ export const getMainnetProfileForNetwork = (networkName) => {
 };
 
 export const supportedChainProfiles = () => Object.freeze([...CHAIN_PROFILES_BY_ID.values()]);
+
+/** Select one supported chain while leaving operation arguments to its parser. */
+export const parseChainArguments = (argv) => {
+  if (!Array.isArray(argv)) throw new Error("Command arguments must be an array");
+  const positions = argv.flatMap((value, index) => (value === "--chain" ? [index] : []));
+  if (positions.length !== 1) throw new Error("Supply --chain <espace|ethereum> exactly once");
+  const index = positions[0];
+  const chainProfile = getChainProfile(argv[index + 1]);
+  return Object.freeze({
+    chainProfile,
+    arguments_: Object.freeze([...argv.slice(0, index), ...argv.slice(index + 2)]),
+  });
+};

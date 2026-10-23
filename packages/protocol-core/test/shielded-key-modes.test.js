@@ -3,8 +3,6 @@ import test from "node:test";
 import {
   computeShieldedAllocationKeyCommitment,
   computeShieldedBudgetNoteCommitment,
-  computeShieldedReceiveCodeFingerprint,
-  buildShieldedReceiveCodePublicSignals,
   decodeShieldedNotePayload,
   encodeShieldedBudgetNotePayload,
   encodeShieldedValueNotePayload,
@@ -95,32 +93,5 @@ test("private funding backup carries the mode and original viewing key within 46
   assert.equal(
     restored.fundingMemo.viewingKey,
     "0x" + Buffer.from(root.viewPublicKey).toString("hex"),
-  );
-});
-
-test("receive-code fingerprint binds the proved mode, identity and view but no root source or proof", async () => {
-  const keys = await deriveShieldedIndependentKeyMaterial({
-    independentKeyRoot: new Uint8Array(32).fill(8),
-    independentKeyIdentitySecret: new Uint8Array(32).fill(3),
-  });
-  const input = {
-    identityCommitment: 14n,
-    ownerCommitment: keys.ownerCommitment,
-    viewingKey: keys.viewPublicKey,
-    keyMode: 1n,
-  };
-  const fingerprint = computeShieldedReceiveCodeFingerprint(input);
-  assert.equal(buildShieldedReceiveCodePublicSignals(input).length, 9);
-  assert.equal(
-    fingerprint,
-    computeShieldedReceiveCodeFingerprint({ ...input, rootSource: "random", proof: "unbound" }),
-  );
-  assert.notEqual(fingerprint, computeShieldedReceiveCodeFingerprint({ ...input, keyMode: 0n }));
-  assert.notEqual(
-    fingerprint,
-    computeShieldedReceiveCodeFingerprint({ ...input, identityCommitment: 15n }),
-  );
-  assert.throws(() =>
-    buildShieldedReceiveCodePublicSignals({ ...input, independentKeyDerivationVersion: 2 }),
   );
 });

@@ -578,7 +578,7 @@ npm run frontend:check      # lint + source-rules + typecheck + build + vitest
 npm run dev:all
 ```
 
-This starts a Hardhat node, checks the complete ZK artifact bundle (14 Circom circuits, including three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `dev:frontend` in that order.
+This starts a Hardhat node, checks the complete ZK artifact bundle (13 Circom circuits, including three receive presentations), deploys the complete system with one token and lineage index, seeds demo data, generates `frontend/.env.local`, and starts the Vite dev server. For step-by-step control, use `dev:node`, `dev:deploy`, `dev:fund`, `dev:seed`, `frontend:config`, and `frontend:dev` in that order.
 
 ### Inside `frontend/`
 
@@ -615,7 +615,7 @@ Proof workflows load public artifacts at runtime:
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`, and the shared `shielded/receive-link-keys.json` for receive presentations
 - Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys and the small receive-link key file are committed, `npm run zk:assets:fetch` installs proving files
 - Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
-- Circuit catalog: 2 identity/disclosure circuits plus 12 shielded circuits (five business actions, two credential issuers, three presentations, the authorization update and the isolated old `receiveCode` fixture), 14 in total
+- Circuit catalog: 2 identity/disclosure circuits plus 11 shielded circuits (five business actions, two credential issuers, three presentations and the authorization update), 13 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
 If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.
@@ -733,7 +733,7 @@ that the destination is public. Attachment URIs and NFT token URIs are supported
 - Security commands (from repo root):
 
   ```bash
-  npm run security:audit       # prod dependency audit (root + frontend)
+  npm run security:audit       # dependency audit (root + frontend, including development tools)
   npm run security:xss-scan    # TypeScript AST XSS sink check; symlinks fail closed
   ```
 

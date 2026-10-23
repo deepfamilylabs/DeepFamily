@@ -1,7 +1,6 @@
 import {
   SHIELDED_POOL_ACTION,
   SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS,
-  SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
   SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS,
 } from "@deepfamily/protocol-core";
 import type { Groth16Proof } from "./zk";
@@ -10,7 +9,6 @@ import { fetchZkAsset } from "./zkAssets";
 import * as snarkjs from "snarkjs";
 
 export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
-  receiveCode: "shielded_receive_code",
   anonymousReceiveCredential: "shielded_anonymous_receive_credential",
   fundReceiveCredential: "shielded_fund_receive_credential",
   anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
@@ -28,7 +26,6 @@ export type ShieldedCircuitName = keyof typeof SHIELDED_CIRCUIT_NAMES;
 
 /** Pool action counts mirror ProofConstants.sol; receive codes are verified off-chain. */
 const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
-  receiveCode: SHIELDED_RECEIVE_CODE_PUBLIC_SIGNAL_COUNT,
   anonymousReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous,
   fundReceiveCredential: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.fund,
   anonymousReceivePresentation: SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS.anonymous + 11,
@@ -46,7 +43,6 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
  * Receive codes are verified against the key embedded at build time rather than a fetched
  * file, because this key decides whether a payer trusts a recipient's payment keys.
  */
-export const SHIELDED_RECEIVE_CODE_VERIFICATION_KEY = __SHIELDED_RECEIVE_CODE_VKEY__;
 export const SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS = __SHIELDED_RECEIVE_CREDENTIAL_VKEYS__;
 export const SHIELDED_RECEIVE_LINK_KEYS = __RECEIVE_LINK_KEYS__;
 export type ShieldedWitness = Record<string, string | number | Array<string | string[]>>;
@@ -121,13 +117,11 @@ export async function generateShieldedProof(input: {
   const result = await snarkjs.groth16.fullProve(input.witness, wasm, zkey);
   assertShieldedPublicSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
   const verificationKey =
-    input.circuit === "receiveCode"
-      ? SHIELDED_RECEIVE_CODE_VERIFICATION_KEY
-      : input.circuit === "anonymousReceiveCredential"
-        ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous
-        : input.circuit === "fundReceiveCredential"
-          ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.fund
-          : vkey;
+    input.circuit === "anonymousReceiveCredential"
+      ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous
+      : input.circuit === "fundReceiveCredential"
+        ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.fund
+        : vkey;
   if (!(await snarkjs.groth16.verify(verificationKey, result.publicSignals, result.proof))) {
     throw new Error(`Shielded ${input.circuit} proof failed local verification`);
   }

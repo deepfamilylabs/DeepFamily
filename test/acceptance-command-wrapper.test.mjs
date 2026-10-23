@@ -27,10 +27,7 @@ const runFixture = async ({
   try {
     await runAcceptanceCommand({
       chainProfile,
-      entryScript:
-        chainProfile.id === "espace"
-          ? "scripts/espace-acceptance.mjs"
-          : "scripts/ethereum-acceptance.mjs",
+      entryScript: "scripts/evm-acceptance.mjs",
       arguments_,
       environment: {
         ...process.env,
@@ -181,7 +178,7 @@ describe("acceptance command wrapper", function () {
     const calls = [];
     const options = {
       chainProfile: ESPACE_CHAIN_PROFILE,
-      entryScript: "scripts/espace-acceptance.mjs",
+      entryScript: "scripts/evm-acceptance.mjs",
       childRunner: async (invocation) => calls.push(invocation),
     };
     for (const variant of [
@@ -223,7 +220,7 @@ describe("acceptance command wrapper", function () {
       );
       await runAcceptanceCommand({
         chainProfile,
-        entryScript: "scripts/espace-acceptance.mjs",
+        entryScript: "scripts/evm-acceptance.mjs",
         arguments_: [],
         environment: {
           ...environment,
@@ -303,7 +300,7 @@ describe("acceptance command wrapper", function () {
       try {
         await runAcceptanceCommand({
           chainProfile,
-          entryScript: "scripts/espace-acceptance.mjs",
+          entryScript: "scripts/evm-acceptance.mjs",
           arguments_: [],
           environment: {
             [acceptance.modeEnvironmentName]: "release-rehearsal",

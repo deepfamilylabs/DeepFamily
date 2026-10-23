@@ -186,6 +186,7 @@ disclosure confirmation.
   as protocol-sensitive updates.
 - Run `npm run security:audit`, `npm run security:xss-scan`, and the frontend CSP scan before a
   release.
+  Use `npm run security:audit -- --scope prod` to check runtime dependencies only; the default includes development tools.
 - Keep Worker code free of React, DOM, `window`, and browser-storage dependencies. Workers reduce
   UI blocking and accidental React-state exposure, but do not form a security boundary against XSS.
 - Only public ZK artifacts (`.wasm`, `.zkey`, `.vkey.json`) are candidates for ordinary asset

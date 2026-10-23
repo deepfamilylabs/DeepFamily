@@ -242,11 +242,8 @@ describe("KDF schema-v2 incomplete evidence templates", function () {
 
   it("publishes both read-only template commands and their freezing runbook", function () {
     const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
-    expect(packageJson.scripts["release:kdf:device-matrix:template"]).to.equal(
-      "node scripts/kdf-release-evidence-template.mjs --kind device-matrix",
-    );
-    expect(packageJson.scripts["release:kdf:attacker-study:template"]).to.equal(
-      "node scripts/kdf-release-evidence-template.mjs --kind attacker-study",
+    expect(packageJson.scripts["release:kdf:template"]).to.equal(
+      "node scripts/kdf-release-evidence-template.mjs",
     );
     const documentation = fs.readFileSync(path.join(ROOT, "docs/kdf-release-evidence.md"), "utf8");
     for (const phrase of [

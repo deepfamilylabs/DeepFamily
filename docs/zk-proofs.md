@@ -19,7 +19,7 @@ commitment; `personHash` carries no route-recency marker.
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
 
-The shielded inheritance pool uses a separate set of action circuits. Version-2 receive credentials authenticate identity authorization counters and expiry through private presentation proofs. Fund and private transfers verify the presentation and business proof atomically; private letters use the same authorization state. These proofs do not use the DeepFamily `ProofEnvelope` route. See [private letters and receive authorization](private-letters.md) for the full flow and development setup.
+The shielded inheritance pool uses a separate set of action circuits. Version-2 receive credentials authenticate identity authorization counters and expiry through private presentation proofs. Fund and private transfers verify the presentation and business proof atomically; private letters use the same authorization state. These proofs do not use the DeepFamily `ProofEnvelope` route. See [private letters and receive authorization](private-letters.md) for the full flow and shared artifact workflow.
 
 ## Identity and Commitment Architecture
 
@@ -302,9 +302,9 @@ intentionally public NFT data.
 
 The pool protocol, money-note payload and money HPKE envelope retain version 1. Receive credentials use version 2 and private letters have their own versioned HPKE envelope. Exact layouts and operation authorization are specified in [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) and [private letters](private-letters.md).
 
-`shielded_anonymous_receive_credential.circom` and `shielded_fund_receive_credential.circom` authenticate the canonical identity and R from the original identity secrets, counter, expiry, owner, viewing-key limbs, mode and suite metadata with 11/12 public signals. Only the Fund disclosure publishes identity to its holder. The fixed issuer keys differ. `shielded_identity_authorization_update.circom` proves an owner-authorized increment in the 64-level dictionary. The three `shielded_*_receive_presentation.circom` circuits check current counter membership/nonmembership and operation context; attachments also prove 32-level Fund-note membership. LinkG16 links the issuer and presentation proofs over the same hidden credential fields and rerandomizes them before submission. No circuit recursively verifies another proof or evaluates pairing arithmetic. Identity preimages, canonical alias derivation and key ownership remain constrained by the issuer. The old receiveCode circuit remains an isolated artifact fixture and is not accepted by product credential parsing.
+`shielded_anonymous_receive_credential.circom` and `shielded_fund_receive_credential.circom` authenticate the canonical identity and R from the original identity secrets, counter, expiry, owner, viewing-key limbs, mode and suite metadata with 11/12 public signals. Only the Fund disclosure publishes identity to its holder. The fixed issuer keys differ. `shielded_identity_authorization_update.circom` proves an owner-authorized increment in the 64-level dictionary. The three `shielded_*_receive_presentation.circom` circuits check current counter membership/nonmembership and operation context; attachments also prove 32-level Fund-note membership. LinkG16 links the issuer and presentation proofs over the same hidden credential fields and rerandomizes them before submission. No circuit recursively verifies another proof or evaluates pairing arithmetic. Identity preimages, canonical alias derivation and key ownership remain constrained by the issuer.
 
-The five business circuits cover shield, fund, claim, privateTransfer and unshield. Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 29 and 32 signals; Claim remains at 27. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has twelve sets: five business actions, two credential issuers, three presentations, the owner update and the old isolated receiveCode fixture. With the two identity/disclosure circuits, the complete catalog has fourteen circuits.
+The five business circuits cover shield, fund, claim, privateTransfer and unshield. Fund and PrivateTransfer append two randomized receive commitments to their public statements, giving 29 and 32 signals; Claim remains at 27. Each required receipt is checked atomically by the pool against the same commitment. Zero commitments are permitted only for circuit-proven own outputs (or public identity funding). The shielded Circom catalog has eleven sets: five business actions, two credential issuers, three presentations and the owner update. With the two identity/disclosure circuits, the complete catalog has thirteen circuits.
 
 The presentation's credential fields are public inputs only to the local Groth16 prover. The linked transport hides them; raw presentation proofs and their common input prefix must never be submitted on chain. Fixed Solidity verifiers bind both verification keys and the shared hidden inputs. `linkKeys` in the shielded manifest pins `shielded/receive-link-keys.json`, the verifier base and all three generated verifiers. First use requires no recipient registration or transaction; creation and payment read the latest chain authorization state.
 
@@ -316,7 +316,7 @@ Fund reuses its donor's constrained VALUE tag for change. Fund and claim compute
 
 Circuit quality takes precedence over constraint counts: interfaces must make their trust assumptions clear, security bounds must remain explicit, and tests must check protocol semantics independently. `ShieldedBudgetNoteTags` owns the private-budget, identity-budget and owner-authorization purpose tags so fund, claim and their test harness share one definition. Merkle tests compare every legal depth against independently computed JS Poseidon roots, with separate direction, invalid-witness and disabled-slot cases. Pinning the dependency does not replace the project's bounds or regression tests; any library upgrade requires another review and regenerated artifacts. The library's core has related historical PSE review evidence, but that does not constitute a complete audit of version 2.0.0, this wrapper or the protocol.
 
-Before the receive-credential and view-bound-budget changes, the pinned compiler produced 1,681 constraints for receiveCode, 2,006 for shield, 57,700 for Fund, 68,714 for Claim, 75,070 for PrivateTransfer and 75,357 for Unshield. These are historical counts; current circuit artifacts and manifests define the implemented statements. The power-17 Phase-1 file remains pinned.
+Before the receive-credential and view-bound-budget changes, the pinned compiler produced 2,006 constraints for shield, 57,700 for Fund, 68,714 for Claim, 75,070 for PrivateTransfer and 75,357 for Unshield. These are historical counts; current circuit artifacts and manifests define the implemented statements. The power-17 Phase-1 file remains pinned.
 
 The following historical experiment predates the switch back to the fixed library. On 2026-10-04, the second optimization round (budget-tag reuse plus the project-owned Merkle selector) was compared with the preceding shared-domain implementation on macOS, Node v26.9.0 and snarkjs 0.7.5. It did not isolate the Merkle change. Each variant received one warmup and five alternating measured runs in fresh Node CLI processes. `groth16 fullprove` timing includes witness calculation and proving; proof verification runs separately. The fund fixture creates an initial private budget; claim uses 12 periods and a second identity-bound budget. Every proof verified and every public signal matched between variants.
 
@@ -339,9 +339,15 @@ Initial Fund and Claim include `lineageCheckpointId` in transaction data. The in
 
 `ShieldedPoolCore` maintains 32-level note shards and secret-derived spend/period nullifiers. The lineage trees remain 64 levels deep. `privateTransfer` and `unshield` each have one circuit supporting one to eight real inputs. Every real VALUE input has a positive uint128 amount and the same owner, chain and pool. Eight-slot enabled inputs are contiguous; disabled private openings are zero, their public shard/root repeat slot zero, and their slot-specific dummy nullifiers are distinct. The real spend nullifier remains derived from the owner secret and note commitment. Input sums use 131 bits; each of the two outputs remains uint128, and unshield has one change output plus a zero dummy. Different public roots reveal multiple real inputs, while equal roots do not determine the count. `unshield` exposes its recipient and amount. Public budget facts cannot be made secret again, and proof shapes do not prevent timing, wallet or small-set correlation.
 
-`npm run zk:development:setup` prepares all fourteen Circom sets, then synchronizes their artifacts and derives the matching receive-link parameters and fixed verifiers. Presentation circuits use the same shielded manifest as the other shielded circuits. All generated local keys remain explicitly development-only. The existing production setup covers the same complete catalog; no separate receive ceremony or prover toolchain is required.
+`npm run zk:setup` prepares the final keys and single-operator ceremony evidence for all thirteen Circom sets, then synchronizes their artifacts and derives the matching receive-link parameters and fixed verifiers. Local development, CI and release share this artifact set. Presentation circuits use the same shielded manifest as the other shielded circuits; the complete catalog uses one setup workflow.
 
-To rebuild one development shielded key after changing its circuit, use `node scripts/zk-shielded-development-setup.mjs --circuit claim` (or another shielded action). The command preserves other manifest entries and keys, validates the pinned Phase-1 file, and synchronizes the complete artifact set. A fresh checkout without a complete development set needs full setup first.
+The first setup validates manifest and toolchain pins, records the reviewed clean-commit sources,
+and establishes a fresh compiled baseline. Earlier development proving files and their old
+source/R1CS/WASM hashes are not required. Review the complete generated final bundle before
+committing it. Runtime-only rotation and later release checks retain strict comparisons with the
+reviewed final manifest and artifacts.
+
+Daily `zk:build`, `zk:assets:fetch` and check commands reuse the pinned keys. A fresh checkout downloads the matching proving files; stale circuit sources or unavailable keys stop local deployment. Generating replacement keys requires an explicit `npm run zk:setup` for the complete catalog from a clean, reviewed commit on a controlled machine outside CI.
 
 ## Proof Transport and Permanent Routing
 
@@ -400,7 +406,7 @@ are published under `frontend/public/zk/`:
 - `person_commitment.wasm`, `person_commitment_final.zkey`, `person_commitment.vkey.json`;
 - `disclosure_binding.wasm`, `disclosure_binding_final.zkey`,
   `disclosure_binding.vkey.json`;
-- twelve shielded WASM/zkey/vkey sets under `shielded/`, including the three presentations;
+- eleven shielded WASM/zkey/vkey sets under `shielded/`, including the three presentations;
 - one shared `shielded/receive-link-keys.json` containing public linking parameters.
 
 Presentation WASM/zkey downloads are 14,216,109 bytes (13.56 MiB) for anonymous
@@ -411,8 +417,8 @@ runtime. Linked proofs are 1,184 bytes for anonymous/attachment or 1,216 bytes f
 Fund. Their public signals are separate: eleven for anonymous/Fund and fourteen
 for attachments. Transaction data and ciphertext are additional.
 
-Production shielded artifacts use the same `/zk/shielded/` URLs and are installed in
-`frontend/public/zk/shielded/` by `zk:production:setup` with the production manifest. Only the
+The final shielded artifacts use the same `/zk/shielded/` URLs in every environment and are installed in
+`frontend/public/zk/shielded/` by `zk:setup` with the manifest recording their ceremony evidence. Only the
 verification-key metadata is committed. The WASM/zkey files are pinned by the manifests' `wasmSha256`
 and `zkeySha256` and hosted on R2 at `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`:
 `zk:assets:publish` uploads new files and `zk:assets:fetch` installs them in a checkout. The Vite
@@ -451,14 +457,13 @@ Supported top-level commands:
 | Command                        | Purpose                                                  |
 | ------------------------------ | -------------------------------------------------------- |
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                      |
-| `npm run zk:build`             | Compile all 14 Circom circuits                           |
-| `npm run zk:development:setup` | Generate all development artifacts                       |
-| `npm run zk:production:setup`  | Generate production artifacts for all 14 Circom circuits |
+| `npm run zk:build`             | Compile all 13 Circom circuits                           |
+| `npm run zk:setup`             | Generate final artifacts and evidence for all 13 circuits |
 | `npm run zk:check`             | Check all artifacts and available real proof fixtures    |
 | `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact bundle        |
 | `npm run zk:ceremony:verify`   | Verify the complete production artifact bundle           |
 
-The development and checking commands cover identity, disclosure and all twelve
+The shared build, setup and checking commands cover identity, disclosure and all eleven
 shielded circuits, including the three receive presentations. `npm test` runs the real receive
 contract chain in both key modes and the complete 64/32-depth business proof; it
 fails when required proving artifacts are missing or do not match their manifests.
@@ -466,9 +471,9 @@ fails when required proving artifacts are missing or do not match their manifest
 and checks their constraints without proving keys, Powers of Tau, or browser artifacts. It is
 included in `npm run check` and runs in an independent CI job. Negative witnesses must trigger
 a Circom constraint assertion; malformed inputs and runtime failures fail the test instead.
-`zk:check` proves the identity and disclosure fixtures, checks all twelve shielded
+`zk:check` proves the identity and disclosure fixtures, checks all eleven shielded
 artifact sets and available Fund/Claim fixtures, and exercises linked receive
-proofs. Production checks validate all fourteen Circom ceremonies and the matching
+proofs. Production checks validate all thirteen Circom ceremonies and the matching
 link-key/verifier bindings. Release preflight additionally checks independent audits,
 runtime benchmarks and deployment acceptance evidence. Development keys cannot be
 used for a production release.
@@ -479,13 +484,13 @@ fresh v1 ceremony, and deployments as absent. Do not describe the protocol as pr
 until device benchmarks, attacker-cost analysis, a fresh reviewed setup, artifact hashes, golden
 vectors, and deployment/runtime evidence have all been recorded and the release gates pass.
 
-`zk:development:setup` records no ceremony evidence and is never a substitute for a production
-ceremony. Both it and production setup use the pinned public Phase-1 pTau committed at
-`circuits/ptau/ppot_0080_17.ptau` or the file selected by `ZK_PTAU_PATH`; both check
-its pinned hashes before use, and no command downloads it.
+`zk:setup` uses the pinned public Phase-1 pTau installed locally at
+`circuits/ptau/ppot_0080_17.ptau` or the file selected by `ZK_PTAU_PATH` and records the final
+single-operator ceremony. Setup and verification check the pinned pTau hashes before use and do
+not download it. Install it explicitly with `npm run zk:ptau:fetch`.
 
-After all circuits and KDF profiles are frozen, the existing
-`npm run zk:production:setup` prepares the complete fourteen-circuit bundle and
+After all circuits and KDF profiles are frozen, the single
+`npm run zk:setup` prepares the complete thirteen-circuit bundle and
 matching link parameters. Review and commit its outputs before running the release
 gates below; setup alone does not supply audit, benchmark or deployment evidence:
 

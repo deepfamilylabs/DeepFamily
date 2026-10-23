@@ -153,45 +153,17 @@ describe("Ethereum production tooling profiles", function () {
     expect(Object.isFrozen(supportedChainProfiles())).to.equal(true);
   });
 
-  it("exposes only explicit npm entry points with fixed Hardhat networks", async function () {
+  it("exposes one chain-selecting entry for each operation", async function () {
     const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
     expect(packageJson.scripts).to.include({
-      "espace:acceptance": "node scripts/espace-acceptance-command.mjs",
-      "espace:mainnet:safe:plan": "node scripts/espace-mainnet-safe-command.mjs --plan",
-      "espace:mainnet:safe:execute": "node scripts/espace-mainnet-safe-command.mjs --execute",
-      "espace:mainnet:safe:status": "node scripts/espace-mainnet-safe-command.mjs --status",
-      "espace:mainnet:release:projection":
-        "node scripts/protocol-deployment-projection.mjs --chain espace",
-      "espace:mainnet:release:plan": "node scripts/espace-mainnet-release-command.mjs --plan",
-      "espace:mainnet:release:execute": "node scripts/espace-mainnet-release-command.mjs --execute",
-      "ethereum:acceptance": "node scripts/ethereum-acceptance-command.mjs",
-      "ethereum:mainnet:safe:plan": "node scripts/ethereum-mainnet-safe-command.mjs --plan",
-      "ethereum:mainnet:safe:execute": "node scripts/ethereum-mainnet-safe-command.mjs --execute",
-      "ethereum:mainnet:safe:status": "node scripts/ethereum-mainnet-safe-command.mjs --status",
-      "ethereum:mainnet:release:projection":
-        "node scripts/protocol-deployment-projection.mjs --chain ethereum",
-      "ethereum:mainnet:release:plan": "node scripts/ethereum-mainnet-release-command.mjs --plan",
-      "ethereum:mainnet:release:execute":
-        "node scripts/ethereum-mainnet-release-command.mjs --execute",
+      acceptance: "node scripts/evm-command.mjs acceptance",
+      "mainnet:safe": "node scripts/evm-command.mjs safe",
+      "mainnet:release": "node scripts/evm-command.mjs release",
+      "mainnet:projection": "node scripts/protocol-deployment-projection.mjs",
     });
-    for (const name of [
-      "espace:acceptance",
-      "espace:mainnet:safe:plan",
-      "espace:mainnet:safe:execute",
-      "espace:mainnet:safe:status",
-      "espace:mainnet:release:projection",
-      "espace:mainnet:release:plan",
-      "espace:mainnet:release:execute",
-      "ethereum:acceptance",
-      "ethereum:mainnet:safe:plan",
-      "ethereum:mainnet:safe:execute",
-      "ethereum:mainnet:safe:status",
-      "ethereum:mainnet:release:projection",
-      "ethereum:mainnet:release:plan",
-      "ethereum:mainnet:release:execute",
-    ]) {
-      expect(packageJson.scripts[name], name).not.to.include("$npm_config_net");
-    }
+    expect(
+      Object.keys(packageJson.scripts).some((name) => /^(?:espace|ethereum):/u.test(name)),
+    ).to.equal(false);
   });
 
   it("routes Sepolia acceptance to Blockscout while retaining Etherscan-compatible mainnets", async function () {
@@ -591,28 +563,13 @@ describe("Ethereum production tooling profiles", function () {
     );
   });
 
-  it("keeps thin wrappers profile-only and derives network, state directory and locks centrally", async function () {
-    const [shared, locks, espaceSafe, espaceRelease, ethereumSafe, ethereumRelease] =
-      await Promise.all([
-        fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
-        fs.readFile("scripts/lib/exclusiveCommandLock.mjs", "utf8"),
-        fs.readFile("scripts/espace-mainnet-safe-command.mjs", "utf8"),
-        fs.readFile("scripts/espace-mainnet-release-command.mjs", "utf8"),
-        fs.readFile("scripts/ethereum-mainnet-safe-command.mjs", "utf8"),
-        fs.readFile("scripts/ethereum-mainnet-release-command.mjs", "utf8"),
-      ]);
-
-    for (const [source, profileName] of [
-      [espaceSafe, "ESPACE_CHAIN_PROFILE"],
-      [espaceRelease, "ESPACE_CHAIN_PROFILE"],
-      [ethereumSafe, "ETHEREUM_CHAIN_PROFILE"],
-      [ethereumRelease, "ETHEREUM_CHAIN_PROFILE"],
-    ]) {
-      expect(source).to.include(profileName);
-      expect(source).not.to.include("--network");
-      expect(source).not.to.include("npm_config_net");
-      expect(source).not.to.include("process.argv");
-    }
+  it("derives network, state directory and locks from the selected profile", async function () {
+    const [shared, locks, dispatcher] = await Promise.all([
+      fs.readFile("scripts/lib/mainnetCommandWrapper.mjs", "utf8"),
+      fs.readFile("scripts/lib/exclusiveCommandLock.mjs", "utf8"),
+      fs.readFile("scripts/evm-command.mjs", "utf8"),
+    ]);
+    expect(dispatcher).to.include("parseChainArguments");
     expect(shared).to.include("chainProfile.mainnet.networkName");
     expect(shared).to.include("chainProfile.mainnet.deploymentDirectoryName");
     expect(shared).to.include('".mainnet-command.lock"');
@@ -620,7 +577,6 @@ describe("Ethereum production tooling profiles", function () {
     expect(shared).to.include("parseMainnetSafeCommandArguments");
     expect(shared).to.include("parseMainnetReleaseCommandArguments");
     expect(shared).to.include('"--approval-file"');
-    expect(shared).to.include("PRODUCTION_BUILD_LOCK_PATH");
     expect(shared).to.include("productionBuildLockPath(ROOT)");
     expect(locks).to.include('".production-build.lock"');
     expect(shared).not.to.include("npm_config_net");
@@ -642,8 +598,8 @@ describe("Ethereum production tooling profiles", function () {
     expect(projectionIndex).to.be.greaterThan(deriveIndex);
     expect(intentIndex).to.be.greaterThan(projectionIndex);
     for (const [runbook, command, chainId] of [
-      [espaceRunbook, "espace:mainnet:release:projection", "1030"],
-      [ethereumRunbook, "ethereum:mainnet:release:projection", "1"],
+      [espaceRunbook, "mainnet:projection -- --chain espace", "1030"],
+      [ethereumRunbook, "mainnet:projection -- --chain ethereum", "1"],
     ]) {
       expect(runbook).to.include(command);
       expect(runbook).to.include(`chain ID \`${chainId}\``);

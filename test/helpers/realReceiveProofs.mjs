@@ -55,7 +55,7 @@ export function checkRealReceiveArtifacts() {
     assert.deepEqual(
       missing,
       [],
-      "Run npm run zk:development:setup before this required integration test",
+      "Run npm run zk:setup before this required integration test",
     );
   }
   if (missing.length) return { missing };

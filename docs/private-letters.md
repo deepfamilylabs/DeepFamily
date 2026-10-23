@@ -88,20 +88,21 @@ ciphertext. Issuing a receive credential uses its own small issuer WASM/zkey.
 ## Development
 
 ```sh
-npm run zk:development:setup
+npm run zk:assets:fetch
 npm run dev:deploy
 npm run frontend:config
 ```
 
-The same setup handles all 14 Circom circuits, including the credential issuers,
-counter update and three presentations. It derives the shared linking parameters
-and fixed verifiers from the matching keys. Generated proving files stay out of Git.
-`circuits/shielded-development-manifest.json` records shielded artifact hashes and
-`linkKeys`; no separate receive manifest is needed. Synchronization rejects stale
-sources, mismatched issuer keys, incomplete circuit sets and modified proving
-files. Browser downloads use the existing content-addressed asset host and digest
-checks. Local keys remain marked `developmentOnly: true` and
-`productionReady: false`.
+Local development, CI and release reuse one pinned artifact set for all 13 Circom
+circuits, including the credential issuers, counter update and three presentations.
+The explicit `npm run zk:setup` command creates the final keys, shared linking parameters,
+fixed verifiers and single-operator ceremony evidence from a clean, reviewed commit on a
+controlled machine outside CI. Generated proving files stay out of Git. The shared circuit
+manifests record shielded artifact hashes and `linkKeys`. Build, fetch and check commands reuse
+those keys; stale sources, mismatched issuer keys, incomplete circuit sets and modified proving
+files stop the workflow. Browser downloads use the existing content-addressed asset host and
+digest checks. The current checked-in keys remain unattested and marked
+`developmentOnly: true` and `productionReady: false` until the explicit final setup and review.
 
 Integrated deployment creates the shared state, its owner-proof adapter, the
 presentation verifiers and money router, canonical pools/factory, and letter archive.
@@ -123,10 +124,11 @@ npm test
 standalone and shared-root attached letters, owner counter updates and Archive
 recovery. It requires the real artifacts and fails if they are missing or do not
 match the manifests. It also runs the complete 64/32-depth business-proof check.
-Regenerate keys only when needed with `npm run zk:development:setup`.
+Generate a replacement final artifact set explicitly with `npm run zk:setup` after reviewing
+and committing a circuit change; local deployment never regenerates keys automatically.
 
 `zk:check` also exercises fresh linked receive proofs and rejects changed public
-signals and invalid private witnesses. Both development and release setup use the
-same Circom toolchain and artifact catalog; there is no extra receive setup stage.
-The current keys are development-only. Local feature acceptance does not require
-production setup or external deployment.
+signals and invalid private witnesses. The single setup covers the complete Circom artifact
+catalog, including receive proofs. Local feature acceptance can reuse the current pinned
+development-only files; publication requires the reviewed final setup and the other release
+evidence.

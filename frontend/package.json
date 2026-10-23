@@ -14,10 +14,7 @@
     "csp:scan": "node ./scripts/csp-scan.mjs",
     "config:local": "node ./scripts/update-local-config.mjs",
     "sync:abi": "node ./scripts/sync-abi.mjs",
-    "locales:compare": "node ./scripts/compare-locales.mjs",
-    "locales:usage": "node ./scripts/compare-locales.mjs --usage",
-    "locales:usage:verbose": "node ./scripts/compare-locales.mjs --verbose-usage",
-    "locales:check": "npm run locales:compare && npm run locales:usage"
+    "locales:check": "node ./scripts/compare-locales.mjs --check"
   },
   "dependencies": {
     "@deepfamily/protocol-core": "0.1.0",

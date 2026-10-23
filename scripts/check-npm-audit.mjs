@@ -469,15 +469,19 @@ export const defaultAuditRunner = ({
   root,
   platform = process.platform,
   env = process.env,
+  scope = "all",
 } = {}) => {
-  const args = [
-    "audit",
-    "--json",
-    "--include=prod",
-    "--include=dev",
-    "--include=optional",
-    "--include=peer",
-  ];
+  const args =
+    scope === "prod"
+      ? ["audit", "--json", "--omit=dev"]
+      : [
+          "audit",
+          "--json",
+          "--include=prod",
+          "--include=dev",
+          "--include=optional",
+          "--include=peer",
+        ];
   const auditEnvironment = buildAuditEnvironment(env);
   const command = normalizePortableCommand({
     executable: "npm",
@@ -497,9 +501,11 @@ export const runNpmAuditPolicy = ({
   root = process.cwd(),
   stdout = (line) => console.log(line),
   auditRunner = defaultAuditRunner,
+  scope = "all",
   ...evaluationOptions
 } = {}) => {
-  const result = auditRunner({ root });
+  if (!["all", "prod"].includes(scope)) throw new Error("Audit scope must be all or prod");
+  const result = auditRunner({ root, scope });
   if (result.error) throw result.error;
   if (result.signal) throw new Error(`npm audit was terminated by ${result.signal}`);
   if (result.status !== 0 && result.status !== 1) {
@@ -528,9 +534,14 @@ export const runNpmAuditPolicy = ({
   return evaluation;
 };
 
-export const main = () => {
-  if (process.argv.length !== 2) throw new Error("Usage: node scripts/check-npm-audit.mjs");
-  runNpmAuditPolicy();
+export const main = (argv = process.argv.slice(2)) => {
+  if (
+    argv.length !== 0 &&
+    (argv.length !== 2 || argv[0] !== "--scope" || !["all", "prod"].includes(argv[1]))
+  ) {
+    throw new Error("Usage: node scripts/check-npm-audit.mjs [--scope <all|prod>]");
+  }
+  return runNpmAuditPolicy({ scope: argv[1] ?? "all" });
 };
 
 const scriptPath = fileURLToPath(import.meta.url);

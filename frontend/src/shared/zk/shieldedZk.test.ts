@@ -39,7 +39,6 @@ describe("shielded proof public inputs", () => {
 
   it("checks each circuit against its own public-signal count", () => {
     for (const [circuit, count] of [
-      ["receiveCode", 9],
       ["anonymousReceiveCredential", 11],
       ["fundReceiveCredential", 12],
       ["anonymousReceivePresentation", 22],

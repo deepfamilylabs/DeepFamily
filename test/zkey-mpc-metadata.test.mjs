@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 
 import { ZK_CEREMONY_CIRCUIT_FIELDS } from "../scripts/lib/zkArtifactTrust.mjs";
 import { readZkeyMpcMetadata } from "../scripts/lib/zkeyMpcMetadata.mjs";
-import { DEVELOPMENT_CONTRIBUTOR_NAME } from "../scripts/zk-development-setup.mjs";
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -28,7 +27,7 @@ describe("zkey MPC metadata reader", function () {
         expect(metadata.contributions[0]).to.include({
           sequence: 1,
           type: 0,
-          name: DEVELOPMENT_CONTRIBUTOR_NAME,
+          name: "development-only",
           beaconHash: null,
           numIterationsExp: null,
         });
@@ -38,8 +37,7 @@ describe("zkey MPC metadata reader", function () {
         const transcript = JSON.parse(
           await fs.readFile(path.join(PROJECT_ROOT, manifest.trustedSetup.transcript.path), "utf8"),
         );
-        const contributionHashField =
-          ZK_CEREMONY_CIRCUIT_FIELDS[name].contributionHash;
+        const contributionHashField = ZK_CEREMONY_CIRCUIT_FIELDS[name].contributionHash;
         const expectedContributions = [
           ...transcript.contributions.map((contribution, index) => ({
             sequence: index + 1,

@@ -1,12 +1,12 @@
 import { expect } from "chai";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 import { runZkeyContributionFromStdin } from "../scripts/zk-contribute-from-stdin.mjs";
-import { parseArguments as parseProductionSetupArguments } from "../scripts/zk-production-setup.mjs";
+import { parseArguments as parseProductionSetupArguments } from "../scripts/zk-setup.mjs";
 import { ZK_ARTIFACT_MANIFEST_PATH, sha256Text } from "../scripts/lib/zkArtifactTrust.mjs";
 import {
   SINGLE_OPERATOR_BEACON_ITERATIONS_EXP,
@@ -21,9 +21,12 @@ import {
   buildStagedProofValidationCommands,
   buildTranscriptAndManifest,
   installProductionArtifacts,
+  inspectProductionSetupInputs,
   runSingleOperatorProductionSetup,
   runSecretContribution,
   snapshotProductionContributionHelper,
+  snapshotProductionCompilationManifest,
+  snapshotProductionSetupSources,
 } from "../scripts/lib/zkProductionSetup.mjs";
 import {
   CIRCOM_LINUX_X64_SHA256,
@@ -32,6 +35,11 @@ import {
   CIRCOM_VERSION,
 } from "../scripts/lib/circomToolchain.mjs";
 import { inspectSnarkjsRuntime, snapshotSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
+import {
+  SHIELDED_SETUP_CIRCUITS,
+  assertShieldedCompilationUnchanged,
+  snapshotShieldedCompilation,
+} from "../scripts/lib/shieldedProductionSetup.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
 
 const REVIEWED_CONTRIBUTION_HELPER = 'import "./lib/snarkjsToolchain.mjs";\n';
@@ -80,6 +88,111 @@ const installContributionHelperFixture = async (root) => {
   return { helperPath, dependencyPath };
 };
 
+const installFirstSetupFixture = async (root) => {
+  const compilerContents = "fixture compiler\n";
+  const cliContents = "fixture snarkjs CLI\n";
+  await fs.mkdir(path.join(root, "bin"), { recursive: true });
+  await fs.mkdir(path.join(root, "node_modules", "snarkjs", "build"), { recursive: true });
+  await fs.mkdir(path.join(root, "circuits"), { recursive: true });
+  await fs.writeFile(path.join(root, "bin", "circom-release-linux-amd64"), compilerContents);
+  await fs.writeFile(path.join(root, "node_modules", "snarkjs", "build", "cli.cjs"), cliContents);
+  await fs.writeFile(
+    path.join(root, "node_modules", "snarkjs", "package.json"),
+    JSON.stringify({ name: "snarkjs", version: "0.7.5", main: "build/cli.cjs" }),
+  );
+  const manifest = {
+    schemaVersion: 3,
+    circomVersion: CIRCOM_VERSION,
+    snarkjsVersion: "0.7.5",
+    toolchain: {
+      circomBinarySha256: sha256Text(compilerContents),
+      snarkjsCliSha256: sha256Text(cliContents),
+      snarkjsRuntimeSha256: inspectSnarkjsRuntime({ root }).sha256,
+    },
+    trustedSetup: {
+      status: "development",
+      trustModel: "single-operator",
+      warning: "Development fixture keys have no production ceremony evidence.",
+      minimumContributors: 1,
+      contributorCount: 1,
+      beaconApplied: false,
+      transcriptSha256: null,
+    },
+    circuits: Object.fromEntries(
+      ["person_commitment", "disclosure_binding"].map((name) => [
+        name,
+        Object.fromEntries(
+          [
+            "sourceSha256",
+            "r1csSha256",
+            "wasmSha256",
+            "zkeySha256",
+            "verificationKeySha256",
+            "solidityVerifierSha256",
+          ].map((field) => [field, "11".repeat(32)]),
+        ),
+      ]),
+    ),
+  };
+  const manifestRaw = `${JSON.stringify(manifest, null, 2)}\n`;
+  await fs.writeFile(path.join(root, ZK_ARTIFACT_MANIFEST_PATH), manifestRaw);
+  await installContributionHelperFixture(root);
+  const sourcePaths = ["person_commitment", "disclosure_binding"].map((name) =>
+    path.join(root, "circuits", `${name}.circom`),
+  );
+  for (const sourcePath of sourcePaths) {
+    await fs.writeFile(sourcePath, `${path.basename(sourcePath)} changed reviewed source\n`);
+  }
+  const sourceSnapshotter = () =>
+    sha256Text(sourcePaths.map((sourcePath) => fsSync.readFileSync(sourcePath, "utf8")).join("\0"));
+  const ptauPath = path.join(root, "fixture.ptau");
+  const ptauContents = "fixture ptau\n";
+  await fs.writeFile(ptauPath, ptauContents);
+  const options = {
+    root,
+    includeShielded: false,
+    env: {},
+    platform: "darwin",
+    arch: "arm64",
+    captureRunner: createFixtureGitCaptureRunner(),
+    sourceSnapshotter,
+    // The fake compiler is never executed; production enforces its real pinned digest.
+    artifactInspector: () => ({
+      circomVersion: CIRCOM_VERSION,
+      toolchain: { circom: { sha256: CIRCOM_LINUX_X64_SHA256 } },
+      trustedSetupStatus: "development",
+      manifestSha256: sha256Text(manifestRaw),
+    }),
+    compilerSourceBuilder: async () => ({
+      bytes: Buffer.from(compilerContents),
+      cargoVersion: "cargo fixture",
+      rustcVersion: "rustc fixture",
+    }),
+    runtimeSnapshotter: ({ destinationRoot, expectedSha256 }) => ({
+      root: destinationRoot,
+      sha256: expectedSha256,
+    }),
+    ptauInstaller: async () => ({
+      path: ptauPath,
+      source: "https://example.invalid/fixture.ptau",
+      bytes: Buffer.byteLength(ptauContents),
+      sha256: sha256Text(ptauContents),
+      blake2b512: createHash("blake2b512").update(ptauContents).digest("hex"),
+    }),
+  };
+  const compile = async (command) => {
+    const circuitName = path.basename(command.args[0], ".circom");
+    const stageBuild = command.args[command.args.indexOf("-o") + 1];
+    await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
+    await fs.writeFile(path.join(stageBuild, `${circuitName}.r1cs`), `${circuitName} new R1CS\n`);
+    await fs.writeFile(
+      path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
+      `${circuitName} new WASM\n`,
+    );
+  };
+  return { options, sourcePaths, manifest, compile };
+};
+
 describe("single-operator production ZK setup safety", function () {
   let root;
   let stage;
@@ -124,7 +237,7 @@ describe("single-operator production ZK setup safety", function () {
       ["--expected-snarkjs-runtime-sha256", replacementRuntimeSha256],
     ]) {
       expect(() => parseProductionSetupArguments(argumentsWithoutBinding)).to.throw(
-        "Usage: npm run zk:production:setup",
+        "Usage: npm run zk:setup",
       );
     }
   });
@@ -342,23 +455,25 @@ describe("single-operator production ZK setup safety", function () {
     expect(command.args[0]).not.to.match(/\.cmd$/u);
   });
 
-  it("records a reviewed replacement runtime without changing the canonical compiler or CLI", async function () {
+  it("records fresh compilation and a reviewed runtime without changing canonical toolchain pins", async function () {
     const releaseDirectory = path.join(stage, "release");
     await fs.mkdir(releaseDirectory, { recursive: true });
     await fs.mkdir(path.join(root, "circuits"), { recursive: true });
 
     const circuits = {};
     const reviewedCircuits = {};
+    const stageBuild = path.join(stage, "build");
     for (const circuitName of ["person_commitment", "disclosure_binding"]) {
       const circuitDirectory = path.join(stage, circuitName);
       await fs.mkdir(circuitDirectory, { recursive: true });
+      await fs.mkdir(path.join(stageBuild, `${circuitName}_js`), { recursive: true });
       await fs.writeFile(
         path.join(root, "circuits", `${circuitName}.circom`),
         `${circuitName} source\n`,
       );
       const circuit = {
-        r1cs: path.join(circuitDirectory, `${circuitName}.r1cs`),
-        wasm: path.join(circuitDirectory, `${circuitName}.wasm`),
+        r1cs: path.join(stageBuild, `${circuitName}.r1cs`),
+        wasm: path.join(stageBuild, `${circuitName}_js`, `${circuitName}.wasm`),
         finalZkey: path.join(circuitDirectory, `${circuitName}.zkey`),
         verificationKey: path.join(circuitDirectory, `${circuitName}.vkey.json`),
         solidityVerifier: path.join(circuitDirectory, `${circuitName}.sol`),
@@ -405,13 +520,26 @@ describe("single-operator production ZK setup safety", function () {
     const records = await buildTranscriptAndManifest({
       root,
       stageRoot: stage,
-      initialManifest: {
-        schemaVersion: 3,
-        circomVersion: CIRCOM_VERSION,
-        snarkjsVersion: "0.7.5",
-        toolchain: canonicalToolchain,
-        circuits: reviewedCircuits,
-      },
+      initialManifest: snapshotProductionCompilationManifest({
+        root,
+        stageBuild,
+        initialManifest: {
+          schemaVersion: 3,
+          circomVersion: CIRCOM_VERSION,
+          snarkjsVersion: "0.7.5",
+          toolchain: canonicalToolchain,
+          circuits: Object.fromEntries(
+            Object.keys(reviewedCircuits).map((name) => [
+              name,
+              {
+                sourceSha256: "00".repeat(32),
+                r1csSha256: "00".repeat(32),
+                wasmSha256: "00".repeat(32),
+              },
+            ]),
+          ),
+        },
+      }),
       compiler,
       ceremonyId: "deepfamily-production-fixture",
       ptau: {
@@ -433,6 +561,9 @@ describe("single-operator production ZK setup safety", function () {
       ...canonicalToolchain,
       snarkjsRuntimeSha256: "35".repeat(32),
     });
+    for (const [name, reviewed] of Object.entries(reviewedCircuits)) {
+      expect(records.manifest.circuits[name]).to.include(reviewed);
+    }
   });
 
   it("rejects a manifest-selected canonical compiler digest before installing the pTau", async function () {
@@ -535,6 +666,125 @@ describe("single-operator production ZK setup safety", function () {
     expect(ptauError?.message).to.include("staged Powers of Tau");
   });
 
+  it("validates first-setup toolchain inputs without old proving files or source hashes", async function () {
+    const fixture = await installFirstSetupFixture(root);
+    expect(inspectProductionSetupInputs({ root })).to.include({
+      circomVersion: CIRCOM_VERSION,
+      trustedSetupStatus: "development",
+    });
+    await expectMissing(path.join(root, "frontend", "public", "zk"));
+    await fs.appendFile(path.join(root, "node_modules", "snarkjs", "build", "cli.cjs"), "tampered");
+    expect(() => inspectProductionSetupInputs({ root })).to.throw(
+      "Installed snarkjs CLI SHA-256 mismatch",
+    );
+    expect(fixture.manifest.circuits.person_commitment.sourceSha256).not.to.equal(
+      sha256Text(await fs.readFile(fixture.sourcePaths[0], "utf8")),
+    );
+  });
+
+  it("starts first Phase 2 from new compiled hashes without any previous proving keys", async function () {
+    const fixture = await installFirstSetupFixture(root);
+    let setupCalled = false;
+    const stoppedBeforeEntropy = new Error("stop before generating fixture entropy");
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        ...fixture.options,
+        runner: async (command) => {
+          if (command.args[0]?.endsWith(".circom")) return fixture.compile(command);
+          expect(command.args.slice(1, 3)).to.deep.equal(["groth16", "setup"]);
+          setupCalled = true;
+        },
+        randomBytesFn: () => {
+          throw stoppedBeforeEntropy;
+        },
+      }),
+    );
+    expect(error).to.equal(stoppedBeforeEntropy);
+    expect(setupCalled).to.equal(true);
+    await expectMissing(path.join(root, "frontend", "public", "zk"));
+  });
+
+  for (const mutationPoint of ["compilation", "Groth16 setup"]) {
+    it(`rejects source mutation during ${mutationPoint} before requesting entropy`, async function () {
+      const fixture = await installFirstSetupFixture(root);
+      let entropyRequested = false;
+      const error = await captureError(() =>
+        runSingleOperatorProductionSetup({
+          ...fixture.options,
+          runner: async (command) => {
+            const compiling = command.args[0]?.endsWith(".circom");
+            if (compiling) await fixture.compile(command);
+            if ((mutationPoint === "compilation") === compiling) {
+              await fs.appendFile(fixture.sourcePaths[0], "unexpected source change\n");
+            }
+          },
+          randomBytesFn: (length) => {
+            entropyRequested = true;
+            return Buffer.alloc(length);
+          },
+        }),
+      );
+      expect(error?.message).to.include("sources changed after the reviewed snapshot");
+      expect(entropyRequested).to.equal(false);
+    });
+  }
+
+  it("rejects a transitive installed Circom include changed during compilation before entropy", async function () {
+    const fixture = await installFirstSetupFixture(root);
+    delete fixture.options.sourceSnapshotter;
+    const library = path.join(root, "node_modules", "fixture-lib");
+    await fs.mkdir(library, { recursive: true });
+    await fs.writeFile(path.join(library, "shared.circom"), 'include "nested.circom";\n');
+    await fs.writeFile(path.join(library, "nested.circom"), 'include "shared.circom";\n');
+    await fs.appendFile(fixture.sourcePaths[0], 'include "fixture-lib//shared.circom";\n');
+    execFileSync("git", ["init", "--quiet"], { cwd: root });
+    execFileSync("git", ["add", "--", ...fixture.sourcePaths], { cwd: root });
+    const before = snapshotProductionSetupSources({ root, includeShielded: false });
+    let entropyRequested = false;
+    const error = await captureError(() =>
+      runSingleOperatorProductionSetup({
+        ...fixture.options,
+        runner: async (command) => {
+          await fixture.compile(command);
+          await fs.appendFile(path.join(library, "nested.circom"), "changed include\n");
+        },
+        randomBytesFn: (length) => {
+          entropyRequested = true;
+          return Buffer.alloc(length);
+        },
+      }),
+    );
+    const after = snapshotProductionSetupSources({ root, includeShielded: false });
+    expect(after.sourceBundleDigest).to.equal(before.sourceBundleDigest);
+    expect(after.compilationSourceDigest).not.to.equal(before.compilationSourceDigest);
+    expect(error?.message).to.include("sources changed after the reviewed snapshot");
+    expect(entropyRequested).to.equal(false);
+  });
+
+  it("snapshots all fresh shielded compilations without a development manifest", async function () {
+    const stageBuild = path.join(stage, "build");
+    for (const spec of Object.values(SHIELDED_SETUP_CIRCUITS)) {
+      await fs.mkdir(path.join(stageBuild, `${spec.source}_js`), { recursive: true });
+      await fs.mkdir(path.join(root, "circuits"), { recursive: true });
+      await fs.writeFile(
+        path.join(root, "circuits", `${spec.source}.circom`),
+        "new reviewed source",
+      );
+      await fs.writeFile(path.join(stageBuild, `${spec.source}.r1cs`), "new reviewed R1CS");
+      await fs.writeFile(
+        path.join(stageBuild, `${spec.source}_js`, `${spec.source}.wasm`),
+        "new reviewed WASM",
+      );
+    }
+    const compiled = snapshotShieldedCompilation({ root, stageBuild, fresh: true });
+    expect(Object.keys(compiled)).to.have.length(Object.keys(SHIELDED_SETUP_CIRCUITS).length);
+    assertShieldedCompilationUnchanged(compiled);
+    await fs.appendFile(compiled.claim.wasm, "tampering");
+    expect(() => assertShieldedCompilationUnchanged(compiled)).to.throw(
+      "claim shielded WASM changed",
+    );
+  });
+
   it("checks every rotated R1CS/WASM hash before requesting new entropy", async function () {
     const compilerPath = path.join(root, "bin", "circom");
     const compilerContents = "fixture native compiler\n";
@@ -594,6 +844,7 @@ describe("single-operator production ZK setup safety", function () {
         rotate: true,
         expectedCurrentManifestSha256: sha256Text(manifestRaw),
         expectedSnarkjsRuntimeSha256: replacementRuntimeSha256,
+        sourceSnapshotter: () => "reviewed fixture sources",
         env: { ZK_PTAU_PATH: ptauPath },
         platform: "darwin",
         arch: "arm64",
@@ -709,6 +960,12 @@ describe("single-operator production ZK setup safety", function () {
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
     await fs.writeFile(manifestPath, manifestRaw);
     const workspaceHelper = await installContributionHelperFixture(root);
+    for (const circuitName of Object.keys(compiledBytes)) {
+      await fs.writeFile(
+        path.join(root, "circuits", `${circuitName}.circom`),
+        `${circuitName} source\n`,
+      );
+    }
 
     let contributionInvocation;
     const error = await captureError(() =>
@@ -741,6 +998,7 @@ describe("single-operator production ZK setup safety", function () {
           root: destinationRoot,
           sha256: expectedSha256,
         }),
+        sourceSnapshotter: () => "reviewed fixture sources",
         ptauInstaller: async () => {
           await fs.mkdir(setupDirectory, { recursive: true });
           await fs.writeFile(ptauPath, ptauContents);
