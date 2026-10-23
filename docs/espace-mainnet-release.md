@@ -17,9 +17,11 @@ explicit commands:
   checks terminal governance, and records a resumable checkpoint.
 
 Use only these npm commands. Do not invoke either lower-level `.mjs` entry with `hardhat run`. The
-release wrapper holds the shared production-build lock, performs the complete
-`npm run release:preflight` gate, then invokes the reviewed orchestrator with compilation disabled
-without releasing the lock. The Safe creator does not need a protocol compilation; it hashes and
+release wrapper holds the shared production-build lock, runs the clean build, test and
+release-evidence checks, then invokes the reviewed orchestrator with compilation disabled. The
+orchestrator verifies the complete ZK ceremony once before opening the RPC, with the lock still
+held. Standalone `npm run release:preflight` includes that verification itself. The Safe creator
+does not need a protocol compilation; it hashes and
 binds its own pinned deployment inputs instead.
 
 The eSpace and Ethereum commands share reviewed orchestration internals, but the public entry fixes

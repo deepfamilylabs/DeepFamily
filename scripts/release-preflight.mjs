@@ -35,19 +35,16 @@ import {
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
 import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
+import { runZkCheck } from "./zk-check.mjs";
+import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
 
 export const RELEASE_PREFLIGHT_COMMANDS = Object.freeze([
   Object.freeze(["npm", ["run", "clean"]]),
-  // Re-run the pinned Unicode 17 conformance suite before a production release.
-  Object.freeze([process.execPath, ["scripts/generate-unicode-normalization-data.mjs", "--check"]]),
   // Contracts must build before the frontend synchronizes ABI artifacts.
   Object.freeze(["npm", ["run", "contracts:check"]]),
   Object.freeze(["npm", ["run", "frontend:check"]]),
-  Object.freeze(["npm", ["run", "frontend:locales:check"]]),
-  Object.freeze(["npm", ["run", "zk:artifacts:check"]]),
   Object.freeze(["npm", ["run", "zk:check"]]),
   Object.freeze([process.execPath, ["scripts/zk-shielded-release-check.mjs"]]),
-  Object.freeze(["npm", ["run", "security:xss-scan"]]),
   // The release toolchain itself (Hardhat, Safe SDK, ethers and snarkjs) is in devDependencies.
   Object.freeze(["npm", ["run", "security:audit"]]),
 ]);
@@ -97,29 +94,34 @@ const assertCleanGitState = ({ root, runner, stage, env, gitExecutable }) => {
   return commit;
 };
 
-export const runReleasePreflight = async ({
-  root = process.cwd(),
-  platform = process.platform,
-  arch = process.arch,
-  libc,
-  report,
-  env = process.env,
-  runner = defaultRunner,
-  commands = RELEASE_PREFLIGHT_COMMANDS,
-  compilerInspector = assertLocalCircomInstallation,
-  compilerSourceBuilder = buildPinnedCircomFromSource,
-  gitToolResolver = resolveTrustedSourceBuildTool,
-  privateDirectoryFactory = createPrivateTemporaryDirectory,
-  ptauPath,
-  mpcMetadataReader,
-  expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
-  protocolManifestInspector = inspectProtocolReleaseManifest,
-  receiveArtifactInspector = inspectLinkedReceiveArtifacts,
-  receiveCeremonyVerifier = async (options) => {
-    await verifyShieldedProductionCeremony(options);
-    return inspectLinkedReceiveArtifacts({ ...options, requireProduction: true });
-  },
-} = {}) => {
+const runReleaseValidation = async (
+  {
+    root = process.cwd(),
+    platform = process.platform,
+    arch = process.arch,
+    libc,
+    report,
+    env = process.env,
+    runner = defaultRunner,
+    commands = RELEASE_PREFLIGHT_COMMANDS,
+    compilerInspector = assertLocalCircomInstallation,
+    compilerSourceBuilder = buildPinnedCircomFromSource,
+    gitToolResolver = resolveTrustedSourceBuildTool,
+    privateDirectoryFactory = createPrivateTemporaryDirectory,
+    ptauPath,
+    mpcMetadataReader,
+    expectedProductionPhase1 = ZK_PRODUCTION_PHASE1,
+    protocolManifestInspector = inspectProtocolReleaseManifest,
+    zkChecker = runZkCheck,
+    shieldedReleaseInspector = checkShieldedReleaseEvidence,
+    receiveArtifactInspector = inspectLinkedReceiveArtifacts,
+    receiveCeremonyVerifier = async (options) => {
+      await verifyShieldedProductionCeremony(options);
+      return inspectLinkedReceiveArtifacts({ ...options, requireProduction: true });
+    },
+  } = {},
+  { verifyCeremonies },
+) => {
   if (typeof runner !== "function") throw new Error("runner must be a function");
   if (!Array.isArray(commands)) throw new Error("commands must be an array");
   if (typeof compilerInspector !== "function") {
@@ -140,8 +142,12 @@ export const runReleasePreflight = async ({
   if (typeof receiveArtifactInspector !== "function") {
     throw new Error("receiveArtifactInspector must be a function");
   }
+  if (typeof zkChecker !== "function") throw new Error("zkChecker must be a function");
+  if (typeof shieldedReleaseInspector !== "function") {
+    throw new Error("shieldedReleaseInspector must be a function");
+  }
   assertReleaseRuntimeCompatibility({ platform, arch, env, operation: "Release preflight" });
-  if (typeof receiveCeremonyVerifier !== "function") {
+  if (verifyCeremonies && typeof receiveCeremonyVerifier !== "function") {
     throw new Error("Receive production setup and independent verification are not provided");
   }
 
@@ -246,35 +252,50 @@ export const runReleasePreflight = async ({
         : baseEnvironment;
 
     for (const [executable, args] of commands) {
-      const usesCircom =
-        (executable === "npm" &&
-          args[0] === "run" &&
-          ["zk:artifacts:check", "zk:check"].includes(args[1])) ||
-        (executable === process.execPath && args[0] === "scripts/zk-shielded-release-check.mjs");
+      if (executable === "npm" && args[0] === "run" && args[1] === "zk:check") {
+        await zkChecker({
+          root,
+          verifyCeremonies: false,
+          runner: (command) =>
+            runner({
+              ...command,
+              capture: false,
+              env: commandEnvironment,
+            }),
+        });
+        continue;
+      }
+      if (executable === process.execPath && args[0] === "scripts/zk-shielded-release-check.mjs") {
+        await shieldedReleaseInspector({ root, env: baseEnvironment, ptauPath });
+        continue;
+      }
       runner({
         executable,
         args,
         cwd: root,
         capture: false,
-        env: usesCircom ? commandEnvironment : baseEnvironment,
+        env: baseEnvironment,
       });
     }
-    const ceremonyVerification = await verifyProductionCeremony({
-      root,
-      ptauPath: ptauPath ?? resolveProductionPtauPath({ root, env: baseEnvironment, platform }),
-      env: baseEnvironment,
-      runner,
-      mpcMetadataReader,
-      expectedProductionPhase1,
-    });
-    const receiveVerification = await receiveCeremonyVerifier({ root, env: baseEnvironment });
-    if (
-      receiveVerification?.verification !== "passed" ||
-      receiveVerification?.manifestSha256 !== initialReceiveEvidence.manifestSha256
-    )
-      throw new Error(
-        "Release preflight requires independent receive ceremony verification for its exact production manifest",
-      );
+    let coreCeremonyVerification;
+    if (verifyCeremonies) {
+      coreCeremonyVerification = await verifyProductionCeremony({
+        root,
+        ptauPath: ptauPath ?? resolveProductionPtauPath({ root, env: baseEnvironment, platform }),
+        env: baseEnvironment,
+        runner,
+        mpcMetadataReader,
+        expectedProductionPhase1,
+      });
+      const receiveVerification = await receiveCeremonyVerifier({ root, env: baseEnvironment });
+      if (
+        receiveVerification?.verification !== "passed" ||
+        receiveVerification?.manifestSha256 !== initialReceiveEvidence.manifestSha256
+      )
+        throw new Error(
+          "Release preflight requires independent receive ceremony verification for its exact production manifest",
+        );
+    }
 
     const finishedCommit = assertCleanGitState({
       root,
@@ -295,6 +316,13 @@ export const runReleasePreflight = async ({
     if (finalZkEvidence.manifestSha256 !== initialZkEvidence.manifestSha256) {
       throw new Error("ZK artifact manifest changed while release preflight was running");
     }
+    if (
+      verifyCeremonies &&
+      (coreCeremonyVerification.manifestSha256 !== finalZkEvidence.manifestSha256 ||
+        coreCeremonyVerification.transcriptSha256 !== finalZkEvidence.transcriptSha256)
+    ) {
+      throw new Error("Verified core ceremony does not match the final release artifacts");
+    }
     const finalProtocolEvidence = protocolManifestInspector({
       root,
       requireProduction: true,
@@ -311,17 +339,17 @@ export const runReleasePreflight = async ({
     }
 
     return Object.freeze({
-      status: "passed",
+      status: verifyCeremonies ? "passed" : "checks-passed",
       releaseCommit,
       zkCeremonyId: finalZkEvidence.ceremonyId,
       zkTrustModel: finalZkEvidence.trustModel,
       zkContributorCount: finalZkEvidence.contributorCount,
       zkMinimumContributors: finalZkEvidence.minimumContributors,
       zkManifestSha256: finalZkEvidence.manifestSha256,
-      zkTranscriptSha256: ceremonyVerification.transcriptSha256,
+      zkTranscriptSha256: finalZkEvidence.transcriptSha256,
       protocolManifestSha256: finalProtocolEvidence.manifestSha256,
       receiveManifestSha256: finalReceiveEvidence.manifestSha256,
-      ptauSha256: ceremonyVerification.ptau.sha256,
+      ptauSha256: finalZkEvidence.phase1Sha256,
       checks: commands.map(([executable, args]) => `${executable} ${args.join(" ")}`),
     });
   } finally {
@@ -330,6 +358,12 @@ export const runReleasePreflight = async ({
     }
   }
 };
+
+export const runReleaseChecks = (options) =>
+  runReleaseValidation(options, { verifyCeremonies: false });
+
+export const runReleasePreflight = (options) =>
+  runReleaseValidation(options, { verifyCeremonies: true });
 
 export const main = async () => {
   const result = await runReleasePreflight();

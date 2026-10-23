@@ -114,8 +114,6 @@ configuration command fills these from deployment records.
 Use the shared workflow for builds, artifact checks and acceptance:
 
 ```sh
-npm run zk:build
-npm run zk:artifacts:check
 npm run zk:check
 npm test
 ```

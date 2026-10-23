@@ -64,4 +64,31 @@ describe("CI action supply-chain policy", function () {
     expect(manifest.scripts.check).to.match(/^npm run test:circuits && /);
     expect(manifest.scripts.test).not.to.include("test:circuits");
   });
+
+  it("uses the complete contract gate before frontend checks without repeating its steps", async function () {
+    const workflow = await readFile(".github/workflows/ci.yml", "utf8");
+    const buildJob = workflow
+      .split(/^  build-test:\s*$/m)[1]
+      ?.split(/^  [a-z][a-z0-9-]*:\s*$/m, 1)[0];
+    const commands = [...buildJob.matchAll(/^\s*run:\s*(.+)$/gm)].map(([, command]) => command);
+    expect(commands.filter((command) => command === "npm run contracts:check")).to.have.length(1);
+    expect(commands.indexOf("npm run contracts:check")).to.be.lessThan(
+      commands.indexOf("npm run frontend:check"),
+    );
+    for (const duplicate of [
+      "npm run lint",
+      "npm run build",
+      "npm run storage:check",
+      "npm test",
+    ]) {
+      expect(commands).not.to.include(duplicate);
+    }
+    expect(commands).to.include("npm run csp:scan --workspace deepfamily-frontend");
+    expect(commands).to.include("git diff --exit-code -- frontend/src/abi");
+    const nativeJob = workflow.split(/^  zk-native-platforms:\s*$/m)[1];
+    expect(nativeJob.indexOf("run: npm run build")).to.be.lessThan(
+      nativeJob.indexOf("run: npm test -- --no-compile"),
+    );
+    expect(nativeJob).to.include("run: npm test -- --no-compile");
+  });
 });

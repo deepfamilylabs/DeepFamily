@@ -71,13 +71,10 @@ jobs:
         run: npm run zk:assets:fetch
 
       - name: Check ZK artifacts and proofs
-        run: npm run zk:artifacts:check && npm run zk:check
+        run: npm run zk:check
 
-      - name: Lint (solhint)
-        run: npm run lint
-
-      - name: Build (compile contracts)
-        run: npm run build
+      - name: Contract checks
+        run: npm run contracts:check
 
       - name: Frontend checks
         run: npm run frontend:check
@@ -93,12 +90,6 @@ jobs:
 
       - name: Check committed frontend ABIs
         run: git diff --exit-code -- frontend/src/abi
-
-      - name: Check storage layouts
-        run: npm run storage:check
-
-      - name: Test
-        run: npm test
 
   zk-native-platforms:
     name: ZK native (${{ matrix.name }})
@@ -198,10 +189,10 @@ jobs:
         run: npm run zk:assets:fetch
 
       - name: Check native ZK artifacts and real proofs
-        run: npm run zk:artifacts:check && npm run zk:check
+        run: npm run zk:check
 
       - name: Compile contracts on the target runtime
         run: npm run build
 
       - name: Run cross-platform tests
-        run: npm test
+        run: npm test -- --no-compile

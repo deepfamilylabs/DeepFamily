@@ -2,7 +2,10 @@ import { expect } from "chai";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { verifyProductionCeremony } from "../scripts/zk-ceremony-verify.mjs";
+import {
+  verifyProductionCeremony,
+  verifyRecordedCeremonies,
+} from "../scripts/zk-ceremony-verify.mjs";
 import { CIRCOM_VERSION, resolveLocalCircomTarget } from "../scripts/lib/circomToolchain.mjs";
 import {
   MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS,
@@ -18,6 +21,112 @@ import {
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 import { inspectSnarkjsRuntime, resolveSnarkjsCliPath } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
+
+describe("recorded ZK ceremony checks", function () {
+  let root;
+  let calls;
+  let options;
+
+  beforeEach(async function () {
+    root = await createCanonicalTemporaryDirectory("deepfamily-recorded-ceremonies-");
+    calls = [];
+    options = {
+      root,
+      ptauPath: path.join(root, "phase1.ptau"),
+      artifactInspector: (args) => {
+        calls.push(["artifacts", args]);
+        return { trustedSetupStatus: "development" };
+      },
+      coreVerifier: async (args) => {
+        calls.push(["core", args]);
+        return { circuits: Object.keys(ZK_RELEASE_ARTIFACTS) };
+      },
+      shieldedVerifier: async (args) => {
+        calls.push(["shielded", args]);
+        return { circuitCount: 11, manifestSha256: "ab".repeat(32) };
+      },
+      receiveInspector: async (args) => {
+        calls.push(["receive", args]);
+        return {
+          status: "production",
+          verification: "passed",
+          circuitCount: 3,
+          manifestSha256: "ab".repeat(32),
+        };
+      },
+    };
+  });
+
+  afterEach(async function () {
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  const recordShielded = () =>
+    writeRelativeFile(root, "circuits/shielded-production-manifest.json", "{}\n");
+
+  it("inspects the current artifacts without inventing missing ceremony records", async function () {
+    const result = await verifyRecordedCeremonies(options);
+    expect(result).to.deep.equal({ core: null, shielded: null, circuitCount: 0 });
+    expect(calls).to.deep.equal([["artifacts", { root, requireBuiltR1cs: true }]]);
+  });
+
+  it("verifies both recorded groups once and rechecks their receive bindings", async function () {
+    await recordShielded();
+    options.artifactInspector = () => ({ trustedSetupStatus: "production" });
+    const result = await verifyRecordedCeremonies(options);
+    expect(result.circuitCount).to.equal(13);
+    expect(calls).to.deep.equal([
+      ["receive", { root, requireProduction: true }],
+      ["core", { root, ptauPath: options.ptauPath }],
+      ["shielded", { root, ptauPath: options.ptauPath }],
+      ["receive", { root, requireProduction: true }],
+    ]);
+  });
+
+  it("still verifies either group's record when the other has none", async function () {
+    const core = await verifyRecordedCeremonies({
+      ...options,
+      artifactInspector: () => ({ trustedSetupStatus: "production" }),
+    });
+    expect(core.circuitCount).to.equal(2);
+    expect(calls.map(([name]) => name)).to.deep.equal(["core"]);
+
+    calls.length = 0;
+    await recordShielded();
+    const shielded = await verifyRecordedCeremonies(options);
+    expect(shielded.circuitCount).to.equal(11);
+    expect(calls.map(([name]) => name)).to.deep.equal(["artifacts", "shielded"]);
+  });
+
+  it("propagates invalid artifacts before attempting any ceremony", async function () {
+    const failure = new Error("manifest is invalid");
+    const error = await captureError(() =>
+      verifyRecordedCeremonies({
+        ...options,
+        artifactInspector: () => {
+          throw failure;
+        },
+      }),
+    );
+    expect(error).to.equal(failure);
+    expect(calls).to.deep.equal([]);
+  });
+
+  it("fails on an invalid recorded ceremony without falling back to an unchecked set", async function () {
+    await recordShielded();
+    const failure = new Error("recorded shielded ceremony is invalid");
+    const error = await captureError(() =>
+      verifyRecordedCeremonies({
+        ...options,
+        shieldedVerifier: async () => {
+          throw failure;
+        },
+      }),
+    );
+    expect(error).to.equal(failure);
+    expect(calls.map(([name]) => name)).to.deep.equal(["artifacts"]);
+  });
+});
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -99,12 +208,15 @@ const createProductionFixture = async () => {
       { sourceSha256: hashes.sourceSha256, r1csSha256: hashes.r1csSha256 },
     ]),
   );
-  const contributions = Array.from({ length: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS }, (_, index) => ({
-    sequence: index + 1,
-    participantId: `participant-${index + 1}`,
-    personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
-    disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
-  }));
+  const contributions = Array.from(
+    { length: MINIMUM_SINGLE_OPERATOR_CONTRIBUTORS },
+    (_, index) => ({
+      sequence: index + 1,
+      participantId: `participant-${index + 1}`,
+      personCommitmentContributionHash: `${String(index + 1).padStart(2, "0")}`.repeat(64),
+      disclosureBindingContributionHash: `${String(index + 11).padStart(2, "0")}`.repeat(64),
+    }),
+  );
   const beacon = {
     name: "deepfamily-public-beacon",
     hash: sha256Text("public-randomness-beacon"),
@@ -171,8 +283,7 @@ const createProductionFixture = async () => {
 
   const metadataByCircuit = Object.fromEntries(
     Object.keys(ZK_RELEASE_ARTIFACTS).map((circuitName) => {
-      const hashField =
-        ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
+      const hashField = ZK_CEREMONY_CIRCUIT_FIELDS[circuitName].contributionHash;
       return [
         circuitName,
         {

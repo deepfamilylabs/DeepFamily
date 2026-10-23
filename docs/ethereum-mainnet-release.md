@@ -307,9 +307,11 @@ Run:
 npm run mainnet:release -- --chain ethereum --plan
 ```
 
-The wrapper obtains per-chain and shared production-build locks, runs the complete
-`npm run release:preflight` gate, and invokes the Mainnet engine with compilation disabled without
-releasing the shared build lock.
+The wrapper obtains per-chain and shared production-build locks, runs the clean build, test and
+release-evidence checks, and invokes the Mainnet engine with compilation disabled. The engine
+verifies the complete ZK ceremony once before opening the RPC. The shared build lock stays held
+throughout these steps. Standalone `npm run release:preflight` includes that ceremony verification
+itself.
 Plan mode performs chain reads, does not broadcast, and writes this local plan file:
 
 ```text

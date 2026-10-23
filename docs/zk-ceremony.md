@@ -385,8 +385,6 @@ git diff -- \
   contracts/libraries/LinkedGroth16Verifier.sol \
   frontend/public/zk/shielded/receive-link-keys.json
 
-npm run zk:ceremony:verify
-npm run zk:artifacts:check
 npm run zk:check
 ```
 
@@ -439,6 +437,11 @@ explicit `--O2 --sanity_check 2` match the reviewed artifact hashes, runs the ce
 verification from a private runtime snapshot, verifies every real proof and all published hashes,
 validates the single-operator transcript against the real zkey metadata, and runs the complete
 contract, frontend, localization, XSS, storage, and dependency checks.
+
+Mainnet release and release-rehearsal wrappers run those build, test and evidence checks through
+the same internal API, then perform the complete ceremony verification once in the final execution
+process before opening the RPC. They hold the shared build lock across both stages and recheck
+artifact hashes at each boundary. No verification result is reused across separate invocations.
 
 ## Testnet and Mainnet sequence
 

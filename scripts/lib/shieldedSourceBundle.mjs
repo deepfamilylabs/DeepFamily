@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SHIELDED_CIRCUITS } from "./zkCircuitSelection.mjs";
+import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const SOURCE_ROOTS = [
@@ -89,11 +90,12 @@ export function checkedFile(root, relativePath, label, prefix = "") {
 }
 
 /** Hash tracked release sources; generated proof artifacts are hashed by the manifest. */
-export function sourceBundleSha256(root = DEFAULT_ROOT) {
+export function sourceBundleSha256(root = DEFAULT_ROOT, { env = process.env } = {}) {
   root = path.resolve(root);
-  const output = execFileSync("git", ["ls-files", "-z"], { cwd: root });
+  const gitOptions = { cwd: root, env: sanitizeReleaseEnvironment(env) };
+  const output = execFileSync("git", ["ls-files", "-z"], gitOptions);
   const deleted = new Set(
-    execFileSync("git", ["ls-files", "--deleted", "-z"], { cwd: root })
+    execFileSync("git", ["ls-files", "--deleted", "-z"], gitOptions)
       .toString("utf8")
       .split("\0")
       .filter(Boolean),

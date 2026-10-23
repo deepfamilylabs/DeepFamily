@@ -164,9 +164,7 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
 | `npm run zk:build`             | Compile all 13 Circom circuits                                     |
 | `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 13 circuits |
-| `npm run zk:check`             | Check current artifacts and available real proof fixtures          |
-| `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact bundle                  |
-| `npm run zk:ceremony:verify`   | Verify the complete production artifact bundle                     |
+| `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
 
 Each Groth16 circuit has its own proving and verification keys. The single setup command handles
 the complete catalog and derives the shared receive-link parameters and three fixed Solidity
@@ -367,8 +365,10 @@ Next use the resumable protocol orchestrator's explicit read-only plan command:
 npm run mainnet:release -- --chain espace --plan
 ```
 
-Every release invocation performs the complete clean `release:preflight` gate. Review the plan with
-a second operator. At least two current Safe owners must sign the complete printed EIP-191
+Every release invocation runs the clean build, test and release-evidence checks, then verifies the
+complete ZK ceremony once in the final execution process before opening the RPC. The shared build
+lock stays held throughout. Review the plan with a second operator. At least two current Safe owners
+must sign the complete printed EIP-191
 plan-approval message using their external wallet/hardware-wallet workflow. Put the exact printed
 digest and signatures in a regular JSON file inside the repository, for example:
 

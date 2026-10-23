@@ -188,6 +188,7 @@ export const ERROR_SELECTOR_MAP: Record<string, string> = {
   "0xf283c519": "InvalidStory",
   "0x13f04adb": "InvalidTokenURI",
   "0x076490f6": "InvalidZKProof",
+  "0x09bde339": "InvalidProof",
   "0x10c40e8c": "InvalidVerifierAddress",
   "0x1c449cf3": "InvalidDeepFamilyAddress",
   "0x5bb5c7d1": "InvalidGovernanceDelay",

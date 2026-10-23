@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { id } from "ethers";
 import { expectedContractInterfaces } from "./archiveInterfaceDefinition.mjs";
+import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
 
 import {
   AES_GCM_IV_BYTES,
@@ -547,6 +548,7 @@ const isVersionControlledPath = ({ root, relativePath }) => {
   try {
     execFileSync("git", ["-C", root, "ls-files", "--error-unmatch", "--", relativePath], {
       stdio: ["ignore", "ignore", "ignore"],
+      env: sanitizeReleaseEnvironment(),
     });
     return true;
   } catch {

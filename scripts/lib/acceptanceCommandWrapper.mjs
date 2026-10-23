@@ -9,9 +9,15 @@ import {
   productionBuildLockPath,
   releaseExclusiveCommandLocks,
 } from "./exclusiveCommandLock.mjs";
-import { normalizePortableCommand, sanitizeReleaseEnvironment } from "./portableCommand.mjs";
+import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
+import { runReleaseChecks } from "../release-preflight.mjs";
+import {
+  bindReleaseCheckBoundary,
+  withoutReleaseCheckBoundaryEnvironment,
+} from "./releaseCheckBoundary.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const runReleaseBuildChecks = (environment) => runReleaseChecks({ root: ROOT, env: environment });
 
 const runChild = ({ executable, args, environment, label }) =>
   new Promise((resolve, reject) => {
@@ -78,9 +84,11 @@ export const runAcceptanceCommand = async ({
   arguments_ = process.argv.slice(2),
   environment = process.env,
   childRunner = runChild,
+  preflightRunner = runReleaseBuildChecks,
   root = ROOT,
 }) => {
   if (typeof childRunner !== "function") throw new Error("childRunner must be a function");
+  if (typeof preflightRunner !== "function") throw new Error("preflightRunner must be a function");
   if (arguments_.length !== 0) {
     throw new Error(`Usage: ${chainProfile.acceptance.command}`);
   }
@@ -90,7 +98,7 @@ export const runAcceptanceCommand = async ({
     throw new Error(`${acceptance.modeEnvironmentName} must be diagnostic or release-rehearsal`);
   }
   const sanitizedEnvironment = {
-    ...sanitizeReleaseEnvironment(environment),
+    ...withoutReleaseCheckBoundaryEnvironment(sanitizeReleaseEnvironment(environment)),
     DEEPFAMILY_COMMAND_CHAIN: chainProfile.id,
   };
 
@@ -135,18 +143,11 @@ export const runAcceptanceCommand = async ({
       ...sanitizedEnvironment,
       [acceptance.wrapperTokenEnvironmentName]: commandLock.token,
     };
-    const preflightCommand = normalizePortableCommand({
-      executable: "npm",
-      args: ["run", "release:preflight"],
-      platform: process.platform,
-      env: childEnvironment,
-    });
-    await childRunner({
-      ...preflightCommand,
-      environment: childEnvironment,
-      label: "Production release preflight",
-    });
-    await runHardhat(childEnvironment);
+    // The final acceptance process verifies the complete ceremony against these checked inputs.
+    const checkResult = await preflightRunner(childEnvironment);
+    await runHardhat(
+      bindReleaseCheckBoundary({ environment: childEnvironment, result: checkResult }),
+    );
   } finally {
     await releaseExclusiveCommandLocks([buildLock, commandLock]);
   }

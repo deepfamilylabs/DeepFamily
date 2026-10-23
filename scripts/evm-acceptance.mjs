@@ -80,6 +80,7 @@ import {
   GROTH16_ADAPTER_IMMUTABLE_FIELDS,
 } from "./lib/protocolReleaseManifest.mjs";
 import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
+import { assertReleaseCheckBoundary } from "./lib/releaseCheckBoundary.mjs";
 import {
   TESTNET_RELEASE_EVIDENCE_TYPE,
   TESTNET_RELEASE_REPORT_SCHEMA_VERSION,
@@ -930,13 +931,18 @@ export const main = async (chainProfile) => {
   const requestedMode = String(
     process.env[ACCEPTANCE_PROFILE.modeEnvironmentName] ?? "diagnostic",
   ).trim();
+  let ceremonyVerification = null;
   if (requestedMode === "release-rehearsal") {
     // This must pass before opening the RPC. The wrapper keeps the production-build lock held from
-    // the complete preflight through this --no-compile acceptance run.
+    // build and evidence checks through this --no-compile acceptance run.
     await assertAcceptanceReleaseRehearsalWrapper({
       chainProfile: CHAIN_PROFILE,
       environment: process.env,
       root: process.cwd(),
+    });
+    ceremonyVerification = await verifyAllProductionCeremonies({
+      root: process.cwd(),
+      ptauPath: resolveProductionPtauPath(),
     });
   }
   const connection = await hre.network.create();
@@ -1072,13 +1078,6 @@ export const main = async (chainProfile) => {
     artifactsFileCount: acceptanceInputs.directories.artifacts.fileCount,
     artifactsDigest: acceptanceInputs.directories.artifacts.digest,
   };
-  const ceremonyVerification =
-    config.acceptanceMode === "release-rehearsal"
-      ? await verifyAllProductionCeremonies({
-          root: process.cwd(),
-          ptauPath: resolveProductionPtauPath(),
-        })
-      : null;
   const zkCeremonyVerification = ceremonyVerification
     ? {
         ...ceremonyVerification.core,
@@ -1118,6 +1117,23 @@ export const main = async (chainProfile) => {
     root: process.cwd(),
     requireProduction: config.acceptanceMode === "release-rehearsal",
   });
+  if (config.acceptanceMode === "release-rehearsal") {
+    if (
+      ceremonyVerification.core.manifestSha256 !== zkArtifactTrust.manifestSha256 ||
+      ceremonyVerification.core.transcriptSha256 !== zkArtifactTrust.transcriptSha256
+    ) {
+      throw new Error("Core artifacts changed after ceremony verification");
+    }
+    assertReleaseCheckBoundary({
+      actual: {
+        releaseCommit: sourceState.commit,
+        zkManifestSha256: zkArtifactTrust.manifestSha256,
+        zkTranscriptSha256: zkArtifactTrust.transcriptSha256,
+        protocolManifestSha256: inspectedProtocolManifest.manifestSha256,
+        receiveManifestSha256: ceremonyVerification.receive.manifestSha256,
+      },
+    });
+  }
   const protocolManifestEvidence = {
     path: path.relative(process.cwd(), inspectedProtocolManifest.manifestPath),
     sha256: inspectedProtocolManifest.manifestSha256,

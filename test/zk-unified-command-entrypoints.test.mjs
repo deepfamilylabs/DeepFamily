@@ -289,7 +289,7 @@ describe("unified ZK command entrypoints", function () {
       },
       shieldedVerifier: async (args) => {
         calls.push(["shielded", args]);
-        return { circuitCount: 11, manifestSha256: "22".repeat(32) };
+        return { circuitCount: 11, manifestSha256: "33".repeat(32) };
       },
     };
     const result = await verifyAllProductionCeremonies(options);
@@ -297,6 +297,7 @@ describe("unified ZK command entrypoints", function () {
       ["receive", { root: options.root, requireProduction: true }],
       ["core", { root: options.root, ptauPath: options.ptauPath }],
       ["shielded", { root: options.root, ptauPath: options.ptauPath }],
+      ["receive", { root: options.root, requireProduction: true }],
     ]);
     expect(result.circuitCount).to.equal(13);
     expect(result.core.circuits).to.deep.equal(["person_commitment", "disclosure_binding"]);
@@ -317,6 +318,66 @@ describe("unified ZK command entrypoints", function () {
         }),
       /both circuits/u,
     );
+  });
+
+  it("rejects a mathematically verified shielded group from a different receive manifest", async function () {
+    let receiveInspections = 0;
+    await assert.rejects(
+      () =>
+        verifyAllProductionCeremonies({
+          root: fixture.root,
+          receiveInspector: async () => {
+            receiveInspections += 1;
+            return {
+              status: "production",
+              verification: "passed",
+              circuitCount: 3,
+              manifestSha256: "33".repeat(32),
+            };
+          },
+          coreVerifier: async () => ({ circuits: ["person_commitment", "disclosure_binding"] }),
+          shieldedVerifier: async () => ({ circuitCount: 11, manifestSha256: "44".repeat(32) }),
+        }),
+      /Verified shielded ceremony does not match the receive presentation manifest/u,
+    );
+    expect(receiveInspections).to.equal(1);
+  });
+
+  it("rechecks receive status, verification, coverage and manifest after both mathematical verifiers", async function () {
+    const initial = {
+      status: "production",
+      verification: "passed",
+      circuitCount: 3,
+      manifestSha256: "33".repeat(32),
+    };
+    for (const changed of [
+      { ...initial, status: "development" },
+      { ...initial, verification: "failed" },
+      { ...initial, circuitCount: 2 },
+      { ...initial, manifestSha256: "44".repeat(32) },
+    ]) {
+      const calls = [];
+      await assert.rejects(
+        () =>
+          verifyAllProductionCeremonies({
+            root: fixture.root,
+            receiveInspector: async () => {
+              calls.push("receive");
+              return calls.length === 1 ? initial : changed;
+            },
+            coreVerifier: async () => {
+              calls.push("core");
+              return { circuits: ["person_commitment", "disclosure_binding"] };
+            },
+            shieldedVerifier: async () => {
+              calls.push("shielded");
+              return { circuitCount: 11, manifestSha256: initial.manifestSha256 };
+            },
+          }),
+        /Receive presentation artifacts changed during production ceremony verification/u,
+      );
+      expect(calls).to.deep.equal(["receive", "core", "shielded", "receive"]);
+    }
   });
 
   it("rejects missing or invalid production linking keys before checking circuit ceremonies", async function () {

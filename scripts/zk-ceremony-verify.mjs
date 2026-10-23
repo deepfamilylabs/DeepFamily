@@ -22,26 +22,28 @@ import {
   snapshotSnarkjsRuntime,
 } from "./lib/snarkjsToolchain.mjs";
 import { readZkeyMpcMetadata } from "./lib/zkeyMpcMetadata.mjs";
-import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
+import {
+  SHIELDED_PRODUCTION_MANIFEST_PATH,
+  verifyShieldedProductionCeremony,
+} from "./lib/shieldedProductionSetup.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
 import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 
 const usage = () => {
   console.log(`Usage:
-  npm run zk:ceremony:verify
-  npm run zk:ceremony:verify -- --ptau /absolute/path/to/published-final.ptau
+  node scripts/zk-ceremony-verify.mjs [--ptau /absolute/path/to/published-final.ptau]
 
-The command is read-only. It verifies both core and all configured shielded production circuits,
-including artifact hashes, the Powers of Tau transcript, and each final zkey's binding to its
-frozen R1CS. With no --ptau option it uses the file selected by ZK_PTAU_PATH, or the committed
-circuits/ptau file.`);
+Internal ceremony step of npm run zk:check. It verifies the setup records attached to the current
+artifact set, including artifact hashes, the Powers of Tau transcript, and each recorded final
+zkey's binding to its frozen R1CS. It does not generate keys or fabricate missing setup records.
+With no --ptau option it uses ZK_PTAU_PATH, or the committed circuits/ptau file.`);
 };
 
 const parseArguments = (argv) => {
   if (argv.includes("--help") || argv.includes("-h")) return { help: true };
   if (argv.length === 0) return { help: false, ptauPath: undefined };
   if (argv.length !== 2 || argv[0] !== "--ptau" || argv[1].trim() === "") {
-    throw new Error("Usage: npm run zk:ceremony:verify -- [--ptau <path>]");
+    throw new Error("Usage: node scripts/zk-ceremony-verify.mjs [--ptau <path>]");
   }
   return { help: false, ptauPath: argv[1] };
 };
@@ -346,11 +348,56 @@ export const verifyAllProductionCeremonies = async ({
   if (shielded?.circuitCount !== shieldedCount) {
     throw new Error("Shielded production ceremony verification must cover all configured circuits");
   }
+  if (shielded.manifestSha256 !== receive.manifestSha256) {
+    throw new Error("Verified shielded ceremony does not match the receive presentation manifest");
+  }
+  const finalReceive = await receiveInspector({ root, requireProduction: true });
+  if (
+    finalReceive?.status !== "production" ||
+    finalReceive?.verification !== "passed" ||
+    finalReceive?.circuitCount !== 3 ||
+    finalReceive?.manifestSha256 !== receive.manifestSha256
+  ) {
+    throw new Error(
+      "Receive presentation artifacts changed during production ceremony verification",
+    );
+  }
   return Object.freeze({
     core,
     shielded,
     receive,
     circuitCount: expectedCoreCircuits.length + shieldedCount,
+  });
+};
+
+// Older pinned artifacts have no finalized ceremony record. Inspect their actual metadata
+// rather than requiring a different set of keys just to run the shared check command.
+export const verifyRecordedCeremonies = async ({
+  root = process.cwd(),
+  ptauPath,
+  artifactInspector = inspectZkReleaseArtifacts,
+  coreVerifier = verifyProductionCeremony,
+  shieldedVerifier = verifyShieldedProductionCeremony,
+  receiveInspector = inspectLinkedReceiveArtifacts,
+} = {}) => {
+  const evidence = artifactInspector({ root, requireBuiltR1cs: true });
+  const hasCoreRecord = evidence.trustedSetupStatus === "production";
+  const hasShieldedRecord = fs.existsSync(path.join(root, SHIELDED_PRODUCTION_MANIFEST_PATH));
+  if (hasCoreRecord && hasShieldedRecord) {
+    return verifyAllProductionCeremonies({
+      root,
+      ptauPath,
+      coreVerifier,
+      shieldedVerifier,
+      receiveInspector,
+    });
+  }
+  const core = hasCoreRecord ? await coreVerifier({ root, ptauPath }) : null;
+  const shielded = hasShieldedRecord ? await shieldedVerifier({ root, ptauPath }) : null;
+  return Object.freeze({
+    core,
+    shielded,
+    circuitCount: (core?.circuits.length ?? 0) + (shielded?.circuitCount ?? 0),
   });
 };
 
@@ -360,11 +407,11 @@ export const main = async (argv = process.argv.slice(2)) => {
     usage();
     return;
   }
-  const result = await verifyAllProductionCeremonies({ ptauPath: parsed.ptauPath });
+  const result = await verifyRecordedCeremonies({ ptauPath: parsed.ptauPath });
   console.log(
-    `Production ZK ceremonies verified: ${result.circuitCount} circuits, ` +
-      `core manifest ${result.core.manifestSha256}, ` +
-      `shielded manifest ${result.shielded.manifestSha256}`,
+    result.circuitCount === 0
+      ? "Current artifacts have no finalized ceremony records; artifact and proof checks still apply."
+      : `Recorded ZK ceremonies verified: ${result.circuitCount} circuits`,
   );
 };
 

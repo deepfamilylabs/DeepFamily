@@ -13,7 +13,16 @@ import {
   acquireExclusiveCommandLock,
   productionBuildLockPath,
 } from "../scripts/lib/exclusiveCommandLock.mjs";
-import { normalizePortableCommand } from "../scripts/lib/portableCommand.mjs";
+import { RELEASE_CHECK_BOUNDARY_ENV } from "../scripts/lib/releaseCheckBoundary.mjs";
+
+const CHECK_RESULT = Object.freeze({
+  status: "checks-passed",
+  releaseCommit: "a".repeat(40),
+  zkManifestSha256: "b".repeat(64),
+  zkTranscriptSha256: "c".repeat(64),
+  protocolManifestSha256: "d".repeat(64),
+  receiveManifestSha256: "e".repeat(64),
+});
 
 const runFixture = async ({
   chainProfile,
@@ -35,6 +44,10 @@ const runFixture = async ({
         ...overrides,
       },
       childRunner: async (invocation) => calls.push(invocation),
+      preflightRunner: async (environment) => {
+        calls.push({ kind: "checks", environment });
+        return CHECK_RESULT;
+      },
       root,
     });
     return calls;
@@ -113,7 +126,7 @@ describe("acceptance command wrapper", function () {
   });
 
   for (const chainProfile of [ESPACE_CHAIN_PROFILE, ETHEREUM_CHAIN_PROFILE]) {
-    it(`runs ${chainProfile.id} diagnostics without the production preflight`, async function () {
+    it(`runs ${chainProfile.id} diagnostics without release checks`, async function () {
       const calls = await runFixture({ chainProfile });
       expect(calls).to.have.length(1);
       expect(calls[0].executable).to.equal(process.execPath);
@@ -126,24 +139,20 @@ describe("acceptance command wrapper", function () {
       expect(calls[0].args).not.to.include("--no-compile");
     });
 
-    it(`requires the complete preflight before ${chainProfile.id} release rehearsal`, async function () {
+    it(`runs release checks before the final ${chainProfile.id} rehearsal verifier`, async function () {
       const calls = await runFixture({ chainProfile, mode: "release-rehearsal" });
       expect(calls).to.have.length(2);
-      const expectedPreflight = normalizePortableCommand({
-        executable: "npm",
-        args: ["run", "release:preflight"],
-        platform: process.platform,
-        env: calls[0].environment,
-      });
-      expect(calls[0]).to.include({
-        executable: expectedPreflight.executable,
-        label: "Production release preflight",
-      });
-      expect(calls[0].args).to.deep.equal(expectedPreflight.args);
+      expect(calls[0].kind).to.equal("checks");
+      expect(calls[1].executable).to.equal(process.execPath);
       expect(calls[1].args).to.include("--no-compile");
       const tokenName = chainProfile.acceptance.wrapperTokenEnvironmentName;
       expect(calls[0].environment[tokenName]).to.be.a("string").and.not.equal("");
       expect(calls[1].environment[tokenName]).to.equal(calls[0].environment[tokenName]);
+      expect(calls[0].environment).not.to.have.property(RELEASE_CHECK_BOUNDARY_ENV);
+      expect(JSON.parse(calls[1].environment[RELEASE_CHECK_BOUNDARY_ENV])).to.deep.equal({
+        schemaVersion: 1,
+        ...CHECK_RESULT,
+      });
     });
   }
 
@@ -174,12 +183,35 @@ describe("acceptance command wrapper", function () {
     }
   });
 
+  it("clears caller-supplied release evidence before checks and binds only their new result", async function () {
+    const lowerName = RELEASE_CHECK_BOUNDARY_ENV.toLowerCase();
+    for (const mode of ["diagnostic", "release-rehearsal"]) {
+      const calls = await runFixture({
+        chainProfile: ESPACE_CHAIN_PROFILE,
+        mode,
+        overrides: {
+          [RELEASE_CHECK_BOUNDARY_ENV]: "caller-supplied evidence",
+          [lowerName]: "ambiguous caller evidence",
+        },
+      });
+      for (const call of calls) expect(call.environment).not.to.have.property(lowerName);
+      expect(calls[0].environment).not.to.have.property(RELEASE_CHECK_BOUNDARY_ENV);
+      if (mode === "release-rehearsal") {
+        expect(JSON.parse(calls[1].environment[RELEASE_CHECK_BOUNDARY_ENV])).to.deep.equal({
+          schemaVersion: 1,
+          ...CHECK_RESULT,
+        });
+      }
+    }
+  });
+
   it("fails before spawning for an invalid mode or arguments", async function () {
     const calls = [];
     const options = {
       chainProfile: ESPACE_CHAIN_PROFILE,
       entryScript: "scripts/evm-acceptance.mjs",
       childRunner: async (invocation) => calls.push(invocation),
+      preflightRunner: async (environment) => calls.push({ kind: "checks", environment }),
     };
     for (const variant of [
       {
@@ -213,41 +245,118 @@ describe("acceptance command wrapper", function () {
     const buildLockPath = productionBuildLockPath(root);
     const calls = [];
     try {
-      const npmCli = path.join(root, "npm-cli.js");
-      await fs.writeFile(npmCli, "// trusted test npm CLI\n");
-      const environment = Object.fromEntries(
-        Object.entries(process.env).filter(([name]) => name.toLowerCase() !== "npm_execpath"),
-      );
+      const assertHeldLocks = async (environment) => {
+        const [commandLock, buildLock] = await Promise.all([
+          fs.readFile(commandLockPath, "utf8").then(JSON.parse),
+          fs.readFile(buildLockPath, "utf8").then(JSON.parse),
+        ]);
+        expect(environment[acceptance.wrapperTokenEnvironmentName]).to.equal(commandLock.token);
+        expect(buildLock.token).to.be.a("string").and.not.equal("");
+        await assertAcceptanceReleaseRehearsalWrapper({ chainProfile, environment, root });
+      };
       await runAcceptanceCommand({
         chainProfile,
         entryScript: "scripts/evm-acceptance.mjs",
         arguments_: [],
         environment: {
-          ...environment,
-          npm_execpath: npmCli,
+          ...process.env,
           [acceptance.modeEnvironmentName]: "release-rehearsal",
         },
         root,
+        preflightRunner: async (environment) => {
+          calls.push("checks");
+          await assertHeldLocks(environment);
+          return CHECK_RESULT;
+        },
         childRunner: async (invocation) => {
-          calls.push(invocation);
-          const [commandLock, buildLock] = await Promise.all([
-            fs.readFile(commandLockPath, "utf8").then(JSON.parse),
-            fs.readFile(buildLockPath, "utf8").then(JSON.parse),
-          ]);
-          expect(invocation.environment[acceptance.wrapperTokenEnvironmentName]).to.equal(
-            commandLock.token,
-          );
-          expect(buildLock.token).to.be.a("string").and.not.equal("");
-          await assertAcceptanceReleaseRehearsalWrapper({
-            chainProfile,
-            environment: invocation.environment,
-            root,
-          });
+          calls.push("acceptance");
+          await assertHeldLocks(invocation.environment);
         },
       });
-      expect(calls).to.have.length(2);
+      expect(calls).to.deep.equal(["checks", "acceptance"]);
       expect(await pathExists(commandLockPath)).to.equal(false);
       expect(await pathExists(buildLockPath)).to.equal(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  for (const failedPhase of ["checks", "acceptance"]) {
+    it(`releases both locks when the ${failedPhase} phase fails and stops subsequent work`, async function () {
+      const chainProfile = ESPACE_CHAIN_PROFILE;
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-acceptance-failure-"));
+      const failure = new Error(`${failedPhase} failed`);
+      const calls = [];
+      const phase = async (name) => {
+        calls.push(name);
+        expect(await pathExists(acceptanceCommandLockPath(chainProfile, root))).to.equal(true);
+        expect(await pathExists(productionBuildLockPath(root))).to.equal(true);
+        if (name === failedPhase) throw failure;
+        return CHECK_RESULT;
+      };
+      try {
+        let error;
+        try {
+          await runAcceptanceCommand({
+            chainProfile,
+            entryScript: "scripts/evm-acceptance.mjs",
+            arguments_: [],
+            environment: { [chainProfile.acceptance.modeEnvironmentName]: "release-rehearsal" },
+            root,
+            preflightRunner: async () => phase("checks"),
+            childRunner: async () => phase("acceptance"),
+          });
+        } catch (caught) {
+          error = caught;
+        }
+        expect(error).to.equal(failure);
+        expect(calls).to.deep.equal(
+          failedPhase === "checks" ? ["checks"] : ["checks", "acceptance"],
+        );
+        expect(await pathExists(acceptanceCommandLockPath(chainProfile, root))).to.equal(false);
+        expect(await pathExists(productionBuildLockPath(root))).to.equal(false);
+      } finally {
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+
+  it("does not start the final rehearsal without complete checks-passed evidence", async function () {
+    const chainProfile = ESPACE_CHAIN_PROFILE;
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "deepfamily-acceptance-boundary-"));
+    try {
+      for (const result of [
+        undefined,
+        { status: "failed" },
+        { ...CHECK_RESULT, status: "passed" },
+        { ...CHECK_RESULT, receiveManifestSha256: undefined },
+        { ...CHECK_RESULT, zkTranscriptSha256: "invalid" },
+      ]) {
+        let childRan = false;
+        let error;
+        try {
+          await runAcceptanceCommand({
+            chainProfile,
+            entryScript: "scripts/evm-acceptance.mjs",
+            arguments_: [],
+            environment: {
+              [chainProfile.acceptance.modeEnvironmentName]: "release-rehearsal",
+              [RELEASE_CHECK_BOUNDARY_ENV]: JSON.stringify({ schemaVersion: 1, ...CHECK_RESULT }),
+            },
+            root,
+            preflightRunner: async () => result,
+            childRunner: async () => {
+              childRan = true;
+            },
+          });
+        } catch (caught) {
+          error = caught;
+        }
+        expect(error).to.be.instanceOf(Error);
+        expect(childRan).to.equal(false);
+        expect(await pathExists(acceptanceCommandLockPath(chainProfile, root))).to.equal(false);
+        expect(await pathExists(productionBuildLockPath(root))).to.equal(false);
+      }
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
@@ -307,6 +416,7 @@ describe("acceptance command wrapper", function () {
           },
           root,
           childRunner: async (invocation) => calls.push(invocation),
+          preflightRunner: async (environment) => calls.push({ kind: "checks", environment }),
         });
       } catch (caught) {
         error = caught;

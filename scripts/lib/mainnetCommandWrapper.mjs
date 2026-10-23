@@ -8,7 +8,12 @@ import {
   releaseExclusiveCommandLocks,
 } from "./exclusiveCommandLock.mjs";
 import { readRecoveryTransactionsFile, readReleaseApprovalFile } from "./mainnetCommandInput.mjs";
-import { normalizePortableCommand, sanitizeReleaseEnvironment } from "./portableCommand.mjs";
+import { sanitizeReleaseEnvironment } from "./portableCommand.mjs";
+import { runReleaseChecks } from "../release-preflight.mjs";
+import {
+  bindReleaseCheckBoundary,
+  withoutReleaseCheckBoundaryEnvironment,
+} from "./releaseCheckBoundary.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const HARDHAT_CLI = path.join(ROOT, "node_modules", "hardhat", "dist", "src", "cli.js");
@@ -35,33 +40,7 @@ const run = (args, environment, label) =>
     });
   });
 
-const runReleasePreflight = (environment) =>
-  new Promise((resolve, reject) => {
-    const command = normalizePortableCommand({
-      executable: "npm",
-      args: ["run", "release:preflight"],
-      platform: process.platform,
-      env: environment,
-    });
-    const child = spawn(command.executable, command.args, {
-      cwd: ROOT,
-      env: environment,
-      stdio: "inherit",
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) resolve();
-      else {
-        reject(
-          new Error(
-            signal
-              ? `Production release preflight was terminated by ${signal}`
-              : `Production release preflight exited with code ${code}`,
-          ),
-        );
-      }
-    });
-  });
+const runReleaseBuildChecks = (environment) => runReleaseChecks({ root: ROOT, env: environment });
 
 const parseOptionPairs = (arguments_, allowedNames, usage) => {
   if (arguments_.length % 2 !== 0) throw new Error(usage);
@@ -169,7 +148,7 @@ export const runMainnetSafeCommand = async ({
       label: `${chainProfile.displayName} mainnet Safe command`,
     });
     const childEnvironment = {
-      ...sanitizeReleaseEnvironment(environment),
+      ...withoutReleaseCheckBoundaryEnvironment(sanitizeReleaseEnvironment(environment)),
       DEEPFAMILY_COMMAND_CHAIN: chainProfile.id,
       [chainProfile.mainnet.safePlanDigestEnvironmentName]: command.digest ?? "",
       [chainProfile.mainnet.safeRecoveryTransactionEnvironmentName]:
@@ -202,7 +181,7 @@ export const runMainnetReleaseCommand = async ({
   entryScript,
   environment = process.env,
   hardhatRunner = run,
-  preflightRunner = runReleasePreflight,
+  preflightRunner = runReleaseBuildChecks,
   root = ROOT,
 }) => {
   const command = parseMainnetReleaseCommandArguments(chainProfile, arguments_);
@@ -231,7 +210,7 @@ export const runMainnetReleaseCommand = async ({
       label: "shared production build",
     });
     const preflightEnvironment = {
-      ...sanitizeReleaseEnvironment(environment),
+      ...withoutReleaseCheckBoundaryEnvironment(sanitizeReleaseEnvironment(environment)),
       [chainProfile.mainnet.planDigestEnvironmentName]: "",
       [chainProfile.mainnet.planApprovalSignaturesEnvironmentName]: "",
       [chainProfile.mainnet.recoveryTransactionsEnvironmentName]: "",
@@ -249,9 +228,13 @@ export const runMainnetReleaseCommand = async ({
       [chainProfile.mainnet.releaseWrapperModeEnvironmentName]: command.mode,
       [chainProfile.mainnet.sharedWrapperTokenEnvironmentName]: sharedLock.token,
     };
-    // This performs the clean production build plus contract/frontend/ZK/security checks. A
-    // Mainnet plan is not generated unless the complete preflight succeeds in this same command.
-    await preflightRunner(preflightEnvironment);
+    // Build and artifact/evidence checks finish under these locks. The final release process
+    // performs the complete ceremony verification once before it can produce a plan or broadcast.
+    const checkResult = await preflightRunner(preflightEnvironment);
+    const checkedEnvironment = bindReleaseCheckBoundary({
+      environment: childEnvironment,
+      result: checkResult,
+    });
     await hardhatRunner(
       [
         "--config",
@@ -264,7 +247,7 @@ export const runMainnetReleaseCommand = async ({
         "--no-compile",
         entryScript,
       ],
-      childEnvironment,
+      checkedEnvironment,
       `${chainProfile.displayName} mainnet release ${command.mode} phase`,
     );
   } finally {

@@ -44,8 +44,6 @@ describe("public ZK command surface", function () {
         "zk:build",
         "zk:setup",
         "zk:check",
-        "zk:artifacts:check",
-        "zk:ceremony:verify",
       ],
     );
   });
@@ -60,6 +58,24 @@ describe("public ZK command surface", function () {
     expect(scripts["dev:contract"]).to.equal(
       "npm run dev:deploy && npm run dev:fund && npm run dev:seed",
     );
+  });
+
+  it("keeps combined checks complete while reusing compiled artifacts", function () {
+    const { scripts } = JSON.parse(fs.readFileSync("package.json", "utf8"));
+    expect(scripts["contracts:check"]).to.include("npm run build && npm run size");
+    expect(scripts["contracts:check"]).to.include("npm run storage:check");
+    expect(scripts["contracts:check"]).to.match(/npm test -- --no-compile$/u);
+    expect(scripts.test).not.to.include("--no-compile");
+    expect(scripts["dev:fund"]).to.include("run --no-compile scripts/fund-wallet.mjs");
+    expect(scripts["frontend:check"].match(/locales:check/gu)).to.have.length(1);
+    expect(scripts["frontend:check"]).to.include(
+      "npm run locales:check --workspace deepfamily-frontend",
+    );
+    expect(scripts).not.to.have.property("frontend:locales:check");
+    expect(scripts).not.to.have.property("frontend:sync:abi");
+    const frontend = JSON.parse(fs.readFileSync("frontend/package.json", "utf8")).scripts;
+    expect(frontend.dev).to.match(/^npm run sync:abi && /u);
+    expect(frontend.build).to.match(/^npm run sync:abi && /u);
   });
 });
 
@@ -317,6 +333,53 @@ describe("parameterized ZK command wrappers", function () {
   });
 
   describe("zk-check", function () {
+    it("lets the release orchestrator run all other checks before its final ceremony", function () {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "zk-check-separated-ceremony-"));
+      try {
+        fs.mkdirSync(path.join(root, "circuits"));
+        fs.writeFileSync(path.join(root, "circuits", "shielded-production-manifest.json"), "{}");
+        const seen = [];
+        runZkCheck({ root, verifyCeremonies: false, runner: (command) => seen.push(command) });
+        expect(seen.map(({ check }) => check).slice(0, 2)).to.deep.equal(["build", "artifacts"]);
+        expect(seen.some(({ check }) => check.includes("ceremony"))).to.equal(false);
+        expect(seen.filter(({ check }) => check === "proof")).to.have.length(2);
+        expect(seen.at(-1).circuit).to.equal("receive");
+        expect(() =>
+          buildZkCheckCommands({ root, circuit: "core", verifyCeremonies: false }),
+        ).to.throw("complete circuit bundle");
+        expect(() => buildZkCheckCommands({ root, verifyCeremonies: "false" })).to.throw(
+          "verifyCeremonies must be a boolean",
+        );
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+    it("rebuilds and verifies artifacts and ceremony records before running proof checks", function () {
+      const commands = buildZkCheckCommands({ root: fixtureRoot });
+      expect(commands.slice(0, 3)).to.deep.equal(
+        [
+          ["build", "zk-build.mjs"],
+          ["artifacts", "check-zk-artifacts.mjs"],
+          ["ceremony", "zk-ceremony-verify.mjs"],
+        ].map(([check, script]) => ({
+          circuit: "all",
+          check,
+          executable: process.execPath,
+          args: [path.join(fixtureRoot, "scripts", script)],
+          cwd: fixtureRoot,
+        })),
+      );
+      expect(commands[3].check).to.equal("proof");
+      for (const circuit of ["core", "person", "disclosure", "shielded", "shielded:claim"]) {
+        expect(
+          buildZkCheckCommands({ root: fixtureRoot, circuit }).some(
+            (command) => command.circuit === "all",
+          ),
+          `scoped ${circuit} check must not require the complete artifact bundle`,
+        ).to.equal(false);
+      }
+    });
+
     it("builds fixed proof and constraint commands in person/disclosure order", function () {
       const commands = buildZkCheckCommands({ root: fixtureRoot, circuit: "core" });
       expect(commands).to.deep.equal([
@@ -411,14 +474,19 @@ describe("parameterized ZK command wrappers", function () {
       ]);
     });
 
-    it("selects production artifact and ceremony verification when production artifacts are declared", function () {
+    it("verifies the complete ceremony once and retains scoped shielded verification", function () {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "zk-check-production-selection-"));
       try {
         fs.mkdirSync(path.join(root, "circuits"));
         fs.writeFileSync(path.join(root, "circuits", "shielded-production-manifest.json"), "{}");
         const commands = buildZkCheckCommands({ root });
-        expect(commands.at(-2).check).to.equal("production-ceremony");
-        expect(commands.at(-2).args[0]).to.equal(
+        expect(commands.filter(({ check }) => check === "ceremony")).to.have.length(1);
+        expect(commands.some(({ check }) => check === "production-ceremony")).to.equal(false);
+        expect(commands.some(({ circuit }) => circuit === "shielded")).to.equal(false);
+        const scoped = buildZkCheckCommands({ root, circuit: "shielded" });
+        expect(scoped).to.have.length(1);
+        expect(scoped[0].check).to.equal("production-ceremony");
+        expect(scoped[0].args[0]).to.equal(
           path.join(root, "scripts", "zk-shielded-production-check.mjs"),
         );
       } finally {
@@ -460,6 +528,7 @@ describe("parameterized ZK command wrappers", function () {
       expect(() =>
         runZkCheck({
           root: fixtureRoot,
+          circuit: "core",
           runner: (command) => {
             seen.push(`${command.circuit}:${command.check}`);
             throw failure;
@@ -468,6 +537,23 @@ describe("parameterized ZK command wrappers", function () {
       ).to.throw(failure);
       expect(seen).to.deep.equal(["person:proof"]);
     });
+
+    for (const [index, failedCheck] of ["build", "artifacts", "ceremony"].entries()) {
+      it(`stops before proofs when the ${failedCheck} check fails`, function () {
+        const failure = new Error(`${failedCheck} failed`);
+        const seen = [];
+        expect(() =>
+          runZkCheck({
+            root: fixtureRoot,
+            runner: ({ check }) => {
+              seen.push(check);
+              if (check === failedCheck) throw failure;
+            },
+          }),
+        ).to.throw(failure);
+        expect(seen).to.deep.equal(["build", "artifacts", "ceremony"].slice(0, index + 1));
+      });
+    }
 
     it("rejects an invalid runner and programmatic circuit selection", function () {
       expect(() => runZkCheck({ runner: null })).to.throw(/runner must be a function/);

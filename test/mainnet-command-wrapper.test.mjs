@@ -1,5 +1,6 @@
 import { expect } from "chai";
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import { ESPACE_CHAIN_PROFILE } from "../scripts/lib/chainProfiles.mjs";
 import {
@@ -9,6 +10,8 @@ import {
   runMainnetSafeCommand,
 } from "../scripts/lib/mainnetCommandWrapper.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
+import { productionBuildLockPath } from "../scripts/lib/exclusiveCommandLock.mjs";
+import { RELEASE_CHECK_BOUNDARY_ENV } from "../scripts/lib/releaseCheckBoundary.mjs";
 
 const injectedEnvironment = Object.freeze({
   PATH: "/trusted/bin",
@@ -27,6 +30,37 @@ const injectedEnvironment = Object.freeze({
 });
 const PLAN_DIGEST = `0x${"ab".repeat(32)}`;
 const RECOVERY_HASH = `0x${"cd".repeat(32)}`;
+const CHECK_RESULT = Object.freeze({
+  status: "checks-passed",
+  releaseCommit: "a".repeat(40),
+  zkManifestSha256: "b".repeat(64),
+  zkTranscriptSha256: "c".repeat(64),
+  protocolManifestSha256: "d".repeat(64),
+  receiveManifestSha256: "e".repeat(64),
+});
+
+const releaseLockPaths = (root) => {
+  const directory = path.join(
+    root,
+    "deployments",
+    ESPACE_CHAIN_PROFILE.mainnet.deploymentDirectoryName,
+  );
+  return [
+    productionBuildLockPath(root),
+    path.join(directory, ".mainnet-command.lock"),
+    path.join(directory, ".mainnet-release-command.lock"),
+  ];
+};
+
+const pathExists = async (filePath) => {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+};
 
 const expectSanitized = (environment) => {
   expect(environment.PATH).to.equal("/trusted/bin");
@@ -113,23 +147,47 @@ describe("mainnet command wrapper child environments", function () {
 
   it("keeps one-shot approval data out of release preflight", async function () {
     const calls = [];
+    const heldTokens = [];
+    const inspectLocks = async () => {
+      const locks = await Promise.all(
+        releaseLockPaths(root).map(async (file) => JSON.parse(await fs.readFile(file, "utf8"))),
+      );
+      heldTokens.push(locks.map(({ token }) => token));
+    };
 
     await runMainnetReleaseCommand({
       chainProfile: ESPACE_CHAIN_PROFILE,
       arguments_: ["--plan"],
       entryScript: "scripts/evm-mainnet-release.mjs",
-      environment: injectedEnvironment,
+      environment: {
+        ...injectedEnvironment,
+        [RELEASE_CHECK_BOUNDARY_ENV]: "caller-supplied evidence",
+        [RELEASE_CHECK_BOUNDARY_ENV.toLowerCase()]: "ambiguous caller evidence",
+      },
       root,
       preflightRunner: async (environment) => {
         calls.push({ kind: "preflight", environment });
+        await inspectLocks();
+        return CHECK_RESULT;
       },
-      hardhatRunner: async (_args, environment) => {
-        calls.push({ kind: "hardhat", environment });
+      hardhatRunner: async (args, environment) => {
+        calls.push({ kind: "hardhat", args, environment });
+        await inspectLocks();
       },
     });
 
     expect(calls.map(({ kind }) => kind)).to.deep.equal(["preflight", "hardhat"]);
+    expect(calls[1].args).to.include("--no-compile");
+    expect(heldTokens[1]).to.deep.equal(heldTokens[0]);
+    for (const file of releaseLockPaths(root)) expect(await pathExists(file)).to.equal(false);
     for (const call of calls) expectSanitized(call.environment);
+    expect(calls[0].environment).not.to.have.property(RELEASE_CHECK_BOUNDARY_ENV);
+    expect(calls[0].environment).not.to.have.property(RELEASE_CHECK_BOUNDARY_ENV.toLowerCase());
+    expect(calls[1].environment).not.to.have.property(RELEASE_CHECK_BOUNDARY_ENV.toLowerCase());
+    expect(JSON.parse(calls[1].environment[RELEASE_CHECK_BOUNDARY_ENV])).to.deep.equal({
+      schemaVersion: 1,
+      ...CHECK_RESULT,
+    });
     expect(calls[0].environment).to.include({
       [ESPACE_CHAIN_PROFILE.mainnet.planDigestEnvironmentName]: "",
       [ESPACE_CHAIN_PROFILE.mainnet.planApprovalSignaturesEnvironmentName]: "",
@@ -150,6 +208,69 @@ describe("mainnet command wrapper child environments", function () {
       [ESPACE_CHAIN_PROFILE.mainnet.planApprovalSignaturesEnvironmentName]: "",
       [ESPACE_CHAIN_PROFILE.mainnet.recoveryTransactionsEnvironmentName]: "",
     });
+  });
+
+  for (const failedPhase of ["checks", "release"]) {
+    it(`releases all three locks when the ${failedPhase} phase fails and stops subsequent work`, async function () {
+      const failure = new Error(`${failedPhase} failed`);
+      const calls = [];
+      const phase = async (name) => {
+        calls.push(name);
+        for (const file of releaseLockPaths(root)) expect(await pathExists(file)).to.equal(true);
+        if (name === failedPhase) throw failure;
+        return CHECK_RESULT;
+      };
+      let error;
+      try {
+        await runMainnetReleaseCommand({
+          chainProfile: ESPACE_CHAIN_PROFILE,
+          arguments_: ["--plan"],
+          entryScript: "scripts/evm-mainnet-release.mjs",
+          environment: injectedEnvironment,
+          root,
+          preflightRunner: async () => phase("checks"),
+          hardhatRunner: async () => phase("release"),
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).to.equal(failure);
+      expect(calls).to.deep.equal(failedPhase === "checks" ? ["checks"] : ["checks", "release"]);
+      for (const file of releaseLockPaths(root)) expect(await pathExists(file)).to.equal(false);
+    });
+  }
+
+  it("does not start the final release process without complete checks-passed evidence", async function () {
+    for (const result of [
+      undefined,
+      { status: "failed" },
+      { ...CHECK_RESULT, status: "passed" },
+      { ...CHECK_RESULT, releaseCommit: undefined },
+      { ...CHECK_RESULT, zkManifestSha256: "invalid" },
+    ]) {
+      let childRan = false;
+      let error;
+      try {
+        await runMainnetReleaseCommand({
+          chainProfile: ESPACE_CHAIN_PROFILE,
+          arguments_: ["--plan"],
+          entryScript: "scripts/evm-mainnet-release.mjs",
+          environment: {
+            [RELEASE_CHECK_BOUNDARY_ENV]: JSON.stringify({ schemaVersion: 1, ...CHECK_RESULT }),
+          },
+          root,
+          preflightRunner: async () => result,
+          hardhatRunner: async () => {
+            childRan = true;
+          },
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).to.be.instanceOf(Error);
+      expect(childRan).to.equal(false);
+      for (const file of releaseLockPaths(root)) expect(await pathExists(file)).to.equal(false);
+    }
   });
 
   it("loads one release approval file and an optional recovery file for execute/resume", async function () {
@@ -178,7 +299,10 @@ describe("mainnet command wrapper child environments", function () {
         [mainnet.recoveryTransactionsEnvironmentName]: "stale",
       },
       root,
-      preflightRunner: async (environment) => calls.push(environment),
+      preflightRunner: async (environment) => {
+        calls.push(environment);
+        return CHECK_RESULT;
+      },
       hardhatRunner: async (_args, environment) => calls.push(environment),
     });
 

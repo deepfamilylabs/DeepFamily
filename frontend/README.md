@@ -17,8 +17,8 @@ the identity/disclosure flow. Only the `.vkey.json` files are
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
 `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
-circuit manifests. `zk:artifacts:check` validates all 13 artifact sets; `zk:check` and
-`zk:ceremony:verify` perform the cryptographic checks.
+circuit manifests. `npm run zk:check` rebuilds all 13 circuits and checks artifact consistency,
+proofs and available ceremony evidence using the same pinned artifact set.
 The current checked-in keys remain development-only and unattested until the explicit final setup
 and review. `release:preflight` requires the final keys, ceremony evidence and other release
 evidence before publication. Daily builds, downloads and checks reuse keys without generating them.
@@ -104,7 +104,6 @@ same-origin `/zk/`.
 For local development against a Hardhat node:
 
 ```bash
-npm run config:local
 npm run dev:local
 ```
 

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   RELEASE_PREFLIGHT_COMMANDS,
   defaultRunner,
+  runReleaseChecks as runReleaseChecksRaw,
   runReleasePreflight as runReleasePreflightRaw,
 } from "../scripts/release-preflight.mjs";
 import {
@@ -40,17 +41,19 @@ const SUPPORTED_RUNTIMES = Object.freeze([
 ]);
 const inspectFixtureProtocolManifest = () => ({ manifestSha256: "cd".repeat(32) });
 const FIXTURE_GIT_EXECUTABLE = path.resolve("test-tools", "git");
-const runReleasePreflight = (options) =>
-  runReleasePreflightRaw({
-    protocolManifestInspector: inspectFixtureProtocolManifest,
-    receiveArtifactInspector: () => ({ status: "production", manifestSha256: "ef".repeat(32) }),
-    receiveCeremonyVerifier: async () => ({
-      verification: "passed",
-      manifestSha256: "ef".repeat(32),
-    }),
-    gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
-    ...options,
-  });
+const fixtureReleaseOptions = (options) => ({
+  protocolManifestInspector: inspectFixtureProtocolManifest,
+  receiveArtifactInspector: () => ({ status: "production", manifestSha256: "ef".repeat(32) }),
+  receiveCeremonyVerifier: async () => ({
+    verification: "passed",
+    manifestSha256: "ef".repeat(32),
+  }),
+  gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
+  shieldedReleaseInspector: async () => ({ manifestSha256: "ef".repeat(32), circuitCount: 11 }),
+  ...options,
+});
+const runReleasePreflight = (options) => runReleasePreflightRaw(fixtureReleaseOptions(options));
+const runReleaseChecks = (options) => runReleaseChecksRaw(fixtureReleaseOptions(options));
 
 const artifactPath = (root, relativePath) => path.join(root, ...relativePath.split("/"));
 
@@ -273,8 +276,8 @@ const buildFixtureSourceCompiler = async ({ target }) => ({
   rustcVersion: "rustc 1.88.0 fixture",
 });
 
-const runWithFixtureCompiler = (options) =>
-  runReleasePreflight({
+const runWithFixtureCompiler = (options, validation = runReleasePreflight) =>
+  validation({
     compilerInspector: inspectFixtureCompiler,
     compilerSourceBuilder: buildFixtureSourceCompiler,
     protocolManifestInspector: inspectFixtureProtocolManifest,
@@ -511,12 +514,7 @@ describe("production release preflight", function () {
     const fake = createFakeRunner({
       onInvocation: (invocation, state) => {
         if (state.kind === "command") {
-          if (
-            (invocation.executable === "npm" &&
-              ["zk:artifacts:check", "zk:check"].includes(invocation.args[1])) ||
-            (invocation.executable === process.execPath &&
-              invocation.args[0] === "scripts/zk-shielded-release-check.mjs")
-          ) {
+          if (path.basename(invocation.args[0]) === "zk-build.mjs") {
             compilerPathDuringCheck = invocation.env?.[CIRCOM_OVERRIDE_ENV.path];
             expect(fsSync.existsSync(compilerPathDuringCheck)).to.equal(true);
             expect(invocation.env[CIRCOM_OVERRIDE_ENV.target]).to.equal("darwin-arm64");
@@ -534,7 +532,6 @@ describe("production release preflight", function () {
       arch: "arm64",
       commands: [
         ["npm", ["run", "contracts:check"]],
-        ["npm", ["run", "zk:artifacts:check"]],
         ["npm", ["run", "zk:check"]],
         [process.execPath, ["scripts/zk-shielded-release-check.mjs"]],
       ],
@@ -557,6 +554,18 @@ describe("production release preflight", function () {
       expectedProductionPhase1: fixture.expectedProductionPhase1,
       ptauPath: fixture.ptauPath,
       runner: fake.runner,
+      zkChecker: ({ root, verifyCeremonies, runner }) => {
+        expect(verifyCeremonies).to.equal(false);
+        return runner({
+          executable: process.execPath,
+          args: [path.join(root, "scripts/zk-build.mjs")],
+          cwd: root,
+        });
+      },
+      shieldedReleaseInspector: ({ env }) => {
+        expect(env).to.deep.equal({ FIXTURE: "preserved" });
+        expect(Object.isFrozen(env)).to.equal(true);
+      },
       mpcMetadataReader: metadataReaderFor(fixture),
     });
 
@@ -834,12 +843,24 @@ describe("production release preflight", function () {
   it("runs all checks in order, then verifies Powers of Tau and both final zkeys", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
+    let receiveVerifications = 0;
+    let releaseEvidenceInspections = 0;
 
     expect(
-      RELEASE_PREFLIGHT_COMMANDS.map(([executable, args]) => commandLabel({ executable, args })),
-    ).to.include(
-      `${path.basename(process.execPath)} scripts/generate-unicode-normalization-data.mjs --check`,
+      RELEASE_PREFLIGHT_COMMANDS.filter(
+        ([executable, args]) => executable === "npm" && args[1]?.startsWith("zk:"),
+      ),
+    ).to.deep.equal([["npm", ["run", "zk:check"]]]);
+    const checkLabels = RELEASE_PREFLIGHT_COMMANDS.map(([executable, args]) =>
+      commandLabel({ executable, args }),
     );
+    for (const includedCheck of [
+      `${path.basename(process.execPath)} scripts/generate-unicode-normalization-data.mjs --check`,
+      "npm run frontend:locales:check",
+      "npm run security:xss-scan",
+    ]) {
+      expect(checkLabels).not.to.include(includedCheck);
+    }
 
     const result = await runWithFixtureCompiler({
       root: fixture.root,
@@ -849,6 +870,13 @@ describe("production release preflight", function () {
       ptauPath: fixture.ptauPath,
       runner: fake.runner,
       mpcMetadataReader: metadataReaderFor(fixture),
+      receiveCeremonyVerifier: async () => {
+        receiveVerifications += 1;
+        return { verification: "passed", manifestSha256: "ef".repeat(32) };
+      },
+      shieldedReleaseInspector: async () => {
+        releaseEvidenceInspections += 1;
+      },
     });
 
     const labels = fake.calls.map(commandLabel);
@@ -856,16 +884,20 @@ describe("production release preflight", function () {
       "git rev-parse HEAD",
       "git status --porcelain=v1 --untracked-files=all",
     ]);
-    expect(labels.slice(2, 2 + RELEASE_PREFLIGHT_COMMANDS.length)).to.deep.equal(
-      RELEASE_PREFLIGHT_COMMANDS.map(([executable, args]) => commandLabel({ executable, args })),
-    );
+    expect(labels.slice(2, 5)).to.deep.equal([
+      "npm run clean",
+      "npm run contracts:check",
+      "npm run frontend:check",
+    ]);
     expect(labels.slice(-2)).to.deep.equal([
       "git rev-parse HEAD",
       "git status --porcelain=v1 --untracked-files=all",
     ]);
-    expect(path.dirname(fake.calls[2 + RELEASE_PREFLIGHT_COMMANDS.length].args[3])).to.match(
-      /deepfamily-zk-verify-/u,
+    const powersOfTauCall = fake.calls.find(({ args }) => args[1] === "powersoftau");
+    expect(labels.indexOf("npm run security:audit")).to.be.lessThan(
+      fake.calls.indexOf(powersOfTauCall),
     );
+    expect(path.dirname(powersOfTauCall.args[3])).to.match(/deepfamily-zk-verify-/u);
     expect(
       fake.calls.filter(
         ({ executable, args }) =>
@@ -884,6 +916,17 @@ describe("production release preflight", function () {
           args[2] === "verify",
       ),
     ).to.have.lengthOf(Object.keys(ZK_RELEASE_ARTIFACTS).length);
+    expect(receiveVerifications).to.equal(1);
+    expect(releaseEvidenceInspections).to.equal(1);
+    expect(
+      fake.calls.some(
+        ({ executable, args }) =>
+          (executable === "npm" && args[1] === "zk:check") ||
+          path.basename(args[0]) === "zk-ceremony-verify.mjs" ||
+          path.basename(args[0]) === "zk-shielded-production-check.mjs" ||
+          path.basename(args[0]) === "zk-shielded-release-check.mjs",
+      ),
+    ).to.equal(false);
     expect(result).to.deep.equal({
       status: "passed",
       releaseCommit: COMMIT,
@@ -901,6 +944,144 @@ describe("production release preflight", function () {
       ),
     });
   });
+
+  it("runs build, artifacts, proofs and release evidence without claiming ceremony verification", async function () {
+    const fixture = await productionFixture();
+    await writeRelativeFile(fixture.root, "circuits/shielded-production-manifest.json", "{}\n");
+    const fake = createFakeRunner();
+    let evidenceInspections = 0;
+    let protocolInspections = 0;
+    let receiveInspections = 0;
+    const result = await runWithFixtureCompiler(
+      {
+        root: fixture.root,
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        env: { RELEASE_VALUE: "preserved", NODE_OPTIONS: "--require=/untrusted/hook.cjs" },
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        ptauPath: fixture.ptauPath,
+        runner: fake.runner,
+        receiveCeremonyVerifier: null,
+        mpcMetadataReader: () => {
+          throw new Error("Checks must not read mathematical ceremony metadata");
+        },
+        protocolManifestInspector: () => {
+          protocolInspections += 1;
+          return inspectFixtureProtocolManifest();
+        },
+        receiveArtifactInspector: () => {
+          receiveInspections += 1;
+          return { status: "production", manifestSha256: "ef".repeat(32) };
+        },
+        shieldedReleaseInspector: async ({ root, env, ptauPath }) => {
+          evidenceInspections += 1;
+          expect(root).to.equal(fixture.root);
+          expect(env).to.deep.equal({ RELEASE_VALUE: "preserved" });
+          expect(Object.isFrozen(env)).to.equal(true);
+          expect(ptauPath).to.equal(fixture.ptauPath);
+        },
+      },
+      runReleaseChecks,
+    );
+
+    expect(result.status).to.equal("checks-passed");
+    expect(result.zkTranscriptSha256).to.equal(fixture.manifest.trustedSetup.transcript.sha256);
+    expect(result.ptauSha256).to.equal(fixture.manifest.trustedSetup.phase1.sha256);
+    expect(result).not.to.have.property("verification");
+    expect(protocolInspections).to.equal(2);
+    expect(receiveInspections).to.equal(2);
+    expect(evidenceInspections).to.equal(1);
+    const scripts = fake.calls
+      .filter(({ executable }) => executable === process.execPath)
+      .map(({ args }) => path.basename(args[0]));
+    expect(scripts).to.include.members([
+      "zk-build.mjs",
+      "check-zk-artifacts.mjs",
+      "zk-person-hash-check.mjs",
+      "zk-disclosure-binding-check.mjs",
+      "receive-proof-smoke.mjs",
+    ]);
+    for (const ceremonyScript of [
+      "zk-ceremony-verify.mjs",
+      "zk-shielded-production-check.mjs",
+      "zk-shielded-release-check.mjs",
+    ]) {
+      expect(scripts).not.to.include(ceremonyScript);
+    }
+    expect(fake.calls.some(({ args }) => ["powersoftau", "zkey"].includes(args[1]))).to.equal(
+      false,
+    );
+    expect(fake.calls.map(commandLabel).slice(-2)).to.deep.equal([
+      "git rev-parse HEAD",
+      "git status --porcelain=v1 --untracked-files=all",
+    ]);
+  });
+
+  for (const [changedInput, expectedError] of [
+    ["commit", /Release commit changed/u],
+    ["working tree", /clean Git working tree \(after checks\)/u],
+    ["manifest", /ZK artifact manifest changed/u],
+    ["artifact", /person_commitment zkey SHA-256 mismatch/u],
+    ["protocol", /Protocol release manifest changed/u],
+    ["receive", /Receive presentation manifest changed/u],
+  ]) {
+    it(`rejects a changed ${changedInput} after checks without ceremony verification`, async function () {
+      const fixture = await productionFixture();
+      let protocolInspections = 0;
+      let receiveInspections = 0;
+      const fake = createFakeRunner({
+        commits: changedInput === "commit" ? [COMMIT, CHANGED_COMMIT] : [COMMIT, COMMIT],
+        statuses: changedInput === "working tree" ? ["", " M contracts/DeepFamily.sol"] : ["", ""],
+        onInvocation: (_invocation, state) => {
+          if (state.kind !== "status" || state.index !== 1) return;
+          if (changedInput === "manifest") {
+            const changed = JSON.parse(fsSync.readFileSync(fixture.manifestPath, "utf8"));
+            changed.trustedSetup.warning = "Changed after regular checks.";
+            fsSync.writeFileSync(fixture.manifestPath, `${JSON.stringify(changed, null, 2)}\n`);
+          }
+          if (changedInput === "artifact") {
+            fsSync.appendFileSync(
+              artifactPath(fixture.root, ZK_RELEASE_ARTIFACTS.person_commitment.zkey),
+              "tampered",
+            );
+          }
+        },
+      });
+      const error = await captureError(() =>
+        runWithFixtureCompiler(
+          {
+            root: fixture.root,
+            platform: "linux",
+            arch: "x64",
+            libc: "glibc",
+            commands: [],
+            expectedProductionPhase1: fixture.expectedProductionPhase1,
+            runner: fake.runner,
+            receiveCeremonyVerifier: null,
+            protocolManifestInspector: () => ({
+              manifestSha256: (++protocolInspections === 2 && changedInput === "protocol"
+                ? "ab"
+                : "cd"
+              ).repeat(32),
+            }),
+            receiveArtifactInspector: () => ({
+              status: "production",
+              manifestSha256: (++receiveInspections === 2 && changedInput === "receive"
+                ? "ab"
+                : "ef"
+              ).repeat(32),
+            }),
+          },
+          runReleaseChecks,
+        ),
+      );
+      expect(error?.message).to.match(expectedError);
+      expect(fake.calls.every(({ executable }) => path.basename(executable) === "git")).to.equal(
+        true,
+      );
+    });
+  }
 
   it("rejects an initially dirty Git working tree before npm or ZK verification", async function () {
     const fixture = await productionFixture();
@@ -950,7 +1131,9 @@ describe("production release preflight", function () {
     expect(error?.message).to.equal("Release commit changed while preflight was running");
 
     expect(fake.calls.filter(({ executable }) => executable === "npm")).to.have.lengthOf(
-      RELEASE_PREFLIGHT_COMMANDS.filter(([executable]) => executable === "npm").length,
+      RELEASE_PREFLIGHT_COMMANDS.filter(
+        ([executable, args]) => executable === "npm" && args[1] !== "zk:check",
+      ).length,
     );
   });
 
@@ -1006,6 +1189,51 @@ describe("production release preflight", function () {
       }),
     );
     expect(error?.message).to.match(/person_commitment zkey SHA-256 mismatch/u);
+  });
+
+  it("rejects a different manifest verified between identical initial and final snapshots", async function () {
+    const fixture = await productionFixture();
+    const originalManifest = await fs.readFile(fixture.manifestPath, "utf8");
+    const originalManifestSha256 = sha256File(fixture.manifestPath);
+    let verifiedManifestSha256;
+    let restored = false;
+    const fake = createFakeRunner({
+      onInvocation: (invocation, state) => {
+        if (invocation.executable === "npm" && invocation.args[1] === "security:audit") {
+          const changed = JSON.parse(originalManifest);
+          changed.trustedSetup.warning = "Replaced only while the core ceremony is verified.";
+          fsSync.writeFileSync(fixture.manifestPath, `${JSON.stringify(changed, null, 2)}\n`);
+          verifiedManifestSha256 = sha256File(fixture.manifestPath);
+        }
+        if (state.kind === "status" && state.index === 1) {
+          fsSync.writeFileSync(fixture.manifestPath, originalManifest);
+          restored = true;
+        }
+      },
+    });
+
+    const error = await captureError(() =>
+      runWithFixtureCompiler({
+        root: fixture.root,
+        platform: "linux",
+        arch: "x64",
+        libc: "glibc",
+        expectedProductionPhase1: fixture.expectedProductionPhase1,
+        ptauPath: fixture.ptauPath,
+        runner: fake.runner,
+        mpcMetadataReader: metadataReaderFor(fixture),
+      }),
+    );
+
+    expect(verifiedManifestSha256).to.be.a("string").and.not.equal(originalManifestSha256);
+    expect(restored).to.equal(true);
+    expect(sha256File(fixture.manifestPath)).to.equal(originalManifestSha256);
+    expect(error?.message).to.equal(
+      "Verified core ceremony does not match the final release artifacts",
+    );
+    expect(
+      fake.calls.filter(({ args }) => args[1] === "zkey" && args[2] === "verify"),
+    ).to.have.lengthOf(Object.keys(ZK_RELEASE_ARTIFACTS).length);
   });
 
   it("uses the default local pTau path and fails closed when it is unavailable", async function () {

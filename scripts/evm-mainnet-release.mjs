@@ -70,7 +70,8 @@ import {
 } from "./lib/protocolDeploymentProjection.mjs";
 import { validateTestnetReleaseEvidence } from "./lib/testnetReleaseEvidence.mjs";
 import { verifyAllProductionCeremonies } from "./zk-ceremony-verify.mjs";
-import { checkShieldedRelease } from "./zk-shielded-release-check.mjs";
+import { assertReleaseCheckBoundary } from "./lib/releaseCheckBoundary.mjs";
+import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
 import { assertShieldedDeploymentBindings } from "./lib/shieldedDeploymentEvidence.mjs";
 
 const TX_TIMEOUT_MS = 10 * 60 * 1000;
@@ -917,7 +918,17 @@ export const main = async (chainProfile) => {
     throw new Error("Mainnet release command mode does not match its approval input");
   }
 
-  await checkShieldedRelease({ root: process.cwd() });
+  const shieldedReleaseEvidence = await checkShieldedReleaseEvidence({ root: process.cwd() });
+  const zkCeremonyVerification = await verifyAllProductionCeremonies({
+    root: process.cwd(),
+    ptauPath: resolveProductionPtauPath(),
+  });
+  if (
+    zkCeremonyVerification.shielded.manifestSha256 !== shieldedReleaseEvidence.manifestSha256 ||
+    zkCeremonyVerification.shielded.circuitCount !== shieldedReleaseEvidence.circuitCount
+  ) {
+    throw new Error("Verified shielded ceremony does not match the approved release evidence");
+  }
 
   const connection = await hre.network.create();
   const { ethers } = connection;
@@ -954,10 +965,6 @@ export const main = async (chainProfile) => {
       );
     }
   }
-  const zkCeremonyVerification = await verifyAllProductionCeremonies({
-    root: process.cwd(),
-    ptauPath: resolveProductionPtauPath(),
-  });
   const zkArtifactTrust = inspectZkReleaseArtifacts({
     root: process.cwd(),
     requireProduction: true,
@@ -989,6 +996,21 @@ export const main = async (chainProfile) => {
       `${CHAIN_PROFILE.displayName} mainnet release requires a clean Git working tree`,
     );
   }
+  if (
+    zkCeremonyVerification.core.manifestSha256 !== zkArtifactTrust.manifestSha256 ||
+    zkCeremonyVerification.core.transcriptSha256 !== zkArtifactTrust.transcriptSha256
+  ) {
+    throw new Error("Core artifacts changed after ceremony verification");
+  }
+  assertReleaseCheckBoundary({
+    actual: {
+      releaseCommit: sourceState.commit,
+      zkManifestSha256: zkArtifactTrust.manifestSha256,
+      zkTranscriptSha256: zkArtifactTrust.transcriptSha256,
+      protocolManifestSha256: protocolManifestEvidence.manifestSha256,
+      receiveManifestSha256: zkCeremonyVerification.receive.manifestSha256,
+    },
+  });
   if (
     !buildState.productionSettingsMatched ||
     !buildState.sourceContentsMatched ||

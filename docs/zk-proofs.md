@@ -423,11 +423,10 @@ verification-key metadata is committed. The WASM/zkey files are pinned by the ma
 and `zkeySha256` and hosted on R2 at `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`:
 `zk:assets:publish` uploads new files and `zk:assets:fetch` installs them in a checkout. The Vite
 dev server serves the local copies; builds fetch from R2 and reject any file whose SHA-256 differs
-from the manifest digest embedded at build time. The unified `zk:artifacts:check`
-checks artifact digests, shared linking parameters and derived verifiers. `zk:check`
-checks current proofs and available Circom ceremony evidence. The production
-verification entrypoint `zk:ceremony:verify` covers the same complete catalog and
-fixed linking parameters; `release:preflight` also requires the other release evidence.
+from the manifest digest embedded at build time. The unified `zk:check` rebuilds all thirteen
+circuits and checks artifact digests, shared linking parameters, derived verifiers, current
+proofs and available Circom ceremony evidence. It uses the same pinned artifact set in every
+environment; `release:preflight` also requires the other release evidence.
 
 Shielded witnesses are assembled locally by the `shielded*Preparation` services, using
 `packages/protocol-core/shielded-inheritance.js` and replayed public note and lineage events.
@@ -459,9 +458,7 @@ Supported top-level commands:
 | `npm run zk:fetch`             | Install the pinned Circom toolchain                      |
 | `npm run zk:build`             | Compile all 13 Circom circuits                           |
 | `npm run zk:setup`             | Generate final artifacts and evidence for all 13 circuits |
-| `npm run zk:check`             | Check all artifacts and available real proof fixtures    |
-| `npm run zk:artifacts:check`   | Rebuild and validate the complete artifact bundle        |
-| `npm run zk:ceremony:verify`   | Verify the complete production artifact bundle           |
+| `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
 
 The shared build, setup and checking commands cover identity, disclosure and all eleven
 shielded circuits, including the three receive presentations. `npm test` runs the real receive
@@ -471,12 +468,13 @@ fails when required proving artifacts are missing or do not match their manifest
 and checks their constraints without proving keys, Powers of Tau, or browser artifacts. It is
 included in `npm run check` and runs in an independent CI job. Negative witnesses must trigger
 a Circom constraint assertion; malformed inputs and runtime failures fail the test instead.
-`zk:check` proves the identity and disclosure fixtures, checks all eleven shielded
-artifact sets and available Fund/Claim fixtures, and exercises linked receive
-proofs. Production checks validate all thirteen Circom ceremonies and the matching
-link-key/verifier bindings. Release preflight additionally checks independent audits,
-runtime benchmarks and deployment acceptance evidence. Development keys cannot be
-used for a production release.
+`zk:check` first rebuilds all thirteen circuits and compares their artifacts with the pinned
+manifests and derived verifiers. It proves the identity and disclosure fixtures, checks all eleven
+shielded artifact sets and available Fund/Claim fixtures, and exercises linked receive proofs.
+It also verifies recorded ceremony evidence and the matching link-key/verifier bindings.
+Release preflight additionally requires finalized ceremony evidence, independent audits,
+runtime benchmarks and deployment acceptance evidence. Development keys cannot be used for a
+production release.
 
 The checked-in keys and current protocol release manifest are development-only. The manifest marks
 identity/file KDF suite 1 as `candidate-awaiting-device-benchmark`, trusted setup as requiring a
@@ -495,7 +493,7 @@ matching link parameters. Review and commit its outputs before running the relea
 gates below; setup alone does not supply audit, benchmark or deployment evidence:
 
 ```bash
-npm run zk:ceremony:verify
+npm run zk:check
 npm run release:preflight
 ```
 

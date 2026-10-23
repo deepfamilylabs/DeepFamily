@@ -567,7 +567,7 @@ This reads `deployments/localhost/` and writes `frontend/.env.local`, including 
 npm run frontend:dev        # Vite dev server (auto ABI sync)
 npm run frontend:build      # Production build
 npm run frontend:preview    # Serve the built bundle
-npm run frontend:check      # lint + source-rules + typecheck + build + vitest
+npm run frontend:check      # lint + source-rules + typecheck + locales + XSS scan + build + vitest
 ```
 
 `frontend:check` is the gate to run before committing — it matches what CI runs.
@@ -596,10 +596,11 @@ npx tsc --noEmit -p tsconfig.json
 ### Locales
 
 ```bash
-npm run frontend:locales:check     # compare keys + unused-key usage scan
+npm run locales:check --workspace deepfamily-frontend  # compare keys + unused-key usage scan
 ```
 
-Run this after adding or removing i18n keys. Translations live under `frontend/src/locales/`.
+Run this after adding or removing i18n keys. `frontend:check` includes it automatically.
+Translations live under `frontend/src/locales/`.
 
 ## Testing
 
@@ -764,7 +765,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 1. Create `frontend/src/pages/MyPage.tsx` and register the route in `frontend/src/app/router.tsx`.
 2. Import data/actions from the relevant `domains/*` module. If the logic does not yet exist, add it to that domain — not to the page file.
 3. Add a test under `pages/MyPage.test.tsx` for user-visible behavior that spans domains. Leave unit coverage for the domain layer.
-4. Add any new i18n keys under `src/locales/<lang>/…` and run `npm run frontend:locales:check`.
+4. Add any new i18n keys under `src/locales/<lang>/…` and run `npm run frontend:check` or the focused `npm run locales:check --workspace deepfamily-frontend`.
 
 ### Add a new tree view
 
@@ -783,7 +784,7 @@ See [frontend-security.md](frontend-security.md) for the threat model, CSP guida
 | Symptom                         | First thing to check                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | "Network Error" / read failures | `VITE_RPC_URL`, `VITE_READER_ADDRESS` (DeepFamilyReader), and that the node is reachable    |
-| ABI mismatch / missing methods  | Re-run `npm run frontend:sync:abi` (or restart `frontend:dev`)                              |
+| ABI mismatch / missing methods  | Run `npm run sync:abi --workspace deepfamily-frontend` (or restart `frontend:dev`)            |
 | Proof generation fails          | Confirm `/zk/*` artifacts exist and match the deployed verifier version                     |
 | Worker crashes on import        | A React/DOM import leaked into `shared/crypto` or `shared/zk` — inspect the import graph    |
 | Stale tree/query data           | Clear IndexedDB (`VITE_USE_INDEXEDDB_CACHE=1`) or toggle it off for a run                   |

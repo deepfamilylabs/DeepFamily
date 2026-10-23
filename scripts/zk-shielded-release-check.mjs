@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { getAddress, verifyMessage } from "ethers";
 
 import { checkedFile, sourceBundleSha256 } from "./lib/shieldedSourceBundle.mjs";
+import { sanitizeReleaseEnvironment } from "./lib/portableCommand.mjs";
 import {
   inspectShieldedProductionArtifacts,
   verifyShieldedProductionCeremony,
@@ -46,9 +47,10 @@ function checkHashedFile(root, relativePath, digest, label, prefix = "") {
   return absolute;
 }
 
-function assertCleanCheckout(root) {
+function assertCleanCheckout(root, env) {
   const status = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
     cwd: root,
+    env: sanitizeReleaseEnvironment(env),
     encoding: "utf8",
   });
   requireValue(
@@ -223,7 +225,15 @@ function assertReleaseEvidence(root, evidence, manifest, manifestSha256) {
   assertRuntimeBenchmarkReport(report, manifestSha256, manifest.releaseCriteria);
 }
 
-export async function checkShieldedRelease({ root = DEFAULT_ROOT } = {}) {
+/** Check release approvals and pinned inputs before the caller verifies their ceremony. */
+export async function checkShieldedReleaseEvidence({
+  root = DEFAULT_ROOT,
+  env = process.env,
+  ptauPath,
+  artifactInspector = inspectShieldedProductionArtifacts,
+} = {}) {
+  if (typeof artifactInspector !== "function")
+    throw new TypeError("artifactInspector must be a function");
   root = path.resolve(root);
   const productionManifest = path.join(root, MANIFEST_PATH);
   if (!fs.existsSync(productionManifest)) {
@@ -236,7 +246,7 @@ export async function checkShieldedRelease({ root = DEFAULT_ROOT } = {}) {
         "Run npm run zk:setup to prepare the final artifacts for all 13 circuits.",
     );
   }
-  const { manifest, manifestSha256, artifacts } = inspectShieldedProductionArtifacts({ root });
+  const { manifest, manifestSha256, artifacts } = artifactInspector({ root, env, ptauPath });
   assertReleaseCriteria(manifest.releaseCriteria);
   const { value: evidence } = readJson(
     root,
@@ -245,9 +255,33 @@ export async function checkShieldedRelease({ root = DEFAULT_ROOT } = {}) {
     "release-evidence/shielded/",
   );
   assertReleaseEvidence(root, evidence, manifest, manifestSha256);
-  assertCleanCheckout(root);
-  await verifyShieldedProductionCeremony({ root });
+  assertCleanCheckout(root, env);
   return { manifestSha256, circuitCount: Object.keys(artifacts).length };
+}
+
+export async function checkShieldedRelease({
+  root = DEFAULT_ROOT,
+  env = process.env,
+  ptauPath,
+  artifactInspector = inspectShieldedProductionArtifacts,
+  ceremonyVerifier = verifyShieldedProductionCeremony,
+} = {}) {
+  if (typeof ceremonyVerifier !== "function")
+    throw new TypeError("ceremonyVerifier must be a function");
+  root = path.resolve(root);
+  const evidence = await checkShieldedReleaseEvidence({ root, env, ptauPath, artifactInspector });
+  const verified = await ceremonyVerifier({ root, env, ptauPath });
+  requireValue(
+    verified.manifestSha256 === evidence.manifestSha256 &&
+      verified.circuitCount === evidence.circuitCount,
+    "Shielded ceremony verification does not match the approved release artifacts",
+  );
+  const finalArtifacts = artifactInspector({ root, env, ptauPath });
+  requireValue(
+    finalArtifacts.manifestSha256 === evidence.manifestSha256,
+    "Shielded production manifest changed during release verification",
+  );
+  return evidence;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

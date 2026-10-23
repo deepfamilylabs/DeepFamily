@@ -70,17 +70,42 @@ const defaultRunner = ({ executable, args, cwd }) =>
 
 export const parseArguments = parseCircuitArguments;
 
-export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } = {}) => {
+export const buildZkCheckCommands = ({
+  root = process.cwd(),
+  circuit = "all",
+  verifyCeremonies = true,
+} = {}) => {
+  if (typeof verifyCeremonies !== "boolean") {
+    throw new TypeError("verifyCeremonies must be a boolean");
+  }
+  if (!verifyCeremonies && circuit !== "all") {
+    throw new Error("Separating ceremony verification requires the complete circuit bundle");
+  }
   const resolvedRoot = path.resolve(root);
-  const productionManifest = path.join(
-    resolvedRoot,
-    "circuits",
-    "shielded-production-manifest.json",
+  const hasShieldedSetupRecord = fs.existsSync(
+    path.join(resolvedRoot, "circuits", "shielded-production-manifest.json"),
   );
   const selected = selectCircuitNames(circuit);
   const core = selected.filter((name) => !name.startsWith("shielded:"));
   const shielded = selected.filter((name) => name.startsWith("shielded:"));
   return Object.freeze([
+    ...(circuit === "all"
+      ? [
+          ["build", "zk-build.mjs"],
+          ["artifacts", "check-zk-artifacts.mjs"],
+          ["ceremony", "zk-ceremony-verify.mjs"],
+        ]
+          .filter(([check]) => verifyCeremonies || check !== "ceremony")
+          .map(([check, script]) =>
+            Object.freeze({
+              circuit: "all",
+              check,
+              executable: process.execPath,
+              args: Object.freeze([path.join(resolvedRoot, "scripts", script)]),
+              cwd: resolvedRoot,
+            }),
+          )
+      : []),
     ...core.flatMap((name) =>
       CHECKS[name].map((check) =>
         Object.freeze({
@@ -92,9 +117,10 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
         }),
       ),
     ),
-    ...(shielded.length === 0
+    // The complete check verifies this ceremony in its shared setup-record step.
+    ...(shielded.length === 0 || (circuit === "all" && hasShieldedSetupRecord)
       ? []
-      : fs.existsSync(productionManifest)
+      : hasShieldedSetupRecord
         ? [
             Object.freeze({
               circuit: "shielded",
@@ -152,13 +178,14 @@ export const buildZkCheckCommands = ({ root = process.cwd(), circuit = "all" } =
 export const runZkCheck = ({
   root = process.cwd(),
   circuit = "all",
+  verifyCeremonies = true,
   runner = defaultRunner,
 } = {}) => {
   if (typeof runner !== "function") {
     throw new TypeError("runner must be a function");
   }
 
-  const commands = buildZkCheckCommands({ root, circuit });
+  const commands = buildZkCheckCommands({ root, circuit, verifyCeremonies });
   for (const command of commands) {
     runner(command);
   }
@@ -169,10 +196,11 @@ const printUsage = () => {
   console.log(`Usage:
   node scripts/zk-check.mjs [--circuit <all|core|person|disclosure|shielded|shielded:action>]
 
-Checks the selected circuits. Person/disclosure run real proofs and constraints. Shielded checks
-all configured development artifact sets and proves fund/claim when no production manifest exists;
-with a production manifest it verifies production artifacts and ceremony. The default --circuit all
-also proves receive presentations with the current parameters, without generating new keys.`);
+The default check rebuilds all circuits, validates artifact hashes and derived verifiers,
+verifies recorded setup ceremonies, then checks real proofs, constraints and receive presentations.
+Every step reuses the current keys; no check generates replacement keys.
+Use --circuit to run the existing focused proof and constraint checks without rebuilding or
+requiring the complete bundle. Setup also uses these focused checks while installing artifacts.`);
 };
 
 export const main = (argv = process.argv.slice(2)) => {
