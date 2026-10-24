@@ -80,9 +80,9 @@ jobs:
         run: npm run frontend:check
 
       # Builds its own copy (frontend/.csp-scan) with proving files on the preview origin, serves it
-      # under the production headers, visits every route and runs the crypto and ZK workers on the
-      # golden vector. Fails on any CSP violation or broken worker flow. The runner image ships
-      # Google Chrome.
+      # under the production headers, visits every route and runs all three workers on the golden
+      # vector and a controlled RPC fixture, including real receive presentation/link proofs.
+      # Fails on any CSP violation or broken worker flow. The runner image ships Google Chrome.
       - name: Frontend CSP scan
         run: npm run csp:scan --workspace deepfamily-frontend
         env:

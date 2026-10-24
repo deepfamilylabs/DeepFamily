@@ -154,6 +154,11 @@ disclosure confirmation.
   props go through the CSSOM, which the directive does not govern.
 - Preview and production always enforce the policy. Discover a missing source on the dev server,
   whose policy is report-only, and with `csp:scan`, which CI runs on every change.
+- The production scan supplies receive-code chain context and expiry through a controlled
+  same-origin RPC fixture. It proves and verifies credentials in the ZK and asset Workers, then
+  generates a real receive presentation and LinkG16 proof in the asset Worker. Independent
+  verification binds the proof to the returned ciphertext and rejects operation or hash changes.
+  This exercises the built Worker bundles under the production policy without a live deployment.
 - Production sends HSTS (`max-age=31536000`) for the site's own host. Without it, the first
   plain-http request can be intercepted and the CSP stripped along with the rest of the response.
   `includeSubDomains` and `preload` stay off: they would bind every subdomain, including

@@ -3,6 +3,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import { splitShieldedLetterCiphertextHash, verifyLinkedGroth16Proof } from '@deepfamily/protocol-core'
+import { createCspScanRpcFixture } from './lib/cspScanRpcFixture.mjs'
 
 const mode = process.env.CSP_SCAN_MODE === 'dev' ? 'dev' : 'preview'
 const port = Number(process.env.CSP_SCAN_PORT || (mode === 'dev' ? 5173 : 4173))
@@ -98,12 +100,22 @@ const spawnFrontendServer = async () => {
 // First paint never starts the crypto, ZK or asset worker, yet they hold the code the policy is most
 // likely to break: WebAssembly, blob: threads and fetched proving files. Drive the built bundles
 // with the committed golden vector: derive its identity material and unlock its envelope, then
-// create and verify shielded receive codes in both proving workers, using real Groth16 proofs.
+// create and verify shielded receive codes in both proving workers, using real Groth16 proofs,
+// then prove a letter presentation and its LinkG16 transport in the production asset worker.
 // The asset flow also checks that its unlocked session only returns the public DTO. Codes refuse
 // an empty passphrase, which is what the vector uses, so that step takes a fixed one instead.
 const RECEIVE_CODE_PASSPHRASE = 'csp-scan receive code'
 
 const runWorkerFlows = async (page) => {
+  // Route only this controlled JSON-RPC endpoint. Worker fetches still run under the
+  // production same-origin CSP; the scan never needs a public chain or extra CSP origin.
+  const rpcFixture = createCspScanRpcFixture()
+  const rpcUrl = new URL('/__csp-scan/rpc', baseUrl).toString()
+  const fulfillRpc = async (route) => {
+    const response = rpcFixture.handle(route.request().postDataJSON())
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(response) })
+  }
+  await page.context().route(rpcUrl, fulfillRpc)
   const assets = await fs.readdir(path.join(outDir, 'assets'))
   const workerUrl = (name) => {
     const file = assets.find(f => f.startsWith(`${name}.worker-`) && f.endsWith('.js'))
@@ -123,6 +135,8 @@ const runWorkerFlows = async (page) => {
     identity: { fullName, gender, birthYear, birthMonth, birthDay, isBirthBC },
     rawPassphrase: vector.identity.rawPassphrase,
     receivePassphrase: RECEIVE_CODE_PASSPHRASE,
+    receiveContext: { ...rpcFixture.context, rpcUrl },
+    expiresAt: rpcFixture.expiresAt,
     identitySuiteId: vector.identity.identitySuiteId,
     envelopeHex: vector.envelope.envelopeHex,
     context: {
@@ -145,11 +159,16 @@ const runWorkerFlows = async (page) => {
     timer = setTimeout(() => reject(new Error('worker flows timed out')), 240_000)
   })
   const flows = page.evaluate(async (input) => {
+    let sequence = 0
     const call = (worker, method, params) => new Promise((resolve, reject) => {
-      worker.onmessage = ({ data }) =>
-        data?.ok ? resolve(data.result) : reject(new Error(`${method}: ${data?.error?.message || 'failed'}`))
+      const id = ++sequence
+      worker.onmessage = ({ data }) => {
+        // Public-state synchronization can emit progress before the method result.
+        if (data?.id !== id) return
+        data.ok ? resolve(data.result) : reject(new Error(`${method}: ${data?.error?.message || 'failed'}`))
+      }
       worker.onerror = (event) => reject(new Error(`${method}: ${event.message || 'worker failed to load'}`))
-      worker.postMessage({ id: 1, method, params })
+      worker.postMessage({ id, method, params })
     })
     const context = { ...input.context }
     for (const key of ['chainId', 'fatherVersionIndex', 'motherVersionIndex', 'versionCommitment']) {
@@ -189,6 +208,9 @@ const runWorkerFlows = async (page) => {
       const created = await call(zk, 'createShieldedReceiveCodeFromCredentials', {
         identity,
         rawPassphrase: receivePassphrase,
+        context: input.receiveContext,
+        expiresAt: input.expiresAt,
+        disclosure: 'anonymous',
       })
       const check = await call(zk, 'verifyShieldedReceiveCode', { code: created.code })
       const assetState = await call(asset, 'unlockIdentity', {
@@ -208,35 +230,56 @@ const runWorkerFlows = async (page) => {
         typeof assetState.identity.identity.fullName !== 'string') {
         throw new Error('asset session returned invalid public field types or created an independent key root')
       }
-      const assetCreated = await call(asset, 'receiveCode', { slot: 'identity' })
+      const assetCreated = await call(asset, 'receiveCode', {
+        slot: 'identity', context: input.receiveContext, expiresAt: input.expiresAt, disclosure: 'anonymous',
+      })
       assertPublicFields(assetCreated, ['code'], 'asset receive code')
       if (typeof assetCreated.code !== 'string') {
         throw new Error('asset receive code returned invalid public field types')
       }
       const assetCheck = await call(zk, 'verifyShieldedReceiveCode', { code: assetCreated.code })
+      const publicCheckFields = [
+        'ok', 'disclosure', 'authorizationAlias', 'authorizationCounter', 'expiresAt',
+        'ownerCommitment', 'viewingKey', 'keyMode', 'identitySuiteId',
+        'independentKeySuiteId', 'independentKeyDerivationVersion', 'fingerprint',
+      ]
+      assertPublicFields(check, publicCheckFields, 'anonymous receive verification')
+      assertPublicFields(assetCheck, publicCheckFields, 'anonymous asset receive verification')
+      const letter = await call(asset, 'prepareLetter', {
+        context: input.receiveContext, code: created.code, body: 'CSP scan test letter',
+      })
+      assertPublicFields(letter, ['delivery', 'ciphertext', 'proof'], 'proven letter')
+      assertPublicFields(letter.delivery, [
+        'messageId', 'checkpointId', 'asOf', 'expiresAt', 'recipientBinding',
+      ], 'letter delivery')
       return {
         personHash: lower(material.personHash),
         unlockValidated: unlocked.metadataUnlockValidated,
         versionCommitment: String(unlocked.versionCommitment),
         receiverPersonHash: lower(receiver.personHash),
+        receiverIdentityCommitment: String(receiver.identityCommitment),
         createdPersonHash: lower(created.personHash),
-        checkedPersonHash: lower(check.personHash),
         receiveCodeVerified: check.ok,
         assetPersonHash: lower(assetState.identity.personHash),
         assetIdentityCommitment: assetState.identity.identityCommitment,
         assetIdentitySuiteId: assetState.identity.identitySuiteId,
-        assetCheckedPersonHash: lower(assetCheck.personHash),
-        assetCheckedIdentityCommitment: assetCheck.identityCommitment,
         assetReceiveCodeVerified: assetCheck.ok,
         assetKeyMode: assetCheck.keyMode,
-        assetFingerprintMatches: assetCheck.fingerprint === check.fingerprint,
+        assetReceivingFieldsMatch: publicCheckFields.every(field => assetCheck[field] === check[field]),
+        anonymousDisclosureValidated: check.disclosure === 'anonymous' && check.expiresAt === input.expiresAt &&
+          check.authorizationCounter === '0',
         assetPublicDtoValidated: true,
+        letter,
       }
     } finally {
       for (const worker of workers) worker.terminate()
     }
   }, input)
-  const result = await Promise.race([flows, timeout]).finally(() => clearTimeout(timer))
+  const result = await Promise.race([flows, timeout]).finally(async () => {
+    clearTimeout(timer)
+    await page.context().unroute(rpcUrl, fulfillRpc)
+  })
+  if (rpcFixture.errors.length) throw new Error('worker flows used unsupported fixture RPC calls')
 
   const checks = [
     ['the vector identity derives to its person hash', result.personHash === String(vector.identity.personHash).toLowerCase()],
@@ -245,21 +288,49 @@ const runWorkerFlows = async (page) => {
     ['the receive code verifies', result.receiveCodeVerified === true],
     [
       'both workers derive the same receiving identity',
-      result.createdPersonHash === result.receiverPersonHash && result.checkedPersonHash === result.receiverPersonHash,
+      result.createdPersonHash === result.receiverPersonHash,
     ],
     ['the asset worker returns only public session/code DTOs', result.assetPublicDtoValidated === true],
     ['the asset receive code verifies in the ZK worker', result.assetReceiveCodeVerified === true],
     [
       'the asset session and verified code match the original identity and mode',
       result.assetPersonHash === result.receiverPersonHash &&
-      result.assetCheckedPersonHash === result.receiverPersonHash &&
-      result.assetIdentityCommitment === result.assetCheckedIdentityCommitment &&
+      result.assetIdentityCommitment === result.receiverIdentityCommitment &&
       result.assetIdentitySuiteId === Number(input.identitySuiteId) && result.assetKeyMode === 0,
     ],
-    ['both proving workers bind the same receiving keys', result.assetFingerprintMatches === true],
+    ['anonymous verification exposes only the expected public fields', result.anonymousDisclosureValidated === true],
+    ['both proving workers bind the same receiving keys and credential fields', result.assetReceivingFieldsMatch === true],
   ]
   const broken = checks.find(([, ok]) => !ok)
-  if (broken) throw new Error(`worker flows: ${broken[0]} failed (${JSON.stringify(result)})`)
+  if (broken) throw new Error(`worker flows: ${broken[0]} failed`)
+
+  const { delivery, ciphertext, proof } = result.letter
+  if (delivery.checkpointId !== rpcFixture.checkpointId || delivery.asOf !== rpcFixture.asOf ||
+    delivery.expiresAt !== rpcFixture.expiresAt || !/^0x[0-9a-f]+$/iu.test(proof) ||
+    (proof.length - 2) / 2 !== 1184) {
+    throw new Error('worker flows: letter delivery does not match the controlled authorization state')
+  }
+  const { cipherLo, cipherHi } = splitShieldedLetterCiphertextHash(ciphertext)
+  const publicInputs = [
+    BigInt(input.receiveContext.chainId), BigInt(input.receiveContext.lettersAddress), 1n,
+    BigInt(delivery.messageId), cipherLo, cipherHi, BigInt(delivery.checkpointId),
+    BigInt(rpcFixture.stateRoot), BigInt(delivery.asOf), BigInt(delivery.expiresAt), BigInt(delivery.recipientBinding),
+  ]
+  const linkKeys = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/receive-link-keys.json', import.meta.url), 'utf8')).anonymous
+  const issuerKey = JSON.parse(await fs.readFile(new URL('../public/zk/shielded/shielded_anonymous_receive_credential.vkey.json', import.meta.url), 'utf8'))
+  const verifies = (publicInputs) => verifyLinkedGroth16Proof({
+    proof, publicInputs,
+    issuer: { verificationKey: issuerKey, deltaG1: linkKeys.issuerDeltaG1 },
+    presentation: { verificationKey: linkKeys.verificationKey, deltaG1: linkKeys.deltaG1 },
+  })
+  if (!await verifies(publicInputs)) throw new Error('worker flows: production receive presentation/link proof failed independent verification')
+  const replay = [...publicInputs]
+  replay[2] = 4n
+  const changedCiphertext = [...publicInputs]
+  changedCiphertext[4] ^= 1n
+  if (await verifies(replay) || await verifies(changedCiphertext)) {
+    throw new Error('worker flows: linked proof accepted a changed operation or ciphertext')
+  }
 }
 
 const readReports = async () => {
@@ -533,7 +604,7 @@ const main = async () => {
         try {
           await runWorkerFlows(page)
           const seconds = ((Date.now() - started) / 1000).toFixed(1)
-          console.log(`[csp-scan] workers: identity derived, envelope unlocked, ZK + asset receive codes proved and verified, asset DTO public-only, all workers terminated (${seconds}s)`)
+          console.log(`[csp-scan] workers: identity derived, envelope unlocked, ZK + asset receive codes proved and verified, real receive presentation/link independently verified with replay rejection, asset DTO public-only, all workers terminated (${seconds}s)`)
         } catch (err) {
           workerFailure = err
         }
