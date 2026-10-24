@@ -12,8 +12,8 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const BYTES = {
   "frontend/public/zk/person_commitment.wasm": Buffer.from("core-wasm"),
   "frontend/public/zk/person_commitment_final.zkey": Buffer.from("core-zkey"),
-  "frontend/public/zk/shielded/shielded_claim.wasm": Buffer.from("claim-wasm"),
-  "frontend/public/zk/shielded/shielded_claim_final.zkey": Buffer.from("claim-zkey"),
+  "frontend/public/zk/shielded/shielded_claim_64.wasm": Buffer.from("claim-wasm"),
+  "frontend/public/zk/shielded/shielded_claim_64_final.zkey": Buffer.from("claim-zkey"),
 };
 const digest = (file) => sha256(BYTES[`frontend/public/zk/${file}`]);
 const CREDENTIALS = {
@@ -44,9 +44,9 @@ describe("ZK public proving assets", function () {
       JSON.stringify({
         circuits: {
           claim: {
-            source: "shielded_claim",
-            wasmSha256: digest("shielded/shielded_claim.wasm"),
-            zkeySha256: digest("shielded/shielded_claim_final.zkey"),
+            source: "shielded_claim_64",
+            wasmSha256: digest("shielded/shielded_claim_64.wasm"),
+            zkeySha256: digest("shielded/shielded_claim_64_final.zkey"),
           },
         },
       }),
@@ -83,16 +83,16 @@ describe("ZK public proving assets", function () {
         sha256: digest("person_commitment_final.zkey"),
       },
       {
-        path: "/zk/shielded/shielded_claim.wasm",
-        file: "frontend/public/zk/shielded/shielded_claim.wasm",
-        key: `${digest("shielded/shielded_claim.wasm")}/shielded_claim.wasm`,
-        sha256: digest("shielded/shielded_claim.wasm"),
+        path: "/zk/shielded/shielded_claim_64.wasm",
+        file: "frontend/public/zk/shielded/shielded_claim_64.wasm",
+        key: `${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm`,
+        sha256: digest("shielded/shielded_claim_64.wasm"),
       },
       {
-        path: "/zk/shielded/shielded_claim_final.zkey",
-        file: "frontend/public/zk/shielded/shielded_claim_final.zkey",
-        key: `${digest("shielded/shielded_claim_final.zkey")}/shielded_claim_final.zkey`,
-        sha256: digest("shielded/shielded_claim_final.zkey"),
+        path: "/zk/shielded/shielded_claim_64_final.zkey",
+        file: "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
+        key: `${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey`,
+        sha256: digest("shielded/shielded_claim_64_final.zkey"),
       },
     ]);
   });
@@ -103,7 +103,7 @@ describe("ZK public proving assets", function () {
       JSON.stringify({
         circuits: {
           claim: {
-            source: "shielded_claim",
+            source: "shielded_claim_64",
             wasmSha256: "a".repeat(64),
             zkeySha256: "b".repeat(64),
           },
@@ -142,8 +142,8 @@ describe("ZK public proving assets", function () {
     expect(result).to.deep.equal({ assetCount: 4, downloaded: 3 });
     expect(requests).to.deep.equal([
       `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey`,
-      `https://assets.example/${digest("shielded/shielded_claim.wasm")}/shielded_claim.wasm`,
-      `https://assets.example/${digest("shielded/shielded_claim_final.zkey")}/shielded_claim_final.zkey`,
+      `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm`,
+      `https://assets.example/${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey`,
     ]);
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
@@ -258,7 +258,7 @@ describe("ZK public proving assets", function () {
 
   it("refuses to publish local files that differ from the manifest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
-    writeLocal("frontend/public/zk/shielded/shielded_claim_final.zkey", Buffer.from("regenerated"));
+    writeLocal("frontend/public/zk/shielded/shielded_claim_64_final.zkey", Buffer.from("regenerated"));
     let error;
     try {
       await publishZkAssets({

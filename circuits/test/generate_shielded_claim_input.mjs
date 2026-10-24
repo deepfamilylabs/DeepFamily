@@ -1,4 +1,4 @@
-// Isolated fixture for shielded_claim.circom. It deliberately does not modify
+// Isolated fixture for shielded_claim_64.circom. It deliberately does not modify
 // the reviewed production ZK artifact manifest or verifier assets.
 import { poseidon2, poseidon3, poseidon4, poseidon5, poseidon7, poseidon8 } from "poseidon-lite";
 import { buildLineageFixture } from "./generate_lineage_fixture.mjs";

@@ -196,7 +196,7 @@ describe("planned production protocol deployment projection", function () {
         inspected.deployments.groth16VerifierAdapter[`${getter}Immutable`],
       ]),
     );
-    immutableValues.fundVerifier = plannedAddresses.shieldedClaimVerifier;
+    immutableValues.fundVerifier = plannedAddresses.shieldedClaim64Verifier;
     const wrongRoute = inspectProtocolDeploymentArtifact({
       artifactName: "groth16VerifierAdapter",
       immutableValues,

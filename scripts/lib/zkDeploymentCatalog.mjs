@@ -21,7 +21,7 @@ export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   Object.fromEntries(
     [...SHIELDED_ACTIONS, "claim32", "privateTransfer4", "unshield4", "fundContinuation"].map((action, index) => {
       const actionId = action === "fundContinuation" ? 1 : action === "claim32" ? 2 : action === "privateTransfer4" ? 3 : action === "unshield4" ? 4 : index;
-      const suffix = action[0].toUpperCase() + action.slice(1);
+      const suffix = action === "claim" ? "Claim64" : action[0].toUpperCase() + action.slice(1);
       return [
         action,
         Object.freeze({

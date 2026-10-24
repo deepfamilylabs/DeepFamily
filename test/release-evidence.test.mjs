@@ -294,7 +294,7 @@ describe("shared acceptance and mainnet release input evidence", function () {
       await writeFile(root, "protocol-vectors/vector.json", '{"version":1}\n');
       await writeFile(
         root,
-        "frontend/public/zk/shielded/shielded_claim_final.zkey",
+        "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
         "public proof key v1\n",
       );
       const acceptanceSnapshot = await hashReleaseInputs(ethers, root);
@@ -308,7 +308,7 @@ describe("shared acceptance and mainnet release input evidence", function () {
       expect(changed.digest).not.to.equal(acceptanceSnapshot.digest);
       await writeFile(
         root,
-        "frontend/public/zk/shielded/shielded_claim_final.zkey",
+        "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
         "public proof key v2\n",
       );
       const changedProofKey = await hashReleaseInputs(ethers, root);

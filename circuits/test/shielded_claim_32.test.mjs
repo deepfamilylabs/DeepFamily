@@ -32,7 +32,7 @@ test("claim variants share roots and reject paths outside their capacity", async
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-claim32-test-"));
   t.after(() => fs.rmSync(output, { recursive: true, force: true }));
   const calculators = {};
-  for (const name of ["shielded_claim", "shielded_claim32"]) {
+  for (const name of ["shielded_claim_64", "shielded_claim_32"]) {
     execFileSync(
       path.join(root, "bin/circom"),
       [
@@ -61,13 +61,13 @@ test("claim variants share roots and reject paths outside their capacity", async
       extend(witness, "endorsement", 32);
       // The trusted input names use trustedRoot, just like the endorsement path.
       extend(witness, "trusted", 32);
-      const standard = await calculators.shielded_claim.calculateWitness(witness, true);
-      const compact = await calculators.shielded_claim32.calculateWitness(for32(witness), true);
+      const standard = await calculators.shielded_claim_64.calculateWitness(witness, true);
+      const compact = await calculators.shielded_claim_32.calculateWitness(for32(witness), true);
       assert.deepEqual(compact.slice(1, 16), standard.slice(1, 16));
       const forged = for32(structuredClone(witness));
       forged.endorsementSiblings[31] = "1";
       await assertConstraintViolation(() =>
-        calculators.shielded_claim32.calculateWitness(forged, true),
+        calculators.shielded_claim_32.calculateWitness(forged, true),
       );
     }
   });
@@ -75,9 +75,9 @@ test("claim variants share roots and reject paths outside their capacity", async
     for (const prefix of ["endorsement", "trusted"]) {
       const { witness } = buildShieldedClaimFixture();
       extend(witness, prefix, 33);
-      await calculators.shielded_claim.calculateWitness(witness, true);
+      await calculators.shielded_claim_64.calculateWitness(witness, true);
       await assertConstraintViolation(() =>
-        calculators.shielded_claim32.calculateWitness(for32(witness), true),
+        calculators.shielded_claim_32.calculateWitness(for32(witness), true),
       );
     }
   });

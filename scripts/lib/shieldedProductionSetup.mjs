@@ -71,7 +71,9 @@ export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
   Object.fromEntries(
     Object.entries(SHIELDED_CIRCUITS).map(([action, source]) => {
       const verifierContractName = hasShieldedSolidityVerifier(action)
-        ? `Shielded${suffix(action)}Verifier`
+        ? action === "claim"
+          ? "ShieldedClaim64Verifier"
+          : `Shielded${suffix(action)}Verifier`
         : null;
       return [
         action,

@@ -12,6 +12,7 @@ import {
   computeLineageEndorsementLeaf,
   computeLineageParentsDigest,
   computeLineageTrustedLeaf,
+  computeShieldedReceiveCredentialBinding,
   createLineageTree,
   deriveShieldedHeirKeyMaterial,
   deriveShieldedIndependentKeyMaterial,
@@ -45,12 +46,41 @@ const donorKeys = { ...deriveShieldedHeirKeyMaterial(donorSecret), keyMode: 0 as
 const initialTime = 1_700_000_000n;
 
 /** Opt-in circuit assertions for the exact public/private witnesses prepared by the UI service. */
-function checkWitness(circuit: "fund" | "claim", witness: Record<string, unknown>) {
+function checkWitness(
+  circuit: "fund" | "claim",
+  witness: Record<string, unknown>,
+  recipient?: VerifiedShieldedRecipient,
+) {
   // eslint-disable-next-line no-restricted-syntax
   if (process.env.SHIELDED_UNIFIED_WITNESS !== "1") return;
+  if (circuit === "fund" && recipient) {
+    // Complete the binding normally added by the Worker after preparation.
+    const authorizationAlias = 99101n;
+    const salt = 99102n;
+    const binding = computeShieldedReceiveCredentialBinding({
+      credential: {
+        ...recipient,
+        authorizationAlias,
+        authorizationCounter: 0n,
+        expiresAt: initialTime + SECONDS_PER_DAY,
+      },
+      salt,
+    });
+    witness = {
+      ...witness,
+      receiveAuthorizationAlias: String(authorizationAlias),
+      receiveSalt: String(salt),
+      receiveBindings: [String(binding), "0"],
+    };
+  }
   const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-unified-witness-"));
   try {
+    const source = circuit === "claim"
+      ? "shielded_claim_64"
+      : Number(witness.fundMode) === 1
+        ? "shielded_fund_continuation"
+        : "shielded_fund";
     const inputPath = path.join(temporary, "input.json");
     fs.writeFileSync(inputPath, JSON.stringify(witness));
     execFileSync(
@@ -59,7 +89,7 @@ function checkWitness(circuit: "fund" | "claim", witness: Record<string, unknown
         path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs"),
         "wtns",
         "calculate",
-        path.join(repoRoot, `frontend/public/zk/shielded/shielded_${circuit === "fund" && Number(witness.fundMode) === 1 ? "fund_continuation" : circuit}.wasm`),
+        path.join(repoRoot, `frontend/public/zk/shielded/${source}.wasm`),
         inputPath,
         path.join(temporary, "witness.wtns"),
       ],
@@ -452,7 +482,7 @@ describe("unified budget recovery and claims", () => {
       lineage: f.lineage,
       budgetPeriods: 1n,
     });
-    checkWitness("fund", privateFund.witness);
+    checkWitness("fund", privateFund.witness, f.recipient);
     expect(privateFund.witness.publicBudget).toEqual(Array(10).fill("0"));
     f.record(privateFund, 1);
     const donor = await recoverLocalShieldedWallet(f.pool, {
@@ -490,7 +520,7 @@ describe("unified budget recovery and claims", () => {
       budget,
       budgetPeriods: 2n,
     });
-    checkWitness("fund", privateRefill.witness);
+    checkWitness("fund", privateRefill.witness, f.recipient);
     f.record(privateRefill, 1);
     f.mature();
     const wallet = await recoverLocalShieldedWallet(f.pool, f.childRecovery);

@@ -905,4 +905,4 @@ read-only for other visitors, pending lookups and read failures. Access refreshe
 sealing and window focus; submissions recheck it before signing. Pending previews are bound to the
 original token, contract, network and wallet, and token/config changes reset the editor's draft.
 
-Claim proving automatically uses `shielded_claim32` when both compact qualification paths have at most 32 siblings, and the existing 64-level `shielded_claim` otherwise. Only the selected WASM/zkey pair is downloaded and cached. Both variants use the same roots, checkpoint and fifteen public signals; trimming the zero-padded witness does not change the prepared transaction.
+Claim proving automatically uses `shielded_claim_32` when both compact qualification paths have at most 32 siblings, and the existing 64-level `shielded_claim_64` otherwise. Only the selected WASM/zkey pair is downloaded and cached. Both variants use the same roots, checkpoint and fifteen public signals; trimming the zero-padded witness does not change the prepared transaction.

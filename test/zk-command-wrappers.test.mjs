@@ -274,7 +274,7 @@ describe("parameterized ZK command wrappers", function () {
         runner: () => {},
       });
       expect(commands).to.have.length(1);
-      expect(commands[0].args[0]).to.equal(path.join("circuits", "shielded_claim.circom"));
+      expect(commands[0].args[0]).to.equal(path.join("circuits", "shielded_claim_64.circom"));
       expect(commands[0].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
     });
 

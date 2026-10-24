@@ -580,7 +580,7 @@ describe("local shielded claim preparation", () => {
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
         const publicPath = path.join(temporary, "public.json");
-        for (const [keyMode, source] of [[0, "shielded_claim32"], [1, "shielded_claim32"], [0, "shielded_claim"], [1, "shielded_claim"]] as const) {
+        for (const [keyMode, source] of [[0, "shielded_claim_32"], [1, "shielded_claim_32"], [0, "shielded_claim_64"], [1, "shielded_claim_64"]] as const) {
           const keys =
             keyMode === 1
               ? await deriveShieldedIndependentKeyMaterial({
@@ -593,7 +593,7 @@ describe("local shielded claim preparation", () => {
             ...input,
             periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
           });
-          const witness = source === "shielded_claim32" ? { ...prepared.witness,
+          const witness = source === "shielded_claim_32" ? { ...prepared.witness,
             endorsementSiblings: (prepared.witness.endorsementSiblings as string[]).slice(0, 32),
             trustedSiblings: (prepared.witness.trustedSiblings as string[]).slice(0, 32),
           } : prepared.witness;

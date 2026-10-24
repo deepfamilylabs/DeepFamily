@@ -212,7 +212,7 @@ function checkedCurrentArtifacts(actions) {
   assert.deepEqual(Object.keys(manifest.circuits).sort(), Object.keys(SHIELDED_CIRCUITS).sort());
   for (const action of actions) {
     const item = manifest.circuits[action];
-    const contractName = `Shielded${action[0].toUpperCase()}${action.slice(1)}Verifier`;
+    const contractName = SHIELDED_SETUP_CIRCUITS[action].verifierContractName;
     assert.equal(item.source, SHIELDED_CIRCUITS[action]);
     assert.equal(item.verifierContractName, contractName);
     assert.equal(item.verifierPath, `contracts/${contractName}.sol`);

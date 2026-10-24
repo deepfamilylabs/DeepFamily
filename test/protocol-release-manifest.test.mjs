@@ -1464,7 +1464,7 @@ describe("production protocol release manifest evidence", function () {
 
   it("rejects a shielded verifier artifact or adapter immutable-linked runtime hash drift", function () {
     fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = hash("0");
-    assert.throws(() => fixture.inspect(), /ShieldedClaimVerifier artifactSha256/);
+    assert.throws(() => fixture.inspect(), /ShieldedClaim64Verifier artifactSha256/);
     fixture.deploymentArtifacts.shieldedVerifiers.claim.artifactSha256 = HASHES.adapterArtifact;
     fixture.deploymentArtifacts.groth16VerifierAdapter.runtimeSha256 = hash("0");
     assert.throws(() => fixture.inspect(), /Groth16VerifierAdapter runtimeSha256/);

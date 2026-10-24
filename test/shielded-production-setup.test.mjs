@@ -555,7 +555,7 @@ describe("shielded production setup artifacts", function () {
     writeJson(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH, records.manifest);
     fs.copyFileSync(
       fixture.finalized.fund.finalZkey,
-      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_final.zkey"),
+      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_64_final.zkey"),
     );
     expect(() => inspectShieldedProductionArtifacts({ root: fixture.root })).to.throw(
       "claim zkey SHA-256 mismatch",
@@ -613,7 +613,7 @@ describe("shielded production setup artifacts", function () {
       Object.keys(SHIELDED_SETUP_CIRCUITS).length,
     );
     fs.appendFileSync(
-      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_final.zkey"),
+      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_64_final.zkey"),
       "modified key\n",
     );
     expect(() => inspectShieldedProductionArtifacts(options)).to.throw(

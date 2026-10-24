@@ -209,8 +209,8 @@ describe("shielded proof public inputs", () => {
     };
     await generateShieldedProof({ circuit: "claim", witness, expectedPublicSignals });
     expect(mocks.fetchAsset.mock.calls).toEqual([
-      ["/zk/shielded/shielded_claim32.wasm"],
-      ["/zk/shielded/shielded_claim32_final.zkey"],
+      ["/zk/shielded/shielded_claim_32.wasm"],
+      ["/zk/shielded/shielded_claim_32_final.zkey"],
     ]);
     expect(mocks.fullProve.mock.calls[0][0].endorsementSiblings).toHaveLength(32);
     expect(witness.endorsementSiblings).toHaveLength(64);
@@ -221,8 +221,8 @@ describe("shielded proof public inputs", () => {
       expectedPublicSignals,
     });
     expect(mocks.fetchAsset.mock.calls).toEqual([
-      ["/zk/shielded/shielded_claim.wasm"],
-      ["/zk/shielded/shielded_claim_final.zkey"],
+      ["/zk/shielded/shielded_claim_64.wasm"],
+      ["/zk/shielded/shielded_claim_64_final.zkey"],
     ]);
     expect(mocks.fullProve.mock.calls[1][0].trustedSiblings).toHaveLength(64);
     await expect(

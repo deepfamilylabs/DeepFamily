@@ -18,9 +18,9 @@ describe("ZK proving asset loading", () => {
   it("reads same-origin /zk files when no asset host is configured", async () => {
     const fetchMock = stubFetch(BYTES);
     await expect(
-      fetchZkAsset("/zk/shielded/shielded_claim_final.zkey", { baseUrl: "", digests: {} }),
+      fetchZkAsset("/zk/shielded/shielded_claim_64_final.zkey", { baseUrl: "", digests: {} }),
     ).resolves.toEqual(BYTES);
-    expect(fetchMock).toHaveBeenCalledWith("/zk/shielded/shielded_claim_final.zkey", {
+    expect(fetchMock).toHaveBeenCalledWith("/zk/shielded/shielded_claim_64_final.zkey", {
       cache: "no-cache",
     });
   });
@@ -29,24 +29,24 @@ describe("ZK proving asset loading", () => {
     const digest = await sha256Hex(BYTES);
     const fetchMock = stubFetch(BYTES);
     await expect(
-      fetchZkAsset("/zk/shielded/shielded_claim_final.zkey", {
+      fetchZkAsset("/zk/shielded/shielded_claim_64_final.zkey", {
         baseUrl: "https://zk.example",
-        digests: { "/zk/shielded/shielded_claim_final.zkey": digest },
+        digests: { "/zk/shielded/shielded_claim_64_final.zkey": digest },
       }),
     ).resolves.toEqual(BYTES);
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://zk.example/${digest}/shielded_claim_final.zkey`,
+      `https://zk.example/${digest}/shielded_claim_64_final.zkey`,
     );
   });
 
   it("rejects asset host bytes that differ from the pinned digest", async () => {
     stubFetch(new TextEncoder().encode("tampered"));
     await expect(
-      fetchZkAsset("/zk/shielded/shielded_claim_final.zkey", {
+      fetchZkAsset("/zk/shielded/shielded_claim_64_final.zkey", {
         baseUrl: "https://zk.example",
-        digests: { "/zk/shielded/shielded_claim_final.zkey": await sha256Hex(BYTES) },
+        digests: { "/zk/shielded/shielded_claim_64_final.zkey": await sha256Hex(BYTES) },
       }),
-    ).rejects.toThrow("ZK asset digest mismatch: /zk/shielded/shielded_claim_final.zkey");
+    ).rejects.toThrow("ZK asset digest mismatch: /zk/shielded/shielded_claim_64_final.zkey");
   });
 
   it("refuses unpinned files and reports HTTP failures", async () => {

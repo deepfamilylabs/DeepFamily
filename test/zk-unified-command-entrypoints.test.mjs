@@ -259,7 +259,7 @@ describe("unified ZK command entrypoints", function () {
     fixture.manifest.circuits.claim = claim;
     write(fixture.root, fixture.manifestPath, `${JSON.stringify(fixture.manifest, null, 2)}\n`);
     fs.appendFileSync(
-      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_final.zkey"),
+      path.join(fixture.root, "frontend/public/zk/shielded/shielded_claim_64_final.zkey"),
       "tampered",
     );
     expect(() =>

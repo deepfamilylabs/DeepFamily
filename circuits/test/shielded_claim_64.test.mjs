@@ -1,4 +1,4 @@
-// Run with: node --test circuits/test/shielded_claim.test.mjs
+// Run with: node --test circuits/test/shielded_claim_64.test.mjs
 // This compiles the circuit to a temporary directory. It does not generate or
 // trust a production Groth16 key.
 import assert from "node:assert/strict";
@@ -76,7 +76,7 @@ test("shielded claim constraints", async (t) => {
     execFileSync(
       path.join(repoRoot, "bin/circom"),
       [
-        "circuits/shielded_claim.circom",
+        "circuits/shielded_claim_64.circom",
         "--r1cs",
         "--wasm",
         "--sym",
@@ -92,7 +92,7 @@ test("shielded claim constraints", async (t) => {
       ],
       { cwd: repoRoot, stdio: "pipe" },
     );
-    const wasm = fs.readFileSync(path.join(output, "shielded_claim_js/shielded_claim.wasm"));
+    const wasm = fs.readFileSync(path.join(output, "shielded_claim_64_js/shielded_claim_64.wasm"));
     const calculator = await WitnessCalculatorBuilder(wasm, { singleThread: true });
     const valid = async (witness) => {
       const wires = await calculator.calculateWitness(witness, 1);
@@ -465,7 +465,7 @@ test("shielded claim constraints", async (t) => {
           snarkjsCli,
           "wtns",
           "calculate",
-          path.join(output, "shielded_claim_js/shielded_claim.wasm"),
+          path.join(output, "shielded_claim_64_js/shielded_claim_64.wasm"),
           inputFile,
           witnessFile,
         ],
@@ -473,7 +473,7 @@ test("shielded claim constraints", async (t) => {
       );
       const check = execFileSync(
         process.execPath,
-        [snarkjsCli, "wtns", "check", path.join(output, "shielded_claim.r1cs"), witnessFile],
+        [snarkjsCli, "wtns", "check", path.join(output, "shielded_claim_64.r1cs"), witnessFile],
         { cwd: repoRoot, encoding: "utf8" },
       );
       assert.match(check, /WITNESS IS CORRECT/u);

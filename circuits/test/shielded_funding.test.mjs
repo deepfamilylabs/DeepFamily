@@ -124,7 +124,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
   try {
     const calculators = {};
     for (const action of ["fund", "fund_continuation", "claim"]) {
-      const circuit = `shielded_${action}`;
+      const circuit = action === "claim" ? "shielded_claim_64" : `shielded_${action}`;
       execFileSync(
         path.join(repoRoot, "bin/circom"),
         [

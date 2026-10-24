@@ -564,8 +564,15 @@ installation, and optional multi-party setup details.
   documentation update must land together. A mismatch normally manifests as proof rejection,
   incorrect parent linkage, or failed mint disclosure binding.
 
-The Claim32 variant (`shielded_claim32`) shares Claim's fifteen public signals and its
-single-note, three-period rules. Both compact endorsement and trusted paths must fit
+Circuit entrypoint and browser artifact basenames use `snake_case`. Claim variants
+explicitly include their qualification-path capacity: `shielded_claim_32` and
+`shielded_claim_64`, with `ShieldedClaim32Verifier` and `ShieldedClaim64Verifier`
+as their Solidity names. Single-input VALUE entrypoints keep their unsuffixed names;
+four-input variants use `_4`, and Fund continuation uses `_continuation`.
+Shared templates are not circuit entrypoints or separate proving-key sets.
+
+The Claim32 variant (`shielded_claim_32`) shares the fifteen public signals and
+single-note, three-period rules of Claim64 (`shielded_claim_64`). Both compact endorsement and trusted paths must fit
 32 levels. Browser proving selects Claim32 for those paths and downloads only that
 variant; otherwise it uses the existing 64-level Claim circuit. The adapter tries the
 Claim32 verifier before the standard Claim verifier, using the same purpose 4 and
