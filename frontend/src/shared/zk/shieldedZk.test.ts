@@ -3,6 +3,7 @@ import {
   assertShieldedPublicSignals,
   generateShieldedProof,
   SHIELDED_RECEIVE_LINK_KEYS,
+  selectShieldedClaimCircuit,
 } from "./shieldedZk";
 
 const mocks = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ describe("shielded proof public inputs", () => {
       ["shield", 7],
       ["fund", 29],
       ["claim", 15],
+      ["claim32", 15],
       ["privateTransfer", 20],
       ["unshield", 20],
     ] as const) {
@@ -58,6 +60,65 @@ describe("shielded proof public inputs", () => {
         assertShieldedPublicSignals(circuit, Array(count - 1).fill("0"), Array(count).fill("0")),
       ).toThrow(`${count} public signals`);
     }
+  });
+
+  it("selects by both compact paths and checks the supported depth range", () => {
+    for (const [endorsementDepth, trustedDepth, expected] of [
+      [0, 0, "claim32"],
+      [32, 32, "claim32"],
+      [33, 1, "claim"],
+      [1, 33, "claim"],
+      [64, 64, "claim"],
+    ] as const) {
+      expect(selectShieldedClaimCircuit({ endorsementDepth, trustedDepth })).toBe(expected);
+    }
+    for (const endorsementDepth of [-1, 65, 1.5, "bad"]) {
+      expect(() => selectShieldedClaimCircuit({ endorsementDepth, trustedDepth: 0 })).toThrow(
+        "depth",
+      );
+    }
+  });
+
+  it("downloads only the selected claim variant and preserves the original witness", async () => {
+    const expectedPublicSignals = Array(15).fill("0");
+    mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
+    mocks.verify.mockResolvedValue(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ nPublic: 15 }))),
+    );
+    const siblings = Array(64).fill("0");
+    const witness = {
+      endorsementDepth: 32,
+      trustedDepth: 1,
+      endorsementSiblings: siblings,
+      trustedSiblings: siblings,
+    };
+    await generateShieldedProof({ circuit: "claim", witness, expectedPublicSignals });
+    expect(mocks.fetchAsset.mock.calls).toEqual([
+      ["/zk/shielded/shielded_claim32.wasm"],
+      ["/zk/shielded/shielded_claim32_final.zkey"],
+    ]);
+    expect(mocks.fullProve.mock.calls[0][0].endorsementSiblings).toHaveLength(32);
+    expect(witness.endorsementSiblings).toHaveLength(64);
+    mocks.fetchAsset.mockClear();
+    await generateShieldedProof({
+      circuit: "claim",
+      witness: { ...witness, trustedDepth: 33 },
+      expectedPublicSignals,
+    });
+    expect(mocks.fetchAsset.mock.calls).toEqual([
+      ["/zk/shielded/shielded_claim.wasm"],
+      ["/zk/shielded/shielded_claim_final.zkey"],
+    ]);
+    expect(mocks.fullProve.mock.calls[1][0].trustedSiblings).toHaveLength(64);
+    await expect(
+      generateShieldedProof({
+        circuit: "claim32",
+        witness: { ...witness, trustedDepth: 33 },
+        expectedPublicSignals,
+      }),
+    ).rejects.toThrow("cannot exceed");
   });
 
   it("proves a receive presentation with existing Circom assets and its embedded verification key", async () => {

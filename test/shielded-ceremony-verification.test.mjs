@@ -190,7 +190,7 @@ describe("shielded production ceremony verification snapshots", function () {
         Object.values(SHIELDED_SETUP_CIRCUITS).filter((spec) => spec.verifierPath).length,
     );
     // The receive code is verified in the browser and exports no Solidity verifier.
-    expect(fixture.calls.filter(({ args }) => args[3] === "solidityverifier")).to.have.length(6);
+    expect(fixture.calls.filter(({ args }) => args[3] === "solidityverifier")).to.have.length(7);
     const snapshotRoot = path.dirname(fixture.calls[0].args[3]);
     expect(snapshotRoot).not.to.equal(path.dirname(fixture.ptau));
     const nativeCalls = fixture.calls.filter(({ executable }) => executable !== process.execPath);

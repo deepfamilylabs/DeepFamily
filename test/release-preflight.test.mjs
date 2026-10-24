@@ -53,7 +53,7 @@ const fixtureReleaseOptions = (options) => ({
     manifestSha256: "ef".repeat(32),
   }),
   gitToolResolver: async () => FIXTURE_GIT_EXECUTABLE,
-  shieldedReleaseInspector: async () => ({ manifestSha256: "ef".repeat(32), circuitCount: 11 }),
+  shieldedReleaseInspector: async () => ({ manifestSha256: "ef".repeat(32), circuitCount: 12 }),
   ...options,
 });
 const runReleasePreflight = (options) => runReleasePreflightRaw(fixtureReleaseOptions(options));

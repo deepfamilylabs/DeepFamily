@@ -87,6 +87,23 @@ describe("Unified Groth16 verifier adapter", function () {
     }
   });
 
+  it("accepts either claim key and falls back to the 64-level verifier", async function () {
+    const claim = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
+    const claim32 = await hre.ethers.deployContract("ShieldedGroth16VerifierMock");
+    await claim.configure(true, 64n);
+    await claim32.configure(true, 32n);
+    const adapter = await deployUnifiedVerifierAdapter(hre, { claim, claim32 });
+    expect(await adapter.claim32Verifier()).to.equal(await claim32.getAddress());
+    const signals = Array(15).fill(0n);
+    for (const last of [32n, 64n]) {
+      signals[14] = last;
+      expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(true);
+    }
+    signals[14] = 99n;
+    expect(await adapter.verifyProof(4, 1, PROOF, signals)).to.equal(false);
+    await expect(deployUnifiedVerifierAdapter(hre, { claim32 })).to.be.revertedWithCustomError(adapter, "InvalidVerifier");
+  });
+
   it("allows isolated disabled routes but rejects their use and codeless verifier addresses", async function () {
     const adapter = await deployUnifiedVerifierAdapter(hre);
     expect(await adapter.verifierForPurpose(4)).to.equal(hre.ethers.ZeroAddress);
@@ -98,10 +115,10 @@ describe("Unified Groth16 verifier adapter", function () {
       hre.ethers.deployContract("Groth16VerifierAdapter", [
         eoa.address,
         hre.ethers.ZeroAddress,
-        Array(5).fill(hre.ethers.ZeroAddress),
+        Array(6).fill(hre.ethers.ZeroAddress),
       ]),
     ).to.be.revertedWithCustomError(adapter, "InvalidVerifier");
-    const invalidShieldedRoutes = Array(5).fill(hre.ethers.ZeroAddress);
+    const invalidShieldedRoutes = Array(6).fill(hre.ethers.ZeroAddress);
     invalidShieldedRoutes[4] = eoa.address;
     await expect(
       hre.ethers.deployContract("Groth16VerifierAdapter", [

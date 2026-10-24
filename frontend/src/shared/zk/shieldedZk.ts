@@ -18,6 +18,7 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   shield: "shielded_shield",
   fund: "shielded_fund",
   claim: "shielded_claim",
+  claim32: "shielded_claim32",
   privateTransfer: "shielded_private_transfer",
   unshield: "shielded_unshield",
 });
@@ -35,6 +36,7 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
+  claim32: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
   unshield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Unshield],
 };
@@ -107,15 +109,68 @@ export function assertShieldedPublicSignals(
   }
 }
 
+/** Both compact qualification paths must fit the selected circuit's capacity. */
+export function selectShieldedClaimCircuit(witness: ShieldedWitness): "claim32" | "claim" {
+  const rawDepths = [witness.endorsementDepth, witness.trustedDepth];
+  if (
+    rawDepths.some(
+      (value) =>
+        typeof value !== "number" &&
+        (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(value)),
+    )
+  ) {
+    throw new Error("Claim qualification path depth must be an integer from 0 to 64");
+  }
+  const depths = rawDepths.map(Number);
+  if (depths.some((depth) => !Number.isInteger(depth) || depth < 0 || depth > 64)) {
+    throw new Error("Claim qualification path depth must be an integer from 0 to 64");
+  }
+  return depths.every((depth) => depth <= 32) ? "claim32" : "claim";
+}
+
+function claimWitness(witness: ShieldedWitness, circuit: "claim32" | "claim"): ShieldedWitness {
+  const selected = selectShieldedClaimCircuit(witness);
+  if (circuit === "claim32" && selected !== "claim32") {
+    throw new Error("Claim32 qualification paths cannot exceed 32 levels");
+  }
+  const maximum = circuit === "claim32" ? 32 : 64;
+  const trimmed = { ...witness };
+  for (const [field, depthField] of [
+    ["endorsementSiblings", "endorsementDepth"],
+    ["trustedSiblings", "trustedDepth"],
+  ]) {
+    const siblings = witness[field];
+    if (
+      !Array.isArray(siblings) ||
+      siblings.length < Number(witness[depthField]) ||
+      siblings.length > 64 ||
+      siblings.some((value) => typeof value !== "string")
+    ) {
+      throw new Error("Claim qualification siblings do not match their path depth");
+    }
+    trimmed[field] = [
+      ...siblings.slice(0, maximum),
+      ...Array<string>(Math.max(0, maximum - siblings.length)).fill("0"),
+    ];
+  }
+  return trimmed;
+}
+
 /** Runs entirely inside the local browser worker; no witness is posted to a prover. */
 export async function generateShieldedProof(input: {
   circuit: ShieldedCircuitName;
   witness: ShieldedWitness;
   expectedPublicSignals: string[];
 }): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
-  const { wasm, zkey, vkey } = await loadArtifacts(input.circuit);
-  const result = await snarkjs.groth16.fullProve(input.witness, wasm, zkey);
-  assertShieldedPublicSignals(input.circuit, result.publicSignals, input.expectedPublicSignals);
+  const circuit =
+    input.circuit === "claim" ? selectShieldedClaimCircuit(input.witness) : input.circuit;
+  const witness =
+    circuit === "claim" || circuit === "claim32"
+      ? claimWitness(input.witness, circuit)
+      : input.witness;
+  const { wasm, zkey, vkey } = await loadArtifacts(circuit);
+  const result = await snarkjs.groth16.fullProve(witness, wasm, zkey);
+  assertShieldedPublicSignals(circuit, result.publicSignals, input.expectedPublicSignals);
   const verificationKey =
     input.circuit === "anonymousReceiveCredential"
       ? SHIELDED_RECEIVE_CREDENTIAL_VERIFICATION_KEYS.anonymous

@@ -335,7 +335,7 @@ const shieldedProofs = (chainId) =>
       signals[1] = BigInt(SHIELDED_ADDRESSES.shieldedErc20Pool).toString();
       // asOf closes the fund and claim inputs.
       if (action === "fund") signals[signals.length - 1] = "1000";
-      if (action === "claim") signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
+      if ((action === "claim" || action === "claim32")) signals[signals.length - 1] = String(8200 + 3 * 2_592_000);
       return [
         action,
         {
@@ -348,8 +348,8 @@ const shieldedProofs = (chainId) =>
           proofSha256: SHIELDED_PROOF_SHA256,
           publicSignals: signals,
           publicSignalsSha256: createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
-          execution: action === "claim" ? "verifier-call" : "transaction",
-          ...(action === "claim"
+          execution: (action === "claim" || action === "claim32") ? "verifier-call" : "transaction",
+          ...((action === "claim" || action === "claim32")
             ? { claimCount: 3 }
             : { transactionLabel: `shielded-action-${action}` }),
         },
@@ -791,15 +791,15 @@ describe("schema v1 initial-mainnet-release rehearsal evidence", function () {
       protocolGeneration: PROTOCOL_GENERATION,
       goldenVectorSha256: GOLDEN_VECTOR_SHA256,
     });
-    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(6);
+    expect(result.publicSummary.finality.revalidatedTransactionCount).to.equal(7);
     expect(result.publicSummary.shielded).to.deep.include({
       manifestSha256: SHIELDED_MANIFEST_SHA256,
-      proofCount: 5,
+      proofCount: 6,
       claimCount: 3,
       lineageDepth: 1,
       noteDepth: 1,
     });
-    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim"]);
+    expect(result.publicSummary.shielded.verifierCallActions).to.deep.equal(["claim", "claim32"]);
     expect(result.publicSummary.shielded.transactionActions).to.have.length(4);
     expect(result.publicSummary.refund.transactionHash).to.equal(REFUND_TRANSACTION_HASH);
     expect(Object.isFrozen(result)).to.equal(true);

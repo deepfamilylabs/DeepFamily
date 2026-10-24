@@ -550,7 +550,7 @@ export const assertIntegratedShieldedWiring = async (deployed) => {
     const verifierAddress = await deployed.shieldedVerifiers[action].getAddress();
     if (
       !sameAddress(await adapter[spec.adapterVerifierGetter](), verifierAddress) ||
-      !sameAddress(await adapter.verifierForPurpose(spec.proofPurpose), verifierAddress)
+      (action !== "claim32" && !sameAddress(await adapter.verifierForPurpose(spec.proofPurpose), verifierAddress))
     ) {
       throw new Error(`Integrated deployment ${action} verifier binding mismatch`);
     }

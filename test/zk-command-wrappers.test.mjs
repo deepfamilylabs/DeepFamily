@@ -224,6 +224,7 @@ describe("parameterized ZK command wrappers", function () {
         "shielded:anonymousReceivePresentation",
         "shielded:fundReceivePresentation",
         "shielded:attachedReceivePresentation",
+        "shielded:claim32",
       ]);
       expect(events).to.deep.equal([
         ["inspect", fixtureRoot, "linux", "x64"],
@@ -242,6 +243,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:anonymousReceivePresentation"],
         ["run", "shielded:fundReceivePresentation"],
         ["run", "shielded:attachedReceivePresentation"],
+        ["run", "shielded:claim32"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
       expect(commands[2].args[0]).to.equal(
@@ -249,7 +251,7 @@ describe("parameterized ZK command wrappers", function () {
       );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
       expect(commands.at(-1).args[0]).to.equal(
-        path.join("circuits", "shielded_attached_receive_presentation.circom"),
+        path.join("circuits", "shielded_claim32.circom"),
       );
       expect(
         commands.every(({ executable }) => executable === path.join(fixtureRoot, "bin", "circom")),

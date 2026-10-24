@@ -10,6 +10,7 @@ export const SHIELDED_CIRCUITS = Object.freeze({
   anonymousReceivePresentation: "shielded_anonymous_receive_presentation",
   fundReceivePresentation: "shielded_fund_receive_presentation",
   attachedReceivePresentation: "shielded_attached_receive_presentation",
+  claim32: "shielded_claim32",
 });
 
 /** Both Groth16 relations use the same hidden credential prefix; only operation fields escape. */

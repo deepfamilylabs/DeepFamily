@@ -12,12 +12,13 @@ export const SHIELDED_ACTIONS = Object.freeze([
 export const SHIELDED_ACTION_PROOF_PURPOSE_BASE = 2;
 
 /**
- * The same five pool verifier routes are deployed in every environment.
+ * The same five pool action routes and the additional Claim32 verifier are deployed in every environment.
  * The receive-code circuit is verified in the browser and is never deployed.
  */
 export const SHIELDED_DEPLOYMENT_CIRCUITS = Object.freeze(
   Object.fromEntries(
-    SHIELDED_ACTIONS.map((action, actionId) => {
+    [...SHIELDED_ACTIONS, "claim32"].map((action, index) => {
+      const actionId = action === "claim32" ? 2 : index;
       const suffix = action[0].toUpperCase() + action.slice(1);
       return [
         action,

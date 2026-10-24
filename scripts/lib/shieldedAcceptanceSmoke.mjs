@@ -219,6 +219,9 @@ export async function runShieldedAcceptanceSmoke({
       ...extra,
     };
     if (!proofs[action]) proofs[action] = metadata;
+    if (action === "claim" && !proofs.claim32 && Number(witness.endorsementDepth) <= 32 && Number(witness.trustedDepth) <= 32) {
+      await prove("claim32", { ...witness, endorsementSiblings: witness.endorsementSiblings.slice(0, 32), trustedSiblings: witness.trustedSiblings.slice(0, 32) }, publicSignals, { execution, ...extra });
+    }
     return { ...generated, evidence: metadata };
   };
   const keysFor = async (material) => {

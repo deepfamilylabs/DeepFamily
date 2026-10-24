@@ -183,6 +183,7 @@ function circuitFiles(action, manifest) {
 }
 
 function checkedCurrentArtifacts(actions) {
+  actions = [...new Set(actions.flatMap((action) => action === "claim" ? ["claim", "claim32"] : [action]))];
   const manifestFile = path.join(ROOT, currentShieldedCandidateManifest({ root: ROOT }));
   if (!fs.existsSync(manifestFile)) return { missing: [manifestFile] };
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
@@ -244,6 +245,7 @@ function checkedCurrentArtifacts(actions) {
 }
 
 async function deployCurrentGeneratedVerifiers(actions, signer) {
+  actions = [...new Set(actions.flatMap((action) => action === "claim" ? ["claim", "claim32"] : [action]))];
   // Compile the named contracts matching the current public proving keys and deploy only to
   // Hardhat's in-process test chain. These measurements are never release evidence.
   const compilerModule = path.join(
@@ -353,6 +355,10 @@ function syntheticFullMerklePath(leaf, depth, index, siblingSeed) {
 }
 
 async function prove(action, witness, expectedSignals) {
+  if (action === "claim" && Number(witness.endorsementDepth) <= 32 && Number(witness.trustedDepth) <= 32) {
+    action = "claim32";
+    witness = { ...witness, endorsementSiblings: witness.endorsementSiblings.slice(0, 32), trustedSiblings: witness.trustedSiblings.slice(0, 32) };
+  }
   const files = circuitFiles(action);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-e2e-"));
   const inputPath = path.join(temporary, "input.json");
@@ -913,6 +919,17 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
     const proof = await prove("claim", witness, claimSignalsOf(witness));
     const nodeProofMs = Math.ceil(performance.now() - start);
     assert.ok(proof.length > 2);
+    const [signer] = await hre.ethers.getSigners();
+    const verifiers = await deployCurrentGeneratedVerifiers(["claim"], signer);
+    const adapter = await deployUnifiedVerifierAdapter(hre, verifiers);
+    const [rawA, rawB, rawC] = hre.ethers.AbiCoder.defaultAbiCoder().decode(["uint256[2]", "uint256[2][2]", "uint256[2]"], proof);
+    const a = [...rawA], b = rawB.map((row) => [...row]), c = [...rawC];
+    expect(await verifiers.claim32.verifyProof(a, b, c, claimSignalsOf(witness))).to.equal(false);
+    expect(await adapter.verifyProof(4, 1, proof, claimSignalsOf(witness))).to.equal(true);
+    const tampered = claimSignalsOf(witness);
+    tampered[12] += 1n;
+    expect(await adapter.verifyProof(4, 1, proof, tampered)).to.equal(false);
+
     if (process.env.SHIELDED_FULL_DEPTH_PROOF_REPORT === "1") {
       console.log(
         JSON.stringify({

@@ -50,8 +50,9 @@ const sameKeys = (value, expected) =>
 const suffix = (action) => action[0].toUpperCase() + action.slice(1);
 
 /** Pool action counts mirror ProofConstants.sol; the receive code is verified off-chain. */
-const publicSignalCount = (action) =>
-  RECEIVE_PRESENTATION_CIRCUITS[action]
+const publicSignalCount = (action) => {
+  if (action === "claim32") return SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim];
+  return RECEIVE_PRESENTATION_CIRCUITS[action]
     ? RECEIVE_PRESENTATION_CIRCUITS[action].hiddenInputs +
       RECEIVE_PRESENTATION_CIRCUITS[action].publicInputs
     : action === "anonymousReceiveCredential"
@@ -61,6 +62,7 @@ const publicSignalCount = (action) =>
         : action === "identityAuthorizationUpdate"
           ? 6
           : SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION[suffix(action)]];
+};
 
 export const SHIELDED_SETUP_CIRCUITS = Object.freeze(
   Object.fromEntries(

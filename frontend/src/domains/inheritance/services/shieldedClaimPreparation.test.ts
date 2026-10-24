@@ -574,14 +574,13 @@ describe("local shielded claim preparation", () => {
     async () => {
       const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-claim-prep-"));
       try {
-        const source = "shielded_claim";
         const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
         const artifacts = path.join(repoRoot, "frontend/public/zk/shielded");
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
         const publicPath = path.join(temporary, "public.json");
-        for (const keyMode of [0, 1] as const) {
+        for (const [keyMode, source] of [[0, "shielded_claim32"], [1, "shielded_claim32"], [0, "shielded_claim"], [1, "shielded_claim"]] as const) {
           const keys =
             keyMode === 1
               ? await deriveShieldedIndependentKeyMaterial({
@@ -594,7 +593,11 @@ describe("local shielded claim preparation", () => {
             ...input,
             periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
           });
-          fs.writeFileSync(inputPath, JSON.stringify(prepared.witness));
+          const witness = source === "shielded_claim32" ? { ...prepared.witness,
+            endorsementSiblings: (prepared.witness.endorsementSiblings as string[]).slice(0, 32),
+            trustedSiblings: (prepared.witness.trustedSiblings as string[]).slice(0, 32),
+          } : prepared.witness;
+          fs.writeFileSync(inputPath, JSON.stringify(witness));
           execFileSync(
             process.execPath,
             [

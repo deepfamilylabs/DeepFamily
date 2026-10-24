@@ -21,6 +21,10 @@ const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).dige
 const fixtures = {
   fund: () => buildShieldedFundingFixtures().initial,
   claim: () => buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness,
+  claim32: () => {
+    const witness = buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness;
+    return { ...witness, endorsementSiblings: witness.endorsementSiblings.slice(0, 32), trustedSiblings: witness.trustedSiblings.slice(0, 32) };
+  },
 };
 const sources = Object.fromEntries(
   Object.keys(fixtures).map((action) => [action, SHIELDED_CIRCUITS[action]]),

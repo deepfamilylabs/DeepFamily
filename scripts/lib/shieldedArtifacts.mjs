@@ -46,7 +46,7 @@ export function currentShieldedCandidateManifest({ root = DEFAULT_ROOT } = {}) {
 }
 
 /**
- * Accepts the six pinned public artifact sets and the named contract verifiers of the five
+ * Accepts the six pinned public artifact sets and the named contract verifiers of the six
  * pool verifier routes. The receive-code circuit is verified in the browser and has no contract.
  */
 export function loadCandidateArtifacts({

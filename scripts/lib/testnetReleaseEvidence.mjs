@@ -1387,7 +1387,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
       report.addresses.shieldedErc20Pool,
       `shielded.proofs.${action} contract`,
     );
-    if (action === "claim") {
+    if (action === "claim" || action === "claim32") {
       requireExact(proof.execution, "verifier-call", `shielded.proofs.${action}.execution`);
       requireExact(proof.claimCount, 3, `shielded.proofs.${action}.claimCount`);
       if (Object.hasOwn(proof, "transactionLabel"))

@@ -40,7 +40,7 @@ interface IGroth16Verifier7 {
   ) external view returns (bool);
 }
 
-/** @dev Generated verifier interface for the eighteen-signal claim circuit. */
+/** @dev Generated verifier interface for the fifteen-signal claim circuit. */
 interface IGroth16Verifier15 {
   function verifyProof(
     uint256[2] calldata a,
@@ -91,23 +91,26 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
   address public immutable shieldVerifier;
   address public immutable fundVerifier;
   address public immutable claimVerifier;
+  address public immutable claim32Verifier;
   address public immutable privateTransferVerifier;
   address public immutable unshieldVerifier;
 
   /**
-   * @param shieldedVerifiers Five pool actions in enum order. A zero
+   * @param shieldedVerifiers Five pool actions in enum order, followed by Claim32. A zero
    *                          address explicitly disables a route.
    */
   constructor(
     address _personVerifier,
     address _disclosureBindingVerifier,
-    address[5] memory shieldedVerifiers
+    address[6] memory shieldedVerifiers
   ) {
     _validateVerifier(_personVerifier);
     _validateVerifier(_disclosureBindingVerifier);
     for (uint256 i = 0; i < shieldedVerifiers.length; ++i) {
       _validateVerifier(shieldedVerifiers[i]);
     }
+    if (shieldedVerifiers[5] != address(0) && shieldedVerifiers[2] == address(0))
+      revert InvalidVerifier();
     personVerifier = _personVerifier;
     disclosureBindingVerifier = _disclosureBindingVerifier;
     shieldVerifier = shieldedVerifiers[0];
@@ -115,6 +118,7 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
     claimVerifier = shieldedVerifiers[2];
     privateTransferVerifier = shieldedVerifiers[3];
     unshieldVerifier = shieldedVerifiers[4];
+    claim32Verifier = shieldedVerifiers[5];
   }
 
   /** @notice Returns a known route's verifier, or zero when the route was explicitly disabled. */
@@ -183,6 +187,13 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       return IGroth16DisclosureBindingVerifier(verifier).verifyProof(a, b, c, disclosureSignals);
     }
 
+    if (purpose == ProofConstants.PROOF_PURPOSE_SHIELDED_CLAIM && claim32Verifier != address(0)) {
+      uint256[15] memory signals15;
+      for (uint256 i = 0; i < signals15.length; ++i) signals15[i] = publicSignals[i];
+      try IGroth16Verifier15(claim32Verifier).verifyProof(a, b, c, signals15) returns (bool valid) {
+        if (valid) return true;
+      } catch {}
+    }
     return _verifyShieldedAction(verifier, a, b, c, publicSignals);
   }
 

@@ -43,7 +43,9 @@ export async function assertShieldedDeploymentBindings({
   ).entries()) {
     const [verifier, routedVerifier] = await Promise.all([
       read(`adapter ${getter}`, () => adapter[getter]()),
-      read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose)),
+      getter === "claim32Verifier"
+        ? read("adapter claim32 verifier", () => adapter.claim32Verifier())
+        : read(`adapter proof purpose ${purpose}`, () => adapter.verifierForPurpose(purpose)),
     ]);
     same(verifier, addresses[label], `adapter ${getter}`);
     same(routedVerifier, addresses[label], `adapter proof purpose ${purpose}`);
