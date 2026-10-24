@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   proof: vi.fn(),
   receipt: vi.fn(),
   verify: vi.fn(),
+  decode: vi.fn(),
   recover: vi.fn(),
   getBlock: vi.fn(),
   selectedQuery: vi.fn(),
@@ -28,6 +29,10 @@ const mocks = vi.hoisted(() => ({
   loadTargetedLineage: vi.fn(),
   targetIdentity: vi.fn(),
   authorizationMode: vi.fn(),
+  authorizationCounter: 0n,
+  authorizationAsOf: 1000n,
+  authorizationFailure: null as Error | null,
+  invalidAuthorizationWitness: false,
   notes: [] as Array<{
     commitment: bigint;
     note: { kind: "value"; amount: bigint; ownerCommitment: bigint };
@@ -47,9 +52,7 @@ vi.mock("ethers", async (original) => ({
 }));
 vi.mock("@deepfamily/protocol-core", async (original) => ({
   ...(await original<typeof import("@deepfamily/protocol-core")>()),
-  decodeShieldedReceiveCredential: () => ({ disclosure: "anonymous", authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
-    ownerCommitment: 29n, viewingKey: `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
-    proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] } }),
+  decodeShieldedReceiveCredential: mocks.decode,
   deriveShieldedIndependentKeyIdentitySecret: async () => new Uint8Array(32).fill(3),
   deriveIdentityMaterial: async ({ identity }: { identity: object }) => ({
     identity,
@@ -89,9 +92,10 @@ vi.mock("../domains/inheritance/services/shieldedIdentityAuthorizationChain", ()
   createIdentityAuthorizationContract: () => ({}),
   loadShieldedIdentityAuthorizationWitnessForMode: async (_contract: unknown, alias: bigint, mode?: unknown) => {
     mocks.authorizationMode(mode);
+    if (mocks.authorizationFailure) throw mocks.authorizationFailure;
     const { createShieldedIdentityAuthorizationTree } = await import("@deepfamily/protocol-core");
-    const tree = createShieldedIdentityAuthorizationTree();
-    return { stateRoot: tree.root, witness: tree.getWitness(alias), checkpointId: 1n, asOf: 1000n, blockNumber: 12 };
+    const tree = createShieldedIdentityAuthorizationTree(mocks.authorizationCounter === 0n ? [] : [[alias, mocks.authorizationCounter]]);
+    return { stateRoot: tree.root + (mocks.invalidAuthorizationWitness ? 1n : 0n), witness: tree.getWitness(alias), checkpointId: 1n, asOf: mocks.authorizationAsOf, blockNumber: 12 };
   },
 }));
 vi.mock("../shared/zk/shieldedReceiveCode", () => ({
@@ -139,6 +143,30 @@ const context: ShieldedWorkerContext = {
   assetKind: "native",
 };
 const secretKeys = deriveShieldedHeirKeyMaterial(13n);
+function receiveCredential(disclosure: "anonymous" | "fund" = "anonymous", overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) {
+  return { disclosure, authorizationAlias: 17n, authorizationCounter: 0n, expiresAt: 2000000000n,
+    ...(disclosure === "fund" ? { identityCommitment: 31n } : {}),
+    ownerCommitment: 29n, viewingKey: `0x${"01".repeat(32)}`, keyMode: 0, identitySuiteId: 1, independentKeySuiteId: 1, independentKeyDerivationVersion: 1,
+    proof: { protocol: "groth16", curve: "bn128", pi_a: ["1", "2", "1"], pi_b: [["1", "2"], ["3", "4"], ["1", "0"]], pi_c: ["1", "2", "1"] },
+    ...overrides,
+  };
+}
+function verifiedCredential(credential = receiveCredential()) {
+  mocks.decode.mockReturnValue(credential);
+  mocks.verify.mockResolvedValue({
+    ...credential,
+    ok: true,
+    authorizationAlias: String(credential.authorizationAlias),
+    authorizationCounter: String(credential.authorizationCounter),
+    expiresAt: String(credential.expiresAt),
+    ...(credential.identityCommitment === undefined ? {} : {
+      identityCommitment: String(credential.identityCommitment),
+      personHash: `0x${"00".repeat(31)}1f`,
+    }),
+    ownerCommitment: String(credential.ownerCommitment),
+    fingerprint: "verified-destination",
+  });
+}
 const fixedRoot = new Uint8Array(32).fill(41);
 const independentKeyMaterial = await deriveShieldedIndependentKeyMaterial({
   independentKeyRoot: fixedRoot,
@@ -196,6 +224,12 @@ function assertNoOpenings(value: unknown) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.decode.mockReset();
+  verifiedCredential();
+  mocks.authorizationCounter = 0n;
+  mocks.authorizationAsOf = 1000n;
+  mocks.authorizationFailure = null;
+  mocks.invalidAuthorizationWitness = false;
   mocks.pool = context.poolAddress;
   mocks.notes = [];
   const snapshot = { timestamp: 1000n, checkpointId: 7n, versions: new Map(), endorsements: new Map(), trustedEndorsers: new Map() };
@@ -639,6 +673,7 @@ describe("asset Worker preview and proof boundary", () => {
     );
     expect(mocks.proof).not.toHaveBeenCalled();
     expect(mocks.selectedQuery).not.toHaveBeenCalled();
+    expect(mocks.authorizationMode).not.toHaveBeenCalled();
   });
   it("rejects the final transfer destination before making a preparatory merge", async () => {
     const session = await unlocked();
@@ -654,6 +689,165 @@ describe("asset Worker preview and proof boundary", () => {
       }),
     ).rejects.toThrow("receiving code");
     expect(mocks.transfer).not.toHaveBeenCalled();
+  });
+
+  describe.each(["privateTransfer", "fund"] as const)("receive checks before %s consolidation", (action) => {
+    const request = (stateReadMode?: "rebuild" | "chain") => ({
+      context: { ...context, stateReadMode },
+      slot: "identity" as const,
+      action,
+      amount: "9",
+      recipientCode: "verified-code",
+      candidates: mocks.notes.map((note) => String(note.commitment)),
+      ...(action === "fund" ? {
+        fundingEntry: "privateConvenient" as const,
+        periods: "1",
+        periodDays: "30",
+        rootVersionIndex: 1,
+        publicRecipient: `0x${"00".repeat(31)}1f`,
+      } : {}),
+    });
+    const prepare = async (overrides: { expiresAt?: bigint; authorizationCounter?: bigint } = {}) => {
+      const session = await unlocked();
+      mocks.notes = Array.from({ length: 9 }, (_, index) =>
+        value(BigInt(index + 1), 1n, secretKeys.ownerCommitment),
+      );
+      // Isolate issuer proof verification while retaining real spend planning,
+      // disclosure handling and authenticated authorization-tree witnesses.
+      verifiedCredential(receiveCredential(action === "fund" ? "fund" : "anonymous", overrides));
+      return session;
+    };
+    const useFinalSpend = () => {
+      mocks.notes = [value(1n, 9n, secretKeys.ownerCommitment)];
+      if (action === "fund") {
+        const prepared = preparedValueOutputs([9n, 0n], 0n, 2);
+        prepared.data.asOf = 1000n;
+        prepared.data.lineageCheckpointId = 7n;
+        mocks.fund.mockResolvedValue(prepared);
+      }
+    };
+
+    it("rejects a proven credential for the wrong operation before preparing any merge", async () => {
+      const session = await prepare();
+      verifiedCredential(receiveCredential(action === "fund" ? "anonymous" : "fund"));
+      await expect(session.call("preview", request())).rejects.toThrow(/operation|disclosure|receiving code/i);
+      expect(mocks.verify).toHaveBeenCalledOnce();
+      expect(mocks.transfer).not.toHaveBeenCalled();
+      expect(mocks.fund).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
+    });
+
+    it("rejects a credential expiring at the current state time before preparing any merge", async () => {
+      const session = await prepare({ expiresAt: 1000n });
+      await expect(session.call("preview", request())).rejects.toThrow(/expired/i);
+      expect(mocks.transfer).not.toHaveBeenCalled();
+      expect(mocks.fund).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
+    });
+
+    it("rejects a credential revoked at the current counter before preparing any merge", async () => {
+      const session = await prepare();
+      mocks.authorizationCounter = 1n;
+      await expect(session.call("preview", request())).rejects.toThrow(/revoked/i);
+      expect(mocks.transfer).not.toHaveBeenCalled();
+      expect(mocks.fund).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
+    });
+
+    it("stops before preparing a merge when current authorization cannot be read", async () => {
+      const session = await prepare();
+      mocks.authorizationFailure = new Error("Authorization state unavailable");
+      await expect(session.call("preview", request())).rejects.toThrow("Authorization state unavailable");
+      expect(mocks.transfer).not.toHaveBeenCalled();
+      expect(mocks.fund).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
+    });
+
+    it("rejects an invalid authorization witness before preparing any merge", async () => {
+      const session = await prepare();
+      mocks.invalidAuthorizationWitness = true;
+      await expect(session.call("preview", request())).rejects.toThrow(/root|witness/i);
+      expect(mocks.transfer).not.toHaveBeenCalled();
+      expect(mocks.fund).not.toHaveBeenCalled();
+      expect(mocks.proof).not.toHaveBeenCalled();
+    });
+
+    it("refreshes authorization before proving a merge and rejects revocation after preview", async () => {
+      const session = await prepare();
+      const preview = await session.call("preview", request());
+      expect(preview.steps.length).toBeGreaterThan(1);
+      expect(preview.action).toBe("privateTransfer");
+      expect(preview.steps[preview.steps.length - 1]?.action).toBe(action);
+      mocks.authorizationCounter = 1n;
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(/revoked/i);
+      expect(mocks.authorizationMode.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(mocks.proof).not.toHaveBeenCalled();
+      expect(mocks.receipt).not.toHaveBeenCalled();
+    });
+
+    it("refreshes expiry before proving a merge after a successful preview", async () => {
+      const session = await prepare({ expiresAt: 1001n });
+      const preview = await session.call("preview", request());
+      expect(preview.steps.length).toBeGreaterThan(1);
+      mocks.authorizationAsOf = 1001n;
+      mocks.getBlock.mockResolvedValue({ number: 12, hash: blockHash, timestamp: 1001 });
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(/expired/i);
+      expect(mocks.proof).not.toHaveBeenCalled();
+      expect(mocks.receipt).not.toHaveBeenCalled();
+    });
+
+    it("rejects a merge when the recipient is revoked while its money proof is generated", async () => {
+      const session = await prepare();
+      const preview = await session.call("preview", request());
+      const generateProof = mocks.proof.getMockImplementation()!;
+      mocks.proof.mockImplementationOnce(async (...args) => {
+        const result = await generateProof(...args);
+        mocks.authorizationCounter = 1n;
+        return result;
+      });
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(/revoked/i);
+      expect(mocks.proof).toHaveBeenCalledOnce();
+      expect(mocks.authorizationMode.mock.calls.length).toBeGreaterThanOrEqual(3);
+      expect(mocks.receipt).not.toHaveBeenCalled();
+    });
+
+    it("still checks the recipient authorization before proving the final spend", async () => {
+      const session = await prepare();
+      useFinalSpend();
+      const preview = await session.call("preview", request());
+      expect(preview.steps).toHaveLength(1);
+      mocks.authorizationCounter = 1n;
+      await expect(session.call("prove", { context, handle: preview.handle })).rejects.toThrow(/revoked/i);
+      expect(mocks.proof).not.toHaveBeenCalled();
+      expect(mocks.receipt).not.toHaveBeenCalled();
+    });
+
+    it("creates a receive presentation for a valid final spend", async () => {
+      const session = await prepare();
+      useFinalSpend();
+      const preview = await session.call("preview", request());
+      expect(preview.steps).toHaveLength(1);
+      const proof = await session.call("prove", { context, handle: preview.handle });
+      expect(proof.action).toBe(action);
+      expect(mocks.receipt).toHaveBeenCalledOnce();
+      expect(mocks.proof).toHaveBeenCalledOnce();
+      assertNoOpenings(preview);
+    });
+
+    it.each(["rebuild", "chain"] as const)("allows a valid merge and refreshes its destination with the selected %s read mode", async (stateReadMode) => {
+      const session = await prepare();
+      const input = request(stateReadMode);
+      const preview = await session.call("preview", input);
+      expect(preview.steps.length).toBeGreaterThan(1);
+      expect(preview.steps[preview.steps.length - 1]?.action).toBe(action);
+      const proof = await session.call("prove", { context: input.context, handle: preview.handle });
+      expect(proof.action).toBe("privateTransfer");
+      expect(mocks.proof).toHaveBeenCalledOnce();
+      expect(mocks.receipt).not.toHaveBeenCalled();
+      expect(mocks.authorizationMode.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(mocks.authorizationMode.mock.calls.every(([mode]) => mode === stateReadMode)).toBe(true);
+      assertNoOpenings(preview);
+    });
   });
 
   it.each(["unshield", "privateTransfer", "fund"] as const)(

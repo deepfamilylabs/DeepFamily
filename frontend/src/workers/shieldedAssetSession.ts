@@ -14,6 +14,7 @@ import {
   equalHexConstantTime,
   planShieldedValueSpend,
   computeShieldedAuthorizationAlias,
+  verifyShieldedIdentityAuthorizationWitness,
   prepareShieldedIdentityCounterAuthorization,
   decodeShieldedReceiveCredential, computeShieldedReceiveCredentialBinding, computeShieldedReceiveActionHash,
   emptyShieldedReceiveAuthorizations, prepareShieldedReceivePresentation, generateShieldedRandomField,
@@ -114,6 +115,10 @@ type Prepared = {
   witness: ShieldedWitness;
   outputs: readonly { note: { amount?: BigNumberish; remaining?: BigNumberish } }[];
 };
+type ReceiveDestination = {
+  credential: ReturnType<typeof decodeShieldedReceiveCredential>;
+  action: "fund" | "privateTransfer";
+};
 class AssetSessionError extends Error {}
 const ASSET_METHODS = new Set([
   "unlockIdentity",
@@ -182,6 +187,7 @@ export class ShieldedAssetSession {
     prepared: Prepared;
     circuit: ShieldedCircuitName;
     actionId: number;
+    receiveDestination?: ReceiveDestination;
     receive?: { credential: ReturnType<typeof decodeShieldedReceiveCredential>; salt: bigint; slot: number }[];
   } | null = null;
 
@@ -1083,6 +1089,39 @@ export class ShieldedAssetSession {
     } as unknown as VerifiedShieldedRecipient;
   }
 
+  private async validateReceiveDestination(
+    destination: ReceiveDestination,
+    context: ShieldedWorkerContext,
+    env: Awaited<ReturnType<ShieldedAssetSession["context"]>>,
+  ) {
+    const { credential, action } = destination;
+    requireValue(
+      credential.disclosure === (action === "fund" ? "fund" : "anonymous"),
+      "Use the receive material for this operation.",
+    );
+    const authorizationAddress = String(await env.pool.AUTHORIZATION_STATE());
+    const state = await loadShieldedIdentityAuthorizationWitnessForMode(
+      createIdentityAuthorizationContract(authorizationAddress, env.provider),
+      credential.authorizationAlias,
+      context.stateReadMode,
+      { chainId: context.chainId, authorizationStateAddress: authorizationAddress },
+    );
+    requireValue(
+      state.asOf < credential.expiresAt,
+      "Receive credential has expired at the selected state time",
+    );
+    const lookup = verifyShieldedIdentityAuthorizationWitness(
+      state.witness,
+      state.stateRoot,
+      credential.authorizationAlias,
+    );
+    requireValue(
+      lookup.authorizationCounter === credential.authorizationCounter,
+      "Receive credential has been revoked",
+    );
+    return state;
+  }
+
   async preview(request: ShieldedAssetActionRequest): Promise<ShieldedActionPreview> {
     const current = this.sessionGuard();
     this.pending = null;
@@ -1104,12 +1143,21 @@ export class ShieldedAssetSession {
     let recipient: string | undefined;
     let policyHandle: string | undefined;
     let fundArgs: Parameters<typeof prepareShieldedFund>[0] | undefined;
+    let receiveDestination: ReceiveDestination | undefined;
     // Verify the final destination before any preparatory consolidation spend.
     const transferRecipient =
       request.action === "privateTransfer"
         ? await this.recipient(request.recipientCode ?? "")
         : undefined;
-    if (transferRecipient) recipient = transferRecipient.fingerprint;
+    if (transferRecipient) {
+      recipient = transferRecipient.fingerprint;
+      receiveDestination = {
+        credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
+        action: "privateTransfer",
+      };
+      await this.validateReceiveDestination(receiveDestination, ctx, env);
+      current();
+    }
     let withdrawalRecipient: string | undefined;
     if (request.action === "unshield") {
       requireValue(request.publicRecipient, "Choose a public withdrawal destination.");
@@ -1215,6 +1263,14 @@ export class ShieldedAssetSession {
             verified.disclosure === "fund" && verified.personHash?.toLowerCase() === request.publicRecipient.toLowerCase(),
           "The receiving code does not match the selected child and funding entry.",
         );
+      if (verified) {
+        receiveDestination = {
+          credential: decodeShieldedReceiveCredential(request.recipientCode ?? ""),
+          action: "fund",
+        };
+        await this.validateReceiveDestination(receiveDestination, ctx, env);
+        current();
+      }
       if (template && verified && template.note.binding !== "identity") {
         requireValue(
           getBigInt(template.note.heirOwnerCommitment) === verified.ownerCommitment &&
@@ -1417,7 +1473,8 @@ export class ShieldedAssetSession {
     prepared.data.receiveAuthorizations = emptyShieldedReceiveAuthorizations();
     if ((actualAction === "fund" && Number(prepared.data.budgetKind) === 0) ||
       (actualAction === "privateTransfer" && request.action === "privateTransfer" && steps[0]?.inputs.join() === inputs.join() && firstStepIsFinal(steps))) {
-      const credential = decodeShieldedReceiveCredential(request.recipientCode ?? "");
+      requireValue(receiveDestination, "The receiving destination was not verified.");
+      const { credential } = receiveDestination;
       requireValue(credential.disclosure === (actualAction === "fund" ? "fund" : "anonymous"), "Use the receive material for this operation.");
       const salt = generateShieldedRandomField();
       const binding = computeShieldedReceiveCredentialBinding({ credential, salt });
@@ -1452,7 +1509,7 @@ export class ShieldedAssetSession {
       ...(policyHandle ? { policyHandle } : {}),
     };
     current();
-    this.pending = { context: ctx, request, preview, prepared, circuit, actionId, receive };
+    this.pending = { context: ctx, request, preview, prepared, circuit, actionId, receive, receiveDestination };
     return preview;
   }
 
@@ -1520,12 +1577,19 @@ export class ShieldedAssetSession {
         "Family eligibility snapshot expired after preview. Prepare and confirm a fresh proof.",
       );
     }
+    const destinationState = pending.receiveDestination
+      ? await this.validateReceiveDestination(pending.receiveDestination, params.context, env)
+      : undefined;
+    requireValue(
+      this.pending === pending,
+      "The prepared action was replaced or locked while proving. Review a fresh preview.",
+    );
     if (pending.receive?.length) {
-      const authorizationAddress = String(await env.pool.AUTHORIZATION_STATE());
       const payloadHash = computeShieldedReceiveActionHash(pending.prepared.data);
       const authorizations = [...emptyShieldedReceiveAuthorizations()];
       for (const item of pending.receive) {
-        const state = await loadShieldedIdentityAuthorizationWitnessForMode(createIdentityAuthorizationContract(authorizationAddress, env.provider), item.credential.authorizationAlias, params.context.stateReadMode, { chainId: params.context.chainId, authorizationStateAddress: authorizationAddress });
+        requireValue(destinationState, "The receiving destination was not verified.");
+        const state = destinationState;
         const presentation = prepareShieldedReceivePresentation({ ...item, authorizationWitness: state.witness, authorizationStateRoot: state.stateRoot, checkpointId: state.checkpointId, asOf: state.asOf,
           chainId: params.context.chainId, consumer: params.context.poolAddress, action: pending.actionId === SHIELDED_POOL_ACTION.Fund ? 3 : 4,
           messageId: item.slot, payloadHash });
@@ -1563,6 +1627,15 @@ export class ShieldedAssetSession {
         witness: pending.prepared.witness,
         expectedPublicSignals: expected.map(String),
       });
+      requireValue(
+        this.pending === pending,
+        "The prepared action was replaced or locked while proving. Review a fresh preview.",
+      );
+      // A consolidation does not carry the final recipient's on-chain authorization.
+      // Refresh again after the potentially long proof before returning it for payment.
+      if (pending.receiveDestination && !pending.receive?.length) {
+        await this.validateReceiveDestination(pending.receiveDestination, params.context, env);
+      }
       requireValue(
         this.pending === pending,
         "The prepared action was replaced or locked while proving. Review a fresh preview.",
