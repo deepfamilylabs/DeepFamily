@@ -343,6 +343,7 @@ describe("shielded production setup artifacts", function () {
       { ptauPath: external, env: { ZK_PTAU_PATH: "missing.ptau" } },
     ]) {
       const calls = [];
+      const receiveCalls = [];
       const runner = (invocation) => {
         calls.push(invocation);
         selection.env.ZK_PTAU_PATH = "changed-during-verification.ptau";
@@ -369,7 +370,7 @@ describe("shielded production setup artifacts", function () {
           }
         }
       };
-      const result = await verifyShieldedProductionCeremony({
+      const verificationOptions = {
         root: fixture.root,
         ...selection,
         platform: "darwin",
@@ -403,18 +404,70 @@ describe("shielded production setup artifacts", function () {
             ],
           };
         },
-      });
+        receiveArtifactVerifier: async (options) => {
+          receiveCalls.push(options);
+          expect(calls).to.have.length(
+            1 +
+              Object.keys(SHIELDED_SETUP_CIRCUITS).length * 3 +
+              Object.values(SHIELDED_SETUP_CIRCUITS).filter((spec) => spec.verifierPath).length,
+          );
+          return {
+            status: "production",
+            verification: "passed",
+            circuitCount: 3,
+            manifestSha256: sha256File(path.join(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH)),
+          };
+        },
+      };
+      const result = await verifyShieldedProductionCeremony(verificationOptions);
       expect(result).to.include({
         status: "passed",
         circuitCount: Object.keys(SHIELDED_SETUP_CIRCUITS).length,
       });
       expect(result.ptau.path).to.equal(external);
+      expect(receiveCalls).to.deep.equal([
+        {
+          root: fixture.root,
+          requireProduction: true,
+          expectedManifestSha256: sha256File(
+            path.join(fixture.root, SHIELDED_PRODUCTION_MANIFEST_PATH),
+          ),
+          env: selection.env,
+          platform: "darwin",
+        },
+      ]);
+      expect(result.receive).to.include({ verification: "passed", circuitCount: 3 });
       // The receive code exports a verification key but no Solidity verifier.
       expect(calls).to.have.length(
         1 +
           Object.keys(SHIELDED_SETUP_CIRCUITS).length * 3 +
           Object.values(SHIELDED_SETUP_CIRCUITS).filter((spec) => spec.verifierPath).length,
       );
+      if (!selection.ptauPath) {
+        // Synthetic keys omit linking artifacts. The production default must run
+        // independent linking verification after the mathematical ceremony checks.
+        const error = await captureError(() =>
+          verifyShieldedProductionCeremony({
+            ...verificationOptions,
+            ptauPath: external,
+            receiveArtifactVerifier: undefined,
+          }),
+        );
+        expect(error?.message).to.include("Receive link key bundle does not match");
+        const changedManifest = await captureError(() =>
+          verifyShieldedProductionCeremony({
+            ...verificationOptions,
+            ptauPath: external,
+            receiveArtifactVerifier: async () => ({
+              ...result.receive,
+              manifestSha256: "aa".repeat(32),
+            }),
+          }),
+        );
+        expect(changedManifest?.message).to.include(
+          "Receive linking verification does not match the verified shielded ceremony",
+        );
+      }
     }
   });
 

@@ -33,7 +33,7 @@ import {
   preparePrivateProductionCompiler,
 } from "./lib/zkProductionSetup.mjs";
 import { verifyProductionCeremony } from "./zk-ceremony-verify.mjs";
-import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
+import { verifyLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { verifyShieldedProductionCeremony } from "./lib/shieldedProductionSetup.mjs";
 import { runZkCheck } from "./zk-check.mjs";
 import { checkShieldedReleaseEvidence } from "./zk-shielded-release-check.mjs";
@@ -114,10 +114,10 @@ const runReleaseValidation = async (
     protocolManifestInspector = inspectProtocolReleaseManifest,
     zkChecker = runZkCheck,
     shieldedReleaseInspector = checkShieldedReleaseEvidence,
-    receiveArtifactInspector = inspectLinkedReceiveArtifacts,
+    receiveArtifactInspector = verifyLinkedReceiveArtifacts,
     receiveCeremonyVerifier = async (options) => {
-      await verifyShieldedProductionCeremony(options);
-      return inspectLinkedReceiveArtifacts({ ...options, requireProduction: true });
+      const verified = await verifyShieldedProductionCeremony(options);
+      return verified.receive;
     },
   } = {},
   { verifyCeremonies },
@@ -172,9 +172,16 @@ const runReleaseValidation = async (
     throw new Error("Release preflight protocol manifest SHA-256 is invalid");
   }
   // Check this independently before commands can rebuild artifacts or local compilers.
-  const initialReceiveEvidence = await receiveArtifactInspector({ root, requireProduction: true });
+  const initialReceiveEvidence = await receiveArtifactInspector({
+    root,
+    requireProduction: true,
+    env: baseEnvironment,
+    platform,
+  });
   if (
     initialReceiveEvidence?.status !== "production" ||
+    initialReceiveEvidence?.verification !== "passed" ||
+    initialReceiveEvidence?.circuitCount !== 3 ||
     !/^[0-9a-f]{64}$/u.test(initialReceiveEvidence?.manifestSha256 ?? "")
   ) {
     throw new Error("Release preflight requires production receive presentation evidence");
@@ -330,9 +337,17 @@ const runReleaseValidation = async (
     if (finalProtocolEvidence.manifestSha256 !== initialProtocolEvidence.manifestSha256) {
       throw new Error("Protocol release manifest changed while release preflight was running");
     }
-    const finalReceiveEvidence = await receiveArtifactInspector({ root, requireProduction: true });
+    const finalReceiveEvidence = await receiveArtifactInspector({
+      root,
+      requireProduction: true,
+      expectedManifestSha256: initialReceiveEvidence.manifestSha256,
+      env: baseEnvironment,
+      platform,
+    });
     if (
       finalReceiveEvidence?.status !== "production" ||
+      finalReceiveEvidence?.verification !== "passed" ||
+      finalReceiveEvidence?.circuitCount !== 3 ||
       finalReceiveEvidence?.manifestSha256 !== initialReceiveEvidence.manifestSha256
     ) {
       throw new Error("Receive presentation manifest changed while release preflight was running");

@@ -22,7 +22,11 @@ import {
 } from "./zkCircuitSelection.mjs";
 import { assertSnarkjsRuntimeHash } from "./snarkjsToolchain.mjs";
 import { verifyShieldedCeremonyArtifacts } from "./shieldedCeremonyVerification.mjs";
-import { syncLinkedReceiveArtifacts, RECEIVE_LINK_KEYS_PATH } from "./linkedReceiveArtifacts.mjs";
+import {
+  syncLinkedReceiveArtifacts,
+  verifyLinkedReceiveArtifacts,
+  RECEIVE_LINK_KEYS_PATH,
+} from "./linkedReceiveArtifacts.mjs";
 
 export const SHIELDED_PRODUCTION_MANIFEST_PATH = "circuits/shielded-production-manifest.json";
 export const SHIELDED_PHASE2_TRANSCRIPT_PATH = "release-evidence/shielded/phase2-transcript.json";
@@ -571,7 +575,14 @@ export function inspectShieldedProductionArtifacts({
 }
 
 /** Read-only verification uses the same private runtime and input isolation as the core ceremony. */
-export async function verifyShieldedProductionCeremony({ root = process.cwd(), ...options } = {}) {
+export async function verifyShieldedProductionCeremony({
+  root = process.cwd(),
+  receiveArtifactVerifier = verifyLinkedReceiveArtifacts,
+  ...options
+} = {}) {
+  if (typeof receiveArtifactVerifier !== "function") {
+    throw new Error("Receive artifact verifier must be a function");
+  }
   const resolvedRoot = path.resolve(root);
   const inspectionOptions = {
     root: resolvedRoot,
@@ -586,6 +597,21 @@ export async function verifyShieldedProductionCeremony({ root = process.cwd(), .
     ...options,
     ptauPath: inspected.ptauPath,
   });
+  const receive = await receiveArtifactVerifier({
+    root: resolvedRoot,
+    requireProduction: true,
+    expectedManifestSha256: inspected.manifestSha256,
+    env: options.env,
+    platform: options.platform,
+  });
+  if (
+    receive?.status !== "production" ||
+    receive?.verification !== "passed" ||
+    receive?.circuitCount !== 3 ||
+    receive?.manifestSha256 !== inspected.manifestSha256
+  ) {
+    throw new Error("Receive linking verification does not match the verified shielded ceremony");
+  }
   const final = inspectShieldedProductionArtifacts({
     ...inspectionOptions,
     ptauPath: inspected.ptauPath,
@@ -593,5 +619,5 @@ export async function verifyShieldedProductionCeremony({ root = process.cwd(), .
   if (final.manifestSha256 !== inspected.manifestSha256) {
     throw new Error("Shielded production manifest changed during ceremony verification");
   }
-  return verified;
+  return Object.freeze({ ...verified, receive });
 }

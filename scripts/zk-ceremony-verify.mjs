@@ -27,7 +27,7 @@ import {
   verifyShieldedProductionCeremony,
 } from "./lib/shieldedProductionSetup.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
-import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
+import { verifyLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 
 const usage = () => {
   console.log(`Usage:
@@ -317,7 +317,7 @@ export const verifyAllProductionCeremonies = async ({
   ptauPath,
   coreVerifier = verifyProductionCeremony,
   shieldedVerifier = verifyShieldedProductionCeremony,
-  receiveInspector = inspectLinkedReceiveArtifacts,
+  receiveInspector = verifyLinkedReceiveArtifacts,
 } = {}) => {
   // Presentations are Circom relations covered by the same shielded ceremony;
   // independently check the fixed keys embedded by the lightweight linker.
@@ -378,7 +378,7 @@ export const verifyRecordedCeremonies = async ({
   artifactInspector = inspectZkReleaseArtifacts,
   coreVerifier = verifyProductionCeremony,
   shieldedVerifier = verifyShieldedProductionCeremony,
-  receiveInspector = inspectLinkedReceiveArtifacts,
+  receiveInspector = verifyLinkedReceiveArtifacts,
 } = {}) => {
   const evidence = artifactInspector({ root, requireBuiltR1cs: true });
   const hasCoreRecord = evidence.trustedSetupStatus === "production";

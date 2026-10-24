@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   checkShieldedArtifacts,
   checkShieldedDevelopmentArtifacts,
+  main as checkZkArtifacts,
 } from "../scripts/check-zk-artifacts.mjs";
 import { verifyAllProductionCeremonies } from "../scripts/zk-ceremony-verify.mjs";
 import { SHIELDED_CIRCUITS } from "../scripts/lib/zkCircuitSelection.mjs";
@@ -126,6 +127,53 @@ describe("unified ZK command entrypoints", function () {
   afterEach(function () {
     fs.rmSync(fixture.root, { recursive: true, force: true });
     if (fixture.externalRoot) fs.rmSync(fixture.externalRoot, { recursive: true, force: true });
+  });
+
+  it("awaits independent linking verification in the complete artifact check", async function () {
+    const calls = [];
+    const core = { status: "passed" };
+    const shielded = { status: "production", circuitCount: 11 };
+    const receive = { circuitCount: 3, manifestSha256: "ab".repeat(32) };
+    const result = await checkZkArtifacts({
+      coreChecker: () => core,
+      shieldedChecker: () => shielded,
+      receiveVerifier: async (options) => {
+        await Promise.resolve();
+        calls.push(options);
+        return receive;
+      },
+    });
+    expect(calls).to.deep.equal([
+      {
+        root: path.resolve(fileURLToPath(new URL("..", import.meta.url))),
+        requireProduction: true,
+      },
+    ]);
+    expect(result).to.deep.equal({ core, shielded, receive });
+    const failure = new Error("linked verifier differs from zkey-derived source");
+    await assert.rejects(
+      () =>
+        checkZkArtifacts({
+          coreChecker: () => core,
+          shieldedChecker: () => shielded,
+          receiveVerifier: async () => {
+            throw failure;
+          },
+        }),
+      (error) => error === failure,
+    );
+  });
+
+  it("keeps the intermediate issuer artifact check independent of unfinished linking outputs", async function () {
+    const result = await checkZkArtifacts({
+      circomOnly: true,
+      coreChecker: () => ({ status: "passed" }),
+      shieldedChecker: () => ({ status: "development" }),
+      receiveVerifier: () => {
+        throw new Error("Linking artifacts are installed after the intermediate check");
+      },
+    });
+    expect(Object.keys(result)).to.deep.equal(["core", "shielded"]);
   });
 
   it("checks all configured shielded development circuits and their zkey-derived outputs", function () {

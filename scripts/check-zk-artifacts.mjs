@@ -19,7 +19,7 @@ import {
   inspectShieldedProductionArtifacts,
 } from "./lib/shieldedProductionSetup.mjs";
 import { inspectZkReleaseArtifacts } from "./lib/zkArtifactTrust.mjs";
-import { inspectLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
+import { verifyLinkedReceiveArtifacts } from "./lib/linkedReceiveArtifacts.mjs";
 import { renameZkVerifierSource } from "./rename-zk-verifier.mjs";
 import { SHIELDED_CIRCUITS } from "./lib/zkCircuitSelection.mjs";
 
@@ -177,10 +177,7 @@ export function checkShieldedDevelopmentArtifacts({
   platform = process.platform,
 } = {}) {
   const manifestFile = path.join(root, SHIELDED_DEVELOPMENT_MANIFEST);
-  requireFile(
-    manifestFile,
-    "shielded development manifest (run `npm run zk:setup` first)",
-  );
+  requireFile(manifestFile, "shielded development manifest (run `npm run zk:setup` first)");
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
   if (
     manifest.schema !== "deepfamily/shielded-development-keys@1" ||
@@ -310,12 +307,17 @@ export function checkShieldedArtifacts({
   return checkShieldedDevelopmentArtifacts({ root });
 }
 
-export function main({ circomOnly = false } = {}) {
-  const core = checkCoreArtifacts();
-  const shielded = checkShieldedArtifacts();
+export async function main({
+  circomOnly = false,
+  coreChecker = checkCoreArtifacts,
+  shieldedChecker = checkShieldedArtifacts,
+  receiveVerifier = verifyLinkedReceiveArtifacts,
+} = {}) {
+  const core = await coreChecker();
+  const shielded = await shieldedChecker();
   // All relations now use the same Circom artifact workflow.
   if (circomOnly) return { core, shielded };
-  const receive = inspectLinkedReceiveArtifacts({
+  const receive = await receiveVerifier({
     root: projectRoot,
     requireProduction: shielded.status === "production",
   });
@@ -335,7 +337,7 @@ if (isMain) {
       throw new Error(
         "Expected no arguments or --circom-only for the intermediate issuer setup check",
       );
-    main({ circomOnly: args.includes("--circom-only") });
+    await main({ circomOnly: args.includes("--circom-only") });
   } catch (error) {
     console.error(`[check-zk-artifacts] ${error.message}`);
     process.exitCode = 1;

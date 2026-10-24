@@ -30,7 +30,6 @@ import {
 import { inspectPtauFile } from "../scripts/lib/productionPtau.mjs";
 import { inspectSnarkjsRuntime } from "../scripts/lib/snarkjsToolchain.mjs";
 import { createCanonicalTemporaryDirectory } from "./helpers/temporaryDirectory.mjs";
-import { inspectLinkedReceiveArtifacts } from "../scripts/lib/linkedReceiveArtifacts.mjs";
 
 const COMMIT = "12".repeat(20);
 const CHANGED_COMMIT = "34".repeat(20);
@@ -43,7 +42,12 @@ const inspectFixtureProtocolManifest = () => ({ manifestSha256: "cd".repeat(32) 
 const FIXTURE_GIT_EXECUTABLE = path.resolve("test-tools", "git");
 const fixtureReleaseOptions = (options) => ({
   protocolManifestInspector: inspectFixtureProtocolManifest,
-  receiveArtifactInspector: () => ({ status: "production", manifestSha256: "ef".repeat(32) }),
+  receiveArtifactInspector: () => ({
+    status: "production",
+    verification: "passed",
+    circuitCount: 3,
+    manifestSha256: "ef".repeat(32),
+  }),
   receiveCeremonyVerifier: async () => ({
     verification: "passed",
     manifestSha256: "ef".repeat(32),
@@ -374,7 +378,7 @@ describe("production release preflight", function () {
         arch: "x64",
         libc: "glibc",
         runner: fake.runner,
-        receiveArtifactInspector: inspectLinkedReceiveArtifacts,
+        receiveArtifactInspector: undefined,
         compilerInspector: () => {
           compilerInspected = true;
         },
@@ -389,23 +393,34 @@ describe("production release preflight", function () {
     expect(fake.calls.every((call) => path.basename(call.executable) === "git")).to.equal(true);
   });
 
-  it("requires production receipt evidence instead of accepting an inspector's development result", async function () {
+  it("requires independently verified receive evidence covering all production presentations", async function () {
     const fixture = await productionFixture();
     const fake = createFakeRunner();
-    const error = await captureError(() =>
-      runReleasePreflight({
-        root: fixture.root,
-        platform: "linux",
-        arch: "x64",
-        libc: "glibc",
-        runner: fake.runner,
-        receiveArtifactInspector: ({ requireProduction }) => {
-          expect(requireProduction).to.equal(true);
-          return { status: "development", manifestSha256: "ef".repeat(32) };
-        },
-      }),
-    );
-    expect(error?.message).to.include("requires production receive presentation evidence");
+    for (const evidence of [
+      { status: "development", manifestSha256: "ef".repeat(32) },
+      { status: "production", circuitCount: 3, manifestSha256: "ef".repeat(32) },
+      {
+        status: "production",
+        verification: "passed",
+        circuitCount: 2,
+        manifestSha256: "ef".repeat(32),
+      },
+    ]) {
+      const error = await captureError(() =>
+        runReleasePreflight({
+          root: fixture.root,
+          platform: "linux",
+          arch: "x64",
+          libc: "glibc",
+          runner: fake.runner,
+          receiveArtifactInspector: ({ requireProduction }) => {
+            expect(requireProduction).to.equal(true);
+            return evidence;
+          },
+        }),
+      );
+      expect(error?.message).to.include("requires production receive presentation evidence");
+    }
     expect(fake.calls.every((call) => path.basename(call.executable) === "git")).to.equal(true);
   });
 
@@ -426,6 +441,8 @@ describe("production release preflight", function () {
         mpcMetadataReader: metadataReaderFor(fixture),
         receiveArtifactInspector: () => ({
           status: "production",
+          verification: "passed",
+          circuitCount: 3,
           manifestSha256: (++inspections === 1 ? "ef" : "ab").repeat(32),
         }),
       }),
@@ -972,7 +989,12 @@ describe("production release preflight", function () {
         },
         receiveArtifactInspector: () => {
           receiveInspections += 1;
-          return { status: "production", manifestSha256: "ef".repeat(32) };
+          return {
+            status: "production",
+            verification: "passed",
+            circuitCount: 3,
+            manifestSha256: "ef".repeat(32),
+          };
         },
         shieldedReleaseInspector: async ({ root, env, ptauPath }) => {
           evidenceInspections += 1;
@@ -1067,6 +1089,8 @@ describe("production release preflight", function () {
             }),
             receiveArtifactInspector: () => ({
               status: "production",
+              verification: "passed",
+              circuitCount: 3,
               manifestSha256: (++receiveInspections === 2 && changedInput === "receive"
                 ? "ab"
                 : "ef"

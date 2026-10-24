@@ -15,8 +15,13 @@ Receive presentations use ordinary Circom Groth16 proofs linked to their issuer
 proofs through LinkG16. They require no recursive pairing arithmetic, Go prover or
 separate ceremony. The same setup derives `shielded/receive-link-keys.json` and
 the three fixed Solidity verifiers; the shielded manifest's `linkKeys` pins their
-hashes and the shared verifier base. Verification checks these bindings together
-with all thirteen circuit ceremonies. Current checked-in keys remain
+hashes and the shared verifier base. Artifact checks, production ceremony verification and
+release preflight also independently derive the public verification keys and delta G1 points
+from private snapshots of the five issuer/presentation zkeys, validate gamma and delta relations,
+and regenerate the link bundle and all three fixed verifiers for byte-for-byte comparison.
+The input snapshots and originals are rehashed before success, and production checks bind the
+derivation to the same manifest as the verified ceremony. Refreshing a manifest hash cannot
+make an incorrect generated linker artifact pass. Current checked-in keys remain
 `developmentOnly: true` and `productionReady: false`; they are unattested material awaiting the
 explicit final setup and review. Daily builds, downloads, checks and local acceptance reuse the
 pinned artifact set. They stop on stale or missing keys rather than generate replacements.
