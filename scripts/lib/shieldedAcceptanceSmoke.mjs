@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { getAddress, getBytes, hexlify } from "ethers";
 import {
   SECONDS_PER_DAY,
+  SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   buildShieldedPoolPublicInputs,
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
@@ -286,7 +287,7 @@ export async function runShieldedAcceptanceSmoke({
         identitySuiteId: "1",
         independentKeySuiteId: "1",
         independentKeyDerivationVersion: "1",
-        receiveCodeVersion: "2",
+        receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
         spendingSecret: String(keys.ownerSecret),
         nameField: String(material.nameField),
         derivedSecretField: String(material.derivedSecretField),

@@ -7,6 +7,7 @@ import path from "node:path";
 import { expect } from "chai";
 import hre from "hardhat";
 import {
+  SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   buildShieldedIdentityAuthorizationState,
   buildShieldedPoolPublicInputs,
   computeShieldedBudgetNoteCommitment,
@@ -791,7 +792,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
           identitySuiteId: "1",
           independentKeySuiteId: "1",
           independentKeyDerivationVersion: "1",
-          receiveCodeVersion: "2",
+          receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
           spendingSecret: String(restoredKeys[0].ownerSecret),
         });
         const renewed = prepareShieldedReceivePresentation({

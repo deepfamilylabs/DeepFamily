@@ -1,10 +1,11 @@
 # Private letters and receive authorization
 
-The inheritance page uses two version-2 receive credentials. Anonymous credentials
+The inheritance page uses two fresh-v1 receive credentials. Anonymous credentials
 (`dfrecv`) serve private transfers, standalone letters and private Fund attachments.
 Fund credentials (`dffund`) disclose the authenticated heir identity to the payer.
-The product rejects version-1 credentials; the two disclosures have distinct fixed
-issuer verification keys and cannot be converted by removing the identity field.
+Both disclosures use version 1, with distinct fixed issuer verification keys;
+they cannot be converted by removing the identity field. The unpublished protocol
+defines one current format, without historical-format decoding or migration.
 
 An identity's two key modes and disclosures share the alias R and authorization
 counter. First use requires no recipient registration or transaction. Credentials

@@ -270,8 +270,8 @@ export function buildShieldedIdentityAuthorizationState(entries = []) {
 
 export function getShieldedIdentityAuthorizationWitness(state, authorizationAlias) {
   const alias = nonzeroAlias(authorizationAlias);
-  // State snapshots remain mutable for compatibility. Always rebuild from their
-  // checked records instead of trusting caller-supplied or cached private nodes.
+  // Authenticate snapshot records against their declared root instead of
+  // trusting caller-supplied or cached private nodes.
   let node = buildNode([...checkedRecords(state.entries)]);
   const root = node.hash;
   protocolAssert(

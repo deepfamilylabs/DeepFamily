@@ -1260,7 +1260,7 @@ export function decryptShieldedLetter(
 
 /** Issuance transport; use the matching fixed anonymous/Fund verification key. */
 export type ShieldedReceiveCredentialDisclosure = "anonymous" | "fund";
-export const SHIELDED_RECEIVE_CREDENTIAL_VERSION: 2;
+export const SHIELDED_RECEIVE_CREDENTIAL_VERSION: 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN: bigint;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS: Readonly<{
   anonymous: 11;
@@ -1316,7 +1316,7 @@ export function decodeShieldedReceiveCredential(code: string): {
   identitySuiteId: number;
   independentKeySuiteId: number;
   independentKeyDerivationVersion: number;
-  receiveCodeVersion: 2;
+  receiveCodeVersion: 1;
   fingerprint: string;
   publicSignals: bigint[];
   proof: ShieldedReceiveCredentialProof;

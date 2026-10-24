@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from "ethers";
 import {
   SHIELDED_CIPHERTEXT_BYTES,
   SHIELDED_HPKE_MAX_PAYLOAD_BYTES,
@@ -93,6 +94,10 @@ test("wrong identity, AAD, ciphertext mutation and truncation fail closed", asyn
 });
 
 test("AAD is deployment-specific and validates chain/pool identity", () => {
+  assert.deepEqual(buildShieldedHpkeAad(context), getBytes(solidityPacked(
+    ["bytes32", "uint64", "address"],
+    [keccak256(toUtf8Bytes("DeepFamily:ShieldedNoteHPKE:v1")), context.chainId, context.poolAddress],
+  )));
   assert.notDeepEqual(
     buildShieldedHpkeAad(context),
     buildShieldedHpkeAad({ ...context, chainId: 1031n }),

@@ -35,7 +35,7 @@ template ShieldedReceiveCredential() {
     identitySuiteId === suiteId;
     independentKeySuiteId === 1;
     independentKeyDerivationVersion === 1;
-    receiveCodeVersion === 2;
+    receiveCodeVersion === 1;
     keyMode * (1 - keyMode) === 0;
 
     component identity = IdentityCommitmentCore();

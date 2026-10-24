@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { poseidon2, poseidon3 } from "poseidon-lite";
 import { getBytes, keccak256 } from "ethers";
 import {
+  SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   computeShieldedBudgetNoteCommitment,
   decodeShieldedIndependentKey,
   deriveShieldedHeirKeyMaterial,
@@ -110,7 +111,7 @@ export async function prepareReceiveProofFixtures(
       identitySuiteId: "1",
       independentKeySuiteId: "1",
       independentKeyDerivationVersion: "1",
-      receiveCodeVersion: "2",
+      receiveCodeVersion: String(SHIELDED_RECEIVE_CREDENTIAL_VERSION),
       spendingSecret: String(keys.ownerSecret),
     };
     const credentials = {};

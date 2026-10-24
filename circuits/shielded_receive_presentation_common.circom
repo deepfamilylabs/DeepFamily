@@ -199,7 +199,7 @@ template ShieldedReceivePresentation(KIND) {
     credentialPublicSignals[7 + OFFSET] === 1;
     credentialPublicSignals[8 + OFFSET] === 1;
     credentialPublicSignals[9 + OFFSET] === 1;
-    credentialPublicSignals[10 + OFFSET] === 2;
+    credentialPublicSignals[10 + OFFSET] === 1;
     component viewLoBits = Num2Bits(128);
     viewLoBits.in <== viewLo;
     component viewHiBits = Num2Bits(128);

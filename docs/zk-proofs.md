@@ -19,7 +19,7 @@ commitment; `personHash` carries no route-recency marker.
 The current development manifest assigns circuit ID `1` independently to both purposes. The same
 numeric ID may be used under different purposes because the full key is `(purpose,circuitId)`.
 
-The shielded inheritance pool uses a separate set of action circuits. Version-2 receive credentials authenticate identity authorization counters and expiry through private presentation proofs. Fund and private transfers verify the presentation and business proof atomically; private letters use the same authorization state. These proofs do not use the DeepFamily `ProofEnvelope` route. See [private letters and receive authorization](private-letters.md) for the full flow and shared artifact workflow.
+The shielded inheritance pool uses a separate set of action circuits. Version-1 receive credentials authenticate identity authorization counters and expiry through private presentation proofs. Fund and private transfers verify the presentation and business proof atomically; private letters use the same authorization state. These proofs do not use the DeepFamily `ProofEnvelope` route. See [private letters and receive authorization](private-letters.md) for the full flow and shared artifact workflow.
 
 ## Identity and Commitment Architecture
 
@@ -300,7 +300,7 @@ intentionally public NFT data.
 
 ## Shielded inheritance circuits
 
-The pool protocol, money-note payload and money HPKE envelope retain version 1. Receive credentials use version 2 and private letters have their own versioned HPKE envelope. Exact layouts and operation authorization are specified in [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) and [private letters](private-letters.md).
+The pool protocol, note payload, money HPKE envelope, receive credentials and private-letter envelope all use version 1. Each format has its own purpose and cryptographic domain. Exact layouts and operation authorization are specified in [Shielded inheritance contracts](contracts.md#shielded-inheritance-contracts) and [private letters](private-letters.md).
 
 `shielded_anonymous_receive_credential.circom` and `shielded_fund_receive_credential.circom` authenticate the canonical identity and R from the original identity secrets, counter, expiry, owner, viewing-key limbs, mode and suite metadata with 11/12 public signals. Only the Fund disclosure publishes identity to its holder. The fixed issuer keys differ. `shielded_identity_authorization_update.circom` proves an owner-authorized increment in the 64-level dictionary. The three `shielded_*_receive_presentation.circom` circuits check current counter membership/nonmembership and operation context; attachments also prove 32-level Fund-note membership. LinkG16 links the issuer and presentation proofs over the same hidden credential fields and rerandomizes them before submission. No circuit recursively verifies another proof or evaluates pairing arithmetic. Identity preimages, canonical alias derivation and key ownership remain constrained by the issuer.
 

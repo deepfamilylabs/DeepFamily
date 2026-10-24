@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { bech32m } from "@scure/base";
 import {
+  SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
   computeShieldedReceiveCredentialFingerprint,
@@ -37,6 +38,10 @@ test("anonymous transport carries canonical R, counter and expiry without identi
   assert.match(encoded, /^dfrecv1/u);
   assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words).length, 373);
   assert.equal(decoded.disclosure, "anonymous");
+  assert.equal(SHIELDED_RECEIVE_CREDENTIAL_VERSION, 1);
+  assert.equal(decoded.receiveCodeVersion, 1);
+  assert.equal(decoded.publicSignals.at(-1), 1n);
+  assert.equal(bech32m.fromWords(bech32m.decode(encoded, false).words)[0], 1);
   assert.equal("identityCommitment" in decoded, false);
   assert.deepEqual(decoded.publicSignals, buildShieldedReceiveCredentialPublicSignals(base));
   assert.equal(decoded.publicSignals.length, 11);
@@ -88,7 +93,7 @@ test("fingerprint binds every authenticated field and excludes randomized proof 
   }
 });
 
-test("credential parsing rejects old formats, wrong prefixes, noncanonical fields and proof points", () => {
+test("credential parsing accepts only the fresh-v1 format and canonical fields", () => {
   const encoded = encodeShieldedReceiveCredential(base);
   assert.deepEqual(
     decodeShieldedReceiveCredential(encoded.toUpperCase()),
@@ -103,17 +108,20 @@ test("credential parsing rejects old formats, wrong prefixes, noncanonical field
     { expiresAt: 0n },
     { expiresAt: 1n << 64n },
     { keyMode: 2 },
-    { receiveCodeVersion: 1 },
+    { receiveCodeVersion: 0 },
+    { receiveCodeVersion: 2 },
     { viewingKey: new Uint8Array(32) },
     { authorizationAlias: 0n },
   ]) {
     assert.throws(() => encodeShieldedReceiveCredential({ ...base, ...patch }));
   }
   const packet = bech32m.fromWords(bech32m.decode(encoded, false).words);
-  packet[0] = 1;
-  assert.throws(() =>
-    decodeShieldedReceiveCredential(bech32m.encode("dfrecv", bech32m.toWords(packet), false)),
-  );
+  for (const unsupported of [0, 2, 255]) {
+    packet[0] = unsupported;
+    assert.throws(() =>
+      decodeShieldedReceiveCredential(bech32m.encode("dfrecv", bech32m.toWords(packet), false)),
+    );
+  }
   assert.throws(() => decodeShieldedReceiveCredential(encoded.slice(0, -1)));
   assert.throws(() => decodeShieldedReceiveCredential(null));
 });

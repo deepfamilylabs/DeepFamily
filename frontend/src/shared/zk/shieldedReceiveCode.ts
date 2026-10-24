@@ -1,5 +1,6 @@
 import {
   IDENTITY_SUITE_CANDIDATE_1,
+  SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   buildShieldedReceiveCredentialPublicSignals,
   computeShieldedAuthorizationAlias,
   computeShieldedOwnerCommitment,
@@ -113,7 +114,7 @@ export async function createShieldedReceiveCode(input: ShieldedReceiveCodeIdenti
       identitySuiteId: material.identitySuiteId,
       independentKeySuiteId: 1,
       independentKeyDerivationVersion: 1,
-      receiveCodeVersion: 2,
+      receiveCodeVersion: SHIELDED_RECEIVE_CREDENTIAL_VERSION,
       spendingSecret: keys.ownerSecret.toString(),
       nameField: material.nameField.toString(),
       derivedSecretField: material.derivedSecretField.toString(),

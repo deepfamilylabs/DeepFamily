@@ -211,7 +211,7 @@ test("linked receive presentations preserve credential prefixes and complete ope
             [7 + offset, "2"],
             [8 + offset, "2"],
             [9 + offset, "2"],
-            [10 + offset, "1"],
+            [10 + offset, "2"],
           ]) {
             const changed = [...witness.credentialPublicSignals];
             changed[slot] = value;

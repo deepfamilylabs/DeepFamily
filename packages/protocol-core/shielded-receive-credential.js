@@ -7,7 +7,7 @@ import { protocolAssert } from "./errors.js";
 import { splitShieldedViewPublicKey } from "./shielded-hpke.js";
 import { receiveProofFromWords, receiveProofWords } from "./shielded-receive-proof-codec.js";
 
-export const SHIELDED_RECEIVE_CREDENTIAL_VERSION = 2;
+export const SHIELDED_RECEIVE_CREDENTIAL_VERSION = 1;
 export const SHIELDED_AUTHORIZATION_ALIAS_DOMAIN = 202610210001n;
 export const SHIELDED_RECEIVE_CREDENTIAL_PUBLIC_SIGNAL_COUNTS = Object.freeze({
   anonymous: 11,
@@ -65,10 +65,10 @@ export function buildShieldedReceiveCredentialPublicSignals(input) {
     input.identitySuiteId ?? 1,
     input.independentKeySuiteId ?? 1,
     input.independentKeyDerivationVersion ?? 1,
-    input.receiveCodeVersion ?? 2,
+    input.receiveCodeVersion ?? SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   ].map((value, index) => bigintFrom(value, `credentialMetadata[${index}]`, 255n));
   invalid(
-    metadata.every((value, index) => value === (index === 3 ? 2n : 1n)),
+    metadata.every((value, index) => value === (index === 3 ? BigInt(SHIELDED_RECEIVE_CREDENTIAL_VERSION) : 1n)),
     "Unsupported credential suite",
   );
   const identity =
@@ -84,7 +84,7 @@ export function computeShieldedReceiveCredentialFingerprint(input) {
   const disclosure = disclosureOf(input.disclosure);
   return sha256(
     concat([
-      toUtf8Bytes(`DeepFamily:ReceiveCredential:${disclosure}:v2`),
+      toUtf8Bytes(`DeepFamily:ReceiveCredential:${disclosure}:v${SHIELDED_RECEIVE_CREDENTIAL_VERSION}`),
       ...buildShieldedReceiveCredentialPublicSignals(input).map((value) => fixed(value, 32)),
     ]),
   );
@@ -97,7 +97,7 @@ export function encodeShieldedReceiveCredential(input) {
   const offset = disclosure === "fund" ? 1 : 0;
   const payload = getBytes(
     concat([
-      Uint8Array.of(2, Number(signals[6 + offset]), 1, 1, 1),
+      Uint8Array.of(SHIELDED_RECEIVE_CREDENTIAL_VERSION, Number(signals[6 + offset]), 1, 1, 1),
       fixed(signals[0], 32),
       fixed(signals[1], 8),
       fixed(signals[2], 8),
@@ -117,7 +117,7 @@ export function decodeShieldedReceiveCredential(code) {
     const decoded = bech32m.decode(code.replace(/\s+/gu, ""), false);
     disclosure = Object.keys(PREFIX).find((key) => PREFIX[key] === decoded.prefix);
     bytes = bech32m.fromWords(decoded.words);
-    if (!disclosure || bytes[0] !== 2 || bytes.length !== (disclosure === "fund" ? 405 : 373))
+    if (!disclosure || bytes[0] !== SHIELDED_RECEIVE_CREDENTIAL_VERSION || bytes.length !== (disclosure === "fund" ? 405 : 373))
       throw new Error();
   } catch {
     protocolAssert(
@@ -144,7 +144,7 @@ export function decodeShieldedReceiveCredential(code) {
     identitySuiteId: bytes[2],
     independentKeySuiteId: bytes[3],
     independentKeyDerivationVersion: bytes[4],
-    receiveCodeVersion: 2,
+    receiveCodeVersion: SHIELDED_RECEIVE_CREDENTIAL_VERSION,
   };
   offset += 32;
   const proof = receiveProofFromWords(Array.from({ length: 8 }, () => read(32)));
