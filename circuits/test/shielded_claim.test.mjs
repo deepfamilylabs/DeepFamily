@@ -13,7 +13,6 @@ import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedBudgetOwnerAuthorization,
   computeShieldedClaimBatch,
-  computeShieldedDummyInputNullifier,
   computeShieldedDummyPeriodNullifier,
   computeShieldedEnrollmentCommitment,
   computeShieldedIdentityBudgetTermsCommitment,
@@ -26,7 +25,6 @@ import { assertConstraintViolation } from "./constraint_assertions.mjs";
 import {
   CLAIM_PRIVATE_BUDGET_PURPOSE,
   FUND_PRIVATE_BUDGET_PURPOSE,
-  shieldedFixtureViewingKey,
 } from "./shielded_budget_fixture.mjs";
 
 import { shieldedFixtureScope, shieldedFixtureTag } from "./shielded_scope_fixture.mjs";
@@ -63,8 +61,7 @@ function withPrivateClaimOutput(fixture, witness, purpose = CLAIM_PRIVATE_BUDGET
         BigInt(changed.heirViewKeyHi),
       ]),
       BigInt(changed.rate),
-      BigInt(changed.remaining) +
-        BigInt(changed.secondRemaining) -
+      BigInt(changed.remaining) -
         BigInt(changed.claimCount) * BigInt(changed.rate),
       BigInt(changed.newBudgetNonce),
       BigInt(changed.ciphertextHashes[0]),
@@ -114,98 +111,48 @@ test("shielded claim constraints", async (t) => {
       async () => {
         for (const keyMode of [0, 1]) {
           for (const budgetOrigin of ["fund", "claim"]) {
-            for (const secondBudgetOrigin of ["fund", "claim"]) {
-              const fixture = buildShieldedClaimFixture({
-                keyMode,
-                budgetOrigin,
-                secondBudgetOrigin,
-                secondRemainingPeriods: 2,
-              });
-              await valid(fixture.witness);
-              for (const slot of [0, 1]) {
-                await invalid(
-                  mutate(fixture.witness, (w) => {
-                    w.inputBudgetIsClaim[slot] = w.inputBudgetIsClaim[slot] === "1" ? "0" : "1";
-                  }),
-                );
-                await invalid(
-                  mutate(fixture.witness, (w) => {
-                    w.inputBudgetIsClaim[slot] = "2";
-                  }),
-                );
-              }
-              await invalid(
-                withPrivateClaimOutput(fixture, fixture.witness, FUND_PRIVATE_BUDGET_PURPOSE),
-              );
-            }
             const fixture = buildShieldedClaimFixture({ keyMode, budgetOrigin });
             await valid(fixture.witness);
+            for (const flag of [fixture.witness.inputBudgetIsClaim[0] === "1" ? "0" : "1", "2"]) {
+              await invalid({ ...fixture.witness, inputBudgetIsClaim: [flag] });
+            }
+            await invalid(withPrivateClaimOutput(fixture, fixture.witness, FUND_PRIVATE_BUDGET_PURPOSE));
             for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
-              await invalid(
-                withPrivateClaimOutput(fixture, {
-                  ...fixture.witness,
-                  [limb]: String(BigInt(fixture.witness[limb]) ^ 1n),
-                }),
-              );
+              await invalid(withPrivateClaimOutput(fixture, {
+                ...fixture.witness,
+                [limb]: String(BigInt(fixture.witness[limb]) ^ 1n),
+              }));
             }
           }
-          const differentView = shieldedFixtureViewingKey(keyMode);
-          differentView[0] ^= 1;
-          await invalid(
-            buildShieldedClaimFixture({
-              keyMode,
-              secondRemainingPeriods: 2,
-              secondViewingKey: differentView,
-            }).witness,
-          );
         }
-        const absent = buildShieldedClaimFixture().witness;
-        await invalid({ ...absent, inputBudgetIsClaim: ["0", "1"] });
-        const identity = buildShieldedClaimFixture({
-          budgetKind: 1,
-          secondRemainingPeriods: 2,
-        }).witness;
-        for (const slot of [0, 1]) {
-          await invalid(
-            mutate(identity, (w) => {
-              w.inputBudgetIsClaim[slot] = "1";
-            }),
-          );
-        }
+        const identity = buildShieldedClaimFixture({ budgetKind: 1 }).witness;
+        await invalid({ ...identity, inputBudgetIsClaim: ["1"] });
         for (const limb of ["heirViewKeyLo", "heirViewKeyHi"]) {
           await invalid({ ...identity, [limb]: "1" });
         }
       },
     );
 
-    await t.test("same-binding claims enforce chain and pool domains", async () => {
+    await t.test("claims enforce chain and pool domains", async () => {
       for (const budgetKind of [0, 1]) {
-        for (const secondRemainingPeriods of [0, 2]) {
-          const options = { budgetKind, secondBudgetKind: budgetKind, secondRemainingPeriods };
-          const base = buildShieldedClaimFixture(options);
-          for (const context of [
-            { chainId: 71n },
-            { poolAddress: "0x2222222222222222222222222222222222222222" },
-          ]) {
-            const changed = buildShieldedClaimFixture({ ...options, ...context });
-            await valid(changed.witness);
-            assert.notEqual(changed.policy, base.policy);
-            assert.notEqual(changed.enrollment, base.enrollment);
-            assert.notEqual(changed.inputBudget, base.inputBudget);
-            assert.notDeepEqual(changed.witness.inputNullifiers, base.witness.inputNullifiers);
-            assert.notDeepEqual(changed.witness.periodNullifiers, base.witness.periodNullifiers);
-            assert.equal(changed.ownerSecret, base.ownerSecret);
-            assert.equal(changed.ownerCommitment, base.ownerCommitment);
-            assert.equal(changed.heirIdentityCommitment, base.heirIdentityCommitment);
-            assert.equal(changed.witness.endorsementRoot, base.witness.endorsementRoot);
-            assert.equal(changed.witness.trustedRoot, base.witness.trustedRoot);
-            await invalid(
-              mutate(base.witness, (w) => {
-                w.chainId = changed.witness.chainId;
-                w.pool = changed.witness.pool;
-              }),
-            );
-          }
+        const base = buildShieldedClaimFixture({ budgetKind });
+        for (const context of [
+          { chainId: 71n },
+          { poolAddress: "0x2222222222222222222222222222222222222222" },
+        ]) {
+          const changed = buildShieldedClaimFixture({ budgetKind, ...context });
+          await valid(changed.witness);
+          assert.notEqual(changed.policy, base.policy);
+          assert.notEqual(changed.enrollment, base.enrollment);
+          assert.notEqual(changed.inputBudget, base.inputBudget);
+          assert.notDeepEqual(changed.witness.inputNullifiers, base.witness.inputNullifiers);
+          assert.notDeepEqual(changed.witness.periodNullifiers, base.witness.periodNullifiers);
+          assert.equal(changed.ownerSecret, base.ownerSecret);
+          assert.equal(changed.ownerCommitment, base.ownerCommitment);
+          assert.equal(changed.heirIdentityCommitment, base.heirIdentityCommitment);
+          assert.equal(changed.witness.endorsementRoot, base.witness.endorsementRoot);
+          assert.equal(changed.witness.trustedRoot, base.witness.trustedRoot);
+          await invalid({ ...base.witness, chainId: changed.witness.chainId, pool: changed.witness.pool });
         }
       }
     });
@@ -250,24 +197,6 @@ test("shielded claim constraints", async (t) => {
       }
     });
     await t.test(
-      "different cycles cannot be combined in either private or public input pair",
-      async () => {
-        for (const budgetKind of [0, 1]) {
-          for (const secondBudgetKind of [0, 1]) {
-            await invalid(
-              buildShieldedClaimFixture({
-                budgetKind,
-                secondBudgetKind,
-                periodDays: 30n,
-                secondPeriodDays: 7n,
-                secondRemainingPeriods: 2,
-              }).witness,
-            );
-          }
-        }
-      },
-    );
-    await t.test(
       "the maximum uint64 index and uint32 cycle cannot wrap maturity into the past",
       async () => {
         const periodDays = (1n << 32n) - 1n;
@@ -294,33 +223,18 @@ test("shielded claim constraints", async (t) => {
       },
     );
 
-    await t.test("claims reject mixed binding inputs", async () => {
-      for (const budgetKind of [0, 1]) {
-        await valid(buildShieldedClaimFixture({ budgetKind }).witness);
-        for (const secondBudgetKind of [0, 1]) {
-          await (budgetKind === secondBudgetKind ? valid : invalid)(
-            buildShieldedClaimFixture({ budgetKind, secondBudgetKind, secondRemainingPeriods: 2 })
-              .witness,
-          );
-        }
-      }
-    });
     await t.test(
       "independent authorization requires its owner and preserves identity period history",
       async () => {
-        const independent = buildShieldedClaimFixture({ keyMode: 1, secondRemainingPeriods: 2 });
+        const independent = buildShieldedClaimFixture({ keyMode: 1 });
         await valid(independent.witness);
-        const legacy = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
+        const legacy = buildShieldedClaimFixture();
         assert.deepEqual(
           independent.witness.periodNullifiers.slice(0, 2),
           legacy.witness.periodNullifiers.slice(0, 2),
         );
         await invalid({ ...independent.witness, ownerSecret: legacy.ownerSecret.toString() });
         await invalid({ ...independent.witness, keyMode: "0" });
-        await invalid(
-          buildShieldedClaimFixture({ keyMode: 1, secondKeyMode: 0, secondRemainingPeriods: 2 })
-            .witness,
-        );
         await invalid(buildShieldedClaimFixture({ budgetKind: 1, keyMode: 1 }).witness);
       },
     );
@@ -364,11 +278,6 @@ test("shielded claim constraints", async (t) => {
             w.budgetKind = "0";
           }),
         );
-        await invalid(
-          mutate(witness, (w) => {
-            w.secondBudgetKind = "1";
-          }),
-        );
         for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
           await invalid(
             mutate(witness, (w) => {
@@ -389,12 +298,9 @@ test("shielded claim constraints", async (t) => {
           const fixture = buildShieldedClaimFixture({
             budgetKind,
             keyMode,
-            secondBudgetKind: budgetKind,
-            secondKeyMode: keyMode,
-            secondRemainingPeriods: 2,
           });
           const { witness } = fixture;
-          // Every attack starts from a compatible pair that satisfies the circuit.
+          // Every attack starts from a valid single budget note.
           await valid(witness);
           if (budgetKind === 0) {
             for (const field of ["policySalt", "allocationKeyCommitment", "enrollmentSalt"]) {
@@ -433,7 +339,7 @@ test("shielded claim constraints", async (t) => {
                       scope,
                     );
               // Recompute a valid opposite-kind output, so rejection tests the
-              // output binding rather than a stale hash or an invalid input pair.
+              // output binding rather than a stale hash or an invalid input note.
               w.outputCommitments[0] = poseidon8([
                 shieldedFixtureTag(
                   budgetKind === 0 ? 1030n : CLAIM_PRIVATE_BUDGET_PURPOSE,
@@ -444,8 +350,7 @@ test("shielded claim constraints", async (t) => {
                 fixture.enrollment,
                 binding,
                 BigInt(w.rate),
-                BigInt(w.remaining) +
-                  BigInt(w.secondRemaining) -
+                BigInt(w.remaining) -
                   BigInt(w.claimCount) * BigInt(w.rate),
                 BigInt(w.newBudgetNonce),
                 BigInt(w.ciphertextHashes[0]),
@@ -504,16 +409,6 @@ test("shielded claim constraints", async (t) => {
           shieldedFixtureScope(witness),
         ),
         inputBudget,
-      );
-      assert.equal(
-        computeShieldedDummyInputNullifier(
-          {
-            ownerSecret: keys.ownerSecret,
-            noteCommitment: inputBudget,
-          },
-          shieldedFixtureScope(witness),
-        ).toString(),
-        witness.inputNullifiers[1],
       );
       assert.equal(
         computeShieldedPeriodNullifier(
@@ -586,118 +481,24 @@ test("shielded claim constraints", async (t) => {
     await t.test("three full periods", async () => {
       await valid(buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 3 }).witness);
     });
-    await t.test(
-      "two budgets jointly fund a claim exceeding either individual balance",
-      async () => {
-        await valid(
-          buildShieldedClaimFixture({
-            claimCount: 3,
-            remainingPeriods: 2,
-            secondRemainingPeriods: 2,
-          }).witness,
-        );
-      },
-    );
-    await t.test(
-      "second budget must be distinct, spendable, and share the enrollment",
-      async () => {
-        const fixture = buildShieldedClaimFixture({ secondRemainingPeriods: 2 });
-        await invalid(
-          mutate(fixture.witness, (w) => {
-            w.inputRoots[1] = "123";
-          }),
-        );
-        await invalid(
-          mutate(fixture.witness, (w) => {
-            w.inputNullifiers[1] = "123";
-          }),
-        );
-        await invalid(
-          mutate(fixture.witness, (w) => {
-            w.secondBudgetNonce = "0";
-          }),
-        );
-        await invalid(
-          mutate(fixture.witness, (w) => {
-            w.secondRemaining = w.remaining;
-            w.secondRemainingPeriods = w.remainingPeriods;
-            w.secondBudgetNonce = w.budgetNonce;
-            w.secondBudgetCiphertextHash = w.budgetCiphertextHash;
-            w.inputRoots[1] = w.inputRoots[0];
-            w.inputNullifiers[1] = w.inputNullifiers[0];
-            // Balance the attempted double spend so only note distinctness
-            // rejects it, rather than an unrelated output-value mismatch.
-            w.outputCommitments[0] = computeShieldedBudgetNoteCommitment(
-              {
-                policyCommitment: fixture.policy,
-                enrollmentCommitment: fixture.enrollment,
-                heirOwnerCommitment: fixture.ownerCommitment,
-                viewingKey: fixture.viewingKey,
-                budgetOrigin: "claim",
-                amountPerPeriod: w.rate,
-                remaining: 2n * BigInt(w.remaining) - BigInt(w.claimCount) * BigInt(w.rate),
-                nonce: w.newBudgetNonce,
-                ciphertextHashField: w.ciphertextHashes[0],
-              },
-              shieldedFixtureScope(w),
-            ).toString();
-          }),
-        );
-        const wrongEnrollmentBudget = computeShieldedBudgetNoteCommitment(
-          {
-            policyCommitment: fixture.policy,
-            enrollmentCommitment: fixture.enrollment + 1n,
-            heirOwnerCommitment: fixture.ownerCommitment,
-            viewingKey: fixture.viewingKey,
-            budgetOrigin: fixture.budgetOrigin,
-            amountPerPeriod: fixture.witness.rate,
-            remaining: fixture.witness.secondRemaining,
-            nonce: fixture.witness.secondBudgetNonce,
-            ciphertextHashField: fixture.witness.secondBudgetCiphertextHash,
-          },
-          shieldedFixtureScope(fixture.witness),
-        );
-        await invalid(
-          mutate(fixture.witness, (w) => {
-            w.inputRoots[1] = String(wrongEnrollmentBudget);
-          }),
-        );
-      },
-    );
-    await t.test(
-      "absent second input has canonical zero witnesses and repeated public root",
-      async () => {
-        const witness = buildShieldedClaimFixture().witness;
-        await invalid(
-          mutate(witness, (w) => {
-            w.hasSecondInput = "2";
-          }),
-        );
-        await invalid(
-          mutate(witness, (w) => {
-            w.secondRemaining = "100";
-            w.secondRemainingPeriods = "1";
-          }),
-        );
-        await invalid(
-          mutate(witness, (w) => {
-            w.secondNoteSiblings[0] = "1";
-          }),
-        );
-        await invalid(
-          mutate(witness, (w) => {
-            w.inputRoots[1] = "123";
-          }),
-        );
-      },
-    );
-    await t.test("combined period count cannot overflow uint64", async () => {
-      await invalid(
-        buildShieldedClaimFixture({
-          remainingPeriods: 1n << 63n,
-          secondRemainingPeriods: 1n << 63n,
-        }).witness,
-      );
+    await t.test("a second budget cannot fund a claim exceeding the selected note", async () => {
+      const fixture = buildShieldedClaimFixture({ claimCount: 2, remainingPeriods: 2 });
+      const witness = fixture.witness;
+      await valid(witness);
+      // Rebalance the outputs as if another 100-unit budget had been added.
+      // Membership still opens only the selected 200-unit note.
+      const inflated = withPrivateClaimOutput(fixture, { ...witness, remaining: "300" });
+      await invalid(inflated);
+      await assert.rejects(() => calculator.calculateWitness({
+        ...witness,
+        inputShardIds: ["0", "0"],
+        inputRoots: [witness.inputRoots[0], witness.inputRoots[0]],
+        inputNullifiers: [witness.inputNullifiers[0], witness.inputNullifiers[0]],
+      }, 1));
+    });
+
+    await t.test("budget period count cannot overflow uint64", async () => {
+      await invalid(buildShieldedClaimFixture({ remainingPeriods: 1n << 64n }).witness);
     });
     await t.test("exact 32-level note path", async () => {
       const { witness, inputBudget } = buildShieldedClaimFixture();
@@ -709,25 +510,8 @@ test("shielded claim constraints", async (t) => {
       }
       witness.noteDepth = "32";
       witness.noteIndex = (1n << 31n).toString();
-      witness.inputRoots = [root.toString(), root.toString()];
+      witness.inputRoots = [root.toString()];
       await valid(witness);
-    });
-    await t.test("compatible claim binds the second full-depth budget path", async () => {
-      const { witness } = buildShieldedClaimFixture({
-        secondRemainingPeriods: 2,
-        secondBudgetKind: 0,
-      });
-      const proof = fullSyntheticPath(BigInt(witness.inputRoots[1]), 32, (1n << 31n) | 5n, 1800);
-      witness.secondNoteDepth = proof.depth;
-      witness.secondNoteIndex = proof.index;
-      witness.secondNoteSiblings = proof.siblings;
-      witness.inputRoots[1] = proof.root.toString();
-      await valid(witness);
-      await invalid(
-        mutate(witness, (w) => {
-          w.secondNoteSiblings[31] = String(BigInt(w.secondNoteSiblings[31]) + 1n);
-        }),
-      );
     });
     await t.test("full 64-level endorsement and trusted paths verify the child", async () => {
       const { witness, heirIdentityCommitment } = buildShieldedClaimFixture();

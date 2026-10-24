@@ -47,7 +47,7 @@ describe("shielded proof public inputs", () => {
       ["identityAuthorizationUpdate", 6],
       ["shield", 7],
       ["fund", 29],
-      ["claim", 18],
+      ["claim", 15],
       ["privateTransfer", 20],
       ["unshield", 20],
     ] as const) {

@@ -71,6 +71,16 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     ...overrides,
   });
 
+  const claimActionData = (overrides = {}) => {
+    const data = actionData(overrides);
+    return {
+      ...data,
+      inputShardIds: data.inputShardIds.slice(0, 1),
+      inputRoots: data.inputRoots.slice(0, 1),
+      inputNullifiers: data.inputNullifiers.slice(0, 1),
+    };
+  };
+
   const valueActionData = (overrides = {}) => {
     const data = actionData(overrides);
     const pad = (values, filler) =>
@@ -392,10 +402,9 @@ describe("ShieldedErc20Pool contract boundaries", function () {
       pool,
       "InvalidActionData",
     );
-    await expect(pool.unshield(recipient.address, 1n, oversized, proof)).to.be.revertedWithCustomError(
-      pool,
-      "InvalidActionData",
-    );
+    await expect(
+      pool.unshield(recipient.address, 1n, oversized, proof),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     const duplicate = { ...transfer, inputNullifiers: [...transfer.inputNullifiers] };
     duplicate.inputNullifiers[3] = duplicate.inputNullifiers[2];
     await expect(pool.privateTransfer(duplicate, proof)).to.be.revertedWithCustomError(
@@ -542,7 +551,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     await lineage.setRoot(1, 800n);
     const root = (await pool.noteShard(0)).root;
     const asOf = BigInt((await hre.ethers.provider.getBlock("latest")).timestamp);
-    const claim = actionData({
+    const claim = claimActionData({
       inputRoots: [root, root],
       inputNullifiers: [401n, 402n],
       periodNullifiers: Array.from({ length: 3 }, (_, i) => 500n + BigInt(i)),
@@ -566,7 +575,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.nullifierSpent(500n)).to.equal(true);
     expect(await pool.nullifierSpent(502n)).to.equal(true);
 
-    const nextClaim = actionData({
+    const nextClaim = claimActionData({
       inputRoots: [root, root],
       inputNullifiers: [403n, 404n],
       periodNullifiers: Array.from({ length: 3 }, (_, i) => 600n + BigInt(i)),
@@ -803,7 +812,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     expect(await pool.nullifierSpent(802n)).to.equal(true);
   });
 
-  it("binds both claim roots while accepting budgets from different known roots", async () => {
+  it("binds one claim root and rejects a second budget input", async () => {
     const { pool, lineage } = await setup();
     const firstDeposit = actionData();
     await pool.shield(100n, firstDeposit, await proofFor(pool, 0, firstDeposit, 100n));
@@ -816,7 +825,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     const secondRoot = (await pool.noteShard(0)).root;
     await lineage.setRoot(0, 700n);
     await lineage.setRoot(1, 800n);
-    const claim = actionData({
+    const claim = claimActionData({
       inputRoots: [firstRoot, secondRoot],
       inputNullifiers: [901n, 902n],
       periodNullifiers: Array.from({ length: 3 }, (_, index) => 1001n + BigInt(index)),
@@ -828,11 +837,22 @@ describe("ShieldedErc20Pool contract boundaries", function () {
     });
     const proof = await proofFor(pool, 2, claim);
     await expect(
-      pool.claim({ ...claim, inputRoots: [firstRoot, firstRoot] }, proof),
+      pool.claim({ ...claim, inputRoots: [secondRoot] }, proof),
     ).to.be.revertedWithCustomError(pool, "InvalidZKProof");
+    await expect(
+      pool.claim(
+        {
+          ...claim,
+          inputShardIds: [0n, 0n],
+          inputRoots: [firstRoot, secondRoot],
+          inputNullifiers: [901n, 902n],
+        },
+        proof,
+      ),
+    ).to.be.revertedWithCustomError(pool, "InvalidActionData");
     await pool.claim(claim, proof);
     expect(await pool.nullifierSpent(901n)).to.equal(true);
-    expect(await pool.nullifierSpent(902n)).to.equal(true);
+    expect(await pool.nullifierSpent(902n)).to.equal(false);
     expect(await pool.totalShielded()).to.equal(200n);
   });
 
@@ -890,7 +910,7 @@ describe("ShieldedErc20Pool contract boundaries", function () {
         lineageCheckpointId: await lineage.currentCheckpointId(),
       });
       const fundReceipt = await (await pool.fund(funding, await proofFor(pool, 1, funding))).wait();
-      const claim = actionData({
+      const claim = claimActionData({
         inputRoots: Array(2).fill((await pool.noteShard(0)).root),
         inputNullifiers: [301n, 302n],
         periodNullifiers: Array.from({ length: 3 }, (_, index) => 401n + BigInt(index)),

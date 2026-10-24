@@ -417,16 +417,25 @@ test("public fund signal fields come from the canonical output while claim expos
     (error) => error.code === "INVALID_SHIELDED_PUBLIC_BUDGET",
   );
   assert.throws(
-    () => buildShieldedPoolPublicInputs({ ...base, action: SHIELDED_POOL_ACTION.Claim }),
+    () => buildShieldedPoolPublicInputs({
+      ...base,
+      action: SHIELDED_POOL_ACTION.Claim,
+      inputShardIds: [2],
+      inputRoots: [11],
+      inputNullifiers: [13],
+    }),
     (error) => error.code === "INVALID_SHIELDED_ACTION_DATA",
   );
   const claim = buildShieldedPoolPublicInputs({
     ...base,
     action: SHIELDED_POOL_ACTION.Claim,
+    inputShardIds: [2],
+    inputRoots: [11],
+    inputNullifiers: [13],
     budgetKind: 0,
     outputCiphertexts: [privateEnvelope, privateEnvelope],
   });
-  assert.equal(claim.signals.length, 18);
+  assert.equal(claim.signals.length, 15);
   assert.equal("budgetKind" in claim.witness, false);
   assert.equal("publicBudget" in claim.witness, false);
 });

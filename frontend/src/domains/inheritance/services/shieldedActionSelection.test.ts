@@ -145,7 +145,7 @@ describe("automatic shielded claim selection", () => {
     expect(wallet.spentNullifiers).toEqual(original);
   });
 
-  it("selects two compatible budgets when they can pay more due periods", () => {
+  it("selects one budget without combining balances from compatible notes", () => {
     const first = budget(1n, { remaining: 100n });
     const second = budget(2n, { remaining: 200n });
     const selected = selectClaimBudget(
@@ -154,25 +154,8 @@ describe("automatic shielded claim selection", () => {
       secret,
       eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
     );
-    expect(selected?.budget).toBe(first);
-    expect(selected?.secondBudget).toBe(second);
-    expect(selected?.periodIndices).toEqual([0n, 1n, 2n]);
-    expect(
-      selectClaimBudget(
-        [first, second],
-        { ...scope, spentNullifiers: new Set() },
-        secret,
-        eligibleFrom + DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY,
-      )?.secondBudget,
-    ).toBeUndefined();
-    expect(
-      selectClaimBudget(
-        [first, budget(2n, { remaining: 200n, enrollmentSalt: 999n })],
-        { ...scope, spentNullifiers: new Set() },
-        secret,
-        eligibleFrom + 4n * (DEFAULT_SHIELDED_PERIOD_DAYS * SECONDS_PER_DAY),
-      )?.secondBudget,
-    ).toBeUndefined();
+    expect(selected).toEqual({ budget: first, periodIndices: [0n] });
+    expect(selected).not.toHaveProperty("secondBudget");
   });
 
   it("limits one automatic claim to the circuit's three period slots", () => {

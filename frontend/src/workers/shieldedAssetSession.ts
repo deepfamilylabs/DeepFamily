@@ -1026,12 +1026,7 @@ export class ShieldedAssetSession {
         summary.claims.push({
           handle: `${slot}:${option.key}`,
           slot,
-          budgets: claim
-            ? [
-                String(claim.budget.commitment),
-                ...(claim.secondBudget ? [String(claim.secondBudget.commitment)] : []),
-              ]
-            : [],
+          budgets: claim ? [String(claim.budget.commitment)] : [],
           periodIndices: claim?.periodIndices.map(String) ?? [],
           amount: String(claim?.amount ?? 0n),
           amountPerPeriod: String(option.notes[0].note.amountPerPeriod),
@@ -1327,7 +1322,7 @@ export class ShieldedAssetSession {
         (candidate) => candidate.handle === request.claimHandle && candidate.slot === request.slot,
       );
       requireValue(
-        claim && claim.budgets.length && claim.periodIndices.length,
+        claim && claim.budgets.length === 1 && claim.periodIndices.length,
         "The selected claim is no longer available. Review fresh history first.",
       );
       const indices = request.periodIndices ?? claim.periodIndices;
@@ -1361,7 +1356,6 @@ export class ShieldedAssetSession {
         wallet,
         lineage,
         budgetCommitment: claim.budgets[0],
-        ...(claim.budgets[1] ? { secondBudgetCommitment: claim.budgets[1] } : {}),
         asOf: lineage.timestamp,
         periodIndices: indices,
       });

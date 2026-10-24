@@ -24,7 +24,6 @@ import {
   computeShieldedIdentityBudgetNoteCommitment,
   computeShieldedIdentityBudgetTermsCommitment,
   computeShieldedCiphertextHashField,
-  computeShieldedDummyInputNullifier,
   computeShieldedDummyInputNullifierForSlot,
   computeShieldedEnrollmentCommitment,
   computeShieldedEnrollmentNullifier,
@@ -433,14 +432,6 @@ export async function runShieldedAcceptanceSmoke({
   });
   const spend = (note) =>
     computeShieldedSpendNullifier(
-      {
-        ownerSecret: note.keys.ownerSecret,
-        noteCommitment: note.commitment,
-      },
-      scope,
-    );
-  const dummySpend = (note) =>
-    computeShieldedDummyInputNullifier(
       {
         ownerSecret: note.keys.ownerSecret,
         noteCommitment: note.commitment,
@@ -1022,13 +1013,12 @@ export async function runShieldedAcceptanceSmoke({
     );
 
     const claimAsOf = eligibleFrom + 3n * PERIOD;
-    const remainingBudget = await budgetNote(1200n, "claim");
+    const remainingBudget = await budgetNote(900n, "claim");
     const payout = await valueNote(childKeys, 300n);
-    const claimPaths = await Promise.all([notePath(budget), notePath(additionalFundingBudget)]);
-    const [budgetClaimPath, secondClaimPath] = claimPaths;
+    const budgetClaimPath = await notePath(budget);
     const claimData = {
       ...zeroData(),
-      ...inputs(claimPaths, [spend(budget), spend(additionalFundingBudget)]),
+      ...inputs([budgetClaimPath], [spend(budget)]),
       periodNullifiers: Array.from({ length: 3 }, (_, periodIndex) =>
         computeShieldedPeriodNullifier(
           {
@@ -1063,10 +1053,8 @@ export async function runShieldedAcceptanceSmoke({
         budgetKind: "0",
         heirViewKeyLo: String(heirViewLimbs.viewKeyLo),
         heirViewKeyHi: String(heirViewLimbs.viewKeyHi),
-        inputBudgetIsClaim: ["0", "0"],
-        secondBudgetKind: "0",
+        inputBudgetIsClaim: ["0"],
         keyMode: "0",
-        secondKeyMode: "0",
         ownerSecret: String(childKeys.ownerSecret),
         policyCommitmentInput: String(policyCommitment),
         enrollmentCommitmentInput: String(enrollmentCommitment),
@@ -1076,7 +1064,6 @@ export async function runShieldedAcceptanceSmoke({
         eligibleFrom: String(eligibleFrom),
         rate: String(rate),
         periodDays: String(PERIOD_DAYS),
-        hasSecondInput: "1",
         remaining: "1200",
         remainingPeriods: "12",
         budgetNonce: String(budget.nonce),
@@ -1084,13 +1071,6 @@ export async function runShieldedAcceptanceSmoke({
         noteDepth: budgetClaimPath.depth,
         noteIndex: budgetClaimPath.index,
         noteSiblings: budgetClaimPath.siblings,
-        secondRemaining: "300",
-        secondRemainingPeriods: "3",
-        secondBudgetNonce: String(additionalFundingBudget.nonce),
-        secondBudgetCiphertextHash: String(additionalFundingBudget.ciphertextHashField),
-        secondNoteDepth: secondClaimPath.depth,
-        secondNoteIndex: secondClaimPath.index,
-        secondNoteSiblings: secondClaimPath.siblings,
         claimCount: "3",
         periodIndices: Array.from({ length: 3 }, (_, index) => String(index)),
         newBudgetNonce: String(remainingBudget.nonce),
@@ -1115,10 +1095,7 @@ export async function runShieldedAcceptanceSmoke({
     const publicClaimPath = await notePath(publicBudget);
     const identityClaimData = {
       ...zeroData(),
-      ...inputs(
-        [publicClaimPath, publicClaimPath],
-        [spend(publicBudget), dummySpend(publicBudget)],
-      ),
+      ...inputs([publicClaimPath], [spend(publicBudget)]),
       periodNullifiers: Array.from({ length: 3 }, (_, index) =>
         computeShieldedPeriodNullifier(
           {
@@ -1153,10 +1130,8 @@ export async function runShieldedAcceptanceSmoke({
         budgetKind: "1",
         heirViewKeyLo: "0",
         heirViewKeyHi: "0",
-        inputBudgetIsClaim: ["0", "0"],
-        secondBudgetKind: "0",
+        inputBudgetIsClaim: ["0"],
         keyMode: "0",
-        secondKeyMode: "0",
         ownerSecret: String(childKeys.ownerSecret),
         policyCommitmentInput: String(publicPolicyCommitment),
         enrollmentCommitmentInput: String(publicEnrollmentCommitment),
@@ -1166,7 +1141,6 @@ export async function runShieldedAcceptanceSmoke({
         eligibleFrom: String(eligibleFrom),
         rate: String(rate),
         periodDays: String(PERIOD_DAYS),
-        hasSecondInput: "0",
         remaining: "1500",
         remainingPeriods: "15",
         budgetNonce: String(publicBudget.nonce),
@@ -1174,13 +1148,6 @@ export async function runShieldedAcceptanceSmoke({
         noteDepth: publicClaimPath.depth,
         noteIndex: publicClaimPath.index,
         noteSiblings: publicClaimPath.siblings,
-        secondRemaining: "0",
-        secondRemainingPeriods: "0",
-        secondBudgetNonce: "0",
-        secondBudgetCiphertextHash: "0",
-        secondNoteDepth: "0",
-        secondNoteIndex: "0",
-        secondNoteSiblings: Array(32).fill("0"),
         claimCount: "3",
         periodIndices: Array.from({ length: 3 }, (_, index) => String(index)),
         newBudgetNonce: String(identityRemainder.nonce),
@@ -1342,7 +1309,7 @@ export async function runShieldedAcceptanceSmoke({
         lineageDepth: Math.max(Number(endorsement.depth), Number(trusted.depth)),
         endorsementDepth: Number(endorsement.depth),
         trustedDepth: Number(trusted.depth),
-        noteDepth: Math.max(Number(budgetClaimPath.depth), Number(secondClaimPath.depth)),
+        noteDepth: Number(budgetClaimPath.depth),
         receiveCode,
         identityBudget: {
           fundingLabel: "shielded-action-fund-identity",

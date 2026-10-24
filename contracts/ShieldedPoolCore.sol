@@ -51,8 +51,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   /**
    * @notice All actions use two output slots. PrivateTransfer and Unshield always use
    *         four input slots, including proved placeholders for unused slots.
-   *         Shield, Fund and Claim use two input slots. Initial Fund repeats the
-   *         first shard and root; Claim proves both input roots.
+   *         Shield and Fund use two input slots; Claim uses one budget input.
+   *         Initial Fund repeats the first shard and root.
    */
   struct ReceiveAuthorization {
     uint256 checkpointId;
@@ -279,7 +279,8 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     bool isShield = action == Action.Shield;
     bool isClaim = action == Action.Claim;
     bool isInitialFund = action == Action.Fund && data.fundMode == 0;
-    uint256 capacity = action == Action.PrivateTransfer || action == Action.Unshield ? 4 : 2;
+    uint256 capacity = _inputCount(action);
+    if (isShield) capacity = 2;
     if (
       data.inputNullifiers.length != capacity ||
       data.inputShardIds.length != capacity ||
@@ -315,7 +316,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     if (data.outputCommitments[0] == data.outputCommitments[1]) {
       revert DuplicateCommitment();
     }
-    if (!isShield && data.inputNullifiers[0] == data.inputNullifiers[1]) {
+    if (
+      data.inputNullifiers.length > 1 &&
+      !isShield &&
+      data.inputNullifiers[0] == data.inputNullifiers[1]
+    ) {
       revert NullifierAlreadySpent();
     }
     if (
@@ -544,9 +549,10 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
     ) revert InvalidFieldElement();
   }
 
-  /** @dev VALUE actions prove four root slots; Fund and Claim prove two. */
+  /** @dev VALUE actions prove four root slots; Fund proves two and Claim proves one. */
   function _inputCount(Action action) private pure returns (uint256) {
     if (action == Action.Shield) return 0;
+    if (action == Action.Claim) return 1;
     if (action == Action.PrivateTransfer || action == Action.Unshield) return 4;
     return 2;
   }
@@ -570,7 +576,11 @@ abstract contract ShieldedPoolCore is ReentrancyGuardTransient {
   }
 
   function _appendOutputs(Action action, ActionData calldata data) internal {
-    emit ActionExecuted(uint8(action), data.inputShardIds[0], data.inputShardIds[1]);
+    emit ActionExecuted(
+      uint8(action),
+      data.inputShardIds[0],
+      data.inputShardIds.length > 1 ? data.inputShardIds[1] : data.inputShardIds[0]
+    );
     commitmentExists[data.outputCommitments[0]] = true;
     _append(data.outputCommitments[0], data.outputCiphertexts[0]);
     commitmentExists[data.outputCommitments[1]] = true;

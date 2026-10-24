@@ -47,7 +47,7 @@ test("each pool action has the verifier input count in ProofConstants.sol", () =
     {
       Shield: 7,
       Fund: 29,
-      Claim: 18,
+      Claim: 15,
       PrivateTransfer: 20,
       Unshield: 20,
     },
@@ -59,8 +59,9 @@ test("claim signals follow the circuit's named public inputs", () => {
   const { signals, witness } = buildShieldedPoolPublicInputs({
     ...base,
     action: SHIELDED_POOL_ACTION.Claim,
-    inputShardIds: [2, 2],
-    inputRoots: [11, 11],
+    inputShardIds: [2],
+    inputRoots: [11],
+    inputNullifiers: [13],
     periodNullifiers,
     relation0: 29,
     relation1: 30,
@@ -72,11 +73,8 @@ test("claim signals follow the circuit's named public inputs", () => {
     1030n,
     1n,
     2n,
-    2n,
-    11n,
     11n,
     13n,
-    14n,
     ...periodNullifiers.map(BigInt),
     27n,
     28n,
@@ -89,8 +87,8 @@ test("claim signals follow the circuit's named public inputs", () => {
   assert.deepEqual(Object.keys(witness), [
     ...SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Claim],
   ]);
-  assert.deepEqual(witness.inputShardIds, ["2", "2"]);
-  assert.deepEqual(witness.inputNullifiers, ["13", "14"]);
+  assert.deepEqual(witness.inputShardIds, ["2"]);
+  assert.deepEqual(witness.inputNullifiers, ["13"]);
   assert.deepEqual(witness.ciphertextHashes, [String(hashA), String(hashB)]);
   assert.equal(witness.asOf, "31");
 });
@@ -264,8 +262,18 @@ test("data an action does not use must be zero, as the pool requires", () => {
       buildShieldedPoolPublicSignals({
         ...base,
         action: SHIELDED_POOL_ACTION.Claim,
+        inputShardIds: [2],
+        inputRoots: [11],
+        inputNullifiers: [13],
         periodNullifiers: [0],
       }),
+    (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
+  );
+});
+
+test("claims reject the removed two-budget public shape", () => {
+  assert.throws(
+    () => buildShieldedPoolPublicSignals({ ...base, action: SHIELDED_POOL_ACTION.Claim }),
     (error) => error.code === "INVALID_SHIELDED_SIGNAL_SHAPE",
   );
 });

@@ -10,7 +10,6 @@ import {
   splitShieldedViewPublicKey,
   computeShieldedCiphertextHashField,
   computeShieldedClaimBatch,
-  computeShieldedDummyInputNullifier,
   computeShieldedDummyPeriodNullifier,
   computeShieldedPeriodNullifier,
   computeShieldedSpendNullifier,
@@ -59,7 +58,6 @@ export type PrepareShieldedClaimInput = {
   /** Authenticated selected lineage paths at one paired checkpoint and block. */
   lineage: LineageSnapshot;
   budgetCommitment: BigNumberish;
-  secondBudgetCommitment?: BigNumberish;
   /** Defaults to the lineage snapshot timestamp; the pool enforces its recency. */
   asOf?: BigNumberish;
   /** Strictly increasing, due period indices, with 1–3 entries. */
@@ -181,6 +179,7 @@ async function encryptOwnOutput<T extends ShieldedBudgetNotePayload | ShieldedVa
 export async function prepareShieldedClaim(
   input: PrepareShieldedClaimInput,
 ): Promise<PreparedShieldedClaim> {
+  if ("secondBudgetCommitment" in input) throw new Error("Claim accepts exactly one budget note");
   const chainId = checkedUint64(input.chainId, "chainId");
   const poolAddress = getAddress(input.poolAddress);
   const asOf = checkedUint64(input.asOf ?? input.lineage.timestamp, "asOf");
@@ -250,89 +249,13 @@ export async function prepareShieldedClaim(
     },
     { chainId, poolAddress },
   );
-  const dummySpend = computeShieldedDummyInputNullifier(
-    {
-      ownerSecret: keys.ownerSecret,
-      noteCommitment: budgetCommitment,
-    },
-    { chainId, poolAddress },
-  );
-  if (input.wallet.spentNullifiers.has(spend) || input.wallet.spentNullifiers.has(dummySpend)) {
+  if (input.wallet.spentNullifiers.has(spend)) {
     throw new Error("Budget note has already been spent");
   }
-  const secondCommitment =
-    input.secondBudgetCommitment === undefined
-      ? undefined
-      : getBigInt(input.secondBudgetCommitment);
-  if (secondCommitment === budgetCommitment) throw new Error("Claim needs distinct budget notes");
-  const secondOwned =
-    secondCommitment === undefined ? undefined : input.wallet.ownedNotes.get(secondCommitment);
-  if (secondCommitment !== undefined && (!secondOwned || secondOwned.note.kind !== "budget")) {
-    throw new Error("Second input must be a locally recovered budget note");
-  }
-  const secondBudget = secondOwned?.note.kind === "budget" ? secondOwned.note : undefined;
-  let secondSpend: bigint | undefined;
-  let secondHash = 0n;
-  let secondPath: ReturnType<typeof getLocalShieldedNoteProof> | undefined;
-  if (secondBudget && secondOwned && secondCommitment !== undefined) {
-    if (
-      (secondBudget.binding === "identity") !== (budget.binding === "identity") ||
-      normalizeShieldedKeyMode(secondBudget.keyMode, secondBudget.binding) !== keyMode
-    )
-      throw new Error("Claim budgets must retain the same binding and key mode");
-    for (const field of [
-      "rootIdentityCommitment",
-      "rootVersionIndex",
-      "heirIdentityCommitment",
-      "eligibleFrom",
-      "amountPerPeriod",
-      "periodDays",
-    ] as const) {
-      if (secondBudget[field] !== budget[field])
-        throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
-    }
-    const secondRule = getShieldedBudgetCommitments(secondBudget, { chainId, poolAddress });
-    if (
-      secondRule.policyCommitment !== policyCommitment ||
-      secondRule.enrollmentCommitment !== enrollmentCommitment ||
-      (secondBudget.binding !== "identity" &&
-        secondBudget.heirOwnerCommitment !== keys.ownerCommitment)
-    )
-      throw new Error("Claim budgets must share policy, enrollment, owner, and rate");
-    const payload = encodeShieldedBudgetNotePayload(secondBudget, scope);
-    try {
-      verifyShieldedNotePayload(
-        {
-          payload,
-          ciphertext: secondOwned.ciphertext,
-          noteCommitment: secondCommitment,
-        },
-        scope,
-      );
-    } finally {
-      payload.fill(0);
-    }
-    secondHash = computeShieldedCiphertextHashField(secondOwned.ciphertext);
-    if (secondHash !== secondOwned.ciphertextHashField)
-      throw new Error("Second budget does not match its public ciphertext");
-    secondSpend = computeShieldedSpendNullifier(
-      {
-        ownerSecret: keys.ownerSecret,
-        noteCommitment: secondCommitment,
-      },
-      { chainId, poolAddress },
-    );
-    if (input.wallet.spentNullifiers.has(secondSpend))
-      throw new Error("Second budget note has already been spent");
-    secondPath = getLocalShieldedNoteProof(input.wallet, secondCommitment);
-  }
-  const combinedRemaining = budget.remaining + (secondBudget?.remaining ?? 0n);
-  if (combinedRemaining / budget.amountPerPeriod > MAX_UINT64)
-    throw new Error("Combined budget exceeds the period limit");
   const batch = computeShieldedClaimBatch({
     amountPerPeriod: budget.amountPerPeriod,
     periodDays: budget.periodDays,
-    remaining: combinedRemaining,
+    remaining: budget.remaining,
     eligibleFrom: budget.eligibleFrom,
     now: asOf,
     periodIndices: [...input.periodIndices],
@@ -427,9 +350,9 @@ export async function prepareShieldedClaim(
   const data = {
     fundMode: 0n,
     budgetKind: 0n,
-    inputShardIds: [path.shardId, secondPath?.shardId ?? path.shardId],
-    inputRoots: [path.root, secondPath?.root ?? path.root],
-    inputNullifiers: [spend, secondSpend ?? dummySpend],
+    inputShardIds: [path.shardId],
+    inputRoots: [path.root],
+    inputNullifiers: [spend],
     periodNullifiers,
     outputCommitments: [outputs[0].commitment, outputs[1].commitment],
     outputCiphertexts: [outputs[0].ciphertext, outputs[1].ciphertext],
@@ -453,25 +376,10 @@ export async function prepareShieldedClaim(
     heirViewKeyHi: ownerBudget ? String(splitShieldedViewPublicKey(viewingKey).viewKeyHi) : "0",
     inputBudgetIsClaim: [
       ownerBudget ? String(normalizeShieldedBudgetOrigin(ownerBudget.budgetOrigin)) : "0",
-      secondBudget && secondBudget.binding !== "identity"
-        ? String(normalizeShieldedBudgetOrigin(secondBudget.budgetOrigin))
-        : "0",
     ],
     ownerSecret: String(keys.ownerSecret),
-    secondKeyMode: secondBudget ? String(keyMode) : "0",
-    secondBudgetKind: secondBudget?.binding === "identity" ? "1" : "0",
     policyCommitmentInput: String(policyCommitment),
     enrollmentCommitmentInput: String(enrollmentCommitment),
-    hasSecondInput: secondBudget ? "1" : "0",
-    secondRemaining: String(secondBudget?.remaining ?? 0n),
-    secondRemainingPeriods: String(
-      secondBudget ? secondBudget.remaining / secondBudget.amountPerPeriod : 0n,
-    ),
-    secondBudgetNonce: String(secondBudget?.nonce ?? 0n),
-    secondBudgetCiphertextHash: String(secondHash),
-    secondNoteDepth: secondPath?.proofDepth ?? 0,
-    secondNoteIndex: String(secondPath?.proofIndex ?? 0n),
-    secondNoteSiblings: (secondPath?.siblings ?? Array<bigint>(32).fill(0n)).map(String),
     nameField: String(material.nameField),
     derivedSecretField: String(material.derivedSecretField),
     isBirthBC: Number(material.identity.isBirthBC),

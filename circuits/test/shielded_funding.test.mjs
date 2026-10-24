@@ -95,10 +95,9 @@ function withClaimSource(witness, source) {
   updated.noteSiblings = [...siblings, ...Array(32 - siblings.length).fill("0")];
   const pairRoot = poseidon2([old, BigInt(source.sibling)]);
   const root = source.prefixRoot ? poseidon2([BigInt(source.prefixRoot), pairRoot]) : pairRoot;
-  updated.inputRoots = Array(2).fill(String(root));
+  updated.inputRoots = [String(root)];
   updated.inputNullifiers = [
     poseidon3([scoped(1016n), ownerSecret, old]),
-    poseidon3([scoped(1021n), ownerSecret, old]),
   ].map(String);
   for (let slot = Number(updated.claimCount); slot < 3; slot++) {
     updated.periodNullifiers[slot] = String(
@@ -461,7 +460,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
             assert.equal(step.heirViewKeyHi, funded.initial.heirViewKeyHi);
           }
           await invalid("fund", { ...refill, oldBudgetIsClaim: "0" });
-          await invalid("claim", { ...continuation, inputBudgetIsClaim: ["0", "0"] });
+          await invalid("claim", { ...continuation, inputBudgetIsClaim: ["0"] });
         }
       },
     );

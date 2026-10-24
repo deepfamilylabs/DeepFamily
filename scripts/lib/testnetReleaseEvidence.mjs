@@ -1454,7 +1454,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
     proofs.claim.publicSignals.at(-1),
     "identityBudget claim maturity",
   );
-  for (let index = 8; index < 11; index++)
+  for (let index = 5; index < 8; index++)
     requireExact(
       identityClaimSignals[index],
       proofs.claim.publicSignals[index],

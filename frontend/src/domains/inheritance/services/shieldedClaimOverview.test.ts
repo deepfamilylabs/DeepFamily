@@ -213,8 +213,8 @@ describe("shielded claim budget options", () => {
       [4n],
     ]);
     expect(new Set(result.map((option) => option.key)).size).toBe(3);
-    expect(result[0].overview.claim?.secondBudget).toBeUndefined();
-    expect(result[2].overview.claim?.secondBudget).toBeUndefined();
+    expect(result[0].overview.claim).not.toHaveProperty("secondBudget");
+    expect(result[2].overview.claim).not.toHaveProperty("secondBudget");
     expect(
       listShieldedClaimBudgetOptions(
         [first, otherRule, compatible, later],
@@ -233,7 +233,7 @@ describe("shielded claim budget options", () => {
     ).toBe(result[1].key);
   });
 
-  it("combines compatible fragments with no more than two inputs or three periods", () => {
+  it("shows all compatible balances while limiting a claim to one note", () => {
     const first = budget(1n, { remaining: 100n });
     const second = budget(2n, { remaining: 200n });
     const third = budget(3n, { remaining: 300n });
@@ -257,9 +257,8 @@ describe("shielded claim budget options", () => {
     expect(result[0].overview.totalRemaining).toBe(600n);
     expect(result[0].overview.claim).toEqual({
       budget: first,
-      secondBudget: second,
-      periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
-      amount: 300n,
+      periodIndices: [0n],
+      amount: 100n,
     });
   });
 

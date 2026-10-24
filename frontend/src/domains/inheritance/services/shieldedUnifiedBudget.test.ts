@@ -234,7 +234,7 @@ async function fixture(periodDays = 30n, keyMode: 0 | 1 = 0) {
     }
     logs.push({
       ...iface.encodeEventLog(iface.getEvent("ActionExecuted")!, [
-        action, ...prepared.data.inputShardIds,
+        action, prepared.data.inputShardIds[0] ?? 0n, prepared.data.inputShardIds[1] ?? prepared.data.inputShardIds[0] ?? 0n,
       ]),
       address: poolAddress,
       blockNumber: 10,
@@ -433,7 +433,7 @@ describe("unified budget recovery and claims", () => {
     },
   );
 
-  it.each([0, 1] as const)("preserves private authorization and rejects mixed bindings in key mode %s", async (keyMode) => {
+  it.each([0, 1] as const)("preserves private authorization while consuming only one budget in key mode %s", async (keyMode) => {
     const f = await fixture(30n, keyMode);
     await expect(
       prepareShieldedFund({
@@ -500,7 +500,7 @@ describe("unified budget recovery and claims", () => {
       childSecret,
       f.now,
     );
-    expect(selection?.secondBudget).toBeDefined();
+    expect(selection).not.toHaveProperty("secondBudget");
     const claim = await prepareShieldedClaim({
       chainId,
       poolAddress,
@@ -509,43 +509,19 @@ describe("unified budget recovery and claims", () => {
       wallet,
       lineage: f.lineage,
       budgetCommitment: privateRefill.outputs[0].commitment,
-      secondBudgetCommitment: privateFund.outputs[0].commitment,
       asOf: f.now,
       periodIndices: [0n, 1n],
     });
     checkWitness("claim", claim.witness);
     expect(claim.witness.budgetKind).toBe("0");
-    expect(claim.witness.secondBudgetKind).toBe("0");
+    expect(claim.witness).not.toHaveProperty("secondBudgetKind");
     expect(claim.outputs[0].note).toMatchObject({
       heirOwnerCommitment: f.childKeys.ownerCommitment,
-      remaining: 10n,
+      remaining: 0n,
       keyMode: BigInt(keyMode),
     });
-    // Even with identical owner, policy and enrollment, the public structure cannot be mixed in.
-    const original = wallet.ownedNotes.get(privateFund.outputs[0].commitment)!;
-    if (original.note.kind !== "budget") throw new Error("Expected budget");
-    wallet.ownedNotes.set(privateFund.outputs[0].commitment, {
-      ...original,
-      note: {
-        ...original.note,
-        ...getShieldedBudgetCommitments(original.note, { chainId, poolAddress }),
-        binding: "identity",
-      },
-    });
-    await expect(
-      prepareShieldedClaim({
-        chainId,
-        poolAddress,
-        identity: f.identity,
-        keyMaterial: f.childKeys,
-        wallet,
-        lineage: f.lineage,
-        budgetCommitment: privateRefill.outputs[0].commitment,
-        secondBudgetCommitment: privateFund.outputs[0].commitment,
-        asOf: f.now,
-        periodIndices: [0n],
-      }),
-    ).rejects.toThrow("binding");
+    expect(wallet.ownedNotes.has(privateFund.outputs[0].commitment)).toBe(true);
+    expect(claim.data.inputNullifiers).toHaveLength(1);
   });
   it("ignores a malformed public envelope while recovering later private notes", async () => {
     const f = await fixture();

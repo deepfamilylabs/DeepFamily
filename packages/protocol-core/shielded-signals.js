@@ -25,6 +25,7 @@ const OUTPUTS = ["outputCommitments", "ciphertextHashes"];
 const LINEAGE = ["endorsementRoot", "trustedRoot", "asOf"];
 
 function inputSlotCount(action) {
+  if (action === SHIELDED_POOL_ACTION.Claim) return 1;
   return action === SHIELDED_POOL_ACTION.PrivateTransfer || action === SHIELDED_POOL_ACTION.Unshield
     ? 4
     : 2;
@@ -33,7 +34,7 @@ function inputSlotCount(action) {
 /**
  * Each action's circuit declares exactly these named public inputs, in this order.
  * ShieldedPoolCore._publicSignals builds the same sequence. VALUE transfers and
- * withdrawals always use four input slots; Fund and Claim use two.
+ * withdrawals always use four input slots; Fund uses two and Claim uses one.
  */
 export const SHIELDED_POOL_PUBLIC_INPUTS = Object.freeze({
   [SHIELDED_POOL_ACTION.Shield]: Object.freeze([...CONTEXT, ...OUTPUTS, "amount"]),

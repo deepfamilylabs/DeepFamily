@@ -52,7 +52,7 @@ function actionData(capacity = 2): ShieldedPoolActionData {
   };
 }
 
-function fixture() {
+function fixture(capacity = 2) {
   let chainId = 71n;
   let gasBalance = 10n ** 18n;
   const receipt = { status: 1 };
@@ -104,7 +104,7 @@ function fixture() {
     pool,
     signer,
     expectedChainId: 71n,
-    data: actionData(),
+    data: actionData(capacity),
     preparedProof: { ...PROOF, protocol: "groth16", curve: "bn128" } as Groth16Proof,
   };
   return {
@@ -132,7 +132,7 @@ describe("shielded pool asset-worker proof submission", () => {
     ["claim", submitClaim],
   ] as const)("final public bindings for %s", (action, submit) => {
     it.each(["fee review", "nonce lookup"] as const)("rejects a %s wait with an expired checkpoint before starting a wallet request", async (wait) => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       const onWalletRequest = vi.fn(() => vi.fn());
       const onSubmitting = vi.fn();
       const onStage = vi.fn();
@@ -162,7 +162,7 @@ describe("shielded pool asset-worker proof submission", () => {
       ["expired", 300, 0n],
       ["future", 0, 1n],
     ] as const)("rejects a %s proof after fee review without recording an unknown broadcast", async (_reason, timestamp, asOf) => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       const onSubmitting = vi.fn();
       const onWalletRequest = vi.fn(() => vi.fn());
       const onStage = vi.fn();
@@ -181,7 +181,7 @@ describe("shielded pool asset-worker proof submission", () => {
     });
 
     it("checks the snapshot checkpoint and lifetime at one anchored block after nonce lookup", async () => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       f.provider.getBlockNumber.mockResolvedValueOnce(77).mockResolvedValueOnce(78);
       const onSubmitting = vi.fn();
       await submit({ ...f.common, onSubmitting });
@@ -198,7 +198,7 @@ describe("shielded pool asset-worker proof submission", () => {
     });
 
     it("submits the original proof after unrelated roots change while its checkpoint remains valid", async () => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       const data = { ...f.common.data, relation0: 700n, relation1: 800n };
       await submit({ ...f.common, data, onGasEstimate: async () => { f.lineageRoot.mockResolvedValue(999n); } });
       expect(f.knownCheckpoint).toHaveBeenCalledWith(7n, 700n, 800n, 0n, { blockTag: 77 });
@@ -207,7 +207,7 @@ describe("shielded pool asset-worker proof submission", () => {
     });
 
     it("rejects a reorganized final anchor before any submission bookkeeping", async () => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       f.provider.getBlock
         .mockResolvedValueOnce({ hash: BLOCK_HASH, timestamp: 0 })
         .mockResolvedValueOnce({ hash: `0x${"bb".repeat(32)}`, timestamp: 0 });
@@ -221,7 +221,7 @@ describe("shielded pool asset-worker proof submission", () => {
     });
 
     it("rechecks the caller after the final checkpoint RPC before marking submission", async () => {
-      const f = fixture();
+      const f = fixture(action === "claim" ? 1 : 2);
       let locked = false;
       f.knownCheckpoint.mockImplementation(async () => { locked = true; return true; });
       const onSubmitting = vi.fn();
@@ -675,7 +675,7 @@ describe("shielded pool asset-worker proof submission", () => {
     ] as const;
     for (const [name, submit] of cases) {
       const f = fixture();
-      const data = name === "privateTransfer" ? actionData(4) : f.common.data;
+      const data = name === "privateTransfer" ? actionData(4) : name === "claim" ? actionData(1) : f.common.data;
       await submit({ ...f.common, data });
       expect(f.methods[name]).toHaveBeenCalledOnce();
       expect(f.methods[name].mock.calls[0][0]).toEqual({ ...data, receiveAuthorizations: Array.from({ length: 2 }, () => ({ checkpointId: 0n, asOf: 0n, expiresAt: 0n, recipientBinding: 0n, proof: "0x" })) });
@@ -695,21 +695,21 @@ describe("shielded pool asset-worker proof submission", () => {
   });
 
   it("rejects the wrong chain before estimation or submission", async () => {
-    const f = fixture();
+    const f = fixture(1);
     f.setChainId(1n);
     await expect(submitClaim(f.common)).rejects.toThrow("wrong network");
     expect(f.estimateGas).not.toHaveBeenCalled();
   });
 
   it("refuses to send when the gas wallet cannot pay the estimated CFX fee", async () => {
-    const f = fixture();
+    const f = fixture(1);
     f.setBalance(1n);
     await expect(submitClaim(f.common)).rejects.toThrow("Transaction wallet needs at least");
     expect(f.methods.claim).not.toHaveBeenCalled();
   });
 
   it("rejects malformed ciphertexts before estimation or submission", async () => {
-    const f = fixture();
+    const f = fixture(1);
     const data = { ...f.common.data, outputCiphertexts: ["0xab", CIPHERTEXT] as const };
     await expect(submitClaim({ ...f.common, data })).rejects.toThrow("exactly 512 bytes");
     expect(f.estimateGas).not.toHaveBeenCalled();

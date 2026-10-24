@@ -18,9 +18,7 @@ type PeriodWallet = Pick<
 
 export type ShieldedSelectableBudgetNote = OwnedShieldedNote<BudgetPayload>;
 
-const MAX_UINT64 = (1n << 64n) - 1n;
 const MAX_UINT32 = (1n << 32n) - 1n;
-const MAX_UINT128 = (1n << 128n) - 1n;
 const MAX_AUTOMATIC_PERIOD_SCAN = 100_000n;
 
 function compareBigInt(a: bigint, b: bigint): number {
@@ -31,7 +29,7 @@ function uniqueNotes<T extends Note>(notes: readonly T[]): T[] {
   return [...new Map(notes.map((note) => [note.commitment, note])).values()];
 }
 
-/** Stable key for budget notes that may fund a single claim together. */
+/** Stable key for budget notes sharing one allowance and period-nullifier sequence. */
 export function getShieldedClaimBudgetKey(note: BudgetPayload, scope: ShieldedScope): string {
   const { policyCommitment, enrollmentCommitment } = getShieldedBudgetCommitments(note, scope);
   return [
@@ -123,7 +121,6 @@ export function selectClaimBudget(
 ):
   | {
       budget: ShieldedSelectableBudgetNote;
-      secondBudget?: ShieldedSelectableBudgetNote;
       periodIndices: bigint[];
     }
   | undefined {
@@ -137,28 +134,6 @@ export function selectClaimBudget(
   for (const budget of budgets) {
     const periodIndices = findClaimPeriods(wallet, derivedSecretField, budget.note, now);
     if (!periodIndices.length) continue;
-    if (periodIndices.length < 3) {
-      for (const secondBudget of budgets) {
-        if (
-          secondBudget.commitment === budget.commitment ||
-          secondBudget.note.remaining <= 0n ||
-          getShieldedClaimBudgetKey(secondBudget.note, wallet) !==
-            getShieldedClaimBudgetKey(budget.note, wallet)
-        )
-          continue;
-        const remaining = budget.note.remaining + secondBudget.note.remaining;
-        if (remaining > MAX_UINT128 || remaining / budget.note.amountPerPeriod > MAX_UINT64)
-          continue;
-        const combinedPeriods = findClaimPeriods(
-          wallet,
-          derivedSecretField,
-          { ...budget.note, remaining },
-          now,
-        );
-        if (combinedPeriods.length > periodIndices.length)
-          return { budget, secondBudget, periodIndices: combinedPeriods };
-      }
-    }
     return { budget, periodIndices };
   }
   return undefined;

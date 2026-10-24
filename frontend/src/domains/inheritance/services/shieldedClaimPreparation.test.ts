@@ -14,7 +14,6 @@ import {
   computeShieldedBudgetNoteCommitment,
   computeShieldedCiphertextHashField,
   computeShieldedNoteCommitmentFromPayload,
-  computeShieldedSpendNullifier,
   computeShieldedEnrollmentCommitment,
   computeShieldedPeriodNullifier,
   computeShieldedPolicyCommitment,
@@ -327,26 +326,11 @@ describe("local shielded claim preparation", () => {
       }),
     ).rejects.toThrow("canonical identity keys");
   });
-  it("does not combine mode-0 and mode-1 budgets even when their actual owner is identical", async () => {
+  it("rejects the removed second-budget input even when both notes share an owner", async () => {
     const input = await fixture(100n);
-    const secondBudgetCommitment = await addSecondBudget(input, { keyMode: 1n });
-    await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
-      "same binding and key mode",
-    );
-    const independent = await fixture(
-      100n,
-      100n,
-      30n,
-      deriveShieldedHeirKeyMaterial(derivedSecretField),
-    );
-    const matchingSecond = await addSecondBudget(independent);
-    const result = await prepareShieldedClaim({
-      ...independent,
-      secondBudgetCommitment: matchingSecond,
-      periodIndices: [0n, 1n],
-    });
-    expect(result.witness.keyMode).toBe("1");
-    expect(result.witness.secondKeyMode).toBe("1");
+    const secondBudgetCommitment = await addSecondBudget(input);
+    const unsupported = { ...input, secondBudgetCommitment };
+    await expect(prepareShieldedClaim(unsupported)).rejects.toThrow("exactly one budget note");
   });
   it.each([1n, 7n, 365n])(
     "claims on a %s-day schedule only when a complete period has elapsed",
@@ -363,26 +347,17 @@ describe("local shielded claim preparation", () => {
     },
   );
 
-  it("does not combine budgets with different claim intervals", async () => {
-    const input = await fixture(1_200n, 100n, 7n);
-    const secondBudgetCommitment = await addSecondBudget(input, { periodDays: 1n });
-    await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
-      "must share policy",
-    );
-  });
-
   it("builds exact fixed public inputs and encrypted continuation/payout notes", async () => {
     const input = await fixture();
     const prepared = await prepareShieldedClaim(input);
     const { witness } = prepared;
-    // One budget note: the pool requires its shard and root in both input slots.
-    expect(prepared.data.inputShardIds[1]).toBe(prepared.data.inputShardIds[0]);
-    expect(prepared.data.inputRoots[1]).toBe(prepared.data.inputRoots[0]);
+    expect(prepared.data.inputShardIds).toHaveLength(1);
+    expect(prepared.data.inputRoots).toHaveLength(1);
     expect(witness.inputRoots).toEqual(prepared.data.inputRoots.map(String));
-    expect(witness.hasSecondInput).toBe("0");
-    expect(witness.secondNoteSiblings).toEqual(Array(32).fill("0"));
+    expect(witness).not.toHaveProperty("hasSecondInput");
+    expect(Object.keys(witness).some((key) => key.startsWith("second"))).toBe(false);
     const nullifiers = witness.inputNullifiers as string[];
-    expect(nullifiers[0]).not.toBe(nullifiers[1]);
+    expect(nullifiers).toHaveLength(1);
     expect(witness.periodNullifiers).toHaveLength(3);
     expect(witness.endorsementRoot).toBe(String(input.lineage.endorsementTree.root));
     expect(witness.trustedRoot).toBe(String(input.lineage.trustedTree.root));
@@ -425,61 +400,14 @@ describe("local shielded claim preparation", () => {
     }
   });
 
-  it("claims across two compatible budgets with one global period sequence", async () => {
+  it("cannot use a second recovered budget to cover the selected note's shortfall", async () => {
     const input = await fixture(100n);
-    const secondBudgetCommitment = await addSecondBudget(input);
-    const prepared = await prepareShieldedClaim({
-      ...input,
-      secondBudgetCommitment,
-      periodIndices: [0n, 1n],
-    });
-    expect(prepared.amount).toBe(200n);
+    await addSecondBudget(input, { remaining: 1_200n });
+    await expect(prepareShieldedClaim({ ...input, periodIndices: [0n, 1n] })).rejects.toThrow();
+    const prepared = await prepareShieldedClaim({ ...input, periodIndices: [0n] });
+    expect(prepared.amount).toBe(100n);
     expect(prepared.outputs[0].note.remaining).toBe(0n);
-    expect(prepared.outputs[0].note.binding).not.toBe("identity");
-    if (prepared.outputs[0].note.binding !== "identity")
-      expect(prepared.outputs[0].note.enrollmentSalt).toBe(444n);
-    expect(prepared.witness.hasSecondInput).toBe("1");
-    expect(prepared.witness.secondRemainingPeriods).toBe("1");
-    expect(prepared.data.inputNullifiers[1]).toBe(
-      computeShieldedSpendNullifier(
-        {
-          ownerSecret: input.keys.ownerSecret,
-          noteCommitment: secondBudgetCommitment,
-        },
-        { chainId, poolAddress },
-      ),
-    );
-    expect(prepared.data.periodNullifiers[1]).toBe(
-      computeShieldedPeriodNullifier(
-        {
-          derivedSecretField,
-          policyCommitment: input.policyCommitment,
-          periodIndex: 1n,
-        },
-        { chainId, poolAddress },
-      ),
-    );
-    await expect(
-      prepareShieldedClaim({ ...input, secondBudgetCommitment: input.budgetCommitment }),
-    ).rejects.toThrow("distinct");
-    input.wallet.spentNullifiers.add(BigInt(prepared.data.inputNullifiers[1]));
-    await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
-      "already been spent",
-    );
-  });
-
-  it("rejects a second budget with another policy or enrollment", async () => {
-    for (const overrides of [
-      { policySalt: 223n },
-      { eligibleFrom: eligibleFrom + 1n },
-      { enrollmentSalt: 445n },
-    ]) {
-      const input = await fixture(100n);
-      const secondBudgetCommitment = await addSecondBudget(input, overrides);
-      await expect(prepareShieldedClaim({ ...input, secondBudgetCommitment })).rejects.toThrow(
-        "share policy, enrollment",
-      );
-    }
+    expect(prepared.data.inputNullifiers).toHaveLength(1);
   });
 
   it("claims 3 whole matured periods while preserving the original enrollment", async () => {
@@ -653,12 +581,7 @@ describe("local shielded claim preparation", () => {
         const inputPath = path.join(temporary, "input.json");
         const proofPath = path.join(temporary, "proof.json");
         const publicPath = path.join(temporary, "public.json");
-        for (const [keyMode, useSecond] of [
-          [0, false],
-          [0, true],
-          [1, false],
-          [1, true],
-        ] as const) {
+        for (const keyMode of [0, 1] as const) {
           const keys =
             keyMode === 1
               ? await deriveShieldedIndependentKeyMaterial({
@@ -666,13 +589,9 @@ describe("local shielded claim preparation", () => {
                   independentKeyIdentitySecret: new Uint8Array(32).fill(91),
                 })
               : undefined;
-          const input = await fixture(useSecond ? 600n : 1_200n, 100n, 30n, keys);
-          const secondBudgetCommitment = useSecond
-            ? await addSecondBudget(input, { remaining: 600n })
-            : undefined;
+          const input = await fixture(1_200n, 100n, 30n, keys);
           const prepared = await prepareShieldedClaim({
             ...input,
-            secondBudgetCommitment,
             periodIndices: Array.from({ length: 3 }, (_, index) => BigInt(index)),
           });
           fs.writeFileSync(inputPath, JSON.stringify(prepared.witness));

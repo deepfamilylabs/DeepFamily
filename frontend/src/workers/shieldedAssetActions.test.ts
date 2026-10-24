@@ -320,7 +320,7 @@ function value(commitment: bigint, amount: bigint, ownerCommitment: bigint) {
 }
 async function timeBoundPreview(action: "fund" | "claim", stateReadMode?: "rebuild" | "chain") {
   const session = await unlocked();
-  const prepared = action === "fund" ? preparedPublicFundOutputs([10n, 0n]) : preparedValueOutputs([10n, 0n], 0n, 2);
+  const prepared = action === "fund" ? preparedPublicFundOutputs([10n, 0n]) : preparedValueOutputs([10n, 0n], 0n, 1);
   prepared.data.asOf = 1000n;
   prepared.data.lineageCheckpointId = 7n;
   if (action === "fund") {

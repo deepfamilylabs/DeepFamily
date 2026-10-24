@@ -41,12 +41,12 @@ interface IGroth16Verifier7 {
 }
 
 /** @dev Generated verifier interface for the eighteen-signal claim circuit. */
-interface IGroth16Verifier18 {
+interface IGroth16Verifier15 {
   function verifyProof(
     uint256[2] calldata a,
     uint256[2][2] calldata b,
     uint256[2] calldata c,
-    uint256[18] calldata publicSignals
+    uint256[15] calldata publicSignals
   ) external view returns (bool);
 }
 
@@ -210,9 +210,9 @@ contract Groth16VerifierAdapter is IProofVerifierAdapter {
       for (uint256 i = 0; i < length; ++i) signals20[i] = publicSignals[i];
       return IGroth16Verifier20(verifier).verifyProof(a, b, c, signals20);
     }
-    uint256[18] memory signals18;
-    for (uint256 i = 0; i < length; ++i) signals18[i] = publicSignals[i];
-    return IGroth16Verifier18(verifier).verifyProof(a, b, c, signals18);
+    uint256[15] memory signals15;
+    for (uint256 i = 0; i < length; ++i) signals15[i] = publicSignals[i];
+    return IGroth16Verifier15(verifier).verifyProof(a, b, c, signals15);
   }
 
   function _publicSignalsLength(uint8 purpose) private pure returns (uint256) {

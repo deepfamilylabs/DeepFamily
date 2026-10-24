@@ -94,10 +94,10 @@ describe("integrated shielded acceptance smoke", function () {
     assert.equal(result.scenario.identityBudget.periodDays, "7");
     assert.equal(result.scenario.identityBudget.fundProof.publicSignals[13], "7");
     const publicPeriodNullifiers = result.scenario.identityBudget.claimProof.publicSignals.slice(
+      5,
       8,
-      11,
     );
-    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(8, 11);
+    const privatePeriodNullifiers = result.proofs.claim.publicSignals.slice(5, 8);
     assert.notDeepEqual(publicPeriodNullifiers, privatePeriodNullifiers);
     assert.equal(new Set(publicPeriodNullifiers).size, 3);
     assert.equal(new Set(privatePeriodNullifiers).size, 3);

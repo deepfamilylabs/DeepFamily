@@ -26,7 +26,6 @@ export type ShieldedClaimOverview = {
   /** Exactly the budget and period batch used by automatic claim selection. */
   claim?: {
     budget: ShieldedSelectableBudgetNote;
-    secondBudget?: ShieldedSelectableBudgetNote;
     periodIndices: bigint[];
     amount: bigint;
   };
@@ -72,7 +71,7 @@ function validBudget(note: Note): note is ShieldedSelectableBudgetNote {
   );
 }
 
-/** Group recovered, eligible budgets by the same compatibility rule as automatic claims. */
+/** Group recovered budgets by allowance; each claim spends only one note in its group. */
 export function listShieldedClaimBudgetOptions(
   notes: readonly Note[],
   wallet: PeriodWallet,

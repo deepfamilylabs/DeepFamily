@@ -116,6 +116,9 @@ describe("Shielded lineage checkpoint integration", function () {
     });
     const claim = {
       ...data,
+      inputShardIds: data.inputShardIds.slice(0, 1),
+      inputRoots: data.inputRoots.slice(0, 1),
+      inputNullifiers: data.inputNullifiers.slice(0, 1),
       receiveAuthorizations: emptyShieldedReceiveAuthorizations(),
       periodNullifiers: Array.from({ length: 3 }, (_, i) => 500n + BigInt(i)),
     };
