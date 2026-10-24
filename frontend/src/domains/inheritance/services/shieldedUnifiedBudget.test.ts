@@ -59,7 +59,7 @@ function checkWitness(circuit: "fund" | "claim", witness: Record<string, unknown
         path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs"),
         "wtns",
         "calculate",
-        path.join(repoRoot, `frontend/public/zk/shielded/shielded_${circuit}.wasm`),
+        path.join(repoRoot, `frontend/public/zk/shielded/shielded_${circuit === "fund" && Number(witness.fundMode) === 1 ? "fund_continuation" : circuit}.wasm`),
         inputPath,
         path.join(temporary, "witness.wtns"),
       ],

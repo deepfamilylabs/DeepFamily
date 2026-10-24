@@ -227,6 +227,7 @@ describe("parameterized ZK command wrappers", function () {
         "shielded:claim32",
         "shielded:privateTransfer4",
         "shielded:unshield4",
+        "shielded:fundContinuation",
       ]);
       expect(events).to.deep.equal([
         ["inspect", fixtureRoot, "linux", "x64"],
@@ -248,6 +249,7 @@ describe("parameterized ZK command wrappers", function () {
         ["run", "shielded:claim32"],
         ["run", "shielded:privateTransfer4"],
         ["run", "shielded:unshield4"],
+        ["run", "shielded:fundContinuation"],
       ]);
       expect(commands[1].args[0]).to.equal(path.join("circuits", "disclosure_binding.circom"));
       expect(commands[2].args[0]).to.equal(
@@ -255,7 +257,7 @@ describe("parameterized ZK command wrappers", function () {
       );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
       expect(commands.at(-1).args[0]).to.equal(
-        path.join("circuits", "shielded_unshield_4.circom"),
+        path.join("circuits", "shielded_fund_continuation.circom"),
       );
       expect(
         commands.every(({ executable }) => executable === path.join(fixtureRoot, "bin", "circom")),
@@ -471,6 +473,12 @@ describe("parameterized ZK command wrappers", function () {
         args: [path.join(fixtureRoot, "scripts", "receive-proof-smoke.mjs"), "--current"],
         cwd: fixtureRoot,
       });
+      expect(
+        buildZkCheckCommands({ root: fixtureRoot, circuit: "shielded:fundContinuation" }).at(-1).args,
+      ).to.deep.equal([
+        path.join(fixtureRoot, "scripts", "zk-shielded-development-proof-smoke.mjs"),
+        "fundContinuation",
+      ]);
       expect(
         buildZkCheckCommands({ root: fixtureRoot, circuit: "shielded:unshield" }).at(-1).args,
       ).to.deep.equal([

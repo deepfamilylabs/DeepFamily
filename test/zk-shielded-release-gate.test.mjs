@@ -371,6 +371,7 @@ describe("shielded release source digest", function () {
       "contracts/PersonCommitmentVerifier.sol",
       "contracts/DisclosureBindingVerifier.sol",
       "contracts/ShieldedShieldVerifier.sol",
+      "contracts/ShieldedFundContinuationVerifier.sol",
     ];
     try {
       execFileSync("git", ["init", "-q", root]);

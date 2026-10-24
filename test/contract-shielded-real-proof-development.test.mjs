@@ -192,9 +192,11 @@ function checkedCurrentArtifacts(actions) {
       actions.flatMap((action) =>
         action === "claim"
           ? ["claim", "claim32"]
-          : action === "privateTransfer" || action === "unshield"
-            ? [action, `${action}4`]
-            : [action],
+          : action === "fund"
+            ? ["fund", "fundContinuation"]
+            : action === "privateTransfer" || action === "unshield"
+              ? [action, `${action}4`]
+              : [action],
       ),
     ),
   ];
@@ -264,9 +266,11 @@ async function deployCurrentGeneratedVerifiers(actions, signer) {
       actions.flatMap((action) =>
         action === "claim"
           ? ["claim", "claim32"]
-          : action === "privateTransfer" || action === "unshield"
-            ? [action, `${action}4`]
-            : [action],
+          : action === "fund"
+            ? ["fund", "fundContinuation"]
+            : action === "privateTransfer" || action === "unshield"
+              ? [action, `${action}4`]
+              : [action],
       ),
     ),
   ];
@@ -378,7 +382,8 @@ function syntheticFullMerklePath(leaf, depth, index, siblingSeed) {
   return { root, siblings, index: index.toString(), depth: depth.toString() };
 }
 
-function valueCircuitAction(action, witness) {
+function shieldedCircuitAction(action, witness) {
+  if (action === "fund" && BigInt(witness.fundMode) === 1n) return "fundContinuation";
   return (action === "privateTransfer" || action === "unshield") &&
     witness.inputEnabled?.length === 4
     ? `${action}4`
@@ -386,7 +391,7 @@ function valueCircuitAction(action, witness) {
 }
 
 async function prove(action, witness, expectedSignals) {
-  action = valueCircuitAction(action, witness);
+  action = shieldedCircuitAction(action, witness);
   if (
     action === "claim" &&
     Number(witness.endorsementDepth) <= 32 &&
@@ -434,7 +439,7 @@ async function prove(action, witness, expectedSignals) {
 }
 
 function assertInvalidCircuitWitness(action, witness, expectedFailure) {
-  action = valueCircuitAction(action, witness);
+  action = shieldedCircuitAction(action, witness);
   const files = circuitFiles(action);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-invalid-"));
   const inputPath = path.join(temporary, "input.json");
@@ -904,6 +909,74 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       expect(await pool.totalShielded()).to.equal(1000n);
     });
   }
+
+  it("proves full 64-level initial Fund qualification and 32-level note paths in both modes", async function () {
+    const artifacts = checkedCurrentArtifacts(["fund"]);
+    if (artifacts.missing) this.skip();
+    const [signer] = await hre.ethers.getSigners();
+    const generated = await deployCurrentGeneratedVerifiers(["fund"], signer);
+    const adapter = await deployUnifiedVerifierAdapter(hre, generated);
+    const { initial, continuation } = buildShieldedFundingFixtures({ periodDays: PERIOD_DAYS });
+    const donor = syntheticFullMerklePath(initial.inputRoots[0], 32, (1n << 31n) | 5n, 4100);
+    for (const witness of [initial, continuation]) {
+      witness.donorDepth = donor.depth;
+      witness.donorIndex = donor.index;
+      witness.donorSiblings = donor.siblings;
+      witness.inputRoots[0] = String(donor.root);
+    }
+    initial.inputRoots[1] = String(donor.root);
+    const endorser = hre.ethers.toBeHex(BigInt(initial.endorser), 20);
+    const parentsDigest = computeLineageParentsDigest({
+      fatherIdentityCommitment: initial.fatherIdentityCommitment,
+      motherIdentityCommitment: initial.motherIdentityCommitment,
+    });
+    const endorsementLeaf = computeLineageEndorsementLeaf({
+      identityCommitment: initial.heirIdentityCommitment,
+      parentsDigest,
+      versionIndex: initial.heirVersionIndex,
+      endorser,
+      writtenAt: initial.writtenAt,
+    });
+    const trustedLeaf = computeLineageTrustedLeaf({
+      rootIdentityCommitment: initial.rootIdentityCommitment,
+      rootVersionIndex: initial.rootVersionIndex,
+      account: endorser,
+    });
+    const endorsement = syntheticFullMerklePath(endorsementLeaf, 64, (1n << 63n) | 7n, 4200);
+    const trusted = syntheticFullMerklePath(trustedLeaf, 64, (1n << 63n) | 3n, 4300);
+    for (const [name, membership] of [
+      ["endorsement", endorsement],
+      ["trusted", trusted],
+    ]) {
+      initial[`${name}Root`] = String(membership.root);
+      initial[`${name}Depth`] = membership.depth;
+      initial[`${name}Index`] = membership.index;
+      initial[`${name}Siblings`] = membership.siblings;
+    }
+    const oldBudget = syntheticFullMerklePath(
+      continuation.inputRoots[1],
+      32,
+      (1n << 31n) | 9n,
+      4400,
+    );
+    continuation.oldBudgetDepth = oldBudget.depth;
+    continuation.oldBudgetIndex = oldBudget.index;
+    continuation.oldBudgetSiblings = oldBudget.siblings;
+    continuation.inputRoots[1] = String(oldBudget.root);
+    for (const witness of [initial, continuation]) {
+      const signals = SHIELDED_POOL_PUBLIC_INPUTS[SHIELDED_POOL_ACTION.Fund].flatMap((name) =>
+        [witness[name]].flat().map(BigInt),
+      );
+      const proof = await prove("fund", witness, signals);
+      expect(await adapter.verifyProof(3, 1, proof, signals)).to.equal(true);
+    }
+    assertInvalidCircuitWitness("fund", { ...initial, endorsementDepth: "65" }, /Assert Failed/u);
+    assertInvalidCircuitWitness(
+      "fund",
+      { ...continuation, oldBudgetDepth: "33" },
+      /Assert Failed/u,
+    );
+  });
 
   it("proves one synthetic full 64/32 path and three periods with current public keys", async function () {
     const artifacts = checkedCurrentArtifacts(["claim"]);
@@ -1419,6 +1492,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       changeNonce: "109",
     };
     const fundProof = await prove("fund", realAllocationWitness, allocationSignals);
+    const initialAsContinuationSignals = [...allocationSignals];
+    initialAsContinuationSignals[2] = 1n;
+    expect(await adapter.verifyProof(3, 1, fundProof, initialAsContinuationSignals)).to.equal(
+      false,
+    );
     await lineage.setRoot(0, endorsementRoot + 1n);
     await pool.fund.staticCall(allocationData, fundProof);
     await expect(
@@ -1552,6 +1630,11 @@ describe("Shielded pool real Groth16 current public artifact integration", funct
       additionalFundingWitness,
       additionalFundingSignals,
     );
+    const continuationAsInitialSignals = [...additionalFundingSignals];
+    continuationAsInitialSignals[2] = 0n;
+    expect(
+      await adapter.verifyProof(3, 1, additionalFundingProof, continuationAsInitialSignals),
+    ).to.equal(false);
     const tamperedAdditionalFunding = {
       ...additionalFundingData,
       outputCommitments: [

@@ -1345,7 +1345,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   ) {
     throw new Error("Future-maturity claim must not claim an executed pool transaction");
   }
-  const validateProof = (action, value, label = `shielded-action-${action}`) => {
+  const validateProof = (action, value, label = action === "fundContinuation" ? "shielded-action-fund-additional" : `shielded-action-${action}`) => {
     const spec = SHIELDED_DEPLOYMENT_CIRCUITS[action];
     const item = inspected.manifest.circuits[action];
     const proof = requireRecord(value, `shielded.proofs.${action}`);
@@ -1374,6 +1374,9 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
         `shielded.proofs.${action}.publicSignals must contain canonical decimal signals`,
       );
     const signals = proof.publicSignals;
+    if (action === "fund" || action === "fundContinuation") {
+      requireExact(signals[2], action === "fund" ? "0" : "1", `shielded.proofs.${action}.fundMode`);
+    }
     requireExact(
       requireSha256(proof.publicSignalsSha256, `shielded.proofs.${action}.publicSignalsSha256`),
       createHash("sha256").update(JSON.stringify(signals)).digest("hex"),
@@ -1420,7 +1423,7 @@ const requireShieldedAcceptanceEvidence = (report, repositoryRoot, expectedChain
   validateProof("claim", identityBudget.claimProof);
   const identityFundSignals = identityBudget.fundProof.publicSignals;
   const identityClaimSignals = identityBudget.claimProof.publicSignals;
-  requireExact(identityFundSignals[2], "1", "identityBudget additional fund mode");
+  requireExact(identityFundSignals[2], "0", "identityBudget initial fund mode");
   requireExact(identityFundSignals[3], "1", "identityBudget identity binding");
   requireExact(
     identityFundSignals[20],

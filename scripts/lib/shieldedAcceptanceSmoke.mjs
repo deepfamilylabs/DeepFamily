@@ -185,6 +185,7 @@ export async function runShieldedAcceptanceSmoke({
     publicSignals,
     { execution = "transaction", label = `shielded-action-${action}`, ...extra } = {},
   ) => {
+    if (action === "fund" && BigInt(witness.fundMode) === 1n) action = "fundContinuation";
     const generated = generateProof(root, candidate.circuits[action], witness, publicSignals);
     const verifier = deployed.shieldedVerifiers[action];
     const { a, b, c } = generated.normalized;

@@ -128,6 +128,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
         const adapter = await deployUnifiedVerifierAdapter(hre, {
           shield: generated.ShieldedShieldVerifier,
           fund: generated.ShieldedFundVerifier,
+          fundContinuation: generated.ShieldedFundContinuationVerifier,
           privateTransfer: generated.ShieldedPrivateTransferVerifier,
         });
         const router = await hre.ethers.deployContract("ReceivePresentationVerifierRouter", [
@@ -394,7 +395,7 @@ describe("Receive presentation real-proof canonical pool and letter integration"
               : {}),
           };
           const businessProof = prover.circom(
-            "shielded_fund",
+            iteration === 0 ? "shielded_fund" : "shielded_fund_continuation",
             witness,
             inputs.signals,
           ).solidityProof;

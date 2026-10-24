@@ -20,6 +20,7 @@ const cli = path.join(root, "node_modules", "snarkjs", "build", "cli.cjs");
 const sha256 = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 const fixtures = {
   fund: () => buildShieldedFundingFixtures().initial,
+  fundContinuation: () => buildShieldedFundingFixtures().continuation,
   claim: () => buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness,
   claim32: () => {
     const witness = buildShieldedClaimFixture({ claimCount: 3, remainingPeriods: 12 }).witness;

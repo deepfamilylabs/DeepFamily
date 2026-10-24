@@ -18,6 +18,7 @@ export const SHIELDED_CIRCUIT_NAMES = Object.freeze({
   identityAuthorizationUpdate: "shielded_identity_authorization_update",
   shield: "shielded_shield",
   fund: "shielded_fund",
+  fundContinuation: "shielded_fund_continuation",
   claim: "shielded_claim",
   claim32: "shielded_claim32",
   privateTransfer: "shielded_private_transfer",
@@ -38,6 +39,7 @@ const PUBLIC_SIGNAL_COUNTS: Record<ShieldedCircuitName, number> = {
   identityAuthorizationUpdate: 6,
   shield: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Shield],
   fund: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
+  fundContinuation: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Fund],
   claim: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   claim32: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.Claim],
   privateTransfer: SHIELDED_POOL_PUBLIC_SIGNAL_COUNTS[SHIELDED_POOL_ACTION.PrivateTransfer],
@@ -174,6 +176,13 @@ export function selectShieldedValueCircuit(
   return circuit === "privateTransfer" ? "privateTransfer4" : "unshield4";
 }
 
+/** First funding retains both depth-64 qualification paths; refills use their historical budget. */
+export function selectShieldedFundCircuit(witness: ShieldedWitness): "fund" | "fundContinuation" {
+  if (witness.fundMode === 0 || witness.fundMode === "0") return "fund";
+  if (witness.fundMode === 1 || witness.fundMode === "1") return "fundContinuation";
+  throw new Error("Fund proof witness mode must be 0 or 1");
+}
+
 /** Runs entirely inside the local browser worker; no witness is posted to a prover. */
 export async function generateShieldedProof(input: {
   circuit: ShieldedCircuitName;
@@ -181,11 +190,16 @@ export async function generateShieldedProof(input: {
   expectedPublicSignals: string[];
 }): Promise<{ proof: Groth16Proof; publicSignals: string[] }> {
   const circuit =
-    input.circuit === "claim"
-      ? selectShieldedClaimCircuit(input.witness)
-      : input.circuit === "privateTransfer" || input.circuit === "unshield"
-        ? selectShieldedValueCircuit(input.circuit, input.witness)
-        : input.circuit;
+    input.circuit === "fund" || input.circuit === "fundContinuation"
+      ? selectShieldedFundCircuit(input.witness)
+      : input.circuit === "claim"
+        ? selectShieldedClaimCircuit(input.witness)
+        : input.circuit === "privateTransfer" || input.circuit === "unshield"
+          ? selectShieldedValueCircuit(input.circuit, input.witness)
+          : input.circuit;
+  if (input.circuit === "fundContinuation" && circuit !== "fundContinuation") {
+    throw new Error("Fund continuation proof requires mode 1");
+  }
   const witness =
     circuit === "claim" || circuit === "claim32"
       ? claimWitness(input.witness, circuit)

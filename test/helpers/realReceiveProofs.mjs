@@ -36,6 +36,7 @@ export function checkRealReceiveArtifacts() {
     ...presentationSources,
     "shielded_shield",
     "shielded_fund",
+    "shielded_fund_continuation",
     "shielded_identity_authorization_update",
     "shielded_private_transfer",
   ]) {
@@ -52,11 +53,7 @@ export function checkRealReceiveArtifacts() {
     required.push(path.join(root, "contracts", `${contractName}.sol`));
   const missing = required.filter((file) => !fs.existsSync(file));
   if (process.env.REQUIRE_REAL_RECEIVE_PROOFS === "1") {
-    assert.deepEqual(
-      missing,
-      [],
-      "Run npm run zk:setup before this required integration test",
-    );
+    assert.deepEqual(missing, [], "Run npm run zk:setup before this required integration test");
   }
   if (missing.length) return { missing };
   assert.equal(inspectLinkedReceiveArtifacts({ root }).verification, "passed");
@@ -83,6 +80,7 @@ export async function deployRealReceiveVerifiers(hre) {
     [
       "ShieldedShieldVerifier",
       "ShieldedFundVerifier",
+      "ShieldedFundContinuationVerifier",
       "ShieldedIdentityAuthorizationUpdateVerifier",
       "ShieldedPrivateTransferVerifier",
     ].map((name) => [

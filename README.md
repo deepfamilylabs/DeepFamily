@@ -148,7 +148,7 @@ check. Gas reports remain optional maintenance checks; see [ZK proofs](docs/zk-p
 
 ### ZK Artifact Workflow
 
-The same `zk:*` workflow covers 16 Circom circuits (two identity/disclosure and fourteen shielded,
+The same `zk:*` workflow covers 17 Circom circuits (two identity/disclosure and fifteen shielded,
 including three receive presentations). Receive credentials, letters and recovery use these
 shared build, setup and verification commands:
 
@@ -162,8 +162,8 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
 | `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
 | `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
-| `npm run zk:build`             | Compile all 16 Circom circuits                                     |
-| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 16 circuits |
+| `npm run zk:build`             | Compile all 17 Circom circuits                                     |
+| `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 17 circuits |
 | `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
 
 Each Groth16 circuit has its own proving and verification keys. The single setup command handles
@@ -257,7 +257,7 @@ and regenerates every Phase 2 artifact set from scratch; see the
 
 Run `npm run zk:ptau:fetch` once to download and verify the pinned power-17 Phase 1 file (151 MB,
 Git-ignored). After freezing the reviewed circuit and dependency commit, run `npm run zk:setup`
-on a controlled machine outside CI. It verifies the pinned Phase 1 pTau, compiles all 16 circuits,
+on a controlled machine outside CI. It verifies the pinned Phase 1 pTau, compiles all 17 circuits,
 generates their final keys and receive-link parameters, exports the Solidity verifiers, copies
 the frontend assets, and records the manifests and ceremony transcripts. Review and commit the
 complete generated bundle, then publish its proving files for development, CI and release to reuse.

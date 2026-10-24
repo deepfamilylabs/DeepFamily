@@ -4,7 +4,9 @@ import {
   generateShieldedProof,
   SHIELDED_RECEIVE_LINK_KEYS,
   selectShieldedClaimCircuit,
+  selectShieldedFundCircuit,
   selectShieldedValueCircuit,
+  type ShieldedWitness,
 } from "./shieldedZk";
 
 const mocks = vi.hoisted(() => ({
@@ -49,6 +51,7 @@ describe("shielded proof public inputs", () => {
       ["identityAuthorizationUpdate", 6],
       ["shield", 7],
       ["fund", 29],
+      ["fundContinuation", 29],
       ["claim", 15],
       ["claim32", 15],
       ["privateTransfer", 11],
@@ -65,10 +68,76 @@ describe("shielded proof public inputs", () => {
     }
   });
 
+  it("selects the Fund circuit from its mode before downloading artifacts", () => {
+    for (const fundMode of [0, "0"] as const) {
+      expect(selectShieldedFundCircuit({ fundMode })).toBe("fund");
+    }
+    for (const fundMode of [1, "1"] as const) {
+      expect(selectShieldedFundCircuit({ fundMode })).toBe("fundContinuation");
+    }
+    for (const fundMode of [-1, 2, 0.5, "", "01", "1.0", "bad", ["1"]]) {
+      expect(() => selectShieldedFundCircuit({ fundMode })).toThrow("mode must be 0 or 1");
+    }
+    expect(() => selectShieldedFundCircuit({})).toThrow("mode must be 0 or 1");
+  });
+
+  it("downloads only the Fund mode's proving artifacts and retains its witness", async () => {
+    mocks.verify.mockResolvedValue(true);
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ nPublic: 29 })));
+    vi.stubGlobal("fetch", fetch);
+    for (const [fundMode, file] of [
+      [0, "shielded_fund"],
+      [1, "shielded_fund_continuation"],
+    ] as const) {
+      mocks.fetchAsset.mockClear();
+      fetch.mockClear();
+      const expectedPublicSignals = Array(29).fill("0");
+      expectedPublicSignals[2] = String(fundMode);
+      mocks.fullProve.mockResolvedValue({ proof: {}, publicSignals: expectedPublicSignals });
+      const witness = { fundMode: String(fundMode), endorsementSiblings: Array(64).fill("0") };
+      await generateShieldedProof({ circuit: "fund", witness, expectedPublicSignals });
+      expect(mocks.fetchAsset.mock.calls).toEqual([
+        [`/zk/shielded/${file}.wasm`],
+        [`/zk/shielded/${file}_final.zkey`],
+      ]);
+      expect(fetch).toHaveBeenCalledExactlyOnceWith(`/zk/shielded/${file}.vkey.json`, {
+        cache: "no-cache",
+        credentials: "same-origin",
+      });
+      expect(mocks.fullProve.mock.calls[mocks.fullProve.mock.calls.length - 1][0]).toBe(witness);
+      expect(witness.endorsementSiblings).toHaveLength(64);
+    }
+  });
+
+  it("rejects unsupported Fund modes and explicit continuation mismatches before proving", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    for (const witness of [{}, { fundMode: "2" }, { fundMode: ["1"] }] as ShieldedWitness[]) {
+      await expect(
+        generateShieldedProof({
+          circuit: "fund",
+          witness,
+          expectedPublicSignals: Array(29).fill("0"),
+        }),
+      ).rejects.toThrow("mode must be 0 or 1");
+    }
+    await expect(
+      generateShieldedProof({
+        circuit: "fundContinuation",
+        witness: { fundMode: "0" },
+        expectedPublicSignals: Array(29).fill("0"),
+      }),
+    ).rejects.toThrow("requires mode 1");
+    expect(mocks.fullProve).not.toHaveBeenCalled();
+    expect(mocks.fetchAsset).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("selects the VALUE variant from witness capacity and rejects unsupported shapes", () => {
     for (const circuit of ["privateTransfer", "unshield"] as const) {
       expect(selectShieldedValueCircuit(circuit, { inputEnabled: ["1"] })).toBe(circuit);
-      expect(selectShieldedValueCircuit(circuit, { inputEnabled: ["1", "1", "0", "0"] })).toBe(`${circuit}4`);
+      expect(selectShieldedValueCircuit(circuit, { inputEnabled: ["1", "1", "0", "0"] })).toBe(
+        `${circuit}4`,
+      );
       for (const inputEnabled of [[], ["1", "1"], ["1", "1", "1"], Array(5).fill("1")]) {
         expect(() => selectShieldedValueCircuit(circuit, { inputEnabled })).toThrow("one or four");
       }
@@ -79,7 +148,10 @@ describe("shielded proof public inputs", () => {
     mocks.verify.mockResolvedValue(true);
     const fetch = vi.fn(async () => new Response(JSON.stringify({})));
     vi.stubGlobal("fetch", fetch);
-    for (const [action, file] of [["privateTransfer", "shielded_private_transfer"], ["unshield", "shielded_unshield"]] as const) {
+    for (const [action, file] of [
+      ["privateTransfer", "shielded_private_transfer"],
+      ["unshield", "shielded_unshield"],
+    ] as const) {
       for (const width of [1, 4] as const) {
         mocks.fetchAsset.mockClear();
         fetch.mockClear();
@@ -95,7 +167,10 @@ describe("shielded proof public inputs", () => {
           [`/zk/shielded/${selected}.wasm`],
           [`/zk/shielded/${selected}_final.zkey`],
         ]);
-        expect(fetch).toHaveBeenCalledExactlyOnceWith(`/zk/shielded/${selected}.vkey.json`, { cache: "no-cache", credentials: "same-origin" });
+        expect(fetch).toHaveBeenCalledExactlyOnceWith(`/zk/shielded/${selected}.vkey.json`, {
+          cache: "no-cache",
+          credentials: "same-origin",
+        });
       }
     }
   });

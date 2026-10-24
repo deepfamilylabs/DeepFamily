@@ -963,7 +963,7 @@ describe("local unified funding preparation", () => {
         const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
         for (const [source, action, prepared] of [
           ["shielded_fund", SHIELDED_POOL_ACTION.Fund, initialFunding],
-          ["shielded_fund", SHIELDED_POOL_ACTION.Fund, additionalFunding],
+          ["shielded_fund_continuation", SHIELDED_POOL_ACTION.Fund, additionalFunding],
         ] as const) {
           const { witness } = prepared;
           // Complete the same receiver binding the Worker adds after preparation.

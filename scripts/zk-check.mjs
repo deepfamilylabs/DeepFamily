@@ -146,7 +146,7 @@ export const buildZkCheckCommands = ({
             ]
           : shielded.map((name) => {
               const action = name.slice("shielded:".length);
-              const hasProofFixture = ["fund", "claim"].includes(action);
+              const hasProofFixture = ["fund", "fundContinuation", "claim", "claim32"].includes(action);
               return Object.freeze({
                 circuit: name,
                 check: hasProofFixture ? "development-proof-smoke" : "development-artifacts",

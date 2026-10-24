@@ -96,9 +96,7 @@ function withClaimSource(witness, source) {
   const pairRoot = poseidon2([old, BigInt(source.sibling)]);
   const root = source.prefixRoot ? poseidon2([BigInt(source.prefixRoot), pairRoot]) : pairRoot;
   updated.inputRoots = [String(root)];
-  updated.inputNullifiers = [
-    poseidon3([scoped(1016n), ownerSecret, old]),
-  ].map(String);
+  updated.inputNullifiers = [poseidon3([scoped(1016n), ownerSecret, old])].map(String);
   for (let slot = Number(updated.claimCount); slot < 3; slot++) {
     updated.periodNullifiers[slot] = String(
       poseidon4([scoped(1019n), ownerSecret, old, BigInt(slot)]),
@@ -125,7 +123,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), "deepfamily-shielded-funding-"));
   try {
     const calculators = {};
-    for (const action of ["fund", "claim"]) {
+    for (const action of ["fund", "fund_continuation", "claim"]) {
       const circuit = `shielded_${action}`;
       execFileSync(
         path.join(repoRoot, "bin/circom"),
@@ -151,29 +149,69 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
         { singleThread: true },
       );
     }
+    const calculatorFor = (action, witness) =>
+      calculators[action === "fund" && witness.fundMode === "1" ? "fund_continuation" : action];
     const valid = async (action, witness) => {
-      assert.equal((await calculators[action].calculateWitness(witness, 1))[0], 1n);
+      assert.equal((await calculatorFor(action, witness).calculateWitness(witness, 1))[0], 1n);
     };
     const invalid = (action, witness) =>
-      assertConstraintViolation(() => calculators[action].calculateWitness(witness, 1));
+      assertConstraintViolation(() => calculatorFor(action, witness).calculateWitness(witness, 1));
     const mutate = (witness, change) => {
       const copy = structuredClone(witness);
       change(copy);
       return copy;
     };
     const fixture = buildShieldedFundingFixtures();
-    await t.test("private Fund initial and top-up require the exact authenticated recipient binding", async () => {
-      for (const witness of [fixture.initial, fixture.continuation]) {
-        for (const field of ["receiveAuthorizationAlias", "receiveSalt"]) {
-          await invalid("fund", mutate(witness, (w) => { w[field] = "0"; }));
-          await invalid("fund", mutate(witness, (w) => { w[field] = String(BigInt(w[field]) + 1n); }));
-        }
-        for (const slot of [0, 1]) {
-          await invalid("fund", mutate(witness, (w) => { w.receiveBindings[slot] = String(BigInt(w.receiveBindings[slot]) + 1n); }));
-        }
-        await invalid("fund", mutate(witness, (w) => { w.receiveBindings[0] = "0"; }));
-      }
+    await t.test("separate funding circuits bind their own public mode", async () => {
+      const initial = await calculators.fund.calculateWitness(fixture.initial, true);
+      const continuation = await calculators.fund_continuation.calculateWitness(
+        fixture.continuation,
+        true,
+      );
+      assert.equal(initial[3], 0n);
+      assert.equal(continuation[3], 1n);
+      await assertConstraintViolation(() =>
+        calculators.fund.calculateWitness(fixture.continuation, true),
+      );
+      await assertConstraintViolation(() =>
+        calculators.fund_continuation.calculateWitness(fixture.initial, true),
+      );
     });
+    await t.test(
+      "private Fund initial and top-up require the exact authenticated recipient binding",
+      async () => {
+        for (const witness of [fixture.initial, fixture.continuation]) {
+          for (const field of ["receiveAuthorizationAlias", "receiveSalt"]) {
+            await invalid(
+              "fund",
+              mutate(witness, (w) => {
+                w[field] = "0";
+              }),
+            );
+            await invalid(
+              "fund",
+              mutate(witness, (w) => {
+                w[field] = String(BigInt(w[field]) + 1n);
+              }),
+            );
+          }
+          for (const slot of [0, 1]) {
+            await invalid(
+              "fund",
+              mutate(witness, (w) => {
+                w.receiveBindings[slot] = String(BigInt(w.receiveBindings[slot]) + 1n);
+              }),
+            );
+          }
+          await invalid(
+            "fund",
+            mutate(witness, (w) => {
+              w.receiveBindings[0] = "0";
+            }),
+          );
+        }
+      },
+    );
 
     await t.test("both funding bindings and modes enforce the public chain and pool", async () => {
       for (const budgetKind of [0, 1]) {
@@ -559,7 +597,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       const cli = path.join(repoRoot, "node_modules/snarkjs/build/cli.cjs");
       for (const [action, witness] of [
         ["fund", fixture.initial],
-        ["fund", fixture.continuation],
+        ["fund_continuation", fixture.continuation],
       ]) {
         await valid(action, witness);
         const circuit = `shielded_${action}`;
@@ -721,7 +759,7 @@ test("shielded initial Fund and continuation Fund constraints", async (t) => {
       async () => {
         for (const [action, witness] of [
           ["fund", fixture.initial],
-          ["fund", fixture.continuation],
+          ["fund_continuation", fixture.continuation],
         ]) {
           await invalid(
             action,

@@ -508,7 +508,7 @@ describe("shielded production setup artifacts", function () {
       ).to.equal(fixture.finalized[action].finalZkey);
       if (spec.verifierPath) expect(destinations).to.include(spec.verifierPath);
     }
-    expect(destinations.filter((name) => name.startsWith("contracts/"))).to.have.length(9);
+    expect(destinations.filter((name) => name.startsWith("contracts/"))).to.have.length(10);
     expect(destinations.at(-1)).to.equal(SHIELDED_PRODUCTION_MANIFEST_PATH);
   });
 
