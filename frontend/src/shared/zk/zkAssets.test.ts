@@ -25,7 +25,7 @@ describe("ZK proving asset loading", () => {
     });
   });
 
-  it("loads the content-addressed object from the asset host", async () => {
+  it("loads the Brotli object and checks the decoded bytes against the original digest", async () => {
     const digest = await sha256Hex(BYTES);
     const fetchMock = stubFetch(BYTES);
     await expect(
@@ -35,7 +35,7 @@ describe("ZK proving asset loading", () => {
       }),
     ).resolves.toEqual(BYTES);
     expect(fetchMock).toHaveBeenCalledWith(
-      `https://zk.example/${digest}/shielded_claim_64_final.zkey`,
+      `https://zk.example/${digest}/shielded_claim_64_final.zkey.br`,
     );
   });
 
@@ -47,6 +47,31 @@ describe("ZK proving asset loading", () => {
         digests: { "/zk/shielded/shielded_claim_64_final.zkey": await sha256Hex(BYTES) },
       }),
     ).rejects.toThrow("ZK asset digest mismatch: /zk/shielded/shielded_claim_64_final.zkey");
+  });
+
+  it("rejects compressed bytes served without HTTP decoding", async () => {
+    const { brotliCompressSync } = await import("node:zlib");
+    stubFetch(new Uint8Array(brotliCompressSync(BYTES)));
+    await expect(
+      fetchZkAsset("/zk/person_commitment.wasm", {
+        baseUrl: "https://zk.example",
+        digests: { "/zk/person_commitment.wasm": await sha256Hex(BYTES) },
+      }),
+    ).rejects.toThrow("ZK asset digest mismatch: /zk/person_commitment.wasm");
+  });
+
+  it("propagates a failed HTTP Brotli decode before returning proving bytes", async () => {
+    const failure = new TypeError("Brotli decoding failed");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, arrayBuffer: () => Promise.reject(failure) })),
+    );
+    await expect(
+      fetchZkAsset("/zk/person_commitment.wasm", {
+        baseUrl: "https://zk.example",
+        digests: { "/zk/person_commitment.wasm": await sha256Hex(BYTES) },
+      }),
+    ).rejects.toBe(failure);
   });
 
   it("refuses unpinned files and reports HTTP failures", async () => {
@@ -63,7 +88,7 @@ describe("ZK proving asset loading", () => {
         digests: { "/zk/person_commitment.wasm": UNSERVED_DIGEST },
       }),
     ).rejects.toThrow(
-      `Failed to load https://zk.example/${UNSERVED_DIGEST}/person_commitment.wasm: 404`,
+      `Failed to load https://zk.example/${UNSERVED_DIGEST}/person_commitment.wasm.br: 404`,
     );
   });
 });

@@ -10,6 +10,7 @@ zk-artifacts/
 # (npm run zk:assets:fetch / zk:assets:publish); only their .vkey.json stay in Git.
 frontend/public/zk/**/*.wasm
 frontend/public/zk/**/*.zkey
+frontend/public/zk/**/*.br
 /cache/
 coverage/
 coverage.json

@@ -160,8 +160,8 @@ temporary directories and require only npm dependencies and the pinned Circom co
 | Command                        | Purpose                                                            |
 | ------------------------------ | ------------------------------------------------------------------ |
 | `npm run zk:fetch`             | Install host-native and canonical audit-reference Circom compilers |
-| `npm run zk:assets:fetch`      | Download the manifest-pinned browser WASM/zkey files from R2       |
-| `npm run zk:assets:publish`    | Upload new browser WASM/zkey files to R2 after a setup             |
+| `npm run zk:assets:fetch`      | Download and decode the manifest-pinned browser WASM/zkey files from R2 |
+| `npm run zk:assets:publish`    | Compress and upload new browser WASM/zkey files to R2              |
 | `npm run zk:build`             | Compile all 16 Circom circuits                                     |
 | `npm run zk:setup`             | Generate the final keys, verifiers and evidence for all 16 circuits |
 | `npm run zk:check`             | Rebuild and check artifacts, proofs and available ceremony evidence |
@@ -174,7 +174,7 @@ under `frontend/public/zk/` and Solidity verifiers under `contracts/`.
 
 Receive presentations use LinkG16 to link two ordinary Circom proofs over the same hidden
 credential fields, without recursive pairing checks inside a circuit or a Go/WASM prover.
-The payer downloads one presentation's WASM/zkey: about 13.56 MiB for anonymous receipts,
+The payer loads one presentation's WASM/zkey, with uncompressed sizes of about 13.56 MiB for anonymous receipts,
 13.69 MiB for Fund, or 20.97 MiB for attachments, plus a shared 26 KiB link-key file.
 The submitted proof is 1,184 bytes (anonymous/attachment) or 1,216 bytes (Fund), excluding
 public signals and ciphertext. First use needs no recipient registration or transaction;
@@ -187,12 +187,19 @@ pinned files; the setup command creates their final replacement for every enviro
 
 The browser `.wasm` and `.zkey` files are not committed; their `.vkey.json` files and the
 small shared `shielded/receive-link-keys.json` are committed. The
-circuit manifests pin each file's SHA-256, and the files are hosted on R2 at
-`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`. The repository names no host: set the variable
+circuit manifests pin each uncompressed file's SHA-256, and Brotli copies are hosted on R2 at
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. Objects carry `Content-Encoding: br`
+and the original file's content type, so native browser and Node fetch decode them before the
+unchanged manifest digest is checked. The repository names no host: set the variable
 in `frontend/.env.local`, in the GitHub repository variables for CI, and in Cloudflare Pages.
-`npm run zk:assets:fetch` installs them in a fresh checkout (`dev:all` and CI do this automatically). After any setup that changes a key, run
+`npm run zk:assets:fetch` installs the decoded files in a fresh checkout (`dev:all` and CI do this automatically).
+The publish command generates adjacent, ignored `.br` files using Brotli quality 5 and reports
+their sizes before uploading. Run it once when adopting Brotli,
+and after any setup that changes a key:
 `npm run zk:assets:publish` (with `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and
-`R2_BUCKET` in `.env`) before pushing the new manifests. Daily build, fetch and check commands reuse
+`R2_BUCKET` in `.env`), before deploying a build that uses the new URLs. Compression reduces
+download size; decoded proving-key size, prover memory, circuit constraints and proof bytes
+remain unchanged. Local development serves the original files. Daily build, fetch and check commands reuse
 the pinned keys. `dev:all` stops if a circuit change makes them stale or a required pinned file
 cannot be obtained; key generation requires an explicit `npm run zk:setup` from a clean, reviewed
 commit.

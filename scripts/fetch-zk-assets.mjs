@@ -37,7 +37,7 @@ export function configuredZkAssetBaseUrl(root = ROOT) {
   return url;
 }
 
-/** Installs the manifest-pinned browser WASM/zkey files under frontend/public/zk. */
+/** Fetch decodes Content-Encoding: br; install the digest-checked raw WASM/zkey files locally. */
 export async function fetchZkAssets({
   root = ROOT,
   baseUrl = configuredZkAssetBaseUrl(root),

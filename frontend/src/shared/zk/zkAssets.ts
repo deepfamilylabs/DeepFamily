@@ -11,8 +11,8 @@ const BUILD_ASSET_HOST: ZkAssetHost = {
 
 /**
  * Proving WASM/zkey files exceed Cloudflare Pages' 25 MiB asset limit, so builds load them
- * from the R2 asset host by content digest and reject bytes that differ from the digests
- * the circuit manifests pinned at build time. The dev server serves the local copies.
+ * from the R2 asset host as Brotli-encoded objects. HTTP Content-Encoding: br makes fetch
+ * decode them before the original manifest digest is checked. The dev server serves raw copies.
  */
 export async function fetchZkAsset(
   path: string,
@@ -25,7 +25,7 @@ export async function fetchZkAsset(
   }
   const digest = host.digests[path];
   if (!digest) throw new Error(`No pinned digest for ZK asset ${path}`);
-  const url = `${host.baseUrl}/${digest}/${path.slice(path.lastIndexOf("/") + 1)}`;
+  const url = `${host.baseUrl}/${digest}/${path.slice(path.lastIndexOf("/") + 1)}.br`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());

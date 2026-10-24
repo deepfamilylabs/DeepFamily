@@ -254,9 +254,7 @@ describe("parameterized ZK command wrappers", function () {
         path.join("circuits", "shielded_anonymous_receive_credential.circom"),
       );
       expect(commands[2].args.at(-1)).to.equal(path.join("zk-artifacts", "shielded"));
-      expect(commands.at(-1).args[0]).to.equal(
-        path.join("circuits", "shielded_unshield_4.circom"),
-      );
+      expect(commands.at(-1).args[0]).to.equal(path.join("circuits", "shielded_unshield_4.circom"));
       expect(
         commands.every(({ executable }) => executable === path.join(fixtureRoot, "bin", "circom")),
       ).to.equal(true);

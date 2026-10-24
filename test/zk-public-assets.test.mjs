@@ -1,5 +1,7 @@
 import { expect } from "chai";
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import { brotliCompressSync, brotliDecompressSync } from "node:zlib";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +9,7 @@ import path from "node:path";
 import { fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
 import { configuredZkAssetBaseUrl, fetchZkAssets } from "../scripts/fetch-zk-assets.mjs";
 import { publishZkAssets } from "../scripts/publish-zk-assets.mjs";
+import { compressZkAssets } from "../scripts/compress-zk-assets.mjs";
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const BYTES = {
@@ -73,25 +76,25 @@ describe("ZK public proving assets", function () {
       {
         path: "/zk/person_commitment.wasm",
         file: "frontend/public/zk/person_commitment.wasm",
-        key: `${digest("person_commitment.wasm")}/person_commitment.wasm`,
+        key: `${digest("person_commitment.wasm")}/person_commitment.wasm.br`,
         sha256: digest("person_commitment.wasm"),
       },
       {
         path: "/zk/person_commitment_final.zkey",
         file: "frontend/public/zk/person_commitment_final.zkey",
-        key: `${digest("person_commitment_final.zkey")}/person_commitment_final.zkey`,
+        key: `${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
         sha256: digest("person_commitment_final.zkey"),
       },
       {
         path: "/zk/shielded/shielded_claim_64.wasm",
         file: "frontend/public/zk/shielded/shielded_claim_64.wasm",
-        key: `${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm`,
+        key: `${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
         sha256: digest("shielded/shielded_claim_64.wasm"),
       },
       {
         path: "/zk/shielded/shielded_claim_64_final.zkey",
         file: "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
-        key: `${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey`,
+        key: `${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey.br`,
         sha256: digest("shielded/shielded_claim_64_final.zkey"),
       },
     ]);
@@ -141,9 +144,9 @@ describe("ZK public proving assets", function () {
     });
     expect(result).to.deep.equal({ assetCount: 4, downloaded: 3 });
     expect(requests).to.deep.equal([
-      `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey`,
-      `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm`,
-      `https://assets.example/${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey`,
+      `https://assets.example/${digest("person_commitment_final.zkey")}/person_commitment_final.zkey.br`,
+      `https://assets.example/${digest("shielded/shielded_claim_64.wasm")}/shielded_claim_64.wasm.br`,
+      `https://assets.example/${digest("shielded/shielded_claim_64_final.zkey")}/shielded_claim_64_final.zkey.br`,
     ]);
     for (const [file, bytes] of Object.entries(BYTES)) {
       expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
@@ -221,7 +224,7 @@ describe("ZK public proving assets", function () {
 
   it("uploads only objects the bucket lacks, signing each payload digest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
-    const existingKey = `${digest("person_commitment.wasm")}/person_commitment.wasm`;
+    const existingKey = `${digest("person_commitment.wasm")}/person_commitment.wasm.br`;
     const requests = [];
     const result = await publishZkAssets({
       root,
@@ -229,7 +232,10 @@ describe("ZK public proving assets", function () {
       fetchImpl: async (url, init) => {
         requests.push({ url, method: init.method, headers: init.headers, body: init.body });
         if (init.method === "HEAD") {
-          return new Response(null, { status: url.endsWith(existingKey) ? 200 : 404 });
+          return new Response(null, {
+            status: url.endsWith(existingKey) ? 200 : 404,
+            headers: { "content-encoding": "br" },
+          });
         }
         return new Response(null, { status: 200 });
       },
@@ -245,8 +251,12 @@ describe("ZK public proving assets", function () {
     for (const put of puts) {
       expect(put.headers["x-amz-content-sha256"]).to.equal(sha256(put.body));
       expect(put.headers["cache-control"]).to.equal("public, max-age=31536000, immutable");
+      expect(put.headers["content-encoding"]).to.equal("br");
+      const asset = listZkPublicAssets(root).find((item) => put.url.endsWith(`/${item.key}`));
+      expect(brotliDecompressSync(put.body)).to.deep.equal(BYTES[asset.file]);
+      expect(put.headers["x-amz-content-sha256"]).not.to.equal(asset.sha256);
       expect(put.headers.authorization).to.match(
-        /^AWS4-HMAC-SHA256 Credential=key-id\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=cache-control;content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
+        /^AWS4-HMAC-SHA256 Credential=key-id\/\d{8}\/auto\/s3\/aws4_request, SignedHeaders=cache-control;content-encoding;content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
       );
     }
     expect(puts.map((put) => put.headers["content-type"])).to.deep.equal([
@@ -256,21 +266,119 @@ describe("ZK public proving assets", function () {
     ]);
   });
 
+  it("compresses, reuses valid sidecars and repairs corrupt or stale copies", async function () {
+    for (const file of Object.keys(BYTES)) writeLocal(file);
+    const first = await compressZkAssets({ root, log: () => {} });
+    expect(first.assetCount).to.equal(4);
+    expect(first.compressed).to.equal(4);
+    expect(first.rawBytes).to.equal(
+      Object.values(BYTES).reduce((total, bytes) => total + bytes.length, 0),
+    );
+    for (const [file, original] of Object.entries(BYTES)) {
+      expect(brotliDecompressSync(fs.readFileSync(path.join(root, `${file}.br`)))).to.deep.equal(
+        original,
+      );
+      expect(fs.readFileSync(path.join(root, file))).to.deep.equal(original);
+    }
+    expect(await compressZkAssets({ root, log: () => {} })).to.deep.equal({
+      ...first,
+      compressed: 0,
+    });
+
+    const files = Object.keys(BYTES);
+    fs.writeFileSync(path.join(root, `${files[0]}.br`), Buffer.from("corrupt"));
+    fs.writeFileSync(path.join(root, `${files[1]}.br`), brotliCompressSync(Buffer.from("stale")));
+    const repaired = await compressZkAssets({ root, log: () => {} });
+    expect(repaired.compressed).to.equal(2);
+    for (const file of files) {
+      expect(brotliDecompressSync(fs.readFileSync(path.join(root, `${file}.br`)))).to.deep.equal(
+        BYTES[file],
+      );
+    }
+  });
+
+  it("refuses an existing encoded URL without the required Content-Encoding metadata", async function () {
+    for (const file of Object.keys(BYTES)) writeLocal(file);
+    let error;
+    const methods = [];
+    try {
+      await publishZkAssets({
+        root,
+        env: CREDENTIALS,
+        fetchImpl: async (_url, init) => {
+          methods.push(init.method);
+          return new Response(null, { status: 200 });
+        },
+        log: () => {},
+      });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error?.message).to.contain("missing Content-Encoding: br");
+    expect(methods).to.deep.equal(["HEAD"]);
+  });
+
+  it("downloads Brotli over real HTTP and installs decoded files with their original digests", async function () {
+    const requests = [];
+    const assets = listZkPublicAssets(root);
+    const server = createServer((request, response) => {
+      requests.push(request.url);
+      const asset = assets.find((item) => request.url === `/${item.key}`);
+      if (!asset) {
+        response.writeHead(404).end();
+        return;
+      }
+      const bytes = brotliCompressSync(BYTES[asset.file]);
+      response.writeHead(200, {
+        "content-encoding": "br",
+        "content-type": asset.file.endsWith(".wasm")
+          ? "application/wasm"
+          : "application/octet-stream",
+        "content-length": bytes.length,
+      });
+      response.end(bytes);
+    });
+    try {
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+      const result = await fetchZkAssets({
+        root,
+        baseUrl: `http://127.0.0.1:${server.address().port}`,
+        log: () => {},
+      });
+      expect(result).to.deep.equal({ assetCount: 4, downloaded: 4 });
+      expect(requests).to.deep.equal(assets.map((asset) => `/${asset.key}`));
+      for (const [file, bytes] of Object.entries(BYTES)) {
+        expect(fs.readFileSync(path.join(root, file))).to.deep.equal(bytes);
+      }
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
   it("refuses to publish local files that differ from the manifest", async function () {
     for (const file of Object.keys(BYTES)) writeLocal(file);
-    writeLocal("frontend/public/zk/shielded/shielded_claim_64_final.zkey", Buffer.from("regenerated"));
+    writeLocal(
+      "frontend/public/zk/shielded/shielded_claim_64_final.zkey",
+      Buffer.from("regenerated"),
+    );
     let error;
     try {
       await publishZkAssets({
         root,
         env: CREDENTIALS,
-        fetchImpl: async () => new Response(null, { status: 404 }),
+        fetchImpl: async () => expect.fail("validate the complete set before contacting R2"),
         log: () => {},
       });
     } catch (caught) {
       error = caught;
     }
     expect(error?.message).to.contain("does not match its manifest digest");
+    for (const file of Object.keys(BYTES)) {
+      expect(fs.existsSync(path.join(root, `${file}.br`))).to.equal(false);
+    }
   });
 
   it("retries reset connections and server errors but not client errors", async function () {

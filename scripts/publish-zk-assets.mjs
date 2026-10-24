@@ -5,12 +5,16 @@ import { createHash, createHmac } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+import { brotliDecompress } from "node:zlib";
 import { fetchWithRetry, listZkPublicAssets } from "../lib/zkPublicAssets.js";
+import { compressZkAssets } from "./compress-zk-assets.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const hmac = (key, data) => createHmac("sha256", key).update(data).digest();
+const decompress = promisify(brotliDecompress);
 
 const CONTENT_TYPES = Object.freeze({
   ".wasm": "application/wasm",
@@ -84,7 +88,7 @@ function readCredentials(env) {
   return credentials;
 }
 
-/** Uploads every manifest-pinned browser WASM/zkey that the bucket does not hold yet. */
+/** Uploads Brotli-encoded proving files; browsers decode before checking the pinned raw digest. */
 export async function publishZkAssets({
   root = ROOT,
   env = process.env,
@@ -94,12 +98,7 @@ export async function publishZkAssets({
   root = path.resolve(root);
   const credentials = readCredentials(env);
   const assets = listZkPublicAssets(root);
-  // Check every file before uploading any, so an unfinished setup publishes nothing.
-  for (const asset of assets) {
-    if (sha256(await fs.readFile(path.join(root, asset.file))) !== asset.sha256) {
-      throw new Error(`${asset.file} does not match its manifest digest; rerun the ZK setup first`);
-    }
-  }
+  await compressZkAssets({ root, log });
   let uploaded = 0;
   for (const asset of assets) {
     const head = signR2Request({
@@ -112,17 +111,27 @@ export async function publishZkAssets({
       method: "HEAD",
       headers: head.headers,
     });
-    if (existing.ok) continue;
+    if (existing.ok) {
+      if (existing.headers.get("content-encoding") !== "br") {
+        throw new Error(`R2 object ${asset.key} is missing Content-Encoding: br`);
+      }
+      continue;
+    }
     if (existing.status !== 404)
       throw new Error(`R2 HEAD ${asset.key} failed: HTTP ${existing.status}`);
-    const bytes = await fs.readFile(path.join(root, asset.file));
+    const bytes = await fs.readFile(path.join(root, `${asset.file}.br`));
+    const originalSize = (await fs.stat(path.join(root, asset.file))).size;
+    if (sha256(await decompress(bytes, { maxOutputLength: originalSize })) !== asset.sha256) {
+      throw new Error(`${asset.file}.br does not decode to its manifest digest`);
+    }
     const put = signR2Request({
       credentials,
       method: "PUT",
       key: asset.key,
-      payloadSha256: asset.sha256,
+      payloadSha256: sha256(bytes),
       headers: {
         "cache-control": CACHE_CONTROL,
+        "content-encoding": "br",
         "content-type": CONTENT_TYPES[path.extname(asset.file)],
       },
     });

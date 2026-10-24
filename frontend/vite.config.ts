@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const UNICODE_LICENSE_SHA256 = 'e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96'
@@ -204,6 +205,27 @@ const pagesOutputPlugin = (headers: Record<string, string>): Plugin => ({
   }
 })
 
+// Vite copies public/ before writing the bundle. Remote builds only need the small verification
+// and linking keys; raw proving files remain available for builds using same-origin /zk.
+const zkOutputPlugin = (remoteAssets: boolean): Plugin => ({
+  name: 'deepfamily:zk-output',
+  apply: 'build',
+  writeBundle(options) {
+    if (!options.dir) return
+    const prune = (directory: string) => {
+      if (!fs.existsSync(directory)) return
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const file = path.join(directory, entry.name)
+        if (entry.isDirectory()) prune(file)
+        else if (/\.(wasm|zkey)(\.br)?$/.test(entry.name) && (remoteAssets || entry.name.endsWith('.br'))) {
+          fs.rmSync(file)
+        }
+      }
+    }
+    prune(path.join(options.dir, 'zk'))
+  }
+})
+
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const getEnv = (key: string): string | undefined => env[key] ?? process.env[key]
@@ -237,6 +259,7 @@ export default defineConfig(({ command, mode }) => {
       react(),
       cspReportPlugin({ reportFile }),
       pagesOutputPlugin(securityHeaders),
+      zkOutputPlugin(Boolean(zkAssetBaseUrl)),
     ],
     resolve: {
       alias: {

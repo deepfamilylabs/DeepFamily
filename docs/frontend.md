@@ -713,19 +713,24 @@ Proof workflows load public artifacts at runtime:
 
 - Inputs: `.wasm`, `.zkey`, `.vkey.json`, and the shared `shielded/receive-link-keys.json` for receive presentations
 - Local location: `frontend/public/zk/` (served as `/zk/…` by the dev server); verification keys and the small receive-link key file are committed, `npm run zk:assets:fetch` installs proving files
-- Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and are checked against the manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
-- Circuit catalog: 2 identity/disclosure circuits plus 11 shielded circuits (five business actions, two credential issuers, three presentations and the authorization update), 13 in total
+- Builds: `.wasm`/`.zkey` come from `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br` with `Content-Encoding: br`; native fetch decompresses them before checking the original manifest digests embedded at build time (`shared/zk/zkAssets.ts`); `.vkey.json` stays same-origin
+- Compression: `npm run zk:assets:publish` automatically creates adjacent, ignored `.br` files at Brotli quality 5 and reports sizes before uploading
+- Circuit catalog: 2 identity/disclosure circuits plus 14 shielded circuits, 16 in total
 - Generation and verification details: see [zk-proofs.md](zk-proofs.md)
 
-If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). In a build, a digest mismatch or HTTP 404 means the files for the current manifests were not published with `npm run zk:assets:publish`.
+If proof generation or verification fails in dev, first confirm the expected files exist in `public/zk/` (run `npm run zk:assets:fetch`). For a remote build, publish the `.br` objects before deployment, including when first adopting Brotli with unchanged proving keys. On HTTP 404, run `npm run zk:assets:publish` for the current manifests. On a digest mismatch, check the served bytes and ensure the object has `Content-Encoding: br` and the original WASM or binary content type.
 
-The payer loads one presentation's WASM and zkey: 13.56 MiB for anonymous receipts,
+The payer loads one presentation's WASM and zkey, with uncompressed sizes of 13.56 MiB for anonymous receipts,
 13.69 MiB for Fund or 20.97 MiB for attached letters. The roughly 26 KiB linking
 key file is shared; its digest and three fixed on-chain verifiers are pinned by
 the shielded manifest's `linkKeys`. Browsers do not fetch R1CS files. Submitted
 linked proofs are 1,184 bytes for anonymous/attached receipts and 1,216 bytes for
 Fund, with eleven public signals (fourteen for attachments) and ciphertext counted
 separately. See [private letters](private-letters.md#browser-artifacts) for exact sizes.
+
+Brotli reduces network transfer; the prover receives the same decoded bytes and uses the same
+memory and constraints. The circuit manifests, contract verifiers and submitted proofs are unchanged.
+Business metadata continues to use its existing gzip format.
 
 ## Encrypted Version Metadata
 

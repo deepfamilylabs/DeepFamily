@@ -16,9 +16,15 @@ WASM/zkey/vkey files to `public/zk/shielded/` and generated verifiers to `contra
 the identity/disclosure flow. Only the `.vkey.json` files are
 committed; publish new WASM/zkey files with `npm run zk:assets:publish` from the repository root.
 The dev server serves the local copies at `/zk/`. Builds load WASM/zkey from
-`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>` and reject any file whose SHA-256 differs from the
-circuit manifests. `npm run zk:check` rebuilds all 13 circuits and checks artifact consistency,
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`. The host sends `Content-Encoding: br`, so
+the browser decodes the download before checking its original SHA-256 against the circuit
+manifests. `npm run zk:assets:publish` automatically prepares local Brotli files before uploading.
+Builds using this host omit local WASM/zkey files and their compressed
+copies from `dist`; local dev and builds with an empty host keep using raw files at `/zk/`.
+`npm run zk:check` rebuilds all 16 circuits and checks artifact consistency,
 proofs and available ceremony evidence using the same pinned artifact set.
+Publish the `.br` objects once before deploying this frontend, even when the circuit keys have
+not changed; existing raw objects use different URLs.
 The current checked-in keys remain development-only and unattested until the explicit final setup
 and review. `release:preflight` requires the final keys, ceremony evidence and other release
 evidence before publication. Daily builds, downloads and checks reuse keys without generating them.
@@ -93,8 +99,10 @@ The build writes `dist/_headers` with the same security headers `vite preview` s
 reads Functions only from the project's root directory, so the CSP report endpoint lives at the
 repository root in `functions/__csp-report.ts`.
 Cloudflare Pages currently limits each site asset to [25 MiB](https://developers.cloudflare.com/pages/platform/limits/#file-size),
-and the shielded claim and fund zkeys exceed it. Proving WASM/zkey files are therefore served from
-the R2 bucket behind `VITE_ZK_ASSET_BASE_URL`, whose CORS policy must allow the site origins. The code names no host: each build reads it from its environment
+and some raw shielded zkeys exceed it. Proving WASM/zkey files are therefore served as Brotli
+objects from the R2 bucket behind `VITE_ZK_ASSET_BASE_URL`, whose CORS policy must allow the site
+origins. Published objects retain their original MIME type and carry `Content-Encoding: br`.
+The code names no host: each build reads it from its environment
 (Pages settings, CI, or `.env.local` locally) and fails without it. The build embeds the file
 digests from the circuit manifests and adds the host to `connect-src`; an empty value loads
 same-origin `/zk/`.

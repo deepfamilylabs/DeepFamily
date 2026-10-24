@@ -430,7 +430,7 @@ The four-input variants use `_4` before `_final.zkey`:
 The browser fetches the selected variant only. These are proving-key sizes; the
 Groth16 ABC proof payload remains 256 bytes for either capacity.
 
-Presentation WASM/zkey downloads are 14,216,109 bytes (13.56 MiB) for anonymous
+Uncompressed presentation WASM/zkey files total 14,216,109 bytes (13.56 MiB) for anonymous
 receipts, 14,355,369 bytes (13.69 MiB) for Fund, or 21,993,051 bytes (20.97 MiB) for
 attachments; the link-key file adds roughly 26 KiB shared across kinds. Browsers
 load the needed presentation and do not download R1CS files or a separate prover
@@ -438,13 +438,38 @@ runtime. Linked proofs are 1,184 bytes for anonymous/attachment or 1,216 bytes f
 Fund. Their public signals are separate: eleven for anonymous/Fund and fourteen
 for attachments. Transaction data and ciphertext are additional.
 
-The final shielded artifacts use the same `/zk/shielded/` URLs in every environment and are installed in
+The final shielded artifacts use the same logical `/zk/shielded/` paths in every environment and are installed in
 `frontend/public/zk/shielded/` by `zk:setup` with the manifest recording their ceremony evidence. Only the
 verification-key metadata is committed. The WASM/zkey files are pinned by the manifests' `wasmSha256`
-and `zkeySha256` and hosted on R2 at `<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>`:
-`zk:assets:publish` uploads new files and `zk:assets:fetch` installs them in a checkout. The Vite
-dev server serves the local copies; builds fetch from R2 and reject any file whose SHA-256 differs
-from the manifest digest embedded at build time. The unified `zk:check` rebuilds all sixteen
+and `zkeySha256` of the original bytes. R2 hosts Brotli copies at
+`<VITE_ZK_ASSET_BASE_URL>/<sha256>/<file name>.br`, with `Content-Encoding: br`, the original
+content type and immutable caching. The `.br` suffix gives compressed objects separate URLs
+from previously published uncompressed objects.
+
+`npm run zk:assets:publish` validates the pinned files, automatically creates adjacent ignored
+`.br` files at Brotli quality 5, reports their sizes and uploads the new objects.
+Publish once before deploying the Brotli loader, even when no
+circuit or key changed. Browser and Node fetch decompress the HTTP response automatically;
+the loader checks the decoded bytes against the original manifest digest. `zk:assets:fetch`
+installs these decoded files in a checkout. The Vite dev server serves the original local files.
+Compression changes transfer size, while proving-key contents, prover memory, constraints and
+submitted proofs remain unchanged. Business metadata keeps its existing gzip format.
+
+The current development keys measure as follows at Brotli quality 5 (decimal MB; future setup
+outputs may have different sizes):
+
+| Proving key | Uncompressed MB | Brotli MB |
+| --- | ---: | ---: |
+| `shielded_fund_final.zkey` | 37.79 | 20.89 |
+| `shielded_claim_64_final.zkey` | 35.48 | 18.55 |
+| `shielded_claim_32_final.zkey` | 27.68 | 14.52 |
+| `shielded_private_transfer_final.zkey` | 8.77 | 4.73 |
+| `shielded_unshield_final.zkey` | 7.80 | 4.27 |
+
+All 32 WASM/zkey files total 282.62 MB uncompressed and 137.90 MB with Brotli. The browser
+downloads only the files needed for the selected proof.
+
+The unified `zk:check` rebuilds all sixteen
 circuits and checks artifact digests, shared linking parameters, derived verifiers, current
 proofs and available Circom ceremony evidence. It uses the same pinned artifact set in every
 environment; `release:preflight` also requires the other release evidence.
